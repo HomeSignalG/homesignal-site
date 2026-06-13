@@ -865,13 +865,13 @@ loadMeetings();
 <div id="auth-overlay" class="auth-overlay">
   <div class="auth-modal">
     <button class="auth-close" id="auth-close">&times;</button>
-    <h2 id="auth-title">Log in</h2>
-    <p class="auth-sub" id="auth-sub">Welcome back to HomeSignal.</p>
-    <input type="email" id="auth-email" class="auth-input" placeholder="Email address" />
-    <input type="password" id="auth-password" class="auth-input" placeholder="Password" />
-    <button id="auth-submit" class="auth-submit">Log in</button>
+    <h2 id="auth-title">Log in or sign up</h2>
+    <p class="auth-sub" id="auth-sub">Enter your email and we'll send you a 6-digit code &mdash; no password needed.</p>
+    <input type="email" id="auth-email" class="auth-input" placeholder="Email address" autocomplete="email" />
+    <input type="text" id="auth-code" class="auth-input" placeholder="6-digit code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" style="display:none;letter-spacing:6px;text-align:center;font-size:18px;" />
+    <button id="auth-submit" class="auth-submit">Send me a code</button>
     <div id="auth-msg" class="auth-msg"></div>
-    <div class="auth-toggle"><span id="auth-toggle-text">Don't have an account?</span> <a href="#" id="auth-toggle-link">Sign up</a></div>
+    <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><a href="#" id="auth-back-link">Use a different email</a></div>
   </div>
 </div>
 
@@ -881,70 +881,97 @@ loadMeetings();
   var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
   var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
   var client = window.supabase.createClient(SB_URL, SB_ANON);
-  var mode = 'login';
+  window.hsClient = client;   // shared so the rest of the page can use the logged-in session
+  window.hsUser = null;       // current logged-in user (null when logged out)
+  var step = 'email';         // 'email' -> 'code'
+  var pendingEmail = '';
   function $(id){ return document.getElementById(id); }
 
-  function renderMode(){
-    if (mode === 'signup') {
-      $('auth-title').textContent = 'Sign up';
-      $('auth-sub').textContent = 'Create your HomeSignal account.';
-      $('auth-submit').textContent = 'Sign up';
-      $('auth-toggle-text').textContent = 'Already have an account?';
-      $('auth-toggle-link').textContent = 'Log in';
+  function showMsg(text, isError){
+    var m = $('auth-msg');
+    m.textContent = text || '';
+    m.style.color = isError ? '#b91c1c' : 'var(--green-dark)';
+  }
+
+  function setStep(s){
+    step = s;
+    if (s === 'code') {
+      $('auth-sub').textContent = 'We emailed a 6-digit code to ' + pendingEmail + '. Enter it below.';
+      $('auth-email').style.display = 'none';
+      $('auth-code').style.display = 'block';
+      $('auth-submit').textContent = 'Verify & continue';
+      $('auth-back-wrap').style.display = 'block';
+      setTimeout(function(){ $('auth-code').focus(); }, 50);
     } else {
-      $('auth-title').textContent = 'Log in';
-      $('auth-sub').textContent = 'Welcome back to HomeSignal.';
-      $('auth-submit').textContent = 'Log in';
-      $('auth-toggle-text').textContent = "Don't have an account?";
-      $('auth-toggle-link').textContent = 'Sign up';
+      $('auth-sub').innerHTML = "Enter your email and we'll send you a 6-digit code &mdash; no password needed.";
+      $('auth-email').style.display = 'block';
+      $('auth-code').style.display = 'none';
+      $('auth-code').value = '';
+      $('auth-submit').textContent = 'Send me a code';
+      $('auth-back-wrap').style.display = 'none';
+      setTimeout(function(){ $('auth-email').focus(); }, 50);
     }
   }
-  function openAuth(m){ mode = m; renderMode(); $('auth-msg').textContent=''; $('auth-overlay').style.display = 'flex'; }
-  function closeAuth(){ $('auth-overlay').style.display = 'none'; }
 
-  async function submitAuth(){
+  function openAuth(){ pendingEmail=''; $('auth-email').value=''; showMsg('', false); setStep('email'); $('auth-overlay').style.display = 'flex'; }
+  function closeAuth(){ $('auth-overlay').style.display = 'none'; }
+  window.hsOpenAuth = openAuth;
+
+  async function sendCode(){
     var email = ($('auth-email').value || '').trim();
-    var pw = $('auth-password').value || '';
-    if (!email || !pw) { $('auth-msg').textContent = 'Enter your email and password.'; return; }
-    $('auth-submit').disabled = true;
+    if (!email || email.indexOf('@') === -1) { showMsg('Please enter a valid email address.', true); return; }
+    $('auth-submit').disabled = true; showMsg('Sending your code\u2026', false);
     try {
-      if (mode === 'signup') {
-        var r = await client.auth.signUp({ email: email, password: pw });
-        $('auth-msg').textContent = r.error ? r.error.message : 'Check your email to confirm your account.';
-      } else {
-        var r2 = await client.auth.signInWithPassword({ email: email, password: pw });
-        if (r2.error) { $('auth-msg').textContent = r2.error.message; }
-        else { closeAuth(); }
-      }
-    } catch (e) { $('auth-msg').textContent = 'Something went wrong \u2014 please try again.'; }
+      var r = await client.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true } });
+      if (r.error) { showMsg(r.error.message, true); }
+      else { pendingEmail = email; setStep('code'); showMsg('', false); }
+    } catch (e) { showMsg('Something went wrong \u2014 please try again.', true); }
     $('auth-submit').disabled = false;
   }
 
+  async function verifyCode(){
+    var code = ($('auth-code').value || '').trim();
+    if (code.length < 6) { showMsg('Enter the 6-digit code from your email.', true); return; }
+    $('auth-submit').disabled = true; showMsg('Checking\u2026', false);
+    try {
+      var r = await client.auth.verifyOtp({ email: pendingEmail, token: code, type: 'email' });
+      if (r.error) { showMsg(r.error.message, true); $('auth-submit').disabled = false; return; }
+      closeAuth();
+    } catch (e) { showMsg('Something went wrong \u2014 please try again.', true); }
+    $('auth-submit').disabled = false;
+  }
+
+  function submitAuth(){ if (step === 'code') verifyCode(); else sendCode(); }
+
   function bindAuthButtons(){
     var li = $('btn-login'), su = $('btn-signup');
-    if (li) li.addEventListener('click', function(){ openAuth('login'); });
-    if (su) su.addEventListener('click', function(){ openAuth('signup'); });
+    if (li) li.addEventListener('click', function(){ openAuth(); });
+    if (su) su.addEventListener('click', function(){ openAuth(); });
   }
 
   function updateNav(session){
+    window.hsUser = (session && session.user) ? session.user : null;
     var box = $('nav-auth');
-    if (!box) return;
-    if (session && session.user) {
-      box.innerHTML = '<span style="font-size:13px;color:var(--text-secondary);margin-right:8px">' + session.user.email + '</span><button class="btn-outline" id="btn-logout">Log out</button>';
-      var lo = $('btn-logout');
-      if (lo) lo.addEventListener('click', function(){ client.auth.signOut(); });
-    } else {
-      box.innerHTML = '<button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button>';
-      bindAuthButtons();
+    if (box) {
+      if (window.hsUser) {
+        box.innerHTML = '<span style="font-size:13px;color:var(--text-secondary);margin-right:8px">' + window.hsUser.email + '</span><button class="btn-outline" id="btn-logout">Log out</button>';
+        var lo = $('btn-logout');
+        if (lo) lo.addEventListener('click', function(){ client.auth.signOut(); });
+      } else {
+        box.innerHTML = '<button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button>';
+        bindAuthButtons();
+      }
     }
+    if (typeof window.hsOnAuthChange === 'function') { try { window.hsOnAuthChange(window.hsUser); } catch(e){} }
   }
 
   document.addEventListener('DOMContentLoaded', function(){
     bindAuthButtons();
     $('auth-close').addEventListener('click', closeAuth);
     $('auth-submit').addEventListener('click', submitAuth);
-    $('auth-password').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
-    $('auth-toggle-link').addEventListener('click', function(e){ e.preventDefault(); mode = (mode === 'login' ? 'signup' : 'login'); renderMode(); $('auth-msg').textContent=''; });
+    $('auth-email').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
+    $('auth-code').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
+    $('auth-back-link').addEventListener('click', function(e){ e.preventDefault(); showMsg('', false); setStep('email'); });
     $('auth-overlay').addEventListener('click', function(e){ if (e.target === $('auth-overlay')) closeAuth(); });
     client.auth.getSession().then(function(res){ updateNav(res.data.session); });
     client.auth.onAuthStateChange(function(evt, session){ updateNav(session); });
