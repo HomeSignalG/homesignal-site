@@ -159,7 +159,9 @@ body { background: var(--bg); font-size: 15px; }
   .hero-sub { font-size: 15px; }
   .search-card { padding: 20px; }
   .search-row { flex-direction: column; }
-  .btn-search { width: 100%; }
+  .search-row > * + * { margin-left: 0; margin-top: 10px; }
+  .search-input { width: 100%; box-sizing: border-box; }
+  .btn-search { width: 100%; box-sizing: border-box; }
   .not-listed-band { padding: 20px; }
   .not-listed-inner { gap: 14px; }
   .nl-form { width: 100%; }
@@ -303,11 +305,11 @@ body { background: var(--bg); font-size: 15px; }
     </div>
     <div class="nl-text">
       <h4>Don't see your community listed?</h4>
-      <p>Submit your community name and ZIP code and we'll add it to HomeSignal.</p>
+      <p>Submit your ZIP code and we'll add your area to HomeSignal.</p>
     </div>
     <div class="nl-form">
       <input class="nl-input" id="request-email" type="email" placeholder="Your email" />
-      <input class="nl-input" id="request-input" type="text" placeholder="Community name, ZIP code…" />
+      <input class="nl-input" id="request-input" type="text" placeholder="Your ZIP code" />
       <button class="btn-request" id="request-btn">Request my community</button>
     </div>
     <div id="request-msg" style="width:100%;display:none;margin-top:10px;font-size:13px;color:var(--green-dark);background:var(--bg);border:1px solid var(--green-mid);border-radius:var(--radius-sm);padding:10px 14px;"></div>
@@ -315,64 +317,135 @@ body { background: var(--bg); font-size: 15px; }
 </div>
 
 <!-- TOPICS -->
+<style>
+.tg-wrap{max-width:900px;margin:0 auto;}
+.topics-head{max-width:900px;margin:0 auto 18px;}
+.topics-title{font-size:20px;font-weight:700;color:var(--text);letter-spacing:-0.02em;line-height:1.25;margin:0 0 6px;}
+.topics-sub{font-size:14px;color:var(--text-secondary);line-height:1.5;margin:0;}
+.topics-cta{margin-top:14px;background:var(--green);color:#fff;border:none;padding:11px 22px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;}
+.topics-cta:hover{opacity:.9;}
+.tg-group{margin-bottom:18px;}
+.tg-head{font-size:13px;font-weight:600;color:var(--green-dark);margin-bottom:8px;}
+.tg-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));column-gap:18px;row-gap:7px;align-items:start;}
+.tg-item{font-size:12px;color:var(--text);display:flex;align-items:baseline;line-height:1.5;}
+.tg-item::before{content:"•";color:var(--green-mid);margin-right:7px;font-size:14px;line-height:1;flex-shrink:0;}
+.tg-soon .tg-head{color:var(--text-tertiary);}
+.tg-soon .tg-item{color:var(--text-tertiary);}
+.tg-soon .tg-item::before{color:var(--text-tertiary);}
+@media (max-width:720px){
+  .not-listed-inner{flex-direction:column;align-items:center;text-align:center;}
+  .not-listed-inner > * + *{margin-left:0;margin-top:14px;}
+  .nl-text{min-width:0;}
+  .nl-form{width:100%;flex-direction:column;}
+  .nl-input,.btn-request{width:100%;box-sizing:border-box;}
+  .nl-form > * + *{margin-left:0;margin-top:10px;}
+  .search-row > * + *{margin-left:0;margin-top:10px;}
+}
+</style>
 <section class="topics-section">
-  <div class="topics-label">Topics we cover</div>
-  <div class="topics-row">
-    <div class="topic-pill">
-      <svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 00-5 5c0 5 5 13 5 13s5-8 5-13a5 5 0 00-5-5z"/></svg>
-      Water Quality
+  <div class="topics-head">
+    <h2 class="topics-title">We monitor all of this and alert you when it affects your home</h2>
+    <p class="topics-sub">New filings, alerts, and upcoming meetings — to start getting notified, enter your ZIP code and pick the topics you want to follow.</p>
+    <button class="topics-cta" onclick="var c=document.querySelector('.search-card');if(c)c.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){var i=document.getElementById('search-input');if(i)i.focus();},450);">Enter your ZIP to get started ↑</button>
+  </div>
+  <div class="tg-wrap">
+    <div class="tg-group">
+      <div class="tg-head">Government &amp; filings</div>
+      <div class="tg-row">
+        <span class="tg-item">City &amp; County Council Meetings</span>
+        <span class="tg-item">Planning Commission Hearings</span>
+        <span class="tg-item">Rezoning &amp; Zoning Changes</span>
+        <span class="tg-item">Building &amp; Land-Use Permits</span>
+        <span class="tg-item">Variances &amp; Ordinances</span>
+        <span class="tg-item">Eminent Domain</span>
+        <span class="tg-item">Public Notices &amp; Comment Periods</span>
+        <span class="tg-item">Ballot Measures, Bonds &amp; Taxes</span>
+      </div>
     </div>
-    <div class="topic-pill">
-      <svg viewBox="0 0 24 24"><path d="M9.59 4.59A2 2 0 1111 8H2m10.59 11.41A2 2 0 1014 16H2m15.73-8.27A2.5 2.5 0 1119.5 12H2"/></svg>
-      Air Quality
+    <div class="tg-group">
+      <div class="tg-head">Big builds &amp; industrial sites</div>
+      <div class="tg-row">
+        <span class="tg-item">New Development Projects</span>
+        <span class="tg-item">Redevelopment</span>
+        <span class="tg-item">Data Centers</span>
+        <span class="tg-item">Chemical Plants</span>
+        <span class="tg-item">Sanitation / Wastewater Plants</span>
+        <span class="tg-item">Slaughter &amp; Rendering Plants</span>
+        <span class="tg-item">Warehouses &amp; Distribution Centers</span>
+        <span class="tg-item">Detention &amp; Correctional Facilities</span>
+        <span class="tg-item">Power Plants, Substations &amp; Pipelines</span>
+        <span class="tg-item">Landfills &amp; Quarries</span>
+      </div>
     </div>
-    <div class="topic-pill">
-      <svg viewBox="0 0 24 24"><path d="M3 17l4-8 4 4 4-6 4 10"/></svg>
-      Soil Quality
+    <div class="tg-group">
+      <div class="tg-head">Environment &amp; hazards</div>
+      <div class="tg-row">
+        <span class="tg-item">Water Quality</span>
+        <span class="tg-item">Air Quality</span>
+        <span class="tg-item">Soil Quality</span>
+        <span class="tg-item">Contamination &amp; Cleanup Sites</span>
+        <span class="tg-item">Weather &amp; Climate Hazards</span>
+        <span class="tg-item">Radiation</span>
+      </div>
     </div>
-    <div class="topic-pill">
-      <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-      Animal &amp; Human Viruses / Diseases
+    <div class="tg-group">
+      <div class="tg-head">Health &amp; living conditions</div>
+      <div class="tg-row">
+        <span class="tg-item">Animal &amp; Human Diseases</span>
+        <span class="tg-item">Livestock, Crops, Pets &amp; Wildlife Health</span>
+        <span class="tg-item">Noise Pollution</span>
+        <span class="tg-item">Light Pollution</span>
+        <span class="tg-item">Electromagnetic Fields (EMF)</span>
+      </div>
     </div>
-    <div class="topic-pill">
-      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-      Infrastructure
+    <div class="tg-group">
+      <div class="tg-head">Emerging technologies &amp; global best practices</div>
+      <div class="tg-row">
+        <span class="tg-item">Drone Farming</span>
+        <span class="tg-item">Soil Mineral / Nutrient Analysis</span>
+        <span class="tg-item">Ocean Data</span>
+        <span class="tg-item">Regenerative Farming</span>
+        <span class="tg-item">Precision Agriculture</span>
+        <span class="tg-item">No-Till &amp; Cover Cropping</span>
+        <span class="tg-item">Permaculture</span>
+        <span class="tg-item">Vertical / Indoor Farming</span>
+        <span class="tg-item">Agrivoltaics</span>
+        <span class="tg-item">Rotational / Holistic Grazing</span>
+        <span class="tg-item">Rainwater Harvesting</span>
+        <span class="tg-item">Greywater Recycling</span>
+        <span class="tg-item">Aquifer Recharge &amp; Groundwater Management</span>
+        <span class="tg-item">Watershed &amp; Wetland Restoration</span>
+        <span class="tg-item">Community Solar &amp; Microgrids</span>
+        <span class="tg-item">Battery Storage</span>
+        <span class="tg-item">Methane / Biogas Capture</span>
+        <span class="tg-item">Carbon Sequestration</span>
+        <span class="tg-item">Geothermal Heating</span>
+        <span class="tg-item">Xeriscaping</span>
+        <span class="tg-item">Wildfire-Resilient Land Management</span>
+        <span class="tg-item">Pollinator Habitat Programs</span>
+        <span class="tg-item">Reforestation &amp; Tree Canopy</span>
+        <span class="tg-item">Satellite / Remote Sensing</span>
+        <span class="tg-item">Environmental Sensor Networks</span>
+        <span class="tg-item">Wildlife &amp; Biodiversity Tracking</span>
+      </div>
     </div>
-    <div class="topic-pill">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49M7.76 16.24a6 6 0 010-8.49M19.07 4.93a10 10 0 010 14.14M4.93 19.07a10 10 0 010-14.14"/></svg>
-      EMF
+    <div class="tg-group">
+      <div class="tg-head">Local news</div>
+      <div class="tg-row">
+        <span class="tg-item">Local News</span>
+      </div>
     </div>
-    <div class="topic-pill">
-      <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/></svg>
-      Noise Pollution
-    </div>
-    <div class="topic-pill">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-      Light Pollution
-    </div>
-    <div class="topic-pill">
-      <svg viewBox="0 0 24 24"><path d="M11 20A7 7 0 019.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>
-      Livestock, Crops, Pets &amp; Wildlife Health
-    </div>
-    <div class="topic-pill">
-      <svg viewBox="0 0 24 24"><path d="M19 16.9A5 5 0 0018 7h-1.26a8 8 0 10-11.62 9"/><polyline points="13 11 9 17 15 17 11 23"/></svg>
-      Weather &amp; Climate Hazards
-    </div>
-    <div class="topic-pill">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="1.6"/><line x1="12" y1="12" x2="12" y2="4"/><line x1="12" y1="12" x2="5" y2="16"/><line x1="12" y1="12" x2="19" y2="16"/></svg>
-      Radiation
-    </div>
-    <div class="topic-pill">
-      <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
-      Data Centers
-    </div>
-    <div class="topic-pill">
-      <svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 00-4 12.7c.5.4.9 1 1 1.6V17h6v-.7c.1-.6.5-1.2 1-1.6A7 7 0 0012 2z"/></svg>
-      Emerging technologies
-    </div>
-    <div class="topic-pill">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20 15.3 15.3 0 010-20z"/></svg>
-      Global best practices
+    <div class="tg-group tg-soon">
+      <div class="tg-head">Coming soon</div>
+      <div class="tg-row">
+        <span class="tg-item">Flood Risk</span>
+        <span class="tg-item">Wildfire Risk</span>
+        <span class="tg-item">Earthquake Risk</span>
+        <span class="tg-item">School Boundary &amp; Rating Changes</span>
+        <span class="tg-item">Property Tax &amp; Assessment Changes</span>
+        <span class="tg-item">Crime &amp; Public Safety</span>
+        <span class="tg-item">Short-Term Rentals &amp; HOA Rules</span>
+      </div>
     </div>
   </div>
 </section>
@@ -487,7 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function submitRequest(){
       var email = (document.getElementById('request-email').value || '').trim();
       var val = (input.value || '').trim();
-      if (!email || !val) { show('Please enter your email and your community name + ZIP code.'); return; }
+      if (!email || !val) { show('Please enter your email and ZIP code.'); return; }
       try {
         var res = await fetch(SB_URL + '/rest/v1/self_reports', {
           method: 'POST',
