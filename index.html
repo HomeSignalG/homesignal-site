@@ -286,9 +286,9 @@ body { background: var(--bg); font-size: 15px; }
   <p class="hero-sub">HomeSignal unifies permit filings, government public notices, and local news into one early warning feed — so you know what's coming before decisions affect your home.</p>
   <div class="search-card">
     <div class="search-card-title">Search your community</div>
-    <div class="search-card-sub">Enter a county, city, ZIP code, address, or project name</div>
+    <div class="search-card-sub">Enter your ZIP code to see your community</div>
     <div class="search-row">
-      <input class="search-input" id="search-input" type="text" placeholder="Example: Box Elder County, UT · 84302 · Project Oasis · Water Quality" />
+      <input class="search-input" id="search-input" type="text" inputmode="numeric" maxlength="5" placeholder="Enter your ZIP code (example: 84302)" />
       <button class="btn-search" id="search-btn">Search</button>
     </div>
     <div class="search-msg" id="search-msg"></div>
@@ -404,20 +404,24 @@ body { background: var(--bg); font-size: 15px; }
 // Add more communities to the map as you build them.
 // ============================================================
 
-// Maps search terms -> community page URL.
-// Keys are lowercase. Match is substring-based.
+// Communities by ZIP code. Each ZIP is unique nationwide, so there is
+// no ambiguity. To add a new community later, add its ZIP codes here.
 const COMMUNITIES = [
   {
     page: 'box-elder.html',
-    terms: ['box elder', 'box elder county', 'brigham city', 'project oasis', '84302', '84337']
+    zips: ['84301','84302','84306','84307','84309','84311','84312','84313','84314','84316','84324','84329','84330','84331','84334','84336','84337','84340']
   }
 ];
 
-function findCommunity(query) {
-  const q = query.trim().toLowerCase();
-  if (!q) return null;
+// Pull a 5-digit ZIP out of whatever was typed (ignores spaces, etc.).
+function extractZip(query) {
+  const m = (query || '').match(/\b\d{5}\b/);
+  return m ? m[0] : null;
+}
+
+function findCommunityByZip(zip) {
   for (const c of COMMUNITIES) {
-    if (c.terms.some(t => q.includes(t))) return c.page;
+    if (c.zips.includes(zip)) return c.page;
   }
   return null;
 }
@@ -425,16 +429,38 @@ function findCommunity(query) {
 function runSearch() {
   const input = document.getElementById('search-input');
   const msg = document.getElementById('search-msg');
-  const page = findCommunity(input.value);
+  const zip = extractZip(input.value);
 
+  // Nothing that looks like a ZIP code.
+  if (!zip) {
+    msg.textContent = "Please enter your 5-digit ZIP code.";
+    msg.classList.add('show');
+    return;
+  }
+
+  const page = findCommunityByZip(zip);
   if (page) {
     window.location.href = page;
     return;
   }
 
-  // No match yet — let the user know and nudge the request form.
-  msg.textContent = "We don't cover that community yet. Add it below and we'll set it up.";
+  // A valid ZIP, but not a community we cover yet —
+  // guide them straight into the request form below.
+  msg.textContent = "We don't cover ZIP " + zip + " yet \u2014 we've added it to the request box below. Just enter your email and we'll set it up.";
   msg.classList.add('show');
+
+  const band = document.querySelector('.not-listed-band');
+  const reqInput = document.getElementById('request-input');
+  const reqEmail = document.getElementById('request-email');
+  if (reqInput) reqInput.value = zip;                 // pre-fill their ZIP for them
+  if (band) {
+    try { band.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    catch (e) { band.scrollIntoView(); }              // fallback for older browsers
+  }
+  if (reqEmail) {
+    try { reqEmail.focus({ preventScroll: true }); }  // cursor ready in the email box
+    catch (e) { reqEmail.focus(); }
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
