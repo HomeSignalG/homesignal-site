@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeSignal — Box Elder County, Utah</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   HomeSignal — shared styles
+   Design tokens, reset, base typography, nav, footer.
+   Loaded on every page before the page-specific stylesheet.
+   ============================================================ */
+
+:root {
+  --green: #1a6b3c;
+  --green-light: #eaf3de;
+  --green-mid: #97c459;
+  --green-dark: #27500a;
+  --green-text: #3b6d11;
+  --text: #111827;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+  --border: #e5e7eb;
+  --bg: #ffffff;
+  --bg-secondary: #f9fafb;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-pill: 100px;
+
+  /* shorthand aliases used by the community page */
+  --gl: var(--green-light);
+  --gm: var(--green-mid);
+  --gd: var(--green-dark);
+  --ts: var(--text-secondary);
+  --tt: var(--text-tertiary);
+  --bg2: var(--bg-secondary);
+  --r: var(--radius);
+  --rs: var(--radius-sm);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+a { text-decoration: none; }
+input, button, textarea { font-family: inherit; outline: none; }
+input:focus, textarea:focus { border-color: var(--green) !important; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+/* ---------- NAV (shared across all pages) ---------- */
+nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 48px; border-bottom: 1px solid var(--border);
+  background: var(--bg); position: sticky; top: 0; z-index: 100;
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 34px; height: 34px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.logo-icon svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.logo-text { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+.logo-text span { color: var(--green); }
+.nav-links { display: flex; align-items: center; gap: 36px; list-style: none; }
+.nav-links a { color: var(--text-secondary); font-size: 14px; }
+.nav-links a:hover { color: var(--text); }
+.nav-actions { display: flex; gap: 10px; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 8px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-outline:hover { background: var(--bg-secondary); }
+.btn-primary { background: var(--green); color: #fff; border: none; padding: 8px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-primary:hover { opacity: 0.9; }
+
+/* ---------- FOOTER (shared across all pages) ---------- */
+footer {
+  padding: 32px 48px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 16px; background: var(--bg-secondary);
+}
+.footer-left .logo-text { font-size: 15px; margin-bottom: 4px; }
+.footer-tagline { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.footer-links { display: flex; gap: 20px; }
+.footer-links a { font-size: 13px; color: var(--text-tertiary); }
+.footer-links a:hover { color: var(--text); }
+
+</style>
+<style>
+/* ============================================================
+   HomeSignal — community page styles (box-elder.html)
+   ============================================================ */
+
+body { background: #f3f4f6; font-size: 14px; }
+
+.comm-header { padding: 20px 40px; background: var(--bg); border-bottom: 1px solid var(--border); }
+.comm-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+.comm-title { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 3px; }
+.comm-sub { font-size: 13px; color: var(--ts); }
+.save-btn { display: flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--border); color: var(--ts); padding: 7px 14px; border-radius: var(--rs); font-size: 13px; cursor: pointer; }
+.save-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+.neutral-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--rs); padding: 10px 14px; display: flex; align-items: center; gap: 9px; font-size: 12px; color: #1e40af; }
+.neutral-note svg { width: 15px; height: 15px; stroke: #1e40af; fill: none; stroke-width: 2; flex-shrink: 0; }
+
+.cat-section { padding: 18px 40px; background: var(--bg2); border-bottom: 1px solid var(--border); }
+.instruction { font-size: 13px; font-weight: 500; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.instruction svg { width: 16px; height: 16px; stroke: var(--green); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.free-badge { background: var(--green); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+.groups { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+.group { border-radius: var(--r); padding: 16px; }
+.g-early { border: 1.5px solid #fca5a5; background: var(--bg); }
+.g-inform { border: 1.5px solid #86efac; background: var(--bg); }
+.row-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.early-lbl { color: #991b1b; }
+.early-badge { background: #fee2e2; color: #991b1b; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+.inform-lbl { color: #166534; }
+.inform-badge { background: #dcfce7; color: #166534; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+.cat-tiles { display: flex; flex-direction: column; gap: 8px; }
+.cat-tile { border-radius: var(--rs); padding: 11px 14px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.15s; user-select: none; }
+.cat-tile svg { width: 18px; height: 18px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.ct-label { font-size: 12px; font-weight: 500; margin-bottom: 2px; }
+.ct-sub { font-size: 11px; }
+.early-off { background: #fee2e2; border: 1px solid #fca5a5; }
+.early-off svg { stroke: #f87171; }
+.early-off .ct-label { color: #991b1b; }
+.early-off .ct-sub { color: #ef4444; }
+.early-on { background: #dc2626; border: 1px solid #b91c1c; }
+.early-on svg { stroke: #fff; }
+.early-on .ct-label, .early-on .ct-sub { color: #fff; }
+.early-on .ct-sub { color: #fecaca; }
+.inform-off { background: #dcfce7; border: 1px solid #86efac; }
+.inform-off svg { stroke: #4ade80; }
+.inform-off .ct-label { color: #166534; }
+.inform-off .ct-sub { color: #16a34a; }
+.inform-on { background: #15803d; border: 1px solid #166534; }
+.inform-on svg { stroke: #fff; }
+.inform-on .ct-label { color: #fff; }
+.inform-on .ct-sub { color: #bbf7d0; }
+
+.signup-band { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.signup-label { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+.signup-label svg { width: 15px; height: 15px; stroke: var(--green); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.free-tag { background: var(--green); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+.signup-input { border: 1px solid var(--border); border-radius: var(--rs); padding: 9px 12px; font-size: 13px; background: var(--bg2); color: var(--text); flex: 1; min-width: 140px; }
+.signup-input::placeholder { color: var(--tt); }
+.submit-btn { background: var(--green); color: #fff; border: none; padding: 9px 20px; border-radius: var(--rs); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.signup-note { font-size: 11px; color: var(--tt); width: 100%; text-align: center; margin-top: 2px; }
+
+.page-body { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 20px 40px; align-items: start; }
+.feed-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.feed-title { font-size: 15px; font-weight: 600; }
+.feed-count { font-size: 12px; color: var(--tt); }
+.alert-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; margin-bottom: 10px; }
+.ptag { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+.tp { background: #ede9fe; color: #4c1d95; }
+.tg { background: #dbeafe; color: #1e40af; }
+.tn { background: #fef3c7; color: #92400e; }
+.te { background: #fce7f3; color: #9d174d; }
+.tgb { background: #d1fae5; color: #065f46; }
+.alert-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.aicon { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.aicon svg { width: 17px; height: 17px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.abody { flex: 1; min-width: 0; }
+.atitle { font-size: 13px; font-weight: 600; margin-bottom: 3px; line-height: 1.4; }
+.ameta { font-size: 11px; color: var(--tt); line-height: 1.5; }
+.abadge { font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 4px; flex-shrink: 0; text-transform: uppercase; align-self: flex-start; }
+.bu { background: #fee2e2; color: #991b1b; }
+.bn { background: var(--gl); color: var(--gd); }
+.bw { background: #fef3c7; color: #92400e; }
+.bi { background: #dbeafe; color: #1e40af; }
+.aactions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.abtn { padding: 5px 11px; border-radius: var(--rs); font-size: 11px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg2); color: var(--ts); }
+.abtn-c { border-color: var(--gm); color: var(--gd); background: var(--gl); }
+.abtn-e { border-color: #fca5a5; color: #991b1b; background: #fff0f0; }
+.alink { font-size: 11px; color: var(--green); margin-left: auto; font-weight: 500; }
+.loading { text-align: center; padding: 40px; color: var(--tt); font-size: 13px; }
+.empty-state { text-align: center; padding: 40px 20px; border: 1px dashed var(--border); border-radius: var(--r); background: var(--bg); }
+.empty-state p { font-size: 13px; color: var(--ts); margin-bottom: 4px; font-weight: 500; }
+.empty-state span { font-size: 12px; color: var(--tt); }
+
+.scard { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; margin-bottom: 12px; }
+.stitle { font-size: 13px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+.stitle a { font-size: 11px; color: var(--green); font-weight: 400; }
+.mitem { padding: 8px 0; border-bottom: 1px solid var(--bg2); }
+.mitem:last-child { border-bottom: none; }
+.mdate { display: flex; align-items: center; gap: 7px; margin-bottom: 2px; }
+.mdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.mdt { font-size: 12px; font-weight: 500; }
+.mtit { font-size: 11px; color: var(--ts); padding-left: 15px; line-height: 1.4; }
+.murg { font-size: 10px; color: #dc2626; font-weight: 600; padding-left: 15px; margin-top: 2px; }
+.mcard { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 13px 15px; margin-bottom: 10px; }
+.mcard:last-child { margin-bottom: 0; }
+.mcard-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 7px; }
+.mchip { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: var(--gl); color: var(--gd); }
+.mcard-title { font-size: 13.5px; font-weight: 600; color: var(--text); line-height: 1.35; margin-bottom: 2px; }
+.mcard-body { font-size: 11.5px; color: var(--ts); margin-bottom: 9px; }
+.mcard-row { display: flex; align-items: flex-start; gap: 7px; font-size: 12px; color: var(--text); margin-bottom: 5px; }
+.mcard-row svg { width: 14px; height: 14px; stroke: var(--ts); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; margin-top: 1px; }
+.mcard-agenda { margin: 9px 0 4px; }
+.mcard-agenda-label { font-size: 10px; font-weight: 700; color: var(--ts); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.mcard-agenda ul { margin: 0; padding-left: 16px; }
+.mcard-agenda li { font-size: 12px; color: var(--text); line-height: 1.5; margin-bottom: 3px; }
+.mcard-hearing { display: flex; align-items: center; gap: 6px; background: #fef2f2; border-radius: var(--rs); padding: 6px 10px; font-size: 11.5px; color: #991b1b; font-weight: 500; margin: 9px 0; }
+.mcard-hearing svg { width: 14px; height: 14px; stroke: #dc2626; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.mcard-foot { margin-top: 8px; }
+.mcard-foot a { font-size: 12px; color: var(--green); font-weight: 500; text-decoration: none; }
+
+.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+.overlay.open { display: flex; }
+.modal { background: var(--bg); border-radius: 14px; padding: 24px; width: 100%; max-width: 440px; margin: 16px; border: 1px solid var(--border); }
+.modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+.modal-title-row { display: flex; align-items: center; gap: 10px; }
+.modal-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.modal-icon svg { width: 17px; height: 17px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.modal-title { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+.modal-sub { font-size: 12px; color: var(--ts); }
+.modal-close { background: none; border: 1px solid var(--border); cursor: pointer; color: var(--ts); width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: 12px; }
+.modal-close svg { width: 14px; height: 14px; stroke: var(--ts); fill: none; stroke-width: 2.5; }
+.modal-divider { height: 1px; background: var(--border); margin-bottom: 14px; }
+.sub-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.sub-item { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--rs); cursor: pointer; background: var(--bg2); transition: all 0.15s; user-select: none; }
+.sub-item:hover { border-color: var(--gm); background: var(--gl); }
+.sub-item.on { background: var(--gl); border-color: var(--gm); }
+.sub-item.on .sub-label { color: var(--gd); font-weight: 500; }
+.sub-check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border); flex-shrink: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.sub-item.on .sub-check { background: var(--green); border-color: var(--green); }
+.sub-item.on .sub-check::after { content: '✓'; font-size: 10px; color: #fff; font-weight: 700; line-height: 1; }
+.sub-label { font-size: 12px; color: var(--ts); line-height: 1.4; }
+.modal-info { background: var(--bg2); border-radius: var(--rs); padding: 10px 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ts); }
+.modal-info svg { width: 14px; height: 14px; stroke: var(--tt); fill: none; stroke-width: 2; flex-shrink: 0; }
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; }
+.btn-cancel { background: transparent; border: 1px solid var(--border); color: var(--ts); padding: 9px 18px; border-radius: var(--rs); font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-confirm { background: var(--green); color: #fff; border: none; padding: 9px 20px; border-radius: var(--rs); font-size: 13px; font-weight: 600; cursor: pointer; }
+
+</style>
+<style>
+/* ===== Responsive nav + mobile layout ===== */
+.nav-toggle { display: none; background: none; border: none; cursor: pointer; color: var(--text); padding: 4px; }
+.nav-menu { display: contents; }
+
+@media (max-width: 720px) {
+  nav { padding: 12px 20px; }
+  .nav-toggle { display: flex; align-items: center; }
+  .nav-menu {
+    display: none; position: absolute; top: 100%; left: 0; right: 0;
+    flex-direction: column; align-items: stretch; gap: 0;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    padding: 6px 20px 14px; box-shadow: 0 8px 16px rgba(0,0,0,0.07);
+  }
+  .nav-menu.open { display: flex; }
+  .nav-links { flex-direction: column; align-items: stretch; gap: 0; width: 100%; }
+  .nav-links a { display: block; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
+  .nav-actions { flex-direction: column; align-items: stretch; gap: 8px; width: 100%; margin-top: 12px; }
+  .nav-actions button { width: 100%; padding: 12px; }
+
+  /* homepage */
+  .hero { padding: 48px 20px 40px; }
+  .hero h1 { font-size: 32px; }
+  .hero-sub { font-size: 15px; }
+  .search-card { padding: 20px; }
+  .search-row { flex-direction: column; }
+  .btn-search { width: 100%; }
+  .not-listed-band { padding: 20px; }
+  .not-listed-inner { gap: 14px; }
+  .nl-form { width: 100%; }
+  .nl-input { width: 100%; }
+  .btn-request { width: 100%; }
+  .topics-section { padding: 24px 20px; }
+
+  /* community page */
+  .comm-header { padding: 18px 20px; }
+  .comm-top { flex-direction: column; gap: 12px; }
+  .cat-section { padding: 16px 20px; }
+  .page-body { grid-template-columns: 1fr; padding: 18px 20px; }
+  .signup-band { flex-direction: column; align-items: stretch; }
+  .signup-input { width: 100%; }
+  .sub-list { grid-template-columns: 1fr; }
+  .modal { margin: 12px; }
+
+  /* content pages */
+  .page-wrap { padding: 40px 20px 56px; }
+  .page-wrap h1 { font-size: 28px; }
+  .contact-form { max-width: 100%; }
+
+  /* footer */
+  footer { padding: 24px 20px; flex-direction: column; align-items: flex-start; gap: 14px; }
+}
+</style>
+<style>
+/* ===== flex-gap compatibility: spacing via margins (works in every browser) ===== */
+.logo { gap: 0; }
+.logo > * + * { margin-left: 10px; }
+.nav-links { gap: 0; }
+.nav-links li + li { margin-left: 36px; }
+.nav-actions { gap: 0; }
+.nav-actions > * + * { margin-left: 10px; }
+.footer-links { gap: 0; }
+.footer-links > * + * { margin-left: 20px; }
+.eyebrow { gap: 0; }
+.eyebrow > * + * { margin-left: 7px; }
+.search-row { gap: 0; }
+.search-row > * + * { margin-left: 10px; }
+.not-listed-inner { gap: 0; }
+.not-listed-inner > * + * { margin-left: 20px; }
+.nl-form { gap: 0; }
+.nl-form > * + * { margin-left: 8px; }
+.topics-row .topic-pill { gap: 0; }
+.topic-pill > svg { margin-right: 9px; }
+
+/* community page */
+.save-btn { gap: 0; }
+.save-btn > :first-child { margin-right: 6px; }
+.neutral-note { gap: 0; }
+.neutral-note > :first-child { margin-right: 9px; }
+.instruction { gap: 0; }
+.instruction > :first-child { margin-right: 8px; }
+.groups { gap: 0; }
+.groups > * + * { margin-top: 12px; }
+.row-label { gap: 0; }
+.row-label > :first-child { margin-right: 7px; }
+.cat-tiles { gap: 0; }
+.cat-tiles > * + * { margin-top: 8px; }
+.cat-tile { gap: 0; }
+.cat-tile > :first-child { margin-right: 10px; }
+.signup-band { gap: 0; }
+.signup-band > * + * { margin-left: 10px; }
+.signup-label { gap: 0; }
+.signup-label > :first-child { margin-right: 7px; }
+.ptag { gap: 0; }
+.ptag > :first-child { margin-right: 4px; }
+.alert-top { gap: 0; }
+.alert-top > * + * { margin-left: 10px; }
+.aactions { gap: 0; }
+.aactions > * + * { margin-left: 6px; }
+.mdate { gap: 0; }
+.mdate > :first-child { margin-right: 7px; }
+.modal-title-row { gap: 0; }
+.modal-title-row > :first-child { margin-right: 10px; }
+.sub-item { gap: 0; }
+.sub-item > :first-child { margin-right: 9px; }
+.modal-info { gap: 0; }
+.modal-info > :first-child { margin-right: 8px; }
+.modal-footer { gap: 0; }
+.modal-footer > * + * { margin-left: 8px; }
+
+@media (max-width: 720px) {
+  .nav-links li + li { margin-left: 0; }
+  .nav-actions > * + * { margin-left: 0; margin-top: 8px; }
+  .not-listed-inner > * + * { margin-left: 0; }
+  .signup-band > * + * { margin-left: 0; margin-top: 8px; }
+  .comm-top > * + * { margin-top: 12px; }
+  footer > * + * { margin-top: 14px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="logo" href="index.html">
+    <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
+    <div class="logo-text">Home<span>Signal</span></div>
+  </a>
+  <button class="nav-toggle" id="nav-toggle" aria-label="Open menu"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="nav-menu" id="nav-menu"><ul class="nav-links"><li><a href="how-it-works.html">How it works</a></li><li><a href="about.html">About</a></li></ul>
+  <div class="nav-actions" id="nav-auth"><button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button></div>
+</div>
+</nav>
+
+<div class="comm-header">
+  <div class="comm-top">
+    <div>
+      <div class="comm-title">Box Elder County, Utah</div>
+      <div class="comm-sub">Monitor factors that may influence quality of life and long-term community well-being</div>
+    </div>
+    <button class="save-btn" onclick="toggleSave(this)"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg> <span id="save-label">Save location</span></button>
+  </div>
+  <div class="neutral-note"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> HomeSignal provides neutral, fact-based information from public records and official filings.</div>
+</div>
+
+<div class="cat-section">
+  <div class="instruction"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg> Click a box to select and sign up for <span class="free-badge">FREE</span> alerts</div>
+  <div class="groups">
+    <div class="group g-early">
+      <div class="row-label early-lbl"><svg style="width:13px;height:13px;stroke:#991b1b;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Early warning — advance notice before decisions are made <span class="early-badge">Act before the vote</span></div>
+      <div class="cat-tiles">
+        <div class="cat-tile early-off" data-id="meetings" data-type="early" onclick="openModal(this)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><div><div class="ct-label">Government notices &amp; meetings</div><div class="ct-sub" id="lbl-meetings">Click to choose topics</div></div></div>
+      </div>
+    </div>
+    <div class="group g-inform">
+      <div class="row-label inform-lbl"><svg style="width:13px;height:13px;stroke:#166534;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/></svg> Stay informed — real-time news and intelligence <span class="inform-badge">Informational</span></div>
+      <div class="cat-tiles">
+        <div class="cat-tile inform-off" data-id="news" data-type="inform" onclick="openModal(this)"><svg viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg><div><div class="ct-label">News alerts</div><div class="ct-sub" id="lbl-news">Click to choose topics</div></div></div>
+        <div class="cat-tile inform-off" data-id="emerging" data-type="inform" onclick="openModal(this)"><svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg><div><div class="ct-label">Emerging technologies</div><div class="ct-sub" id="lbl-emerging">Click to choose topics</div></div></div>
+        <div class="cat-tile inform-off" data-id="global" data-type="inform" onclick="openModal(this)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg><div><div class="ct-label">Global best practices</div><div class="ct-sub" id="lbl-global">Click to choose topics</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-body">
+  <div>
+    <div class="feed-header">
+      <div class="feed-title">Active alerts</div>
+      <div class="feed-count" id="feed-count">Loading...</div>
+    </div>
+    <div id="alert-feed"><div class="loading">Loading alerts...</div></div>
+  </div>
+
+  <div>
+    <div class="scard">
+      <div class="stitle">Upcoming meetings<span id="mtg-count" style="font-weight:500;color:var(--ts);font-size:12px;margin-left:8px"></span></div>
+      <div id="meetings-list"><div class="mtit" style="padding:8px 0">Loading meetings…</div></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-left">
+    <a class="logo" href="index.html" style="margin-bottom:4px;">
+      <div class="logo-icon" style="width:28px;height:28px;">
+        <svg viewBox="0 0 24 24" style="width:15px;height:15px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+      </div>
+      <div class="logo-text" style="font-size:14px;">Home<span>Signal</span></div>
+    </a>
+    <div class="footer-tagline">Real-time community intelligence. Smarter decisions.</div>
+  </div>
+  <div class="footer-links">
+    <a href="about.html">About</a>
+    <a href="how-it-works.html">How it works</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="terms.html">Terms of use</a>
+    <a href="contact.html">Contact</a>
+  </div>
+</footer>
+
+<div class="overlay" id="overlay" onclick="handleOverlayClick(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div><div class="modal-title-row"><div class="modal-icon" id="modal-icon"></div><div class="modal-title" id="modal-title"></div></div><div class="modal-sub" id="modal-sub"></div></div>
+      <button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-divider"></div>
+    <div class="sub-list" id="modal-list"></div>
+    <div class="modal-info"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="modal-count">No topics selected yet</span></div>
+    <div class="alert-signup">
+      <div class="alert-signup-label">Sign up for these alerts — free</div>
+      <input class="alert-field" type="email" id="modal-email" placeholder="Email address" />
+      <input class="alert-field" type="text" id="modal-zip" placeholder="ZIP code" />
+      <button class="btn-confirm alert-submit" id="modal-submit" onclick="submitModalSignup()">Sign up</button>
+      <div class="alert-msg" id="modal-msg"></div>
+      <div class="alert-note">No spam · Unsubscribe anytime</div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .alert-signup{border-top:1px solid var(--border);margin-top:14px;padding-top:14px;}
+  .alert-signup-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;}
+  .alert-field{width:100%;border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px;font-size:14px;background:var(--bg2);color:var(--text);margin-bottom:9px;display:block;box-sizing:border-box;}
+  .alert-submit{width:100%;cursor:pointer;}
+  .alert-submit:disabled{opacity:.7;cursor:default;}
+  .alert-msg{font-size:13px;margin-top:10px;min-height:1em;color:var(--ts);}
+  .alert-note{font-size:11px;color:var(--tt);margin-top:8px;text-align:center;}
+</style>
+
+<div class="overlay" id="alert-overlay" onclick="handleAlertOverlay(event)">
+  <div class="modal" id="alert-modal">
+    <div class="modal-header">
+      <div><div class="modal-title-row"><div class="modal-icon" id="alert-icon"></div><div class="modal-title" id="alert-title"></div></div><div class="modal-sub" id="alert-sub"></div></div>
+      <button class="modal-close" onclick="closeAlertModal()"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-divider"></div>
+    <div class="sub-list" id="alert-list"></div>
+    <div class="modal-info"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="alert-count">No topics selected yet</span></div>
+    <div class="alert-signup">
+      <div class="alert-signup-label">Sign up for these alerts — free</div>
+      <input class="alert-field" type="email" id="alert-email" placeholder="Email address" />
+      <input class="alert-field" type="text" id="alert-zip" placeholder="ZIP code" />
+      <button class="btn-confirm alert-submit" id="alert-submit" onclick="submitAlertSignup()">Sign up</button>
+      <div class="alert-msg" id="alert-msg"></div>
+      <div class="alert-note">No spam · Unsubscribe anytime</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// SUPABASE CONFIG
+// Replace SUPABASE_URL and SUPABASE_ANON_KEY with your values.
+// NOTE: the anon key is safe to expose ONLY if Row Level Security
+// is enabled on your Supabase tables. Confirm RLS before launch.
+// ============================================================
+const SUPABASE_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
+const COMMUNITY_ID = 'd67c558f-1f04-4811-a565-873ae2afd6f3';
+
+// ============================================================
+// FETCH ALERTS FROM SUPABASE
+// ============================================================
+async function loadAlerts() {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/alerts?community_id=eq.${COMMUNITY_ID}&order=created_at.desc&limit=20`,
+      { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    const alerts = await res.json();
+    renderAlerts(alerts);
+  } catch (err) {
+    document.getElementById('alert-feed').innerHTML = '<div class="empty-state"><p>Could not load alerts</p><span>Check your connection and try again</span></div>';
+    document.getElementById('feed-count').textContent = '0 alerts';
+  }
+}
+
+function getPipelineTag(type, category) {
+  if (type === 'government_notice') return `<span class="ptag tg">Government notice</span>`;
+  if (category === 'emerging_technology') return `<span class="ptag te">Emerging technology</span>`;
+  if (category === 'global_best_practices') return `<span class="ptag tgb">Global best practices</span>`;
+  return `<span class="ptag tn">News alert</span>`;
+}
+
+function getIcon(type, category) {
+  if (type === 'government_notice') return { bg:'#f0fdf4', stroke:'#16a34a', path:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>' };
+  if (category === 'emerging_technology') return { bg:'#fdf4ff', stroke:'#9333ea', path:'<line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>' };
+  if (category === 'global_best_practices') return { bg:'#f0fdf4', stroke:'#059669', path:'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/>' };
+  return { bg:'#fffbeb', stroke:'#d97706', path:'<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>' };
+}
+
+function getBadge(level) {
+  const map = { urgent:'<span class="abadge bu">Urgent</span>', watch:'<span class="abadge bw">Watch</span>', new:'<span class="abadge bi">New</span>', resolved:'<span class="abadge bn">Resolved</span>' };
+  return map[level] || '<span class="abadge bi">New</span>';
+}
+
+function formatDate(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+function renderAlerts(alerts) {
+  const feed = document.getElementById('alert-feed');
+  const count = document.getElementById('feed-count');
+  if (!alerts || alerts.length === 0) {
+    feed.innerHTML = '<div class="empty-state"><p>No alerts yet for this community</p><span>Check back soon — alerts appear as new filings and notices are published</span></div>';
+    count.textContent = '0 alerts';
+    return;
+  }
+  count.textContent = alerts.length + ' alert' + (alerts.length === 1 ? '' : 's') + ' · updated today';
+  feed.innerHTML = alerts.map(a => {
+    const tag = getPipelineTag(a.pipeline_type, a.category);
+    const icon = getIcon(a.pipeline_type, a.category);
+    const badge = getBadge(a.impact_level);
+    const date = formatDate(a.published_at || a.created_at);
+    const meta = [a.agency_name, date, a.geographic_reference].filter(Boolean).join(' · ');
+    const link = a.source_url ? `<a class="alink" href="${a.source_url}" target="_blank">Read more →</a>` : '';
+    const catId = alertCatId(a.pipeline_type, a.category);
+    return `<div class="alert-card" data-cat="${catId}">
+      ${tag}
+      <div class="alert-top">
+        <div class="aicon" style="background:${icon.bg}"><svg style="stroke:${icon.stroke}" viewBox="0 0 24 24">${icon.path}</svg></div>
+        <div class="abody"><div class="atitle">${a.title || 'Untitled alert'}</div><div class="ameta">${meta}</div></div>
+        ${badge}
+      </div>
+      <div class="aactions">
+        <button class="abtn abtn-c" onclick="affectsMe(this)">Affects me — sign up</button>
+        ${link}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+let alertCat = null;
+
+// Map an alert's pipeline_type/category to one of the four signup categories.
+function alertCatId(type, category){
+  if(type==='government_notice') return 'meetings';
+  if(category==='emerging_technology') return 'emerging';
+  if(category==='global_best_practices') return 'global';
+  return 'news';
+}
+
+// "Affects me — sign up": open one popup, pre-set to the alert's topic category.
+// The visitor picks the topics they want and signs up (email + ZIP) right there.
+function affectsMe(btn){
+  const card = btn.closest('.alert-card');
+  const catId = (card && card.dataset.cat) ? card.dataset.cat : 'news';
+  const d = cats[catId];
+  alertCat = catId;
+  const icon = document.getElementById('alert-icon');
+  icon.style.background = d.iconBg;
+  icon.innerHTML = '<svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:'+d.iconStroke+';stroke-width:2;stroke-linecap:round;stroke-linejoin:round">'+d.iconPath+'</svg>';
+  document.getElementById('alert-title').textContent = d.title;
+  document.getElementById('alert-sub').textContent = d.sub;
+  const list = document.getElementById('alert-list');
+  list.innerHTML = '';
+  d.items.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'sub-item';
+    div.innerHTML = '<div class="sub-check"></div><span class="sub-label">'+item+'</span>';
+    div.addEventListener('click', () => { div.classList.toggle('on'); updateAlertCount(); });
+    list.appendChild(div);
+  });
+  updateAlertCount();
+  document.getElementById('alert-email').value = '';
+  document.getElementById('alert-zip').value = '';
+  document.getElementById('alert-msg').textContent = '';
+  const sb = document.getElementById('alert-submit');
+  sb.disabled = false; sb.textContent = 'Sign up';
+  document.getElementById('alert-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function updateAlertCount(){
+  const n = document.querySelectorAll('#alert-list .sub-item.on').length;
+  document.getElementById('alert-count').textContent = n>0 ? n+' topic'+(n===1?'':'s')+' selected' : 'No topics selected yet';
+}
+function closeAlertModal(){
+  document.getElementById('alert-overlay').classList.remove('open');
+  document.body.style.overflow=''; alertCat=null;
+}
+function handleAlertOverlay(e){ if(e.target===document.getElementById('alert-overlay')) closeAlertModal(); }
+async function submitAlertSignup(){
+  const email=document.getElementById('alert-email').value.trim();
+  const zip=document.getElementById('alert-zip').value.trim();
+  const msg=document.getElementById('alert-msg');
+  const checked=[...document.querySelectorAll('#alert-list .sub-item.on')].map(el=>el.querySelector('.sub-label').textContent);
+  if(checked.length===0){ msg.style.color='#b91c1c'; msg.textContent='Please choose at least one topic above.'; return; }
+  if(!email||!zip){ msg.style.color='#b91c1c'; msg.textContent='Please enter your email and ZIP code.'; return; }
+  const sb=document.getElementById('alert-submit'); const old=sb.textContent;
+  sb.disabled=true; sb.textContent='Signing up…'; msg.style.color='var(--ts)'; msg.textContent='';
+  try{
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/users`,{
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({ email, zip_code:zip, community_id:COMMUNITY_ID, topics:{[alertCat]:checked} })
+    });
+    if(res.ok||res.status===409){
+      msg.style.color='#166534';
+      msg.textContent="You're signed up! We'll send you alerts for these topics in Box Elder County.";
+      sb.textContent='Signed up ✓';
+      setTimeout(closeAlertModal, 1800);
+    }else{
+      msg.style.color='#b91c1c'; msg.textContent='Something went wrong. Please try again.'; sb.disabled=false; sb.textContent=old;
+    }
+  }catch(err){
+    msg.style.color='#b91c1c'; msg.textContent='Something went wrong. Please try again.'; sb.disabled=false; sb.textContent=old;
+  }
+}
+
+// Save location: toggle saved state with visual feedback
+function toggleSave(btn) {
+  const label = document.getElementById('save-label');
+  if (btn.dataset.saved === '1') {
+    btn.dataset.saved = '0';
+    if (label) label.textContent = 'Save location';
+    btn.style.background = 'transparent';
+    btn.style.color = 'var(--ts)';
+    btn.style.borderColor = 'var(--border)';
+  } else {
+    btn.dataset.saved = '1';
+    if (label) label.textContent = 'Saved';
+    btn.style.background = 'var(--green)';
+    btn.style.color = '#fff';
+    btn.style.borderColor = 'var(--green)';
+  }
+}
+
+// ============================================================
+// SIGNUP — writes to Supabase users table
+// ============================================================
+async function saveUser(email, zip) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/users`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ email, zip_code: zip, community_id: COMMUNITY_ID, topics: selections })
+    });
+    if (res.ok || res.status === 409) {
+      alert('You\'re signed up! We\'ll send you alerts for Box Elder County.');
+    } else {
+      alert('Something went wrong. Please try again.');
+    }
+  } catch (err) {
+    alert('Something went wrong. Please try again.');
+  }
+}
+
+// ============================================================
+// CATEGORY SELECTOR MODAL
+// ============================================================
+const cats = {
+  meetings:{title:'Box Elder County notices',sub:'Choose which county notices you want advance alerts for',iconBg:'#fee2e2',iconStroke:'#991b1b',iconPath:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',items:['County Commission & county business','Planning, zoning & development','Elections & voting','Public safety & emergencies','Water companies','Stratos data center project','Property taxes & assessments']},
+  news:{title:'News alerts',sub:'Select the news topics you want real-time alerts for',iconBg:'#dcfce7',iconStroke:'#166534',iconPath:'<path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/>',items:['Water Quality','Air Quality','Soil Quality','Animal & Human Viruses / Diseases','Infrastructure','EMF','Noise Pollution','Light Pollution','Livestock, Crops, Pets & Wildlife Health','Weather & Climate Hazards','Radiation','Data Centers']},
+  emerging:{title:'Emerging technologies',sub:'Select the technology categories you want to follow',iconBg:'#dcfce7',iconStroke:'#166534',iconPath:'<line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>',items:['Water Quality','Air Quality','Soil Quality','Animal & Human Viruses / Diseases','Infrastructure','EMF','Noise Pollution','Light Pollution','Livestock, Crops, Pets & Wildlife Health','Weather & Climate Hazards','Radiation','Data Centers']},
+  global:{title:'Global best practices',sub:'Select the global standards you want to follow',iconBg:'#dcfce7',iconStroke:'#166534',iconPath:'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/>',items:['Water Quality','Air Quality','Soil Quality','Animal & Human Viruses / Diseases','Infrastructure','EMF','Noise Pollution','Light Pollution','Livestock, Crops, Pets & Wildlife Health','Weather & Climate Hazards','Radiation','Data Centers']}
+};
+const selections={};let currentId=null,currentType=null;
+function openModal(tile){
+  currentId=tile.dataset.id;currentType=tile.dataset.type;
+  const d=cats[currentId];
+  document.getElementById('modal-title').textContent=d.title;
+  document.getElementById('modal-sub').textContent=d.sub;
+  const icon=document.getElementById('modal-icon');
+  icon.style.background=d.iconBg;
+  icon.innerHTML='<svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:'+d.iconStroke+';stroke-width:2;stroke-linecap:round;stroke-linejoin:round">'+d.iconPath+'</svg>';
+  const list=document.getElementById('modal-list');list.innerHTML='';
+  d.items.forEach(item=>{
+    const sel=selections[currentId]&&selections[currentId].includes(item);
+    const div=document.createElement('div');div.className='sub-item'+(sel?' on':'');
+    div.innerHTML='<div class="sub-check"></div><span class="sub-label">'+item+'</span>';
+    div.addEventListener('click',()=>{div.classList.toggle('on');updateCount();});
+    list.appendChild(div);
+  });
+  updateCount();
+  document.getElementById('modal-email').value='';
+  document.getElementById('modal-zip').value='';
+  document.getElementById('modal-msg').textContent='';
+  const msb=document.getElementById('modal-submit'); msb.disabled=false; msb.textContent='Sign up';
+  document.getElementById('overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function updateCount(){
+  const n=document.querySelectorAll('#modal-list .sub-item.on').length;
+  document.getElementById('modal-count').textContent=n>0?n+' topic'+(n===1?'':'s')+' selected':'No topics selected yet';
+}
+async function submitModalSignup(){
+  const email=document.getElementById('modal-email').value.trim();
+  const zip=document.getElementById('modal-zip').value.trim();
+  const msg=document.getElementById('modal-msg');
+  const checked=[...document.querySelectorAll('#modal-list .sub-item.on')].map(el=>el.querySelector('.sub-label').textContent);
+  if(checked.length===0){ msg.style.color='#b91c1c'; msg.textContent='Please choose at least one topic above.'; return; }
+  if(!email||!zip){ msg.style.color='#b91c1c'; msg.textContent='Please enter your email and ZIP code.'; return; }
+  const sb=document.getElementById('modal-submit'); const old=sb.textContent;
+  sb.disabled=true; sb.textContent='Signing up…'; msg.style.color='var(--ts)'; msg.textContent='';
+  try{
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/users`,{
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({ email, zip_code:zip, community_id:COMMUNITY_ID, topics:{[currentId]:checked} })
+    });
+    if(res.ok||res.status===409){
+      msg.style.color='#166534';
+      msg.textContent="You're signed up! We'll send you alerts for these topics in Box Elder County.";
+      sb.textContent='Signed up ✓';
+      setTimeout(closeModal, 1800);
+    }else{
+      msg.style.color='#b91c1c'; msg.textContent='Something went wrong. Please try again.'; sb.disabled=false; sb.textContent=old;
+    }
+  }catch(err){
+    msg.style.color='#b91c1c'; msg.textContent='Something went wrong. Please try again.'; sb.disabled=false; sb.textContent=old;
+  }
+}
+function closeModal(){document.getElementById('overlay').classList.remove('open');document.body.style.overflow='';currentId=null;currentType=null;}
+function handleOverlayClick(e){if(e.target===document.getElementById('overlay'))closeModal();}
+function confirmModal(){
+  if(!currentId)return;
+  const checked=[...document.querySelectorAll('#modal-list .sub-item.on')].map(el=>el.querySelector('.sub-label').textContent);
+  selections[currentId]=checked;
+  const tile=document.querySelector('[data-id="'+currentId+'"]');
+  tile.className='cat-tile '+(checked.length>0?(currentType==='early'?'early-on':'inform-on'):(currentType==='early'?'early-off':'inform-off'));
+  const lbl=document.getElementById('lbl-'+currentId);
+  if(lbl)lbl.textContent=checked.length>0?checked.length+' topic'+(checked.length===1?'':'s')+' selected · click to change':'Click to choose topics';
+  closeModal();
+}
+
+// ============================================================
+// UPCOMING MEETINGS — pulled live from the meetings table
+// ============================================================
+async function loadMeetings() {
+  const list = document.getElementById('meetings-list');
+  if (!list) return;
+  try {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/meetings?community_id=eq.${COMMUNITY_ID}&meeting_date=gte.${todayStr}&order=meeting_date.asc&limit=60`,
+      { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    const meetings = await res.json();
+    if (!meetings || meetings.length === 0) {
+      list.innerHTML = '<div class="mtit" style="padding:8px 0">No upcoming meetings posted yet.</div>';
+      return;
+    }
+    const mtgCountEl = document.getElementById('mtg-count');
+    if (mtgCountEl) mtgCountEl.textContent = meetings.length;
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+    function fmtDate(value){
+      if(!value) return '';
+      var raw=String(value), d=new Date(raw);
+      if(isNaN(d.getTime())) return '';
+      var dateOnly=/^\d{4}-\d{2}-\d{2}$/.test(raw) || /T00:00(:00)?(\.0+)?(Z|\+00:?00)?$/.test(raw);
+      var tz=dateOnly?'UTC':'America/Denver';
+      return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',timeZone:tz});
+    }
+    var ICO_CAL='<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+    var ICO_PIN='<svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+    var ICO_MIC='<svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>';
+    const VISIBLE = 4;
+    const items = meetings.map(m => {
+      const dateStr = fmtDate(m.meeting_date);
+      const time = m.meeting_time ? esc(m.meeting_time) : '';
+      const when = dateStr ? (dateStr + (time ? ' · ' + time : '')) : (time || '');
+      let tags = '';
+      if(m.category) tags += `<span class="mchip">${esc(m.category)}</span>`;
+      const title = esc(m.title || m.meeting_type || 'Public meeting');
+      const bodyName = (m.meeting_type && m.title && m.meeting_type !== m.title) ? `<div class="mcard-body">${esc(m.meeting_type)}</div>` : '';
+      let rows = '';
+      if(when) rows += `<div class="mcard-row">${ICO_CAL}<div>${when}</div></div>`;
+      if(m.location) rows += `<div class="mcard-row">${ICO_PIN}<div>${esc(m.location)}</div></div>`;
+      let agenda = '';
+      if(m.agenda_summary){
+        const lines = String(m.agenda_summary).split('\n').map(s=>s.trim()).filter(Boolean);
+        if(lines.length){
+          agenda = `<div class="mcard-agenda"><div class="mcard-agenda-label">On the agenda</div><ul>` +
+            lines.map(l=>`<li>${esc(l)}</li>`).join('') + `</ul></div>`;
+        }
+      }
+      const hearing = m.is_public_hearing
+        ? `<div class="mcard-hearing">${ICO_MIC}<div>Public hearing — you can speak at this meeting</div></div>`
+        : (m.comment_period_open ? `<div class="mcard-hearing">${ICO_MIC}<div>Comment period open</div></div>` : '');
+      const foot = m.source_url ? `<div class="mcard-foot"><a href="${esc(m.source_url)}" target="_blank" rel="noopener">Read the full notice &amp; how to comment →</a></div>` : '';
+      return `<div class="mcard">
+        ${tags?`<div class="mcard-tags">${tags}</div>`:''}
+        <div class="mcard-title">${title}</div>
+        ${bodyName}
+        ${rows}
+        ${agenda}
+        ${hearing}
+        ${foot}
+      </div>`;
+    });
+    let html = items.slice(0, VISIBLE).join('');
+    if (items.length > VISIBLE) {
+      html += '<div id="more-meetings" style="display:none">' + items.slice(VISIBLE).join('') + '</div>';
+      html += '<button id="more-meetings-btn" onclick="toggleMoreMeetings()" style="display:block;width:100%;margin-top:12px;padding:9px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);font-size:13px;font-weight:600;color:var(--green);cursor:pointer">Show ' + (items.length - VISIBLE) + ' more</button>';
+    }
+    list.innerHTML = html;
+  } catch (err) {
+    list.innerHTML = '<div class="mtit" style="padding:8px 0">Could not load meetings.</div>';
+  }
+}
+
+// Load alerts and meetings on page load
+function toggleMoreMeetings(){
+  const more=document.getElementById('more-meetings');
+  const btn=document.getElementById('more-meetings-btn');
+  if(!more||!btn) return;
+  const open=more.style.display!=='none';
+  more.style.display=open?'none':'block';
+  btn.textContent=open?('Show '+more.children.length+' more'):'Show less';
+}
+loadAlerts();
+loadMeetings();
+
+</script>
+<style>
+  .auth-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center; }
+  .auth-modal { background:#fff; border-radius:14px; padding:28px; width:100%; max-width:380px; margin:16px; border:1px solid var(--border); position:relative; }
+  .auth-modal h2 { font-size:20px; font-weight:700; margin-bottom:4px; color:var(--text); }
+  .auth-sub { font-size:13px; color:var(--text-secondary); margin-bottom:18px; }
+  .auth-input { width:100%; border:1px solid var(--border); border-radius:var(--radius-sm); padding:11px 13px; font-size:14px; background:var(--bg-secondary); color:var(--text); margin-bottom:10px; }
+  .auth-submit { width:100%; background:var(--green); color:#fff; border:none; padding:12px; border-radius:var(--radius-sm); font-size:14px; font-weight:600; cursor:pointer; }
+  .auth-submit:hover { opacity:0.9; }
+  .auth-submit:disabled { opacity:0.6; cursor:default; }
+  .auth-msg { font-size:13px; color:var(--green-dark); margin-top:12px; min-height:1em; }
+  .auth-toggle { font-size:13px; color:var(--text-secondary); margin-top:16px; text-align:center; }
+  .auth-toggle a { color:var(--green); font-weight:600; }
+  .auth-close { position:absolute; top:14px; right:16px; background:none; border:none; font-size:22px; line-height:1; color:var(--text-tertiary); cursor:pointer; }
+</style>
+
+<div id="auth-overlay" class="auth-overlay">
+  <div class="auth-modal">
+    <button class="auth-close" id="auth-close">&times;</button>
+    <h2 id="auth-title">Log in</h2>
+    <p class="auth-sub" id="auth-sub">Welcome back to HomeSignal.</p>
+    <input type="email" id="auth-email" class="auth-input" placeholder="Email address" />
+    <input type="password" id="auth-password" class="auth-input" placeholder="Password" />
+    <button id="auth-submit" class="auth-submit">Log in</button>
+    <div id="auth-msg" class="auth-msg"></div>
+    <div class="auth-toggle"><span id="auth-toggle-text">Don't have an account?</span> <a href="#" id="auth-toggle-link">Sign up</a></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+  var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
+  var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
+  var client = window.supabase.createClient(SB_URL, SB_ANON);
+  var mode = 'login';
+  function $(id){ return document.getElementById(id); }
+
+  function renderMode(){
+    if (mode === 'signup') {
+      $('auth-title').textContent = 'Sign up';
+      $('auth-sub').textContent = 'Create your HomeSignal account.';
+      $('auth-submit').textContent = 'Sign up';
+      $('auth-toggle-text').textContent = 'Already have an account?';
+      $('auth-toggle-link').textContent = 'Log in';
+    } else {
+      $('auth-title').textContent = 'Log in';
+      $('auth-sub').textContent = 'Welcome back to HomeSignal.';
+      $('auth-submit').textContent = 'Log in';
+      $('auth-toggle-text').textContent = "Don't have an account?";
+      $('auth-toggle-link').textContent = 'Sign up';
+    }
+  }
+  function openAuth(m){ mode = m; renderMode(); $('auth-msg').textContent=''; $('auth-overlay').style.display = 'flex'; }
+  function closeAuth(){ $('auth-overlay').style.display = 'none'; }
+
+  async function submitAuth(){
+    var email = ($('auth-email').value || '').trim();
+    var pw = $('auth-password').value || '';
+    if (!email || !pw) { $('auth-msg').textContent = 'Enter your email and password.'; return; }
+    $('auth-submit').disabled = true;
+    try {
+      if (mode === 'signup') {
+        var r = await client.auth.signUp({ email: email, password: pw });
+        $('auth-msg').textContent = r.error ? r.error.message : 'Check your email to confirm your account.';
+      } else {
+        var r2 = await client.auth.signInWithPassword({ email: email, password: pw });
+        if (r2.error) { $('auth-msg').textContent = r2.error.message; }
+        else { closeAuth(); }
+      }
+    } catch (e) { $('auth-msg').textContent = 'Something went wrong \u2014 please try again.'; }
+    $('auth-submit').disabled = false;
+  }
+
+  function bindAuthButtons(){
+    var li = $('btn-login'), su = $('btn-signup');
+    if (li) li.addEventListener('click', function(){ openAuth('login'); });
+    if (su) su.addEventListener('click', function(){ openAuth('signup'); });
+  }
+
+  function updateNav(session){
+    var box = $('nav-auth');
+    if (!box) return;
+    if (session && session.user) {
+      box.innerHTML = '<span style="font-size:13px;color:var(--text-secondary);margin-right:8px">' + session.user.email + '</span><button class="btn-outline" id="btn-logout">Log out</button>';
+      var lo = $('btn-logout');
+      if (lo) lo.addEventListener('click', function(){ client.auth.signOut(); });
+    } else {
+      box.innerHTML = '<button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button>';
+      bindAuthButtons();
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    bindAuthButtons();
+    $('auth-close').addEventListener('click', closeAuth);
+    $('auth-submit').addEventListener('click', submitAuth);
+    $('auth-password').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
+    $('auth-toggle-link').addEventListener('click', function(e){ e.preventDefault(); mode = (mode === 'login' ? 'signup' : 'login'); renderMode(); $('auth-msg').textContent=''; });
+    $('auth-overlay').addEventListener('click', function(e){ if (e.target === $('auth-overlay')) closeAuth(); });
+    client.auth.getSession().then(function(res){ updateNav(res.data.session); });
+    client.auth.onAuthStateChange(function(evt, session){ updateNav(session); });
+  });
+})();
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var t = document.getElementById('nav-toggle');
+  var m = document.getElementById('nav-menu');
+  if (t && m) t.addEventListener('click', function(){ m.classList.toggle('open'); });
+});
+</script>
+</body>
+</html>

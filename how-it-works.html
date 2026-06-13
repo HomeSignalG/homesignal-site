@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeSignal — How it works</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   HomeSignal — shared styles
+   Design tokens, reset, base typography, nav, footer.
+   Loaded on every page before the page-specific stylesheet.
+   ============================================================ */
+
+:root {
+  --green: #1a6b3c;
+  --green-light: #eaf3de;
+  --green-mid: #97c459;
+  --green-dark: #27500a;
+  --green-text: #3b6d11;
+  --text: #111827;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+  --border: #e5e7eb;
+  --bg: #ffffff;
+  --bg-secondary: #f9fafb;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-pill: 100px;
+
+  /* shorthand aliases used by the community page */
+  --gl: var(--green-light);
+  --gm: var(--green-mid);
+  --gd: var(--green-dark);
+  --ts: var(--text-secondary);
+  --tt: var(--text-tertiary);
+  --bg2: var(--bg-secondary);
+  --r: var(--radius);
+  --rs: var(--radius-sm);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+a { text-decoration: none; }
+input, button, textarea { font-family: inherit; outline: none; }
+input:focus, textarea:focus { border-color: var(--green) !important; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+/* ---------- NAV (shared across all pages) ---------- */
+nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 48px; border-bottom: 1px solid var(--border);
+  background: var(--bg); position: sticky; top: 0; z-index: 100;
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 34px; height: 34px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.logo-icon svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.logo-text { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+.logo-text span { color: var(--green); }
+.nav-links { display: flex; align-items: center; gap: 36px; list-style: none; }
+.nav-links a { color: var(--text-secondary); font-size: 14px; }
+.nav-links a:hover { color: var(--text); }
+.nav-actions { display: flex; gap: 10px; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 8px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-outline:hover { background: var(--bg-secondary); }
+.btn-primary { background: var(--green); color: #fff; border: none; padding: 8px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-primary:hover { opacity: 0.9; }
+
+/* ---------- FOOTER (shared across all pages) ---------- */
+footer {
+  padding: 32px 48px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 16px; background: var(--bg-secondary);
+}
+.footer-left .logo-text { font-size: 15px; margin-bottom: 4px; }
+.footer-tagline { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.footer-links { display: flex; gap: 20px; }
+.footer-links a { font-size: 13px; color: var(--text-tertiary); }
+.footer-links a:hover { color: var(--text); }
+
+</style>
+<style>
+/* ============================================================
+   HomeSignal — content page styles (about, how-it-works, legal, contact)
+   ============================================================ */
+
+body { background: var(--bg); font-size: 15px; }
+
+.page-wrap { max-width: 760px; margin: 0 auto; padding: 56px 24px 72px; }
+.page-eyebrow { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--green); margin-bottom: 12px; }
+.page-wrap h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 16px; line-height: 1.2; }
+.page-wrap h2 { font-size: 19px; font-weight: 600; margin: 32px 0 10px; }
+.page-wrap p { color: var(--text-secondary); line-height: 1.75; margin-bottom: 14px; }
+.page-wrap ul { color: var(--text-secondary); line-height: 1.75; margin: 0 0 14px 20px; }
+.page-wrap li { margin-bottom: 6px; }
+.page-wrap a.inline { color: var(--green); }
+.lead { font-size: 17px; color: var(--text); margin-bottom: 24px; }
+.muted { font-size: 13px; color: var(--text-tertiary); margin-top: 32px; }
+
+/* simple steps for how-it-works */
+.step { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 20px; }
+.step-num { width: 30px; height: 30px; border-radius: 50%; background: var(--green-light); color: var(--green-dark); font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.step h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.step p { margin-bottom: 0; }
+
+/* contact form */
+.contact-form { display: flex; flex-direction: column; gap: 12px; max-width: 460px; margin-top: 8px; }
+.contact-form input, .contact-form textarea { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px 13px; font-size: 14px; background: var(--bg-secondary); color: var(--text); width: 100%; }
+.contact-form textarea { min-height: 120px; resize: vertical; }
+.contact-form button { align-self: flex-start; background: var(--green); color: #fff; border: none; padding: 11px 22px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; }
+.contact-form button:hover { opacity: 0.9; }
+
+/* meetings list page */
+.meeting-row { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; display: flex; gap: 14px; align-items: flex-start; }
+.meeting-date { background: var(--green-light); color: var(--green-dark); border-radius: var(--radius-sm); padding: 8px 12px; text-align: center; flex-shrink: 0; min-width: 64px; }
+.meeting-date .m { font-size: 11px; font-weight: 600; text-transform: uppercase; }
+.meeting-date .d { font-size: 20px; font-weight: 700; line-height: 1; }
+.meeting-body h3 { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
+.meeting-body .time { font-size: 13px; color: var(--text-secondary); }
+.meeting-open { display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 600; color: #dc2626; }
+
+</style>
+
+<style>
+/* ===== Responsive nav + mobile layout ===== */
+.nav-toggle { display: none; background: none; border: none; cursor: pointer; color: var(--text); padding: 4px; }
+.nav-menu { display: contents; }
+
+@media (max-width: 720px) {
+  nav { padding: 12px 20px; }
+  .nav-toggle { display: flex; align-items: center; }
+  .nav-menu {
+    display: none; position: absolute; top: 100%; left: 0; right: 0;
+    flex-direction: column; align-items: stretch; gap: 0;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    padding: 6px 20px 14px; box-shadow: 0 8px 16px rgba(0,0,0,0.07);
+  }
+  .nav-menu.open { display: flex; }
+  .nav-links { flex-direction: column; align-items: stretch; gap: 0; width: 100%; }
+  .nav-links a { display: block; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
+  .nav-actions { flex-direction: column; align-items: stretch; gap: 8px; width: 100%; margin-top: 12px; }
+  .nav-actions button { width: 100%; padding: 12px; }
+
+  /* homepage */
+  .hero { padding: 48px 20px 40px; }
+  .hero h1 { font-size: 32px; }
+  .hero-sub { font-size: 15px; }
+  .search-card { padding: 20px; }
+  .search-row { flex-direction: column; }
+  .btn-search { width: 100%; }
+  .not-listed-band { padding: 20px; }
+  .not-listed-inner { gap: 14px; }
+  .nl-form { width: 100%; }
+  .nl-input { width: 100%; }
+  .btn-request { width: 100%; }
+  .topics-section { padding: 24px 20px; }
+
+  /* community page */
+  .comm-header { padding: 18px 20px; }
+  .comm-top { flex-direction: column; gap: 12px; }
+  .cat-section { padding: 16px 20px; }
+  .page-body { grid-template-columns: 1fr; padding: 18px 20px; }
+  .signup-band { flex-direction: column; align-items: stretch; }
+  .signup-input { width: 100%; }
+  .sub-list { grid-template-columns: 1fr; }
+  .modal { margin: 12px; }
+
+  /* content pages */
+  .page-wrap { padding: 40px 20px 56px; }
+  .page-wrap h1 { font-size: 28px; }
+  .contact-form { max-width: 100%; }
+
+  /* footer */
+  footer { padding: 24px 20px; flex-direction: column; align-items: flex-start; gap: 14px; }
+}
+</style>
+<style>
+/* ===== flex-gap compatibility: spacing via margins (works in every browser) ===== */
+.logo { gap: 0; }
+.logo > * + * { margin-left: 10px; }
+.nav-links { gap: 0; }
+.nav-links li + li { margin-left: 36px; }
+.nav-actions { gap: 0; }
+.nav-actions > * + * { margin-left: 10px; }
+.footer-links { gap: 0; }
+.footer-links > * + * { margin-left: 20px; }
+.eyebrow { gap: 0; }
+.eyebrow > * + * { margin-left: 7px; }
+.search-row { gap: 0; }
+.search-row > * + * { margin-left: 10px; }
+.not-listed-inner { gap: 0; }
+.not-listed-inner > * + * { margin-left: 20px; }
+.nl-form { gap: 0; }
+.nl-form > * + * { margin-left: 8px; }
+.topics-row .topic-pill { gap: 0; }
+.topic-pill > svg { margin-right: 9px; }
+
+/* community page */
+.save-btn { gap: 0; }
+.save-btn > :first-child { margin-right: 6px; }
+.neutral-note { gap: 0; }
+.neutral-note > :first-child { margin-right: 9px; }
+.instruction { gap: 0; }
+.instruction > :first-child { margin-right: 8px; }
+.groups { gap: 0; }
+.groups > * + * { margin-top: 12px; }
+.row-label { gap: 0; }
+.row-label > :first-child { margin-right: 7px; }
+.cat-tiles { gap: 0; }
+.cat-tiles > * + * { margin-top: 8px; }
+.cat-tile { gap: 0; }
+.cat-tile > :first-child { margin-right: 10px; }
+.signup-band { gap: 0; }
+.signup-band > * + * { margin-left: 10px; }
+.signup-label { gap: 0; }
+.signup-label > :first-child { margin-right: 7px; }
+.ptag { gap: 0; }
+.ptag > :first-child { margin-right: 4px; }
+.alert-top { gap: 0; }
+.alert-top > * + * { margin-left: 10px; }
+.aactions { gap: 0; }
+.aactions > * + * { margin-left: 6px; }
+.mdate { gap: 0; }
+.mdate > :first-child { margin-right: 7px; }
+.modal-title-row { gap: 0; }
+.modal-title-row > :first-child { margin-right: 10px; }
+.sub-item { gap: 0; }
+.sub-item > :first-child { margin-right: 9px; }
+.modal-info { gap: 0; }
+.modal-info > :first-child { margin-right: 8px; }
+.modal-footer { gap: 0; }
+.modal-footer > * + * { margin-left: 8px; }
+
+@media (max-width: 720px) {
+  .nav-links li + li { margin-left: 0; }
+  .nav-actions > * + * { margin-left: 0; margin-top: 8px; }
+  .not-listed-inner > * + * { margin-left: 0; }
+  .signup-band > * + * { margin-left: 0; margin-top: 8px; }
+  .comm-top > * + * { margin-top: 12px; }
+  footer > * + * { margin-top: 14px; }
+}
+</style>
+</head>
+<body>
+<nav>
+  <a class="logo" href="index.html">
+    <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
+    <div class="logo-text">Home<span>Signal</span></div>
+  </a>
+  <button class="nav-toggle" id="nav-toggle" aria-label="Open menu"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="nav-menu" id="nav-menu"><ul class="nav-links"><li><a href="how-it-works.html">How it works</a></li><li><a href="about.html">About</a></li></ul>
+  <div class="nav-actions" id="nav-auth"><button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button></div>
+</div>
+</nav>
+<div class="page-wrap">
+<div class="page-eyebrow">How it works</div>
+<h1>From public record to your inbox.</h1>
+<p class="lead">Three steps to stay ahead of decisions that affect your home.</p>
+<div class="step"><div class="step-num">1</div><div><h3>Find your community</h3><p>Search by county, city, ZIP code, or project name to open your community page.</p></div></div>
+<div class="step"><div class="step-num">2</div><div><h3>Choose the alerts that matter</h3><p>Pick the meeting types and topics you care about — council meetings, data center development, water quality, and more.</p></div></div>
+<div class="step"><div class="step-num">3</div><div><h3>Get notified early</h3><p>We watch permit filings, government notices, and local news, and send you a heads-up while there is still time to act.</p></div></div>
+<h2>Where the information comes from</h2>
+<p>HomeSignal pulls from official sources such as government public notice websites and local news, then organizes them into a single, readable feed for your community.</p>
+</div>
+<footer>
+  <div class="footer-left">
+    <a class="logo" href="index.html" style="margin-bottom:4px;">
+      <div class="logo-icon" style="width:28px;height:28px;"><svg viewBox="0 0 24 24" style="width:15px;height:15px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
+      <div class="logo-text" style="font-size:14px;">Home<span>Signal</span></div>
+    </a>
+    <div class="footer-tagline">Real-time community intelligence. Smarter decisions.</div>
+  </div>
+  <div class="footer-links">
+    <a href="about.html">About</a>
+    <a href="how-it-works.html">How it works</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="terms.html">Terms of use</a>
+    <a href="contact.html">Contact</a>
+  </div>
+</footer>
+
+<style>
+  .auth-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center; }
+  .auth-modal { background:#fff; border-radius:14px; padding:28px; width:100%; max-width:380px; margin:16px; border:1px solid var(--border); position:relative; }
+  .auth-modal h2 { font-size:20px; font-weight:700; margin-bottom:4px; color:var(--text); }
+  .auth-sub { font-size:13px; color:var(--text-secondary); margin-bottom:18px; }
+  .auth-input { width:100%; border:1px solid var(--border); border-radius:var(--radius-sm); padding:11px 13px; font-size:14px; background:var(--bg-secondary); color:var(--text); margin-bottom:10px; }
+  .auth-submit { width:100%; background:var(--green); color:#fff; border:none; padding:12px; border-radius:var(--radius-sm); font-size:14px; font-weight:600; cursor:pointer; }
+  .auth-submit:hover { opacity:0.9; }
+  .auth-submit:disabled { opacity:0.6; cursor:default; }
+  .auth-msg { font-size:13px; color:var(--green-dark); margin-top:12px; min-height:1em; }
+  .auth-toggle { font-size:13px; color:var(--text-secondary); margin-top:16px; text-align:center; }
+  .auth-toggle a { color:var(--green); font-weight:600; }
+  .auth-close { position:absolute; top:14px; right:16px; background:none; border:none; font-size:22px; line-height:1; color:var(--text-tertiary); cursor:pointer; }
+</style>
+
+<div id="auth-overlay" class="auth-overlay">
+  <div class="auth-modal">
+    <button class="auth-close" id="auth-close">&times;</button>
+    <h2 id="auth-title">Log in</h2>
+    <p class="auth-sub" id="auth-sub">Welcome back to HomeSignal.</p>
+    <input type="email" id="auth-email" class="auth-input" placeholder="Email address" />
+    <input type="password" id="auth-password" class="auth-input" placeholder="Password" />
+    <button id="auth-submit" class="auth-submit">Log in</button>
+    <div id="auth-msg" class="auth-msg"></div>
+    <div class="auth-toggle"><span id="auth-toggle-text">Don't have an account?</span> <a href="#" id="auth-toggle-link">Sign up</a></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+  var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
+  var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
+  var client = window.supabase.createClient(SB_URL, SB_ANON);
+  var mode = 'login';
+  function $(id){ return document.getElementById(id); }
+
+  function renderMode(){
+    if (mode === 'signup') {
+      $('auth-title').textContent = 'Sign up';
+      $('auth-sub').textContent = 'Create your HomeSignal account.';
+      $('auth-submit').textContent = 'Sign up';
+      $('auth-toggle-text').textContent = 'Already have an account?';
+      $('auth-toggle-link').textContent = 'Log in';
+    } else {
+      $('auth-title').textContent = 'Log in';
+      $('auth-sub').textContent = 'Welcome back to HomeSignal.';
+      $('auth-submit').textContent = 'Log in';
+      $('auth-toggle-text').textContent = "Don't have an account?";
+      $('auth-toggle-link').textContent = 'Sign up';
+    }
+  }
+  function openAuth(m){ mode = m; renderMode(); $('auth-msg').textContent=''; $('auth-overlay').style.display = 'flex'; }
+  function closeAuth(){ $('auth-overlay').style.display = 'none'; }
+
+  async function submitAuth(){
+    var email = ($('auth-email').value || '').trim();
+    var pw = $('auth-password').value || '';
+    if (!email || !pw) { $('auth-msg').textContent = 'Enter your email and password.'; return; }
+    $('auth-submit').disabled = true;
+    try {
+      if (mode === 'signup') {
+        var r = await client.auth.signUp({ email: email, password: pw });
+        $('auth-msg').textContent = r.error ? r.error.message : 'Check your email to confirm your account.';
+      } else {
+        var r2 = await client.auth.signInWithPassword({ email: email, password: pw });
+        if (r2.error) { $('auth-msg').textContent = r2.error.message; }
+        else { closeAuth(); }
+      }
+    } catch (e) { $('auth-msg').textContent = 'Something went wrong \u2014 please try again.'; }
+    $('auth-submit').disabled = false;
+  }
+
+  function bindAuthButtons(){
+    var li = $('btn-login'), su = $('btn-signup');
+    if (li) li.addEventListener('click', function(){ openAuth('login'); });
+    if (su) su.addEventListener('click', function(){ openAuth('signup'); });
+  }
+
+  function updateNav(session){
+    var box = $('nav-auth');
+    if (!box) return;
+    if (session && session.user) {
+      box.innerHTML = '<span style="font-size:13px;color:var(--text-secondary);margin-right:8px">' + session.user.email + '</span><button class="btn-outline" id="btn-logout">Log out</button>';
+      var lo = $('btn-logout');
+      if (lo) lo.addEventListener('click', function(){ client.auth.signOut(); });
+    } else {
+      box.innerHTML = '<button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button>';
+      bindAuthButtons();
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    bindAuthButtons();
+    $('auth-close').addEventListener('click', closeAuth);
+    $('auth-submit').addEventListener('click', submitAuth);
+    $('auth-password').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
+    $('auth-toggle-link').addEventListener('click', function(e){ e.preventDefault(); mode = (mode === 'login' ? 'signup' : 'login'); renderMode(); $('auth-msg').textContent=''; });
+    $('auth-overlay').addEventListener('click', function(e){ if (e.target === $('auth-overlay')) closeAuth(); });
+    client.auth.getSession().then(function(res){ updateNav(res.data.session); });
+    client.auth.onAuthStateChange(function(evt, session){ updateNav(session); });
+  });
+})();
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var t = document.getElementById('nav-toggle');
+  var m = document.getElementById('nav-menu');
+  if (t && m) t.addEventListener('click', function(){ m.classList.toggle('open'); });
+});
+</script>
+</body>
+</html>
