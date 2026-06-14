@@ -638,7 +638,7 @@ async function submitAlertSignup(){
     sb.textContent='Saved \u2713';
     setTimeout(closeAlertModal, 1600);
   }catch(err){
-    msg.style.color='#b91c1c'; msg.textContent='Something went wrong. Please try again.'; sb.disabled=false; sb.textContent=old;
+    msg.style.color='#b91c1c'; msg.textContent=(err&&err.message)?err.message:'Something went wrong. Please try again.'; sb.disabled=false; sb.textContent=old;
   }
 }
 
@@ -735,7 +735,10 @@ async function saveTopics(cat, checked){
     res = await insertRow();
     if(res.status===409){ res = await patchRow(); }
   }
-  if(!res.ok) throw new Error('save failed');
+  if(!res.ok){
+    let detail=''; try{ detail = await res.text(); }catch(e){}
+    throw new Error('Save error ' + res.status + (detail ? (': ' + detail.slice(0,200)) : ''));
+  }
   accountExists = true;
   refreshTileLabels();
 }
@@ -843,7 +846,7 @@ async function submitModalSignup(){
     sb.textContent='Saved \u2713';
     setTimeout(closeModal, 1600);
   }catch(err){
-    msg.style.color='#b91c1c'; msg.textContent='Something went wrong. Please try again.'; sb.disabled=false; sb.textContent=old;
+    msg.style.color='#b91c1c'; msg.textContent=(err&&err.message)?err.message:'Something went wrong. Please try again.'; sb.disabled=false; sb.textContent=old;
   }
 }
 function closeModal(){document.getElementById('overlay').classList.remove('open');document.body.style.overflow='';currentId=null;currentType=null;}
