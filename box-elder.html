@@ -580,28 +580,33 @@ function alertCatId(type, category){
 function affectsMe(btn){
   const card = btn.closest('.alert-card');
   const catId = (card && card.dataset.cat) ? card.dataset.cat : 'news';
-  const d = cats[catId];
+  openAlertModalForCat(catId);
+}
+function openAlertModalForCat(catId){
+  const d = cats[catId] || cats['news'];
   alertCat = catId;
+  pendingFollow=null;
   const icon = document.getElementById('alert-icon');
   icon.style.background = d.iconBg;
   icon.innerHTML = '<svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:'+d.iconStroke+';stroke-width:2;stroke-linecap:round;stroke-linejoin:round">'+d.iconPath+'</svg>';
   document.getElementById('alert-title').textContent = d.title;
   document.getElementById('alert-sub').textContent = d.sub;
+  const already = followedFor(catId);
   const list = document.getElementById('alert-list');
   list.innerHTML = '';
   d.items.forEach(item => {
+    const sel = already.includes(item);
     const div = document.createElement('div');
-    div.className = 'sub-item';
+    div.className = 'sub-item'+(sel?' on':'');
     div.innerHTML = '<div class="sub-check"></div><span class="sub-label">'+item+'</span>';
     div.addEventListener('click', () => { div.classList.toggle('on'); updateAlertCount(); });
     list.appendChild(div);
   });
   updateAlertCount();
-  document.getElementById('alert-email').value = '';
-  document.getElementById('alert-zip').value = '';
+  setupSignupArea('alert');
   document.getElementById('alert-msg').textContent = '';
   const sb = document.getElementById('alert-submit');
-  sb.disabled = false; sb.textContent = 'Sign up';
+  sb.disabled = false;
   document.getElementById('alert-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -615,28 +620,23 @@ function closeAlertModal(){
 }
 function handleAlertOverlay(e){ if(e.target===document.getElementById('alert-overlay')) closeAlertModal(); }
 async function submitAlertSignup(){
-  const email=document.getElementById('alert-email').value.trim();
-  const zip=document.getElementById('alert-zip').value.trim();
   const msg=document.getElementById('alert-msg');
   const checked=[...document.querySelectorAll('#alert-list .sub-item.on')].map(el=>el.querySelector('.sub-label').textContent);
   if(checked.length===0){ msg.style.color='#b91c1c'; msg.textContent='Please choose at least one topic above.'; return; }
-  if(!email||!zip){ msg.style.color='#b91c1c'; msg.textContent='Please enter your email and ZIP code.'; return; }
+  if(!hsLoggedIn()){
+    pendingFollow={ kind:'alert', cat:alertCat, checked:checked };
+    closeAlertModal();
+    window.hsOpenAuth();
+    return;
+  }
   const sb=document.getElementById('alert-submit'); const old=sb.textContent;
-  sb.disabled=true; sb.textContent='Signing up…'; msg.style.color='var(--ts)'; msg.textContent='';
+  sb.disabled=true; sb.textContent='Saving\u2026'; msg.style.color='var(--ts)'; msg.textContent='';
   try{
-    const res=await fetch(`${SUPABASE_URL}/rest/v1/users`,{
-      method:'POST',
-      headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({ email, zip_code:zip, community_id:COMMUNITY_ID, topics:{[alertCat]:checked} })
-    });
-    if(res.ok||res.status===409){
-      msg.style.color='#166534';
-      msg.textContent="You're signed up! We'll send you alerts for these topics in Box Elder County.";
-      sb.textContent='Signed up ✓';
-      setTimeout(closeAlertModal, 1800);
-    }else{
-      msg.style.color='#b91c1c'; msg.textContent='Something went wrong. Please try again.'; sb.disabled=false; sb.textContent=old;
-    }
+    await saveTopics(alertCat, checked);
+    msg.style.color='#166534';
+    msg.textContent="Saved \u2713 You're following these alerts in Box Elder County.";
+    sb.textContent='Saved \u2713';
+    setTimeout(closeAlertModal, 1600);
   }catch(err){
     msg.style.color='#b91c1c'; msg.textContent='Something went wrong. Please try again.'; sb.disabled=false; sb.textContent=old;
   }
@@ -690,27 +690,121 @@ const cats = {
   global:{title:'Global best practices',sub:'Select the global standards you want to follow',iconBg:'#dcfce7',iconStroke:'#166534',iconPath:'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/>',items:['Water Quality','Air Quality','Soil Quality','Animal & Human Viruses / Diseases','Infrastructure','EMF','Noise Pollution','Light Pollution','Livestock, Crops, Pets & Wildlife Health','Weather & Climate Hazards','Radiation','Data Centers']}
 };
 const selections={};let currentId=null,currentType=null;
+
+// ============================================================
+// STAGE 2 — account-tied alert follows
+// ============================================================
+let accountTopics = {};
+let accountZip = '';
+let accountLoaded = false;
+let pendingFollow = null;
+
+function hsLoggedIn(){ return !!(window.hsUser); }
+function followedFor(cat){ return (accountTopics && Array.isArray(accountTopics[cat])) ? accountTopics[cat] : []; }
+
+async function loadAccount(){
+  if(!hsLoggedIn()){ accountTopics={}; accountZip=''; accountLoaded=true; refreshTileLabels(); return; }
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(window.hsUser.email)}&select=topics,zip_code`,
+      { headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${SUPABASE_ANON_KEY}` } });
+    const rows = await res.json();
+    if(Array.isArray(rows) && rows.length){ accountTopics = rows[0].topics || {}; accountZip = rows[0].zip_code || ''; }
+    else { accountTopics = {}; accountZip = ''; }
+  }catch(e){ accountTopics = {}; }
+  accountLoaded = true;
+  refreshTileLabels();
+}
+
+async function saveTopics(cat, checked){
+  accountTopics[cat] = checked;
+  const payload = { email: window.hsUser.email, community_id: COMMUNITY_ID, topics: accountTopics };
+  if(accountZip) payload.zip_code = accountZip;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/users?on_conflict=email`, {
+    method:'POST',
+    headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type':'application/json', 'Prefer':'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(payload)
+  });
+  if(!(res.ok || res.status===409)) throw new Error('save failed');
+  refreshTileLabels();
+}
+
+function refreshTileLabels(){
+  ['meetings','news','emerging','global'].forEach(function(cat){
+    const tile = document.querySelector('.cat-tile[data-id="'+cat+'"]');
+    if(!tile) return;
+    const n = followedFor(cat).length;
+    const type = tile.dataset.type;
+    tile.className = 'cat-tile '+(n>0?(type==='early'?'early-on':'inform-on'):(type==='early'?'early-off':'inform-off'));
+    const lbl = document.getElementById('lbl-'+cat);
+    if(lbl) lbl.textContent = n>0 ? (n+' topic'+(n===1?'':'s')+' followed · click to change') : 'Click to choose topics';
+  });
+}
+
+function setupSignupArea(which){
+  const emailEl = document.getElementById(which==='modal'?'modal-email':'alert-email');
+  const zipEl = document.getElementById(which==='modal'?'modal-zip':'alert-zip');
+  const btn = document.getElementById(which==='modal'?'modal-submit':'alert-submit');
+  if(emailEl) emailEl.style.display='none';
+  if(zipEl) zipEl.style.display='none';
+  const wrap = emailEl ? emailEl.closest('.alert-signup') : null;
+  const label = wrap ? wrap.querySelector('.alert-signup-label') : null;
+  if(hsLoggedIn()){
+    if(label) label.textContent = 'Saving to your account · ' + window.hsUser.email;
+    if(btn) btn.textContent = 'Save alerts';
+  } else {
+    if(label) label.textContent = 'Log in to save these alerts — free';
+    if(btn) btn.textContent = 'Log in to save';
+  }
+}
+
+function showToast(text){
+  let t = document.getElementById('hs-toast');
+  if(!t){ t=document.createElement('div'); t.id='hs-toast'; t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--green);color:#fff;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 8px 28px rgba(0,0,0,.2);z-index:9999;max-width:90%;text-align:center;'; document.body.appendChild(t); }
+  t.textContent=text; t.style.display='block';
+  clearTimeout(window.__hsToastT); window.__hsToastT=setTimeout(function(){ t.style.display='none'; },3500);
+}
+
+// auth module calls this whenever login state changes (and on initial load)
+window.hsOnAuthChange = async function(user){
+  await loadAccount();
+  if(user && pendingFollow){
+    const p = pendingFollow; pendingFollow = null;
+    try{
+      await saveTopics(p.cat, p.checked);
+      if(p.kind==='modal'){
+        const tile=document.querySelector('.cat-tile[data-id="'+p.cat+'"]');
+        if(tile) openModal(tile);
+        const m=document.getElementById('modal-msg'); if(m){ m.style.color='#166534'; m.textContent="You're following these alerts \u2713"; }
+      } else {
+        openAlertModalForCat(p.cat);
+        const m=document.getElementById('alert-msg'); if(m){ m.style.color='#166534'; m.textContent="You're following these alerts \u2713"; }
+      }
+      showToast("Saved \u2014 you're following these alerts.");
+    }catch(e){ showToast('Could not save \u2014 please try again.'); }
+  }
+};
 function openModal(tile){
   currentId=tile.dataset.id;currentType=tile.dataset.type;
+  pendingFollow=null;
   const d=cats[currentId];
   document.getElementById('modal-title').textContent=d.title;
   document.getElementById('modal-sub').textContent=d.sub;
   const icon=document.getElementById('modal-icon');
   icon.style.background=d.iconBg;
   icon.innerHTML='<svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:'+d.iconStroke+';stroke-width:2;stroke-linecap:round;stroke-linejoin:round">'+d.iconPath+'</svg>';
+  const already=followedFor(currentId);
   const list=document.getElementById('modal-list');list.innerHTML='';
   d.items.forEach(item=>{
-    const sel=selections[currentId]&&selections[currentId].includes(item);
+    const sel=already.includes(item);
     const div=document.createElement('div');div.className='sub-item'+(sel?' on':'');
     div.innerHTML='<div class="sub-check"></div><span class="sub-label">'+item+'</span>';
     div.addEventListener('click',()=>{div.classList.toggle('on');updateCount();});
     list.appendChild(div);
   });
   updateCount();
-  document.getElementById('modal-email').value='';
-  document.getElementById('modal-zip').value='';
+  setupSignupArea('modal');
   document.getElementById('modal-msg').textContent='';
-  const msb=document.getElementById('modal-submit'); msb.disabled=false; msb.textContent='Sign up';
+  const msb=document.getElementById('modal-submit'); msb.disabled=false;
   document.getElementById('overlay').classList.add('open');
   document.body.style.overflow='hidden';
 }
@@ -719,28 +813,23 @@ function updateCount(){
   document.getElementById('modal-count').textContent=n>0?n+' topic'+(n===1?'':'s')+' selected':'No topics selected yet';
 }
 async function submitModalSignup(){
-  const email=document.getElementById('modal-email').value.trim();
-  const zip=document.getElementById('modal-zip').value.trim();
   const msg=document.getElementById('modal-msg');
   const checked=[...document.querySelectorAll('#modal-list .sub-item.on')].map(el=>el.querySelector('.sub-label').textContent);
   if(checked.length===0){ msg.style.color='#b91c1c'; msg.textContent='Please choose at least one topic above.'; return; }
-  if(!email||!zip){ msg.style.color='#b91c1c'; msg.textContent='Please enter your email and ZIP code.'; return; }
+  if(!hsLoggedIn()){
+    pendingFollow={ kind:'modal', cat:currentId, checked:checked };
+    closeModal();
+    window.hsOpenAuth();
+    return;
+  }
   const sb=document.getElementById('modal-submit'); const old=sb.textContent;
-  sb.disabled=true; sb.textContent='Signing up…'; msg.style.color='var(--ts)'; msg.textContent='';
+  sb.disabled=true; sb.textContent='Saving\u2026'; msg.style.color='var(--ts)'; msg.textContent='';
   try{
-    const res=await fetch(`${SUPABASE_URL}/rest/v1/users`,{
-      method:'POST',
-      headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${SUPABASE_ANON_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({ email, zip_code:zip, community_id:COMMUNITY_ID, topics:{[currentId]:checked} })
-    });
-    if(res.ok||res.status===409){
-      msg.style.color='#166534';
-      msg.textContent="You're signed up! We'll send you alerts for these topics in Box Elder County.";
-      sb.textContent='Signed up ✓';
-      setTimeout(closeModal, 1800);
-    }else{
-      msg.style.color='#b91c1c'; msg.textContent='Something went wrong. Please try again.'; sb.disabled=false; sb.textContent=old;
-    }
+    await saveTopics(currentId, checked);
+    msg.style.color='#166534';
+    msg.textContent="Saved \u2713 You're following these alerts in Box Elder County.";
+    sb.textContent='Saved \u2713';
+    setTimeout(closeModal, 1600);
   }catch(err){
     msg.style.color='#b91c1c'; msg.textContent='Something went wrong. Please try again.'; sb.disabled=false; sb.textContent=old;
   }
