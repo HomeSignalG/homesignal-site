@@ -866,9 +866,9 @@ loadMeetings();
   <div class="auth-modal">
     <button class="auth-close" id="auth-close">&times;</button>
     <h2 id="auth-title">Log in or sign up</h2>
-    <p class="auth-sub" id="auth-sub">Enter your email and we'll send you a 6-digit code &mdash; no password needed.</p>
+    <p class="auth-sub" id="auth-sub">Enter your email and we'll send you a code &mdash; no password needed.</p>
     <input type="email" id="auth-email" class="auth-input" placeholder="Email address" autocomplete="email" />
-    <input type="text" id="auth-code" class="auth-input" placeholder="6-digit code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" style="display:none;letter-spacing:6px;text-align:center;font-size:18px;" />
+    <input type="text" id="auth-code" class="auth-input" placeholder="Enter your code" inputmode="numeric" maxlength="8" autocomplete="one-time-code" style="display:none;letter-spacing:6px;text-align:center;font-size:18px;" />
     <button id="auth-submit" class="auth-submit">Send me a code</button>
     <div id="auth-msg" class="auth-msg"></div>
     <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><a href="#" id="auth-back-link">Use a different email</a></div>
@@ -896,14 +896,14 @@ loadMeetings();
   function setStep(s){
     step = s;
     if (s === 'code') {
-      $('auth-sub').textContent = 'We emailed a 6-digit code to ' + pendingEmail + '. Enter it below.';
+      $('auth-sub').textContent = 'We emailed a code to ' + pendingEmail + '. Enter it below.';
       $('auth-email').style.display = 'none';
       $('auth-code').style.display = 'block';
       $('auth-submit').textContent = 'Verify & continue';
       $('auth-back-wrap').style.display = 'block';
       setTimeout(function(){ $('auth-code').focus(); }, 50);
     } else {
-      $('auth-sub').innerHTML = "Enter your email and we'll send you a 6-digit code &mdash; no password needed.";
+      $('auth-sub').innerHTML = "Enter your email and we'll send you a code &mdash; no password needed.";
       $('auth-email').style.display = 'block';
       $('auth-code').style.display = 'none';
       $('auth-code').value = '';
@@ -931,7 +931,7 @@ loadMeetings();
 
   async function verifyCode(){
     var code = ($('auth-code').value || '').trim();
-    if (code.length < 6) { showMsg('Enter the 6-digit code from your email.', true); return; }
+    if (code.length < 4) { showMsg('Enter the code from your email.', true); return; }
     $('auth-submit').disabled = true; showMsg('Checking\u2026', false);
     try {
       var r = await client.auth.verifyOtp({ email: pendingEmail, token: code, type: 'email' });
