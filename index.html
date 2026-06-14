@@ -125,6 +125,14 @@ body { background: var(--bg); font-size: 15px; }
 .btn-request { background: var(--green); color: #fff; border: none; padding: 10px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .btn-request:hover { opacity: 0.9; }
 
+/* TOPIC REQUEST BAND */
+.topic-request-band { padding: 24px 48px; background: var(--bg); border-top: 1px solid var(--green-mid); border-bottom: 1px solid var(--green-mid); }
+.trb-inner { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; max-width: 960px; margin: 0 auto; }
+.trb-text { flex: 1; min-width: 200px; }
+.trb-text h4 { font-size: 15px; font-weight: 600; margin-bottom: 3px; color: var(--green-dark); }
+.trb-text p { font-size: 13px; color: var(--green-text); line-height: 1.5; }
+.trb-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
 /* TOPICS */
 .topics-section { padding: 28px 48px; border-bottom: 1px solid var(--border); background: var(--bg); }
 .topics-label { font-size: 11px; color: var(--text-tertiary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; margin: 0 auto 14px; max-width: 900px; }
@@ -450,6 +458,22 @@ body { background: var(--bg); font-size: 15px; }
   </div>
 </section>
 
+<!-- TOPIC REQUEST BAND -->
+<div class="topic-request-band">
+  <div class="trb-inner">
+    <div class="trb-text">
+      <h4>Don't see a topic that's affecting your home?</h4>
+      <p>Tell us what to track — we're always adding new topics.</p>
+    </div>
+    <div class="trb-form">
+      <input class="nl-input" id="topic-request-input" type="text" placeholder="What should we track?" style="width:260px;" />
+      <input class="nl-input" id="topic-request-email" type="email" placeholder="Email (optional)" />
+      <button class="btn-request" id="topic-request-btn">Request a topic</button>
+    </div>
+    <div id="topic-request-msg" style="width:100%;display:none;margin-top:10px;font-size:13px;color:var(--green-dark);background:var(--bg);border:1px solid var(--green-mid);border-radius:var(--radius-sm);padding:10px 14px;"></div>
+  </div>
+</div>
+
 <!-- FOOTER -->
 <footer>
   <div class="footer-left">
@@ -573,6 +597,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (btn) btn.addEventListener('click', submitRequest);
     if (input) input.addEventListener('keydown', function(e){ if (e.key === 'Enter') submitRequest(); });
+  });
+})();
+</script>
+
+<script>
+// ============================================================
+// "Request a topic" — saves to Supabase self_reports (public-insert)
+// Email is optional; a topic is required.
+// ============================================================
+(function(){
+  var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
+  var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
+  document.addEventListener('DOMContentLoaded', function(){
+    var btn = document.getElementById('topic-request-btn');
+    var input = document.getElementById('topic-request-input');
+    var emailEl = document.getElementById('topic-request-email');
+    var msg = document.getElementById('topic-request-msg');
+    if (!btn || !input || !emailEl || !msg) return;
+    function show(text){ msg.style.display = 'block'; msg.textContent = text; }
+    async function submitTopic(){
+      var topic = (input.value || '').trim();
+      var email = (emailEl.value || '').trim();
+      if (!topic) { show('Please enter a topic you\u2019d like us to track.'); return; }
+      try {
+        var res = await fetch(SB_URL + '/rest/v1/self_reports', {
+          method: 'POST',
+          headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ description: 'Topic request: ' + topic, location_reference: topic, user_email: email || '' })
+        });
+        if (res.ok || res.status === 201) {
+          show(email ? 'Thank you! We\u2019ll let you know when we add it.' : 'Thank you! Your topic request has been received.');
+          input.value = ''; emailEl.value = '';
+        } else { show('Something went wrong \u2014 please try again.'); }
+      } catch (e) { show('Something went wrong \u2014 please try again.'); }
+    }
+    btn.addEventListener('click', submitTopic);
+    input.addEventListener('keydown', function(e){ if (e.key === 'Enter') submitTopic(); });
+    emailEl.addEventListener('keydown', function(e){ if (e.key === 'Enter') submitTopic(); });
   });
 })();
 </script>
