@@ -638,7 +638,7 @@ async function submitAlertSignup(){
     sb.textContent='Saved \u2713';
     setTimeout(closeAlertModal, 1600);
   }catch(err){
-    msg.style.color='#b91c1c'; msg.textContent=(err&&err.message)?err.message:'Something went wrong. Please try again.'; sb.disabled=false; sb.textContent=old;
+    msg.style.color='#b91c1c'; msg.textContent='Sorry, that didn\'t save. Please try again.'; sb.disabled=false; sb.textContent=old;
   }
 }
 
@@ -699,6 +699,15 @@ let accountZip = '';
 let accountLoaded = false;
 let accountExists = false;
 let pendingFollow = null;
+let searchedZip = '';
+(function(){
+  try{
+    var u = new URLSearchParams(window.location.search);
+    var z = (u.get('zip')||'').replace(/\D/g,'').slice(0,5);
+    if(z.length===5){ searchedZip=z; try{ localStorage.setItem('hs_zip',z); }catch(e){} }
+    else { try{ searchedZip = localStorage.getItem('hs_zip')||''; }catch(e){} }
+  }catch(e){}
+})();
 
 function hsLoggedIn(){ return !!(window.hsUser); }
 function followedFor(cat){ return (accountTopics && Array.isArray(accountTopics[cat])) ? accountTopics[cat] : []; }
@@ -720,7 +729,7 @@ async function saveTopics(cat, checked){
   accountTopics[cat] = checked;
   const email = window.hsUser.email;
   const H = { 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type':'application/json', 'Prefer':'return=minimal' };
-  const body = { community_id: COMMUNITY_ID, topics: accountTopics, zip_code: accountZip || '84302' };
+  const body = { community_id: COMMUNITY_ID, topics: accountTopics, zip_code: searchedZip || accountZip || '84302' };
   function patchRow(){
     return fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}`, { method:'PATCH', headers:H, body: JSON.stringify(body) });
   }
@@ -845,7 +854,7 @@ async function submitModalSignup(){
     sb.textContent='Saved \u2713';
     setTimeout(closeModal, 1600);
   }catch(err){
-    msg.style.color='#b91c1c'; msg.textContent=(err&&err.message)?err.message:'Something went wrong. Please try again.'; sb.disabled=false; sb.textContent=old;
+    msg.style.color='#b91c1c'; msg.textContent='Sorry, that didn\'t save. Please try again.'; sb.disabled=false; sb.textContent=old;
   }
 }
 function closeModal(){document.getElementById('overlay').classList.remove('open');document.body.style.overflow='';currentId=null;currentType=null;}

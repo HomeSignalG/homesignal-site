@@ -513,7 +513,7 @@ function runSearch() {
 
   const page = findCommunityByZip(zip);
   if (page) {
-    window.location.href = page;
+    window.location.href = page + '?zip=' + encodeURIComponent(zip);
     return;
   }
 
