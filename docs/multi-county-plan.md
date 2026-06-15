@@ -18,6 +18,20 @@ Everything we build must scale to **all ~3,144 U.S. counties**, with a new count
 5. **Shared where possible; per-county only as rows.** Universal topics shared across all counties; per-county specifics (government topics, ZIPs) are rows, never code.
 6. **No per-county deploy.** The dynamic page queries Supabase live; onboarding a county never requires a site build.
 7. **Graceful coverage.** Any ZIP resolves: covered → community page; not-yet-covered → waitlist capture (also an acquisition signal).
+8. **Flexible geographic granularity.** The "community" unit is NOT always a county. The ZIP code is the atom; a community is a named *set of ZIPs* at a `level`, so huge counties can be split for real local momentum.
+
+### 0a. Geographic model (proposed)
+
+Large counties (e.g., Los Angeles, ~10M people) have no shared "community feel" — county-wide is the wrong unit there. So granularity must vary:
+
+- **ZIP = atomic unit.** Alerts and subscribers resolve to ZIP(s).
+- **A community = a named set of ZIPs + a `level`** (`county` | `city` | `zip` | …), with optional **`parent_id`** for hierarchy:
+  - Rural/small county → one row, `level=county`, all ZIPs.
+  - Huge county → many rows (`level=city`/`zip`), each a ZIP subset, `parent_id` → the county.
+- **A ZIP resolves to the most specific *live* community** containing it (falls back to county if no sub-community is live yet).
+- **Cascade matching:** a county-scoped alert reaches all child communities; a city/ZIP-scoped alert reaches just that one. (`alerts.geographic_reference` carries the scope.)
+
+**Schema impact (additive):** `communities` already has `zip_codes`; add `level` and `parent_id`. No re-architecting.
 
 ---
 
