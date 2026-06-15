@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
-<title>HomeSignal — Box Elder County, Utah</title>
+<title>HomeSignal</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
@@ -367,7 +367,7 @@ body { background: #f3f4f6; font-size: 14px; }
 <div class="comm-header">
   <div class="comm-top">
     <div>
-      <div class="comm-title">Box Elder County, Utah</div>
+      <div class="comm-title" id="comm-title">Box Elder County, Utah</div>
       <div class="comm-sub">Monitor factors that may influence quality of life and long-term community well-being</div>
     </div>
     <button class="save-btn" onclick="toggleSave(this)"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg> <span id="save-label">Save location</span></button>
@@ -481,6 +481,8 @@ body { background: #f3f4f6; font-size: 14px; }
   </div>
 </div>
 
+<script src="topics.js"></script>
+<script src="communities.js"></script>
 <script>
 // ============================================================
 // SUPABASE CONFIG
@@ -490,7 +492,7 @@ body { background: #f3f4f6; font-size: 14px; }
 // ============================================================
 const SUPABASE_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
-const COMMUNITY_ID = 'd67c558f-1f04-4811-a565-873ae2afd6f3';
+let COMMUNITY_ID = 'd67c558f-1f04-4811-a565-873ae2afd6f3'; // Box Elder fallback; resolved dynamically below
 
 // ============================================================
 // FETCH ALERTS FROM SUPABASE
@@ -635,7 +637,7 @@ async function submitAlertSignup(){
   try{
     await saveTopics(alertCat, checked);
     msg.style.color='#166534';
-    msg.textContent="Saved \u2713 You're following these alerts in Box Elder County.";
+    msg.textContent="Saved \u2713 You're following these alerts in " + commName() + ".";
     sb.textContent='Saved \u2713';
     setTimeout(closeAlertModal, 1600);
   }catch(err){
@@ -672,7 +674,7 @@ async function saveUser(email, zip) {
       body: JSON.stringify({ email, zip_code: zip, community_id: COMMUNITY_ID, topics: selections })
     });
     if (res.ok || res.status === 409) {
-      alert('You\'re signed up! We\'ll send you alerts for Box Elder County.');
+      alert('You\'re signed up! We\'ll send you alerts for ' + commName() + '.');
     } else {
       alert('Something went wrong. Please try again.');
     }
@@ -884,7 +886,7 @@ async function submitModalSignup(){
   try{
     await saveTopics(currentId, checked);
     msg.style.color='#166534';
-    msg.textContent="Saved \u2713 You're following these alerts in Box Elder County.";
+    msg.textContent="Saved \u2713 You're following these alerts in " + commName() + ".";
     sb.textContent='Saved \u2713';
     setTimeout(closeModal, 1600);
   }catch(err){
@@ -979,8 +981,58 @@ function toggleMoreMeetings(){
   more.style.display=open?'none':'block';
   btn.textContent=open?('Show '+more.children.length+' more'):'Show less';
 }
-loadAlerts();
-loadMeetings();
+// ============================================================
+// DYNAMIC COMMUNITY RESOLUTION
+// Load ANY county from the Supabase `communities` table.
+//   ?id=<uuid>  |  ?community=<slug>  |  ?zip=<zip>   (defaults to Box Elder)
+// ============================================================
+var COMMUNITY = null;
+function commName(){ return COMMUNITY ? COMMUNITY.name : 'your community'; }
+
+async function resolveCommunity(){
+  var p = new URLSearchParams(window.location.search);
+  var id = p.get('id');
+  var slug = p.get('community') || p.get('slug');
+  var zip = p.get('zip');
+  // communities table has no slug column yet — map slug -> id via the bootstrap registry.
+  if(!id && slug && window.HS && HS.getCommunity){ var c = HS.getCommunity(slug); if(c) id = c.id; }
+  var url = null;
+  if(id) url = `${SUPABASE_URL}/rest/v1/communities?id=eq.${encodeURIComponent(id)}&select=*`;
+  else if(zip) url = `${SUPABASE_URL}/rest/v1/communities?zip_codes=cs.{${encodeURIComponent(zip)}}&select=*`;
+  if(!url) return; // nothing specified -> keep Box Elder fallback
+  try{
+    var res = await fetch(url, { headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${SUPABASE_ANON_KEY}` } });
+    if(!res.ok) return;
+    var rows = await res.json();
+    if(Array.isArray(rows) && rows.length){ COMMUNITY = rows[0]; COMMUNITY_ID = rows[0].id; }
+  }catch(e){}
+}
+
+function applyCommunity(){
+  if(COMMUNITY){
+    var nm = COMMUNITY.name + (COMMUNITY.state ? ', ' + COMMUNITY.state : '');
+    var t = document.getElementById('comm-title'); if(t) t.textContent = nm;
+    document.title = 'HomeSignal — ' + nm;
+    cats.meetings.title = COMMUNITY.name + ' notices';
+    if(Array.isArray(COMMUNITY.government_topics) && COMMUNITY.government_topics.length){
+      cats.meetings.items = COMMUNITY.government_topics;
+    }
+  }
+  // Universal topics come from the canonical registry (topics.js).
+  if(window.HS && Array.isArray(HS.universalTopics) && HS.universalTopics.length){
+    cats.news.items = HS.universalTopics;
+    cats.emerging.items = HS.universalTopics;
+    cats.global.items = HS.universalTopics;
+  }
+}
+
+async function initCommunity(){
+  await resolveCommunity();
+  applyCommunity();
+  loadAlerts();
+  loadMeetings();
+}
+initCommunity();
 
 </script>
 <style>
