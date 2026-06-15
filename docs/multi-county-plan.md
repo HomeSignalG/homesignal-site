@@ -58,9 +58,22 @@ This supports pipeline-level **and** topic-level follows in one model, so granul
 4. You update the engine to read `user_subscriptions` (match rule above) when ready; then we drop the `users.topics` mirror.
 5. Pop-ups driven by `topics.js` so only real pipelines are offered (granular topics opt-in / "coming soon" as tagging catches up).
 
-### ⛔ Open confirmations before coding increment 2
-- Confirm the 3 canonical pipeline strings: `news_alert`, `emerging_technology`, `global_best_practice` (or your preferred spellings) — these become the standard your Zaps must emit.
-- Confirm the universal topic list in `topics.js` (currently Box Elder's 12 environmental topics) is the shared list you want.
+### ✅ Confirmations (resolved 2026-06-15)
+- Canonical pipeline strings: `government_notice` (live), `news_alert`, `emerging_technology`, `global_best_practices` (plural — matches live alert data).
+- Universal topic list = Box Elder's 12 pop-up topics, verbatim (in `topics.js`).
+
+### Increment 2 — data layer BUILT (2026-06-15, dormant on branch)
+- `box-elder.html` `saveTopics` now **dual-writes**: existing `users.topics` write is unchanged (engine's success path), plus a **best-effort** granular write to `user_subscriptions` (one row per chosen topic, via `syncSubscriptions`). If the subscriptions write fails, the signup still succeeds.
+- `docs/user-subscriptions-setup.sql`: uniqueness guard + RLS (scoped to the logged-in user's own rows) + one-time backfill from `users.topics`.
+- **To activate:** run `docs/user-subscriptions-setup.sql`, then follow some topics on the page and confirm rows appear (the verify query is in the SQL).
+
+### ⚠️ Article-tagging target (YOUR Zap/engine side — required before matching works)
+For subscriptions to match articles, every article should be tagged consistently:
+- `alerts.pipeline_type` = one of the 4 canonical strings (`government_notice` | `news_alert` | `emerging_technology` | `global_best_practices`).
+- `alerts.category` = the **granular topic** (must equal a `topic` value from `topics.js`, e.g. `Water Quality`, `Stratos data center project`).
+
+Today this is inconsistent: government uses `pipeline_type`, while emerging/global put their identity in `category`, and `category` is also used for granular topics. Standardize the Zaps to the above so the engine's match rule fires:
+`community_id` matches **and** `pipeline_type` matches **and** (`subscription.topic IS NULL` **or** `subscription.topic = alerts.category`).
 
 ---
 

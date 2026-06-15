@@ -726,6 +726,14 @@ async function loadAccount(){
   refreshTileLabels();
 }
 
+// Canonical pipeline_type for each UI cat (mirrors topics.js — keep in sync).
+const CAT_TO_PIPELINE = {
+  meetings: 'government_notice',
+  news: 'news_alert',
+  emerging: 'emerging_technology',
+  global: 'global_best_practices'
+};
+
 async function saveTopics(cat, checked){
   accountTopics[cat] = checked;
   const email = window.hsUser.email;
@@ -750,6 +758,31 @@ async function saveTopics(cat, checked){
   }
   accountExists = true;
   refreshTileLabels();
+  // Forward-looking, BEST-EFFORT: mirror this follow into the normalized
+  // user_subscriptions table (the multi-county model). This never blocks the
+  // save above — the engine still reads users.topics during the transition.
+  try { await syncSubscriptions(cat, checked, email, H); } catch(e) { /* non-fatal */ }
+}
+
+// Replace the user's user_subscriptions rows for ONE pipeline with the
+// currently-checked topics: one row per (user_id, community_id, pipeline_type, topic).
+async function syncSubscriptions(cat, checked, email, H){
+  const pipeline = CAT_TO_PIPELINE[cat];
+  if(!pipeline) return;
+  // Resolve this user's id from the users table (PostgREST returns the row).
+  const ures = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}&select=id`, { headers: H });
+  if(!ures.ok) return;
+  const urows = await ures.json();
+  if(!Array.isArray(urows) || !urows.length || !urows[0].id) return;
+  const userId = urows[0].id;
+  // Replace the set for this pipeline: delete its rows, then insert the chosen topics.
+  await fetch(`${SUPABASE_URL}/rest/v1/user_subscriptions?user_id=eq.${encodeURIComponent(userId)}&community_id=eq.${encodeURIComponent(COMMUNITY_ID)}&pipeline_type=eq.${encodeURIComponent(pipeline)}`, { method:'DELETE', headers: H });
+  if(checked && checked.length){
+    const rows = checked.map(function(topic){
+      return { user_id: userId, community_id: COMMUNITY_ID, pipeline_type: pipeline, topic: topic };
+    });
+    await fetch(`${SUPABASE_URL}/rest/v1/user_subscriptions`, { method:'POST', headers: H, body: JSON.stringify(rows) });
+  }
 }
 
 function refreshTileLabels(){
