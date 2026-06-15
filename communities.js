@@ -2,7 +2,7 @@
 // HomeSignal — shared community registry
 // Single source of truth for the communities we cover and the
 // ZIP -> community mapping used by the homepage search and the
-// "My alerts" dashboard. To add a county, add an entry here.
+// dashboard. To add a county, add an entry here.
 //
 // (Later this can be backed by the Supabase `communities` table;
 //  the helpers below are written so callers don't need to change
