@@ -195,15 +195,23 @@ Instead of one HTML file per county (`box-elder.html`, `cache.html`, …), move 
 
 ---
 
-## 5. Engine change spec (`homesignal-ingest` — founder owns this repo; Claude will NOT edit it)
+## 5. Engine change spec (`homesignal-ingest` — you maintain this repo yourself)
 
-Today the engine presumably emails users by matching `users.community_id` + topic overlap. After this change:
+You own and edit this repo, so this section is your implementation checklist. (Claude does not touch it.)
 
-- For each new alert/meeting in `community_id = X`, find recipients by querying
-  **`user_communities` where `community_id = X`** and whose `topics` include the alert's category/topic, then email those `user_email`s.
-- Read the per-county `topics` from `user_communities`, **not** `users.topics`.
+**Recipient matching — the core change:**
+- Today: emails recipients by matching `users.community_id` + topic overlap.
+- After: for each new alert/meeting in `community_id = X`, find recipients by querying
+  **`user_communities` where `community_id = X`** and whose `topics` include the alert's category/topic. Email those `user_email`s.
+- Read per-county `topics` from **`user_communities`**, not `users.topics`.
+- Respect consent: only email rows where the account has `marketing_consent = true` (join `users` on email).
 
-> Sequencing note: until the engine reads `user_communities`, follows in a *second* county won't actually trigger emails. So we should not advertise multi-county alerts to users until the engine change ships. The website work can land behind this without over-promising.
+**Engagement logging (feeds §2.3b):**
+- Write one `email_events` row per send (`event_type = 'sent'`, with `user_email`, `community_id`, `alert_id`).
+- Wire your email provider's webhook (delivered/open/click/bounce/unsubscribe) to insert matching `email_events` rows. Use the **service-role key** (bypasses RLS).
+- On an unsubscribe event, set `users.marketing_consent = false` so the matching query above stops including them.
+
+**Sequencing note:** until the engine reads `user_communities`, follows in a *second* county won't trigger emails. So don't advertise multi-county alerts to users until this engine change ships. The website work can land behind it without over-promising.
 
 ---
 
