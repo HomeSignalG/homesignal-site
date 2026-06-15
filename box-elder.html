@@ -859,16 +859,6 @@ async function submitModalSignup(){
 }
 function closeModal(){document.getElementById('overlay').classList.remove('open');document.body.style.overflow='';currentId=null;currentType=null;}
 function handleOverlayClick(e){if(e.target===document.getElementById('overlay'))closeModal();}
-function confirmModal(){
-  if(!currentId)return;
-  const checked=[...document.querySelectorAll('#modal-list .sub-item.on')].map(el=>el.querySelector('.sub-label').textContent);
-  selections[currentId]=checked;
-  const tile=document.querySelector('[data-id="'+currentId+'"]');
-  tile.className='cat-tile '+(checked.length>0?(currentType==='early'?'early-on':'inform-on'):(currentType==='early'?'early-off':'inform-off'));
-  const lbl=document.getElementById('lbl-'+currentId);
-  if(lbl)lbl.textContent=checked.length>0?checked.length+' topic'+(checked.length===1?'':'s')+' selected · click to change':'Click to choose topics';
-  closeModal();
-}
 
 // ============================================================
 // UPCOMING MEETINGS — pulled live from the meetings table
