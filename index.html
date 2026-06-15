@@ -357,106 +357,30 @@ body { background: var(--bg); font-size: 15px; }
     <p class="topics-sub">New filings, alerts, and upcoming meetings — to start getting notified, enter your ZIP code and pick the topics you want to follow.</p>
     <button class="topics-cta" onclick="var c=document.querySelector('.search-card');if(c)c.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){var i=document.getElementById('search-input');if(i)i.focus();},450);">Enter your ZIP to get started ↑</button>
   </div>
-  <div class="tg-wrap">
-    <div class="tg-group">
-      <div class="tg-head">Government &amp; filings</div>
-      <div class="tg-row">
-        <span class="tg-item">City &amp; County Council Meetings</span>
-        <span class="tg-item">Planning Commission Hearings</span>
-        <span class="tg-item">Rezoning &amp; Zoning Changes</span>
-        <span class="tg-item">Building &amp; Land-Use Permits</span>
-        <span class="tg-item">Variances &amp; Ordinances</span>
-        <span class="tg-item">Eminent Domain</span>
-        <span class="tg-item">Public Notices &amp; Comment Periods</span>
-        <span class="tg-item">Ballot Measures, Bonds &amp; Taxes</span>
-      </div>
-    </div>
-    <div class="tg-group">
-      <div class="tg-head">Big builds &amp; industrial sites</div>
-      <div class="tg-row">
-        <span class="tg-item">New Development Projects</span>
-        <span class="tg-item">Redevelopment</span>
-        <span class="tg-item">Data Centers</span>
-        <span class="tg-item">Chemical Plants</span>
-        <span class="tg-item">Sanitation / Wastewater Plants</span>
-        <span class="tg-item">Slaughter &amp; Rendering Plants</span>
-        <span class="tg-item">Warehouses &amp; Distribution Centers</span>
-        <span class="tg-item">Detention &amp; Correctional Facilities</span>
-        <span class="tg-item">Power Plants, Substations &amp; Pipelines</span>
-        <span class="tg-item">Landfills &amp; Quarries</span>
-      </div>
-    </div>
-    <div class="tg-group">
-      <div class="tg-head">Environment &amp; hazards</div>
-      <div class="tg-row">
-        <span class="tg-item">Water Quality</span>
-        <span class="tg-item">Air Quality</span>
-        <span class="tg-item">Soil Quality</span>
-        <span class="tg-item">Contamination &amp; Cleanup Sites</span>
-        <span class="tg-item">Weather &amp; Climate Hazards</span>
-        <span class="tg-item">Radiation</span>
-      </div>
-    </div>
-    <div class="tg-group">
-      <div class="tg-head">Health &amp; living conditions</div>
-      <div class="tg-row">
-        <span class="tg-item">Animal &amp; Human Diseases</span>
-        <span class="tg-item">Livestock, Crops, Pets &amp; Wildlife Health</span>
-        <span class="tg-item">Noise Pollution</span>
-        <span class="tg-item">Light Pollution</span>
-        <span class="tg-item">Electromagnetic Fields (EMF)</span>
-      </div>
-    </div>
-    <div class="tg-group">
-      <div class="tg-head">Emerging technologies &amp; global best practices</div>
-      <div class="tg-row">
-        <span class="tg-item">Drone Farming</span>
-        <span class="tg-item">Soil Mineral / Nutrient Analysis</span>
-        <span class="tg-item">Ocean Data</span>
-        <span class="tg-item">Regenerative Farming</span>
-        <span class="tg-item">Precision Agriculture</span>
-        <span class="tg-item">No-Till &amp; Cover Cropping</span>
-        <span class="tg-item">Permaculture</span>
-        <span class="tg-item">Vertical / Indoor Farming</span>
-        <span class="tg-item">Agrivoltaics</span>
-        <span class="tg-item">Rotational / Holistic Grazing</span>
-        <span class="tg-item">Rainwater Harvesting</span>
-        <span class="tg-item">Greywater Recycling</span>
-        <span class="tg-item">Aquifer Recharge &amp; Groundwater Management</span>
-        <span class="tg-item">Watershed &amp; Wetland Restoration</span>
-        <span class="tg-item">Community Solar &amp; Microgrids</span>
-        <span class="tg-item">Battery Storage</span>
-        <span class="tg-item">Methane / Biogas Capture</span>
-        <span class="tg-item">Carbon Sequestration</span>
-        <span class="tg-item">Geothermal Heating</span>
-        <span class="tg-item">Xeriscaping</span>
-        <span class="tg-item">Wildfire-Resilient Land Management</span>
-        <span class="tg-item">Pollinator Habitat Programs</span>
-        <span class="tg-item">Reforestation &amp; Tree Canopy</span>
-        <span class="tg-item">Satellite / Remote Sensing</span>
-        <span class="tg-item">Environmental Sensor Networks</span>
-        <span class="tg-item">Wildlife &amp; Biodiversity Tracking</span>
-      </div>
-    </div>
-    <div class="tg-group">
-      <div class="tg-head">Local news</div>
-      <div class="tg-row">
-        <span class="tg-item">Local News</span>
-      </div>
-    </div>
-    <div class="tg-group tg-soon">
-      <div class="tg-head">Coming soon</div>
-      <div class="tg-row">
-        <span class="tg-item">Flood Risk</span>
-        <span class="tg-item">Wildfire Risk</span>
-        <span class="tg-item">Earthquake Risk</span>
-        <span class="tg-item">School Boundary &amp; Rating Changes</span>
-        <span class="tg-item">Property Tax &amp; Assessment Changes</span>
-        <span class="tg-item">Crime &amp; Public Safety</span>
-        <span class="tg-item">Short-Term Rentals &amp; HOA Rules</span>
-      </div>
-    </div>
-  </div>
+  <div class="tg-wrap" id="tg-wrap"></div>
+  <script>
+  // Single source of truth for the homepage topic showcase.
+  // `group` tags each group; the pipeline split lives here (emerging_tech | best_practice).
+  (function(){
+    var TOPIC_GROUPS = [
+      { group:'government',    header:'Government & filings', items:['City & County Council Meetings','Planning Commission Hearings','Rezoning & Zoning Changes','Building & Land-Use Permits','Variances & Ordinances','Eminent Domain','Public Notices & Comment Periods','Ballot Measures, Bonds & Taxes'] },
+      { group:'big_builds',    header:'Big builds & industrial sites', items:['New Development Projects','Redevelopment','Data Centers','Chemical Plants','Sanitation / Wastewater Plants','Slaughter & Rendering Plants','Warehouses & Distribution Centers','Detention & Correctional Facilities','Power Plants, Substations & Pipelines','Landfills & Quarries'] },
+      { group:'environment',   header:'Environment & hazards', items:['Water Quality','Air Quality','Soil Quality','Contamination & Cleanup Sites','Weather & Climate Hazards','Radiation'] },
+      { group:'health',        header:'Health & living conditions', items:['Animal & Human Diseases','Livestock, Crops, Pets & Wildlife Health','Noise Pollution','Light Pollution','Electromagnetic Fields (EMF)'] },
+      { group:'emerging_tech', header:'Emerging Technology', items:['Drone Farming','Precision Agriculture','Soil Mineral / Nutrient Analysis','Vertical / Indoor Farming','Agrivoltaics','Community Solar & Microgrids','Battery Storage','Methane / Biogas Capture','Geothermal Heating','Satellite / Remote Sensing','Environmental Sensor Networks','Wildlife & Biodiversity Tracking','Ocean Data Centers'] },
+      { group:'best_practice', header:'Global Best Practices', items:['Regenerative Farming','No-Till & Cover Cropping','Permaculture','Rotational / Holistic Grazing','Rainwater Harvesting','Greywater Recycling','Aquifer Recharge & Groundwater Management','Watershed & Wetland Restoration','Xeriscaping','Wildfire-Resilient Land Management','Pollinator Habitat Programs','Reforestation & Tree Canopy','Carbon Sequestration'] },
+      { group:'local_news',    header:'Local news', items:['Local News'] },
+      { group:'coming_soon',   header:'Coming soon', soon:true, items:['Flood Risk','Wildfire Risk','Earthquake Risk','School Boundary & Rating Changes','Property Tax & Assessment Changes','Crime & Public Safety','Short-Term Rentals & HOA Rules'] }
+    ];
+    function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    var wrap = document.getElementById('tg-wrap');
+    if(!wrap) return;
+    wrap.innerHTML = TOPIC_GROUPS.map(function(g){
+      var items = g.items.map(function(t){ return '<span class="tg-item">' + esc(t) + '</span>'; }).join('');
+      return '<div class="tg-group' + (g.soon ? ' tg-soon' : '') + '"><div class="tg-head">' + esc(g.header) + '</div><div class="tg-row">' + items + '</div></div>';
+    }).join('');
+  })();
+  </script>
 </section>
 
 <!-- TOPIC REQUEST BAND -->
