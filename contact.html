@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
 <title>HomeSignal — Contact</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -263,8 +264,9 @@ body { background: var(--bg); font-size: 15px; }
 <div class="contact-form">
   <input type="text" id="c-name" placeholder="Your name">
   <input type="email" id="c-email" placeholder="Your email">
-  <textarea id="c-message" placeholder="Your message"></textarea>
+  <textarea id="c-message" placeholder="Your message" maxlength="2000"></textarea>
   <button onclick="sendContact()">Send message</button>
+  <div id="c-msg" role="alert" style="font-size:13px;min-height:1em;color:#b91c1c;"></div>
 </div>
 </div>
 <footer>
@@ -285,11 +287,21 @@ body { background: var(--bg); font-size: 15px; }
 </footer>
 <script>
 function sendContact(){
-  var name=document.getElementById('c-name').value.trim();
-  var email=document.getElementById('c-email').value.trim();
-  var msg=document.getElementById('c-message').value.trim();
+  var nameEl=document.getElementById('c-name');
+  var emailEl=document.getElementById('c-email');
+  var msgEl=document.getElementById('c-message');
+  var note=document.getElementById('c-msg');
+  var name=nameEl.value.trim();
+  var email=emailEl.value.trim();
+  var msg=msgEl.value.trim();
+  function fail(text, el){ if(note) note.textContent=text; if(el) el.focus(); }
+  var emailRe=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if(!email || !emailRe.test(email)){ fail('Please enter a valid email address so we can reply.', emailEl); return; }
+  if(msg.length<5){ fail('Please enter a message (at least a few words).', msgEl); return; }
+  if(msg.length>2000){ fail('Please shorten your message to under 2000 characters.', msgEl); return; }
+  if(note) note.textContent='';
   var subject=encodeURIComponent('HomeSignal contact from '+(name||'a visitor'));
-  var body=encodeURIComponent((msg||'')+'\n\nFrom: '+(name||'')+' ('+(email||'')+')');
+  var body=encodeURIComponent(msg+'\n\nFrom: '+(name||'(no name given)')+' ('+email+')');
   window.location.href='mailto:hello@homesignal.net?subject='+subject+'&body='+body;
 }
 </script>
