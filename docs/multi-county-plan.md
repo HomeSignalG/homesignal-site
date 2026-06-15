@@ -16,7 +16,55 @@ We want to fix the foundation now so adding county #2 (and #50) is *just data*, 
 
 ---
 
-## 2. Recommended data model
+## 2′. Revised data model — CONFIRMED from the live Supabase schema (2026-06-15)
+
+> This section **supersedes the original §2 and §3 below**, which were written before we inspected the real database. Kept for history; do not run the §3 SQL as-is.
+
+**What we found in the live schema (6 users, pre-launch):**
+- ✅ `communities` **already exists** (`id, name, county, state, zip_codes, created_at`) — no need to create it.
+- ✅ `user_subscriptions` **already exists** and is the purpose-built per-county follow table: `id, user_id, community_id, pipeline_type (text), topic (text), created_at`. It is **empty** — never written to.
+- `users` = `id, email, zip_code, created_at, data_licensing_agreed (bool), community_id, topics (jsonb)`.
+- The website (`box-elder.html`) currently writes follows into **`users.topics` + `users.community_id`** (denormalized, one county per user). The engine reads `users.topics`. **`user_subscriptions` is unused.**
+
+**The tagging model (confirmed from the live page + the Stratos Zap):** content is connected to subscribers by **tags**, in a two-level hierarchy — **Pipeline > Topic**. There are **4 pipelines**; articles are tagged at the pipeline level, with an optional finer `category`:
+
+| `pipeline_type` (canonical key) | Topics (`topic` / article `category`) |
+|---|---|
+| `government_notice` *(live)* | **Per-county** — tracks the exact government feeds available for that county (Box Elder's list lives in `communities.js`). |
+| `news_alert` | Universal shared list (see `topics.js`). |
+| `emerging_technology` | Universal shared list. |
+| `global_best_practice` | Universal shared list. |
+
+(Decision 2026-06-15: News / Emerging / Global **share one topic list** to keep the site simple; Government Notices is per-county.)
+
+**Follow record = `user_subscriptions`, one row per `(user_id, community_id, pipeline_type[, topic])`.** `topic` is **nullable**:
+- `topic IS NULL` → follow the **whole** pipeline.
+- `topic = <value>` → follow **only** that topic within the pipeline.
+
+**Match rule the engine should use:** an article reaches a user when
+`community_id` matches **and** `pipeline_type` matches **and** (`subscription.topic IS NULL` **or** `subscription.topic = article.category`).
+This supports pipeline-level **and** topic-level follows in one model, so granularity can be added later with **no schema change**.
+
+**Canonical taxonomy registry (built 2026-06-15):** `topics.js` (the 4 pipelines + universal topic list + match-rule doc) and `communities.js` (`governmentTopics` per county). This is the single source of truth shared by the pop-ups, the subscription writes, and — as the reference you tag against — your Zaps. **Tag your Zaps with exactly these `pipeline_type` strings.**
+
+**Consent:** `users.data_licensing_agreed` already exists. We can extend with `signup_source` / `consent_at` / `marketing_consent` if desired (low-risk on 6 rows), but it's no longer urgent table-creation.
+
+**Email provider = Resend** (confirmed) — its webhooks feed `email_events` (still to be created; see §5).
+
+### Increment 2 (revised scope)
+1. Website writes follows to **`user_subscriptions`** (per `(user_id, community_id, pipeline_type[, topic])`), resolving `user_id` from `users` by email, using the canonical strings from `topics.js`.
+2. **Dual-write** `users.topics` during transition so the current engine keeps working untouched.
+3. Backfill the existing follows from `users.topics` into `user_subscriptions`.
+4. You update the engine to read `user_subscriptions` (match rule above) when ready; then we drop the `users.topics` mirror.
+5. Pop-ups driven by `topics.js` so only real pipelines are offered (granular topics opt-in / "coming soon" as tagging catches up).
+
+### ⛔ Open confirmations before coding increment 2
+- Confirm the 3 canonical pipeline strings: `news_alert`, `emerging_technology`, `global_best_practice` (or your preferred spellings) — these become the standard your Zaps must emit.
+- Confirm the universal topic list in `topics.js` (currently Box Elder's 12 environmental topics) is the shared list you want.
+
+---
+
+## 2. ~~Recommended data model~~ (SUPERSEDED by §2′ — kept for history)
 
 Add a dedicated **follows** table — one row per *person × county* — instead of cramming counties into a single user row.
 
@@ -77,9 +125,9 @@ email_events
 
 ---
 
-## 3. Exact Supabase SQL (founder pastes into Supabase → SQL Editor)
+## 3. ~~Exact Supabase SQL~~ (SUPERSEDED — DO NOT RUN AS-IS)
 
-> Safe to run: schema + Row-Level-Security only. No secrets. Review before running.
+> ⛔ **Superseded by §2′.** This SQL creates `user_communities` and `communities`, but the live DB already has `communities` and `user_subscriptions`. Do **not** run it. The only new table we still likely want is `email_events` (see §5). Kept for history.
 
 ```sql
 -- 1) FOLLOWS TABLE -------------------------------------------------

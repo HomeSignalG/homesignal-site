@@ -17,7 +17,18 @@
       page: 'box-elder.html',
       zips: ['84301', '84302', '84306', '84307', '84309', '84311', '84312',
              '84313', '84314', '84316', '84324', '84329', '84330', '84331',
-             '84334', '84336', '84337', '84340']
+             '84334', '84336', '84337', '84340'],
+      // Per-county Government Notices topics — these must track the exact
+      // government feeds available for this county (see topics.js).
+      governmentTopics: [
+        'County Commission & county business',
+        'Planning, zoning & development',
+        'Elections & voting',
+        'Public safety & emergencies',
+        'Water companies',
+        'Stratos data center project',
+        'Property taxes & assessments'
+      ]
     }
   ];
 
