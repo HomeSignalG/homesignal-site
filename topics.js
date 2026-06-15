@@ -13,11 +13,13 @@
 // anchors the naming convention (singular, snake_case); the other
 // three are DEFINED here as the standard for the Zaps you build next.
 //
-// Intended match rule for the engine:
-//   an article reaches a user when
-//     community_id matches  AND  pipeline_type matches  AND
-//       ( subscription.topic IS NULL          -> whole pipeline )
-//       OR ( subscription.topic = article.category -> that one topic )
+// Intended match rule (per the Feeds config: matching keys on CATEGORY):
+//   an article reaches a user when community_id matches AND
+//     ( subscription.topic = article.category   -> that one topic )
+//     OR ( subscription.topic IS NULL AND subscription.pipeline_type
+//          = article.pipeline_type              -> the whole pipeline )
+//   `pipeline_type` is a grouping label; the granular match key is
+//   category == topic (same canonical string, word-for-word).
 // ============================================================
 (function () {
   // Universal topics — INTENTIONALLY shared by News Alerts, Emerging

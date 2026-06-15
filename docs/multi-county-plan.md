@@ -67,13 +67,16 @@ This supports pipeline-level **and** topic-level follows in one model, so granul
 - `docs/user-subscriptions-setup.sql`: uniqueness guard + RLS (scoped to the logged-in user's own rows) + one-time backfill from `users.topics`.
 - **To activate:** run `docs/user-subscriptions-setup.sql`, then follow some topics on the page and confirm rows appear (the verify query is in the SQL).
 
-### ⚠️ Article-tagging target (YOUR alert-import side — required before matching works)
-Alerts are loaded from an **Excel sheet** (not Zapier). For subscriptions to match articles, each row you import must be tagged consistently:
-- `alerts.pipeline_type` = one of the 4 canonical strings (`government_notice` | `news_alert` | `emerging_technology` | `global_best_practices`).
-- `alerts.category` = the **granular topic** (must equal a `topic` value from `topics.js`, e.g. `Water Quality`, `Stratos data center project`).
+### Ingestion model (from `HomeSignalFeedsConfig.xlsx` — confirmed 2026-06-15)
+Alerts/meetings are loaded by a **scheduled ingestion engine** driven by a **Feeds config spreadsheet** (NOT Zapier — Zaps don't scale). One row = one feed; `source_type` ∈ `rss | keyword | html | email`. The engine loops active rows, fetches the source, de-dupes, and upserts items into the `alerts` or `meetings` table with that row's constant fields (`community_id`, `category`, `pipeline_type`, `agency_name`, `geographic_reference`, `impact_level`). **Adding a county = adding rows.**
 
-Best practice in the spreadsheet: use **data-validation dropdowns** for the `pipeline_type` and `category` columns, sourced from the canonical lists, so values can never drift. The engine's match rule then fires:
-`community_id` matches **and** `pipeline_type` matches **and** (`subscription.topic IS NULL` **or** `subscription.topic = alerts.category`).
+**The match key is `category`.** Per the config's rule: `category` MUST equal a Topics-sheet value *exactly*, and that is what subscriber matching keys on. `pipeline_type` (`government_notice | news | …`) is a coarser grouping label, not the match key.
+
+**Website ↔ engine contract:** `user_subscriptions.topic` (what the user follows) must equal `alerts.category` (what the engine tags). Both come from the same canonical topic list. Match: `community_id` matches **and** `subscription.topic = alerts.category` (a whole-pipeline follow with `topic IS NULL` matches all of that `pipeline_type`).
+
+**Canonical sync requirement — keep these identical:** the spreadsheet **Topics sheet** ⇄ the website's `topics.js` / `communities.js`.
+- ✅ Government topics already match exactly: the Excel Topics sheet's 7 values == Box Elder `governmentTopics` in `communities.js`.
+- ⬜ When News / Emerging / Global feeds go live, add their categories (the 12 universal topics in `topics.js`) to the Topics sheet so the strings stay word-for-word identical.
 
 ---
 
