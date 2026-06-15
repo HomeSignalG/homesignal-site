@@ -50,7 +50,7 @@
     },
     { key: 'news_alert',           label: 'News Alerts',          perCommunity: false, topics: UNIVERSAL_TOPICS },
     { key: 'emerging_technology',  label: 'Emerging Technology',  perCommunity: false, topics: UNIVERSAL_TOPICS },
-    { key: 'global_best_practice', label: 'Global Best Practices',perCommunity: false, topics: UNIVERSAL_TOPICS }
+    { key: 'global_best_practices',label: 'Global Best Practices',perCommunity: false, topics: UNIVERSAL_TOPICS }
   ];
 
   function getPipeline(key) {
