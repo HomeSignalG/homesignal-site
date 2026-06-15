@@ -67,12 +67,12 @@ This supports pipeline-level **and** topic-level follows in one model, so granul
 - `docs/user-subscriptions-setup.sql`: uniqueness guard + RLS (scoped to the logged-in user's own rows) + one-time backfill from `users.topics`.
 - **To activate:** run `docs/user-subscriptions-setup.sql`, then follow some topics on the page and confirm rows appear (the verify query is in the SQL).
 
-### ⚠️ Article-tagging target (YOUR Zap/engine side — required before matching works)
-For subscriptions to match articles, every article should be tagged consistently:
+### ⚠️ Article-tagging target (YOUR alert-import side — required before matching works)
+Alerts are loaded from an **Excel sheet** (not Zapier). For subscriptions to match articles, each row you import must be tagged consistently:
 - `alerts.pipeline_type` = one of the 4 canonical strings (`government_notice` | `news_alert` | `emerging_technology` | `global_best_practices`).
 - `alerts.category` = the **granular topic** (must equal a `topic` value from `topics.js`, e.g. `Water Quality`, `Stratos data center project`).
 
-Today this is inconsistent: government uses `pipeline_type`, while emerging/global put their identity in `category`, and `category` is also used for granular topics. Standardize the Zaps to the above so the engine's match rule fires:
+Best practice in the spreadsheet: use **data-validation dropdowns** for the `pipeline_type` and `category` columns, sourced from the canonical lists, so values can never drift. The engine's match rule then fires:
 `community_id` matches **and** `pipeline_type` matches **and** (`subscription.topic IS NULL` **or** `subscription.topic = alerts.category`).
 
 ---
