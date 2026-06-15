@@ -95,6 +95,12 @@ This supports pipeline-level **and** topic-level follows in one model, so granul
 - `docs/user-subscriptions-setup.sql`: uniqueness guard + RLS (scoped to the logged-in user's own rows) + one-time backfill from `users.topics`.
 - **To activate:** run `docs/user-subscriptions-setup.sql`, then follow some topics on the page and confirm rows appear (the verify query is in the SQL).
 
+### Increment 3 — dynamic community page BUILT (2026-06-15, dormant on branch)
+- `community.html`: one DB-driven page that loads **any** county from the `communities` table via `?id=<uuid>` | `?community=<slug>` | `?zip=<zip>` (defaults to Box Elder). Resolves name, ZIPs, and per-county `government_topics` from the table; universal topics from `topics.js`. Alerts/meetings/follows all keyed to the resolved `community_id`.
+- `box-elder.html` left untouched until `community.html` is verified; then it becomes a redirect and `communities.js` drops to a thin slug→id fallback.
+- Prereq: `communities` needs **public (anon) SELECT** so the browser can read it. If the page title doesn't update for a non-default county, that policy is missing.
+- **To verify:** open `community.html?zip=84302` (or `?community=box-elder`) and confirm it loads as Box Elder; alerts/meetings/follows work as before.
+
 ### Ingestion model (from `HomeSignalFeedsConfig.xlsx` — confirmed 2026-06-15)
 Alerts/meetings are loaded by a **scheduled ingestion engine** driven by a **Feeds config spreadsheet** (NOT Zapier — Zaps don't scale). One row = one feed; `source_type` ∈ `rss | keyword | html | email`. The engine loops active rows, fetches the source, de-dupes, and upserts items into the `alerts` or `meetings` table with that row's constant fields (`community_id`, `category`, `pipeline_type`, `agency_name`, `geographic_reference`, `impact_level`). **Adding a county = adding rows.**
 
