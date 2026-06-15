@@ -746,7 +746,7 @@ document.addEventListener('DOMContentLoaded', () => {
     var box = $('nav-auth');
     if (box) {
       if (window.hsUser) {
-        box.innerHTML = '<a class="btn-outline" href="dashboard.html" style="text-decoration:none">Dashboard</a><span style="font-size:13px;color:var(--text-secondary);margin:0 8px">' + window.hsUser.email + '</span><button class="btn-outline" id="btn-logout">Log out</button>';
+        box.innerHTML = '<a class="btn-outline" href="dashboard.html" style="text-decoration:none">Dashboard</a>' + '<span style="display:inline-flex;align-items:center;gap:10px;margin-left:12px;vertical-align:middle">' + '<span title="' + window.hsUser.email + '" style="font-size:12.5px;color:#6b7280;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle">' + window.hsUser.email + '</span>' + '<button type="button" id="btn-logout" style="background:none;border:none;padding:0;color:#6b7280;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline">Log out</button>' + '</span>';
         var lo = $('btn-logout');
         if (lo) lo.addEventListener('click', function(){ client.auth.signOut(); });
       } else {
