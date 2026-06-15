@@ -368,7 +368,7 @@ body { background: #f3f4f6; font-size: 14px; }
   <div class="comm-top">
     <div>
       <div class="comm-title" id="comm-title">Box Elder County, Utah</div>
-      <div class="comm-sub">Monitor factors that may influence quality of life and long-term community well-being</div>
+      <div class="comm-sub">Monitor factors that influence quality of life and long-term community well-being</div>
     </div>
     <button class="save-btn" onclick="toggleSave(this)"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg> <span id="save-label">Save location</span></button>
   </div>
@@ -1143,7 +1143,7 @@ initCommunity();
     var box = $('nav-auth');
     if (box) {
       if (window.hsUser) {
-        box.innerHTML = '<a class="btn-outline" href="dashboard.html" style="text-decoration:none">Dashboard</a><span style="font-size:13px;color:var(--text-secondary);margin:0 8px">' + window.hsUser.email + '</span><button class="btn-outline" id="btn-logout">Log out</button>';
+        box.innerHTML = '<a class="btn-outline" href="dashboard.html" style="text-decoration:none">Dashboard</a>' + '<span style="display:inline-flex;align-items:center;gap:10px;margin-left:12px;vertical-align:middle">' + '<span title="' + window.hsUser.email + '" style="font-size:12.5px;color:#6b7280;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle">' + window.hsUser.email + '</span>' + '<button type="button" id="btn-logout" style="background:none;border:none;padding:0;color:#6b7280;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline">Log out</button>' + '</span>';
         var lo = $('btn-logout');
         if (lo) lo.addEventListener('click', function(){ client.auth.signOut(); });
       } else {

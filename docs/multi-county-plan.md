@@ -101,6 +101,11 @@ This supports pipeline-level **and** topic-level follows in one model, so granul
 - Prereq: `communities` needs **public (anon) SELECT** so the browser can read it. If the page title doesn't update for a non-default county, that policy is missing.
 - **To verify:** open `community.html?zip=84302` (or `?community=box-elder`) and confirm it loads as Box Elder; alerts/meetings/follows work as before.
 
+### Near-term tasks
+- **Centralize the shared nav/footer + logged-in account bar** into one source (a shared include or JS render) instead of copy-pasting it across ~9 pages. Then **upgrade the logged-in bar to a proper account dropdown** (avatar/initial + email + Log out) — built once, every page inherits it. *(A clean flat version shipped 2026-06-15 as the interim; the dropdown waits for this centralization so we don't duplicate toggle JS across pages.)*
+- **Cut over to the dynamic page:** point the dashboard "Manage"/community-name link and the homepage ZIP search at `community.html` (currently `box-elder.html`), once `community.html` is verified live.
+- **Operator setup (Supabase):** run `docs/user-subscriptions-setup.sql` and ensure `communities` has public SELECT so `community.html` can read it.
+
 ### Ingestion model (from `HomeSignalFeedsConfig.xlsx` — confirmed 2026-06-15)
 Alerts/meetings are loaded by a **scheduled ingestion engine** driven by a **Feeds config spreadsheet** (NOT Zapier — Zaps don't scale). One row = one feed; `source_type` ∈ `rss | keyword | html | email`. The engine loops active rows, fetches the source, de-dupes, and upserts items into the `alerts` or `meetings` table with that row's constant fields (`community_id`, `category`, `pipeline_type`, `agency_name`, `geographic_reference`, `impact_level`). **Adding a county = adding rows.**
 
