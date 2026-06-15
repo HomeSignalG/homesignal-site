@@ -7,6 +7,20 @@
 
 ---
 
+## 0. Scalability mandate (NON-NEGOTIABLE)
+
+Everything we build must scale to **all ~3,144 U.S. counties**, with a new county added as **pure data — zero engineering**. Every change is judged against these rules:
+
+1. **No per-county files.** ONE dynamic community page, loaded by id/slug from the DB. (Retire `box-elder.html`.)
+2. **No hardcoded registries in the browser.** Communities and ZIP→county come from the `communities` table via query — not a static JS array. (`communities.js` → thin bootstrap/fallback only.)
+3. **Config as data.** Feeds / topics / communities live in DB tables the engine and site read. Spreadsheets are an *authoring* surface, not the runtime source.
+4. **Normalized, indexed data.** Follows in `user_subscriptions` keyed by `(community_id, category)`; matching stays index-fast, never JSON scans. *(done)*
+5. **Shared where possible; per-county only as rows.** Universal topics shared across all counties; per-county specifics (government topics, ZIPs) are rows, never code.
+6. **No per-county deploy.** The dynamic page queries Supabase live; onboarding a county never requires a site build.
+7. **Graceful coverage.** Any ZIP resolves: covered → community page; not-yet-covered → waitlist capture (also an acquisition signal).
+
+---
+
 ## 1. The problem we're solving
 
 - When a logged-in user is on the homepage, there is **no clear way back to their community** — the nav only shows their email + "Log out". They must re-type a ZIP.
