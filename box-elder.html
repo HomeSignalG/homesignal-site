@@ -1058,7 +1058,7 @@ loadMeetings();
     var box = $('nav-auth');
     if (box) {
       if (window.hsUser) {
-        box.innerHTML = '<span style="font-size:13px;color:var(--text-secondary);margin-right:8px">' + window.hsUser.email + '</span><button class="btn-outline" id="btn-logout">Log out</button>';
+        box.innerHTML = '<a class="btn-outline" href="my-alerts.html" style="text-decoration:none">My alerts</a><span style="font-size:13px;color:var(--text-secondary);margin:0 8px">' + window.hsUser.email + '</span><button class="btn-outline" id="btn-logout">Log out</button>';
         var lo = $('btn-logout');
         if (lo) lo.addEventListener('click', function(){ client.auth.signOut(); });
       } else {
