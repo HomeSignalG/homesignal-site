@@ -208,7 +208,7 @@ You own and edit this repo, so this section is your implementation checklist. (C
 
 **Engagement logging (feeds §2.3b):**
 - Write one `email_events` row per send (`event_type = 'sent'`, with `user_email`, `community_id`, `alert_id`).
-- Wire your email provider's webhook (delivered/open/click/bounce/unsubscribe) to insert matching `email_events` rows. Use the **service-role key** (bypasses RLS).
+- Wire **Resend's webhook** (events: `email.delivered`, `email.opened`, `email.clicked`, `email.bounced`, `email.complained`) to insert matching `email_events` rows. The webhook can land in a Supabase Edge Function or a Zap that writes the row using the **service-role key** (bypasses RLS).
 - On an unsubscribe event, set `users.marketing_consent = false` so the matching query above stops including them.
 
 **Sequencing note:** until the engine reads `user_communities`, follows in a *second* county won't trigger emails. So don't advertise multi-county alerts to users until this engine change ships. The website work can land behind it without over-promising.
@@ -232,6 +232,6 @@ You own and edit this repo, so this section is your implementation checklist. (C
 3. **Dynamic `community.html` template** vs one HTML file per county — recommend dynamic.
 4. **Who updates the engine repo, and when**, so website + engine stay in sync.
 5. **Consent wording:** the exact opt-in text (and `consent_version` value) should be reviewed by a lawyer before launch.
-6. **Email-event source:** which provider's webhooks feed `email_events` (e.g., Resend/Postmark/SES) — needed so the engine can write open/click events.
+6. ✅ Resolved 2026-06-15: **email provider is Resend.** Its webhooks (`email.delivered/opened/clicked/bounced/complained`) feed `email_events`.
 
 > ✅ Resolved 2026-06-15: include the consent & compliance trail (§2.3a) and metrics/engagement capture (§2.3b) in this foundation.
