@@ -235,3 +235,78 @@ Run the **DB-backed dry-run** (no emails actually sent):
 
 **Storage is locked to jsonb keys (Option A).** No site follow-up is needed or
 pending; typed columns are explicitly rejected (see §1).
+
+---
+
+## 6. Live DB validation (2026-06-17, project `qwnnmljucajnexpxdgxr`)
+
+Verified the real Supabase schema/data against this spec (read-only). The
+matching contract holds, but the engine implementer must account for these
+ground-truth facts:
+
+### Tables/columns that DON'T exist yet (created by the unmerged migration)
+- **`email_deliveries`** and **`email_events`** tables do **not** exist in the
+  live DB. They are part of the unmerged email-delivery migration in
+  `homesignal-ingest` — correct, since the migration hasn't been applied. The
+  dedup logic (§3) depends on `email_deliveries` existing post-migration.
+- **`users.marketing_consent`** does **not** exist yet (nor `consent_at`,
+  `consent_version`, `signup_source`). The consent gate in the §2 sketch
+  (`user.get("marketing_consent", True)`) therefore must **default to True when
+  the column/key is absent**, or be gated on whether the consent migration
+  (`docs/multi-county-plan.md` §3 step 5) has run. Do **not** hard-require the
+  column. `users` today = `id, email, zip_code, created_at,
+  data_licensing_agreed, community_id, topics(jsonb)`.
+
+### `alerts` — pipeline_type is the v1 filter
+- `alerts.pipeline_type` has a CHECK constraint:
+  `pipeline_type IN ('permit_filing','government_notice','news')`. There is **no
+  `emerging_technology`/`global_best_practices`** at the alerts level. So
+  "exclude news / emerging / global" simply means **filter
+  `pipeline_type = 'government_notice'`** — that's the whole exclusion. (Note the
+  alerts value is `'news'`, while `topics.js`/the site use `'news_alert'` as the
+  pipeline label — irrelevant to v1 since we only select `government_notice`.)
+- Match notice-topics on `alerts.category` (exact string).
+- 260 existing rows → all suppressed on first send (no-backfill, §3).
+
+### ⚠︎ Non-canonical categories already in the data (re-tag decision needed)
+Live Box Elder `government_notice` alerts by category include two values that
+are **not** among the 7 canonical topics and therefore **match nothing and never
+deliver**:
+- `council_meeting` — **46 rows**
+- `Public notices` — **7 rows**
+
+(The canonical ones present: County Commission & county business 9, Planning 10,
+Elections & voting 3, Public safety & emergencies 1, Stratos 7, Water companies
+7; no Property-taxes alerts yet.) This is the same taxonomy-drift the FIX-2 /
+re-tag work targets — surfacing it here because exact-string matching means
+those 53 rows are invisible to subscribers until re-tagged. **Not fixing it in
+this change** (separate data decision), but flag it: the engine owner should
+decide whether `council_meeting`/`Public notices` get re-tagged to canonical
+categories.
+
+### `meetings` — future filter + nullable category
+- Match meeting-topics on `meetings.category` (exact string); **`category` is
+  nullable** — null-category meetings (3 today) match no topic and are skipped.
+- Future filter = **`meeting_date >= now()`** (`meeting_date` is `timestamptz`).
+- Live data: exactly **1 future** meeting (`Planning, zoning & development`); the
+  rest are past and correctly excluded. A test user following Planning in
+  meeting-topics would get that 1 meeting.
+
+### Dry-run note (§4) given no-backfill + live data
+With no-backfill suppressing all 260 historical alerts, a first-run dry-run for
+a seeded user would show **would-send = 0** unless a **fresh** matching item
+(dated after the first-send cutoff / not in `email_deliveries`) exists. To get a
+**non-zero** "would send" in the dry-run, seed one new `alerts` row
+(`pipeline_type='government_notice'`, a canonical `category` in the user's
+notice-topics, `created_at = now()`) and/or rely on the 1 existing **future
+meeting** if the meeting path isn't subject to the alert backfill cutoff. ⚠︎
+confirm how the branch's no-backfill rule treats `meetings` vs `alerts`.
+
+### Read-only would-send preview (no writes, ran 2026-06-17)
+The matching logic was previewed against live data with a pure `SELECT` (0
+writes, 0 sends). For a hypothetical user following notice-topics
+{County Commission & county business, Water companies} and meeting-topics
+{Planning, zoning & development}, the canonical matches present are: 9 + 7 = 16
+gov-notice alerts and 1 future meeting — confirming the join/category matching
+works end-to-end at the DB level. (Actual first-send would still be governed by
+the no-backfill cutoff + `email_deliveries` dedup.)
