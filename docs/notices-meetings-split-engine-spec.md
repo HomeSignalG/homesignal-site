@@ -64,29 +64,26 @@ deliberately choose the backfill option above.
 
 ---
 
-## 1. Storage (task item 6) — no new columns required (recommended)
+## 1. Storage (task item 6) — jsonb keys, no new columns (LOCKED — Option A)
+
+**Decision (locked 2026-06-17):** read the two jsonb keys; **add no columns.**
 
 The split needs **no schema change**: `users.topics` is already jsonb and the
 site writes both keys. Reading `topics->'notices'` and `topics->'meetings'`
-satisfies "store each user's notice-topics and meeting-topics independently."
+satisfies "store each user's notice-topics and meeting-topics independently,"
+and adding zero columns is the safest way to honor "no second migration." Keep
+the existing unmerged migration exactly as-is.
 
-**This is the safest way to honor "no second migration":** adding zero columns
-can't introduce one. Keep the existing unmerged migration exactly as-is.
+**Why jsonb, not typed columns:** News / Emerging technologies / Global best
+practices are parked now and get added later. jsonb absorbs each new pipeline as
+another key with **no schema change**; typed columns would force a fresh
+migration every time a pipeline ships. So the engine reads `users.topics`
+key-by-key and the site half is **final** on this basis.
 
-### If you prefer typed columns instead of jsonb keys (Option B) ⚠︎
-Only if the unmerged branch already moves follows off `users.topics` onto typed
-columns, fold these into **that same migration** (additive, no table rewrites):
-
-```sql
--- Fold into the EXISTING unmerged migration file. Additive only.
-alter table public.users
-  add column if not exists notice_topics  text[] not null default '{}',
-  add column if not exists meeting_topics text[] not null default '{}';
-```
-
-If you take Option B, tell me and I'll update the site to also write
-`notice_topics` / `meeting_topics` (today it writes the jsonb keys). Until then,
-**Option A (read the jsonb keys) is what the shipped site supports.**
+### Rejected — typed columns (Option B)
+Do **not** add `notice_topics` / `meeting_topics` columns. Rejected for the
+reason above (schema churn on every future pipeline). The shipped site writes
+jsonb keys and will not be changed to write typed columns.
 
 ---
 
@@ -235,6 +232,5 @@ Run the **DB-backed dry-run** (no emails actually sent):
 | 8 | homesignal-ingest | Keep locked decisions | ◻ this spec §3 |
 | 9 | homesignal-ingest | DB-backed dry-run verification | ◻ this spec §4 |
 
-**If you take Option B (typed columns), ping me** — the site needs a one-line
-follow-up to write `notice_topics`/`meeting_topics` instead of (or in addition
-to) the jsonb keys.
+**Storage is locked to jsonb keys (Option A).** No site follow-up is needed or
+pending; typed columns are explicitly rejected (see §1).
