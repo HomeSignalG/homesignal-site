@@ -214,8 +214,9 @@ Run the **DB-backed dry-run** (no emails actually sent):
    - **0 emails actually sent** and **0 new `email_deliveries`/`email_events`
      rows** written by the dry-run.
 4. **Show the diff** (`git diff` of the branch) and **confirm the migration is
-   still a single, additive migration** that does not alter existing tables —
-   i.e. Option A added nothing, or Option B only `ADD COLUMN ... IF NOT EXISTS`.
+   still a single, additive migration** that does not alter existing tables. Per
+   the locked decision (§1), this split adds **no columns** — the migration is
+   unchanged by it.
 
 **Prerequisite for real sends (not a blocker for building/dry-running):**
 `RESEND_API_KEY` in GitHub Secrets + `homesignal.net` verified in Resend.
