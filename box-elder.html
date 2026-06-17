@@ -113,7 +113,7 @@ body { background: #f3f4f6; font-size: 14px; }
 .early-badge { background: #fee2e2; color: #991b1b; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
 .inform-lbl { color: #166534; }
 .inform-badge { background: #dcfce7; color: #166534; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
-.cat-tiles { display: flex; flex-direction: column; gap: 8px; }
+.cat-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .cat-tile { border-radius: var(--rs); padding: 11px 14px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.15s; user-select: none; }
 .cat-tile svg { width: 18px; height: 18px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .ct-label { font-size: 12px; font-weight: 500; margin-bottom: 2px; }
@@ -316,8 +316,7 @@ body { background: #f3f4f6; font-size: 14px; }
 .groups > * + * { margin-top: 12px; }
 .row-label { gap: 0; }
 .row-label > :first-child { margin-right: 7px; }
-.cat-tiles { gap: 0; }
-.cat-tiles > * + * { margin-top: 8px; }
+.cat-tiles { grid-template-columns: 1fr; gap: 8px; }
 .cat-tile { gap: 0; }
 .cat-tile > :first-child { margin-right: 10px; }
 .signup-band { gap: 0; }
@@ -381,7 +380,8 @@ body { background: #f3f4f6; font-size: 14px; }
     <div class="group g-early">
       <div class="row-label early-lbl"><svg style="width:13px;height:13px;stroke:#991b1b;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Early warning — advance notice before decisions are made <span class="early-badge">Act before the vote</span></div>
       <div class="cat-tiles">
-        <div class="cat-tile early-off" data-id="meetings" data-type="early" onclick="openModal(this)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><div><div class="ct-label">Government notices &amp; meetings</div><div class="ct-sub" id="lbl-meetings">Click to choose topics</div></div></div>
+        <div class="cat-tile early-off" data-id="gov-notices" data-cat="meetings" data-type="early" onclick="openModal(this)"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg><div><div class="ct-label">Government notices</div><div class="ct-sub">Click to choose topics</div></div></div>
+        <div class="cat-tile early-off" data-id="gov-meetings" data-cat="meetings" data-type="early" onclick="openModal(this)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><div><div class="ct-label">Upcoming meetings</div><div class="ct-sub">Click to choose topics</div></div></div>
       </div>
     </div>
     <div class="group g-inform">
@@ -549,10 +549,19 @@ function renderAlerts(alerts) {
     const badge = getBadge(a.impact_level);
     const date = formatDate(a.published_at || a.created_at);
     const meta = [a.agency_name, date, a.geographic_reference].filter(Boolean).join(' · ');
-    const link = a.source_url ? `<a class="alink" href="${a.source_url}" target="_blank">Read more →</a>` : '';
+    // Topic chip — mirrors the meetings card. Show only when category is a real
+    // topic; suppress raw pipeline keys so we never display e.g. "emerging_technology".
+    const RAW_PIPELINE_KEYS = ['government_notice','news_alert','emerging_technology','global_best_practices'];
+    const showTopic = a.category && RAW_PIPELINE_KEYS.indexOf(a.category) < 0;
+    const topicChip = showTopic
+      ? `<div class="mcard-tags"><span class="mchip">${String(a.category).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span></div>`
+      : '';
+    const linkText = (a.pipeline_type === 'government_notice') ? 'View official record →' : 'Read more →';
+    const link = a.source_url ? `<a class="alink" href="${a.source_url}" target="_blank">${linkText}</a>` : '';
     const catId = alertCatId(a.pipeline_type, a.category);
     return `<div class="alert-card" data-cat="${catId}">
       ${tag}
+      ${topicChip}
       <div class="alert-top">
         <div class="aicon" style="background:${icon.bg}"><svg style="stroke:${icon.stroke}" viewBox="0 0 24 24">${icon.path}</svg></div>
         <div class="abody"><div class="atitle">${a.title || 'Untitled alert'}</div><div class="ameta">${meta}</div></div>
@@ -786,13 +795,16 @@ async function syncSubscriptions(cat, checked, email, H){
 }
 
 function refreshTileLabels(){
-  ['meetings','news','emerging','global'].forEach(function(cat){
-    const tile = document.querySelector('.cat-tile[data-id="'+cat+'"]');
-    if(!tile) return;
-    const n = followedFor(cat).length;
-    const type = tile.dataset.type;
+  // Each tile maps to a subscription cat via data-cat (falls back to data-id).
+  // Two government tiles (notices + meetings) share cat "meetings", so we key
+  // off each tile's own .ct-sub rather than a shared id.
+  document.querySelectorAll('.cat-tile').forEach(function(tile){
+    var cat = tile.dataset.cat || tile.dataset.id;
+    if(!cat) return;
+    var n = followedFor(cat).length;
+    var type = tile.dataset.type;
     tile.className = 'cat-tile '+(n>0?(type==='early'?'early-on':'inform-on'):(type==='early'?'early-off':'inform-off'));
-    const lbl = document.getElementById('lbl-'+cat);
+    var lbl = tile.querySelector('.ct-sub');
     if(lbl) lbl.textContent = n>0 ? (n+' topic'+(n===1?'':'s')+' followed · click to change') : 'Click to choose topics';
   });
 }
@@ -841,7 +853,7 @@ window.hsOnAuthChange = async function(user){
   }
 };
 function openModal(tile){
-  currentId=tile.dataset.id;currentType=tile.dataset.type;
+  currentId=tile.dataset.cat||tile.dataset.id;currentType=tile.dataset.type;
   pendingFollow=null;
   const d=cats[currentId];
   document.getElementById('modal-title').textContent=d.title;
@@ -948,7 +960,7 @@ async function loadMeetings() {
       const hearing = m.is_public_hearing
         ? `<div class="mcard-hearing">${ICO_MIC}<div>Public hearing — you can speak at this meeting</div></div>`
         : (m.comment_period_open ? `<div class="mcard-hearing">${ICO_MIC}<div>Comment period open</div></div>` : '');
-      const foot = m.source_url ? `<div class="mcard-foot"><a href="${esc(m.source_url)}" target="_blank" rel="noopener">Read the full notice &amp; how to comment →</a></div>` : '';
+      const foot = m.source_url ? `<div class="mcard-foot"><a href="${esc(m.source_url)}" target="_blank" rel="noopener">Agenda &amp; how to attend →</a></div>` : '';
       return `<div class="mcard">
         ${tags?`<div class="mcard-tags">${tags}</div>`:''}
         <div class="mcard-title">${title}</div>
