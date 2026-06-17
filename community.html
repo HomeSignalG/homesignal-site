@@ -381,7 +381,8 @@ body { background: #f3f4f6; font-size: 14px; }
     <div class="group g-early">
       <div class="row-label early-lbl"><svg style="width:13px;height:13px;stroke:#991b1b;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Early warning — advance notice before decisions are made <span class="early-badge">Act before the vote</span></div>
       <div class="cat-tiles">
-        <div class="cat-tile early-off" data-id="meetings" data-type="early" onclick="openModal(this)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><div><div class="ct-label">Government notices &amp; meetings</div><div class="ct-sub" id="lbl-meetings">Click to choose topics</div></div></div>
+        <div class="cat-tile early-off" data-id="notices" data-type="early" onclick="openModal(this)"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg><div><div class="ct-label">Government notices</div><div class="ct-sub" id="lbl-notices">Click to choose topics</div></div></div>
+        <div class="cat-tile early-off" data-id="meetings" data-type="early" onclick="openModal(this)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><div><div class="ct-label">Upcoming meetings</div><div class="ct-sub" id="lbl-meetings">Click to choose topics</div></div></div>
       </div>
     </div>
     <div class="group g-inform">
@@ -572,7 +573,7 @@ let alertCat = null;
 
 // Map an alert's pipeline_type/category to one of the four signup categories.
 function alertCatId(type, category){
-  if(type==='government_notice') return 'meetings';
+  if(type==='government_notice') return 'notices';
   if(category==='emerging_technology') return 'emerging';
   if(category==='global_best_practices') return 'global';
   return 'news';
@@ -687,7 +688,8 @@ async function saveUser(email, zip) {
 // CATEGORY SELECTOR MODAL
 // ============================================================
 const cats = {
-  meetings:{title:'Box Elder County notices',sub:'Choose which county notices you want advance alerts for',iconBg:'#fee2e2',iconStroke:'#991b1b',iconPath:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',items:['County Commission & county business','Planning, zoning & development','Elections & voting','Public safety & emergencies','Water companies','Stratos data center project','Property taxes & assessments']},
+  notices:{title:'Government notices',sub:'Choose which government notices you want advance alerts for',iconBg:'#fee2e2',iconStroke:'#991b1b',iconPath:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>',items:['County Commission & county business','Planning, zoning & development','Property taxes & assessments','Public safety & emergencies','Water companies','Elections & voting','Stratos data center project']},
+  meetings:{title:'Upcoming meetings',sub:'Choose which county meetings you want advance alerts for',iconBg:'#fee2e2',iconStroke:'#991b1b',iconPath:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',items:['County Commission & county business','Planning, zoning & development','Property taxes & assessments','Public safety & emergencies','Water companies','Elections & voting','Stratos data center project']},
   news:{title:'News alerts',sub:'Select the news topics you want real-time alerts for',iconBg:'#dcfce7',iconStroke:'#166534',iconPath:'<path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/>',items:['Water Quality','Air Quality','Soil Quality','Animal & Human Viruses / Diseases','Infrastructure','EMF','Noise Pollution','Light Pollution','Livestock, Crops, Pets & Wildlife Health','Weather & Climate Hazards','Radiation','Data Centers']},
   emerging:{title:'Emerging technologies',sub:'Select the technology categories you want to follow',iconBg:'#dcfce7',iconStroke:'#166534',iconPath:'<line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>',items:['Water Quality','Air Quality','Soil Quality','Animal & Human Viruses / Diseases','Infrastructure','EMF','Noise Pollution','Light Pollution','Livestock, Crops, Pets & Wildlife Health','Weather & Climate Hazards','Radiation','Data Centers']},
   global:{title:'Global best practices',sub:'Select the global standards you want to follow',iconBg:'#dcfce7',iconStroke:'#166534',iconPath:'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/>',items:['Water Quality','Air Quality','Soil Quality','Animal & Human Viruses / Diseases','Infrastructure','EMF','Noise Pollution','Light Pollution','Livestock, Crops, Pets & Wildlife Health','Weather & Climate Hazards','Radiation','Data Centers']}
@@ -730,11 +732,16 @@ async function loadAccount(){
 
 // Canonical pipeline_type for each UI cat (mirrors topics.js — keep in sync).
 const CAT_TO_PIPELINE = {
-  meetings: 'government_notice',
+  notices: 'government_notice',
   news: 'news_alert',
   emerging: 'emerging_technology',
   global: 'global_best_practices'
 };
+// NOTE: the "meetings" (Upcoming meetings) tile is intentionally NOT mapped here.
+// Both "notices" and "meetings" are the government_notice pipeline, so the current
+// user_subscriptions schema (keyed on pipeline_type) cannot hold them as two
+// independent sets without one clobbering the other. The split is authoritative in
+// users.topics.notices / users.topics.meetings, which the ingestion engine reads.
 
 async function saveTopics(cat, checked){
   accountTopics[cat] = checked;
@@ -788,7 +795,7 @@ async function syncSubscriptions(cat, checked, email, H){
 }
 
 function refreshTileLabels(){
-  ['meetings','news','emerging','global'].forEach(function(cat){
+  ['notices','meetings','news','emerging','global'].forEach(function(cat){
     const tile = document.querySelector('.cat-tile[data-id="'+cat+'"]');
     if(!tile) return;
     const n = followedFor(cat).length;
