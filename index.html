@@ -3,703 +3,278 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
-<title>HomeSignal — Know Before the Vote</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; form-action 'self'">
+<title>HomeSignal — See what's being planned around your home</title>
 <style>
 /* ============================================================
-   HomeSignal — shared styles
-   Design tokens, reset, base typography, nav, footer.
-   Loaded on every page before the page-specific stylesheet.
-   ============================================================ */
-
-:root {
-  --green: #1a6b3c;
-  --green-light: #eaf3de;
-  --green-mid: #97c459;
-  --green-dark: #27500a;
-  --green-text: #3b6d11;
-  --text: #111827;
-  --text-secondary: #6b7280;
-  --text-tertiary: #9ca3af;
-  --border: #e5e7eb;
-  --bg: #ffffff;
-  --bg-secondary: #f9fafb;
-  --radius: 10px;
-  --radius-sm: 6px;
-  --radius-pill: 100px;
-
-  /* shorthand aliases used by the community page */
-  --gl: var(--green-light);
-  --gm: var(--green-mid);
-  --gd: var(--green-dark);
-  --ts: var(--text-secondary);
-  --tt: var(--text-tertiary);
-  --bg2: var(--bg-secondary);
-  --r: var(--radius);
-  --rs: var(--radius-sm);
+   HomeSignal — homepage (marketing only)
+   Design tokens adapted from the reference mockup; brand green
+   #1f5130, with a prefers-color-scheme dark-mode block.
+   Icons are inline SVG (no external icon font — matches the repo
+   and the page CSP). ============================================ */
+:root{
+  --bg-primary:#ffffff; --bg-secondary:#f4f3ee; --bg-tertiary:#eceae2; --bg-band:#f0efe7;
+  --bg-info:#e6f1fb; --tx-info:#0c447c;
+  --bg-success:#e1f5ee; --tx-success:#0f6e56; --bd-success:#9fe1cb;
+  --bg-purple:#eeedfe; --tx-purple:#3c3489;
+  --bg-warning:#faeeda; --tx-warning:#854f0b;
+  --green:#1f5130; --green-tx:#ffffff;
+  --tx-primary:#1c1c1a; --tx-secondary:#5f5e5a; --tx-tertiary:#8a8980;
+  --bd-tertiary:rgba(0,0,0,.12); --bd-secondary:rgba(0,0,0,.22);
+  --r-md:8px; --r-lg:12px; --r-xl:16px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-a { text-decoration: none; }
-input, button, textarea { font-family: inherit; outline: none; }
-input:focus, textarea:focus { border-color: var(--green) !important; }
-
-body {
-  font-family: 'Inter', system-ui, sans-serif;
-  color: var(--text);
-  line-height: 1.6;
-}
-
-/* ---------- NAV (shared across all pages) ---------- */
-nav {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 48px; border-bottom: 1px solid var(--border);
-  background: var(--bg); position: sticky; top: 0; z-index: 100;
-}
-.logo { display: flex; align-items: center; gap: 10px; }
-.logo-icon { width: 34px; height: 34px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-.logo-icon svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.logo-text { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
-.logo-text span { color: var(--green); }
-.nav-links { display: flex; align-items: center; gap: 36px; list-style: none; }
-.nav-links a { color: var(--text-secondary); font-size: 14px; }
-.nav-links a:hover { color: var(--text); }
-.nav-actions { display: flex; gap: 10px; }
-.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 8px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; }
-.btn-outline:hover { background: var(--bg-secondary); }
-.btn-primary { background: var(--green); color: #fff; border: none; padding: 8px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; }
-.btn-primary:hover { opacity: 0.9; }
-
-/* ---------- FOOTER (shared across all pages) ---------- */
-footer {
-  padding: 32px 48px; border-top: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: 16px; background: var(--bg-secondary);
-}
-.footer-left .logo-text { font-size: 15px; margin-bottom: 4px; }
-.footer-tagline { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
-.footer-links { display: flex; gap: 20px; }
-.footer-links a { font-size: 13px; color: var(--text-tertiary); }
-.footer-links a:hover { color: var(--text); }
-
-</style>
-<style>
-/* ============================================================
-   HomeSignal — homepage styles (index.html)
-   ============================================================ */
-
-body { background: var(--bg); font-size: 15px; }
-
-/* HERO */
-.hero { padding: 72px 48px 56px; text-align: center; background: var(--bg-secondary); border-bottom: 1px solid var(--border); }
-.eyebrow { display: inline-flex; align-items: center; gap: 7px; background: var(--green-light); border: 1px solid var(--green-mid); color: var(--green-dark); font-size: 11px; font-weight: 600; padding: 5px 14px; border-radius: var(--radius-pill); margin-bottom: 24px; letter-spacing: 0.06em; text-transform: uppercase; }
-.pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-.hero h1 { font-size: 46px; font-weight: 700; line-height: 1.15; margin-bottom: 18px; letter-spacing: -0.03em; max-width: 640px; margin-left: auto; margin-right: auto; }
-.hero h1 span { color: var(--green); }
-.hero-sub { font-size: 16px; color: var(--text-secondary); max-width: 540px; margin: 0 auto 40px; line-height: 1.75; font-weight: 400; }
-
-/* SEARCH */
-.search-card { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 28px; max-width: 660px; margin: 0 auto; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-.search-card-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; text-align: left; }
-.search-card-sub { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; text-align: left; }
-.search-row { display: flex; gap: 10px; }
-.search-input { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 13px; color: var(--text); background: var(--bg-secondary); }
-.search-input::placeholder { color: var(--text-tertiary); }
-.btn-search { background: var(--green); color: #fff; border: none; padding: 12px 24px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.btn-search:hover { opacity: 0.9; }
-.search-msg { display: none; margin-top: 14px; font-size: 13px; text-align: left; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--green-light); border: 1px solid var(--green-mid); color: var(--green-dark); }
-.search-msg.show { display: block; }
-
-/* NOT LISTED BAND */
-.not-listed-band { padding: 24px 48px; background: var(--green-light); border-top: 1px solid var(--green-mid); border-bottom: 1px solid var(--green-mid); }
-.not-listed-inner { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; max-width: 960px; margin: 0 auto; }
-.nl-icon { width: 42px; height: 42px; background: var(--bg); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid var(--green-mid); }
-.nl-icon svg { width: 20px; height: 20px; stroke: var(--green); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.nl-text { flex: 1; min-width: 200px; }
-.nl-text h4 { font-size: 15px; font-weight: 600; margin-bottom: 3px; color: var(--green-dark); }
-.nl-text p { font-size: 13px; color: var(--green-text); line-height: 1.5; }
-.nl-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.nl-input { border: 1px solid var(--green-mid); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; color: var(--green-dark); background: var(--bg); width: 220px; }
-.nl-input::placeholder { color: var(--green-text); opacity: 0.6; }
-.btn-request { background: var(--green); color: #fff; border: none; padding: 10px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.btn-request:hover { opacity: 0.9; }
-
-/* TOPIC REQUEST BAND */
-.topic-request-band { padding: 24px 48px; background: var(--bg); border-top: 1px solid var(--green-mid); border-bottom: 1px solid var(--green-mid); }
-.trb-inner { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; max-width: 960px; margin: 0 auto; }
-.trb-text { flex: 1; min-width: 200px; }
-.trb-text h4 { font-size: 15px; font-weight: 600; margin-bottom: 3px; color: var(--green-dark); }
-.trb-text p { font-size: 13px; color: var(--green-text); line-height: 1.5; }
-.trb-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-
-/* TOPICS */
-.topics-section { padding: 28px 48px; border-bottom: 1px solid var(--border); background: var(--bg); }
-.topics-label { font-size: 11px; color: var(--text-tertiary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; margin: 0 auto 14px; max-width: 900px; }
-.topics-row { display: flex; flex-wrap: wrap; justify-content: center; max-width: 900px; margin: 0 auto; }
-.topic-pill { display: flex; align-items: center; gap: 9px; font-size: 14px; color: var(--text); width: 33.333%; box-sizing: border-box; padding-right: 22px; margin-bottom: 16px; }
-.topic-pill svg { width: 15px; height: 15px; stroke: var(--green); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
-
-</style>
-<style>
-/* ===== Responsive nav + mobile layout ===== */
-.nav-toggle { display: none; background: none; border: none; cursor: pointer; color: var(--text); padding: 4px; }
-.nav-menu { display: contents; }
-
-@media (max-width: 720px) {
-  nav { padding: 12px 20px; }
-  .nav-toggle { display: flex; align-items: center; }
-  .nav-menu {
-    display: none; position: absolute; top: 100%; left: 0; right: 0;
-    flex-direction: column; align-items: stretch; gap: 0;
-    background: var(--bg); border-bottom: 1px solid var(--border);
-    padding: 6px 20px 14px; box-shadow: 0 8px 16px rgba(0,0,0,0.07);
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg-primary:#232320; --bg-secondary:#2b2b26; --bg-tertiary:#191917; --bg-band:#201f1c;
+    --bg-info:#0c447c; --tx-info:#b5d4f4;
+    --bg-success:#085041; --tx-success:#9fe1cb; --bd-success:#0f6e56;
+    --bg-purple:#3c3489; --tx-purple:#cecbf6;
+    --bg-warning:#633806; --tx-warning:#fac775;
+    --green:#2f7048; --green-tx:#ffffff;
+    --tx-primary:#f1efe8; --tx-secondary:#b4b2a9; --tx-tertiary:#888780;
+    --bd-tertiary:rgba(255,255,255,.14); --bd-secondary:rgba(255,255,255,.26);
   }
-  .nav-menu.open { display: flex; }
-  .nav-links { flex-direction: column; align-items: stretch; gap: 0; width: 100%; }
-  .nav-links a { display: block; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
-  .nav-actions { flex-direction: column; align-items: stretch; gap: 8px; width: 100%; margin-top: 12px; }
-  .nav-actions button { width: 100%; padding: 12px; }
-
-  /* homepage */
-  .hero { padding: 48px 20px 40px; }
-  .hero h1 { font-size: 32px; }
-  .hero-sub { font-size: 15px; }
-  .search-card { padding: 20px; }
-  .search-row { flex-direction: column; }
-  .search-row > * + * { margin-left: 0; margin-top: 10px; }
-  .search-input { width: 100%; box-sizing: border-box; }
-  .btn-search { width: 100%; box-sizing: border-box; }
-  .not-listed-band { padding: 20px; }
-  .not-listed-inner { gap: 14px; }
-  .nl-form { width: 100%; }
-  .nl-input { width: 100%; }
-  .btn-request { width: 100%; }
-  .topics-section { padding: 24px 20px; }
-  .topics-row { max-width: 100%; }
-  .topic-pill { width: 50%; padding-right: 14px; }
-
-  /* community page */
-  .comm-header { padding: 18px 20px; }
-  .comm-top { flex-direction: column; gap: 12px; }
-  .cat-section { padding: 16px 20px; }
-  .page-body { grid-template-columns: 1fr; padding: 18px 20px; }
-  .signup-band { flex-direction: column; align-items: stretch; }
-  .signup-input { width: 100%; }
-  .sub-list { grid-template-columns: 1fr; }
-  .modal { margin: 12px; }
-
-  /* content pages */
-  .page-wrap { padding: 40px 20px 56px; }
-  .page-wrap h1 { font-size: 28px; }
-  .contact-form { max-width: 100%; }
-
-  /* footer */
-  footer { padding: 24px 20px; flex-direction: column; align-items: flex-start; gap: 14px; }
 }
-</style>
-<style>
-/* ===== flex-gap compatibility: spacing via margins (works in every browser) ===== */
-.logo { gap: 0; }
-.logo > * + * { margin-left: 10px; }
-.nav-links { gap: 0; }
-.nav-links li + li { margin-left: 36px; }
-.nav-actions { gap: 0; }
-.nav-actions > * + * { margin-left: 10px; }
-.footer-links { gap: 0; }
-.footer-links > * + * { margin-left: 20px; }
-.eyebrow { gap: 0; }
-.eyebrow > * + * { margin-left: 7px; }
-.search-row { gap: 0; }
-.search-row > * + * { margin-left: 10px; }
-.not-listed-inner { gap: 0; }
-.not-listed-inner > * + * { margin-left: 20px; }
-.nl-form { gap: 0; }
-.nl-form > * + * { margin-left: 8px; }
-.topics-row .topic-pill { gap: 0; }
-.topic-pill > svg { margin-right: 9px; }
-
-/* community page */
-.save-btn { gap: 0; }
-.save-btn > :first-child { margin-right: 6px; }
-.neutral-note { gap: 0; }
-.neutral-note > :first-child { margin-right: 9px; }
-.instruction { gap: 0; }
-.instruction > :first-child { margin-right: 8px; }
-.groups { gap: 0; }
-.groups > * + * { margin-top: 12px; }
-.row-label { gap: 0; }
-.row-label > :first-child { margin-right: 7px; }
-.cat-tiles { gap: 0; }
-.cat-tiles > * + * { margin-top: 8px; }
-.cat-tile { gap: 0; }
-.cat-tile > :first-child { margin-right: 10px; }
-.signup-band { gap: 0; }
-.signup-band > * + * { margin-left: 10px; }
-.signup-label { gap: 0; }
-.signup-label > :first-child { margin-right: 7px; }
-.ptag { gap: 0; }
-.ptag > :first-child { margin-right: 4px; }
-.alert-top { gap: 0; }
-.alert-top > * + * { margin-left: 10px; }
-.aactions { gap: 0; }
-.aactions > * + * { margin-left: 6px; }
-.mdate { gap: 0; }
-.mdate > :first-child { margin-right: 7px; }
-.modal-title-row { gap: 0; }
-.modal-title-row > :first-child { margin-right: 10px; }
-.sub-item { gap: 0; }
-.sub-item > :first-child { margin-right: 9px; }
-.modal-info { gap: 0; }
-.modal-info > :first-child { margin-right: 8px; }
-.modal-footer { gap: 0; }
-.modal-footer > * + * { margin-left: 8px; }
-
-@media (max-width: 720px) {
-  .nav-links li + li { margin-left: 0; }
-  .nav-actions > * + * { margin-left: 0; margin-top: 8px; }
-  .not-listed-inner > * + * { margin-left: 0; }
-  .signup-band > * + * { margin-left: 0; margin-top: 8px; }
-  .comm-top > * + * { margin-top: 12px; }
-  footer > * + * { margin-top: 14px; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-tertiary);color:var(--tx-primary);font-family:var(--font);line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1100px;margin:0 auto;padding:0 24px}
+a{color:var(--tx-info);text-decoration:none}
+.ic{width:1em;height:1em;display:inline-block;vertical-align:-0.125em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+button{font-family:var(--font);cursor:pointer;border-radius:var(--r-md);font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0.5px solid var(--bd-secondary);background:transparent;color:var(--tx-primary);padding:11px 18px;transition:filter .12s,background .12s}
+button:active{transform:scale(.99)}
+.btn-primary{background:var(--green);color:var(--green-tx);border:0.5px solid var(--green);font-weight:500}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-ghost:hover{background:var(--bg-secondary)}
+input{font-family:var(--font);height:48px;border:0.5px solid var(--bd-secondary);border-radius:var(--r-md);padding:0 14px 0 42px;font-size:15px;background:var(--bg-primary);color:var(--tx-primary);width:100%}
+input:focus{outline:none;box-shadow:0 0 0 3px var(--bg-success)}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+h1{font-size:46px;line-height:1.08;font-weight:600;letter-spacing:-.022em;margin:0 0 18px}
+h2{font-size:27px;line-height:1.15;font-weight:600;letter-spacing:-.015em;margin:0}
+h3{font-size:16px;font-weight:600;margin:0}
+.card{background:var(--bg-primary);border:0.5px solid var(--bd-tertiary);border-radius:var(--r-lg)}
+.tile{width:44px;height:44px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0;background:var(--bg-success);color:var(--tx-success)}
+.chip{display:inline-flex;align-items:center;font-size:12.5px;padding:3px 10px;border-radius:var(--r-md);background:var(--bg-secondary);color:var(--tx-primary)}
+.pill{font-size:11.5px;padding:3px 9px;border-radius:var(--r-md);white-space:nowrap}
+.eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:500;color:var(--tx-success);background:var(--bg-success);padding:5px 12px;border-radius:999px;margin-bottom:20px}
+.meta{font-size:13px;color:var(--tx-secondary)}
+.zip-msg{font-size:13px;color:var(--tx-warning);margin-top:8px;min-height:1em}
+header{background:var(--bg-primary);border-bottom:0.5px solid var(--bd-tertiary)}
+header .wrap{display:flex;align-items:center;justify-content:space-between;height:66px}
+.logo{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:600}
+nav{display:flex;align-items:center;gap:24px;font-size:14px}
+nav a{color:var(--tx-secondary)}
+nav a:hover{color:var(--tx-primary)}
+.hero{display:grid;grid-template-columns:1.04fr 1fr;gap:48px;align-items:center;padding:64px 0 58px}
+.band{background:var(--bg-band);border-top:0.5px solid var(--bd-tertiary);border-bottom:0.5px solid var(--bd-tertiary)}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:36px}
+.feat{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:8px}
+.sources{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:26px}
+.src{display:flex;flex-direction:column;align-items:center;text-align:center;gap:9px;font-size:12.5px;color:var(--tx-secondary)}
+.erow{display:flex;gap:12px;align-items:flex-start;padding:13px 0;border-top:0.5px solid var(--bd-tertiary)}
+.stile{width:34px;height:34px;border-radius:var(--r-md);background:var(--bg-secondary);color:var(--tx-secondary);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.vall{font-size:13px;color:var(--tx-info)}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.zip-field{position:relative}
+.zip-field .ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--tx-tertiary);font-size:18px;pointer-events:none}
+footer .foot-links a{color:var(--tx-secondary)}
+footer .foot-links a:hover{color:var(--tx-primary)}
+@media (max-width:860px){
+  .hero{grid-template-columns:1fr;gap:30px;padding:42px 0 38px}
+  h1{font-size:35px}.steps,.feat{grid-template-columns:1fr}.sources{grid-template-columns:repeat(2,1fr);row-gap:22px}
+  nav{display:none}
+}
+@media (max-width:380px){
+  .wrap{padding:0 16px}
+  h1{font-size:30px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important;scroll-behavior:auto!important}
 }
 </style>
 </head>
 <body>
 
-<!-- NAV -->
-<nav>
-  <a class="logo" href="index.html">
-    <div class="logo-icon">
-      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
-    </div>
-    <div class="logo-text">Home<span>Signal</span></div>
-  </a>
-  <button class="nav-toggle" id="nav-toggle" aria-label="Open menu"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="nav-menu" id="nav-menu"><ul class="nav-links">
-    <li><a href="how-it-works.html">How it works</a></li>
-    <li><a href="about.html">About</a></li>
-  </ul>
-  <div class="nav-actions" id="nav-auth">
-    <button class="btn-outline" id="btn-login">Log in</button>
-    <button class="btn-primary" id="btn-signup">Sign up</button>
+<header>
+  <div class="wrap">
+    <div class="logo"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="font-size:22px;color:var(--green)"><path d="M20.2 16.4A9 9 0 1 0 16.4 20.2"/><path d="M7 12a5 5 0 0 1 5-5"/><circle cx="12" cy="12" r="1"/></svg>HomeSignal</div>
+    <nav><a href="how-it-works.html">How it works</a><a href="about.html">About</a></nav>
+    <button class="btn-primary" id="header-cta" style="padding:9px 16px">Track my community</button>
   </div>
-</div>
-</nav>
+</header>
 
-<!-- HERO -->
-<section class="hero">
-  <div class="eyebrow">
-    <div class="pulse-dot"></div>
-    Early warning for homeowners
-  </div>
-  <h1>Know before the vote.<br><span>Act before it's too late.</span></h1>
-  <p class="hero-sub">HomeSignal unifies permit filings, government public notices, and local news into one early warning feed — so you know what's coming before decisions affect your home.</p>
-  <div class="search-card">
-    <div class="search-card-title">Search your community</div>
-    <div class="search-card-sub">Enter your ZIP code to see your community</div>
-    <div class="search-row">
-      <input class="search-input" id="search-input" type="text" inputmode="numeric" maxlength="5" placeholder="Enter your ZIP code (example: 84302)" />
-      <button class="btn-search" id="search-btn">Search</button>
-    </div>
-    <div class="search-msg" id="search-msg"></div>
-  </div>
-</section>
-
-<!-- NOT LISTED BAND -->
-<div class="not-listed-band">
-  <div class="not-listed-inner">
-    <div class="nl-icon">
-      <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/><line x1="12" y1="7" x2="12" y2="7"/></svg>
-    </div>
-    <div class="nl-text">
-      <h4>Don't see your community listed?</h4>
-      <p>Submit your ZIP code and we'll add your area to HomeSignal.</p>
-    </div>
-    <div class="nl-form">
-      <input class="nl-input" id="request-email" type="email" placeholder="Your email" />
-      <input class="nl-input" id="request-input" type="text" placeholder="Your ZIP code" />
-      <button class="btn-request" id="request-btn">Request my community</button>
-    </div>
-    <div id="request-msg" style="width:100%;display:none;margin-top:10px;font-size:13px;color:var(--green-dark);background:var(--bg);border:1px solid var(--green-mid);border-radius:var(--radius-sm);padding:10px 14px;"></div>
-  </div>
-</div>
-
-<!-- TOPICS -->
-<style>
-.tg-wrap{max-width:900px;margin:0 auto;}
-.topics-head{max-width:900px;margin:0 auto 18px;}
-.topics-title{font-size:20px;font-weight:700;color:var(--text);letter-spacing:-0.02em;line-height:1.25;margin:0 0 6px;}
-.topics-sub{font-size:14px;color:var(--text-secondary);line-height:1.5;margin:0;}
-.topics-cta{margin-top:14px;background:var(--green);color:#fff;border:none;padding:11px 22px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;}
-.topics-cta:hover{opacity:.9;}
-.tg-group{margin-bottom:18px;}
-.tg-head{font-size:13px;font-weight:600;color:var(--green-dark);margin-bottom:8px;}
-.tg-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));column-gap:18px;row-gap:7px;align-items:start;}
-.tg-item{font-size:12px;color:var(--text);display:flex;align-items:baseline;line-height:1.5;}
-.tg-item::before{content:"•";color:var(--green-mid);margin-right:7px;font-size:14px;line-height:1;flex-shrink:0;}
-.tg-soon .tg-head{color:var(--text-tertiary);}
-.tg-soon .tg-item{color:var(--text-tertiary);}
-.tg-soon .tg-item::before{color:var(--text-tertiary);}
-@media (max-width:720px){
-  .not-listed-inner{flex-direction:column;align-items:center;text-align:center;}
-  .not-listed-inner > * + *{margin-left:0;margin-top:14px;}
-  .nl-text{min-width:0;}
-  .nl-form{width:100%;flex-direction:column;}
-  .nl-input,.btn-request{width:100%;box-sizing:border-box;}
-  .nl-form > * + *{margin-left:0;margin-top:10px;}
-  .search-row > * + *{margin-left:0;margin-top:10px;}
-}
-</style>
-<section class="topics-section">
-  <div class="topics-head">
-    <h2 class="topics-title">We monitor all of this and alert you when it affects your home</h2>
-    <p class="topics-sub">New filings, alerts, and upcoming meetings — to start getting notified, enter your ZIP code and pick the topics you want to follow.</p>
-    <button class="topics-cta" onclick="var c=document.querySelector('.search-card');if(c)c.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(function(){var i=document.getElementById('search-input');if(i)i.focus();},450);">Enter your ZIP to get started ↑</button>
-  </div>
-  <div class="tg-wrap" id="tg-wrap"></div>
-  <script>
-  // Single source of truth for the homepage topic showcase.
-  // `group` tags each group; the pipeline split lives here (emerging_tech | best_practice).
-  (function(){
-    var TOPIC_GROUPS = [
-      { group:'government',    header:'Government & filings', items:['City & County Council Meetings','Planning Commission Hearings','Rezoning & Zoning Changes','Building & Land-Use Permits','Variances & Ordinances','Eminent Domain','Public Notices & Comment Periods','Ballot Measures, Bonds & Taxes'] },
-      { group:'big_builds',    header:'Big builds & industrial sites', items:['New Development Projects','Redevelopment','Data Centers','Chemical Plants','Sanitation / Wastewater Plants','Slaughter & Rendering Plants','Warehouses & Distribution Centers','Detention & Correctional Facilities','Power Plants, Substations & Pipelines','Landfills & Quarries'] },
-      { group:'environment',   header:'Environment & hazards', items:['Water Quality','Air Quality','Soil Quality','Contamination & Cleanup Sites','Weather & Climate Hazards','Radiation'] },
-      { group:'health',        header:'Health & living conditions', items:['Animal & Human Diseases','Livestock, Crops, Pets & Wildlife Health','Noise Pollution','Light Pollution','Electromagnetic Fields (EMF)'] },
-      { group:'emerging_tech', header:'Emerging Technology', items:['Drone Farming','Precision Agriculture','Soil Mineral / Nutrient Analysis','Vertical / Indoor Farming','Agrivoltaics','Community Solar & Microgrids','Battery Storage','Methane / Biogas Capture','Geothermal Heating','Satellite / Remote Sensing','Environmental Sensor Networks','Wildlife & Biodiversity Tracking','Ocean Data Centers'] },
-      { group:'best_practice', header:'Global Best Practices', items:['Regenerative Farming','No-Till & Cover Cropping','Permaculture','Rotational / Holistic Grazing','Rainwater Harvesting','Greywater Recycling','Aquifer Recharge & Groundwater Management','Watershed & Wetland Restoration','Xeriscaping','Wildfire-Resilient Land Management','Pollinator Habitat Programs','Reforestation & Tree Canopy','Carbon Sequestration'] },
-      { group:'local_news',    header:'Local news', items:['Local News'] },
-      { group:'coming_soon',   header:'Coming soon', soon:true, items:['Flood Risk','Wildfire Risk','Earthquake Risk','School Boundary & Rating Changes','Property Tax & Assessment Changes','Crime & Public Safety','Short-Term Rentals & HOA Rules'] }
-    ];
-    function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-    var wrap = document.getElementById('tg-wrap');
-    if(!wrap) return;
-    wrap.innerHTML = TOPIC_GROUPS.map(function(g){
-      var items = g.items.map(function(t){ return '<span class="tg-item">' + esc(t) + '</span>'; }).join('');
-      return '<div class="tg-group' + (g.soon ? ' tg-soon' : '') + '"><div class="tg-head">' + esc(g.header) + '</div><div class="tg-row">' + items + '</div></div>';
-    }).join('');
-  })();
-  </script>
-</section>
-
-<!-- TOPIC REQUEST BAND -->
-<div class="topic-request-band">
-  <div class="trb-inner">
-    <div class="trb-text">
-      <h4>Don't see a topic that's affecting your home?</h4>
-      <p>Tell us what to track — we're always adding new topics.</p>
-    </div>
-    <div class="trb-form">
-      <input class="nl-input" id="topic-request-input" type="text" placeholder="What should we track?" style="width:260px;" />
-      <input class="nl-input" id="topic-request-email" type="email" placeholder="Email (optional)" />
-      <button class="btn-request" id="topic-request-btn">Request a topic</button>
-    </div>
-    <div id="topic-request-msg" style="width:100%;display:none;margin-top:10px;font-size:13px;color:var(--green-dark);background:var(--bg);border:1px solid var(--green-mid);border-radius:var(--radius-sm);padding:10px 14px;"></div>
-  </div>
-</div>
-
-<!-- FOOTER -->
-<footer>
-  <div class="footer-left">
-    <a class="logo" href="index.html" style="margin-bottom:4px;">
-      <div class="logo-icon" style="width:28px;height:28px;">
-        <svg viewBox="0 0 24 24" style="width:15px;height:15px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+<section class="wrap hero">
+  <div>
+    <span class="eyebrow"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>Civic early-warning, by email</span>
+    <h1>See what's being planned around your home — before the decisions are made.</h1>
+    <p style="font-size:17px;color:var(--tx-secondary);margin:0 0 26px;max-width:500px">HomeSignal turns hearings, permits, public records, and local news into one daily email, so homeowners hear what's coming in time to speak up.</p>
+    <div data-zip-form>
+      <div class="zip-field" style="max-width:440px;margin-bottom:12px">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.4-6-10a6 6 0 1 1 12 0c0 4.6-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
+        <input id="hero-zip" type="text" placeholder="Enter your ZIP code (e.g., 84302)" aria-label="ZIP code" inputmode="numeric" />
       </div>
-      <div class="logo-text" style="font-size:14px;">Home<span>Signal</span></div>
-    </a>
-    <div class="footer-tagline">Real-time community intelligence. Smarter decisions.</div>
+      <button class="btn-primary">Track my community</button>
+      <p class="zip-msg" data-zip-msg role="status" aria-live="polite"></p>
+    </div>
+    <p class="meta" style="margin-top:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--tx-success)"><path d="M12 3l8 3.5V12c0 4.6-3.2 7.6-8 9-4.8-1.4-8-4.4-8-9V6.5z"/><path d="M9 12l2 2 4-4"/></svg> Free · one email a day · every item links to its official record</p>
   </div>
-  <div class="footer-links">
-    <a href="about.html">About</a>
-    <a href="how-it-works.html">How it works</a>
-    <a href="privacy.html">Privacy</a>
-    <a href="terms.html">Terms of use</a>
-    <a href="contact.html">Contact</a>
+
+  <div class="card" style="overflow:hidden">
+    <div style="background:var(--bg-secondary);padding:13px 18px;border-bottom:0.5px solid var(--bd-tertiary)">
+      <div class="meta" style="font-size:12px">HomeSignal · Box Elder County daily</div>
+      <div style="font-weight:600;font-size:15px;margin-top:2px">3 new filings and 2 hearings this week</div>
+    </div>
+    <div style="padding:4px 18px 14px">
+      <div class="erow" style="border-top:none">
+        <div class="stile"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><line x1="7" y1="7.5" x2="7.01" y2="7.5"/><line x1="7" y1="16.5" x2="7.01" y2="16.5"/></svg></div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:14px;font-weight:500;line-height:1.35">Data center conditional use permit — comment open</span><span class="pill" style="background:var(--bg-warning);color:var(--tx-warning)">Jun 30</span></div>
+          <div class="meta" style="font-size:12px;margin-top:3px">Brigham City Planning Commission · <span style="color:var(--tx-info)">View record</span></div>
+        </div>
+      </div>
+      <div class="erow">
+        <div class="stile"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="4" y1="10" x2="20" y2="10"/></svg></div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:14px;font-weight:500;line-height:1.35">Planning Commission meeting</span><span class="pill" style="background:var(--bg-info);color:var(--tx-info)">Jun 27</span></div>
+          <div class="meta" style="font-size:12px;margin-top:3px">6:00 PM · Commission Chambers · <span style="color:var(--tx-info)">Add to calendar</span></div>
+        </div>
+      </div>
+      <div class="erow">
+        <div class="stile"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c2.8 3.8 5.5 6.7 5.5 9.5a5.5 5.5 0 0 1-11 0c0-2.8 2.7-5.7 5.5-9.5z"/></svg></div>
+        <div style="flex:1;min-width:0">
+          <span style="font-size:14px;font-weight:500;line-height:1.35">Water Conservancy Board — agenda posted</span>
+          <div class="meta" style="font-size:12px;margin-top:3px">Tremonton · <span style="color:var(--tx-info)">View agenda</span></div>
+        </div>
+      </div>
+      <div class="meta" style="font-size:12px;margin-top:12px;color:var(--tx-tertiary);display:flex;align-items:center;gap:6px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 13h4l2 3h6l2-3h4"/></svg>This is the daily email — nothing to log into.</div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap" style="display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center;padding:34px 0">
+    <div class="tile" style="width:52px;height:52px;font-size:26px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 21V5a2 2 0 0 1 2-2h7l5 5v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><line x1="12" y1="10" x2="12" y2="13.5"/><line x1="12" y1="16.5" x2="12.01" y2="16.5"/></svg></div>
+    <div>
+      <h2 style="font-size:23px">Changes show up in public records before you're notified.</h2>
+      <p style="color:var(--tx-secondary);margin:10px 0 0;max-width:720px">Applications get filed, meetings get scheduled, decisions move forward — quietly. Most homeowners don't hear about it until it's too late. HomeSignal surfaces it while you can still weigh in.</p>
+    </div>
+  </div>
+</section>
+
+<section class="wrap" style="padding:54px 0 4px">
+  <h2 style="text-align:center">How it works</h2>
+  <div class="steps">
+    <div class="card" style="padding:22px"><div class="tile" style="background:var(--bg-success);color:var(--tx-success)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.4-6-10a6 6 0 1 1 12 0c0 4.6-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg></div><h3 style="margin-top:14px">1 · Find your community</h3><p class="meta" style="margin:6px 0 0">Search your city or ZIP to get started.</p></div>
+    <div class="card" style="padding:22px"><div class="tile" style="background:var(--bg-info);color:var(--tx-info)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="8" x2="20" y2="8"/><circle cx="9" cy="8" r="2.2"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="15" cy="16" r="2.2"/></svg></div><h3 style="margin-top:14px">2 · Choose your topics</h3><p class="meta" style="margin:6px 0 0">Pick the filings, hearings, and record types that matter.</p></div>
+    <div class="card" style="padding:22px"><div class="tile" style="background:var(--bg-purple);color:var(--tx-purple)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></div><h3 style="margin-top:14px">3 · Get one daily email</h3><p class="meta" style="margin:6px 0 0">Every relevant item, sourced and timed so you can act before the vote.</p></div>
+  </div>
+</section>
+
+<section class="wrap" style="padding:46px 0 8px">
+  <div class="feat">
+    <div class="card" style="padding:18px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><div class="stile" style="background:var(--bg-success);color:var(--tx-success)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7 2.5 7h-17S6 15 6 9z"/><path d="M10.5 20a1.8 1.8 0 0 0 3 0"/></svg></div><h3>Alert feed</h3></div><span class="vall">View all</span></div>
+      <div class="erow"><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:13.5px;font-weight:500">Rezoning proposed</span><span class="pill" style="background:var(--bg-warning);color:var(--tx-warning)">High impact</span></div><div class="meta" style="font-size:12px;margin-top:2px">Permit filing · May 13</div></div></div>
+      <div class="erow"><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:13.5px;font-weight:500">New permit submitted</span><span class="pill" style="background:var(--bg-success);color:var(--tx-success)">New</span></div><div class="meta" style="font-size:12px;margin-top:2px">450-unit multifamily · May 9</div></div></div>
+      <div class="erow"><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:13.5px;font-weight:500">Variance request</span><span class="pill" style="background:var(--bg-info);color:var(--tx-info)">Medium</span></div><div class="meta" style="font-size:12px;margin-top:2px">Side setback reduction · May 6</div></div></div>
+      <p class="meta" style="font-size:12px;margin:14px 0 0">Real-time alerts from public records and local sources.</p>
+    </div>
+
+    <div class="card" style="padding:18px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><div class="stile" style="background:var(--bg-info);color:var(--tx-info)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="4" y1="10" x2="20" y2="10"/></svg></div><h3>Upcoming meetings</h3></div><span class="vall">View calendar</span></div>
+      <div class="erow"><div class="stile" style="font-size:11px;font-weight:600;flex-direction:column;line-height:1.1">JUN<br>21</div><div style="flex:1;min-width:0"><span style="font-size:13.5px;font-weight:500">County Commission meeting</span><div class="meta" style="font-size:12px;margin-top:2px">9:00 AM · Commission Chambers</div></div></div>
+      <div class="erow"><div class="stile" style="font-size:11px;font-weight:600;flex-direction:column;line-height:1.1">JUN<br>27</div><div style="flex:1;min-width:0"><span style="font-size:13.5px;font-weight:500">Planning Commission meeting</span><div class="meta" style="font-size:12px;margin-top:2px">6:00 PM · Public hearing</div></div></div>
+      <div class="erow"><div class="stile" style="font-size:11px;font-weight:600;flex-direction:column;line-height:1.1">JUL<br>02</div><div style="flex:1;min-width:0"><span style="font-size:13.5px;font-weight:500">Water Conservancy Board</span><div class="meta" style="font-size:12px;margin-top:2px">1:30 PM · Tremonton</div></div></div>
+      <p class="meta" style="font-size:12px;margin:14px 0 0">See what's on the agenda so you can participate.</p>
+    </div>
+
+    <div class="card" style="padding:18px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><div class="stile" style="background:var(--bg-purple);color:var(--tx-purple)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 21V5a2 2 0 0 1 2-2h7l5 5v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="16.5" x2="13" y2="16.5"/></svg></div><h3>Government notices</h3></div><span class="vall">View all</span></div>
+      <div class="erow"><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:13.5px;font-weight:500">Public comment period opened</span><span class="pill" style="background:var(--bg-warning);color:var(--tx-warning)">Open</span></div><div class="meta" style="font-size:12px;margin-top:2px">Stratos data center project</div></div></div>
+      <div class="erow"><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:13.5px;font-weight:500">Notice of public hearing</span><span class="pill" style="background:var(--bg-info);color:var(--tx-info)">New</span></div><div class="meta" style="font-size:12px;margin-top:2px">Planning &amp; zoning</div></div></div>
+      <div class="erow"><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:13.5px;font-weight:500">Conditional use permit filed</span><span class="pill" style="background:var(--bg-secondary);color:var(--tx-secondary)">Filed</span></div><div class="meta" style="font-size:12px;margin-top:2px">Brigham City</div></div></div>
+      <p class="meta" style="font-size:12px;margin:14px 0 0">Official notices, comment periods, and permit &amp; zoning filings.</p>
+    </div>
+  </div>
+</section>
+
+<section class="wrap" style="padding:46px 0">
+  <div class="card" style="background:var(--bg-secondary);border:none;padding:30px">
+    <div style="text-align:center;max-width:640px;margin:0 auto">
+      <h2 style="font-size:24px">Every item sourced.</h2>
+      <p style="color:var(--tx-secondary);margin:10px 0 0">Built from public records and named sources — every alert links back to the original.</p>
+    </div>
+    <div class="sources">
+      <div class="src"><div class="tile" style="background:var(--bg-primary);color:var(--green)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 21V5a2 2 0 0 1 2-2h7l5 5v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="16.5" x2="13" y2="16.5"/></svg></div>Permits &amp; applications</div>
+      <div class="src"><div class="tile" style="background:var(--bg-primary);color:var(--green)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.2a3 3 0 0 1 0 5.6"/><path d="M18 20a5.5 5.5 0 0 0-2.5-4.6"/></svg></div>Planning &amp; zoning hearings</div>
+      <div class="src"><div class="tile" style="background:var(--bg-primary);color:var(--green)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="21" x2="21" y2="21"/><path d="M5 21V10l7-4.5 7 4.5v11"/><line x1="9" y1="21" x2="9" y2="13"/><line x1="15" y1="21" x2="15" y2="13"/><line x1="12" y1="21" x2="12" y2="13"/></svg></div>City &amp; county agendas</div>
+      <div class="src"><div class="tile" style="background:var(--bg-primary);color:var(--green)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9l-7 7"/><path d="M4.5 20.5h6"/><path d="M9 6l5 5"/><path d="M13.5 3.5l5 5-2.5 2.5-5-5z"/></svg></div>Court &amp; legal filings</div>
+      <div class="src"><div class="tile" style="background:var(--bg-primary);color:var(--green)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="13" height="15" rx="1"/><path d="M17 8h3v10a2 2 0 0 1-2 2"/><line x1="7" y1="9" x2="14" y2="9"/><line x1="7" y1="12" x2="14" y2="12"/><line x1="7" y1="15" x2="11" y2="15"/></svg></div>Local news sources</div>
+    </div>
+    <p class="meta" style="text-align:center;margin:24px 0 0;display:flex;align-items:center;justify-content:center;gap:7px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>We never sell your data. You're in control of your alerts and preferences.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap" style="text-align:center;padding:56px 0">
+    <h2>Start tracking your community today.</h2>
+    <p style="color:var(--tx-secondary);margin:12px auto 24px;max-width:480px">Stay informed. Be heard. Protect what matters.</p>
+    <div data-zip-form style="max-width:380px;margin:0 auto">
+      <div class="zip-field" style="margin-bottom:14px">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.4-6-10a6 6 0 1 1 12 0c0 4.6-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
+        <input type="text" placeholder="Enter your ZIP code (e.g., 84302)" aria-label="ZIP code" inputmode="numeric" />
+      </div>
+      <button class="btn-primary">Track my community</button>
+      <p class="zip-msg" data-zip-msg role="status" aria-live="polite"></p>
+    </div>
+  </div>
+</section>
+
+<footer style="background:var(--bg-primary);border-top:0.5px solid var(--bd-tertiary)">
+  <div class="wrap" style="padding:22px 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+    <div class="meta" style="font-size:12.5px">© 2025 HomeSignal, Inc. · Neutral, sourced, non-partisan.</div>
+    <div class="meta foot-links" style="display:flex;gap:18px;font-size:12.5px"><a href="dashboard.html">Manage your alerts</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="contact.html">Contact</a></div>
   </div>
 </footer>
 
 <script>
 // ============================================================
-// HomeSignal — homepage search
-// Finding "Box Elder County" opens the community page.
-// Add more communities to the map as you build them.
+// ZIP search — routes into the existing signup flow (box-elder.html).
+// Preserved from the prior homepage; the signup logic itself lives in
+// box-elder.html and is NOT touched here.
 // ============================================================
-
-// Communities by ZIP code. Each ZIP is unique nationwide, so there is
-// no ambiguity. To add a new community later, add its ZIP codes here.
 const COMMUNITIES = [
   {
     page: 'box-elder.html',
-    zips: ['84301','84302','84306','84307','84309','84311','84312','84313','84314','84316','84324','84329','84330','84331','84334','84336','84337','84340']
+    zips: ['84302','84307','84308','84309','84311','84312','84313','84314','84315','84316','84324','84331']
   }
 ];
-
-// Pull a 5-digit ZIP out of whatever was typed (ignores spaces, etc.).
-function extractZip(query) {
-  const m = (query || '').match(/\b\d{5}\b/);
-  return m ? m[0] : null;
-}
-
-function findCommunityByZip(zip) {
-  for (const c of COMMUNITIES) {
-    if (c.zips.includes(zip)) return c.page;
-  }
-  return null;
-}
-
-function runSearch() {
-  const input = document.getElementById('search-input');
-  const msg = document.getElementById('search-msg');
-  const zip = extractZip(input.value);
-
-  // Nothing that looks like a ZIP code.
-  if (!zip) {
-    msg.textContent = "Please enter your 5-digit ZIP code.";
-    msg.classList.add('show');
-    return;
-  }
-
+function extractZip(query){ const m=(query||'').match(/\b\d{5}\b/); return m?m[0]:null; }
+function findCommunityByZip(zip){ for(const c of COMMUNITIES){ if(c.zips.includes(zip)) return c.page; } return null; }
+function runZip(input, msg){
+  const zip = extractZip(input ? input.value : '');
+  if(!zip){ if(msg) msg.textContent = 'Please enter your 5-digit ZIP code.'; if(input) input.focus(); return; }
   const page = findCommunityByZip(zip);
-  if (page) {
-    window.location.href = page + '?zip=' + encodeURIComponent(zip);
-    return;
-  }
-
-  // A valid ZIP, but not a community we cover yet —
-  // guide them straight into the request form below.
-  msg.textContent = "Your ZIP code is not on our list yet, but we would love to add it! Please add your email to the community request form below.";
-  msg.classList.add('show');
-
-  const band = document.querySelector('.not-listed-band');
-  const reqInput = document.getElementById('request-input');
-  const reqEmail = document.getElementById('request-email');
-  if (reqInput) reqInput.value = zip;                 // pre-fill their ZIP for them
-  if (band) {
-    try { band.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-    catch (e) { band.scrollIntoView(); }              // fallback for older browsers
-  }
-  if (reqEmail) {
-    try { reqEmail.focus({ preventScroll: true }); }  // cursor ready in the email box
-    catch (e) { reqEmail.focus(); }
-  }
+  if(page){ window.location.href = page + '?zip=' + encodeURIComponent(zip); return; }
+  if(msg) msg.textContent = "We don't cover that ZIP yet — we're adding counties. We'll route you in the moment yours is live.";
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('search-btn');
-  const input = document.getElementById('search-input');
-  if (btn) btn.addEventListener('click', runSearch);
-  if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
-});
-
-</script>
-<script>
-// ============================================================
-// "Request my community" — saves to Supabase self_reports
-// (existing table with public-insert; no new setup needed)
-// ============================================================
-(function(){
-  var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
-  var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
-  document.addEventListener('DOMContentLoaded', function(){
-    var btn = document.getElementById('request-btn');
-    var input = document.getElementById('request-input');
-    var msg = document.getElementById('request-msg');
-    function show(text){ msg.style.display = 'block'; msg.textContent = text; }
-    async function submitRequest(){
-      var email = (document.getElementById('request-email').value || '').trim();
-      var val = (input.value || '').trim();
-      if (!email || !val) { show('Please enter your email and ZIP code.'); return; }
-      try {
-        var res = await fetch(SB_URL + '/rest/v1/self_reports', {
-          method: 'POST',
-          headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-          body: JSON.stringify({ description: 'Community request: ' + val, location_reference: val, user_email: email })
-        });
-        if (res.ok || res.status === 201) { show('Thank you! Your request has been received \u2014 we\u2019ll start working on adding your community and email you when it\u2019s live.'); input.value = ''; document.getElementById('request-email').value = ''; }
-        else { show('Something went wrong \u2014 please try again.'); }
-      } catch (e) { show('Something went wrong \u2014 please try again.'); }
-    }
-    if (btn) btn.addEventListener('click', submitRequest);
-    if (input) input.addEventListener('keydown', function(e){ if (e.key === 'Enter') submitRequest(); });
-  });
-})();
-</script>
-
-<script>
-// ============================================================
-// "Request a topic" — saves to Supabase self_reports (public-insert)
-// Email is optional; a topic is required.
-// ============================================================
-(function(){
-  var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
-  var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
-  document.addEventListener('DOMContentLoaded', function(){
-    var btn = document.getElementById('topic-request-btn');
-    var input = document.getElementById('topic-request-input');
-    var emailEl = document.getElementById('topic-request-email');
-    var msg = document.getElementById('topic-request-msg');
-    if (!btn || !input || !emailEl || !msg) return;
-    function show(text){ msg.style.display = 'block'; msg.textContent = text; }
-    async function submitTopic(){
-      var topic = (input.value || '').trim();
-      var email = (emailEl.value || '').trim();
-      if (!topic) { show('Please enter a topic you\u2019d like us to track.'); return; }
-      try {
-        var res = await fetch(SB_URL + '/rest/v1/self_reports', {
-          method: 'POST',
-          headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-          body: JSON.stringify({ description: 'Topic request: ' + topic, location_reference: topic, user_email: email || '' })
-        });
-        if (res.ok || res.status === 201) {
-          show(email ? 'Thank you! We\u2019ll let you know when we add it.' : 'Thank you! Your topic request has been received.');
-          input.value = ''; emailEl.value = '';
-        } else { show('Something went wrong \u2014 please try again.'); }
-      } catch (e) { show('Something went wrong \u2014 please try again.'); }
-    }
-    btn.addEventListener('click', submitTopic);
-    input.addEventListener('keydown', function(e){ if (e.key === 'Enter') submitTopic(); });
-    emailEl.addEventListener('keydown', function(e){ if (e.key === 'Enter') submitTopic(); });
-  });
-})();
-</script>
-<style>
-  .auth-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center; }
-  .auth-modal { background:#fff; border-radius:14px; padding:28px; width:100%; max-width:380px; margin:16px; border:1px solid var(--border); position:relative; }
-  .auth-modal h2 { font-size:20px; font-weight:700; margin-bottom:4px; color:var(--text); }
-  .auth-sub { font-size:13px; color:var(--text-secondary); margin-bottom:18px; }
-  .auth-input { width:100%; border:1px solid var(--border); border-radius:var(--radius-sm); padding:11px 13px; font-size:14px; background:var(--bg-secondary); color:var(--text); margin-bottom:10px; }
-  .auth-submit { width:100%; background:var(--green); color:#fff; border:none; padding:12px; border-radius:var(--radius-sm); font-size:14px; font-weight:600; cursor:pointer; }
-  .auth-submit:hover { opacity:0.9; }
-  .auth-submit:disabled { opacity:0.6; cursor:default; }
-  .auth-msg { font-size:13px; color:var(--green-dark); margin-top:12px; min-height:1em; }
-  .auth-toggle { font-size:13px; color:var(--text-secondary); margin-top:16px; text-align:center; }
-  .auth-toggle a { color:var(--green); font-weight:600; }
-  .auth-close { position:absolute; top:14px; right:16px; background:none; border:none; font-size:22px; line-height:1; color:var(--text-tertiary); cursor:pointer; }
-</style>
-
-<div id="auth-overlay" class="auth-overlay">
-  <div class="auth-modal">
-    <button class="auth-close" id="auth-close">&times;</button>
-    <h2 id="auth-title">Log in or sign up</h2>
-    <p class="auth-sub" id="auth-sub">Enter your email and we'll send you a code &mdash; no password needed.</p>
-    <input type="email" id="auth-email" class="auth-input" placeholder="Email address" autocomplete="email" />
-    <input type="text" id="auth-code" class="auth-input" placeholder="Enter your code" inputmode="numeric" maxlength="8" autocomplete="one-time-code" style="display:none;letter-spacing:6px;text-align:center;font-size:18px;" />
-    <button id="auth-submit" class="auth-submit">Send me a code</button>
-    <div id="auth-msg" class="auth-msg"></div>
-    <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><a href="#" id="auth-back-link">Use a different email</a></div>
-  </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-(function(){
-  var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
-  var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
-  var client = window.supabase.createClient(SB_URL, SB_ANON);
-  window.hsClient = client;   // shared so the rest of the page can use the logged-in session
-  window.hsUser = null;       // current logged-in user (null when logged out)
-  var step = 'email';         // 'email' -> 'code'
-  var pendingEmail = '';
-  function $(id){ return document.getElementById(id); }
-
-  function showMsg(text, isError){
-    var m = $('auth-msg');
-    m.textContent = text || '';
-    m.style.color = isError ? '#b91c1c' : 'var(--green-dark)';
-  }
-
-  function setStep(s){
-    step = s;
-    if (s === 'code') {
-      $('auth-sub').textContent = 'We emailed a code to ' + pendingEmail + '. Enter it below.';
-      $('auth-email').style.display = 'none';
-      $('auth-code').style.display = 'block';
-      $('auth-submit').textContent = 'Verify & continue';
-      $('auth-back-wrap').style.display = 'block';
-      setTimeout(function(){ $('auth-code').focus(); }, 50);
-    } else {
-      $('auth-sub').innerHTML = "Enter your email and we'll send you a code &mdash; no password needed.";
-      $('auth-email').style.display = 'block';
-      $('auth-code').style.display = 'none';
-      $('auth-code').value = '';
-      $('auth-submit').textContent = 'Send me a code';
-      $('auth-back-wrap').style.display = 'none';
-      setTimeout(function(){ $('auth-email').focus(); }, 50);
-    }
-  }
-
-  function openAuth(){ pendingEmail=''; $('auth-email').value=''; showMsg('', false); setStep('email'); $('auth-overlay').style.display = 'flex'; }
-  function closeAuth(){ $('auth-overlay').style.display = 'none'; }
-  window.hsOpenAuth = openAuth;
-
-  async function sendCode(){
-    var email = ($('auth-email').value || '').trim();
-    if (!email || email.indexOf('@') === -1) { showMsg('Please enter a valid email address.', true); return; }
-    $('auth-submit').disabled = true; showMsg('Sending your code\u2026', false);
-    try {
-      var r = await client.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true } });
-      if (r.error) { showMsg(r.error.message, true); }
-      else { pendingEmail = email; setStep('code'); showMsg('', false); }
-    } catch (e) { showMsg('Something went wrong \u2014 please try again.', true); }
-    $('auth-submit').disabled = false;
-  }
-
-  async function verifyCode(){
-    var code = ($('auth-code').value || '').trim();
-    if (code.length < 4) { showMsg('Enter the code from your email.', true); return; }
-    $('auth-submit').disabled = true; showMsg('Checking\u2026', false);
-    try {
-      var r = await client.auth.verifyOtp({ email: pendingEmail, token: code, type: 'email' });
-      if (r.error) { showMsg(r.error.message, true); $('auth-submit').disabled = false; return; }
-      closeAuth();
-    } catch (e) { showMsg('Something went wrong \u2014 please try again.', true); }
-    $('auth-submit').disabled = false;
-  }
-
-  function submitAuth(){ if (step === 'code') verifyCode(); else sendCode(); }
-
-  function bindAuthButtons(){
-    var li = $('btn-login'), su = $('btn-signup');
-    if (li) li.addEventListener('click', function(){ openAuth(); });
-    if (su) su.addEventListener('click', function(){ openAuth(); });
-  }
-
-  function updateNav(session){
-    window.hsUser = (session && session.user) ? session.user : null;
-    var box = $('nav-auth');
-    if (box) {
-      if (window.hsUser) {
-        box.innerHTML = '<a class="btn-outline" href="dashboard.html" style="text-decoration:none">Dashboard</a>' + '<span style="display:inline-flex;align-items:center;gap:10px;margin-left:12px;vertical-align:middle">' + '<span title="' + window.hsUser.email + '" style="font-size:12.5px;color:#6b7280;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle">' + window.hsUser.email + '</span>' + '<button type="button" id="btn-logout" style="background:none;border:none;padding:0;color:#6b7280;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline">Log out</button>' + '</span>';
-        var lo = $('btn-logout');
-        if (lo) lo.addEventListener('click', function(){ client.auth.signOut(); });
-      } else {
-        box.innerHTML = '<button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button>';
-        bindAuthButtons();
-      }
-    }
-    if (typeof window.hsOnAuthChange === 'function') { try { window.hsOnAuthChange(window.hsUser); } catch(e){} }
-  }
-
-  document.addEventListener('DOMContentLoaded', function(){
-    bindAuthButtons();
-    $('auth-close').addEventListener('click', closeAuth);
-    $('auth-submit').addEventListener('click', submitAuth);
-    $('auth-email').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
-    $('auth-code').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
-    $('auth-back-link').addEventListener('click', function(e){ e.preventDefault(); showMsg('', false); setStep('email'); });
-    $('auth-overlay').addEventListener('click', function(e){ if (e.target === $('auth-overlay')) closeAuth(); });
-    client.auth.getSession().then(function(res){ updateNav(res.data.session); });
-    client.auth.onAuthStateChange(function(evt, session){ updateNav(session); });
-  });
-})();
-</script>
-
-<script>
 document.addEventListener('DOMContentLoaded', function(){
-  var t = document.getElementById('nav-toggle');
-  var m = document.getElementById('nav-menu');
-  if (t && m) t.addEventListener('click', function(){ m.classList.toggle('open'); });
+  document.querySelectorAll('[data-zip-form]').forEach(function(form){
+    const input = form.querySelector('input');
+    const msg = form.querySelector('[data-zip-msg]');
+    const btn = form.querySelector('button');
+    function go(){ runZip(input, msg); }
+    if(btn) btn.addEventListener('click', go);
+    if(input) input.addEventListener('keydown', function(e){ if(e.key === 'Enter') go(); });
+  });
+  // Header "Track my community" scrolls to the hero ZIP box (no separate endpoint).
+  const hcta = document.getElementById('header-cta');
+  if(hcta) hcta.addEventListener('click', function(){
+    const hi = document.getElementById('hero-zip');
+    if(!hi) return;
+    try { hi.scrollIntoView({ behavior:'smooth', block:'center' }); } catch(e){ hi.scrollIntoView(); }
+    setTimeout(function(){ try { hi.focus({ preventScroll:true }); } catch(e){ hi.focus(); } }, 300);
+  });
 });
 </script>
 </body>
