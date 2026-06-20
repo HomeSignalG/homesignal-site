@@ -91,6 +91,11 @@ footer .foot-links a:hover{color:var(--tx-primary)}
 @media (prefers-reduced-motion:reduce){
   *{transition:none!important;animation:none!important;scroll-behavior:auto!important}
 }
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:20px;z-index:200}
+.modal-overlay.open{display:flex}
+.modal{position:relative;background:var(--bg-primary);border:0.5px solid var(--bd-tertiary);border-radius:var(--r-lg);padding:24px;max-width:460px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.modal-close{position:absolute;top:8px;right:8px;background:none;border:none;font-size:24px;line-height:1;color:var(--tx-secondary);cursor:pointer;padding:2px 8px}
+.modal-close:hover{color:var(--tx-primary);background:var(--bg-secondary)}
 </style>
 </head>
 <body>
@@ -154,18 +159,20 @@ footer .foot-links a:hover{color:var(--tx-primary)}
   </div>
 </section>
 
-<section class="wrap" id="request-section" style="padding:14px 0 40px">
-  <div class="card" id="request-card" style="padding:24px;max-width:560px;margin:0 auto">
-    <h3 style="font-size:18px">Don't see your community listed?</h3>
-    <p class="meta" style="margin:6px 0 16px">Submit your ZIP code and we'll add your area to HomeSignal.</p>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <input id="request-email" type="email" placeholder="Your email" aria-label="Your email" autocomplete="email" style="padding-left:14px" />
-      <input id="request-zip" type="text" placeholder="ZIP code" aria-label="ZIP code" inputmode="numeric" style="padding-left:14px" />
-      <button class="btn-primary" id="request-btn">Request my community</button>
+<div class="modal-overlay" id="request-overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="request-heading">
+    <button type="button" class="modal-close" id="request-close" aria-label="Close">&times;</button>
+    <div id="request-card">
+      <p id="request-heading" style="font-size:15px;color:var(--tx-primary);margin:0 28px 16px 0">Your ZIP code is not on our list yet, but we would love to add it! Please add your email to the community request form below.</p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="request-email" type="email" placeholder="Your email" aria-label="Your email" autocomplete="email" style="padding-left:14px" />
+        <input id="request-zip" type="text" placeholder="ZIP code" aria-label="ZIP code" inputmode="numeric" style="padding-left:14px" />
+        <button class="btn-primary" id="request-btn">Request my community</button>
+      </div>
+      <p class="zip-msg" id="request-msg" role="status" aria-live="polite"></p>
     </div>
-    <p class="zip-msg" id="request-msg" role="status" aria-live="polite"></p>
   </div>
-</section>
+</div>
 
 <section class="band">
   <div class="wrap" style="display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center;padding:34px 0">
@@ -300,16 +307,44 @@ async function submitCommunityRequest(){
 
 function extractZip(query){ const m=(query||'').match(/\b\d{5}\b/); return m?m[0]:null; }
 function findCommunityByZip(zip){ for(const c of COMMUNITIES){ if(c.zips.includes(zip)) return c.page; } return null; }
+// ----- Community request modal (opens only on a not-covered ZIP search) -----
+var REQUEST_FORM_HTML = null;     // captured template so the modal is reusable
+var requestTriggerInput = null;   // search box to return focus to on close
+function wireRequestForm(){
+  var btn = document.getElementById('request-btn');
+  if(btn) btn.addEventListener('click', submitCommunityRequest);
+  ['request-email','request-zip'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.addEventListener('keydown', function(e){ if(e.key === 'Enter') submitCommunityRequest(); });
+  });
+}
+function openRequestModal(zip, input){
+  var overlay = document.getElementById('request-overlay');
+  var card = document.getElementById('request-card');
+  if(!overlay || !card) return;
+  requestTriggerInput = input || document.getElementById('hero-zip');
+  if(REQUEST_FORM_HTML !== null){ card.innerHTML = REQUEST_FORM_HTML; wireRequestForm(); } // fresh form each open
+  var rzip = document.getElementById('request-zip');
+  if(rzip) rzip.value = zip || '';
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  var email = document.getElementById('request-email');
+  if(email){ try { email.focus(); } catch(e){} }
+}
+function closeRequestModal(){
+  var overlay = document.getElementById('request-overlay');
+  if(!overlay) return;
+  overlay.classList.remove('open');
+  document.body.style.overflow = '';
+  if(requestTriggerInput){ try { requestTriggerInput.focus(); } catch(e){} } // return focus to the search box
+}
 function runZip(input, msg){
   const zip = extractZip(input ? input.value : '');
   if(!zip){ if(msg) msg.textContent = 'Please enter your 5-digit ZIP code.'; if(input) input.focus(); return; }
   const page = findCommunityByZip(zip);
   if(page){ window.location.href = page + '?zip=' + encodeURIComponent(zip); return; }
-  if(msg) msg.textContent = "Your ZIP code is not on our list yet, but we would love to add it! Please add your email to the community request form below.";
-  var rzip = document.getElementById('request-zip');
-  if(rzip) rzip.value = zip;
-  var rsec = document.getElementById('request-section');
-  if(rsec){ try { rsec.scrollIntoView({ behavior:'smooth', block:'center' }); } catch(e){ rsec.scrollIntoView(); } }
+  // Not covered -> open the request modal (it carries the message); prefill ZIP + focus email.
+  openRequestModal(zip, input);
 }
 document.addEventListener('DOMContentLoaded', function(){
   document.querySelectorAll('[data-zip-form]').forEach(function(form){
@@ -328,13 +363,14 @@ document.addEventListener('DOMContentLoaded', function(){
     try { hi.scrollIntoView({ behavior:'smooth', block:'center' }); } catch(e){ hi.scrollIntoView(); }
     setTimeout(function(){ try { hi.focus({ preventScroll:true }); } catch(e){ hi.focus(); } }, 300);
   });
-  // Wire the community request form.
-  const reqBtn = document.getElementById('request-btn');
-  if(reqBtn) reqBtn.addEventListener('click', submitCommunityRequest);
-  ['request-email','request-zip'].forEach(function(id){
-    const el = document.getElementById(id);
-    if(el) el.addEventListener('keydown', function(e){ if(e.key === 'Enter') submitCommunityRequest(); });
-  });
+  // Community request modal: capture the form template + wire close controls.
+  var rcard = document.getElementById('request-card');
+  if(rcard) REQUEST_FORM_HTML = rcard.innerHTML;
+  var overlay = document.getElementById('request-overlay');
+  var closeBtn = document.getElementById('request-close');
+  if(closeBtn) closeBtn.addEventListener('click', closeRequestModal);
+  if(overlay) overlay.addEventListener('click', function(e){ if(e.target === overlay) closeRequestModal(); });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && overlay && overlay.classList.contains('open')) closeRequestModal(); });
 });
 </script>
 </body>
