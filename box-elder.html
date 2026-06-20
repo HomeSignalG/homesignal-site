@@ -440,6 +440,7 @@ body { background: #f3f4f6; font-size: 14px; }
     <div class="modal-divider"></div>
     <div class="sub-list" id="modal-list"></div>
     <div class="modal-info"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="modal-count">No topics selected yet</span></div>
+    <label class="consent-row"><input type="checkbox" id="modal-consent" /><span>I agree that HomeSignal may share anonymized and aggregated information about the topics and locations I follow with third parties to support its products, services, and research. No personal contact information is ever shared. <a href="privacy.html">Privacy Policy</a></span></label>
     <div class="alert-signup">
       <div class="alert-signup-label">Sign up for these alerts — free</div>
       <input class="alert-field" type="email" id="modal-email" placeholder="Email address" />
@@ -459,6 +460,9 @@ body { background: #f3f4f6; font-size: 14px; }
   .alert-submit:disabled{opacity:.7;cursor:default;}
   .alert-msg{font-size:13px;margin-top:10px;min-height:1em;color:var(--ts);}
   .alert-note{font-size:11px;color:var(--tt);margin-top:8px;text-align:center;}
+  .consent-row{display:flex;align-items:flex-start;gap:8px;margin-top:14px;font-size:12px;line-height:1.5;color:var(--ts);cursor:pointer;}
+  .consent-row input{margin-top:2px;flex-shrink:0;width:15px;height:15px;accent-color:var(--green);cursor:pointer;}
+  .consent-row a{color:var(--green);text-decoration:underline;}
 </style>
 
 <div class="overlay" id="alert-overlay" onclick="handleAlertOverlay(event)">
@@ -470,6 +474,7 @@ body { background: #f3f4f6; font-size: 14px; }
     <div class="modal-divider"></div>
     <div class="sub-list" id="alert-list"></div>
     <div class="modal-info"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="alert-count">No topics selected yet</span></div>
+    <label class="consent-row"><input type="checkbox" id="alert-consent" /><span>I agree that HomeSignal may share anonymized and aggregated information about the topics and locations I follow with third parties to support its products, services, and research. No personal contact information is ever shared. <a href="privacy.html">Privacy Policy</a></span></label>
     <div class="alert-signup">
       <div class="alert-signup-label">Sign up for these alerts — free</div>
       <input class="alert-field" type="email" id="alert-email" placeholder="Email address" />
@@ -633,8 +638,9 @@ async function submitAlertSignup(){
   const msg=document.getElementById('alert-msg');
   const checked=[...document.querySelectorAll('#alert-list .sub-item.on')].map(el=>el.querySelector('.sub-label').textContent);
   if(checked.length===0){ msg.style.color='#b91c1c'; msg.textContent='Please choose at least one topic above.'; return; }
+  const consent=document.getElementById('alert-consent').checked;
   if(!hsLoggedIn()){
-    pendingFollow={ kind:'alert', cat:alertCat, checked:checked };
+    pendingFollow={ kind:'alert', cat:alertCat, checked:checked, consent:consent };
     closeAlertModal();
     window.hsOpenAuth();
     return;
@@ -642,7 +648,7 @@ async function submitAlertSignup(){
   const sb=document.getElementById('alert-submit'); const old=sb.textContent;
   sb.disabled=true; sb.textContent='Saving\u2026'; msg.style.color='var(--ts)'; msg.textContent='';
   try{
-    await saveTopics(alertCat, checked);
+    await saveTopics(alertCat, checked, consent);
     msg.style.color='#166534';
     msg.textContent="Saved \u2713 You're following these alerts in Box Elder County.";
     sb.textContent='Saved \u2713';
@@ -708,6 +714,7 @@ let accountTopics = {};
 let accountZip = '';
 let accountLoaded = false;
 let accountExists = false;
+let accountConsent = false;
 let pendingFollow = null;
 let searchedZip = '';
 (function(){
@@ -723,9 +730,9 @@ function hsLoggedIn(){ return !!(window.hsUser); }
 function followedFor(cat){ return (accountTopics && Array.isArray(accountTopics[cat])) ? accountTopics[cat] : []; }
 
 async function loadAccount(){
-  if(!hsLoggedIn()){ accountTopics={}; accountZip=''; accountLoaded=true; refreshTileLabels(); return; }
+  if(!hsLoggedIn()){ accountTopics={}; accountZip=''; accountConsent=false; accountLoaded=true; refreshTileLabels(); return; }
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(window.hsUser.email)}&select=topics,zip_code`,
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(window.hsUser.email)}&select=topics,zip_code,data_licensing_agreed`,
       { headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${window.hsToken || SUPABASE_ANON_KEY}` } });
     const rows = await res.json();
     if(Array.isArray(rows) && rows.length){
@@ -735,10 +742,10 @@ async function loadAccount(){
       const gov = Array.isArray(t.notices) ? t.notices : (Array.isArray(t.meetings) ? t.meetings : []);
       accountTopics = { meetings: gov };
       ['news','emerging','global'].forEach(function(k){ if(Array.isArray(t[k])) accountTopics[k] = t[k]; });
-      accountZip = rows[0].zip_code || ''; accountExists = true;
+      accountZip = rows[0].zip_code || ''; accountConsent = !!rows[0].data_licensing_agreed; accountExists = true;
     }
-    else { accountTopics = {}; accountZip = ''; accountExists = false; }
-  }catch(e){ accountTopics = {}; }
+    else { accountTopics = {}; accountZip = ''; accountConsent = false; accountExists = false; }
+  }catch(e){ accountTopics = {}; accountConsent = false; }
   accountLoaded = true;
   refreshTileLabels();
 }
@@ -751,7 +758,7 @@ const CAT_TO_PIPELINE = {
   global: 'global_best_practices'
 };
 
-async function saveTopics(cat, checked){
+async function saveTopics(cat, checked, consent){
   accountTopics[cat] = checked;
   const email = window.hsUser.email;
   const H = { 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${window.hsToken || SUPABASE_ANON_KEY}`, 'Content-Type':'application/json', 'Prefer':'return=minimal' };
@@ -770,7 +777,10 @@ async function saveTopics(cat, checked){
     return fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}`, { method:'PATCH', headers:H, body: JSON.stringify(body) });
   }
   function insertRow(){
-    return fetch(`${SUPABASE_URL}/rest/v1/users`, { method:'POST', headers:H, body: JSON.stringify(Object.assign({ email: email }, body)) });
+    // New-signup INSERT only: record the data-licensing consent (boolean, default false).
+    // The PATCH/update branch intentionally omits this so a returning user's stored
+    // consent is never reset here (consent changes are handled on the dashboard).
+    return fetch(`${SUPABASE_URL}/rest/v1/users`, { method:'POST', headers:H, body: JSON.stringify(Object.assign({ email: email, data_licensing_agreed: !!consent }, body)) });
   }
   let res;
   if(accountExists){
@@ -835,6 +845,10 @@ function setupSignupArea(which){
   if(zipEl) zipEl.style.display='none';
   const wrap = emailEl ? emailEl.closest('.alert-signup') : null;
   const label = wrap ? wrap.querySelector('.alert-signup-label') : null;
+  // Reflect the user's stored consent for logged-in visitors; default unchecked otherwise.
+  // (Checking it on the edit path still won't write — INSERT-only; see saveTopics.)
+  const consentEl = document.getElementById(which==='modal'?'modal-consent':'alert-consent');
+  if(consentEl) consentEl.checked = hsLoggedIn() ? accountConsent : false;
   if(hsLoggedIn()){
     if(label) label.textContent = 'Saving to your account · ' + window.hsUser.email;
     if(btn) btn.textContent = 'Save alerts';
@@ -857,7 +871,7 @@ window.hsOnAuthChange = async function(user){
   if(user && pendingFollow){
     const p = pendingFollow; pendingFollow = null;
     try{
-      await saveTopics(p.cat, p.checked);
+      await saveTopics(p.cat, p.checked, p.consent);
       if(p.kind==='modal'){
         const tile=document.querySelector('.cat-tile[data-id="'+p.cat+'"]');
         if(tile) openModal(tile);
@@ -903,8 +917,9 @@ async function submitModalSignup(){
   const msg=document.getElementById('modal-msg');
   const checked=[...document.querySelectorAll('#modal-list .sub-item.on')].map(el=>el.querySelector('.sub-label').textContent);
   if(checked.length===0){ msg.style.color='#b91c1c'; msg.textContent='Please choose at least one topic above.'; return; }
+  const consent=document.getElementById('modal-consent').checked;
   if(!hsLoggedIn()){
-    pendingFollow={ kind:'modal', cat:currentId, checked:checked };
+    pendingFollow={ kind:'modal', cat:currentId, checked:checked, consent:consent };
     closeModal();
     window.hsOpenAuth();
     return;
@@ -912,7 +927,7 @@ async function submitModalSignup(){
   const sb=document.getElementById('modal-submit'); const old=sb.textContent;
   sb.disabled=true; sb.textContent='Saving\u2026'; msg.style.color='var(--ts)'; msg.textContent='';
   try{
-    await saveTopics(currentId, checked);
+    await saveTopics(currentId, checked, consent);
     msg.style.color='#166534';
     msg.textContent="Saved \u2713 You're following these alerts in Box Elder County.";
     sb.textContent='Saved \u2713';
