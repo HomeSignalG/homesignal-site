@@ -784,10 +784,11 @@ async function saveTopics(cat, checked, consent){
     return fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}`, { method:'PATCH', headers:H, body: JSON.stringify(body) });
   }
   function insertRow(){
-    // New-signup INSERT only: record the data-licensing consent (boolean, default false).
+    // New-signup INSERT only: record the data-licensing consent (boolean, default false)
+    // and the consent version string in effect at signup (always set, regardless of the box).
     // The PATCH/update branch intentionally omits this so a returning user's stored
     // consent is never reset here (consent changes are handled on the dashboard).
-    return fetch(`${SUPABASE_URL}/rest/v1/users`, { method:'POST', headers:H, body: JSON.stringify(Object.assign({ email: email, data_licensing_agreed: !!consent }, body)) });
+    return fetch(`${SUPABASE_URL}/rest/v1/users`, { method:'POST', headers:H, body: JSON.stringify(Object.assign({ email: email, data_licensing_agreed: !!consent, consent_version: '2026-06-20' }, body)) });
   }
   let res;
   if(accountExists){
