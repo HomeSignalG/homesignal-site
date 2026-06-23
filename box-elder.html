@@ -909,24 +909,11 @@ function showToast(text){
   clearTimeout(window.__hsToastT); window.__hsToastT=setTimeout(function(){ t.style.display='none'; },3500);
 }
 
-// auth module calls this whenever login state changes (and on initial load)
+// auth module calls this whenever login state changes (and on initial load).
+// The signup write goes through the signup_complete RPC in verifyCode() only \u2014
+// there is intentionally no saveTopics replay here, to keep a single write path.
 window.hsOnAuthChange = async function(user){
   await loadAccount();
-  if(user && pendingFollow){
-    const p = pendingFollow; pendingFollow = null;
-    try{
-      await saveTopics(p.cat, p.checked, p.consent);
-      if(p.kind==='modal'){
-        const tile=document.querySelector('.cat-tile[data-id="'+p.cat+'"]');
-        if(tile) openModal(tile);
-        const m=document.getElementById('modal-msg'); if(m){ m.style.color='#166534'; m.textContent="You're following these alerts \u2713"; }
-      } else {
-        openAlertModalForCat(p.cat);
-        const m=document.getElementById('alert-msg'); if(m){ m.style.color='#166534'; m.textContent="You're following these alerts \u2713"; }
-      }
-      showToast("Saved \u2014 you're following these alerts.");
-    }catch(e){ showToast('Could not save \u2014 please try again.'); }
-  }
 };
 function openModal(tile){
   currentId=tile.dataset.cat||tile.dataset.id;currentType=tile.dataset.type;
