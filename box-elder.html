@@ -1161,6 +1161,30 @@ loadMeetings();
     try {
       var r = await client.auth.verifyOtp({ email: pendingEmail, token: code, type: 'email' });
       if (r.error) { showMsg(r.error.message, true); $('auth-submit').disabled = false; return; }
+      // Persist the confirmed user into public.users (+ user_subscriptions) via the
+      // SECURITY DEFINER signup_complete RPC, called from the authenticated session
+      // verifyOtp just established. Without this, confirmed auth.users never reach
+      // public.users. Sources mirror saveTopics: the tile selection captured in
+      // pendingFollow right before auth opened, and the searched ZIP (the modal's own
+      // zip input is hidden/empty, and the RPC rejects a null/blank zip_code).
+      var pf = (typeof pendingFollow !== 'undefined' && pendingFollow) ? pendingFollow : null;
+      var cat = pf ? pf.cat : null;
+      var picked = (pf && Array.isArray(pf.checked)) ? pf.checked : [];
+      var pipeline = (cat && typeof CAT_TO_PIPELINE !== 'undefined') ? CAT_TO_PIPELINE[cat] : null;
+      var topicsObj = {}; if (cat) { topicsObj[cat] = picked; }
+      var subs = pipeline ? picked.map(function(t){ return { pipeline_type: pipeline, topic: t }; }) : [];
+      var zip = (typeof searchedZip !== 'undefined' && searchedZip) ? searchedZip
+              : (typeof accountZip !== 'undefined' && accountZip) ? accountZip : '84302';
+      showMsg('Finishing sign-up\u2026', false);
+      var w = await client.rpc('signup_complete', {
+        p_email: pendingEmail,
+        p_community_id: 'd67c558f-1f04-4811-a565-873ae2afd6f3',
+        p_zip_code: zip,
+        p_topics: topicsObj,
+        p_consent_version: '2026-06-20',
+        p_subscriptions: subs
+      });
+      if (w && w.error) { showMsg(w.error.message || 'Could not finish sign-up \u2014 please try again.', true); $('auth-submit').disabled = false; return; }
       closeAuth();
     } catch (e) { showMsg('Something went wrong \u2014 please try again.', true); }
     $('auth-submit').disabled = false;
