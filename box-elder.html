@@ -663,6 +663,7 @@ async function submitAlertSignup(){
   const checked=[...document.querySelectorAll('#alert-list .sub-item.on')].map(el=>el.querySelector('.sub-label').textContent);
   if(checked.length===0){ msg.style.color='#b91c1c'; msg.textContent='Please choose at least one topic above.'; return; }
   const consent=document.getElementById('alert-consent').checked;
+  console.log('[consent-trace] Sign-up/Save click via ALERT modal (#alert-modal) — #alert-consent.checked =', consent, '| loggedIn =', hsLoggedIn(), '| cat =', alertCat);
   if(!hsLoggedIn()){
     pendingFollow={ kind:'alert', cat:alertCat, checked:checked, consent:consent };
     closeAlertModal();
@@ -949,6 +950,7 @@ async function submitModalSignup(){
   const checked=[...document.querySelectorAll('#modal-list .sub-item.on')].map(el=>el.querySelector('.sub-label').textContent);
   if(checked.length===0){ msg.style.color='#b91c1c'; msg.textContent='Please choose at least one topic above.'; return; }
   const consent=document.getElementById('modal-consent').checked;
+  console.log('[consent-trace] Sign-up/Save click via TILE modal (#modal) — #modal-consent.checked =', consent, '| loggedIn =', hsLoggedIn(), '| cat =', currentId);
   if(!hsLoggedIn()){
     pendingFollow={ kind:'modal', cat:currentId, checked:checked, consent:consent };
     closeModal();
@@ -1166,6 +1168,7 @@ loadMeetings();
       // they used (#modal-consent or #alert-consent) at Sign-up click time and stored on
       // pendingFollow \u2014 never re-read from a fixed element here, since the modal is closed.
       var consent = !!(pf && pf.consent);
+      console.log('[consent-trace] verifyCode \u2192 signup_complete p_data_licensing_agreed =', consent, '| pendingFollow =', pf ? { kind: pf.kind, cat: pf.cat, consent: pf.consent } : null);
       showMsg('Finishing sign-up\u2026', false);
       var w = await client.rpc('signup_complete', {
         p_email: pendingEmail,
