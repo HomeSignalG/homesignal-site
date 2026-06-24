@@ -702,26 +702,6 @@ function toggleSave(btn) {
 }
 
 // ============================================================
-// SIGNUP — writes to Supabase users table
-// ============================================================
-async function saveUser(email, zip) {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/users`, {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ email, zip_code: zip, community_id: COMMUNITY_ID, topics: selections })
-    });
-    if (res.ok || res.status === 409) {
-      alert('You\'re signed up! We\'ll send you alerts for Box Elder County.');
-    } else {
-      alert('Something went wrong. Please try again.');
-    }
-  } catch (err) {
-    alert('Something went wrong. Please try again.');
-  }
-}
-
-// ============================================================
 // CATEGORY SELECTOR MODAL
 // ============================================================
 const cats = {
@@ -790,7 +770,6 @@ const CAT_TO_PIPELINE = {
 async function saveTopics(cat, checked, consent){
   accountTopics[cat] = checked;
   const email = window.hsUser.email;
-  const H = { 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${window.hsToken || SUPABASE_ANON_KEY}`, 'Content-Type':'application/json', 'Prefer':'return=minimal' };
   // Digest contract (what the live digest on main reads): users.topics is a split
   // object { notices:[...], meetings:[...] }. Each government tile owns its OWN list —
   // Government notices -> topics.notices, Upcoming meetings -> topics.meetings — so the
@@ -804,67 +783,39 @@ async function saveTopics(cat, checked, consent){
   ['news','emerging','global'].forEach(function(k){
     if(Array.isArray(accountTopics[k]) && accountTopics[k].length) topicsObj[k] = accountTopics[k];
   });
-  const body = { community_id: COMMUNITY_ID, topics: topicsObj, zip_code: searchedZip || accountZip || '84302' };
-  function patchRow(){
-    return fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}`, { method:'PATCH', headers:H, body: JSON.stringify(body) });
-  }
-  function insertRow(){
-    // New-signup INSERT only: record the data-licensing consent (boolean, default false)
-    // and the consent version string in effect at signup (always set, regardless of the box).
-    // The PATCH/update branch intentionally omits this so a returning user's stored
-    // consent is never reset here (consent changes are handled on the dashboard).
-    return fetch(`${SUPABASE_URL}/rest/v1/users`, { method:'POST', headers:H, body: JSON.stringify(Object.assign({ email: email, data_licensing_agreed: !!consent, consent_version: '2026-06-20' }, body)) });
-  }
-  let res;
-  if(accountExists){
-    res = await patchRow();
-  } else {
-    res = await insertRow();
-    if(res.status===409){ res = await patchRow(); }
-  }
-  if(!res.ok){
-    let detail=''; try{ detail = await res.text(); }catch(e){}
-    throw new Error('Save error ' + res.status + (detail ? (': ' + detail.slice(0,200)) : ''));
-  }
+  // SINGLE WRITE PATH: signup_complete (SECURITY DEFINER, authenticated session) is the only
+  // writer — an idempotent upsert (no direct table inserts -> no 409s) that also writes consent.
+  // We pass the COMPLETE desired subscription set across ALL tiles on every save; the RPC
+  // reconciles it server-side (adds missing, deletes removed), so unfollow works WITHOUT any
+  // client-side delete or a browser DELETE grant on user_subscriptions.
+  const r = await window.hsClient.rpc('signup_complete', {
+    p_email: email,
+    p_community_id: COMMUNITY_ID,
+    p_zip_code: searchedZip || accountZip || '84302',
+    p_topics: topicsObj,
+    p_consent_version: '2026-06-20',
+    p_subscriptions: buildSubscriptionSet(),
+    p_data_licensing_agreed: !!consent
+  });
+  if(r && r.error){ throw new Error('Save error: ' + (r.error.message || r.error)); }
   accountExists = true;
+  accountConsent = !!consent; // keep the pre-filled checkbox in sync so a later save can't reset it
   refreshTileLabels();
-  // Forward-looking, BEST-EFFORT: mirror this follow into the normalized
-  // user_subscriptions table (the multi-county model). This never blocks the
-  // save above — the engine still reads users.topics during the transition.
-  try { await syncSubscriptions(cat, checked, email, H); } catch(e) { /* non-fatal */ }
 }
 
-// Replace the user's user_subscriptions rows for ONE pipeline with the
-// currently-checked topics: one row per (user_id, community_id, pipeline_type, topic).
-async function syncSubscriptions(cat, checked, email, H){
-  const pipeline = CAT_TO_PIPELINE[cat];
-  if(!pipeline) return;
-  // government_notice is ONE pipeline in user_subscriptions but is fed by BOTH government
-  // tiles (notices + meetings). The sync below replaces the whole pipeline's rows, so write
-  // the UNION of both lists — otherwise saving one tile would wipe the other's rows.
-  let topics = checked;
-  if(pipeline === 'government_notice'){
-    const seen = {}; topics = [];
-    ['notices','meetings'].forEach(function(k){
-      (Array.isArray(accountTopics[k]) ? accountTopics[k] : []).forEach(function(tp){
-        if(!seen[tp]){ seen[tp] = 1; topics.push(tp); }
-      });
+// The user's COMPLETE current subscription selection across all tiles: one {pipeline_type, topic}
+// per followed topic, deduped (the two government tiles share the government_notice pipeline).
+// Passed in full on every save so the RPC can reconcile server-side (add missing, delete removed).
+function buildSubscriptionSet(){
+  const seen = {}; const out = [];
+  Object.keys(CAT_TO_PIPELINE).forEach(function(k){
+    const pl = CAT_TO_PIPELINE[k];
+    (accountTopics[k] || []).forEach(function(t){
+      const key = pl + ' ' + t;
+      if(!seen[key]){ seen[key] = 1; out.push({ pipeline_type: pl, topic: t }); }
     });
-  }
-  // Resolve this user's id from the users table (PostgREST returns the row).
-  const ures = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}&select=id`, { headers: H });
-  if(!ures.ok) return;
-  const urows = await ures.json();
-  if(!Array.isArray(urows) || !urows.length || !urows[0].id) return;
-  const userId = urows[0].id;
-  // Replace the set for this pipeline: delete its rows, then insert the chosen topics.
-  await fetch(`${SUPABASE_URL}/rest/v1/user_subscriptions?user_id=eq.${encodeURIComponent(userId)}&community_id=eq.${encodeURIComponent(COMMUNITY_ID)}&pipeline_type=eq.${encodeURIComponent(pipeline)}`, { method:'DELETE', headers: H });
-  if(topics && topics.length){
-    const rows = topics.map(function(topic){
-      return { user_id: userId, community_id: COMMUNITY_ID, pipeline_type: pipeline, topic: topic };
-    });
-    await fetch(`${SUPABASE_URL}/rest/v1/user_subscriptions`, { method:'POST', headers: H, body: JSON.stringify(rows) });
-  }
+  });
+  return out;
 }
 
 function refreshTileLabels(){
