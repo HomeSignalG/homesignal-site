@@ -78,7 +78,8 @@ body {
 /* ---------- NAV (shared across all pages) ---------- */
 nav {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 48px; border-bottom: 1px solid var(--border);
+  max-width: 1200px; margin: 0 auto;
+  padding: 14px 40px; border-bottom: 1px solid var(--border);
   background: var(--bg); position: sticky; top: 0; z-index: 100;
 }
 .logo { display: flex; align-items: center; gap: 10px; }
@@ -384,7 +385,7 @@ input:focus, textarea:focus,
 body { background: var(--bg-tertiary); }
 
 /* ---- shell ---- */
-.be-shell { max-width: 900px; margin: 0 auto; padding: 0; }
+.be-shell { max-width: 1200px; margin: 0 auto; padding: 0; }
 .be-section { padding: 0 40px; }
 
 h1.be-h1 { font-size: 22px; font-weight: 500; margin: 5px 0 7px; letter-spacing: -0.01em; }
@@ -453,7 +454,7 @@ h2.be-h2 { font-size: 18px; font-weight: 500; margin: 0; }
 .alert-card, .scard, .mcard { border-color: var(--bd-tertiary); border-radius: var(--r-lg); }
 
 /* ---- footer (neutral mockup text) ---- */
-.be-footer { margin-top: 22px; padding: 14px 40px 30px; border-top: 0.5px solid var(--bd-tertiary); font-size: 12px; color: var(--tx-tertiary); }
+.be-footer { max-width: 1200px; margin: 22px auto 0; padding: 14px 40px 30px; border-top: 0.5px solid var(--bd-tertiary); font-size: 12px; color: var(--tx-tertiary); }
 .be-footer a { font-size: 12px; }
 
 @media (max-width: 720px){
