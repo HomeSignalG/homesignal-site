@@ -909,24 +909,11 @@ function showToast(text){
   clearTimeout(window.__hsToastT); window.__hsToastT=setTimeout(function(){ t.style.display='none'; },3500);
 }
 
-// auth module calls this whenever login state changes (and on initial load)
+// auth module calls this whenever login state changes (and on initial load).
+// The signup write goes through the signup_complete RPC in verifyCode() only \u2014
+// there is intentionally no saveTopics replay here, to keep a single write path.
 window.hsOnAuthChange = async function(user){
   await loadAccount();
-  if(user && pendingFollow){
-    const p = pendingFollow; pendingFollow = null;
-    try{
-      await saveTopics(p.cat, p.checked, p.consent);
-      if(p.kind==='modal'){
-        const tile=document.querySelector('.cat-tile[data-id="'+p.cat+'"]');
-        if(tile) openModal(tile);
-        const m=document.getElementById('modal-msg'); if(m){ m.style.color='#166534'; m.textContent="You're following these alerts \u2713"; }
-      } else {
-        openAlertModalForCat(p.cat);
-        const m=document.getElementById('alert-msg'); if(m){ m.style.color='#166534'; m.textContent="You're following these alerts \u2713"; }
-      }
-      showToast("Saved \u2014 you're following these alerts.");
-    }catch(e){ showToast('Could not save \u2014 please try again.'); }
-  }
 };
 function openModal(tile){
   currentId=tile.dataset.cat||tile.dataset.id;currentType=tile.dataset.type;
@@ -1161,6 +1148,35 @@ loadMeetings();
     try {
       var r = await client.auth.verifyOtp({ email: pendingEmail, token: code, type: 'email' });
       if (r.error) { showMsg(r.error.message, true); $('auth-submit').disabled = false; return; }
+      // Persist the confirmed user into public.users (+ user_subscriptions) via the
+      // SECURITY DEFINER signup_complete RPC, called from the authenticated session
+      // verifyOtp just established. Without this, confirmed auth.users never reach
+      // public.users. Sources mirror saveTopics: the tile selection captured in
+      // pendingFollow right before auth opened, and the searched ZIP (the modal's own
+      // zip input is hidden/empty, and the RPC rejects a null/blank zip_code).
+      var pf = (typeof pendingFollow !== 'undefined' && pendingFollow) ? pendingFollow : null;
+      var cat = pf ? pf.cat : null;
+      var picked = (pf && Array.isArray(pf.checked)) ? pf.checked : [];
+      var pipeline = (cat && typeof CAT_TO_PIPELINE !== 'undefined') ? CAT_TO_PIPELINE[cat] : null;
+      var topicsObj = {}; if (cat) { topicsObj[cat] = picked; }
+      var subs = pipeline ? picked.map(function(t){ return { pipeline_type: pipeline, topic: t }; }) : [];
+      var zip = (typeof searchedZip !== 'undefined' && searchedZip) ? searchedZip
+              : (typeof accountZip !== 'undefined' && accountZip) ? accountZip : '84302';
+      // Consent reflects whatever the user actually did: it is captured from the modal
+      // they used (#modal-consent or #alert-consent) at Sign-up click time and stored on
+      // pendingFollow \u2014 never re-read from a fixed element here, since the modal is closed.
+      var consent = !!(pf && pf.consent);
+      showMsg('Finishing sign-up\u2026', false);
+      var w = await client.rpc('signup_complete', {
+        p_email: pendingEmail,
+        p_community_id: 'd67c558f-1f04-4811-a565-873ae2afd6f3',
+        p_zip_code: zip,
+        p_topics: topicsObj,
+        p_consent_version: '2026-06-20',
+        p_subscriptions: subs,
+        p_data_licensing_agreed: consent
+      });
+      if (w && w.error) { showMsg(w.error.message || 'Could not finish sign-up \u2014 please try again.', true); $('auth-submit').disabled = false; return; }
       closeAuth();
     } catch (e) { showMsg('Something went wrong \u2014 please try again.', true); }
     $('auth-submit').disabled = false;
