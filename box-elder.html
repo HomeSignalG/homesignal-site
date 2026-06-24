@@ -153,22 +153,8 @@ body { background: var(--bg-tertiary); font-size: 14px; }
 .cat-tile svg { width: 18px; height: 18px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .ct-label { font-size: 12px; font-weight: 500; margin-bottom: 2px; }
 .ct-sub { font-size: 11px; }
-.early-off { background: #fee2e2; border: 1px solid #fca5a5; }
-.early-off svg { stroke: #f87171; }
-.early-off .ct-label { color: #991b1b; }
-.early-off .ct-sub { color: #ef4444; }
-.early-on { background: #dc2626; border: 1px solid #b91c1c; }
-.early-on svg { stroke: #fff; }
-.early-on .ct-label, .early-on .ct-sub { color: #fff; }
-.early-on .ct-sub { color: #fecaca; }
-.inform-off { background: #dcfce7; border: 1px solid #86efac; }
-.inform-off svg { stroke: #4ade80; }
-.inform-off .ct-label { color: #166534; }
-.inform-off .ct-sub { color: #16a34a; }
-.inform-on { background: #15803d; border: 1px solid #166534; }
-.inform-on svg { stroke: #fff; }
-.inform-on .ct-label { color: #fff; }
-.inform-on .ct-sub { color: #bbf7d0; }
+/* Legacy solid red/green tile fills removed — tiles now render as neutral mockup
+   lens cards (see the .cat-tile rules further below). */
 
 .signup-band { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .signup-label { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
@@ -449,15 +435,18 @@ h2.be-h2 { font-size: 18px; font-weight: 500; margin: 0; }
 .cat-tile .ct-sub { font-size: 12.5px; color: var(--tx-secondary); }
 /* keep the existing svg hidden once we swap to Tabler icons in the markup */
 .cat-tile > svg { display: none; }
-/* selected-state accent: tint the icon badge per lens type without re-coloring the card */
-.cat-tile.early-off .ct-icon { background: var(--bg-info); color: var(--tx-info); }
-.cat-tile.early-on .ct-icon  { background: var(--bg-warning); color: var(--tx-warning); }
-.cat-tile.early-on { border-color: var(--bd-warning); }
-.cat-tile.early-on .ct-sub { color: var(--tx-warning); }
-.cat-tile.inform-off .ct-icon { background: var(--bg-secondary); color: var(--tx-secondary); }
-.cat-tile.inform-on .ct-icon  { background: var(--bg-success); color: var(--tx-success); }
-.cat-tile.inform-on { border-color: var(--bd-success); }
-.cat-tile.inform-on .ct-sub { color: var(--tx-success); }
+/* card is a column: [icon + title/meta row] · [topic chips] · [click-to-change control] */
+.cat-tile { flex-direction: column; }
+.cat-tile .ct-top { display: flex; align-items: flex-start; gap: 12px; width: 100%; }
+.cat-tile .ct-meta { font-size: 12.5px; color: var(--tx-secondary); line-height: 1.5; margin-top: 2px; }
+.cat-tile .ct-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.cat-tile .ct-sub { margin-top: 11px; font-size: 13px; color: var(--tx-info); }
+/* badge tint is by LENS GROUP only — Early warning = info/blue, Stay informed = neutral.
+   The followed (on) state shows a subtle hairline + text accent, never a solid fill. */
+.cat-tile.early-off .ct-icon, .cat-tile.early-on .ct-icon { background: var(--bg-info); color: var(--tx-info); }
+.cat-tile.inform-off .ct-icon, .cat-tile.inform-on .ct-icon { background: var(--bg-secondary); color: var(--tx-secondary); }
+.cat-tile.early-on, .cat-tile.inform-on { border-color: var(--bd-success); }
+.cat-tile.early-on .ct-sub, .cat-tile.inform-on .ct-sub { color: var(--tx-success); }
 
 /* lens-group headers */
 .be-lens-head { font-size: 13px; color: var(--tx-secondary); display: flex; align-items: center; gap: 7px; margin: 18px 0 10px; }
@@ -525,15 +514,15 @@ h2.be-h2 { font-size: 18px; font-weight: 500; margin: 0; }
 
     <div class="be-lens-head early"><i class="ti ti-radar-2" aria-hidden="true"></i>Early warning — advance notice before decisions are made</div>
     <div class="be-grid2 groups">
-      <div class="cat-tile early-off" data-id="gov-notices" data-cat="notices" data-type="early" onclick="openModal(this)"><svg viewBox="0 0 24 24"></svg><div class="ct-icon"><i class="ti ti-file-text" aria-hidden="true"></i></div><div class="ct-body"><div class="ct-label">Government notices</div><div class="ct-sub">Click to choose topics</div></div></div>
-      <div class="cat-tile early-off" data-id="gov-meetings" data-cat="meetings" data-type="early" onclick="openModal(this)"><svg viewBox="0 0 24 24"></svg><div class="ct-icon"><i class="ti ti-calendar-event" aria-hidden="true"></i></div><div class="ct-body"><div class="ct-label">Upcoming meetings</div><div class="ct-sub">Click to choose topics</div></div></div>
+      <div class="cat-tile early-off" data-id="gov-notices" data-cat="notices" data-type="early" onclick="openModal(this)"><svg viewBox="0 0 24 24"></svg><div class="ct-top"><div class="ct-icon"><i class="ti ti-file-text" aria-hidden="true"></i></div><div class="ct-body"><div class="ct-label">Government notices</div><div class="ct-meta">Official notices, comment periods, permit &amp; zoning filings.</div></div></div><div class="ct-chips"><span class="be-chip">Planning &amp; zoning</span><span class="be-chip">Water companies</span><span class="be-chip">Stratos data center</span></div><div class="ct-sub">Click to choose topics</div></div>
+      <div class="cat-tile early-off" data-id="gov-meetings" data-cat="meetings" data-type="early" onclick="openModal(this)"><svg viewBox="0 0 24 24"></svg><div class="ct-top"><div class="ct-icon"><i class="ti ti-calendar-event" aria-hidden="true"></i></div><div class="ct-body"><div class="ct-label">Upcoming meetings</div><div class="ct-meta">Hearings and agendas before decisions are made.</div></div></div><div class="ct-chips"><span class="be-chip">County Commission</span><span class="be-chip">Planning &amp; zoning</span></div><div class="ct-sub">Click to choose topics</div></div>
     </div>
 
     <div class="be-lens-head"><i class="ti ti-info-circle" aria-hidden="true"></i>Stay informed — real-time news and intelligence</div>
     <div class="be-grid3">
-      <div class="cat-tile inform-off" data-id="news" data-type="inform" onclick="openModal(this)"><svg viewBox="0 0 24 24"></svg><div class="ct-icon"><i class="ti ti-news" aria-hidden="true"></i></div><div class="ct-body"><div class="ct-label">News alerts</div><div class="ct-sub" id="lbl-news">Click to choose topics</div></div></div>
-      <div class="cat-tile inform-off" data-id="emerging" data-type="inform" onclick="openModal(this)"><svg viewBox="0 0 24 24"></svg><div class="ct-icon"><i class="ti ti-bulb" aria-hidden="true"></i></div><div class="ct-body"><div class="ct-label">Emerging technologies</div><div class="ct-sub" id="lbl-emerging">Click to choose topics</div></div></div>
-      <div class="cat-tile inform-off" data-id="global" data-type="inform" onclick="openModal(this)"><svg viewBox="0 0 24 24"></svg><div class="ct-icon"><i class="ti ti-world" aria-hidden="true"></i></div><div class="ct-body"><div class="ct-label">Global best practices</div><div class="ct-sub" id="lbl-global">Click to choose topics</div></div></div>
+      <div class="cat-tile inform-off" data-id="news" data-type="inform" onclick="openModal(this)"><svg viewBox="0 0 24 24"></svg><div class="ct-top"><div class="ct-icon"><i class="ti ti-news" aria-hidden="true"></i></div><div class="ct-body"><div class="ct-label">News alerts</div><div class="ct-meta">Announcements and coverage that matter locally.</div></div></div><div class="ct-chips"><span class="be-chip">Water quality</span><span class="be-chip">Air quality</span><span class="be-chip">Data centers</span></div><div class="ct-sub" id="lbl-news">Click to choose topics</div></div>
+      <div class="cat-tile inform-off" data-id="emerging" data-type="inform" onclick="openModal(this)"><svg viewBox="0 0 24 24"></svg><div class="ct-top"><div class="ct-icon"><i class="ti ti-bulb" aria-hidden="true"></i></div><div class="ct-body"><div class="ct-label">Emerging technologies</div><div class="ct-meta">New technology and infrastructure proposals.</div></div></div><div class="ct-chips"><span class="be-chip">Data centers</span><span class="be-chip">Infrastructure</span></div><div class="ct-sub" id="lbl-emerging">Click to choose topics</div></div>
+      <div class="cat-tile inform-off" data-id="global" data-type="inform" onclick="openModal(this)"><svg viewBox="0 0 24 24"></svg><div class="ct-top"><div class="ct-icon"><i class="ti ti-world" aria-hidden="true"></i></div><div class="ct-body"><div class="ct-label">Global best practices</div><div class="ct-meta">How peer communities handle the same issues.</div></div></div><div class="ct-chips"><span class="be-chip">Water quality</span><span class="be-chip">Air quality</span></div><div class="ct-sub" id="lbl-global">Click to choose topics</div></div>
     </div>
   </section>
 
