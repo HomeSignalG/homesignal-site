@@ -14,19 +14,34 @@
    ============================================================ */
 
 :root {
-  --green: #1a6b3c;
-  --green-light: #eaf3de;
-  --green-mid: #97c459;
-  --green-dark: #27500a;
-  --green-text: #3b6d11;
-  --text: #111827;
-  --text-secondary: #6b7280;
-  --text-tertiary: #9ca3af;
-  --border: #e5e7eb;
+  /* Aligned to the home page (index.html) as the single source of look-and-feel:
+     brand green #1f5130, warm-neutral surfaces, hairline borders, system font,
+     12px/8px radii. Existing token NAMES are kept and re-pointed to these values
+     so every rule on this page adopts the shared design without any renames. */
+  /* home-page tokens (added so this page can reference them directly) */
+  --bg-primary:#ffffff; --bg-tertiary:#eceae2; --bg-band:#f0efe7;
+  --bg-info:#e6f1fb; --tx-info:#0c447c;
+  --bg-success:#e1f5ee; --tx-success:#0f6e56; --bd-success:#9fe1cb;
+  --bg-warning:#faeeda; --tx-warning:#854f0b;
+  --green-tx:#ffffff;
+  --tx-primary:#1c1c1a; --tx-secondary:#5f5e5a; --tx-tertiary:#8a8980;
+  --bd-tertiary:rgba(0,0,0,.12); --bd-secondary:rgba(0,0,0,.22);
+  --r-md:8px; --r-lg:12px; --r-xl:16px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+
+  --green: #1f5130;
+  --green-light: #e1f5ee;
+  --green-mid: #9fe1cb;
+  --green-dark: #0f6e56;
+  --green-text: #0f6e56;
+  --text: #1c1c1a;
+  --text-secondary: #5f5e5a;
+  --text-tertiary: #8a8980;
+  --border: rgba(0,0,0,.12);
   --bg: #ffffff;
-  --bg-secondary: #f9fafb;
-  --radius: 10px;
-  --radius-sm: 6px;
+  --bg-secondary: #f4f3ee;
+  --radius: 12px;
+  --radius-sm: 8px;
   --radius-pill: 100px;
 
   /* shorthand aliases used by the community page */
@@ -46,9 +61,10 @@ input, button, textarea { font-family: inherit; outline: none; }
 input:focus, textarea:focus { border-color: var(--green) !important; }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font);
   color: var(--text);
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ---------- NAV (shared across all pages) ---------- */
@@ -89,7 +105,7 @@ footer {
    HomeSignal — community page styles (box-elder.html)
    ============================================================ */
 
-body { background: #f3f4f6; font-size: 14px; }
+body { background: var(--bg-tertiary); font-size: 14px; }
 
 .comm-header { padding: 20px 40px; background: var(--bg); border-bottom: 1px solid var(--border); }
 .comm-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
@@ -348,6 +364,19 @@ body { background: #f3f4f6; font-size: 14px; }
   .comm-top > * + * { margin-top: 12px; }
   footer > * + * { margin-top: 14px; }
 }
+</style>
+<style>
+/* ===== Home-page visual alignment (index.html = single source of truth) =====
+   Layered CSS overrides ONLY — no class/id renames, no markup or behavior
+   changes. Brings this page's neutral surfaces to the home page's hairline
+   borders, soft modal shadow, and input focus ring. The early-warning /
+   informational tile + badge palette is intentionally semantic and is left
+   untouched. */
+nav, footer, .comm-header, .cat-section,
+.alert-card, .scard, .mcard, .signup-band { border-width: 0.5px; }
+.modal { box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+input:focus, textarea:focus,
+.signup-input:focus, .alert-field:focus { box-shadow: 0 0 0 3px var(--bg-success); }
 </style>
 </head>
 <body>
