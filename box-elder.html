@@ -59,20 +59,9 @@
   --bd-info:#b5d4f4; --bd-warning:#fac775;
 }
 
-@media (prefers-color-scheme: dark){
-  :root{
-    --bg-primary:#232320; --bg-secondary:#2b2b27; --bg-tertiary:#161614; --bg-band:#161614;
-    --bg-info:#0c447c; --tx-info:#b5d4f4; --bd-info:#185fa5;
-    --bg-success:#085041; --tx-success:#9fe1cb; --bd-success:#0f6e56;
-    --bg-warning:#633806; --tx-warning:#fac775;
-    --green-light:#085041; --green-mid:#0f6e56; --green-dark:#9fe1cb; --green-text:#9fe1cb;
-    --tx-primary:#f1efe8; --tx-secondary:#b4b2a9; --tx-tertiary:#888780;
-    --text:#f1efe8; --text-secondary:#b4b2a9; --text-tertiary:#888780;
-    --bd-tertiary:rgba(255,255,255,.18); --bd-secondary:rgba(255,255,255,.30);
-    --border:rgba(255,255,255,.14);
-    --bg:#232320;
-  }
-}
+/* Light mode is forced on this page: the prefers-color-scheme: dark override
+   was removed so the light :root variables above always apply, regardless of
+   the visitor's OS theme. */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 a { text-decoration: none; }
