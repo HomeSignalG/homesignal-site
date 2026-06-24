@@ -768,9 +768,6 @@ const CAT_TO_PIPELINE = {
 };
 
 async function saveTopics(cat, checked, consent){
-  // Snapshot the previous follow list for this cat BEFORE overwriting, so we can detect
-  // which topics the user just unchecked and remove only those subscriptions below.
-  const prev = Array.isArray(accountTopics[cat]) ? accountTopics[cat].slice() : [];
   accountTopics[cat] = checked;
   const email = window.hsUser.email;
   // Digest contract (what the live digest on main reads): users.topics is a split
@@ -786,50 +783,39 @@ async function saveTopics(cat, checked, consent){
   ['news','emerging','global'].forEach(function(k){
     if(Array.isArray(accountTopics[k]) && accountTopics[k].length) topicsObj[k] = accountTopics[k];
   });
-  // SINGLE WRITE PATH: signup_complete is a SECURITY DEFINER idempotent upsert (no direct
-  // table inserts -> no 409 against users_email_key / the user_subscriptions grain index).
-  // It writes consent from the checkbox and ADDS subscriptions (ON CONFLICT DO NOTHING).
-  // Must run on the authenticated session (window.hsClient) so the JWT email matches p_email.
-  const pipeline = CAT_TO_PIPELINE[cat];
-  const subs = pipeline ? checked.map(function(t){ return { pipeline_type: pipeline, topic: t }; }) : [];
+  // SINGLE WRITE PATH: signup_complete (SECURITY DEFINER, authenticated session) is the only
+  // writer — an idempotent upsert (no direct table inserts -> no 409s) that also writes consent.
+  // We pass the COMPLETE desired subscription set across ALL tiles on every save; the RPC
+  // reconciles it server-side (adds missing, deletes removed), so unfollow works WITHOUT any
+  // client-side delete or a browser DELETE grant on user_subscriptions.
   const r = await window.hsClient.rpc('signup_complete', {
     p_email: email,
     p_community_id: COMMUNITY_ID,
     p_zip_code: searchedZip || accountZip || '84302',
     p_topics: topicsObj,
     p_consent_version: '2026-06-20',
-    p_subscriptions: subs,
+    p_subscriptions: buildSubscriptionSet(),
     p_data_licensing_agreed: !!consent
   });
   if(r && r.error){ throw new Error('Save error: ' + (r.error.message || r.error)); }
   accountExists = true;
   accountConsent = !!consent; // keep the pre-filled checkbox in sync so a later save can't reset it
   refreshTileLabels();
-  // Unfollow-removal: the RPC only ADDS, so remove the subscription rows for topics the user
-  // just unchecked — targeted (only those topics), never the old blunt delete-all. Best-effort.
-  try { await removeUnfollowedSubs(cat, prev, r && r.data); } catch(e) { /* non-fatal */ }
 }
 
-// Delete ONLY the user_subscriptions rows for topics the user just unchecked in this pipeline.
-// government_notice is fed by BOTH government tiles (notices + meetings), so a topic is only
-// removed when it is gone from the WHOLE pipeline's union — never wiping the sibling tile's rows.
-async function removeUnfollowedSubs(cat, prev, userId){
-  const pipeline = CAT_TO_PIPELINE[cat];
-  if(!pipeline || !userId) return;
-  const sibCats = Object.keys(CAT_TO_PIPELINE).filter(function(k){ return CAT_TO_PIPELINE[k] === pipeline; });
-  const current = {};
-  sibCats.forEach(function(k){ (accountTopics[k]||[]).forEach(function(t){ current[t] = 1; }); });
-  const before = {};
-  sibCats.forEach(function(k){ ((k===cat ? prev : accountTopics[k])||[]).forEach(function(t){ before[t] = 1; }); });
-  const removed = Object.keys(before).filter(function(t){ return !current[t]; });
-  if(!removed.length) return;
-  await window.hsClient
-    .from('user_subscriptions')
-    .delete()
-    .eq('user_id', userId)
-    .eq('community_id', COMMUNITY_ID)
-    .eq('pipeline_type', pipeline)
-    .in('topic', removed);
+// The user's COMPLETE current subscription selection across all tiles: one {pipeline_type, topic}
+// per followed topic, deduped (the two government tiles share the government_notice pipeline).
+// Passed in full on every save so the RPC can reconcile server-side (add missing, delete removed).
+function buildSubscriptionSet(){
+  const seen = {}; const out = [];
+  Object.keys(CAT_TO_PIPELINE).forEach(function(k){
+    const pl = CAT_TO_PIPELINE[k];
+    (accountTopics[k] || []).forEach(function(t){
+      const key = pl + ' ' + t;
+      if(!seen[key]){ seen[key] = 1; out.push({ pipeline_type: pl, topic: t }); }
+    });
+  });
+  return out;
 }
 
 function refreshTileLabels(){
