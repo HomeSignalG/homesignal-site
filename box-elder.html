@@ -784,7 +784,10 @@ async function submitAlertSignup(){
   if(checked.length===0){ msg.style.color='#b91c1c'; msg.textContent='Please choose at least one topic above.'; return; }
   const consent=document.getElementById('alert-consent').checked;
   if(!hsLoggedIn()){
-    pendingFollow={ kind:'alert', cat:alertCat, checked:checked, consent:consent };
+    const zipEl=document.getElementById('alert-zip');
+    const zip=(zipEl?zipEl.value:'').trim();
+    if(!/^\d{5}$/.test(zip)){ msg.style.color='#b91c1c'; msg.textContent='Please enter a valid 5-digit ZIP code.'; if(zipEl) zipEl.focus(); return; }
+    pendingFollow={ kind:'alert', cat:alertCat, checked:checked, consent:consent, zip:zip };
     closeAlertModal();
     window.hsOpenAuth();
     return;
@@ -907,10 +910,15 @@ async function saveTopics(cat, checked, consent){
   // We pass the COMPLETE desired subscription set across ALL tiles on every save; the RPC
   // reconciles it server-side (adds missing, deletes removed), so unfollow works WITHOUT any
   // client-side delete or a browser DELETE grant on user_subscriptions.
+  // Existing-user topic edit: write the user's already-stored ZIP. No 84302 fallback — if the
+  // account somehow has no valid 5-digit ZIP on file, abort rather than store a fake one.
+  // (Normal edits, where a valid zip is already stored, save fine with no re-entry.)
+  const zipForSave = (accountZip || '').trim();
+  if(!/^\d{5}$/.test(zipForSave)){ throw new Error('Your account has no ZIP code on file — please re-enter it before editing alerts.'); }
   const r = await window.hsClient.rpc('signup_complete', {
     p_email: email,
     p_community_id: COMMUNITY_ID,
-    p_zip_code: searchedZip || accountZip || '84302',
+    p_zip_code: zipForSave,
     p_topics: topicsObj,
     p_consent_version: '2026-06-20',
     p_subscriptions: buildSubscriptionSet(),
@@ -957,7 +965,14 @@ function setupSignupArea(which){
   const zipEl = document.getElementById(which==='modal'?'modal-zip':'alert-zip');
   const btn = document.getElementById(which==='modal'?'modal-submit':'alert-submit');
   if(emailEl) emailEl.style.display='none';
-  if(zipEl) zipEl.style.display='none';
+  // ZIP is captured here and is authoritative for new signups: show the input for
+  // logged-out signup, prefilled from the searched/?zip= value for convenience (the
+  // WRITTEN value is whatever's in the input at submit). Keep it hidden for logged-in
+  // topic edits — those reuse the account's already-stored zip, no re-entry.
+  if(zipEl){
+    if(hsLoggedIn()){ zipEl.style.display='none'; }
+    else { zipEl.style.display=''; if(searchedZip && !zipEl.value){ zipEl.value = searchedZip; } }
+  }
   const wrap = emailEl ? emailEl.closest('.alert-signup') : null;
   const label = wrap ? wrap.querySelector('.alert-signup-label') : null;
   // Reflect the user's stored consent for logged-in visitors; default unchecked otherwise.
@@ -1021,7 +1036,10 @@ async function submitModalSignup(){
   if(checked.length===0){ msg.style.color='#b91c1c'; msg.textContent='Please choose at least one topic above.'; return; }
   const consent=document.getElementById('modal-consent').checked;
   if(!hsLoggedIn()){
-    pendingFollow={ kind:'modal', cat:currentId, checked:checked, consent:consent };
+    const zipEl=document.getElementById('modal-zip');
+    const zip=(zipEl?zipEl.value:'').trim();
+    if(!/^\d{5}$/.test(zip)){ msg.style.color='#b91c1c'; msg.textContent='Please enter a valid 5-digit ZIP code.'; if(zipEl) zipEl.focus(); return; }
+    pendingFollow={ kind:'modal', cat:currentId, checked:checked, consent:consent, zip:zip };
     closeModal();
     window.hsOpenAuth();
     return;
@@ -1231,8 +1249,18 @@ loadMeetings();
       var pipeline = (cat && typeof CAT_TO_PIPELINE !== 'undefined') ? CAT_TO_PIPELINE[cat] : null;
       var topicsObj = {}; if (cat) { topicsObj[cat] = picked; }
       var subs = pipeline ? picked.map(function(t){ return { pipeline_type: pipeline, topic: t }; }) : [];
-      var zip = (typeof searchedZip !== 'undefined' && searchedZip) ? searchedZip
-              : (typeof accountZip !== 'undefined' && accountZip) ? accountZip : '84302';
+      // New-signup ZIP is the value the user typed in the signup modal, captured + validated
+      // into pendingFollow at submit time — authoritative, no 84302 fallback. Plain login
+      // (no pendingFollow) keeps using the stored/searched zip so returning-user login still
+      // works before their account record loads.
+      var zip;
+      if (pf) {
+        zip = (pf.zip || '').trim();
+        if (!/^\d{5}$/.test(zip)) { showMsg('Please enter a valid 5-digit ZIP code to finish sign-up.', true); $('auth-submit').disabled = false; return; }
+      } else {
+        zip = (typeof searchedZip !== 'undefined' && searchedZip) ? searchedZip
+            : (typeof accountZip !== 'undefined' && accountZip) ? accountZip : '84302';
+      }
       // Consent reflects whatever the user actually did: it is captured from the modal
       // they used (#modal-consent or #alert-consent) at Sign-up click time and stored on
       // pendingFollow \u2014 never re-read from a fixed element here, since the modal is closed.
