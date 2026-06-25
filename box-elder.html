@@ -77,10 +77,13 @@ body {
 
 /* ---------- NAV (shared across all pages) ---------- */
 nav {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg); position: sticky; top: 0; z-index: 100;
+}
+.be-nav-inner {
   display: flex; align-items: center; justify-content: space-between;
   max-width: 1200px; margin: 0 auto;
-  padding: 14px 40px; border-bottom: 1px solid var(--border);
-  background: var(--bg); position: sticky; top: 0; z-index: 100;
+  padding: 14px 40px;
 }
 .logo { display: flex; align-items: center; gap: 10px; }
 .logo-icon { width: 34px; height: 34px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
@@ -98,7 +101,7 @@ nav {
 
 /* ---------- FOOTER (shared across all pages) ---------- */
 footer {
-  padding: 32px 48px; border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap; gap: 16px; background: var(--bg-secondary);
 }
@@ -248,7 +251,7 @@ body { background: var(--bg-tertiary); font-size: 14px; }
 .nav-menu { display: contents; }
 
 @media (max-width: 720px) {
-  nav { padding: 12px 20px; }
+  .be-nav-inner { padding: 12px 20px; }
   .nav-toggle { display: flex; align-items: center; }
   .nav-menu {
     display: none; position: absolute; top: 100%; left: 0; right: 0;
@@ -292,7 +295,7 @@ body { background: var(--bg-tertiary); font-size: 14px; }
   .contact-form { max-width: 100%; }
 
   /* footer */
-  footer { padding: 24px 20px; flex-direction: column; align-items: flex-start; gap: 14px; }
+  .be-footer-inner { flex-direction: column; align-items: flex-start; gap: 14px; }
 }
 </style>
 <style>
@@ -416,11 +419,11 @@ h2.be-h2 { font-size: 18px; font-weight: 500; margin: 0; }
    The .cat-tile keeps its data-*/onclick/.ct-label/.ct-sub contract and the
    refreshTileLabels() early-*/inform-* toggles; here we drop the old colored-pill
    look and render each tile as a neutral mockup lens card. */
-.card { background: var(--bg-primary); border: 1px solid rgba(0,0,0,.14); border-radius: var(--r-lg); padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04); }
+.card { background: var(--bg-primary); border: 1px solid rgba(0,0,0,.10); border-radius: 14px; padding: 16px 18px; box-shadow: 0 4px 6px rgba(0,0,0,.07), 0 10px 20px rgba(0,0,0,.10); }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px,1fr)); gap: 12px; }
 .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px,1fr)); gap: 12px; }
-.cat-tile { background: var(--bg-primary); border: 1px solid rgba(0,0,0,.14); border-radius: var(--r-lg); padding: 16px 18px; align-items: flex-start; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04); transition: box-shadow .15s ease, border-color .15s ease; }
-.cat-tile:hover { background: var(--bg-primary); border-color: var(--bd-secondary); box-shadow: 0 4px 12px rgba(0,0,0,.10); }
+.cat-tile { background: var(--bg-primary); border: 1px solid rgba(0,0,0,.10); border-radius: 14px; padding: 16px 18px; align-items: flex-start; gap: 12px; box-shadow: 0 4px 6px rgba(0,0,0,.07), 0 10px 20px rgba(0,0,0,.10); transition: box-shadow .15s ease, border-color .15s ease; }
+.cat-tile:hover { background: var(--bg-primary); border-color: var(--bd-secondary); box-shadow: 0 8px 16px rgba(0,0,0,.10), 0 16px 32px rgba(0,0,0,.14); }
 .cat-tile > :first-child { margin-right: 0; }
 .cat-tile .ct-icon { width: 34px; height: 34px; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; }
 .cat-tile .ct-body { flex: 1; min-width: 0; }
@@ -454,12 +457,13 @@ h2.be-h2 { font-size: 18px; font-weight: 500; margin: 0; }
 .alert-card, .scard, .mcard { border-color: var(--bd-tertiary); border-radius: var(--r-lg); }
 
 /* ---- footer (neutral mockup text) ---- */
-.be-footer { max-width: 1200px; margin: 22px auto 0; padding: 14px 40px 30px; border-top: 0.5px solid var(--bd-tertiary); font-size: 12px; color: var(--tx-tertiary); }
+.be-footer { margin: 22px 0 0; padding: 0; border-top: 0.5px solid var(--bd-tertiary); background: var(--bg-primary); font-size: 12px; color: var(--tx-tertiary); }
+.be-footer-inner { max-width: 1200px; margin: 0 auto; padding: 14px 40px 30px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
 .be-footer a { font-size: 12px; }
 
 @media (max-width: 720px){
   .be-section { padding: 0 20px; }
-  .be-footer { padding: 14px 20px 28px; }
+  .be-footer-inner { padding: 14px 20px 28px; }
 }
 </style>
 </head>
@@ -467,6 +471,7 @@ h2.be-h2 { font-size: 18px; font-weight: 500; margin: 0; }
 
 <!-- NAV -->
 <nav>
+  <div class="be-nav-inner">
   <a class="logo" href="index.html">
     <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
     <div class="logo-text">Home<span>Signal</span></div>
@@ -474,6 +479,7 @@ h2.be-h2 { font-size: 18px; font-weight: 500; margin: 0; }
   <button class="nav-toggle" id="nav-toggle" aria-label="Open menu"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="nav-menu" id="nav-menu"><ul class="nav-links"><li><a href="how-it-works.html">How it works</a></li><li><a href="about.html">About</a></li></ul>
   <div class="nav-actions" id="nav-auth"><button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button></div>
 </div>
+  </div>
 </nav>
 
 <div class="be-shell">
@@ -539,8 +545,10 @@ h2.be-h2 { font-size: 18px; font-weight: 500; margin: 0; }
 </div>
 
 <footer class="be-footer">
+  <div class="be-footer-inner">
   HomeSignal organizes public records into a neutral, sourced feed. We don't give legal advice, predict property values, or make political endorsements.
   <span style="margin-left:6px;white-space:nowrap"><a href="how-it-works.html">How it works</a> · <a href="about.html">About</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms of use</a> · <a href="contact.html">Contact</a></span>
+  </div>
 </footer>
 
 <div class="overlay" id="overlay" onclick="handleOverlayClick(event)">
