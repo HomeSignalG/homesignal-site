@@ -768,14 +768,21 @@ function openAlertModalForCat(catId){
   updateAlertCount();
   setupSignupArea('alert');
   document.getElementById('alert-msg').textContent = '';
-  const sb = document.getElementById('alert-submit');
-  sb.disabled = false;
+  updateAlertCount(); // gate submit on topic count (sets disabled + inline hint)
   document.getElementById('alert-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
 function updateAlertCount(){
   const n = document.querySelectorAll('#alert-list .sub-item.on').length;
   document.getElementById('alert-count').textContent = n>0 ? n+' topic'+(n===1?'':'s')+' selected' : 'No topics selected yet';
+  // Require at least one topic: disable submit and show an inline hint while none are picked.
+  const sb = document.getElementById('alert-submit');
+  if(sb) sb.disabled = (n===0);
+  const m = document.getElementById('alert-msg');
+  if(m){
+    if(n===0){ m.style.color='var(--ts)'; m.textContent='Pick at least one topic so we know what to alert you about.'; }
+    else if(m.textContent==='Pick at least one topic so we know what to alert you about.'){ m.textContent=''; }
+  }
 }
 function closeAlertModal(){
   document.getElementById('alert-overlay').classList.remove('open');
@@ -1026,13 +1033,21 @@ function openModal(tile){
   updateCount();
   setupSignupArea('modal');
   document.getElementById('modal-msg').textContent='';
-  const msb=document.getElementById('modal-submit'); msb.disabled=false;
+  updateCount(); // gate submit on topic count (sets disabled + inline hint)
   document.getElementById('overlay').classList.add('open');
   document.body.style.overflow='hidden';
 }
 function updateCount(){
   const n=document.querySelectorAll('#modal-list .sub-item.on').length;
   document.getElementById('modal-count').textContent=n>0?n+' topic'+(n===1?'':'s')+' selected':'No topics selected yet';
+  // Require at least one topic: disable submit and show an inline hint while none are picked.
+  const sb=document.getElementById('modal-submit');
+  if(sb) sb.disabled=(n===0);
+  const m=document.getElementById('modal-msg');
+  if(m){
+    if(n===0){ m.style.color='var(--ts)'; m.textContent='Pick at least one topic so we know what to alert you about.'; }
+    else if(m.textContent==='Pick at least one topic so we know what to alert you about.'){ m.textContent=''; }
+  }
 }
 async function submitModalSignup(){
   const msg=document.getElementById('modal-msg');
