@@ -294,6 +294,10 @@ body { background: var(--bg-tertiary); font-size: 14px; }
   .page-wrap h1 { font-size: 28px; }
   .contact-form { max-width: 100%; }
 
+  /* community H1: cap the 46px hero headline on phones (index caps its H1 to 35/30px;
+     box-elder's breakpoint is 720px, so cap to 32px here) */
+  h1.be-h1 { font-size: 32px; }
+
   /* footer */
   .be-footer-inner { flex-direction: column; align-items: flex-start; gap: 14px; }
 }
