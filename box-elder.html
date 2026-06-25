@@ -1102,13 +1102,22 @@ async function loadMeetings() {
   const list = document.getElementById('meetings-list');
   if (!list) return;
   try {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    // "Upcoming" is judged by America/Denver LOCAL date, not UTC. Bare YYYY-MM-DD values are
+    // taken literally; anything with a time is converted to the community's local date.
+    const denverDate = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v)) ? String(v).slice(0,10)
+      : new Date(v).toLocaleDateString('en-CA', { timeZone: 'America/Denver' });
+    const denverToday = denverDate(new Date());
+    // Query a safe superset (~2 days back in UTC so no local-today meeting is dropped at the
+    // coarse boundary), then filter precisely by local date below.
+    const qFrom = new Date(Date.now() - 48*3600*1000).toISOString().slice(0, 10);
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/meetings?community_id=eq.${COMMUNITY_ID}&meeting_date=gte.${todayStr}&order=meeting_date.asc&limit=60`,
+      `${SUPABASE_URL}/rest/v1/meetings?community_id=eq.${COMMUNITY_ID}&meeting_date=gte.${qFrom}&order=meeting_date.asc&limit=60`,
       { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }
     );
-    const meetings = await res.json();
-    if (!meetings || meetings.length === 0) {
+    let meetings = await res.json();
+    // Keep only meetings whose LOCAL (Denver) date is today or later (ISO dates sort chronologically).
+    meetings = Array.isArray(meetings) ? meetings.filter(m => m.meeting_date && denverDate(m.meeting_date) >= denverToday) : [];
+    if (meetings.length === 0) {
       list.innerHTML = '<div class="mtit" style="padding:8px 0">No upcoming meetings posted yet.</div>';
       return;
     }
@@ -1119,8 +1128,10 @@ async function loadMeetings() {
       if(!value) return '';
       var raw=String(value), d=new Date(raw);
       if(isNaN(d.getTime())) return '';
-      var dateOnly=/^\d{4}-\d{2}-\d{2}$/.test(raw) || /T00:00(:00)?(\.0+)?(Z|\+00:?00)?$/.test(raw);
-      var tz=dateOnly?'UTC':'America/Denver';
+      // Always render in the community's local zone; only a bare date-only string (no time)
+      // is treated as a literal calendar date (UTC) so it isn't shifted back a day.
+      var bareDate=/^\d{4}-\d{2}-\d{2}$/.test(raw);
+      var tz=bareDate?'UTC':'America/Denver';
       return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',timeZone:tz});
     }
     var ICO_CAL='<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
@@ -1129,8 +1140,8 @@ async function loadMeetings() {
     const VISIBLE = 4;
     const items = meetings.map(m => {
       const dateStr = fmtDate(m.meeting_date);
-      const time = m.meeting_time ? esc(m.meeting_time) : '';
-      const when = dateStr ? (dateStr + (time ? ' · ' + time : '')) : (time || '');
+      const time = m.meeting_time ? esc(m.meeting_time) : 'Time TBD';
+      const when = dateStr ? (dateStr + ' · ' + time) : time;
       let tags = '';
       if(m.category) tags += `<span class="mchip">${esc(m.category)}</span>`;
       const title = esc(m.title || m.meeting_type || 'Public meeting');
