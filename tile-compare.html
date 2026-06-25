@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tile design comparison — HomeSignal (preview)</title>
+<style>
+  :root{
+    --green:#1f5130;
+    --page:#f3f4f6;
+    --card:#ffffff;
+    --tx-primary:#1c1c1a;
+    --tx-secondary:#5f5e5a;
+    --tx-tertiary:#8a8980;
+    --chip:#f4f4f5;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--page); color:var(--tx-primary);
+    font-family:var(--font); line-height:1.6; -webkit-font-smoothing:antialiased;
+    padding:48px 24px;
+  }
+  .wrap{max-width:1040px; margin:0 auto}
+  .pagetitle{font-size:20px; font-weight:600; margin:0 0 6px; letter-spacing:-0.01em}
+  .pagesub{font-size:13.5px; color:var(--tx-secondary); margin:0 0 32px}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:32px}
+  @media (max-width:760px){ .grid{grid-template-columns:1fr} }
+  .optlabel{
+    font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--tx-tertiary); margin:0 0 12px;
+  }
+
+  /* shared chips */
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px}
+  .chip{
+    font-size:12px; padding:4px 11px; border-radius:999px;
+    background:var(--chip); border:1px solid rgba(0,0,0,.08); color:var(--tx-secondary);
+    white-space:nowrap;
+  }
+
+  /* ============ OPTION A — Elevated card ============ */
+  .tile-a{
+    background:var(--card); border-radius:14px; overflow:hidden;
+    box-shadow:0 10px 30px rgba(0,0,0,.12);
+  }
+  .tile-a .accent{height:4px; background:var(--green)}
+  .tile-a .body{padding:20px}
+  .tile-a .head{display:flex; align-items:flex-start; gap:14px}
+  .tile-a .icon{
+    width:40px; height:40px; border-radius:50%; background:var(--green);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .tile-a .icon svg{width:20px; height:20px; stroke:#fff; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round}
+  .tile-a .title{font-size:18px; font-weight:600; margin:0 0 4px; letter-spacing:-0.01em}
+  .tile-a .desc{font-size:13.5px; color:var(--tx-secondary); line-height:1.5; margin:0}
+
+  /* ============ OPTION B — Bold filled header ============ */
+  .tile-b{
+    background:var(--card); border-radius:14px; overflow:hidden;
+    border:1px solid rgba(0,0,0,.10); box-shadow:0 4px 6px rgba(0,0,0,.06);
+  }
+  .tile-b .header{
+    background:var(--green); padding:15px 20px;
+    display:flex; align-items:center; gap:12px;
+  }
+  .tile-b .header svg{width:22px; height:22px; stroke:#fff; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0}
+  .tile-b .header .title{color:#fff; font-size:17px; font-weight:600; margin:0; letter-spacing:-0.01em}
+  .tile-b .body{padding:18px 20px 20px}
+  .tile-b .desc{font-size:13.5px; color:var(--tx-secondary); line-height:1.5; margin:0}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 class="pagetitle">Lens-tile design comparison</h1>
+    <p class="pagesub">Same content, two treatments, on the live gray page — pick one for box-elder. Nothing here is wired up; this is a mockup only.</p>
+
+    <div class="grid">
+      <!-- ===== OPTION A ===== -->
+      <div class="col">
+        <p class="optlabel">Option A — Elevated card</p>
+        <div class="tile-a">
+          <div class="accent"></div>
+          <div class="body">
+            <div class="head">
+              <div class="icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              </div>
+              <div>
+                <h3 class="title">Government notices</h3>
+                <p class="desc">Official notices, comment periods, permit &amp; zoning filings.</p>
+              </div>
+            </div>
+            <div class="chips">
+              <span class="chip">Planning &amp; zoning</span>
+              <span class="chip">Water companies</span>
+              <span class="chip">Stratos data center</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== OPTION B ===== -->
+      <div class="col">
+        <p class="optlabel">Option B — Bold filled header</p>
+        <div class="tile-b">
+          <div class="header">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <h3 class="title">Government notices</h3>
+          </div>
+          <div class="body">
+            <p class="desc">Official notices, comment periods, permit &amp; zoning filings.</p>
+            <div class="chips">
+              <span class="chip">Planning &amp; zoning</span>
+              <span class="chip">Water companies</span>
+              <span class="chip">Stratos data center</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
