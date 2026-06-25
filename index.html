@@ -292,7 +292,14 @@ async function submitCommunityRequest(){
       body: JSON.stringify({ email: email, requested_zip: zip || null, source: 'homepage' })
     });
     if(!res.ok) throw new Error('insert failed ' + res.status);
-    if(card) card.innerHTML = '<p class="meta" style="font-size:14px;color:var(--tx-success);margin:0">Thanks — we\'ll email you the moment HomeSignal covers your area.</p>';
+    // Confirmation matches whether the submitted ZIP is covered: a covered ZIP means the
+    // area is live (we'll alert them about new items); an uncovered ZIP is a waitlist capture.
+    // Coverage uses the same findCommunityByZip source as the search; logic unchanged.
+    const covered = findCommunityByZip(extractZip(zip) || '');
+    const confirmText = covered
+      ? "Thanks — you're set. We'll email you when there's something new in your area."
+      : "Thanks — we'll email you the moment HomeSignal covers your area.";
+    if(card) card.innerHTML = '<p class="meta" style="font-size:14px;color:var(--tx-success);margin:0">' + confirmText + '</p>';
   }catch(e){
     if(btn) btn.disabled = false;
     if(msgEl) msgEl.textContent = 'Something went wrong — please try again.';
