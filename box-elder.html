@@ -416,11 +416,11 @@ h2.be-h2 { font-size: 18px; font-weight: 500; margin: 0; }
    The .cat-tile keeps its data-*/onclick/.ct-label/.ct-sub contract and the
    refreshTileLabels() early-*/inform-* toggles; here we drop the old colored-pill
    look and render each tile as a neutral mockup lens card. */
-.card { background: var(--bg-primary); border: 1px solid var(--bd-tertiary); border-radius: var(--r-lg); padding: 16px 18px; }
+.card { background: var(--bg-primary); border: 1px solid rgba(0,0,0,.14); border-radius: var(--r-lg); padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04); }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px,1fr)); gap: 12px; }
 .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px,1fr)); gap: 12px; }
-.cat-tile { background: var(--bg-primary); border: 1px solid var(--bd-tertiary); border-radius: var(--r-lg); padding: 16px 18px; align-items: flex-start; gap: 12px; }
-.cat-tile:hover { background: var(--bg-primary); border-color: var(--bd-secondary); }
+.cat-tile { background: var(--bg-primary); border: 1px solid rgba(0,0,0,.14); border-radius: var(--r-lg); padding: 16px 18px; align-items: flex-start; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04); transition: box-shadow .15s ease, border-color .15s ease; }
+.cat-tile:hover { background: var(--bg-primary); border-color: var(--bd-secondary); box-shadow: 0 4px 12px rgba(0,0,0,.10); }
 .cat-tile > :first-child { margin-right: 0; }
 .cat-tile .ct-icon { width: 34px; height: 34px; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; }
 .cat-tile .ct-body { flex: 1; min-width: 0; }
