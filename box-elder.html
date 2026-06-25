@@ -775,12 +775,14 @@ function openAlertModalForCat(catId){
 function updateAlertCount(){
   const n = document.querySelectorAll('#alert-list .sub-item.on').length;
   document.getElementById('alert-count').textContent = n>0 ? n+' topic'+(n===1?'':'s')+' selected' : 'No topics selected yet';
-  // Require at least one topic: disable submit and show an inline hint while none are picked.
+  // Require >=1 topic across the user's TOTAL follows (all categories), not per-category — so a
+  // category can be emptied as long as some other category still has a follow.
+  const total = totalFollowedWith(alertCat, n);
   const sb = document.getElementById('alert-submit');
-  if(sb) sb.disabled = (n===0);
+  if(sb) sb.disabled = (total===0);
   const m = document.getElementById('alert-msg');
   if(m){
-    if(n===0){ m.style.color='var(--ts)'; m.textContent='Pick at least one topic so we know what to alert you about.'; }
+    if(total===0){ m.style.color='var(--ts)'; m.textContent='Pick at least one topic so we know what to alert you about.'; }
     else if(m.textContent==='Pick at least one topic so we know what to alert you about.'){ m.textContent=''; }
   }
 }
@@ -792,7 +794,8 @@ function handleAlertOverlay(e){ if(e.target===document.getElementById('alert-ove
 async function submitAlertSignup(){
   const msg=document.getElementById('alert-msg');
   const checked=[...document.querySelectorAll('#alert-list .sub-item.on')].map(el=>el.querySelector('.sub-label').textContent);
-  if(checked.length===0){ msg.style.color='#b91c1c'; msg.textContent='Please choose at least one topic above.'; return; }
+  // Block only if this save would leave the WHOLE account at zero topics; emptying one category is allowed.
+  if(totalFollowedWith(alertCat, checked.length)===0){ msg.style.color='#b91c1c'; msg.textContent='Pick at least one topic so we know what to alert you about.'; return; }
   const consent=document.getElementById('alert-consent').checked;
   if(!hsLoggedIn()){
     const zipEl=document.getElementById('alert-zip');
@@ -956,6 +959,17 @@ function buildSubscriptionSet(){
   return out;
 }
 
+// The >=1-topic guard is GLOBAL, not per-category: total follows = the current modal's live
+// selection (currentCount, for currentCat) + every OTHER category's stored follows. This lets a
+// user fully empty one feed while still following others, and blocks only an all-zero account.
+function totalFollowedWith(currentCat, currentCount){
+  var total = currentCount || 0;
+  Object.keys(CAT_TO_PIPELINE).forEach(function(k){
+    if(k!==currentCat && Array.isArray(accountTopics[k])) total += accountTopics[k].length;
+  });
+  return total;
+}
+
 function refreshTileLabels(){
   // Each tile maps to a subscription cat via data-cat (falls back to data-id).
   // The two government tiles use distinct cats ("notices" and "meetings") and keep
@@ -1040,19 +1054,22 @@ function openModal(tile){
 function updateCount(){
   const n=document.querySelectorAll('#modal-list .sub-item.on').length;
   document.getElementById('modal-count').textContent=n>0?n+' topic'+(n===1?'':'s')+' selected':'No topics selected yet';
-  // Require at least one topic: disable submit and show an inline hint while none are picked.
+  // Require >=1 topic across the user's TOTAL follows (all categories), not per-category — so a
+  // category can be emptied as long as some other category still has a follow.
+  const total=totalFollowedWith(currentId, n);
   const sb=document.getElementById('modal-submit');
-  if(sb) sb.disabled=(n===0);
+  if(sb) sb.disabled=(total===0);
   const m=document.getElementById('modal-msg');
   if(m){
-    if(n===0){ m.style.color='var(--ts)'; m.textContent='Pick at least one topic so we know what to alert you about.'; }
+    if(total===0){ m.style.color='var(--ts)'; m.textContent='Pick at least one topic so we know what to alert you about.'; }
     else if(m.textContent==='Pick at least one topic so we know what to alert you about.'){ m.textContent=''; }
   }
 }
 async function submitModalSignup(){
   const msg=document.getElementById('modal-msg');
   const checked=[...document.querySelectorAll('#modal-list .sub-item.on')].map(el=>el.querySelector('.sub-label').textContent);
-  if(checked.length===0){ msg.style.color='#b91c1c'; msg.textContent='Please choose at least one topic above.'; return; }
+  // Block only if this save would leave the WHOLE account at zero topics; emptying one category is allowed.
+  if(totalFollowedWith(currentId, checked.length)===0){ msg.style.color='#b91c1c'; msg.textContent='Pick at least one topic so we know what to alert you about.'; return; }
   const consent=document.getElementById('modal-consent').checked;
   if(!hsLoggedIn()){
     const zipEl=document.getElementById('modal-zip');
