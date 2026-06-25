@@ -294,6 +294,10 @@ body { background: var(--bg-tertiary); font-size: 14px; }
   .page-wrap h1 { font-size: 28px; }
   .contact-form { max-width: 100%; }
 
+  /* community H1: cap the 46px hero headline on phones (index caps its H1 to 35/30px;
+     box-elder's breakpoint is 720px, so cap to 32px here) */
+  h1.be-h1 { font-size: 32px; }
+
   /* footer */
   .be-footer-inner { flex-direction: column; align-items: flex-start; gap: 14px; }
 }
@@ -391,12 +395,12 @@ body { background: var(--bg-tertiary); }
 .be-shell { max-width: 1200px; margin: 0 auto; padding: 0; }
 .be-section { padding: 0 40px; }
 
-h1.be-h1 { font-size: 22px; font-weight: 500; margin: 5px 0 7px; letter-spacing: -0.01em; }
-h2.be-h2 { font-size: 18px; font-weight: 500; margin: 0; }
+h1.be-h1 { font-size: 46px; font-weight: 600; margin: 5px 0 7px; letter-spacing: -0.022em; line-height: 1.08; }
+h2.be-h2 { font-size: 27px; font-weight: 600; margin: 0; letter-spacing: -0.015em; line-height: 1.15; }
 
 /* ---- mockup component primitives ---- */
 .be-card { background: var(--bg-primary); border: 0.5px solid var(--bd-tertiary); border-radius: var(--r-lg); padding: 16px 18px; }
-.be-chip { display: inline-flex; align-items: center; background: var(--bg-secondary); color: var(--tx-primary); font-size: 13px; padding: 4px 10px; border-radius: var(--r-md); }
+.be-chip { display: inline-flex; align-items: center; background: var(--bg-secondary); color: var(--tx-primary); font-size: 12.5px; padding: 4px 10px; border-radius: var(--r-md); }
 .be-stat { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-secondary); font-size: 13px; color: var(--tx-secondary); padding: 6px 11px; border-radius: var(--r-md); }
 .be-badge { width: 34px; height: 34px; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
 .be-meta { font-size: 12.5px; color: var(--tx-secondary); line-height: 1.5; }
@@ -406,8 +410,8 @@ h2.be-h2 { font-size: 18px; font-weight: 500; margin: 0; }
 
 /* ---- header / hero ---- */
 .be-hero { padding: 18px 0 4px; }
-.be-eyebrow { font-size: 12.5px; color: var(--tx-secondary); }
-.be-hero-sub { font-size: 15px; color: var(--tx-secondary); max-width: 640px; margin: 4px 0 14px; }
+.be-eyebrow { font-size: 13px; font-weight: 500; color: var(--tx-secondary); }
+.be-hero-sub { font-size: 16px; color: var(--tx-secondary); max-width: 640px; margin: 4px 0 14px; }
 .be-stats { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* ---- sourcing / info banner ---- */
