@@ -114,6 +114,9 @@ body { background: var(--bg); font-size: 15px; }
 .contact-form textarea { min-height: 120px; resize: vertical; }
 .contact-form button { align-self: flex-start; background: var(--green); color: #fff; border: none; padding: 11px 22px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; }
 .contact-form button:hover { opacity: 0.9; }
+.contact-form button:disabled { opacity: 0.7; cursor: default; }
+.contact-success { max-width: 460px; margin-top: 8px; padding: 16px 18px; background: var(--green-light); border: 1px solid var(--green-mid); border-radius: var(--radius); }
+.contact-success p { color: var(--green-dark); font-weight: 600; margin: 0; line-height: 1.6; }
 
 /* meetings list page */
 .meeting-row { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; display: flex; gap: 14px; align-items: flex-start; }
@@ -261,12 +264,15 @@ body { background: var(--bg); font-size: 15px; }
 <h1>Get in touch.</h1>
 <p class="lead">Questions, feedback, or a community you'd like us to add? We'd love to hear from you.</p>
 <p>Email us directly at <a class="inline" href="mailto:hello@homesignal.net">hello@homesignal.net</a>, or use the form below.</p>
-<div class="contact-form">
-  <input type="text" id="c-name" placeholder="Your name">
-  <input type="email" id="c-email" placeholder="Your email">
-  <textarea id="c-message" placeholder="Your message" maxlength="2000"></textarea>
-  <button onclick="sendContact()">Send message</button>
+<div class="contact-form" id="contact-form">
+  <input type="text" id="c-name" placeholder="Your name" autocomplete="name" required>
+  <input type="email" id="c-email" placeholder="Your email" autocomplete="email" required>
+  <textarea id="c-message" placeholder="Your message" maxlength="2000" required></textarea>
+  <button type="button" id="c-submit" onclick="sendContact()">Send message</button>
   <div id="c-msg" role="alert" style="font-size:13px;min-height:1em;color:#b91c1c;"></div>
+</div>
+<div class="contact-success" id="contact-success" role="status" style="display:none">
+  <p>Thanks — we got your message and will be in touch.</p>
 </div>
 </div>
 <footer>
@@ -286,23 +292,47 @@ body { background: var(--bg); font-size: 15px; }
   </div>
 </footer>
 <script>
-function sendContact(){
+// Contact form posts straight to Supabase (contact_messages) — no mailto handoff.
+// Uses the PUBLIC anon key only (same one the rest of the site uses); RLS on
+// contact_messages must allow anon INSERT and nothing else. The secret zapier_write
+// key is never referenced in client code. See docs/contact-messages-setup.sql.
+var CONTACT_SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
+var CONTACT_SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
+async function sendContact(){
   var nameEl=document.getElementById('c-name');
   var emailEl=document.getElementById('c-email');
   var msgEl=document.getElementById('c-message');
   var note=document.getElementById('c-msg');
+  var btn=document.getElementById('c-submit');
   var name=nameEl.value.trim();
   var email=emailEl.value.trim();
   var msg=msgEl.value.trim();
-  function fail(text, el){ if(note) note.textContent=text; if(el) el.focus(); }
+  function fail(text, el){ if(note){ note.style.color='#b91c1c'; note.textContent=text; } if(el) el.focus(); }
   var emailRe=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if(!name){ fail('Please enter your name.', nameEl); return; }
   if(!email || !emailRe.test(email)){ fail('Please enter a valid email address so we can reply.', emailEl); return; }
-  if(msg.length<5){ fail('Please enter a message (at least a few words).', msgEl); return; }
+  if(!msg || msg.length<5){ fail('Please enter a message (at least a few words).', msgEl); return; }
   if(msg.length>2000){ fail('Please shorten your message to under 2000 characters.', msgEl); return; }
   if(note) note.textContent='';
-  var subject=encodeURIComponent('HomeSignal contact from '+(name||'a visitor'));
-  var body=encodeURIComponent(msg+'\n\nFrom: '+(name||'(no name given)')+' ('+email+')');
-  window.location.href='mailto:hello@homesignal.net?subject='+subject+'&body='+body;
+  var oldText=btn.textContent;
+  btn.disabled=true; btn.textContent='Sending…';
+  try{
+    var res=await fetch(CONTACT_SB_URL+'/rest/v1/contact_messages', {
+      method:'POST',
+      headers:{ 'apikey':CONTACT_SB_ANON, 'Authorization':'Bearer '+CONTACT_SB_ANON, 'Content-Type':'application/json', 'Prefer':'return=minimal' },
+      body:JSON.stringify({ name:name, email:email, message:msg, source:'contact_form' })
+    });
+    if(!res.ok) throw new Error('insert failed '+res.status);
+    // Success: swap the form for an in-page confirmation. No reload, no popup.
+    var form=document.getElementById('contact-form');
+    var ok=document.getElementById('contact-success');
+    if(form) form.style.display='none';
+    if(ok) ok.style.display='';
+  }catch(e){
+    // Keep the visitor's typed text; show a friendly inline error.
+    btn.disabled=false; btn.textContent=oldText;
+    fail('Sorry, something went wrong sending your message. Please try again, or email us at hello@homesignal.net.');
+  }
 }
 </script>
 <style>
