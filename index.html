@@ -182,6 +182,11 @@ footer .foot-links a:hover{color:var(--tx-primary)}
       <div style="display:flex;flex-direction:column;gap:10px">
         <input id="request-email" type="email" placeholder="Your email" aria-label="Your email" autocomplete="email" style="padding-left:14px" />
         <input id="request-zip" type="text" placeholder="ZIP code" aria-label="ZIP code" inputmode="numeric" style="padding-left:14px" />
+        <!-- Honeypot: off-screen (not display:none) so real browsers never see it but bots autofill it. -->
+        <div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true">
+          <label for="company_website">Company website</label>
+          <input id="company_website" name="company_website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" />
+        </div>
         <button class="btn-primary" id="request-btn">Request my community</button>
       </div>
       <p class="zip-msg" id="request-msg" role="status" aria-live="polite"></p>
@@ -296,9 +301,9 @@ const COMMUNITIES = [
 ];
 
 // ============================================================
-// Community request form -> saves to Supabase (community_requests).
-// Reuses the EXISTING project + anon key (same as box-elder.html);
-// the anon key is public-safe (RLS allows anon INSERT only).
+// Community request form -> routes through the submit-public-form Edge Function
+// (server-side honeypot + timing + validation), not a direct table insert.
+// Reuses the EXISTING project + public anon key, sent as apikey + Bearer.
 // ============================================================
 const SUPABASE_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
@@ -313,13 +318,16 @@ async function submitCommunityRequest(){
   if(!isValidEmail(email)){ if(msgEl) msgEl.textContent = 'Please enter a valid email.'; return; }
   const zip = (zipEl ? zipEl.value : '').trim();
   if(btn) btn.disabled = true;
+  const hp = document.getElementById('company_website');
+  const elapsedMs = Date.now() - requestRenderedAt;
   try{
-    const res = await fetch(SUPABASE_URL + '/rest/v1/community_requests', {
+    const res = await fetch(SUPABASE_URL + '/functions/v1/submit-public-form', {
       method: 'POST',
-      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ email: email, requested_zip: zip || null, source: 'homepage' })
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ form_type: 'community_request', company_website: (hp ? hp.value : ''), elapsed_ms: elapsedMs, email: email, requested_zip: zip || null, requested_community: null })
     });
-    if(!res.ok) throw new Error('insert failed ' + res.status);
+    if(res.status === 400){ if(btn) btn.disabled = false; if(msgEl) msgEl.textContent = 'Please check your entries and try again.'; return; }
+    if(!res.ok) throw new Error('submit failed ' + res.status);
     // Confirmation matches whether the submitted ZIP is covered: a covered ZIP means the
     // area is live (we'll alert them about new items); an uncovered ZIP is a waitlist capture.
     // Coverage uses the same findCommunityByZip source as the search; logic unchanged.
@@ -339,6 +347,7 @@ function findCommunityByZip(zip){ for(const c of COMMUNITIES){ if(c.zips.include
 // ----- Community request modal (opens only on a not-covered ZIP search) -----
 var REQUEST_FORM_HTML = null;     // captured template so the modal is reusable
 var requestTriggerInput = null;   // search box to return focus to on close
+var requestRenderedAt = 0;        // timing check: when the request popup became visible
 function wireRequestForm(){
   var btn = document.getElementById('request-btn');
   if(btn) btn.addEventListener('click', submitCommunityRequest);
@@ -356,6 +365,7 @@ function openRequestModal(zip, input){
   var rzip = document.getElementById('request-zip');
   if(rzip) rzip.value = zip || '';
   overlay.classList.add('open');
+  requestRenderedAt = Date.now();   // start the timing clock when the popup opens
   document.body.style.overflow = 'hidden';
   var email = document.getElementById('request-email');
   if(email){ try { email.focus(); } catch(e){} }
