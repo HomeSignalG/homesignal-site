@@ -292,6 +292,11 @@ body { background: var(--bg-tertiary); font-size: 15px; }
   <input type="text" id="c-name" placeholder="Your name" autocomplete="name" required aria-label="Your name">
   <input type="email" id="c-email" placeholder="Your email" autocomplete="email" required aria-label="Your email">
   <textarea id="c-message" placeholder="Your message" maxlength="2000" required aria-label="Your message"></textarea>
+  <!-- Honeypot: off-screen (not display:none) so real browsers never see it but bots autofill it. -->
+  <div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true">
+    <label for="company_website">Company website</label>
+    <input type="text" id="company_website" name="company_website" tabindex="-1" autocomplete="off" aria-hidden="true">
+  </div>
   <button type="button" id="c-submit" onclick="sendContact()">Send message</button>
   <div id="c-msg" role="alert" style="font-size:13px;min-height:1em;color:#b91c1c;"></div>
 </div>
@@ -317,12 +322,13 @@ body { background: var(--bg-tertiary); font-size: 15px; }
   </div>
 </footer>
 <script>
-// Contact form posts straight to Supabase (contact_messages) — no mailto handoff.
-// Uses the PUBLIC anon key only (same one the rest of the site uses); RLS on
-// contact_messages must allow anon INSERT and nothing else. The secret zapier_write
-// key is never referenced in client code. See docs/contact-messages-setup.sql.
+// Contact form routes through the submit-public-form Edge Function (server-side
+// honeypot + timing + validation), not a direct table insert. Uses the PUBLIC
+// anon key only (same one the rest of the site uses), sent as apikey + Bearer.
 var CONTACT_SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
 var CONTACT_SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
+// Timing check input: when the contact page (and form) became visible.
+var CONTACT_RENDERED_AT = Date.now();
 async function sendContact(){
   var nameEl=document.getElementById('c-name');
   var emailEl=document.getElementById('c-email');
@@ -341,14 +347,17 @@ async function sendContact(){
   if(note) note.textContent='';
   var oldText=btn.textContent;
   btn.disabled=true; btn.textContent='Sending…';
+  var hp=document.getElementById('company_website');
+  var elapsedMs=Date.now()-CONTACT_RENDERED_AT;
   try{
-    var res=await fetch(CONTACT_SB_URL+'/rest/v1/contact_messages', {
+    var res=await fetch(CONTACT_SB_URL+'/functions/v1/submit-public-form', {
       method:'POST',
-      headers:{ 'apikey':CONTACT_SB_ANON, 'Authorization':'Bearer '+CONTACT_SB_ANON, 'Content-Type':'application/json', 'Prefer':'return=minimal' },
-      body:JSON.stringify({ name:name, email:email, message:msg, source:'contact_form' })
+      headers:{ 'apikey':CONTACT_SB_ANON, 'Authorization':'Bearer '+CONTACT_SB_ANON, 'Content-Type':'application/json' },
+      body:JSON.stringify({ form_type:'contact', company_website:(hp?hp.value:''), elapsed_ms:elapsedMs, name:name, email:email, message:msg })
     });
-    if(!res.ok) throw new Error('insert failed '+res.status);
-    // Success: swap the form for an in-page confirmation. No reload, no popup.
+    if(res.status===400){ btn.disabled=false; btn.textContent=oldText; fail('Please check your entries and try again.'); return; }
+    if(!res.ok) throw new Error('submit failed '+res.status);
+    // Success (HTTP 200 {"ok":true}): swap the form for the in-page confirmation. No reload, no popup.
     var form=document.getElementById('contact-form');
     var ok=document.getElementById('contact-success');
     if(form) form.style.display='none';
