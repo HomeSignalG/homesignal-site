@@ -101,9 +101,10 @@ nav {
 
 /* ---------- FOOTER (shared across all pages) ---------- */
 footer {
-  border-top: 1px solid var(--border);
+  max-width: 1200px; margin: 0 auto;
+  padding: 32px 24px; border-top: 0.5px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: 16px; background: var(--bg-secondary);
+  flex-wrap: wrap; gap: 16px; background: var(--bg);
 }
 .footer-left .logo-text { font-size: 15px; margin-bottom: 4px; }
 .footer-tagline { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
@@ -299,7 +300,7 @@ body { background: var(--bg-tertiary); font-size: 14px; }
   h1.be-h1 { font-size: 32px; }
 
   /* footer */
-  .be-footer-inner { flex-direction: column; align-items: flex-start; gap: 14px; }
+  footer { padding: 24px 20px; flex-direction: column; align-items: flex-start; gap: 14px; }
 }
 </style>
 <style>
@@ -548,10 +549,22 @@ h2.be-h2 { font-size: 27px; font-weight: 600; margin: 0; letter-spacing: -0.015e
   </div>
 </div>
 
-<footer class="be-footer">
-  <div class="be-footer-inner">
-  HomeSignal organizes public records into a neutral, sourced feed. We don't give legal advice, predict property values, or make political endorsements.
-  <span style="margin-left:6px;white-space:nowrap"><a href="how-it-works.html">How it works</a> · <a href="about.html">About</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms of use</a> · <a href="contact.html">Contact</a></span>
+<footer>
+  <div class="footer-left">
+    <a class="logo" href="index.html" style="margin-bottom:4px;">
+      <div class="logo-icon" style="width:28px;height:28px;"><svg viewBox="0 0 24 24" style="width:15px;height:15px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
+      <div class="logo-text" style="font-size:14px;">Home<span>Signal</span></div>
+    </a>
+    <div class="footer-tagline">Civic early-warning, by email.</div>
+    <div class="footer-tagline" style="margin-top:6px">© 2026 HomeSignal, Inc. · Neutral · sourced · non-partisan</div>
+    <div class="footer-tagline" style="margin-top:6px;max-width:560px">HomeSignal organizes public records into a neutral, sourced feed. We don't give legal advice, predict property values, or make political endorsements.</div>
+  </div>
+  <div class="footer-links">
+    <a href="how-it-works.html">How it works</a>
+    <a href="about.html">About</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="terms.html">Terms of use</a>
+    <a href="contact.html">Contact</a>
   </div>
 </footer>
 
