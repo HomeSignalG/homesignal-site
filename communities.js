@@ -27,7 +27,9 @@
         'Public safety & emergencies',
         'Water companies',
         'Stratos data center project',
-        'Property taxes & assessments'
+        'Property taxes & assessments',
+        'City government (Brigham City)',
+        'City government (Tremonton)'
       ]
     }
   ];
