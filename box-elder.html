@@ -3,9 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
 <title>HomeSignal — Box Elder County, Utah</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<meta name="description" content="Box Elder County, Utah — daily email alerts on the hearings, permits, and public records that affect your home, from HomeSignal.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://homesignal.net/box-elder.html">
+<meta property="og:title" content="HomeSignal — Box Elder County, Utah">
+<meta property="og:description" content="Box Elder County, Utah — daily email alerts on the hearings, permits, and public records that affect your home, from HomeSignal.">
+<meta name="twitter:card" content="summary">
+<!-- og:image / twitter:image (branded 1200x630 PNG) go here when the asset exists -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.7.0/tabler-icons.min.css" />
 <style>
 /* ============================================================
@@ -25,7 +32,7 @@
   --bg-success:#e1f5ee; --tx-success:#0f6e56; --bd-success:#9fe1cb;
   --bg-warning:#faeeda; --tx-warning:#854f0b;
   --green-tx:#ffffff;
-  --tx-primary:#1c1c1a; --tx-secondary:#5f5e5a; --tx-tertiary:#8a8980;
+  --tx-primary:#1c1c1a; --tx-secondary:#5f5e5a; --tx-tertiary:#6f6e69;
   --bd-tertiary:rgba(0,0,0,.12); --bd-secondary:rgba(0,0,0,.22);
   --r-md:8px; --r-lg:12px; --r-xl:16px;
   --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -37,7 +44,7 @@
   --green-text: #0f6e56;
   --text: #1c1c1a;
   --text-secondary: #5f5e5a;
-  --text-tertiary: #8a8980;
+  --text-tertiary: #6f6e69;
   --border: rgba(0,0,0,.12);
   --bg: #ffffff;
   --bg-secondary: #f4f4f5;
@@ -68,6 +75,7 @@ a { text-decoration: none; }
 input, button, textarea { font-family: inherit; outline: none; }
 input:focus, textarea:focus { border-color: var(--green) !important; }
 
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 body {
   font-family: var(--font);
   color: var(--text);
@@ -577,11 +585,11 @@ h2.be-h2 { font-size: 27px; font-weight: 600; margin: 0; letter-spacing: -0.015e
     <div class="modal-divider"></div>
     <div class="sub-list" id="modal-list"></div>
     <div class="modal-info"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="modal-count">No topics selected yet</span></div>
-    <label class="consent-row"><input type="checkbox" id="modal-consent" /><span>I agree that HomeSignal may share anonymized and aggregated information about the topics and locations I follow with third parties to support its products, services, and research. No personal contact information is ever shared. <a href="privacy.html">Privacy Policy</a></span></label>
+    <label class="consent-row"><input type="checkbox" id="modal-consent" / aria-label="I agree to HomeSignal's data-sharing terms"><span>I agree that HomeSignal may share anonymized and aggregated information about the topics and locations I follow with third parties to support its products, services, and research. No personal contact information is ever shared. <a href="privacy.html">Privacy Policy</a></span></label>
     <div class="alert-signup">
       <div class="alert-signup-label">Sign up for these alerts — free</div>
-      <input class="alert-field" type="email" id="modal-email" placeholder="Email address" />
-      <input class="alert-field" type="text" id="modal-zip" placeholder="ZIP code" />
+      <input class="alert-field" type="email" id="modal-email" placeholder="Email address" / aria-label="Email address">
+      <input class="alert-field" type="text" id="modal-zip" placeholder="ZIP code" / aria-label="ZIP code">
       <button class="btn-confirm alert-submit" id="modal-submit" onclick="submitModalSignup()">Sign up</button>
       <div class="alert-msg" id="modal-msg"></div>
       <div class="alert-note">No spam · Unsubscribe anytime</div>
@@ -611,11 +619,11 @@ h2.be-h2 { font-size: 27px; font-weight: 600; margin: 0; letter-spacing: -0.015e
     <div class="modal-divider"></div>
     <div class="sub-list" id="alert-list"></div>
     <div class="modal-info"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="alert-count">No topics selected yet</span></div>
-    <label class="consent-row"><input type="checkbox" id="alert-consent" /><span>I agree that HomeSignal may share anonymized and aggregated information about the topics and locations I follow with third parties to support its products, services, and research. No personal contact information is ever shared. <a href="privacy.html">Privacy Policy</a></span></label>
+    <label class="consent-row"><input type="checkbox" id="alert-consent" / aria-label="I agree to HomeSignal's data-sharing terms"><span>I agree that HomeSignal may share anonymized and aggregated information about the topics and locations I follow with third parties to support its products, services, and research. No personal contact information is ever shared. <a href="privacy.html">Privacy Policy</a></span></label>
     <div class="alert-signup">
       <div class="alert-signup-label">Sign up for these alerts — free</div>
-      <input class="alert-field" type="email" id="alert-email" placeholder="Email address" />
-      <input class="alert-field" type="text" id="alert-zip" placeholder="ZIP code" />
+      <input class="alert-field" type="email" id="alert-email" placeholder="Email address" / aria-label="Email address">
+      <input class="alert-field" type="text" id="alert-zip" placeholder="ZIP code" / aria-label="ZIP code">
       <button class="btn-confirm alert-submit" id="alert-submit" onclick="submitAlertSignup()">Sign up</button>
       <div class="alert-msg" id="alert-msg"></div>
       <div class="alert-note">No spam · Unsubscribe anytime</div>
@@ -1228,8 +1236,8 @@ loadMeetings();
     <button class="auth-close" id="auth-close">&times;</button>
     <h2 id="auth-title">Log in or sign up</h2>
     <p class="auth-sub" id="auth-sub">Enter your email and we'll send you a code &mdash; no password needed.</p>
-    <input type="email" id="auth-email" class="auth-input" placeholder="Email address" autocomplete="email" />
-    <input type="text" id="auth-code" class="auth-input" placeholder="Enter your code" inputmode="numeric" maxlength="8" autocomplete="one-time-code" style="display:none;letter-spacing:6px;text-align:center;font-size:18px;" />
+    <input type="email" id="auth-email" class="auth-input" placeholder="Email address" autocomplete="email" / aria-label="Email address">
+    <input type="text" id="auth-code" class="auth-input" placeholder="Enter your code" inputmode="numeric" maxlength="8" autocomplete="one-time-code" style="display:none;letter-spacing:6px;text-align:center;font-size:18px;" / aria-label="Enter your code">
     <button id="auth-submit" class="auth-submit">Send me a code</button>
     <div id="auth-msg" class="auth-msg"></div>
     <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><a href="#" id="auth-back-link">Use a different email</a></div>
