@@ -11,11 +11,15 @@
    HomeSignal — shared styles (tokens, reset, nav, footer)
    ============================================================ */
 :root {
-  --green: #1f5130; --green-light: #eaf3de; --green-mid: #97c459;
-  --green-dark: #27500a; --green-text: #3b6d11;
-  --text: #111827; --text-secondary: #6b7280; --text-tertiary: #9ca3af;
-  --border: #e5e7eb; --bg: #ffffff; --bg-secondary: #f9fafb;
-  --radius: 10px; --radius-sm: 6px; --radius-pill: 100px;
+  /* Ported to the index.html / box-elder design system: system font, brand
+     green #1f5130, warm-neutral surfaces, hairline borders. Token NAMES are
+     kept and re-pointed so all existing rules adopt the shared look. */
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --green: #1f5130; --green-light: #e1f5ee; --green-mid: #9fe1cb;
+  --green-dark: #0f6e56; --green-text: #0f6e56;
+  --text: #1c1c1a; --text-secondary: #5f5e5a; --text-tertiary: #8a8980;
+  --border: rgba(0,0,0,.12); --bg: #ffffff; --bg-secondary: #f4f4f5;
+  --radius: 12px; --radius-sm: 8px; --radius-pill: 100px;
   --gl: var(--green-light); --gm: var(--green-mid); --gd: var(--green-dark);
   --ts: var(--text-secondary); --tt: var(--text-tertiary); --bg2: var(--bg-secondary);
   --r: var(--radius); --rs: var(--radius-sm);
@@ -24,7 +28,7 @@
 a { text-decoration: none; }
 input, button, textarea { font-family: inherit; outline: none; }
 input:focus, textarea:focus { border-color: var(--green) !important; }
-body { font-family: 'Inter', system-ui, sans-serif; color: var(--text); line-height: 1.6; background: #f3f4f6; font-size: 14px; }
+body { font-family: var(--font); color: var(--text); line-height: 1.6; background: #f3f4f6; font-size: 14px; }
 
 nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 48px; border-bottom: 1px solid var(--border); background: var(--bg); position: sticky; top: 0; z-index: 100; }
 .logo { display: flex; align-items: center; gap: 10px; }
