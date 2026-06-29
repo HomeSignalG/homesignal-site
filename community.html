@@ -417,7 +417,7 @@ body { background: #f3f4f6; font-size: 14px; }
   <div>
     <div class="scard">
       <div class="stitle">Upcoming meetings<span id="mtg-count" style="font-weight:500;color:var(--ts);font-size:12px;margin-left:8px"></span></div>
-      <div id="meetings-list"><div class="mtit" style="padding:8px 0">Loading meetings…</div></div>
+      <div id="meetings-list"><div class="loading">Loading meetings…</div></div>
     </div>
   </div>
 </div>
@@ -945,7 +945,7 @@ async function loadMeetings() {
     // Keep only meetings whose LOCAL (Denver) date is today or later (ISO dates sort chronologically).
     meetings = Array.isArray(meetings) ? meetings.filter(m => m.meeting_date && denverDate(m.meeting_date) >= denverToday) : [];
     if (meetings.length === 0) {
-      list.innerHTML = '<div class="mtit" style="padding:8px 0">No upcoming meetings posted yet.</div>';
+      list.innerHTML = '<div class="empty-state"><p>No upcoming meetings posted yet</p><span>Check back soon — new hearings and agendas appear here</span></div>';
       return;
     }
     const mtgCountEl = document.getElementById('mtg-count');
@@ -1005,7 +1005,7 @@ async function loadMeetings() {
     }
     list.innerHTML = html;
   } catch (err) {
-    list.innerHTML = '<div class="mtit" style="padding:8px 0">Could not load meetings.</div>';
+    list.innerHTML = '<div class="empty-state"><p>Could not load meetings</p><span>Check your connection and try again</span></div>';
   }
 }
 
