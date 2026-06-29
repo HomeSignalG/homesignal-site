@@ -11,13 +11,15 @@
       '.nav-share{display:inline-flex;align-items:center;gap:6px;background:transparent;' +
       'border:1px solid rgba(0,0,0,.2);color:#3f3f46;padding:7px 13px;border-radius:8px;' +
       'font-family:inherit;font-size:13px;font-weight:500;line-height:1;cursor:pointer;' +
-      'white-space:nowrap;-webkit-appearance:none;appearance:none;' +
+      'white-space:nowrap;-webkit-appearance:none;appearance:none;margin-left:auto;' +
       'transition:border-color .15s ease,color .15s ease}' +
       '.nav-share svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;' +
       'stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}' +
       '.nav-share:hover{border-color:rgba(0,0,0,.36);color:#18181b}' +
       '.nav-share:focus-visible{outline:2px solid #1f5130;outline-offset:2px}' +
-      '@media(max-width:720px){.nav-share{width:100%;justify-content:center;padding:12px}}';
+      // keep nav items evenly spaced once .nav-share's margin-left:auto packs them
+      '@media(min-width:721px){header .wrap,.be-nav-inner,body>nav{column-gap:28px}}' +
+      '@media(max-width:720px){.nav-share{width:100%;justify-content:center;padding:12px;margin-left:0}}';
     var style = document.createElement('style');
     style.id = 'nav-share-style';
     style.textContent = css;
