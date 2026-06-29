@@ -700,26 +700,6 @@ function toggleSave(btn) {
 }
 
 // ============================================================
-// SIGNUP — writes to Supabase users table
-// ============================================================
-async function saveUser(email, zip) {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/users`, {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ email, zip_code: zip, community_id: COMMUNITY_ID, topics: selections })
-    });
-    if (res.ok || res.status === 409) {
-      alert('You\'re signed up! We\'ll send you alerts for ' + commName() + '.');
-    } else {
-      alert('Something went wrong. Please try again.');
-    }
-  } catch (err) {
-    alert('Something went wrong. Please try again.');
-  }
-}
-
-// ============================================================
 // CATEGORY SELECTOR MODAL
 // ============================================================
 const cats = {
