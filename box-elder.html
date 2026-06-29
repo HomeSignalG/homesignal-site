@@ -189,6 +189,7 @@ body { background: var(--bg-tertiary); font-size: 14px; }
 .tn { background: #fef3c7; color: #92400e; }
 .te { background: #fce7f3; color: #9d174d; }
 .tgb { background: #d1fae5; color: #065f46; }
+.tmeet { background: #dcfce7; color: #166534; }
 .alert-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
 .aicon { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .aicon svg { width: 17px; height: 17px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -1278,8 +1279,10 @@ async function loadMeetings() {
       const dateStr = fmtDate(m.meeting_date);
       const time = m.meeting_time ? esc(m.meeting_time) : 'Time TBD';
       const when = dateStr ? (dateStr + ' · ' + time) : time;
-      let tags = '';
-      if(m.category) tags += `<span class="mchip">${esc(m.category)}</span>`;
+      let mtopics = getAlertTopics(m);
+      if(!mtopics.length && m.category) mtopics = [m.category];
+      const mtopicPills = mtopics.map(tp => `<span class="ptopic"><span class="pdot" style="background:#16a34a"></span>${esc(tp)}</span>`).join('');
+      const mtagRow = `<div class="tagrow"><span class="ptag tmeet">Meeting</span>${mtopicPills}</div>`;
       const title = esc(m.title || m.meeting_type || 'Public meeting');
       const bodyName = (m.meeting_type && m.title && m.meeting_type !== m.title) ? `<div class="mcard-body">${esc(m.meeting_type)}</div>` : '';
       let rows = '';
@@ -1299,7 +1302,7 @@ async function loadMeetings() {
       const meetingLink = m.source_url ? `<a href="${esc(m.source_url)}" target="_blank" rel="noopener">Agenda &amp; how to attend →</a>` : '';
       const foot = `<div class="mcard-foot"><button class="abtn abtn-c" onclick="affectsMeMeeting(this)">Affects me — sign up</button>${meetingLink}</div>`;
       return `<div class="mcard" data-topic="${esc(m.category || m.meeting_type || '')}">
-        ${tags?`<div class="mcard-tags">${tags}</div>`:''}
+        ${mtagRow}
         <div class="mcard-title">${title}</div>
         ${bodyName}
         ${rows}
