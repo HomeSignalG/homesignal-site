@@ -666,6 +666,7 @@ h2.be-h2 { font-size: 27px; font-weight: 600; margin: 0; letter-spacing: -0.015e
 const SUPABASE_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
 const COMMUNITY_ID = 'd67c558f-1f04-4811-a565-873ae2afd6f3';
+window.COMMUNITY_ID = COMMUNITY_ID;  // expose for events.js (anonymous analytics) so events tag the right community
 
 // ============================================================
 // FETCH ALERTS FROM SUPABASE
