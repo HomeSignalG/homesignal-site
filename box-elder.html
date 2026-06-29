@@ -598,7 +598,7 @@ h2.be-h2 { font-size: 27px; font-weight: 600; margin: 0; letter-spacing: -0.015e
     <div class="modal-divider"></div>
     <div class="sub-list" id="modal-list"></div>
     <div class="modal-info"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="modal-count">No topics selected yet</span></div>
-    <label class="consent-row"><input type="checkbox" id="modal-consent" / aria-label="I agree to HomeSignal's data-sharing terms"><span>I agree that HomeSignal may share anonymized and aggregated information about the topics and locations I follow with third parties to support its products, services, and research. No personal contact information is ever shared. <a href="privacy.html">Privacy Policy</a></span></label>
+    <label class="consent-row"><input type="checkbox" id="modal-consent" / aria-label="I agree to HomeSignal's data-sharing terms"><span><b class="opt">Optional</b> I agree that HomeSignal may share anonymized and aggregated information about the topics and locations I follow with third parties to support its products, services, and research. No personal contact information is ever shared. <a href="privacy.html">Privacy Policy</a></span></label>
     <div class="alert-signup">
       <div class="alert-signup-label">Sign up for these alerts — free</div>
       <input class="alert-field" type="email" id="modal-email" placeholder="Email address" / aria-label="Email address">
@@ -621,6 +621,7 @@ h2.be-h2 { font-size: 27px; font-weight: 600; margin: 0; letter-spacing: -0.015e
   .consent-row{display:flex;align-items:flex-start;gap:8px;margin-top:14px;font-size:12px;line-height:1.5;color:var(--ts);cursor:pointer;}
   .consent-row input{margin-top:2px;flex-shrink:0;width:15px;height:15px;accent-color:var(--green);cursor:pointer;}
   .consent-row a{color:var(--green);text-decoration:underline;}
+  .consent-row .opt{font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.05em;color:var(--green);margin-right:4px;}
 </style>
 
 <div class="overlay" id="alert-overlay" onclick="handleAlertOverlay(event)">
@@ -632,7 +633,7 @@ h2.be-h2 { font-size: 27px; font-weight: 600; margin: 0; letter-spacing: -0.015e
     <div class="modal-divider"></div>
     <div class="sub-list" id="alert-list"></div>
     <div class="modal-info"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="alert-count">No topics selected yet</span></div>
-    <label class="consent-row"><input type="checkbox" id="alert-consent" / aria-label="I agree to HomeSignal's data-sharing terms"><span>I agree that HomeSignal may share anonymized and aggregated information about the topics and locations I follow with third parties to support its products, services, and research. No personal contact information is ever shared. <a href="privacy.html">Privacy Policy</a></span></label>
+    <label class="consent-row"><input type="checkbox" id="alert-consent" / aria-label="I agree to HomeSignal's data-sharing terms"><span><b class="opt">Optional</b> I agree that HomeSignal may share anonymized and aggregated information about the topics and locations I follow with third parties to support its products, services, and research. No personal contact information is ever shared. <a href="privacy.html">Privacy Policy</a></span></label>
     <div class="alert-signup">
       <div class="alert-signup-label">Sign up for these alerts — free</div>
       <input class="alert-field" type="email" id="alert-email" placeholder="Email address" / aria-label="Email address">
@@ -700,7 +701,7 @@ function getPipelineTag(type, category) {
   if (type === 'government_notice') return `<span class="ptag tg">Government notice</span>`;
   if (category === 'emerging_technology') return `<span class="ptag te">Emerging technology</span>`;
   if (category === 'global_best_practices') return `<span class="ptag tgb">Global best practices</span>`;
-  return `<span class="ptag tn">News alert</span>`;
+  return `<span class="ptag tn">Local News</span>`;
 }
 
 function getIcon(type, category) {
@@ -760,7 +761,7 @@ let alertCat = null;
 
 // Map an alert's pipeline_type/category to one of the four signup categories.
 function alertCatId(type, category){
-  if(type==='government_notice') return 'meetings';
+  if(type==='government_notice') return 'notices';
   if(category==='emerging_technology') return 'emerging';
   if(category==='global_best_practices') return 'global';
   return 'news';
