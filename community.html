@@ -775,52 +775,42 @@ const CAT_TO_PIPELINE = {
 async function saveTopics(cat, checked){
   accountTopics[cat] = checked;
   const email = window.hsUser.email;
-  const H = { 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${window.hsToken || SUPABASE_ANON_KEY}`, 'Content-Type':'application/json', 'Prefer':'return=minimal' };
-  const body = { community_id: COMMUNITY_ID, topics: accountTopics, zip_code: searchedZip || accountZip || '84302' };
-  function patchRow(){
-    return fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}`, { method:'PATCH', headers:H, body: JSON.stringify(body) });
-  }
-  function insertRow(){
-    return fetch(`${SUPABASE_URL}/rest/v1/users`, { method:'POST', headers:H, body: JSON.stringify(Object.assign({ email: email }, body)) });
-  }
-  let res;
-  if(accountExists){
-    res = await patchRow();
-  } else {
-    res = await insertRow();
-    if(res.status===409){ res = await patchRow(); }
-  }
-  if(!res.ok){
-    let detail=''; try{ detail = await res.text(); }catch(e){}
-    throw new Error('Save error ' + res.status + (detail ? (': ' + detail.slice(0,200)) : ''));
-  }
+  // SINGLE WRITE PATH: signup_complete (SECURITY DEFINER, authenticated session) is the only
+  // writer for users + user_subscriptions. It reconciles the COMPLETE desired subscription set
+  // server-side (adds missing, deletes removed), so the browser never writes user_subscriptions
+  // directly — no INSERT/DELETE grant on that table is needed. Mirrors box-elder.html.
+  // Existing-user edit: write the user's already-stored ZIP. No 84302 fallback — abort rather
+  // than store a fake ZIP if the account has no valid 5-digit ZIP on file.
+  const zipForSave = (searchedZip || accountZip || '').trim();
+  if(!/^\d{5}$/.test(zipForSave)){ throw new Error('Your account has no ZIP code on file — please re-enter it before editing alerts.'); }
+  // Consent was captured at original signup; this edit must not re-assert it, so pass false
+  // (the RPC preserves the stored consent — it does not downgrade an existing agreement).
+  const r = await window.hsClient.rpc('signup_complete', {
+    p_email: email,
+    p_community_id: COMMUNITY_ID,
+    p_zip_code: zipForSave,
+    p_topics: accountTopics,
+    p_consent_version: '2026-06-20',
+    p_subscriptions: buildSubscriptionSet(),
+    p_data_licensing_agreed: false
+  });
+  if(r && r.error){ throw new Error('Save error: ' + (r.error.message || r.error)); }
   accountExists = true;
   refreshTileLabels();
-  // Forward-looking, BEST-EFFORT: mirror this follow into the normalized
-  // user_subscriptions table (the multi-county model). This never blocks the
-  // save above — the engine still reads users.topics during the transition.
-  try { await syncSubscriptions(cat, checked, email, H); } catch(e) { /* non-fatal */ }
 }
 
-// Replace the user's user_subscriptions rows for ONE pipeline with the
-// currently-checked topics: one row per (user_id, community_id, pipeline_type, topic).
-async function syncSubscriptions(cat, checked, email, H){
-  const pipeline = CAT_TO_PIPELINE[cat];
-  if(!pipeline) return;
-  // Resolve this user's id from the users table (PostgREST returns the row).
-  const ures = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}&select=id`, { headers: H });
-  if(!ures.ok) return;
-  const urows = await ures.json();
-  if(!Array.isArray(urows) || !urows.length || !urows[0].id) return;
-  const userId = urows[0].id;
-  // Replace the set for this pipeline: delete its rows, then insert the chosen topics.
-  await fetch(`${SUPABASE_URL}/rest/v1/user_subscriptions?user_id=eq.${encodeURIComponent(userId)}&community_id=eq.${encodeURIComponent(COMMUNITY_ID)}&pipeline_type=eq.${encodeURIComponent(pipeline)}`, { method:'DELETE', headers: H });
-  if(checked && checked.length){
-    const rows = checked.map(function(topic){
-      return { user_id: userId, community_id: COMMUNITY_ID, pipeline_type: pipeline, topic: topic };
+// Build the COMPLETE desired subscription set across all tiles (mirrors box-elder.html).
+// signup_complete reconciles this server-side, so the browser never writes user_subscriptions.
+function buildSubscriptionSet(){
+  const seen = {}; const out = [];
+  Object.keys(CAT_TO_PIPELINE).forEach(function(k){
+    const pl = CAT_TO_PIPELINE[k];
+    (accountTopics[k] || []).forEach(function(t){
+      const key = pl + ' ' + t;
+      if(!seen[key]){ seen[key] = 1; out.push({ pipeline_type: pl, topic: t }); }
     });
-    await fetch(`${SUPABASE_URL}/rest/v1/user_subscriptions`, { method:'POST', headers: H, body: JSON.stringify(rows) });
-  }
+  });
+  return out;
 }
 
 function refreshTileLabels(){
