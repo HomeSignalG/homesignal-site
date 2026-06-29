@@ -34,7 +34,7 @@ body{font-family:var(--font);color:var(--text);line-height:1.6;background:var(--
 a:focus-visible,button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 
 /* nav */
-nav{display:flex;align-items:center;justify-content:space-between;max-width:1200px;width:100%;margin:0 auto;padding:14px 24px;border-bottom:0.5px solid var(--border);background:var(--bg)}
+nav{display:flex;align-items:center;justify-content:space-between;padding:14px max(24px, calc((100% - 1200px) / 2 + 24px));border-bottom:0.5px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:100}
 .logo{display:flex;align-items:center;gap:10px}
 .logo-icon{width:34px;height:34px;background:var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center}
 .logo-icon svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
