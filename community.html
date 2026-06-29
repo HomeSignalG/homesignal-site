@@ -526,7 +526,7 @@ async function loadAlerts() {
     const [gov, emerging, global, recent] = await Promise.all([
       fetchTier('pipeline_type=eq.government_notice', PER_TIER),
       fetchTier('category=eq.emerging_technology', PER_TIER),
-      fetchTier('category=eq.global_best_practices', PER_TIER),
+      fetchTier('category=eq.global_best_practices&quality_grade=in.(BEST,MEDIUM)', PER_TIER),
       fetchTier('', PER_TIER * 3)
     ]);
     const news = recent.filter(a => alertCatId(a.pipeline_type, a.category) === 'news').slice(0, PER_TIER);
@@ -574,6 +574,8 @@ function formatDate(str) {
 function renderAlerts(alerts) {
   const feed = document.getElementById('alert-feed');
   const count = document.getElementById('feed-count');
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const safeUrl = u => { u = String(u == null ? '' : u); return /^https?:\/\//i.test(u) ? u : ''; };
   if (!alerts || alerts.length === 0) {
     feed.innerHTML = '<div class="empty-state"><p>No alerts yet for this community</p><span>Check back soon — alerts appear as new filings and notices are published</span></div>';
     count.textContent = '0 alerts';
@@ -585,14 +587,15 @@ function renderAlerts(alerts) {
     const icon = getIcon(a.pipeline_type, a.category);
     const badge = getBadge(a.impact_level);
     const date = formatDate(a.published_at || a.created_at);
-    const meta = [a.agency_name, date, a.geographic_reference].filter(Boolean).join(' · ');
-    const link = a.source_url ? `<a class="alink" href="${a.source_url}" target="_blank">Read more →</a>` : '';
+    const meta = [a.agency_name, date, a.geographic_reference].filter(Boolean).map(esc).join(' · ');
+    const url = safeUrl(a.source_url);
+    const link = url ? `<a class="alink" href="${esc(url)}" target="_blank" rel="noopener">Read more →</a>` : '';
     const catId = alertCatId(a.pipeline_type, a.category);
-    return `<div class="alert-card" data-cat="${catId}">
+    return `<div class="alert-card" data-cat="${esc(catId)}">
       ${tag}
       <div class="alert-top">
         <div class="aicon" style="background:${icon.bg}"><svg style="stroke:${icon.stroke}" viewBox="0 0 24 24">${icon.path}</svg></div>
-        <div class="abody"><div class="atitle">${a.title || 'Untitled alert'}</div><div class="ameta">${meta}</div></div>
+        <div class="abody"><div class="atitle">${esc(a.title || 'Untitled alert')}</div><div class="ameta">${meta}</div></div>
         ${badge}
       </div>
       <div class="aactions">
