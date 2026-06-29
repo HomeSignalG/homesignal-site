@@ -119,8 +119,9 @@ footer .foot-links a:hover{color:var(--tx-primary)}
     <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
     <div class="nav-menu" id="nav-menu">
       <nav><a href="how-it-works.html">How it works</a><a href="about.html">About</a></nav>
+      <button class="nav-share" type="button" onclick="sharePage()" aria-label="Share this page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg><span>Share</span></button>
       <div class="nav-actions" style="display:flex;align-items:center;gap:18px">
-        <a href="dashboard.html" style="font-size:14px;color:var(--tx-secondary)">Manage your alerts</a>
+        <a href="dashboard.html" style="font-size:14px;color:var(--tx-secondary)">Dashboard</a>
         <a href="dashboard.html" style="font-size:14px;color:var(--tx-secondary)">Log in</a>
         <button class="btn-primary" id="header-cta" style="padding:9px 16px">Sign up</button>
       </div>
@@ -195,16 +196,6 @@ footer .foot-links a:hover{color:var(--tx-primary)}
     </div>
   </div>
 </div>
-
-<section class="band">
-  <div class="wrap" style="display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center;padding:34px 0">
-    <div class="tile" style="width:52px;height:52px;font-size:26px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 21V5a2 2 0 0 1 2-2h7l5 5v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><line x1="12" y1="10" x2="12" y2="13.5"/><line x1="12" y1="16.5" x2="12.01" y2="16.5"/></svg></div>
-    <div>
-      <h2 style="font-size:23px">Changes show up in public records before you're notified.</h2>
-      <p style="color:var(--tx-secondary);margin:10px 0 0;max-width:720px">Applications get filed, meetings get scheduled, decisions move forward — quietly. Most homeowners don't hear about it until it's too late. HomeSignal surfaces it while you can still weigh in.</p>
-    </div>
-  </div>
-</section>
 
 <section class="wrap" style="padding:54px 0 4px">
   <h2 style="text-align:center">How it works</h2>
@@ -421,5 +412,6 @@ document.addEventListener('DOMContentLoaded', function(){
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && overlay && overlay.classList.contains('open')) closeRequestModal(); });
 });
 </script>
+<script src="share.js" defer></script>
 </body>
 </html>
