@@ -15,9 +15,7 @@
     email: '<path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm9 7l8-5.2V6H4v.8L12 12zm0 1.5L4 8.3V18h16V8.3l-8 5.2z"/>',
     reddit: '<path d="M22 12a2.04 2.04 0 0 0-3.46-1.46 10 10 0 0 0-5.27-1.67l.9-4.23 2.94.62a1.5 1.5 0 1 0 .16-1l-3.28-.7a.5.5 0 0 0-.59.38l-1 4.7a10 10 0 0 0-5.34 1.66 2.04 2.04 0 1 0-2.2 3.36c-.03.21-.05.43-.05.65 0 3.31 3.58 6 8 6s8-2.69 8-6c0-.22-.02-.44-.05-.65A2.04 2.04 0 0 0 22 12zM7 13.5a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0zm8.1 4.2c-.86.86-2.6.93-3.1.93-.5 0-2.24-.07-3.1-.93a.34.34 0 0 1 .48-.48c.54.54 1.7.73 2.62.73.92 0 2.08-.19 2.62-.73a.34.34 0 0 1 .48.48zM15.5 15a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>',
     pinterest: '<path d="M12 2a10 10 0 0 0-3.65 19.31c-.05-.82-.01-1.8.2-2.69l1.28-5.41s-.32-.64-.32-1.58c0-1.48.86-2.59 1.93-2.59.91 0 1.35.68 1.35 1.5 0 .91-.58 2.28-.88 3.55-.25 1.06.53 1.92 1.58 1.92 1.9 0 3.35-2 3.35-4.89 0-2.56-1.84-4.35-4.46-4.35-3.04 0-4.83 2.28-4.83 4.64 0 .92.35 1.9.79 2.44.09.1.1.19.07.3l-.3 1.21c-.05.2-.16.24-.36.15-1.35-.63-2.19-2.6-2.19-4.19 0-3.41 2.48-6.54 7.14-6.54 3.75 0 6.66 2.67 6.66 6.24 0 3.72-2.35 6.72-5.61 6.72-1.1 0-2.13-.57-2.48-1.24l-.67 2.57c-.24.94-.9 2.11-1.34 2.83A10 10 0 1 0 12 2z"/>',
-    li: '<path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14zM8.34 18.34V9.9H5.67v8.44h2.67zM7 8.67a1.55 1.55 0 1 0 0-3.1 1.55 1.55 0 0 0 0 3.1zm11.34 9.67v-4.63c0-2.47-1.32-3.62-3.08-3.62-1.42 0-2.06.78-2.41 1.33V9.9h-2.67v8.44h2.67v-4.71c0-.25.02-.5.09-.68.2-.5.65-1.01 1.41-1.01 1 0 1.4.76 1.4 1.87v4.53h2.6z"/>',
-    tiktok: '<path d="M16.6 5.82a4.28 4.28 0 0 1-1.06-2.82h-3.2v12.86a2.34 2.34 0 1 1-2.34-2.34c.2 0 .4.03.59.08v-3.3a5.62 5.62 0 1 0 4.95 5.57V9.01a7.5 7.5 0 0 0 4.36 1.4V7.2a4.28 4.28 0 0 1-3.3-1.38z"/>',
-    embed: '<path d="M8.7 7.3 4 12l4.7 4.7 1.4-1.4L7.2 12l2.9-2.9L8.7 7.3zm6.6 0-1.4 1.4 2.9 2.9-2.9 2.9 1.4 1.4L20 12l-4.7-4.7z"/>'
+    li: '<path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14zM8.34 18.34V9.9H5.67v8.44h2.67zM7 8.67a1.55 1.55 0 1 0 0-3.1 1.55 1.55 0 0 0 0 3.1zm11.34 9.67v-4.63c0-2.47-1.32-3.62-3.08-3.62-1.42 0-2.06.78-2.41 1.33V9.9h-2.67v8.44h2.67v-4.71c0-.25.02-.5.09-.68.2-.5.65-1.01 1.41-1.01 1 0 1.4.76 1.4 1.87v4.53h2.6z"/>'
   };
 
   // ---- styles ----
@@ -48,7 +46,6 @@
       '.ns-messages .ico{background:#2cc84b}.ns-whatsapp .ico{background:#25d366}.ns-fb .ico{background:#1877f2}',
       '.ns-x .ico{background:#000}.ns-bsky .ico{background:#1185fe}.ns-email .ico{background:#5b7083}',
       '.ns-reddit .ico{background:#ff4500}.ns-pinterest .ico{background:#e60023}.ns-li .ico{background:#0a66c2}',
-      '.ns-tiktok .ico{background:#010101}.ns-embed .ico{background:#606060}',
       '.nav-share-copy{display:flex;margin-top:16px;border:1px solid rgba(0,0,0,.14);border-radius:9px;overflow:hidden}',
       '.nav-share-copy input{flex:1;border:none;padding:10px 12px;font:inherit;font-size:12px;',
       'color:#3f3f46;background:#fafafa;min-width:0}',
@@ -95,9 +92,7 @@
       { key: 'email', label: 'Email', icon: I.email, href: 'mailto:?subject=' + t + '&body=' + t + '%20' + u, nav: true },
       { key: 'reddit', label: 'Reddit', icon: I.reddit, href: 'https://www.reddit.com/submit?url=' + u + '&title=' + t },
       { key: 'pinterest', label: 'Pinterest', icon: I.pinterest, href: 'https://pinterest.com/pin/create/button/?url=' + u + '&description=' + t },
-      { key: 'li', label: 'LinkedIn', icon: I.li, href: 'https://www.linkedin.com/sharing/share-offsite/?url=' + u },
-      { key: 'tiktok', label: 'TikTok', icon: I.tiktok, copy: url, msg: 'Link copied — paste it into TikTok' },
-      { key: 'embed', label: 'Embed', icon: I.embed, copy: '<iframe src="' + url + '" width="100%" height="600" style="border:0" loading="lazy"></iframe>', msg: 'Embed code copied' }
+      { key: 'li', label: 'LinkedIn', icon: I.li, href: 'https://www.linkedin.com/sharing/share-offsite/?url=' + u }
     ];
   }
 
