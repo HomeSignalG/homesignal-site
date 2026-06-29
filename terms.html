@@ -104,7 +104,7 @@ footer {
 .footer-left .logo-text { font-size: 15px; margin-bottom: 4px; }
 .footer-tagline { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
 .footer-links { display: flex; gap: 20px; }
-.footer-links a { font-size: 13px; color: var(--text-tertiary); }
+.footer-links a { font-size: 13px; color: var(--text-tertiary); display: inline-block; padding: 4px 0; }
 .footer-links a:hover { color: var(--text); }
 
 </style>
@@ -119,11 +119,11 @@ body { background: var(--bg-tertiary); font-size: 15px; }
 .page-eyebrow { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--green); margin-bottom: 12px; }
 .page-wrap h1 { font-size: 46px; font-weight: 600; letter-spacing: -0.022em; margin-bottom: 18px; line-height: 1.08; }
 .page-wrap h2 { font-size: 27px; font-weight: 600; letter-spacing: -0.015em; margin: 32px 0 10px; }
-.page-wrap p { color: var(--text-secondary); line-height: 1.75; margin-bottom: 14px; }
+.page-wrap p { color: var(--text-secondary); line-height: 1.75; margin-bottom: 14px; max-width: 68ch; }
 .page-wrap ul { color: var(--text-secondary); line-height: 1.75; margin: 0 0 14px 20px; }
 .page-wrap li { margin-bottom: 6px; }
 .page-wrap a.inline { color: var(--green); }
-.lead { font-size: 17px; color: var(--text); margin-bottom: 24px; }
+.lead { font-size: 17px; color: var(--text); margin-bottom: 24px; max-width: 68ch; }
 .muted { font-size: 13px; color: var(--text-tertiary); margin-top: 32px; }
 
 /* simple steps for how-it-works */
@@ -284,7 +284,7 @@ body { background: var(--bg-tertiary); font-size: 15px; }
 <div class="page-eyebrow">Terms</div>
 <h1>Terms of Use</h1>
 <h2>Using HomeSignal</h2>
-<p>HomeSignal provides information drawn from public records and official filings for general informational purposes. We work to keep it accurate but cannot guarantee completeness or timeliness. How we handle the information you provide — including optional data sharing — is described in our <a href="privacy.html">Privacy Policy</a>.</p>
+<p>HomeSignal provides information drawn from public records and official filings for general informational purposes. We work to keep it accurate but cannot guarantee completeness or timeliness. How we handle the information you provide — including optional data sharing — is described in our <a href="privacy.html" class="inline">Privacy Policy</a>.</p>
 <h2>Not professional advice</h2>
 <p>Information on HomeSignal is not legal, financial, or professional advice. Always confirm details with the relevant government body or official source.</p>
 <h2>Changes</h2>

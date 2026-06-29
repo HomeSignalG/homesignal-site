@@ -42,6 +42,7 @@ a{color:var(--tx-info);text-decoration:none}
 button{font-family:var(--font);cursor:pointer;border-radius:var(--r-md);font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0.5px solid var(--bd-secondary);background:transparent;color:var(--tx-primary);padding:11px 18px;transition:filter .12s,background .12s}
 button:active{transform:scale(.99)}
 .btn-primary{background:var(--green);color:var(--green-tx);border:0.5px solid var(--green);font-weight:500}
+[data-zip-form] .btn-primary{height:48px;padding:0 24px}
 .btn-primary:hover{filter:brightness(1.08)}
 .btn-ghost:hover{background:var(--bg-secondary)}
 input{font-family:var(--font);height:48px;border:0.5px solid var(--bd-secondary);border-radius:var(--r-md);padding:0 14px 0 42px;font-size:15px;background:var(--bg-primary);color:var(--tx-primary);width:100%}
@@ -81,7 +82,7 @@ nav a:hover{color:var(--tx-primary)}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
 .zip-field{position:relative}
 .zip-field .ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--tx-tertiary);font-size:18px;pointer-events:none}
-footer .foot-links a{color:var(--tx-secondary)}
+footer .foot-links a{color:var(--tx-secondary);display:inline-block;padding:4px 0}
 footer .foot-links a:hover{color:var(--tx-primary)}
 @media (max-width:720px){
   .hero{grid-template-columns:1fr;gap:30px;padding:42px 0 38px}
@@ -94,6 +95,7 @@ footer .foot-links a:hover{color:var(--tx-primary)}
   nav a{padding:12px 0;border-bottom:0.5px solid var(--bd-tertiary);font-size:15px}
   .nav-actions{flex-direction:column!important;align-items:stretch!important;gap:8px!important;margin-top:12px}
   .nav-actions .btn-primary{width:100%}
+  [data-zip-form] .btn-primary{width:100%}
 }
 @media (max-width:380px){
   .wrap{padding:0 16px}

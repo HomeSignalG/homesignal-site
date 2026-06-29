@@ -117,7 +117,7 @@ footer {
 .footer-left .logo-text { font-size: 15px; margin-bottom: 4px; }
 .footer-tagline { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
 .footer-links { display: flex; gap: 20px; }
-.footer-links a { font-size: 13px; color: var(--text-tertiary); }
+.footer-links a { font-size: 13px; color: var(--text-tertiary); display: inline-block; padding: 4px 0; }
 .footer-links a:hover { color: var(--text); }
 
 </style>
@@ -464,9 +464,10 @@ h2.be-h2 { font-size: 27px; font-weight: 600; margin: 0; letter-spacing: -0.015e
 /* topic-tile GROUPS (local vs benchmark) — visual regrouping only; tiles keep their
    data-*/onclick/refreshTileLabels contract. Color is scoped via the group WRAPPER
    (not the tile) because refreshTileLabels() rewrites each tile's className. */
-.be-group-head { font-size: 13.5px; font-weight: 600; color: var(--tx-secondary); letter-spacing: .005em; margin: 20px 0 11px; }
+.be-group-head { font-size: 15px; font-weight: 600; color: var(--tx-primary); margin: 20px 0 11px; }
 .be-group-divider { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--bd-tertiary); }
-.be-group-local, .be-group-benchmark { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.be-group-local { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.be-group-benchmark { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 720px){ .be-group-local, .be-group-benchmark { grid-template-columns: 1fr; } }
 /* GROUP 2 (benchmarks) get a BLUE header with white text to distinguish from local green */
 .be-group-benchmark .cat-tile .ct-top { background: var(--tx-info); }
@@ -562,7 +563,7 @@ h2.be-h2 { font-size: 27px; font-weight: 600; margin: 0; letter-spacing: -0.015e
     <section class="be-section" style="margin-top:0">
       <div class="scard" style="border:none;padding:0;background:transparent;margin-bottom:0">
         <h2 class="be-h2 stitle" style="margin-bottom:12px">Upcoming meetings<span id="mtg-count" style="font-weight:500;color:var(--ts);font-size:12px;margin-left:8px"></span></h2>
-        <div id="meetings-list"><div class="mtit" style="padding:8px 0">Loading meetings…</div></div>
+        <div id="meetings-list"><div class="loading">Loading meetings…</div></div>
       </div>
     </section>
   </div>
@@ -1144,7 +1145,7 @@ async function loadMeetings() {
     // Keep only meetings whose LOCAL (Denver) date is today or later (ISO dates sort chronologically).
     meetings = Array.isArray(meetings) ? meetings.filter(m => m.meeting_date && denverDate(m.meeting_date) >= denverToday) : [];
     if (meetings.length === 0) {
-      list.innerHTML = '<div class="mtit" style="padding:8px 0">No upcoming meetings posted yet.</div>';
+      list.innerHTML = '<div class="empty-state"><p>No upcoming meetings posted yet</p><span>Check back soon — new hearings and agendas appear here</span></div>';
       return;
     }
     const mtgCountEl = document.getElementById('mtg-count');
@@ -1204,7 +1205,7 @@ async function loadMeetings() {
     }
     list.innerHTML = html;
   } catch (err) {
-    list.innerHTML = '<div class="mtit" style="padding:8px 0">Could not load meetings.</div>';
+    list.innerHTML = '<div class="empty-state"><p>Could not load meetings</p><span>Check your connection and try again</span></div>';
   }
 }
 
