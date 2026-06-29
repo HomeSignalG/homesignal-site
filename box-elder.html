@@ -727,7 +727,7 @@ function getTopicDot(type, category) {
 
 // All canonical topic labels that appear in the signup popups (cats[].items),
 // lowercased -> canonical-cased. Memoized; cats exists by the time alerts render.
-let _allTopicLabels = null;
+let _allTopicLabels = null, _catTopicLabels = {};
 function allTopicLabels() {
   if (_allTopicLabels) return _allTopicLabels;
   _allTopicLabels = {};
@@ -741,10 +741,20 @@ function allTopicLabels() {
   return _allTopicLabels;
 }
 
-// The topic(s) this alert matched — only labels the user can actually check off
-// in a popup (so tier markers like "emerging_technology" are filtered out).
-// Shows ALL matches. Reads whichever field the alert exposes; empty if none.
-function getAlertTopics(a) {
+// Labels for ONE tile's popup only, so a card tags only topics you could
+// actually check off in ITS popup — not a topic that lives under another tile.
+function catTopicLabels(catId) {
+  if (_catTopicLabels[catId]) return _catTopicLabels[catId];
+  var map = {};
+  try { ((cats[catId] && cats[catId].items) || []).forEach(function (it) { map[String(it).trim().toLowerCase()] = it; }); } catch (e) {}
+  _catTopicLabels[catId] = map;
+  return map;
+}
+
+// The topic(s) this alert/meeting matched, RESTRICTED to the given tile's popup
+// (catId). Tier markers (e.g. "emerging_technology") and cross-tile topics are
+// filtered out. Shows ALL matches; reads whichever field the row exposes; empty if none.
+function getAlertTopics(a, catId) {
   var cand = [];
   ['topics', 'matched_topics', 'subtopics'].forEach(function (k) {
     if (Array.isArray(a[k])) cand = cand.concat(a[k]);
@@ -752,7 +762,7 @@ function getAlertTopics(a) {
   ['topic', 'subtopic', 'category'].forEach(function (k) {
     if (a[k] != null) cand.push(a[k]);
   });
-  var known = allTopicLabels(), seen = {}, out = [];
+  var known = catId ? catTopicLabels(catId) : allTopicLabels(), seen = {}, out = [];
   cand.forEach(function (x) {
     var key = String(x == null ? '' : x).trim().toLowerCase();
     if (!key || !known[key] || seen[key]) return;
@@ -800,7 +810,7 @@ function renderAlerts(alerts) {
     const link = url ? `<a class="alink" href="${esc(url)}" target="_blank" rel="noopener">Read more →</a>` : '';
     const catId = alertCatId(a.pipeline_type, a.category);
     const dot = getTopicDot(a.pipeline_type, a.category);
-    const topics = getAlertTopics(a);
+    const topics = getAlertTopics(a, catId);
     const topicPills = topics.map(tp =>
       `<span class="ptopic"><span class="pdot" style="background:${dot}"></span>${esc(tp)}</span>`).join('');
     const tagRow = `<div class="tagrow">${tag}${topicPills}</div>`;
@@ -1279,7 +1289,7 @@ async function loadMeetings() {
       const dateStr = fmtDate(m.meeting_date);
       const time = m.meeting_time ? esc(m.meeting_time) : 'Time TBD';
       const when = dateStr ? (dateStr + ' · ' + time) : time;
-      let mtopics = getAlertTopics(m);
+      let mtopics = getAlertTopics(m, 'meetings');
       if(!mtopics.length && m.category) mtopics = [m.category];
       const mtopicPills = mtopics.map(tp => `<span class="ptopic"><span class="pdot" style="background:#16a34a"></span>${esc(tp)}</span>`).join('');
       const mtagRow = `<div class="tagrow"><span class="ptag tmeet">Meeting</span>${mtopicPills}</div>`;
