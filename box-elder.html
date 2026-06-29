@@ -500,6 +500,7 @@ h2.be-h2 { font-size: 27px; font-weight: 600; margin: 0; letter-spacing: -0.015e
     <div class="logo-text">Home<span>Signal</span></div>
   </a>
   <button class="nav-toggle" id="nav-toggle" aria-label="Open menu"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="nav-menu" id="nav-menu"><ul class="nav-links"><li><a href="how-it-works.html">How it works</a></li><li><a href="about.html">About</a></li></ul>
+  <button class="nav-share" type="button" onclick="sharePage()" aria-label="Share this page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg><span>Share</span></button>
   <div class="nav-actions" id="nav-auth"><button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button></div>
 </div>
   </div>
@@ -1401,5 +1402,6 @@ document.addEventListener('DOMContentLoaded', function(){
   if (t && m) t.addEventListener('click', function(){ m.classList.toggle('open'); });
 });
 </script>
+<script src="share.js" defer></script>
 </body>
 </html>
