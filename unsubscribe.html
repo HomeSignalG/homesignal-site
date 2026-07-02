@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unsubscribe · HomeSignal</title>
+<script>
+  (function () {
+    var t = new URLSearchParams(window.location.search).get("t") || "";
+    var dest = "https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/unsubscribe?t="
+               + encodeURIComponent(t);
+    var a = document.getElementById("go");
+    if (a) a.href = dest;
+    window.location.replace(dest);   // forward the token to the engine function
+  })();
+</script>
+</head>
+<body style="margin:0;background:#eceef0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#18181b;">
+  <div style="max-width:520px;margin:48px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+    <div style="background:#1f5130;padding:20px 28px;">
+      <span style="font-size:18px;font-weight:800;letter-spacing:-.3px;color:#fff;">Home<span style="color:#9fe1cb;">Signal</span></span>
+    </div>
+    <div style="padding:28px;font-size:15px;line-height:1.55;color:#3f3f46;">
+      <h1 style="font-size:20px;font-weight:800;margin:0 0 10px;">One moment…</h1>
+      <p>Completing your unsubscribe. If this page doesn't move automatically,
+         <a id="go" href="https://homesignal.net" style="color:#1f5130;font-weight:700;">tap here to continue</a>.</p>
+    </div>
+  </div>
+</body></html>
