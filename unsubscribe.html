@@ -3,26 +3,36 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Unsubscribe · HomeSignal</title>
-<script>
-  (function () {
-    var t = new URLSearchParams(window.location.search).get("t") || "";
-    var dest = "https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/unsubscribe?t="
-               + encodeURIComponent(t);
-    var a = document.getElementById("go");
-    if (a) a.href = dest;
-    window.location.replace(dest);   // forward the token to the engine function
-  })();
-</script>
 </head>
 <body style="margin:0;background:#eceef0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#18181b;">
   <div style="max-width:520px;margin:48px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);">
     <div style="background:#1f5130;padding:20px 28px;">
       <span style="font-size:18px;font-weight:800;letter-spacing:-.3px;color:#fff;">Home<span style="color:#9fe1cb;">Signal</span></span>
     </div>
-    <div style="padding:28px;font-size:15px;line-height:1.55;color:#3f3f46;">
-      <h1 style="font-size:20px;font-weight:800;margin:0 0 10px;">One moment…</h1>
-      <p>Completing your unsubscribe. If this page doesn't move automatically,
-         <a id="go" href="https://homesignal.net" style="color:#1f5130;font-weight:700;">tap here to continue</a>.</p>
+    <div style="padding:28px;">
+      <h1 id="title" style="font-size:20px;font-weight:800;margin:0 0 10px;">One moment…</h1>
+      <div id="msg" style="font-size:15px;line-height:1.55;color:#3f3f46;">Completing your request.</div>
+      <a href="https://homesignal.net" style="display:inline-block;margin-top:22px;background:#1f5130;color:#fff;font-size:14px;font-weight:600;text-decoration:none;padding:11px 22px;border-radius:8px;">Go to HomeSignal</a>
     </div>
+    <div style="padding:16px 28px;border-top:1px solid #eef0f1;font-size:12px;color:#8a8a85;">HomeSignal — neutral · sourced · non-partisan</div>
   </div>
+<script>
+  (function () {
+    var FN = "https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/unsubscribe";
+    var t = new URLSearchParams(window.location.search).get("t") || "";
+    var title = document.getElementById("title"), msg = document.getElementById("msg");
+    var M = {
+      unsubscribed:  ["You're unsubscribed", "You will no longer receive HomeSignal digest emails. You can re-subscribe anytime at homesignal.net."],
+      not_found:     ["Link not recognized", "This unsubscribe link is invalid or has already been used."],
+      missing_token: ["Invalid link", "This unsubscribe link is missing its token."],
+      error:         ["Something went wrong", "We couldn't process your request right now. Please try again later."]
+    };
+    function show(k){ title.textContent = M[k][0]; msg.textContent = M[k][1]; }
+    if (!t) { show("missing_token"); return; }
+    fetch(FN + "?t=" + encodeURIComponent(t))
+      .then(function (r) { return r.json().catch(function(){ return {status:"error"}; }); })
+      .then(function (d) { show((d && M[d.status]) ? d.status : "error"); })
+      .catch(function () { show("error"); });
+  })();
+</script>
 </body></html>
