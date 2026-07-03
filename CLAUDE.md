@@ -72,3 +72,8 @@ After any change:
 
 See **`docs/website-community-build.md`** — the exact clone-edit surface, the
 "only `cats.meetings.items` varies" rule, and the cross-repo label warning.
+
+**The complete two-repo picture** (ingest + delivery + this site) lives in the
+engine repo: **`homesignal-ingest/docs/community-build-source-of-truth.md`** and
+**`homesignal-ingest/CLAUDE.md`**. Read those for what the engine side must do
+(feeds, `digest.py` edits) alongside this site's clone.
