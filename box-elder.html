@@ -224,15 +224,14 @@ body { background: var(--bg-tertiary); font-size: 14px; }
 .mcard { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 13px 15px; margin-bottom: 10px; }
 .mcard:last-child { margin-bottom: 0; }
 .mcard-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 7px; }
-.mchip { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: var(--gl); color: var(--gd); }
+.mchip { display: inline-flex; align-items: center; gap: 5px; background: var(--bg2); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 600; color: var(--text); }
+.mchip svg { width: 12px; height: 12px; stroke: var(--ts); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .mcard-title { font-size: 13.5px; font-weight: 600; color: var(--text); line-height: 1.35; margin-bottom: 2px; }
 .mcard-body { font-size: 11.5px; color: var(--ts); margin-bottom: 9px; }
 .mcard-row { display: flex; align-items: flex-start; gap: 7px; font-size: 12px; color: var(--text); margin-bottom: 5px; }
 .mcard-row svg { width: 14px; height: 14px; stroke: var(--ts); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; margin-top: 1px; }
-.mcard-agenda { margin: 9px 0 4px; }
-.mcard-agenda-label { font-size: 10px; font-weight: 700; color: var(--ts); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
-.mcard-agenda ul { margin: 0; padding-left: 16px; }
-.mcard-agenda li { font-size: 12px; color: var(--text); line-height: 1.5; margin-bottom: 3px; }
+.mcard-titlerow { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.mchip-row { margin: 6px 0 2px; }
 .mcard-hearing { display: flex; align-items: center; gap: 6px; background: #fef2f2; border-radius: var(--rs); padding: 6px 10px; font-size: 11.5px; color: #991b1b; font-weight: 500; margin: 9px 0; }
 .mcard-hearing svg { width: 14px; height: 14px; stroke: #dc2626; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .mcard-foot { margin-top: 10px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -1285,6 +1284,22 @@ async function loadMeetings() {
     var ICO_CAL='<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
     var ICO_PIN='<svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
     var ICO_MIC='<svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>';
+    var ICO_PERSON='<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+    var ICO_VIDEO='<svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
+    var ICO_DOC='<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>';
+    // attendance_mode -> chip label + icon. Blank/unknown -> no chip.
+    function attendanceChip(mode){
+      var map = { in_person:['In person', ICO_PERSON], video:['Video', ICO_VIDEO], hybrid:['In person & Video', ICO_PERSON] };
+      var a = map[String(mode==null?'':mode).trim().toLowerCase()];
+      return a ? '<div class="mchip-row"><span class="mchip">'+a[1]+a[0]+'</span></div>' : '';
+    }
+    // "New" badge for a freshly-detected meeting (added within the last 7 days).
+    function isNewMeeting(m){
+      var t = m.created_at || m.first_seen_at || m.inserted_at;
+      if(!t) return false;
+      var d = new Date(t);
+      return !isNaN(d.getTime()) && (Date.now() - d.getTime()) < 7*24*3600*1000;
+    }
     const VISIBLE = 4;
     const items = meetings.map(m => {
       const dateStr = fmtDate(m.meeting_date);
@@ -1296,28 +1311,26 @@ async function loadMeetings() {
       const mtagRow = `<div class="tagrow"><span class="ptag tmeet">Meeting</span>${mtopicPills}</div>`;
       const title = esc(m.title || m.meeting_type || 'Public meeting');
       const bodyName = (m.meeting_type && m.title && m.meeting_type !== m.title) ? `<div class="mcard-body">${esc(m.meeting_type)}</div>` : '';
-      let rows = '';
-      if(when) rows += `<div class="mcard-row">${ICO_CAL}<div>${when}</div></div>`;
-      if(m.location) rows += `<div class="mcard-row">${ICO_PIN}<div>${esc(m.location)}</div></div>`;
-      let agenda = '';
-      if(m.agenda_summary){
-        const lines = String(m.agenda_summary).split('\n').map(s=>s.trim()).filter(Boolean);
-        if(lines.length){
-          agenda = `<div class="mcard-agenda"><div class="mcard-agenda-label">On the agenda</div><ul>` +
-            lines.map(l=>`<li>${esc(l)}</li>`).join('') + `</ul></div>`;
-        }
-      }
+      const newBadge = isNewMeeting(m) ? '<span class="abadge bi">New</span>' : '';
+      const whenRow = when ? `<div class="mcard-row">${ICO_CAL}<div>${when}</div></div>` : '';
+      const attChip = attendanceChip(m.attendance_mode);
+      const locRow = m.location ? `<div class="mcard-row">${ICO_PIN}<div>${esc(m.location)}</div></div>` : '';
+      // agenda_summary is a presence flag only — never print its contents on the tile.
+      const agendaFlag = (m.agenda_summary && String(m.agenda_summary).trim())
+        ? `<div class="mcard-row">${ICO_DOC}<div>Agenda now available</div></div>` : '';
       const hearing = m.is_public_hearing
         ? `<div class="mcard-hearing">${ICO_MIC}<div>Public hearing — you can speak at this meeting</div></div>`
         : (m.comment_period_open ? `<div class="mcard-hearing">${ICO_MIC}<div>Comment period open</div></div>` : '');
-      const meetingLink = m.source_url ? `<a href="${esc(m.source_url)}" target="_blank" rel="noopener">Agenda &amp; how to attend →</a>` : '';
+      const meetingLink = m.source_url ? `<a href="${esc(m.source_url)}" target="_blank" rel="noopener">Read more →</a>` : '';
       const foot = `<div class="mcard-foot"><button class="abtn abtn-c" onclick="affectsMeMeeting(this)">Affects me — sign up</button>${meetingLink}</div>`;
       return `<div class="mcard" data-topic="${esc(m.category || m.meeting_type || '')}">
         ${mtagRow}
-        <div class="mcard-title">${title}</div>
+        <div class="mcard-titlerow"><div class="mcard-title">${title}</div>${newBadge}</div>
         ${bodyName}
-        ${rows}
-        ${agenda}
+        ${whenRow}
+        ${attChip}
+        ${locRow}
+        ${agendaFlag}
         ${hearing}
         ${foot}
       </div>`;
