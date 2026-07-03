@@ -81,12 +81,32 @@ After any change:
 4. The site reflects new engine data only after a deploy — the engine fills
    Supabase continuously, the site lags until published.
 
-## Full per-community checklist
+## Full per-community clone-edit surface
 
-See **`docs/website-community-build.md`** — the exact clone-edit surface, the
-"only `cats.meetings.items` varies" rule, and the cross-repo label warning.
+Clone `box-elder.html` → `<slug>.html` and change exactly:
+1. **`COMMUNITY_ID` — BOTH hardcoded spots** (`const` near the top **and**
+   `p_community_id` in the signup RPC ~line 1482). Grep the old UUID; there are 2.
+2. **`cats.meetings.items`** — the community's government topics (`cats.notices`
+   derives from it). This is the **only** per-community topic list; leave
+   `cats.news.items` / `cats.emerging.items` / `cats.global.items` (the 12 universal
+   subtopics) untouched.
+3. **All display/branding strings** — grep the old county name (~13: `<title>`,
+   meta description, `og:`/`twitter:` tags, `hs:share-text`, `be-eyebrow`,
+   `<h1 class="comm-title">`, the "In &lt;County&gt;" heading, the two save messages).
 
-**The complete two-repo picture** (ingest + delivery + this site) lives in the
-engine repo: **`homesignal-ingest/docs/community-build-source-of-truth.md`** and
-**`homesignal-ingest/CLAUDE.md`**. Read those for what the engine side must do
-(feeds, `digest.py` edits) alongside this site's clone.
+Then add one record to **`communities.js`** (`id`, `slug`, `name`, `page`, `zips`,
+`governmentTopics` — which must equal the page's `cats.meetings.items`). `index.html`
+auto-routes via `communities.js`; there is **no** per-community edit there (its old
+private registry was removed).
+
+> ⚠️ **Empty-tile trap.** The page scopes EVERY tier by `community_id` (`const base =
+> ".../alerts?community_id=eq.${COMMUNITY_ID}"`; the Global + Emerging tiers fetch off
+> `base`). A fresh clone shows **empty Global Best Practices & Emerging Technology
+> tiles** for the new `community_id` — the first thing a prospect sees. Fix: either tag
+> the global feed rows with the new `community_id` (engine side) or drop the
+> `community_id` filter on those two tiers in the page. Decide before go-live. (Same
+> trap hits the digest — see `homesignal-ingest/CLAUDE.md`.)
+
+**The complete two-repo picture** (ingest + delivery) lives in
+**`homesignal-ingest/CLAUDE.md`** — read it for the engine side (feeds, `digest.py`
+edits) alongside this site's clone.
