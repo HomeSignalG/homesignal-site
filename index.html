@@ -287,18 +287,16 @@ footer .foot-links a:hover{color:var(--tx-primary)}
   </div>
 </footer>
 
+<script src="communities.js"></script>
 <script>
 // ============================================================
 // ZIP search — routes into the existing signup flow (box-elder.html).
 // Preserved from the prior homepage; the signup logic itself lives in
 // box-elder.html and is NOT touched here.
+//
+// Community registry is the SHARED one in communities.js (window.HS) — this
+// page no longer keeps its own list, so ZIP coverage can never drift again.
 // ============================================================
-const COMMUNITIES = [
-  {
-    page: 'box-elder.html',
-    zips: ['84301','84302','84306','84307','84308','84309','84311','84312','84313','84314','84315','84316','84324','84329','84330','84331','84334','84336','84337','84340']
-  }
-];
 
 // ============================================================
 // Community request form -> routes through the submit-public-form Edge Function
@@ -343,7 +341,7 @@ async function submitCommunityRequest(){
 }
 
 function extractZip(query){ const m=(query||'').match(/\b\d{5}\b/); return m?m[0]:null; }
-function findCommunityByZip(zip){ for(const c of COMMUNITIES){ if(c.zips.includes(zip)) return c.page; } return null; }
+function findCommunityByZip(zip){ var c = (window.HS && window.HS.zipToCommunity) ? window.HS.zipToCommunity(zip) : null; return c ? c.page : null; }
 // ----- Community request modal (opens only on a not-covered ZIP search) -----
 var REQUEST_FORM_HTML = null;     // captured template so the modal is reusable
 var requestTriggerInput = null;   // search box to return focus to on close

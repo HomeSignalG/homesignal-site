@@ -116,7 +116,7 @@ Alerts/meetings are loaded by a **scheduled ingestion engine** driven by a **Fee
 **Website ↔ engine contract:** `user_subscriptions.topic` (what the user follows) must equal `alerts.category` (what the engine tags). Both come from the same canonical topic list. Match: `community_id` matches **and** `subscription.topic = alerts.category` (a whole-pipeline follow with `topic IS NULL` matches all of that `pipeline_type`).
 
 **Canonical sync requirement — keep these identical:** the spreadsheet **Topics sheet** ⇄ the website's `topics.js` / `communities.js`.
-- ✅ Government topics already match exactly: the Excel Topics sheet's 7 values == Box Elder `governmentTopics` in `communities.js`.
+- ✅ Government topics: Box Elder `governmentTopics` in `communities.js` now has **9** values (the 7 original topics + the two `City government (Brigham City)` / `City government (Tremonton)` meeting labels). The Excel Topics sheet must carry the **same 9**, word-for-word. **Authority for valid labels: `digest.py::CANONICAL_TOPICS`** in `homesignal-ingest` — a label not in that set is silently dropped by the digest.
 - ⬜ When News / Emerging / Global feeds go live, add their categories (the 12 universal topics in `topics.js`) to the Topics sheet so the strings stay word-for-word identical.
 
 ---

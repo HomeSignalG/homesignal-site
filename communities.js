@@ -15,9 +15,12 @@
       slug: 'box-elder',
       name: 'Box Elder County, Utah',
       page: 'box-elder.html',
-      zips: ['84301', '84302', '84306', '84307', '84309', '84311', '84312',
-             '84313', '84314', '84316', '84324', '84329', '84330', '84331',
-             '84334', '84336', '84337', '84340'],
+      // Union of the two registries that used to drift (index.html carried
+      // 84308 + 84315; this list lacked them). index.html now loads THIS file,
+      // so this is the single ZIP registry — keep it complete.
+      zips: ['84301', '84302', '84306', '84307', '84308', '84309', '84311',
+             '84312', '84313', '84314', '84315', '84316', '84324', '84329',
+             '84330', '84331', '84334', '84336', '84337', '84340'],
       // Per-county Government Notices topics — these must track the exact
       // government feeds available for this county (see topics.js).
       governmentTopics: [
