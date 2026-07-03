@@ -9,16 +9,18 @@
 ## The clone-edit surface (everything you touch — and nothing else)
 
 ### 1. The page — clone `box-elder.html` → `<slug>.html`
-Change exactly two things:
+Change these (and **only** these):
 
 | What | Where in the page | Value |
 |---|---|---|
-| **`COMMUNITY_ID`** | `const COMMUNITY_ID = '…'` near the top (and it's re-exposed as `window.COMMUNITY_ID`) | the Supabase `communities.id` UUID **from the engine — never invented** |
-| **`cats.meetings.items`** | the `cats` object (the `meetings` tile's `items: [...]`) | this community's Government-Notices topics (see rule below) |
+| **`COMMUNITY_ID` — BOTH occurrences** | `const COMMUNITY_ID = '…'` near the top **AND** `p_community_id: '…'` in the signup RPC (~line 1482, a separate hardcoded literal). **Grep the old UUID — there are 2.** | the Supabase `communities.id` UUID **from the engine — never invented** |
+| **`cats.meetings.items`** | the `cats` object (the `meetings` tile's `items: [...]`); `cats.notices` derives from it | this community's Government-Notices topics (see rule below) |
+| **All display/branding strings** | `<title>`, `<meta name="description">`, `og:title`/`og:description`, `twitter:title`/`twitter:description`, `hs:share-text`, `be-eyebrow`, `<h1 class="comm-title">`, the "In &lt;County&gt;" heading, the two "following … in &lt;County&gt;" save messages | the new community's name (**grep the old county name — ~13 occurrences**) |
 
-**Leave everything else byte-for-byte:** `SUPABASE_URL` + anon key, the
-`submit-public-form` call, the subscription RPC (`p_community_id`), alerts/meetings
-fetch, `events.js` analytics, and **`cats.news.items`**.
+**Leave the WIRING byte-for-byte:** `SUPABASE_URL` + anon key, the
+`submit-public-form` call, the *shape* of the subscription RPC, alerts/meetings
+fetch, `events.js` analytics, and **`cats.news.items` / `cats.emerging.items` /
+`cats.global.items`** (the 12 universal subtopics).
 
 ### 2. The registry — add one record to `communities.js`
 ```js

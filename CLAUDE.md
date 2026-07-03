@@ -30,15 +30,28 @@
 
 ## Preserve-the-wiring invariant (the thing that breaks if you're careless)
 
-When you clone `box-elder.html`, the ONLY things that change per community are:
-1. **`COMMUNITY_ID`** (the UUID near the top of the page).
-2. **`cats.meetings.items`** — the community's Government-Notices topic list.
+When you clone `box-elder.html`, the things that change per community are:
+1. **`COMMUNITY_ID` — in BOTH places it is hardcoded.** It appears twice: the
+   `const COMMUNITY_ID = '…'` near the top **and** the `p_community_id: '…'`
+   literal in the signup RPC (~line 1482, which does NOT reference the const).
+   **Change both**, or new signups are tagged to the wrong community. (Grep the
+   old UUID to be sure you got every occurrence.)
+2. **`cats.meetings.items`** — the community's Government-Notices topic list
+   (`cats.notices` is auto-derived from it, so this one edit covers both
+   government tiles).
+3. **Every display/branding string** — the page is full of "Box Elder" copy that
+   must become the new community: `<title>`, `<meta name="description">`,
+   `og:title`/`og:description`, `twitter:title`/`twitter:description`,
+   `hs:share-text`, the `be-eyebrow`, `<h1 class="comm-title">`, the "In Box
+   Elder County" group heading, and the two "following these alerts in Box Elder
+   County" save messages. (Grep the old county name to catch them all.)
 
-**Do NOT touch** any of: `SUPABASE_URL` / anon key, the `submit-public-form` Edge
-Function call, the subscription RPC (`p_community_id`), the alerts/meetings fetch
+**Do NOT touch** the WIRING: `SUPABASE_URL` / anon key, the `submit-public-form`
+Edge Function call, the shape of the subscription RPC, the alerts/meetings fetch
 logic, the analytics (`events.js` / `window.COMMUNITY_ID`), or **`cats.news.items`
-(the 12 universal subtopics — global, identical everywhere)**. Changing those is
-how signup writes, matching, and analytics silently break.
+/ `cats.emerging.items` / `cats.global.items` (the 12 universal subtopics —
+global, identical everywhere)**. Changing those is how signup writes, matching,
+and analytics silently break.
 
 ## Get `COMMUNITY_ID` from the engine — NEVER invent it
 
