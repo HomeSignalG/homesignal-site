@@ -1038,18 +1038,27 @@ async function resolveCommunity(){
   var id = p.get('id');
   var slug = p.get('community') || p.get('slug');
   var zip = p.get('zip');
-  // communities table has no slug column yet — map slug -> id via the bootstrap registry.
-  if(!id && slug && window.HS && HS.getCommunity){ var c = HS.getCommunity(slug); if(c) id = c.id; }
-  var url = null;
-  if(id) url = `${SUPABASE_URL}/rest/v1/communities?id=eq.${encodeURIComponent(id)}&select=*`;
-  else if(zip) url = `${SUPABASE_URL}/rest/v1/communities?zip_codes=cs.{${encodeURIComponent(zip)}}&select=*`;
-  if(!url) return; // nothing specified -> keep Box Elder fallback
-  try{
-    var res = await fetch(url, { headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${SUPABASE_ANON_KEY}` } });
-    if(!res.ok) return;
-    var rows = await res.json();
-    if(Array.isArray(rows) && rows.length){ COMMUNITY = rows[0]; COMMUNITY_ID = rows[0].id; }
-  }catch(e){}
+  var H = { 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${SUPABASE_ANON_KEY}` };
+  async function fetchRow(qs){
+    try{
+      var res = await fetch(`${SUPABASE_URL}/rest/v1/communities?${qs}&select=*`, { headers:H });
+      if(!res.ok) return null;
+      var rows = await res.json();
+      return (Array.isArray(rows) && rows.length) ? rows[0] : null;
+    }catch(e){ return null; }
+  }
+  var row = null;
+  if(id) row = await fetchRow(`id=eq.${encodeURIComponent(id)}`);
+  // DB is source of truth: resolve a slug against communities.slug directly.
+  else if(slug) row = await fetchRow(`slug=eq.${encodeURIComponent(slug)}`);
+  else if(zip) row = await fetchRow(`zip_codes=cs.{${encodeURIComponent(zip)}}`);
+  // Fallback for a slug not yet backfilled into communities.slug: the
+  // communities.js bootstrap map (slug -> id), then load by id.
+  if(!row && slug && window.HS && HS.getCommunity){
+    var c = HS.getCommunity(slug);
+    if(c && c.id) row = await fetchRow(`id=eq.${encodeURIComponent(c.id)}`);
+  }
+  if(row){ COMMUNITY = row; COMMUNITY_ID = row.id; } // else keep Box Elder fallback
 }
 
 function applyCommunity(){

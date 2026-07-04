@@ -43,7 +43,7 @@ the bug to fix.
 | 2 | **`homesignal-ingest`** (separate repo) | How alerts/meetings get *created*: government feeds (`feeds.csv`), the pipeline/topic canon (`digest.py::CANONICAL_TOPICS`), grading. | Not in this repo | A community has no Government Notices until its feeds are configured **there**. Requires granting that repo to the session. |
 | 3 | **`docs/*.sql`** | Schema & DDL of record for this project | `docs/*-setup.sql`, `docs/*-migration.sql` | **Parked, applied manually** in the Supabase SQL editor. If you change schema, write/append the SQL here too so it stays reproducible. |
 | 4 | **`topics.js`** | The canonical **Pipeline > Topic taxonomy** strings used across the front-end | `topics.js` | Universal topics (News / Emerging Tech / Global Best Practices) are shared; Government topics are per-community (§2). See string-matching rule below. |
-| 5 | **`communities.js`** | Front-end **bootstrap/fallback** registry: slug→id, ZIP→community, and a display copy of `governmentTopics` | `communities.js` | The header comment calls itself "single source of truth" — that is **aspirational/legacy**; #1 outranks it. Its real job today: map `?community=<slug>`→id (the DB has no `slug` column yet) and provide an offline fallback. |
+| 5 | **`communities.js`** | Front-end **bootstrap/fallback** registry: slug→id, ZIP→community, and a display copy of `governmentTopics` | `communities.js` | The header comment calls itself "single source of truth" — that is **aspirational/legacy**; #1 outranks it. Its job today is a **fallback only**: `communities` now has a `slug` column, so `community.html` resolves `?community=<slug>` against the DB and only falls back to this map for rows not yet backfilled. |
 | 6 | **`docs/*.md`** | Intent, specs, plans, checklists | `docs/multi-county-plan.md`, `docs/community-build-source-of-truth.md`, `docs/acquisition-dashboard-spec.md`, … | `multi-county-plan.md` is the north star for the scaling model; `community-build-source-of-truth.md` is the full site-build reference behind §3 (the engine half lives in `homesignal-ingest`). |
 
 **The string-matching rule (topics):** an article reaches a user only when the
@@ -79,9 +79,10 @@ subscribers.
   using verbatim canonical labels.
 
 `community.html` resolution (already built): `?id=<uuid>` → DB by id;
-`?zip=<zip>` → DB by `zip_codes` containment; `?community=<slug>` → slug mapped to
-id via `communities.js`, then DB by id. So **a brand-new DB row is immediately
-reachable by `?id=` and `?zip=` with no repo change** — that's the pure-data path.
+`?zip=<zip>` → DB by `zip_codes` containment; `?community=<slug>` → DB by `slug`
+(falls back to the `communities.js` slug→id map for rows not yet backfilled). So **a
+brand-new DB row is immediately reachable by `?id=`, `?zip=`, and — once it has a
+`slug` — `?community=<slug>`, with no repo change**. That's the pure-data path.
 
 ---
 
@@ -109,12 +110,13 @@ Then do the runbook end-to-end without pausing. The session already runs in
 1. **Insert the row** (Supabase — `mcp__Supabase__apply_migration`, project
    `qwnnmljucajnexpxdgxr`). Idempotent form:
    ```sql
-   insert into public.communities (name, county, state, zip_codes, level, government_topics)
+   insert into public.communities (name, county, state, zip_codes, level, government_topics, slug)
    values (
      'Tremonton, Utah', 'Box Elder', 'Utah',
      array['84337'],                 -- every ZIP the community covers
      'city',                         -- county | city | zip | neighborhood
-     array[]::text[]                 -- fill once feeds exist (step 3); [] is a valid start
+     array[]::text[],                -- fill once feeds exist (step 3); [] is a valid start
+     'tremonton'                     -- kebab-case slug; enables ?community=<slug> as pure data
    )
    on conflict do nothing;
    ```
@@ -130,10 +132,10 @@ Then do the runbook end-to-end without pausing. The session already runs in
    both places (DB row + ingest). Universal-topic content flows automatically.
    *If that repo isn't in the session, add it (`add_repo`) and do it there; if you
    can't, note explicitly that gov notices stay empty until feeds are configured.*
-4. **(Optional, only if a pretty URL is wanted)** add a bootstrap entry to
-   `communities.js` (`slug`, `id`, `name`, `page: 'community.html'`, `zips`,
-   `governmentTopics`) so `?community=<slug>` works. Not required for the community
-   to be live.
+4. **(Optional)** the `slug` set in step 1 already makes `?community=<slug>` work
+   from the DB. Only add a `communities.js` bootstrap entry (`slug`, `id`, `name`,
+   `page: 'community.html'`, `zips`, `governmentTopics`) if you want the dashboard
+   registry / offline fallback to know the community too. Not required to be live.
 
 **Do NOT** create a new `<community>.html`, and **do NOT** edit the frozen
 `box-elder.html` / `eagle-mountain.html`. (The engine repo's build doc has a legacy
@@ -146,14 +148,17 @@ following that playbook and hit "clone the page," use the dynamic page instead. 
 (overlap policy call), or a legal/consent change. Ordinary "add community N" never
 qualifies — just ship it.
 
-### Known scaling gaps (fix opportunistically, they block true zero-touch)
-- **`index.html` hardcodes its own `COMMUNITIES` array** (separate from
-  `communities.js`) to route homepage ZIP search, and points at the legacy
-  per-county pages. New ZIPs typed on the homepage won't route until this queries
-  the DB (or at least `communities.js`). Prefer fixing it to query `communities`.
-- **`communities` has no `slug` column**, so `?community=<slug>` still depends on a
-  `communities.js` entry. Adding a `slug` column (+ index) would remove that
-  bootstrap dependency and make slugs pure data too.
+### Scaling gaps — status
+- ✅ **`index.html` homepage ZIP search now queries `communities`** (source of truth)
+  via `resolveCoverageUrl`: a covered ZIP routes to its bespoke launch page when one
+  exists (Box Elder / Eagle Mountain — SEO), else to `community.html?zip=…`; new
+  communities route with **no repo change**. The inline `COMMUNITIES` array is now
+  only the legacy bespoke-page map, not the coverage source.
+- ✅ **`communities` has a `slug` column** (`docs/communities-slug-migration.sql`), so
+  `?community=<slug>` resolves against the DB; `communities.js` is fallback-only.
+- ⚠️ **`communities.js` still drifts from the DB** (e.g. Box Elder ZIPs/topics). It's a
+  fallback, so this isn't a runtime bug, but don't treat it as truth — the DB (#1) is.
+  The clean fix is to generate it from `communities` rather than hand-edit it.
 
 ---
 

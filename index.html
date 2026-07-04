@@ -289,9 +289,13 @@ footer .foot-links a:hover{color:var(--tx-primary)}
 
 <script>
 // ============================================================
-// ZIP search — routes into the existing signup flow (box-elder.html).
-// Preserved from the prior homepage; the signup logic itself lives in
-// box-elder.html and is NOT touched here.
+// ZIP search — routes to a community page.
+// The `communities` table is the SOURCE OF TRUTH for which ZIPs are live
+// (a new community is added as a DB row, no site deploy). A covered ZIP
+// routes to its bespoke launch page when one exists (box-elder /
+// eagle-mountain — better SEO), otherwise to the dynamic community.html.
+// The list below is ONLY the legacy bespoke-page map; it is not the
+// coverage source — the DB is (see resolveCoverageUrl).
 // ============================================================
 const COMMUNITIES = [
   {
@@ -334,8 +338,8 @@ async function submitCommunityRequest(){
     if(!res.ok) throw new Error('submit failed ' + res.status);
     // Confirmation matches whether the submitted ZIP is covered: a covered ZIP means the
     // area is live (we'll alert them about new items); an uncovered ZIP is a waitlist capture.
-    // Coverage uses the same findCommunityByZip source as the search; logic unchanged.
-    const covered = findCommunityByZip(extractZip(zip) || '');
+    // Coverage uses the same DB-backed source as the search (resolveCoverageUrl).
+    const covered = await resolveCoverageUrl(extractZip(zip) || '');
     const confirmText = covered
       ? "Thanks — you're set. We'll email you when there's something new in your area."
       : "Thanks — we'll email you the moment HomeSignal covers your area.";
@@ -347,7 +351,23 @@ async function submitCommunityRequest(){
 }
 
 function extractZip(query){ const m=(query||'').match(/\b\d{5}\b/); return m?m[0]:null; }
+// Legacy bespoke-page lookup: returns box-elder.html / eagle-mountain.html for the
+// two launch communities, or null. NOT the coverage source — see resolveCoverageUrl.
 function findCommunityByZip(zip){ for(const c of COMMUNITIES){ if(c.zips.includes(zip)) return c.page; } return null; }
+// Coverage is decided by the `communities` table (source of truth). Returns the URL to
+// navigate to for a covered ZIP, or null if not covered. A ZIP with a bespoke launch
+// page routes there (SEO); any other covered ZIP routes to the dynamic community.html.
+async function resolveCoverageUrl(zip){
+  if(!zip) return null;
+  const legacy = findCommunityByZip(zip);
+  if(legacy) return legacy + '?zip=' + encodeURIComponent(zip);
+  try{
+    const res = await fetch(SUPABASE_URL + '/rest/v1/communities?select=id&limit=1&zip_codes=cs.{' + encodeURIComponent(zip) + '}',
+      { headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer ' + SUPABASE_ANON_KEY } });
+    if(res.ok){ const rows = await res.json(); if(Array.isArray(rows) && rows.length) return 'community.html?zip=' + encodeURIComponent(zip); }
+  }catch(e){ /* network/RLS failure -> treat as not-covered (waitlist), never a broken link */ }
+  return null;
+}
 // ----- Community request modal (opens only on a not-covered ZIP search) -----
 var REQUEST_FORM_HTML = null;     // captured template so the modal is reusable
 var requestTriggerInput = null;   // search box to return focus to on close
@@ -381,11 +401,11 @@ function closeRequestModal(){
   document.body.style.overflow = '';
   if(requestTriggerInput){ try { requestTriggerInput.focus(); } catch(e){} } // return focus to the search box
 }
-function runZip(input, msg){
+async function runZip(input, msg){
   const zip = extractZip(input ? input.value : '');
   if(!zip){ if(msg) msg.textContent = 'Please enter your 5-digit ZIP code.'; if(input) input.focus(); return; }
-  const page = findCommunityByZip(zip);
-  if(page){ window.location.href = page + '?zip=' + encodeURIComponent(zip); return; }
+  const url = await resolveCoverageUrl(zip);
+  if(url){ window.location.href = url; return; }
   // Not covered -> open the request modal (it carries the message); prefill ZIP + focus email.
   openRequestModal(zip, input);
 }

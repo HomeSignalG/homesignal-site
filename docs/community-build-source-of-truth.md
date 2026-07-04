@@ -145,8 +145,10 @@ the DB, not `communities.js`.**
   exist). Populate it with **verbatim canonical labels** matching the ingest feeds.
 - **Universal topics are shared** (News / Emerging Tech / Global Best Practices —
   `topics.js::UNIVERSAL_TOPICS`); never configured per community.
-- **There is no `slug` column yet** (verified) — that's why `?community=<slug>` still
-  needs a `communities.js` entry. See §6.
+- **`slug` is a column** (`text`, case-insensitive unique; see
+  `docs/communities-slug-migration.sql`) — so `?community=<slug>` resolves against the
+  DB. `communities.js` is only a fallback for rows not yet backfilled. Set `slug` on
+  every new row (kebab-case of the name). See §6.
 
 ---
 
@@ -179,14 +181,15 @@ Cloning gave each community an indexable URL with its own `<title>`/`canonical`/
 (real acquisition value). A `?id=<uuid>` query-string URL ranks poorly. **The correct
 way to get both scale and SEO is NOT to clone 100 HTML files** — it's to make slugs
 pure data and give the dynamic page real per-community metadata:
-1. Add a **`slug` column** to `communities` (§6) so `?community=<slug>` needs no JS entry.
+1. ✅ **`slug` column on `communities`** — done (§6); `?community=<slug>` needs no JS entry.
 2. Serve a **clean per-community path** (e.g. `/c/<slug>`) that maps to `community.html`,
-   and set the page's `<title>`/`canonical`/`og:*` **dynamically from the DB row**.
+   and set the page's `<title>`/`canonical`/`og:*` **dynamically from the DB row**. (Still
+   to do — the SEO polish.)
 3. Add each live community as one `<url>` line in `sitemap.xml`.
 
 That is a **one-time engineering investment** (not per-community work) that preserves
-the zero-touch model. Until it's done, `?id=`/`?zip=` already make every new row live;
-SEO polish is a follow-up, never a reason to clone.
+the zero-touch model. `?id=`/`?zip=`/`?community=<slug>` already make every new row live;
+the remaining metadata polish is a follow-up, never a reason to clone.
 
 ---
 
@@ -196,14 +199,15 @@ Before editing `community.html`, confirm these still hold (grep, don't trust lin
 numbers — they rot). Verified on this branch:
 
 - **Resolution** — `resolveCommunity()` (`community.html:1036`): reads URL params
-  `id`, `community`/`slug`, `zip`; maps slug→id via `HS.getCommunity` (communities.js,
-  because the DB has no `slug`); then queries Supabase:
+  `id`, `community`/`slug`, `zip` and queries Supabase (DB is source of truth):
   - `?id=<uuid>` → `communities?id=eq.<id>&select=*`
+  - `?community=<slug>` → `communities?slug=eq.<slug>&select=*` (falls back to the
+    `communities.js` slug→id map only if the DB has no slug match)
   - `?zip=<zip>` → `communities?zip_codes=cs.{<zip>}&select=*` (array containment)
   - defaults to **Box Elder** (`COMMUNITY_ID` seed at `community.html:516`) if nothing
     resolves.
-- **Government tile** — `applyCommunity()` (`community.html:1055`) sets
-  `cats.meetings.items = COMMUNITY.government_topics` (`1061-1062`). **This is why the
+- **Government tile** — `applyCommunity()` (`community.html:1064`) sets
+  `cats.meetings.items = COMMUNITY.government_topics` (`1071`). **This is why the
   DB `government_topics` must be canonical** — the tile renders the array verbatim.
 - **Content reads** — alerts: `alerts?community_id=eq.<id>` (`community.html:526`);
   meetings: `meetings?community_id=eq.<id>&meeting_date=gte.…` (`community.html:933`).
@@ -218,23 +222,21 @@ change**. That is the pure-data path.
 
 ## 6. Known scaling gaps + the fix (so they don't block true zero-touch)
 
-These don't block the DB-row path, but they block *fully* hands-off onboarding. Fix
-opportunistically; each is a one-time job, not per-community work.
+Two of the three original gaps are now closed; the third is fallback hygiene.
 
-1. **`index.html` has its own hardcoded `COMMUNITIES` array** (`index.html:296-350`),
-   separate from `communities.js`, and `findCommunityByZip` (`index.html:350`) routes
-   the **homepage ZIP search to the legacy per-community pages** (`box-elder.html` /
-   `eagle-mountain.html`), not `community.html`. So a ZIP typed on the homepage for a
-   new community **won't route** until this is updated. **Fix:** have the homepage
-   search query the `communities` table (or at least `communities.js`) and route to
-   `community.html?zip=…`. Highest-value gap — it's the front door.
-2. **No `slug` column on `communities`** (verified) → `?community=<slug>` depends on a
-   `communities.js` entry. **Fix:** add a `slug text unique` column (+ index), backfill,
-   and change `resolveCommunity` to query the DB by slug. Removes the last bootstrap
-   dependency and makes pretty URLs pure data. Write the DDL into `docs/*.sql` (source #3).
-3. **`communities.js` drifts from the DB** (§2). **Fix:** treat it strictly as a thin
-   fallback — or generate it from the DB — and never hand-edit topics/ZIPs into it as if
-   it were truth.
+1. ✅ **`index.html` homepage ZIP search now queries `communities`** (source of truth)
+   via `resolveCoverageUrl`: a covered ZIP routes to its bespoke launch page if one
+   exists (Box Elder / Eagle Mountain — SEO), else to `community.html?zip=…`; on a DB/RLS
+   error it degrades to the waitlist modal (never a broken link). The inline `COMMUNITIES`
+   array is now **only** the legacy bespoke-page map, not the coverage source. New
+   communities route from the homepage with no repo change.
+2. ✅ **`communities` has a `slug` column** (`docs/communities-slug-migration.sql`;
+   `text`, case-insensitive unique, backfilled for the two live rows) and
+   `resolveCommunity` queries the DB by slug — `communities.js` is fallback-only. Pretty
+   URLs are now pure data. **Set `slug` on every new row.**
+3. ⚠️ **`communities.js` drifts from the DB** (§2). **Fix (open):** treat it strictly as
+   a thin fallback — or generate it from the DB — and never hand-edit topics/ZIPs into it
+   as if it were truth. Not a runtime bug (the DB wins), just hygiene.
 
 ---
 
@@ -246,12 +248,13 @@ Standing authority: do this end-to-end without pausing (Step 0 already cleared p
    `qwnnmljucajnexpxdgxr`). Idempotent form — **use verbatim canonical topic labels**
    (they must equal the ingest `CANONICAL_TOPICS` word-for-word; `[]` is a valid start):
    ```sql
-   insert into public.communities (name, county, state, zip_codes, level, government_topics)
+   insert into public.communities (name, county, state, zip_codes, level, government_topics, slug)
    values (
      'Tremonton, Utah', 'Box Elder', 'Utah',
      array['84337'],                 -- every ZIP the community covers
      'city',                         -- county | city | zip | neighborhood
-     array[]::text[]                 -- fill once feeds exist (step 3); [] is valid
+     array[]::text[],                -- fill once feeds exist (step 3); [] is valid
+     'tremonton'                     -- kebab-case slug -> enables ?community=<slug> as pure data
    )
    on conflict do nothing;
    ```
@@ -268,10 +271,11 @@ Standing authority: do this end-to-end without pausing (Step 0 already cleared p
    Universal-topic content flows automatically. *If that repo isn't in the session, add
    it and do it there; if you can't, state explicitly that Government Notices stay empty
    until feeds are configured — don't leave it implied.*
-4. **(Optional — only for a pretty URL today)** add a bootstrap entry to `communities.js`
-   (`slug`, `id`, `name`, `page: 'community.html'`, `zips`, `governmentTopics`) so
-   `?community=<slug>` works. **Point `page` at `community.html`, never a per-community
-   file.** Not required for the community to be live.
+4. **(Optional)** the `slug` from step 1 already makes `?community=<slug>` work from the
+   DB. Add a `communities.js` bootstrap entry (`slug`, `id`, `name`,
+   `page: 'community.html'`, `zips`, `governmentTopics`) only if you want the dashboard
+   registry / offline fallback to know it too. **Point `page` at `community.html`, never
+   a per-community file.** Not required for the community to be live.
 
 **Do NOT** create a new `<community>.html`, and **do NOT** edit the frozen
 `box-elder.html` / `eagle-mountain.html`.
@@ -313,7 +317,7 @@ asking.** (Only §10 warrants a pause.)
 | Is a new row immediately live? | **Yes**, at `?id=`/`?zip=` — no repo change, no deploy. (§5) |
 | Empty government tile on a fresh community? | **Expected** until ingest feeds exist (Step 3). `government_topics` may start `[]`. |
 | Global Best Practices / Emerging tiles empty? | **Already solved, one-time** — those tiers are community-agnostic on both pages (Eagle Mountain build). Zero per-community work. |
-| Homepage ZIP search doesn't find the new community? | Known gap (§6.1) — the homepage uses its own hardcoded array + legacy pages. Fix it to query the DB; don't clone a page to work around it. |
+| Homepage ZIP search doesn't find the new community? | **Fixed (§6.1)** — the homepage now queries `communities` and routes covered ZIPs to `community.html?zip=…` (or a bespoke launch page if one exists). A new row is found with no repo change. |
 | Add to `sitemap.xml`? | Yes — one `<url>` line per live community (cheap, SEO). |
 | Open a PR? | Only if asked. Data changes (the DB row) go live via Supabase, **not** a repo push. |
 
@@ -355,7 +359,7 @@ Everything else above is pre-approved. Pause only for:
 ### Provenance
 Every schema/behavior claim here was verified against the live DB
 (`qwnnmljucajnexpxdgxr`) and the code on the authoring branch: `community.html`
-resolution (`1036`, `1051`, `1055`, `1061-1062`), content reads (`526`, `933`),
-sign-up RPC (`782`); `index.html` homepage registry (`296-350`); `communities.js`;
+resolution (`1036`), government tile (`1064`, `1071`), content reads (`526`, `933`),
+sign-up RPC (`782`); `index.html` homepage routing (`resolveCoverageUrl`/`runZip`);
 `topics.js`; and the `communities`/`alerts` schema + RLS state. Re-verify before relying
 on any line number — the anchors rot; the DB and code are the truth.
