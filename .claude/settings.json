@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "allow": [
+      "mcp__github",
+      "mcp__Supabase",
+      "mcp__Shopify",
+      "mcp__Zapier",
+      "mcp__Claude_Code_Remote",
+      "mcp__Supabase__execute_sql",
+      "mcp__Supabase__apply_migration",
+      "mcp__Supabase__list_projects",
+      "mcp__Supabase__list_tables",
+      "mcp__Supabase__get_project",
+      "mcp__Supabase__get_project_url",
+      "mcp__Supabase__get_publishable_keys",
+      "mcp__github__get_file_contents",
+      "mcp__github__create_pull_request",
+      "mcp__github__pull_request_read",
+      "mcp__Claude_Code_Remote__add_repo",
+      "mcp__Claude_Code_Remote__register_repo_root"
+    ]
+  }
+}
