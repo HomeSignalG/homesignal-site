@@ -678,10 +678,15 @@ async function loadAlerts() {
   // the fresh Global best practices / Emerging technology items out of view. The
   // filters mirror how renderAlerts/alertCatId classify a row into a tier.
   const base = `${SUPABASE_URL}/rest/v1/alerts?community_id=eq.${COMMUNITY_ID}`;
+  // Global best practices + Emerging technology are community-agnostic (the same
+  // worldwide sources serve every community), so they query WITHOUT the community_id
+  // scope — otherwise a non-Box-Elder community shows empty tiles. Mirrors
+  // digest.py's GLOBAL_TIER_CATEGORIES. Government notices + Local News stay scoped.
+  const agnosticBase = `${SUPABASE_URL}/rest/v1/alerts?select=*`;
   const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
   const PER_TIER = 10;
-  const fetchTier = (filter, lim) =>
-    fetch(`${base}${filter ? '&' + filter : ''}&order=created_at.desc&limit=${lim}`, { headers })
+  const fetchTier = (filter, lim, baseUrl = base) =>
+    fetch(`${baseUrl}${filter ? '&' + filter : ''}&order=created_at.desc&limit=${lim}`, { headers })
       .then(r => r.ok ? r.json() : [])
       .catch(() => []);
   try {
@@ -689,8 +694,8 @@ async function loadAlerts() {
     // own tier directly; News is the catch-all (newest items not in those three tiers).
     const [gov, emerging, global, recent] = await Promise.all([
       fetchTier('pipeline_type=eq.government_notice', PER_TIER),
-      fetchTier('category=eq.emerging_technology', PER_TIER),
-      fetchTier('category=eq.global_best_practices&or=(quality_grade.is.null,quality_grade.in.(BEST,MEDIUM))', PER_TIER),
+      fetchTier('category=eq.emerging_technology', PER_TIER, agnosticBase),
+      fetchTier('category=eq.global_best_practices&or=(quality_grade.is.null,quality_grade.in.(BEST,MEDIUM))', PER_TIER, agnosticBase),
       fetchTier('', PER_TIER * 3)
     ]);
     const news = recent.filter(a => alertCatId(a.pipeline_type, a.category) === 'news').slice(0, PER_TIER);
