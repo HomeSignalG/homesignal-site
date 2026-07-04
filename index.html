@@ -354,19 +354,31 @@ function extractZip(query){ const m=(query||'').match(/\b\d{5}\b/); return m?m[0
 // Legacy bespoke-page lookup: returns box-elder.html / eagle-mountain.html for the
 // two launch communities, or null. NOT the coverage source — see resolveCoverageUrl.
 function findCommunityByZip(zip){ for(const c of COMMUNITIES){ if(c.zips.includes(zip)) return c.page; } return null; }
-// Coverage is decided by the `communities` table (source of truth). Returns the URL to
-// navigate to for a covered ZIP, or null if not covered. A ZIP with a bespoke launch
-// page routes there (SEO); any other covered ZIP routes to the dynamic community.html.
+// Coverage + routing decided by the `communities` table (source of truth): resolve the
+// ZIP to the MOST-SPECIFIC community that contains it (a town wins over its county), then
+// route there. A community with a bespoke launch page (Box Elder / Eagle Mountain — SEO)
+// routes to that page; every other covered community routes to the dynamic community.html
+// (which re-resolves most-specific and scopes the town to its county). Falls back to the
+// in-page legacy map only if the DB is unreachable. Returns null if not covered.
+const LEGACY_PAGE = { 'box-elder': 'box-elder.html', 'eagle-mountain': 'eagle-mountain.html' };
+const LEVEL_RANK = { neighborhood: 4, zip: 3, city: 2, county: 1 };
 async function resolveCoverageUrl(zip){
   if(!zip) return null;
-  const legacy = findCommunityByZip(zip);
-  if(legacy) return legacy + '?zip=' + encodeURIComponent(zip);
   try{
-    const res = await fetch(SUPABASE_URL + '/rest/v1/communities?select=id&limit=1&zip_codes=cs.{' + encodeURIComponent(zip) + '}',
+    const res = await fetch(SUPABASE_URL + '/rest/v1/communities?select=slug,level,zip_codes&zip_codes=cs.{' + encodeURIComponent(zip) + '}',
       { headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer ' + SUPABASE_ANON_KEY } });
-    if(res.ok){ const rows = await res.json(); if(Array.isArray(rows) && rows.length) return 'community.html?zip=' + encodeURIComponent(zip); }
-  }catch(e){ /* network/RLS failure -> treat as not-covered (waitlist), never a broken link */ }
-  return null;
+    if(res.ok){
+      const rows = await res.json();
+      if(Array.isArray(rows) && rows.length){
+        rows.sort((a,b) => (LEVEL_RANK[b.level]||0)-(LEVEL_RANK[a.level]||0) || (a.zip_codes||[]).length-(b.zip_codes||[]).length);
+        const m = rows[0];
+        if(m.slug && LEGACY_PAGE[m.slug]) return LEGACY_PAGE[m.slug] + '?zip=' + encodeURIComponent(zip);
+        return 'community.html?zip=' + encodeURIComponent(zip);
+      }
+    }
+  }catch(e){ /* fall through to the offline legacy map */ }
+  const legacy = findCommunityByZip(zip);
+  return legacy ? (legacy + '?zip=' + encodeURIComponent(zip)) : null;
 }
 // ----- Community request modal (opens only on a not-covered ZIP search) -----
 var REQUEST_FORM_HTML = null;     // captured template so the modal is reusable
