@@ -358,8 +358,10 @@ function findCommunityByZip(zip){ for(const c of COMMUNITIES){ if(c.zips.include
 // ZIP to the MOST-SPECIFIC community that contains it (a town wins over its county), then
 // route there. A community with a bespoke launch page (Box Elder / Eagle Mountain — SEO)
 // routes to that page; every other covered community routes to the dynamic community.html
-// (which re-resolves most-specific and scopes the town to its county). Falls back to the
-// in-page legacy map only if the DB is unreachable. Returns null if not covered.
+// (which re-resolves most-specific and scopes the town to its county). Each DB answer is
+// cached per-ZIP (localStorage), so a brief Supabase outage still routes correctly from
+// DB-derived data — the hardcoded `COMMUNITIES` map is only an absolute last resort for a
+// never-searched ZIP while offline. Adding a community needs NO homepage edit. Null = not covered.
 const LEGACY_PAGE = { 'box-elder': 'box-elder.html', 'eagle-mountain': 'eagle-mountain.html' };
 const LEVEL_RANK = { neighborhood: 4, zip: 3, city: 2, county: 1 };
 async function resolveCoverageUrl(zip){
@@ -372,11 +374,13 @@ async function resolveCoverageUrl(zip){
       if(Array.isArray(rows) && rows.length){
         rows.sort((a,b) => (LEVEL_RANK[b.level]||0)-(LEVEL_RANK[a.level]||0) || (a.zip_codes||[]).length-(b.zip_codes||[]).length);
         const m = rows[0];
-        if(m.slug && LEGACY_PAGE[m.slug]) return LEGACY_PAGE[m.slug] + '?zip=' + encodeURIComponent(zip);
-        return 'community.html?zip=' + encodeURIComponent(zip);
+        const url = (m.slug && LEGACY_PAGE[m.slug]) ? (LEGACY_PAGE[m.slug] + '?zip=' + encodeURIComponent(zip)) : ('community.html?zip=' + encodeURIComponent(zip));
+        try{ localStorage.setItem('hs_cov_' + zip, url); }catch(e){}
+        return url;
       }
     }
-  }catch(e){ /* fall through to the offline legacy map */ }
+  }catch(e){ /* DB unreachable -> use the last DB-resolved answer for this ZIP, then the frozen map */ }
+  try{ const cached = localStorage.getItem('hs_cov_' + zip); if(cached) return cached; }catch(e){}
   const legacy = findCommunityByZip(zip);
   return legacy ? (legacy + '?zip=' + encodeURIComponent(zip)) : null;
 }
