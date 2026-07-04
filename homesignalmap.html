@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: https://*.tile.openstreetmap.org https://tile.openstreetmap.org; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<title>Development around your home — HomeSignal</title>
+<meta name="description" content="See what's built and what's proposed near your home — EPA-registered facilities, planning hearings and open comment windows, each linked to its official public record.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://homesignal.net/homesignalmap.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://homesignal.net/homesignalmap.html">
+<meta property="og:title" content="Development around your home — HomeSignal">
+<meta property="og:description" content="What's built and what's proposed near your home, every item linked to its official public record.">
+<meta property="og:image" content="https://homesignal.net/og-default.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://homesignal.net/og-default.png">
+<!-- Leaflet (2D map) from jsDelivr — the one CDN the site's CSP already trusts. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" defer></script>
+<style>
+:root{
+  --green:#1f5130; --green-dark:#0f6e56;
+  --text:#1c1c1a; --text-secondary:#5f5e5a; --text-tertiary:#6f6e69;
+  --border:rgba(0,0,0,.12); --bg:#ffffff; --bg-secondary:#f4f4f5; --bg-page:#f3f4f6;
+  --built:#1f5130; --proposed:#b4690e; --datacenter:#5b3fb4;
+  --radius-sm:8px; --radius:14px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font);color:var(--text);background:var(--bg-page);line-height:1.5}
+a{color:var(--green-dark)}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--bg);border-bottom:1px solid var(--border)}
+header .brand{font-weight:700;color:var(--green);text-decoration:none;font-size:18px}
+header nav a{margin-left:18px;color:var(--text-secondary);text-decoration:none;font-size:14px}
+main{max-width:1080px;margin:0 auto;padding:24px 20px 60px}
+.hero h1{font-size:26px;margin:6px 0 4px}
+.hero p{color:var(--text-secondary);margin:0 0 18px;max-width:70ch}
+.place{color:var(--green);font-weight:600}
+.addr{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 22px}
+.addr input{flex:1;min-width:240px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:15px;background:var(--bg)}
+.addr button{padding:12px 18px;border:0;border-radius:var(--radius-sm);background:var(--green);color:#fff;font-weight:600;font-size:15px;cursor:pointer}
+.addr .hint{flex-basis:100%;color:var(--text-tertiary);font-size:12.5px;margin-top:2px}
+.counts{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:0 0 20px}
+.tile{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.tile .n{font-size:28px;font-weight:700;line-height:1.1}
+.tile .l{font-size:12.5px;color:var(--text-secondary);margin-top:2px}
+#map{height:440px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-secondary);z-index:0;overflow:hidden}
+#mapInner{height:100%;width:100%}
+.status{margin:14px 2px;color:var(--text-secondary);font-size:14px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:22px}
+.cols h2{font-size:15px;margin:0 0 10px;color:var(--text)}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:520px;overflow:auto}
+.item{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px}
+.item .t{font-size:13.5px;font-weight:600;margin-bottom:2px}
+.item .m{font-size:12px;color:var(--text-tertiary);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:99px;color:#fff}
+.b-built{background:var(--built)} .b-proposed{background:var(--proposed)} .b-datacenter{background:var(--datacenter)}
+.viol{background:#a11;color:#fff;border-radius:99px;padding:1px 7px;font-size:11px;font-weight:600;text-decoration:none}
+.empty{background:var(--bg);border:1px dashed var(--border);border-radius:var(--radius-sm);padding:14px;color:var(--text-tertiary);font-size:13px}
+footer{border-top:1px solid var(--border);background:var(--bg);margin-top:40px}
+.legal{max-width:1080px;margin:0 auto;padding:20px;color:var(--text-tertiary);font-size:12px}
+.legal strong{color:var(--text-secondary)}
+@media(max-width:760px){.counts{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="/">HomeSignal</a>
+  <nav><a href="how-it-works.html">How it works</a><a href="about.html">About</a></nav>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Development around <span class="place" id="placeName">your home</span></h1>
+    <p>What's already built and what's being proposed nearby — EPA-registered facilities,
+       planning hearings and open comment windows. Every item links to its official public
+       record. Type your address for the exact one-mile view around your home.</p>
+  </div>
+
+  <form class="addr" id="addrForm" autocomplete="off">
+    <input id="addrInput" type="text" name="address" placeholder="Enter your street address (e.g. 100 N Main St, Brigham City, UT)" aria-label="Your address">
+    <button type="submit">See my 1-mile view</button>
+    <span class="hint">Address search is live and precise. The map below starts on the ZIP as a whole — your home pin appears only when you search.</span>
+  </form>
+
+  <div class="counts">
+    <div class="tile"><div class="n" id="cFac">0</div><div class="l">EPA-registered facilities</div></div>
+    <div class="tile"><div class="n" id="cApproved">0</div><div class="l">Approved</div></div>
+    <div class="tile"><div class="n" id="cProposed">0</div><div class="l">Proposed</div></div>
+    <div class="tile"><div class="n" id="cComment">0</div><div class="l">Open comment windows</div></div>
+  </div>
+
+  <div id="map"><div id="mapInner"></div></div>
+  <div class="status" id="status">Loading…</div>
+
+  <div class="cols">
+    <div>
+      <h2>Registered facilities <span id="facCount" style="color:var(--text-tertiary);font-weight:400"></span></h2>
+      <ul class="list" id="facList"></ul>
+    </div>
+    <div>
+      <h2>Planning &amp; public notices <span id="devCount" style="color:var(--text-tertiary);font-weight:400"></span></h2>
+      <ul class="list" id="devList"></ul>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="legal">
+    <strong>Sources.</strong> Facilities and any violation counts are drawn from the U.S.
+    EPA Facility Registry Service (FRS) and Enforcement &amp; Compliance History Online
+    (ECHO); planning items are drawn from county, city and Utah Public Meeting Notice
+    records. Each item links to its official public record. A violation figure is a
+    <strong>factual count taken from the public EPA ECHO record — not a verdict on any
+    operator</strong>. Nothing here is legal advice or an allegation of wrongdoing.
+    HomeSignal renders public records; it does not generate claims about any facility.
+  </div>
+</footer>
+
+<script src="share.js" defer></script>
+<script>
+// ── Supabase config (read by scripts/verify-development.mjs via `var NAME = "…"`). ──
+var ENDPOINT = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/get-address-report';
+var APIKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
+var SUPABASE_URL = ENDPOINT.replace(/\/functions\/v1\/.*$/, '');
+
+(function(){
+  var map, layer, homeMarker;
+
+  function qzip(){
+    var u = new URL(window.location.href);
+    var z = u.searchParams.get('zip');
+    if (z) return z.trim();
+    var m = u.pathname.match(/\/development\/(\d{5})\b/);   // pretty route /development/<zip>
+    return m ? m[1] : null;
+  }
+  function el(id){ return document.getElementById(id); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function sourced(s){ return s && ((s.url && s.url.trim()) || (s.record_url && s.record_url.trim())); }
+  function srcUrl(s){ return (s.record_url && s.record_url.trim()) || (s.url && s.url.trim()) || ''; }
+
+  function ensureMap(){
+    if (map || typeof L === 'undefined') return map;
+    // Map lives in an inner div so Leaflet's `.leaflet-container` class is a DESCENDANT of
+    // #map (what scripts/verify-development.mjs looks for), present the moment the map inits
+    // — even for an empty ZIP with no markers.
+    map = L.map('mapInner', { scrollWheelZoom:false }).setView([39.5, -111.5], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18, attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+    layer = L.layerGroup().addTo(map);
+    return map;
+  }
+
+  function layerColor(s){
+    if (s.layer === 'datacenter') return '#5b3fb4';
+    if (s.type === 'built') return '#1f5130';
+    return '#b4690e';
+  }
+  function typeBadge(s){
+    if (s.layer === 'datacenter') return '<span class="badge b-datacenter">data center</span>';
+    if (s.type === 'built') return '<span class="badge b-built">built</span>';
+    if (s.type === 'approved') return '<span class="badge b-built">approved</span>';
+    return '<span class="badge b-proposed">proposed</span>';
+  }
+
+  // Central render — the page shows ONLY what the engine returned, sourced sites only.
+  function render(report, mode){
+    var home = report.home || { lat: report.home_lat, lng: report.home_lng };
+    var counts = report.counts || {};
+    var all = Array.isArray(report.sites) ? report.sites : [];
+    var sites = all.filter(sourced);          // anti-fabrication gate: no source → not rendered
+    window.__HS_SITES = sites;                // exposed for scripts/verify-development.mjs
+
+    var points = sites.filter(function(s){ return s.scope === 'point'; });
+    var areas  = sites.filter(function(s){ return s.scope !== 'point'; });
+    var now = Date.now();
+    var approved = sites.filter(function(s){ return s.type === 'approved'; }).length;
+    var proposed = sites.filter(function(s){ return s.type === 'proposed'; }).length;
+    var openComment = sites.filter(function(s){
+      return s.comment_deadline && !isNaN(Date.parse(s.comment_deadline)) && Date.parse(s.comment_deadline) >= now;
+    }).length;
+
+    el('cFac').textContent = (counts.facilities != null ? counts.facilities : points.length);
+    el('cApproved').textContent = approved;
+    el('cProposed').textContent = proposed;
+    el('cComment').textContent = openComment;
+    el('facCount').textContent = points.length ? '(' + points.length + ')' : '';
+    el('devCount').textContent = areas.length ? '(' + areas.length + ')' : '';
+
+    ensureMap();
+    if (map){
+      if (layer) layer.clearLayers();
+      if (homeMarker){ map.removeLayer(homeMarker); homeMarker = null; }
+      if (home && isFinite(home.lat) && isFinite(home.lng)){
+        map.setView([home.lat, home.lng], mode === 'address' ? 14 : 12);
+        // A ZIP centroid is a page anchor, NOT a home pin. Only address mode drops a pin.
+        if (mode === 'address'){
+          homeMarker = L.circleMarker([home.lat, home.lng], {
+            radius: 9, color:'#0f6e56', weight:3, fillColor:'#0f6e56', fillOpacity:0.9
+          }).addTo(map).bindPopup('This address');
+        }
+      }
+      points.forEach(function(s){
+        if (!isFinite(s.lat) || !isFinite(s.lng)) return;
+        var url = srcUrl(s);
+        L.circleMarker([s.lat, s.lng], {
+          radius: 7, color: layerColor(s), weight: 2, fillColor: layerColor(s), fillOpacity: 0.75
+        }).addTo(layer).bindPopup(
+          '<strong>' + esc(s.label) + '</strong><br>' + esc(s.src || '') +
+          '<br><a href="' + esc(url) + '" target="_blank" rel="noopener">Official record ↗</a>'
+        );
+      });
+    }
+
+    // Facilities list (points)
+    var fl = el('facList'); fl.innerHTML = '';
+    if (!points.length){
+      fl.innerHTML = '<li class="empty">No EPA-registered industrial facility mapped for this area.</li>';
+    } else {
+      points.forEach(function(s){
+        var url = srcUrl(s);
+        var viol = (s.viol && s.violUrl) ? ' <a class="viol" href="' + esc(s.violUrl) + '" target="_blank" rel="noopener">' + esc(s.viol) + ' viol.</a>' : '';
+        var li = document.createElement('li'); li.className = 'item';
+        li.innerHTML = '<div class="t">' + esc(s.label) + '</div>' +
+          '<div class="m">' + typeBadge(s) + '<span>' + esc(s.src || '') + '</span>' + viol +
+          ' <a href="' + esc(url) + '" target="_blank" rel="noopener">record ↗</a></div>';
+        fl.appendChild(li);
+      });
+    }
+
+    // Planning / notices list (areas)
+    var dl = el('devList'); dl.innerHTML = '';
+    if (!areas.length){
+      dl.innerHTML = '<li class="empty">No planning notices in the jurisdiction feed right now.</li>';
+    } else {
+      areas.forEach(function(s){
+        var url = srcUrl(s);
+        var when = s.meeting_date && !isNaN(Date.parse(s.meeting_date))
+          ? new Date(s.meeting_date).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) : '';
+        var li = document.createElement('li'); li.className = 'item';
+        li.innerHTML = '<div class="t">' + esc(s.label) + '</div>' +
+          '<div class="m">' + typeBadge(s) + '<span>' + esc(s.src || '') + '</span>' +
+          (when ? '<span>' + esc(when) + '</span>' : '') +
+          ' <a href="' + esc(url) + '" target="_blank" rel="noopener">notice ↗</a></div>';
+        dl.appendChild(li);
+      });
+    }
+
+    var n = sites.length;
+    el('status').textContent = mode === 'address'
+      ? (n ? n + ' record(s) within about a mile of this address.' : 'No sourced records within about a mile of this address.')
+      : (n ? n + ' public record(s) in this ZIP — all linked to their official source.'
+           : 'No public records cached for this ZIP yet. Try your address above for the live 1-mile view.');
+  }
+
+  // ZIP mode: read the cached report (never a live pull) and render the aggregate.
+  function loadZip(zip){
+    el('placeName').textContent = 'ZIP ' + zip;
+    document.title = 'Development around ' + zip + ' — HomeSignal';
+    var url = SUPABASE_URL + '/rest/v1/development_reports?zip=eq.' + encodeURIComponent(zip) +
+              '&select=zip,home_lat,home_lng,counts,sites,paywall&limit=1';
+    fetch(url, { headers: { apikey: APIKEY, Authorization: 'Bearer ' + APIKEY } })
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(rows){
+        if (rows && rows.length){ render(rows[0], 'zip'); }
+        else {
+          // No cached row → still a valid, empty page (centroid unknown here → show search).
+          window.__HS_SITES = [];
+          ensureMap();
+          el('status').textContent = 'No cached report for ZIP ' + zip + ' yet. Enter your address for the live view.';
+        }
+      })
+      .catch(function(){
+        window.__HS_SITES = [];
+        ensureMap();
+        el('status').textContent = 'Could not load this ZIP report. Enter your address for the live view.';
+      });
+  }
+
+  // Address mode: LIVE, precise, 1-mile — the conversion moment. Unchanged engine contract.
+  function runAddress(address){
+    el('status').textContent = 'Searching ' + address + '…';
+    fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: APIKEY },
+      body: JSON.stringify({ address: address, radius_mi: 1 })
+    })
+      .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+      .then(function(res){
+        if (!res.ok){ el('status').textContent = (res.j && res.j.error) ? res.j.error : 'Address not found.'; return; }
+        el('placeName').textContent = res.j.address || address;
+        render(res.j, 'address');
+      })
+      .catch(function(){ el('status').textContent = 'Network error — please try again.'; });
+  }
+
+  function boot(){
+    ensureMap();
+    var zip = qzip();
+    if (zip) loadZip(zip);
+    else { window.__HS_SITES = []; el('status').textContent = 'Enter your address above to see development around your home.'; }
+    var form = el('addrForm');
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var a = el('addrInput').value.trim();
+      if (a) runAddress(a);
+    });
+  }
+
+  // Leaflet is deferred; wait for it (and the DOM) before booting.
+  function whenReady(){
+    if (document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', whenReady); return; }
+    if (typeof L === 'undefined'){ setTimeout(whenReady, 60); return; }
+    boot();
+  }
+  whenReady();
+})();
+</script>
+</body>
+</html>
