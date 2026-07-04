@@ -665,8 +665,52 @@ DB-verified this session; versioned in `docs/salt-lake-county-communities-seed.s
   subscribable value on day one.
 
 **Same caveat as Box Elder:** verified by **data + deployed code + resolution probe**, not an
-in-sandbox browser signup (egress blocked). Confirm on the real site
-(`homesignal.net/community.html?zip=84101` → pick a topic → sign up).
+in-sandbox browser signup (egress blocked). The live-signup gap is now closed **automatically
+in CI** (see §14).
+
+---
+
+## 14. Automating the two decoupled halves (so a build finishes with no human step)
+
+Two things a **site-only build sandbox** cannot finish itself. Here is how each runs
+automatically going forward, so "add a community" needs no manual follow-up:
+
+### 14.1 Live end-to-end verification — BUILT, runs in CI (no egress problem)
+The sandbox can't reach Supabase / `homesignal.net`, so it can only verify by data + code.
+`.github/workflows/verify-communities.yml` + `scripts/verify-communities.mjs` close that gap
+by running where egress works (a GitHub-hosted runner):
+- **Zero-touch:** it reads the **live `communities` table** (public anon key, extracted from
+  `community.html` so the key is never forked), so every newly-added community is covered
+  with **no code change** — consistent with §0's data-not-code model.
+- **What it asserts, per covered ZIP:** `community.html?zip=<zip>` resolves to the
+  **most-specific** community the DB says contains it (mirrors `LEVEL_RANK`, verified against
+  `community.html:1065/1089`) **and** the page renders a subscribable topic set. Mismatch or a
+  broken page fails the run and is listed in the job summary.
+- **Triggers:** daily `schedule`, `workflow_dispatch` (optional `county` scope), and `push` to
+  `main` touching `community.html` / a `*-communities-seed.sql` / the script. So after any
+  deploy or data change the live pages are re-checked without anyone loading a browser.
+
+This is the standing answer to every "⚠️ not eyeballed live" caveat above: it now **is**,
+automatically, on the real site.
+
+### 14.2 Government feeds — the INGEST-side lever (semi-automatic, needs a source registry)
+Government Notices / Meetings tiles stay empty until feeds are wired in `homesignal-ingest`
+(§8). That is **not** a site job and cannot be fully "automatic" because each place's
+meeting-notice **source URL must be discovered + verified once** (§13.2). The automation lever
+that makes it repeatable rather than per-community hand-work:
+- **A feed generator in `homesignal-ingest`** that, given the live `communities` rows for a
+  county, emits `feeds.csv` rows keyed by `community_id` with `category` = the canonical topic
+  labels (word-for-word, §8) — so adding communities to the DB is the only manual input.
+- **A per-state source registry** it reads. For **Utah** the natural one is the state **Public
+  Meeting Notices (PMN)** portal, which has per-body entities (§13.1) — map county/city →
+  PMN body → feed URL once, then re-run for every new Utah community. Egress to those hosts
+  must be allowed in the ingest environment.
+- **What stays manual (by design):** confirming a body actually publishes findable notices
+  before promoting its `City government (X)` topic (§13.3) — never mint a subscribable topic
+  with no live source behind it.
+
+So: **verification = fully automatic (CI, this repo)**; **feeds = generator + one-time
+per-state source map (ingest repo)**, which turns per-community wiring into per-*state* setup.
 
 ---
 

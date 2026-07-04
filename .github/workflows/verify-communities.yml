@@ -1,0 +1,40 @@
+name: verify-communities
+
+# Automated, live end-to-end check that every community page resolves correctly on the
+# real site. Runs where network egress works (GitHub-hosted runner) — the piece the build
+# sandbox cannot do (docs/community-build-source-of-truth.md §13.8/§13.9). Zero-touch: it
+# reads the live `communities` table, so new communities are covered with no code change.
+
+on:
+  workflow_dispatch:
+    inputs:
+      county:
+        description: 'Optional: scope to one county (e.g. "Salt Lake")'
+        required: false
+        default: ''
+  schedule:
+    - cron: '17 13 * * *'   # daily 13:17 UTC — catches regressions after any deploy/data change
+  push:
+    branches: [main]
+    paths:
+      - 'community.html'
+      - 'communities.js'
+      - 'docs/*-communities-seed.sql'
+      - 'scripts/verify-communities.mjs'
+      - '.github/workflows/verify-communities.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Verify community pages
+        env:
+          SITE_BASE: https://homesignal.net
+          COUNTY: ${{ github.event.inputs.county }}
+        run: node scripts/verify-communities.mjs

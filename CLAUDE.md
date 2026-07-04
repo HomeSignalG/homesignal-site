@@ -270,6 +270,15 @@ ship it.
 - **No test/lint suite** exists (static site). "Verify" means: apply the SQL, then
   load the affected page (e.g. `community.html?zip=…`) and confirm it renders and
   reads the right rows.
+- **Automated live verification (CI).** The build sandbox can't reach Supabase/`homesignal.net`
+  (egress blocked), so `.github/workflows/verify-communities.yml` + `scripts/verify-communities.mjs`
+  do the live check on a GitHub runner: they read the **live `communities` table** and, for
+  every covered ZIP, assert `community.html?zip=<zip>` resolves to the most-specific community
+  and renders a subscribable topic set. Runs daily, on `main` pushes touching the page/seeds,
+  and on demand (optional `county` input). Zero-touch — new communities are covered with no
+  code change. This is the automatic replacement for the "⚠️ not eyeballed live" caveat; the
+  ingest-feeds half is a separate ingest-repo generator (see
+  `docs/community-build-source-of-truth.md` §14).
 
 ## 6. Related repos & services
 - **`homesignal-ingest`** — the alert engine (feeds, scraping, grading, topic
