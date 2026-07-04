@@ -26,8 +26,8 @@ insert into public.communities (name, county, state, level, slug, zip_codes, gov
        'Property taxes & assessments','Public safety & emergencies','Water companies',
        'Elections & voting','Stratos data center project'])
 on conflict do nothing;
--- NOTE: 84315 (Hooper) is Weber County, not Box Elder — removed. 84308 is still on the
--- DB county row with no place name / page — left off this list pending a decision.
+-- NOTE: neither 84315 (Hooper, Weber County) nor 84308 (Cornish, Cache County) is in
+-- Box Elder — both removed from the county row and this list. County = the 18 ZIPs above.
 
 -- ── 2) Incorporated cities — own council; parent → county ───────────────────────────
 insert into public.communities (name, county, state, level, slug, zip_codes, government_topics, parent_id) values
