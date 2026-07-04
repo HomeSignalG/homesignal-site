@@ -70,7 +70,10 @@ subscribers.
 `parent_id uuid` (self-ref, for splitting big counties), `government_topics text[]`.
 
 - **ZIP is the atomic unit.** A community is a named *set of ZIPs* at a `level`. A
-  ZIP resolves to the most specific live community that contains it.
+  ZIP resolves to the most specific live community that contains it. **Choosing that
+  `level` (town vs county) is the geographic backbone: a community's level follows the
+  unit of government whose public meetings a resident would attend — see
+  `docs/community-build-source-of-truth.md` §13.**
 - **Universal topics are shared** across all communities (News, Emerging Tech,
   Global Best Practices — see `topics.js::UNIVERSAL_TOPICS`); you never configure
   them per community.
@@ -162,6 +165,11 @@ qualifies — just ship it.
 - ⚠️ **`communities.js` still drifts from the DB** (e.g. Box Elder ZIPs/topics). It's a
   fallback, so this isn't a runtime bug, but don't treat it as truth — the DB (#1) is.
   The clean fix is to generate it from `communities` rather than hand-edit it.
+- ⚠️ **ZIP resolution is not most-specific-live yet** (latent). `community.html` `?zip=`
+  takes `rows[0]` unordered, and `index.html`'s homepage lookup likewise — harmless while
+  no live communities share a ZIP (Box Elder / Eagle Mountain don't), but **must be fixed
+  before the first county→city split** or a shared ZIP may resolve to the county instead
+  of the town. Fix: rank by `level` specificity. See `community-build-source-of-truth.md` §13.4.
 
 ---
 

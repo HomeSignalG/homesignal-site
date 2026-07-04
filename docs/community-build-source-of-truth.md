@@ -139,7 +139,9 @@ the DB, not `communities.js`.**
 | `government_topics` | `text[]` NOT NULL | `default '{}'` — the only per-community topic list |
 
 - **ZIP is the atomic unit.** A community is a named *set of ZIPs* at a `level`; a ZIP
-  resolves to the most specific live community that contains it.
+  resolves to the most specific live community that contains it. **How to choose that
+  `level` — town vs county — is the geographic backbone: §13** (it follows where the
+  government meetings happen).
 - **`government_topics` is `NOT NULL default '{}'`** — so a brand-new row is always
   safe to read (empty is valid; the government tile just shows nothing until feeds
   exist). Populate it with **verbatim canonical labels** matching the ingest feeds.
@@ -397,7 +399,8 @@ name, state, county, level, parent_slug, zip_codes, slug, government_topics, fip
   (`springfield` → `springfield-il` → `springfield-sangamon-il`). The rule must be
   stable so re-runs produce identical slugs.
 - `level` defaults to `county` for the initial national county pass. City/ZIP
-  subdivisions come later as **child** rows (`parent_slug` → the parent county).
+  subdivisions come later as **child** rows (`parent_slug` → the parent county) — see
+  **§13.5** for the rule on when to split a town out of its county.
 - `government_topics` is normally `[]` at seed time — content is wired later (§12.7).
 
 ### 12.2 Validation gates — quarantine, don't stop
@@ -464,6 +467,96 @@ Government Notices / News arrive later via `homesignal-ingest` feeds (§8, §7 s
 Universal topics flow automatically. **Do not hold the site batch waiting on feeds** —
 wiring feeds for 1,100 communities is an ingest-side scale problem with its own runbook
 in `homesignal-ingest`. The site batch's job is only to make the **rows and pages** exist.
+
+---
+
+## 13. The geographic backbone — a community's LEVEL follows where the meetings happen
+
+> **The rule that decides town vs county.** A community's `level` is set by **the unit
+> of government whose public meetings a resident would physically show up to** in order
+> to act. Meetings drive civic action — so the model's one job here is to always route a
+> resident to *the specific meeting where their lever is* (city council for a city
+> matter, county commission for a county matter). Get the level wrong and you send
+> someone to the wrong room. The schema already supports all of this (`level`,
+> `parent_id`, `zip_codes`, `government_topics`, §3) — what was missing is this rule.
+
+### 13.1 The granularity ceiling is set by the STATE'S notice system
+You can only split as fine as that state actually **publishes** meetings/notices:
+- **Centralized state portal with per-body IDs** (e.g. Utah **PMN**) → per-city is easy;
+  each council/planning body is a distinct source. (Eagle Mountain = one city, one
+  council body, one ZIP.)
+- **Per-municipality platforms** (CivicPlus / Granicus / Legistar / CivicClerk) →
+  per-city is natural but assembled city by city.
+- **County-only / newspaper-of-record** (many rural areas) → the **county** is the
+  finest unit you can build; towns have no separately-published meeting.
+
+**Determine this per state at research time — never assume.** The state's architecture
+is the ceiling; the governance structure below is the floor.
+
+### 13.2 The decision variables (the "when to expand" checklist, in order)
+1. **Incorporation status.** An **incorporated municipality** (own elected council) is a
+   candidate for its own `level=city` community. An **unincorporated** area has *no*
+   separate meeting — the **county** governs it — so it stays part of the county
+   community. This is the hard floor: never mint a community for a place that has no
+   government of its own to attend.
+2. **A distinct meeting/notice source exists** for that place in the state system
+   (§13.1). If a town's council meetings aren't published anywhere findable, you
+   physically cannot route residents to a town meeting → keep them at county. **Verify
+   the source returns real notices first** (§8; the ingest rule 4).
+3. **State notice architecture** — the ceiling (§13.1).
+4. **Salience / demand** — population, local identity, subscriber interest. This decides
+   *packaging* (own page vs topic), **not** whether the meeting is reachable.
+
+### 13.3 Two structural patterns — same rule, different packaging
+| Pattern | Shape | Use when | Example |
+|---|---|---|---|
+| **City = its own community row** | `level=city`, `parent_id`=county (if the county is a live community) | incorporated, has its own meeting source, salient enough to warrant a dedicated page + signup | **Eagle Mountain** (one city, one ZIP `84005`, one council body) |
+| **City = a government topic inside the county community** | a `City government (X)` label in the county row's `government_topics` | the town is small / demand is low, but you still want its council meetings reachable on the county page | **Box Elder County** → `City government (Brigham City)`, `City government (Tremonton)` |
+
+Both satisfy the prime rule — the resident can reach the town meeting. The only
+difference is a **dedicated page** vs a **topic on the county page**, chosen by salience
+(#4). Promote a topic-town to its own row when demand justifies a page; never before it
+has a verified source.
+
+### 13.4 Cascade + the most-specific-live resolution requirement
+- **County-scoped matters** (county commission, county elections, county planning for
+  unincorporated land) reach **every** child community via `parent_id` — one county
+  notice cascades down.
+- **City-scoped matters** (city council, municipal budget/utilities) reach **only** that
+  city community.
+- **A ZIP must resolve to the MOST-SPECIFIC live community that contains it** (city over
+  its parent county), or the resident lands on the county page and the city council
+  meeting they actually need is buried.
+
+> ⚠️ **CODE GAP (latent today, blocks the first split).** `community.html`
+> `resolveCommunity()` resolves `?zip=` with `communities?zip_codes=cs.{zip}` and takes
+> **`rows[0]` unordered** — it does NOT pick the most-specific match. No live community
+> shares a ZIP yet (Box Elder and Eagle Mountain don't overlap), so it's harmless now.
+> **But it MUST be fixed before the first county→city split:** rank the matches by level
+> specificity (`neighborhood` > `zip` > `city` > `county`), tie-break deterministically
+> (e.g. smaller `zip_codes` length, then `id`), and return the most-specific. The
+> homepage `resolveCoverageUrl` (`index.html`) needs the same ordering once towns split.
+
+### 13.5 The backbone default for scale (§12)
+"Expand from town to county" is really **start at county, split *down* to town where
+justified**:
+1. **Seed every place at `level=county` first** — always correct (every ZIP has a
+   county; unincorporated land has *only* county government).
+2. **Promote an incorporated place to its own `level=city` row** (with `parent_id` → the
+   county) when §13.2 is satisfied *and* salience (#4) justifies a page. Its ZIP(s) then
+   resolve to the city by §13.4.
+3. **Or add it as a `City government (X)` topic** on the county row when the source
+   exists but demand doesn't yet justify a page.
+Record the choice in the seed (`level`, `parent_slug`) so the batch (§12.1) stamps it.
+
+### 13.6 Worked contrast
+- **Box Elder County** (`level=county`, `parent_id=null`, 20 ZIPs): a county community
+  covering many towns; the incorporated towns (Brigham City, Tremonton) surface as
+  `City government (X)` **topics**, not separate rows — pattern B, low-salience towns.
+- **Eagle Mountain** (`level=city`, one ZIP `84005`, one council body): a single
+  incorporated city salient enough for its **own page** — pattern A. (Its `parent_id`
+  is null because Utah County is not itself a live community; a city with no live parent
+  is valid — most-specific-live simply has nothing broader to fall back to.)
 
 ---
 
