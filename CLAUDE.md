@@ -190,11 +190,30 @@ following that playbook and hit "clone the page," use the dynamic page instead. 
   (`government_topics=[]`, inherit county via cascade); add a `City government (X)` topic only
   after that city's meeting feed is verified/wired on the ingest side.
 
-**When to stop and ask (the only cases):** the schema doesn't support what's needed
+**Definition of DONE — run to a GREEN DEPLOY, do NOT stop early (full contract:
+`docs/community-build-source-of-truth.md` §15).** A build is *not* finished when the DB
+rows exist — stopping there, or pausing to ask "should I deploy?", is the #1 failure mode.
+Run this whole sequence **without asking** (every step is pre-authorized):
+1. Apply the seed (rows) + resolution probe (most-specific resolves; no dup slugs).
+2. Write + commit `docs/<place>-communities-seed.sql` to the assigned branch.
+3. If a new question came up that §9 didn't answer, **add the standing answer to §9 +
+   this file in the same build** (so #N+1 never re-asks).
+4. **Open AND squash-merge the PR to `main`** — this is "deploy," and it is
+   **pre-authorized for a community build** (the generic "PR only if asked" rule is for
+   *other* work). The pages are already live via Supabase; the merge ships seed/docs + arms CI.
+5. Confirm the **Pages deploy** for the merge commit is green (a transient "try again later"
+   self-heals — re-check, don't stop).
+6. Confirm the **`verify-communities` CI run** is green; if red, **fix + re-run until green**
+   (bad assertion → fix script; real broken page → fix row). Only then report done, with
+   numbers, noting any deferred ingest item **(logged, not blocking)**.
+
+**When to stop and ask (the ONLY cases):** the schema doesn't support what's needed
 (a genuinely new column/table), a *same-level* ZIP collision that is systematic/state-wide
-(a single cross-county border ZIP is NOT this — handle per above), or a legal/consent change.
-Ordinary "add community N" — including a whole metro county of ZIPs — never qualifies; just
-ship it.
+(a single cross-county border ZIP is NOT this — handle per above), secrets/PII/subscriber
+exposure, a destructive DB change, or a legal/consent change. Ordinary "add community N" —
+including a whole metro county of ZIPs, **plus its deploy + CI-verify** — never qualifies;
+just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went red" are
+**all answered above — do not stop for them.**
 
 ### Scaling gaps — status
 - ✅ **`index.html` homepage ZIP search now queries `communities`** (source of truth)

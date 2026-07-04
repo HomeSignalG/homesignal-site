@@ -323,7 +323,11 @@ asking.** (Only §10 warrants a pause.)
 | Global Best Practices / Emerging tiles empty? | **Already solved, one-time** — those tiers are community-agnostic on both pages (Eagle Mountain build). Zero per-community work. |
 | Homepage ZIP search doesn't find the new community? | **Fixed (§6.1)** — the homepage now queries `communities` and routes covered ZIPs to `community.html?zip=…` (or a bespoke launch page if one exists). A new row is found with no repo change. |
 | Add to `sitemap.xml`? | Yes — one `<url>` line per live community (cheap, SEO). |
-| Open a PR? | Only if asked. Data changes (the DB row) go live via Supabase, **not** a repo push. |
+| **Is the build DONE once the DB rows exist?** | **NO. Do not stop there.** A community build runs the **full §15 sequence to a green deploy** without pausing: DB rows → commit the versioned seed → **open AND merge the PR to `main`** → confirm Pages deploy is green → confirm the `verify-communities` CI run is green. Stopping after the rows (as an early build did) is the mistake this contract exists to prevent. |
+| **Open a PR / merge to `main` / "deploy"?** | **YES — pre-authorized inside a community build. Do it without asking.** The founder has standing-authorized opening *and* squash-merging the PR for a community build (the seed + docs must land on `main`, and `verify-communities` runs from `main`). The generic "only open a PR if asked" rule applies to *other* work, **not** a community build. "Deploy" = merge to `main`; the ZIP pages themselves are already live via Supabase, so the merge ships the seed/docs + arms CI. |
+| **A deferred cross-repo item (ingest feeds, city councils)** — stop to surface it? | **NO. Log it and keep going.** Note it in the PR body / final summary and finish the site build; never pause the workflow to flag work that belongs to `homesignal-ingest`. (Content is decoupled — §12.7.) |
+| **The `verify-communities` CI run failed** — ask what to do? | **NO. Diagnose + fix + re-run until green**, exactly like any red CI (this is the "kick it until it passes" loop). Distinguish a bad *assertion* (fix the script) from a real broken page (fix the data/row). Only escalate if it's genuinely unfixable or out of scope. |
+| **Squash-merge left my branch diverged / a later PR conflicts** | **Not a stop.** Restart the branch from latest `main` and re-apply only the new commits: `git fetch origin main && git checkout -B <branch> origin/main && git cherry-pick <new-shas>`, then `git push --force-with-lease`. (Same as the top-level merged-PR rule.) |
 | A big county has **many ZIPs per city** (Salt Lake City = ~10 ZIPs) — name each row after the city? | **NO — one page per ZIP, name it `"<place label> (<ZIP>)"`** (e.g. `Salt Lake City (84101)`, slug `salt-lake-city-84101`). The ZIP is the page (§13.7); a repeated bare city name collides on slug and reads as a thin duplicate. Append the ZIP to make each name + slug distinct and deterministic. |
 | A ZIP spans **two+ cities** (`Salt Lake City / Millcreek`, `Kearns / Taylorsville`)? | **Still ONE `level=zip` page**, `parent_id` → the **county**, named with both places verbatim from the source label. Do **not** try to pick a single city or split the ZIP — the county cascade covers it, and city councils are layered on later (below). |
 | A ZIP straddles **two counties** and another county row already lists it (e.g. `84065` in the live Utah County row)? | **Not a stop.** Build the ZIP page under the county it predominantly serves; it resolves most-specific (`zip > city > county`) so residents route correctly. **But keep that ZIP OFF your new county row's county-level `zip_codes` array** — two `county`-level rows claiming one ZIP is the one real same-level collision (§12.4). The ZIP-level page is enough. |
@@ -711,6 +715,56 @@ that makes it repeatable rather than per-community hand-work:
 
 So: **verification = fully automatic (CI, this repo)**; **feeds = generator + one-time
 per-state source map (ingest repo)**, which turns per-community wiring into per-*state* setup.
+
+---
+
+## 15. The no-stop completion contract — run a build to a GREEN DEPLOY, never stop early
+
+> **Why this section exists:** a build session once did the DB rows, then **stopped and
+> asked** whether it was done / whether to deploy. That pause is the single biggest failure
+> mode of a community-build workflow. This section is the **definition of done**: a build is
+> not finished until it is **deployed and CI-verified green**, and every step below is
+> **pre-authorized** — run them in order, without asking, exactly as §9 says.
+
+### 15.1 Definition of DONE (all must be true — do not report "done" before the last box)
+1. **Rows applied** — `communities` county root + one `level=zip` page per ZIP, in Supabase
+   (§7 / §12), and a **resolution probe** passes (each ZIP resolves most-specific; no
+   duplicate slugs; §12.5).
+2. **Seed versioned + committed** — `docs/<place>-communities-seed.sql` written and committed
+   to the assigned branch (idempotent, mirrors `box-elder-…` / `salt-lake-county-…`).
+3. **Standing answers current** — if the build surfaced a question §9 didn't already answer,
+   **add it to §9 + `CLAUDE.md`** in the same build (so #N+1 never re-asks — this is a rule,
+   not optional).
+4. **Deployed** — PR opened **and squash-merged to `main`** (pre-authorized, §9). The ZIP
+   pages are already live via Supabase; the merge ships the seed/docs and arms CI.
+5. **Pages deploy green** — confirm the `pages build and deployment` run for the merge commit
+   `completed/success`. A transient "try again later" self-heals on the next deploy; re-check,
+   don't stop.
+6. **CI verification green** — the `verify-communities` run for the merge commit is
+   `success` (§14.1). If red: **fix + re-run until green** (bad assertion → fix the script;
+   real broken page → fix the row). This is the live end-to-end proof, replacing "not
+   eyeballed live."
+
+Only after box 6 do you report done — with the numbers (rows, ZIPs, gov counts) and any
+deferred ingest item **noted, not blocking**.
+
+### 15.2 The sequence, start to finish (no pause between steps)
+```
+apply seed (Supabase)  →  resolution probe  →  write+commit docs/<place>-seed.sql
+  →  (update §9/CLAUDE.md if a new question arose)  →  push branch
+  →  open PR  →  squash-merge to main            # = "deploy"; pre-authorized
+  →  confirm Pages deploy success (merge commit)
+  →  confirm verify-communities success           # fix+re-run until green
+  →  report done + numbers + deferred ingest note
+```
+
+### 15.3 What STILL stops the workflow (unchanged — only §10, kept tiny)
+The pre-authorization above does **not** loosen §10. A build still pauses **only** for: a
+schema change beyond the known columns; a *systematic, state-wide* same-level ZIP collision
+(a single border ZIP does not — §9/§12.4); secrets/PII/subscriber-data exposure; a
+destructive DB change; or a legal/consent change. **Everything else — including "should I
+deploy?", "is it done?", "a feed isn't wired", "CI went red" — is answered above: do not
+stop.**
 
 ---
 
