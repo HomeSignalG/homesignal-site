@@ -69,11 +69,19 @@ subscribers.
 `zip_codes text[]`, `level` (`county|city|zip|neighborhood`, default `county`),
 `parent_id uuid` (self-ref, for splitting big counties), `government_topics text[]`.
 
-- **ZIP is the atomic unit.** A community is a named *set of ZIPs* at a `level`. A
-  ZIP resolves to the most specific live community that contains it. **Choosing that
-  `level` (town vs county) is the geographic backbone: a community's level follows the
-  unit of government whose public meetings a resident would attend — see
-  `docs/community-build-source-of-truth.md` §13.**
+- **The ZIP is the resident-facing PAGE; city/county are cascaded government layers.**
+  Citizens think in ZIP codes, so the backbone is built **per ZIP**: each ZIP is a
+  `level=zip` community (its own page), `parent_id` → its city (or county), and it
+  **inherits** government by cascading UP the chain (city council + county + eventually
+  state). A ZIP has no government of its own — it layers its parents' meetings on top.
+  A ZIP resolves to the **most-specific** live community that contains it (`zip > city >
+  county`). See `docs/community-build-source-of-truth.md` §13.
+- **Each row holds ONLY its own level's `government_topics`.** County row = county
+  topics; city row = that city's council; ZIP row = `[]` (inherits via cascade). Never
+  jam a town's council onto the county row — that breaks sibling-exclusion scoping.
+- **Content + subscriptions anchor at the chain ROOT** (the content-bearing community —
+  the county today); the page scopes displayed content by the ancestor topic set, so a
+  sibling town's meetings never leak onto another's page.
 - **Universal topics are shared** across all communities (News, Emerging Tech,
   Global Best Practices — see `topics.js::UNIVERSAL_TOPICS`); you never configure
   them per community.
@@ -162,19 +170,20 @@ qualifies — just ship it.
   only the legacy bespoke-page map, not the coverage source.
 - ✅ **`communities` has a `slug` column** (`docs/communities-slug-migration.sql`), so
   `?community=<slug>` resolves against the DB; `communities.js` is fallback-only.
-- ✅ **Box Elder copies reconciled** — DB `government_topics` 7→9 (added the
-  `City government (Brigham City)` / `(Tremonton)` councils, whose meetings already exist
-  in the DB) and `communities.js` ZIPs 18→20. `communities.js` stays a **fallback** (the
-  DB #1 is truth); the clean long-term fix is to generate it from `communities`.
-- ⚠️ **Two town-split prerequisites — DESIGNED but NOT BUILT** (harmless while every place
-  is a single county community; **both must ship before splitting a town into its own
-  community**, §community-build-source-of-truth `§13.4`):
-  1. **Cascade content query** — `community.html` pulls `alerts`/`meetings` by a single
-     `community_id=eq.<self>` (`:526`,`:933`), no ancestor walk. A child town page would
-     miss the county meetings that impact it. Fix: query `community_id IN (self+ancestors)`
-     up the `parent_id` chain (per `multi-county-plan.md` §0a `geographic_reference`).
-  2. **Most-specific-live resolution** — `?zip=` takes `rows[0]` unordered; must rank by
-     `level` so a shared ZIP resolves to the town, not the county (same for `index.html`).
+- ✅ **The per-ZIP page engine is BUILT** (shipped this session, `community.html`): the ZIP
+  is the resident-facing page and city/county meetings **cascade down** onto it. Three
+  once-and-done pieces are now live — **most-specific-live resolution** (`?zip=` ranks
+  `zip>city>county`), the **parent-chain cascade query** (`community_id` up the chain,
+  scoped by the ancestor topic set so sibling towns don't leak), and the **generated,
+  level-grouped, ZIP-scoped government popup** — plus **separate Notices / Meetings tiles**.
+  Subscriptions anchor to the chain **root**, so no subscriber is switched between communities.
+- ✅ **Box Elder is modeled per-ZIP (pattern A)** — county row = 7 county topics; Brigham
+  City / Tremonton = their own council; each covered ZIP = its own `level=zip` page
+  inheriting the county. Full tree in `docs/box-elder-communities-seed.sql`.
+- ⚠️ **Delivery split is the open cross-repo item.** Notices and Meetings are separate
+  *tiles*, but making them independently *deliverable* — and the email structure (default:
+  two emails, one 5 PM Central window, news rides with notices — a **founder** call) —
+  lives in `homesignal-ingest` `digest.py`. Spec: `docs/notices-vs-meetings-delivery-handoff.md`.
 
 ---
 

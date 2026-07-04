@@ -545,26 +545,24 @@ ancestor's (walk `parent_id` up the chain). `multi-county-plan.md` §0a specifie
 this ("a county-scoped alert reaches all child communities… `alerts.geographic_reference`
 carries the scope").
 
-> ⚠️ **TWO code gaps — both DESIGNED but NOT BUILT; both block the first county→town split.**
-> Harmless today only because Box Elder is a *single* county community (county content
-> trivially reaches everyone in it) and no live communities share a ZIP. The moment a town
-> becomes its own child community, both must ship or the town page is **wrong**:
+> ✅ **BUILT — shipped this session (the per-ZIP page engine in `community.html`).** Both
+> pieces are live, so a town/ZIP resolves to its own page with city/county meetings
+> cascaded onto it:
 >
-> 1. **Cascade content query is missing.** `community.html` pulls content with
->    `alerts?community_id=eq.<self>` (`:526`) and `meetings?community_id=eq.<self>`
->    (`:933`) — a **single** community_id, no ancestor walk. So a Brigham City page
->    (community_id = Brigham City) would show **zero county-commission meetings** — the
->    exact county-impacts-town content that MUST appear. **Fix before splitting:** resolve
->    the `parent_id` chain and query `community_id IN (self + ancestors)` (or scope-match
->    on `geographic_reference`), filtered by the resident's subscribed topics.
-> 2. **Most-specific resolution is missing.** `resolveCommunity()` resolves `?zip=` with
->    `zip_codes=cs.{zip}` and takes **`rows[0]` unordered** — it does not prefer the town
->    over its parent county. **Fix:** rank matches by level (`neighborhood` > `zip` >
->    `city` > `county`), tie-break deterministically (smaller `zip_codes` length, then
->    `id`). The homepage `resolveCoverageUrl` (`index.html`) needs the same ordering.
+> 1. **Cascade content query** — after resolving, `community.html` walks the `parent_id`
+>    chain, anchors content at the chain **root** (`CONTENT_ID`), and filters government
+>    content to the ancestor topic set (`allowedGov`) — so a town/ZIP page shows its
+>    county's meetings and **excludes sibling towns**.
+> 2. **Most-specific resolution** — `?zip=` now ranks matches by `level`
+>    (`neighborhood>zip>city>county`), tie-broken deterministically, so a shared ZIP
+>    resolves to the town/ZIP over its county. `index.html`'s `resolveCoverageUrl` matches.
 >
-> **Until both land, keep towns as `government_topics` on the county row (pattern B) — do
-> NOT split a town into its own community**, or its residents lose the county cascade.
+> Plus **separate Notices / Meetings tiles** and a **generated, level-grouped, ZIP-scoped**
+> government popup. Subscriptions anchor to the chain root (`p_community_id = CONTENT_ID`),
+> so **no subscriber is switched** between communities. **Towns and ZIPs can now be split
+> into their own communities safely** — pattern B (towns as county topics) is no longer
+> required. The remaining cross-repo item is *independent Notices/Meetings delivery* in
+> `homesignal-ingest` (`docs/notices-vs-meetings-delivery-handoff.md`).
 
 ### 13.5 The backbone default for scale (§12)
 "Expand from town to county" is really **start at county, split *down* to town where
@@ -578,14 +576,33 @@ justified**:
    exists but demand doesn't yet justify a page.
 Record the choice in the seed (`level`, `parent_slug`) so the batch (§12.1) stamps it.
 
-### 13.6 Worked contrast
-- **Box Elder County** (`level=county`, `parent_id=null`, 20 ZIPs): a county community
-  covering many towns; the incorporated towns (Brigham City, Tremonton) surface as
-  `City government (X)` **topics**, not separate rows — pattern B, low-salience towns.
-- **Eagle Mountain** (`level=city`, one ZIP `84005`, one council body): a single
-  incorporated city salient enough for its **own page** — pattern A. (Its `parent_id`
-  is null because Utah County is not itself a live community; a city with no live parent
-  is valid — most-specific-live simply has nothing broader to fall back to.)
+### 13.6 Worked example — Box Elder, built per-ZIP (pattern A)
+Box Elder is the pilot for the per-ZIP backbone (§13.7; `docs/box-elder-communities-seed.sql`):
+- **County** `Box Elder County` (`level=county`) holds only the **7 county topics** — the
+  government layer every ZIP inherits.
+- **Cities** `Brigham City` (84302) / `Tremonton` (84337) (`level=city`, `parent_id`→county)
+  hold their **own council** label; their ZIPs resolve to the city page (council + county).
+- **ZIPs** — every other Box Elder ZIP (`Bear River City`…`Willard`, `level=zip`,
+  `parent_id`→county, `government_topics=[]`) is its own page inheriting the county's
+  meetings. Each town's council is layered on later, when its meeting source is wired (ingest).
+- **Eagle Mountain** (`level=city`, one ZIP `84005`, `parent_id=null`) — a standalone city
+  with no live parent county; most-specific-live has nothing broader to fall back to.
+
+### 13.7 The ZIP is the page — build the backbone PER ZIP
+**Citizens think in ZIP codes**, so the resident-facing unit is the **ZIP**; city and county
+are **cascaded government layers**, not the page:
+- Each ZIP is a `level=zip` community (its own page + URL + metadata), `parent_id` → its
+  city (or county). A ZIP has **no government of its own** — it **inherits** the city council
+  + county + (later) state by cascading up the chain (§13.4).
+- The shipped engine (§13.4) makes it pure data: add a ZIP row → its page exists, resolves
+  most-specific, and layers its parents' meetings on — **no per-ZIP code**.
+- **Scale:** seed county rows first (the government layer), then a ZIP row per ZIP with
+  `parent_slug` → its city/county (§12 batch). The one thing never guessed is the
+  **ZIP → city → county crosswalk** (§12.0) that sets each `parent_id`. Nationally that is
+  ~41k ZIP pages; Box Elder's ~18 are the pilot.
+- **Duplicate-content note:** ZIPs inside the same city show the same civic feed (shared
+  city+county content); give each a distinct `<title>`/URL/place name so they read as real
+  pages, not thin duplicates.
 
 ---
 
