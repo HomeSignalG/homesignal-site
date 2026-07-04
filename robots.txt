@@ -1,0 +1,10 @@
+# HomeSignal — robots.txt
+# Public marketing + community pages are indexable; the logged-in app
+# and one-off utility pages are not.
+User-agent: *
+Allow: /
+Disallow: /dashboard.html
+Disallow: /my-alerts.html
+Disallow: /unsubscribe.html
+
+Sitemap: https://homesignal.net/sitemap.xml
