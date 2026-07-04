@@ -374,6 +374,31 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   Full tree: `docs/massachusetts-communities-seed.sql`. Resolution probe passed (12-ZIP sample
   all resolve most-specific `zip>county`; 0 dup slugs; 0 orphan pages); same egress caveat —
   confirm on the real site (`?zip=02138` → pick a topic → sign up).
+- 🟢 **The 42 REMAINING STATES per-ZIP build is LIVE — 9,729 rows (405 county roots + 9,324 ZIP
+  pages)** (DB-verified). The largest batch by far and the one that **completes all 50 states**
+  (the 8 prior builds — UT/CO/MI/WA/IL/TX/MN + MA — cover the rest). Top-10 counties per state
+  across AL, AK, AZ, AR, CA, CT, DE, FL, GA, HI, ID, IN, IA, KS, KY, LA, ME, MD, MS, MO, MT, NE,
+  NV, NH, NJ, NM, NY, NC, ND, OH, OK, OR, PA, RI, SC, SD, TN, VT, VA, WV, WI, WY — **same model,
+  no new fork**. Each county root = the 6 canonical topics; every ZIP is a `level=zip` page named
+  `"<place> (<ZIP>)"` (`parent_id`→county, `government_topics=[]`) inheriting via cascade. The
+  ZIP→county crosswalk came from the uploaded **U.S. Census 2020 ZCTA5→County Relationship File**
+  (an authoritative §12.0 dataset), **not** hand-typed; county identity is keyed on **`county_fips`**
+  with **`Census_County_Name`** for display. The dataset's free-text `County` column was
+  **contaminated** (RI/CT/DE/HI planning regions like "Narragansett Bay Area"/"Blackstone Valley";
+  AK boroughs/LA parishes/independent cities mislabeled "County") and was **ignored** — fips is the
+  truth (new standing answer, §9 + community-build-source-of-truth §9). Consequently **independent
+  cities and Alaska boroughs/census areas are distinct county-equivalent roots by fips** — Baltimore
+  city vs Baltimore County, St. Louis city vs St. Louis County, Fairfax city vs Fairfax County,
+  Virginia Beach city, Anchorage Municipality, Valdez-Cordova split into Chugach + Copper River —
+  which is why AK/MD/MO/VA show 11 roots (not a bug). USPS city labels from the **`zipcodes` PyPI
+  v3.0.0** package; 450 ZCTA-only ZIPs absent from that package fall back to the Census county-name
+  label (authoritative, not guessed). Two cross-state border ZCTAs — `20135` (Bluemont) and `82701`
+  (Newcastle) — were each listed under two states by the CSV's ZCTA overlap; each resolves to its
+  authoritative USPS state (VA Loudoun, WY Campbell). **No collisions** with the 8 existing states
+  (disjoint ZIP ranges — 0 ZIP overlap, 0 dup slugs). City councils intentionally **deferred** to
+  the ingest step. Full tree: `docs/remaining-states-communities-seed.sql`. Resolution probe passed
+  (most-specific `zip>county`; 0 dup slugs; 0 orphan pages); same egress caveat — confirm on the
+  real site (`?zip=35801` → pick a topic → sign up).
 - ⚠️ **Delivery split is the open cross-repo item.** Notices and Meetings are separate
   *tiles*, but making them independently *deliverable* — and the email structure (default:
   two emails, one 5 PM Central window, news rides with notices — a **founder** call) —
