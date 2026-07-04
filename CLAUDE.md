@@ -269,6 +269,20 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   intentionally **deferred** to the ingest step. Full tree: `docs/colorado-communities-seed.sql`.
   Resolution probe passed (all 4 collision ZIPs + samples resolve most-specific; 0 dup slugs);
   same egress caveat — confirm on the real site (`?zip=80202` → pick a topic → sign up).
+- 🟢 **Michigan (SE Michigan metro + Grand Rapids/Lansing/Flint) per-ZIP build is LIVE —
+  371 rows (11 county roots + 360 ZIP pages)** (DB-verified). Second **out-of-state** build
+  and the largest single batch yet: Wayne, Oakland, Macomb, Kent, Washtenaw, Ottawa, Genesee,
+  Shiawassee, Ingham, Livingston, Monroe — same model, **no new fork**. Each county root = the
+  6 canonical topics; every requested ZIP is a `level=zip` page named `"<place> (<ZIP>)"`
+  (`parent_id`→county, `government_topics=[]`) inheriting via cascade. The ZIP→city→county
+  crosswalk was generated from the **`zipcodes` PyPI package v3.0.0** (bundled offline USPS
+  database — §12.0 "never guess a ZIP↔county mapping"), not hand-typed. **No cross-county
+  collisions** — all 360 ZIPs mapped to exactly one MI county and none was pre-claimed by a
+  live row. County slugs carry a `-mi` suffix (`wayne-county-mi`, …). City councils (Detroit,
+  Grand Rapids, Ann Arbor, Lansing, Flint, Warren, Sterling Heights, Troy, Livonia, Dearborn,
+  …) are intentionally **deferred** to the ingest step. Full tree: `docs/michigan-communities-seed.sql`.
+  Resolution probe passed (20-ZIP sample all resolve most-specific `zip>county`; 0 dup slugs;
+  0 orphan pages); same egress caveat — confirm on the real site (`?zip=48226` → pick a topic → sign up).
 - ⚠️ **Delivery split is the open cross-repo item.** Notices and Meetings are separate
   *tiles*, but making them independently *deliverable* — and the email structure (default:
   two emails, one 5 PM Central window, news rides with notices — a **founder** call) —
