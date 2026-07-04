@@ -90,6 +90,9 @@ brand-new DB row is immediately reachable by `?id=`, `?zip=`, and — once it ha
 
 > Full reference: **`docs/community-build-source-of-truth.md`** (Step 0 preflight,
 > verified code anchors, no-stop standing answers, the site↔ingest contract).
+> **Onboarding many communities at once, unattended/overnight → its §12 batch runbook**
+> (one authoritative dataset, idempotent resumable load, quarantine-don't-stop
+> validation, overlap policy, programmatic verification).
 
 **Step 0 — the first minute: front-load all permissions.** Handle these once, up front,
 then run with no prompts (this is the whole point — the build must run unattended /

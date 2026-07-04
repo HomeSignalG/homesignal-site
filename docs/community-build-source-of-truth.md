@@ -328,6 +328,9 @@ asking.** (Only §10 warrants a pause.)
 Everything else above is pre-approved. Pause only for:
 
 - **A ZIP already belongs to a different live community** — an overlap/policy call.
+  *(Single-community/manual mode only. In the batch runbook this does NOT stop: a
+  county/city overlap is expected and resolves by `level`+`parent_id`; a same-level
+  collision quarantines the row and the run continues — §12.4.)*
 - **The schema genuinely doesn't support what's needed** (a new column/table beyond §6's
   known ones) — surface it, write the DDL into `docs/*.sql`, don't improvise on live data.
 - **Anything touching secrets, money, PII, or the subscriber list** — never expose a
@@ -356,6 +359,114 @@ Everything else above is pre-approved. Pause only for:
 
 ---
 
+## 12. Onboarding at scale (100 → 3,144) — the unattended batch runbook
+
+> **Why this section exists:** §7 onboards ONE community by hand. To stand up
+> **1,100+ communities and run overnight without pausing**, you drive the *same*
+> data model in bulk. **Nothing about the model changes** — a community is still one
+> `communities` row; a batch is just many rows, inserted idempotently, validated, and
+> verified programmatically. There is no new page, no per-community code, no deploy —
+> that is the whole point of §0's "communities are DATA." Executed via the Supabase
+> MCP (generate `INSERT`s from the seed) — no app code, consistent with "no build step."
+
+### 12.0 The one thing that must never be guessed: the community master dataset
+Everything else here is procedure; **this is the rule that makes scale *correct*.** The
+identity data — name, state, county, FIPS, **ZIPs**, slug — must trace to **one
+authoritative public dataset**. Never hand-type or infer a ZIP.
+
+- **Pin the dataset at Step 0** (then treat it like source #3 seed data — reproducible):
+  - **ZIP ↔ county mapping:** an authoritative crosswalk — e.g. the U.S. Census
+    **ZCTA–county relationship file**, or a maintained **HUD–USPS ZIP crosswalk**.
+    ⚠️ **Confirm the exact file + vintage before the run** (do not assert it from
+    memory). **ZCTA ≠ USPS ZIP** exactly — pick **one** crosswalk and pin it; two runs
+    on different vintages can drift ZIP membership.
+  - **County / place identity + FIPS:** a Census gazetteer / county list (same vintage).
+- **Freeze the chosen seed in the repo** (`docs/seeds/communities-seed.csv`) with its
+  source + vintage in a header comment, so any run is reproducible and auditable.
+- If the dataset can't be confirmed/pinned, **that is a Step-0 stop** (§12.6) — a
+  guessed ZIP is the one error this whole doc exists to prevent.
+
+### 12.1 The seed format (what the batch consumes)
+One row per community, columns mapping straight to the DB (§3):
+
+```
+name, state, county, level, parent_slug, zip_codes, slug, government_topics, fips
+```
+- `slug` = **deterministic** kebab-case: lowercase → non-alphanumeric runs to a single
+  `-` → trim `-`. Disambiguate collisions by appending state then county
+  (`springfield` → `springfield-il` → `springfield-sangamon-il`). The rule must be
+  stable so re-runs produce identical slugs.
+- `level` defaults to `county` for the initial national county pass. City/ZIP
+  subdivisions come later as **child** rows (`parent_slug` → the parent county).
+- `government_topics` is normally `[]` at seed time — content is wired later (§12.7).
+
+### 12.2 Validation gates — quarantine, don't stop
+Validate every seed row **before** insert. A failing row is written to a **quarantine
+log and SKIPPED**; the batch continues (no pause). Checks:
+- `name` + `state` present; `state` a valid 2-letter code.
+- `level` ∈ {`county`,`city`,`zip`,`neighborhood`}.
+- every ZIP matches `^\d{5}$`; ZIP list non-empty; no in-row duplicates.
+- `slug` matches `^[a-z0-9]+(-[a-z0-9]+)*$` and is unique **within the batch**.
+- `parent_slug` (if set) resolves to a row in this batch or an existing DB community.
+
+Emit a report: *N valid, M quarantined (with reasons)*. **A run with quarantined rows
+is still a success** — the quarantine set is the only human follow-up.
+
+### 12.3 Idempotent, resumable load
+- Insert in chunks (e.g. 200 rows/statement) with **`on conflict do nothing`** keyed on
+  the natural unique key — **`slug`** (now case-insensitive-unique, §6). Re-running skips
+  existing rows, so a batch is **safe to resume** after any timeout/failure.
+- **Insert-new-only. Never blind-UPDATE** existing rows in a bulk pass — it could clobber
+  a hand-tuned `government_topics`. Updates go through a separate, explicit path.
+- Log per chunk: inserted / skipped-existing / quarantined + running totals. **The log
+  is the resume state.**
+
+### 12.4 Overlap policy at scale — so it never pauses
+At national scale ZIP overlaps are normal, and the model already resolves the common one:
+- **County + city/ZIP overlap → EXPECTED, not a stop.** A ZIP resolves to the *most
+  specific LIVE* community (`level` + `parent_id`, §2–§3). Set the child's `parent_id`
+  to the county and continue.
+- **The only genuine collision is two SAME-LEVEL live communities claiming one ZIP.**
+  Standing rule for batch mode: **quarantine the later row + log it** — do not overwrite,
+  do not hard-stop. Resolve the quarantined set afterward. (This converts §10's
+  "stop on ZIP overlap" into a non-blocking quarantine at scale; only a *state-wide*
+  systematic collision warrants a real pause.)
+
+### 12.5 Verify at scale — programmatic, not 1,100 page loads
+- **Count reconciliation:** rows inserted == valid seed rows − skipped-existing.
+- **Resolution probe:** for a random sample **and** every parent/child ZIP boundary,
+  query `communities?id=eq…`, `?slug=eq…`, `?zip_codes=cs.{zip}` and assert exactly one
+  *most-specific* hit.
+- **Render probe:** load `community.html?zip=…` / `?community=<slug>` for the sample;
+  assert the header names the community and the government tile renders (empty is valid).
+- **Homepage probe:** `resolveCoverageUrl(sampleZip)` returns a routing URL (the §6.1 fix
+  means new rows route from the homepage with no repo change).
+
+Log a scale-verification summary. A failed probe quarantines that community for review;
+the run result still stands.
+
+### 12.6 The overnight operating contract (batch no-pause policy)
+- **Step 0 done once:** permissions + both repos (§Step 0) **and** the dataset pinned (§12.0).
+- **The batch:** validate → load idempotently → verify → log. It runs to completion
+  unattended and its **deliverable is the DB rows + a run log** (inserted / skipped /
+  quarantined / verified). The quarantine list is the only human follow-up.
+- **NEVER pauses for:** ordinary county/city overlaps (§12.4), empty `government_topics`,
+  missing feeds (content is decoupled, §12.7), or any individual bad row (quarantine).
+- **STOPS only for** (extends §10, kept deliberately tiny): the master dataset is
+  unavailable or its vintage unverified (§12.0); a schema/DDL need beyond the known
+  columns; anything touching secrets/PII/subscriber data; or a *systematic, state-wide*
+  same-level collision policy question (a single-row collision quarantines, it does not
+  stop). Everything else logs and continues.
+
+### 12.7 Content & delivery are decoupled — never block the batch on them
+A community is **live on the site the moment its row exists** (empty tiles are valid).
+Government Notices / News arrive later via `homesignal-ingest` feeds (§8, §7 step 3);
+Universal topics flow automatically. **Do not hold the site batch waiting on feeds** —
+wiring feeds for 1,100 communities is an ingest-side scale problem with its own runbook
+in `homesignal-ingest`. The site batch's job is only to make the **rows and pages** exist.
+
+---
+
 ### Provenance
 Every schema/behavior claim here was verified against the live DB
 (`qwnnmljucajnexpxdgxr`) and the code on the authoring branch: `community.html`
@@ -363,3 +474,6 @@ resolution (`1036`), government tile (`1064`, `1071`), content reads (`526`, `93
 sign-up RPC (`782`); `index.html` homepage routing (`resolveCoverageUrl`/`runZip`);
 `topics.js`; and the `communities`/`alerts` schema + RLS state. Re-verify before relying
 on any line number — the anchors rot; the DB and code are the truth.
+**§12 exception:** the external master dataset (the ZIP↔county crosswalk file + vintage)
+is **not** verified in this doc by design — it is a Step-0 confirm before each batch run
+(§12.0). Everything else in §12 is procedure/policy over the already-verified schema.
