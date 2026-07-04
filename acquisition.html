@@ -314,6 +314,128 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
     wireTabs();
     initGrowth(p.S||[]);
     wireLive();
+    wireFeedInventory();
+    wireAcqLive();
+    stalenessBanner(p.meta);
+  }
+
+  // ---- LIVE Acquisition & retention + Coverage demand (gated RPC; current,
+  //      not the static snapshot). Prepended to the Executive Summary tab. ----
+  function liveTile(label,val,note,state){
+    state=state||'real';
+    return '<div class="tile s-'+state+'"><div class="tile-val">'+esc(String(val))+'</div>'+
+      '<div class="tile-label">'+esc(label)+'</div>'+
+      (note?'<div class="tile-note">'+esc(note)+'</div>':'')+'</div>';
+  }
+  function acqCard(a){
+    a=a||{};
+    var wk=(a.signups_by_week||[]).map(function(w){ return { day:w.week, followers:w.count }; });
+    var churnState=(a.users_unsubscribed>0)?'persist':'real';
+    return '<div class="card"><h3>Acquisition &amp; retention <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
+      '<p class="sub">Real signups &amp; churn from the users table — current, not the snapshot below.</p>'+
+      '<div class="grid" style="margin-bottom:'+(wk.length?'14px':'0')+'">'+
+        liveTile('Users (total)', a.users_total||0, 'all-time signups')+
+        liveTile('Active', a.users_active||0, 'not unsubscribed')+
+        liveTile('Churned', a.users_unsubscribed||0, (a.unsub_rate_pct||0)+'% unsub rate', churnState)+
+        liveTile('Signup intents', a.signup_intents||0, 'clicked subscribe')+
+      '</div>'+
+      (wk.length?('<div class="sub" style="margin:0 0 4px">Signups per week</div>'+spark(wk)):'')+
+    '</div>';
+  }
+  function demandCard(d){
+    d=d||{};
+    var rows=(d.by_area||[]).map(function(a){
+      var badge=a.covered?'<span class="t-real">covered</span>':'<span class="t-persist">not covered — expansion signal</span>';
+      return '<tr><td>'+esc(a.zip||'?')+'</td><td>'+esc(a.community||'—')+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums">'+(a.count||0)+'</td><td>'+badge+'</td></tr>';
+    }).join('');
+    return '<div class="card"><h3>Coverage demand <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
+      '<p class="sub">Where people ask for coverage (homepage ZIP requests) + inbound contacts. Uncovered ZIPs are expansion signals.</p>'+
+      '<div class="grid" style="margin-bottom:14px">'+
+        liveTile('Area requests', d.requests_total||0, 'ZIP / coverage requests')+
+        liveTile('Inbound contacts', d.contacts_total||0, (d.contacts_recent_7d||0)+' in last 7 days')+
+      '</div>'+
+      (rows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>ZIP</th><th>Community</th><th style="text-align:right">Requests</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>'):'<div class="muted">No coverage requests yet.</div>')+
+    '</div>';
+  }
+  async function wireAcqLive(){
+    var host=$('tab-exec'); if(!host) return;
+    try{
+      var r=await window.hsClient.rpc('hs_acquisition_live');
+      if(r.error || !r.data) return;
+      if(!document.getElementById('acq-live-wrap')){
+        var box=document.createElement('div'); box.id='acq-live-wrap';
+        box.innerHTML=acqCard(r.data.acquisition)+demandCard(r.data.demand);
+        host.insertBefore(box, host.firstChild);
+      }
+    }catch(e){}
+  }
+
+  // ---- Staleness banner for the static snapshot (the tabbed content) ----
+  function stalenessBanner(meta){
+    if(!meta || !meta.snapshot) return;
+    var snap=new Date(meta.snapshot); if(isNaN(snap.getTime())) return;
+    var days=Math.floor((Date.now()-snap.getTime())/86400000);
+    if(days<1 || document.getElementById('stale-banner')) return;
+    var b=document.createElement('div'); b.id='stale-banner';
+    b.style.cssText='background:rgba(224,164,35,.12);border-bottom:1px solid var(--persist);color:#f0d089;padding:9px 16px;font-size:12.5px;text-align:center;line-height:1.5';
+    b.innerHTML='⚠ The tabbed snapshot is '+days+' day'+(days===1?'':'s')+' old (as of '+esc(String(meta.snapshot).slice(0,10))+'). '+
+      'The <b>Acquisition &amp; retention</b>, <b>Coverage demand</b>, <b>Bluesky followers</b> and <b>Feed inventory</b> panels are live; the rest updates when the snapshot is regenerated.';
+    var root=$('dash-root'); root.insertBefore(b, root.firstChild);
+  }
+
+  // ---- LIVE Feed Inventory panel (reads public.feed_inventory_live directly
+  //      via the anon key under RLS; auto-refreshes every 60s). No local data. ----
+  var feedTimer=null;
+  function gradeBreakdown(gb){
+    if(!gb || typeof gb!=='object') return '<span class="muted">—</span>';
+    var order=[['BEST','t-real'],['MEDIUM','t-real'],['LOW','t-persist'],['REJECT','t-pending'],['ungraded','t-pending']];
+    var parts=order.map(function(p){ var v=gb[p[0]]||0; return v?('<span class="'+p[1]+'">'+p[0].slice(0,4)+' '+v+'</span>'):''; }).filter(Boolean);
+    return parts.length?parts.join(' <span class="muted">·</span> '):'<span class="muted">—</span>';
+  }
+  function renderFeedInv(rows){
+    var tb=document.querySelector('#feed-inv-tbl tbody'); if(!tb) return;
+    if(!rows || !rows.length){ tb.innerHTML='<tr><td colspan="8" class="muted">No feeds returned.</td></tr>'; return; }
+    tb.innerHTML=rows.map(function(r){
+      var firstUrl=(r.url||'').split(' ;')[0].trim();
+      var url=firstUrl?('<a href="'+esc(firstUrl)+'" target="_blank" rel="noopener" style="color:var(--accent)">open</a>'):'<span class="muted">—</span>';
+      var lp=r.last_published?esc(String(r.last_published).slice(0,10)):'<span class="muted">—</span>';
+      var ic=(r.item_count!=null?r.item_count:0);
+      return '<tr>'+
+        '<td>'+esc(r.tile||'')+'</td>'+
+        '<td>'+esc(r.topic||'')+'</td>'+
+        '<td class="muted"><details class="content"><summary>'+esc((r.sources||'—').slice(0,60))+'</summary><div class="content-full">'+esc(r.sources||'')+'</div></details></td>'+
+        '<td>'+url+'</td>'+
+        '<td class="muted"><details class="content"><summary>'+esc((r.grade_policy||'—').slice(0,40))+'</summary><div class="content-full">'+esc(r.grade_policy||'')+'</div></details></td>'+
+        '<td>'+lp+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums;'+(ic?'':'color:var(--muted)')+'">'+ic+'</td>'+
+        '<td style="font-size:11.5px">'+gradeBreakdown(r.grade_breakdown)+'</td>'+
+      '</tr>';
+    }).join('');
+    var st=document.getElementById('feed-inv-stamp'); if(st) st.textContent='updated '+new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }
+  async function refreshFeedInv(){
+    try{
+      var r=await window.hsClient.from('feed_inventory_live').select('*').order('sort',{ascending:true});
+      if(r.error) return;                 // leave prior content; empty cells mean no live items, not an error
+      renderFeedInv(r.data||[]);
+    }catch(e){}
+  }
+  function wireFeedInventory(){
+    var host=$('tab-feed'); if(!host) return;
+    if(!document.getElementById('feed-inv-card')){
+      var card=document.createElement('div'); card.className='card'; card.id='feed-inv-card';
+      card.innerHTML='<h3>Feed Inventory <span class="tile-tag t-real" style="margin-left:6px">live</span> '+
+        '<span id="feed-inv-stamp" class="muted" style="font-size:11px;font-weight:400;margin-left:8px"></span></h3>'+
+        '<p class="sub">Live from <code>feed_inventory_live</code> — one row per feed, auto-refreshing every 60s. An empty cell means no live items yet.</p>'+
+        '<div style="overflow-x:auto"><table class="tbl" id="feed-inv-tbl">'+
+        '<thead><tr><th>Tile</th><th>Topic</th><th>Sources</th><th>URL</th><th>Grade policy</th><th>Last published</th><th style="text-align:right">Items</th><th>Grade breakdown</th></tr></thead>'+
+        '<tbody><tr><td colspan="8" class="muted">Loading…</td></tr></tbody></table></div>';
+      host.insertBefore(card, host.firstChild);
+    }
+    refreshFeedInv();
+    if(feedTimer) clearInterval(feedTimer);
+    feedTimer=setInterval(refreshFeedInv, 60000);
   }
 
   // ---- live overlays fetched separately from the static snapshot ----
