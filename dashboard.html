@@ -102,6 +102,7 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
 .comm-card:hover { border-color: var(--green-mid); }
 .comm-card-meta { font-size: 12.5px; color: var(--ts); }
 .comm-card-meta .dot { color: var(--green); font-weight: 700; }
+.comm-card-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
 .add-card { background: var(--bg); border: 1px dashed var(--gm); border-radius: var(--r); padding: 18px; margin-top: 18px; }
 .add-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
@@ -114,6 +115,8 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
 @media (max-width: 720px) {
   .dash-wrap { padding: 28px 16px 48px; }
   .comm-card { align-items: stretch; }
+  .comm-card-actions { width: 100%; }
+  .comm-card-actions .btn-outline { flex: 1; text-align: center; }
   .add-row { flex-direction: column; }
   .add-input, .add-row .btn-primary { width: 100%; }
 }
@@ -301,6 +304,44 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     return { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + token };
   }
 
+  // ---- Development tracker (coverage-aware, DB-driven) ----------------
+  // The button links to a ZIP's development page. Isolated in one place so
+  // the base is trivial to swap if the live route changes (e.g. to a clean
+  // /development/<zip> path). ROUTE PENDING CONFIRMATION — see PR notes.
+  var DEV_ROUTE_BASE = 'homesignalmap.html?zip=';
+  function devUrl(zip){ return DEV_ROUTE_BASE + encodeURIComponent(zip); }
+
+  // Every ZIP we can associate with a follow: the ZIP the user signed up
+  // with (carried on the follow row) plus any ZIPs the bootstrap registry
+  // knows for that community. No hardcoded coverage list — which ZIPs are
+  // actually covered comes from the DB (loadDevCoverage), not from here.
+  function communityZips(f){
+    var out = [];
+    if (f && f.zip_code != null && String(f.zip_code)) out.push(String(f.zip_code));
+    var c = window.HS.getCommunity(f && f.community_id);
+    if (c && Array.isArray(c.zips)) c.zips.forEach(function(z){ if (out.indexOf(z) < 0) out.push(z); });
+    return out;
+  }
+
+  // Ask development_reports which of these ZIPs have a report row. Returns
+  // a { zip: true } map. A missing table or network error yields {} (no
+  // buttons) — the feature is zero-touch and fails closed: buttons appear
+  // automatically as rows are cached, and never render a dead button.
+  async function loadDevCoverage(zips){
+    var covered = {};
+    if (!zips || !zips.length) return covered;
+    try {
+      var url = SB_URL + '/rest/v1/development_reports?select=zip&zip=in.(' +
+                zips.map(encodeURIComponent).join(',') + ')';
+      var res = await fetch(url, { headers: authHeaders() });
+      if (res.ok) {
+        var rows = await res.json();
+        if (Array.isArray(rows)) rows.forEach(function(r){ if (r && r.zip != null) covered[String(r.zip)] = true; });
+      }
+    } catch (e) { /* table not there yet — no dev buttons */ }
+    return covered;
+  }
+
   // Returns an array of { community_id, topics } for the logged-in user.
   async function loadFollows(email){
     // 1) New model: user_communities (one row per county).
@@ -362,7 +403,7 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     input.addEventListener('keydown', function(e){ if (e.key === 'Enter') go(); });
   }
 
-  function renderFollows(follows){
+  async function renderFollows(follows){
     var body = $('dash-body');
     if (!follows.length){
       body.innerHTML =
@@ -374,18 +415,33 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
       bindAddCommunity();
       return;
     }
+    // Coverage-aware Development tracker: gather every ZIP across the
+    // followed communities, ask the DB which have a development report,
+    // and only show a button for those (fails closed to none).
+    var zipSet = {};
+    follows.forEach(function(f){ communityZips(f).forEach(function(z){ if (z) zipSet[z] = true; }); });
+    var covered = await loadDevCoverage(Object.keys(zipSet));
+
     var cards = follows.map(function(f){
       var c = window.HS.getCommunity(f.community_id);
       var name = c ? c.name : 'Your community';
       var page = c ? c.page : 'index.html';
       var n = countTopics(f.topics);
       var meta = n > 0 ? ('<span class="dot">' + n + '</span> topic' + (n===1?'':'s') + ' followed') : 'No topics selected yet';
+      // First covered ZIP for this community, if any → active button; else nothing.
+      var devZip = communityZips(f).filter(function(z){ return covered[z]; })[0];
+      var devBtn = devZip
+        ? '<a class="btn-outline" href="' + esc(devUrl(devZip)) + '" style="text-decoration:none">Development tracker</a>'
+        : '';
       return '<div class="comm-card">' +
         '<div class="comm-card-main">' +
           '<div class="comm-card-name"><a class="comm-card-link" href="' + esc(page) + '">' + esc(name) + '</a></div>' +
           '<div class="comm-card-meta">' + meta + '</div>' +
         '</div>' +
-        '<a class="btn-outline" href="' + esc(page) + '" style="text-decoration:none">Manage alerts</a>' +
+        '<div class="comm-card-actions">' +
+          '<a class="btn-outline" href="' + esc(page) + '" style="text-decoration:none">Manage alerts</a>' +
+          devBtn +
+        '</div>' +
       '</div>';
     }).join('');
     body.innerHTML = cards + addCommunityHtml();
@@ -396,7 +452,7 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     if (!window.hsUser){ renderLoggedOut(); return; }
     $('dash-body').innerHTML = '<div class="loading">Loading your alerts…</div>';
     var follows = await loadFollows(window.hsUser.email);
-    renderFollows(follows);
+    await renderFollows(follows);
   }
 
   // Re-render whenever auth state resolves/changes.
