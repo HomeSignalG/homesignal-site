@@ -604,6 +604,31 @@ are **cascaded government layers**, not the page:
   city+county content); give each a distinct `<title>`/URL/place name so they read as real
   pages, not thin duplicates.
 
+### 13.8 Status Q&A — Box Elder per-ZIP pilot
+
+**Q: Are all 18 Box Elder ZIP pages built and live for a subscriber to subscribe to?**
+
+**A (verified against the live DB):** **Yes — 18/18 resolve to their own page.** 16 are
+`level=zip` pages (Bear River City … Willard); Brigham City (`84302`) and Tremonton
+(`84337`) are `level=city`. The engine is deployed on `main`/Pages, and a resident can pick
+topics and sign up on every page:
+- **16 town ZIP pages** → subscribe to **Box Elder County** government (7 topics) +
+  universal (News / Emerging / Global). Each town's **own council is NOT wired yet**
+  (ingest follow-up — needs that town's meeting source).
+- **Brigham City / Tremonton** → their **own city council** + county + universal.
+
+Subscriptions anchor to the **Box Elder County** `community_id` (the chain root), so they
+match content and deliver.
+
+**Caveat — not eyeballed live.** The build sandbox **cannot reach Supabase or
+`homesignal.net`** (egress blocked → `curl HTTP 000`), so the live signup was verified by
+**data + deployed code + static render**, NOT an end-to-end browser signup. Confirm on the
+real site: `homesignal.net/community.html?zip=84312` → pick a topic → complete signup.
+(General rule: this build environment can't reach Supabase/`utah.gov` — do live/source
+verification on the real site or via CI, never assume it ran in-sandbox.)
+
+**Pending:** wiring each small town's own council (per-town meeting source, ingest side).
+
 ---
 
 ### Provenance

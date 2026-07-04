@@ -180,6 +180,16 @@ qualifies — just ship it.
 - ✅ **Box Elder is modeled per-ZIP (pattern A)** — county row = 7 county topics; Brigham
   City / Tremonton = their own council; each covered ZIP = its own `level=zip` page
   inheriting the county. Full tree in `docs/box-elder-communities-seed.sql`.
+- 🟢 **Box Elder per-ZIP pilot is LIVE — 18/18 pages, subscribable** (DB-verified). All 18
+  ZIPs resolve to their own page (16 `level=zip` + Brigham City/Tremonton `city`) and a
+  resident can pick topics + sign up on each: the **16 town ZIP pages** → Box Elder
+  **County** government (7 topics) + universal (News/Emerging/Global); **Brigham City /
+  Tremonton** → their **own council** + county + universal. Subscriptions anchor to the
+  Box Elder County `community_id` (chain root), so they match and deliver.
+  ⚠️ **Not eyeballed live** — the build sandbox can't reach Supabase/`homesignal.net`
+  (egress blocked → `HTTP 000`); verified by data + deployed code + static render, **not**
+  an end-to-end browser signup. Confirm on the real site (`?zip=84312` → pick a topic →
+  sign up). Each small town's **own council** is the pending ingest follow-up.
 - ⚠️ **Delivery split is the open cross-repo item.** Notices and Meetings are separate
   *tiles*, but making them independently *deliverable* — and the email structure (default:
   two emails, one 5 PM Central window, news rides with notices — a **founder** call) —
