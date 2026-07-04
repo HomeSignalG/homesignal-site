@@ -38,12 +38,29 @@ const SAMPLE = process.env.SAMPLE ? parseInt(process.env.SAMPLE, 10) : 0;
 const LEVEL_RANK = { neighborhood: 4, zip: 3, city: 2, county: 1 };
 
 async function loadCommunities() {
-  const url = `${SUPABASE_URL}/rest/v1/communities?select=id,name,county,level,zip_codes,slug,government_topics&order=name`;
-  const res = await fetch(url, {
-    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
-  });
-  if (!res.ok) throw new Error(`Supabase communities read failed: ${res.status} ${await res.text()}`);
-  let rows = await res.json();
+  // PostgREST caps a single read at 1000 rows (the Supabase default max-rows). The table is
+  // now several thousand rows, so we MUST page through it with Range headers — a single fetch
+  // silently truncated to the first 1000-by-name, which made every alphabetically-late ZIP
+  // page (Westland, Ypsilanti, Zeeland, …) invisible and produced false "resolved zip !=
+  // expected county" failures. Page until a short page comes back.
+  const base = `${SUPABASE_URL}/rest/v1/communities?select=id,name,county,level,zip_codes,slug,government_topics&order=name.asc,id.asc`;
+  const PAGE = 1000;
+  let rows = [];
+  for (let from = 0; ; from += PAGE) {
+    const to = from + PAGE - 1;
+    const res = await fetch(base, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        Range: `${from}-${to}`,
+        'Range-Unit': 'items',
+      },
+    });
+    if (!res.ok) throw new Error(`Supabase communities read failed: ${res.status} ${await res.text()}`);
+    const page = await res.json();
+    rows = rows.concat(page);
+    if (page.length < PAGE) break; // last page
+  }
   if (COUNTY) rows = rows.filter((r) => (r.county || '').toLowerCase() === COUNTY.toLowerCase() ||
     // county not selected above (kept select tight); fall back to name/slug contains
     (r.name || '').toLowerCase().includes(COUNTY.toLowerCase()));
