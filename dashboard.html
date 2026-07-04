@@ -135,8 +135,8 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
 
 <div class="dash-wrap">
   <div class="dash-head">
-    <h1>Your community dashboard</h1>
-    <p>The communities you follow and the topics you get alerts for.</p>
+    <h1>Your ZIP code dashboard</h1>
+    <p>The ZIP codes you follow and the topics you get alerts for.</p>
   </div>
   <div id="dash-body">
     <div class="loading">Loading your alerts…</div>
@@ -301,6 +301,32 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     return { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + token };
   }
 
+  function extractZip(q){ var m = (q||'').match(/\b\d{5}\b/); return m ? m[0] : null; }
+
+  // Resolve a ZIP against the `communities` table (source of truth) to the
+  // MOST-SPECIFIC community that contains it, and the URL to route there — the
+  // same logic index.html uses (resolveCoverageUrl). A bespoke launch page
+  // (Box Elder / Eagle Mountain) routes to that page; everything else to the
+  // dynamic community.html. Returns { name, level, url } or null (not covered).
+  var LEGACY_PAGE = { 'box-elder': 'box-elder.html', 'eagle-mountain': 'eagle-mountain.html' };
+  var LEVEL_RANK = { neighborhood: 4, zip: 3, city: 2, county: 1 };
+  async function resolveZip(zip){
+    if (!zip) return null;
+    try {
+      var res = await fetch(SB_URL + '/rest/v1/communities?select=slug,name,level,zip_codes&zip_codes=cs.{' + encodeURIComponent(zip) + '}', { headers: authHeaders() });
+      if (res.ok) {
+        var rows = await res.json();
+        if (Array.isArray(rows) && rows.length) {
+          rows.sort(function(a,b){ return (LEVEL_RANK[b.level]||0)-(LEVEL_RANK[a.level]||0) || (a.zip_codes||[]).length-(b.zip_codes||[]).length; });
+          var m = rows[0];
+          var url = (m.slug && LEGACY_PAGE[m.slug]) ? (LEGACY_PAGE[m.slug] + '?zip=' + encodeURIComponent(zip)) : ('community.html?zip=' + encodeURIComponent(zip));
+          return { name: m.name || null, level: m.level || null, url: url };
+        }
+      }
+    } catch (e) { /* DB unreachable — caller falls back to a plain ?zip= link */ }
+    return null;
+  }
+
   // Returns an array of { community_id, topics } for the logged-in user.
   async function loadFollows(email){
     // 1) New model: user_communities (one row per county).
@@ -337,11 +363,11 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
 
   function addCommunityHtml(){
     return '<div class="add-card">' +
-      '<h3>Add a community</h3>' +
+      '<h3>Add a ZIP code</h3>' +
       '<p>Enter a ZIP code to follow another area.</p>' +
       '<div class="add-row">' +
         '<input class="add-input" id="add-zip" type="text" inputmode="numeric" maxlength="5" placeholder="Enter a ZIP code" />' +
-        '<button class="btn-primary" id="add-btn">Find community</button>' +
+        '<button class="btn-primary" id="add-btn">Add ZIP</button>' +
       '</div>' +
       '<div class="add-msg" id="add-msg"></div>' +
     '</div>';
@@ -350,11 +376,12 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
   function bindAddCommunity(){
     var btn = $('add-btn'), input = $('add-zip'), msg = $('add-msg');
     if (!btn || !input) return;
-    function go(){
-      var zip = window.HS.extractZip(input.value);
+    async function go(){
+      var zip = extractZip(input.value);
       if (!zip) { msg.style.color = '#b91c1c'; msg.textContent = 'Please enter a 5-digit ZIP code.'; return; }
-      var c = window.HS.zipToCommunity(zip);
-      if (c) { window.location.href = c.page + '?zip=' + encodeURIComponent(zip); return; }
+      msg.style.color = 'var(--ts)'; msg.textContent = 'Checking coverage…';
+      var hit = await resolveZip(zip);
+      if (hit && hit.url) { window.location.href = hit.url; return; }
       msg.style.color = 'var(--ts)';
       msg.innerHTML = "We don't cover that ZIP yet — you can request it on the <a href=\"index.html\" style=\"color:var(--green);font-weight:600\">home page</a>.";
     }
@@ -362,33 +389,44 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     input.addEventListener('keydown', function(e){ if (e.key === 'Enter') go(); });
   }
 
-  function renderFollows(follows){
+  // One card per saved follow, keyed on its ZIP code (the resident-facing unit in
+  // the per-ZIP model). Each ZIP is resolved against the communities table for a
+  // friendly place name + the correct routing URL; everything degrades gracefully.
+  async function renderFollows(follows){
     var body = $('dash-body');
     if (!follows.length){
       body.innerHTML =
         '<div class="state-card">' +
-          '<h2>You’re not following any communities yet</h2>' +
-          '<p>Find your area and pick the topics you want alerts for.</p>' +
-          '<a class="btn-primary" href="index.html" style="display:inline-block">Find my community</a>' +
+          '<h2>You’re not following any ZIP codes yet</h2>' +
+          '<p>Find your ZIP code and pick the topics you want alerts for.</p>' +
+          '<a class="btn-primary" href="index.html" style="display:inline-block">Find my ZIP code</a>' +
         '</div>' + addCommunityHtml();
       bindAddCommunity();
       return;
     }
-    var cards = follows.map(function(f){
-      var c = window.HS.getCommunity(f.community_id);
-      var name = c ? c.name : 'Your community';
-      var page = c ? c.page : 'index.html';
+    var cards = await Promise.all(follows.map(async function(f){
+      var zip = (f.zip_code != null && String(f.zip_code).trim()) ? String(f.zip_code).trim() : '';
+      var hit = zip ? await resolveZip(zip) : null;
+      // Route: resolved DB URL -> a plain ?zip= link -> legacy ?id= (follows with no zip).
+      var url = (hit && hit.url) ? hit.url
+              : zip ? ('community.html?zip=' + encodeURIComponent(zip))
+              : (f.community_id ? ('community.html?id=' + encodeURIComponent(f.community_id)) : 'index.html');
+      // Title: resolved place name -> the ZIP itself -> a legacy communities.js name.
+      var legacy = (!hit && !zip && f.community_id && window.HS && window.HS.getCommunity) ? window.HS.getCommunity(f.community_id) : null;
+      var title = (hit && hit.name) ? hit.name : (zip ? ('ZIP ' + zip) : (legacy ? legacy.name : 'Your community'));
       var n = countTopics(f.topics);
-      var meta = n > 0 ? ('<span class="dot">' + n + '</span> topic' + (n===1?'':'s') + ' followed') : 'No topics selected yet';
+      var bits = [];
+      if (zip && hit && hit.name) bits.push('ZIP ' + esc(zip)); // show the ZIP under the place name
+      bits.push(n > 0 ? ('<span class="dot">' + n + '</span> topic' + (n===1?'':'s') + ' followed') : 'No topics selected yet');
       return '<div class="comm-card">' +
         '<div class="comm-card-main">' +
-          '<div class="comm-card-name"><a class="comm-card-link" href="' + esc(page) + '">' + esc(name) + '</a></div>' +
-          '<div class="comm-card-meta">' + meta + '</div>' +
+          '<div class="comm-card-name"><a class="comm-card-link" href="' + esc(url) + '">' + esc(title) + '</a></div>' +
+          '<div class="comm-card-meta">' + bits.join(' · ') + '</div>' +
         '</div>' +
-        '<a class="btn-outline" href="' + esc(page) + '" style="text-decoration:none">Manage alerts</a>' +
+        '<a class="btn-outline" href="' + esc(url) + '" style="text-decoration:none">Manage alerts</a>' +
       '</div>';
-    }).join('');
-    body.innerHTML = cards + addCommunityHtml();
+    }));
+    body.innerHTML = cards.join('') + addCommunityHtml();
     bindAddCommunity();
   }
 
@@ -396,7 +434,7 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     if (!window.hsUser){ renderLoggedOut(); return; }
     $('dash-body').innerHTML = '<div class="loading">Loading your alerts…</div>';
     var follows = await loadFollows(window.hsUser.email);
-    renderFollows(follows);
+    await renderFollows(follows);
   }
 
   // Re-render whenever auth state resolves/changes.
