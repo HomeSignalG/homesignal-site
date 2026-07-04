@@ -517,9 +517,23 @@ legal/framing change not covered by the one-time sign-off.
 ### Status
 - 🟢 **84302 (Brigham City, Box Elder County, UT) prototype is LIVE** (DB-verified). ZIP-mode
   report cached in `development_reports`: **facilities 23 · development 41 · proposed 41 ·
-  approved 0 · open comment windows 0**, **64 sites, 0 unsourced** (every marker carries an EPA
-  ECHO / Utah PMN / county / city `record_url`). Route: `homesignalmap.html?zip=84302` (pretty
-  `/development/84302` redirects via `404.html`). Full tree: `docs/box-elder-development-reports-seed.sql`.
+  approved 0**, **64 sites, 0 unsourced** (every marker carries an EPA ECHO / Utah PMN / county /
+  city `record_url`); the page surfaces upcoming hearings as "comment windows open" (2 as of the
+  build date — a live, date-derived count from each notice's `meeting_date`). Route:
+  `homesignalmap.html?zip=84302` (pretty `/development/84302` redirects via `404.html`). Full tree:
+  `docs/box-elder-development-reports-seed.sql`.
   Same egress caveat as the alerts builds — not eyeballed live from the sandbox; `verify-development`
   CI does the live browser check. City-council planning feeds beyond Box Elder County are the
   deferred engine-coverage item (logged, not blocking).
+- 🟢 **`homesignalmap.html` is the full canonical page — THREE map views** (founder's refined
+  Leaflet / Three.js / MapLibre page, ported and wired to live data): **2D map** (Leaflet + OSM),
+  **3D aerial** (Three.js isometric blocks — built=green, approved=blue, proposed=orange wireframe,
+  with orbit / time-of-day / "From home"), and **3D satellite** (MapLibre GL + Esri imagery + AWS
+  terrarium terrain). All three share one dataset via `MAP_SITES`; the legend doubles as
+  built/approved/proposed filters; the radius selector (½/1/2/3/5 mi) drives the address view.
+  Libraries load from **jsDelivr** (CSP: self + jsDelivr for scripts, `worker-src blob:` for
+  MapLibre, imagery hosts allow-listed). The **address box stays live** (`{address,radius_mi}`
+  unchanged); ZIP mode reads the cache and centers on the centroid with **no "this address" pin
+  until the resident searches**. `render()` drops any unsourced site and sets `window.__HS_SITES`;
+  the Leaflet map lives in an inner `#mapInner` so the verifier's `#map .leaflet-container`
+  selector matches even for an empty ZIP.
