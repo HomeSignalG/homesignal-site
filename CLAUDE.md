@@ -124,6 +124,11 @@ brand-new DB row is immediately reachable by `?id=`, `?zip=`, and — once it ha
 > **Onboarding many communities at once, unattended/overnight → its §12 batch runbook**
 > (one authoritative dataset, idempotent resumable load, quarantine-don't-stop
 > validation, overlap policy, programmatic verification).
+> **Handed a county + its ZIP codes and told to "run overnight without stopping" → §14**
+> (the whole-county-from-a-ZIP-list runbook: settled per-ZIP model so nothing is re-asked,
+> first-party-only feeds via the state PMN system, CI as the live feed-check because the
+> sandbox has no egress, per-ZIP inventory output). Every pausable decision has a
+> pre-settled answer there; the only stops are §10.
 
 **Step 0 — the first minute: front-load all permissions.** Handle these once, up front,
 then run with no prompts (this is the whole point — the build must run unattended /
