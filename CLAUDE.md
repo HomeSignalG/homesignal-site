@@ -453,3 +453,73 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
 > anyone with the anon key can read/write it. Not caused by this doc; flag to the
 > owner before relying on that table. Don't auto-enable RLS without policies (it
 > would lock out all access).
+
+---
+
+## 7. Development tracker (`homesignalmap.html` + per-ZIP pages)
+
+A second page type alongside the civic-alerts community pages: **"Development around your
+home"** — what's built and what's proposed near an address/ZIP (EPA-registered facilities,
+data-center activity, planning hearings, open comment windows), **every item linked to its
+official public record.** Full runbook: **`docs/development-tracker-source-of-truth.md`**
+(Step 0, the batch runbook, standing answers, the no-stop completion contract).
+
+**Prime directive (stricter than the communities one, because this page makes factual
+claims about named real facilities):** the page renders **only** what the
+`get-address-report` edge function returns. The build **never** invents, infers, or
+back-fills a development record. A source with no real feed yields an **empty** result,
+never a plausible one. Every rendered marker traces to a `record_url`.
+
+- **The Three.js `development-map-desktop*.html` is a FROZEN mock** (self-labeled
+  "Illustrative sample data") — never copy its inline `sites`/`INTEL` arrays into a real
+  page, seed, or the engine. The canonical page is the refined Leaflet page
+  (`homesignalmap.html`).
+- **Two layers, decoupled (same split as site ↔ ingest):** the **page** is a thin client
+  (safe to batch-build overnight); the **`get-address-report` edge function** is the engine
+  (coverage expansion is a separate ingest-style job — the page batch never blocks on it).
+- **Two page modes, both kept:** ZIP mode = the crawlable SEO landing page (`?zip=`, cached
+  aggregate, must stand alone as real content); the embedded **address box** = the live
+  1-mile-around-my-home precision view (`{address, radius_mi}`, unchanged). A ZIP centroid
+  is a page anchor, **not** a "your home" pin — no address marker until the resident searches.
+- **Empty is valid; fabricated is a defect.** EPA FRS/ECHO (national, free) is the baseline
+  floor — every ZIP ships at least a facilities view; planning notices are per-county
+  enrichment and a county with no verified feed still ships (facilities-only). Never stop and
+  never fabricate to fill a map.
+- **Cache with RLS ON.** Pages read `development_reports` (per-ZIP cached engine output;
+  `docs/development-reports-cache.sql`). Ship it with RLS **enabled** (public `select`,
+  no anon writes) — **do not** model it on `page_cache`, which has RLS disabled (see the DB
+  advisory above).
+- **Legal framing is founder-signed-off ONCE** (§10 of the doc): render the public fact +
+  link, never editorialize a named operator into wrongdoing; keep the "factual count… not a
+  verdict on any operator" copy on every page.
+
+**Standing authority / DONE / when-to-stop:** identical to the communities build — run to a
+GREEN DEPLOY (reports cached → seed committed → PR squash-merged → Pages green →
+`verify-development` CI green), no pausing for "should I deploy?", "is it done?", "this ZIP
+has no records", or "a county has no feed." The only stops are: ZIP master dataset
+unavailable/unverified; a schema need beyond the known cache columns (incl. anything ZIP-mode
+needs beyond a query change); secrets/PII/subscriber-data or the cache RLS posture; or a
+legal/framing change not covered by the one-time sign-off.
+
+### New standing answers logged this build (so the mass build never re-asks — mirror in the doc §6)
+- **ZIP mode is BUILT** as an additive branch in `get-address-report` **v9** — `{zip}` (or
+  `{zip,lat,lng}`); address mode `{address,radius_mi}` is byte-for-byte unchanged. It filters
+  to sourced sites only, so the cache is anti-fabrication-clean at the engine.
+- **No ZIP polygon → approximate the ZIP as centroid + radius** (`ZIP_RADIUS_MI`, default 3 mi);
+  polygon-precise clipping is a decoupled engine enrichment, not a page blocker. Not a stop.
+- **ZIP centroid pinned to `zipcodes` PyPI v3.0.0** (bundled offline USPS dataset — same source
+  the alerts builds pin). The batch passes `{zip,lat,lng}`; an unknown ZIP returns 422 (never a
+  guessed point) → quarantine, not stop.
+- **Canonical page absent from the repo → build it from the §3 data contract; not a stop.**
+- **Sandbox has no egress → populate the cache server-side via `pg_net`** (`net.http_post` →
+  upsert `net._http_response.content`); Postgres has egress even when the sandbox doesn't.
+
+### Status
+- 🟢 **84302 (Brigham City, Box Elder County, UT) prototype is LIVE** (DB-verified). ZIP-mode
+  report cached in `development_reports`: **facilities 23 · development 41 · proposed 41 ·
+  approved 0 · open comment windows 0**, **64 sites, 0 unsourced** (every marker carries an EPA
+  ECHO / Utah PMN / county / city `record_url`). Route: `homesignalmap.html?zip=84302` (pretty
+  `/development/84302` redirects via `404.html`). Full tree: `docs/box-elder-development-reports-seed.sql`.
+  Same egress caveat as the alerts builds — not eyeballed live from the sandbox; `verify-development`
+  CI does the live browser check. City-council planning feeds beyond Box Elder County are the
+  deferred engine-coverage item (logged, not blocking).

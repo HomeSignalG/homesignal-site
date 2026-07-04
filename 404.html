@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; form-action 'self'">
+<script>
+// Pretty development route: GitHub Pages serves 404.html for unmatched paths, so
+// /development/<zip> is caught here and forwarded to the one dynamic page. No per-ZIP
+// files (CLAUDE.md §0 / development-tracker §0) — the canonical URL is homesignalmap.html?zip=.
+(function(){
+  var m = window.location.pathname.match(/^\/development\/(\d{5})\/?$/);
+  if (m) window.location.replace('/homesignalmap.html?zip=' + m[1]);
+})();
+</script>
 <title>HomeSignal — Page not found</title>
 <meta name="description" content="The page you were looking for isn't here. Return to HomeSignal — community change.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
