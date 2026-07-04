@@ -529,9 +529,9 @@ h2.be-h2 { font-size: 27px; font-weight: 600; margin: 0; letter-spacing: -0.015e
       <button class="save-btn" onclick="toggleSave(this)"><i class="ti ti-heart" aria-hidden="true"></i> <span id="save-label">Save location</span></button>
     </div>
     <div class="be-stats">
-      <span class="be-stat stat"><i class="ti ti-bell" aria-hidden="true"></i>20 active alerts</span>
-      <span class="be-stat stat"><i class="ti ti-calendar-event" aria-hidden="true"></i>2 upcoming hearings</span>
-      <span class="be-stat stat"><i class="ti ti-refresh" aria-hidden="true"></i>Updated today</span>
+      <span class="be-stat stat"><i class="ti ti-bell" aria-hidden="true"></i><span id="hero-alerts">Live alerts below</span></span>
+      <span class="be-stat stat"><i class="ti ti-calendar-event" aria-hidden="true"></i><span id="hero-hearings">Upcoming hearings tracked</span></span>
+      <span class="be-stat stat"><i class="ti ti-refresh" aria-hidden="true"></i>Updated automatically</span>
     </div>
 
     <!-- SOURCING / INFO BANNER -->
@@ -797,14 +797,17 @@ function formatDate(str) {
 function renderAlerts(alerts) {
   const feed = document.getElementById('alert-feed');
   const count = document.getElementById('feed-count');
+  const heroAlerts = document.getElementById('hero-alerts');
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeUrl = u => { u = String(u == null ? '' : u); return /^https?:\/\//i.test(u) ? u : ''; };
   if (!alerts || alerts.length === 0) {
     feed.innerHTML = '<div class="empty-state"><p>No alerts yet for this community</p><span>Check back soon — alerts appear as new filings and notices are published</span></div>';
     count.textContent = '0 alerts';
+    if (heroAlerts) heroAlerts.textContent = 'Live alerts below';
     return;
   }
   count.textContent = alerts.length + ' alert' + (alerts.length === 1 ? '' : 's') + ' · updated today';
+  if (heroAlerts) heroAlerts.textContent = alerts.length + ' active alert' + (alerts.length === 1 ? '' : 's');
   feed.innerHTML = alerts.map(a => {
     const tag = getPipelineTag(a.pipeline_type, a.category);
     const icon = getIcon(a.pipeline_type, a.category);
@@ -1269,12 +1272,15 @@ async function loadMeetings() {
     let meetings = await res.json();
     // Keep only meetings whose LOCAL (Denver) date is today or later (ISO dates sort chronologically).
     meetings = Array.isArray(meetings) ? meetings.filter(m => m.meeting_date && denverDate(m.meeting_date) >= denverToday) : [];
+    const heroHearings = document.getElementById('hero-hearings');
     if (meetings.length === 0) {
       list.innerHTML = '<div class="empty-state"><p>No upcoming meetings posted yet</p><span>Check back soon — new hearings and agendas appear here</span></div>';
+      if (heroHearings) heroHearings.textContent = 'Upcoming hearings tracked';
       return;
     }
     const mtgCountEl = document.getElementById('mtg-count');
     if (mtgCountEl) mtgCountEl.textContent = meetings.length;
+    if (heroHearings) heroHearings.textContent = meetings.length + ' upcoming hearing' + (meetings.length === 1 ? '' : 's');
     function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
     function fmtDate(value){
       if(!value) return '';
