@@ -148,7 +148,7 @@ async function facilitySites(homeLat: number, homeLng: number, radiusMi: number)
     const d = Math.hypot(e, n);
     if (d > radiusMi + 0.05) continue;
     const rid = String(rr.RegistryId ?? rr.RegistryID ?? "").trim();
-    kept.push({ label: name, e, n, lat, lng, _d: d, scope: "point", type: "built", layer: classifyLayer(name), registry_id: rid, src: rid ? `EPA FRS  registry ${rid}` : "EPA FRS", record_url: rid ? `https://echo.epa.gov/detailed-facility-report?fid=${rid}` : "" });
+    kept.push({ label: name, e, n, lat, lng, _d: d, scope: "point", type: "built", layer: classifyLayer(name), registry_id: rid, src: rid ? `EPA FRS · registry ${rid}` : "EPA FRS", record_url: rid ? `https://echo.epa.gov/detailed-facility-report?fid=${rid}` : "" });
   }
   kept.sort((a, b) => (a._d as number) - (b._d as number));
   return kept.slice(0, MAX_FACILITIES).map((f) => { delete f._d; return f; });
