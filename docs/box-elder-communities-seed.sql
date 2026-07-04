@@ -1,0 +1,69 @@
+-- box-elder-communities-seed.sql
+-- The Box Elder County community tree — the PER-ZIP backbone with city/county
+-- government layered on via parent_id (see docs/community-build-source-of-truth.md §13).
+-- Versioned source for the rows created in Supabase this session; requires the `slug`
+-- column (docs/communities-slug-migration.sql) and the level enum (county|city|zip|
+-- neighborhood). Idempotent: re-running skips existing rows.
+--
+-- MODEL (citizens think in ZIP codes):
+--   The ZIP is the resident-facing PAGE. The city and county are government LAYERS the
+--   ZIP inherits by cascading UP parent_id. A ZIP page shows its own place name +
+--   whatever government cascades down from its parents (city council, county, state).
+--
+--   county  Box Elder County ............ county government (commission, planning, tax, …)
+--     ├─ city  Brigham City / Tremonton ... their own city council (for 84302 / 84337)
+--     └─ zip   Bear River City … Willard, Hooper ... inherit the county's government
+--
+-- Town councils for the small ZIP towns are layered on LATER, once each town's meeting
+-- source is wired on the ingest side (many small Utah towns may not publish meetings).
+
+-- ── 1) County — the root government layer ──────────────────────────────────────────
+insert into public.communities (name, county, state, level, slug, zip_codes, government_topics) values
+('Box Elder County','Box Elder','UT','county','box-elder',
+ array['84301','84302','84306','84307','84309','84311','84312','84313','84314','84315',
+       '84316','84324','84329','84330','84331','84334','84336','84337','84340'],
+ array['County Commission & county business','Planning, zoning & development',
+       'Property taxes & assessments','Public safety & emergencies','Water companies',
+       'Elections & voting','Stratos data center project'])
+on conflict do nothing;
+-- NOTE: DB also carries 84308 on the county row; it has no place name / page yet —
+-- left off this list pending a decision (see the session flag).
+
+-- ── 2) Incorporated cities — own council; parent → county ───────────────────────────
+insert into public.communities (name, county, state, level, slug, zip_codes, government_topics, parent_id) values
+('Brigham City','Box Elder','UT','city','brigham-city',array['84302'],
+ array['City government (Brigham City)'],(select id from public.communities where slug='box-elder')),
+('Tremonton','Box Elder','UT','city','tremonton',array['84337'],
+ array['City government (Tremonton)'],(select id from public.communities where slug='box-elder'))
+on conflict do nothing;
+
+-- ── 3) ZIP pages — one per ZIP; parent → county; government inherited via cascade ───
+insert into public.communities (name, county, state, level, slug, zip_codes, government_topics, parent_id)
+select v.name, 'Box Elder', 'UT', 'zip', v.slug, array[v.zip], array[]::text[],
+       (select id from public.communities where slug='box-elder')
+from (values
+  ('Bear River City','bear-river-city','84301'),
+  ('Collinston','collinston','84306'),
+  ('Corinne','corinne','84307'),
+  ('Deweyville','deweyville','84309'),
+  ('Fielding','fielding','84311'),
+  ('Garland','garland','84312'),
+  ('Grouse Creek','grouse-creek','84313'),
+  ('Honeyville','honeyville','84314'),
+  ('Hooper','hooper','84315'),          -- 84315 is postally Hooper (usually Weber County); reparent if needed
+  ('Howell','howell','84316'),
+  ('Mantua','mantua','84324'),
+  ('Park Valley','park-valley','84329'),
+  ('Plymouth','plymouth','84330'),
+  ('Portage','portage','84331'),
+  ('Riverside','riverside','84334'),
+  ('Snowville','snowville','84336'),
+  ('Willard','willard','84340')
+) as v(name, slug, zip)
+on conflict do nothing;
+
+-- Verify:
+--   select name, level, slug, zip_codes[1] as zip,
+--          (select p.name from public.communities p where p.id = c.parent_id) as parent
+--   from public.communities c where c.county='Box Elder'
+--   order by array_position(array['county','city','zip'], c.level), name;
