@@ -324,6 +324,10 @@ asking.** (Only §10 warrants a pause.)
 | Homepage ZIP search doesn't find the new community? | **Fixed (§6.1)** — the homepage now queries `communities` and routes covered ZIPs to `community.html?zip=…` (or a bespoke launch page if one exists). A new row is found with no repo change. |
 | Add to `sitemap.xml`? | Yes — one `<url>` line per live community (cheap, SEO). |
 | Open a PR? | Only if asked. Data changes (the DB row) go live via Supabase, **not** a repo push. |
+| A big county has **many ZIPs per city** (Salt Lake City = ~10 ZIPs) — name each row after the city? | **NO — one page per ZIP, name it `"<place label> (<ZIP>)"`** (e.g. `Salt Lake City (84101)`, slug `salt-lake-city-84101`). The ZIP is the page (§13.7); a repeated bare city name collides on slug and reads as a thin duplicate. Append the ZIP to make each name + slug distinct and deterministic. |
+| A ZIP spans **two+ cities** (`Salt Lake City / Millcreek`, `Kearns / Taylorsville`)? | **Still ONE `level=zip` page**, `parent_id` → the **county**, named with both places verbatim from the source label. Do **not** try to pick a single city or split the ZIP — the county cascade covers it, and city councils are layered on later (below). |
+| A ZIP straddles **two counties** and another county row already lists it (e.g. `84065` in the live Utah County row)? | **Not a stop.** Build the ZIP page under the county it predominantly serves; it resolves most-specific (`zip > city > county`) so residents route correctly. **But keep that ZIP OFF your new county row's county-level `zip_codes` array** — two `county`-level rows claiming one ZIP is the one real same-level collision (§12.4). The ZIP-level page is enough. |
+| A large county's incorporated **cities** (Salt Lake City, Sandy, West Valley City…) — create `level=city` council rows now? | **NO, in a site-only session.** Seed the **county root + one `level=zip` page per ZIP** (`government_topics=[]`, inheriting the county's topics via cascade). A subscribable `City government (X)` topic is added **only after that city's meeting source is verified + wired on the ingest side** (§13.2/§13.3) — never before its feed exists. The county's topics are real, subscribable value on day one. |
 
 ---
 
@@ -334,7 +338,10 @@ Everything else above is pre-approved. Pause only for:
 - **A ZIP already belongs to a different live community** — an overlap/policy call.
   *(Single-community/manual mode only. In the batch runbook this does NOT stop: a
   county/city overlap is expected and resolves by `level`+`parent_id`; a same-level
-  collision quarantines the row and the run continues — §12.4.)*
+  collision quarantines the row and the run continues — §12.4.)* **A cross-county
+  border ZIP** (one already listed by another county row — e.g. `84065`) is **not** this
+  exception: it resolves most-specific; just keep it off your new county-level array and
+  build the ZIP page (§9). Only a *systematic, state-wide* same-level collision pauses.
 - **The schema genuinely doesn't support what's needed** (a new column/table beyond §6's
   known ones) — surface it, write the DDL into `docs/*.sql`, don't improvise on live data.
 - **Anything touching secrets, money, PII, or the subscriber list** — never expose a
@@ -628,6 +635,38 @@ real site: `homesignal.net/community.html?zip=84312` → pick a topic → comple
 verification on the real site or via CI, never assume it ran in-sandbox.)
 
 **Pending:** wiring each small town's own council (per-town meeting source, ingest side).
+
+### 13.9 Worked example — Salt Lake County, built per-ZIP (the big-county pattern)
+
+Box Elder (§13.6) is a *rural* county — one ZIP per small town. **Salt Lake County is the
+opposite shape** (dense, many ZIPs per city, multi-city and cross-county ZIPs), so it is the
+reference for how the same model handles a metro county **without** any new fork. Built +
+DB-verified this session; versioned in `docs/salt-lake-county-communities-seed.sql`.
+
+- **County** `Salt Lake County` (`level=county`, `slug=salt-lake-county`) holds the **6
+  canonical county topics** — the same six as the live `Utah County` row, no place-specific
+  data-center topic. This is the content root every ZIP inherits.
+- **36 ZIP pages** (`level=zip`, `parent_id`→county, `government_topics=[]`) — one per
+  requested ZIP, each named **`"<place label> (<ZIP>)"`** so a city with many ZIPs
+  (Salt Lake City = 84101…84116) yields distinct pages/slugs (`salt-lake-city-84101`, …)
+  instead of colliding on one bare `salt-lake-city` slug (§9, §13.7 duplicate-content note).
+- **Multi-city ZIPs stay one page**: `Salt Lake City / Millcreek (84106)`,
+  `Kearns / Taylorsville (84118)`, `Sandy / Alta (84092)`, etc. — labeled with every place,
+  parented to the county, not split.
+- **Cross-county border ZIP `84065`** (Herriman/Riverton/Bluffdale, part) is already on the
+  live `Utah County` row. Its Salt Lake ZIP page is built (resolves most-specific — verified
+  it ranks `zip` above the existing `Bluffdale` city + `Utah County` rows), but `84065` was
+  **deliberately kept off** the `Salt Lake County` county-level `zip_codes` array to avoid
+  two `county` rows claiming one ZIP (§9 / §12.4). Non-blocking, no stop.
+- **City councils are NOT rows yet.** No `level=city` row for Salt Lake City / Sandy / West
+  Valley City / Murray / Taylorsville / Holladay / …: a subscribable `City government (X)`
+  topic is added only once that city's meeting source is verified + wired on the ingest side
+  (§13.2/§13.3). Until then every ZIP inherits the county's 6 topics via cascade — real,
+  subscribable value on day one.
+
+**Same caveat as Box Elder:** verified by **data + deployed code + resolution probe**, not an
+in-sandbox browser signup (egress blocked). Confirm on the real site
+(`homesignal.net/community.html?zip=84101` → pick a topic → sign up).
 
 ---
 
