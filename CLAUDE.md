@@ -177,10 +177,24 @@ Then do the runbook end-to-end without pausing. The session already runs in
 following that playbook and hit "clone the page," use the dynamic page instead. See
 `docs/community-build-source-of-truth.md` §4 for the reconciliation.)
 
+**Big-county / metro standing answers (no stop — see `docs/community-build-source-of-truth.md`
+§9 & §13.9, the Salt Lake County pattern):**
+- **Many ZIPs per city** → one `level=zip` page per ZIP named `"<place> (<ZIP>)"` (distinct
+  name + slug); never one bare city slug for many ZIPs.
+- **A ZIP spanning multiple cities** → still ONE ZIP page, `parent_id`→county, labeled with
+  every place; don't split it or pick one city.
+- **A cross-county border ZIP already on another county row** → build the ZIP page (it
+  resolves most-specific), but keep it OFF your county-level `zip_codes` array (avoids the one
+  real same-level county collision). Not a stop.
+- **Incorporated city councils in a site-only session** → defer. Seed county + ZIP pages
+  (`government_topics=[]`, inherit county via cascade); add a `City government (X)` topic only
+  after that city's meeting feed is verified/wired on the ingest side.
+
 **When to stop and ask (the only cases):** the schema doesn't support what's needed
-(a genuinely new column/table), a ZIP already belongs to a different live community
-(overlap policy call), or a legal/consent change. Ordinary "add community N" never
-qualifies — just ship it.
+(a genuinely new column/table), a *same-level* ZIP collision that is systematic/state-wide
+(a single cross-county border ZIP is NOT this — handle per above), or a legal/consent change.
+Ordinary "add community N" — including a whole metro county of ZIPs — never qualifies; just
+ship it.
 
 ### Scaling gaps — status
 - ✅ **`index.html` homepage ZIP search now queries `communities`** (source of truth)
@@ -210,6 +224,19 @@ qualifies — just ship it.
   (egress blocked → `HTTP 000`); verified by data + deployed code + static render, **not**
   an end-to-end browser signup. Confirm on the real site (`?zip=84312` → pick a topic →
   sign up). Each small town's **own council** is the pending ingest follow-up.
+- 🟢 **Salt Lake County per-ZIP build is LIVE — 37 rows (1 county + 36 ZIP pages)**
+  (DB-verified). This is the **metro-county** reference (Box Elder is the rural one): dense
+  ZIPs, many-ZIPs-per-city, multi-city and cross-county ZIPs — all handled by the same model,
+  **no new fork**. County root = the 6 canonical topics (same six as Utah County); every ZIP
+  is a `level=zip` page named `"<place> (<ZIP>)"` (`parent_id`→county, `government_topics=[]`)
+  inheriting the county via cascade. Multi-city ZIPs (e.g. `Salt Lake City / Millcreek
+  (84106)`) stay one page; the cross-county ZIP `84065` (already on the live Utah County row)
+  is built as a ZIP page but kept **off** the county-level array to avoid a same-level
+  collision. **City councils (Salt Lake City, Sandy, West Valley City, …) are intentionally
+  deferred** to the ingest step (no subscribable `City government (X)` topic before its feed
+  is verified). Full tree + standing answers: `docs/salt-lake-county-communities-seed.sql`,
+  `docs/community-build-source-of-truth.md` §9 & §13.9. Same egress caveat — not eyeballed
+  live; confirm on the real site (`?zip=84101` → pick a topic → sign up).
 - ⚠️ **Delivery split is the open cross-repo item.** Notices and Meetings are separate
   *tiles*, but making them independently *deliverable* — and the email structure (default:
   two emails, one 5 PM Central window, news rides with notices — a **founder** call) —
