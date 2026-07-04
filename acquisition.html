@@ -313,6 +313,61 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
     $('dash-root').style.display='block';
     wireTabs();
     initGrowth(p.S||[]);
+    wireLive();
+  }
+
+  // ---- live overlays fetched separately from the static snapshot ----
+  function fmtDay(s){ var p=String(s).split('-'); var M=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; return M[parseInt(p[1],10)-1]+' '+parseInt(p[2],10); }
+  function spark(daily){
+    if(!daily || !daily.length) return '';
+    var W=280,H=54,pad=7,n=daily.length;
+    var vals=daily.map(function(r){return Number(r.followers)||0;});
+    var mn=Math.min.apply(null,vals), mx=Math.max.apply(null,vals), rng=(mx-mn)||1;
+    function X(i){ return pad+(W-2*pad)*(n===1?0.5:i/(n-1)); }
+    function Y(v){ return H-pad-(H-2*pad)*((v-mn)/rng); }
+    var pts=daily.map(function(r,i){ return [X(i),Y(r.followers)]; });
+    var line=pts.map(function(p,i){ return (i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1); }).join(' ');
+    var dots=pts.map(function(p,i){ return '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.6" fill="#2fbf71"><title>'+esc(fmtDay(daily[i].day))+': '+daily[i].followers+'</title></circle>'; }).join('');
+    return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:300px;display:block" role="img" aria-label="Follower trend">'+
+      '<path d="'+line+'" fill="none" stroke="#2fbf71" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+dots+'</svg>';
+  }
+  function followerCard(d){
+    var daily=d.daily||[];
+    var cur=(d.current && d.current.followers!=null)?d.current.followers:(daily.length?daily[daily.length-1].followers:0);
+    var first=daily.length?daily[0].followers:cur;
+    var delta=cur-first;
+    var deltaTxt=delta>0?('▲ +'+delta):(delta<0?('▼ '+delta):'no change');
+    var since=daily.length>1?(' since '+fmtDay(daily[0].day)):'';
+    return '<div class="card">'+
+      '<h3>Bluesky followers <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
+      '<p class="sub">Live from social_account_stats · @'+esc(d.handle||'')+' — grows as daily captures accumulate.</p>'+
+      '<div style="display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap">'+
+        '<div><div class="tile-val" style="font-size:30px">'+cur+'</div>'+
+        '<div class="tile-note" style="color:var(--real)">'+esc(deltaTxt+since)+'</div></div>'+
+        '<div style="flex:1;min-width:200px">'+spark(daily)+'</div>'+
+      '</div></div>';
+  }
+  function upgradeFollowerTile(d){
+    var cur=(d.current && d.current.followers!=null)?d.current.followers:null;
+    if(cur==null) return;
+    document.querySelectorAll('#dash-root .tile').forEach(function(t){
+      var lbl=t.querySelector('.tile-label');
+      if(lbl && lbl.textContent.trim()==='Social followers'){
+        t.classList.remove('s-pending'); t.classList.add('s-real');
+        var val=t.querySelector('.tile-val'); if(val) val.textContent=cur;
+        var tag=t.querySelector('.tile-tag'); if(tag){ tag.classList.remove('t-pending'); tag.classList.add('t-real'); tag.textContent='live'; }
+        var note=t.querySelector('.tile-note'); if(note) note.textContent='Bluesky · live';
+      }
+    });
+  }
+  async function wireLive(){
+    try{
+      var r=await window.hsClient.rpc('hs_social_followers');
+      if(r.error || !r.data) return;       // silently skip if unavailable — never breaks the page
+      upgradeFollowerTile(r.data);
+      var eng=$('tab-engagement');
+      if(eng){ var wrap=document.createElement('div'); wrap.innerHTML=followerCard(r.data); if(wrap.firstChild) eng.insertBefore(wrap.firstChild, eng.firstChild); }
+    }catch(e){}
   }
 
   async function load(){
