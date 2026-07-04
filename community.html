@@ -1033,32 +1033,49 @@ function toggleMoreMeetings(){
 var COMMUNITY = null;
 function commName(){ return COMMUNITY ? COMMUNITY.name : 'your community'; }
 
+// Level specificity for most-specific-live resolution (town wins over its county).
+var LEVEL_RANK = { neighborhood:4, zip:3, city:2, county:1 };
 async function resolveCommunity(){
   var p = new URLSearchParams(window.location.search);
   var id = p.get('id');
   var slug = p.get('community') || p.get('slug');
   var zip = p.get('zip');
   var H = { 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${SUPABASE_ANON_KEY}` };
-  async function fetchRow(qs){
+  async function q(qs){
     try{
       var res = await fetch(`${SUPABASE_URL}/rest/v1/communities?${qs}&select=*`, { headers:H });
-      if(!res.ok) return null;
+      if(!res.ok) return [];
       var rows = await res.json();
-      return (Array.isArray(rows) && rows.length) ? rows[0] : null;
-    }catch(e){ return null; }
+      return Array.isArray(rows) ? rows : [];
+    }catch(e){ return []; }
   }
   var row = null;
-  if(id) row = await fetchRow(`id=eq.${encodeURIComponent(id)}`);
-  // DB is source of truth: resolve a slug against communities.slug directly.
-  else if(slug) row = await fetchRow(`slug=eq.${encodeURIComponent(slug)}`);
-  else if(zip) row = await fetchRow(`zip_codes=cs.{${encodeURIComponent(zip)}}`);
-  // Fallback for a slug not yet backfilled into communities.slug: the
-  // communities.js bootstrap map (slug -> id), then load by id.
-  if(!row && slug && window.HS && HS.getCommunity){
-    var c = HS.getCommunity(slug);
-    if(c && c.id) row = await fetchRow(`id=eq.${encodeURIComponent(c.id)}`);
+  if(id) row = (await q(`id=eq.${encodeURIComponent(id)}`))[0] || null;
+  else if(slug){
+    row = (await q(`slug=eq.${encodeURIComponent(slug)}`))[0] || null;
+    // Fallback for a slug not yet backfilled into communities.slug: communities.js map.
+    if(!row && window.HS && HS.getCommunity){ var c = HS.getCommunity(slug); if(c && c.id) row = (await q(`id=eq.${encodeURIComponent(c.id)}`))[0] || null; }
+  } else if(zip){
+    // Most-specific-live: a ZIP can sit in a county AND a town; the town wins.
+    var hits = await q(`zip_codes=cs.{${encodeURIComponent(zip)}}`);
+    hits.sort(function(a,b){ return (LEVEL_RANK[b.level]||0)-(LEVEL_RANK[a.level]||0) || (a.zip_codes||[]).length-(b.zip_codes||[]).length; });
+    row = hits[0] || null;
   }
-  if(row){ COMMUNITY = row; COMMUNITY_ID = row.id; } // else keep Box Elder fallback
+  if(!row) return; // keep Box Elder fallback
+  COMMUNITY = row; COMMUNITY_ID = row.id;
+  // Walk parent_id up to the root so county content cascades DOWN to a town page.
+  var chain = [row], cur = row, guard = 0;
+  while(cur && cur.parent_id && guard++ < 8){
+    var par = (await q(`id=eq.${encodeURIComponent(cur.parent_id)}`))[0] || null;
+    if(!par) break; chain.push(par); cur = par;
+  }
+  COMMUNITY.chain    = chain;
+  COMMUNITY.chainIds = chain.map(function(c){ return c.id; });
+  COMMUNITY.rootId   = chain[chain.length-1].id;   // where content + subscriptions anchor
+  // Government topics grouped by level, ancestors only — siblings never appear.
+  COMMUNITY.govGroups = chain.map(function(c){ return { name:c.name, level:c.level, topics:(c.government_topics||[]) }; }).filter(function(g){ return g.topics.length; });
+  COMMUNITY.govTopics = []; COMMUNITY.allowedGov = {};
+  COMMUNITY.govGroups.forEach(function(g){ g.topics.forEach(function(t){ if(!COMMUNITY.allowedGov[t]){ COMMUNITY.allowedGov[t]=1; COMMUNITY.govTopics.push(t); } }); });
 }
 
 function applyCommunity(){
