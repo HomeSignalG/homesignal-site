@@ -37,6 +37,12 @@ ALTER VIEW public.v_growth_daily         SET (security_invoker = on);
 REVOKE ALL ON public.page_cache FROM anon, authenticated;
 ALTER TABLE public.page_cache ENABLE ROW LEVEL SECURITY;
 
+-- 4) Consistency fix (audit follow-up): hs_zip_behavior kept EXECUTE for anon via
+--    the public-schema default privilege, while every other dashboard RPC is
+--    authenticated-only. The in-function dashboard_admins gate already blocks anon
+--    (null email -> 42501), so this was not a leak — but match the pattern.
+REVOKE EXECUTE ON FUNCTION public.hs_zip_behavior() FROM anon;
+
 -- Verify:
 --   SELECT count(*) FROM information_schema.role_table_grants
 --   WHERE table_schema='public' AND grantee IN ('anon','authenticated')
