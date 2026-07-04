@@ -283,6 +283,24 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   …) are intentionally **deferred** to the ingest step. Full tree: `docs/michigan-communities-seed.sql`.
   Resolution probe passed (20-ZIP sample all resolve most-specific `zip>county`; 0 dup slugs;
   0 orphan pages); same egress caveat — confirm on the real site (`?zip=48226` → pick a topic → sign up).
+- 🟢 **Washington (Puget Sound metros + Spokane + Yakima Valley + Tri-Cities + NW counties)
+  per-ZIP build is LIVE — 374 rows (13 county roots + 361 ZIP pages)** (DB-verified). Third
+  **out-of-state** build: King, Pierce, Snohomish, Spokane, Yakima, Clark, Thurston, Whatcom,
+  Skagit, Benton, plus single-ZIP roots Kittitas, Lewis, Stevens — same model, **no new fork**.
+  Each county root = the 6 canonical topics; every requested ZIP is a `level=zip` page named
+  `"<place> (<ZIP>)"` (`parent_id`→county, `government_topics=[]`) inheriting via cascade. The
+  ZIP→city→county crosswalk was generated from the **`zipcodes` PyPI package v3.0.0** (bundled
+  offline USPS database — §12.0), not hand-typed. **No cross-county collisions** — all 361 ZIPs
+  mapped to exactly one WA county and WA had zero rows pre-seed (prior states are UT/CO/MI ZIP
+  ranges). County slugs carry a `-wa` suffix (`king-county-wa`, …). Two crosswalk edge cases:
+  `98082` (Mill Creek) had a blank county field in the package but its city sits wholly in
+  Snohomish County, so it's parented there from the package's own city value; `99015` (Freeman)
+  is **not in the crosswalk at all** and was **quarantined** (excluded, not guessed — §12.2).
+  City councils (Seattle, Tacoma, Spokane, Bellevue, Everett, Vancouver, Yakima, Olympia,
+  Bellingham, …) are intentionally **deferred** to the ingest step. Full tree:
+  `docs/washington-communities-seed.sql`. Resolution probe passed (13-ZIP sample all resolve
+  most-specific `zip>county`; 0 dup slugs; 0 orphan pages); same egress caveat — confirm on the
+  real site (`?zip=98101` → pick a topic → sign up).
 - ⚠️ **Delivery split is the open cross-repo item.** Notices and Meetings are separate
   *tiles*, but making them independently *deliverable* — and the email structure (default:
   two emails, one 5 PM Central window, news rides with notices — a **founder** call) —
