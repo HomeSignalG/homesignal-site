@@ -31,6 +31,26 @@
         'City government (Brigham City)',
         'City government (Tremonton)'
       ]
+    },
+    {
+      id: '3aa7541e-2aa1-4254-96d2-962240cd2e32',
+      slug: 'eagle-mountain',
+      name: 'Eagle Mountain, Utah',
+      page: 'eagle-mountain.html',
+      zips: ['84005'],
+      // Per-community Government Notices topics — must track the exact government
+      // feeds available for this city (see topics.js / digest.py::CANONICAL_TOPICS).
+      // A city's own council maps to the fixed 'County Commission & county business'
+      // label — do NOT rename to 'City Council'; the engine matches exact strings.
+      governmentTopics: [
+        'County Commission & county business',
+        'Planning, zoning & development',
+        'Property taxes & assessments',
+        'Public safety & emergencies',
+        'Water companies',
+        'Elections & voting',
+        'Eagle Mountain data center project'
+      ]
     }
   ];
 
