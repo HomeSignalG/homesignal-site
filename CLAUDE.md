@@ -10,6 +10,26 @@ the repo is what ships.
 
 ---
 
+## Claims discipline — verify the field, attach the evidence (read before asserting)
+
+Most broken rules are just claims that weren't verified. Operational, not abstract:
+
+1. **A count / grep is a LEAD, not a fact.** `grep -c "x"` proves a word *appears*, not
+   what it *means* — parse the actual field and read the value before you assert.
+   *(A real miss: "we have ~10 Google feeds" was shipped from a substring count; all 10
+   were notes saying "NO Google." The real count was zero.)*
+2. **Evidence rides WITH the claim, or the claim is marked UNVERIFIED.** State a fact about
+   data/state only next to the query + result that proves it. No receipt → say "unverified"
+   or go verify first. Never a naked assertion.
+3. **Quote the source; don't recall it.** For a DB value / file line / doc, show the exact
+   row or line — never from memory.
+4. **"Rows match" ≠ "rows do X."** Matching a term isn't doing the thing; check the column
+   that actually drives behavior (e.g. `source_type`/`source`, not `notes`).
+
+If you can't produce the evidence in the same message, you don't yet know it — so don't say it.
+
+---
+
 ## 0. The prime directive: communities are DATA, not code
 
 **We are scaling to 100+ communities (goal: all ~3,144 U.S. counties). A new
