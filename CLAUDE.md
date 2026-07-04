@@ -502,9 +502,10 @@ needs beyond a query change); secrets/PII/subscriber-data or the cache RLS postu
 legal/framing change not covered by the one-time sign-off.
 
 ### New standing answers logged this build (so the mass build never re-asks — mirror in the doc §6)
-- **ZIP mode is BUILT** as an additive branch in `get-address-report` **v9** — `{zip}` (or
-  `{zip,lat,lng}`); address mode `{address,radius_mi}` is byte-for-byte unchanged. It filters
-  to sourced sites only, so the cache is anti-fabrication-clean at the engine.
+- **ZIP mode is BUILT** as an additive branch in `get-address-report` (**v10**) — `{zip}` (or
+  `{zip,lat,lng}`); address mode `{address,radius_mi}` is byte-for-byte unchanged (audited:
+  address mode + all helpers identical to v8, incl. the `EPA FRS · registry` facility label).
+  It filters to sourced sites only, so the cache is anti-fabrication-clean at the engine.
 - **No ZIP polygon → approximate the ZIP as centroid + radius** (`ZIP_RADIUS_MI`, default 3 mi);
   polygon-precise clipping is a decoupled engine enrichment, not a page blocker. Not a stop.
 - **ZIP centroid pinned to `zipcodes` PyPI v3.0.0** (bundled offline USPS dataset — same source
