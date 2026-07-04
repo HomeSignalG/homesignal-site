@@ -317,6 +317,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
     wireFeedInventory();
     wireAcqLive();
     wireZipBehavior();
+    wireAcqMetrics();
     stalenessBanner(p.meta);
   }
 
@@ -427,6 +428,74 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
       if(!document.getElementById('zip-behavior-wrap')){
         var box=document.createElement('div'); box.id='zip-behavior-wrap';
         box.innerHTML=zipBehaviorCard(r.data);
+        host.insertBefore(box, host.firstChild);
+      }
+    }catch(e){}
+  }
+
+  // ---- LIVE Acquisition Metrics (gated RPC hs_acquisition_metrics). Leads the
+  //      Acquisition Metrics tab: KPIs, the 30-day funnel, topic demand, and paid
+  //      conversion — all current, above the static snapshot below. ----
+  function barCell(pct){
+    return '<div style="background:rgba(79,156,255,.18);border-radius:4px;height:8px;min-width:60px">'+
+      '<div style="background:var(--accent);height:8px;border-radius:4px;width:'+Math.max(pct,0.5)+'%"></div></div>';
+  }
+  function acqMetricsCard(d){
+    d=d||{};
+    var k=d.kpis||{}, f=d.funnel||{}, paid=d.paid||{};
+    var topics=d.topics_top||[];
+    var wk=(d.signups_by_week||[]).map(function(w){ return { day:w.week, followers:w.count }; });
+    var emailState=(k.email_error_rate_pct>0)?'persist':'real';
+    var kpis=
+      liveTile('Users', k.users_total||0, (k.users_active||0)+' active · '+(k.unsub_rate_pct||0)+'% unsub', (k.unsub_rate_pct>0?'persist':'real'))+
+      liveTile('Topic subscriptions', k.subscriptions_total||0, 'across all users')+
+      liveTile('Signup intents', k.signup_intents||0, 'clicked subscribe')+
+      liveTile('Area requests', k.community_requests||0, 'coverage asks')+
+      liveTile('Emails sent', k.emails_sent||0, (k.email_error_rate_pct||0)+'% error rate', emailState)+
+      liveTile('Community pages', (k.communities_live||0).toLocaleString(), 'provisioned');
+    // 30-day funnel — each stage as a share of the top stage
+    var stages=[['Alert views',f.alert_view||0],['Alert reads',f.alert_read||0],['Signup intents',f.signup_intent||0],['Signups',f.signup||0]];
+    var top=stages[0][1]||1;
+    var funnelRows=stages.map(function(s){
+      var pct=Math.round(1000*s[1]/top)/10;
+      return '<tr><td>'+esc(s[0])+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums">'+s[1].toLocaleString()+'</td>'+
+        '<td>'+barCell(pct)+'</td>'+
+        '<td class="muted" style="font-variant-numeric:tabular-nums">'+pct+'%</td></tr>';
+    }).join('');
+    // topic demand
+    var tmax=topics.length?(topics[0].followers||1):1;
+    var topicRows=topics.map(function(t){
+      var pct=Math.round(1000*(t.followers||0)/tmax)/10;
+      return '<tr><td>'+esc(t.topic||'')+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums">'+(t.followers||0)+'</td>'+
+        '<td>'+barCell(pct)+'</td></tr>';
+    }).join('');
+    var paidTotal=(paid.active||0)+(paid.trialing||0)+(paid.canceled||0);
+    var paidLine=paidTotal
+      ? '<span class="t-real">'+(paid.active||0)+' active</span> · '+(paid.trialing||0)+' trialing · <span class="muted">'+(paid.canceled||0)+' canceled</span>'
+      : '<span class="muted">No paid subscriptions yet — free tier only.</span>';
+    return '<div class="card"><h3>Acquisition metrics <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
+      '<p class="sub">Current KPIs, the 30-day acquisition funnel, topic demand and paid conversion — live, above the snapshot below.</p>'+
+      '<div class="grid" style="margin-bottom:16px">'+kpis+'</div>'+
+      (wk.length?('<div class="sub" style="margin:0 0 4px">Signups per week</div>'+spark(wk)+'<div style="height:14px"></div>'):'')+
+      '<div style="display:flex;gap:24px;flex-wrap:wrap">'+
+        '<div style="flex:1;min-width:280px"><div class="sub" style="margin:0 0 6px">Funnel · last 30 days</div>'+
+          '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Stage</th><th style="text-align:right">Count</th><th>Share</th><th></th></tr></thead><tbody>'+funnelRows+'</tbody></table></div></div>'+
+        '<div style="flex:1;min-width:280px"><div class="sub" style="margin:0 0 6px">Top topic demand</div>'+
+          (topicRows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Topic</th><th style="text-align:right">Followers</th><th></th></tr></thead><tbody>'+topicRows+'</tbody></table></div>'):'<div class="muted">No topic subscriptions yet.</div>')+'</div>'+
+      '</div>'+
+      '<div class="tile-note" style="margin-top:14px">Paid: '+paidLine+'</div>'+
+    '</div>';
+  }
+  async function wireAcqMetrics(){
+    var host=$('tab-acquisition'); if(!host) return;
+    try{
+      var r=await window.hsClient.rpc('hs_acquisition_metrics');
+      if(r.error || !r.data) return;
+      if(!document.getElementById('acq-metrics-wrap')){
+        var box=document.createElement('div'); box.id='acq-metrics-wrap';
+        box.innerHTML=acqMetricsCard(r.data);
         host.insertBefore(box, host.firstChild);
       }
     }catch(e){}
