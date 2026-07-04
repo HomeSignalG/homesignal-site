@@ -162,14 +162,19 @@ qualifies — just ship it.
   only the legacy bespoke-page map, not the coverage source.
 - ✅ **`communities` has a `slug` column** (`docs/communities-slug-migration.sql`), so
   `?community=<slug>` resolves against the DB; `communities.js` is fallback-only.
-- ⚠️ **`communities.js` still drifts from the DB** (e.g. Box Elder ZIPs/topics). It's a
-  fallback, so this isn't a runtime bug, but don't treat it as truth — the DB (#1) is.
-  The clean fix is to generate it from `communities` rather than hand-edit it.
-- ⚠️ **ZIP resolution is not most-specific-live yet** (latent). `community.html` `?zip=`
-  takes `rows[0]` unordered, and `index.html`'s homepage lookup likewise — harmless while
-  no live communities share a ZIP (Box Elder / Eagle Mountain don't), but **must be fixed
-  before the first county→city split** or a shared ZIP may resolve to the county instead
-  of the town. Fix: rank by `level` specificity. See `community-build-source-of-truth.md` §13.4.
+- ✅ **Box Elder copies reconciled** — DB `government_topics` 7→9 (added the
+  `City government (Brigham City)` / `(Tremonton)` councils, whose meetings already exist
+  in the DB) and `communities.js` ZIPs 18→20. `communities.js` stays a **fallback** (the
+  DB #1 is truth); the clean long-term fix is to generate it from `communities`.
+- ⚠️ **Two town-split prerequisites — DESIGNED but NOT BUILT** (harmless while every place
+  is a single county community; **both must ship before splitting a town into its own
+  community**, §community-build-source-of-truth `§13.4`):
+  1. **Cascade content query** — `community.html` pulls `alerts`/`meetings` by a single
+     `community_id=eq.<self>` (`:526`,`:933`), no ancestor walk. A child town page would
+     miss the county meetings that impact it. Fix: query `community_id IN (self+ancestors)`
+     up the `parent_id` chain (per `multi-county-plan.md` §0a `geographic_reference`).
+  2. **Most-specific-live resolution** — `?zip=` takes `rows[0]` unordered; must rank by
+     `level` so a shared ZIP resolves to the town, not the county (same for `index.html`).
 
 ---
 

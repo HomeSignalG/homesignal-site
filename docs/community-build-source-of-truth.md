@@ -104,21 +104,23 @@ rename a topic label casually.** A city's own council still maps to the fixed
 `'County Commission & county business'` — do **not** "fix" it to `'City Council'`.
 Renaming silently breaks matching for existing subscribers.
 
-### Proof that #1 (DB) outranks #5 (communities.js) — live, verified today
-`communities.js` is drifted from the DB right now, and that's fine *because the DB
-wins* — but it's why you never treat `communities.js` as truth:
+### Worked example — why #1 (DB) is truth, even when it's the incomplete copy
+Box Elder's copies were drifted; the reconciliation (2026-07) is the lesson:
 
-- **ZIP drift:** DB `Box Elder County.zip_codes` has **20** ZIPs (incl. `84308`,
-  `84315`). `communities.js` lists **18** (missing those two). `index.html`'s own
-  array has the full 20. Three copies, two of them wrong.
-- **Topic drift:** DB `Box Elder County.government_topics` has **7** labels;
-  `communities.js` `governmentTopics` lists **9** (adds two `City government (…)`
-  entries the DB row omits).
+- **Topic drift — and the DB was the SHORT one.** `communities.js` and
+  `box-elder.html` listed **9** government topics (incl. `City government (Brigham City)`
+  + `City government (Tremonton)`), but the DB row had only **7** — even though the DB
+  already held **45 Brigham City + 13 Tremonton meetings** tagged with those exact
+  labels. So the source of truth was *under-populated*: on the dynamic
+  `community.html` (which reads `government_topics`), a resident couldn't subscribe to
+  town meetings that already existed. **Fix: bring the DB row up to 9** (done) — you fix
+  the DB to match reality, not the other way round.
+- **ZIP drift.** DB `Box Elder County.zip_codes` had **20** ZIPs; `communities.js` had
+  **18** (missing `84308`, `84315`). Reconciled `communities.js` → 20.
 
-`community.html` never trusts `communities.js` for topics or ZIPs — it reads the DB
-row (`community.html:1051`, `1061-1062`). The drift is a documentation-hygiene bug in
-the bootstrap file, not a runtime bug. **Lesson: to change what a resident sees, change
-the DB, not `communities.js`.**
+`community.html` never trusts `communities.js` for topics or ZIPs — it reads the DB row
+(§5). **Lesson: the DB (#1) is truth even when it's the *thinnest* copy; a lower copy is
+never the source, and an under-filled DB row is itself the bug to fix.**
 
 ---
 
@@ -518,24 +520,51 @@ difference is a **dedicated page** vs a **topic on the county page**, chosen by 
 (#4). Promote a topic-town to its own row when demand justifies a page; never before it
 has a verified source.
 
-### 13.4 Cascade + the most-specific-live resolution requirement
-- **County-scoped matters** (county commission, county elections, county planning for
-  unincorporated land) reach **every** child community via `parent_id` — one county
-  notice cascades down.
-- **City-scoped matters** (city council, municipal budget/utilities) reach **only** that
-  city community.
-- **A ZIP must resolve to the MOST-SPECIFIC live community that contains it** (city over
-  its parent county), or the resident lands on the county page and the city council
-  meeting they actually need is buried.
+### 13.4 Impact is DIRECTIONAL — the cascade is the whole product
+Government impact flows **one way, downward, through the hierarchy** — and *unifying that
+fragmented flow into one place per resident is what HomeSignal is*:
 
-> ⚠️ **CODE GAP (latent today, blocks the first split).** `community.html`
-> `resolveCommunity()` resolves `?zip=` with `communities?zip_codes=cs.{zip}` and takes
-> **`rows[0]` unordered** — it does NOT pick the most-specific match. No live community
-> shares a ZIP yet (Box Elder and Eagle Mountain don't overlap), so it's harmless now.
-> **But it MUST be fixed before the first county→city split:** rank the matches by level
-> specificity (`neighborhood` > `zip` > `city` > `county`), tie-break deterministically
-> (e.g. smaller `zip_codes` length, then `id`), and return the most-specific. The
-> homepage `resolveCoverageUrl` (`index.html`) needs the same ordering once towns split.
+- **DOWN — county → town: INCLUDE.** A county decision (county commission, county-wide
+  zoning/roads, county elections, county-scoped meetings) **impacts every town inside
+  it**, so it **must appear** in each town resident's feed. "A citizen should always be
+  aware of what their county is doing when it impacts their town." This is non-negotiable.
+- **UP — town → county: EXCLUDE.** A town's own local business (its city council budget,
+  its municipal utility) does **not** impact the rest of the county → it does **not**
+  bubble up to the county view or to other towns.
+- **SIDEWAYS — town → sibling town: EXCLUDE.** A Tremonton council item is **noise** to a
+  Brigham City resident. Siblings never cross.
+
+**A resident's "one unified place" = their most-specific community + everything that
+cascades DOWN from its ancestors (county, and later state), MINUS sibling towns.** That
+is the fragmented-government problem solved: one feed that merges *my town + my county
+(as it affects me)*, and nothing that doesn't.
+
+Mechanically this is: resolve the resident to the **most-specific live** community, then
+show content whose scope **covers** them — their own community's items **plus** every
+ancestor's (walk `parent_id` up the chain). `multi-county-plan.md` §0a specifies exactly
+this ("a county-scoped alert reaches all child communities… `alerts.geographic_reference`
+carries the scope").
+
+> ⚠️ **TWO code gaps — both DESIGNED but NOT BUILT; both block the first county→town split.**
+> Harmless today only because Box Elder is a *single* county community (county content
+> trivially reaches everyone in it) and no live communities share a ZIP. The moment a town
+> becomes its own child community, both must ship or the town page is **wrong**:
+>
+> 1. **Cascade content query is missing.** `community.html` pulls content with
+>    `alerts?community_id=eq.<self>` (`:526`) and `meetings?community_id=eq.<self>`
+>    (`:933`) — a **single** community_id, no ancestor walk. So a Brigham City page
+>    (community_id = Brigham City) would show **zero county-commission meetings** — the
+>    exact county-impacts-town content that MUST appear. **Fix before splitting:** resolve
+>    the `parent_id` chain and query `community_id IN (self + ancestors)` (or scope-match
+>    on `geographic_reference`), filtered by the resident's subscribed topics.
+> 2. **Most-specific resolution is missing.** `resolveCommunity()` resolves `?zip=` with
+>    `zip_codes=cs.{zip}` and takes **`rows[0]` unordered** — it does not prefer the town
+>    over its parent county. **Fix:** rank matches by level (`neighborhood` > `zip` >
+>    `city` > `county`), tie-break deterministically (smaller `zip_codes` length, then
+>    `id`). The homepage `resolveCoverageUrl` (`index.html`) needs the same ordering.
+>
+> **Until both land, keep towns as `government_topics` on the county row (pattern B) — do
+> NOT split a town into its own community**, or its residents lose the county cascade.
 
 ### 13.5 The backbone default for scale (§12)
 "Expand from town to county" is really **start at county, split *down* to town where
