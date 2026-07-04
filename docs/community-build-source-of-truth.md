@@ -672,6 +672,43 @@ DB-verified this session; versioned in `docs/salt-lake-county-communities-seed.s
 in-sandbox browser signup (egress blocked). The live-signup gap is now closed **automatically
 in CI** (see §14).
 
+### 13.10 Worked example — Colorado Front Range, built per-ZIP (first out-of-state, multi-county)
+
+Box Elder (§13.6, rural) and Salt Lake (§13.9, metro) are both Utah. **Colorado is the first
+out-of-state build** and the widest single batch so far — **9 counties at once**, 148 rows
+(9 county roots + 139 ZIP pages). It proves the same model with **no new fork** across state
+lines. Built + DB-verified this session; versioned in `docs/colorado-communities-seed.sql`.
+
+- **9 county roots** (`level=county`): Douglas, El Paso, Larimer, Weld, Adams, Jefferson,
+  Arapahoe, Boulder, Denver — each holding the **6 canonical county topics** (identical to the
+  live Utah county rows; word-for-word ingest matches). These are the content roots every ZIP
+  inherits.
+- **139 ZIP pages** (`level=zip`, `parent_id`→county, `government_topics=[]`), one per unique
+  requested ZIP, named **`"<place> (<ZIP>)"`** so a city with many ZIPs (Colorado Springs =
+  80903…80951, Denver = 80202…80247) yields distinct pages/slugs instead of one bare city slug.
+- **County slugs carry a `-co` suffix** (`douglas-county-co`, `adams-county-co`, …). Adams,
+  Jefferson, Boulder, Douglas, El Paso, Weld are all **common county names** nationally; the
+  state suffix keeps the case-insensitive-unique `slug` collision-free when other states land
+  (a deterministic extension of §12.1's disambiguation rule — apply it whenever a county name
+  is not obviously state-unique). ZIP-page slugs are globally unique via the ZIP, so they carry
+  no suffix.
+- **4 cross-county collision ZIPs** appeared in the source under two counties each:
+  `80003` (Adams/Westminster + Jefferson/Arvada), `80023` (Adams/Brighton + Boulder/Broomfield),
+  `80516` (Weld/Erie + Boulder/Erie), `80549` (Larimer/Wellington + Weld/Wellington). Each got
+  **one** ZIP page, parented to the **first** county it appeared under, **labeled with every
+  place** (`Westminster / Arvada (80003)`), and kept **off** every other county-level
+  `zip_codes` array — the one real same-level county collision (§9 / §12.4). All 4 verified to
+  resolve most-specific (`zip > county`). Non-blocking, no stop.
+- **City councils are NOT rows yet.** No `level=city` row for Denver / Colorado Springs /
+  Aurora / Fort Collins / Boulder / Castle Rock / Parker / Centennial / Arvada / Westminster /
+  Thornton / Longmont / …: a subscribable `City government (X)` topic is added only once that
+  city's meeting source is verified + wired on the ingest side (§13.2/§13.3). Until then every
+  ZIP inherits its county's 6 topics via cascade — real, subscribable value on day one.
+
+**Same caveat + closure as above:** verified by data + deployed code + resolution probe (egress
+blocked in-sandbox); the live end-to-end signup is checked **automatically in CI** (§14.1) once
+merged to `main`.
+
 ---
 
 ## 14. Automating the two decoupled halves (so a build finishes with no human step)
