@@ -328,6 +328,22 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
       '<div class="tile-label">'+esc(label)+'</div>'+
       (note?'<div class="tile-note">'+esc(note)+'</div>':'')+'</div>';
   }
+  // Coverage vs. content — the honesty tile. Pages are provisioned as pure data
+  // (thousands instantly); government/news content flows to a page only once that
+  // community's feeds are wired in ingest. Showing pages live WITHOUT this ratio
+  // over-states real coverage, so this card leads the Executive Summary.
+  function coverageCard(c){
+    c=c||{};
+    var total=c.communities_total||0, content=c.communities_with_content||0, visits=c.communities_with_visits||0;
+    var pct=total?(Math.round(10000*content/total)/100):0;
+    return '<div class="card"><h3>Coverage vs. content <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
+      '<p class="sub">Community <b>pages</b> are provisioned instantly as data; government &amp; news <b>content</b> reaches a page only once that community’s feeds are wired in the ingest pipeline. This is the real ratio &mdash; pages live is not coverage delivered.</p>'+
+      '<div class="grid">'+
+        liveTile('Community pages live', total.toLocaleString(), 'provisioned as data', 'real')+
+        liveTile('With active content', content.toLocaleString(), pct+'% of pages · alerts or meetings', 'persist')+
+        liveTile('With tracked visits', visits.toLocaleString(), 'have website behavior', 'persist')+
+      '</div></div>';
+  }
   function acqCard(a){
     a=a||{};
     var wk=(a.signups_by_week||[]).map(function(w){ return { day:w.week, followers:w.count }; });
@@ -366,7 +382,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
       if(r.error || !r.data) return;
       if(!document.getElementById('acq-live-wrap')){
         var box=document.createElement('div'); box.id='acq-live-wrap';
-        box.innerHTML=acqCard(r.data.acquisition)+demandCard(r.data.demand);
+        box.innerHTML=coverageCard(r.data.coverage)+acqCard(r.data.acquisition)+demandCard(r.data.demand);
         host.insertBefore(box, host.firstChild);
       }
     }catch(e){}
