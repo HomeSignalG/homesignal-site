@@ -1015,6 +1015,13 @@ let accountZip = '';
 let accountLoaded = false;
 let accountExists = false;
 let accountConsent = false;
+let accountCommunityId = '';   // the community this account currently follows (single-community model)
+// True when a logged-in visitor's account belongs to a DIFFERENT community than this page.
+// The users table stores one community_id + one shared topics object per person, so the 6
+// core government labels are string-identical across communities and would otherwise pre-check
+// here. We suppress the pre-check and warn, so a follower of another community can't silently
+// overwrite their follow by "saving" here. (Real fix = per-community user_subscriptions.)
+function accountOnOtherCommunity(){ return accountExists && !!accountCommunityId && accountCommunityId !== COMMUNITY_ID; }
 let pendingFollow = null;
 let searchedZip = '';
 (function(){
@@ -1032,18 +1039,26 @@ function followedFor(cat){ return (accountTopics && Array.isArray(accountTopics[
 async function loadAccount(){
   if(!hsLoggedIn()){ accountTopics={}; accountZip=''; accountConsent=false; accountLoaded=true; refreshTileLabels(); return; }
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(window.hsUser.email)}&select=topics,zip_code,data_licensing_agreed`,
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(window.hsUser.email)}&select=topics,zip_code,data_licensing_agreed,community_id`,
       { headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${window.hsToken || SUPABASE_ANON_KEY}` } });
     const rows = await res.json();
     if(Array.isArray(rows) && rows.length){
       const t = rows[0].topics || {};
-      // Each tile owns its own list: load notices, meetings, news, emerging, global
-      // independently from the saved topics object.
+      accountCommunityId = rows[0].community_id || '';
+      accountConsent = !!rows[0].data_licensing_agreed; accountExists = true;
+      // Only pre-fill the followed topics when this account already belongs to THIS
+      // community (or has none yet). If it follows a DIFFERENT community, leave the
+      // selections empty so nothing shows pre-checked — the shared, per-account topics
+      // object would otherwise falsely tick the 6 identical core labels here.
       accountTopics = {};
-      ['notices','meetings','news','emerging','global'].forEach(function(k){ if(Array.isArray(t[k])) accountTopics[k] = t[k]; });
-      accountZip = rows[0].zip_code || ''; accountConsent = !!rows[0].data_licensing_agreed; accountExists = true;
+      if(!accountCommunityId || accountCommunityId === COMMUNITY_ID){
+        ['notices','meetings','news','emerging','global'].forEach(function(k){ if(Array.isArray(t[k])) accountTopics[k] = t[k]; });
+        accountZip = rows[0].zip_code || '';
+      } else {
+        accountZip = '';
+      }
     }
-    else { accountTopics = {}; accountZip = ''; accountConsent = false; accountExists = false; }
+    else { accountTopics = {}; accountZip = ''; accountConsent = false; accountExists = false; accountCommunityId = ''; }
   }catch(e){ accountTopics = {}; accountConsent = false; }
   accountLoaded = true;
   refreshTileLabels();
@@ -1160,10 +1175,18 @@ function setupSignupArea(which){
   const consentEl = document.getElementById(which==='modal'?'modal-consent':'alert-consent');
   if(consentEl) consentEl.checked = hsLoggedIn() ? accountConsent : false;
   if(hsLoggedIn()){
-    if(label) label.textContent = 'Saving to your account · ' + window.hsUser.email;
-    if(btn) btn.textContent = 'Save alerts';
+    var cn = (document.querySelector('.comm-title')||{}).textContent || 'this community';
+    if(accountOnOtherCommunity()){
+      // Cross-community guard: warn before an accidental overwrite of the account's
+      // current community (single-community-per-user model — see loadAccount).
+      if(label){ label.textContent = '⚠ Your account currently follows a different community. Saving here switches your HomeSignal alerts to ' + cn + ' (you can follow only one community for now).'; label.style.color = '#b45309'; }
+      if(btn) btn.textContent = 'Switch my alerts to ' + cn;
+    } else {
+      if(label){ label.textContent = 'Saving to your account · ' + window.hsUser.email; label.style.color = ''; }
+      if(btn) btn.textContent = 'Save alerts';
+    }
   } else {
-    if(label) label.textContent = 'Log in to save these alerts — free';
+    if(label){ label.textContent = 'Log in to save these alerts — free'; label.style.color = ''; }
     if(btn) btn.textContent = 'Log in to save';
   }
 }
