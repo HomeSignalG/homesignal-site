@@ -3,8 +3,9 @@
 -- Backs acquisition.html (investor + internal-staff growth dashboard).
 -- Run once in Supabase -> SQL Editor. REVIEW BEFORE RUNNING.
 --
--- This is a PARKED reference for project qwnnmljucajnexpxdgxr; it is NOT
--- auto-applied by the static site. It creates:
+-- APPLIED to project qwnnmljucajnexpxdgxr on 2026-07-04 (migration
+-- `acquisition_dashboard_setup`); allowlist seeded with the founder email.
+-- Kept here as the annotated reference / re-runnable source. It creates:
 --   1) dashboard_admins  — email allowlist (who may see the dashboard)
 --   2) hs_acquisition_metrics() — a SECURITY DEFINER function that returns
 --      AGGREGATES ONLY (no PII) to allowlisted, logged-in callers.
