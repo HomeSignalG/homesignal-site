@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<title>HomeSignal — Acquisition</title>
+<meta name="description" content="HomeSignal acquisition &amp; growth dashboard — for staff and investors.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://homesignal.net/acquisition.html">
+<style>
+/* ============================================================
+   HomeSignal — shared styles (tokens, reset, nav, footer)
+   Ported verbatim from dashboard.html so this page matches.
+   ============================================================ */
+:root {
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --green: #1f5130; --green-light: #e1f5ee; --green-mid: #9fe1cb;
+  --green-dark: #0f6e56; --green-text: #0f6e56;
+  --text: #1c1c1a; --text-secondary: #5f5e5a; --text-tertiary: #6f6e69;
+  --border: rgba(0,0,0,.12); --bg: #ffffff; --bg-secondary: #f4f4f5;
+  --radius: 12px; --radius-sm: 8px; --radius-pill: 100px;
+  --gl: var(--green-light); --gm: var(--green-mid); --gd: var(--green-dark);
+  --ts: var(--text-secondary); --tt: var(--text-tertiary); --bg2: var(--bg-secondary);
+  --r: var(--radius); --rs: var(--radius-sm);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+a { text-decoration: none; }
+input, button, textarea { font-family: inherit; outline: none; }
+input:focus, textarea:focus { border-color: var(--green) !important; }
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+body { font-family: var(--font); color: var(--text); line-height: 1.6; background: #f3f4f6; font-size: 14px; }
+
+nav { display: flex; align-items: center; justify-content: space-between; padding: 14px max(24px, calc((100% - 1200px) / 2 + 24px)); border-bottom: 0.5px solid var(--border); background: var(--bg); position: sticky; top: 0; z-index: 100; }
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 34px; height: 34px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.logo-icon svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.logo-text { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+.logo-text span { color: var(--green); }
+.nav-links { display: flex; align-items: center; gap: 36px; list-style: none; }
+.nav-links a { color: var(--text-secondary); font-size: 14px; }
+.nav-links a:hover { color: var(--text); }
+.nav-actions { display: flex; gap: 10px; align-items: center; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 8px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-outline:hover { background: var(--bg-secondary); }
+.btn-primary { background: var(--green); color: #fff; border: none; padding: 8px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-primary:hover { opacity: 0.9; }
+
+footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; background: var(--bg-secondary); }
+.footer-left .logo-text { font-size: 15px; margin-bottom: 4px; }
+.footer-tagline { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.footer-links { display: flex; gap: 20px; }
+.footer-links a { font-size: 13px; color: var(--text-tertiary); display: inline-block; padding: 4px 0; }
+.footer-links a:hover { color: var(--text); }
+
+.nav-toggle { display: none; background: none; border: none; cursor: pointer; color: var(--text); padding: 4px; }
+.nav-menu { display: contents; }
+@media (max-width: 720px) {
+  nav { padding: 12px 20px; }
+  .nav-toggle { display: flex; align-items: center; }
+  .nav-menu { display: none; position: absolute; top: 100%; left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 0; background: var(--bg); border-bottom: 1px solid var(--border); padding: 6px 20px 14px; box-shadow: 0 8px 16px rgba(0,0,0,0.07); }
+  .nav-menu.open { display: flex; }
+  .nav-links { flex-direction: column; align-items: stretch; gap: 0; width: 100%; }
+  .nav-links a { display: block; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
+  .nav-actions { flex-direction: column; align-items: stretch; gap: 8px; width: 100%; margin-top: 12px; }
+  .nav-actions > * { width: 100%; padding: 12px; text-align: center; }
+  footer { padding: 24px 20px; flex-direction: column; align-items: flex-start; gap: 14px; }
+}
+
+/* ============================================================
+   Acquisition dashboard
+   ============================================================ */
+.dash-wrap { max-width: 1000px; margin: 0 auto; padding: 36px 24px 64px; }
+.dash-head { margin-bottom: 24px; }
+.dash-head .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--green-dark); margin-bottom: 6px; }
+.dash-head h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
+.dash-head p { font-size: 14px; color: var(--ts); }
+.dash-head .stamp { font-size: 12px; color: var(--tt); margin-top: 6px; }
+
+.state-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 32px 28px; text-align: center; max-width: 460px; margin: 12px auto; }
+.state-card h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+.state-card p { font-size: 13px; color: var(--ts); margin-bottom: 16px; }
+.loading { text-align: center; padding: 48px 20px; color: var(--tt); font-size: 14px; }
+
+/* KPI stat tiles — the number IS the visualization */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 22px; }
+.kpi-tile { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 16px 18px; }
+.kpi-label { font-size: 12px; font-weight: 600; color: var(--ts); text-transform: uppercase; letter-spacing: .04em; }
+.kpi-value { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); margin-top: 6px; line-height: 1.1; }
+.kpi-value .unit { font-size: 15px; font-weight: 600; color: var(--tt); margin-left: 2px; }
+.kpi-cap { font-size: 12px; color: var(--tt); margin-top: 4px; }
+
+/* Panels wrapping charts */
+.panel { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 20px 22px; margin-bottom: 18px; }
+.panel-head { margin-bottom: 16px; }
+.panel-head h2 { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.panel-head p { font-size: 12.5px; color: var(--ts); margin-top: 2px; }
+.panel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 760px) { .panel-grid { grid-template-columns: 1fr; } }
+
+/* Horizontal magnitude bars (single brand-green hue; length encodes value) */
+.bars { display: flex; flex-direction: column; gap: 10px; }
+.bar-row { display: grid; grid-template-columns: minmax(90px, 34%) 1fr auto; align-items: center; gap: 12px; }
+.bar-name { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { position: relative; height: 12px; background: var(--bg-secondary); border-radius: 6px; overflow: hidden; }
+.bar-fill { position: absolute; inset: 0 auto 0 0; height: 100%; background: var(--green); border-radius: 0 6px 6px 0; min-width: 3px; }
+.bar-val { font-size: 13px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+.bar-sub { font-size: 11.5px; color: var(--tt); }
+
+/* Funnel: bars + step conversion between them */
+.funnel-step { margin-bottom: 4px; }
+.funnel-conv { font-size: 11.5px; color: var(--green-dark); padding: 2px 0 6px 0; display: flex; align-items: center; gap: 6px; }
+.funnel-conv::before { content: "↓"; font-weight: 700; }
+
+/* Signups line chart */
+.chart-svg { width: 100%; height: auto; display: block; }
+.chart-empty { font-size: 13px; color: var(--tt); padding: 24px 0; text-align: center; }
+
+.legend-note { font-size: 12px; color: var(--tt); margin-top: 4px; }
+.badge-soon { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--green-dark); background: var(--green-light); border-radius: var(--radius-pill); padding: 2px 8px; vertical-align: middle; margin-left: 8px; }
+
+@media (max-width: 720px) {
+  .dash-wrap { padding: 28px 16px 48px; }
+  .bar-row { grid-template-columns: minmax(76px, 40%) 1fr auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="logo" href="index.html">
+    <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
+    <div class="logo-text">Home<span>Signal</span></div>
+  </a>
+  <button class="nav-toggle" id="nav-toggle" aria-label="Open menu"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="nav-menu" id="nav-menu"><ul class="nav-links"><li><a href="how-it-works.html">How it works</a></li><li><a href="about.html">About</a></li></ul>
+  <div class="nav-actions" id="nav-auth"><button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button></div>
+</div>
+</nav>
+
+<div class="dash-wrap">
+  <div class="dash-head">
+    <div class="eyebrow">Internal &middot; Staff &amp; investors</div>
+    <h1>Acquisition dashboard</h1>
+    <p>Growth, activation, and reach across HomeSignal — aggregates only, no personal data.</p>
+    <div class="stamp" id="dash-stamp"></div>
+  </div>
+  <div id="dash-body">
+    <div class="loading">Loading…</div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-left">
+    <a class="logo" href="index.html" style="margin-bottom:4px;">
+      <div class="logo-icon" style="width:28px;height:28px;"><svg viewBox="0 0 24 24" style="width:15px;height:15px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
+      <div class="logo-text" style="font-size:14px;">Home<span>Signal</span></div>
+    </a>
+    <div class="footer-tagline">Civic early-warning, by email.</div>
+    <div class="footer-tagline" style="margin-top:6px">© 2026 HomeSignal, Inc. · Neutral · sourced · non-partisan</div>
+  </div>
+  <div class="footer-links">
+    <a href="how-it-works.html">How it works</a>
+    <a href="about.html">About</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="terms.html">Terms of use</a>
+    <a href="contact.html">Contact</a>
+  </div>
+</footer>
+
+<!-- AUTH MODAL (shared markup, identical to dashboard.html) -->
+<style>
+  .auth-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center; }
+  .auth-modal { background:#fff; border-radius:14px; padding:28px; width:100%; max-width:380px; margin:16px; border:1px solid var(--border); position:relative; }
+  .auth-modal h2 { font-size:20px; font-weight:700; margin-bottom:4px; color:var(--text); }
+  .auth-sub { font-size:13px; color:var(--text-secondary); margin-bottom:18px; }
+  .auth-input { width:100%; border:1px solid var(--border); border-radius:var(--radius-sm); padding:11px 13px; font-size:14px; background:var(--bg-secondary); color:var(--text); margin-bottom:10px; }
+  .auth-submit { width:100%; background:var(--green); color:#fff; border:none; padding:12px; border-radius:var(--radius-sm); font-size:14px; font-weight:600; cursor:pointer; }
+  .auth-submit:hover { opacity:0.9; }
+  .auth-submit:disabled { opacity:0.6; cursor:default; }
+  .auth-msg { font-size:13px; color:var(--green-dark); margin-top:12px; min-height:1em; }
+  .auth-toggle { font-size:13px; color:var(--text-secondary); margin-top:16px; text-align:center; }
+  .auth-toggle a { color:var(--green); font-weight:600; }
+  .auth-close { position:absolute; top:14px; right:16px; background:none; border:none; font-size:22px; line-height:1; color:var(--text-tertiary); cursor:pointer; }
+</style>
+<div id="auth-overlay" class="auth-overlay">
+  <div class="auth-modal">
+    <button class="auth-close" id="auth-close">&times;</button>
+    <h2 id="auth-title">Log in</h2>
+    <p class="auth-sub" id="auth-sub">Enter your email and we'll send you a code &mdash; no password needed.</p>
+    <input type="email" id="auth-email" class="auth-input" placeholder="Email address" autocomplete="email" / aria-label="Email address">
+    <input type="text" id="auth-code" class="auth-input" placeholder="Enter your code" inputmode="numeric" maxlength="8" autocomplete="one-time-code" style="display:none;letter-spacing:6px;text-align:center;font-size:18px;" / aria-label="Enter your code">
+    <button id="auth-submit" class="auth-submit">Send me a code</button>
+    <div id="auth-msg" class="auth-msg"></div>
+    <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><a href="#" id="auth-back-link">Use a different email</a></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ============================================================
+// Shared auth module (identical across pages). Exposes
+// window.hsUser / hsToken / hsClient / hsOpenAuth and calls hsOnAuthChange.
+// ============================================================
+(function(){
+  var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
+  var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
+  var client = window.supabase.createClient(SB_URL, SB_ANON);
+  window.hsClient = client;
+  window.hsUser = null;
+  var step = 'email';
+  var pendingEmail = '';
+  function $(id){ return document.getElementById(id); }
+  function showMsg(text, isError){ var m = $('auth-msg'); m.textContent = text || ''; m.style.color = isError ? '#b91c1c' : 'var(--green-dark)'; }
+  function setStep(s){
+    step = s;
+    if (s === 'code') {
+      $('auth-sub').textContent = 'We emailed a code to ' + pendingEmail + '. Enter it below.';
+      $('auth-email').style.display = 'none'; $('auth-code').style.display = 'block';
+      $('auth-submit').textContent = 'Verify & continue'; $('auth-back-wrap').style.display = 'block';
+      setTimeout(function(){ $('auth-code').focus(); }, 50);
+    } else {
+      $('auth-sub').innerHTML = "Enter your email and we'll send you a code &mdash; no password needed.";
+      $('auth-email').style.display = 'block'; $('auth-code').style.display = 'none'; $('auth-code').value = '';
+      $('auth-submit').textContent = 'Send me a code'; $('auth-back-wrap').style.display = 'none';
+      setTimeout(function(){ $('auth-email').focus(); }, 50);
+    }
+  }
+  function openAuth(){ pendingEmail=''; $('auth-email').value=''; showMsg('', false); setStep('email'); $('auth-overlay').style.display = 'flex'; }
+  function closeAuth(){ $('auth-overlay').style.display = 'none'; }
+  window.hsOpenAuth = openAuth;
+  async function sendCode(){
+    var email = ($('auth-email').value || '').trim();
+    if (!email || email.indexOf('@') === -1) { showMsg('Please enter a valid email address.', true); return; }
+    $('auth-submit').disabled = true; showMsg('Sending your code…', false);
+    try { var r = await client.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true } });
+      if (r.error) { showMsg(r.error.message, true); } else { pendingEmail = email; setStep('code'); showMsg('', false); }
+    } catch (e) { showMsg('Something went wrong — please try again.', true); }
+    $('auth-submit').disabled = false;
+  }
+  async function verifyCode(){
+    var code = ($('auth-code').value || '').trim();
+    if (code.length < 4) { showMsg('Enter the code from your email.', true); return; }
+    $('auth-submit').disabled = true; showMsg('Checking…', false);
+    try { var r = await client.auth.verifyOtp({ email: pendingEmail, token: code, type: 'email' });
+      if (r.error) { showMsg(r.error.message, true); $('auth-submit').disabled = false; return; } closeAuth();
+    } catch (e) { showMsg('Something went wrong — please try again.', true); }
+    $('auth-submit').disabled = false;
+  }
+  function submitAuth(){ if (step === 'code') verifyCode(); else sendCode(); }
+  function bindAuthButtons(){ var li = $('btn-login'), su = $('btn-signup'); if (li) li.addEventListener('click', function(){ openAuth(); }); if (su) su.addEventListener('click', function(){ openAuth(); }); }
+  function updateNav(session){
+    window.hsUser = (session && session.user) ? session.user : null;
+    window.hsToken = (session && session.access_token) ? session.access_token : null;
+    var box = $('nav-auth');
+    if (box) {
+      if (window.hsUser) {
+        box.innerHTML = '<a class="btn-outline" href="dashboard.html" style="text-decoration:none">My alerts</a>' + '<span style="display:inline-flex;align-items:center;gap:10px;margin-left:12px;vertical-align:middle">' + '<span title="' + window.hsUser.email + '" style="font-size:12.5px;color:#6b7280;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle">' + window.hsUser.email + '</span>' + '<button type="button" id="btn-logout" style="background:none;border:none;padding:0;color:#6b7280;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline">Log out</button>' + '</span>';
+        var lo = $('btn-logout'); if (lo) lo.addEventListener('click', function(){ client.auth.signOut(); });
+      } else {
+        box.innerHTML = '<button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button>';
+        bindAuthButtons();
+      }
+    }
+    if (typeof window.hsOnAuthChange === 'function') { try { window.hsOnAuthChange(window.hsUser); } catch(e){} }
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    bindAuthButtons();
+    $('auth-close').addEventListener('click', closeAuth);
+    $('auth-submit').addEventListener('click', submitAuth);
+    $('auth-email').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
+    $('auth-code').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
+    $('auth-back-link').addEventListener('click', function(e){ e.preventDefault(); showMsg('', false); setStep('email'); });
+    $('auth-overlay').addEventListener('click', function(e){ if (e.target === $('auth-overlay')) closeAuth(); });
+    client.auth.getSession().then(function(res){ updateNav(res.data.session); });
+    client.auth.onAuthStateChange(function(evt, session){ updateNav(session); });
+  });
+})();
+</script>
+
+<script>
+// ============================================================
+// Acquisition dashboard renderer
+// Pulls ONE aggregates-only JSON blob from the allowlist-gated
+// SECURITY DEFINER function hs_acquisition_metrics() and renders
+// KPI tiles + charts. No personal data ever reaches the client.
+// See docs/acquisition-dashboard-spec.md and
+// docs/acquisition-dashboard-setup.sql.
+// ============================================================
+(function(){
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function num(n){ return (n==null || isNaN(n)) ? '0' : Number(n).toLocaleString('en-US'); }
+  function pct(n){ return (n==null || isNaN(n)) ? '0' : Number(n); }
+
+  function stamp(iso){
+    var el = $('dash-stamp'); if (!el) return;
+    if (!iso) { el.textContent = ''; return; }
+    var d = new Date(iso);
+    el.textContent = 'As of ' + d.toLocaleString('en-US', { dateStyle:'medium', timeStyle:'short' });
+  }
+
+  function renderLoggedOut(){
+    stamp(null);
+    $('dash-body').innerHTML =
+      '<div class="state-card">' +
+        '<h2>Sign in to view the dashboard</h2>' +
+        '<p>This acquisition dashboard is limited to HomeSignal staff and investors.</p>' +
+        '<button class="btn-primary" id="dash-login">Log in</button>' +
+      '</div>';
+    var b = $('dash-login');
+    if (b) b.addEventListener('click', function(){ if (window.hsOpenAuth) window.hsOpenAuth(); });
+  }
+
+  function renderNoAccess(email){
+    stamp(null);
+    $('dash-body').innerHTML =
+      '<div class="state-card">' +
+        '<h2>No access</h2>' +
+        '<p>The account <strong>' + esc(email||'') + '</strong> isn’t on the dashboard allowlist. ' +
+        'This view is limited to HomeSignal staff and investors — ask the team to add you.</p>' +
+        '<button class="btn-outline" id="dash-logout">Log out</button>' +
+      '</div>';
+    var b = $('dash-logout');
+    if (b) b.addEventListener('click', function(){ if (window.hsClient) window.hsClient.auth.signOut(); });
+  }
+
+  function renderError(){
+    stamp(null);
+    $('dash-body').innerHTML =
+      '<div class="state-card">' +
+        '<h2>Couldn’t load metrics</h2>' +
+        '<p>Something went wrong reaching the metrics service. Please try again.</p>' +
+        '<button class="btn-primary" id="dash-retry">Retry</button>' +
+      '</div>';
+    var b = $('dash-retry');
+    if (b) b.addEventListener('click', function(){ load(); });
+  }
+
+  // ---- small view helpers ------------------------------------------
+  function kpiTile(label, value, unit, cap){
+    return '<div class="kpi-tile">' +
+      '<div class="kpi-label">' + esc(label) + '</div>' +
+      '<div class="kpi-value">' + esc(value) + (unit ? '<span class="unit">' + esc(unit) + '</span>' : '') + '</div>' +
+      (cap ? '<div class="kpi-cap">' + esc(cap) + '</div>' : '') +
+    '</div>';
+  }
+
+  // Horizontal magnitude bars. rows: [{name, value, sub?}]. Single green hue;
+  // length encodes magnitude (max-scaled).
+  function bars(rows){
+    if (!rows || !rows.length) return '<div class="chart-empty">No data yet.</div>';
+    var max = rows.reduce(function(m,r){ return Math.max(m, Number(r.value)||0); }, 0) || 1;
+    return '<div class="bars">' + rows.map(function(r){
+      var v = Number(r.value)||0;
+      var w = Math.max(2, Math.round(100 * v / max));
+      return '<div class="bar-row">' +
+        '<div class="bar-name" title="' + esc(r.name) + '">' + esc(r.name) + '</div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + w + '%"></div></div>' +
+        '<div class="bar-val">' + num(v) + (r.sub ? ' <span class="bar-sub">' + esc(r.sub) + '</span>' : '') + '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+  }
+
+  // Funnel: stacked steps with step-to-step conversion between them.
+  function funnel(f){
+    var steps = [
+      { name: 'Alert views',   key: 'alert_view' },
+      { name: 'Alerts read',   key: 'alert_read' },
+      { name: 'Signup intent', key: 'signup_intent' },
+      { name: 'Signed up',     key: 'signup' }
+    ];
+    var vals = steps.map(function(s){ return Number(f && f[s.key]) || 0; });
+    var max = Math.max.apply(null, vals.concat([1]));
+    var out = '';
+    for (var i = 0; i < steps.length; i++){
+      var v = vals[i];
+      var w = Math.max(2, Math.round(100 * v / max));
+      out += '<div class="funnel-step"><div class="bar-row">' +
+        '<div class="bar-name">' + esc(steps[i].name) + '</div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + w + '%"></div></div>' +
+        '<div class="bar-val">' + num(v) + '</div>' +
+      '</div></div>';
+      if (i < steps.length - 1){
+        var prev = vals[i], next = vals[i+1];
+        var conv = prev > 0 ? (Math.round(1000 * next / prev) / 10) : null;
+        out += '<div class="funnel-conv">' + (conv==null ? '—' : (conv + '% continue')) + '</div>';
+      }
+    }
+    return out;
+  }
+
+  // Signups-over-time: single-series area+line, inline SVG. points:[{week,count}]
+  function signupsChart(points){
+    if (!points || !points.length) return '<div class="chart-empty">No signups recorded yet.</div>';
+    var W = 680, H = 180, padL = 34, padR = 14, padT = 14, padB = 26;
+    var iw = W - padL - padR, ih = H - padT - padB;
+    var maxY = points.reduce(function(m,p){ return Math.max(m, Number(p.count)||0); }, 0) || 1;
+    var n = points.length;
+    function x(i){ return padL + (n === 1 ? iw/2 : (iw * i / (n - 1))); }
+    function y(v){ return padT + ih - (ih * (Number(v)||0) / maxY); }
+    var pts = points.map(function(p,i){ return [x(i), y(p.count)]; });
+    var line = pts.map(function(p,i){ return (i?'L':'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ');
+    var area = 'M' + pts[0][0].toFixed(1) + ' ' + (padT+ih) + ' ' +
+               pts.map(function(p){ return 'L' + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ') +
+               ' L' + pts[n-1][0].toFixed(1) + ' ' + (padT+ih) + ' Z';
+    // gridlines: 0, mid, max
+    function fmtWeek(w){ var d = new Date(w); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+    var grid = '';
+    [0, 0.5, 1].forEach(function(t){
+      var gy = padT + ih - ih*t; var val = Math.round(maxY*t);
+      grid += '<line x1="' + padL + '" y1="' + gy.toFixed(1) + '" x2="' + (W-padR) + '" y2="' + gy.toFixed(1) + '" stroke="rgba(0,0,0,.08)" stroke-width="1"/>' +
+              '<text x="' + (padL-6) + '" y="' + (gy+3).toFixed(1) + '" text-anchor="end" font-size="10" fill="#6f6e69">' + val + '</text>';
+    });
+    var dots = pts.map(function(p,i){
+      return '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3.5" fill="#1f5130">' +
+             '<title>' + esc(fmtWeek(points[i].week)) + ': ' + num(points[i].count) + ' signup' + (points[i].count==1?'':'s') + '</title></circle>';
+    }).join('');
+    // x labels: first, last (and mid if room)
+    var xl = '';
+    var idxs = n === 1 ? [0] : [0, n-1];
+    idxs.forEach(function(i){
+      xl += '<text x="' + x(i).toFixed(1) + '" y="' + (H-8) + '" text-anchor="' + (i===0?'start':'end') + '" font-size="10" fill="#6f6e69">' + esc(fmtWeek(points[i].week)) + '</text>';
+    });
+    return '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Signups per week">' +
+      grid +
+      '<path d="' + area + '" fill="rgba(31,81,48,.12)"/>' +
+      '<path d="' + line + '" fill="none" stroke="#1f5130" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+      dots + xl +
+    '</svg>';
+  }
+
+  function renderDashboard(m){
+    stamp(m.generated_at);
+    var k = m.kpis || {};
+    var kpis = '<div class="kpi-grid">' +
+      kpiTile('Users', num(k.users_total), '', num(k.users_active) + ' active') +
+      kpiTile('Topic follows', num(k.subscriptions_total), '', 'across all users') +
+      kpiTile('Communities live', num(k.communities_live), '', 'counties covered') +
+      kpiTile('Emails sent', num(k.emails_sent), '', pct(k.email_error_rate_pct) + '% errors') +
+      kpiTile('Signup intents', num(k.signup_intents), '', 'all-time') +
+      kpiTile('Area requests', num(k.community_requests), '', 'demand for new areas') +
+    '</div>';
+
+    var signups = '<div class="panel">' +
+      '<div class="panel-head"><h2>Signups over time</h2><p>New users per week.</p></div>' +
+      signupsChart(m.signups_by_week) +
+    '</div>';
+
+    var funnelPanel = '<div class="panel">' +
+      '<div class="panel-head"><h2>Acquisition funnel</h2><p>Anonymous visitor activity → signup, last 30 days.</p></div>' +
+      funnel(m.funnel) +
+    '</div>';
+
+    var topicRows = (m.topics_top || []).map(function(t){ return { name: t.topic, value: t.followers }; });
+    var commRows = (m.communities || []).map(function(c){ return { name: c.name, value: c.users, sub: num(c.subscriptions) + ' follows' }; });
+    var twoUp = '<div class="panel-grid">' +
+      '<div class="panel">' +
+        '<div class="panel-head"><h2>Top topics</h2><p>By follower count.</p></div>' +
+        bars(topicRows) +
+      '</div>' +
+      '<div class="panel">' +
+        '<div class="panel-head"><h2>By community</h2><p>Users per county (with topic follows).</p></div>' +
+        bars(commRows) +
+      '</div>' +
+    '</div>';
+
+    var paid = m.paid || {};
+    var paidPanel = '<div class="panel">' +
+      '<div class="panel-head"><h2>Paid subscriptions<span class="badge-soon">Coming online</span></h2>' +
+        '<p>Lights up when billing is connected.</p></div>' +
+      '<div class="kpi-grid" style="margin-bottom:0">' +
+        kpiTile('Active', num(paid.active), '', '') +
+        kpiTile('Trialing', num(paid.trialing), '', '') +
+        kpiTile('Canceled', num(paid.canceled), '', '') +
+      '</div>' +
+    '</div>';
+
+    $('dash-body').innerHTML = kpis + signups + funnelPanel + twoUp + paidPanel;
+  }
+
+  async function load(){
+    if (!window.hsUser){ renderLoggedOut(); return; }
+    $('dash-body').innerHTML = '<div class="loading">Loading metrics…</div>';
+    try {
+      var r = await window.hsClient.rpc('hs_acquisition_metrics');
+      if (r.error){
+        // The function raises 'not authorized' (42501 / permission) for
+        // logged-in users who aren't on the allowlist.
+        var msg = (r.error.message || '').toLowerCase();
+        if (r.error.code === '42501' || msg.indexOf('not authorized') !== -1 || msg.indexOf('permission') !== -1){
+          renderNoAccess(window.hsUser.email);
+        } else {
+          renderError();
+        }
+        return;
+      }
+      renderDashboard(r.data || {});
+    } catch (e) {
+      renderError();
+    }
+  }
+
+  // Re-render whenever auth state resolves/changes.
+  window.hsOnAuthChange = function(){ load(); };
+})();
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var t = document.getElementById('nav-toggle');
+  var m = document.getElementById('nav-menu');
+  if (t && m) t.addEventListener('click', function(){ m.classList.toggle('open'); });
+});
+</script>
+</body>
+</html>
