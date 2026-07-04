@@ -82,20 +82,32 @@ async function main() {
     const target = `${SITE_BASE}/community.html?zip=${zip}`;
     try {
       await page.goto(target, { waitUntil: 'networkidle', timeout: 30000 });
-      // Wait until the async resolveCommunity()/applyCommunity() has stamped the title.
+      // Wait until resolveCommunity()/applyCommunity() has stamped the title AND loaded the
+      // universal topic set into the global `cats` state (community.html:1114/1135).
       await page.waitForFunction(() => {
         const t = document.getElementById('comm-title');
-        return t && t.textContent && t.textContent.trim().length > 0;
+        return !!(t && t.textContent && t.textContent.trim().length > 0 &&
+          typeof cats !== 'undefined' && cats.news && cats.news.items && cats.news.items.length > 0);
       }, { timeout: 15000 });
-      const title = (await page.locator('#comm-title').textContent() || '').trim();
-      // Topic/subscribe UI present (government + universal tiles render checkboxes/options).
-      const hasTopics = await page.locator('input[type="checkbox"], .topic, [data-topic]').count();
-      if (title !== want.name) {
-        fails.push(`ZIP ${zip}: title "${title}" != expected most-specific "${want.name}" (${want.level})`);
-      } else if (!hasTopics) {
-        fails.push(`ZIP ${zip} (${want.name}): resolved but no subscribable topics rendered`);
+      // Read the resolved runtime state directly (deterministic; no modal/consent-overlay
+      // click flakiness). `cats.meetings.items` is the cascaded government topic set
+      // (community.html:1131); `cats.news.items` is the universal set (1135).
+      const st = await page.evaluate(() => ({
+        title: (document.getElementById('comm-title') || {}).textContent?.trim() || '',
+        name: (typeof COMMUNITY !== 'undefined' && COMMUNITY) ? COMMUNITY.name : null,
+        universal: (typeof cats !== 'undefined' && cats.news && cats.news.items) ? cats.news.items.length : 0,
+        gov: (typeof cats !== 'undefined' && cats.meetings && cats.meetings.items) ? cats.meetings.items.length : 0,
+      }));
+      if (st.title !== want.name || st.name !== want.name) {
+        // The core correctness gate: did ?zip= resolve to the most-specific community?
+        fails.push(`ZIP ${zip}: resolved "${st.title || st.name}" != expected most-specific "${want.name}" (${want.level})`);
+      } else if (st.universal < 1) {
+        // Universal topics are community-agnostic and always present — 0 means the page's
+        // subscribe flow failed to initialize (a real breakage), not an empty-but-valid tile.
+        fails.push(`ZIP ${zip} (${want.name}): resolved but subscribe flow rendered no topics (JS init failed)`);
       } else {
-        console.log(`  ✓ ${zip} → ${want.name} (${want.level})`);
+        // gov=0 is VALID (empty government tile until feeds exist) — report, don't fail.
+        console.log(`  ✓ ${zip} → ${want.name} (${want.level}) · gov ${st.gov} · universal ${st.universal}`);
       }
     } catch (e) {
       fails.push(`ZIP ${zip} (${want.name}): ${e.message.split('\n')[0]}`);
