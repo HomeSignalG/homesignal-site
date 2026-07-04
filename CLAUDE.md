@@ -353,6 +353,27 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   tree: `docs/minnesota-communities-seed.sql`. Resolution probe passed (11-ZIP sample all
   resolve most-specific `zip>county`; 0 dup slugs; 0 orphan pages); same egress caveat — confirm
   on the real site (`?zip=55401` → pick a topic → sign up).
+- 🟢 **Massachusetts (statewide — Greater Boston + Cape Cod + Berkshires + Pioneer Valley +
+  South Coast + Central MA) per-ZIP build is LIVE — 603 rows (11 county roots + 592 ZIP pages)**
+  (DB-verified). Seventh **out-of-state** build and the first covering an entire state's
+  requested ZIP set in one pass: Middlesex (110), Worcester (99), Plymouth (61), Essex (57),
+  Barnstable (55), Hampden (53), Norfolk (45), Bristol (44), Berkshire (38), Hampshire (29),
+  Suffolk (1) — same model, **no new fork**. Each county root = the 6 canonical topics; every
+  requested ZIP is a `level=zip` page named `"<place> (<ZIP>)"` (`parent_id`→county,
+  `government_topics=[]`) inheriting via cascade. The ZIP→city→county crosswalk was generated
+  from the **`zipcodes` PyPI package v3.0.0** (§12.0), not hand-typed; USPS city names used
+  verbatim. All 592 input ZIPs were entered as leading-zero MA ZIPs (zero-padded from the
+  request list, e.g. `2138`→`02138`). **No collisions** — all 592 ZIPs mapped to exactly one MA
+  county, **0 quarantined**, and MA had zero rows pre-seed (prior states are UT/CO/MI/WA/IL/TX/MN
+  ZIP ranges). County slugs carry a `-ma` suffix (`middlesex-county-ma`, … — Bristol/Essex/
+  Middlesex/Norfolk/Plymouth are all shared with other states, so the suffix prevents a
+  cross-state slug clash). Two crosswalk notes: `05501`/`05544` (Andover IRS ZIPs) map to Essex;
+  `02212` (a Boston P.O. block) is Suffolk County's only ZIP here while `02238` (a Cambridge P.O.
+  block) maps to Middlesex. City councils / town meetings (Boston, Worcester, Springfield,
+  Cambridge, Lowell, Brockton, Quincy, Newton, …) intentionally **deferred** to the ingest step.
+  Full tree: `docs/massachusetts-communities-seed.sql`. Resolution probe passed (12-ZIP sample
+  all resolve most-specific `zip>county`; 0 dup slugs; 0 orphan pages); same egress caveat —
+  confirm on the real site (`?zip=02138` → pick a topic → sign up).
 - ⚠️ **Delivery split is the open cross-repo item.** Notices and Meetings are separate
   *tiles*, but making them independently *deliverable* — and the email structure (default:
   two emails, one 5 PM Central window, news rides with notices — a **founder** call) —
