@@ -20,14 +20,14 @@
 -- ── 1) County — the root government layer ──────────────────────────────────────────
 insert into public.communities (name, county, state, level, slug, zip_codes, government_topics) values
 ('Box Elder County','Box Elder','UT','county','box-elder',
- array['84301','84302','84306','84307','84309','84311','84312','84313','84314','84315',
+ array['84301','84302','84306','84307','84309','84311','84312','84313','84314',
        '84316','84324','84329','84330','84331','84334','84336','84337','84340'],
  array['County Commission & county business','Planning, zoning & development',
        'Property taxes & assessments','Public safety & emergencies','Water companies',
        'Elections & voting','Stratos data center project'])
 on conflict do nothing;
--- NOTE: DB also carries 84308 on the county row; it has no place name / page yet —
--- left off this list pending a decision (see the session flag).
+-- NOTE: 84315 (Hooper) is Weber County, not Box Elder — removed. 84308 is still on the
+-- DB county row with no place name / page — left off this list pending a decision.
 
 -- ── 2) Incorporated cities — own council; parent → county ───────────────────────────
 insert into public.communities (name, county, state, level, slug, zip_codes, government_topics, parent_id) values
@@ -50,7 +50,6 @@ from (values
   ('Garland','garland','84312'),
   ('Grouse Creek','grouse-creek','84313'),
   ('Honeyville','honeyville','84314'),
-  ('Hooper','hooper','84315'),          -- 84315 is postally Hooper (usually Weber County); reparent if needed
   ('Howell','howell','84316'),
   ('Mantua','mantua','84324'),
   ('Park Valley','park-valley','84329'),
