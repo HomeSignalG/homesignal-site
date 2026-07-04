@@ -316,6 +316,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
     wireLive();
     wireFeedInventory();
     wireAcqLive();
+    wireZipBehavior();
     stalenessBanner(p.meta);
   }
 
@@ -366,6 +367,50 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
       if(!document.getElementById('acq-live-wrap')){
         var box=document.createElement('div'); box.id='acq-live-wrap';
         box.innerHTML=acqCard(r.data.acquisition)+demandCard(r.data.demand);
+        host.insertBefore(box, host.firstChild);
+      }
+    }catch(e){}
+  }
+
+  // ---- LIVE behavior-per-ZIP (gated RPC hs_zip_behavior). Pages are built by
+  //      ZIP, so this rolls website activity up to the ZIP the visitor viewed —
+  //      sessions, events and signup intents, flagged covered vs. expansion. ----
+  function zipBehaviorCard(z){
+    z=z||{};
+    var list=(z.by_zip||[]);
+    var rows=list.map(function(a){
+      var badge=a.covered?'<span class="t-real">covered</span>':'<span class="t-persist">no feeds — expansion signal</span>';
+      var last=a.last_seen?esc(String(a.last_seen).slice(0,10)):'—';
+      var si=(a.signup_intents||0);
+      return '<tr><td style="font-variant-numeric:tabular-nums">'+esc(a.zip||'?')+'</td>'+
+        '<td>'+esc(a.community||'—')+'</td><td class="muted">'+esc(a.county||'—')+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums">'+(a.sessions||0)+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums">'+(a.events||0)+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums'+(si?'':';color:var(--muted)')+'">'+si+'</td>'+
+        '<td>'+badge+'</td><td class="muted">'+last+'</td></tr>';
+    }).join('');
+    var tagged=(z.zip_tagged_events||0), total=(z.total_events||0);
+    var pct=total?Math.round(1000*tagged/total)/10:0;
+    return '<div class="card"><h3>Behavior by ZIP <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
+      '<p class="sub">Website activity rolled up to the ZIP each visitor viewed (pages are built by ZIP). Uncovered ZIPs with real traffic are the sharpest expansion signals.</p>'+
+      '<div class="grid" style="margin-bottom:14px">'+
+        liveTile('ZIPs with activity', z.distinct_zips||0, (z.covered_zips||0)+' covered by a feed set')+
+        liveTile('ZIP-tagged events', tagged, pct+'% of '+total+' total events')+
+      '</div>'+
+      (rows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>ZIP</th><th>Community</th><th>County</th>'+
+        '<th style="text-align:right">Sessions</th><th style="text-align:right">Events</th><th style="text-align:right">Signup intents</th>'+
+        '<th>Status</th><th>Last seen</th></tr></thead><tbody>'+rows+'</tbody></table></div>')
+        :'<div class="muted">No ZIP-tagged activity yet. New visits are tagged from the page ZIP; historical rows are matched from the URL.</div>')+
+    '</div>';
+  }
+  async function wireZipBehavior(){
+    var host=$('tab-website'); if(!host) return;
+    try{
+      var r=await window.hsClient.rpc('hs_zip_behavior');
+      if(r.error || !r.data) return;
+      if(!document.getElementById('zip-behavior-wrap')){
+        var box=document.createElement('div'); box.id='zip-behavior-wrap';
+        box.innerHTML=zipBehaviorCard(r.data);
         host.insertBefore(box, host.firstChild);
       }
     }catch(e){}

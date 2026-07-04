@@ -18,7 +18,27 @@
     } catch (e) { return 'anon'; }
   }
 
-  // hsLogEvent(eventType, { topic, pipeline_type, community_id, alert_id })
+  // The 5-digit ZIP the page is scoped to, so behavior can be rolled up per ZIP.
+  // Pages are built by ZIP; resolve it once and remember it for the session so
+  // later events on ZIP-less URLs (e.g. detail modals) still attribute correctly.
+  // Order: explicit override -> ?zip= param -> remembered ZIP for this session.
+  function currentZip(payload) {
+    try {
+      var z = (payload && payload.zip_code) || window.HS_ZIP;
+      if (!z) {
+        var m = location.search.match(/[?&]zip=(\d{5})/);
+        if (m) z = m[1];
+      }
+      if (!z) { try { z = localStorage.getItem('hs_zip'); } catch (e) {} }
+      if (z && /^\d{5}$/.test(String(z))) {
+        try { localStorage.setItem('hs_zip', String(z)); } catch (e) {}
+        return String(z);
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // hsLogEvent(eventType, { topic, pipeline_type, community_id, alert_id, zip_code })
   window.hsLogEvent = function (eventType, payload) {
     try {
       var c = window.hsClient;
@@ -30,7 +50,8 @@
         topic: (payload && payload.topic) || null,
         pipeline_type: (payload && payload.pipeline_type) || null,
         community_id: (payload && payload.community_id) || (window.COMMUNITY_ID || null),
-        alert_id: (payload && payload.alert_id) || null
+        alert_id: (payload && payload.alert_id) || null,
+        zip_code: currentZip(payload)
       };
       var q = c.from('events').insert([row]);
       if (q && typeof q.then === 'function') q.then(function () {}, function () {});
