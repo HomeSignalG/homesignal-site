@@ -301,6 +301,23 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   `docs/washington-communities-seed.sql`. Resolution probe passed (13-ZIP sample all resolve
   most-specific `zip>county`; 0 dup slugs; 0 orphan pages); same egress caveat — confirm on the
   real site (`?zip=98101` → pick a topic → sign up).
+- 🟢 **Illinois (Chicago metro + collar counties + Rockford + Metro East + Champaign-Urbana)
+  per-ZIP build is LIVE — 485 rows (11 county roots + 474 ZIP pages)** (DB-verified). Fourth
+  **out-of-state** build (prior: UT/CO/MI/WA) and the densest metro yet (Cook County alone =
+  216 ZIP pages): Cook, DuPage, Kane, Lake, McHenry, Will, Kendall, LaSalle, Winnebago,
+  Madison, Champaign — same model, **no new fork**. Each county root = the 6 canonical topics;
+  every requested ZIP is a `level=zip` page named `"<place> (<ZIP>)"` (`parent_id`→county,
+  `government_topics=[]`) inheriting via cascade. The ZIP→city→county crosswalk was generated
+  from the **`zipcodes` PyPI package v3.0.0** (bundled offline USPS database — §12.0), not
+  hand-typed. **No cross-county collisions** — all 474 ZIPs mapped to exactly one IL county
+  and IL had zero rows pre-seed. County-name casing was canonicalized where the package was
+  inconsistent (DuPage/Dupage, McHenry/Mchenry) so each county has exactly one root. One
+  crosswalk edge case: `60569` (Aurora) is a UNIQUE-type corporate ZIP with a blank county
+  field and was **quarantined** (excluded, not guessed — §12.2). City councils (Chicago,
+  Aurora, Rockford, Naperville, Joliet, Elgin, Evanston, Cicero, Champaign, Urbana, …) are
+  intentionally **deferred** to the ingest step. Full tree: `docs/illinois-communities-seed.sql`.
+  Resolution probe passed (9-ZIP sample all resolve most-specific `zip>county`; 0 dup slugs;
+  0 orphan pages); same egress caveat — confirm on the real site (`?zip=60601` → pick a topic → sign up).
 - ⚠️ **Delivery split is the open cross-repo item.** Notices and Meetings are separate
   *tiles*, but making them independently *deliverable* — and the email structure (default:
   two emails, one 5 PM Central window, news rides with notices — a **founder** call) —
