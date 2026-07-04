@@ -318,6 +318,41 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   intentionally **deferred** to the ingest step. Full tree: `docs/illinois-communities-seed.sql`.
   Resolution probe passed (9-ZIP sample all resolve most-specific `zip>county`; 0 dup slugs;
   0 orphan pages); same egress caveat — confirm on the real site (`?zip=60601` → pick a topic → sign up).
+- 🟢 **Texas (Central Texas / Austin metro + DFW-north collar + Greater Houston collar +
+  New Braunfels edge) per-ZIP build is LIVE — 267 rows (18 county roots + 249 ZIP pages)**
+  (DB-verified). Fifth **out-of-state** build: Travis, Denton, Collin, Williamson, Montgomery,
+  Fort Bend, Hays, Comal, Bastrop, Burnet, Llano, Bexar, plus single-ZIP roots Brazoria,
+  Caldwell, Harris, Lampasas, Liberty, Walker — same model, **no new fork**. Each county root =
+  the 6 canonical topics; every requested ZIP is a `level=zip` page named `"<place> (<ZIP>)"`
+  (`parent_id`→county, `government_topics=[]`) inheriting via cascade. The ZIP→city→county
+  crosswalk was generated from the **`zipcodes` PyPI package v3.0.0** (bundled offline USPS
+  database — §12.0), not hand-typed; city names used verbatim from the package (e.g. "Mckinney",
+  "Mc Dade"). **No collisions** — all 249 ZIPs mapped to exactly one TX county, 0 quarantined,
+  and TX had zero rows pre-seed (prior states are UT/CO/MI/WA ZIP ranges). County slugs carry a
+  `-tx` suffix (`travis-county-tx`, …) so common county names (Montgomery, Liberty, Walker, …)
+  don't collide across states. City councils (Austin, Plano, McKinney, Frisco, Denton, Sugar
+  Land, Conroe, Round Rock, Georgetown, San Antonio, …) intentionally **deferred** to the ingest
+  step. Full tree: `docs/texas-communities-seed.sql`. Resolution probe passed (10-ZIP sample all
+  resolve most-specific `zip>county`; 0 dup slugs; 0 orphan pages); same egress caveat — confirm
+  on the real site (`?zip=78701` → pick a topic → sign up).
+- 🟢 **Minnesota (Twin Cities metro + St. Cloud + Rochester + collar counties) per-ZIP build is
+  LIVE — 190 rows (18 county roots + 172 ZIP pages)** (DB-verified). Sixth **out-of-state**
+  build: Hennepin, Ramsey, Washington, Dakota, Stearns, Carver, Olmsted, Wright, Anoka, Scott,
+  Sherburne, plus single-ZIP roots Benton, Chisago, Dodge, Isanti, Rice, Todd, Wabasha — same
+  model, **no new fork**. Each county root = the 6 canonical topics; every requested ZIP is a
+  `level=zip` page named `"<place> (<ZIP>)"` (`parent_id`→county, `government_topics=[]`)
+  inheriting via cascade. The ZIP→city→county crosswalk was generated from the **`zipcodes`
+  PyPI package v3.0.0** (§12.0), not hand-typed; USPS city names used verbatim (e.g. "Saint
+  Paul" for the 551xx block). **No collisions** — all 172 ZIPs mapped to exactly one MN county,
+  0 quarantined, and MN had zero rows pre-seed. County slugs carry a `-mn` suffix
+  (`hennepin-county-mn`, `benton-county-mn` — Benton also exists in WA, so the suffix prevents a
+  cross-state slug clash). Note St. Cloud's `56304` maps to Sherburne and `56367` (Rice) to
+  Benton per the package's single authoritative assignment (St. Cloud physically spans
+  Stearns/Benton/Sherburne). City councils (Minneapolis, Saint Paul, Bloomington, Rochester,
+  Eden Prairie, Plymouth, St. Cloud, …) intentionally **deferred** to the ingest step. Full
+  tree: `docs/minnesota-communities-seed.sql`. Resolution probe passed (11-ZIP sample all
+  resolve most-specific `zip>county`; 0 dup slugs; 0 orphan pages); same egress caveat — confirm
+  on the real site (`?zip=55401` → pick a topic → sign up).
 - ⚠️ **Delivery split is the open cross-repo item.** Notices and Meetings are separate
   *tiles*, but making them independently *deliverable* — and the email structure (default:
   two emails, one 5 PM Central window, news rides with notices — a **founder** call) —
