@@ -519,15 +519,41 @@ legal/framing change not covered by the one-time sign-off.
 - **Canonical page absent from the repo → build it from the §3 data contract; not a stop.**
 - **Sandbox has no egress → populate the cache server-side via `pg_net`** (`net.http_post` →
   upsert `net._http_response.content`); Postgres has egress even when the sandbox doesn't.
+- **The engine's planning notices are hardcoded to Box Elder County** (`BOX_ELDER_COMMUNITY_ID`
+  in `get-address-report`). EPA facilities are national (queried around any centroid), but
+  `devSites` always returns Box Elder county notices. So **only Box Elder ZIPs can be cached
+  correctly today** — caching another county would attach Box Elder's hearings to it, a
+  fabrication-class defect. That is a real **engine-coverage boundary** (un-hardcode + wire each
+  county's notice feed on the ingest side), NOT a stop-and-ask — cache the county you have feeds
+  for, and expand coverage before caching the next.
+- **At batch scale the seed is a reproducible pg_net REFRESH SCRIPT, not a literal snapshot.**
+  A one-ZIP literal is fine; a whole county (18 ZIPs × ~40-64 sites, mostly the same county
+  notices repeated) is ~220 KB of engine output — embedding it as hand-copied JSON is the
+  "hand-authored site data" §0 warns against and no more reproducible. The seed pins the ZIP
+  centroids (§7.1) and re-invokes the engine, so re-applying rebuilds from the source of truth.
+- **Development ZIP pages are in the sitemap zero-touch** — `scripts/gen_sitemap.py` emits one
+  `homesignalmap.html?zip=<zip>` per `development_reports` row (alongside the community pages), so
+  newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 
 ### Status
-- 🟢 **84302 (Brigham City, Box Elder County, UT) prototype is LIVE** (DB-verified). ZIP-mode
-  report cached in `development_reports`: **facilities 23 · development 41 · proposed 41 ·
-  approved 0**, **64 sites, 0 unsourced** (every marker carries an EPA ECHO / Utah PMN / county /
-  city `record_url`); the page surfaces upcoming hearings as "comment windows open" (2 as of the
-  build date — a live, date-derived count from each notice's `meeting_date`). Route:
-  `homesignalmap.html?zip=84302` (pretty `/development/84302` redirects via `404.html`). Full tree:
-  `docs/box-elder-development-reports-seed.sql`.
+- 🟢 **ALL 18 Box Elder County ZIPs are LIVE** (DB-verified) — the full county, not just the
+  84302 prototype. Every Box Elder ZIP (84301, 84302, 84306, 84307, 84309, 84311, 84312, 84313,
+  84314, 84316, 84324, 84329, 84330, 84331, 84334, 84336, 84337, 84340) has a cached
+  `development_reports` row: **local EPA facilities** (0–23 per ZIP, scaling with each town's
+  industrial density — Brigham City 23, Corinne/Tremonton 15, Garland 12 … rural ZIPs 0) plus the
+  **41 county-wide planning notices** (jurisdiction model — every Box Elder ZIP inherits them).
+  **0 unsourced across the whole set, 0 count mismatches** (facilities == mapped point sites).
+  ZIPs with 0 facilities are valid facilities-empty pages. Centroids pinned to `zipcodes` PyPI
+  v3.0.0; engine `get-address-report` v10; each in the sitemap (via the generator). Full tree
+  (reproducible refresh script): `docs/box-elder-development-reports-seed.sql`. Same egress caveat
+  — `verify-development` CI does the live browser check on all 18. **The county line is the
+  coverage frontier**: expanding to another county needs the engine's planning feed un-hardcoded
+  first (ingest side). Original 84302 numbers preserved for reference: facilities 23 · development
+  41 · 64 sites · 0 unsourced.
+- 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
+  proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
+  "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
+  `homesignalmap.html?zip=84302` (pretty `/development/84302` redirects via `404.html`).
   Same egress caveat as the alerts builds — not eyeballed live from the sandbox; `verify-development`
   CI does the live browser check. City-council planning feeds beyond Box Elder County are the
   deferred engine-coverage item (logged, not blocking).
