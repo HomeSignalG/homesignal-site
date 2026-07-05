@@ -197,6 +197,7 @@ body { background: #f3f4f6; font-size: 14px; }
 .empty-state { text-align: center; padding: 40px 20px; border: 1px dashed var(--border); border-radius: var(--r); background: var(--bg); }
 .empty-state p { font-size: 13px; color: var(--ts); margin-bottom: 4px; font-weight: 500; }
 .empty-state span { font-size: 12px; color: var(--tt); }
+.trunc-note { font-size: 12px; color: var(--ts); background: var(--bg); border: 1px dashed var(--border); border-radius: var(--r); padding: 8px 12px; margin-bottom: 10px; text-align: center; }
 
 .scard { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; margin-bottom: 12px; }
 .stitle { font-size: 13px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
@@ -555,11 +556,18 @@ async function loadAlerts() {
   try {
     // Government (scoped) + Emerging/Global (universal, unscoped) each query their own
     // tier; News is the community-scoped catch-all (newest not in those three tiers).
-    const [gov, emerging, global, recent] = await Promise.all([
+    // Also ask for the TRUE total of this community's local alerts (count only, 1 row) so we
+    // can tell the reader when the newest-N view is truncated instead of hiding the rest silently.
+    const localTotalP = fetch(`${SUPABASE_URL}/rest/v1/alerts?community_id=eq.${CONTENT_ID}&select=id`,
+      { headers: Object.assign({}, headers, { 'Prefer': 'count=exact', 'Range-Unit': 'items', 'Range': '0-0' }) })
+      .then(r => { const m = (r.headers.get('content-range') || '').match(/\/(\d+)$/); return m ? parseInt(m[1], 10) : null; })
+      .catch(() => null);
+    const [gov, emerging, global, recent, localTotal] = await Promise.all([
       fetchQ(true,  'pipeline_type=eq.government_notice', PER_TIER),
       fetchQ(false, 'category=eq.emerging_technology', PER_TIER),
       fetchQ(false, 'category=eq.global_best_practices&or=(quality_grade.is.null,quality_grade.in.(BEST,MEDIUM))', PER_TIER),
-      fetchQ(true,  '', PER_TIER * 3)
+      fetchQ(true,  '', PER_TIER * 3),
+      localTotalP
     ]);
     const news = recent.filter(a => alertCatId(a.pipeline_type, a.category) === 'news').slice(0, PER_TIER);
     // Merge the tiers, de-dupe by id, newest first.
@@ -579,7 +587,7 @@ async function loadAlerts() {
     // If we have nothing to show AND at least one tier failed, this is an ERROR, not a genuine
     // empty community — surface it distinctly so an outage never masquerades as "no alerts".
     if (scoped.length === 0 && anyFail) { renderAlertsError(); return; }
-    renderAlerts(scoped);
+    renderAlerts(scoped, localTotal);
   } catch (err) {
     renderAlertsError();
   }
@@ -648,7 +656,7 @@ function renderAlertsError() {
   document.getElementById('feed-count').textContent = 'Couldn’t load alerts';
 }
 
-function renderAlerts(alerts) {
+function renderAlerts(alerts, localTotal) {
   const feed = document.getElementById('alert-feed');
   const count = document.getElementById('feed-count');
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -675,7 +683,12 @@ function renderAlerts(alerts) {
   const localEmptyBanner = (localCount === 0 && universalCount > 0)
     ? '<div class="empty-state local-empty"><p>No local alerts yet for this community</p><span>Showing regional &amp; global updates below — local notices appear here as they’re published</span></div>'
     : '';
-  feed.innerHTML = localEmptyBanner + alerts.map(a => {
+  // The feed shows only the newest few per tier. When this community has more local alerts
+  // than are shown, say so — never truncate silently (was: 297 of 337 hidden with no notice).
+  const truncNote = (typeof localTotal === 'number' && localTotal > localCount)
+    ? '<div class="trunc-note">Showing the newest ' + localCount + ' of ' + localTotal + ' local alerts</div>'
+    : '';
+  feed.innerHTML = truncNote + localEmptyBanner + alerts.map(a => {
     const tag = getPipelineTag(a.pipeline_type, a.category);
     const icon = getIcon(a.pipeline_type, a.category);
     const badge = freshnessBadge(a);
