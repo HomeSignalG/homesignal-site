@@ -73,6 +73,27 @@ state-portal parsers:
 > first-party state-portal parsers come *after*, and only for the states whose portal actually
 > carries **local** bodies (very few — see the first table).
 
+### ✅ Granicus RSS path — VALIDATED with live data (2026-07-05)
+
+Confirmed on a GitHub runner (the read-only probe `homesignal-ingest scripts/probe_granicus_rss.py`,
+run `28746915043`, since the sandbox has no egress). Target: **Douglas County, NV**
+(`douglascountynv.granicus.com`, community root `519481a8-9535-4fb5-9413-e5e36a3e8f97`).
+
+- **`ViewPublisherRSS.php?view_id=1&mode=agendas` → HTTP 200, 84,697 B, 102 items.** Real upcoming
+  local meetings, e.g. `Board of County Commissioners - Supplemental - Jul 02, 2026`,
+  `Airport Advisory Committee - Jul 07, 2026`, `Library Board of Trustees …`. `view_id=1` is the
+  county's **all-bodies** feed; `view_id≥3` → 404; `view_id=2` is an internal test view (ignore).
+- **The meeting date is in the `<title>` (`… - Jul 20, 2026`), NOT `pubDate`.** `pubDate` is the
+  *posting* date (e.g. posted Jun 29 for a Jul 20 meeting). So a generic `source_type=rss` row
+  would mis-date every meeting. **The one required piece of engineering:** a small Granicus adapter
+  that (a) recognizes a `*.granicus.com/ViewPublisherRSS.php` source, (b) parses the trailing
+  `- Mon DD, YYYY` from each title into `meetings.meeting_date`, (c) maps items to the meetings
+  schema. ~30 lines, **state-agnostic** (works for any Granicus entity), dwarfed in value by its
+  reach. This is the concrete next build; it is NOT pure feeds.csv data (per the engineering-reality
+  section above), but it is one adapter, not 25.
+- Net: the vendor-adapter thesis is confirmed with real content. A single Granicus adapter turns
+  every already-modeled county whose government runs Granicus into a live-Meetings page.
+
 ---
 
 ## Tier 1 — first-party portals that carry LOCAL bodies (the Utah-style path)
