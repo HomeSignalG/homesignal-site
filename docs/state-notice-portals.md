@@ -94,33 +94,45 @@ run `28746915043`, since the sandbox has no egress). Target: **Douglas County, N
 - Net: the vendor-adapter thesis is confirmed with real content. A single Granicus adapter turns
   every already-modeled county whose government runs Granicus into a live-Meetings page.
 
-### 🟢 Douglas County, NV — LIVE (first non-Utah county with government content)
+### 🟢 Non-Utah government content is LIVE — 9 counties / 6 states (523 meetings)
 
-Shipped end-to-end this build (DB-verified). The Granicus adapter (`parse_granicus_rss`, ingest
-PR #120), a `feeds.csv` row + reusable `golive-feed.yml` (PR #122), and a targeted live ingest
-(`ONLY_FEED`, run `28747348321`) wrote **100 real Douglas County NV meetings** to `meetings`
-(root `519481a8-…`, category `County Commission & county business`) — e.g. `Board of County
-Commissioners - Jul 02, 2026`, `Airport Advisory Committee - Jul 07, 2026`, `Library Board of
-Trustees …`. Every row: real title, `meeting_date` matching the title exactly, canonical category,
-Granicus `AgendaViewer` permalink. **0 subscribers on Douglas County NV**, so this only populated
-its previously-empty government tiles — no digest emails.
+Shipped end-to-end this build (DB-verified). From Utah-only to **9 counties across 6 states**, all
+anchored to their county root under `County Commission & county business`, all first-party, all
+correctly dated (adapters drop undated/unsourced items — no fabrication):
 
-- **Honest caveat:** the `agendas` feed is mostly a recent *archive* — of the 100, only ~2 are
-  future-dated at ingest time (it's July; the forward agenda window is short). The page's Meetings
-  tile shows the upcoming ones; the rest are real historical meetings (same as Utah's archive).
-  Not a defect — it's the source's real content, correctly dated, never fabricated.
-- **Reusability proven:** the same feed pattern (`rss` → `<entity>.granicus.com/ViewPublisherRSS.php?view_id=N&mode=agendas`,
-  keyed to a county root) now works for *any* modeled county on Granicus — pure feeds.csv + DB row,
-  no new code. The engine (adapter) is built; widening is data.
-- **Adjacent finding (flag for reconciliation):** the repo already carries `adapters/legistar.py`,
-  `adapters/civicplus.py`, `adapters/iqm2.py` (Legistar/iQM2 are Granicus-family; CivicPlus is
-  another major vendor) and a `mi-genesee-commission-meetings` feed whose `feeds.csv` note claims
-  "LIVE — verified 25 events." But the DB shows **0 Genesee meetings**, and `public.feeds` had **0
-  vendor rows** before this build — i.e. those vendor feeds were *parse-verified on a runner but
-  never synced into the DB-first config, so scheduled ingest never ran them.* The gap that blocks
-  the whole vendor frontier is **feeds.csv → `public.feeds` sync**, not the adapters. (Fixing/wiring
-  Genesee + a full CSV→DB sync is the obvious next step, left to the owner since it activates
-  several other in-flight pending feeds at once.)
+| County | Meetings | Upcoming | Vendor |
+|---|---|---|---|
+| Clark County, NV | 104 | 5 | Granicus (`clark` view 28) |
+| Wake County, NC | 102 | 2 | Granicus (`wake` view 18) |
+| Hennepin County, MN | 100 | 0 | Granicus (`hennepinmn` view 2) |
+| Douglas County, NV | 100 | 2 | Granicus (`douglascountynv` view 1) |
+| Genesee County, MI | 25 | 13 | Legistar (`geneseecountymi`) |
+| Mecklenburg County, NC | 25 | 1 | Legistar (`mecklenburg`) |
+| Washoe County, NV | 24 | 7 | Legistar (`washoe-nv`) |
+| King County, WA | 24 | 9 | Legistar (`kingcounty`) |
+| Pima County, AZ | 19 | 0 | Legistar (`pima`) |
+
+Two vendor adapters carried all of it: the new state-agnostic **Granicus RSS** (`parse_granicus_rss`,
+ingest PR #120) and the existing **Legistar** (`adapters/legistar.py`). Every county's titles were
+DB-verified as real bodies (e.g. Pima "Board of Supervisors", Mecklenburg "Board of Commissioners",
+Wake "Regular Meeting … BOC", Hennepin standing committees). Douglas has 0 subscribers so it was
+pages-only, no emails; the others likewise only populate their previously-empty Meetings tiles.
+
+- **Reusability proven — widening is pure data.** Add one feed row per county — Granicus
+  `rss → <entity>.granicus.com/ViewPublisherRSS.php?view_id=N&mode=agendas`, or Legistar
+  `html → <client>.legistar.com/Calendar.aspx` — keyed to the county root. No new code.
+- **The frontier blocker was the `feeds.csv` → `public.feeds` sync, not the adapters.** Config is
+  DB-first (`load_config`), so a feed added only to `feeds.csv` never runs on the schedule — which is
+  exactly why Genesee sat at 0 despite a "LIVE — 25 events" note (now genuinely live: 25 meetings, 13
+  upcoming). The wire pattern that works: `dryrun-feed.yml` (read-only) → insert row into
+  `public.feeds` → `golive-feed.yml` or full ingest → **verify meeting titles** (confirm the right
+  body). Existing adapters: Granicus RSS, Legistar, iQM2, CivicPlus AgendaCenter.
+- **Honest caveats:** (1) Granicus `agendas` skews to a recent *archive* (e.g. Douglas/Hennepin show
+  few future-dated at ingest time in July); the tile shows upcoming, the rest are real history. (2)
+  **CivicClerk (`*.portal.civicclerk.com`) has no adapter yet** — Oakland MI / Travis TX / Salt Lake UT
+  are deferred until one is built. (3) **Maricopa AZ** uses CivicPlus AgendaCenter on its own domain;
+  the default category returned only the Community Action Commission (not the Board of Supervisors), so
+  its feed is **disabled** pending the correct category CID.
 
 ---
 
