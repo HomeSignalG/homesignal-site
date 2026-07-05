@@ -92,9 +92,14 @@ async function main() {
   console.log(`Verifying ${zips.length} ZIP(s) against ${SITE_BASE} (from ${rows.length} communities)`);
 
   const browser = await chromium.launch();
-  const page = await browser.newPage();
   const fails = [];
-  for (const zip of zips) {
+  // Bounded concurrency: a pool of reused pages pulls ZIPs off a shared cursor. The check is
+  // network-bound (each ZIP is a page load + Supabase reads), so sequential ran ~1 ZIP/sec —
+  // a national corpus (10k+ ZIPs) approached the 6h job cap. N workers cut wall-clock ~Nx
+  // with IDENTICAL assertions. Override with CONCURRENCY (default 8).
+  const CONCURRENCY = Math.max(1, process.env.CONCURRENCY ? parseInt(process.env.CONCURRENCY, 10) : 8);
+  let cursor = 0;
+  async function checkOne(page, zip) {
     const want = expected.get(zip);
     const target = `${SITE_BASE}/community.html?zip=${zip}`;
     try {
@@ -130,6 +135,16 @@ async function main() {
       fails.push(`ZIP ${zip} (${want.name}): ${e.message.split('\n')[0]}`);
     }
   }
+  async function worker() {
+    const page = await browser.newPage();
+    for (;;) {
+      const i = cursor++;
+      if (i >= zips.length) break;
+      await checkOne(page, zips[i]);
+    }
+    await page.close();
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, zips.length || 1) }, () => worker()));
   await browser.close();
 
   const summary = [
