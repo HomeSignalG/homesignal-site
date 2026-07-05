@@ -1,4 +1,4 @@
-// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v13.
+// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v14.
 // PARKED HERE FOR REFERENCE/REPRODUCIBILITY ONLY — Supabase is the source of truth
 // (docs/development-tracker-source-of-truth.md §2). v11 = MULTI-COUNTY: resolveCommunityIds()
 // maps a ZIP to its own community chain (city+county) so each ZIP shows its OWN county's
@@ -8,8 +8,11 @@
 // densest ZIPs falsely showed zero. frsFacilities() now shrinks the radius until FRS answers and
 // escapes FRS's invalid-JSON backslashes. v13 = distinguish transient FRS 5xx (retry same radius)
 // from the process-limit error (shrink) — a flaky FRS 502 was making the code shrink and undercount
-// (Box Elder 23→18); floor lowered to 0.25 mi. Address-mode input/output shape unchanged. Redeploy
-// via mcp__Supabase__deploy_edge_function — committing does not deploy.
+// (Box Elder 23→18); floor lowered to 0.25 mi. v14 = tracker-accuracy: dedup dev items (url|title+date
+// — ingest can double-emit), age out concluded hearings older than MEETING_LOOKBACK_DAYS, and stamp
+// `decided` (approved|denied/withdrawn/tabled) so the page never shows a resolved item as "open for
+// comment". Address-mode input/output shape unchanged. Redeploy via
+// mcp__Supabase__deploy_edge_function — committing does not deploy.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -25,6 +28,7 @@ const DEV_CATEGORIES = [
 const MILES_PER_DEG_LAT = 69.0;
 const MAX_FACILITIES = 40;
 const MAX_RADIUS_MI = 5;
+const MEETING_LOOKBACK_DAYS = 90;   // age out concluded hearings older than this (keep recent + upcoming)
 const TEASER_LIMIT = 5;
 const PAYWALL_ENABLED = (Deno.env.get("PAYWALL_ENABLED") || "").toLowerCase() === "true";
 
@@ -117,30 +121,45 @@ async function geocode(address: string): Promise<[number, number, string]> {
 async function devSites(supabase: ReturnType<typeof createClient>, homeLat: number, homeLng: number, communityIds: string[]): Promise<Record<string, unknown>[]> {
   const sites: Record<string, unknown>[] = [];
   if (!communityIds.length) return sites;   // ZIP has no modeled jurisdiction → facilities-only page (valid)
+  // Age out stale hearings: a meeting concluded long ago is not "what's happening now". Keep
+  // upcoming + the last MEETING_LOOKBACK_DAYS so the tracker reflects current activity, not history.
+  const floorIso = new Date(Date.now() - MEETING_LOOKBACK_DAYS * 86400000).toISOString().slice(0, 10);
   const { data: alerts } = await supabase.from("alerts").select("title,category,agency_name,geographic_reference,source_url,comment_deadline").in("community_id", communityIds).eq("pipeline_type", "government_notice").in("category", DEV_CATEGORIES).order("published_at", { ascending: false }).limit(100);
-  const { data: meetings } = await supabase.from("meetings").select("title,category,location,meeting_date,source_url,is_public_hearing,comment_period_open").in("community_id", communityIds).or("is_public_hearing.eq.true,comment_period_open.eq.true").order("meeting_date", { ascending: false }).limit(150);
+  const { data: meetings } = await supabase.from("meetings").select("title,category,location,meeting_date,source_url,is_public_hearing,comment_period_open").in("community_id", communityIds).or("is_public_hearing.eq.true,comment_period_open.eq.true").gte("meeting_date", floorIso).order("meeting_date", { ascending: false }).limit(150);
   for (const a of alerts ?? []) {
     const pt = centroid((a.geographic_reference as string) || (a.agency_name as string) || "");
     if (!pt) continue;
     const [e, n] = toEN(homeLat, homeLng, pt[0], pt[1]);
     const title = ((a.title as string) || "").trim();
     const approved = /\b(approved|approves|granted|adopted|entitled|permit issued|issued a permit|under construction|final plat|site plan approv|authoriz|ground ?break|breaks ground|begins construction|construction begins)\b/i.test(title);
-    const s: Record<string, unknown> = { label: title.slice(0, 120) || "Development item", e, n, lat: pt[0], lng: pt[1], scope: "area", type: approved ? "approved" : "proposed", layer: classifyLayer(title, a.category as string), src: ((a.agency_name as string) || (a.category as string) || "Planning record").trim(), url: (a.source_url as string) || "" };
+    // A DECIDED item (approved OR denied/withdrawn/tabled) is not an open comment opportunity — the
+    // page uses this so it never tells a resident to "comment" on something already resolved.
+    const denied = /\b(denied|denies|deny|withdrawn|withdrew|withdraws|rejected|rejects|tabled|dismissed|vacated|rescinded)\b/i.test(title);
+    const s: Record<string, unknown> = { label: title.slice(0, 120) || "Development item", e, n, lat: pt[0], lng: pt[1], scope: "area", type: approved ? "approved" : "proposed", decided: approved || denied, layer: classifyLayer(title, a.category as string), src: ((a.agency_name as string) || (a.category as string) || "Planning record").trim(), url: (a.source_url as string) || "" };
     if (a.comment_deadline) s.comment_deadline = a.comment_deadline;
     sites.push(s);
   }
   for (const m of meetings ?? []) {
     const pt = centroid((m.location as string) || "") ?? PLACES["box elder county"];
     const [e, n] = toEN(homeLat, homeLng, pt[0], pt[1]);
-    sites.push({ label: ((m.title as string) || "Public hearing").slice(0, 120), e, n, lat: pt[0], lng: pt[1], scope: "area", type: "proposed", layer: classifyLayer((m.title as string) || "", m.category as string), src: m.is_public_hearing ? "Public hearing" : "Comment window", url: (m.source_url as string) || "", meeting_date: m.meeting_date });
+    sites.push({ label: ((m.title as string) || "Public hearing").slice(0, 120), e, n, lat: pt[0], lng: pt[1], scope: "area", type: "proposed", decided: false, layer: classifyLayer((m.title as string) || "", m.category as string), src: m.is_public_hearing ? "Public hearing" : "Comment window", url: (m.source_url as string) || "", meeting_date: m.meeting_date });
   }
+  // Dedup: ingest can emit the same notice more than once. Key on the record URL when present, else
+  // title + date. First-seen wins (alerts before meetings, both newest-first) so counts aren't inflated.
+  const seen = new Set<string>();
+  const deduped = sites.filter((s) => {
+    const url = ((s.url as string) || "").trim();
+    const key = url || `${(s.label as string) || ""}|${(s.meeting_date as string) || (s.comment_deadline as string) || ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key); return true;
+  });
   const groups: Record<string, Record<string, unknown>[]> = {};
-  for (const s of sites) { const k = `${(s.lat as number).toFixed(4)},${(s.lng as number).toFixed(4)}`; (groups[k] ??= []).push(s); }
+  for (const s of deduped) { const k = `${(s.lat as number).toFixed(4)},${(s.lng as number).toFixed(4)}`; (groups[k] ??= []).push(s); }
   for (const members of Object.values(groups)) {
     if (members.length < 2) continue;
     members.forEach((s, i) => { const ang = i * 2.399963, rad = 0.18 + 0.09 * Math.sqrt(i); s.e = Math.round(((s.e as number) + rad * Math.cos(ang)) * 1000) / 1000; s.n = Math.round(((s.n as number) + rad * Math.sin(ang)) * 1000) / 1000; s.approx = true; });
   }
-  return sites;
+  return deduped;
 }
 // One FRS query at a fixed radius. Distinguishes the two failure modes that matter:
 //  • tooBig  → FRS returned its "Process Limit would be exceeded" Error object (deterministic,

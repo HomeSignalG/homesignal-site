@@ -620,6 +620,28 @@ legal/framing change not covered by the one-time sign-off.
   84606 0→40, 84010 0→40); the rest are genuinely-empty west-desert/mountain ZIPs (Dugway, Ibapah,
   Wendover, Grouse Creek — 0 industrial is valid). Parked ref: `supabase/functions/get-address-report/index.ts`
   (deploy via MCP, not commit). Anti-fabrication invariant still 0 (every rendered site keeps a `record_url`).
+- 🟢 **Staleness + status-accuracy hardened — engine v14 + auto-refresh + honest dating** (DB-verified).
+  A tracker is worthless if it's a frozen snapshot with a hardcoded stage, so three fixes: **(1) it now
+  updates** — `development_reports` was only ever refreshed by a MANUAL pg_net run (nothing re-ran it), so a
+  new hearing never reached a ZIP page until a human re-cached. Added a **pg_cron daily auto-refresh**
+  (`dev_refresh_fire` 09:00 UTC → `dev_refresh_collect` 09:08, both `SECURITY DEFINER`, self-contained via
+  pg_net — no egress/secret needed) with a **transient-safe upsert** (never overwrite a row that has content
+  with an all-empty response, so a flaky FRS night can't blank good pages). Parked:
+  `docs/development-reports-refresh-cron.sql`. **(2) it's honestly dated** — the page reads `refreshed_at`
+  and shows **"Updated <date>"** (ZIP snapshot) / **"Live results"** (address mode); previously it never read
+  the field, so undated snapshots silently drifted. **(3) status is less of a guess** — v14 stamps
+  `decided` (title matches approved OR denied/withdrawn/tabled/rescinded) so the page **never shows a resolved
+  item as "open for public comment"** (a denied item with a future date used to count as open + show a
+  "closes in N days" countdown); it now shows the plain date + a "decided" tag. v14 also **dedups** dev items
+  (url|title+date — ingest can double-emit, which inflated counts) and **ages out concluded hearings** older
+  than 90 days (`MEETING_LOOKBACK_DAYS`) so old items stop lingering as "Proposed" (Utah County 91→89 on
+  re-cache — 2 stale items dropped). **Known residual (NOT fixed — needs ingest-side work):** there is still
+  no project *identity/lifecycle* — each notice is classified independently, so "proposed→approved→built"
+  isn't tracked as one entity; and `centroid()`/`PLACES` geocoding of planning notices is Box-Elder-hardcoded
+  (inert today because area-scope items aren't map-pinned — `mappable()` is point-only — but the lat/lng on
+  non-Box-Elder notices are wrong). Also **EPA ECHO violations are effectively 0 everywhere** — the
+  `echo_violation_counts` table is near-empty (3 rows, 0 with violations), so every facility shows "0 recorded
+  violations" regardless of real history (fetched from a table, not live ECHO). Logged for a future build.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
