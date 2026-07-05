@@ -425,24 +425,30 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   (`<entity>.granicus.com/ViewPublisher.php?view_id=N`) hosts county/city agendas nationwide, so one
   adapter widens coverage across every state at once (then CivicPlus/Legistar/PrimeGov for the tail).
   Full registry + recommended wire order: `docs/state-notice-portals.md`.
-- 🟢 **Non-Utah government content is LIVE across 9 counties / 6 states (523 meetings)** (DB-verified).
-  From Utah-only at the start of this build to: **Clark NV (104), Wake NC (102), Hennepin MN (100),
-  Douglas NV (100), Genesee MI (25), Mecklenburg NC (25), Washoe NV (24), King WA (24), Pima AZ (19)** —
-  all anchored to their county root under `County Commission & county business`, all first-party, all
-  correctly dated (adapters drop undated/unsourced items, so no fabrication). Proven via **two vendor
-  adapters**: the new state-agnostic **Granicus RSS** (`parse_granicus_rss`, ingest PR #120 — Douglas/
-  Clark/Wake/Hennepin) and the existing **Legistar** (`adapters/legistar.py` — Genesee/Mecklenburg/
-  Washoe/King/Pima). **Widening is now pure data**: add a feed row per county — Granicus
-  `rss → <entity>.granicus.com/ViewPublisherRSS.php?view_id=N&mode=agendas`, or Legistar
-  `html → <client>.legistar.com/Calendar.aspx` — keyed to its root; a wrong URL yields 0, never fake data.
+- 🟢 **Government content is LIVE across 13 non-Utah counties / 8 states (675 meetings) + 4 Utah
+  communities** (DB-verified). From Utah-only at the start of this build to: **Clark NV (104), Multnomah
+  OR (101), Wake NC (102), Hennepin MN (100), Douglas NV (100), Genesee MI (25), Mecklenburg NC (25),
+  Washoe NV (24), King WA (24), Ramsey MN (21), Pima AZ (19), Oakland MI (15), Travis TX (15)** — plus
+  Salt Lake County UT (15, CivicClerk). All anchored to their county root under `County Commission &
+  county business`, all first-party, all title-verified as the correct board, all correctly dated
+  (adapters drop undated/unsourced items — no fabrication). Proven via **three vendor adapters**:
+  state-agnostic **Granicus RSS** (`parse_granicus_rss` — Douglas/Clark/Wake/Hennepin/Multnomah), the
+  existing **Legistar** (`adapters/legistar.py` — Genesee/Mecklenburg/Washoe/King/Pima/Ramsey), and the
+  new **CivicClerk** (`adapters/civicclerk.py`, reads the `<sub>.api.civicclerk.com/v1/Events` OData API
+  behind the portal SPA — Oakland/Travis/Salt Lake). **Widening is now pure data**: add a feed row per
+  county — Granicus `rss → <entity>.granicus.com/ViewPublisherRSS.php?view_id=N&mode=agendas`, Legistar
+  `html → <client>.legistar.com/Calendar.aspx`, or CivicClerk `html → <sub>.portal.civicclerk.com/` —
+  keyed to its root; a wrong URL yields 0, never fake data.
 - 🔑 **The frontier blocker is the `feeds.csv` → `public.feeds` sync, not the adapters** (learned this
   build). Config is **DB-first** (`load_config`), so a feed added only to `feeds.csv` never runs on the
   schedule (that's why Genesee sat at 0 despite a "LIVE" note). Wire pattern that works: dry-run
   (`dryrun-feed.yml`, read-only) → insert the row into `public.feeds` → `golive-feed.yml`
   (`ONLY_FEED` single-feed live ingest) OR a full ingest → verify meeting **titles** in the DB (confirm
-  the right body, not a sub-committee). Adapters exist for Granicus RSS, Legistar, iQM2, CivicPlus
-  AgendaCenter; **CivicClerk (`*.portal.civicclerk.com`) has no adapter yet** (Oakland MI / Travis TX /
-  Salt Lake UT deferred). Full registry, wire order, and per-county receipts: `docs/state-notice-portals.md`.
+  the right body, not a sub-committee). Adapters now exist for **Granicus RSS, Legistar, CivicClerk,
+  iQM2, CivicPlus AgendaCenter** — the four dominant civic-agenda vendors, so most US counties are now
+  reachable as pure data. Known gaps: bespoke county systems (Wayne MI = YouTube/PDF, Cuyahoga/Hamilton
+  OH = own portals, Maricopa AZ AgendaCenter needs the right category CID). Full registry, wire order,
+  and per-county receipts: `docs/state-notice-portals.md`.
 
 ---
 
