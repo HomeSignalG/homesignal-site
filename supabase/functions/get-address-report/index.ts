@@ -1,8 +1,10 @@
-// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v9.
+// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v11.
 // PARKED HERE FOR REFERENCE/REPRODUCIBILITY ONLY — Supabase is the source of truth
-// (docs/development-tracker-source-of-truth.md §2). ZIP mode is an ADDITIVE branch; address
-// mode {address, radius_mi} is byte-for-byte unchanged from v8. If you edit this, redeploy
-// via Supabase MCP (mcp__Supabase__deploy_edge_function) — committing it does not deploy it.
+// (docs/development-tracker-source-of-truth.md §2). v11 = MULTI-COUNTY: resolveCommunityIds()
+// maps a ZIP to its own community chain (city+county) so each ZIP shows its OWN county's
+// planning notices, never a hardcoded one; ZIP mode + address mode both use it. Address mode
+// input/output shape unchanged. Redeploy via mcp__Supabase__deploy_edge_function — committing
+// does not deploy.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -107,10 +109,11 @@ async function geocode(address: string): Promise<[number, number, string]> {
   const c = matches[0].coordinates;
   return [Number(c.y), Number(c.x), matches[0].matchedAddress ?? address];
 }
-async function devSites(supabase: ReturnType<typeof createClient>, homeLat: number, homeLng: number): Promise<Record<string, unknown>[]> {
+async function devSites(supabase: ReturnType<typeof createClient>, homeLat: number, homeLng: number, communityIds: string[]): Promise<Record<string, unknown>[]> {
   const sites: Record<string, unknown>[] = [];
-  const { data: alerts } = await supabase.from("alerts").select("title,category,agency_name,geographic_reference,source_url,comment_deadline").eq("community_id", BOX_ELDER_COMMUNITY_ID).eq("pipeline_type", "government_notice").in("category", DEV_CATEGORIES).order("published_at", { ascending: false }).limit(60);
-  const { data: meetings } = await supabase.from("meetings").select("title,category,location,meeting_date,source_url,is_public_hearing,comment_period_open").eq("community_id", BOX_ELDER_COMMUNITY_ID).or("is_public_hearing.eq.true,comment_period_open.eq.true").order("meeting_date", { ascending: false }).limit(30);
+  if (!communityIds.length) return sites;   // ZIP has no modeled jurisdiction → facilities-only page (valid)
+  const { data: alerts } = await supabase.from("alerts").select("title,category,agency_name,geographic_reference,source_url,comment_deadline").in("community_id", communityIds).eq("pipeline_type", "government_notice").in("category", DEV_CATEGORIES).order("published_at", { ascending: false }).limit(100);
+  const { data: meetings } = await supabase.from("meetings").select("title,category,location,meeting_date,source_url,is_public_hearing,comment_period_open").in("community_id", communityIds).or("is_public_hearing.eq.true,comment_period_open.eq.true").order("meeting_date", { ascending: false }).limit(150);
   for (const a of alerts ?? []) {
     const pt = centroid((a.geographic_reference as string) || (a.agency_name as string) || "");
     if (!pt) continue;
@@ -163,6 +166,16 @@ async function enrichViolations(supabase: ReturnType<typeof createClient>, fac: 
     for (const f of fac) { const c = byId.get(f.registry_id as string); if (c && c > 0) { f.viol = c; f.violUrl = f.record_url; } }
   } catch (_e) { /* best-effort */ }
 }
+// Resolve a ZIP to the community rows whose jurisdiction covers it (the ZIP's chain — its
+// city + county). Planning notices are queried for THESE ids, so each ZIP shows its OWN
+// county's hearings, not a hardcoded one. A ZIP with no modeled community → [] (facilities-
+// only, never another county's notices — that would be fabrication). Box Elder ZIPs resolve
+// to [Brigham City, Box Elder County]; only the county carries content, so output is unchanged.
+async function resolveCommunityIds(supabase: ReturnType<typeof createClient>, zip: string | null): Promise<string[]> {
+  if (!zip || !/^\d{5}$/.test(zip)) return [];
+  const { data } = await supabase.from("communities").select("id").contains("zip_codes", [zip]);
+  return (data ?? []).map((r) => r.id as string);
+}
 async function accessLevel(req: Request, supabase: ReturnType<typeof createClient>): Promise<"full" | "teaser"> {
   if (!PAYWALL_ENABLED) return "full";
   const auth = req.headers.get("Authorization") || ""; const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
@@ -198,7 +211,8 @@ Deno.serve(async (req: Request) => {
     }
     const zipRadius = Math.min(Math.max(Number(body.radius_mi) || ZIP_RADIUS_MI, 0.5), MAX_RADIUS_MI);
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
-    const [devRaw, facRaw] = await Promise.all([devSites(supabase, clat, clng), facilitySites(clat, clng, zipRadius)]);
+    const communityIds = await resolveCommunityIds(supabase, zip);
+    const [devRaw, facRaw] = await Promise.all([devSites(supabase, clat, clng, communityIds), facilitySites(clat, clng, zipRadius)]);
     await enrichViolations(supabase, facRaw);
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");
@@ -216,7 +230,9 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
   let lat: number, lng: number, matched: string;
   try { [lat, lng, matched] = await geocode(address); } catch (e) { return json({ error: String(e instanceof Error ? e.message : e) }, 422, cors); }
-  const [dev, fac] = await Promise.all([devSites(supabase, lat, lng), facilitySites(lat, lng, radiusMi)]);
+  const zipM = matched.match(/\b(\d{5})\b/);
+  const communityIds = await resolveCommunityIds(supabase, zipM ? zipM[1] : null);
+  const [dev, fac] = await Promise.all([devSites(supabase, lat, lng, communityIds), facilitySites(lat, lng, radiusMi)]);
   const rids = fac.map((f) => f.registry_id as string).filter(Boolean);
   if (rids.length) {
     try { const { data: rows } = await supabase.from("echo_violation_counts").select("registry_id,count").in("registry_id", rids); const byId = new Map((rows ?? []).map((r) => [r.registry_id as string, r.count as number])); for (const f of fac) { const c = byId.get(f.registry_id as string); if (c && c > 0) { f.viol = c; f.violUrl = f.record_url; } } } catch (_e) { /* best-effort */ }
