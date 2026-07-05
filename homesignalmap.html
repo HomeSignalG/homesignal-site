@@ -70,6 +70,7 @@
   .mapcard{padding:14px}
   .map-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;gap:10px}
   .map-cap{font-weight:600;font-size:13px;color:var(--soft)}
+  .zipmode #radSel{display:none}   /* radius is an address-mode concept; a ZIP page is the whole ZIP */
   .viewseg{display:inline-flex;background:#eef2f1;border:1px solid var(--line);border-radius:9px;overflow:hidden;flex:0 0 auto}
   .viewseg button{border:0;background:transparent;font:600 12px var(--font);color:var(--soft);padding:6px 13px;cursor:pointer}
   .viewseg button.on{background:var(--green);color:#fff}
@@ -362,6 +363,10 @@
     // A real address search leaves ZIP mode: now we DO drop the "this address" pin.
     ZIP_MODE = false; HOME_ANCHOR = false;
     CUR_ADDRESS = address;
+    // Back to address mode: bring back the radius control and reset the ZIP-scoped caption.
+    document.body.classList.remove("zipmode");
+    var _cap2 = document.querySelector(".map-cap");
+    if(_cap2){ _cap2.textContent = "Development around this home"; }
     $("go").disabled = true;
     status("Pulling public records for " + address + " within " + radiusLabel(CUR_RADIUS) + " …");
     fetch(ENDPOINT, {
@@ -392,6 +397,21 @@
     if(rb){ [].forEach.call(document.querySelectorAll("#radSel button"),function(c){c.classList.remove("on");}); rb.classList.add("on"); }
     $("eyebrow").textContent = "ZIP " + zip + " · development overview";
     document.title = "Development around " + zip + " — HomeSignal";
+    // ZIP mode: the page is about the whole ZIP, not a Box Elder address. Re-word the hero so a
+    // resident of ANY covered county sees copy that matches their ZIP (the static copy names Box
+    // Elder, which is wrong on every other ZIP page). The radius selector is hidden (address-only).
+    document.body.classList.add("zipmode");
+    var _sub = document.querySelector(".sub");
+    if(_sub){ _sub.textContent = "What's built and what's proposed across ZIP " + zip + " — "
+      + "industrial facilities, data-center activity, planning hearings and open comment windows — "
+      + "every item linked to its official public record."; }
+    var _hint = document.querySelector(".hint");
+    if(_hint){ _hint.textContent = "Or enter your street address for a precise view around your home. "
+      + "Free while we're in launch."; }
+    var _cap = document.querySelector(".map-cap");
+    if(_cap){ _cap.textContent = "Development across ZIP " + zip; }
+    var _addr = $("addr");
+    if(_addr){ _addr.placeholder = "Enter your street address for a precise view"; }
     status("Loading development records for ZIP " + zip + " …");
     var url = SUPABASE_URL + "/rest/v1/development_reports?zip=eq." + encodeURIComponent(zip) +
               "&select=zip,home_lat,home_lng,counts,sites,paywall&limit=1";
