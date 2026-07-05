@@ -198,6 +198,18 @@ These convert every foreseeable "should I ask?" into "no — do this." Add to th
 - **A facility that geocodes outside the ZIP boundary → exclude from ZIP mode, keep for
   address mode.** ZIP mode contains only points inside the ZIP; address mode is radius-based
   and legitimately crosses ZIP lines. Not a stop.
+- **The cache MUST auto-refresh and be honestly dated — a manual snapshot is a bug, not a feature.**
+  `development_reports` is refreshed by **pg_cron** (`dev_refresh_fire` → `dev_refresh_collect`, daily,
+  self-contained via pg_net — `docs/development-reports-refresh-cron.sql`), and the page shows
+  `refreshed_at` as "Updated <date>". Any recurring re-cache uses a **transient-safe upsert** (never
+  overwrite a row that has content with an all-empty response — a flaky FRS night must not blank good
+  pages). Never ship a ZIP cache that only a human can refresh, and never render a snapshot without its date.
+- **Status is a title heuristic, so never present a DECIDED item as an open comment window.** The engine
+  stamps `decided` = title matches approved OR denied/withdrawn/tabled/rescinded; the page excludes decided
+  items from "open for public comment" and drops their countdown (plain date + "decided" tag instead). Dedup
+  dev items (url|title+date — ingest can double-emit) and age out hearings older than `MEETING_LOOKBACK_DAYS`
+  so concluded items stop lingering as "Proposed". **Out of scope here (needs ingest-side entity resolution):**
+  true project *identity/lifecycle* (proposed→approved→built as one tracked entity) — flag it, don't fake it.
 - **NEVER treat an EPA-FRS non-200 / error object / parse failure as "0 facilities" (engine
   v13).** FRS refuses a query whose result set is too large — it returns
   `{"Results":{"Error":{"ErrorMessage":"Process Limit would be exceeded..."}}}` (HTTP 200!),

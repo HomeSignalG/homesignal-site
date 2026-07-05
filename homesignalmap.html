@@ -117,7 +117,9 @@
 
   .read{padding:18px}
   .read h2{font-size:12px;letter-spacing:.02em;color:var(--mute);margin:0 0 4px;font-weight:600}
-  .addr{font-weight:600;font-size:16px;margin-bottom:14px}
+  .addr{font-weight:600;font-size:16px;margin-bottom:4px}
+  .freshline{font-size:11.5px;color:var(--mute);margin-bottom:12px;min-height:14px}
+  .freshline:empty{margin-bottom:0;min-height:0}
   .counts{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:8px}
   .cc{background:#f6f9f7;border:1px solid var(--line);border-radius:11px;padding:11px 12px}
   .covnote{margin-top:12px;font-size:12.5px;line-height:1.5;color:var(--soft);
@@ -145,6 +147,7 @@
   .rec .dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex:0 0 auto}
   .rec .t{font-weight:600;font-size:14px}
   .rec .s{font-size:12.5px;color:var(--soft)}
+  .rec .decidedtag{font-weight:700;color:var(--mute)}
   .rec .vflag{display:inline-block;margin-top:4px;font-size:11px;color:var(--violation);
     background:#fdecec;border:1px solid #f5c9c9;border-radius:6px;padding:2px 7px}
   .empty{color:var(--mute);font-size:13px;padding:12px 0}
@@ -241,6 +244,8 @@
         <div class="card read">
           <h2 id="withinLbl">Within 1 mile of</h2>
           <div class="addr" id="rAddr">—</div>
+          <!-- Freshness stamp: "Updated <date>" for cached ZIP snapshots, "Live results" for address mode. -->
+          <div class="freshline" id="freshLine"></div>
           <!-- Open-for-comment banner: built fresh each render(); hidden (no reserved space)
                when nothing is open. Sits above the counts so a worried resident sees it first. -->
           <div class="commentbar" id="commentBar" style="display:none"></div>
@@ -391,6 +396,13 @@
     return "closes " + plain;                // far out → "closes Aug 3, 2026"
   }
 
+  // A timestamp → a plain "Jul 5, 2026" for the freshness stamp (local time is fine for "updated").
+  function fmtDate(iso){
+    if(!iso) return "";
+    var d = new Date(iso); if(isNaN(d.getTime())) return "";
+    return d.toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" });
+  }
+
   // Inject a heavy 3D library (three.js / maplibre-gl) on first use, then run cb() — keeps them
   // out of the initial page load. Shows the loading status, then PROCEEDS automatically (no
   // second click). Queues callbacks if the same lib is requested twice before it lands.
@@ -504,14 +516,14 @@
     if(_addr){ _addr.placeholder = "Enter your street address for a precise view"; }
     status("Loading development records for ZIP " + zip + " …");
     var url = SUPABASE_URL + "/rest/v1/development_reports?zip=eq." + encodeURIComponent(zip) +
-              "&select=zip,home_lat,home_lng,counts,sites,paywall&limit=1";
+              "&select=zip,home_lat,home_lng,counts,sites,paywall,refreshed_at&limit=1";
     fetch(url, { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } })
       .then(function(r){ return r.ok ? r.json() : []; })
       .then(function(rows){
         if(rows && rows.length){
           var row = rows[0];
           render({ address:"ZIP "+zip, home:{ lat:row.home_lat, lng:row.home_lng },
-                   counts:row.counts||{}, sites:row.sites||[], paywall:!!row.paywall });
+                   counts:row.counts||{}, sites:row.sites||[], paywall:!!row.paywall, updated:row.refreshed_at });
         } else {
           // No cached row yet → still a valid, empty page. Empty is valid, not an error.
           window.__HS_SITES = [];
@@ -545,7 +557,17 @@
     var dev = sites.filter(function(s){ return s.scope==="area"; });
     var appr = dev.filter(function(s){ return bucketOf(s.type)==="approved"; });
     var prop = dev.filter(function(s){ return bucketOf(s.type)==="proposed"; });
-    var open = dev.filter(function(s){ return s.meeting_date && s.meeting_date.slice(0,10) >= new Date().toISOString().slice(0,10); });
+    // "Open for public comment" = a genuine opportunity only: a PROPOSED item, not already
+    // decided (approved/denied/withdrawn), with a meeting/comment date that's today or later.
+    var today = new Date().toISOString().slice(0,10);
+    var open = dev.filter(function(s){
+      return bucketOf(s.type)==="proposed" && !s.decided && s.meeting_date && s.meeting_date.slice(0,10) >= today;
+    });
+    // Freshness stamp: ZIP pages are a cached snapshot — show when it was last refreshed so the
+    // reader knows it's not live. Address mode is a live fetch.
+    $("freshLine").textContent = ZIP_MODE
+      ? (data.updated ? "Updated " + fmtDate(data.updated) : "")
+      : "Live results · fetched just now";
     $("cFac").textContent  = (data.counts && data.counts.facilities)  != null ? data.counts.facilities  : fac.length;
     $("cDev").textContent  = (data.counts && data.counts.development)  != null ? data.counts.development  : dev.length;
     $("cOpen").textContent = open.length;
@@ -707,12 +729,16 @@
       var a = link ? " · <a href='"+esc(link)+"' target='_blank' rel='noopener'>record ▸</a>" : "";
       var v = s.viol ? "<div class='vflag'>"+s.viol+" recorded violation"+(s.viol===1?"":"s")+" · EPA ECHO ▸</div>" : "";
       var tag = LAYER_LABEL[s.layer] || "Development";
-      var when = s.meeting_date ? " · " + friendlyDeadline(s.meeting_date.slice(0,10)) : "";
+      // A decided item (approved/denied/withdrawn) shows its plain date, not a "closes in N days"
+      // countdown — it's resolved, not an open comment window — plus a "decided" marker.
+      var mdate = s.meeting_date ? s.meeting_date.slice(0,10) : "";
+      var when = mdate ? " · " + (s.decided ? fmtDate(mdate) : friendlyDeadline(mdate)) : "";
+      var decidedTag = s.decided ? " · <span class='decidedtag'>decided</span>" : "";
       var dm = (s.scope==="point" && typeof s.e==="number" && typeof s.n==="number" && !ZIP_MODE) ? Math.hypot(s.e,s.n) : null;
       var dstr = (dm!=null && dm>=0.1) ? " · "+(Math.round(dm*10)/10)+" mi away" : "";
       return "<div class='rec'><span class='dot' style='background:"+col+"'></span>"+
         "<div style='flex:1'><div class='t'>"+esc(s.label)+"</div>"+
-        "<div class='s'>"+esc(tag)+dstr+when+" · "+esc(s.src||"")+a+"</div>"+v+"</div></div>";
+        "<div class='s'>"+esc(tag)+dstr+when+decidedTag+" · "+esc(s.src||"")+a+"</div>"+v+"</div></div>";
     }).join("");
   }
 
