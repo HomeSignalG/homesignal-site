@@ -3,6 +3,13 @@ name: Regenerate sitemap.xml from communities (daily)
 # Zero-touch SEO: rebuild sitemap.xml from the live communities table so newly-added
 # communities become indexable with no per-community edit. Reads only the public anon
 # key (RLS read); commits sitemap.xml back to main (which republishes GitHub Pages).
+#
+# NOTE: the commit message must NOT carry [skip ci]. Pages here is classic "deploy from
+# a branch", whose internal pages-build-deployment IS suppressed by [skip ci] — so a
+# [skip ci] regen that lands as the branch tip commits the new sitemap but never
+# publishes it (it only goes live when some later normal commit rebuilds Pages). The
+# verify-* workflows are path-scoped to source files (not sitemap.xml), so a plain
+# commit here rebuilds Pages without triggering them.
 on:
   schedule:
     - cron: "17 6 * * *"   # daily, 06:17 UTC
@@ -33,6 +40,6 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add sitemap.xml
-            git commit -m "chore: regenerate sitemap.xml from communities [skip ci]"
+            git commit -m "chore: regenerate sitemap.xml from communities"
             git push
           fi
