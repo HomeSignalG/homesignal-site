@@ -198,6 +198,18 @@ These convert every foreseeable "should I ask?" into "no — do this." Add to th
 - **A facility that geocodes outside the ZIP boundary → exclude from ZIP mode, keep for
   address mode.** ZIP mode contains only points inside the ZIP; address mode is radius-based
   and legitimately crosses ZIP lines. Not a stop.
+- **NEVER treat an EPA-FRS non-200 / error object / parse failure as "0 facilities" (engine
+  v13).** FRS refuses a query whose result set is too large — it returns
+  `{"Results":{"Error":{"ErrorMessage":"Process Limit would be exceeded..."}}}` (HTTP 200!),
+  not rows. A fixed 5-mi `search_radius` trips this across most metro/suburban ZIPs, so reading
+  the error through `?? []` silently zeroed **90 of 136** UT ZIPs (incl. Provo, all of SLC/Ogden).
+  FRS also emits invalid JSON (lone `\` in facility names) that throws in `JSON.parse`. The fix
+  (`frsFacilities`/`frsAt`): start at the needed radius; **shrink ONLY on the process-limit
+  `Error`** (floor 0.25 mi); **retry the SAME radius on a transient 5xx/parse-fail** (shrinking a
+  transient undercounts — a flaky FRS 502 made Box Elder read 23→18); escape invalid backslashes
+  before parsing. When RE-CACHING after such a fix, use an **improvement guard** — upsert only
+  where new `facilities` > cached — so a transient 0 can never clobber a good row. Result: 46→126
+  ZIPs with facilities; the 10 still-0 are genuinely-empty rural/west-desert ZIPs (valid). Not a stop.
 - **A source returns an error / times out for one ZIP → quarantine that ZIP + log, continue.**
   Never fabricate to cover a gap; never hard-stop the batch for one bad ZIP (§7.2).
 - **`counts.locked` / `paywall` present → render as the page already does.** The paywall is

@@ -1,10 +1,15 @@
-// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v11.
+// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v13.
 // PARKED HERE FOR REFERENCE/REPRODUCIBILITY ONLY — Supabase is the source of truth
 // (docs/development-tracker-source-of-truth.md §2). v11 = MULTI-COUNTY: resolveCommunityIds()
 // maps a ZIP to its own community chain (city+county) so each ZIP shows its OWN county's
-// planning notices, never a hardcoded one; ZIP mode + address mode both use it. Address mode
-// input/output shape unchanged. Redeploy via mcp__Supabase__deploy_edge_function — committing
-// does not deploy.
+// planning notices, never a hardcoded one; ZIP mode + address mode both use it. v12 = FRS
+// radius back-off + tolerant JSON: dense urban ZIPs made the fixed 5-mi EPA-FRS query exceed
+// FRS's process limit, which returned an error object the old code read as 0 facilities — so the
+// densest ZIPs falsely showed zero. frsFacilities() now shrinks the radius until FRS answers and
+// escapes FRS's invalid-JSON backslashes. v13 = distinguish transient FRS 5xx (retry same radius)
+// from the process-limit error (shrink) — a flaky FRS 502 was making the code shrink and undercount
+// (Box Elder 23→18); floor lowered to 0.25 mi. Address-mode input/output shape unchanged. Redeploy
+// via mcp__Supabase__deploy_edge_function — committing does not deploy.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -137,10 +142,46 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
   }
   return sites;
 }
+// One FRS query at a fixed radius. Distinguishes the two failure modes that matter:
+//  • tooBig  → FRS returned its "Process Limit would be exceeded" Error object (deterministic,
+//              result set too large). Retrying the same radius is futile — must shrink.
+//  • transient → 5xx / network / parse failure (FRS is intermittently flaky and 502s under load).
+//              Retrying the SAME radius is the right move; shrinking here would undercount.
+async function frsAt(lat: number, lng: number, rad: number): Promise<{ ok: boolean; tooBig: boolean; rows: Record<string, unknown>[] }> {
+  const q = new URLSearchParams({ latitude83: lat.toFixed(6), longitude83: lng.toFixed(6), search_radius: String(rad), output: "JSON" });
+  try {
+    const r = await fetch(`https://ofmpub.epa.gov/frs_public2/frs_rest_services.get_facilities?${q}`, { signal: AbortSignal.timeout(30000) });
+    if (r.status >= 500) return { ok: false, tooBig: false, rows: [] };   // transient FRS 5xx
+    const text = await r.text();
+    // Escape any backslash that isn't the start of a valid JSON escape so JSON.parse survives FRS
+    // payloads like "BULLOUGHS INSULATION\B..." (a lone backslash, invalid JSON).
+    const data = JSON.parse(text.replace(/\\(?!["\\/bfnrtu])/g, "\\\\")) as Record<string, unknown>;
+    const res = data?.Results as Record<string, unknown> | undefined;
+    if (res?.Error) return { ok: false, tooBig: true, rows: [] };          // process-limit refusal
+    const rows = (res?.FRSFacility ?? res?.Facilities ?? data?.FRSFacility ?? []) as Record<string, unknown>[];
+    return { ok: true, tooBig: false, rows: Array.isArray(rows) ? rows : [] };
+  } catch (_e) { return { ok: false, tooBig: false, rows: [] }; }          // network/parse → transient
+}
+// Fetch FRS facilities with radius back-off + transient retry. FRS refuses a query whose result set
+// is too large ("Process Limit would be exceeded") — common in dense urban ZIPs (downtown SLC has
+// 800+ facilities within a mile). The old code read that error through `?? []` as ZERO facilities,
+// so the DENSEST ZIPs falsely showed nothing. We start at the needed radius and shrink ONLY on the
+// process-limit error; on a transient 5xx we retry the same radius (shrinking there would undercount,
+// which is exactly how a flaky FRS made Box Elder drop 23→18). Floor is 0.25 mi for ultra-dense cores.
+async function frsFacilities(lat: number, lng: number, radiusMi: number): Promise<Record<string, unknown>[]> {
+  const radii = [radiusMi, 3, 2, 1.5, 1, 0.5, 0.25].filter((r, i, a) => r <= radiusMi && a.indexOf(r) === i);
+  for (const rad of radii) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { ok, tooBig, rows } = await frsAt(lat, lng, rad);
+      if (ok) return rows;      // success (possibly empty — a genuinely empty area)
+      if (tooBig) break;        // result too large → next smaller radius (retry won't help)
+      // else transient → retry the same radius
+    }
+  }
+  return [];
+}
 async function facilitySites(homeLat: number, homeLng: number, radiusMi: number): Promise<Record<string, unknown>[]> {
-  const q = new URLSearchParams({ latitude83: homeLat.toFixed(6), longitude83: homeLng.toFixed(6), search_radius: String(MAX_RADIUS_MI), output: "JSON" });
-  let rows: Record<string, unknown>[] = [];
-  try { const r = await fetch(`https://ofmpub.epa.gov/frs_public2/frs_rest_services.get_facilities?${q}`, { signal: AbortSignal.timeout(30000) }); const data = await r.json(); rows = data?.Results?.FRSFacility ?? data?.Results?.Facilities ?? data?.FRSFacility ?? []; } catch (_e) { return []; }
+  const rows = await frsFacilities(homeLat, homeLng, radiusMi);
   const kept: Record<string, unknown>[] = [];
   for (const rr of rows) {
     const lat = Number(rr.Latitude83 ?? rr.FacLat), lng = Number(rr.Longitude83 ?? rr.FacLong);
