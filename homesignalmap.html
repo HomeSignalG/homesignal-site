@@ -116,6 +116,8 @@
   .addr{font-weight:600;font-size:16px;margin-bottom:14px}
   .counts{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:8px}
   .cc{background:#f6f9f7;border:1px solid var(--line);border-radius:11px;padding:11px 12px}
+  .covnote{margin-top:12px;font-size:12.5px;line-height:1.5;color:var(--soft);
+    background:#f0f6f3;border:1px solid var(--line);border-radius:10px;padding:9px 12px}
   .cc .n{font-weight:700;font-size:22px}
   .cc .k{font-size:11.5px;color:var(--soft);line-height:1.3}
   .cc.flag .n{color:var(--orange)}
@@ -231,6 +233,10 @@
             <div class="cc flag"><div class="n" id="cOpen">0</div><div class="k">comment windows open</div></div>
             <div class="cc"><div class="n" id="cTot">0</div><div class="k">total records nearby</div></div>
           </div>
+          <!-- Honest coverage note: shown only on a ZIP page that has EPA facilities but no planning
+               items yet, so "0 planning items" doesn't read as "nothing is happening" when the real
+               reason is that the county's planning feed isn't wired on the ingest side yet. -->
+          <div class="covnote" id="covNote" style="display:none"></div>
         </div>
       </div>
 
@@ -282,6 +288,7 @@
   // per-ZIP report and centers on the ZIP centroid. The centroid is a page ANCHOR, not a
   // home — no "this address" pin until the resident searches (development-tracker §0/§3).
   var ZIP_MODE = false, ZIP_CODE = null, HOME_ANCHOR = false;
+  var ZIP_COUNTY = null, FACILITIES_ONLY = false;   // drives the honest facilities-only coverage note
   // HomeSignal house logo, reused as the "your home" marker across all three maps.
   var HOME_SVG = "<svg width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='#fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z'/><path d='M9.5 20.5v-6h5v6'/></svg>";
   function homePinEl(){ var el=document.createElement("div"); el.className="homepin"; el.innerHTML=HOME_SVG; return el; }
@@ -350,6 +357,17 @@
   var $ = function(id){ return document.getElementById(id); };
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   function status(msg, isErr){ var el=$("status"); el.textContent=msg||""; el.className="status"+(isErr?" err":""); }
+
+  // The honest facilities-only coverage note. Called by render() (sets FACILITIES_ONLY) and by the
+  // async county lookup in loadZip() (sets ZIP_COUNTY) — whichever lands last paints the final text.
+  function updateCovNote(){
+    var el = $("covNote"); if(!el) return;
+    if(!FACILITIES_ONLY){ el.style.display = "none"; el.textContent = ""; return; }
+    var where = ZIP_COUNTY ? (ZIP_COUNTY + " County") : "this area";
+    el.textContent = "Showing EPA-registered facilities for this ZIP. Local planning-hearing and "
+      + "land-use coverage for " + where + " isn't available yet — we're adding counties over time.";
+    el.style.display = "";
+  }
   function radiusLabel(r){ return (r===0.5 ? "½ mile" : (r===1 ? "1 mile" : r+" miles")); }
 
   $("form").addEventListener("submit", function(e){
@@ -391,7 +409,20 @@
   // ZIP mode: read the cached per-ZIP report (never a live pull) and render the aggregate.
   function loadZip(zip){
     ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
+    FACILITIES_ONLY = false; ZIP_COUNTY = null;
     LAST_ADDR = "ZIP " + zip;
+    // Best-effort county name for the coverage note (the cache row has no county). Non-blocking:
+    // if it resolves after render(), updateCovNote() re-paints. If it fails, the note falls back
+    // to "this area". cs.{<zip>} = text[] contains; take the county only if it's unambiguous.
+    fetch(SUPABASE_URL + "/rest/v1/communities?select=county&zip_codes=cs.%7B" + encodeURIComponent(zip) + "%7D",
+      { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } })
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(rows){
+        var seen = {}; (rows||[]).forEach(function(r){ if(r.county) seen[r.county] = 1; });
+        var keys = Object.keys(seen);
+        ZIP_COUNTY = keys.length === 1 ? keys[0] : null;
+        updateCovNote();
+      }).catch(function(){ updateCovNote(); });
     CUR_RADIUS = 3;                                   // the ZIP-mode engine radius (development-tracker §3)
     var rb = document.querySelector("#radSel button[data-r='3']");
     if(rb){ [].forEach.call(document.querySelectorAll("#radSel button"),function(c){c.classList.remove("on");}); rb.classList.add("on"); }
@@ -460,6 +491,13 @@
     $("cDev").textContent  = (data.counts && data.counts.development)  != null ? data.counts.development  : dev.length;
     $("cOpen").textContent = open.length;
     $("cTot").textContent  = sites.length;
+
+    // Facilities-only ZIP page (has EPA facilities, no planning items yet) → show the honest
+    // coverage note so "0 planning items" doesn't read as "nothing is happening here."
+    var devCount = (data.counts && data.counts.development) != null ? data.counts.development : dev.length;
+    var facCount = (data.counts && data.counts.facilities)  != null ? data.counts.facilities  : fac.length;
+    FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0;
+    updateCovNote();
 
     drawMap(data, sites);
     listInto("builtList", fac, "No EPA-registered facility on record here.");
