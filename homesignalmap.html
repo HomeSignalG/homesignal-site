@@ -212,7 +212,7 @@
             <div class="mapgl" id="mapgl"></div>
             <div class="map3d" id="map3d">
               <div class="hud3d">
-                <div class="h3-hint">drag to orbit · scroll to zoom · same data as the 2D map</div>
+                <div class="h3-hint">drag to orbit · scroll to zoom · hover a building for details</div>
                 <div class="ctrl3d">
                   <span class="c3-time" title="Time of day">☀<input type="range" id="todSlider" min="0" max="100" value="64"></span>
                   <button class="c3-btn" id="homeViewBtn">👁 From home</button>
@@ -687,10 +687,14 @@
     if(!V3.inited)return;
     // Frame the view to where the buildings actually are (not the empty outer radius),
     // so it reads well at every radius. maxD = farthest visible facility from home.
-    var maxD=0;
+    var maxD=0, nLabelable=0;
     MAP_SITES.forEach(function(p){ if(!mappable(p))return; if(!FILTER[bucketOf(p.type)])return;
       if(typeof p.e!=="number"||typeof p.n!=="number")return; var dd=Math.hypot(p.e,p.n);
-      if(dd<=CUR_RADIUS+0.3) maxD=Math.max(maxD,dd); });
+      if(dd<=CUR_RADIUS+0.3){ maxD=Math.max(maxD,dd); if(bucketOf(p.type)!=="proposed") nLabelable++; } });
+    // Readability: floating type-labels only when few enough not to collide. In a dense
+    // cluster (a whole ZIP of downtown facilities) the labels pile into an unreadable wall —
+    // above the threshold we drop them and let hover/click reveal each building instead.
+    var showLabels = nLabelable <= 12;
     V3.frameExt = Math.min(CUR_RADIUS, Math.max(0.6, maxD*1.15));
     if(!V3.userZoom){ V3.dist = mi(V3.frameExt*2.0); }
     updateHome3D();drawRings();
@@ -720,8 +724,9 @@
         var col=bkt==="approved"?0x2563EB:0x1f5130;
         var bm=new THREE.Mesh(new THREE.BoxGeometry(w,h,w),new THREE.MeshStandardMaterial({color:col,roughness:.7,emissive:0xffce8a,emissiveIntensity:.10}));
         bm.position.set(x,h/2,zc);bm.castShadow=true;bm.receiveShadow=true;bm.userData.site=p;G.add(bm);V3.pickable.push(bm);
-        // Always-on label = friendly building TYPE (short, readable); full name shows on hover.
-        var lb=lblSprite(facilityType(p),bkt==="approved"?"#14306e":"#0E2A26","#eaf5f1");lb.position.set(x,h+11,zc);G.add(lb);
+        // Friendly building-TYPE label — only when the scene is sparse enough to read;
+        // in a dense cluster hover/click shows it instead (see showLabels above).
+        if(showLabels){ var lb=lblSprite(facilityType(p),bkt==="approved"?"#14306e":"#0E2A26","#eaf5f1");lb.position.set(x,h+11,zc);G.add(lb); }
         if(p.viol){var fl=new THREE.Mesh(new THREE.SphereGeometry(3.5,12,12),new THREE.MeshBasicMaterial({color:0xC0392B}));fl.position.set(x,h+6,zc);G.add(fl);}
       }
     });
