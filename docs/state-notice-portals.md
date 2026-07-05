@@ -94,33 +94,46 @@ run `28746915043`, since the sandbox has no egress). Target: **Douglas County, N
 - Net: the vendor-adapter thesis is confirmed with real content. A single Granicus adapter turns
   every already-modeled county whose government runs Granicus into a live-Meetings page.
 
-### 🟢 Non-Utah government content is LIVE — 9 counties / 6 states (523 meetings)
+### 🟢 Government content is LIVE — 13 non-Utah counties / 8 states (675 meetings) + Salt Lake UT
 
-Shipped end-to-end this build (DB-verified). From Utah-only to **9 counties across 6 states**, all
-anchored to their county root under `County Commission & county business`, all first-party, all
-correctly dated (adapters drop undated/unsourced items — no fabrication):
+Shipped end-to-end this build (DB-verified). From Utah-only to **13 non-Utah counties across 8 states**
+(plus Salt Lake County UT), all anchored to their county root under `County Commission & county
+business`, all first-party, all **title-verified as the correct board**, all correctly dated (adapters
+drop undated/unsourced items — no fabrication):
 
 | County | Meetings | Upcoming | Vendor |
 |---|---|---|---|
 | Clark County, NV | 104 | 5 | Granicus (`clark` view 28) |
 | Wake County, NC | 102 | 2 | Granicus (`wake` view 18) |
+| Multnomah County, OR | 101 | 1 | Granicus (`multnomah` view 3) |
 | Hennepin County, MN | 100 | 0 | Granicus (`hennepinmn` view 2) |
 | Douglas County, NV | 100 | 2 | Granicus (`douglascountynv` view 1) |
 | Genesee County, MI | 25 | 13 | Legistar (`geneseecountymi`) |
 | Mecklenburg County, NC | 25 | 1 | Legistar (`mecklenburg`) |
 | Washoe County, NV | 24 | 7 | Legistar (`washoe-nv`) |
 | King County, WA | 24 | 9 | Legistar (`kingcounty`) |
+| Ramsey County, MN | 21 | 4 | Legistar (`ramseycountymn`) |
 | Pima County, AZ | 19 | 0 | Legistar (`pima`) |
+| Oakland County, MI | 15 | 15 | CivicClerk (`oaklandcomi`) |
+| Travis County, TX | 15 | 5 | CivicClerk (`traviscotx`) |
+| Salt Lake County, UT | 15 | 15 | CivicClerk (`saltlakecounty`) |
 
-Two vendor adapters carried all of it: the new state-agnostic **Granicus RSS** (`parse_granicus_rss`,
-ingest PR #120) and the existing **Legistar** (`adapters/legistar.py`). Every county's titles were
-DB-verified as real bodies (e.g. Pima "Board of Supervisors", Mecklenburg "Board of Commissioners",
-Wake "Regular Meeting … BOC", Hennepin standing committees). Douglas has 0 subscribers so it was
-pages-only, no emails; the others likewise only populate their previously-empty Meetings tiles.
+**Three vendor adapters** carried it: state-agnostic **Granicus RSS** (`parse_granicus_rss`), the
+existing **Legistar** (`adapters/legistar.py`), and the new **CivicClerk** (`adapters/civicclerk.py`,
+reads the `<sub>.api.civicclerk.com/v1/Events` OData API behind the portal SPA — probe run
+`28749134250` confirmed Oakland "Full Board of Commissioners", Travis "Commissioners Court", Salt Lake
+"County Council Meeting"). Every county's titles were DB-verified as the correct board. Douglas has 0
+subscribers so it was pages-only, no emails; the others likewise only populate their previously-empty
+Meetings tiles. (CivicClerk stamps `startDateTime` as `Z` but it's local wall-clock, so those feeds are
+stored date-only / time-TBD to avoid a wrong time — the date is always right.)
 
 - **Reusability proven — widening is pure data.** Add one feed row per county — Granicus
-  `rss → <entity>.granicus.com/ViewPublisherRSS.php?view_id=N&mode=agendas`, or Legistar
-  `html → <client>.legistar.com/Calendar.aspx` — keyed to the county root. No new code.
+  `rss → <entity>.granicus.com/ViewPublisherRSS.php?view_id=N&mode=agendas`, Legistar
+  `html → <client>.legistar.com/Calendar.aspx`, or CivicClerk `html → <sub>.portal.civicclerk.com/` —
+  keyed to the county root. No new code for any county on one of the four supported vendors.
+- **Known non-vendor gaps** (need bespoke work, not pure data): Wayne County MI (YouTube + PDF agendas),
+  Cuyahoga & Hamilton OH (own council portals / OnBase), Maricopa AZ (AgendaCenter — needs the correct
+  Board-of-Supervisors category CID; currently disabled).
 - **The frontier blocker was the `feeds.csv` → `public.feeds` sync, not the adapters.** Config is
   DB-first (`load_config`), so a feed added only to `feeds.csv` never runs on the schedule — which is
   exactly why Genesee sat at 0 despite a "LIVE — 25 events" note (now genuinely live: 25 meetings, 13
