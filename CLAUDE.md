@@ -168,7 +168,10 @@ Then do the runbook end-to-end without pausing. The session already runs in
 3. **Wire the content feeds** in `homesignal-ingest` (separate repo). Add the
    community's government RSS/feed rows to `feeds.csv` keyed by `community_id`, and
    make its Government topic labels match `government_topics` **word-for-word** in
-   both places (DB row + ingest). Universal-topic content flows automatically.
+   both places (DB row + ingest). Universal topics (News/Emerging/Global) need **no
+   per-community feed config** — but their content is still stored per `community_id`
+   (no alert is community-agnostic), so those tiles are empty too until the ingest
+   pipeline runs for this community. "Automatic" = zero config, not zero pipeline.
    *If that repo isn't in the session, add it (`add_repo`) and do it there; if you
    can't, note explicitly that gov notices stay empty until feeds are configured.*
 4. **(Optional)** the `slug` set in step 1 already makes `?community=<slug>` work
