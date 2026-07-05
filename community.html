@@ -529,21 +529,32 @@ async function loadAlerts() {
   // ~88 data_center_development rows) can't dominate a single newest-N pull and push
   // the fresh Global best practices / Emerging technology items out of view. The
   // filters mirror how renderAlerts/alertCatId classify a row into a tier.
-  const base = `${SUPABASE_URL}/rest/v1/alerts?community_id=eq.${CONTENT_ID}`;
   const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
   const PER_TIER = 10;
-  const fetchTier = (filter, lim) =>
-    fetch(`${base}${filter ? '&' + filter : ''}&order=created_at.desc&limit=${lim}`, { headers })
+  // Government notices + the local/news catch-all are scoped to THIS community's chain
+  // root (CONTENT_ID). Global best practices + Emerging technology are UNIVERSAL — engine-
+  // owned, community-agnostic content stored under a single community_id — so they are
+  // fetched WITHOUT a community filter; otherwise every non-anchor community's page would
+  // show empty Global / Emerging tiles.
+  const q = (scoped, filter, lim) => {
+    const parts = [];
+    if (scoped) parts.push(`community_id=eq.${CONTENT_ID}`);
+    if (filter) parts.push(filter);
+    parts.push('order=created_at.desc', `limit=${lim}`);
+    return `${SUPABASE_URL}/rest/v1/alerts?${parts.join('&')}`;
+  };
+  const fetchQ = (scoped, filter, lim) =>
+    fetch(q(scoped, filter, lim), { headers })
       .then(r => r.ok ? r.json() : [])
       .catch(() => []);
   try {
-    // Government notices, Emerging technology and Global best practices each query their
-    // own tier directly; News is the catch-all (newest items not in those three tiers).
+    // Government (scoped) + Emerging/Global (universal, unscoped) each query their own
+    // tier; News is the community-scoped catch-all (newest not in those three tiers).
     const [gov, emerging, global, recent] = await Promise.all([
-      fetchTier('pipeline_type=eq.government_notice', PER_TIER),
-      fetchTier('category=eq.emerging_technology', PER_TIER),
-      fetchTier('category=eq.global_best_practices&or=(quality_grade.is.null,quality_grade.in.(BEST,MEDIUM))', PER_TIER),
-      fetchTier('', PER_TIER * 3)
+      fetchQ(true,  'pipeline_type=eq.government_notice', PER_TIER),
+      fetchQ(false, 'category=eq.emerging_technology', PER_TIER),
+      fetchQ(false, 'category=eq.global_best_practices&or=(quality_grade.is.null,quality_grade.in.(BEST,MEDIUM))', PER_TIER),
+      fetchQ(true,  '', PER_TIER * 3)
     ]);
     const news = recent.filter(a => alertCatId(a.pipeline_type, a.category) === 'news').slice(0, PER_TIER);
     // Merge the tiers, de-dupe by id, newest first.
