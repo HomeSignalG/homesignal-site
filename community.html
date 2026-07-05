@@ -664,8 +664,18 @@ function renderAlerts(alerts) {
     return (!isNaN(d.getTime()) && d.getTime() > m) ? d.getTime() : m;
   }, 0);
   const when = newest > 0 ? ' · newest ' + formatDate(new Date(newest).toISOString()) : '';
-  count.textContent = alerts.length + ' alert' + (alerts.length === 1 ? '' : 's') + when;
-  feed.innerHTML = alerts.map(a => {
+  // Emerging/Global are UNIVERSAL (fetched unscoped) — regional/global content, NOT this
+  // community's local activity. Split the count so universal filler never overstates local
+  // activity, and surface a local-empty banner when a community has ONLY universal items.
+  const isUniversal = a => a.category === 'emerging_technology' || a.category === 'global_best_practices';
+  const universalCount = alerts.filter(isUniversal).length;
+  const localCount = alerts.length - universalCount;
+  count.textContent = localCount + ' local alert' + (localCount === 1 ? '' : 's') +
+    (universalCount ? ' · ' + universalCount + ' regional/global' : '') + when;
+  const localEmptyBanner = (localCount === 0 && universalCount > 0)
+    ? '<div class="empty-state local-empty"><p>No local alerts yet for this community</p><span>Showing regional &amp; global updates below — local notices appear here as they’re published</span></div>'
+    : '';
+  feed.innerHTML = localEmptyBanner + alerts.map(a => {
     const tag = getPipelineTag(a.pipeline_type, a.category);
     const icon = getIcon(a.pipeline_type, a.category);
     const badge = freshnessBadge(a);
