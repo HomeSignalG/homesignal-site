@@ -186,14 +186,26 @@ Cloning gave each community an indexable URL with its own `<title>`/`canonical`/
 way to get both scale and SEO is NOT to clone 100 HTML files** — it's to make slugs
 pure data and give the dynamic page real per-community metadata:
 1. ✅ **`slug` column on `communities`** — done (§6); `?community=<slug>` needs no JS entry.
-2. Serve a **clean per-community path** (e.g. `/c/<slug>`) that maps to `community.html`,
-   and set the page's `<title>`/`canonical`/`og:*` **dynamically from the DB row**. (Still
-   to do — the SEO polish.)
-3. Add each live community as one `<url>` line in `sitemap.xml`.
+2. ✅ **Dynamic per-community metadata from the DB row** — done. `applyCommunity()` in
+   `community.html` now sets the `<title>`, `<link rel=canonical>`, `<meta description>`
+   and the `og:*`/`twitter:*` tags from the resolved community (canonical → its
+   `?community=<slug>` URL). JS-rendering crawlers (Google) index each community's real
+   metadata with **zero per-community files**. *Not done:* a truly clean `/c/<slug>` path —
+   GitHub Pages is static with no URL rewrites, so `?community=<slug>` remains the canonical
+   form until/unless an SSR/redirect layer is added; social scrapers that don't run JS still
+   see the default OG card (a static-hosting limit, not a data one).
+3. ✅ **`sitemap.xml` is generated from the live DB** — done. `scripts/generate-sitemap.mjs`
+   + `.github/workflows/sitemap.yml` rewrite one `<url>` per live `communities` row
+   (preserving hand-curated static/bespoke entries) on a daily schedule and on any
+   community-touching push, committing only on change — so new communities (incl. DB-only /
+   ingest additions) appear in the sitemap with **no repo work**. Same zero-touch, DB-as-truth
+   pattern as `verify-communities`.
 
 That is a **one-time engineering investment** (not per-community work) that preserves
 the zero-touch model. `?id=`/`?zip=`/`?community=<slug>` already make every new row live;
-the remaining metadata polish is a follow-up, never a reason to clone.
+the metadata + sitemap polish above is now in place (the only remaining item is a clean
+`/c/<slug>` path, which needs an SSR/redirect layer Pages doesn't provide) — never a reason
+to clone.
 
 ---
 

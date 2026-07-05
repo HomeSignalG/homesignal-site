@@ -1,0 +1,48 @@
+name: sitemap
+
+# Regenerate sitemap.xml from the LIVE communities table and commit it if it changed.
+# Communities are data rows (CLAUDE.md §0), so the sitemap must be derived from the DB —
+# this keeps it current with zero repo work as communities are added (incl. DB-only /
+# ingest additions), on a GitHub runner where Supabase egress works. Mirrors
+# verify-communities.yml's triggers; the generator preserves hand-curated static entries.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '37 5 * * *'   # daily 05:37 UTC — offset from verify-communities (13:17)
+  push:
+    branches: [main]
+    paths:
+      - 'community.html'
+      - 'docs/*-communities-seed.sql'
+      - 'scripts/generate-sitemap.mjs'
+      - '.github/workflows/sitemap.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sitemap
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Regenerate sitemap.xml from live DB
+        run: node scripts/generate-sitemap.mjs
+      - name: Commit if changed
+        run: |
+          if [[ -n "$(git status --porcelain sitemap.xml)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add sitemap.xml
+            git commit -m "chore(sitemap): refresh from live communities [skip ci]"
+            git push
+          else
+            echo "sitemap.xml already current — no change."
+          fi

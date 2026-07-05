@@ -1108,11 +1108,39 @@ async function resolveCommunity(){
   IS_TOWN = (COMMUNITY.chain && COMMUNITY.chain.length > 1);
 }
 
+// Per-community SEO metadata (canonical + social tags), set from the resolved DB row.
+// GitHub Pages is static, so this is client-side — it upgrades the title/canonical/
+// description/og-tags for JS-rendering crawlers (Google) without any per-community file,
+// keeping the zero-touch model. All target tags already exist in <head>; we only set
+// attributes here. Every lookup is null-guarded so a missing tag never throws.
+function updateSeoMeta(nm){
+  try{
+    var origin = 'https://homesignal.net';
+    // Stable per-community URL: prefer the pretty slug, then ZIP, then id.
+    var path = COMMUNITY.slug ? ('/community.html?community=' + encodeURIComponent(COMMUNITY.slug))
+             : (searchedZip ? ('/community.html?zip=' + encodeURIComponent(searchedZip))
+             : ('/community.html?id=' + encodeURIComponent(COMMUNITY.id)));
+    var url = origin + path;
+    var title = 'HomeSignal — ' + nm;
+    var desc = 'Follow ' + nm + ': local government notices, public meetings, permits, and '
+             + 'community news that affect your home — a neutral, sourced daily email from HomeSignal.';
+    function setAttr(sel, attr, val){ var el = document.querySelector(sel); if(el) el.setAttribute(attr, val); }
+    setAttr('link[rel="canonical"]', 'href', url);
+    setAttr('meta[name="description"]', 'content', desc);
+    setAttr('meta[property="og:url"]', 'content', url);
+    setAttr('meta[property="og:title"]', 'content', title);
+    setAttr('meta[property="og:description"]', 'content', desc);
+    setAttr('meta[name="twitter:title"]', 'content', title);
+    setAttr('meta[name="twitter:description"]', 'content', desc);
+  }catch(e){ /* metadata is best-effort; never block the page */ }
+}
+
 function applyCommunity(){
   if(COMMUNITY){
     var nm = COMMUNITY.name + (COMMUNITY.state ? ', ' + COMMUNITY.state : '');
     var t = document.getElementById('comm-title'); if(t) t.textContent = COMMUNITY.name;
     document.title = 'HomeSignal — ' + nm;
+    updateSeoMeta(nm);
     // Personal sub-line: ZIP + the parent county (when this is a town under a county).
     var parent = (COMMUNITY.chain && COMMUNITY.chain.length > 1) ? COMMUNITY.chain[COMMUNITY.chain.length - 1] : null;
     var sub = document.getElementById('comm-sub');
