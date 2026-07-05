@@ -543,10 +543,14 @@ async function loadAlerts() {
     parts.push('order=created_at.desc', `limit=${lim}`);
     return `${SUPABASE_URL}/rest/v1/alerts?${parts.join('&')}`;
   };
+  // Track whether any tier actually FAILED (network error or non-OK response). A failed
+  // tier returns [] like an empty one, so without this flag an outage is indistinguishable
+  // from "no alerts" and both render the empty state — masking backend failures as "nothing here".
+  let anyFail = false;
   const fetchQ = (scoped, filter, lim) =>
     fetch(q(scoped, filter, lim), { headers })
-      .then(r => r.ok ? r.json() : [])
-      .catch(() => []);
+      .then(r => { if (!r.ok) { anyFail = true; return []; } return r.json(); })
+      .catch(() => { anyFail = true; return []; });
   try {
     // Government (scoped) + Emerging/Global (universal, unscoped) each query their own
     // tier; News is the community-scoped catch-all (newest not in those three tiers).
@@ -571,10 +575,12 @@ async function loadAlerts() {
     const scoped = (IS_TOWN && COMMUNITY && COMMUNITY.allowedGov)
       ? alerts.filter(a => a.pipeline_type !== 'government_notice' || COMMUNITY.allowedGov[a.category])
       : alerts;
+    // If we have nothing to show AND at least one tier failed, this is an ERROR, not a genuine
+    // empty community — surface it distinctly so an outage never masquerades as "no alerts".
+    if (scoped.length === 0 && anyFail) { renderAlertsError(); return; }
     renderAlerts(scoped);
   } catch (err) {
-    document.getElementById('alert-feed').innerHTML = '<div class="empty-state"><p>Could not load alerts</p><span>Check your connection and try again</span></div>';
-    document.getElementById('feed-count').textContent = '0 alerts';
+    renderAlertsError();
   }
 }
 
@@ -601,6 +607,13 @@ function formatDate(str) {
   if (!str) return '';
   const d = new Date(str);
   return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+// Distinct ERROR state — reachable only when a fetch/tier actually failed (see loadAlerts).
+// Kept visually separate from the "No alerts yet" empty state so an outage is never silent.
+function renderAlertsError() {
+  document.getElementById('alert-feed').innerHTML = '<div class="empty-state feed-error"><p>Couldn’t load alerts</p><span>Check your connection and try again</span></div>';
+  document.getElementById('feed-count').textContent = 'Couldn’t load alerts';
 }
 
 function renderAlerts(alerts) {
