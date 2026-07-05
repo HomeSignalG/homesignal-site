@@ -519,13 +519,26 @@ legal/framing change not covered by the one-time sign-off.
 - **Canonical page absent from the repo → build it from the §3 data contract; not a stop.**
 - **Sandbox has no egress → populate the cache server-side via `pg_net`** (`net.http_post` →
   upsert `net._http_response.content`); Postgres has egress even when the sandbox doesn't.
-- **The engine's planning notices are hardcoded to Box Elder County** (`BOX_ELDER_COMMUNITY_ID`
-  in `get-address-report`). EPA facilities are national (queried around any centroid), but
-  `devSites` always returns Box Elder county notices. So **only Box Elder ZIPs can be cached
-  correctly today** — caching another county would attach Box Elder's hearings to it, a
-  fabrication-class defect. That is a real **engine-coverage boundary** (un-hardcode + wire each
-  county's notice feed on the ingest side), NOT a stop-and-ask — cache the county you have feeds
-  for, and expand coverage before caching the next.
+- **The engine is MULTI-COUNTY (v11).** `resolveCommunityIds(zip)` maps a ZIP to its own
+  community chain (city + county) via `communities.zip_codes @> [zip]`, and `devSites` queries
+  planning notices for THOSE ids — so each ZIP shows its OWN county's hearings, never a hardcoded
+  one. A ZIP with no modeled community → `[]` → facilities-only (never another county's notices —
+  that would be fabrication). Box Elder ZIPs resolve to `[Brigham City, Box Elder County]`; only
+  the county carries content, so Box Elder output is byte-identical to v10 (regression-verified:
+  84302 → facilities 23 · development 41). *(Superseded the earlier "hardcoded to Box Elder"
+  note.)* **The coverage frontier is now which counties have planning FEEDS wired in ingest**
+  (today: Box Elder + Utah County + Eagle Mountain); every other modeled ZIP is cacheable now as a
+  facilities-only page (the national EPA floor). Address mode also resolves the county from the
+  geocoded ZIP.
+- **At batch scale the seed is a reproducible pg_net REFRESH SCRIPT, not a literal snapshot.**
+  A one-ZIP literal is fine; a county/state is hundreds of KB of engine output, mostly repeated
+  county notices — embedding it as hand-copied JSON is the "hand-authored site data" §0 warns
+  against and no more reproducible. The seed pins the ZIP centroids (§7.1) and re-invokes the
+  engine (fire via `pg_net` → upsert the 200s; retry any transient 503 cold-starts), so
+  re-applying rebuilds from the source of truth.
+- **Development ZIP pages are in the sitemap zero-touch** — `scripts/gen_sitemap.py` emits one
+  `homesignalmap.html?zip=<zip>` per `development_reports` row (alongside the community pages), so
+  newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 - **At batch scale the seed is a reproducible pg_net REFRESH SCRIPT, not a literal snapshot.**
   A one-ZIP literal is fine; a whole county (18 ZIPs × ~40-64 sites, mostly the same county
   notices repeated) is ~220 KB of engine output — embedding it as hand-copied JSON is the
@@ -536,20 +549,20 @@ legal/framing change not covered by the one-time sign-off.
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 
 ### Status
-- 🟢 **ALL 18 Box Elder County ZIPs are LIVE** (DB-verified) — the full county, not just the
-  84302 prototype. Every Box Elder ZIP (84301, 84302, 84306, 84307, 84309, 84311, 84312, 84313,
-  84314, 84316, 84324, 84329, 84330, 84331, 84334, 84336, 84337, 84340) has a cached
-  `development_reports` row: **local EPA facilities** (0–23 per ZIP, scaling with each town's
-  industrial density — Brigham City 23, Corinne/Tremonton 15, Garland 12 … rural ZIPs 0) plus the
-  **41 county-wide planning notices** (jurisdiction model — every Box Elder ZIP inherits them).
-  **0 unsourced across the whole set, 0 count mismatches** (facilities == mapped point sites).
-  ZIPs with 0 facilities are valid facilities-empty pages. Centroids pinned to `zipcodes` PyPI
-  v3.0.0; engine `get-address-report` v10; each in the sitemap (via the generator). Full tree
-  (reproducible refresh script): `docs/box-elder-development-reports-seed.sql`. Same egress caveat
-  — `verify-development` CI does the live browser check on all 18. **The county line is the
-  coverage frontier**: expanding to another county needs the engine's planning feed un-hardcoded
-  first (ingest side). Original 84302 numbers preserved for reference: facilities 23 · development
-  41 · 64 sites · 0 unsourced.
+- 🟢 **ALL 136 modeled Utah ZIPs are LIVE** (DB-verified) — statewide across Box Elder, Utah,
+  Salt Lake, Davis, Weber, Tooele, and Cache counties, on the **multi-county engine (v11)**.
+  Every modeled UT ZIP has a cached `development_reports` row: **local EPA facilities** (national
+  floor) + its **own county's planning notices**. **0 unsourced across all 136, 0 count
+  mismatches** (facilities == mapped point sites). **46 ZIPs carry planning content** (Box Elder +
+  Utah County + Eagle Mountain — full pages, e.g. a Utah County ZIP shows its 91 hearings/notices);
+  the rest are **facilities-only** (valid — the national floor). 84684/84685 were absent from the
+  `zipcodes` dataset and **quarantined** (excluded, not guessed). Centroids pinned to `zipcodes`
+  PyPI v3.0.0; each in the sitemap (zero-touch generator). Full tree (reproducible refresh script):
+  `docs/utah-development-reports-seed.sql` (supersedes the Box Elder subset seed). Same egress
+  caveat — `verify-development` CI does the live browser check on all 136. **The frontier is now
+  ingest feeds, not code**: a county gets *full* pages once its planning feed is wired in
+  `homesignal-ingest`; until then it ships facilities-only. Box Elder regression-verified identical
+  to v10 (84302 → facilities 23 · development 41).
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:

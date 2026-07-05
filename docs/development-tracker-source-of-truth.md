@@ -219,13 +219,17 @@ These convert every foreseeable "should I ask?" into "no — do this." Add to th
   Invoke `get-address-report` from SQL (`net.http_post(...)`, then upsert
   `net._http_response.content`). Postgres has egress even when the sandbox does not — this
   is the caching analog of "verify runs in CI where egress works." Not a stop.
-- **The engine's planning notices are currently Box Elder-County-only → only Box Elder ZIPs
-  are cacheable today.** `devSites` in `get-address-report` is hardcoded to
-  `BOX_ELDER_COMMUNITY_ID`; EPA facilities are national but the planning notices always come
-  from Box Elder. Caching a non-Box-Elder ZIP would attach Box Elder's hearings to it — a
-  fabrication-class defect (§0). This is a real **engine-coverage boundary**, not a stop: cache
-  the county whose feed is wired, and un-hardcode + wire the next county's notice feed (ingest
-  side, §7.6) before caching it. The page batch never fabricates to cross that line.
+- **The engine is MULTI-COUNTY (v11) → any modeled ZIP is cacheable; the frontier is ingest
+  feeds, not code.** `resolveCommunityIds(zip)` maps a ZIP to its community chain
+  (`communities.zip_codes @> [zip]`) and `devSites` queries planning notices for those ids, so
+  each ZIP shows its OWN county's hearings. A ZIP with no modeled community → `[]` → facilities-
+  only (never another county's notices — that would be fabrication, §0). Box Elder resolves to
+  `[Brigham City, Box Elder County]`; only the county carries content, so its output is
+  byte-identical to v10 (regression-verified). Counties whose planning feed is wired in
+  `homesignal-ingest` (today: Box Elder, Utah County, Eagle Mountain) get **full** pages; every
+  other modeled ZIP ships **facilities-only** now (the national EPA floor). So caching is never
+  blocked — wiring a new county's *feed* (ingest side) is what upgrades it from facilities-only to
+  full, and that is the decoupled §7.6 job, not a page-batch stop.
 - **At batch/county scale the seed is a reproducible pg_net REFRESH SCRIPT, not a literal
   snapshot.** A one-ZIP literal is fine, but a whole county (18 ZIPs × ~40-64 sites, mostly the
   same county notices repeated per ZIP) is ~220 KB of engine output; embedding it as hand-copied
