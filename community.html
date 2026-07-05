@@ -1112,7 +1112,36 @@ function applyCommunity(){
   if(COMMUNITY){
     var nm = COMMUNITY.name + (COMMUNITY.state ? ', ' + COMMUNITY.state : '');
     var t = document.getElementById('comm-title'); if(t) t.textContent = COMMUNITY.name;
-    document.title = 'HomeSignal — ' + nm;
+    // SEO (§4): per-community <title>/description/canonical/og:* from the DB row, so
+    // every one of the 12k+ dynamic pages is indexable with real metadata — no clones.
+    try {
+      var slug = COMMUNITY.slug || '';
+      var canon = 'https://homesignal.net/community.html' +
+        (slug ? ('?community=' + encodeURIComponent(slug))
+              : (searchedZip ? ('?zip=' + encodeURIComponent(searchedZip)) : ''));
+      var seoDesc = 'Upcoming government meetings, public notices, permits and local ' +
+        'news for ' + nm + ', tracked and delivered free by HomeSignal. Follow your community.';
+      document.title = nm + ' — government meetings & public notices | HomeSignal';
+      var setMeta = function (sel, attr, val) {
+        var el = document.querySelector(sel);
+        if (!el) {
+          el = document.createElement('meta');
+          var m = sel.match(/\[(name|property)="([^"]+)"\]/);
+          if (m) el.setAttribute(m[1], m[2]);
+          document.head.appendChild(el);
+        }
+        el.setAttribute(attr, val);
+      };
+      setMeta('meta[name="description"]', 'content', seoDesc);
+      setMeta('meta[property="og:title"]', 'content', nm + ' — HomeSignal');
+      setMeta('meta[property="og:description"]', 'content', seoDesc);
+      setMeta('meta[property="og:url"]', 'content', canon);
+      setMeta('meta[name="twitter:title"]', 'content', nm + ' — HomeSignal');
+      setMeta('meta[name="twitter:description"]', 'content', seoDesc);
+      var link = document.querySelector('link[rel="canonical"]');
+      if (!link) { link = document.createElement('link'); link.setAttribute('rel', 'canonical'); document.head.appendChild(link); }
+      link.setAttribute('href', canon);
+    } catch (e) { /* SEO is best-effort; never block the page */ }
     // Personal sub-line: ZIP + the parent county (when this is a town under a county).
     var parent = (COMMUNITY.chain && COMMUNITY.chain.length > 1) ? COMMUNITY.chain[COMMUNITY.chain.length - 1] : null;
     var sub = document.getElementById('comm-sub');

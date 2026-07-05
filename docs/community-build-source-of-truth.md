@@ -811,6 +811,89 @@ stop.**
 
 ---
 
+## 14. RUNBOOK — build a WHOLE COUNTY from a ZIP list (unattended / overnight, no-stop)
+
+> **This is the answer to "give me a county + its ZIP codes and run overnight without
+> stopping."** Every decision that could make you pause has a pre-settled answer below.
+> The build is legitimate and repeatable because the model is fixed (§14.1) and every
+> claim is DB-/CI-verified (§14.5). The ONLY legitimate stops are §10.
+
+**Input you'll be handed:** a county name + a list of ZIP codes (optionally ZIP→city).
+That is the whole input. Proceed end-to-end; do not ask for more.
+
+### 14.0 Preflight (once, up front)
+Bypass permissions; both repos in the session; Supabase + GitHub + WebSearch available.
+**CI is the live feed-check — the build sandbox has NO external egress** (curl/WebFetch to
+any feed host returns 403/000 via the policy proxy). Never conclude a feed is dead, alive,
+or wrong from the sandbox. Verify feed URLs with the `verify-local-outlets` workflow (or an
+ingest dry-run) and READ THE RUN LOGS. Mark unverifiable rows `DRAFT`; CI promotes them.
+
+### 14.1 The settled model — do NOT re-ask
+- **Each ZIP is its own page** (a `level=zip` community). Citizens think in ZIP codes.
+- **Government cascades DOWN** zip → city → county → state. A ZIP inherits its parents'
+  government and holds none of its own (`government_topics = []`).
+- **The content root is the most-specific gov body that exists** — usually the **city**
+  (its council), with the **county** above it. Content + subscriptions anchor at the chain
+  root; the page scopes by the ancestor topic set so sibling towns never leak.
+- **A city with multiple ZIPs** (e.g. Provo 84601–84606): ONE city community holds the
+  council; each of its ZIPs is a `level=zip` page with `parent_id` → that city.
+- **Universal topics** (News / Global Best Practices / Emerging Tech) are shared — never
+  per-community; they flow automatically.
+- **Government topic labels are the fixed canonical strings** — a city council still maps to
+  `'County Commission & county business'`. Never rename; matching is word-for-word across the
+  four copies (pop-ups, `user_subscriptions`, content tags, `digest.py::CANONICAL_TOPICS`).
+
+### 14.2 Classification — verify, never recall (Claims discipline)
+- **Incorporated city vs unincorporated place:** confirm against an authoritative first-party
+  roster (Census / state municipal list). An incorporated city gets its own council row; an
+  unincorporated ZIP inherits county only. Don't assert from memory.
+- **ZIP actually in this county?** Verify. If a ZIP belongs to a *different* county (as with
+  Hooper 84315 = Weber, Cornish 84308 = Cache earlier), EXCLUDE it with a one-line note —
+  don't stop.
+- **Partial-county ZIP** (mostly another county — Bluffdale 84065 = mostly Salt Lake,
+  Santaquin 84655 = partly Juab): INCLUDE with a note — don't stop.
+
+### 14.3 Data layer — idempotent, quarantine-don't-stop
+Insert county → cities → ZIP pages with `slug`, `level`, `parent_id`, `government_topics`,
+`on conflict do nothing`. A brand-new row is immediately reachable by `?id=`, `?zip=`, and
+`?community=<slug>` with **no repo change**. A row that fails validation is quarantined
+(logged + skipped); the batch continues (§12.2).
+
+### 14.4 Feeds — FIRST-PARTY ONLY, no aggregators (the founder rule)
+- **Government = the state Public Notice system.** For Utah that is **`utah.gov/pmn`** — a
+  first-party government source, legally mandated (Utah Code §63F-1-701) for every public
+  body, so it satisfies the no-third-party rule even for tiny towns with no website. Discover
+  each community's PMN public-body ID (WebSearch + `scripts/discover_utah_pmn.py` / the
+  `discover-utah-pmn` CI). One `feeds.csv` row per body → alerts/meetings, canonical topic
+  label verbatim, `community_id` = the content root.
+- **Local News = direct local-outlet RSS**, geo-gated to the community's place names.
+  **NEVER Google / Yahoo / MSN / AOL / rss.app aggregators** (aggregators resolve stories to
+  whatever host syndicated them — the exact failure that put yahoo/msn/aol links in Stratos).
+- **No PMN body / no RSS** → write the row `active=FALSE` with an honest note listing which
+  URLs failed (as with KSL TV — 8 paths all 404), and continue. Never fabricate a feed; never
+  stop.
+
+### 14.5 Verify — programmatic, at scale (never eyeball 1,000 pages)
+- **Feed URLs:** `verify-local-outlets` CI, read logs; DRAFT→LIVE on a green resolve.
+- **Data:** query the DB for per-community counts; every count/date you assert rides with the
+  query that proves it. A grep is a lead, not a fact (Claims discipline).
+
+### 14.6 Output — the per-ZIP inventory (acquisition-dashboard handoff)
+Regenerate the per-ZIP feed inventory CSV in the fixed 14-column shape
+(`docs/box-elder-feed-inventory-per-zip.csv` is the template; Utah County is the worked
+example): each ZIP its own page, the uniform backbone (gov topics + County-Commission
+meetings + Local News / Global Best Practices / Emerging Tech × 12 subtopics), real feeds
+in the matching slots, unbuilt slots marked `NOT BUILT — feed pending`. Never imply feeds
+that don't exist.
+
+### 14.7 The no-stop contract
+Run the whole county end-to-end without pausing. Quarantine problems, log them, continue.
+The ONLY stops are §10: the schema genuinely can't hold what's needed; a ZIP already belongs
+to a **different live** community (an overlap policy call); or a legal/consent change.
+"Build county N from these ZIPs" never qualifies — ship it.
+
+---
+
 ### Provenance
 Every schema/behavior claim here was verified against the live DB
 (`qwnnmljucajnexpxdgxr`) and the code on the authoring branch: `community.html`
