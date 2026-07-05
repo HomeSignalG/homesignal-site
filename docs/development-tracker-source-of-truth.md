@@ -219,6 +219,22 @@ These convert every foreseeable "should I ask?" into "no — do this." Add to th
   Invoke `get-address-report` from SQL (`net.http_post(...)`, then upsert
   `net._http_response.content`). Postgres has egress even when the sandbox does not — this
   is the caching analog of "verify runs in CI where egress works." Not a stop.
+- **The engine's planning notices are currently Box Elder-County-only → only Box Elder ZIPs
+  are cacheable today.** `devSites` in `get-address-report` is hardcoded to
+  `BOX_ELDER_COMMUNITY_ID`; EPA facilities are national but the planning notices always come
+  from Box Elder. Caching a non-Box-Elder ZIP would attach Box Elder's hearings to it — a
+  fabrication-class defect (§0). This is a real **engine-coverage boundary**, not a stop: cache
+  the county whose feed is wired, and un-hardcode + wire the next county's notice feed (ingest
+  side, §7.6) before caching it. The page batch never fabricates to cross that line.
+- **At batch/county scale the seed is a reproducible pg_net REFRESH SCRIPT, not a literal
+  snapshot.** A one-ZIP literal is fine, but a whole county (18 ZIPs × ~40-64 sites, mostly the
+  same county notices repeated per ZIP) is ~220 KB of engine output; embedding it as hand-copied
+  JSON is the "hand-authored site data" §0 warns against and no more reproducible. The seed pins
+  the ZIP centroids (§7.1) and re-invokes the engine (fire via `pg_net` → upsert the 200s), so
+  re-applying rebuilds from the source of truth. This is the shape §7's national batch uses.
+- **Development ZIP pages are in the sitemap zero-touch.** `scripts/gen_sitemap.py` emits one
+  `homesignalmap.html?zip=<zip>` per `development_reports` row, so newly-cached ZIPs become
+  indexable with no per-ZIP edit; the daily `sitemap.yml` workflow republishes.
 
 ---
 
