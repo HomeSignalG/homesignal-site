@@ -53,6 +53,8 @@ main{padding:20px 24px;max-width:1180px;margin:0 auto}
 .tile-tag{display:inline-block;margin-top:8px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;
 padding:2px 7px;border-radius:20px;border:1px solid var(--line)}
 .t-real{color:var(--real)}.t-persist{color:var(--persist)}.t-pending{color:var(--pending)}
+.bsky-btn{border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer}
+.bsky-btn:hover{filter:brightness(1.1)}
 .tile-tag.t-real{color:var(--real)}.tile-tag.t-persist{color:var(--persist)}.tile-tag.t-pending{color:var(--pending)}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0}
 .card h3{margin:0 0 4px;font-size:15px}
@@ -124,7 +126,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
       <span><i class="dot pending"></i> instrumentation pending — not collected; never faked</span>
     </div>
   </header>
-  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button></nav>
+  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="bluesky">11 · Bluesky Posts</button></nav>
   <main>
     <div class="tab active" id="tab-exec"></div>
     <div class="tab" id="tab-feed"></div>
@@ -136,6 +138,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
     <div class="tab" id="tab-alertperf"></div>
     <div class="tab" id="tab-homeowners"></div>
     <div class="tab" id="tab-acquisition"></div>
+    <div class="tab" id="tab-bluesky"></div>
   </main>
   <footer>Internal · staff &amp; investors. Numbers are a point-in-time snapshot (<span id="dash-foot-date">—</span>), served only to allowlisted accounts through a gated read-only function — no data ships in this page. Regenerated from the HomeSignal ingest pipeline.</footer>
 </div>
@@ -318,6 +321,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
     wireAcqLive();
     wireZipBehavior();
     wireAcqMetrics();
+    wireBluesky();
     stalenessBanner(p.meta);
   }
 
@@ -499,6 +503,91 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
         host.insertBefore(box, host.firstChild);
       }
     }catch(e){}
+  }
+
+  // ---- Tab 11: Bluesky Posts (LIVE, owner-only write surface) ----------------
+  //   Reads/writes public.social_posts through the OWNER's logged-in session; RLS
+  //   (social_posts_owner_all) gates it to the owner only. A non-owner sees an
+  //   empty queue and cannot write. The page NEVER holds the Bluesky credential
+  //   and NEVER posts — Approve only flips status; the server worker publishes.
+  var _gseg = (typeof Intl!=='undefined' && Intl.Segmenter) ? new Intl.Segmenter('en',{granularity:'grapheme'}) : null;
+  function graphemeLen(s){ s=String(s||''); if(!_gseg) return s.length; var n=0; var it=_gseg.segment(s); for(var _ of it) n++; return n; }
+  function fmtSlot(ts){ if(!ts) return ''; var d=new Date(ts); if(isNaN(d)) return ''; return d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }
+  function blueskyRow(p){
+    var n=graphemeLen(p.post_text), over=n>300;
+    var tags=(p.hashtags||[]).map(function(t){return '#'+t;}).join(' ');
+    var when=p.scheduled_slot?('<span class="t-real">scheduled '+esc(fmtSlot(p.scheduled_slot))+'</span>'):'<span class="muted">unscheduled</span>';
+    var statusTag=p.status==='approved'?'<span class="tile-tag t-real">approved</span>':'<span class="tile-tag t-persist">draft</span>';
+    return '<div class="card" data-post="'+esc(p.id)+'" style="margin-bottom:12px">'+
+      '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">'+
+        '<div>'+statusTag+' <span class="muted" style="font-size:12px">'+esc(p.tile)+' · '+when+'</span></div>'+
+        '<div style="font-variant-numeric:tabular-nums;'+(over?'color:var(--persist);font-weight:700':'color:var(--muted)')+'">'+n+'/300</div>'+
+      '</div>'+
+      '<div style="white-space:pre-wrap;margin:10px 0;line-height:1.5">'+esc(p.post_text)+'</div>'+
+      '<div class="muted" style="font-size:12px;margin-bottom:10px">'+esc(tags)+' &nbsp;·&nbsp; '+
+        (p.source_url?('<a href="'+esc(p.source_url)+'" target="_blank" rel="noopener" style="color:var(--accent)">verify source ↗</a> (approval = fact-check)'):'<span style="color:var(--persist)">NO source_url — not postable</span>')+'</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        (p.status!=='approved'?'<button class="bsky-btn" data-act="approve" style="background:var(--real);color:#04240f">Approve</button>':'')+
+        '<button class="bsky-btn" data-act="edit" style="background:#2a3550;color:#dce6f7">Edit</button>'+
+        '<button class="bsky-btn" data-act="skip" style="background:#3a2530;color:#f2c0cf">Skip</button>'+
+      '</div></div>';
+  }
+  async function refreshBluesky(){
+    var host=$('tab-bluesky'); if(!host) return;
+    var body=document.getElementById('bsky-queue'); if(!body) return;
+    try{
+      var r=await window.hsClient.from('social_posts').select('*')
+        .in('status',['draft','approved']).order('scheduled_slot',{ascending:true,nullsFirst:false}).order('created_at',{ascending:true});
+      if(r.error){ body.innerHTML='<div class="muted">Queue unavailable ('+esc(r.error.message||'')+').</div>'; return; }
+      var rows=r.data||[];
+      // metrics strip
+      var today=new Date(); today.setHours(0,0,0,0);
+      var startWeek=new Date(Date.now()-7*864e5);
+      var qToday=rows.filter(function(p){ return new Date(p.created_at)>=today; }).length;
+      var mp=document.getElementById('bsky-metrics');
+      if(mp) mp.innerHTML=liveTile('In queue', rows.length, 'draft + approved')+
+        liveTile('Queued today', qToday, 'new drafts')+
+        liveTile('Approved', rows.filter(function(p){return p.status==='approved';}).length, 'scheduled to post');
+      body.innerHTML=rows.length?rows.map(blueskyRow).join(''):'<div class="muted">No posts in the queue. A quiet day is valid — the generator drafts only real, source-backed candidates.</div>';
+      var stamp=document.getElementById('bsky-stamp'); if(stamp) stamp.textContent='updated '+new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+    }catch(e){ body.innerHTML='<div class="muted">Queue error.</div>'; }
+  }
+  async function blueskyAction(id, act){
+    try{
+      if(act==='approve'){
+        var r=await window.hsClient.rpc('hs_approve_social_post',{p_id:id});
+        if(r.error){ alert('Approve failed: '+(r.error.message||'')); return; }
+      } else if(act==='skip'){
+        var r2=await window.hsClient.from('social_posts').update({status:'skipped'}).eq('id',id);
+        if(r2.error){ alert('Skip failed: '+(r2.error.message||'')); return; }
+      } else if(act==='edit'){
+        var cur=document.querySelector('[data-post="'+id+'"] div[style*="pre-wrap"]');
+        var next=prompt('Edit post text (max 300 graphemes). Facts must stay verbatim from the source.', cur?cur.textContent:'');
+        if(next==null) return;
+        if(graphemeLen(next)>300){ alert('Too long: '+graphemeLen(next)+'/300 graphemes.'); return; }
+        var r3=await window.hsClient.from('social_posts').update({post_text:next}).eq('id',id);
+        if(r3.error){ alert('Edit failed: '+(r3.error.message||'')); return; }
+      }
+      refreshBluesky();
+    }catch(e){ alert('Action error.'); }
+  }
+  function wireBluesky(){
+    var host=$('tab-bluesky'); if(!host) return;
+    if(!document.getElementById('bsky-card')){
+      var card=document.createElement('div'); card.className='card'; card.id='bsky-card';
+      card.innerHTML='<h3>Bluesky Posts <span class="tile-tag t-real" style="margin-left:6px">live</span> '+
+        '<span id="bsky-stamp" class="muted" style="font-size:11px;font-weight:400;margin-left:8px"></span></h3>'+
+        '<p class="sub">Owner-only approval queue for @HomeSignal on Bluesky. Every post is composed from a real government record and carries its source link — approving is a fact-check. Approve schedules it; the server worker posts at the slot. This page never posts and never holds the credential.</p>'+
+        '<div class="grid" id="bsky-metrics" style="margin-bottom:16px"></div>'+
+        '<div id="bsky-queue"><div class="muted">Loading queue…</div></div>';
+      host.appendChild(card);
+      host.addEventListener('click', function(e){
+        var btn=e.target.closest && e.target.closest('.bsky-btn'); if(!btn) return;
+        var wrap=btn.closest('[data-post]'); if(!wrap) return;
+        blueskyAction(wrap.getAttribute('data-post'), btn.getAttribute('data-act'));
+      });
+    }
+    refreshBluesky();
   }
 
   // ---- Staleness banner for the static snapshot (the tabbed content) ----
