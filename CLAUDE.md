@@ -411,6 +411,20 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   *tiles*, but making them independently *deliverable* — and the email structure (default:
   two emails, one 5 PM Central window, news rides with notices — a **founder** call) —
   lives in `homesignal-ingest` `digest.py`. Spec: `docs/notices-vs-meetings-delivery-handoff.md`.
+- 🗺️ **Government CONTENT is the real frontier — mapped in `docs/state-notice-portals.md`.**
+  Pages are pure data everywhere; government Notices/Meetings content exists for **only 3 Utah
+  communities** (Utah County, Box Elder, Eagle Mountain — DB-verified). Standing answer for
+  scaling it (so no session re-derives): **adding a state's government content is NOT pure data.**
+  `ingest.py`'s `source_type=html` handler is **Utah-PMN-specific** (`is_pmn_body_url()` hard-checks
+  `"utah.gov/pmn"`; `parse_pmn_body/notice/date` assume its exact HTML) — so each new portal format
+  needs its own **parser adapter in `homesignal-ingest`** (CI-verified; sandbox has no egress).
+  Of all 50 states, only ~4 besides Utah have a first-party statewide portal that carries **local**
+  city/county bodies (NV, RI, ND, OH⚠️demoted); 21 are first-party but **state-agency-scoped**, 16
+  are **aggregator-only (barred — press associations)**, 8 have **no statewide system**. The real
+  unlock is therefore a **civic-agenda VENDOR adapter, not per-state portals**: **Granicus**
+  (`<entity>.granicus.com/ViewPublisher.php?view_id=N`) hosts county/city agendas nationwide, so one
+  adapter widens coverage across every state at once (then CivicPlus/Legistar/PrimeGov for the tail).
+  Full registry + recommended wire order: `docs/state-notice-portals.md`.
 
 ---
 
