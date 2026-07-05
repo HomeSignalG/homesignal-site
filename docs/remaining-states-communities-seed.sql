@@ -9901,3 +9901,21 @@ insert into public.communities (name, county, state, level, slug, zip_codes, gov
 ('Sitka (99835)','Sitka','AK','zip','sitka-99835',array['99835'],array[]::text[],(select id from public.communities where slug='sitka-city-and-borough-ak')),
 ('Ketchikan (99901)','Ketchikan Gateway','AK','zip','ketchikan-99901',array['99901'],array[]::text[],(select id from public.communities where slug='ketchikan-gateway-borough-ak'))
 on conflict do nothing;
+
+-- ── POST-BUILD CORRECTION (data audit) — Fairfax city, VA ────────────────────────────
+-- Fairfax city (independent city, fips 51600) shares its only ZIPs — 22030/22031/22032 —
+-- with Fairfax County (51059) in the source. The generator parented all three to the
+-- county (the `zipcodes` package reports "Fairfax County" for them), which left the
+-- independent-city root EMPTY and unreachable. The City of Fairfax has its OWN government
+-- distinct from the county, and the source's own fips lists these ZIPs under the city, so
+-- re-home them to the city (the most-specific jurisdiction) and drop them from the county
+-- array — a ZIP sits on exactly one county-level array (§12.4). Idempotent; run after the
+-- inserts above. See docs/community-build-source-of-truth.md §9 (independent-city standing
+-- answer). Functionally identical for residents today (same 6 canonical topics), and
+-- most-specific resolution is unchanged (the level=zip page still wins).
+update public.communities set zip_codes = array['22030','22031','22032']
+  where slug='fairfax-city-va';
+update public.communities set parent_id = (select id from public.communities where slug='fairfax-city-va')
+  where level='zip' and state='VA' and zip_codes[1] in ('22030','22031','22032');
+update public.communities set zip_codes = array(select z from unnest(zip_codes) z where z not in ('22030','22031','22032'))
+  where slug='fairfax-county-va';
