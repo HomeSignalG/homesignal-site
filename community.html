@@ -187,6 +187,7 @@ body { background: #f3f4f6; font-size: 14px; }
 .bn { background: var(--gl); color: var(--gd); }
 .bw { background: #fef3c7; color: #92400e; }
 .bi { background: #dbeafe; color: #1e40af; }
+.bs { background: var(--bg); color: var(--tt); text-transform: none; border: 1px solid var(--border); }
 .aactions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .abtn { padding: 5px 11px; border-radius: var(--rs); font-size: 11px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg2); color: var(--ts); }
 .abtn-c { border-color: var(--gm); color: var(--gd); background: var(--gl); }
@@ -603,6 +604,37 @@ function getBadge(level) {
   return map[level] || '<span class="abadge bi">New</span>';
 }
 
+// Freshness is DERIVED from the item's real date, not from the static impact_level
+// (which the engine stamps 'new' on ~all rows). Whole days since published/created.
+const NEW_MAX_DAYS = 7; // matches the ingest news-recency window
+function daysSince(str) {
+  if (!str) return null;
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return null;
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+}
+function relAge(days) {
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 7) return days + ' days ago';
+  if (days < 14) return 'last week';
+  if (days < 60) return Math.round(days / 7) + ' weeks ago';
+  if (days < 365) return Math.round(days / 30) + ' months ago';
+  return Math.max(1, Math.round(days / 365)) + ' year' + (days < 550 ? '' : 's') + ' ago';
+}
+// 'New' only inside the freshness window; older items relabel to their real age.
+// An explicit engine priority state (urgent/watch/resolved) still wins if ever set.
+function freshnessBadge(a) {
+  const lvl = a.impact_level;
+  if (lvl === 'urgent') return '<span class="abadge bu">Urgent</span>';
+  if (lvl === 'watch') return '<span class="abadge bw">Watch</span>';
+  if (lvl === 'resolved') return '<span class="abadge bn">Resolved</span>';
+  const days = daysSince(a.published_at || a.created_at);
+  if (days === null) return '';
+  if (days <= NEW_MAX_DAYS) return '<span class="abadge bi">New</span>';
+  return '<span class="abadge bs">' + relAge(days) + '</span>';
+}
+
 function formatDate(str) {
   if (!str) return '';
   const d = new Date(str);
@@ -626,11 +658,17 @@ function renderAlerts(alerts) {
     count.textContent = '0 alerts';
     return;
   }
-  count.textContent = alerts.length + ' alert' + (alerts.length === 1 ? '' : 's') + ' · updated today';
+  // Header reflects the REAL newest item's date, not a hardcoded "updated today".
+  const newest = alerts.reduce((m, a) => {
+    const d = new Date(a.published_at || a.created_at);
+    return (!isNaN(d.getTime()) && d.getTime() > m) ? d.getTime() : m;
+  }, 0);
+  const when = newest > 0 ? ' · newest ' + formatDate(new Date(newest).toISOString()) : '';
+  count.textContent = alerts.length + ' alert' + (alerts.length === 1 ? '' : 's') + when;
   feed.innerHTML = alerts.map(a => {
     const tag = getPipelineTag(a.pipeline_type, a.category);
     const icon = getIcon(a.pipeline_type, a.category);
-    const badge = getBadge(a.impact_level);
+    const badge = freshnessBadge(a);
     const date = formatDate(a.published_at || a.created_at);
     const meta = [a.agency_name, date, a.geographic_reference].filter(Boolean).map(esc).join(' · ');
     const url = safeUrl(a.source_url);
