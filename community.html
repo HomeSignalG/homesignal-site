@@ -623,7 +623,7 @@ function renderAlerts(alerts) {
     const url = safeUrl(a.source_url);
     const link = url ? `<a class="alink" href="${esc(url)}" target="_blank" rel="noopener">Read more →</a>` : '';
     const catId = alertCatId(a.pipeline_type, a.category);
-    return `<div class="alert-card" data-cat="${esc(catId)}">
+    return `<div class="alert-card" data-cat="${esc(catId)}" data-topic="${esc((a.subtopics && a.subtopics[0]) || a.category || '')}" data-pipeline="${esc(a.pipeline_type || '')}" data-alert="${esc(a.id || '')}">
       ${tag}
       <div class="alert-top">
         <div class="aicon" style="background:${icon.bg}"><svg style="stroke:${icon.stroke}" viewBox="0 0 24 24">${icon.path}</svg></div>
@@ -636,6 +636,43 @@ function renderAlerts(alerts) {
       </div>
     </div>`;
   }).join('');
+  setupAlertTracking(feed);
+}
+
+// Acquisition analytics (anonymous, best-effort): card impressions (alert_view) +
+// "Read more" clicks (alert_read). Ported from the legacy launch pages so the dynamic
+// page — which serves every non-legacy community — emits the same events. Lazy about
+// window.hsLogEvent so it works even if events.js loads after the first render.
+let _alertReadBound = false, _alertObserver = null;
+const _seenAlerts = new WeakSet();
+function setupAlertTracking(feed){
+  if(!feed) return;
+  function log(type, c){
+    if(typeof window.hsLogEvent === 'function'){
+      window.hsLogEvent(type, { topic:c.dataset.topic||null, pipeline_type:c.dataset.pipeline||null, alert_id:c.dataset.alert||null });
+    }
+  }
+  if(!_alertReadBound){
+    feed.addEventListener('click', function(e){
+      const a = e.target.closest('.alink'); if(!a) return;
+      const c = a.closest('.alert-card'); if(c) log('alert_read', c);
+    });
+    _alertReadBound = true;
+  }
+  if('IntersectionObserver' in window){
+    if(!_alertObserver){
+      _alertObserver = new IntersectionObserver(function(entries){
+        entries.forEach(function(en){
+          if(en.isIntersecting && !_seenAlerts.has(en.target)){
+            _seenAlerts.add(en.target);
+            log('alert_view', en.target);
+            _alertObserver.unobserve(en.target);
+          }
+        });
+      }, { threshold: 0.5 });
+    }
+    feed.querySelectorAll('.alert-card').forEach(function(c){ _alertObserver.observe(c); });
+  }
 }
 
 let alertCat = null;
@@ -1181,6 +1218,9 @@ function applyCommunity(){
 async function initCommunity(){
   await resolveCommunity();
   applyCommunity();
+  // Expose the content/anchor community id so events.js tags analytics with the
+  // community the alerts actually belong to (the chain root), matching the legacy pages.
+  window.COMMUNITY_ID = CONTENT_ID;
   loadAlerts();
   loadMeetings();
 }
@@ -1328,5 +1368,6 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 </script>
 <script src="share.js" defer></script>
+<script src="events.js" defer></script>
 </body>
 </html>
