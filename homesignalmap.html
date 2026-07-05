@@ -21,7 +21,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css"/>
 <style>
   :root{
-    --ink:#0F1A1C; --soft:#46565A; --mute:#7C8E92; --line:#E7ECEA; --paper:#EEF2F1; --card:#fff;
+    --ink:#0F1A1C; --soft:#46565A; --mute:#5b6d71; --line:#E7ECEA; --paper:#EEF2F1; --card:#fff;
     --green:#1f5130; --green-bright:#16a34a; --orange:#E2772F; --violation:#C0392B;
     --font:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   }
@@ -57,6 +57,10 @@
   .search button:hover{background:#174026}
   .search button:disabled{opacity:.6;cursor:default}
   .hint{font-size:12.5px;color:var(--mute);margin-top:2px}
+  /* Quiet text link (e.g. "See a sample") — a link, never a second primary button. */
+  .linklike{background:none;border:0;padding:0;margin-top:6px;font:inherit;font-size:12.5px;
+    color:var(--green);cursor:pointer;text-decoration:underline;display:inline-block}
+  .linklike:hover{color:#174026}
 
   .status{margin:18px 0;font-size:14px;color:var(--soft)}
   .status.err{color:var(--violation)}
@@ -121,6 +125,14 @@
   .cc .n{font-weight:700;font-size:22px}
   .cc .k{font-size:11.5px;color:var(--soft);line-height:1.3}
   .cc.flag .n{color:var(--orange)}
+  /* Open-for-comment banner — shown above the counts only when there's a live comment window. */
+  .commentbar{display:flex;align-items:flex-start;gap:9px;margin:0 0 12px;padding:11px 13px;
+    border:1px solid var(--orange);border-left-width:4px;border-radius:10px;
+    background:#fdf1e8;color:#8a4113}
+  .commentbar .cb-ic{flex:0 0 auto;font-size:15px;line-height:1.35}
+  .commentbar .cb-tx{font-size:13px;line-height:1.4}
+  .commentbar strong{font-weight:700}
+  .commentbar .cb-when{font-weight:700;color:var(--orange)}
 
   .band{margin-top:22px}
   .band-h{font-weight:700;font-size:16px;color:#fff;
@@ -152,6 +164,7 @@
     padding:4px 10px;border-radius:7px;cursor:pointer;user-select:none;font-size:12px;
     border:1px solid var(--line);background:#f7faf8}
   .mapkey span:hover{background:#f2f5f3}
+  .mapkey span:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
   .mapkey span.off{opacity:.4}
   .mapkey span.off .t{text-decoration:line-through}
   .mapkey i{width:11px;height:11px;border-radius:50%;flex:0 0 auto;
@@ -182,6 +195,7 @@
         <button id="go" type="submit">See development</button>
       </form>
       <div class="hint">Box Elder County addresses only, for now. Free while we're in launch.</div>
+      <button type="button" class="linklike" id="sampleBtn">See a sample</button>
     </div>
 
     <div class="status" id="status"></div>
@@ -227,11 +241,14 @@
         <div class="card read">
           <h2 id="withinLbl">Within 1 mile of</h2>
           <div class="addr" id="rAddr">—</div>
+          <!-- Open-for-comment banner: built fresh each render(); hidden (no reserved space)
+               when nothing is open. Sits above the counts so a worried resident sees it first. -->
+          <div class="commentbar" id="commentBar" style="display:none"></div>
           <div class="counts">
-            <div class="cc"><div class="n" id="cFac">0</div><div class="k">EPA-registered facilities</div></div>
-            <div class="cc"><div class="n" id="cDev">0</div><div class="k">planning / development items</div></div>
-            <div class="cc flag"><div class="n" id="cOpen">0</div><div class="k">comment windows open</div></div>
-            <div class="cc"><div class="n" id="cTot">0</div><div class="k">total records nearby</div></div>
+            <div class="cc"><div class="n" id="cFac">0</div><div class="k">Industrial sites near you</div></div>
+            <div class="cc"><div class="n" id="cDev">0</div><div class="k">New projects proposed nearby</div></div>
+            <div class="cc flag"><div class="n" id="cOpen">0</div><div class="k">Open for public comment</div></div>
+            <div class="cc"><div class="n" id="cTot">0</div><div class="k">Total records nearby</div></div>
           </div>
           <!-- Honest coverage note: shown only on a ZIP page that has EPA facilities but no planning
                items yet, so "0 planning items" doesn't read as "nothing is happening" when the real
@@ -262,9 +279,9 @@
     </div>
   </div>
 
+<!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
+     on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
   // --- config -------------------------------------------------------------
   var ENDPOINT = "https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/get-address-report";
@@ -358,6 +375,40 @@
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   function status(msg, isErr){ var el=$("status"); el.textContent=msg||""; el.className="status"+(isErr?" err":""); }
 
+  // Turn an ISO date (YYYY-MM-DD) into plain-language urgency vs today, for a worried resident:
+  // "closes today" / "closes tomorrow" / "closes in 5 days" / "closes Aug 3, 2026" (far out).
+  // A date already in the past returns just the friendly date (no "closes" — the window is over).
+  function friendlyDeadline(iso){
+    if(!iso) return "";
+    var d1 = new Date(iso + "T00:00:00Z"); if(isNaN(d1.getTime())) return iso;
+    var today = new Date(new Date().toISOString().slice(0,10) + "T00:00:00Z");
+    var days = Math.round((d1 - today) / 86400000);
+    var plain = d1.toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric", timeZone:"UTC" });
+    if(days < 0)  return plain;              // already past → just the date
+    if(days === 0) return "closes today";
+    if(days === 1) return "closes tomorrow";
+    if(days <= 21) return "closes in " + days + " days";
+    return "closes " + plain;                // far out → "closes Aug 3, 2026"
+  }
+
+  // Inject a heavy 3D library (three.js / maplibre-gl) on first use, then run cb() — keeps them
+  // out of the initial page load. Shows the loading status, then PROCEEDS automatically (no
+  // second click). Queues callbacks if the same lib is requested twice before it lands.
+  var _libLoading = {};
+  function ensureLib(globalName, src, label, cb){
+    if(window[globalName]){ status(""); cb(); return; }
+    status(label + " is loading…");
+    if(_libLoading[src]){ _libLoading[src].push(cb); return; }
+    _libLoading[src] = [cb];
+    var sc = document.createElement("script");
+    sc.src = src;
+    sc.onload = function(){ status(""); var cbs = _libLoading[src]; _libLoading[src] = null;
+      cbs.forEach(function(fn){ try{ fn(); }catch(e){} }); };
+    sc.onerror = function(){ _libLoading[src] = null;
+      status(label + " couldn't load — check your connection and try again.", true); };
+    document.head.appendChild(sc);
+  }
+
   // The honest facilities-only coverage note. Called by render() (sets FACILITIES_ONLY) and by the
   // async county lookup in loadZip() (sets ZIP_COUNTY) — whichever lands last paints the final text.
   function updateCovNote(){
@@ -376,6 +427,14 @@
     if(!address) return;
     run(address);
   });
+
+  // "See a sample" — fill the box with a known address and submit via the normal search path.
+  var _sampleBtn = document.getElementById("sampleBtn");
+  if(_sampleBtn){ _sampleBtn.addEventListener("click", function(){
+    var a = $("addr"); a.value = "20 North Main Street, Brigham City, UT 84302";
+    if(typeof $("form").requestSubmit === "function"){ $("form").requestSubmit(); }
+    else { run(a.value.trim()); }
+  }); }
 
   function run(address){
     // A real address search leaves ZIP mode: now we DO drop the "this address" pin.
@@ -492,6 +551,24 @@
     $("cOpen").textContent = open.length;
     $("cTot").textContent  = sites.length;
 
+    // Open-for-comment banner — rebuilt every render (clears between searches; works in both
+    // modes since it reads the already-computed `open` set). Hidden with no reserved space when
+    // nothing is open. Shows the soonest deadline as a friendly countdown.
+    var cbar = $("commentBar");
+    if(open.length){
+      var soonest = open.map(function(s){ return s.meeting_date.slice(0,10); }).sort()[0];
+      var lead = open.length === 1
+        ? "<strong>1 project near you</strong> is open for public comment"
+        : "<strong>" + open.length + " projects near you</strong> are open for public comment";
+      var tail = open.length === 1
+        ? " — <span class='cb-when'>" + esc(friendlyDeadline(soonest)) + "</span>."
+        : " — the soonest <span class='cb-when'>" + esc(friendlyDeadline(soonest)) + "</span>.";
+      cbar.innerHTML = "<span class='cb-ic' aria-hidden='true'>📣</span><span class='cb-tx'>" + lead + tail + "</span>";
+      cbar.style.display = "";
+    } else {
+      cbar.innerHTML = ""; cbar.style.display = "none";
+    }
+
     // Facilities-only ZIP page (has EPA facilities, no planning items yet) → show the honest
     // coverage note so "0 planning items" doesn't read as "nothing is happening here."
     var devCount = (data.counts && data.counts.development) != null ? data.counts.development : dev.length;
@@ -581,13 +658,21 @@
     d.innerHTML = "";
     LEGEND.forEach(function(it){
       var row = document.createElement("span");
+      row.tabIndex = 0;
+      row.setAttribute("role", "button");
+      row.setAttribute("aria-label", it.t + " markers");
       if(!FILTER[it.b]) row.className = "off";
+      row.setAttribute("aria-pressed", FILTER[it.b] ? "true" : "false");  // pressed = layer shown
       row.innerHTML = "<i style='background:"+it.c+"'></i><span class='t'>"+it.t+"</span>";
-      row.addEventListener("click", function(e){
-        e.stopPropagation();
+      function toggle(){
         FILTER[it.b] = !FILTER[it.b];
         row.classList.toggle("off", !FILTER[it.b]);
+        row.setAttribute("aria-pressed", FILTER[it.b] ? "true" : "false");
         applyFilter();
+      }
+      row.addEventListener("click", function(e){ e.stopPropagation(); toggle(); });
+      row.addEventListener("keydown", function(e){
+        if(e.key === "Enter" || e.key === " " || e.key === "Spacebar"){ e.preventDefault(); toggle(); }
       });
       d.appendChild(row);
     });
@@ -622,7 +707,7 @@
       var a = link ? " · <a href='"+esc(link)+"' target='_blank' rel='noopener'>record ▸</a>" : "";
       var v = s.viol ? "<div class='vflag'>"+s.viol+" recorded violation"+(s.viol===1?"":"s")+" · EPA ECHO ▸</div>" : "";
       var tag = LAYER_LABEL[s.layer] || "Development";
-      var when = s.meeting_date ? " · " + s.meeting_date.slice(0,10) : "";
+      var when = s.meeting_date ? " · " + friendlyDeadline(s.meeting_date.slice(0,10)) : "";
       var dm = (s.scope==="point" && typeof s.e==="number" && typeof s.n==="number" && !ZIP_MODE) ? Math.hypot(s.e,s.n) : null;
       var dstr = (dm!=null && dm>=0.1) ? " · "+(Math.round(dm*10)/10)+" mi away" : "";
       return "<div class='rec'><span class='dot' style='background:"+col+"'></span>"+
@@ -914,16 +999,22 @@
     if(mode!=="3d"){ ["mk3tip","mk3info"].forEach(function(id){ var t=document.getElementById(id); if(t)t.style.display="none"; }); }
     if(mode==="2d" && map){ setTimeout(function(){ map.invalidateSize(); },20); }
     if(mode==="3d"){
-      if(!window.THREE){ status("3D aerial needs a moment to load — try again.", true); return; }
-      V3.userZoom=false;                       // re-frame to the data on entering 3D
-      if(!V3.inited){ init3D(); } else { build3DFacilities(); }
-      setTimeout(resize3D,30);
+      // Lazy-load three.js on first use, then proceed automatically (no second click).
+      ensureLib("THREE", "https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js", "3D aerial", function(){
+        if(!V3.active) return;                   // resident switched away while it loaded
+        V3.userZoom=false;                       // re-frame to the data on entering 3D
+        if(!V3.inited){ init3D(); } else { build3DFacilities(); }
+        setTimeout(resize3D,30);
+      });
     }
     if(mode==="gl"){
-      if(!window.maplibregl){ status("3D satellite needs a moment to load — try again.", true); return; }
-      if(!GL.inited && !GL.map){ initGL(LAST_HOME); }
-      else if(GL.inited){ GL.home=LAST_HOME; buildGLMarkers(); GL.map.jumpTo({ center:[LAST_HOME.lng,LAST_HOME.lat], zoom:glZoom(CUR_RADIUS), pitch:62, bearing:-18 }); }
-      setTimeout(function(){ if(GL.map) GL.map.resize(); },40);
+      // Lazy-load maplibre-gl on first use, then proceed automatically.
+      ensureLib("maplibregl", "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js", "3D satellite", function(){
+        if(!GL.active) return;                   // resident switched away while it loaded
+        if(!GL.inited && !GL.map){ initGL(LAST_HOME); }
+        else if(GL.inited){ GL.home=LAST_HOME; buildGLMarkers(); GL.map.jumpTo({ center:[LAST_HOME.lng,LAST_HOME.lat], zoom:glZoom(CUR_RADIUS), pitch:62, bearing:-18 }); }
+        setTimeout(function(){ if(GL.map) GL.map.resize(); },40);
+      });
     }
   }
   document.getElementById("viewSeg").addEventListener("click",function(e){
