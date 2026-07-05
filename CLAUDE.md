@@ -598,6 +598,22 @@ legal/framing change not covered by the one-time sign-off.
   ingest feeds, not code**: a county gets *full* pages once its planning feed is wired in
   `homesignal-ingest`; until then it ships facilities-only. Box Elder regression-verified identical
   to v10 (84302 → facilities 23 · development 41).
+- 🟢 **EPA-facilities under-return FIXED — engine v13 (FRS radius back-off + transient retry)**
+  (DB-verified). Found this build: the facilities query used a fixed 5-mile FRS `search_radius`;
+  in dense/suburban areas that exceeds FRS's process limit, so FRS returns an **error object** the
+  old code read through `?? []` as **0 facilities** — silently zeroing **90 of 136** cached UT ZIPs
+  (not just downtown cores: Provo 84606, all of SLC/Ogden, Davis/Weber suburbs). A second latent bug:
+  FRS emits invalid JSON (unescaped `\` in facility names) that made `r.json()` throw into the same
+  `catch → []`. **Standing answer (so no session re-derives): NEVER treat an FRS non-200 / error /
+  parse-fail as "0 facilities."** `frsFacilities()` now starts at the needed radius and (a) shrinks
+  ONLY on the deterministic process-limit `Error` (floor 0.25 mi), (b) RETRIES the same radius on a
+  transient 5xx/parse fail (shrinking there undercounts — a flaky FRS 502 made Box Elder read 23→18),
+  (c) escapes FRS's invalid backslashes before `JSON.parse`. Re-cached the affected ZIPs with an
+  **improvement guard** (only overwrite when new `facilities` > cached, so a transient 0 can never
+  clobber a good row): **77 of 90 zero-fac ZIPs corrected** to real EPA counts (e.g. 84101 0→40,
+  84606 0→40, 84010 0→40); the rest are genuinely-empty west-desert/mountain ZIPs (Dugway, Ibapah,
+  Wendover, Grouse Creek — 0 industrial is valid). Parked ref: `supabase/functions/get-address-report/index.ts`
+  (deploy via MCP, not commit). Anti-fabrication invariant still 0 (every rendered site keeps a `record_url`).
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
