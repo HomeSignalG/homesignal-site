@@ -425,6 +425,19 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   (`<entity>.granicus.com/ViewPublisher.php?view_id=N`) hosts county/city agendas nationwide, so one
   adapter widens coverage across every state at once (then CivicPlus/Legistar/PrimeGov for the tail).
   Full registry + recommended wire order: `docs/state-notice-portals.md`.
+- 🟢 **First non-Utah government content is LIVE — Douglas County, NV (100 meetings)** (DB-verified,
+  golive run `28747348321`). The state-agnostic **Granicus RSS adapter** (`parse_granicus_rss`,
+  ingest PR #120) + a `feeds.csv`/`public.feeds` row + reusable `golive-feed.yml` (`ONLY_FEED` single-
+  feed live ingest, PR #122) wrote 100 real, correctly-dated Douglas County meetings to the county
+  root (`519481a8-…`, `County Commission & county business`) — proving the vendor path end-to-end.
+  0 subscribers there, so pages-only, no emails. **Widening is now data** (add an `rss` row →
+  `<entity>.granicus.com/ViewPublisherRSS.php?view_id=N&mode=agendas` per Granicus county, keyed to
+  its root). ⚠️ **The blocker for the rest of the vendor frontier is feeds.csv→`public.feeds` sync,
+  not the adapters:** `adapters/legistar.py`/`civicplus.py`/`iqm2.py` already exist and Genesee County
+  MI's feed note says "LIVE — 25 events," but the DB has **0 Genesee meetings** because those vendor
+  rows were never synced into the DB-first config (0 vendor rows in `public.feeds` pre-build). Owner
+  call: a full CSV→DB sync activates several in-flight pending feeds at once. Details:
+  `docs/state-notice-portals.md`.
 
 ---
 
