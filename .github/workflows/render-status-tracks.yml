@@ -1,0 +1,42 @@
+name: Render status tracks (live end-to-end verification)
+
+# Throwaway verification harness on the CI branch. Loads the real ZIP pages in a
+# headless browser on the runner (which has egress to Supabase), lets the page fetch
+# LIVE data with the public anon key, screenshots the rendered status-tracks panel,
+# and prints it as base64 in the job log. No secrets. Not meant to merge.
+on:
+  push:
+    branches:
+      - claude/status-tracks-live-render-ci
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install Playwright + Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i playwright@1.48.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium
+      - name: Serve site
+        run: |
+          python3 -m http.server 8080 >/tmp/http.log 2>&1 &
+          for i in $(seq 1 20); do curl -sf http://localhost:8080/box-elder.html >/dev/null && break; sleep 0.5; done
+          echo "server up"
+      - name: Live render + screenshot
+        run: node tools/render-status-tracks.cjs
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: status-tracks-screenshots
+          path: /tmp/*.jpg
+          if-no-files-found: warn
