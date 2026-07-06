@@ -479,6 +479,13 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
     var paidLine=paidTotal
       ? '<span class="t-real">'+(paid.active||0)+' active</span> · '+(paid.trialing||0)+' trialing · <span class="muted">'+(paid.canceled||0)+' canceled</span>'
       : '<span class="muted">No paid subscriptions yet — free tier only.</span>';
+    // Event-logging drop accounting (events.dropped_before). measured_rows=0 means the
+    // instrumented client hasn't shipped yet — say "not yet measured", never "0 drops":
+    // pre-instrumentation history is unknown, not zero.
+    var dq=d.data_quality||{}, dqMeasured=dq.events_measured_rows||0, dqTotal=dq.events_total||0;
+    var dqLine=dqMeasured
+      ? '<span class="t-persist">'+(dq.events_dropped_measured||0)+'</span> measured drops across '+dqMeasured.toLocaleString()+' instrumented events (known floor — the other '+(dqTotal-dqMeasured).toLocaleString()+' events predate the counter: unknown, not zero)'
+      : '<span class="muted">not yet measured — the client-side drop counter ships with the next deploy; all '+dqTotal.toLocaleString()+' existing events predate it (unknown, not zero)</span>';
     return '<div class="card"><h3>Acquisition metrics <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
       '<p class="sub">Current KPIs, the 30-day acquisition funnel, topic demand and paid conversion — live, above the snapshot below.</p>'+
       '<div class="grid" style="margin-bottom:16px">'+kpis+'</div>'+
@@ -490,6 +497,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
           (topicRows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Topic</th><th style="text-align:right">Followers</th><th></th></tr></thead><tbody>'+topicRows+'</tbody></table></div>'):'<div class="muted">No topic subscriptions yet.</div>')+'</div>'+
       '</div>'+
       '<div class="tile-note" style="margin-top:14px">Paid: '+paidLine+'</div>'+
+      '<div class="tile-note" style="margin-top:6px">Event drops: '+dqLine+'</div>'+
     '</div>';
   }
   async function wireAcqMetrics(){
