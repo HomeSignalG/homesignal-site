@@ -2,10 +2,42 @@
    INVISIBLE to the user: no UI, no personal info. Writes one row per event to the
    Supabase `events` table (INSERT-only for the browser; see docs/events-setup.sql).
 
-   Never throws and never blocks the UI — if the table/grant isn't set up yet, or the
-   network fails, the event is silently dropped. Reuses the page's window.hsClient. */
+   Never throws and never blocks the UI. When an event can't be written it is still
+   dropped (no retry/queue here — deliberate), but the drop is now COUNTED per-path in
+   a durable localStorage tally so the undercount is measurable instead of guessed.
+   Read it in any browser console:  hsEventDrops()
+     -> { client_not_ready, insert_error, exception, total, since }
+   NOTE: this tally is PER-BROWSER (localStorage). Cross-visitor aggregation needs a
+   server sink (a count beacon or a `dropped_before` column) — intentionally deferred.
+   Reuses the page's window.hsClient. */
 (function () {
   'use strict';
+
+  // ---- drop accounting -----------------------------------------------------
+  // Each silent-drop path below bumps one bucket so we can size the loss rather
+  // than confirm-it-exists. Durable across reloads; every access is wrapped so the
+  // accounting can never itself throw or block a log call.
+  var DROP_KEY = 'hs_evt_drops';
+  var drops = { client_not_ready: 0, insert_error: 0, exception: 0, total: 0, since: null };
+  try {
+    var saved = JSON.parse(localStorage.getItem(DROP_KEY) || 'null');
+    if (saved && typeof saved === 'object') {
+      ['client_not_ready', 'insert_error', 'exception', 'total'].forEach(function (k) {
+        if (typeof saved[k] === 'number') drops[k] = saved[k];
+      });
+      drops.since = saved.since || null;
+    }
+  } catch (e) {}
+  function bumpDrop(path) {
+    try {
+      if (!drops.since) drops.since = new Date().toISOString();
+      drops[path] = (drops[path] || 0) + 1;
+      drops.total += 1;
+      try { localStorage.setItem(DROP_KEY, JSON.stringify(drops)); } catch (e) {}
+    } catch (e) { /* accounting must never break logging */ }
+  }
+  // Queryable surface — returns a snapshot copy so a caller can't mutate the tally.
+  window.hsEventDrops = function () { var o = {}; for (var k in drops) o[k] = drops[k]; return o; };
 
   function sessionId() {
     try {
@@ -42,7 +74,7 @@
   window.hsLogEvent = function (eventType, payload) {
     try {
       var c = window.hsClient;
-      if (!c || typeof c.from !== 'function') return; // client not ready -> drop silently
+      if (!c || typeof c.from !== 'function') { bumpDrop('client_not_ready'); return; } // client not ready -> counted drop
       var row = {
         session_id: sessionId(),
         event_type: String(eventType || '').slice(0, 64),
@@ -54,7 +86,12 @@
         zip_code: currentZip(payload)
       };
       var q = c.from('events').insert([row]);
-      if (q && typeof q.then === 'function') q.then(function () {}, function () {});
-    } catch (e) { /* never surface analytics errors */ }
+      // insert() RESOLVES with {error} on RLS/constraint/4xx and only REJECTS on a
+      // network failure — count both, so neither kind of failure is silent.
+      if (q && typeof q.then === 'function') {
+        q.then(function (r) { if (r && r.error) bumpDrop('insert_error'); },
+               function () { bumpDrop('insert_error'); });
+      }
+    } catch (e) { bumpDrop('exception'); } // sync throw building/sending the row -> counted drop
   };
 })();
