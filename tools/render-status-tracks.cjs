@@ -1,9 +1,12 @@
 // LIVE end-to-end render check (runs on a GitHub Actions runner, which has open
 // egress to Supabase). Loads the real page over http://localhost, lets the page's
-// own JS fetch LIVE Supabase with the embedded anon key (NO interception), waits for
-// the status-tracks panel to populate, captures the network response status as proof
-// the live hit happened, screenshots the section, and emits it as base64 chunks in
-// the job log for retrieval. No secrets used — the anon key is already public in the page.
+// own inline JS fetch LIVE Supabase with the embedded public anon key (NO interception,
+// NO CSP bypass — the page's real Content-Security-Policy stays enforced), synchronizes
+// on the actual network responses (which proves the live hit and gives the row counts),
+// lets the page render, then screenshots the panel and emits it as base64 in the log.
+// No secrets — the anon key is already public in the page. Uses ONLY Node-side Playwright
+// APIs (waitForResponse / element.screenshot); no page.evaluate / waitForFunction, so
+// nothing here needs the page's CSP to allow 'unsafe-eval'.
 const { chromium } = require('playwright');
 const fs = require('fs');
 
@@ -15,45 +18,34 @@ const PAGES = [
 (async () => {
   const browser = await chromium.launch();
   for (const pg of PAGES) {
-    const page = await browser.newPage({ viewport: { width: 900, height: 1400 }, deviceScaleFactor: 1 });
-    const netProof = [];
-    page.on('response', res => {
-      const u = res.url();
-      if (u.includes('/rest/v1/v_community_status_tracks') || u.includes('/rest/v1/v_community_status_items')) {
-        netProof.push({ view: u.includes('tracks') ? 'tracks' : 'items', status: res.status(), url: u.split('?')[0] });
-      }
-    });
+    const context = await browser.newContext({ viewport: { width: 900, height: 1400 }, deviceScaleFactor: 1 });
+    const page = await context.newPage();
     console.log(`\n===== RENDER ${pg.name} =====`);
-    await page.goto(`http://localhost:8080/${pg.file}`, { waitUntil: 'domcontentloaded' });
-    let ok = true;
-    try {
-      await page.waitForFunction(() => {
-        const g = document.getElementById('status-tracks');
-        return g && !g.querySelector('.loading') && g.children.length > 0;
-      }, { timeout: 30000 });
-    } catch (e) { ok = false; console.log('WAIT TIMEOUT:', String(e)); }
 
-    const readout = await page.evaluate(() => [...document.querySelectorAll('#status-tracks .track-card')].map(c => ({
-      title: c.querySelector('.track-title')?.textContent,
-      badge: c.querySelector('.track-head .conf-badge')?.textContent?.trim(),
-      empty: !!c.querySelector('.track-empty'),
-      directItems: c.querySelectorAll(':scope > .trk-item').length,
-      moreItems: c.querySelectorAll('.track-more .trk-item').length,
-      firstBadge: c.querySelector('.trk-item .conf-badge')?.textContent?.trim(),
-      firstSource: c.querySelector('.trk-item .trk-meta')?.textContent?.trim()?.slice(0, 60),
-    })));
-    console.log(`LIVE_NET_PROOF ${pg.name}: ${JSON.stringify(netProof)}`);
-    console.log(`RENDER_READOUT ${pg.name}: ${JSON.stringify(readout)}`);
+    const want = u => u.includes('/rest/v1/v_community_status_tracks') || u.includes('/rest/v1/v_community_status_items');
+    const trackP = page.waitForResponse(r => r.url().includes('/rest/v1/v_community_status_tracks'), { timeout: 25000 }).catch(() => null);
+    const itemP  = page.waitForResponse(r => r.url().includes('/rest/v1/v_community_status_items'),  { timeout: 25000 }).catch(() => null);
+
+    await page.goto(`http://localhost:8080/${pg.file}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    const [tR, iR] = await Promise.all([trackP, itemP]);
+
+    const proof = { tracks_status: null, tracks_rows: null, items_status: null, items_rows: null };
+    if (tR) { proof.tracks_status = tR.status(); try { const j = await tR.json(); proof.tracks_rows = Array.isArray(j) ? j.length : null; } catch {} }
+    if (iR) { proof.items_status  = iR.status();  try { const j = await iR.json(); proof.items_rows  = Array.isArray(j) ? j.length  : null; } catch {} }
+    console.log(`LIVE_NET_PROOF ${pg.name}: ${JSON.stringify(proof)}`);
+
+    // give the page's own inline render a moment to write the DOM after the fetch resolves
+    await page.waitForTimeout(1500);
 
     const el = await page.$('#status-track-section');
-    const buf = await el.screenshot({ type: 'jpeg', quality: 55 });
-    const b64 = buf.toString('base64');
+    const buf = await el.screenshot({ type: 'jpeg', quality: 60 });
     fs.writeFileSync(`/tmp/${pg.name}.jpg`, buf);
+    const b64 = buf.toString('base64');
     console.log(`IMG_BYTES ${pg.name}: ${buf.length}  B64_LEN: ${b64.length}`);
     console.log(`===B64_BEGIN ${pg.name}===`);
     for (let i = 0; i < b64.length; i += 4000) console.log(b64.slice(i, i + 4000));
     console.log(`===B64_END ${pg.name}===`);
-    await page.close();
+    await context.close();
   }
   await browser.close();
 })().catch(e => { console.error('FATAL', e); process.exit(1); });
