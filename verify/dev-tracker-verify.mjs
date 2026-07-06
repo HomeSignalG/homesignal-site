@@ -34,7 +34,30 @@ const A = await page.evaluate(() => {
   const txt = s => (q(s)?.textContent || '').trim();
   const vis = s => { const el = q(s); return !!el && getComputedStyle(el).display !== 'none'; };
   const flags = qa('#dtAnchorBody .dt-flag').map(f => f.textContent.trim());
+
+  // --- Map-layer introspection: prove all resolved parcels ACTUALLY drew on the map, and that
+  //     the extra leaflet-interactive paths are EPA facility markers (identified by name), NOT
+  //     padding for parcels that silently failed to render. `parcelLayer`/`siteMarkers`/`map`/
+  //     `MAP_SITES`/`RESOLVED_PARCELS` are top-level `var`s → global (window) props of the page. ---
+  const _map = window.map, _pl = window.parcelLayer, _sm = window.siteMarkers || [];
+  let parcel_features_drawn = 0, parcel_paths_drawn = 0;
+  if (_pl) {
+    parcel_features_drawn = _pl.getLayers().length;               // one L.geoJSON layer per parcel
+    _pl.getLayers().forEach(gj => gj.eachLayer(l => { if (l._path) parcel_paths_drawn++; }));
+  }
+  let facility_markers_on_map = 0;
+  _sm.forEach(x => { if (_map && x && x.m && _map.hasLayer(x.m)) facility_markers_on_map++; });
+  const total_interactive_paths = qa('#mapInner path.leaflet-interactive').length;
+  const facility_labels = (window.MAP_SITES || [])
+    .filter(s => s && s.scope === 'point').map(s => s.label).slice(0, 40);
+
   return {
+    resolved_parcels_total: (window.RESOLVED_PARCELS || []).length,
+    parcel_features_drawn,
+    parcel_paths_drawn,
+    facility_markers_on_map,
+    total_interactive_paths,
+    facility_labels,
     anchor_visible: vis('#dtAnchor'),
     title: txt('#dtAnchorBody .dt-title'),
     straddle: txt('#dtAnchorBody .dt-straddle'),
