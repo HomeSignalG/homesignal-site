@@ -1,0 +1,51 @@
+{
+  "url": "http://localhost:8080/homesignalmap.html?zip=84336",
+  "at": "2026-07-06T01:28:01.198Z",
+  "assertions": {
+    "anchor_visible": true,
+    "title": "Stratos data center project — land assembly",
+    "straddle": "Primary in ZIP 84336 · 78 of 82 parcels here. This assembly also extends into ZIP 84307 (4 parcels there, same ownership).",
+    "status_tracks": [
+      {
+        "k": "MIDA / county approval",
+        "v": "No verified public record yet — unresolved"
+      },
+      {
+        "k": "DEQ air permit",
+        "v": "No verified public record yet — unresolved"
+      },
+      {
+        "k": "Water rights",
+        "v": "No verified public record yet — unresolved"
+      },
+      {
+        "k": "Legal / referendum",
+        "v": "No verified public record yet — unresolved"
+      }
+    ],
+    "unresolved_count": 4,
+    "aliases": [
+      "BAR H RANCH INC",
+      "BAR H LAND LLC",
+      "MURRAY HOLLOW LC",
+      "BULL PASS RANCH LLC",
+      "Wonder Valley"
+    ],
+    "warn_chips": [
+      "unconfirmed — bridge record needed"
+    ],
+    "parcels_rendered": 82,
+    "adjacency_flags": 26,
+    "straddle_flags": 4,
+    "bucket_b_empty_state": true,
+    "bucket_b_recs": 0,
+    "bucket_c_recs": 114,
+    "county_wide_badges": 114,
+    "parcel_polygons_on_map": 85,
+    "parcel_caption_visible": true
+  },
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 400 ()",
+    "Failed to load resource: the server responded with a status of 400 ()"
+  ]
+}
