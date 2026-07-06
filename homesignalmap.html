@@ -1950,7 +1950,7 @@
   function renderNotices(zip){
     var catIn = "in.(" + DEV_CATEGORIES.map(function(c){ return '"'+c.replace(/"/g,'\\"')+'"'; }).join(",") + ")";
     var aSel = "title,category,agency_name,source_url,published_at,created_at,geo_scope,zip,impact_level";
-    var mSel = "title,category,agency_name,source_url,meeting_date,location,geo_scope,zip";
+    var mSel = "title,category,source_url,meeting_date,location,geo_scope,zip"; // meetings has no agency_name
     // Bucket (b): address-precise notices in THIS ZIP.
     Promise.all([
       sbFetch("alerts",   { community_id:"eq."+BOX_ELDER, category:catIn, geo_scope:"eq.address", zip:"eq."+zip, select:aSel, order:"created_at.desc" }),
