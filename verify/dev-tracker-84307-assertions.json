@@ -1,11 +1,11 @@
 {
-  "zip": "84336",
-  "url": "http://localhost:8080/homesignalmap.html?zip=84336",
-  "at": "2026-07-06T01:57:04.165Z",
+  "zip": "84307",
+  "url": "http://localhost:8080/homesignalmap.html?zip=84307",
+  "at": "2026-07-06T01:57:29.282Z",
   "assertions": {
     "anchor_visible": true,
     "title": "Stratos data center project — land assembly",
-    "straddle": "Primary in ZIP 84336 · 78 of 82 parcels here. This assembly also extends into ZIP 84307 (4 parcels there, same ownership).",
+    "straddle": "Part of a project centered in ZIP 84336 — 4 parcels in your ZIP.",
     "status_tracks": [
       {
         "k": "MIDA / county approval",
@@ -42,7 +42,7 @@
     "bucket_b_recs": 0,
     "bucket_c_recs": 117,
     "county_wide_badges": 117,
-    "parcel_polygons_on_map": 85,
+    "parcel_polygons_on_map": 97,
     "parcel_caption_visible": true
   },
   "consoleErrors": []
