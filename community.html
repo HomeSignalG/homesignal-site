@@ -198,6 +198,8 @@ body { background: #f3f4f6; font-size: 14px; }
 .empty-state p { font-size: 13px; color: var(--ts); margin-bottom: 4px; font-weight: 500; }
 .empty-state span { font-size: 12px; color: var(--tt); }
 .trunc-note { font-size: 12px; color: var(--ts); background: var(--bg); border: 1px dashed var(--border); border-radius: var(--r); padding: 8px 12px; margin-bottom: 10px; text-align: center; }
+.feed-section + .feed-section { margin-top: 20px; }
+.feed-section-head { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--tt); padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
 
 .scard { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; margin-bottom: 12px; }
 .stitle { font-size: 13px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
@@ -566,7 +568,9 @@ async function loadAlerts() {
       fetchQ(true,  'pipeline_type=eq.government_notice', PER_TIER),
       fetchQ(false, 'category=eq.emerging_technology', PER_TIER),
       fetchQ(false, 'category=eq.global_best_practices&or=(quality_grade.is.null,quality_grade.in.(BEST,MEDIUM))', PER_TIER),
-      fetchQ(true,  '', PER_TIER * 3),
+      // Local News catch-all — EXCLUDE the universal categories. They share this community's
+      // community_id, so without this they crowd the newest-N window and starve real local news.
+      fetchQ(true,  'or=(category.is.null,category.not.in.(emerging_technology,global_best_practices))', PER_TIER * 3),
       localTotalP
     ]);
     const news = recent.filter(a => alertCatId(a.pipeline_type, a.category) === 'news').slice(0, PER_TIER);
@@ -673,22 +677,17 @@ function renderAlerts(alerts, localTotal) {
   }, 0);
   const when = newest > 0 ? ' · newest ' + formatDate(new Date(newest).toISOString()) : '';
   // Emerging/Global are UNIVERSAL (fetched unscoped) — regional/global content, NOT this
-  // community's local activity. Split the count so universal filler never overstates local
-  // activity, and surface a local-empty banner when a community has ONLY universal items.
+  // community's local activity. LOCAL LEADS: render it in its own labeled section above a
+  // separate "Regional & global" section (each still newest-first). Also splits the count so
+  // universal content never overstates local activity.
   const isUniversal = a => a.category === 'emerging_technology' || a.category === 'global_best_practices';
-  const universalCount = alerts.filter(isUniversal).length;
-  const localCount = alerts.length - universalCount;
-  count.textContent = localCount + ' local alert' + (localCount === 1 ? '' : 's') +
-    (universalCount ? ' · ' + universalCount + ' regional/global' : '') + when;
-  const localEmptyBanner = (localCount === 0 && universalCount > 0)
-    ? '<div class="empty-state local-empty"><p>No local alerts yet for this community</p><span>Showing regional &amp; global updates below — local notices appear here as they’re published</span></div>'
-    : '';
-  // The feed shows only the newest few per tier. When this community has more local alerts
-  // than are shown, say so — never truncate silently (was: 297 of 337 hidden with no notice).
-  const truncNote = (typeof localTotal === 'number' && localTotal > localCount)
-    ? '<div class="trunc-note">Showing the newest ' + localCount + ' of ' + localTotal + ' local alerts</div>'
-    : '';
-  feed.innerHTML = truncNote + localEmptyBanner + alerts.map(a => {
+  const localItems = alerts.filter(a => !isUniversal(a));       // already newest-first (loadAlerts sort)
+  const universalItems = alerts.filter(isUniversal);
+  count.textContent = localItems.length + ' local alert' + (localItems.length === 1 ? '' : 's') +
+    (universalItems.length ? ' · ' + universalItems.length + ' regional/global' : '') + when;
+  const place = (typeof COMMUNITY !== 'undefined' && COMMUNITY && COMMUNITY.name) ? COMMUNITY.name : 'your area';
+  // Card markup — shared by both sections (unchanged from the single-list version).
+  const cardHtml = a => {
     const tag = getPipelineTag(a.pipeline_type, a.category);
     const icon = getIcon(a.pipeline_type, a.category);
     const badge = freshnessBadge(a);
@@ -709,7 +708,19 @@ function renderAlerts(alerts, localTotal) {
         ${link}
       </div>
     </div>`;
-  }).join('');
+  };
+  // When this community has more local alerts than shown, say so — never truncate silently.
+  const truncNote = (typeof localTotal === 'number' && localTotal > localItems.length)
+    ? '<div class="trunc-note">Showing the newest ' + localItems.length + ' of ' + localTotal + ' local alerts</div>'
+    : '';
+  const localBody = localItems.length
+    ? localItems.map(cardHtml).join('')
+    : '<div class="empty-state local-empty"><p>No local alerts yet for ' + esc(place) + '</p><span>Regional &amp; global updates are below — local notices appear here as they’re published</span></div>';
+  const localSection = '<div class="feed-section"><div class="feed-section-head">Local to ' + esc(place) + '</div>' + truncNote + localBody + '</div>';
+  const universalSection = universalItems.length
+    ? '<div class="feed-section"><div class="feed-section-head">Regional &amp; global</div>' + universalItems.map(cardHtml).join('') + '</div>'
+    : '';
+  feed.innerHTML = localSection + universalSection;
   setupAlertTracking(feed);
 }
 
