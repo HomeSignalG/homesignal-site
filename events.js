@@ -18,22 +18,26 @@
   // than confirm-it-exists. Durable across reloads; every access is wrapped so the
   // accounting can never itself throw or block a log call.
   var DROP_KEY = 'hs_evt_drops';
-  var drops = { client_not_ready: 0, insert_error: 0, exception: 0, total: 0, since: null };
+  // total    = drops counted on this browser (all paths, all time).
+  // reported = of those, how many have already been flushed onto a successful
+  //            insert via events.dropped_before. (total - reported) = still-pending.
+  var drops = { client_not_ready: 0, insert_error: 0, exception: 0, total: 0, reported: 0, since: null };
   try {
     var saved = JSON.parse(localStorage.getItem(DROP_KEY) || 'null');
     if (saved && typeof saved === 'object') {
-      ['client_not_ready', 'insert_error', 'exception', 'total'].forEach(function (k) {
+      ['client_not_ready', 'insert_error', 'exception', 'total', 'reported'].forEach(function (k) {
         if (typeof saved[k] === 'number') drops[k] = saved[k];
       });
       drops.since = saved.since || null;
     }
   } catch (e) {}
+  function saveDrops() { try { localStorage.setItem(DROP_KEY, JSON.stringify(drops)); } catch (e) {} }
   function bumpDrop(path) {
     try {
       if (!drops.since) drops.since = new Date().toISOString();
       drops[path] = (drops[path] || 0) + 1;
       drops.total += 1;
-      try { localStorage.setItem(DROP_KEY, JSON.stringify(drops)); } catch (e) {}
+      saveDrops();
     } catch (e) { /* accounting must never break logging */ }
   }
   // Queryable surface — returns a snapshot copy so a caller can't mutate the tally.
@@ -85,12 +89,23 @@
         alert_id: (payload && payload.alert_id) || null,
         zip_code: currentZip(payload)
       };
+      // Flush this browser's still-pending silent-drop count onto the row, so the
+      // undercount is queryable server-side in events.dropped_before (0 = measured
+      // no-drops; N = N flushed). Advance `reported` optimistically so concurrent
+      // inserts don't double-report; roll it back if THIS insert fails so the count
+      // rides the next successful row instead of being lost.
+      var pending = Math.max(0, drops.total - drops.reported);
+      row.dropped_before = pending;
+      if (pending) { drops.reported += pending; saveDrops(); }
       var q = c.from('events').insert([row]);
       // insert() RESOLVES with {error} on RLS/constraint/4xx and only REJECTS on a
-      // network failure — count both, so neither kind of failure is silent.
+      // network failure — treat both as a failed insert.
+      function onInsertFail() {
+        if (pending) { drops.reported -= pending; saveDrops(); } // un-report so it re-flushes
+        bumpDrop('insert_error');
+      }
       if (q && typeof q.then === 'function') {
-        q.then(function (r) { if (r && r.error) bumpDrop('insert_error'); },
-               function () { bumpDrop('insert_error'); });
+        q.then(function (r) { if (r && r.error) onInsertFail(); }, onInsertFail);
       }
     } catch (e) { bumpDrop('exception'); } // sync throw building/sending the row -> counted drop
   };
