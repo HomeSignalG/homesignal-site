@@ -262,6 +262,47 @@
   .mapkey span.off .t{text-decoration:line-through}
   .mapkey i{width:11px;height:11px;border-radius:50%;flex:0 0 auto;
     border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+
+  /* ===== Development-tracker: resolved-project anchor (a) + ZIP/county notices (b/c) =====
+     The resolved-project data is a verified public-record anchor. Every honesty label the
+     store carries (zip_basis, off_target_zip straddle, unresolved status tracks, unconfirmed
+     bridges) renders here verbatim — never flattened, never faked. */
+  .devtracker{margin-top:22px}
+  .dt-anchor{margin-bottom:16px}
+  .dt-hd{font-weight:700;font-size:16px;color:#fff;background:#4b3f8f;
+    margin:-18px -18px 0;padding:12px 18px;border-radius:16px 16px 0 0}
+  .dt-sub{font-size:12.5px;color:var(--mute);margin:10px 0 2px}
+  .dt-title{font-weight:700;font-size:17px;color:var(--ink);margin-top:12px}
+  .dt-straddle{font-size:13px;color:var(--soft);margin:5px 0 4px;line-height:1.5}
+  .dt-lbl{font-weight:700;font-size:11.5px;color:var(--soft);text-transform:uppercase;
+    letter-spacing:.04em;margin:18px 0 4px}
+  .dt-lbl-note{font-weight:400;text-transform:none;letter-spacing:0;color:var(--mute)}
+  .dt-track{display:flex;justify-content:space-between;gap:12px;align-items:baseline;
+    padding:9px 0;border-top:1px solid var(--line);font-size:13px}
+  .dt-track .k{font-weight:600;color:var(--ink)}
+  .dt-track .v{text-align:right}
+  .dt-unresolved{color:var(--mute);font-style:italic}
+  .dt-alias{padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+  .dt-alias .nm{font-weight:600;color:var(--ink)}
+  .dt-alias .src{color:var(--mute);font-size:11.5px;margin-top:2px}
+  .dt-alias .src a{color:var(--green)}
+  .dt-chip{display:inline-block;font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:6px;
+    background:#e6f4ec;color:#1f5130;margin-left:7px;vertical-align:middle}
+  .dt-chip.warn{background:#fdf0e6;color:#a85a1f}
+  .dt-roster{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:10px;
+    padding:2px 12px;margin-top:6px}
+  .dt-parcel{padding:9px 0;border-top:1px solid var(--line);font-size:13px}
+  .dt-parcel:first-child{border-top:none}
+  .dt-parcel .own{font-weight:600;color:var(--ink)}
+  .dt-parcel .meta{color:var(--soft);font-size:12px;margin-top:1px}
+  .dt-parcel .meta a{color:var(--green)}
+  .dt-flag{display:block;color:#a85a1f;font-size:11.5px;margin-top:3px;line-height:1.45}
+  .dt-badge{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 8px;border-radius:6px;
+    background:#eef2f7;color:#3b5566;margin-right:8px;letter-spacing:.02em;flex:0 0 auto}
+  .dt-count{font-size:12px;color:var(--mute);margin:2px 0 8px}
+  .mapcaption{font-size:12px;color:var(--soft);margin-top:8px;line-height:1.5}
+  .mapcaption .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:middle;
+    margin:0 3px 0 9px;border:1px solid rgba(0,0,0,.15)}
 </style>
 </head>
 <body>
@@ -365,6 +406,8 @@
                items yet, so "0 planning items" doesn't read as "nothing is happening" when the real
                reason is that the county's planning feed isn't wired on the ingest side yet. -->
           <div class="covnote" id="covNote" style="display:none"></div>
+          <!-- Parcel-overlay caption: shown only when a resolved-project footprint is drawn on the map. -->
+          <div class="mapcaption" id="parcelCaption" style="display:none"></div>
         </div>
       </div>
 
@@ -383,6 +426,35 @@
           <div class="band-h t-proposed">Proposed</div>
           <div class="band-s">Hearings and notices you can still weigh in on</div>
           <div id="propList"></div>
+        </div>
+      </div>
+
+      <!-- ===== Development tracker: resolved-project anchor (a) + ZIP/county notices (b/c) =====
+           Data comes verbatim from the homesignal-ingest resolved store (v_resolved_project_zip,
+           v_resolved_project_parcels, resolved_projects) + geocoded alerts/meetings. Rendered by
+           loadDevTracker(). Each sub-block hides itself when it has no real data (honest empty),
+           never fills with placeholder. -->
+      <div class="devtracker" id="devTracker" style="display:none">
+        <div class="card read dt-anchor" id="dtAnchor" style="display:none">
+          <div class="dt-hd">Tracked project in this area</div>
+          <div class="dt-sub">A verified land-assembly anchor built from Box Elder County public
+            parcel records. Every parcel below is tied to its owner of record; honesty labels are
+            shown exactly as the record store carries them.</div>
+          <div id="dtAnchorBody"></div>
+        </div>
+
+        <div class="grid band" id="dtNotices" style="display:none">
+          <div class="card read">
+            <div class="band-h" style="background:#0f766e">Notices in your ZIP</div>
+            <div class="band-s" id="dtBucketBSub">Filed with a specific address in this ZIP</div>
+            <div id="dtBucketB"><div class="empty">Loading…</div></div>
+          </div>
+          <div class="card read">
+            <div class="band-h" style="background:#3b5566">County-wide notices</div>
+            <div class="band-s">Apply across Box Elder County — not specific to your ZIP.
+              Shown here, clearly labeled, never hidden.</div>
+            <div id="dtBucketC"><div class="empty">Loading…</div></div>
+          </div>
         </div>
       </div>
 
@@ -598,6 +670,15 @@
                       logistics:"Logistics", residential:"Residential" };
 
   var map, layerGroup;
+  // ===== Development-tracker (resolved-project anchor + ZIP/county notices) state =====
+  // The anchor + notices load on a SEPARATE async path from the EPA/planning report, so they
+  // render even on a ZIP with no cached development_reports row. parcelLayer holds the resolved
+  // parcel polygons; RESOLVED_PARCELS is cached so drawParcels() can (re)draw once the map exists.
+  var parcelLayer = null, RESOLVED_PARCELS = null;
+  var BOX_ELDER = 'd67c558f-1f04-4811-a565-873ae2afd6f3';
+  var DEV_CATEGORIES = ['Planning, zoning & development',
+                        'Stratos data center project',
+                        'County Commission & county business'];
   var $ = function(id){ return document.getElementById(id); };
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   function status(msg, isErr){ var el=$("status"); el.textContent=msg||""; el.className="status"+(isErr?" err":""); }
@@ -894,6 +975,9 @@
     });
     applyFilter();
     if(bounds.length>1){ map.fitBounds(bounds, { padding:[30,30], maxZoom:14 }); }
+    // If the resolved-project parcels have already loaded, draw them onto this same map (and let
+    // their footprint re-frame the view — the parcel geometry is the point of the ZIP-precise page).
+    drawParcels();
   }
 
   // Show only the buckets whose legend chip is on.
@@ -1722,6 +1806,248 @@
     setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
 
+  // ===================== Development tracker (resolved anchor + notices) =====================
+  // Reads the homesignal-ingest resolved store + geocoded notices via the anon/publishable key
+  // (same key + host the ZIP report already uses). Read-only. Every sub-block renders only from
+  // real rows; if a source returns nothing, that block shows its honest empty/unresolved state
+  // and is never filled with placeholder data.
+  function sbFetch(path, params){
+    var u = new URL(SUPABASE_URL + "/rest/v1/" + path);
+    Object.keys(params).forEach(function(k){ u.searchParams.set(k, params[k]); });
+    return fetch(u.toString(), { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } })
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .catch(function(){ return []; });
+  }
+
+  // A government status track: NULL/empty → honest "unresolved" (never fabricated). A populated
+  // jsonb track shows its status + record link. Currently every track is NULL (unresolved).
+  function renderTrack(v){
+    if(v==null || (typeof v==="object" && !Array.isArray(v) && Object.keys(v).length===0))
+      return "<span class='dt-unresolved'>No verified public record yet — unresolved</span>";
+    var st = (v && (v.status||v.state||v.decision)) || "";
+    var url = (v && (v.source_url||v.url)) || "";
+    var txt = st ? esc(String(st)) : esc(JSON.stringify(v));
+    if(url) txt += " · <a href='"+esc(url)+"' target='_blank' rel='noopener'>record ▸</a>";
+    return txt;
+  }
+
+  function renderAnchor(zr, parent, parcels, zip){
+    var total = zr.parcels_in_anchor_total, inZipN = zr.parcels_in_this_zip;
+    var others = zr.other_zips || [];
+    var straddle;
+    if(zr.is_primary_zip){
+      straddle = "Primary in ZIP " + esc(zip) + " · " + inZipN + " of " + total + " parcels here.";
+      if(others.length){ straddle += " This assembly also extends into ZIP " + esc(others.join(", ")) +
+        " (" + (total-inZipN) + " parcel" + ((total-inZipN)===1?"":"s") + " there, same ownership)."; }
+    } else {
+      straddle = "Part of a project centered in ZIP " + esc(zr.primary_zip||"") + " — " + inZipN +
+        " parcel" + (inZipN===1?"":"s") + " in your ZIP.";
+    }
+    var h = "";
+    h += "<div class='dt-title'>Stratos data center project — land assembly</div>";
+    h += "<div class='dt-straddle'>" + straddle + "</div>";
+
+    // Government status tracks — NULL renders as "unresolved", never invented.
+    h += "<div class='dt-lbl'>Government status <span class='dt-lbl-note'>— a track with no verified " +
+         "record shows “unresolved”</span></div>";
+    [["mida_county","MIDA / county approval"],["deq_air_permit","DEQ air permit"],
+     ["water_rights","Water rights"],["legal_referendum","Legal / referendum"]].forEach(function(t){
+      h += "<div class='dt-track'><span class='k'>" + t[1] + "</span><span class='v'>" +
+           renderTrack(parent ? parent[t[0]] : null) + "</span></div>";
+    });
+
+    // Landowner entities of record — verbatim owner strings, never merged.
+    var aliases = (parent && parent.aliases) || [];
+    if(aliases.length){
+      h += "<div class='dt-lbl'>Landowner entities of record <span class='dt-lbl-note'>— from Box " +
+           "Elder County tax parcels, verbatim</span></div>";
+      aliases.forEach(function(a){
+        var verified = (a.confidence==="verified" || a.status==="confirmed");
+        var chip = verified ? "<span class='dt-chip'>verified</span>"
+                 : (a.status ? "<span class='dt-chip warn'>"+esc(a.status)+"</span>" : "");
+        var src = [a.source_document, a.date].filter(Boolean).map(esc).join(" · ");
+        var link = a.source_url ? " · <a href='"+esc(a.source_url)+"' target='_blank' rel='noopener'>source ▸</a>" : "";
+        h += "<div class='dt-alias'><span class='nm'>" + esc(a.name) + "</span>" + chip +
+             ((src||link) ? "<div class='src'>"+src+link+"</div>" : "") + "</div>";
+      });
+    }
+
+    // Unconfirmed entities — named but not yet tied to a parcel; needs a bridge record.
+    var unconf = (parent && parent.unconfirmed) || [];
+    if(unconf.length){
+      h += "<div class='dt-lbl'>Unconfirmed <span class='dt-lbl-note'>— named but not yet tied to a " +
+           "parcel; needs a bridge record</span></div>";
+      unconf.forEach(function(u){
+        h += "<div class='dt-alias'><span class='nm'>" + esc(u.entity_name||"") + "</span>" +
+             "<span class='dt-chip warn'>unconfirmed — bridge record needed</span>" +
+             (u.bridge_record_needed ? "<div class='src'>"+esc(u.bridge_record_needed)+"</div>" : "") + "</div>";
+      });
+    }
+
+    // Parcel roster — ALL parcels; per-parcel honesty labels; nothing dropped.
+    var inZip = parcels.filter(function(p){ return !p.off_target_zip && String(p.zip)===String(zip); });
+    var straddleP = parcels.filter(function(p){ return p.off_target_zip || String(p.zip)!==String(zip); });
+    function parcelRow(p){
+      var meta = [];
+      if(p.acres) meta.push(esc(p.acres) + " acres");
+      if(p.apn) meta.push("APN " + esc(p.apn));
+      var metaStr = meta.join(" · ");
+      if(p.erecord_url) metaStr += " · <a href='"+esc(p.erecord_url)+"' target='_blank' rel='noopener'>parcel record ▸</a>";
+      var flags = "";
+      if(p.zip_basis==="adjacency-ZCTA-gap") flags += "<span class='dt-flag'>ZIP by adjacency (not direct geometry)</span>";
+      if(p.off_target_zip && p.note) flags += "<span class='dt-flag'>" + esc(p.note) + "</span>";
+      else if(p.off_target_zip) flags += "<span class='dt-flag'>Straddle: physically in ZIP " + esc(p.zip) +
+        ", kept in the assembly by common ownership.</span>";
+      return "<div class='dt-parcel'><div class='own'>" + esc(p.owner_of_record||"—") + "</div>" +
+             "<div class='meta'>" + metaStr + "</div>" + flags + "</div>";
+    }
+    h += "<div class='dt-lbl'>Parcels of record</div>";
+    h += "<div class='dt-count'>" + parcels.length + " parcels total · " + inZip.length + " in ZIP " + esc(zip) +
+         (straddleP.length ? " · " + straddleP.length + " straddle (neighboring ZIP, same ownership)" : "") + "</div>";
+    h += "<div class='dt-roster'>";
+    inZip.forEach(function(p){ h += parcelRow(p); });
+    if(straddleP.length){
+      h += "<div class='dt-lbl' style='margin-top:14px'>Straddle parcels — ZIP " +
+           esc((straddleP[0] && straddleP[0].zip) || "") + "</div>";
+      straddleP.forEach(function(p){ h += parcelRow(p); });
+    }
+    h += "</div>";
+    $("dtAnchorBody").innerHTML = h;
+  }
+
+  function renderNoticeList(elId, alerts, meetings, zip, countywide){
+    var el = $(elId); alerts = alerts||[]; meetings = meetings||[];
+    var total = alerts.length + meetings.length;
+    if(!total){
+      el.innerHTML = countywide
+        ? "<div class='empty'>No county-wide development notices on record right now.</div>"
+        : "<div class='empty'>No address-specific development notices filed in ZIP " + esc(zip) + " yet. " +
+          "For a rural ZIP this is expected — the county-wide items are listed alongside.</div>";
+      return;
+    }
+    var badge = countywide ? "<span class='dt-badge'>County-wide</span>" : "";
+    var body = "";
+    meetings.forEach(function(m){
+      var when = m.meeting_date ? " · " + fmtDate(m.meeting_date) : "";
+      var link = m.source_url ? " · <a href='"+esc(m.source_url)+"' target='_blank' rel='noopener'>record ▸</a>" : "";
+      body += "<div class='rec'><span class='dot' style='background:#0f766e'></span><div style='flex:1'>" +
+        "<div class='t'>" + badge + esc(m.title||"Untitled meeting") + "</div>" +
+        "<div class='s'>" + esc(m.category||"") + when + (m.agency_name?" · "+esc(m.agency_name):"") +
+        (m.location?" · "+esc(m.location):"") + link + "</div></div></div>";
+    });
+    alerts.forEach(function(a){
+      var when = (a.published_at||a.created_at) ? " · " + fmtDate(a.published_at||a.created_at) : "";
+      var link = a.source_url ? " · <a href='"+esc(a.source_url)+"' target='_blank' rel='noopener'>record ▸</a>" : "";
+      body += "<div class='rec'><span class='dot' style='background:#3b5566'></span><div style='flex:1'>" +
+        "<div class='t'>" + badge + esc(a.title||"Untitled notice") + "</div>" +
+        "<div class='s'>" + esc(a.category||"") + when + (a.agency_name?" · "+esc(a.agency_name):"") +
+        link + "</div></div></div>";
+    });
+    el.innerHTML = "<div class='dt-count'>" + total + " notice" + (total===1?"":"s") + "</div>" +
+                   "<div class='dt-roster'>" + body + "</div>";
+  }
+
+  function renderNotices(zip){
+    var catIn = "in.(" + DEV_CATEGORIES.map(function(c){ return '"'+c.replace(/"/g,'\\"')+'"'; }).join(",") + ")";
+    var aSel = "title,category,agency_name,source_url,published_at,created_at,geo_scope,zip,impact_level";
+    var mSel = "title,category,agency_name,source_url,meeting_date,location,geo_scope,zip";
+    // Bucket (b): address-precise notices in THIS ZIP.
+    Promise.all([
+      sbFetch("alerts",   { community_id:"eq."+BOX_ELDER, category:catIn, geo_scope:"eq.address", zip:"eq."+zip, select:aSel, order:"created_at.desc" }),
+      sbFetch("meetings", { community_id:"eq."+BOX_ELDER, category:catIn, geo_scope:"eq.address", zip:"eq."+zip, select:mSel, order:"meeting_date.asc" })
+    ]).then(function(r){ renderNoticeList("dtBucketB", r[0], r[1], zip, false); });
+    // Bucket (c): county-wide notices (geo_scope countywide OR null) — cascade, labeled, never hidden.
+    Promise.all([
+      sbFetch("alerts",   { community_id:"eq."+BOX_ELDER, category:catIn, or:"(geo_scope.eq.countywide,geo_scope.is.null)", select:aSel, order:"created_at.desc" }),
+      sbFetch("meetings", { community_id:"eq."+BOX_ELDER, category:catIn, or:"(geo_scope.eq.countywide,geo_scope.is.null)", select:mSel, order:"meeting_date.asc" })
+    ]).then(function(r){ renderNoticeList("dtBucketC", r[0], r[1], zip, true); });
+  }
+
+  // Create the Leaflet map for the parcel footprint when the ZIP has no cached development_reports
+  // row (so drawMap never ran). Mirrors drawMap's base-map setup.
+  function ensureParcelMap(lat, lng){
+    if(map) return;
+    map = L.map("mapInner", { scrollWheelZoom:false }).setView([lat, lng], 12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      { maxZoom:19, attribution:"&copy; OpenStreetMap" }).addTo(map);
+    layerGroup = L.layerGroup().addTo(map);
+    $("results").style.display = "block";
+  }
+
+  // Draw the resolved parcel polygons (real county geometry) on the map. Idempotent. In-ZIP parcels
+  // are solid violet; straddle parcels (off_target_zip) are a dashed orange outline — styled
+  // distinctly, exactly as the store flags them. Fits the map to the whole footprint.
+  function drawParcels(){
+    if(!RESOLVED_PARCELS || !RESOLVED_PARCELS.length) return;
+    if(!map){
+      var la=0, ln=0, n=0;
+      RESOLVED_PARCELS.forEach(function(p){
+        if(p.centroid_lat!=null && p.centroid_lng!=null){ la+=+p.centroid_lat; ln+=+p.centroid_lng; n++; }
+      });
+      if(!n) return;
+      ensureParcelMap(la/n, ln/n);
+    }
+    if(parcelLayer){ map.removeLayer(parcelLayer); parcelLayer = null; }
+    parcelLayer = L.layerGroup().addTo(map);
+    var drawn = [];
+    RESOLVED_PARCELS.forEach(function(p){
+      if(!p.geom_geojson) return;
+      var geom; try{ geom = JSON.parse(p.geom_geojson); }catch(e){ return; }
+      var straddle = !!p.off_target_zip;
+      var style = straddle
+        ? { color:"#E2772F", weight:1.5, opacity:.95, fillColor:"#E2772F", fillOpacity:.16, dashArray:"5 4" }
+        : { color:"#4b3f8f", weight:1.2, opacity:.95, fillColor:"#6d5fc0", fillOpacity:.20 };
+      var gj = L.geoJSON({ type:"Feature", geometry:geom, properties:{} }, { style:style });
+      var pop = "<div class='pt'>" + esc(p.owner_of_record||"") + "</div>" +
+        "<div class='pk'>APN " + esc(p.apn||"") + (p.acres ? " · "+esc(p.acres)+" acres" : "") + "</div>" +
+        (straddle ? "<div style='margin-top:4px;color:#a85a1f'>Straddle — in ZIP "+esc(p.zip||"")+", same ownership</div>" : "") +
+        (p.zip_basis==="adjacency-ZCTA-gap" ? "<div style='margin-top:4px;color:#a85a1f'>ZIP by adjacency (not direct geometry)</div>" : "");
+      gj.bindPopup(pop);
+      gj.addTo(parcelLayer);
+      drawn.push(gj);
+    });
+    try{
+      var b = L.featureGroup(drawn).getBounds();
+      if(b && b.isValid()){ map.fitBounds(b, { padding:[30,30], maxZoom:13 }); }
+    }catch(e){}
+    var cap = $("parcelCaption");
+    if(cap){
+      cap.innerHTML = "Outlined above are the " + RESOLVED_PARCELS.length + " parcels of record in this " +
+        "land assembly (real Box Elder County parcel geometry)." +
+        "<span class='sw' style='background:#6d5fc0'></span>in-ZIP parcel" +
+        "<span class='sw' style='background:#E2772F'></span>straddle (same ownership, neighboring ZIP)";
+      cap.style.display = "";
+    }
+  }
+
+  function loadDevTracker(zip){
+    // (a) resolved-project anchor for this ZIP.
+    sbFetch("v_resolved_project_zip", { zip:"eq."+zip, select:"*" }).then(function(zrows){
+      if(!zrows || !zrows.length) return; // no resolved project here → anchor stays hidden (honest empty)
+      var zr = zrows[0];
+      Promise.all([
+        sbFetch("resolved_projects", { project_key:"eq."+zr.project_key,
+          select:"project_key,aliases,unconfirmed,not_drawn,mida_county,deq_air_permit,water_rights,legal_referendum,last_resolved_at" }),
+        sbFetch("v_resolved_project_parcels", { project_key:"eq."+zr.project_key, in_anchor:"eq.true",
+          select:"apn,parcel_num,landowner_label,owner_of_record,acres,zip,zip_basis,off_target_zip,note,account,erecord_url,centroid_lat,centroid_lng,geom_geojson",
+          order:"acres.desc.nullslast" })
+      ]).then(function(res){
+        var parent = (res[0] && res[0][0]) || null;
+        RESOLVED_PARCELS = res[1] || [];
+        renderAnchor(zr, parent, RESOLVED_PARCELS, zip);
+        $("dtAnchor").style.display = ""; $("devTracker").style.display = "";
+        drawParcels();
+      });
+    });
+    // (b)/(c) notices — only for a Box Elder ZIP (the county whose notices cascade onto this page).
+    sbFetch("communities", { zip_codes:"cs.{"+zip+"}", select:"county" }).then(function(crows){
+      var isBE = (crows||[]).some(function(r){ return (r.county||"").toLowerCase()==="box elder"; });
+      if(!isBE) return; // outside Box Elder → county notices don't apply here
+      renderNotices(zip);
+      $("dtNotices").style.display = ""; $("devTracker").style.display = "";
+    });
+  }
+
   // ===================== ZIP-mode boot (the crawlable landing surface) =====================
   // ?addr=<canonical> → property page; ?zip=<zip> or /development/<zip> → cached ZIP report.
   (function boot(){
@@ -1730,7 +2056,7 @@
     if(a && a.trim()){ loadProperty(a.trim()); return; }
     var z = u.searchParams.get("zip");
     if(!z){ var m = u.pathname.match(/\/development\/(\d{5})\b/); if(m) z = m[1]; }
-    if(z && /^\d{5}$/.test(z)){ loadZip(z); }
+    if(z && /^\d{5}$/.test(z)){ loadZip(z); loadDevTracker(z); }
   })();
 </script>
 <script>

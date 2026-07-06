@@ -1,0 +1,64 @@
+name: Verify dev-tracker 84336 render
+
+# Faithful, live render check of the 84336 development page (buckets a/b/c). Runs on the runner
+# (open egress): serves the static site, loads homesignalmap.html?zip=84336 against LIVE Supabase +
+# real OSM tiles via headless Chromium, screenshots the rendered page, and prints a structured
+# assertion of every honesty label. Commits the screenshot + assertions back to the branch (with
+# [skip ci] to avoid a loop) so they can be reviewed on the PR.
+on:
+  push:
+    branches: [claude/dev-tracker-zip-scope]
+    paths:
+      - homesignalmap.html
+      - verify/dev-tracker-verify.mjs
+      - .github/workflows/verify-dev-tracker.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: verify-dev-tracker
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install Playwright + Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i -D playwright@1.47.2
+          npx playwright install --with-deps chromium
+      - name: Serve site
+        run: |
+          python3 -m http.server 8080 >/tmp/http.log 2>&1 &
+          sleep 2
+      - name: Render + assert
+        env:
+          VERIFY_URL: http://localhost:8080/homesignalmap.html?zip=84336
+        run: node verify/dev-tracker-verify.mjs
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-tracker-84336-render
+          path: |
+            verify/dev-tracker-84336.png
+            verify/dev-tracker-84336-assertions.json
+      - name: Commit screenshot + assertions to branch
+        if: always()
+        run: |
+          git config user.name "verify-bot"
+          git config user.email "verify-bot@users.noreply.github.com"
+          git add verify/dev-tracker-84336.png verify/dev-tracker-84336-assertions.json || true
+          if git diff --cached --quiet; then
+            echo "No render output changes to commit."
+          else
+            git commit -m "verify: 84336 dev-tracker rendered screenshot + assertions [skip ci]"
+            git push origin HEAD:claude/dev-tracker-zip-scope
+          fi
