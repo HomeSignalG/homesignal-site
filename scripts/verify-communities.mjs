@@ -131,6 +131,30 @@ async function main() {
         // gov=0 is VALID (empty government tile until feeds exist) — report, don't fail.
         console.log(`  ✓ ${zip} → ${want.name} (${want.level}) · gov ${st.gov} · universal ${st.universal}`);
       }
+      // Local-first baseline guard (zero-touch, applies to every ZIP that renders sections):
+      //   1. the "Local to <place>" section must render ABOVE "Regional & global";
+      //   2. the Local section must NOT contain universal cards (data-cat emerging/global) —
+      //      i.e. the news catch-all de-dilution is holding.
+      // Best-effort: if the feed hasn't rendered sections (slow/empty page), skip — only a real
+      // wrong-ordering or a leaked universal card fails the run.
+      const feed = await page.evaluate(() => {
+        const f = document.getElementById('alert-feed');
+        if (!f) return null;
+        const secs = [...f.querySelectorAll('.feed-section .feed-section-head')].map(h => h.textContent.trim());
+        const localIdx = secs.findIndex(t => /^Local to /.test(t));
+        const globalIdx = secs.findIndex(t => /^Regional & global/.test(t));
+        const localSec = [...f.querySelectorAll('.feed-section')]
+          .find(s => /^Local to /.test((s.querySelector('.feed-section-head') || {}).textContent || ''));
+        const localHasUniversal = localSec
+          ? !!localSec.querySelector('.alert-card[data-cat="emerging"], .alert-card[data-cat="global"]') : false;
+        return { localIdx, globalIdx, localHasUniversal };
+      });
+      if (feed && feed.localIdx > -1 && feed.globalIdx > -1 && feed.localIdx > feed.globalIdx) {
+        fails.push(`ZIP ${zip} (${want.name}): "Regional & global" rendered ABOVE "Local to …" (local-first broken)`);
+      }
+      if (feed && feed.localHasUniversal) {
+        fails.push(`ZIP ${zip} (${want.name}): universal (emerging/global) card inside the Local section (news de-dilution broken)`);
+      }
     } catch (e) {
       fails.push(`ZIP ${zip} (${want.name}): ${e.message.split('\n')[0]}`);
     }
