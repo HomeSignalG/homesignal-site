@@ -187,6 +187,7 @@ body { background: #f3f4f6; font-size: 14px; }
 .bn { background: var(--gl); color: var(--gd); }
 .bw { background: #fef3c7; color: #92400e; }
 .bi { background: #dbeafe; color: #1e40af; }
+.bs { background: var(--bg); color: var(--tt); text-transform: none; border: 1px solid var(--border); }
 .aactions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .abtn { padding: 5px 11px; border-radius: var(--rs); font-size: 11px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg2); color: var(--ts); }
 .abtn-c { border-color: var(--gm); color: var(--gd); background: var(--gl); }
@@ -196,6 +197,7 @@ body { background: #f3f4f6; font-size: 14px; }
 .empty-state { text-align: center; padding: 40px 20px; border: 1px dashed var(--border); border-radius: var(--r); background: var(--bg); }
 .empty-state p { font-size: 13px; color: var(--ts); margin-bottom: 4px; font-weight: 500; }
 .empty-state span { font-size: 12px; color: var(--tt); }
+.trunc-note { font-size: 12px; color: var(--ts); background: var(--bg); border: 1px dashed var(--border); border-radius: var(--r); padding: 8px 12px; margin-bottom: 10px; text-align: center; }
 
 .scard { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; margin-bottom: 12px; }
 .stitle { font-size: 13px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
@@ -543,18 +545,29 @@ async function loadAlerts() {
     parts.push('order=created_at.desc', `limit=${lim}`);
     return `${SUPABASE_URL}/rest/v1/alerts?${parts.join('&')}`;
   };
+  // Track whether any tier actually FAILED (network error or non-OK response). A failed
+  // tier returns [] like an empty one, so without this flag an outage is indistinguishable
+  // from "no alerts" and both render the empty state — masking backend failures as "nothing here".
+  let anyFail = false;
   const fetchQ = (scoped, filter, lim) =>
     fetch(q(scoped, filter, lim), { headers })
-      .then(r => r.ok ? r.json() : [])
-      .catch(() => []);
+      .then(r => { if (!r.ok) { anyFail = true; return []; } return r.json(); })
+      .catch(() => { anyFail = true; return []; });
   try {
     // Government (scoped) + Emerging/Global (universal, unscoped) each query their own
     // tier; News is the community-scoped catch-all (newest not in those three tiers).
-    const [gov, emerging, global, recent] = await Promise.all([
+    // Also ask for the TRUE total of this community's local alerts (count only, 1 row) so we
+    // can tell the reader when the newest-N view is truncated instead of hiding the rest silently.
+    const localTotalP = fetch(`${SUPABASE_URL}/rest/v1/alerts?community_id=eq.${CONTENT_ID}&select=id`,
+      { headers: Object.assign({}, headers, { 'Prefer': 'count=exact', 'Range-Unit': 'items', 'Range': '0-0' }) })
+      .then(r => { const m = (r.headers.get('content-range') || '').match(/\/(\d+)$/); return m ? parseInt(m[1], 10) : null; })
+      .catch(() => null);
+    const [gov, emerging, global, recent, localTotal] = await Promise.all([
       fetchQ(true,  'pipeline_type=eq.government_notice', PER_TIER),
       fetchQ(false, 'category=eq.emerging_technology', PER_TIER),
       fetchQ(false, 'category=eq.global_best_practices&or=(quality_grade.is.null,quality_grade.in.(BEST,MEDIUM))', PER_TIER),
-      fetchQ(true,  '', PER_TIER * 3)
+      fetchQ(true,  '', PER_TIER * 3),
+      localTotalP
     ]);
     const news = recent.filter(a => alertCatId(a.pipeline_type, a.category) === 'news').slice(0, PER_TIER);
     // Merge the tiers, de-dupe by id, newest first.
@@ -571,10 +584,12 @@ async function loadAlerts() {
     const scoped = (IS_TOWN && COMMUNITY && COMMUNITY.allowedGov)
       ? alerts.filter(a => a.pipeline_type !== 'government_notice' || COMMUNITY.allowedGov[a.category])
       : alerts;
-    renderAlerts(scoped);
+    // If we have nothing to show AND at least one tier failed, this is an ERROR, not a genuine
+    // empty community — surface it distinctly so an outage never masquerades as "no alerts".
+    if (scoped.length === 0 && anyFail) { renderAlertsError(); return; }
+    renderAlerts(scoped, localTotal);
   } catch (err) {
-    document.getElementById('alert-feed').innerHTML = '<div class="empty-state"><p>Could not load alerts</p><span>Check your connection and try again</span></div>';
-    document.getElementById('feed-count').textContent = '0 alerts';
+    renderAlertsError();
   }
 }
 
@@ -597,13 +612,51 @@ function getBadge(level) {
   return map[level] || '<span class="abadge bi">New</span>';
 }
 
+// Freshness is DERIVED from the item's real date, not from the static impact_level
+// (which the engine stamps 'new' on ~all rows). Whole days since published/created.
+const NEW_MAX_DAYS = 7; // matches the ingest news-recency window
+function daysSince(str) {
+  if (!str) return null;
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return null;
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+}
+function relAge(days) {
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 7) return days + ' days ago';
+  if (days < 14) return 'last week';
+  if (days < 60) return Math.round(days / 7) + ' weeks ago';
+  if (days < 365) return Math.round(days / 30) + ' months ago';
+  return Math.max(1, Math.round(days / 365)) + ' year' + (days < 550 ? '' : 's') + ' ago';
+}
+// 'New' only inside the freshness window; older items relabel to their real age.
+// An explicit engine priority state (urgent/watch/resolved) still wins if ever set.
+function freshnessBadge(a) {
+  const lvl = a.impact_level;
+  if (lvl === 'urgent') return '<span class="abadge bu">Urgent</span>';
+  if (lvl === 'watch') return '<span class="abadge bw">Watch</span>';
+  if (lvl === 'resolved') return '<span class="abadge bn">Resolved</span>';
+  const days = daysSince(a.published_at || a.created_at);
+  if (days === null) return '';
+  if (days <= NEW_MAX_DAYS) return '<span class="abadge bi">New</span>';
+  return '<span class="abadge bs">' + relAge(days) + '</span>';
+}
+
 function formatDate(str) {
   if (!str) return '';
   const d = new Date(str);
   return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
 }
 
-function renderAlerts(alerts) {
+// Distinct ERROR state — reachable only when a fetch/tier actually failed (see loadAlerts).
+// Kept visually separate from the "No alerts yet" empty state so an outage is never silent.
+function renderAlertsError() {
+  document.getElementById('alert-feed').innerHTML = '<div class="empty-state feed-error"><p>Couldn’t load alerts</p><span>Check your connection and try again</span></div>';
+  document.getElementById('feed-count').textContent = 'Couldn’t load alerts';
+}
+
+function renderAlerts(alerts, localTotal) {
   const feed = document.getElementById('alert-feed');
   const count = document.getElementById('feed-count');
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -613,17 +666,38 @@ function renderAlerts(alerts) {
     count.textContent = '0 alerts';
     return;
   }
-  count.textContent = alerts.length + ' alert' + (alerts.length === 1 ? '' : 's') + ' · updated today';
-  feed.innerHTML = alerts.map(a => {
+  // Header reflects the REAL newest item's date, not a hardcoded "updated today".
+  const newest = alerts.reduce((m, a) => {
+    const d = new Date(a.published_at || a.created_at);
+    return (!isNaN(d.getTime()) && d.getTime() > m) ? d.getTime() : m;
+  }, 0);
+  const when = newest > 0 ? ' · newest ' + formatDate(new Date(newest).toISOString()) : '';
+  // Emerging/Global are UNIVERSAL (fetched unscoped) — regional/global content, NOT this
+  // community's local activity. Split the count so universal filler never overstates local
+  // activity, and surface a local-empty banner when a community has ONLY universal items.
+  const isUniversal = a => a.category === 'emerging_technology' || a.category === 'global_best_practices';
+  const universalCount = alerts.filter(isUniversal).length;
+  const localCount = alerts.length - universalCount;
+  count.textContent = localCount + ' local alert' + (localCount === 1 ? '' : 's') +
+    (universalCount ? ' · ' + universalCount + ' regional/global' : '') + when;
+  const localEmptyBanner = (localCount === 0 && universalCount > 0)
+    ? '<div class="empty-state local-empty"><p>No local alerts yet for this community</p><span>Showing regional &amp; global updates below — local notices appear here as they’re published</span></div>'
+    : '';
+  // The feed shows only the newest few per tier. When this community has more local alerts
+  // than are shown, say so — never truncate silently (was: 297 of 337 hidden with no notice).
+  const truncNote = (typeof localTotal === 'number' && localTotal > localCount)
+    ? '<div class="trunc-note">Showing the newest ' + localCount + ' of ' + localTotal + ' local alerts</div>'
+    : '';
+  feed.innerHTML = truncNote + localEmptyBanner + alerts.map(a => {
     const tag = getPipelineTag(a.pipeline_type, a.category);
     const icon = getIcon(a.pipeline_type, a.category);
-    const badge = getBadge(a.impact_level);
+    const badge = freshnessBadge(a);
     const date = formatDate(a.published_at || a.created_at);
     const meta = [a.agency_name, date, a.geographic_reference].filter(Boolean).map(esc).join(' · ');
     const url = safeUrl(a.source_url);
     const link = url ? `<a class="alink" href="${esc(url)}" target="_blank" rel="noopener">Read more →</a>` : '';
     const catId = alertCatId(a.pipeline_type, a.category);
-    return `<div class="alert-card" data-cat="${esc(catId)}">
+    return `<div class="alert-card" data-cat="${esc(catId)}" data-topic="${esc((a.subtopics && a.subtopics[0]) || a.category || '')}" data-pipeline="${esc(a.pipeline_type || '')}" data-alert="${esc(a.id || '')}">
       ${tag}
       <div class="alert-top">
         <div class="aicon" style="background:${icon.bg}"><svg style="stroke:${icon.stroke}" viewBox="0 0 24 24">${icon.path}</svg></div>
@@ -636,6 +710,43 @@ function renderAlerts(alerts) {
       </div>
     </div>`;
   }).join('');
+  setupAlertTracking(feed);
+}
+
+// Acquisition analytics (anonymous, best-effort): card impressions (alert_view) +
+// "Read more" clicks (alert_read). Ported from the legacy launch pages so the dynamic
+// page — which serves every non-legacy community — emits the same events. Lazy about
+// window.hsLogEvent so it works even if events.js loads after the first render.
+let _alertReadBound = false, _alertObserver = null;
+const _seenAlerts = new WeakSet();
+function setupAlertTracking(feed){
+  if(!feed) return;
+  function log(type, c){
+    if(typeof window.hsLogEvent === 'function'){
+      window.hsLogEvent(type, { topic:c.dataset.topic||null, pipeline_type:c.dataset.pipeline||null, alert_id:c.dataset.alert||null });
+    }
+  }
+  if(!_alertReadBound){
+    feed.addEventListener('click', function(e){
+      const a = e.target.closest('.alink'); if(!a) return;
+      const c = a.closest('.alert-card'); if(c) log('alert_read', c);
+    });
+    _alertReadBound = true;
+  }
+  if('IntersectionObserver' in window){
+    if(!_alertObserver){
+      _alertObserver = new IntersectionObserver(function(entries){
+        entries.forEach(function(en){
+          if(en.isIntersecting && !_seenAlerts.has(en.target)){
+            _seenAlerts.add(en.target);
+            log('alert_view', en.target);
+            _alertObserver.unobserve(en.target);
+          }
+        });
+      }, { threshold: 0.5 });
+    }
+    feed.querySelectorAll('.alert-card').forEach(function(c){ _alertObserver.observe(c); });
+  }
 }
 
 let alertCat = null;
@@ -1181,6 +1292,9 @@ function applyCommunity(){
 async function initCommunity(){
   await resolveCommunity();
   applyCommunity();
+  // Expose the content/anchor community id so events.js tags analytics with the
+  // community the alerts actually belong to (the chain root), matching the legacy pages.
+  window.COMMUNITY_ID = CONTENT_ID;
   loadAlerts();
   loadMeetings();
 }
@@ -1328,5 +1442,6 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 </script>
 <script src="share.js" defer></script>
+<script src="events.js" defer></script>
 </body>
 </html>
