@@ -1,0 +1,14 @@
+{
+  "box-elder": {
+    "tracks_status": 200,
+    "tracks_rows": 3,
+    "items_status": 200,
+    "items_rows": 25
+  },
+  "eagle-mountain": {
+    "tracks_status": 200,
+    "tracks_rows": 1,
+    "items_status": 200,
+    "items_rows": 12
+  }
+}
