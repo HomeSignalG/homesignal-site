@@ -674,7 +674,7 @@
   // The anchor + notices load on a SEPARATE async path from the EPA/planning report, so they
   // render even on a ZIP with no cached development_reports row. parcelLayer holds the resolved
   // parcel polygons; RESOLVED_PARCELS is cached so drawParcels() can (re)draw once the map exists.
-  var parcelLayer = null, RESOLVED_PARCELS = null;
+  var parcelLayer = null, RESOLVED_PARCELS = null, CURRENT_DEV_ZIP = null;
   var BOX_ELDER = 'd67c558f-1f04-4811-a565-873ae2afd6f3';
   var DEV_CATEGORIES = ['Planning, zoning & development',
                         'Stratos data center project',
@@ -1884,9 +1884,14 @@
       });
     }
 
-    // Parcel roster — ALL parcels; per-parcel honesty labels; nothing dropped.
-    var inZip = parcels.filter(function(p){ return !p.off_target_zip && String(p.zip)===String(zip); });
-    var straddleP = parcels.filter(function(p){ return p.off_target_zip || String(p.zip)!==String(zip); });
+    // Parcel roster — ALL parcels; per-parcel honesty labels; nothing dropped. Grouped by the
+    // CURRENT ZIP's geometry so the page is resident-centered on BOTH the primary and the straddle
+    // ZIP: parcels physically in this ZIP vs the rest of the assembly elsewhere. (The per-parcel
+    // off_target_zip straddle note still renders regardless of grouping.)
+    var inZip = parcels.filter(function(p){ return String(p.zip)===String(zip); });
+    var elsewhere = parcels.filter(function(p){ return String(p.zip)!==String(zip); });
+    var otherZips = [];
+    elsewhere.forEach(function(p){ if(otherZips.indexOf(p.zip)<0) otherZips.push(p.zip); });
     function parcelRow(p){
       var meta = [];
       if(p.acres) meta.push(esc(p.acres) + " acres");
@@ -1903,13 +1908,17 @@
     }
     h += "<div class='dt-lbl'>Parcels of record</div>";
     h += "<div class='dt-count'>" + parcels.length + " parcels total · " + inZip.length + " in ZIP " + esc(zip) +
-         (straddleP.length ? " · " + straddleP.length + " straddle (neighboring ZIP, same ownership)" : "") + "</div>";
+         (elsewhere.length ? " · " + elsewhere.length + " elsewhere in the same assembly (neighboring ZIP " +
+           esc(otherZips.join(", ")) + ")" : "") + "</div>";
     h += "<div class='dt-roster'>";
-    inZip.forEach(function(p){ h += parcelRow(p); });
-    if(straddleP.length){
-      h += "<div class='dt-lbl' style='margin-top:14px'>Straddle parcels — ZIP " +
-           esc((straddleP[0] && straddleP[0].zip) || "") + "</div>";
-      straddleP.forEach(function(p){ h += parcelRow(p); });
+    if(inZip.length){
+      h += "<div class='dt-lbl'>In ZIP " + esc(zip) + "</div>";
+      inZip.forEach(function(p){ h += parcelRow(p); });
+    }
+    if(elsewhere.length){
+      h += "<div class='dt-lbl' style='margin-top:14px'>Elsewhere in the same assembly — ZIP " +
+           esc(otherZips.join(", ")) + "</div>";
+      elsewhere.forEach(function(p){ h += parcelRow(p); });
     }
     h += "</div>";
     $("dtAnchorBody").innerHTML = h;
@@ -1993,14 +2002,17 @@
     RESOLVED_PARCELS.forEach(function(p){
       if(!p.geom_geojson) return;
       var geom; try{ geom = JSON.parse(p.geom_geojson); }catch(e){ return; }
-      var straddle = !!p.off_target_zip;
-      var style = straddle
+      // Color relative to the CURRENT ZIP: parcels in this ZIP are solid violet; parcels elsewhere
+      // in the assembly (neighboring ZIP) are a dashed orange outline — styled distinctly.
+      var elsewhere = String(p.zip) !== String(CURRENT_DEV_ZIP);
+      var style = elsewhere
         ? { color:"#E2772F", weight:1.5, opacity:.95, fillColor:"#E2772F", fillOpacity:.16, dashArray:"5 4" }
         : { color:"#4b3f8f", weight:1.2, opacity:.95, fillColor:"#6d5fc0", fillOpacity:.20 };
       var gj = L.geoJSON({ type:"Feature", geometry:geom, properties:{} }, { style:style });
       var pop = "<div class='pt'>" + esc(p.owner_of_record||"") + "</div>" +
         "<div class='pk'>APN " + esc(p.apn||"") + (p.acres ? " · "+esc(p.acres)+" acres" : "") + "</div>" +
-        (straddle ? "<div style='margin-top:4px;color:#a85a1f'>Straddle — in ZIP "+esc(p.zip||"")+", same ownership</div>" : "") +
+        (elsewhere ? "<div style='margin-top:4px;color:#a85a1f'>In ZIP "+esc(p.zip||"")+" — part of the same assembly</div>" : "") +
+        (p.off_target_zip ? "<div style='margin-top:4px;color:#a85a1f'>Straddles the ZIP boundary (kept in the assembly by common ownership)</div>" : "") +
         (p.zip_basis==="adjacency-ZCTA-gap" ? "<div style='margin-top:4px;color:#a85a1f'>ZIP by adjacency (not direct geometry)</div>" : "");
       gj.bindPopup(pop);
       gj.addTo(parcelLayer);
@@ -2012,15 +2024,18 @@
     }catch(e){}
     var cap = $("parcelCaption");
     if(cap){
-      cap.innerHTML = "Outlined above are the " + RESOLVED_PARCELS.length + " parcels of record in this " +
-        "land assembly (real Box Elder County parcel geometry)." +
-        "<span class='sw' style='background:#6d5fc0'></span>in-ZIP parcel" +
-        "<span class='sw' style='background:#E2772F'></span>straddle (same ownership, neighboring ZIP)";
+      var inN = RESOLVED_PARCELS.filter(function(p){ return String(p.zip)===String(CURRENT_DEV_ZIP); }).length;
+      var elseN = RESOLVED_PARCELS.length - inN;
+      cap.innerHTML = "Outlined above are the " + RESOLVED_PARCELS.length + " parcels of record in this land " +
+        "assembly (real Box Elder County parcel geometry)." +
+        "<span class='sw' style='background:#6d5fc0'></span>" + inN + " in ZIP " + esc(CURRENT_DEV_ZIP) +
+        "<span class='sw' style='background:#E2772F'></span>" + elseN + " elsewhere in the assembly (neighboring ZIP)";
       cap.style.display = "";
     }
   }
 
   function loadDevTracker(zip){
+    CURRENT_DEV_ZIP = zip;
     // (a) resolved-project anchor for this ZIP.
     sbFetch("v_resolved_project_zip", { zip:"eq."+zip, select:"*" }).then(function(zrows){
       if(!zrows || !zrows.length) return; // no resolved project here → anchor stays hidden (honest empty)

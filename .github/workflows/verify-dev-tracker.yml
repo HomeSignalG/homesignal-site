@@ -38,24 +38,29 @@ jobs:
         run: |
           python3 -m http.server 8080 >/tmp/http.log 2>&1 &
           sleep 2
-      - name: Render + assert
-        env:
-          VERIFY_URL: http://localhost:8080/homesignalmap.html?zip=84336
-        run: node verify/dev-tracker-verify.mjs
+      - name: Render + assert (84336 primary, 84307 straddle)
+        run: |
+          for z in 84336 84307; do
+            echo "===== ZIP $z ====="
+            VERIFY_ZIP=$z node verify/dev-tracker-verify.mjs
+          done
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dev-tracker-84336-render
+          name: dev-tracker-render
           path: |
             verify/dev-tracker-84336.png
             verify/dev-tracker-84336-assertions.json
+            verify/dev-tracker-84307.png
+            verify/dev-tracker-84307-assertions.json
       - name: Commit screenshot + assertions to branch
         if: always()
         run: |
           git config user.name "verify-bot"
           git config user.email "verify-bot@users.noreply.github.com"
-          git add verify/dev-tracker-84336.png verify/dev-tracker-84336-assertions.json || true
+          git add verify/dev-tracker-84336.png verify/dev-tracker-84336-assertions.json \
+                  verify/dev-tracker-84307.png verify/dev-tracker-84307-assertions.json || true
           if git diff --cached --quiet; then
             echo "No render output changes to commit."
           else

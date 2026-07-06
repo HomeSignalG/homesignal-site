@@ -6,9 +6,10 @@
 import { chromium } from 'playwright';
 import fs from 'fs';
 
-const URL = process.env.VERIFY_URL || 'http://localhost:8080/homesignalmap.html?zip=84336';
-const OUT_PNG = 'verify/dev-tracker-84336.png';
-const OUT_JSON = 'verify/dev-tracker-84336-assertions.json';
+const ZIP = process.env.VERIFY_ZIP || '84336';
+const URL = process.env.VERIFY_URL || ('http://localhost:8080/homesignalmap.html?zip=' + ZIP);
+const OUT_PNG = 'verify/dev-tracker-' + ZIP + '.png';
+const OUT_JSON = 'verify/dev-tracker-' + ZIP + '-assertions.json';
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1200, height: 2400 } });
@@ -57,7 +58,7 @@ const A = await page.evaluate(() => {
 });
 
 fs.mkdirSync('verify', { recursive: true });
-fs.writeFileSync(OUT_JSON, JSON.stringify({ url: URL, at: new Date().toISOString(), assertions: A, consoleErrors }, null, 2));
+fs.writeFileSync(OUT_JSON, JSON.stringify({ zip: ZIP, url: URL, at: new Date().toISOString(), assertions: A, consoleErrors }, null, 2));
 await page.screenshot({ path: OUT_PNG, fullPage: true });
 await browser.close();
 
