@@ -1,8 +1,18 @@
 {
   "zip": "84336",
   "url": "http://localhost:8080/homesignalmap.html?zip=84336",
-  "at": "2026-07-06T01:57:04.165Z",
+  "at": "2026-07-06T02:04:28.034Z",
   "assertions": {
+    "resolved_parcels_total": 82,
+    "parcel_features_drawn": 82,
+    "parcel_paths_drawn": 82,
+    "facility_markers_on_map": 3,
+    "total_interactive_paths": 85,
+    "facility_labels": [
+      "FLYING J WAREHOUSE",
+      "BLM-SNOWVILLE LANDFILL",
+      "MORGAN DAIRY, INC."
+    ],
     "anchor_visible": true,
     "title": "Stratos data center project — land assembly",
     "straddle": "Primary in ZIP 84336 · 78 of 82 parcels here. This assembly also extends into ZIP 84307 (4 parcels there, same ownership).",
