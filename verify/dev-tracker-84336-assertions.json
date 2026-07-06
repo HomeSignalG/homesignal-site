@@ -1,6 +1,6 @@
 {
   "url": "http://localhost:8080/homesignalmap.html?zip=84336",
-  "at": "2026-07-06T01:28:01.198Z",
+  "at": "2026-07-06T01:30:09.104Z",
   "assertions": {
     "anchor_visible": true,
     "title": "Stratos data center project — land assembly",
@@ -39,13 +39,10 @@
     "straddle_flags": 4,
     "bucket_b_empty_state": true,
     "bucket_b_recs": 0,
-    "bucket_c_recs": 114,
-    "county_wide_badges": 114,
+    "bucket_c_recs": 117,
+    "county_wide_badges": 117,
     "parcel_polygons_on_map": 85,
     "parcel_caption_visible": true
   },
-  "consoleErrors": [
-    "Failed to load resource: the server responded with a status of 400 ()",
-    "Failed to load resource: the server responded with a status of 400 ()"
-  ]
+  "consoleErrors": []
 }
