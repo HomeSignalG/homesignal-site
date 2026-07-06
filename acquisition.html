@@ -457,8 +457,11 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
       liveTile('Area requests', k.community_requests||0, 'coverage asks')+
       liveTile('Emails sent', k.emails_sent||0, (k.email_error_rate_pct||0)+'% error rate', emailState)+
       liveTile('Community pages', (k.communities_live||0).toLocaleString(), 'provisioned');
-    // 30-day funnel — each stage as a share of the top stage
-    var stages=[['Alert views',f.alert_view||0],['Alert reads',f.alert_read||0],['Signup intents',f.signup_intent||0],['Signups',f.signup||0]];
+    // 30-day funnel — each stage as a share of the top stage. alert_read is an external
+    // source click-through most readers never make (a poor engagement proxy that collapsed
+    // the whole funnel), so the engagement stage is alert_view; reads are shown as a
+    // secondary metric under the table, not a mandatory funnel stage.
+    var stages=[['Alert views',f.alert_view||0],['Signup intents',f.signup_intent||0],['Signups',f.signup||0]];
     var top=stages[0][1]||1;
     var funnelRows=stages.map(function(s){
       var pct=Math.round(1000*s[1]/top)/10;
@@ -485,7 +488,8 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
       (wk.length?('<div class="sub" style="margin:0 0 4px">Signups per week</div>'+spark(wk)+'<div style="height:14px"></div>'):'')+
       '<div style="display:flex;gap:24px;flex-wrap:wrap">'+
         '<div style="flex:1;min-width:280px"><div class="sub" style="margin:0 0 6px">Funnel · last 30 days</div>'+
-          '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Stage</th><th style="text-align:right">Count</th><th>Share</th><th></th></tr></thead><tbody>'+funnelRows+'</tbody></table></div></div>'+
+          '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Stage</th><th style="text-align:right">Count</th><th>Share</th><th></th></tr></thead><tbody>'+funnelRows+'</tbody></table></div>'+
+          '<div class="tile-note" style="margin-top:8px">Alert reads (secondary): '+(f.alert_read||0).toLocaleString()+' — external source click-throughs, not a conversion stage.</div></div>'+
         '<div style="flex:1;min-width:280px"><div class="sub" style="margin:0 0 6px">Top topic demand</div>'+
           (topicRows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Topic</th><th style="text-align:right">Followers</th><th></th></tr></thead><tbody>'+topicRows+'</tbody></table></div>'):'<div class="muted">No topic subscriptions yet.</div>')+'</div>'+
       '</div>'+
