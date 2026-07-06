@@ -198,6 +198,7 @@ body { background: #f3f4f6; font-size: 14px; }
 .empty-state p { font-size: 13px; color: var(--ts); margin-bottom: 4px; font-weight: 500; }
 .empty-state span { font-size: 12px; color: var(--tt); }
 .trunc-note { font-size: 12px; color: var(--ts); background: var(--bg); border: 1px dashed var(--border); border-radius: var(--r); padding: 8px 12px; margin-bottom: 10px; text-align: center; }
+.feed-error-strip { font-size: 12px; color: #92400e; background: #fffbeb; border: 1px solid #fcd34d; border-radius: var(--rs); padding: 8px 12px; margin-bottom: 10px; }
 .feed-section + .feed-section { margin-top: 20px; }
 .feed-section-head { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--tt); padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
 
@@ -550,11 +551,15 @@ async function loadAlerts() {
   // Track whether any tier actually FAILED (network error or non-OK response). A failed
   // tier returns [] like an empty one, so without this flag an outage is indistinguishable
   // from "no alerts" and both render the empty state — masking backend failures as "nothing here".
-  let anyFail = false;
-  const fetchQ = (scoped, filter, lim) =>
+  // Per-tier failure map (F4): a failed tier returns [] like an empty one, so track WHICH
+  // tier failed — a partial outage (e.g. government tier 500s, news succeeds) must be visible
+  // per-section, not masked as "no government notices". anyFail (below) still gates the
+  // all-empty full-error path unchanged.
+  const failed = { gov:false, emerging:false, global:false, news:false };
+  const fetchQ = (key, scoped, filter, lim) =>
     fetch(q(scoped, filter, lim), { headers })
-      .then(r => { if (!r.ok) { anyFail = true; return []; } return r.json(); })
-      .catch(() => { anyFail = true; return []; });
+      .then(r => { if (!r.ok) { failed[key] = true; return []; } return r.json(); })
+      .catch(() => { failed[key] = true; return []; });
   try {
     // Government (scoped) + Emerging/Global (universal, unscoped) each query their own
     // tier; News is the community-scoped catch-all (newest not in those three tiers).
@@ -565,12 +570,12 @@ async function loadAlerts() {
       .then(r => { const m = (r.headers.get('content-range') || '').match(/\/(\d+)$/); return m ? parseInt(m[1], 10) : null; })
       .catch(() => null);
     const [gov, emerging, global, recent, localTotal] = await Promise.all([
-      fetchQ(true,  'pipeline_type=eq.government_notice', PER_TIER),
-      fetchQ(false, 'category=eq.emerging_technology', PER_TIER),
-      fetchQ(false, 'category=eq.global_best_practices&or=(quality_grade.is.null,quality_grade.in.(BEST,MEDIUM))', PER_TIER),
+      fetchQ('gov',      true,  'pipeline_type=eq.government_notice', PER_TIER),
+      fetchQ('emerging', false, 'category=eq.emerging_technology', PER_TIER),
+      fetchQ('global',   false, 'category=eq.global_best_practices&or=(quality_grade.is.null,quality_grade.in.(BEST,MEDIUM))', PER_TIER),
       // Local News catch-all — EXCLUDE the universal categories. They share this community's
       // community_id, so without this they crowd the newest-N window and starve real local news.
-      fetchQ(true,  'or=(category.is.null,category.not.in.(emerging_technology,global_best_practices))', PER_TIER * 3),
+      fetchQ('news',     true,  'or=(category.is.null,category.not.in.(emerging_technology,global_best_practices))', PER_TIER * 3),
       localTotalP
     ]);
     const news = recent.filter(a => alertCatId(a.pipeline_type, a.category) === 'news').slice(0, PER_TIER);
@@ -590,8 +595,9 @@ async function loadAlerts() {
       : alerts;
     // If we have nothing to show AND at least one tier failed, this is an ERROR, not a genuine
     // empty community — surface it distinctly so an outage never masquerades as "no alerts".
+    const anyFail = Object.values(failed).some(Boolean);
     if (scoped.length === 0 && anyFail) { renderAlertsError(); return; }
-    renderAlerts(scoped, localTotal);
+    renderAlerts(scoped, localTotal, failed);
   } catch (err) {
     renderAlertsError();
   }
@@ -660,7 +666,7 @@ function renderAlertsError() {
   document.getElementById('feed-count').textContent = 'Couldn’t load alerts';
 }
 
-function renderAlerts(alerts, localTotal) {
+function renderAlerts(alerts, localTotal, failed) {
   const feed = document.getElementById('alert-feed');
   const count = document.getElementById('feed-count');
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -713,12 +719,20 @@ function renderAlerts(alerts, localTotal) {
   const truncNote = (typeof localTotal === 'number' && localTotal > localItems.length)
     ? '<div class="trunc-note">Showing the newest ' + localItems.length + ' of ' + localTotal + ' local alerts</div>'
     : '';
+  // F4: per-tier failure strips. A tier that failed to load shows a visible "couldn't load"
+  // note in its section instead of silently vanishing, so a load failure never reads as a
+  // genuine "no notices". Local = gov + news tiers; universal = emerging + global tiers.
+  const failMap = failed || {};
+  const strip = msg => '<div class="feed-error-strip">⚠ ' + msg + ' — please retry</div>';
+  const localWarn = (failMap.gov ? strip('Couldn’t load government notices') : '') +
+                    (failMap.news ? strip('Couldn’t load news') : '');
+  const univWarn = (failMap.emerging || failMap.global) ? strip('Couldn’t load regional/global updates') : '';
   const localBody = localItems.length
     ? localItems.map(cardHtml).join('')
     : '<div class="empty-state local-empty"><p>No local alerts yet for ' + esc(place) + '</p><span>Regional &amp; global updates are below — local notices appear here as they’re published</span></div>';
-  const localSection = '<div class="feed-section"><div class="feed-section-head">Local to ' + esc(place) + '</div>' + truncNote + localBody + '</div>';
-  const universalSection = universalItems.length
-    ? '<div class="feed-section"><div class="feed-section-head">Regional &amp; global</div>' + universalItems.map(cardHtml).join('') + '</div>'
+  const localSection = '<div class="feed-section"><div class="feed-section-head">Local to ' + esc(place) + '</div>' + localWarn + truncNote + localBody + '</div>';
+  const universalSection = (universalItems.length || univWarn)
+    ? '<div class="feed-section"><div class="feed-section-head">Regional &amp; global</div>' + univWarn + universalItems.map(cardHtml).join('') + '</div>'
     : '';
   feed.innerHTML = localSection + universalSection;
   setupAlertTracking(feed);
@@ -775,6 +789,18 @@ function alertCatId(type, category){
 function affectsMe(btn){
   const card = btn.closest('.alert-card, .mcard');
   const catId = (card && card.dataset.cat) ? card.dataset.cat : 'news';
+  // F2: instrument the signup CTA so the scaled dynamic page emits signup_intent like the
+  // legacy launch pages (box-elder/eagle-mountain). One handler serves both alert cards and
+  // meeting cards; meeting (.mcard) rows carry only data-cat, so topic/alert_id fall to null
+  // and pipeline_type resolves to government_notice. community_id + zip_code are auto-tagged by
+  // events.js. Guarded + lazy so analytics never throws or blocks the UI (CLAUDE.md §4).
+  if(typeof window.hsLogEvent === 'function' && card){
+    window.hsLogEvent('signup_intent', {
+      topic: card.dataset.topic || null,
+      pipeline_type: card.dataset.pipeline || (catId === 'meetings' ? 'government_notice' : null),
+      alert_id: card.dataset.alert || null
+    });
+  }
   openAlertModalForCat(catId);
 }
 function openAlertModalForCat(catId){
