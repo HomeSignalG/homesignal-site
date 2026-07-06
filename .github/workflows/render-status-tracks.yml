@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   render:
@@ -33,10 +33,17 @@ jobs:
           echo "server up"
       - name: Live render + screenshot
         run: node tools/render-status-tracks.cjs
+      - name: Commit render output for retrieval
+        run: |
+          git config user.name "Claude"
+          git config user.email "noreply@anthropic.com"
+          git add -f _render_out
+          git commit -m "CI render output (live) [skip ci]" || echo "no changes to commit"
+          git push origin HEAD:claude/status-tracks-live-render-ci
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: status-tracks-screenshots
-          path: /tmp/*.jpg
+          path: _render_out/*.jpg
           if-no-files-found: warn
