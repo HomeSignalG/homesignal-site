@@ -902,6 +902,13 @@ let accountLoaded = false;
 let accountExists = false;
 let pendingFollow = null;
 let searchedZip = '';
+// Community-resolution gate: loadAccount() must read the FINAL CONTENT_ID (the resolved
+// chain root), never the Box Elder fallback (COMMUNITY_ID default above). The auth-state
+// callback that calls loadAccount races initCommunity()'s DB resolution, so loadAccount
+// awaits this before scoping its users fetch. Released in initCommunity()'s finally so a
+// resolution failure can never hang it.
+let _resolveCommunityReady;
+const communityReady = new Promise(function(r){ _resolveCommunityReady = r; });
 (function(){
   try{
     var u = new URLSearchParams(window.location.search);
@@ -916,8 +923,14 @@ function followedFor(cat){ return (accountTopics && Array.isArray(accountTopics[
 
 async function loadAccount(){
   if(!hsLoggedIn()){ accountTopics={}; accountZip=''; accountLoaded=true; refreshTileLabels(); return; }
+  // Wait for the community chain to resolve so CONTENT_ID is the real anchor (not the Box
+  // Elder fallback), then scope the Following read to THIS community. users.topics is keyed
+  // per (email, community_id) (unique constraint users_email_community_key), so this returns
+  // 0 or 1 row: a page the user hasn't signed up for reads empty (opt-in default), never
+  // another community's follows. Account-global reads were the "✓ Following" leak bug.
+  await communityReady;
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(window.hsUser.email)}&select=topics,zip_code`,
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(window.hsUser.email)}&community_id=eq.${CONTENT_ID}&select=topics,zip_code`,
       { headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${window.hsToken || SUPABASE_ANON_KEY}` } });
     const rows = await res.json();
     if(Array.isArray(rows) && rows.length){ accountTopics = rows[0].topics || {}; accountZip = rows[0].zip_code || ''; accountExists = true; }
@@ -1327,8 +1340,15 @@ function applyCommunity(){
 }
 
 async function initCommunity(){
-  await resolveCommunity();
-  applyCommunity();
+  try {
+    await resolveCommunity();
+    applyCommunity();
+  } finally {
+    // CONTENT_ID is now final (or the Box Elder fallback if resolution threw). Either way
+    // release the gate so loadAccount() never hangs — a resolution failure degrades the
+    // whole page anyway, and the Following read is no worse off than the alerts read.
+    _resolveCommunityReady();
+  }
   // Expose the content/anchor community id so events.js tags analytics with the
   // community the alerts actually belong to (the chain root), matching the legacy pages.
   window.COMMUNITY_ID = CONTENT_ID;
