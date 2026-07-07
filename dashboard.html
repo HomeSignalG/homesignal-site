@@ -191,6 +191,7 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
 </div>
 
 <script src="communities.js"></script>
+<script src="hs-resolve.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ============================================================
@@ -316,8 +317,12 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
       var res2 = await fetch(SB_URL + '/rest/v1/users?email=eq.' + encodeURIComponent(email) + '&select=community_id,topics,zip_code', { headers: authHeaders() });
       if (res2.ok) {
         var urows = await res2.json();
-        if (Array.isArray(urows) && urows.length && urows[0].community_id) {
-          return [{ community_id: urows[0].community_id, topics: urows[0].topics || {}, zip_code: urows[0].zip_code }];
+        if (Array.isArray(urows) && urows.length) {
+          // users is keyed per (email, community_id) — return EVERY community the user
+          // follows, not just urows[0]. That single-row cap hid real DB follows.
+          var mapped = urows.filter(function (r) { return r.community_id; })
+            .map(function (r) { return { community_id: r.community_id, topics: r.topics || {}, zip_code: r.zip_code }; });
+          if (mapped.length) return mapped;
         }
       }
     } catch (e) {}
@@ -347,36 +352,8 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     '</div>';
   }
 
-  // Coverage is decided by the live `communities` table (source of truth), NOT the frozen
-  // communities.js map — mirrors index.html::resolveCoverageUrl so the dashboard and homepage
-  // agree. Resolve the ZIP to the MOST-SPECIFIC community that contains it (town wins over its
-  // county); route to a bespoke launch page (Box Elder / Eagle Mountain) when one exists, else
-  // to community.html?zip=. Answers are cached per-ZIP (shared hs_cov_ key with the homepage),
-  // so a brief Supabase outage still routes; the frozen HS.zipToCommunity map is only an
-  // absolute last resort. Null = genuinely not covered.
-  var COV_LEGACY_PAGE = { 'box-elder': 'box-elder.html', 'eagle-mountain': 'eagle-mountain.html' };
-  var COV_LEVEL_RANK = { neighborhood: 4, zip: 3, city: 2, county: 1 };
-  async function resolveCoverageUrl(zip){
-    if (!zip) return null;
-    try {
-      var res = await fetch(SB_URL + '/rest/v1/communities?select=slug,level,zip_codes&zip_codes=cs.{' + encodeURIComponent(zip) + '}',
-        { headers: { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON } });
-      if (res.ok) {
-        var rows = await res.json();
-        if (Array.isArray(rows) && rows.length) {
-          rows.sort(function(a,b){ return (COV_LEVEL_RANK[b.level]||0)-(COV_LEVEL_RANK[a.level]||0) || (a.zip_codes||[]).length-(b.zip_codes||[]).length; });
-          var m = rows[0];
-          var url = (m.slug && COV_LEGACY_PAGE[m.slug]) ? (COV_LEGACY_PAGE[m.slug] + '?zip=' + encodeURIComponent(zip)) : ('community.html?zip=' + encodeURIComponent(zip));
-          try { localStorage.setItem('hs_cov_' + zip, url); } catch(e) {}
-          return url;
-        }
-      }
-    } catch(e) { /* DB unreachable -> last DB-resolved answer for this ZIP, then the frozen map */ }
-    try { var cached = localStorage.getItem('hs_cov_' + zip); if (cached) return cached; } catch(e) {}
-    var legacy = window.HS.zipToCommunity(zip);
-    return legacy ? (legacy.page + '?zip=' + encodeURIComponent(zip)) : null;
-  }
-
+  // Coverage/routing = the shared live-DB resolver (hs-resolve.js), the ONE source used by
+  // add-community, the homepage, and the saved-follows list. Never the frozen communities.js map.
   function bindAddCommunity(){
     var btn = $('add-btn'), input = $('add-zip'), msg = $('add-msg');
     if (!btn || !input) return;
@@ -385,7 +362,7 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
       if (!zip) { msg.style.color = '#b91c1c'; msg.textContent = 'Please enter a 5-digit ZIP code.'; return; }
       msg.style.color = 'var(--ts)'; msg.textContent = 'Finding your community…';
       btn.disabled = true;
-      var url = await resolveCoverageUrl(zip);
+      var url = await window.HS.resolveCoverageUrl(zip);
       btn.disabled = false;
       if (url) { window.location.href = url; return; }
       msg.style.color = 'var(--ts)';
@@ -395,7 +372,10 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     input.addEventListener('keydown', function(e){ if (e.key === 'Enter') go(); });
   }
 
-  function renderFollows(follows){
+  function levelLabel(lvl){
+    return ({ county:'County', city:'City', zip:'ZIP area', neighborhood:'Neighborhood' })[lvl] || '';
+  }
+  async function renderFollows(follows){
     var body = $('dash-body');
     if (!follows.length){
       body.innerHTML =
@@ -407,15 +387,21 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
       bindAddCommunity();
       return;
     }
+    // Resolve name + level + page for EVERY followed community from the LIVE communities
+    // table (source of truth) — never the frozen communities.js map, which silently dropped
+    // communities it didn't know (Weber County, Box Elder County, …).
+    var byId = await window.HS.communitiesByIds(follows.map(function(f){ return f.community_id; }));
     var cards = follows.map(function(f){
-      var c = window.HS.getCommunity(f.community_id);
+      var c = byId[f.community_id] || null;
       var name = c ? c.name : 'Your community';
-      var page = c ? c.page : 'index.html';
+      var page = (c && window.HS.pageForCommunity(c)) || ('community.html?id=' + encodeURIComponent(f.community_id));
+      var lvl = c ? levelLabel(c.level) : '';
+      var levelChip = lvl ? ' <span style="font-size:11px;color:#6b7280;border:1px solid #e5e7eb;border-radius:999px;padding:1px 7px;margin-left:8px;white-space:nowrap">' + esc(lvl) + '</span>' : '';
       var n = countTopics(f.topics);
       var meta = n > 0 ? ('<span class="dot">' + n + '</span> topic' + (n===1?'':'s') + ' followed') : 'No topics selected yet';
       return '<div class="comm-card">' +
         '<div class="comm-card-main">' +
-          '<div class="comm-card-name"><a class="comm-card-link" href="' + esc(page) + '">' + esc(name) + '</a></div>' +
+          '<div class="comm-card-name"><a class="comm-card-link" href="' + esc(page) + '">' + esc(name) + '</a>' + levelChip + '</div>' +
           '<div class="comm-card-meta">' + meta + '</div>' +
         '</div>' +
         '<a class="btn-outline" href="' + esc(page) + '" style="text-decoration:none">Manage alerts</a>' +
@@ -429,7 +415,7 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     if (!window.hsUser){ renderLoggedOut(); return; }
     $('dash-body').innerHTML = '<div class="loading">Loading your alerts…</div>';
     var follows = await loadFollows(window.hsUser.email);
-    renderFollows(follows);
+    await renderFollows(follows);
   }
 
   // Re-render whenever auth state resolves/changes.
