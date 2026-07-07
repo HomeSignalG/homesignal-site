@@ -869,21 +869,78 @@ async function submitAlertSignup(){
   }
 }
 
-// Save location: toggle saved state with visual feedback
-function toggleSave(btn) {
+// "Save location" = a one-click community follow. It PERSISTS via signup_complete
+// (users row + user_subscriptions) — subscribing to ALL of this community's government
+// topics across BOTH the Notices and Meetings tiles (Option 1). Universal tiles
+// (News / Emerging / Global) stay separate opt-ins on their own tiles.
+// The button only flips to "Saved" AFTER the write confirms; on failure it reverts and
+// shows an error — never a false "Saved" (the bug this replaces: it used to flip to
+// "Saved" while writing nothing, so users thought they'd subscribed when they hadn't).
+function govTopicList(){
+  if(COMMUNITY && COMMUNITY.govTopics && COMMUNITY.govTopics.length) return COMMUNITY.govTopics.slice();
+  if(COMMUNITY && COMMUNITY.government_topics) return COMMUNITY.government_topics.slice();
+  return [];
+}
+// "Saved" == following the FULL government set on BOTH tiles (exactly what a save writes).
+// A partial pick via the modal reads as "Save location" (there's more to follow).
+function isLocationSaved(){
+  const gov = govTopicList();
+  if(!gov.length) return false;
+  const inN = accountTopics.notices || [], inM = accountTopics.meetings || [];
+  return gov.every(function(t){ return inN.indexOf(t) >= 0 && inM.indexOf(t) >= 0; });
+}
+function setSavedUI(btn, on){
   const label = document.getElementById('save-label');
-  if (btn.dataset.saved === '1') {
-    btn.dataset.saved = '0';
-    if (label) label.textContent = 'Save location';
-    btn.style.background = 'transparent';
-    btn.style.color = 'var(--ts)';
-    btn.style.borderColor = 'var(--border)';
-  } else {
-    btn.dataset.saved = '1';
-    if (label) label.textContent = 'Saved';
-    btn.style.background = 'var(--green)';
-    btn.style.color = '#fff';
-    btn.style.borderColor = 'var(--green)';
+  btn.dataset.saved = on ? '1' : '0';
+  if(label) label.textContent = on ? 'Saved' : 'Save location';
+  btn.style.background = on ? 'var(--green)' : 'transparent';
+  btn.style.color = on ? '#fff' : 'var(--ts)';
+  btn.style.borderColor = on ? 'var(--green)' : 'var(--border)';
+}
+// Reflect the real DB follow-state on the button (called after loadAccount / any save).
+function syncSaveButton(){
+  const btn = document.querySelector('.save-btn');
+  if(btn) setSavedUI(btn, isLocationSaved());
+}
+async function toggleSave(btn){
+  const label = document.getElementById('save-label');
+  const gov = govTopicList();
+  if(!gov.length){ showToast('No government topics to follow here yet.'); return; }
+  // Persisting requires an authenticated session. Stash the intent and open auth; the
+  // hsOnAuthChange handler replays it (writes + flips to "Saved") once the user returns.
+  if(!hsLoggedIn()){
+    pendingFollow = { kind:'savelocation' };
+    window.hsOpenAuth();
+    return;
+  }
+  const following = isLocationSaved();
+  const prev = label ? label.textContent : '';
+  const snapN = (accountTopics.notices || []).slice();   // rollback copies if the write fails
+  const snapM = (accountTopics.meetings || []).slice();
+  btn.disabled = true; if(label) label.textContent = following ? 'Removing…' : 'Saving…';
+  try{
+    if(following){
+      // Unfollow: drop this community's government topics from both tiles (universal untouched).
+      accountTopics.notices  = snapN.filter(function(t){ return gov.indexOf(t) < 0; });
+      accountTopics.meetings = snapM.filter(function(t){ return gov.indexOf(t) < 0; });
+    } else {
+      // Follow: subscribe to ALL government topics on both tiles.
+      accountTopics.notices  = gov.slice();
+      accountTopics.meetings = gov.slice();
+    }
+    await persistAccount(accountConsent);   // preserve consent already on file; don't downgrade
+    setSavedUI(btn, !following);
+    showToast(following
+      ? 'Removed — no longer following ' + commName() + "'s government alerts."
+      : "Saved — you're following " + commName() + "'s government alerts.");
+  }catch(err){
+    // Write FAILED — roll back local state and NEVER show a false "Saved".
+    accountTopics.notices = snapN; accountTopics.meetings = snapM;
+    if(label) label.textContent = prev;
+    refreshTileLabels();
+    showToast('Could not save — please try again.');
+  }finally{
+    btn.disabled = false;
   }
 }
 
@@ -958,19 +1015,22 @@ const CAT_TO_PIPELINE = {
 
 async function saveTopics(cat, checked, consent){
   accountTopics[cat] = checked;
+  return persistAccount(consent);
+}
+
+// SINGLE WRITE PATH: signup_complete (SECURITY DEFINER, authenticated session) is the only
+// writer for users + user_subscriptions. It reconciles the COMPLETE desired subscription set
+// server-side (adds missing, deletes removed) from the current accountTopics, so the browser
+// never writes user_subscriptions directly — no INSERT/DELETE grant on that table is needed.
+// Used by the tile subscribe-modal (saveTopics) AND the "Save location" one-click follow.
+async function persistAccount(consent){
   const email = window.hsUser.email;
-  // SINGLE WRITE PATH: signup_complete (SECURITY DEFINER, authenticated session) is the only
-  // writer for users + user_subscriptions. It reconciles the COMPLETE desired subscription set
-  // server-side (adds missing, deletes removed), so the browser never writes user_subscriptions
-  // directly — no INSERT/DELETE grant on that table is needed. Mirrors box-elder.html.
-  // Existing-user edit: write the user's already-stored ZIP. No 84302 fallback — abort rather
-  // than store a fake ZIP if the account has no valid 5-digit ZIP on file.
+  // Write the user's already-stored ZIP (or the ZIP searched into this page). No 84302
+  // fallback — abort rather than store a fake ZIP if there's no valid 5-digit ZIP on file.
   const zipForSave = (searchedZip || accountZip || '').trim();
   if(!/^\d{5}$/.test(zipForSave)){ throw new Error('Your account has no ZIP code on file — please re-enter it before editing alerts.'); }
-  // Data-licensing consent is captured from the real checkbox in the modal and passed through
-  // on every save (parity with the curated launch pages). The modal pre-fills the box from the
-  // stored value on open (setupSignupArea -> accountConsent), so an existing agreement rides
-  // through a later topic edit and a true is never silently flipped back to false.
+  // Data-licensing consent rides through on every write (parity with the curated pages);
+  // the modal pre-fills the box from the stored value so a prior true is never flipped to false.
   const r = await window.hsClient.rpc('signup_complete', {
     p_email: email,
     p_community_id: CONTENT_ID,
@@ -1010,6 +1070,7 @@ function refreshTileLabels(){
     const lbl = document.getElementById('lbl-'+cat);
     if(lbl) lbl.textContent = n>0 ? (n+' topic'+(n===1?'':'s')+' followed · click to change') : 'Click to choose topics';
   });
+  syncSaveButton();   // keep the "Save location" button honest with the real follow-state
 }
 
 function setupSignupArea(which){
@@ -1046,6 +1107,15 @@ window.hsOnAuthChange = async function(user){
   if(user && pendingFollow){
     const p = pendingFollow; pendingFollow = null;
     try{
+      if(p.kind==='savelocation'){
+        // Replay the one-click "Save location" follow the user attempted while logged out.
+        const gov = govTopicList();
+        accountTopics.notices = gov.slice(); accountTopics.meetings = gov.slice();
+        await persistAccount(accountConsent);
+        const btn = document.querySelector('.save-btn'); if(btn) setSavedUI(btn, true);
+        showToast("Saved — you're following " + commName() + "'s government alerts.");
+        return;
+      }
       await saveTopics(p.cat, p.checked, p.consent);
       if(p.kind==='modal'){
         const tile=document.querySelector('.cat-tile[data-id="'+p.cat+'"]');
