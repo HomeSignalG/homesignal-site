@@ -412,8 +412,8 @@ body { background: #f3f4f6; font-size: 14px; }
   <!-- GROUP 1 — local (green headers): Government Notices & Meetings · Local News -->
   <div class="be-group-head" id="grp-local-head">In your community</div>
   <div class="be-group-local">
-    <div class="cat-tile early-off" data-id="notices" data-type="early" onclick="openModal(this)"><div class="ct-top"><div class="ct-icon"><svg viewBox="0 0 24 24"><path d="M5 3h9l5 5v13a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg></div><div class="ct-body"><div class="ct-label">Government Notices</div></div></div><div class="ct-bd"><div class="ct-meta">Official notices, comment periods, permit &amp; zoning filings.</div><div class="ct-sub" id="lbl-notices">Click to choose topics</div></div></div>
-    <div class="cat-tile early-off" data-id="meetings" data-type="early" onclick="openModal(this)"><div class="ct-top"><div class="ct-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div class="ct-body"><div class="ct-label">Upcoming Meetings</div></div></div><div class="ct-bd"><div class="ct-meta">Hearings and agendas — before the decision is made.</div><div class="ct-sub" id="lbl-meetings">Click to choose topics</div></div></div>
+    <div class="cat-tile early-off" data-id="notices" data-type="early" onclick="openModal(this)"><div class="ct-top"><div class="ct-icon"><svg viewBox="0 0 24 24"><path d="M5 3h9l5 5v13a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg></div><div class="ct-body"><div class="ct-label">Government Notices</div></div></div><div class="ct-bd"><div class="ct-meta">Official notices, comment periods, permit &amp; zoning filings.</div><div class="ct-chips" id="chips-notices"></div><div class="ct-sub" id="lbl-notices">Click to choose topics</div></div></div>
+    <div class="cat-tile early-off" data-id="meetings" data-type="early" onclick="openModal(this)"><div class="ct-top"><div class="ct-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div class="ct-body"><div class="ct-label">Upcoming Meetings</div></div></div><div class="ct-bd"><div class="ct-meta">Hearings and agendas — before the decision is made.</div><div class="ct-chips" id="chips-meetings"></div><div class="ct-sub" id="lbl-meetings">Click to choose topics</div></div></div>
     <div class="cat-tile inform-off" data-id="news" data-type="inform" onclick="openModal(this)"><div class="ct-top"><div class="ct-icon"><svg viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg></div><div class="ct-body"><div class="ct-label">Local News</div></div></div><div class="ct-bd"><div class="ct-meta">Announcements and coverage that matter locally.</div><div class="ct-chips"><span class="be-chip">Data Centers</span><span class="be-chip">Water quality</span></div><div class="ct-sub" id="lbl-news">Click to choose topics</div></div></div>
   </div>
   <!-- GROUP 2 — benchmark (blue headers): Global Best Practices · Emerging Technologies -->
@@ -1329,6 +1329,18 @@ function applyCommunity(){
     var groups = (COMMUNITY.govGroups && COMMUNITY.govGroups.length) ? COMMUNITY.govGroups : null;
     cats.notices.items = govTopics; cats.notices.groups = groups;
     cats.meetings.items = govTopics; cats.meetings.groups = groups;
+    // Government-tile topic-preview chips (parity with the curated launch pages, same
+    // .ct-chips/.be-chip markup): advertise THIS community's cascade-resolved government
+    // topics on the Notices + Meetings tiles. govTopics already inherits the parent chain
+    // (a ZIP with empty own topics shows its county's — e.g. Ogden 84401 -> Weber County).
+    var chipEsc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+    var MAX_CHIPS = 4;  // teaser cap (matches the curated pages' intent); rest as "+N more"
+    var allTopics = govTopics || [];
+    var chipHtml = allTopics.slice(0, MAX_CHIPS).map(function(t){ return '<span class="be-chip">'+chipEsc(t)+'</span>'; }).join('');
+    var extra = allTopics.length - MAX_CHIPS;
+    if(extra > 0){ chipHtml += '<span class="be-chip" style="opacity:.6">+' + extra + ' more</span>'; }
+    var cn = document.getElementById('chips-notices'); if(cn) cn.innerHTML = chipHtml;
+    var cm = document.getElementById('chips-meetings'); if(cm) cm.innerHTML = chipHtml;
   }
   // Universal topics come from the canonical registry (topics.js).
   if(window.HS && Array.isArray(HS.universalTopics) && HS.universalTopics.length){
