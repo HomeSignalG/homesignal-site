@@ -1334,7 +1334,11 @@ function applyCommunity(){
     // topics on the Notices + Meetings tiles. govTopics already inherits the parent chain
     // (a ZIP with empty own topics shows its county's — e.g. Ogden 84401 -> Weber County).
     var chipEsc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
-    var chipHtml = (govTopics||[]).map(function(t){ return '<span class="be-chip">'+chipEsc(t)+'</span>'; }).join('');
+    var MAX_CHIPS = 4;  // teaser cap (matches the curated pages' intent); rest as "+N more"
+    var allTopics = govTopics || [];
+    var chipHtml = allTopics.slice(0, MAX_CHIPS).map(function(t){ return '<span class="be-chip">'+chipEsc(t)+'</span>'; }).join('');
+    var extra = allTopics.length - MAX_CHIPS;
+    if(extra > 0){ chipHtml += '<span class="be-chip" style="opacity:.6">+' + extra + ' more</span>'; }
     var cn = document.getElementById('chips-notices'); if(cn) cn.innerHTML = chipHtml;
     var cm = document.getElementById('chips-meetings'); if(cm) cm.innerHTML = chipHtml;
   }
