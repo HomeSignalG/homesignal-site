@@ -316,8 +316,14 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
       var res2 = await fetch(SB_URL + '/rest/v1/users?email=eq.' + encodeURIComponent(email) + '&select=community_id,topics,zip_code', { headers: authHeaders() });
       if (res2.ok) {
         var urows = await res2.json();
-        if (Array.isArray(urows) && urows.length && urows[0].community_id) {
-          return [{ community_id: urows[0].community_id, topics: urows[0].topics || {}, zip_code: urows[0].zip_code }];
+        if (Array.isArray(urows) && urows.length) {
+          // The users table now holds one row per followed community (multi-community).
+          // Return ALL of them — not just urows[0], which dropped every community after
+          // the first (the bug that hid Box Elder + Weber County).
+          var mapped = urows
+            .filter(function(r){ return r && r.community_id; })
+            .map(function(r){ return { community_id: r.community_id, topics: r.topics || {}, zip_code: r.zip_code }; });
+          if (mapped.length) return mapped;
         }
       }
     } catch (e) {}
@@ -395,7 +401,36 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     input.addEventListener('keydown', function(e){ if (e.key === 'Enter') go(); });
   }
 
-  function renderFollows(follows){
+  // Resolve followed communities' display name + landing page from the LIVE communities
+  // table (the SAME source of truth as resolveCoverageUrl / the homepage), NOT the frozen
+  // communities.js map. The frozen map knows only Box Elder + Eagle Mountain, so DB-covered
+  // communities (e.g. Weber County) were shown with a generic name and a dead index.html
+  // link. Batch one query for all followed ids; fall back to the frozen map only on a DB
+  // outage. Returns { id: {name, slug} }.
+  async function resolveFollowedCommunities(ids){
+    var out = {};
+    if (!ids.length) return out;
+    try {
+      var inList = ids.map(encodeURIComponent).join(',');
+      var res = await fetch(SB_URL + '/rest/v1/communities?select=id,name,slug&id=in.(' + inList + ')',
+        { headers: { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON } });
+      if (res.ok) {
+        var rows = await res.json();
+        if (Array.isArray(rows)) rows.forEach(function(r){ out[r.id] = { name: r.name, slug: r.slug }; });
+      }
+    } catch (e) { /* DB outage -> frozen-map fallback in renderFollows */ }
+    return out;
+  }
+
+  // Landing page for a followed community: the bespoke launch page when one exists
+  // (COV_LEGACY_PAGE, shared with resolveCoverageUrl), else the scaled community.html?zip=
+  // page keyed on the follow's stored ZIP — mirroring resolveCoverageUrl's routing exactly.
+  function communityPage(slug, zip){
+    if (slug && COV_LEGACY_PAGE[slug]) return COV_LEGACY_PAGE[slug];
+    return 'community.html' + (zip ? ('?zip=' + encodeURIComponent(zip)) : '');
+  }
+
+  async function renderFollows(follows){
     var body = $('dash-body');
     if (!follows.length){
       body.innerHTML =
@@ -407,10 +442,12 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
       bindAddCommunity();
       return;
     }
+    var live = await resolveFollowedCommunities(follows.map(function(f){ return f.community_id; }));
     var cards = follows.map(function(f){
-      var c = window.HS.getCommunity(f.community_id);
-      var name = c ? c.name : 'Your community';
-      var page = c ? c.page : 'index.html';
+      var l = live[f.community_id];
+      var frozen = window.HS.getCommunity(f.community_id); // last-resort fallback (DB outage) only
+      var name = l ? l.name : (frozen ? frozen.name : 'Your community');
+      var page = l ? communityPage(l.slug, f.zip_code) : (frozen ? frozen.page : 'index.html');
       var n = countTopics(f.topics);
       var meta = n > 0 ? ('<span class="dot">' + n + '</span> topic' + (n===1?'':'s') + ' followed') : 'No topics selected yet';
       return '<div class="comm-card">' +
@@ -429,7 +466,7 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     if (!window.hsUser){ renderLoggedOut(); return; }
     $('dash-body').innerHTML = '<div class="loading">Loading your alerts…</div>';
     var follows = await loadFollows(window.hsUser.email);
-    renderFollows(follows);
+    await renderFollows(follows);
   }
 
   // Re-render whenever auth state resolves/changes.
