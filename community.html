@@ -469,6 +469,7 @@ body { background: #f3f4f6; font-size: 14px; }
     <div class="modal-divider"></div>
     <div class="sub-list" id="modal-list"></div>
     <div class="modal-info"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="modal-count">No topics selected yet</span></div>
+    <label class="consent-row"><input type="checkbox" id="modal-consent" / aria-label="I agree to HomeSignal's data-sharing terms"><span><b class="opt">Optional</b> I agree that HomeSignal may share anonymized and aggregated information about the topics and locations I follow with third parties to support its products, services, and research. No personal contact information is ever shared. <a href="privacy.html">Privacy Policy</a></span></label>
     <div class="alert-signup">
       <div class="alert-signup-label">Sign up for these alerts — free</div>
       <input class="alert-field" type="email" id="modal-email" placeholder="Email address" / aria-label="Email address">
@@ -488,6 +489,10 @@ body { background: #f3f4f6; font-size: 14px; }
   .alert-submit:disabled{opacity:.7;cursor:default;}
   .alert-msg{font-size:13px;margin-top:10px;min-height:1em;color:var(--ts);}
   .alert-note{font-size:11px;color:var(--tt);margin-top:8px;text-align:center;}
+  .consent-row{display:flex;align-items:flex-start;gap:8px;margin-top:14px;font-size:12px;line-height:1.5;color:var(--ts);cursor:pointer;}
+  .consent-row input{margin-top:2px;flex-shrink:0;width:15px;height:15px;accent-color:var(--green);cursor:pointer;}
+  .consent-row a{color:var(--green);text-decoration:underline;}
+  .consent-row .opt{font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.05em;color:var(--green);margin-right:4px;}
 </style>
 
 <div class="overlay" id="alert-overlay" onclick="handleAlertOverlay(event)">
@@ -499,6 +504,7 @@ body { background: #f3f4f6; font-size: 14px; }
     <div class="modal-divider"></div>
     <div class="sub-list" id="alert-list"></div>
     <div class="modal-info"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="alert-count">No topics selected yet</span></div>
+    <label class="consent-row"><input type="checkbox" id="alert-consent" / aria-label="I agree to HomeSignal's data-sharing terms"><span><b class="opt">Optional</b> I agree that HomeSignal may share anonymized and aggregated information about the topics and locations I follow with third parties to support its products, services, and research. No personal contact information is ever shared. <a href="privacy.html">Privacy Policy</a></span></label>
     <div class="alert-signup">
       <div class="alert-signup-label">Sign up for these alerts — free</div>
       <input class="alert-field" type="email" id="alert-email" placeholder="Email address" / aria-label="Email address">
@@ -843,8 +849,9 @@ async function submitAlertSignup(){
   const msg=document.getElementById('alert-msg');
   const checked=[...document.querySelectorAll('#alert-list .sub-item.on')].map(el=>el.querySelector('.sub-label').textContent);
   if(checked.length===0){ msg.style.color='#b91c1c'; msg.textContent='Please choose at least one topic above.'; return; }
+  const consent=document.getElementById('alert-consent').checked;
   if(!hsLoggedIn()){
-    pendingFollow={ kind:'alert', cat:alertCat, checked:checked };
+    pendingFollow={ kind:'alert', cat:alertCat, checked:checked, consent:consent };
     closeAlertModal();
     window.hsOpenAuth();
     return;
@@ -852,7 +859,7 @@ async function submitAlertSignup(){
   const sb=document.getElementById('alert-submit'); const old=sb.textContent;
   sb.disabled=true; sb.textContent='Saving\u2026'; msg.style.color='var(--ts)'; msg.textContent='';
   try{
-    await saveTopics(alertCat, checked);
+    await saveTopics(alertCat, checked, consent);
     msg.style.color='#166534';
     msg.textContent="Saved \u2713 You're following these alerts in " + commName() + ".";
     sb.textContent='Saved \u2713';
@@ -899,6 +906,7 @@ let accountTopics = {};
 let accountZip = '';
 let accountLoaded = false;
 let accountExists = false;
+let accountConsent = false;
 let pendingFollow = null;
 let searchedZip = '';
 // Community-resolution gate: loadAccount() must read the FINAL CONTENT_ID (the resolved
@@ -921,7 +929,7 @@ function hsLoggedIn(){ return !!(window.hsUser); }
 function followedFor(cat){ return (accountTopics && Array.isArray(accountTopics[cat])) ? accountTopics[cat] : []; }
 
 async function loadAccount(){
-  if(!hsLoggedIn()){ accountTopics={}; accountZip=''; accountLoaded=true; refreshTileLabels(); return; }
+  if(!hsLoggedIn()){ accountTopics={}; accountZip=''; accountConsent=false; accountLoaded=true; refreshTileLabels(); return; }
   // Wait for the community chain to resolve so CONTENT_ID is the real anchor (not the Box
   // Elder fallback), then scope the Following read to THIS community. users.topics is keyed
   // per (email, community_id) (unique constraint users_email_community_key), so this returns
@@ -929,12 +937,12 @@ async function loadAccount(){
   // another community's follows. Account-global reads were the "✓ Following" leak bug.
   await communityReady;
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(window.hsUser.email)}&community_id=eq.${CONTENT_ID}&select=topics,zip_code`,
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(window.hsUser.email)}&community_id=eq.${CONTENT_ID}&select=topics,zip_code,data_licensing_agreed`,
       { headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${window.hsToken || SUPABASE_ANON_KEY}` } });
     const rows = await res.json();
-    if(Array.isArray(rows) && rows.length){ accountTopics = rows[0].topics || {}; accountZip = rows[0].zip_code || ''; accountExists = true; }
-    else { accountTopics = {}; accountZip = ''; accountExists = false; }
-  }catch(e){ accountTopics = {}; }
+    if(Array.isArray(rows) && rows.length){ accountTopics = rows[0].topics || {}; accountZip = rows[0].zip_code || ''; accountConsent = !!rows[0].data_licensing_agreed; accountExists = true; }
+    else { accountTopics = {}; accountZip = ''; accountConsent = false; accountExists = false; }
+  }catch(e){ accountTopics = {}; accountConsent = false; }
   accountLoaded = true;
   refreshTileLabels();
 }
@@ -948,7 +956,7 @@ const CAT_TO_PIPELINE = {
   global: 'global_best_practices'
 };
 
-async function saveTopics(cat, checked){
+async function saveTopics(cat, checked, consent){
   accountTopics[cat] = checked;
   const email = window.hsUser.email;
   // SINGLE WRITE PATH: signup_complete (SECURITY DEFINER, authenticated session) is the only
@@ -959,8 +967,10 @@ async function saveTopics(cat, checked){
   // than store a fake ZIP if the account has no valid 5-digit ZIP on file.
   const zipForSave = (searchedZip || accountZip || '').trim();
   if(!/^\d{5}$/.test(zipForSave)){ throw new Error('Your account has no ZIP code on file — please re-enter it before editing alerts.'); }
-  // Consent was captured at original signup; this edit must not re-assert it, so pass false
-  // (the RPC preserves the stored consent — it does not downgrade an existing agreement).
+  // Data-licensing consent is captured from the real checkbox in the modal and passed through
+  // on every save (parity with the curated launch pages). The modal pre-fills the box from the
+  // stored value on open (setupSignupArea -> accountConsent), so an existing agreement rides
+  // through a later topic edit and a true is never silently flipped back to false.
   const r = await window.hsClient.rpc('signup_complete', {
     p_email: email,
     p_community_id: CONTENT_ID,
@@ -968,10 +978,11 @@ async function saveTopics(cat, checked){
     p_topics: accountTopics,
     p_consent_version: '2026-06-20',
     p_subscriptions: buildSubscriptionSet(),
-    p_data_licensing_agreed: false
+    p_data_licensing_agreed: !!consent
   });
   if(r && r.error){ throw new Error('Save error: ' + (r.error.message || r.error)); }
   accountExists = true;
+  accountConsent = !!consent; // keep the pre-filled checkbox in sync so a later save can't reset it
   refreshTileLabels();
 }
 
@@ -1009,6 +1020,10 @@ function setupSignupArea(which){
   if(zipEl) zipEl.style.display='none';
   const wrap = emailEl ? emailEl.closest('.alert-signup') : null;
   const label = wrap ? wrap.querySelector('.alert-signup-label') : null;
+  // Reflect the user's stored consent for logged-in visitors; default unchecked otherwise.
+  // This is what stops a later topic edit from flipping a prior true -> false.
+  const consentEl = document.getElementById(which==='modal'?'modal-consent':'alert-consent');
+  if(consentEl) consentEl.checked = hsLoggedIn() ? accountConsent : false;
   if(hsLoggedIn()){
     if(label) label.textContent = 'Saving to your account · ' + window.hsUser.email;
     if(btn) btn.textContent = 'Save alerts';
@@ -1031,7 +1046,7 @@ window.hsOnAuthChange = async function(user){
   if(user && pendingFollow){
     const p = pendingFollow; pendingFollow = null;
     try{
-      await saveTopics(p.cat, p.checked);
+      await saveTopics(p.cat, p.checked, p.consent);
       if(p.kind==='modal'){
         const tile=document.querySelector('.cat-tile[data-id="'+p.cat+'"]');
         if(tile) openModal(tile);
@@ -1090,8 +1105,9 @@ async function submitModalSignup(){
   const msg=document.getElementById('modal-msg');
   const checked=[...document.querySelectorAll('#modal-list .sub-item.on')].map(el=>el.querySelector('.sub-label').textContent);
   if(checked.length===0){ msg.style.color='#b91c1c'; msg.textContent='Please choose at least one topic above.'; return; }
+  const consent=document.getElementById('modal-consent').checked;
   if(!hsLoggedIn()){
-    pendingFollow={ kind:'modal', cat:currentId, checked:checked };
+    pendingFollow={ kind:'modal', cat:currentId, checked:checked, consent:consent };
     closeModal();
     window.hsOpenAuth();
     return;
@@ -1099,7 +1115,7 @@ async function submitModalSignup(){
   const sb=document.getElementById('modal-submit'); const old=sb.textContent;
   sb.disabled=true; sb.textContent='Saving\u2026'; msg.style.color='var(--ts)'; msg.textContent='';
   try{
-    await saveTopics(currentId, checked);
+    await saveTopics(currentId, checked, consent);
     msg.style.color='#166534';
     msg.textContent="Saved \u2713 You're following these alerts in " + commName() + ".";
     sb.textContent='Saved \u2713';
