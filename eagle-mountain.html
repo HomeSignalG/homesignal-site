@@ -567,19 +567,6 @@ h2.be-h2 { font-size: 27px; font-weight: 600; margin: 0; letter-spacing: -0.015e
     </div>
   </section>
 
-  <!-- PROJECT STATUS TRACKS (data-driven from v_community_status_* by community_id) -->
-  <section class="be-section" style="margin-top:24px" id="status-track-section">
-    <div class="track-panel-head">
-      <h2 class="be-h2 track-panel-title">Project status — tracked from official records</h2>
-    </div>
-    <div class="be-meta" style="margin-top:5px">Each track is filled automatically from the government source of record. We show how confirmed each item is — and say plainly when a track has nothing on record yet.</div>
-    <div class="track-legend">
-      <span class="conf-badge conf-verified">&#10003; Officially confirmed</span>
-      <span class="conf-badge conf-probable">&#9719; Reported — not yet confirmed</span>
-      <span class="conf-badge conf-monitoring">&#9642; Monitoring — none yet</span>
-    </div>
-    <div class="track-grid" id="status-tracks"><div class="loading">Loading status tracks…</div></div>
-  </section>
 
   <!-- LENS GROUPS -->
   <section class="be-section" style="margin-top:24px">
@@ -1407,81 +1394,9 @@ function toggleMoreMeetings(){
   btn.textContent=open?('Show '+more.children.length+' more'):'Show less';
 }
 
-// ---- PROJECT STATUS TRACKS: read v_community_status_* by community_id, render honestly ----
-// Static 4-track scaffold so absent tracks render a defined "monitoring / none-yet" state
-// (never blank, never faked). Confidence tiers are shown exactly as stored — a "probable"
-// item is never styled or labelled as "verified".
-async function loadProjectStatus(){
-  const grid = document.getElementById('status-tracks');
-  if(!grid) return;
-  const TRACKS = [
-    { key:'water_rights', label:'Water rights',        blurb:'Water-right applications & changes at the project points of diversion.' },
-    { key:'approval',     label:'Development approval', blurb:'Government approvals — MIDA / city / county actions on the project.' },
-    { key:'legal',        label:'Legal & referendum',  blurb:'Referendum efforts and lawsuits touching the project.' },
-    { key:'deq_air',      label:'Air-quality permit',  blurb:'DEQ air-quality permit filings (Intent-to-Approve / Approval Order).' },
-  ];
-  const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` };
-  const tracksUrl = `${SUPABASE_URL}/rest/v1/v_community_status_tracks?community_id=eq.${COMMUNITY_ID}&select=*`;
-  const itemsUrl  = `${SUPABASE_URL}/rest/v1/v_community_status_items?community_id=eq.${COMMUNITY_ID}&select=*`;
-  const [trackRows, itemRows] = await Promise.all([
-    fetch(tracksUrl,{headers}).then(r=>r.ok?r.json():[]).catch(()=>[]),
-    fetch(itemsUrl,{headers}).then(r=>r.ok?r.json():[]).catch(()=>[]),
-  ]);
-
-  const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const fmtDate = d => { if(!d) return ''; const p=String(d).slice(0,10).split('-'); if(p.length!==3) return esc(d); return `${MON[(+p[1])-1]||p[1]} ${+p[2]}, ${p[0]}`; };
-  const today = (() => { const n=new Date(); const m=String(n.getMonth()+1).padStart(2,'0'); const day=String(n.getDate()).padStart(2,'0'); return `${n.getFullYear()}-${m}-${day}`; })();
-
-  const CONF = {
-    verified:  { cls:'conf-verified',  icon:'✓', chip:'Confirmed' },   // ✓
-    probable:  { cls:'conf-probable',  icon:'◷', chip:'Reported' },     // ◷
-    candidate: { cls:'conf-candidate', icon:'◌', chip:'Under review' }, // ◌
-  };
-  const RANK = { verified:0, probable:1, candidate:2 };
-
-  const byTrack = {}; trackRows.forEach(t => { byTrack[t.track] = t; });
-  const itemsBy = {}; itemRows.forEach(it => { (itemsBy[it.track] = itemsBy[it.track] || []).push(it); });
-
-  const renderItem = it => {
-    const c = CONF[it.confidence] || CONF.candidate;
-    const title = esc(it.headline || it.status_label || it.status_value || 'Item');
-    const metaBits = [];
-    if(it.source_system) metaBits.push(esc(it.source_system));
-    if(it.as_of) metaBits.push(fmtDate(it.as_of));
-    if(it.source_ref) metaBits.push('ref ' + esc(it.source_ref));
-    const link = it.source_url ? `<a class="trk-link" href="${esc(it.source_url)}" target="_blank" rel="noopener">View official record &rarr;</a>` : '';
-    return `<div class="trk-item"><div class="trk-row"><span class="conf-badge ${c.cls}">${c.icon} ${c.chip}</span><span class="trk-status">${title}</span></div><div class="trk-meta">${metaBits.join(' &middot; ')}</div>${link}</div>`;
-  };
-
-  let html = '';
-  TRACKS.forEach(tr => {
-    const summary = byTrack[tr.key];
-    const items = (itemsBy[tr.key] || []).slice().sort((a,b) => {
-      const r = (RANK[a.confidence]??9) - (RANK[b.confidence]??9); if(r) return r;
-      return String(b.as_of||'').localeCompare(String(a.as_of||''));
-    });
-    if(!summary || (summary.active_items|0) === 0){
-      html += `<div class="track-card"><div class="track-head"><div class="track-title">${esc(tr.label)}</div><span class="conf-badge conf-monitoring">▪ Monitoring</span></div><div class="track-blurb">${esc(tr.blurb)}</div><div class="track-empty">Nothing on the public record yet (as of ${fmtDate(today)}). This track is monitored automatically — items appear here the moment an official source publishes one.</div></div>`;
-      return;
-    }
-    const topCls = (CONF[summary.top_confidence] || CONF.candidate).cls;
-    const counts = [];
-    if(summary.verified_items) counts.push(`${summary.verified_items} confirmed`);
-    if(summary.probable_items) counts.push(`${summary.probable_items} reported`);
-    if(summary.candidate_items) counts.push(`${summary.candidate_items} under review`);
-    const topBadge = `<span class="conf-badge ${topCls}">${counts.join(' &middot; ')}</span>`;
-    const head = items.slice(0,4).map(renderItem).join('');
-    const rest = items.slice(4);
-    const more = rest.length ? `<details class="track-more"><summary>Show ${rest.length} more</summary>${rest.map(renderItem).join('')}</details>` : '';
-    html += `<div class="track-card"><div class="track-head"><div class="track-title">${esc(tr.label)}</div>${topBadge}</div><div class="track-blurb">${esc(tr.blurb)}</div>${head}${more}</div>`;
-  });
-  grid.innerHTML = html;
-}
 
 loadAlerts();
 loadMeetings();
-loadProjectStatus();
 
 </script>
 <style>
