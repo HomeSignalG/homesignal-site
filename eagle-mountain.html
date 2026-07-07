@@ -734,8 +734,8 @@ async function loadAlerts() {
     // own tier directly; News is the catch-all (newest items not in those three tiers).
     const [gov, emerging, global, recent] = await Promise.all([
       fetchTier('pipeline_type=eq.government_notice', PER_TIER),
-      fetchTier('category=eq.emerging_technology', PER_TIER, agnosticBase),
-      fetchTier('category=eq.global_best_practices&or=(quality_grade.is.null,quality_grade.in.(BEST,MEDIUM))', PER_TIER, agnosticBase),
+      fetchTier('category=eq.emerging_technology&quality_grade.in.(BEST,MEDIUM)', PER_TIER, agnosticBase),
+      fetchTier('category=eq.global_best_practices&quality_grade.in.(BEST,MEDIUM)', PER_TIER, agnosticBase),
       fetchTier('', PER_TIER * 3)
     ]);
     const news = recent.filter(a => alertCatId(a.pipeline_type, a.category) === 'news').slice(0, PER_TIER);
