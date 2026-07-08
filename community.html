@@ -408,7 +408,22 @@ body { background: #f3f4f6; font-size: 14px; }
 </div>
 
 <div class="cat-section">
-  <div class="instruction"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg> Click a box to select and sign up for <span class="free-badge">FREE</span> alerts</div>
+  <!-- Re-opt-in prompt. Hidden by default; updateReoptinBanner() reveals it only for a logged-in
+       user who follows topics but has no email opt-in on record (marketing_consent === false).
+       The CTA (startReoptin) CLEARS the picker so they must actively re-tick under the new heading;
+       that fresh selection + Save is what records the opt-in. -->
+  <div id="reoptin-banner" style="display:none;gap:14px;align-items:flex-start;background:var(--gl);border:1px solid var(--gm);border-radius:var(--r);padding:16px 18px;margin-bottom:20px;">
+    <div style="flex-shrink:0;width:34px;height:34px;border-radius:8px;background:var(--green);display:flex;align-items:center;justify-content:center;">
+      <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M2 6h20v12H2z"/><path d="M22 6l-10 7L2 6"/></svg>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:3px;">Confirm you want these notices emailed to you</div>
+      <div style="font-size:13px;color:var(--ts);margin-bottom:12px;">You're following topics here, but we've updated how email sign-up works — email now requires your explicit go-ahead. To keep getting your daily notices by email, choose the notices you want emailed below. Your alerts still show on this page either way.</div>
+      <button type="button" onclick="startReoptin()" style="background:var(--green);color:#fff;font-size:13px;font-weight:600;padding:9px 16px;border-radius:var(--rs);border:none;cursor:pointer;">Choose the notices I want emailed &rarr;</button>
+      <div style="font-size:11.5px;color:var(--tt);margin-top:9px;">Prefer not to? Do nothing — you just won't receive the email digest.</div>
+    </div>
+  </div>
+  <div class="instruction"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg> Choose the notices you want emailed to you</div>
   <!-- GROUP 1 — local (green headers): Government Notices & Meetings · Local News -->
   <div class="be-group-head" id="grp-local-head">In your community</div>
   <div class="be-group-local">
@@ -964,6 +979,7 @@ let accountZip = '';
 let accountLoaded = false;
 let accountExists = false;
 let accountConsent = false;
+let accountMarketingConsent = null; // email opt-in: null=unknown/absent-column, true/false from users.marketing_consent
 let pendingFollow = null;
 let searchedZip = '';
 // Community-resolution gate: loadAccount() must read the FINAL CONTENT_ID (the resolved
@@ -984,9 +1000,32 @@ const communityReady = new Promise(function(r){ _resolveCommunityReady = r; });
 
 function hsLoggedIn(){ return !!(window.hsUser); }
 function followedFor(cat){ return (accountTopics && Array.isArray(accountTopics[cat])) ? accountTopics[cat] : []; }
+function hasAnyFollowedTopics(){ return !!(accountTopics && Object.keys(accountTopics).some(function(k){ return Array.isArray(accountTopics[k]) && accountTopics[k].length; })); }
+// Re-opt-in banner: shown ONLY to a logged-in user who already follows topics but whose email
+// opt-in isn't on record yet (marketing_consent === false). Never shown on unknown (null) — so a
+// pre-migration DB without the column fails closed to hidden. Actively re-selecting topics under
+// the new heading records the opt-in (signup_complete → marketing_consent); no silent backfill.
+function updateReoptinBanner(){
+  var el = document.getElementById('reoptin-banner');
+  if(!el) return;
+  var show = hsLoggedIn() && accountExists && hasAnyFollowedTopics() && accountMarketingConsent === false;
+  el.style.display = show ? 'flex' : 'none';
+}
+// Cleared-picker re-opt-in: wipe the IN-MEMORY topic selection so every tile opens UNCHECKED and
+// the existing user must actively re-tick under the new heading before Save. In-memory only — the
+// DB is untouched until they explicitly Save (signup_complete then reconciles to whatever they
+// freshly chose), and a page refresh restores their prior follows if they abandon. Guarantees every
+// emailed topic was freshly, affirmatively chosen under the email-naming copy.
+function startReoptin(){
+  accountTopics = {};
+  var el = document.getElementById('reoptin-banner'); if(el) el.style.display = 'none';
+  refreshTileLabels();
+  var tiles = document.querySelector('.be-group-local') || document.querySelector('.cat-section');
+  if(tiles) tiles.scrollIntoView({ behavior:'smooth', block:'start' });
+}
 
 async function loadAccount(){
-  if(!hsLoggedIn()){ accountTopics={}; accountZip=''; accountConsent=false; accountLoaded=true; refreshTileLabels(); return; }
+  if(!hsLoggedIn()){ accountTopics={}; accountZip=''; accountConsent=false; accountMarketingConsent=null; accountLoaded=true; refreshTileLabels(); updateReoptinBanner(); return; }
   // Wait for the community chain to resolve so CONTENT_ID is the real anchor (not the Box
   // Elder fallback), then scope the Following read to THIS community. users.topics is keyed
   // per (email, community_id) (unique constraint users_email_community_key), so this returns
@@ -1002,6 +1041,15 @@ async function loadAccount(){
   }catch(e){ accountTopics = {}; accountConsent = false; }
   accountLoaded = true;
   refreshTileLabels();
+  // Email opt-in state — SEPARATE, error-tolerant read so a pre-migration DB (no marketing_consent
+  // column) can't break the topic/consent load above; on any failure it stays null and the banner hides.
+  accountMarketingConsent = null;
+  try{
+    const cr = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(window.hsUser.email)}&community_id=eq.${CONTENT_ID}&select=marketing_consent`,
+      { headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${window.hsToken || SUPABASE_ANON_KEY}` } });
+    if(cr.ok){ const crows = await cr.json(); if(Array.isArray(crows) && crows.length){ accountMarketingConsent = !!crows[0].marketing_consent; } }
+  }catch(e){ accountMarketingConsent = null; }
+  updateReoptinBanner();
 }
 
 // Canonical pipeline_type for each UI cat (mirrors topics.js — keep in sync).
@@ -1038,7 +1086,11 @@ async function persistAccount(consent){
     p_topics: accountTopics,
     p_consent_version: '2026-06-20',
     p_subscriptions: buildSubscriptionSet(),
-    p_data_licensing_agreed: !!consent
+    p_data_licensing_agreed: !!consent,
+    // Explicit email opt-in: the heading shown above the tiles. Selecting >=1 topic under it is
+    // the opt-in; signup_complete derives marketing_consent server-side and records this copy as
+    // "what they agreed to". Single write path (saveTopics + "Save location" both funnel here).
+    p_marketing_consent_copy: 'Choose the notices you want emailed to you'
   });
   if(r && r.error){ throw new Error('Save error: ' + (r.error.message || r.error)); }
   accountExists = true;
