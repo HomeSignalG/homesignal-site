@@ -62,7 +62,28 @@
     return out;
   }
 
+  // ZIP -> the most-specific community ROW that contains it ({id,name,level,slug}), or null.
+  // Same live-DB query + most-specific ranking as resolveCoverageUrl, but returns the ROW so a
+  // caller can DISPLAY the resident's place. The dashboard uses this to show the ZIP a user
+  // entered (users.zip_code) as their follow's name — while the follow's community_id stays
+  // anchored at the county so alerts keep delivering. Null = ZIP not covered.
+  async function communityForZip(zip) {
+    if (!zip) return null;
+    try {
+      var res = await fetch(SB_URL + '/rest/v1/communities?select=id,name,level,slug,zip_codes&zip_codes=cs.{' + encodeURIComponent(zip) + '}', { headers: anonHeaders() });
+      if (res.ok) {
+        var rows = await res.json();
+        if (Array.isArray(rows) && rows.length) {
+          rows.sort(function (a, b) { return (LEVEL_RANK[b.level] || 0) - (LEVEL_RANK[a.level] || 0) || (a.zip_codes || []).length - (b.zip_codes || []).length; });
+          return rows[0];
+        }
+      }
+    } catch (e) {}
+    return null;
+  }
+
   window.HS.resolveCoverageUrl = resolveCoverageUrl;
   window.HS.communitiesByIds = communitiesByIds;
   window.HS.pageForCommunity = pageForCommunity;
+  window.HS.communityForZip = communityForZip;
 })();
