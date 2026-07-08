@@ -880,6 +880,11 @@ async function submitAlertSignup(){
     sb.textContent='Saved \u2713';
     setTimeout(closeAlertModal, 1600);
   }catch(err){
+    if(err && err.authRequired){
+      // Session lapsed — stash the intent and re-open login; hsOnAuthChange replays it on return.
+      pendingFollow={ kind:'alert', cat:alertCat, checked:checked, consent:consent };
+      closeAlertModal(); window.hsOpenAuth(); return;
+    }
     msg.style.color='#b91c1c'; msg.textContent='Sorry, that didn\'t save. Please try again.'; sb.disabled=false; sb.textContent=old;
   }
 }
@@ -953,6 +958,11 @@ async function toggleSave(btn){
     accountTopics.notices = snapN; accountTopics.meetings = snapM;
     if(label) label.textContent = prev;
     refreshTileLabels();
+    if(err && err.authRequired){
+      // Session lapsed — stash the follow and re-open login; it replays after re-auth.
+      pendingFollow = { kind:'savelocation' };
+      btn.disabled = false; window.hsOpenAuth(); return;
+    }
     showToast('Could not save — please try again.');
   }finally{
     btn.disabled = false;
@@ -1077,22 +1087,40 @@ async function persistAccount(consent){
   // fallback — abort rather than store a fake ZIP if there's no valid 5-digit ZIP on file.
   const zipForSave = (searchedZip || accountZip || '').trim();
   if(!/^\d{5}$/.test(zipForSave)){ throw new Error('Your account has no ZIP code on file — please re-enter it before editing alerts.'); }
+  // Get a LIVE session token at WRITE time. window.hsUser/hsToken can outlive the actual
+  // Supabase session (the access token expires), which made hsClient.rpc() silently fall back
+  // to the anon key -> signup_complete's identity guard returns 403 "must be called from an
+  // authenticated session" (JWT carried no email) and the opt-in never persisted. getSession()
+  // refreshes an expired access token, or returns null if the login truly lapsed; we then send
+  // THAT token explicitly on the RPC — the same authenticated path loadAccount already uses.
+  // A missing/rejected session throws err.authRequired so callers re-open login instead of
+  // showing a generic failure.
+  let token = null;
+  try { const s = await window.hsClient.auth.getSession(); token = (s && s.data && s.data.session && s.data.session.access_token) || null; } catch(e){}
+  if(!token){ const e = new Error('Your session expired — please log in again.'); e.authRequired = true; throw e; }
   // Data-licensing consent rides through on every write (parity with the curated pages);
   // the modal pre-fills the box from the stored value so a prior true is never flipped to false.
-  const r = await window.hsClient.rpc('signup_complete', {
-    p_email: email,
-    p_community_id: CONTENT_ID,
-    p_zip_code: zipForSave,
-    p_topics: accountTopics,
-    p_consent_version: '2026-06-20',
-    p_subscriptions: buildSubscriptionSet(),
-    p_data_licensing_agreed: !!consent,
-    // Explicit email opt-in: the heading shown above the tiles. Selecting >=1 topic under it is
-    // the opt-in; signup_complete derives marketing_consent server-side and records this copy as
-    // "what they agreed to". Single write path (saveTopics + "Save location" both funnel here).
-    p_marketing_consent_copy: 'Choose the notices you want emailed to you'
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/signup_complete`, {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      p_email: email,
+      p_community_id: CONTENT_ID,
+      p_zip_code: zipForSave,
+      p_topics: accountTopics,
+      p_consent_version: '2026-06-20',
+      p_subscriptions: buildSubscriptionSet(),
+      p_data_licensing_agreed: !!consent,
+      // Explicit email opt-in: the heading shown above the tiles. Selecting >=1 topic under it is
+      // the opt-in; signup_complete derives marketing_consent server-side and records this copy as
+      // "what they agreed to". Single write path (saveTopics + "Save location" both funnel here).
+      p_marketing_consent_copy: 'Choose the notices you want emailed to you'
+    })
   });
-  if(r && r.error){ throw new Error('Save error: ' + (r.error.message || r.error)); }
+  // A lapsed session that slipped past getSession() (or an RLS/identity rejection) comes back
+  // 401/403 — treat it as "log in again", not a generic error.
+  if(res.status === 401 || res.status === 403){ const e = new Error('Your session expired — please log in again.'); e.authRequired = true; throw e; }
+  if(!res.ok){ let t=''; try{ t = await res.text(); }catch(_){} throw new Error('Save error: ' + res.status + ' ' + t.slice(0,200)); }
   accountExists = true;
   accountConsent = !!consent; // keep the pre-filled checkbox in sync so a later save can't reset it
   refreshTileLabels();
@@ -1243,6 +1271,11 @@ async function submitModalSignup(){
     sb.textContent='Saved \u2713';
     setTimeout(closeModal, 1600);
   }catch(err){
+    if(err && err.authRequired){
+      // Session lapsed — stash the intent and re-open login; hsOnAuthChange replays it on return.
+      pendingFollow={ kind:'modal', cat:currentId, checked:checked, consent:consent };
+      closeModal(); window.hsOpenAuth(); return;
+    }
     msg.style.color='#b91c1c'; msg.textContent='Sorry, that didn\'t save. Please try again.'; sb.disabled=false; sb.textContent=old;
   }
 }
