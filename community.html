@@ -1459,9 +1459,10 @@ function applyCommunity(){
     var t = document.getElementById('comm-title');
     if(t){
       // If the community's own name already carries the ZIP (e.g. "Ogden (84401)"), don't
-      // repeat it; otherwise append " · <zip>" so a town/county page reads as the ZIP page.
+      // repeat it. Otherwise pair name + ZIP — but LEAD with the ZIP when the place is a
+      // county, so no H1 starts with a bare county name; a town/city leads with its name.
       t.textContent = (headerZip && COMMUNITY.name.indexOf(headerZip) === -1)
-        ? (COMMUNITY.name + ' · ' + headerZip)
+        ? (COMMUNITY.level === 'county' ? (headerZip + ' · ' + COMMUNITY.name) : (COMMUNITY.name + ' · ' + headerZip))
         : COMMUNITY.name;
     }
     // SEO (§4): per-community <title>/description/canonical/og:* from the DB row, so
