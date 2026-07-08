@@ -400,8 +400,8 @@ body { background: #f3f4f6; font-size: 14px; }
 <div class="comm-header">
   <div class="comm-top">
     <div>
-      <h1 class="comm-title" id="comm-title">Box Elder County, Utah</h1>
-      <div class="comm-sub" id="comm-sub">Monitor factors that influence quality of life and long-term community well-being</div>
+      <h1 class="comm-title" id="comm-title">Your ZIP area</h1>
+      <div class="comm-sub" id="comm-sub">Local government alerts, meetings, and notices for your ZIP</div>
     </div>
     <button class="save-btn" onclick="toggleSave(this)"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg> <span id="save-label">Save location</span></button>
   </div>
@@ -1453,7 +1453,18 @@ async function resolveCommunity(){
 function applyCommunity(){
   if(COMMUNITY){
     var nm = COMMUNITY.name + (COMMUNITY.state ? ', ' + COMMUNITY.state : '');
-    var t = document.getElementById('comm-title'); if(t) t.textContent = COMMUNITY.name;
+    // H1 reads as the ZIP/place the resident entered — never a bare county name. The county
+    // is context (shown in the sub-line as the layer that cascades in), not the page identity.
+    var headerZip = (searchedZip || (COMMUNITY.zip_codes && COMMUNITY.zip_codes[0]) || '').trim();
+    var t = document.getElementById('comm-title');
+    if(t){
+      // If the community's own name already carries the ZIP (e.g. "Ogden (84401)"), don't
+      // repeat it. Otherwise pair name + ZIP — but LEAD with the ZIP when the place is a
+      // county, so no H1 starts with a bare county name; a town/city leads with its name.
+      t.textContent = (headerZip && COMMUNITY.name.indexOf(headerZip) === -1)
+        ? (COMMUNITY.level === 'county' ? (headerZip + ' · ' + COMMUNITY.name) : (COMMUNITY.name + ' · ' + headerZip))
+        : COMMUNITY.name;
+    }
     // SEO (§4): per-community <title>/description/canonical/og:* from the DB row, so
     // every one of the 12k+ dynamic pages is indexable with real metadata — no clones.
     try {
@@ -1484,14 +1495,20 @@ function applyCommunity(){
       if (!link) { link = document.createElement('link'); link.setAttribute('rel', 'canonical'); document.head.appendChild(link); }
       link.setAttribute('href', canon);
     } catch (e) { /* SEO is best-effort; never block the page */ }
-    // Personal sub-line: ZIP + the parent county (when this is a town under a county).
-    var parent = (COMMUNITY.chain && COMMUNITY.chain.length > 1) ? COMMUNITY.chain[COMMUNITY.chain.length - 1] : null;
+    // Personal sub-line makes the layers explicit: ZIP-local alerts PLUS the county layer
+    // that cascades onto this page — so the resident sees they get both on their ZIP page.
+    var countyName = '';
+    (COMMUNITY.chain || [COMMUNITY]).forEach(function(c){ if(c && c.level === 'county') countyName = c.name; });
+    if(!countyName){
+      var root = (COMMUNITY.chain && COMMUNITY.chain.length) ? COMMUNITY.chain[COMMUNITY.chain.length - 1] : COMMUNITY;
+      if(root && root.level === 'county') countyName = root.name;
+    }
     var sub = document.getElementById('comm-sub');
     if(sub){
-      var bits = [];
-      if(searchedZip) bits.push('ZIP ' + searchedZip);
-      bits.push(parent ? ('in ' + parent.name + (parent.state ? ', ' + parent.state : '')) : (COMMUNITY.state || ''));
-      sub.textContent = bits.filter(Boolean).join(' · ');
+      var forWhat = headerZip || COMMUNITY.name;
+      var line = 'Local alerts for ' + forWhat;
+      if(countyName && countyName !== COMMUNITY.name) line += ' + ' + countyName + ' updates';
+      sub.textContent = line;
     }
     var gh = document.getElementById('grp-local-head'); if(gh) gh.textContent = 'In ' + COMMUNITY.name;
     // Scoped government topics (this place + its county ancestors, siblings excluded)

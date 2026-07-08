@@ -391,11 +391,20 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     // table (source of truth) — never the frozen communities.js map, which silently dropped
     // communities it didn't know (Weber County, Box Elder County, …).
     var byId = await window.HS.communitiesByIds(follows.map(function(f){ return f.community_id; }));
-    var cards = follows.map(function(f){
-      var c = byId[f.community_id] || null;
-      var name = c ? c.name : 'Your community';
-      var page = (c && window.HS.pageForCommunity(c)) || ('community.html?id=' + encodeURIComponent(f.community_id));
-      var lvl = c ? levelLabel(c.level) : '';
+    // Show the ZIP the user ENTERED (users.zip_code) as the follow's place — not the county the
+    // subscription is anchored to. Resolve each zip to its most-specific community for DISPLAY;
+    // the follow's community_id is unchanged, so alerts keep delivering from the county row.
+    var places = await Promise.all(follows.map(function(f){ return f.zip_code ? window.HS.communityForZip(f.zip_code) : null; }));
+    var cards = follows.map(function(f, i){
+      var place  = places[i];                       // the entered ZIP's community (display)
+      var county = byId[f.community_id] || null;     // the content anchor (fallback name/page)
+      var disp   = place || county;                 // prefer the resident's ZIP/place
+      var name = disp ? disp.name : 'Your community';
+      // "Manage" links to the resident's ZIP page when we know the ZIP; else the anchor page.
+      var page = (place && f.zip_code && window.HS.pageForCommunity(place, f.zip_code))
+              || (county && window.HS.pageForCommunity(county))
+              || ('community.html?id=' + encodeURIComponent(f.community_id));
+      var lvl = disp ? levelLabel(disp.level) : '';
       var levelChip = lvl ? ' <span style="font-size:11px;color:#6b7280;border:1px solid #e5e7eb;border-radius:999px;padding:1px 7px;margin-left:8px;white-space:nowrap">' + esc(lvl) + '</span>' : '';
       var n = countTopics(f.topics);
       var meta = n > 0 ? ('<span class="dot">' + n + '</span> topic' + (n===1?'':'s') + ' followed') : 'No topics selected yet';
