@@ -1,4 +1,4 @@
-// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v14.
+// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v15.
 // PARKED HERE FOR REFERENCE/REPRODUCIBILITY ONLY — Supabase is the source of truth
 // (docs/development-tracker-source-of-truth.md §2). v11 = MULTI-COUNTY: resolveCommunityIds()
 // maps a ZIP to its own community chain (city+county) so each ZIP shows its OWN county's
@@ -11,8 +11,12 @@
 // (Box Elder 23→18); floor lowered to 0.25 mi. v14 = tracker-accuracy: dedup dev items (url|title+date
 // — ingest can double-emit), age out concluded hearings older than MEETING_LOOKBACK_DAYS, and stamp
 // `decided` (approved|denied/withdrawn/tabled) so the page never shows a resolved item as "open for
-// comment". Address-mode input/output shape unchanged. Redeploy via
-// mcp__Supabase__deploy_edge_function — committing does not deploy.
+// comment". v15 = RELEVANCE: classifyRelevance() stamps every dev item `relevance`
+// ('development'|'civic') + `rel_rule` (which rule decided — auditable, overridable, queryable in the
+// cache; 'unmatched' items are stamped, not silently dropped). Only relevance='development' counts as
+// a project: counts.development excludes civic notices (board vacancies, tax sales, budget/comp/bond
+// hearings) and counts.civic reports them separately so the page can list them non-headlined.
+// Redeploy via mcp__Supabase__deploy_edge_function — committing does not deploy.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -98,6 +102,43 @@ function classifyLayer(name: string, category = ""): string {
   for (const [layer, words] of LAYER_KEYWORDS) for (const w of words) { if ((w.includes(" ") && low.includes(w)) || (!w.includes(" ") && t.has(w))) return layer; }
   return "industrial";
 }
+// ── Relevance classifier (v15) ─────────────────────────────────────────────────────────
+// Only land-use / development actions belong in the development buckets; procedural civic
+// notices go to a separate non-headlined list. Rules are ordered so a mixed agenda that
+// names a real land-use action (e.g. "MDA, Fee Schedule Amendment, Overlay Zone") stays a
+// development item, while a purely procedural hearing ("Budget and Exec Compensation")
+// leaves. The county's own category tag is the fallback for generic titles, and anything
+// no rule matches is stamped rel_rule:'unmatched' (routed to the civic list for review —
+// visible in the cache, never dropped). Patterns were derived from the live alerts/meetings
+// corpus for the Utah County and Box Elder chains, not invented.
+const DEV_TITLE = new RegExp([
+  "rezon", "zone chang", "zoning", "subdivision", "subdivide", "\\bplat\\b", "site plan",
+  "conditional use", "variance", "annex", "general plan", "master plan", "comprehensive plan",
+  "development agreement", "master development", "\\bmda\\b", "armda", "overlay zone",
+  "overlay district", "land use", "planned unit", "\\bpud\\b", "concept plan",
+  "development code", "lot split", "lot line", "boundary adjustment", "street vacat",
+  "road vacat", "\\bvacate\\b", "easement vacat", "vacation of", "\\bpue\\b",
+  "right.of.way", "infrastructure district", "impact fee", "\\bpcph\\b",
+  "planning commission", "agriculture protection", "data cent", "moratorium", "housing",
+  "warehouse", "solar", "wind farm", "substation", "landfill", "quarry", "gravel pit",
+  "mining", "asphalt", "concrete", "refinery", "water treatment", "wastewater",
+].join("|"), "i");
+const CIVIC_TITLE = new RegExp([
+  "vacanc", "tax sale", "budget", "compensation", "salar", "fee schedule", "property tax",
+  "tax increase", "\\bbond", "enterprise fund", "utility transfer", "notice of transfer",
+  "transfers? notice", "canvass", "election", "unclaimed property",
+  "disposition of real property", "reorganiz", "\\baudit\\b", "procurement", "\\brfp\\b",
+  "surplus", "block grant", "newsletter", "mayor.?s\\b.*report",
+].join("|"), "i");
+const DEV_CATEGORY = /planning|zoning|stratos|development/i;
+function classifyRelevance(title: string, category: string, agency: string): [string, string] {
+  const t = title || "";
+  if (DEV_TITLE.test(t)) return ["development", "title:landuse"];
+  if (CIVIC_TITLE.test(t)) return ["civic", "title:civic"];
+  if (DEV_CATEGORY.test(category || "")) return ["development", "category:planning"];
+  if (/planning/i.test(agency || "")) return ["development", "agency:planning"];
+  return ["civic", "unmatched"];   // generic agendas / meeting notices — logged for review
+}
 function toEN(homeLat: number, homeLng: number, lat: number, lng: number): [number, number] {
   const n = (lat - homeLat) * MILES_PER_DEG_LAT;
   const e = (lng - homeLng) * MILES_PER_DEG_LAT * Math.cos((homeLat * Math.PI) / 180);
@@ -135,14 +176,16 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
     // A DECIDED item (approved OR denied/withdrawn/tabled) is not an open comment opportunity — the
     // page uses this so it never tells a resident to "comment" on something already resolved.
     const denied = /\b(denied|denies|deny|withdrawn|withdrew|withdraws|rejected|rejects|tabled|dismissed|vacated|rescinded)\b/i.test(title);
-    const s: Record<string, unknown> = { label: title.slice(0, 120) || "Development item", e, n, lat: pt[0], lng: pt[1], scope: "area", type: approved ? "approved" : "proposed", decided: approved || denied, layer: classifyLayer(title, a.category as string), src: ((a.agency_name as string) || (a.category as string) || "Planning record").trim(), url: (a.source_url as string) || "" };
+    const [rel, relRule] = classifyRelevance(title, (a.category as string) || "", (a.agency_name as string) || "");
+    const s: Record<string, unknown> = { label: title.slice(0, 120) || "Development item", e, n, lat: pt[0], lng: pt[1], scope: "area", type: approved ? "approved" : "proposed", decided: approved || denied, relevance: rel, rel_rule: relRule, layer: classifyLayer(title, a.category as string), src: ((a.agency_name as string) || (a.category as string) || "Planning record").trim(), url: (a.source_url as string) || "" };
     if (a.comment_deadline) s.comment_deadline = a.comment_deadline;
     sites.push(s);
   }
   for (const m of meetings ?? []) {
     const pt = centroid((m.location as string) || "") ?? PLACES["box elder county"];
     const [e, n] = toEN(homeLat, homeLng, pt[0], pt[1]);
-    sites.push({ label: ((m.title as string) || "Public hearing").slice(0, 120), e, n, lat: pt[0], lng: pt[1], scope: "area", type: "proposed", decided: false, layer: classifyLayer((m.title as string) || "", m.category as string), src: m.is_public_hearing ? "Public hearing" : "Comment window", url: (m.source_url as string) || "", meeting_date: m.meeting_date });
+    const [rel, relRule] = classifyRelevance((m.title as string) || "", (m.category as string) || "", "");
+    sites.push({ label: ((m.title as string) || "Public hearing").slice(0, 120), e, n, lat: pt[0], lng: pt[1], scope: "area", type: "proposed", decided: false, relevance: rel, rel_rule: relRule, layer: classifyLayer((m.title as string) || "", m.category as string), src: m.is_public_hearing ? "Public hearing" : "Comment window", url: (m.source_url as string) || "", meeting_date: m.meeting_date });
   }
   // Dedup: ingest can emit the same notice more than once. Key on the record URL when present, else
   // title + date. First-seen wins (alerts before meetings, both newest-first) so counts aren't inflated.
@@ -277,11 +320,14 @@ Deno.serve(async (req: Request) => {
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");
     const fac = facRaw.filter((s) => (s.record_url as string) && (s.record_url as string).trim() !== "");
+    // Only genuine land-use items count as development; civic notices are carried in sites
+    // (the page lists them non-headlined) but never inflate the project counts.
+    const devReal = dev.filter((s) => s.relevance !== "civic");
     const allSites = [...dev, ...fac];
     const access = await accessLevel(req, supabase);
     const sites = access === "full" ? allSites : allSites.slice(0, TEASER_LIMIT);
     const locked = access === "full" ? 0 : Math.max(0, allSites.length - sites.length);
-    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, development: dev.length, locked }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
+    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, development: devReal.length, civic: dev.length - devReal.length, locked }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
   }
 
   const address = (body.address || "").trim();
@@ -298,8 +344,9 @@ Deno.serve(async (req: Request) => {
     try { const { data: rows } = await supabase.from("echo_violation_counts").select("registry_id,count").in("registry_id", rids); const byId = new Map((rows ?? []).map((r) => [r.registry_id as string, r.count as number])); for (const f of fac) { const c = byId.get(f.registry_id as string); if (c && c > 0) { f.viol = c; f.violUrl = f.record_url; } } } catch (_e) { /* best-effort */ }
   }
   const allSites = [...dev, ...fac];
+  const devReal = dev.filter((s) => s.relevance !== "civic");
   const access = await accessLevel(req, supabase);
   const sites = access === "full" ? allSites : allSites.slice(0, TEASER_LIMIT);
   const locked = access === "full" ? 0 : Math.max(0, allSites.length - sites.length);
-  return json({ address: matched, home: { lat, lng }, radius_mi: radiusMi, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, development: dev.length, locked }, note: "Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
+  return json({ address: matched, home: { lat, lng }, radius_mi: radiusMi, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, development: devReal.length, civic: dev.length - devReal.length, locked }, note: "Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
 });

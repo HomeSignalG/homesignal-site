@@ -75,6 +75,7 @@ async function main() {
       const st = await page.evaluate(() => ({
         rendered: Array.isArray(window.__HS_SITES) ? window.__HS_SITES : null,
         facText: (document.getElementById('cFac') || {}).textContent || null,
+        devText: (document.getElementById('cDev') || {}).textContent || null,
         mapInited: !!document.querySelector('#map .leaflet-container, #map canvas'),
       }));
 
@@ -87,6 +88,19 @@ async function main() {
       const facShown = st.facText != null ? parseInt(st.facText, 10) : null;
       if (wantFac != null && facShown != null && facShown !== wantFac) {
         fails.push(`ZIP ${zip}: facility count ${facShown} != cached counts.facilities ${wantFac}`);
+      }
+
+      // RELEVANCE SPLIT (engine v15): the headline "projects proposed" number must equal the
+      // non-civic area items the lists can back up — a civic notice (board vacancy, tax sale,
+      // budget/comp/bond hearing) counted as a project is a count-inflation failure. Only
+      // enforced once the cached sites carry relevance stamps (pre-v15 rows have none).
+      const areaSites = (st.rendered || sites).filter((s) => s && s.scope === 'area');
+      if (areaSites.some((s) => s.relevance != null)) {
+        const wantDev = areaSites.filter((s) => s.relevance !== 'civic').length;
+        const devShown = st.devText != null ? parseInt(st.devText, 10) : null;
+        if (devShown != null && devShown !== wantDev) {
+          fails.push(`ZIP ${zip}: projects-proposed tile ${devShown} != non-civic dev items ${wantDev} (count inflation)`);
+        }
       }
 
       // THE ANTI-FABRICATION INVARIANT: every rendered site must carry a record_url.

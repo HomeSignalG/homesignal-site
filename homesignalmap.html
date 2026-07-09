@@ -332,6 +332,16 @@
         </div>
       </div>
 
+      <!-- Non-headlined: procedural public notices (board vacancies, tax sales, budget /
+           compensation / bond hearings) from the same official feeds. The relevance split
+           keeps them OUT of the development buckets and counts, but they stay listed here so
+           nothing is hidden — every item still links to its official record. -->
+      <div class="card read" id="civicCard" style="display:none;margin-top:18px">
+        <div class="band-h" style="background:#5d6f72">Other public notices</div>
+        <div class="band-s" id="civicSub">Procedural civic items from the same official feeds — budgets, board vacancies, tax sales. Not development projects, so they aren't counted above.</div>
+        <div id="civicList"></div>
+      </div>
+
       <div class="foot" id="foot"></div>
     </div>
   </div>
@@ -457,9 +467,11 @@
   // a synthetic DISPLAY position instead: a deterministic golden-angle spread around the
   // page anchor (ZIP centroid / searched home), always inside the viewed radius. Placement
   // is presentation only — the popup says so; every fact on the dot comes from the record.
-  function mappable(s){ return s.scope==="point" || s.scope==="area"; }
+  // Civic-relevance items (relevance:"civic" — engine v15) are procedural notices, not
+  // development: they get no map dot and live only in the "Other public notices" list.
+  function mappable(s){ return s.scope==="point" || (s.scope==="area" && s.relevance!=="civic"); }
   function placeAreaSites(sites, home){
-    var area = sites.filter(function(s){ return s.scope==="area"; });
+    var area = sites.filter(function(s){ return s.scope==="area" && s.relevance!=="civic"; });
     var N = area.length;
     area.forEach(function(s, i){
       var ang = i*2.399963;                                     // golden angle — even, deterministic
@@ -718,7 +730,14 @@
     window.__HS_SITES = sites;
 
     var fac = sites.filter(function(s){ return s.scope==="point"; });
-    var dev = sites.filter(function(s){ return s.scope==="area"; });
+    var devAll = sites.filter(function(s){ return s.scope==="area"; });
+    // Relevance split (engine v15): only land-use items are development projects; procedural
+    // civic notices (board vacancies, tax sales, budget/comp/bond hearings) are listed
+    // separately below and never inflate the project counts. Items from a pre-v15 cache have
+    // no relevance field and keep the old behavior until the nightly re-cache stamps them.
+    var dev = devAll.filter(function(s){ return s.relevance !== "civic"; });
+    var civ = devAll.filter(function(s){ return s.relevance === "civic"; });
+    var stamped = devAll.some(function(s){ return s.relevance != null; });
     var appr = dev.filter(function(s){ return bucketOf(s.type)==="approved"; });
     var prop = dev.filter(function(s){ return bucketOf(s.type)==="proposed"; });
     // "Open for public comment" = a genuine opportunity only: a PROPOSED item, not already
@@ -733,7 +752,10 @@
       ? (data.updated ? "Updated " + fmtDate(data.updated) : "")
       : "Live results · fetched just now";
     $("cFac").textContent  = (data.counts && data.counts.facilities)  != null ? data.counts.facilities  : fac.length;
-    $("cDev").textContent  = (data.counts && data.counts.development)  != null ? data.counts.development  : dev.length;
+    // Once sites carry relevance stamps, the filtered list IS the count — the headline number
+    // must always match what the Proposed/Approved lists can back up.
+    $("cDev").textContent  = stamped ? dev.length
+      : ((data.counts && data.counts.development) != null ? data.counts.development : dev.length);
     $("cOpen").textContent = open.length;
     $("cTot").textContent  = sites.length;
 
@@ -757,20 +779,33 @@
 
     // Facilities-only ZIP page (has EPA facilities, no planning items yet) → show the honest
     // coverage note so "0 planning items" doesn't read as "nothing is happening here."
-    var devCount = (data.counts && data.counts.development) != null ? data.counts.development : dev.length;
+    var devCount = stamped ? dev.length
+      : ((data.counts && data.counts.development) != null ? data.counts.development : dev.length);
     var facCount = (data.counts && data.counts.facilities)  != null ? data.counts.facilities  : fac.length;
     FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0;
     updateCovNote();
 
     drawMap(data, sites);
     listInto("builtList", fac, "No EPA-registered facility on record here.");
-    listInto("apprList", appr, "Nothing approved on record right now.");
+    // Why-empty explainer (honest, same style as the coverage note): a blank Approved column
+    // should never read as a rendering failure.
+    listInto("apprList", appr, dev.length
+      ? "Nothing approved on record right now — items move here when a proposal in these feeds is approved or permitted."
+      : "Approvals appear here once this county's planning feed is connected.");
     listInto("propList", prop, "No proposed item on record right now.");
+    var cc = $("civicCard");
+    if(civ.length){
+      $("civicSub").textContent = "Procedural civic items from the same official feeds — budgets, board vacancies, "
+        + "tax sales (" + civ.length + " on record; newest 12 shown). Not development projects, so they aren't counted above.";
+      listInto("civicList", civ, "");
+      cc.style.display = "";
+    } else { cc.style.display = "none"; }
 
     var locked = data.counts && data.counts.locked ? data.counts.locked : 0;
     $("foot").innerHTML =
       "Sources: US Census geocoder · county &amp; Utah PMN planning notices · EPA FRS facilities · EPA ECHO compliance records. "+
       "Facility pins sit at their exact EPA-registered locations. County and city notices apply jurisdiction-wide (no fixed address) — their orange/blue dots are placed within the viewed area to show activity, not exact sites; open a dot for the official record. "+
+      "Procedural civic notices (budgets, board vacancies, tax sales) are listed under Other public notices and are not counted or mapped as development. "+
       "Violations are a factual count linked to the official EPA record — not a verdict on any operator." +
       (data.paywall ? (" " + locked + " more items are available with a subscription.") : " Free during launch.");
   }
@@ -897,7 +932,8 @@
     var el = $(id);
     if(!items.length){ el.innerHTML = "<div class='empty'>"+emptyMsg+"</div>"; return; }
     el.innerHTML = items.slice(0,12).map(function(s){
-      var col = COLORS[s.type] || "#5d6f72";
+      // Civic notices take a neutral dot — the lifecycle colors are reserved for development.
+      var col = (s.relevance==="civic") ? "#5d6f72" : (COLORS[s.type] || "#5d6f72");
       var link = s.url || s.record_url || "";
       var a = link ? " · <a href='"+esc(link)+"' target='_blank' rel='noopener'>record ▸</a>" : "";
       var v = s.viol ? "<div class='vflag'>"+s.viol+" recorded violation"+(s.viol===1?"":"s")+" · EPA ECHO ▸</div>" : "";
