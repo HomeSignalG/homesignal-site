@@ -375,6 +375,22 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
   function levelLabel(lvl){
     return ({ county:'County', city:'City', zip:'ZIP area', neighborhood:'Neighborhood' })[lvl] || '';
   }
+  // Union topic arrays per category across two follow rows that resolve to the SAME displayed
+  // place (e.g. one row anchored to the right community, another to a mismatched/corrupted
+  // community_id but the same zip_code) so a merged card shows every followed topic once.
+  function mergeTopics(a, b){
+    var out = {};
+    [a, b].forEach(function(t){
+      if (!t) return;
+      Object.keys(t).forEach(function(k){
+        if (!Array.isArray(t[k])) return;
+        var list = out[k] || [];
+        t[k].forEach(function(v){ if (list.indexOf(v) === -1) list.push(v); });
+        out[k] = list;
+      });
+    });
+    return out;
+  }
   async function renderFollows(follows){
     var body = $('dash-body');
     if (!follows.length){
@@ -395,25 +411,38 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     // subscription is anchored to. Resolve each zip to its most-specific community for DISPLAY;
     // the follow's community_id is unchanged, so alerts keep delivering from the county row.
     var places = await Promise.all(follows.map(function(f){ return f.zip_code ? window.HS.communityForZip(f.zip_code) : null; }));
-    var cards = follows.map(function(f, i){
+    // Group by the DISPLAYED place, not the raw row, so two follow rows that resolve to the same
+    // place (e.g. a mismatched community_id/zip_code pair) render as ONE card, not a duplicate.
+    var groups = [];
+    var indexByKey = {};
+    follows.forEach(function(f, i){
       var place  = places[i];                       // the entered ZIP's community (display)
       var county = byId[f.community_id] || null;     // the content anchor (fallback name/page)
       var disp   = place || county;                 // prefer the resident's ZIP/place
-      var name = disp ? disp.name : 'Your community';
-      // "Manage" links to the resident's ZIP page when we know the ZIP; else the anchor page.
       var page = (place && f.zip_code && window.HS.pageForCommunity(place, f.zip_code))
               || (county && window.HS.pageForCommunity(county))
               || ('community.html?id=' + encodeURIComponent(f.community_id));
-      var lvl = disp ? levelLabel(disp.level) : '';
+      var key = (disp && disp.id) || f.community_id;
+      if (Object.prototype.hasOwnProperty.call(indexByKey, key)) {
+        var g = groups[indexByKey[key]];
+        g.topics = mergeTopics(g.topics, f.topics);
+      } else {
+        indexByKey[key] = groups.length;
+        groups.push({ disp: disp, page: page, topics: f.topics || {} });
+      }
+    });
+    var cards = groups.map(function(g){
+      var name = g.disp ? g.disp.name : 'Your community';
+      var lvl = g.disp ? levelLabel(g.disp.level) : '';
       var levelChip = lvl ? ' <span style="font-size:11px;color:#6b7280;border:1px solid #e5e7eb;border-radius:999px;padding:1px 7px;margin-left:8px;white-space:nowrap">' + esc(lvl) + '</span>' : '';
-      var n = countTopics(f.topics);
+      var n = countTopics(g.topics);
       var meta = n > 0 ? ('<span class="dot">' + n + '</span> topic' + (n===1?'':'s') + ' followed') : 'No topics selected yet';
       return '<div class="comm-card">' +
         '<div class="comm-card-main">' +
-          '<div class="comm-card-name"><a class="comm-card-link" href="' + esc(page) + '">' + esc(name) + '</a>' + levelChip + '</div>' +
+          '<div class="comm-card-name"><a class="comm-card-link" href="' + esc(g.page) + '">' + esc(name) + '</a>' + levelChip + '</div>' +
           '<div class="comm-card-meta">' + meta + '</div>' +
         '</div>' +
-        '<a class="btn-outline" href="' + esc(page) + '" style="text-decoration:none">Manage alerts</a>' +
+        '<a class="btn-outline" href="' + esc(g.page) + '" style="text-decoration:none">Manage alerts</a>' +
       '</div>';
     }).join('');
     body.innerHTML = cards + addCommunityHtml();
