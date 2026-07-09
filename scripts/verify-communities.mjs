@@ -37,6 +37,16 @@ const SAMPLE = process.env.SAMPLE ? parseInt(process.env.SAMPLE, 10) : 0;
 // community.html:1065 — the resolution ranking we must mirror exactly.
 const LEVEL_RANK = { neighborhood: 4, zip: 3, city: 2, county: 1 };
 
+// community.html:1470-1472 (applyCommunity) — the H1 pairs name + ZIP (ZIP-first for a
+// county) unless the community's own name already carries the ZIP. Mirror exactly, or
+// every city/zip-level page — which is most of them — false-fails on a correct render.
+function expectedTitle(want, zip) {
+  if (zip && want.name.indexOf(zip) === -1) {
+    return want.level === 'county' ? `${zip} · ${want.name}` : `${want.name} · ${zip}`;
+  }
+  return want.name;
+}
+
 async function loadCommunities() {
   // PostgREST caps a single read at 1000 rows (the Supabase default max-rows). The table is
   // now several thousand rows, so we MUST page through it with Range headers — a single fetch
@@ -120,9 +130,10 @@ async function main() {
         universal: (typeof cats !== 'undefined' && cats.news && cats.news.items) ? cats.news.items.length : 0,
         gov: (typeof cats !== 'undefined' && cats.meetings && cats.meetings.items) ? cats.meetings.items.length : 0,
       }));
-      if (st.title !== want.name || st.name !== want.name) {
+      const wantTitle = expectedTitle(want, zip);
+      if (st.title !== wantTitle || st.name !== want.name) {
         // The core correctness gate: did ?zip= resolve to the most-specific community?
-        fails.push(`ZIP ${zip}: resolved "${st.title || st.name}" != expected most-specific "${want.name}" (${want.level})`);
+        fails.push(`ZIP ${zip}: resolved "${st.title || st.name}" != expected most-specific "${wantTitle}" (${want.level})`);
       } else if (st.universal < 1) {
         // Universal topics are community-agnostic and always present — 0 means the page's
         // subscribe flow failed to initialize (a real breakage), not an empty-but-valid tile.
