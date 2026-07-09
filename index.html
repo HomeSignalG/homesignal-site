@@ -145,7 +145,7 @@ footer .foot-links a:hover{color:var(--tx-primary)}
         <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.4-6-10a6 6 0 1 1 12 0c0 4.6-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
         <input id="hero-zip" type="text" placeholder="Enter your ZIP code (e.g., 84302)" aria-label="ZIP code" inputmode="numeric" />
       </div>
-      <button class="btn-primary">Sign up</button>
+      <button class="btn-primary">See what's planned</button>
       <p class="zip-msg" data-zip-msg role="status" aria-live="polite"></p>
     </div>
     <p class="meta" style="margin-top:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--tx-success)"><path d="M12 3l8 3.5V12c0 4.6-3.2 7.6-8 9-4.8-1.4-8-4.4-8-9V6.5z"/><path d="M9 12l2 2 4-4"/></svg> Free · one email a day · every item links to its official record</p>
@@ -266,7 +266,7 @@ footer .foot-links a:hover{color:var(--tx-primary)}
         <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.4-6-10a6 6 0 1 1 12 0c0 4.6-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
         <input type="text" placeholder="Enter your ZIP code (e.g., 84302)" aria-label="ZIP code" inputmode="numeric" />
       </div>
-      <button class="btn-primary">Sign up</button>
+      <button class="btn-primary">See what's planned</button>
       <p class="zip-msg" data-zip-msg role="status" aria-live="polite"></p>
     </div>
   </div>
@@ -417,13 +417,14 @@ function closeRequestModal(){
   document.body.style.overflow = '';
   if(requestTriggerInput){ try { requestTriggerInput.focus(); } catch(e){} } // return focus to the search box
 }
-async function runZip(input, msg){
+// ZIP submit → the dashboard, which renders the ZIP as a highlighted "pending"
+// community row (the dashboard IS the chooser — no interstitial page). Coverage
+// and save decisions happen there; the homepage only validates the 5 digits and
+// never navigates on a bad ZIP.
+function runZip(input, msg){
   const zip = extractZip(input ? input.value : '');
   if(!zip){ if(msg) msg.textContent = 'Please enter your 5-digit ZIP code.'; if(input) input.focus(); return; }
-  const url = await resolveCoverageUrl(zip);
-  if(url){ window.location.href = url; return; }
-  // Not covered -> open the request modal (it carries the message); prefill ZIP + focus email.
-  openRequestModal(zip, input);
+  window.location.href = 'dashboard.html?pending=' + encodeURIComponent(zip);
 }
 document.addEventListener('DOMContentLoaded', function(){
   // Mobile hamburger: UI-only toggle for the nav dropdown (no auth).

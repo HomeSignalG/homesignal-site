@@ -82,7 +82,37 @@
     return null;
   }
 
+  // ZIP -> the full most-specific community ROW plus its parent chain, content root, and
+  // the cascade-resolved government topic set (union of the chain's government_topics,
+  // own level first — same walk community.html's resolveCommunity() does). The dashboard's
+  // pending-row "Save community" uses this to write the SAME follow the community page's
+  // "Save location" writes: anchored at the chain root, full government set. Null = not covered.
+  async function communityChainForZip(zip) {
+    if (!zip) return null;
+    async function q(qs) {
+      try {
+        var res = await fetch(SB_URL + '/rest/v1/communities?' + qs + '&select=*', { headers: anonHeaders() });
+        if (!res.ok) return [];
+        var rows = await res.json();
+        return Array.isArray(rows) ? rows : [];
+      } catch (e) { return []; }
+    }
+    var hits = await q('zip_codes=cs.{' + encodeURIComponent(zip) + '}');
+    if (!hits.length) return null;
+    hits.sort(function (a, b) { return (LEVEL_RANK[b.level] || 0) - (LEVEL_RANK[a.level] || 0) || (a.zip_codes || []).length - (b.zip_codes || []).length; });
+    var row = hits[0], chain = [row], cur = row, guard = 0;
+    while (cur && cur.parent_id && guard++ < 8) {
+      var par = (await q('id=eq.' + encodeURIComponent(cur.parent_id)))[0] || null;
+      if (!par) break;
+      chain.push(par); cur = par;
+    }
+    var seen = {}, gov = [];
+    chain.forEach(function (c) { (c.government_topics || []).forEach(function (t) { if (!seen[t]) { seen[t] = 1; gov.push(t); } }); });
+    return { row: row, chain: chain, rootId: chain[chain.length - 1].id, govTopics: gov };
+  }
+
   window.HS.resolveCoverageUrl = resolveCoverageUrl;
+  window.HS.communityChainForZip = communityChainForZip;
   window.HS.communitiesByIds = communitiesByIds;
   window.HS.pageForCommunity = pageForCommunity;
   window.HS.communityForZip = communityForZip;

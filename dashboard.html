@@ -103,6 +103,16 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
 .comm-card-meta { font-size: 12.5px; color: var(--ts); }
 .comm-card-meta .dot { color: var(--green); font-weight: 700; }
 
+/* Pending ("just found — not saved yet") community row. The ONLY card on the
+   page allowed the emphasized border; saving converts it in place to a normal
+   hairline card. */
+.comm-card { transition: border-color .4s ease, box-shadow .4s ease; }
+.comm-card.pending-card, .comm-card.pending-card:hover { border: 2px solid var(--green-dark); }
+.pend-badge { display: inline-block; font-size: 11px; font-weight: 600; background: var(--green-light); color: #085041; border-radius: var(--radius-pill); padding: 2px 9px; margin-left: 8px; white-space: nowrap; vertical-align: middle; }
+/* Brief "you already follow this" pulse on an existing saved row. */
+.comm-card-flash { border-color: var(--green-dark); box-shadow: 0 0 0 1.5px var(--green-dark); }
+.guest-hint { font-size: 13px; color: var(--ts); margin: 4px 2px 0; }
+
 .add-card { background: var(--bg); border: 1px dashed var(--gm); border-radius: var(--r); padding: 18px; margin-top: 18px; }
 .add-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
 .add-card p { font-size: 12.5px; color: var(--ts); margin-bottom: 12px; }
@@ -329,6 +339,233 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     return [];
   }
 
+  // ============================================================
+  // Pending ("just found — not saved yet") community row.
+  // Entry points: the homepage ZIP box (?pending=<zip>) and the
+  // "Add a community" box below — one mechanic, two entry points.
+  // The ZIP lives in sessionStorage so the row survives a round
+  // trip to the Development page; nothing is written to the
+  // account until "Save community" (or Manage alerts) is clicked.
+  // ============================================================
+  var PENDING_SS = 'hs_pending_zip';
+  var pendingResolved = { zip: null, info: null }; // communityChainForZip result for the current pending ZIP
+  var pendingAction = null;                        // guest clicked Save/Manage → replayed right after login
+  var pageLoadedAt = Date.now();                   // timing signal for the coverage-request spam check
+  // Canonical pipeline_type per UI cat (mirrors community.html / topics.js — keep in sync).
+  var CAT_TO_PIPELINE = { notices: 'government_notice', meetings: 'government_notice', news: 'news_alert', emerging: 'emerging_technology', global: 'global_best_practices' };
+
+  function plural(n, s){ return n + ' ' + s + (n === 1 ? '' : 's'); }
+
+  // A new ?pending= always wins (and replaces any stored pending ZIP — only one at a
+  // time); otherwise sessionStorage, so the row survives navigating away and back.
+  function getPendingZip(){
+    try {
+      var p = new URLSearchParams(window.location.search).get('pending') || '';
+      var m = p.match(/^\s*(\d{5})\s*$/);
+      if (m) { try { sessionStorage.setItem(PENDING_SS, m[1]); } catch(e){} return m[1]; }
+    } catch(e){}
+    try { var s = sessionStorage.getItem(PENDING_SS); if (s && /^\d{5}$/.test(s)) return s; } catch(e){}
+    return null;
+  }
+  // Drop the pending state everywhere — sessionStorage AND the URL param — so a
+  // refresh after saving can't resurrect the pending row.
+  function clearPendingState(){
+    try { sessionStorage.removeItem(PENDING_SS); } catch(e){}
+    try {
+      var u = new URL(window.location.href);
+      if (u.searchParams.has('pending')) { u.searchParams.delete('pending'); history.replaceState(null, '', u.toString()); }
+    } catch(e){}
+  }
+
+  function pendingCardHtml(zip, info){
+    var name = info ? info.row.name : ('ZIP ' + zip);
+    var page = info ? window.HS.pageForCommunity(info.row, zip) : ('homesignalmap.html?zip=' + encodeURIComponent(zip));
+    // Manage alerts needs a community page to open — hidden for a ZIP with no coverage row.
+    var manageBtn = info ? '<button class="btn-outline" id="pend-manage">Manage alerts</button>' : '';
+    return '<div class="comm-card pending-card" id="pending-card">' +
+      '<div class="comm-card-main">' +
+        '<div class="comm-card-name"><a class="comm-card-link" href="' + esc(page) + '">' + esc(name) + '</a>' +
+        '<span class="pend-badge" id="pend-badge">Just found — not saved yet</span></div>' +
+        '<div class="comm-card-meta" id="pend-meta">Loading area summary…</div>' +
+      '</div>' +
+      '<span style="display:inline-flex;gap:8px;flex-wrap:wrap">' +
+        '<button class="btn-primary" id="pend-save">Save community</button>' +
+        '<a class="btn-outline" href="homesignalmap.html?zip=' + encodeURIComponent(zip) + '" style="text-decoration:none">Development</a>' +
+        manageBtn +
+      '</span>' +
+    '</div>';
+  }
+  function bindPendingRow(){
+    var s = $('pend-save');   if (s) s.addEventListener('click', function(){ savePending(false); });
+    var m = $('pend-manage'); if (m) m.addEventListener('click', function(){ savePending(true); });
+  }
+
+  // One-line area stat summary — same data source the Development page reads
+  // (the cached development_reports row). Fills in async; never blocks row render.
+  async function loadPendingStats(zip){
+    var el = $('pend-meta');
+    if (!el) return;
+    try {
+      var res = await fetch(SB_URL + '/rest/v1/development_reports?zip=eq.' + encodeURIComponent(zip) + '&select=counts,sites&limit=1', { headers: authHeaders() });
+      var rows = res.ok ? await res.json() : [];
+      // The row may have converted to saved (or re-rendered) while we fetched.
+      var card = $('pending-card');
+      el = $('pend-meta');
+      if (!el || !card || !card.classList.contains('pending-card')) return;
+      if (Array.isArray(rows) && rows.length) {
+        var counts = rows[0].counts || {};
+        var sites = Array.isArray(rows[0].sites) ? rows[0].sites : [];
+        var fac = counts.facilities != null ? counts.facilities : sites.filter(function(s){ return s.scope === 'point'; }).length;
+        var prop = sites.filter(function(s){ return s.scope === 'area' && !s.decided; }).length;
+        if (sites.length > 0) {
+          el.textContent = plural(fac, 'industrial site') + ' · ' + plural(prop, 'proposed project') + ' · ' + plural(sites.length, 'record') + ' nearby';
+          return;
+        }
+      }
+      el.textContent = 'No records in our coverage yet — save it and we’ll email you when filings appear.';
+    } catch(e){ if (el) el.textContent = 'Area summary unavailable right now.'; }
+  }
+
+  function setPendingBusy(busy){
+    var s = $('pend-save'), m = $('pend-manage');
+    if (s) { s.disabled = busy; s.textContent = busy ? 'Saving…' : 'Save community'; }
+    if (m) m.disabled = busy;
+  }
+
+  // Build the COMPLETE desired subscription set across all cats (mirrors
+  // community.html::buildSubscriptionSet — signup_complete reconciles it server-side).
+  function buildSubs(topics){
+    var seen = {}, out = [];
+    Object.keys(CAT_TO_PIPELINE).forEach(function(k){
+      var pl = CAT_TO_PIPELINE[k];
+      (topics[k] || []).forEach(function(t){
+        var key = pl + ' ' + t;
+        if (!seen[key]) { seen[key] = 1; out.push({ pipeline_type: pl, topic: t }); }
+      });
+    });
+    return out;
+  }
+
+  // Uncovered ZIP → the same waitlist capture as the homepage request form
+  // (submit-public-form Edge Function), so "save" still means "we'll email you."
+  async function requestCoverage(zip, email){
+    var res = await fetch(SB_URL + '/functions/v1/submit-public-form', {
+      method: 'POST',
+      headers: { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ form_type: 'community_request', company_website: '', elapsed_ms: Date.now() - pageLoadedAt, email: email, requested_zip: zip, requested_community: null })
+    });
+    if (!res.ok) throw new Error('request failed ' + res.status);
+  }
+
+  // "Save community" (openManage=true → Manage alerts, which silently saves first, then
+  // opens the same topic management the saved rows use — the community page).
+  // Storage path is the site's SINGLE write path, signup_complete: the same follow the
+  // community page's "Save location" writes — anchored at the chain ROOT, full government
+  // topic set on both Notices + Meetings; universal-topic follows + stored consent for
+  // that root are preserved by merging into the existing users row's topics.
+  async function savePending(openManage){
+    var zip = getPendingZip();
+    if (!zip) return;
+    if (!window.hsUser) {
+      // Guest: email-first login/signup (the existing OTP modal — no wall until they act).
+      pendingAction = { manage: !!openManage };
+      if (window.hsOpenAuth) window.hsOpenAuth();
+      return;
+    }
+    setPendingBusy(true);
+    try {
+      var info = (pendingResolved.zip === zip && pendingResolved.info) ? pendingResolved.info : await window.HS.communityChainForZip(zip);
+      pendingResolved = { zip: zip, info: info };
+      var email = window.hsUser.email;
+      if (!info) {
+        await requestCoverage(zip, email);
+        clearPendingState();
+        convertPendingRequested(zip);
+        return;
+      }
+      var topics = {}, consent = false;
+      try {
+        var r = await fetch(SB_URL + '/rest/v1/users?email=eq.' + encodeURIComponent(email) + '&community_id=eq.' + encodeURIComponent(info.rootId) + '&select=topics,data_licensing_agreed', { headers: authHeaders() });
+        if (r.ok) { var rows = await r.json(); if (Array.isArray(rows) && rows.length) { topics = rows[0].topics || {}; consent = !!rows[0].data_licensing_agreed; } }
+      } catch(e){}
+      topics.notices  = (info.govTopics || []).slice();
+      topics.meetings = (info.govTopics || []).slice();
+      // Live session token at WRITE time — hsToken can outlive the actual session
+      // (same pattern as community.html::persistAccount).
+      var token = null;
+      try { var s = await window.hsClient.auth.getSession(); token = (s && s.data && s.data.session && s.data.session.access_token) || null; } catch(e){}
+      if (!token) { pendingAction = { manage: !!openManage }; setPendingBusy(false); if (window.hsOpenAuth) window.hsOpenAuth(); return; }
+      var res = await fetch(SB_URL + '/rest/v1/rpc/signup_complete', {
+        method: 'POST',
+        headers: { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          p_email: email,
+          p_community_id: info.rootId,
+          p_zip_code: zip,
+          p_topics: topics,
+          p_consent_version: '2026-06-20',
+          p_subscriptions: buildSubs(topics),
+          p_data_licensing_agreed: consent,
+          p_marketing_consent_copy: 'Choose the notices you want emailed to you'
+        })
+      });
+      if (res.status === 401 || res.status === 403) { pendingAction = { manage: !!openManage }; setPendingBusy(false); if (window.hsOpenAuth) window.hsOpenAuth(); return; }
+      if (!res.ok) { var t = ''; try { t = await res.text(); } catch(e){} throw new Error('save failed ' + res.status + ' ' + t.slice(0, 120)); }
+      clearPendingState();
+      if (openManage) { window.location.href = window.HS.pageForCommunity(info.row, zip); return; }
+      convertPendingSaved(zip, info, topics);
+    } catch (e) {
+      setPendingBusy(false);
+      var meta = $('pend-meta');
+      if (meta) { meta.style.color = '#b91c1c'; meta.textContent = 'Could not save — please try again.'; }
+    }
+  }
+
+  // Saved → the row transitions IN PLACE to a normal saved card: hairline border,
+  // level pill instead of the pending badge (after a brief "Saved ✓" flash), Save
+  // button gone, Manage alerts / Development remain.
+  function convertPendingSaved(zip, info, topics){
+    var card = $('pending-card');
+    if (!card) return;
+    card.classList.remove('pending-card');
+    var chip = '<span style="font-size:11px;color:#6b7280;border:1px solid #e5e7eb;border-radius:999px;padding:1px 7px;margin-left:8px;white-space:nowrap">' + esc(levelLabel(info.row.level) || 'Community') + '</span>';
+    var badge = $('pend-badge');
+    if (badge) { badge.textContent = 'Saved ✓'; setTimeout(function(){ var b = $('pend-badge'); if (b) b.outerHTML = chip; }, 1400); }
+    var n = countTopics(topics);
+    var meta = $('pend-meta');
+    if (meta) meta.innerHTML = n > 0 ? ('<span class="dot">' + n + '</span> topic' + (n === 1 ? '' : 's') + ' followed') : 'No topics selected yet';
+    var s = $('pend-save'); if (s) s.remove();
+    var m = $('pend-manage');
+    if (m) m.outerHTML = '<a class="btn-outline" href="' + esc(window.HS.pageForCommunity(info.row, zip)) + '" style="text-decoration:none">Manage alerts</a>';
+  }
+  // Uncovered ZIP after a successful waitlist capture.
+  function convertPendingRequested(zip){
+    var card = $('pending-card');
+    if (!card) return;
+    card.classList.remove('pending-card');
+    var chip = '<span style="font-size:11px;color:#6b7280;border:1px solid #e5e7eb;border-radius:999px;padding:1px 7px;margin-left:8px;white-space:nowrap">Coverage requested</span>';
+    var badge = $('pend-badge');
+    if (badge) { badge.textContent = 'Requested ✓'; setTimeout(function(){ var b = $('pend-badge'); if (b) b.outerHTML = chip; }, 1400); }
+    var meta = $('pend-meta');
+    if (meta) meta.textContent = 'We’ll email you when filings appear in ZIP ' + zip + '.';
+    var s = $('pend-save'); if (s) s.remove();
+  }
+
+  // Guest dashboard: heading unchanged, ONLY the pending row (no saved rows — no
+  // account), one quiet sign-in line below. Development browsing needs no account.
+  async function renderGuest(zip){
+    $('dash-body').innerHTML = '<div class="loading">Finding your area…</div>';
+    var info = null;
+    try { info = await window.HS.communityChainForZip(zip); } catch(e){}
+    pendingResolved = { zip: zip, info: info };
+    $('dash-body').innerHTML = pendingCardHtml(zip, info) +
+      '<p class="guest-hint"><a href="#" id="guest-auth-link" style="color:var(--green);font-weight:600">Sign up or log in</a> to save communities and get alerts.</p>';
+    bindPendingRow();
+    var gl = $('guest-auth-link');
+    if (gl) gl.addEventListener('click', function(ev){ ev.preventDefault(); if (window.hsOpenAuth) window.hsOpenAuth(); });
+    loadPendingStats(zip);
+  }
+
   function renderLoggedOut(){
     $('dash-body').innerHTML =
       '<div class="state-card">' +
@@ -343,7 +580,7 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
   function addCommunityHtml(){
     return '<div class="add-card">' +
       '<h3>Add a community</h3>' +
-      '<p>Enter a ZIP code to open that area, then tap <strong>Save location</strong> (or pick topics) to follow it.</p>' +
+      '<p>Enter a ZIP code and it appears at the top of your list — tap <strong>Save community</strong> to follow it.</p>' +
       '<div class="add-row">' +
         '<input class="add-input" id="add-zip" type="text" inputmode="numeric" maxlength="5" placeholder="Enter a ZIP code" />' +
         '<button class="btn-primary" id="add-btn">Find community</button>' +
@@ -352,21 +589,30 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     '</div>';
   }
 
-  // Coverage/routing = the shared live-DB resolver (hs-resolve.js), the ONE source used by
-  // add-community, the homepage, and the saved-follows list. Never the frozen communities.js map.
+  // Add-a-community = the SAME pending-row mechanic as the homepage's ?pending= entry
+  // (one mechanic, two entry points): the ZIP becomes/replaces the pending row at the
+  // top of the list instead of navigating away. An already-saved ZIP highlights its
+  // existing row (the render pass handles both cases).
   function bindAddCommunity(){
     var btn = $('add-btn'), input = $('add-zip'), msg = $('add-msg');
     if (!btn || !input) return;
     async function go(){
       var zip = window.HS.extractZip(input.value);
       if (!zip) { msg.style.color = '#b91c1c'; msg.textContent = 'Please enter a 5-digit ZIP code.'; return; }
-      msg.style.color = 'var(--ts)'; msg.textContent = 'Finding your community…';
+      msg.style.color = 'var(--ts)'; msg.textContent = '';
+      input.value = '';
+      try { sessionStorage.setItem(PENDING_SS, zip); } catch(e){}
+      // Keep the URL param in step with the new pending ZIP (a stale ?pending= would
+      // win over sessionStorage on the next render), and keep refresh consistent.
+      try {
+        var u = new URL(window.location.href);
+        u.searchParams.set('pending', zip);
+        history.replaceState(null, '', u.toString());
+      } catch(e){}
       btn.disabled = true;
-      var url = await window.HS.resolveCoverageUrl(zip);
-      btn.disabled = false;
-      if (url) { window.location.href = url; return; }
-      msg.style.color = 'var(--ts)';
-      msg.innerHTML = "We don't cover that ZIP yet — you can request it on the <a href=\"index.html\" style=\"color:var(--green);font-weight:600\">home page</a>.";
+      await render();
+      var pc = $('pending-card') || document.querySelector('.comm-card-flash');
+      if (pc) { try { pc.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e){} }
     }
     btn.addEventListener('click', go);
     input.addEventListener('keydown', function(e){ if (e.key === 'Enter') go(); });
@@ -393,16 +639,6 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
   }
   async function renderFollows(follows){
     var body = $('dash-body');
-    if (!follows.length){
-      body.innerHTML =
-        '<div class="state-card">' +
-          '<h2>You’re not following any communities yet</h2>' +
-          '<p>Find your area and pick the topics you want alerts for.</p>' +
-          '<a class="btn-primary" href="index.html" style="display:inline-block">Find my community</a>' +
-        '</div>' + addCommunityHtml();
-      bindAddCommunity();
-      return;
-    }
     // Resolve name + level + page for EVERY followed community from the LIVE communities
     // table (source of truth) — never the frozen communities.js map, which silently dropped
     // communities it didn't know (Weber County, Box Elder County, …).
@@ -431,6 +667,38 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
         groups.push({ disp: disp, page: page, topics: f.topics || {}, zip: f.zip_code });
       }
     });
+    // Pending ("just found") ZIP: if it's ALREADY followed — by ZIP, or by resolving to a
+    // place the user already follows (e.g. the ZIP maps to a saved City) — don't duplicate
+    // it; briefly highlight the existing row instead. Otherwise it renders as the
+    // emphasized first card.
+    var pendingZip = getPendingZip();
+    var pendHtml = '';
+    var flashIdx = -1;
+    if (pendingZip) {
+      var pinfo = null;
+      try { pinfo = await window.HS.communityChainForZip(pendingZip); } catch(e){}
+      pendingResolved = { zip: pendingZip, info: pinfo };
+      var already = follows.some(function(f){ return f.zip_code === pendingZip; }) ||
+        (pinfo && groups.some(function(g){ return g.disp && g.disp.id === pinfo.row.id; }));
+      if (already) {
+        groups.forEach(function(g, i){
+          if (flashIdx === -1 && (g.zip === pendingZip || (pinfo && g.disp && g.disp.id === pinfo.row.id))) flashIdx = i;
+        });
+        clearPendingState();
+      } else {
+        pendHtml = pendingCardHtml(pendingZip, pinfo);
+      }
+    }
+    if (!follows.length && !pendHtml){
+      body.innerHTML =
+        '<div class="state-card">' +
+          '<h2>You’re not following any communities yet</h2>' +
+          '<p>Find your area and pick the topics you want alerts for.</p>' +
+          '<a class="btn-primary" href="index.html" style="display:inline-block">Find my community</a>' +
+        '</div>' + addCommunityHtml();
+      bindAddCommunity();
+      return;
+    }
     var cards = groups.map(function(g){
       var name = g.disp ? g.disp.name : 'Your community';
       var lvl = g.disp ? levelLabel(g.disp.level) : '';
@@ -453,19 +721,40 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
         '</span>' +
       '</div>';
     }).join('');
-    body.innerHTML = cards + addCommunityHtml();
+    body.innerHTML = pendHtml + cards + addCommunityHtml();
     bindAddCommunity();
+    if (pendHtml) { bindPendingRow(); loadPendingStats(pendingZip); }
+    if (flashIdx >= 0) {
+      var flashEl = body.querySelectorAll('.comm-card')[flashIdx];
+      if (flashEl) {
+        flashEl.classList.add('comm-card-flash');
+        try { flashEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e){}
+        setTimeout(function(){ flashEl.classList.remove('comm-card-flash'); }, 2200);
+      }
+    }
   }
 
   async function render(){
-    if (!window.hsUser){ renderLoggedOut(); return; }
+    var pendingZip = getPendingZip();
+    if (!window.hsUser){
+      // Guest dashboard: the homepage ZIP box must never hit a login wall — a pending
+      // ZIP renders as the (only) row and Development browsing needs no account.
+      if (pendingZip) { await renderGuest(pendingZip); } else { renderLoggedOut(); }
+      return;
+    }
     $('dash-body').innerHTML = '<div class="loading">Loading your alerts…</div>';
     var follows = await loadFollows(window.hsUser.email);
     await renderFollows(follows);
   }
 
-  // Re-render whenever auth state resolves/changes.
-  window.hsOnAuthChange = function(){ render(); };
+  // Re-render whenever auth state resolves/changes. If a guest clicked Save community /
+  // Manage alerts, finish that exact action right after login (the pending ZIP carried
+  // over via sessionStorage, so the row is already on the new account's dashboard).
+  window.hsOnAuthChange = function(){
+    var replay = null;
+    if (window.hsUser && pendingAction) { replay = pendingAction; pendingAction = null; }
+    render().then(function(){ if (replay) savePending(replay.manage); });
+  };
 })();
 </script>
 
