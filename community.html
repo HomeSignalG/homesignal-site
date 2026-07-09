@@ -1083,9 +1083,15 @@ async function saveTopics(cat, checked, consent){
 // Used by the tile subscribe-modal (saveTopics) AND the "Save location" one-click follow.
 async function persistAccount(consent){
   const email = window.hsUser.email;
-  // Write the user's already-stored ZIP (or the ZIP searched into this page). No 84302
-  // fallback — abort rather than store a fake ZIP if there's no valid 5-digit ZIP on file.
-  const zipForSave = (searchedZip || accountZip || '').trim();
+  // Write the user's already-stored ZIP (or the ZIP searched into this page) — but only if it
+  // actually belongs to the community being saved (COMMUNITY.zip_codes). searchedZip can be a
+  // STALE localStorage['hs_zip'] left over from browsing a different community's page (set
+  // whenever the URL has no ?zip=), so trusting it blindly wrote mismatched rows like
+  // community_id=Eagle Mountain + zip_code=84302 (a Brigham City ZIP) — a real corrupted-row bug.
+  // Fall back to this community's own first ZIP rather than an unrelated one.
+  const commZips = (COMMUNITY && Array.isArray(COMMUNITY.zip_codes)) ? COMMUNITY.zip_codes : [];
+  const searchedZipValid = !!searchedZip && commZips.indexOf(searchedZip) !== -1;
+  const zipForSave = (searchedZipValid ? searchedZip : (accountZip || commZips[0] || searchedZip || '')).trim();
   if(!/^\d{5}$/.test(zipForSave)){ throw new Error('Your account has no ZIP code on file — please re-enter it before editing alerts.'); }
   // Get a LIVE session token at WRITE time. window.hsUser/hsToken can outlive the actual
   // Supabase session (the access token expires), which made hsClient.rpc() silently fall back
