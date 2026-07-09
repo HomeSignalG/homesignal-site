@@ -428,7 +428,7 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
         g.topics = mergeTopics(g.topics, f.topics);
       } else {
         indexByKey[key] = groups.length;
-        groups.push({ disp: disp, page: page, topics: f.topics || {} });
+        groups.push({ disp: disp, page: page, topics: f.topics || {}, zip: f.zip_code });
       }
     });
     var cards = groups.map(function(g){
@@ -437,12 +437,20 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
       var levelChip = lvl ? ' <span style="font-size:11px;color:#6b7280;border:1px solid #e5e7eb;border-radius:999px;padding:1px 7px;margin-left:8px;white-space:nowrap">' + esc(lvl) + '</span>' : '';
       var n = countTopics(g.topics);
       var meta = n > 0 ? ('<span class="dot">' + n + '</span> topic' + (n===1?'':'s') + ' followed') : 'No topics selected yet';
+      // "Development" links to the homesignalmap.html tracker for the resident's ZIP — only
+      // shown when we actually know a ZIP (map mode needs one; no ZIP means no dev page).
+      var devBtn = g.zip
+        ? ' <a class="btn-outline" href="homesignalmap.html?zip=' + encodeURIComponent(g.zip) + '" style="text-decoration:none">Development</a>'
+        : '';
       return '<div class="comm-card">' +
         '<div class="comm-card-main">' +
           '<div class="comm-card-name"><a class="comm-card-link" href="' + esc(g.page) + '">' + esc(name) + '</a>' + levelChip + '</div>' +
           '<div class="comm-card-meta">' + meta + '</div>' +
         '</div>' +
+        '<span style="display:inline-flex;gap:8px;flex-wrap:wrap">' +
         '<a class="btn-outline" href="' + esc(g.page) + '" style="text-decoration:none">Manage alerts</a>' +
+        devBtn +
+        '</span>' +
       '</div>';
     }).join('');
     body.innerHTML = cards + addCommunityHtml();
