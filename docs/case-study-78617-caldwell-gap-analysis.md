@@ -198,6 +198,50 @@ same canonical address.
 (needs live tiles); "Federal records" section becomes a filterable list once
 TRI/SEMS/RCRAInfo volume is real (v2).
 
+### 4.3.1 Related activity (the join to the existing alerts/community system)
+
+The community pages (`community.html?zip=<zip>`) already carry ZIP-keyed Government
+Notices, Local News (topic-subscribed: Data Centers, Water Quality, Infrastructure,
+etc.), and Upcoming Meetings with agendas. The property page JOINS that existing
+data — no new ingest, no new alert infrastructure.
+
+**The property identifier set** (computed from the cached property row, grows as
+filings accumulate): the canonical address + street-number variants · every
+`project_no` · every `facility_name` ("ATX1", "Building F") · every entity name on
+record (owner, contact, design firm, filer — verbatim as filed). The day a new
+filing lands, its names join the set; e.g. once TABS added Neuralink as an owner
+here, every "Neuralink" item in the existing alert feeds became matchable to this
+address.
+
+**Two match tiers — relevance is a claim, so the evidence rides with it:**
+
+- **Tier 1 — "Mentions this property."** The notice/agenda/news text contains a
+  member of the identifier set (plain string match, case-insensitive, no semantic
+  guessing). Rendered with the matched identifier shown ("matched: 'ATX1'") and the
+  item's own link (official record link for notices/meetings; article link for
+  news). NEVER infer relevance an item doesn't state — a zoning item that doesn't
+  name the property or an entity is not Tier 1, full stop (§10).
+- **Tier 2 — "In this area."** The ZIP/community feed for the property's ZIP —
+  literally the existing community-page data. Labeled "Upcoming in <county>" /
+  "In Del Valle (78617)", never "related to this property". Meetings keep the
+  existing closes-in-N-days / agenda treatment; a "see all → community page" link
+  hands off to community.html?zip=<zip> rather than duplicating that page.
+
+**Presentation:** one "Activity around this property" section between Federal
+records and the footer. Civic items (hearings, notices) and news items are visually
+separated per the existing community-page distinction — a news mention must never
+read as a public record. Tier 1 first (usually short or empty), Tier 2 as the
+quieter jurisdiction list.
+
+**Watch subscription (the "Watch this address" button's full meaning):** fires on
+(a) new filings at this address, (b) new Tier-1 matches in notices/agendas,
+(c) new Tier-1 matches in local news, (d) optional toggle: Tier-2 jurisdiction
+items. Reuses the existing per-topic alert plumbing — a property watch is a saved
+identifier set evaluated during the existing alert ingest, not a new pipeline.
+News-topic suggestions (e.g. an animal-facility filing suggesting the "Animal &
+Human Viruses / Diseases" topic) are OFFERED as user-controlled toggles at
+subscribe time, never auto-asserted as relevant.
+
 ### 4.4 Entity layer (the one real new-DDL decision — a genuine §12 stop, decided once)
 Three tables, RLS posture identical to `development_reports` (public select, no anon
 writes, service-role batch writes):
