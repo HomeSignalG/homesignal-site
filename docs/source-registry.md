@@ -385,8 +385,10 @@ No exceptions. A source without a `covers` declaration does not run.
 ---
 
 ### TX TDLR/TABS — Texas Department of Licensing and Regulation  [CASE STUDY]
-- **Status:** PLANNED (adapter built; Step-0 fixtures verified 5/5 on 2026-07-10;
-  wired into `get-address-report` v15 ZIP mode — not yet deployed/refreshed)
+- **Status:** LIVE (registry mode, Travis pins). Deployed in `get-address-report` v16
+  (2026-07-10); the 78617 live refresh cached all 5 Caldwell filings (counts
+  facilities 29 / development 5 / civic 1, tabs_quarantined []), and a UT-ZIP
+  spot-check (84302) ran 0 TABS fetches — the coverage gate held.
 - **What it covers:** All construction and tenant improvement projects
   requiring architectural barriers compliance review in Texas. Filed by
   project — each record carries owner name, owner address, owner phone,
@@ -558,7 +560,7 @@ These don't produce map markers directly. They feed the entity graph
 | 2 | EPA RCRAInfo | RESEARCH | National | facilities |
 | 2 | NRC Materials | RESEARCH | National | facilities |
 | 2 | EPA SDWIS | DEFERRED | National | development |
-| 3 | TX TDLR/TABS | PLANNED | TX only | development |
+| 3 | TX TDLR/TABS | LIVE | TX only | development |
 | 3 | UT PMN | LIVE | UT only | development |
 | 4 | State Corp Registries | DEFERRED | Per-state | entity graph |
 | 4 | OSHA Inspections | RESEARCH | National | enrichment |
