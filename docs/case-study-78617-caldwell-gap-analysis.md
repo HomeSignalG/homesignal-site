@@ -161,13 +161,25 @@ cards, the existing green/blue/orange lifecycle colors, the "record ▸" link pa
 2. **Stat cards** (4-up): Filings · Total filed cost · Sq ft filed · Entity links
    (orange number when > 0). Sums are arithmetic on filed values only; absent values
    excluded, never estimated.
-3. **Entities on record panel** — the reporter's core object, first-class. Three
-   columns: Owners / Contacts / Design firms, each entity with its filing count and
-   any cross-signal in muted text ("2 filings, 2 owner names"; "Fremont, CA").
-   Entities participating in a link get an orange dot. Below a divider, each
-   entity-link line renders as a shared-attribute FACT with every evidence filing
-   linked: "● Shared phone (813) 758-6679 — listed as owner contact on
-   <TABS…698> (River Bottoms Ranch LLC) and <TABS…676> (Neuralink)."
+3. **Connected entities (the reporter's core object, first-class — as shipped).**
+   Two cards, connections FIRST:
+   - **"Connected entities" card** — a small SVG **connection map** rendered FROM the
+     `entity_links` evidence (never hand-arranged): one node per entity in a connected
+     cluster (white fill, green border, name bold with a role/filing-count subline),
+     one labeled edge per shared-attribute connection, the label a small warm-tinted
+     pill ("same phone (813) 758-6679", "same contact: Gutknecht"; #FEF8F3 fill,
+     #F0D9C3 border, #8a5a2e text). The map renders only for clusters of 4 nodes or
+     fewer; larger clusters show the evidence list alone. Directly beneath the map:
+     **"The records behind each connection"** — one line per edge with the SAME label
+     wording as its pill and every evidence filing linked to its `record_url`, closed
+     by: "These are facts from the filings — a connection means two records share a
+     detail, not a verdict on any operator." The matching stat card counts the
+     distinct entities that appear in any connection ("Connected entities").
+   - **"All entities on record"** — the full roster, demoted below as a plain
+     three-column list (Owners / Contacts / Design firms) with filing counts and
+     filed-address cross-signals in muted text, NO dots or badges, footer: "Names
+     shown exactly as filed. Similar names (e.g. 'Neuralink' and 'Neuralink
+     Corporation') are listed separately unless a public record connects them."
    §10: never "shell"/"front"/"connected to" — the shared attribute + the records.
 4. **Filing history card** — one bordered list (existing row style), chronological.
    Each row: muted date column (left) · project name (+ orange dot if the filing
