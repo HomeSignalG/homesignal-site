@@ -263,6 +263,16 @@ These convert every foreseeable "should I ask?" into "no — do this." Add to th
 - **Development ZIP pages are in the sitemap zero-touch.** `scripts/gen_sitemap.py` emits one
   `homesignalmap.html?zip=<zip>` per `development_reports` row, so newly-cached ZIPs become
   indexable with no per-ZIP edit; the daily `sitemap.yml` workflow republishes.
+- **Registry record pages MUTATE over time — the raw fetch cache is the point-in-time
+  evidence archive.** Live registries update records in place (Step-0 verified:
+  TDLR TABS2023006449's owner block changed between the source video and the 2026-07-10
+  fetch — name, address, phone, and contact all differ; the old values appear nowhere on
+  today's page). So a re-fetch can silently rewrite the evidence a rendered fact was based
+  on. `source_fetch_cache` is the answer: **every raw fetch is preserved with its
+  timestamp, and an existing fetch row is never overwritten** — a new fetch is a new row.
+  A rendered claim is backed by the fetch that produced it, not by whatever the registry
+  says today; when a page and its cached fetch disagree, that difference IS data (an
+  owner-record update), never a reason to edit history.
 
 ---
 

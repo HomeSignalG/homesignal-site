@@ -661,3 +661,81 @@ legal/framing change not covered by the one-time sign-off.
   until the resident searches**. `render()` drops any unsourced site and sets `window.__HS_SITES`;
   the Leaflet map lives in an inner `#mapInner` so the verifier's `#map .leaflet-container`
   selector matches even for an empty ZIP.
+
+---
+
+## 8. Source adapters (`get-address-report` enrichment sources)
+
+The `get-address-report` edge function pulls from multiple public-record sources.
+Full registry: **`docs/source-registry.md`** — the authoritative list of every source,
+its API, schema mapping, coverage scope, build status, and Step-0 checklist.
+Full site-side governance: **`docs/development-tracker-source-of-truth.md`**
+(anti-fabrication prime directive, §10 legal framing, §12 stop list).
+
+**Before writing any source adapter code:**
+1. Read `docs/source-registry.md` in full.
+2. If the source isn't in the registry, add it (with coverage scope, API, schema
+   mapping, and counts bucket) before writing any code.
+3. Confirm the source's Step-0 checklist is complete — fixtures captured, parser
+   tested against real pages, interface pinned with vintage.
+
+**The five rules that never bend:**
+
+- **Coverage scope is mandatory.** Every source declares `covers: [{state, county}]`
+  in the registry. The engine checks this before activating any source for a ZIP.
+  A Utah planning feed does not run for a Texas ZIP. No exceptions.
+  (`if (!source.covers(zip.state, zip.county)) continue;`)
+
+- **Every emitted site must carry a `record_url`** pointing to the official public
+  record. A site without one is dropped by the anti-fabrication gate in
+  `verify-development.mjs` and fails CI. No exceptions.
+
+- **Absent fields stay absent.** A field the source page doesn't state is not on
+  the site object. Never default, never infer, never interpolate. This includes
+  coordinates: an area-scope record whose geocoder returns coordinates outside
+  the covered jurisdiction's bounding box gets its lat/lng nulled, not trusted.
+
+- **Quarantine, don't stop.** Any per-record or per-ZIP failure (fetch error,
+  parse miss, geocode failure): log to the quarantine list, skip the record,
+  continue the batch. A run with quarantined records is a success; the quarantine
+  log is the only human follow-up.
+
+- **Additive only.** A new source adapter is a new branch. It never modifies
+  existing source behavior. If adding it requires changing how FRS, ECHO, or
+  PMN work, that is a §12 stop — ask before proceeding.
+
+**counts buckets** (declared in the registry, not chosen at build time):
+- `facilities` — EPA-registered or federally licensed physical facilities
+  (FRS, TRI, SEMS, APHIS, FAA, RCRAInfo, NRC)
+- `development` — permits, construction filings, planning notices
+  (TABS, PMN, county permit portals)
+- enrichment — adds fields to existing sites, no new count
+  (ECHO violations, OSHA violations, TRI releases on FRS sites)
+
+**The case study (always the acceptance test for TX sources):**
+`docs/case-study-78617-caldwell-gap-analysis.md` — the Drey Dossier / Neuralink /
+2200 Caldwell Ln investigation. When the TABS adapter and APHIS adapter are both
+live, a refresh of ZIP 78617 must surface the five Caldwell permit filings and
+the entity link connecting River Bottoms Ranch LLC ↔ Neuralink via shared phone
+(813) 758-6679. That before/after is the proof the backbone works.
+
+### Status (2026-07-10)
+- 🟢 **TX TDLR/TABS is LIVE end to end** (engine v16/v17, registry mode, Travis pins):
+  the 78617 refresh caches all 5 Caldwell filings (counts facilities 29 / development 5 /
+  civic 1, `tabs_quarantined: []`), the coverage gate held on a UT spot-check (84302 → 0
+  TABS fetches), and `verify-development` CI is the live page check. Fixture receipts:
+  `fixtures/tabs/` + runbook §2.1.
+- 🟢 **The PROPERTY PAGE (address dossier, §4.3+§4.3.1) is LIVE**: `homesignalmap.html?addr=…`
+  reads `property_reports` (RLS on, public select, service-role writes), written by the
+  engine's v17 ZIP-mode refresh — `canonicalAddr()` is the ONE normalizer (engine-side);
+  both "Ln"/"Lane" filing variants collapse to the one key
+  `2200 CALDWELL LN, DEL VALLE, TX 78617` (5 filings, 1 row). `sources_checked` lists only
+  sources the refresh actually queried that returned empty at that address. ZIP-list
+  `record ▸` on permit records routes to the property page; the external record link lives
+  there. Verifier §4.5 covers every cached property page (record links, ≥2-evidence entity
+  links, honest Also-checked).
+- ⚠️ **Standing answer — MCP edge-function deploys have a ~30 KB payload ceiling**: the
+  multi-file get-address-report deploy (~55 KB) reliably kills the tool permission stream.
+  Deploy as ONE esbuild bundle (`esbuild index.ts --bundle --format=esm --external:jsr:*
+  --minify-whitespace`) with a provenance header naming the repo commit; the repo's
+  readable multi-file source stays the parked reference.

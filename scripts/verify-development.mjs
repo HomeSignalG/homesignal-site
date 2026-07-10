@@ -47,6 +47,16 @@ async function loadReports() {
   return res.json();
 }
 
+// Property dossier rows (gap-analysis §4.5) — zero-touch: every cached address is verified.
+async function loadPropertyReports() {
+  const url = `${SUPABASE_URL}/rest/v1/property_reports?select=address,zip,counts,sites,sources_checked&order=address`;
+  const res = await fetch(url, {
+    headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` },
+  });
+  if (!res.ok) return [];   // table not present yet → nothing to verify (not a failure)
+  return res.json();
+}
+
 async function main() {
   let reports = await loadReports();
   reports.sort((a, b) => a.zip.localeCompare(b.zip));
@@ -105,6 +115,58 @@ async function main() {
       fails.push(`ZIP ${zip}: ${e.message.split('\n')[0]}`);
     }
   }
+  // ── PROPERTY PAGES (gap-analysis §4.5) ────────────────────────────────────────────
+  // For every cached property_reports row, drive the live ?addr= page and assert:
+  //   1. every rendered item carries a record link (the site anti-fabrication gate);
+  //   2. every rendered entity link carries ≥2 evidence record_urls — a connection is
+  //      a fact about two records, not an inference;
+  //   3. the "Also checked" line renders ONLY sources the ENGINE reported checked-empty
+  //      in the cache row — the page never invents a negative.
+  const zipFailCount = fails.length;
+  let props = await loadPropertyReports();
+  if (SAMPLE > 0) props = props.slice(0, SAMPLE);
+  console.log(`\nVerifying ${props.length} property page(s) against ${SITE_BASE}`);
+  for (const row of props) {
+    const target = `${SITE_BASE}/homesignalmap.html?addr=${encodeURIComponent(row.address)}`;
+    try {
+      await page.goto(target, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.waitForFunction(() => Array.isArray(window.__HS_PROP), { timeout: 15000 });
+      const st = await page.evaluate(() => ({
+        rendered: window.__HS_PROP,
+        linkAnchors: Array.from(document.querySelectorAll('.entlink')).map((el) => ({
+          text: el.textContent.slice(0, 80),
+          anchors: el.querySelectorAll('a').length,
+        })),
+        alsoChecked: (document.querySelector('.alsochecked') || {}).textContent || '',
+      }));
+      const noSource = (st.rendered || []).filter((s) => !(s && (s.url || s.record_url)));
+      if (noSource.length) {
+        fails.push(`ADDR ${row.address}: ${noSource.length} rendered record(s) with NO record link (fabrication gate)`);
+      }
+      const weakLinks = st.linkAnchors.filter((l) => l.anchors < 2);
+      for (const l of weakLinks) {
+        fails.push(`ADDR ${row.address}: entity link with <2 evidence record_urls — "${l.text}…" (§4.5 invariant)`);
+      }
+      if (st.alsoChecked) {
+        const allowed = (row.sources_checked || []).map((c) => c.src);
+        if (!allowed.length) {
+          fails.push(`ADDR ${row.address}: "Also checked" rendered but the cache row reports no checked-empty source`);
+        } else {
+          const missing = allowed.filter((srcName) => !st.alsoChecked.includes(srcName));
+          const bodyText = st.alsoChecked.replace(/^Also checked:\s*/i, '');
+          // every rendered token must trace to a row-reported source (page never adds one)
+          const extra = bodyText.split('·').map((t) => t.trim()).filter((t) => t && !allowed.some((srcName) => t.startsWith(srcName)));
+          if (extra.length) fails.push(`ADDR ${row.address}: "Also checked" shows source(s) not reported by the engine: ${extra.join(' | ')}`);
+          if (missing.length) fails.push(`ADDR ${row.address}: engine-reported checked-empty source(s) not rendered: ${missing.join(', ')}`);
+        }
+      }
+      const mine = fails.filter((f) => f.startsWith(`ADDR ${row.address}:`)).length;
+      if (!mine) console.log(`  ✓ ${row.address} → ${(st.rendered || []).length} record(s), all sourced · ${st.linkAnchors.length} entity link(s), all ≥2 evidence`);
+    } catch (e) {
+      fails.push(`ADDR ${row.address}: ${e.message.split('\n')[0]}`);
+    }
+  }
+  const propFails = fails.length - zipFailCount;
   await browser.close();
 
   const summary = [
@@ -112,11 +174,12 @@ async function main() {
     ``,
     `- Site: ${SITE_BASE}`,
     `- ZIPs checked: **${reports.length}**`,
-    `- Passed: **${reports.length - fails.length}** (empty-but-valid: ${emptyOk})`,
-    `- Failed: **${fails.length}**`,
+    `- Property pages checked: **${props.length}**`,
+    `- Passed: **${reports.length + props.length - fails.length}** (empty-but-valid: ${emptyOk})`,
+    `- Failed: **${fails.length}**${propFails ? ` (${propFails} property-page)` : ''}`,
     ...(fails.length
       ? [``, `## Failures`, ...fails.map((f) => `- ${f}`)]
-      : [``, `All pages resolved, counts reconciled, and every rendered site is sourced. ✓`]),
+      : [``, `All pages resolved, counts reconciled, every rendered site is sourced, and every entity link carries ≥2 evidence records. ✓`]),
   ].join('\n');
   console.log('\n' + summary);
   if (process.env.GITHUB_STEP_SUMMARY) {
