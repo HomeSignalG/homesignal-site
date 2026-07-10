@@ -89,10 +89,16 @@ export async function resolveGeocode(
   input_address: string,
   canonical_addr: string,
   ladder: GeocoderRung[],
-  opts?: { providerVintage?: string },
+  opts?: { providerVintage?: string; forceRefresh?: boolean },
 ): Promise<GeocodeResult> {
-  const cached = await store.get(canonical_addr).catch(() => null);
-  if (cached) return cached;
+  // Normal (write-once) path: return the cached row untouched. forceRefresh (the re-geocode
+  // batch) SKIPS the cache read so the ladder runs fresh — but the write still goes through the
+  // SQL improvement guard (upsert_geocode_if_better), so a re-run can only upgrade, never
+  // downgrade, and there is no delete/refresh gap where the row goes missing.
+  if (!opts?.forceRefresh) {
+    const cached = await store.get(canonical_addr).catch(() => null);
+    if (cached) return cached;
+  }
 
   let resolved: GeocodeResult = {
     canonical_addr,

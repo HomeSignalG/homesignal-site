@@ -342,8 +342,37 @@ Deno.serve(async (req: Request) => {
   const cors = corsHeaders();
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST only" }, 405, cors);
-  let body: { address?: string; radius_mi?: number; zip?: string | number; lat?: number; lng?: number };
+  let body: { address?: string; radius_mi?: number; zip?: string | number; lat?: number; lng?: number; regeocode?: string[] };
   try { body = await req.json(); } catch { return json({ error: "bad JSON" }, 400, cors); }
+
+  // ── RE-GEOCODE MODE ── {regeocode:["<canonical_addr>",...]} → the improvement-guarded batch.
+  // For each address ALREADY in geocodes, re-run the ladder fresh (forceRefresh bypasses the
+  // write-once cache read) and write through upsert_geocode_if_better (only upgrades; no delete
+  // gap), bumping provider_vintage. Reports before/after so an upgrade is auditable. Bounded to
+  // existing rows (input_address is read from geocodes) and to the Geocodio monthly cap.
+  if (Array.isArray(body.regeocode)) {
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+    const geoStore = supabaseStore(supabase);
+    const geoLadder = [
+      txgioRung(supabase, "tx_address_points", "rooftop"),
+      txgioRung(supabase, "tx_parcels", "parcel_centroid"),
+      ...(GEOCODIO_API_KEY ? [geocodioRung(supabase, GEOCODIO_API_KEY, { monthlyCap: GEOCODIO_MONTHLY_CAP })] : []),
+      censusRung(fetch),
+    ];
+    const vintage = "regeocode " + new Date().toISOString().slice(0, 10);
+    const results: Record<string, unknown>[] = [];
+    for (const canon of body.regeocode) {
+      const { data: row } = await supabase.from("geocodes")
+        .select("canonical_addr,input_address,match_type,lat,lng,needs_review").eq("canonical_addr", canon).maybeSingle();
+      if (!row) { results.push({ canonical_addr: canon, skipped: "not in geocodes" }); continue; }
+      const before = { match_type: row.match_type, lat: row.lat, lng: row.lng, needs_review: row.needs_review };
+      const after = await resolveGeocode(geoStore, row.input_address as string, canon, geoLadder, { providerVintage: vintage, forceRefresh: true });
+      results.push({ canonical_addr: canon, before,
+        after: { match_type: after.match_type, lat: after.lat, lng: after.lng, geocode_source: after.geocode_source, needs_review: after.needs_review },
+        upgraded: before.match_type !== after.match_type });
+    }
+    return json({ mode: "regeocode", vintage, results }, 200, cors);
+  }
 
   // ── ZIP MODE ── {zip[,lat,lng]} → home = ZIP centroid; anti-fabrication enforced here.
   if (body.zip !== undefined && body.zip !== null && String(body.zip).trim() !== "") {
