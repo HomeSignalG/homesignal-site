@@ -171,55 +171,22 @@ export function censusRung(fetchFn: typeof fetch): GeocoderRung {
   };
 }
 
-/** TxGIO rung — a LOCAL-DATASET lookup, no runtime egress. Reads a table the CI load step
- *  populated from TxGIO StratMap (Address Points = rooftop; Land Parcels = parcel centroid),
- *  keyed by canonicalAddr(). A hit returns the stored point at the rung's tier; a miss returns
- *  null → next rung. Because it queries our own Postgres, the primary rung has zero external
- *  dependency and zero per-call cost. */
+/** Dataset rung — a LOCAL-DATASET lookup, no runtime egress, no per-call cost. Reads a table
+ *  the CI loader populated (today: national_address_points from OpenAddresses), keyed by
+ *  canonicalAddr(). Returns the point AT THE TIER THE LOADER STAMPED ON THE ROW (match_type):
+ *  OpenAddresses defaults to 'parcel_centroid' and is only 'rooftop' where the source gave an
+ *  explicit rooftop signal — so precision is never overstated. A miss returns null → next rung.
+ *  (No commercial geocoder rung exists — the ladder is zero-fee: this dataset, then Census.) */
 // deno-lint-ignore no-explicit-any
-export function txgioRung(supabase: any, table: "tx_address_points" | "tx_parcels", tier: MatchType): GeocoderRung {
+export function datasetRung(supabase: any, table: string, source = table): GeocoderRung {
   return {
-    source: table === "tx_address_points" ? "txgio_address_points" : "txgio_parcels",
+    source,
     resolve: async (_input: string, canonical: string) => {
-      const { data } = await supabase.from(table).select("lat,lng").eq("canonical_addr", canonical).maybeSingle();
+      const { data } = await supabase.from(table).select("lat,lng,match_type").eq("canonical_addr", canonical).maybeSingle();
       if (!data || typeof data.lat !== "number" || typeof data.lng !== "number") return null;
-      return { lat: data.lat, lng: data.lng, match_type: tier, matched_address: canonical };
-    },
-  };
-}
-
-/** Geocodio rung — national HTTP geocoder, storable-forever (NA forward geocoding), used as
- *  the fallback for addresses TxGIO's annual refresh hasn't caught yet and for any future
- *  non-TX source. FAIL-SAFE by construction: a monthly lookup CAP is enforced against
- *  geocode_usage — at/over cap it returns null (→ Census + flag) and never calls the API; any
- *  API error / non-200 / parse failure also returns null. It NEVER hard-errors, so a cap hit or
- *  a Geocodio outage degrades to interpolation, not a broken page. Maps Geocodio's accuracy_type
- *  onto our match_type (rooftop → rooftop, place/parcel → parcel, else range_interpolated). */
-// deno-lint-ignore no-explicit-any
-export function geocodioRung(supabase: any, apiKey: string, opts: { monthlyCap: number }): GeocoderRung {
-  return {
-    source: "geocodio",
-    resolve: async (input: string) => {
-      const ym = new Date().toISOString().slice(0, 7); // YYYY-MM (Date.now allowed in edge runtime)
-      // Budget gate — read this month's Geocodio lookups; at/over cap, fall through (never spend).
-      const { data: usage } = await supabase.from("geocode_usage").select("lookups")
-        .eq("yyyymm", ym).eq("geocode_source", "geocodio").maybeSingle();
-      if ((usage?.lookups ?? 0) >= opts.monthlyCap) return null; // cap hit → next rung (Census) + flag
-      // Count the lookup up-front (best-effort) so concurrent calls stay bounded by the cap.
-      await supabase.rpc("incr_geocode_usage", { p_yyyymm: ym, p_source: "geocodio" }).catch(() => {});
-      try {
-        const q = new URLSearchParams({ q: input, api_key: apiKey, limit: "1" });
-        const r = await fetch(`https://api.geocod.io/v1.7/geocode?${q}`, { signal: AbortSignal.timeout(15000) });
-        if (!r.ok) return null; // any non-200 → fall through, never throw
-        const best = (await r.json())?.results?.[0];
-        if (!best?.location) return null;
-        const acc = String(best.accuracy_type ?? "");
-        const match_type: MatchType = acc === "rooftop" ? "rooftop"
-          : (acc === "point" || acc === "parcel_centroid" ? "parcel_centroid" : "range_interpolated");
-        return { lat: Number(best.location.lat), lng: Number(best.location.lng), match_type, matched_address: best.formatted_address ?? input };
-      } catch {
-        return null; // timeout / parse / network → fall through to Census
-      }
+      // Honour the row's stamped tier; fall back to the conservative parcel_centroid, never rooftop.
+      const mt = (data.match_type === "rooftop" || data.match_type === "parcel_centroid") ? data.match_type : "parcel_centroid";
+      return { lat: data.lat, lng: data.lng, match_type: mt as MatchType, matched_address: canonical };
     },
   };
 }

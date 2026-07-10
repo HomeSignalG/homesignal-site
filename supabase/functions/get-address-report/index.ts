@@ -30,14 +30,15 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
-import { censusRung, geocodioRung, resolveGeocode, supabaseStore, txgioRung } from "./geocode-cache.ts";
+import { censusRung, datasetRung, resolveGeocode, supabaseStore } from "./geocode-cache.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-// Geocodio fallback rung is OPT-IN: only added to the ladder if the secret is set. Absent key
-// → ladder is TxGIO → Census (no error). Cap defaults to 25,000 lookups/mo (~$25 ceiling).
-const GEOCODIO_API_KEY = Deno.env.get("GEOCODIO_API_KEY") ?? "";
-const GEOCODIO_MONTHLY_CAP = Number(Deno.env.get("GEOCODIO_MONTHLY_CAP") ?? "25000");
+// Zero-fee geocode ladder: OpenAddresses (national_address_points, loaded free) → US Census.
+// No commercial geocoder, no API key. datasetRung honours the per-row match_type the loader
+// stamped (OpenAddresses defaults to parcel_centroid), so precision is never overstated.
+const GEO_LADDER = (supabase: ReturnType<typeof createClient>) =>
+  [datasetRung(supabase, "national_address_points", "openaddresses"), censusRung(fetch)];
 
 const BOX_ELDER_COMMUNITY_ID = "d67c558f-1f04-4811-a565-873ae2afd6f3";
 const DEV_CATEGORIES = [
@@ -342,30 +343,18 @@ Deno.serve(async (req: Request) => {
   const cors = corsHeaders();
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST only" }, 405, cors);
-  let body: { address?: string; radius_mi?: number; zip?: string | number; lat?: number; lng?: number; regeocode?: string[]; diag?: string };
+  let body: { address?: string; radius_mi?: number; zip?: string | number; lat?: number; lng?: number; regeocode?: string[] };
   try { body = await req.json(); } catch { return json({ error: "bad JSON" }, 400, cors); }
-
-  // ── TEMPORARY DIAGNOSTIC (v21, to be removed) ── {diag:"geocodio"} → reports ONLY whether the
-  // function can see GEOCODIO_API_KEY and its length. NEVER returns the key value. Remove once
-  // the secret is confirmed working.
-  if (body.diag === "geocodio") {
-    return json({ geocodio_key_present: !!GEOCODIO_API_KEY, geocodio_key_len: GEOCODIO_API_KEY.length, geocodio_monthly_cap: GEOCODIO_MONTHLY_CAP }, 200, cors);
-  }
 
   // ── RE-GEOCODE MODE ── {regeocode:["<canonical_addr>",...]} → the improvement-guarded batch.
   // For each address ALREADY in geocodes, re-run the ladder fresh (forceRefresh bypasses the
   // write-once cache read) and write through upsert_geocode_if_better (only upgrades; no delete
   // gap), bumping provider_vintage. Reports before/after so an upgrade is auditable. Bounded to
-  // existing rows (input_address is read from geocodes) and to the Geocodio monthly cap.
+  // rows already in geocodes (input_address is read from there). Zero-fee ladder — no spend.
   if (Array.isArray(body.regeocode)) {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const geoStore = supabaseStore(supabase);
-    const geoLadder = [
-      txgioRung(supabase, "tx_address_points", "rooftop"),
-      txgioRung(supabase, "tx_parcels", "parcel_centroid"),
-      ...(GEOCODIO_API_KEY ? [geocodioRung(supabase, GEOCODIO_API_KEY, { monthlyCap: GEOCODIO_MONTHLY_CAP })] : []),
-      censusRung(fetch),
-    ];
+    const geoLadder = GEO_LADDER(supabase);
     const vintage = "regeocode " + new Date().toISOString().slice(0, 10);
     const results: Record<string, unknown>[] = [];
     for (const canon of body.regeocode) {
@@ -400,22 +389,16 @@ Deno.serve(async (req: Request) => {
     // tabsForZip(): the source never runs for a non-TX ZIP. Separate query keeps
     // resolveCommunityIds() untouched (additive-only rule, source-registry #4).
     const { data: commRows } = await supabase.from("communities").select("state,county").contains("zip_codes", [zip]);
-    // Geocoding goes through the write-once, quality-aware cache. The LADDER degrades in a fixed
-    // precision order and NEVER hard-errors — each rung returns null on a miss so the next rung
+    // Geocoding goes through the write-once, quality-aware cache. ZERO-FEE LADDER, degrades in a
+    // fixed precision order and NEVER hard-errors — each rung returns null on a miss so the next
     // is tried, ending at Census range_interpolation:
-    //   TxGIO Address Points (rooftop, local lookup, no egress)
-    //   → TxGIO Land Parcels (parcel_centroid, local lookup)
-    //   → Geocodio (national fallback; opt-in via secret; monthly spend cap; fail-safe)
-    //   → Census (range_interpolated, last resort).
-    // Only rooftop clears needs_review; parcel_centroid renders but stays flagged (#2). Writes go
-    // through the SQL improvement guard, so a re-geocode can only upgrade, never downgrade.
+    //   OpenAddresses (national_address_points, local lookup, no egress, no per-call cost;
+    //     tier = the loader-stamped match_type — parcel_centroid unless an explicit rooftop signal)
+    //   → US Census (range_interpolated, last resort).
+    // Only rooftop clears needs_review; parcel_centroid renders but stays flagged. Writes go through
+    // the SQL improvement guard, so a re-geocode can only upgrade, never downgrade.
     const geoStore = supabaseStore(supabase);
-    const geoLadder = [
-      txgioRung(supabase, "tx_address_points", "rooftop"),
-      txgioRung(supabase, "tx_parcels", "parcel_centroid"),
-      ...(GEOCODIO_API_KEY ? [geocodioRung(supabase, GEOCODIO_API_KEY, { monthlyCap: GEOCODIO_MONTHLY_CAP })] : []),
-      censusRung(fetch),
-    ];
+    const geoLadder = GEO_LADDER(supabase);
     const tabs = await tabsForZip(zip, (commRows ?? []) as { state?: string; county?: string }[], TABS_PINS, {
       fetch,
       geocode: async (a: string) => {
