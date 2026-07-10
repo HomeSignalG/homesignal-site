@@ -31,6 +31,8 @@ Config via env:
   STATES    comma list of 2-letter states to download (else: derived from the target ZIPs)
   OA_BASE   region-collection base URL   (default https://data.openaddresses.io/openaddr-collected-)
   DRY_RUN   "1" → parse + report, do NOT write (sanity check)
+
+First live run: TX / ZIP 78617 (the Caldwell canary's ZIP), scope from property_reports.
 """
 
 import csv
