@@ -30,6 +30,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
+import { censusRung, resolveGeocode, supabaseStore } from "./geocode-cache.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -359,9 +360,21 @@ Deno.serve(async (req: Request) => {
     // tabsForZip(): the source never runs for a non-TX ZIP. Separate query keeps
     // resolveCommunityIds() untouched (additive-only rule, source-registry #4).
     const { data: commRows } = await supabase.from("communities").select("state,county").contains("zip_codes", [zip]);
+    // Geocoding goes through the write-once, quality-aware cache (docs/geocodes-setup.sql):
+    // resolve once per canonical address, classify the match, store lat/lng + match_type +
+    // matched_address + source, and auto-flag anything below rooftop/parcel. The ladder is a
+    // single Census rung today (always range_interpolated → always flagged); a parcel/rooftop
+    // rung prepends here later with no other change. Return null on failure/coarse-fail so the
+    // TABS module's existing quarantine path is preserved.
+    const geoStore = supabaseStore(supabase);
+    const geoLadder = [censusRung(fetch)];
     const tabs = await tabsForZip(zip, (commRows ?? []) as { state?: string; county?: string }[], TABS_PINS, {
       fetch,
-      geocode: async (a: string) => { try { const [la, ln] = await geocode(a); return { lat: la, lng: ln }; } catch { return null; } },
+      geocode: async (a: string) => {
+        const g = await resolveGeocode(geoStore, a, canonicalAddr(a), geoLadder);
+        if (g.lat == null || g.lng == null) return null;   // failed → quarantine (tdlr-tabs.ts)
+        return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
+      },
     });
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");
