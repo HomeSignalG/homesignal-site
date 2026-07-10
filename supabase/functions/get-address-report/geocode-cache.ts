@@ -21,11 +21,24 @@
 
 export type MatchType =
   | "rooftop"
-  | "parcel"
+  | "parcel_centroid"
   | "range_interpolated"
   | "zip_centroid"
   | "county_centroid"
   | "failed";
+
+// DISTINCT, ORDERED quality tiers. Higher = more precise. parcel_centroid is its OWN tier
+// between rooftop and range_interpolated — never folded into rooftop. This ordering is the
+// single source of truth the never-downgrade guard uses (mirrored in SQL as
+// geocode_quality_rank(); see docs/txgio-geocode-tables.sql). Keep the two in lockstep.
+export const QUALITY_RANK: Record<MatchType, number> = {
+  rooftop: 3,
+  parcel_centroid: 2,
+  range_interpolated: 1,
+  zip_centroid: 0,
+  county_centroid: 0,
+  failed: -1,
+};
 
 // Only a ROOFTOP point is precise enough to clear the review queue. A parcel centroid is a
 // real, rendered point (better than interpolation) but STAYS flagged (needs_review=true):
@@ -196,7 +209,7 @@ export function geocodioRung(supabase: any, apiKey: string, opts: { monthlyCap: 
         if (!best?.location) return null;
         const acc = String(best.accuracy_type ?? "");
         const match_type: MatchType = acc === "rooftop" ? "rooftop"
-          : (acc === "point" || acc === "parcel_centroid" ? "parcel" : "range_interpolated");
+          : (acc === "point" || acc === "parcel_centroid" ? "parcel_centroid" : "range_interpolated");
         return { lat: Number(best.location.lat), lng: Number(best.location.lng), match_type, matched_address: best.formatted_address ?? input };
       } catch {
         return null; // timeout / parse / network → fall through to Census
@@ -220,22 +233,24 @@ export function supabaseStore(supabase: any): GeocodeStore {
       return (data as GeocodeResult) ?? null;
     },
     put: async (row) => {
-      await supabase.from("geocodes").upsert(
-        {
-          canonical_addr: row.canonical_addr,
-          input_address: row.input_address,
-          lat: row.lat,
-          lng: row.lng,
-          match_type: row.match_type,
-          matched_address: row.matched_address,
-          geocode_source: row.geocode_source,
-          needs_review: row.needs_review,
-          review_reason: row.review_reason,
-          provider_vintage: row.provider_vintage ?? null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "canonical_addr" },
-      );
+      // THE IMPROVEMENT GUARD lives in SQL: upsert_geocode_if_better() inserts a new address,
+      // but on conflict only overwrites when the new tier STRICTLY OUTRANKS the stored one
+      // (geocode_quality_rank(excluded) > geocode_quality_rank(existing)). So a re-geocode can
+      // only ever upgrade a point — a lower/equal tier (incl. a transient 'failed') can never
+      // clobber a better stored point. Routing every write through it makes the guarantee
+      // universal (write-once path AND the re-geocode batch), not batch-only.
+      await supabase.rpc("upsert_geocode_if_better", {
+        p_canonical: row.canonical_addr,
+        p_input: row.input_address,
+        p_lat: row.lat,
+        p_lng: row.lng,
+        p_match_type: row.match_type,
+        p_matched: row.matched_address,
+        p_source: row.geocode_source,
+        p_needs_review: row.needs_review,
+        p_review_reason: row.review_reason,
+        p_vintage: row.provider_vintage ?? null,
+      });
     },
   };
 }
