@@ -1,0 +1,53 @@
+name: txgio-load-probe
+# THROWAWAY discovery probe (delete after). Read-only: maps the real TxGIO StratMap Address
+# Points download URL + format + schema for Travis County, so the actual loader isn't built
+# blind. Writes nothing to any table.
+on:
+  push: { branches: [claude/txgio-load-probe] }
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discover TxGIO Address Points (Travis)
+        run: |
+          set +e
+          sudo apt-get update -qq >/dev/null 2>&1 && sudo apt-get install -y -qq gdal-bin jq >/dev/null 2>&1
+          UA="homesignal-load-probe/1.0"
+          echo "== 1. Address Points collection(s) =="
+          curl -sS -A "$UA" "https://api.tnris.org/api/v1/collections/?search=address%20points" -o coll.json -w "  http=%{http_code} bytes=%{size_download}\n"
+          jq -r '.results[]? | "\(.collection_id)\t\(.name // .title // "?")"' coll.json 2>/dev/null | head -20
+          CID=$(jq -r '.results[]? | select(((.name // .title // "")|ascii_downcase)|test("address point")) | .collection_id' coll.json 2>/dev/null | head -1)
+          echo "  chosen collection_id=$CID"
+          echo
+          echo "== 2. Collection detail — keys + any resource/download structure =="
+          curl -sS -A "$UA" "https://api.tnris.org/api/v1/collections/$CID/" -o detail.json -w "  http=%{http_code} bytes=%{size_download}\n"
+          echo "  top-level keys: $(jq -r 'keys | join(\", \")' detail.json 2>/dev/null)"
+          jq -r 'to_entries[] | select(.value|type=="string") | "  \(.key): \(.value|.[0:120])"' detail.json 2>/dev/null | head -40
+          echo
+          echo "== 3. Resource/download endpoints (try variants), find Travis =="
+          for url in \
+            "https://api.tnris.org/api/v1/resources/?collection_id=$CID&county=Travis" \
+            "https://api.tnris.org/api/v1/resources/?collection_id=$CID" \
+            "https://api.tnris.org/api/v1/collections/$CID/resources/" ; do
+            echo "### $url"
+            curl -sS -A "$UA" "$url" -o res.json -w "  http=%{http_code} bytes=%{size_download}\n"
+            echo "  keys: $(jq -r 'if type==\"object\" then (keys|join(\", \")) else type end' res.json 2>/dev/null)"
+            jq -r '.results[]? | "  \(.county // .area_type // .area // "?") -> \(.download // .url // .resource // .public_url // "?")"' res.json 2>/dev/null | grep -iE 'travis|http' | head -8
+          done
+          echo
+          echo "== 4. Grep everything fetched for a Travis download URL =="
+          DL=$(cat coll.json detail.json res.json 2>/dev/null | grep -oiE 'https?://[^"]+[Tt]ravis[^"]*\.(zip|geojson|gpkg)' | head -1)
+          [ -z "$DL" ] && DL=$(cat res.json 2>/dev/null | grep -oiE 'https?://[^"]+\.(zip|geojson|gpkg)' | head -1)
+          echo "  candidate download: $DL"
+          if [ -n "$DL" ]; then
+            curl -sSL -A "$UA" "$DL" -o dl.bin -w "  download http=%{http_code} bytes=%{size_download} type=%{content_type}\n"
+            file dl.bin; mkdir -p ap; (cd ap && unzip -o ../dl.bin >/dev/null 2>&1)
+            LYR=$(find ap dl.bin -iname '*.shp' -o -iname '*.geojson' -o -iname '*.gpkg' 2>/dev/null | head -1); [ -z "$LYR" ] && LYR=dl.bin
+            echo "  layer: $LYR"
+            echo "  --- ogrinfo (schema, feature count, CRS) ---"
+            ogrinfo -so -al "$LYR" 2>&1 | head -70
+            echo "  --- one sample feature ---"
+            ogrinfo -al -q "$LYR" 2>&1 | sed -n '1,45p'
+          fi
+          echo "PROBE DONE"
