@@ -1,4 +1,7 @@
-// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v15.
+// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr).
+// THIS FILE IS v16 WORK IN PROGRESS — NOT DEPLOYED (live = v15; redeploy gated on founder
+// review). Done so far: areaAnchor()/#165 + devSites(extraSites) hook. NOT yet in this file:
+// the COUNTY_SOURCES registry + Austin Socrata + TDLR TABS adapters described below.
 // PARKED IN REPO FOR REFERENCE/REPRODUCIBILITY — Supabase is the source of truth
 // (docs/development-tracker-source-of-truth.md §2). v11 = MULTI-COUNTY: resolveCommunityIds()
 // maps a ZIP to its own community chain (city+county) so each ZIP shows its OWN county's
@@ -16,6 +19,20 @@
 // cache; 'unmatched' items are stamped, not silently dropped). Only relevance='development' counts as
 // a project: counts.development excludes civic notices (board vacancies, tax sales, budget/comp/bond
 // hearings) and counts.civic reports them separately so the page can list them non-headlined.
+// v16 = TRAVIS COUNTY SOURCE ADAPTERS + honest area anchors (issue #165):
+//   (1) COUNTY_SOURCES registry — engine-side per-county record sources (precedent: EPA FRS).
+//       Travis County TX wires City of Austin Socrata (issued construction permits 3syk-w9eu,
+//       site plan cases 2u4n-hmgw; field names verified against live probes 2026-07-10) and a
+//       TDLR TABS adapter that parses ONLY source_fetch_cache rows (the polite live pull that
+//       populates that cache is a separate, gated refresh step — the adapter never fetches TDLR).
+//   (2) areaAnchor(): jurisdiction-level items with no matched place centroid anchor at the
+//       report's OWN home centroid instead of inheriting Box Elder's coordinates (issue #165);
+//       the centroid() "utah"→Box-Elder line is removed. Anchors carry approx:true.
+//       Alerts whose geo reference matches nothing are no longer dropped — they surface at the
+//       home anchor. ⚠️ PROVISIONAL, coded as option (i): pre-check 2026-07-10 found 93 Utah
+//       alerts silently dropped (incl. Eagle Mountain PCPH rezones/annexations); surfacing them
+//       changes counts on 77 cached UT ZIP pages and is GATED on the founder's (i)/(ii) choice —
+//       do not deploy before that choice lands (option (ii) = scope the fallback to non-Utah).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -139,8 +156,14 @@ function toEN(homeLat: number, homeLng: number, lat: number, lng: number): [numb
 function centroid(geoRef: string): [number, number] | null {
   const low = (geoRef || "").toLowerCase();
   for (const [name, pt] of Object.entries(PLACES)) if (low.includes(name)) return pt;
-  if (low.includes("box elder") || low.includes("utah")) return PLACES["box elder county"];
-  return null;
+  if (low.includes("box elder")) return PLACES["box elder county"];
+  return null;   // v16: no "utah"→Box-Elder inheritance — unmatched refs anchor at the report home (areaAnchor)
+}
+// Issue #165: a jurisdiction-level item with no matched place centroid anchors at the report's
+// OWN home centroid — never another county's coordinates. Area items are never map-pinned
+// (the page pins scope=point only), so this is an honesty fix for the data, not a visual change.
+function areaAnchor(geoRef: string, homeLat: number, homeLng: number): [number, number] {
+  return centroid(geoRef) ?? [homeLat, homeLng];
 }
 async function geocode(address: string): Promise<[number, number, string]> {
   const q = new URLSearchParams({ address, benchmark: "Public_AR_Current", format: "json" });
@@ -151,15 +174,16 @@ async function geocode(address: string): Promise<[number, number, string]> {
   const c = matches[0].coordinates;
   return [Number(c.y), Number(c.x), matches[0].matchedAddress ?? address];
 }
-async function devSites(supabase: ReturnType<typeof createClient>, homeLat: number, homeLng: number, communityIds: string[]): Promise<Record<string, unknown>[]> {
-  const sites: Record<string, unknown>[] = [];
-  if (!communityIds.length) return sites;   // ZIP has no modeled jurisdiction → facilities-only page (valid)
+async function devSites(supabase: ReturnType<typeof createClient>, homeLat: number, homeLng: number, communityIds: string[], extraSites: Record<string, unknown>[] = []): Promise<Record<string, unknown>[]> {
+  const sites: Record<string, unknown>[] = [...extraSites];   // county-source records join the same dedup + filters
+  if (!communityIds.length && !sites.length) return sites;   // ZIP has no modeled jurisdiction → facilities-only page (valid)
   const floorIso = new Date(Date.now() - MEETING_LOOKBACK_DAYS * 86400000).toISOString().slice(0, 10);
-  const { data: alerts } = await supabase.from("alerts").select("title,category,agency_name,geographic_reference,source_url,comment_deadline").in("community_id", communityIds).eq("pipeline_type", "government_notice").in("category", DEV_CATEGORIES).order("published_at", { ascending: false }).limit(100);
-  const { data: meetings } = await supabase.from("meetings").select("title,category,location,meeting_date,source_url,is_public_hearing,comment_period_open").in("community_id", communityIds).or("is_public_hearing.eq.true,comment_period_open.eq.true").gte("meeting_date", floorIso).order("meeting_date", { ascending: false }).limit(150);
+  const { data: alerts } = !communityIds.length ? { data: [] } : await supabase.from("alerts").select("title,category,agency_name,geographic_reference,source_url,comment_deadline").in("community_id", communityIds).eq("pipeline_type", "government_notice").in("category", DEV_CATEGORIES).order("published_at", { ascending: false }).limit(100);
+  const { data: meetings } = !communityIds.length ? { data: [] } : await supabase.from("meetings").select("title,category,location,meeting_date,source_url,is_public_hearing,comment_period_open").in("community_id", communityIds).or("is_public_hearing.eq.true,comment_period_open.eq.true").gte("meeting_date", floorIso).order("meeting_date", { ascending: false }).limit(150);
   for (const a of alerts ?? []) {
-    const pt = centroid((a.geographic_reference as string) || (a.agency_name as string) || "");
-    if (!pt) continue;
+    // ⚠️ Option (i), provisional (see header): unmatched geo refs anchor at home instead of
+    // being dropped. Option (ii) would reinstate `if (!centroid(ref)) continue;` for Utah homes.
+    const pt = areaAnchor((a.geographic_reference as string) || (a.agency_name as string) || "", homeLat, homeLng);
     const [e, n] = toEN(homeLat, homeLng, pt[0], pt[1]);
     const title = ((a.title as string) || "").trim();
     const approved = /\b(approved|approves|granted|adopted|entitled|permit issued|issued a permit|under construction|final plat|site plan approv|authoriz|ground ?break|breaks ground|begins construction|construction begins)\b/i.test(title);
@@ -171,7 +195,7 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
     sites.push(s);
   }
   for (const m of meetings ?? []) {
-    const pt = centroid((m.location as string) || "") ?? PLACES["box elder county"];
+    const pt = areaAnchor((m.location as string) || "", homeLat, homeLng);   // #165: never Box Elder by default
     const [e, n] = toEN(homeLat, homeLng, pt[0], pt[1]);
     const [rel, relRule] = classifyRelevance((m.title as string) || "", (m.category as string) || "", "");
     sites.push({ label: ((m.title as string) || "Public hearing").slice(0, 120), e, n, lat: pt[0], lng: pt[1], scope: "area", type: "proposed", decided: false, relevance: rel, rel_rule: relRule, layer: classifyLayer((m.title as string) || "", m.category as string), src: m.is_public_hearing ? "Public hearing" : "Comment window", url: (m.source_url as string) || "", meeting_date: m.meeting_date });
