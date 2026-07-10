@@ -67,6 +67,44 @@ Any field the live page doesn't state must be **absent**, not defaulted.
 evidence = [TABS2024016698, TABS2024022676] — ≥2 record_urls, satisfying the link
 invariant (case-study doc §4.5).
 
+### 2.1 STEP-0 VERIFIED (fixtures fetched 2026-07-10, all 5 HTTP 200, 0 quarantined)
+
+The table above is the video-transcribed LEAD set. The live pages — committed under
+`fixtures/tabs/` — differ in several fields; per the rule that the fixture is the fact,
+**this table is the acceptance table** and the parser passes 5/5 against it:
+
+| project_no | type | layer | owner (verbatim) | owner_phone_norm | contact_name | filed_by | design_firm | est_cost | sqft |
+|---|---|---|---|---|---|---|---|---|---|
+| TABS2023006483 | built | research | River Bottoms Ranch | 8137589100 | Scott Padilla | Jeff Gutknecht | Emersion Design | 2000000 | 7500 |
+| TABS2023006449 | built | animal-facility | River Bottoms Ranch LLC | 8137586679 | — | Jeff Gutknecht | Emersion Design | 2000000 | 14200 |
+| TABS2024016698 | built | commercial | RIVER BOTTOMS RANCH LLC | 8137586679 | — | Jeff Gutknecht | Emersion Design LLC | 1000000 | 3410 |
+| TABS2024022676 | built | industrial | Neuralink | 8137586679 | Scott Padilla | Brian Conklin | Studio8 Architects | 14700000 | 112000 |
+| TABS2026011928 | approved | commercial | Neuralink Corporation | 7078031177 | Kristin Lorentzen | Kristin Lorentzen | Neuralink | 8200000 | 37607 |
+
+Deviations from the lead table, verified against fixture bytes:
+- The video's "contact" column conflated two page roles. The page has an OWNER-block
+  `Contact Name:` **and** a separate **PERSON FILING FORM** section with its own
+  `Contact Name:` (→ new `filed_by` field; "Jeff Gutknecht (filing)" in the case-study
+  §0 table is the latter). Jeff Gutknecht filed all three River Bottoms Ranch permits.
+- **TABS2023006449's owner record has been updated since the video**: it now reads
+  `River Bottoms Ranch LLC`, 7400 Paseo Padre Pkwy, Fremont CA, phone (813) 758-6679,
+  empty owner contact — 758-9100/Padilla appear nowhere on the page.
+- Owner/design-firm names are kept **verbatim as filed** (uppercase
+  `RIVER BOTTOMS RANCH LLC`, `Emersion Design LLC`) — never normalized (case-study §6
+  standing answer: the difference IS the data; the matcher links on phone, not name).
+- The live pages state values the leads called absent: 022676 sqft **112,000**;
+  011928 est_cost **$8,200,000** and sqft **37,607**.
+- The shared-phone link is **stronger** than the lead expected: `8137586679` is the
+  filed owner phone on **three** records — TABS2023006449 + TABS2024016698 (River
+  Bottoms Ranch LLC) and TABS2024022676 (Neuralink) — so the RBR ↔ Neuralink link
+  carries 3 evidence record_urls.
+- `mapStatus` fixture lesson: `Review Complete` is a plan-review state, not
+  construction-terminal (022676 and 011928 both carry it). Terminal statuses are
+  `Project Closed` / `Inspection Complete`; otherwise the filed completion date with a
+  90-day grace decides built vs approved.
+- `Square Footage` renders as `112,000 ft <sup>2</sup>` — the parser must cut the value
+  at the unit token or the superscript 2 rides into the digits.
+
 ## 3. Verification additions (verify-development.mjs)
 
 - Existing invariant unchanged: every rendered site has a `record_url`.

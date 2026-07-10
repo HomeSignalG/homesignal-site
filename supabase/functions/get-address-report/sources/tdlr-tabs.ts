@@ -45,6 +45,7 @@ export interface TabsSite {
   owner_phone?: string;                 // as filed (display)
   owner_phone_norm?: string;            // digits-only, for the entity matcher
   contact_name?: string;
+  filed_by?: string;                    // PERSON FILING FORM → Contact Name (fixture-verified section)
   design_firm?: string;
   design_firm_addr?: string;
   design_firm_phone?: string;
@@ -181,6 +182,7 @@ interface ParsedProject {
   owner_addr?: string;
   owner_phone?: string;
   contact_name?: string;
+  filed_by?: string;
   design_firm?: string;
   design_firm_addr?: string;
   design_firm_phone?: string;
@@ -208,9 +210,12 @@ export function parseProjectHtml(
     return { error: `page states ${stated}, expected ${expectedProjectNo}` };
   }
 
-  // split into sections so "Owner Phone" and "Design Firm Phone" can't cross-contaminate
-  const sec = sectionize(text, ["PROJECT", "OWNER", "TENANT", "DESIGN FIRM", "RAS"]);
+  // split into sections so "Owner Phone" and "Design Firm Phone" can't cross-contaminate.
+  // PERSON FILING FORM (fixture-verified section, between PROJECT and OWNER) has its own
+  // "Contact Name:" row — fence it so it never bleeds into the PROJECT or OWNER reads.
+  const sec = sectionize(text, ["PROJECT", "PERSON FILING FORM", "OWNER", "TENANT", "DESIGN FIRM", "RAS"]);
   const proj = sec["PROJECT"] ?? text;
+  const filing = sec["PERSON FILING FORM"] ?? "";
   const owner = sec["OWNER"] ?? "";
   const firm = sec["DESIGN FIRM"] ?? "";
 
@@ -231,6 +236,7 @@ export function parseProjectHtml(
   p.owner_addr = multilineField(owner, "Owner Address", "Owner Phone");
   p.owner_phone = phone(field(owner, "Owner Phone"));
   p.contact_name = field(owner, "Contact Name");
+  p.filed_by = field(filing, "Contact Name");
 
   p.design_firm = field(firm, "Design Firm Name");
   p.design_firm_addr = multilineField(firm, "Design Firm Address", "Design Firm Phone");
@@ -277,6 +283,7 @@ async function normalize(
     site.owner_phone_norm = digits(p.owner_phone);
   }
   if (p.contact_name) site.contact_name = p.contact_name;
+  if (p.filed_by) site.filed_by = p.filed_by;
   if (p.design_firm) site.design_firm = p.design_firm;
   if (p.design_firm_addr) site.design_firm_addr = p.design_firm_addr;
   if (p.design_firm_phone) {
@@ -295,14 +302,21 @@ async function normalize(
 
 /**
  * Lifecycle mapping (case-study doc §4.2):
- *   closed / complete → built; everything else registered → approved.
+ *   terminal registry statuses → built; everything else registered → approved.
  * TABS registrations are filed projects, never proposals — "proposed" stays the
  * planning-notice sources' bucket.
+ *
+ * Fixture-verified (Step 0, 2026-07-10): "Review Complete" is a PLAN-REVIEW state,
+ * not a construction-terminal one — TABS2026011928 carries it while its tenant
+ * improvement is barely past the filed dates. Only "Project Closed" /
+ * "Inspection Complete" are the registry asserting the work is done. For
+ * non-terminal statuses fall back to the FILED completion date with a 90-day
+ * grace, so a just-passed estimate doesn't flip a live project to built.
  */
 export function mapStatus(statusText?: string, endDate?: string): "built" | "approved" {
   const s = (statusText || "").toLowerCase();
-  if (/closed|complete/.test(s)) return "built";
-  if (endDate && endDate < todayISO()) return "built"; // completion date passed, status silent
+  if (/closed|inspection complete|project complete/.test(s)) return "built";
+  if (endDate && daysSince(endDate) > 90) return "built"; // filed completion long passed
   return "approved";
 }
 
@@ -310,13 +324,22 @@ export function mapStatus(statusText?: string, endDate?: string): "built" | "app
  * Layer classification from the filing's OWN scope-of-work text (fixes the
  * name-regex misfire flagged in the audit: "Histology Lab" → lab, "barn for
  * animal holding" → agriculture/research, not "Industrial facility").
+ *
+ * Fixture-verified (Step 0): the project NAME is only a fallback when the filing
+ * states no scope — TABS2024016698 ("Barn 2 ACT Office", scope: interior office
+ * fit-out) misclassified as animal-facility when name and scope were blended.
+ * "Tenant improvement" / "fit-out" outrank a bare "manufacturing use" mention
+ * (TABS2026011928: TI of shell space for office and manufacturing → commercial),
+ * while a manufacturing BUILD stays industrial (TABS2024022676: new construction
+ * with machine shop and cleanroom device manufacturing).
  */
 export function classifyLayer(scopeText?: string, name?: string): string {
-  const t = `${scopeText || ""} ${name || ""}`.toLowerCase();
+  const t = (scopeText || name || "").toLowerCase();
   if (/histolog|\blab\b|laborator|research|vivarium/.test(t)) return "research";
   if (/animal holding|\bbarn\b|livestock|kennel/.test(t)) return "animal-facility";
+  if (/tenant improvement|fit.?out/.test(t)) return "commercial";
   if (/manufactur|assembly|fabricat/.test(t)) return "industrial";
-  if (/office|tenant improvement|fit.?out|shell space/.test(t)) return "commercial";
+  if (/office|shell space/.test(t)) return "commercial";
   if (/warehouse|logistic|distribution/.test(t)) return "logistics";
   if (/residen|apartment|housing/.test(t)) return "residential";
   if (/power|substation|solar|energy/.test(t)) return "energy";
@@ -351,6 +374,14 @@ export function entitiesFrom(site: TabsSite): EntityRow[] {
     rows.push({
       kind: "contact", role: "contact", name: site.contact_name,
       phone_norm: site.owner_phone_norm,   // contact is filed under the owner block's phone
+      record_url: site.record_url,
+    });
+  }
+  if (site.filed_by) {
+    rows.push({
+      // PERSON FILING FORM contact — name only, the form states no phone/address.
+      // Links via shared_contact (name) in the matcher, never via a borrowed phone.
+      kind: "contact", role: "contact", name: site.filed_by,
       record_url: site.record_url,
     });
   }
@@ -407,7 +438,7 @@ function multilineField(section: string, label: string, nextLabel: string): stri
   const re = new RegExp(
     `${escapeRe(label)}\\s*:\\s*([\\s\\S]*?)(?=${escapeRe(nextLabel)}\\s*:|$)`, "i",
   );
-  const v = section.match(re)?.[1]?.replace(/\n+/g, ", ").replace(/\s{2,}/g, " ").replace(/,\s*,/g, ",").trim().replace(/,$/, "");
+  const v = section.match(re)?.[1]?.replace(/\n+/g, ", ").replace(/\s{2,}/g, " ").replace(/\s+,/g, ",").replace(/,\s*,/g, ",").trim().replace(/,$/, "");
   return v || undefined;
 }
 
@@ -419,7 +450,10 @@ function usd(v?: string): number | undefined {
 
 function sqft(v?: string): number | undefined {
   if (!v) return undefined;
-  const n = Number(v.replace(/[^0-9.]/g, ""));
+  // fixture-verified: the page writes "112,000 ft <sup>2</sup>" — cut at the unit
+  // token so the superscript 2 can't ride into the digits ("112,000" not "1120002")
+  const cleaned = v.replace(/(sq\.?\s*ft|square\s+feet|ft)[\s\S]*$/i, "");
+  const n = Number(cleaned.replace(/[^0-9.]/g, ""));
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
@@ -450,8 +484,8 @@ function normAddr(v?: string): string | undefined {
     .replace(/[^a-z0-9#]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+function daysSince(isoDate: string): number {
+  return (Date.now() - new Date(`${isoDate}T00:00:00Z`).getTime()) / 86400000;
 }
 
 function escapeRe(s: string): string {

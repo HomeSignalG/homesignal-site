@@ -21,6 +21,10 @@ const fixture = `
 <tr><td>Scope of Work:</td><td>This project is privately funded, on private land for private use.</td></tr>
 <tr><td>Current Status:</td><td>Inspection Complete</td></tr>
 </table>
+<div>PERSON FILING FORM</div>
+<table>
+<tr><td>Contact Name:</td><td>Brian Conklin</td></tr>
+</table>
 <div>OWNER</div>
 <table>
 <tr><td>Owner Name:</td><td>Neuralink</td></tr>
@@ -50,6 +54,7 @@ eq(parsed.project_name, "ATX1 New Construction", "project_name");
 eq(parsed.owner, "Neuralink", "owner");
 eq(parsed.owner_phone, "(813) 758-6679", "owner_phone");
 eq(parsed.contact_name, "Scott Padilla", "contact_name");
+eq(parsed.filed_by, "Brian Conklin", "filed_by (PERSON FILING FORM fenced from OWNER)");
 eq(parsed.design_firm, "Studio8 Architects", "design_firm");
 eq(parsed.est_cost, 14700000, "est_cost");
 eq(parsed.start_date, "2024-07-15", "start_date");
