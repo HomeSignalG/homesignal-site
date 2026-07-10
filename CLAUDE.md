@@ -718,3 +718,24 @@ Full site-side governance: **`docs/development-tracker-source-of-truth.md`**
 live, a refresh of ZIP 78617 must surface the five Caldwell permit filings and
 the entity link connecting River Bottoms Ranch LLC ↔ Neuralink via shared phone
 (813) 758-6679. That before/after is the proof the backbone works.
+
+### Status (2026-07-10)
+- 🟢 **TX TDLR/TABS is LIVE end to end** (engine v16/v17, registry mode, Travis pins):
+  the 78617 refresh caches all 5 Caldwell filings (counts facilities 29 / development 5 /
+  civic 1, `tabs_quarantined: []`), the coverage gate held on a UT spot-check (84302 → 0
+  TABS fetches), and `verify-development` CI is the live page check. Fixture receipts:
+  `fixtures/tabs/` + runbook §2.1.
+- 🟢 **The PROPERTY PAGE (address dossier, §4.3+§4.3.1) is LIVE**: `homesignalmap.html?addr=…`
+  reads `property_reports` (RLS on, public select, service-role writes), written by the
+  engine's v17 ZIP-mode refresh — `canonicalAddr()` is the ONE normalizer (engine-side);
+  both "Ln"/"Lane" filing variants collapse to the one key
+  `2200 CALDWELL LN, DEL VALLE, TX 78617` (5 filings, 1 row). `sources_checked` lists only
+  sources the refresh actually queried that returned empty at that address. ZIP-list
+  `record ▸` on permit records routes to the property page; the external record link lives
+  there. Verifier §4.5 covers every cached property page (record links, ≥2-evidence entity
+  links, honest Also-checked).
+- ⚠️ **Standing answer — MCP edge-function deploys have a ~30 KB payload ceiling**: the
+  multi-file get-address-report deploy (~55 KB) reliably kills the tool permission stream.
+  Deploy as ONE esbuild bundle (`esbuild index.ts --bundle --format=esm --external:jsr:*
+  --minify-whitespace`) with a provenance header naming the repo commit; the repo's
+  readable multi-file source stays the parked reference.
