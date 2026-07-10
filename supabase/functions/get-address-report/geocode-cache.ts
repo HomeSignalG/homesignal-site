@@ -113,9 +113,9 @@ export async function resolveGeocode(
   };
 
   for (const rung of ladder) {
-    // A rung returns null on a miss (no match, API error, or budget cap hit) → try the next
-    // rung. This is how the ladder degrades safely: TxGIO rooftop → TxGIO parcel → Geocodio →
-    // Census, ending at range_interpolated rather than ever hard-erroring.
+    // A rung returns null on a miss (no match or API error) → try the next rung. This is how the
+    // ladder degrades safely: the zero-fee dataset rung (OpenAddresses parcel_centroid) →
+    // Census (range_interpolated), ending at interpolation rather than ever hard-erroring.
     const hit = await rung.resolve(input_address, canonical_addr).catch(() => null);
     if (!hit) continue;
     const clears = CLEARS_REVIEW.has(hit.match_type);
