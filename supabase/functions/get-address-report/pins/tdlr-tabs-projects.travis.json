@@ -1,0 +1,13 @@
+{
+  "_doc": "docs/pins/tdlr-tabs-projects.travis.json — REGISTRY MODE input for the TDLR/TABS adapter (Travis County). Project numbers only; every fact about a project comes from a live fetch of its record page at refresh time — this file asserts existence, nothing else. Provenance: numbers transcribed from TDLR TABS pages shown in The Drey Dossier (youtube.com/watch?v=Lh_0v3nuczE, Jul 2026). STEP-0: re-verify each URL resolves live before the first refresh; a number that 404s is removed here, never guessed.",
+  "county": "Travis",
+  "vintage": "2026-07-09",
+  "record_url_template": "https://www.tdlr.texas.gov/TABS/Projects/{project_no}",
+  "project_nos": [
+    "TABS2023006449",
+    "TABS2023006483",
+    "TABS2024016698",
+    "TABS2024022676",
+    "TABS2026011928"
+  ]
+}

@@ -2,7 +2,10 @@
 
 > Decoupled engine job per source-of-truth §7.6 — the page batch never blocks on this.
 > Files: `sources/tdlr-tabs.ts` (the adapter) ·
-> `docs/pins/tdlr-tabs-projects.travis.json` (registry-mode input).
+> `docs/pins/tdlr-tabs-projects.travis.json` (registry-mode input — the CANONICAL
+> reviewed copy; `supabase/functions/get-address-report/pins/` holds a byte-identical
+> bundle mirror because a deployed function's imports cannot escape the function root.
+> To edit the pins: edit docs/pins, re-copy the mirror, redeploy).
 > Governance: anti-fabrication (§0), quarantine-don't-stop (§7.2), claims discipline.
 
 ---
