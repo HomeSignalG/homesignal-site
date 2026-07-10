@@ -1,4 +1,4 @@
-// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v16.
+// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v17.
 // PARKED IN REPO FOR REFERENCE/REPRODUCIBILITY — Supabase is the source of truth
 // (docs/development-tracker-source-of-truth.md §2). v11 = MULTI-COUNTY: resolveCommunityIds()
 // maps a ZIP to its own community chain (city+county) so each ZIP shows its OWN county's
@@ -20,7 +20,12 @@
 // coverage-gated ZIP-mode branch — the source only activates when the ZIP's resolved communities
 // are in Texas (docs/source-registry.md, mandatory covers check), TABS sites count under
 // counts.development (never counts.facilities), and the quarantine log rides on the run output as
-// tabs_quarantined. Address-mode behavior unchanged.
+// tabs_quarantined. Address-mode behavior unchanged. v17 = PROPERTY REPORTS: canonicalAddr()
+// (the ONE address normalizer, engine-side — case-study §4.3) stamps canonical_addr on every
+// point record with a FILED street address, and the ZIP-mode refresh collapses those records
+// into per-address property_reports rows (the dossier cache behind homesignalmap.html?addr=…).
+// sources_checked lists ONLY sources this refresh actually queried that came back empty at
+// that address — never an assumed check.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
@@ -260,6 +265,56 @@ async function enrichViolations(supabase: ReturnType<typeof createClient>, fac: 
     for (const f of fac) { const c = byId.get(f.registry_id as string); if (c && c > 0) { f.viol = c; f.violUrl = f.record_url; } }
   } catch (_e) { /* best-effort */ }
 }
+// ── v17: the ONE canonical-address normalizer (case-study §4.3) ────────────────────────
+// Deterministic string normalization of a FILED street address, so records filed with
+// suffix/spelling variants ("2200 Caldwell Lane" vs "2200 Caldwell Ln") and the Census
+// matchedAddress form ("…, TX, 78617") all collapse to one property_reports key. The page
+// never normalizes — it links with the engine-stamped canonical_addr.
+function canonicalAddr(a: string): string {
+  return String(a).toUpperCase().replace(/\./g, "")
+    .replace(/\bLANE\b/g, "LN").replace(/\bSTREET\b/g, "ST").replace(/\bDRIVE\b/g, "DR")
+    .replace(/\bROAD\b/g, "RD").replace(/\bAVENUE\b/g, "AVE").replace(/\bBOULEVARD\b/g, "BLVD")
+    .replace(/\bPARKWAY\b/g, "PKWY").replace(/\bHIGHWAY\b/g, "HWY").replace(/\bCOURT\b/g, "CT")
+    .replace(/\bCIRCLE\b/g, "CIR").replace(/\bPLACE\b/g, "PL").replace(/\bSUITE\b/g, "STE")
+    .replace(/\bTEXAS\b/g, "TX").replace(/\bUTAH\b/g, "UT")
+    .replace(/\s*,\s*/g, ", ").replace(/,\s*(\d{5}(-\d{4})?)\s*$/, " $1").replace(/\s+/g, " ").trim();
+}
+// v17: collapse every point record with a filed street address into its per-address
+// property_reports row (public select / service-role writes — docs/property-reports-cache.sql).
+// sources_checked carries ONLY sources this refresh actually queried that returned nothing
+// at that address, with the check's real scope stated — never an assumed or inferred check.
+async function writePropertyReports(
+  supabase: ReturnType<typeof createClient>,
+  zip: string, county: string | null, state: string | null,
+  pointRecords: Record<string, unknown>[], tabsRan: boolean, vintage: string,
+): Promise<void> {
+  const groups: Record<string, Record<string, unknown>[]> = {};
+  for (const s of pointRecords) {
+    const key = (s.canonical_addr as string) || "";
+    if (!key) continue;
+    (groups[key] ??= []).push(s);
+  }
+  for (const [address, recs] of Object.entries(groups)) {
+    const filings = recs.filter((r) => r.project_no);
+    const checked: Record<string, string>[] = [];
+    if (!recs.some((r) => String(r.src || "").indexOf("EPA FRS") === 0)) {
+      checked.push({ src: "EPA FRS", result: "no facility at this address among this ZIP's query results" });
+    }
+    if (tabsRan && !filings.length) {
+      checked.push({ src: "TX TDLR TABS", result: "no filing at this address in the pinned registry set" });
+    }
+    const first = recs.find((r) => typeof r.lat === "number");
+    try {
+      await supabase.from("property_reports").upsert({
+        address, zip, county, state,
+        lat: first ? (first.lat as number) : null, lng: first ? (first.lng as number) : null,
+        counts: { filings: filings.length, federal: recs.length - filings.length },
+        sites: recs, sources_checked: checked,
+        source_vintage: vintage, refreshed_at: new Date().toISOString(),
+      }, { onConflict: "address" });
+    } catch (_e) { /* the dossier cache must never break the page response */ }
+  }
+}
 // Resolve a ZIP to the community rows whose jurisdiction covers it (city + county chain).
 async function resolveCommunityIds(supabase: ReturnType<typeof createClient>, zip: string | null): Promise<string[]> {
   if (!zip || !/^\d{5}$/.test(zip)) return [];
@@ -311,11 +366,19 @@ Deno.serve(async (req: Request) => {
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");
     // TABS filings are development records by construction (state permit registry) — stamp
-    // relevance/rel_rule so the cache stays queryable alongside the v15 classifier's output.
+    // relevance/rel_rule so the cache stays queryable alongside the v15 classifier's output,
+    // and canonical_addr (v17) so filings at one address share one property_reports key.
     const tabsSites: Record<string, unknown>[] = tabs.sites
       .filter((s) => (s.record_url || "").trim() !== "")
-      .map((s) => { const [e, n] = toEN(clat, clng, s.lat!, s.lng!); return { ...s, e, n, relevance: "development", rel_rule: "source:tabs" }; });
+      .map((s) => { const [e, n] = toEN(clat, clng, s.lat!, s.lng!); return { ...s, e, n, relevance: "development", rel_rule: "source:tabs", canonical_addr: s.location_addr ? canonicalAddr(s.location_addr) : undefined }; });
     const fac = facRaw.filter((s) => (s.record_url as string) && (s.record_url as string).trim() !== "");
+    // v17: persist the per-address dossier rows for this ZIP (small N; must never fail the page).
+    const isTx = (commRows ?? []).some((c) => /^(tx|texas)$/i.test(String((c as { state?: string }).state || "").trim()));
+    const countyRow = (commRows ?? []).find((c) => (c as { county?: string }).county) as { county?: string; state?: string } | undefined;
+    try {
+      await writePropertyReports(supabase, zip, countyRow?.county ?? null, countyRow?.state ?? null,
+        tabsSites, isTx, "get-address-report v17 ZIP mode");
+    } catch (_e) { /* never block the page response */ }
     // Only genuine land-use items count as development; civic notices are carried in sites
     // (the page lists them non-headlined) but never inflate the project counts.
     const devReal = dev.filter((s) => s.relevance !== "civic");
