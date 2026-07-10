@@ -189,6 +189,52 @@
   .empty{color:var(--mute);font-size:13px;padding:12px 0}
 
   .foot{color:var(--mute);font-size:12px;margin:8px 0 40px;line-height:1.6}
+
+  /* ── Property page (address dossier — case-study §4.3) ──────────────────────────
+     Same visual language as the rest of the page: Inter, var(--green) #1f5130,
+     var(--line) #E7ECEA borders, white cards, green/blue/orange lifecycle colors,
+     and the existing "record ▸" link pattern. */
+  #property{display:none;margin:8px 0 40px}
+  .prop-head{padding:26px 0 6px}
+  .prop-crumb{font-size:12.5px;color:var(--mute);margin-bottom:6px}
+  .prop-crumb a{color:var(--green);text-decoration:none}
+  .prop-crumb a:hover{text-decoration:underline}
+  .prop-titlerow{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+  .prop-h1{font-weight:700;font-size:26px;letter-spacing:-.02em;margin:0}
+  .prop-actions{display:flex;gap:8px;flex:0 0 auto}
+  .prop-sub{color:var(--soft);font-size:13.5px;margin:6px 0 14px}
+  .prop-sub a{color:var(--green)}
+  .statgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:16px}
+  @media(max-width:820px){.statgrid{grid-template-columns:1fr 1fr}}
+  .prop-card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    box-shadow:0 14px 34px -26px rgba(8,30,28,.5);padding:18px;margin-bottom:16px}
+  .prop-card h3{font-size:12px;letter-spacing:.02em;color:var(--mute);margin:0 0 10px;font-weight:600;text-transform:uppercase}
+  .entgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  @media(max-width:820px){.entgrid{grid-template-columns:1fr}}
+  .entcol .ec-h{font-size:11.5px;color:var(--mute);font-weight:600;margin-bottom:6px}
+  .ent{padding:6px 0;border-top:1px solid var(--line);font-size:13.5px}
+  .ent .en{font-weight:600;display:flex;align-items:center;gap:6px}
+  .ent .em{font-size:12px;color:var(--mute)}
+  .linkdot{width:8px;height:8px;border-radius:50%;background:var(--orange);flex:0 0 auto;display:inline-block}
+  .entlinks{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+  .entlink{font-size:13px;color:var(--ink);padding:5px 0;line-height:1.55}
+  .entlink a{color:var(--green)}
+  .pill{display:inline-block;font:700 10.5px var(--font);letter-spacing:.04em;color:#fff;
+    border-radius:6px;padding:2.5px 8px;vertical-align:middle}
+  .pill.built{background:var(--green)}
+  .pill.approved{background:#2563EB}
+  .pill.proposed{background:var(--orange)}
+  .filing{display:flex;gap:14px;padding:12px 0;border-top:1px solid var(--line)}
+  .filing .fdate{flex:0 0 92px;font-size:12px;color:var(--mute);padding-top:2px}
+  .filing .ft{font-weight:600;font-size:14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .filing .fs{font-size:12.5px;color:var(--soft);margin-top:3px;line-height:1.5}
+  .filing .fmath{color:var(--mute)}
+  .alsochecked{margin-top:10px;font-size:12px;color:var(--mute);border-top:1px solid var(--line);padding-top:10px}
+  .actgrp{margin-top:4px}
+  .actgrp .ag-h{font-size:11.5px;color:var(--mute);font-weight:600;margin:8px 0 2px}
+  .actitem{padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+  .actitem .am{font-size:11.5px;color:var(--mute)}
+  .tier2{margin-top:12px;border-top:1px solid var(--line);padding-top:10px;font-size:13px;color:var(--soft)}
   .leaflet-popup-content{font-family:var(--font);font-size:13px}
   .pt{font-weight:600;margin-bottom:2px}
   .pk{font-size:11.5px;color:var(--mute)}
@@ -317,7 +363,7 @@
       <div class="grid band">
         <div class="card read">
           <div class="band-h t-built">Operating now</div>
-          <div class="band-s">EPA-registered industrial facilities, standing today</div>
+          <div class="band-s">EPA-registered facilities and completed construction filings, standing today</div>
           <div id="builtList"></div>
         </div>
         <div class="card read">
@@ -334,6 +380,10 @@
 
       <div class="foot" id="foot"></div>
     </div>
+
+    <!-- PROPERTY PAGE (address dossier, §4.3) — filled by renderProperty(); one dynamic
+         page / many cached rows, keyed by canonical address (?addr=…). -->
+    <div id="property"></div>
   </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -717,10 +767,18 @@
     var sites = (data.sites || []).filter(sourced);
     window.__HS_SITES = sites;
 
-    var fac = sites.filter(function(s){ return s.scope==="point"; });
+    // Point-scope DEVELOPMENT records (state permit filings, e.g. TX TDLR/TABS — they carry
+    // a project_no) are not EPA facilities: they bucket into the Operating/Approved/Proposed
+    // lists by lifecycle type, and their "record ▸" routes to the property page (§4.3).
+    var isPermit = function(s){ return s.scope==="point" && !!s.project_no; };
+    var permits = sites.filter(isPermit);
+    var fac = sites.filter(function(s){ return s.scope==="point" && !isPermit(s); });
     var dev = sites.filter(function(s){ return s.scope==="area"; });
-    var appr = dev.filter(function(s){ return bucketOf(s.type)==="approved"; });
-    var prop = dev.filter(function(s){ return bucketOf(s.type)==="proposed"; });
+    var appr = permits.filter(function(s){ return bucketOf(s.type)==="approved"; })
+      .concat(dev.filter(function(s){ return bucketOf(s.type)==="approved"; }));
+    var prop = permits.filter(function(s){ return bucketOf(s.type)==="proposed"; })
+      .concat(dev.filter(function(s){ return bucketOf(s.type)==="proposed"; }));
+    var builtRows = permits.filter(function(s){ return bucketOf(s.type)==="built"; }).concat(fac);
     // "Open for public comment" = a genuine opportunity only: a PROPOSED item, not already
     // decided (approved/denied/withdrawn), with a meeting/comment date that's today or later.
     var today = new Date().toISOString().slice(0,10);
@@ -763,7 +821,7 @@
     updateCovNote();
 
     drawMap(data, sites);
-    listInto("builtList", fac, "No EPA-registered facility on record here.");
+    listInto("builtList", builtRows, "No EPA-registered facility on record here.");
     listInto("apprList", appr, "Nothing approved on record right now.");
     listInto("propList", prop, "No proposed item on record right now.");
 
@@ -899,7 +957,13 @@
     el.innerHTML = items.slice(0,12).map(function(s){
       var col = COLORS[s.type] || "#5d6f72";
       var link = s.url || s.record_url || "";
-      var a = link ? " · <a href='"+esc(link)+"' target='_blank' rel='noopener'>record ▸</a>" : "";
+      // Property routing (§4.3): a point record with a FILED street address routes to its
+      // internal property page — the external record link lives there, where every fact
+      // links to its own official source. Area notices and EPA facilities (no canonical
+      // address key yet) keep their direct official-record link.
+      var a = "";
+      if(s.location_addr){ a = " · <a href='"+esc(propertyHref(s.location_addr))+"'>record ▸</a>"; }
+      else if(link){ a = " · <a href='"+esc(link)+"' target='_blank' rel='noopener'>record ▸</a>"; }
       var v = s.viol ? "<div class='vflag'>"+s.viol+" recorded violation"+(s.viol===1?"":"s")+" · EPA ECHO ▸</div>" : "";
       var tag = LAYER_LABEL[s.layer] || "Development";
       // A decided item (approved/denied/withdrawn) shows its plain date, not a "closes in N days"
@@ -1237,10 +1301,339 @@
   window.addEventListener("resize",function(){ if(V3.active)resize3D(); if(GL.active&&GL.map)GL.map.resize(); });
   buildLegend();
 
+  // ===================== PROPERTY PAGE (address dossier — case-study §4.3) =====================
+  // One dynamic page / many cached rows, keyed by the engine's CANONICAL address string
+  // (?addr=…). Funnel: ZIP page → property page → external record. The page renders ONLY
+  // sourced() records from the property_reports cache row — nothing is invented here, the
+  // "Also checked" line comes only from sources the row explicitly reports checked-empty,
+  // and every entity link carries ≥2 record_urls (verifier §4.5 invariant) or is not drawn.
+  var PROP_MODE = false;
+  function propertyHref(addr){ return "homesignalmap.html?addr=" + encodeURIComponent(String(addr).trim()); }
+  function lname(v){ return String(v||"").trim().toLowerCase(); }
+  function fmtMoney(n){ return "$" + Number(n).toLocaleString(); }
+  function fmtSqft(n){ return Number(n).toLocaleString() + " sqft"; }
+  function shortNo(no){ return String(no||"").replace(/^TABS/, "TABS…").slice(0, 4) === "TABS" ? "TABS…" + String(no).slice(-6) : no; }
+  function recA(url, label){ return "<a href='"+esc(url)+"' target='_blank' rel='noopener'>"+esc(label)+"</a>"; }
+  function isFiling(s){ return !!s.project_no; }          // permit-class record (TABS, …); everything else is a federal/registry record
+
+  // v1 entity matcher, page-side over THIS row's records only (the §4.4 nightly matcher is
+  // engine-side, later). Two shared-attribute facts, each requiring ≥2 records AND ≥2
+  // distinct entity names — never rendered with less evidence:
+  //   shared_phone   — same filed owner phone on records with different owner names
+  //   shared_contact — same contact/filer name on records with different owner names
+  function entityLinks(recs){
+    var links = [];
+    var byPhone = {}, byPerson = {};
+    recs.forEach(function(s){
+      if(s.owner_phone_norm && s.owner){
+        (byPhone[s.owner_phone_norm] = byPhone[s.owner_phone_norm] || { disp:s.owner_phone, rows:[] })
+          .rows.push({ owner:s.owner, url:s.record_url, no:s.project_no||"" });
+      }
+      [s.contact_name, s.filed_by].forEach(function(person){
+        if(!person || !s.owner) return;
+        (byPerson[lname(person)] = byPerson[lname(person)] || { disp:person, rows:[] })
+          .rows.push({ owner:s.owner, url:s.record_url, no:s.project_no||"" });
+      });
+    });
+    function push(kind, disp, g){
+      var urls = {}, names = {};
+      g.rows.forEach(function(r){ urls[r.url]=1; names[lname(r.owner)]=1; });
+      if(Object.keys(urls).length < 2 || Object.keys(names).length < 2) return;   // §4.5: ≥2 records, ≥2 entities
+      var seen = {}, ev = g.rows.filter(function(r){ if(seen[r.url]) return false; seen[r.url]=1; return true; });
+      links.push({ kind:kind, disp:disp, evidence:ev });
+    }
+    Object.keys(byPhone).forEach(function(k){ push("Shared phone", byPhone[k].disp, byPhone[k]); });
+    Object.keys(byPerson).forEach(function(k){ push("Shared contact", byPerson[k].disp, byPerson[k]); });
+    return links;
+  }
+
+  // Tier-1 "mentions this property" matcher (§4.3.1) — plain case-insensitive string
+  // containment against the property identifier set, NO semantic guessing. v1: the item
+  // source is the row's own `related` array when the engine provides one (stubbed until
+  // the engine-side join lands); an item that matches nothing is never shown as Tier 1.
+  function identifierSet(row, recs){
+    var ids = {};
+    function add(v){ v = String(v||"").trim(); if(v.length >= 4) ids[v] = 1; }
+    add(row.address);
+    add(String(row.address||"").split(",")[0]);                       // street line
+    add(String(row.address||"").split(",")[0].replace(/^\d+\s*/, "")); // street name
+    recs.forEach(function(s){
+      add(s.project_no); add(s.facility_name);
+      add(s.owner); add(s.contact_name); add(s.filed_by); add(s.design_firm);
+    });
+    return Object.keys(ids);
+  }
+  function tier1Matches(row, recs){
+    var ids = identifierSet(row, recs);
+    return (row.related || []).map(function(it){
+      var text = lname((it.title||"") + " " + (it.summary||""));
+      var hit = null;
+      ids.some(function(id){ if(text.indexOf(lname(id)) !== -1){ hit = id; return true; } return false; });
+      return hit ? { item:it, matched:hit } : null;
+    }).filter(Boolean);
+  }
+
+  function loadProperty(addr){
+    PROP_MODE = true;
+    document.title = addr + " — property record — HomeSignal";
+    var head = document.querySelector(".head"); if(head) head.style.display = "none";
+    $("results").style.display = "none";
+    // Local-override hook for offline render tests: a test harness may inject a row via
+    // window.__HS_PROPERTY_OVERRIDE before boot. Production pages read the live cache.
+    if(window.__HS_PROPERTY_OVERRIDE && lname(window.__HS_PROPERTY_OVERRIDE.address) === lname(addr)){
+      renderProperty(window.__HS_PROPERTY_OVERRIDE); return;
+    }
+    status("Loading property record …");
+    var url = SUPABASE_URL + "/rest/v1/property_reports?address=eq." + encodeURIComponent(addr) +
+              "&select=address,zip,county,state,lat,lng,counts,sites,sources_checked,paywall,refreshed_at&limit=1";
+    fetch(url, { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } })
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(rows){
+        if(rows && rows.length){ renderProperty(rows[0]); }
+        else { renderPropertyEmpty(addr); }
+      })
+      .catch(function(){ renderPropertyEmpty(addr); });
+  }
+
+  function renderPropertyEmpty(addr){
+    status("");
+    var box = $("property");
+    box.innerHTML =
+      "<div class='prop-head'>" +
+        "<div class='prop-crumb'><a href='homesignalmap.html'>Development tracker</a> › property</div>" +
+        "<div class='prop-titlerow'><h1 class='prop-h1'>"+esc(addr)+"</h1></div>" +
+        "<div class='prop-sub'>No property record is cached for this address yet. " +
+        "Records appear here after an engine refresh covers the address.</div>" +
+      "</div>";
+    box.style.display = "block";
+    window.__HS_PROP = [];
+  }
+
+  function renderProperty(row){
+    status("");
+    var recs = (row.sites || []).filter(sourced);          // anti-fabrication gate, again at the page
+    window.__HS_PROP = recs; window.__HS_SITES = recs;
+    var filings = recs.filter(isFiling);
+    var federal = recs.filter(function(s){ return !isFiling(s); });
+    var links = entityLinks(recs);
+    var linkedUrls = {}, linkedNames = {};
+    links.forEach(function(L){ L.evidence.forEach(function(r){ linkedUrls[r.url]=1; linkedNames[lname(r.owner)]=1; }); });
+    links.forEach(function(L){ if(L.kind==="Shared contact") linkedNames[lname(L.disp)]=1; if(L.kind==="Shared phone"){} });
+    var zip = row.zip || (String(row.address).match(/\b(\d{5})\b/) || [])[1] || "";
+    var street = String(row.address||"").split(",")[0].replace(/^\d+\s*/, "");
+    var single = recs.length === 1;
+
+    // header ------------------------------------------------------------------
+    var owners = {}; filings.forEach(function(s){ if(s.owner) owners[lname(s.owner)] = s.owner; });
+    var years = [];
+    filings.forEach(function(s){ if(s.start_date) years.push(s.start_date.slice(0,4)); if(s.end_date) years.push(s.end_date.slice(0,4)); });
+    years.sort();
+    var range = years.length ? (years[0] + "–" + years[years.length-1]) : "";
+    var subBits = [];
+    if(row.county) subBits.push(esc(row.county) + " County");
+    subBits.push(recs.length + (recs.length===1 ? " record" : " records") +
+      (filings.length ? " · " + Object.keys(owners).length + " owner" + (Object.keys(owners).length===1?"":"s") + " of record" : ""));
+    if(range) subBits.push(esc(range));
+    var h =
+      "<div class='prop-head'>" +
+        "<div class='prop-crumb'>" + (zip ? "<a href='homesignalmap.html?zip="+esc(zip)+"'>ZIP "+esc(zip)+"</a> › " : "") + esc(street) + "</div>" +
+        "<div class='prop-titlerow'><h1 class='prop-h1'>"+esc(row.address)+"</h1>" +
+          "<div class='prop-actions'>" +
+            "<button class='btn-primary' id='propWatch'>Watch this address</button>" +
+            "<button class='btn-outline' id='propExport'>Export</button>" +
+          "</div></div>" +
+        "<div class='prop-sub'>" + subBits.join(" · ") +
+          (zip ? " · <a href='homesignalmap.html?zip="+esc(zip)+"'>view on ZIP map ▸</a>" : "") + "</div>" +
+      "</div>";
+
+    // stat cards (multi-record only) ------------------------------------------
+    var cost = 0, sqft = 0, costN = 0, sqftN = 0;
+    filings.forEach(function(s){
+      if(s.est_cost != null){ cost += Number(s.est_cost); costN++; }
+      if(s.sqft != null){ sqft += Number(s.sqft); sqftN++; }
+    });
+    var stats = single ? "" :
+      "<div class='statgrid'>" +
+        "<div class='cc'><div class='n'>"+filings.length+"</div><div class='k'>Filings</div></div>" +
+        "<div class='cc'><div class='n'>"+(costN ? fmtMoney(cost) : "—")+"</div><div class='k'>Total filed cost"+(costN && costN<filings.length ? " ("+costN+" filings state one)" : "")+"</div></div>" +
+        "<div class='cc'><div class='n'>"+(sqftN ? Number(sqft).toLocaleString() : "—")+"</div><div class='k'>Sq ft filed"+(sqftN && sqftN<filings.length ? " ("+sqftN+" filings state it)" : "")+"</div></div>" +
+        "<div class='cc"+(links.length ? " flag" : "")+"'><div class='n'>"+links.length+"</div><div class='k'>Entity links</div></div>" +
+      "</div>";
+
+    // entities panel (multi-record only) ---------------------------------------
+    var ent = "";
+    if(!single){
+      function entCol(title, items){
+        var rows = items.map(function(it){
+          return "<div class='ent'><div class='en'>"+(it.linked ? "<span class='linkdot'></span>" : "")+esc(it.name)+"</div>" +
+                 (it.meta ? "<div class='em'>"+esc(it.meta)+"</div>" : "") + "</div>";
+        }).join("");
+        return "<div class='entcol'><div class='ec-h'>"+title+"</div>" + (rows || "<div class='ent em'>—</div>") + "</div>";
+      }
+      function collect(fieldOf, metaOf){
+        var m = {};
+        filings.forEach(function(s){
+          (fieldOf(s)||[]).forEach(function(pair){
+            var name = pair[0]; if(!name) return;
+            var k = lname(name);
+            (m[k] = m[k] || { name:name, count:0, metas:{} }).count++;
+            var extra = metaOf ? metaOf(s, pair[1]) : "";
+            if(extra) m[k].metas[extra] = 1;
+          });
+        });
+        return Object.keys(m).map(function(k){
+          var e = m[k];
+          var meta = [e.count + " filing" + (e.count===1?"":"s")].concat(Object.keys(e.metas)).join(" · ");
+          return { name:e.name, meta:meta, linked:!!linkedNames[k] };
+        });
+      }
+      var ownersL = collect(function(s){ return s.owner ? [[s.owner]] : []; },
+        function(s){ var m = String(s.owner_addr||"").match(/,\s*([A-Za-z .]+),\s*([A-Za-z]{2,})\b[^,]*$/); return m ? (m[1].trim()+", "+m[2].trim()) : ""; /* city + state verbatim as filed */ });
+      var contactsL = collect(function(s){
+        var out = []; if(s.contact_name) out.push([s.contact_name]); if(s.filed_by) out.push([s.filed_by, "filing"]); return out;
+      }, function(s, role){ return role ? "filed the form" : ""; });
+      // a contact spanning multiple owner names is itself a cross-signal — surface it
+      var spanByPerson = {};
+      filings.forEach(function(s){ [s.contact_name, s.filed_by].forEach(function(p){ if(!p||!s.owner) return;
+        (spanByPerson[lname(p)] = spanByPerson[lname(p)] || {})[lname(s.owner)] = 1; }); });
+      contactsL.forEach(function(c){ var n = Object.keys(spanByPerson[lname(c.name)]||{}).length;
+        if(n > 1) c.meta += " · " + n + " owner names"; });
+      var firmsL = collect(function(s){ return s.design_firm ? [[s.design_firm]] : []; },
+        function(s){ var m = String(s.design_firm_addr||"").match(/,\s*([A-Za-z .]+),\s*([A-Za-z]{2,})\b[^,]*$/); return m ? (m[1].trim()+", "+m[2].trim()) : ""; /* city + state verbatim as filed */ });
+
+      var linkLines = links.map(function(L){
+        var evs = L.evidence.map(function(r){ return recA(r.url, r.no || r.url) + " (" + esc(r.owner) + ")"; });
+        var last = evs.pop();
+        var list = evs.length ? evs.join(", ") + " and " + last : last;
+        var role = L.kind === "Shared phone" ? "listed as the owner phone on" : "named on";
+        return "<div class='entlink'><span class='linkdot'></span> " + esc(L.kind) + " " + esc(L.disp) +
+               " — " + role + " " + list + ".</div>";
+      }).join("");
+
+      ent = "<div class='prop-card'><h3>Entities on record</h3>" +
+        "<div class='entgrid'>" + entCol("Owners", ownersL) + entCol("Contacts", contactsL) + entCol("Design firms", firmsL) + "</div>" +
+        (linkLines ? "<div class='entlinks'>" + linkLines + "</div>" : "") +
+        "</div>";
+    }
+
+    // filing history ------------------------------------------------------------
+    function filingRow(s){
+      var b = bucketOf(s.type);
+      var summary = [];
+      if(s.owner) summary.push(esc(s.owner));
+      if(s.est_cost != null) summary.push(esc(fmtMoney(s.est_cost)));
+      if(s.sqft != null) summary.push(esc(fmtSqft(s.sqft)));
+      if(s.scope_text) summary.push(esc(s.scope_text));
+      var math = (s.est_cost != null && s.sqft != null && Number(s.sqft) > 0)
+        ? " <span class='fmath'>(≈ $" + Math.round(Number(s.est_cost)/Number(s.sqft)).toLocaleString() + "/sqft as filed)</span>" : "";
+      var rec = s.record_url ? " · " + recA(s.record_url, "record ▸") : "";
+      return "<div class='filing'>" +
+        "<div class='fdate'>" + esc(s.start_date ? fmtDate(s.start_date) : (s.status_text||"")) + "</div>" +
+        "<div style='flex:1'><div class='ft'>" + (linkedUrls[s.record_url] ? "<span class='linkdot'></span>" : "") +
+          esc(s.label) + " <span class='pill "+b+"'>"+b.toUpperCase()+"</span></div>" +
+        "<div class='fs'>" + summary.join(" · ") + math + rec +
+          (s.status_text ? " · <span class='fmath'>status as filed: "+esc(s.status_text)+"</span>" : "") + "</div></div></div>";
+    }
+    var hist = "";
+    var sortedFilings = filings.slice().sort(function(a,b){ return String(a.start_date||"").localeCompare(String(b.start_date||"")); });
+    if(filings.length){
+      hist = "<div class='prop-card'><h3>" + (single ? "The record at this address" : "Filing history") + "</h3>" +
+        sortedFilings.map(filingRow).join("") + "</div>";
+    }
+
+    // federal records + "Also checked" (only what the row explicitly reports) ----
+    var fedRows = federal.map(function(s){
+      var link = s.record_url || s.url;
+      return "<div class='filing'><div class='fdate'>" + esc(s.src||"") + "</div>" +
+        "<div style='flex:1'><div class='ft'>" + esc(s.label) + "</div>" +
+        "<div class='fs'>" + esc(facilityType(s)) + (s.scope_text ? " · " + esc(s.scope_text) : "") +
+        (link ? " · " + recA(link, "record ▸") : "") + "</div></div></div>";
+    }).join("");
+    var checked = (row.sources_checked || []).map(function(c){
+      return esc(c.src) + " — " + esc(c.result);
+    }).join(" · ");
+    var fed = "";
+    if(fedRows || checked){
+      fed = "<div class='prop-card'><h3>Federal records at this address</h3>" +
+        (fedRows || "<div class='fs' style='color:var(--mute);font-size:13px'>No federal registry record is in this property's cache.</div>") +
+        (checked ? "<div class='alsochecked'>Also checked: " + checked + ".</div>" : "") +
+        "</div>";
+    }
+
+    // §4.3.1 Related activity — Tier 1 (mentions, evidence shown) + Tier 2 (area handoff)
+    var t1 = tier1Matches(row, recs);
+    var civic = t1.filter(function(m){ return (m.item.kind||"civic") !== "news"; });
+    var news  = t1.filter(function(m){ return m.item.kind === "news"; });
+    function actGroup(title, items){
+      if(!items.length) return "";
+      return "<div class='actgrp'><div class='ag-h'>" + title + "</div>" + items.map(function(m){
+        var it = m.item;
+        return "<div class='actitem'>" + (it.url ? recA(it.url, it.title) : esc(it.title)) +
+          "<div class='am'>" + (it.date ? esc(fmtDate(it.date)) + " · " : "") + "matched: “" + esc(m.matched) + "”</div></div>";
+      }).join("") + "</div>";
+    }
+    var t1Html = t1.length
+      ? actGroup("Civic records that mention this property", civic) + actGroup("Local news that mentions this property", news)
+      : "<div class='fs' style='color:var(--mute);font-size:13px'>No notice, agenda, or local news item on record mentions this property yet.</div>";
+    var act = "<div class='prop-card'><h3>Activity around this property</h3>" + t1Html +
+      (zip ? "<div class='tier2'>In " + (row.county ? esc(row.county) + " County · " : "") + "ZIP " + esc(zip) +
+        " — hearings, notices and local news for the area: <a href='community.html?zip=" + esc(zip) + "'>see all → community page ▸</a></div>" : "") +
+      "</div>";
+
+    // footer ---------------------------------------------------------------------
+    var foot = "<div class='foot'>Sources: state permit registries (TX TDLR/TABS) · EPA registries · official public records. " +
+      "Every item on this page links to its official public record. " +
+      "Cost-per-sqft figures are arithmetic on filed values only. " +
+      "Shared-attribute links show filings that share a phone, contact, or address — not a verdict on any operator.</div>";
+
+    var box = $("property");
+    box.innerHTML = single
+      ? h + hist + fed + act + foot                       // single-record collapse (§4.3): no stats, no entities panel
+      : h + stats + ent + hist + fed + act + foot;
+    box.style.display = "block";
+
+    // actions: Watch = the conversion moment (auth first; engine-side watch wiring is a
+    // later session — no claim is made that a watch exists yet). Export = the sanctioned
+    // evidence snapshot: a self-contained HTML file built from this cache row only.
+    var wb = $("propWatch");
+    if(wb) wb.addEventListener("click", function(){
+      if(!window.hsUser){ if(window.hsOpenAuth) window.hsOpenAuth(); return; }
+      wb.disabled = true; wb.textContent = "Watch requests aren't live yet";
+    });
+    var xb = $("propExport");
+    if(xb) xb.addEventListener("click", function(){ exportProperty(row, recs); });
+  }
+
+  function exportProperty(row, recs){
+    var rows = recs.map(function(s){
+      var bits = [s.project_no, s.label, s.owner, s.owner_phone, s.contact_name, s.filed_by, s.design_firm,
+        (s.est_cost!=null ? fmtMoney(s.est_cost) : ""), (s.sqft!=null ? fmtSqft(s.sqft) : ""),
+        s.status_text, s.start_date, s.end_date].map(function(v){ return esc(v==null?"":v); });
+      return "<tr><td>" + bits.join("</td><td>") + "</td><td><a href='" + esc(s.record_url||s.url||"") + "'>record</a></td></tr>";
+    }).join("");
+    var html = "<!doctype html><html><head><meta charset='utf-8'><title>" + esc(row.address) + " — HomeSignal property record</title>" +
+      "<style>body{font-family:system-ui,sans-serif;margin:24px;color:#0F1A1C}table{border-collapse:collapse;font-size:13px}" +
+      "td,th{border:1px solid #E7ECEA;padding:6px 9px;text-align:left}h1{font-size:20px}</style></head><body>" +
+      "<h1>" + esc(row.address) + "</h1>" +
+      "<table><tr><th>Project #</th><th>Name</th><th>Owner</th><th>Owner phone</th><th>Contact</th><th>Filed by</th><th>Design firm</th><th>Cost</th><th>Sqft</th><th>Status</th><th>Start</th><th>End</th><th>Record</th></tr>" +
+      rows + "</table>" +
+      "<p style='font-size:12px;color:#5b6d71'>Evidence snapshot generated from the HomeSignal property record cache" +
+      (row.refreshed_at ? " (refreshed " + esc(fmtDate(row.refreshed_at)) + ")" : "") + " on " + esc(new Date().toISOString().slice(0,10)) +
+      ". Every fact above is as filed on its linked official public record; absent fields were not stated on the record. Not a verdict on any operator.</p>" +
+      "</body></html>";
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([html], { type:"text/html" }));
+    a.download = "property-" + String(row.address).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".html";
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+
   // ===================== ZIP-mode boot (the crawlable landing surface) =====================
-  // ?zip=<zip> or the pretty /development/<zip> route → read the cached report and render.
+  // ?addr=<canonical> → property page; ?zip=<zip> or /development/<zip> → cached ZIP report.
   (function boot(){
     var u = new URL(window.location.href);
+    var a = u.searchParams.get("addr");
+    if(a && a.trim()){ loadProperty(a.trim()); return; }
     var z = u.searchParams.get("zip");
     if(!z){ var m = u.pathname.match(/\/development\/(\d{5})\b/); if(m) z = m[1]; }
     if(z && /^\d{5}$/.test(z)){ loadZip(z); }
