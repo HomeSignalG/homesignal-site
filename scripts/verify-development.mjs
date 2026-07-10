@@ -137,6 +137,12 @@ async function main() {
           text: el.textContent.slice(0, 80),
           anchors: el.querySelectorAll('a').length,
         })),
+        // connection map (if drawn) must be a rendering OF the evidence: every edge
+        // label must reappear verbatim in "The records behind each connection".
+        mapEdgeLabels: Array.from(document.querySelectorAll('.entmap [data-edge]'))
+          .map((el) => el.getAttribute('data-edge')),
+        evidenceText: Array.from(document.querySelectorAll('.entlink'))
+          .map((el) => el.textContent).join('\n'),
         alsoChecked: (document.querySelector('.alsochecked') || {}).textContent || '',
       }));
       const noSource = (st.rendered || []).filter((s) => !(s && (s.url || s.record_url)));
@@ -146,6 +152,13 @@ async function main() {
       const weakLinks = st.linkAnchors.filter((l) => l.anchors < 2);
       for (const l of weakLinks) {
         fails.push(`ADDR ${row.address}: entity link with <2 evidence record_urls — "${l.text}…" (§4.5 invariant)`);
+      }
+      // The connection map is rendered FROM the evidence — an edge whose label has no
+      // matching evidence line means the map asserts a connection the records don't.
+      for (const lbl of st.mapEdgeLabels) {
+        if (!st.evidenceText.includes(lbl)) {
+          fails.push(`ADDR ${row.address}: map edge "${lbl}" has no matching evidence line (map must be rendered from entity_links evidence)`);
+        }
       }
       if (st.alsoChecked) {
         const allowed = (row.sources_checked || []).map((c) => c.src);

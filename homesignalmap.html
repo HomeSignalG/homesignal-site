@@ -216,9 +216,17 @@
   .ent .en{font-weight:600;display:flex;align-items:center;gap:6px}
   .ent .em{font-size:12px;color:var(--mute)}
   .linkdot{width:8px;height:8px;border-radius:50%;background:var(--orange);flex:0 0 auto;display:inline-block}
-  .entlinks{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+  /* Connection map (SVG, computed from entity_links evidence — never hand-arranged) */
+  .entmap{margin:2px 0 6px;overflow-x:auto}
+  .entmap svg{display:block;margin:0 auto;max-width:100%}
+  .entlinks-h{font-size:11.5px;color:var(--mute);font-weight:600;margin:10px 0 2px;border-top:1px solid var(--line);padding-top:12px}
+  .entlinks{margin-top:2px}
   .entlink{font-size:13px;color:var(--ink);padding:5px 0;line-height:1.55}
   .entlink a{color:var(--green)}
+  .entlink .elbl{background:#FEF8F3;border:1px solid #F0D9C3;color:#8a5a2e;border-radius:6px;
+    padding:1.5px 8px;font-size:11.5px;font-weight:600;white-space:nowrap}
+  .conn-note{margin-top:10px;font-size:12px;color:var(--mute);border-top:1px solid var(--line);padding-top:9px}
+  .roster-note{margin-top:10px;font-size:12px;color:var(--mute);border-top:1px solid var(--line);padding-top:9px}
   .pill{display:inline-block;font:700 10.5px var(--font);letter-spacing:.04em;color:#fff;
     border-radius:6px;padding:2.5px 8px;vertical-align:middle}
   .pill.built{background:var(--green)}
@@ -1420,9 +1428,9 @@
     var filings = recs.filter(isFiling);
     var federal = recs.filter(function(s){ return !isFiling(s); });
     var links = entityLinks(recs);
-    var linkedUrls = {}, linkedNames = {};
-    links.forEach(function(L){ L.evidence.forEach(function(r){ linkedUrls[r.url]=1; linkedNames[lname(r.owner)]=1; }); });
-    links.forEach(function(L){ if(L.kind==="Shared contact") linkedNames[lname(L.disp)]=1; if(L.kind==="Shared phone"){} });
+    // filings that participate in a connection keep their orange dot in the history list
+    var linkedUrls = {};
+    links.forEach(function(L){ L.evidence.forEach(function(r){ linkedUrls[r.url]=1; }); });
     var zip = row.zip || (String(row.address).match(/\b(\d{5})\b/) || [])[1] || "";
     var street = String(row.address||"").split(",")[0].replace(/^\d+\s*/, "");
     var single = recs.length === 1;
@@ -1456,20 +1464,116 @@
       if(s.est_cost != null){ cost += Number(s.est_cost); costN++; }
       if(s.sqft != null){ sqft += Number(s.sqft); sqftN++; }
     });
+    // Connection model — computed FROM the entity_links evidence, never hand-arranged.
+    // Nodes: one per connected entity (case-insensitive key, first-seen verbatim name).
+    // Edges: one labeled edge per shared-attribute connection between two entities; an
+    // attribute shared by 3+ entities expands pairwise, keeping the same label.
+    function edgeLabel(L){
+      return L.kind === "Shared phone"
+        ? "same phone " + L.disp
+        : "same contact: " + String(L.disp).trim().split(/\s+/).pop();
+    }
+    function connectionModel(links){
+      var nodes = {}, edges = [];
+      links.forEach(function(L){
+        var names = {};
+        L.evidence.forEach(function(r){ var k = lname(r.owner); if(!names[k]) names[k] = r.owner; });
+        var keys = Object.keys(names);
+        keys.forEach(function(k){ nodes[k] = nodes[k] || { name: names[k] }; });
+        for(var i = 0; i < keys.length; i++) for(var j = i + 1; j < keys.length; j++){
+          edges.push({ a: keys[i], b: keys[j], label: edgeLabel(L) });
+        }
+      });
+      Object.keys(nodes).forEach(function(k){
+        var n = filings.filter(function(s){ return lname(s.owner) === k; }).length;
+        nodes[k].meta = "owner · " + n + " filing" + (n === 1 ? "" : "s");
+      });
+      return { nodes: nodes, edges: edges };
+    }
+    // Deterministic circle layout per connected cluster (≤4 nodes; larger clusters
+    // fall back to the evidence list alone). Geometry is pure data → position math.
+    function connMapSVG(model){
+      var keys = Object.keys(model.nodes);
+      if(!keys.length) return "";
+      // connected components (union-find)
+      var parent = {}; keys.forEach(function(k){ parent[k] = k; });
+      function find(x){ while(parent[x] !== x){ parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+      model.edges.forEach(function(e){ parent[find(e.a)] = find(e.b); });
+      var comps = {};
+      keys.forEach(function(k){ (comps[find(k)] = comps[find(k)] || []).push(k); });
+      return Object.keys(comps).map(function(root){
+        var ks = comps[root];
+        if(ks.length < 2 || ks.length > 4) return "";     // >4 nodes: evidence list alone
+        var W = 620, H = ks.length === 2 ? 210 : 330, cx = W/2, cy = H/2;
+        var R = ks.length === 2 ? 0 : (ks.length === 3 ? 105 : 125);
+        var pos = {};
+        ks.forEach(function(k, i){
+          if(ks.length === 2){ pos[k] = [cx + (i ? 190 : -190), cy]; return; }
+          var ang = -Math.PI/2 + i * 2*Math.PI/ks.length;
+          pos[k] = [cx + R*Math.cos(ang)*1.7, cy + R*Math.sin(ang)];
+        });
+        var es = model.edges.filter(function(e){ return pos[e.a] && pos[e.b]; });
+        var seenPair = {};
+        var edgeSvg = es.map(function(e){
+          var a = pos[e.a], b = pos[e.b];
+          var pairKey = [e.a, e.b].sort().join("|");
+          var off = (seenPair[pairKey] = (seenPair[pairKey] || 0) + 1) - 1;   // stack labels on multi-edges
+          var mx = (a[0]+b[0])/2, my = (a[1]+b[1])/2 + off*20;
+          var tw = e.label.length * 6.2 + 16;
+          return "<line x1='"+a[0]+"' y1='"+a[1]+"' x2='"+b[0]+"' y2='"+b[1]+"' stroke='#c9d6d0' stroke-width='1.5'/>" +
+            "<g data-edge='"+esc(e.label)+"'>" +
+            "<rect x='"+(mx-tw/2)+"' y='"+(my-11)+"' width='"+tw+"' height='22' rx='6' fill='#FEF8F3' stroke='#F0D9C3'/>" +
+            "<text x='"+mx+"' y='"+(my+4)+"' text-anchor='middle' font-size='11.5' font-weight='600' fill='#8a5a2e'>"+esc(e.label)+"</text></g>";
+        }).join("");
+        var nodeSvg = ks.map(function(k){
+          var n = model.nodes[k], p = pos[k];
+          var bw = Math.max(120, Math.min(230, n.name.length * 8 + 26));
+          return "<g data-node='"+esc(n.name)+"'>" +
+            "<rect x='"+(p[0]-bw/2)+"' y='"+(p[1]-24)+"' width='"+bw+"' height='48' rx='10' fill='#fff' stroke='#1f5130' stroke-width='1.5'/>" +
+            "<text x='"+p[0]+"' y='"+(p[1]-3)+"' text-anchor='middle' font-size='12.5' font-weight='700' fill='#0F1A1C'>"+esc(n.name.length > 26 ? n.name.slice(0,25)+"…" : n.name)+"</text>" +
+            "<text x='"+p[0]+"' y='"+(p[1]+13)+"' text-anchor='middle' font-size='10.5' fill='#5b6d71'>"+esc(n.meta)+"</text></g>";
+        }).join("");
+        return "<svg viewBox='0 0 "+W+" "+H+"' width='"+W+"' height='"+H+"' role='img' " +
+          "aria-label='Connection map: entities joined by shared filing details' font-family='Inter,system-ui,sans-serif'>" +
+          edgeSvg + nodeSvg + "</svg>";
+      }).join("");
+    }
+    var connModel = connectionModel(links);
+    var connectedCount = Object.keys(connModel.nodes).length;
+
     var stats = single ? "" :
       "<div class='statgrid'>" +
         "<div class='cc'><div class='n'>"+filings.length+"</div><div class='k'>Filings</div></div>" +
         "<div class='cc'><div class='n'>"+(costN ? fmtMoney(cost) : "—")+"</div><div class='k'>Total filed cost"+(costN && costN<filings.length ? " ("+costN+" filings state one)" : "")+"</div></div>" +
         "<div class='cc'><div class='n'>"+(sqftN ? Number(sqft).toLocaleString() : "—")+"</div><div class='k'>Sq ft filed"+(sqftN && sqftN<filings.length ? " ("+sqftN+" filings state it)" : "")+"</div></div>" +
-        "<div class='cc"+(links.length ? " flag" : "")+"'><div class='n'>"+links.length+"</div><div class='k'>Entity links</div></div>" +
+        "<div class='cc"+(connectedCount ? " flag" : "")+"'><div class='n'>"+connectedCount+"</div><div class='k'>Connected entities</div></div>" +
       "</div>";
 
-    // entities panel (multi-record only) ---------------------------------------
+    // entities panels (multi-record only) ---------------------------------------
+    // §4.3 item 3 (as shipped): the CONNECTIONS lead — a connection map computed from
+    // the entity_links evidence with the records behind each connection directly
+    // beneath — and the full roster is demoted to a plain list below.
     var ent = "";
     if(!single){
+      var conn = "";
+      if(links.length){
+        var linkLines = links.map(function(L){
+          var evs = L.evidence.map(function(r){ return recA(r.url, r.no || r.url) + " (" + esc(r.owner) + ")"; });
+          var last = evs.pop();
+          var list = evs.length ? evs.join(", ") + " and " + last : last;
+          return "<div class='entlink'><span class='elbl'>" + esc(edgeLabel(L)) + "</span> — " + list + ".</div>";
+        }).join("");
+        conn = "<div class='prop-card'><h3>Connected entities</h3>" +
+          "<div class='entmap'>" + connMapSVG(connModel) + "</div>" +
+          "<div class='entlinks-h'>The records behind each connection</div>" +
+          "<div class='entlinks'>" + linkLines + "</div>" +
+          "<div class='conn-note'>These are facts from the filings — a connection means two records share a detail, not a verdict on any operator.</div>" +
+          "</div>";
+      }
+
       function entCol(title, items){
         var rows = items.map(function(it){
-          return "<div class='ent'><div class='en'>"+(it.linked ? "<span class='linkdot'></span>" : "")+esc(it.name)+"</div>" +
+          return "<div class='ent'><div class='en'>"+esc(it.name)+"</div>" +
                  (it.meta ? "<div class='em'>"+esc(it.meta)+"</div>" : "") + "</div>";
         }).join("");
         return "<div class='entcol'><div class='ec-h'>"+title+"</div>" + (rows || "<div class='ent em'>—</div>") + "</div>";
@@ -1488,7 +1592,7 @@
         return Object.keys(m).map(function(k){
           var e = m[k];
           var meta = [e.count + " filing" + (e.count===1?"":"s")].concat(Object.keys(e.metas)).join(" · ");
-          return { name:e.name, meta:meta, linked:!!linkedNames[k] };
+          return { name:e.name, meta:meta };
         });
       }
       var ownersL = collect(function(s){ return s.owner ? [[s.owner]] : []; },
@@ -1496,27 +1600,13 @@
       var contactsL = collect(function(s){
         var out = []; if(s.contact_name) out.push([s.contact_name]); if(s.filed_by) out.push([s.filed_by, "filing"]); return out;
       }, function(s, role){ return role ? "filed the form" : ""; });
-      // a contact spanning multiple owner names is itself a cross-signal — surface it
-      var spanByPerson = {};
-      filings.forEach(function(s){ [s.contact_name, s.filed_by].forEach(function(p){ if(!p||!s.owner) return;
-        (spanByPerson[lname(p)] = spanByPerson[lname(p)] || {})[lname(s.owner)] = 1; }); });
-      contactsL.forEach(function(c){ var n = Object.keys(spanByPerson[lname(c.name)]||{}).length;
-        if(n > 1) c.meta += " · " + n + " owner names"; });
       var firmsL = collect(function(s){ return s.design_firm ? [[s.design_firm]] : []; },
         function(s){ var m = String(s.design_firm_addr||"").match(/,\s*([A-Za-z .]+),\s*([A-Za-z]{2,})\b[^,]*$/); return m ? (m[1].trim()+", "+m[2].trim()) : ""; /* city + state verbatim as filed */ });
 
-      var linkLines = links.map(function(L){
-        var evs = L.evidence.map(function(r){ return recA(r.url, r.no || r.url) + " (" + esc(r.owner) + ")"; });
-        var last = evs.pop();
-        var list = evs.length ? evs.join(", ") + " and " + last : last;
-        var role = L.kind === "Shared phone" ? "listed as the owner phone on" : "named on";
-        return "<div class='entlink'><span class='linkdot'></span> " + esc(L.kind) + " " + esc(L.disp) +
-               " — " + role + " " + list + ".</div>";
-      }).join("");
-
-      ent = "<div class='prop-card'><h3>Entities on record</h3>" +
+      ent = conn +
+        "<div class='prop-card'><h3>All entities on record</h3>" +
         "<div class='entgrid'>" + entCol("Owners", ownersL) + entCol("Contacts", contactsL) + entCol("Design firms", firmsL) + "</div>" +
-        (linkLines ? "<div class='entlinks'>" + linkLines + "</div>" : "") +
+        "<div class='roster-note'>Names shown exactly as filed. Similar names (e.g. “Neuralink” and “Neuralink Corporation”) are listed separately unless a public record connects them.</div>" +
         "</div>";
     }
 
