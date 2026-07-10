@@ -215,6 +215,9 @@
   .ent{padding:6px 0;border-top:1px solid var(--line);font-size:13.5px}
   .ent .en{font-weight:600;display:flex;align-items:center;gap:6px}
   .ent .em{font-size:12px;color:var(--mute)}
+  /* Verified-negative note: "we checked and found no shared attribute" — same principle as
+     the Also-checked line, so a non-connection is as legible as a connection. */
+  .ent .en-absent{font-size:11.5px;color:var(--mute);font-style:italic;margin-top:2px;line-height:1.4}
   .linkdot{width:8px;height:8px;border-radius:50%;background:var(--orange);flex:0 0 auto;display:inline-block}
   /* Connection map (SVG, computed from entity_links evidence — never hand-arranged) */
   .entmap{margin:2px 0 6px;overflow-x:auto}
@@ -1658,7 +1661,8 @@
       function entCol(title, items){
         var rows = items.map(function(it){
           return "<div class='ent'><div class='en'>"+esc(it.name)+"</div>" +
-                 (it.meta ? "<div class='em'>"+esc(it.meta)+"</div>" : "") + "</div>";
+                 (it.meta ? "<div class='em'>"+esc(it.meta)+"</div>" : "") +
+                 (it.absent ? "<div class='en-absent'>"+esc(it.absent)+"</div>" : "") + "</div>";
         }).join("");
         return "<div class='entcol'><div class='ec-h'>"+title+"</div>" + (rows || "<div class='ent em'>—</div>") + "</div>";
       }
@@ -1686,6 +1690,43 @@
       }, function(s, role){ return role ? "filed the form" : ""; });
       var firmsL = collect(function(s){ return s.design_firm ? [[s.design_firm]] : []; },
         function(s){ var m = String(s.design_firm_addr||"").match(/,\s*([A-Za-z .]+),\s*([A-Za-z]{2,})\b[^,]*$/); return m ? (m[1].trim()+", "+m[2].trim()) : ""; /* city + state verbatim as filed */ });
+
+      // Verified-negative note (same principle as "Also checked"): an owner in the roster
+      // whose normalized name ROOT matches a CONNECTED entity (e.g. "Neuralink Corporation"
+      // vs the connected "Neuralink") but which shares NO phone/contact/filer with it gets an
+      // explicit "checked, nothing shared" line — so an absence of connection is as legible as
+      // a presence. NEVER inferred: drawn only when the two identifier sets are genuinely
+      // disjoint (a shared identifier would have made them a connection instead).
+      var CORP = { llc:1, "l":1, "c":1, inc:1, incorporated:1, corp:1, corporation:1, co:1,
+                   company:1, ltd:1, limited:1, lp:1, llp:1, plc:1, lc:1 };
+      function nameRoot(name){
+        return lname(name).replace(/[^a-z0-9 ]/g, " ").split(/\s+/)
+          .filter(function(t){ return t && !CORP[t]; }).join(" ");
+      }
+      function ownerIdents(k){   // every shared-attribute identifier across one owner's filings
+        var ids = {};
+        filings.forEach(function(s){
+          if(lname(s.owner) !== k) return;
+          if(s.owner_phone_norm) ids["p:" + s.owner_phone_norm] = 1;
+          if(s.contact_name)     ids["n:" + lname(s.contact_name)] = 1;
+          if(s.filed_by)         ids["n:" + lname(s.filed_by)] = 1;
+        });
+        return ids;
+      }
+      var connKeys = Object.keys(connModel.nodes);
+      ownersL.forEach(function(it){
+        var k = lname(it.name);
+        if(connModel.nodes[k]) return;                 // itself connected → nothing to note
+        var root = nameRoot(it.name);
+        if(!root) return;
+        var mine = ownerIdents(k);
+        var partners = connKeys.filter(function(ck){
+          if(ck === k || nameRoot(connModel.nodes[ck].name) !== root) return false;
+          var theirs = ownerIdents(ck);               // truthful: only when NO identifier overlaps
+          return !Object.keys(mine).some(function(id){ return theirs[id]; });
+        }).map(function(ck){ return connModel.nodes[ck].name; });
+        if(partners.length) it.absent = "no shared phone/contact/filer on record with " + partners.join(", ");
+      });
 
       ent = conn +
         "<div class='prop-card'><h3>All entities on record</h3>" +

@@ -180,6 +180,16 @@ cards, the existing green/blue/orange lifecycle colors, the "record ▸" link pa
      filed-address cross-signals in muted text, NO dots or badges, footer: "Names
      shown exactly as filed. Similar names (e.g. 'Neuralink' and 'Neuralink
      Corporation') are listed separately unless a public record connects them."
+     **Verified-negative note (same principle as "Also checked"):** a roster owner
+     whose normalized name ROOT matches a *connected* entity but which shares NO
+     phone/contact/filer with it carries an explicit muted-italic line, e.g. "no
+     shared phone/contact/filer on record with Neuralink" — so an *absence* of
+     connection is as legible as a presence. Drawn only when the two identifier sets
+     are genuinely disjoint; never inferred (a shared identifier would have made them
+     a connection instead). Live example: `TABS2026011928`'s "Neuralink Corporation"
+     has a real phone (707-803-1177) and filer (Kristin Lorentzen) — present on the
+     record, simply not shared with the connected "Neuralink" (813-758-6679 /
+     Conklin / Padilla), so the note reads as a checked-and-empty result, not a blank.
    §10: never "shell"/"front"/"connected to" — the shared attribute + the records.
 4. **Filing history card** — one bordered list (existing row style), chronological.
    Each row: muted date column (left) · project name (+ orange dot if the filing
