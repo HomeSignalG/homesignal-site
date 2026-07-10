@@ -1,4 +1,8 @@
-// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v15.
+// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr).
+// DEPLOYED VERSION: v15 (relevance classifier). This parked copy ALSO carries the v16 no-drop
+// anchor change (see below) which is NOT yet deployed — the MCP deploy stream kept dropping on
+// the payload; deploy this file via mcp__Supabase__deploy_edge_function when the connection
+// cooperates. Until then, v16's effect (Eagle Mountain PCPH alerts appearing) is pending.
 // PARKED HERE FOR REFERENCE/REPRODUCIBILITY ONLY — Supabase is the source of truth
 // (docs/development-tracker-source-of-truth.md §2). v11 = MULTI-COUNTY: resolveCommunityIds()
 // maps a ZIP to its own community chain (city+county) so each ZIP shows its OWN county's
@@ -16,6 +20,9 @@
 // cache; 'unmatched' items are stamped, not silently dropped). Only relevance='development' counts as
 // a project: counts.development excludes civic notices (board vacancies, tax sales, budget/comp/bond
 // hearings) and counts.civic reports them separately so the page can list them non-headlined.
+// v16 = no-drop anchor: an alert/meeting whose place text matches nothing in the (Box Elder)
+// gazetteer is anchored at the query point instead of being silently dropped (alerts) or pinned
+// to Box Elder (meetings) — the old gate hid Eagle Mountain's real PCPH rezone notices.
 // Redeploy via mcp__Supabase__deploy_edge_function — committing does not deploy.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -168,8 +175,11 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
   const { data: alerts } = await supabase.from("alerts").select("title,category,agency_name,geographic_reference,source_url,comment_deadline").in("community_id", communityIds).eq("pipeline_type", "government_notice").in("category", DEV_CATEGORIES).order("published_at", { ascending: false }).limit(100);
   const { data: meetings } = await supabase.from("meetings").select("title,category,location,meeting_date,source_url,is_public_hearing,comment_period_open").in("community_id", communityIds).or("is_public_hearing.eq.true,comment_period_open.eq.true").gte("meeting_date", floorIso).order("meeting_date", { ascending: false }).limit(150);
   for (const a of alerts ?? []) {
-    const pt = centroid((a.geographic_reference as string) || (a.agency_name as string) || "");
-    if (!pt) continue;
+    // No gazetteer match → anchor at the query point instead of dropping. The old `continue`
+    // silently hid real notices whose agency isn't a Box Elder place (Eagle Mountain PCPH
+    // rezones were invisible while "Utah County" vacancies passed). Area items are drawn at
+    // the page's own anchor anyway, so the stored coordinate is a jurisdiction anchor only.
+    const pt = centroid((a.geographic_reference as string) || (a.agency_name as string) || "") ?? [homeLat, homeLng] as [number, number];
     const [e, n] = toEN(homeLat, homeLng, pt[0], pt[1]);
     const title = ((a.title as string) || "").trim();
     const approved = /\b(approved|approves|granted|adopted|entitled|permit issued|issued a permit|under construction|final plat|site plan approv|authoriz|ground ?break|breaks ground|begins construction|construction begins)\b/i.test(title);
@@ -182,7 +192,8 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
     sites.push(s);
   }
   for (const m of meetings ?? []) {
-    const pt = centroid((m.location as string) || "") ?? PLACES["box elder county"];
+    // Same anchor fallback as alerts: never a hardcoded Box Elder coordinate for another county.
+    const pt = centroid((m.location as string) || "") ?? [homeLat, homeLng] as [number, number];
     const [e, n] = toEN(homeLat, homeLng, pt[0], pt[1]);
     const [rel, relRule] = classifyRelevance((m.title as string) || "", (m.category as string) || "", "");
     sites.push({ label: ((m.title as string) || "Public hearing").slice(0, 120), e, n, lat: pt[0], lng: pt[1], scope: "area", type: "proposed", decided: false, relevance: rel, rel_rule: relRule, layer: classifyLayer((m.title as string) || "", m.category as string), src: m.is_public_hearing ? "Public hearing" : "Comment window", url: (m.source_url as string) || "", meeting_date: m.meeting_date });
