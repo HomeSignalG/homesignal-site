@@ -661,3 +661,60 @@ legal/framing change not covered by the one-time sign-off.
   until the resident searches**. `render()` drops any unsourced site and sets `window.__HS_SITES`;
   the Leaflet map lives in an inner `#mapInner` so the verifier's `#map .leaflet-container`
   selector matches even for an empty ZIP.
+
+---
+
+## 8. Source adapters (`get-address-report` enrichment sources)
+
+The `get-address-report` edge function pulls from multiple public-record sources.
+Full registry: **`docs/source-registry.md`** — the authoritative list of every source,
+its API, schema mapping, coverage scope, build status, and Step-0 checklist.
+Full site-side governance: **`docs/development-tracker-source-of-truth.md`**
+(anti-fabrication prime directive, §10 legal framing, §12 stop list).
+
+**Before writing any source adapter code:**
+1. Read `docs/source-registry.md` in full.
+2. If the source isn't in the registry, add it (with coverage scope, API, schema
+   mapping, and counts bucket) before writing any code.
+3. Confirm the source's Step-0 checklist is complete — fixtures captured, parser
+   tested against real pages, interface pinned with vintage.
+
+**The five rules that never bend:**
+
+- **Coverage scope is mandatory.** Every source declares `covers: [{state, county}]`
+  in the registry. The engine checks this before activating any source for a ZIP.
+  A Utah planning feed does not run for a Texas ZIP. No exceptions.
+  (`if (!source.covers(zip.state, zip.county)) continue;`)
+
+- **Every emitted site must carry a `record_url`** pointing to the official public
+  record. A site without one is dropped by the anti-fabrication gate in
+  `verify-development.mjs` and fails CI. No exceptions.
+
+- **Absent fields stay absent.** A field the source page doesn't state is not on
+  the site object. Never default, never infer, never interpolate. This includes
+  coordinates: an area-scope record whose geocoder returns coordinates outside
+  the covered jurisdiction's bounding box gets its lat/lng nulled, not trusted.
+
+- **Quarantine, don't stop.** Any per-record or per-ZIP failure (fetch error,
+  parse miss, geocode failure): log to the quarantine list, skip the record,
+  continue the batch. A run with quarantined records is a success; the quarantine
+  log is the only human follow-up.
+
+- **Additive only.** A new source adapter is a new branch. It never modifies
+  existing source behavior. If adding it requires changing how FRS, ECHO, or
+  PMN work, that is a §12 stop — ask before proceeding.
+
+**counts buckets** (declared in the registry, not chosen at build time):
+- `facilities` — EPA-registered or federally licensed physical facilities
+  (FRS, TRI, SEMS, APHIS, FAA, RCRAInfo, NRC)
+- `development` — permits, construction filings, planning notices
+  (TABS, PMN, county permit portals)
+- enrichment — adds fields to existing sites, no new count
+  (ECHO violations, OSHA violations, TRI releases on FRS sites)
+
+**The case study (always the acceptance test for TX sources):**
+`docs/case-study-78617-caldwell-gap-analysis.md` — the Drey Dossier / Neuralink /
+2200 Caldwell Ln investigation. When the TABS adapter and APHIS adapter are both
+live, a refresh of ZIP 78617 must surface the five Caldwell permit filings and
+the entity link connecting River Bottoms Ranch LLC ↔ Neuralink via shared phone
+(813) 758-6679. That before/after is the proof the backbone works.
