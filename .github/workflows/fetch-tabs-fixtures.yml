@@ -1,9 +1,17 @@
 # Fetch pinned TDLR TABS project pages as parser fixtures (Step 0 of
-# docs/tdlr-tabs-adapter-runbook.md). Manual-only: the build sandbox has no egress,
-# so a GitHub runner does the polite fetch and commits the raw HTML to the branch.
+# docs/tdlr-tabs-adapter-runbook.md). The build sandbox has no egress, so a GitHub
+# runner does the polite fetch and commits the raw HTML to the branch.
+# workflow_dispatch only registers from the default branch, so the push trigger
+# (scoped to this workflow's own files) is what arms it on a feature branch.
 name: fetch-tabs-fixtures
 on:
   workflow_dispatch:
+  push:
+    branches: [claude/new-session-5jaevg]
+    paths:
+      - .github/workflows/fetch-tabs-fixtures.yml
+      - scripts/fetch-tabs-fixtures.mjs
+      - docs/pins/tdlr-tabs-projects.*.json
 
 permissions:
   contents: write
