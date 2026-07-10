@@ -1,4 +1,4 @@
-// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v14.
+// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), v15 (v14 DEPLOYED).
 // PARKED HERE FOR REFERENCE/REPRODUCIBILITY ONLY — Supabase is the source of truth
 // (docs/development-tracker-source-of-truth.md §2). v11 = MULTI-COUNTY: resolveCommunityIds()
 // maps a ZIP to its own community chain (city+county) so each ZIP shows its OWN county's
@@ -11,10 +11,16 @@
 // (Box Elder 23→18); floor lowered to 0.25 mi. v14 = tracker-accuracy: dedup dev items (url|title+date
 // — ingest can double-emit), age out concluded hearings older than MEETING_LOOKBACK_DAYS, and stamp
 // `decided` (approved|denied/withdrawn/tabled) so the page never shows a resolved item as "open for
-// comment". Address-mode input/output shape unchanged. Redeploy via
+// comment". v15 = TX TDLR/TABS enrichment source (docs/tdlr-tabs-adapter-runbook.md §1): an
+// ADDITIVE, coverage-gated ZIP-mode branch — the source only activates when the ZIP's resolved
+// communities are in Texas (docs/source-registry.md, mandatory covers check), TABS sites count
+// under counts.development (never counts.facilities), and the quarantine log rides on the run
+// output as tabs_quarantined. Address-mode input/output shape unchanged. Redeploy via
 // mcp__Supabase__deploy_edge_function — committing does not deploy.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
+import tabsPinsTravis from "../../../docs/pins/tdlr-tabs-projects.travis.json" with { type: "json" };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -44,6 +50,11 @@ const ZCTA_CENTROIDS: Record<string, [number, number]> = {
 };
 const ZIP_RADIUS_MI = 3; // centroid-radius approximation of a ZIP's extent (polygon-precise
                          // clipping is a decoupled engine enrichment, §7.6)
+
+// TX TDLR/TABS registry-mode pins, keyed by county (docs/pins/ is the canonical reviewed
+// set; the JSON import ships it inside the function bundle). tabsForZip() enforces the
+// coverage gate — a pins entry only refreshes when the ZIP's chain matches its county.
+const TABS_PINS: Record<string, TabsPins> = { travis: tabsPinsTravis as TabsPins };
 
 const PLACES: Record<string, [number, number]> = {
   "brigham city": [41.5105, -112.0155], "tremonton": [41.7130, -112.1655],
@@ -274,14 +285,26 @@ Deno.serve(async (req: Request) => {
     const communityIds = await resolveCommunityIds(supabase, zip);
     const [devRaw, facRaw] = await Promise.all([devSites(supabase, clat, clng, communityIds), facilitySites(clat, clng, zipRadius)]);
     await enrichViolations(supabase, facRaw);
+    // TX TDLR/TABS enrichment (v15, additive — runbook §1). Coverage-gated inside
+    // tabsForZip(): the source never runs for a non-TX ZIP. Separate query keeps
+    // resolveCommunityIds() untouched (additive-only rule, source-registry #4).
+    const { data: commRows } = await supabase.from("communities").select("state,county").contains("zip_codes", [zip]);
+    const tabs = await tabsForZip(zip, (commRows ?? []) as { state?: string; county?: string }[], TABS_PINS, {
+      fetch,
+      geocode: async (a: string) => { try { const [la, ln] = await geocode(a); return { lat: la, lng: ln }; } catch { return null; } },
+    });
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");
+    const tabsSites: Record<string, unknown>[] = tabs.sites
+      .filter((s) => (s.record_url || "").trim() !== "")
+      .map((s) => { const [e, n] = toEN(clat, clng, s.lat!, s.lng!); return { ...s, e, n }; });
     const fac = facRaw.filter((s) => (s.record_url as string) && (s.record_url as string).trim() !== "");
-    const allSites = [...dev, ...fac];
+    const allSites = [...dev, ...tabsSites, ...fac];
     const access = await accessLevel(req, supabase);
     const sites = access === "full" ? allSites : allSites.slice(0, TEASER_LIMIT);
     const locked = access === "full" ? 0 : Math.max(0, allSites.length - sites.length);
-    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, development: dev.length, locked }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
+    // TABS records are development filings → counts.development, never counts.facilities.
+    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, development: dev.length + tabsSites.length, locked }, tabs_quarantined: tabs.quarantined, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
   }
 
   const address = (body.address || "").trim();

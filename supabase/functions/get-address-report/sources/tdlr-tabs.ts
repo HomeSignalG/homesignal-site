@@ -346,15 +346,63 @@ export function classifyLayer(scopeText?: string, name?: string): string {
   return "development";
 }
 
+// ───────────────────────────── engine integration (runbook §1) ─────────────────────────────
+
+export interface TabsCommunityRow {
+  state?: string | null;
+  county?: string | null;
+}
+
+export interface TabsPins {
+  county: string;
+  project_nos: string[];
+}
+
+/**
+ * ZIP-mode entry point for the engine — the ONLY function index.ts calls.
+ * Additive TX-only branch:
+ *  • COVERAGE GATE (docs/source-registry.md, mandatory): the source never runs for a
+ *    ZIP whose resolved communities are not in Texas. No exceptions.
+ *  • Registry mode per county: only pinned lists whose county matches the ZIP's
+ *    resolved chain are refreshed.
+ *  • ZIP scoping: a record whose FILED location address does not state the requested
+ *    ZIP is dropped to the quarantine log (report, don't fail — §7.2), never rendered.
+ * Returns sites (all record_url'd) + the quarantine log for the run output.
+ */
+export async function tabsForZip(
+  zip: string,
+  communities: TabsCommunityRow[],
+  pinsByCounty: Record<string, TabsPins>,
+  deps: TabsDeps,
+): Promise<TabsRefreshResult> {
+  const isTx = communities.some((c) => /^(tx|texas)$/i.test((c.state || "").trim()));
+  if (!isTx) return { sites: [], quarantined: [] };   // coverage gate — TX only
+  const counties = new Set(
+    communities.map((c) => (c.county || "").trim().toLowerCase()).filter(Boolean),
+  );
+  const sites: TabsSite[] = [];
+  const quarantined: Quarantined[] = [];
+  for (const pins of Object.values(pinsByCounty)) {
+    if (!counties.has(pins.county.trim().toLowerCase())) continue;
+    const r = await refreshByRegistry(pins.project_nos, deps);
+    for (const s of r.sites) {
+      if ((s.location_addr || "").includes(zip)) sites.push(s);
+      else quarantined.push({ project_no: s.project_no, reason: `outside ZIP ${zip} (filed location: ${s.location_addr})` });
+    }
+    quarantined.push(...r.quarantined);
+  }
+  return { sites, quarantined };
+}
+
 // ───────────────────────────── entity extraction ─────────────────────────────
 
 export interface EntityRow {
-  kind: "owner" | "contact" | "design_firm";
+  kind: "owner" | "contact" | "filer" | "design_firm";
   name: string;
   phone_norm?: string;
   address_norm?: string;
   record_url: string;                   // the filing that establishes this entity
-  role: "owner" | "contact" | "design_firm";
+  role: "owner" | "contact" | "filer" | "design_firm";
 }
 
 /** Feed for the nightly entity matcher (case-study doc §4.4). Pure extraction —
@@ -381,7 +429,7 @@ export function entitiesFrom(site: TabsSite): EntityRow[] {
     rows.push({
       // PERSON FILING FORM contact — name only, the form states no phone/address.
       // Links via shared_contact (name) in the matcher, never via a borrowed phone.
-      kind: "contact", role: "contact", name: site.filed_by,
+      kind: "filer", role: "filer", name: site.filed_by,
       record_url: site.record_url,
     });
   }

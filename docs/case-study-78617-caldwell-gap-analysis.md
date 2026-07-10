@@ -104,6 +104,8 @@ owner           text     -- (already in contract) owner of record, verbatim
 owner_addr      text
 owner_phone     text     -- normalized E.164 for matching; render as filed
 contact_name    text
+filed_by        text     -- PERSON FILING FORM → Contact Name (Step-0 fixture-verified;
+                         -- a distinct page role from the OWNER block's contact)
 design_firm     text
 design_firm_addr text
 design_firm_phone text
@@ -203,7 +205,7 @@ writes, service-role batch writes):
 ```sql
 create table entities (
   id            bigint generated always as identity primary key,
-  kind          text not null check (kind in ('owner','contact','design_firm')),
+  kind          text not null check (kind in ('owner','contact','filer','design_firm')),
   name          text not null,
   phone_norm    text,          -- E.164; the primary match key
   address_norm  text,
@@ -212,7 +214,7 @@ create table entities (
 create table entity_records (   -- entity ↔ filing (record_url is the filing key)
   entity_id  bigint not null references entities(id),
   record_url text   not null,
-  role       text   not null,   -- 'owner' | 'contact' | 'design_firm'
+  role       text   not null,   -- 'owner' | 'contact' | 'filer' | 'design_firm'
   primary key (entity_id, record_url, role)
 );
 create table entity_links (     -- computed nightly; never hand-authored
@@ -226,7 +228,10 @@ create table entity_links (     -- computed nightly; never hand-authored
 );
 ```
 The naive v1 matcher (group by `phone_norm`) already finds River Bottoms Ranch LLC ↔
-Neuralink. Rendering (popup/dossier): *"This owner's phone number also appears on
+Neuralink. The `filer` kind (the PERSON FILING FORM contact, a Step-0-verified distinct
+page role) is linkable alongside owners/contacts/design firms — filers state no phone,
+so they link via `shared_contact` (name): Jeff Gutknecht filed all three River Bottoms
+Ranch permits at 2200 Caldwell Ln. Rendering (popup/dossier): *"This owner's phone number also appears on
 &lt;n&gt; other filing(s) — view records"* with every evidence `record_url` linked.
 
 ### 4.5 Verifier extension (verify-development.mjs)

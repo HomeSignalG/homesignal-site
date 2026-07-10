@@ -385,7 +385,8 @@ No exceptions. A source without a `covers` declaration does not run.
 ---
 
 ### TX TDLR/TABS — Texas Department of Licensing and Regulation  [CASE STUDY]
-- **Status:** PLANNED (adapter built, Step-0 fixtures pending)
+- **Status:** PLANNED (adapter built; Step-0 fixtures verified 5/5 on 2026-07-10;
+  wired into `get-address-report` v15 ZIP mode — not yet deployed/refreshed)
 - **What it covers:** All construction and tenant improvement projects
   requiring architectural barriers compliance review in Texas. Filed by
   project — each record carries owner name, owner address, owner phone,
@@ -404,7 +405,13 @@ No exceptions. A source without a `covers` declaration does not run.
   Search mode: TABS public search (Step-0 pin required before use)
 - **Record URL template:**
   `https://www.tdlr.texas.gov/TABS/Projects/{project_no}`
-- **Schema mapping:** See `sources/tdlr-tabs.ts` — full §4.1 extension fields
+- **Schema mapping:** See `sources/tdlr-tabs.ts` — full §4.1 extension fields, plus:
+  ```
+  filed_by    ← PERSON FILING FORM → Contact Name (fixture-verified section, distinct
+                from the OWNER block's Contact Name; a new §4.1 extension field).
+                Feeds the entity matcher as kind='filer' — Jeff Gutknecht filed all
+                three River Bottoms Ranch permits at 2200 Caldwell Ln.
+  ```
 - **Coverage scope:**
   ```
   covers:
