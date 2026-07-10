@@ -1,0 +1,57 @@
+name: txgio-egress-probe
+# THROWAWAY reachability probe (delete after). Confirms a GitHub runner can reach the TxGIO
+# data-serving layer before we commit to a StratMap Address Points load step. No load, no rung.
+on:
+  push:
+    branches: [claude/txgio-egress-probe]
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe TxGIO hosts + DataHub API from the runner
+        run: |
+          set +e
+          probe() {
+            local url="$1"
+            echo "### $url"
+            # -I head, follow redirects, show final code/host/TLS; capture curl errors
+            curl -sS -L -I --connect-timeout 25 --max-time 60 \
+                 -A "homesignal-egress-probe/1.0" \
+                 -o /dev/null \
+                 -w "  http_code=%{http_code} final=%{url_effective} scheme=%{scheme} ssl_verify=%{ssl_verify_result} redirects=%{num_redirects} time=%{time_total}s\n" \
+                 "$url" 2>&1 || echo "  CURL_ERROR (see stderr above)"
+            echo
+          }
+          echo "== Host/TLS reachability =="
+          probe "https://data.tnris.org/"
+          probe "https://data.geographic.texas.gov/"
+          probe "https://tnris.org/stratmap/address-points.html"
+
+          echo "== DataHub API: search for Address Points collection =="
+          for api in \
+            "https://api.tnris.org/api/v1/collections/?search=address%20points" \
+            "https://api.tnris.org/api/v1/collections/?q=address" ; do
+            echo "### $api"
+            code=$(curl -sS -L --connect-timeout 25 --max-time 60 -A "homesignal-egress-probe/1.0" \
+                   -o api_body.json -w "%{http_code}" "$api" 2>api_err.txt)
+            echo "  http_code=$code  bytes=$(wc -c < api_body.json 2>/dev/null || echo 0)"
+            [ -s api_err.txt ] && echo "  err: $(head -c 300 api_err.txt)"
+            echo "  head: $(head -c 300 api_body.json 2>/dev/null)"
+            echo
+          done
+
+          echo "== Try to follow through to a real download URL (jq) =="
+          # Pull the first http(s) URL that looks like a resource/download out of whatever the API returned.
+          dl=$(grep -oE 'https?://[^"]+\.(zip|gdb|shp|geojson|json|gpkg)[^"]*' api_body.json 2>/dev/null | head -1)
+          if [ -n "$dl" ]; then
+            echo "  candidate download: $dl"
+            curl -sS -L -I --connect-timeout 25 --max-time 90 -A "homesignal-egress-probe/1.0" \
+                 -o /dev/null \
+                 -w "  DOWNLOAD http_code=%{http_code} bytes_hdr_only ssl_verify=%{ssl_verify_result} final=%{url_effective}\n" \
+                 "$dl" 2>&1 || echo "  DOWNLOAD CURL_ERROR"
+          else
+            echo "  no direct file URL found in API body (reachability of hosts/API above is still the key signal)"
+          fi
+          echo
+          echo "Probe complete — read http_code/ssl_verify per URL above. This job never fails on purpose."
