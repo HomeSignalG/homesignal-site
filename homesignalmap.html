@@ -1024,6 +1024,11 @@
   function popupHTML(s){
     var link = s.url || s.record_url || "";
     var a = link ? " · <a href='"+esc(link)+"' target='_blank' rel='noopener'>record ▸</a>" : "";
+    // Prefer the engine-stamped canonical_addr (v17 — the ONE normalizer is engine-side); the
+    // filed location_addr is only a fallback for rows cached before v17. Same key + precedence
+    // the list view uses (listInto) to route to our internal property page.
+    var pkey = s.canonical_addr || s.location_addr;
+    if(pkey){ a += " · <a href='"+esc(propertyHref(pkey))+"'>View address page →</a>"; }
     var vn = s.viol || 0;
     var vlink = s.violUrl || link;
     var echo = vlink ? " · <a href='"+esc(vlink)+"' target='_blank' rel='noopener' style='color:inherit'>EPA ECHO ▸</a>" : "";
