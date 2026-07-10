@@ -21,16 +21,32 @@
 
 export type MatchType =
   | "rooftop"
-  | "parcel"
+  | "parcel_centroid"
   | "range_interpolated"
   | "zip_centroid"
   | "county_centroid"
   | "failed";
 
-// Precise = a point we trust to the building/parcel. Drives needs_review AND the
-// dormant frontend "approximate" marker style (a point is shown approximate only once
-// SOME precise point exists in the set — purely data-driven, no code change needed).
-export const PRECISE: ReadonlySet<MatchType> = new Set<MatchType>(["rooftop", "parcel"]);
+// DISTINCT, ORDERED quality tiers. Higher = more precise. parcel_centroid is its OWN tier
+// between rooftop and range_interpolated — never folded into rooftop. This ordering is the
+// single source of truth the never-downgrade guard uses (mirrored in SQL as
+// geocode_quality_rank(); see docs/txgio-geocode-tables.sql). Keep the two in lockstep.
+export const QUALITY_RANK: Record<MatchType, number> = {
+  rooftop: 3,
+  parcel_centroid: 2,
+  range_interpolated: 1,
+  zip_centroid: 0,
+  county_centroid: 0,
+  failed: -1,
+};
+
+// Only a ROOFTOP point is precise enough to clear the review queue. A parcel centroid is a
+// real, rendered point (better than interpolation) but STAYS flagged (needs_review=true):
+// on a large/industrial lot a centroid can sit well off the building, so we surface it for an
+// optional rooftop upgrade rather than trusting it silently (owner decision, #2). match_type
+// still carries the exact tier (rooftop | parcel | range_interpolated) so the frontend can
+// style all three distinctly.
+export const CLEARS_REVIEW: ReadonlySet<MatchType> = new Set<MatchType>(["rooftop"]);
 
 export interface GeocodeResult {
   canonical_addr: string;
@@ -50,8 +66,11 @@ export interface GeocodeResult {
 // interpolation.
 export interface GeocoderRung {
   source: string;
+  // input = the raw filed address (what an HTTP geocoder wants); canonical = canonicalAddr(input)
+  // (the exact key a loaded-dataset rung, e.g. TxGIO, looks up). A rung uses whichever it needs.
   resolve: (
     input: string,
+    canonical: string,
   ) => Promise<{ lat: number; lng: number; match_type: MatchType; matched_address: string | null } | null>;
 }
 
@@ -70,10 +89,16 @@ export async function resolveGeocode(
   input_address: string,
   canonical_addr: string,
   ladder: GeocoderRung[],
-  opts?: { providerVintage?: string },
+  opts?: { providerVintage?: string; forceRefresh?: boolean },
 ): Promise<GeocodeResult> {
-  const cached = await store.get(canonical_addr).catch(() => null);
-  if (cached) return cached;
+  // Normal (write-once) path: return the cached row untouched. forceRefresh (the re-geocode
+  // batch) SKIPS the cache read so the ladder runs fresh — but the write still goes through the
+  // SQL improvement guard (upsert_geocode_if_better), so a re-run can only upgrade, never
+  // downgrade, and there is no delete/refresh gap where the row goes missing.
+  if (!opts?.forceRefresh) {
+    const cached = await store.get(canonical_addr).catch(() => null);
+    if (cached) return cached;
+  }
 
   let resolved: GeocodeResult = {
     canonical_addr,
@@ -88,9 +113,12 @@ export async function resolveGeocode(
   };
 
   for (const rung of ladder) {
-    const hit = await rung.resolve(input_address).catch(() => null);
+    // A rung returns null on a miss (no match or API error) → try the next rung. This is how the
+    // ladder degrades safely: the zero-fee dataset rung (OpenAddresses parcel_centroid) →
+    // Census (range_interpolated), ending at interpolation rather than ever hard-erroring.
+    const hit = await rung.resolve(input_address, canonical_addr).catch(() => null);
     if (!hit) continue;
-    const precise = PRECISE.has(hit.match_type);
+    const clears = CLEARS_REVIEW.has(hit.match_type);
     resolved = {
       canonical_addr,
       input_address,
@@ -99,8 +127,8 @@ export async function resolveGeocode(
       match_type: hit.match_type,
       matched_address: hit.matched_address,
       geocode_source: rung.source,
-      needs_review: !precise,
-      review_reason: precise ? null : `match_type=${hit.match_type} (not rooftop/parcel) — needs a precise source`,
+      needs_review: !clears,
+      review_reason: clears ? null : `match_type=${hit.match_type} (not rooftop) — flagged for optional precise upgrade`,
     };
     break;
   }
@@ -143,6 +171,26 @@ export function censusRung(fetchFn: typeof fetch): GeocoderRung {
   };
 }
 
+/** Dataset rung — a LOCAL-DATASET lookup, no runtime egress, no per-call cost. Reads a table
+ *  the CI loader populated (today: national_address_points from OpenAddresses), keyed by
+ *  canonicalAddr(). Returns the point AT THE TIER THE LOADER STAMPED ON THE ROW (match_type):
+ *  OpenAddresses defaults to 'parcel_centroid' and is only 'rooftop' where the source gave an
+ *  explicit rooftop signal — so precision is never overstated. A miss returns null → next rung.
+ *  (No commercial geocoder rung exists — the ladder is zero-fee: this dataset, then Census.) */
+// deno-lint-ignore no-explicit-any
+export function datasetRung(supabase: any, table: string, source = table): GeocoderRung {
+  return {
+    source,
+    resolve: async (_input: string, canonical: string) => {
+      const { data } = await supabase.from(table).select("lat,lng,match_type").eq("canonical_addr", canonical).maybeSingle();
+      if (!data || typeof data.lat !== "number" || typeof data.lng !== "number") return null;
+      // Honour the row's stamped tier; fall back to the conservative parcel_centroid, never rooftop.
+      const mt = (data.match_type === "rooftop" || data.match_type === "parcel_centroid") ? data.match_type : "parcel_centroid";
+      return { lat: data.lat, lng: data.lng, match_type: mt as MatchType, matched_address: canonical };
+    },
+  };
+}
+
 // ─────────────────────────── store ───────────────────────────
 
 // The only Supabase-coupled piece. A Python port reimplements just this against the
@@ -158,22 +206,24 @@ export function supabaseStore(supabase: any): GeocodeStore {
       return (data as GeocodeResult) ?? null;
     },
     put: async (row) => {
-      await supabase.from("geocodes").upsert(
-        {
-          canonical_addr: row.canonical_addr,
-          input_address: row.input_address,
-          lat: row.lat,
-          lng: row.lng,
-          match_type: row.match_type,
-          matched_address: row.matched_address,
-          geocode_source: row.geocode_source,
-          needs_review: row.needs_review,
-          review_reason: row.review_reason,
-          provider_vintage: row.provider_vintage ?? null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "canonical_addr" },
-      );
+      // THE IMPROVEMENT GUARD lives in SQL: upsert_geocode_if_better() inserts a new address,
+      // but on conflict only overwrites when the new tier STRICTLY OUTRANKS the stored one
+      // (geocode_quality_rank(excluded) > geocode_quality_rank(existing)). So a re-geocode can
+      // only ever upgrade a point — a lower/equal tier (incl. a transient 'failed') can never
+      // clobber a better stored point. Routing every write through it makes the guarantee
+      // universal (write-once path AND the re-geocode batch), not batch-only.
+      await supabase.rpc("upsert_geocode_if_better", {
+        p_canonical: row.canonical_addr,
+        p_input: row.input_address,
+        p_lat: row.lat,
+        p_lng: row.lng,
+        p_match_type: row.match_type,
+        p_matched: row.matched_address,
+        p_source: row.geocode_source,
+        p_needs_review: row.needs_review,
+        p_review_reason: row.review_reason,
+        p_vintage: row.provider_vintage ?? null,
+      });
     },
   };
 }

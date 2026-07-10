@@ -1,0 +1,49 @@
+name: load-openaddresses
+
+# The zero-fee national geocode backbone loader. Ingests OpenAddresses (free/open government
+# address-point data — no commercial geocoder, ever) into public.national_address_points, keyed by
+# canonicalAddr(), so the engine's datasetRung resolves addresses at zero per-lookup cost before
+# falling to the US Census rung. ONE uniform national pipeline: region-collection download → ZIP
+# filter → canonical key → service-role upsert. No per-state custom code.
+#
+# Runs on the GitHub runner because it needs egress (the build sandbox cannot reach
+# data.openaddresses.io / *.supabase.co). Writes with SUPABASE_SERVICE_ROLE_KEY (repo secret) —
+# national_address_points is RLS service-role only. Manual/monthly; new ZIPs picked up with no code
+# change (scope derives from property_reports unless ZIPS is passed).
+
+on:
+  workflow_dispatch:
+    inputs:
+      zips:
+        description: 'Optional comma-list of target ZIPs (default: distinct zips from property_reports)'
+        required: false
+        default: ''
+      states:
+        description: 'Optional comma-list of 2-letter states to download (default: derived from target rows)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Parse + report only, do not write ("1" to enable)'
+        required: false
+        default: ''
+  schedule:
+    - cron: '19 8 1 * *'   # 08:19 UTC on the 1st of each month — the self-expanding refresh:
+                           # re-derives scope from property_reports, so a newly-ingested state's
+                           # region is picked up automatically with no code change.
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Load OpenAddresses into national_address_points
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ZIPS: ${{ github.event.inputs.zips }}
+          STATES: ${{ github.event.inputs.states }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: python3 scripts/load-openaddresses.py

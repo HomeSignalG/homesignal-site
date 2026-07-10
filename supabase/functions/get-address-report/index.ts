@@ -30,10 +30,15 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
-import { censusRung, resolveGeocode, supabaseStore } from "./geocode-cache.ts";
+import { censusRung, datasetRung, resolveGeocode, supabaseStore } from "./geocode-cache.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// Zero-fee geocode ladder: OpenAddresses (national_address_points, loaded free) → US Census.
+// No commercial geocoder, no API key. datasetRung honours the per-row match_type the loader
+// stamped (OpenAddresses defaults to parcel_centroid), so precision is never overstated.
+const GEO_LADDER = (supabase: ReturnType<typeof createClient>) =>
+  [datasetRung(supabase, "national_address_points", "openaddresses"), censusRung(fetch)];
 
 const BOX_ELDER_COMMUNITY_ID = "d67c558f-1f04-4811-a565-873ae2afd6f3";
 const DEV_CATEGORIES = [
@@ -338,8 +343,32 @@ Deno.serve(async (req: Request) => {
   const cors = corsHeaders();
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST only" }, 405, cors);
-  let body: { address?: string; radius_mi?: number; zip?: string | number; lat?: number; lng?: number };
+  let body: { address?: string; radius_mi?: number; zip?: string | number; lat?: number; lng?: number; regeocode?: string[] };
   try { body = await req.json(); } catch { return json({ error: "bad JSON" }, 400, cors); }
+
+  // ── RE-GEOCODE MODE ── {regeocode:["<canonical_addr>",...]} → the improvement-guarded batch.
+  // For each address ALREADY in geocodes, re-run the ladder fresh (forceRefresh bypasses the
+  // write-once cache read) and write through upsert_geocode_if_better (only upgrades; no delete
+  // gap), bumping provider_vintage. Reports before/after so an upgrade is auditable. Bounded to
+  // rows already in geocodes (input_address is read from there). Zero-fee ladder — no spend.
+  if (Array.isArray(body.regeocode)) {
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+    const geoStore = supabaseStore(supabase);
+    const geoLadder = GEO_LADDER(supabase);
+    const vintage = "regeocode " + new Date().toISOString().slice(0, 10);
+    const results: Record<string, unknown>[] = [];
+    for (const canon of body.regeocode) {
+      const { data: row } = await supabase.from("geocodes")
+        .select("canonical_addr,input_address,match_type,lat,lng,needs_review").eq("canonical_addr", canon).maybeSingle();
+      if (!row) { results.push({ canonical_addr: canon, skipped: "not in geocodes" }); continue; }
+      const before = { match_type: row.match_type, lat: row.lat, lng: row.lng, needs_review: row.needs_review };
+      const after = await resolveGeocode(geoStore, row.input_address as string, canon, geoLadder, { providerVintage: vintage, forceRefresh: true });
+      results.push({ canonical_addr: canon, before,
+        after: { match_type: after.match_type, lat: after.lat, lng: after.lng, geocode_source: after.geocode_source, needs_review: after.needs_review },
+        upgraded: before.match_type !== after.match_type });
+    }
+    return json({ mode: "regeocode", vintage, results }, 200, cors);
+  }
 
   // ── ZIP MODE ── {zip[,lat,lng]} → home = ZIP centroid; anti-fabrication enforced here.
   if (body.zip !== undefined && body.zip !== null && String(body.zip).trim() !== "") {
@@ -360,14 +389,16 @@ Deno.serve(async (req: Request) => {
     // tabsForZip(): the source never runs for a non-TX ZIP. Separate query keeps
     // resolveCommunityIds() untouched (additive-only rule, source-registry #4).
     const { data: commRows } = await supabase.from("communities").select("state,county").contains("zip_codes", [zip]);
-    // Geocoding goes through the write-once, quality-aware cache (docs/geocodes-setup.sql):
-    // resolve once per canonical address, classify the match, store lat/lng + match_type +
-    // matched_address + source, and auto-flag anything below rooftop/parcel. The ladder is a
-    // single Census rung today (always range_interpolated → always flagged); a parcel/rooftop
-    // rung prepends here later with no other change. Return null on failure/coarse-fail so the
-    // TABS module's existing quarantine path is preserved.
+    // Geocoding goes through the write-once, quality-aware cache. ZERO-FEE LADDER, degrades in a
+    // fixed precision order and NEVER hard-errors — each rung returns null on a miss so the next
+    // is tried, ending at Census range_interpolation:
+    //   OpenAddresses (national_address_points, local lookup, no egress, no per-call cost;
+    //     tier = the loader-stamped match_type — parcel_centroid unless an explicit rooftop signal)
+    //   → US Census (range_interpolated, last resort).
+    // Only rooftop clears needs_review; parcel_centroid renders but stays flagged. Writes go through
+    // the SQL improvement guard, so a re-geocode can only upgrade, never downgrade.
     const geoStore = supabaseStore(supabase);
-    const geoLadder = [censusRung(fetch)];
+    const geoLadder = GEO_LADDER(supabase);
     const tabs = await tabsForZip(zip, (commRows ?? []) as { state?: string; county?: string }[], TABS_PINS, {
       fetch,
       geocode: async (a: string) => {
