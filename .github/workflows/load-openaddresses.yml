@@ -27,15 +27,9 @@ on:
         required: false
         default: ''
   schedule:
-    - cron: '19 8 1 * *'   # 08:19 UTC on the 1st — monthly refresh
-  # Runs the loader from THIS branch on any change to the loader files (a push-triggered workflow
-  # executes the file as it exists on the pushed ref — no need for it to be on the default branch
-  # first, which the workflow_dispatch API requires). Narrow back to schedule-only once merged.
-  push:
-    branches: [claude/homesignalmap-address-link-4nv88f]
-    paths:
-      - 'scripts/load-openaddresses.py'
-      - '.github/workflows/load-openaddresses.yml'
+    - cron: '19 8 1 * *'   # 08:19 UTC on the 1st of each month — the self-expanding refresh:
+                           # re-derives scope from property_reports, so a newly-ingested state's
+                           # region is picked up automatically with no code change.
 
 jobs:
   load:
