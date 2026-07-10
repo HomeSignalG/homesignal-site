@@ -342,8 +342,15 @@ Deno.serve(async (req: Request) => {
   const cors = corsHeaders();
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST only" }, 405, cors);
-  let body: { address?: string; radius_mi?: number; zip?: string | number; lat?: number; lng?: number; regeocode?: string[] };
+  let body: { address?: string; radius_mi?: number; zip?: string | number; lat?: number; lng?: number; regeocode?: string[]; diag?: string };
   try { body = await req.json(); } catch { return json({ error: "bad JSON" }, 400, cors); }
+
+  // ── TEMPORARY DIAGNOSTIC (v21, to be removed) ── {diag:"geocodio"} → reports ONLY whether the
+  // function can see GEOCODIO_API_KEY and its length. NEVER returns the key value. Remove once
+  // the secret is confirmed working.
+  if (body.diag === "geocodio") {
+    return json({ geocodio_key_present: !!GEOCODIO_API_KEY, geocodio_key_len: GEOCODIO_API_KEY.length, geocodio_monthly_cap: GEOCODIO_MONTHLY_CAP }, 200, cors);
+  }
 
   // ── RE-GEOCODE MODE ── {regeocode:["<canonical_addr>",...]} → the improvement-guarded batch.
   // For each address ALREADY in geocodes, re-run the ladder fresh (forceRefresh bypasses the
