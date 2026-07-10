@@ -606,6 +606,19 @@
   // the real EPA coordinates for facilities.
   function siteLL(s){ return (s._mLat!=null) ? [s._mLat, s._mLng] : [s.lat, s.lng]; }
   function siteEN(s){ return (s._mE!=null) ? [s._mE, s._mN] : [s.e, s.n]; }
+  // GEOCODE-QUALITY DISPLAY — data-driven, dormant until precise points exist.
+  // Marker style reads the stored match_type (from the write-once geocode cache), never a
+  // hardcoded rule. A point is "precise" only at rooftop/parcel quality. Today every point is
+  // Census range-interpolation, so isPrecise() is false for ALL of them → anyPreciseSite() is
+  // false → NO marker is demoted (every point renders solid, exactly as before). The moment a
+  // parcel/rooftop source lands and some points come back precise, anyPreciseSite() flips true
+  // and the still-interpolated points auto-render in the "approximate" style — no code change.
+  function isPrecise(s){ return !!(s && (s.match_type==="rooftop" || s.match_type==="parcel")); }
+  function anyPreciseSite(){ return MAP_SITES.some(isPrecise); }
+  // A point is drawn approximate only when precise points exist to contrast it against. Until
+  // then we make no precision claim either way (owner: don't overstate precision while all
+  // points are interpolated).
+  function isApproxPoint(s){ return s.scope==="point" && !isPrecise(s) && anyPreciseSite(); }
   // ANTI-FABRICATION GATE (development-tracker §0/§9): a site is renderable ONLY if it
   // carries an official public-record URL. No source → never drawn, never listed, never
   // exposed. Enforced at the engine for ZIP mode; enforced again here for address mode.
@@ -966,9 +979,12 @@
       if(typeof ll[0]!=="number" || typeof ll[1]!=="number") return;
       if(!mappable(s)) return;
       var col = COLORS[s.type] || "#5d6f72";
-      // Facility dots are solid at their exact location; area dots are dashed + slightly
-      // smaller — the visual cue that the spot is representative (jurisdiction-wide).
-      var m = L.circleMarker(ll, s.scope==="point"
+      // A dot is solid+full-size ONLY when it's a precise point: an exact-location facility, or
+      // a point geocode at rooftop/parcel quality. Area dots (jurisdiction-wide) and
+      // approximate points (interpolated, once precise points exist to contrast — isApproxPoint)
+      // render dashed + slightly smaller: the visual cue that the spot is representative.
+      var solidPoint = s.scope==="point" && !isApproxPoint(s);
+      var m = L.circleMarker(ll, solidPoint
         ? { radius:7, color:"#fff", weight:2, fillColor:col, fillOpacity:1 }
         : { radius:5.5, color:"#fff", weight:1.5, dashArray:"2,3", fillColor:col, fillOpacity:.85 });
       m.bindPopup(popupHTML(s));
@@ -1305,10 +1321,13 @@
     var feats = ZIP_MODE ? [] : [circlePoly(GL.home.lat,GL.home.lng,CUR_RADIUS,96)];  // no 1-mi ring in ZIP mode
     src.setData({ type:"FeatureCollection", features:feats });
   }
-  function glDot(color,size,ring){
+  function glDot(color,size,ring,approx){
     var el=document.createElement("div");
     el.style.width=el.style.height=size+"px";el.style.background=color;
-    el.style.border=ring+"px solid #fff";el.style.borderRadius="50%";el.style.boxSizing="border-box";
+    // approx = interpolated point shown alongside precise ones: dashed ring + slight fade,
+    // the 3D echo of the 2D dashed dot. Dormant until a precise source exists (see isApproxPoint).
+    el.style.border=ring+"px "+(approx?"dashed":"solid")+" #fff";el.style.borderRadius="50%";el.style.boxSizing="border-box";
+    if(approx)el.style.opacity="0.85";
     el.style.boxShadow="0 0 0 1px rgba(0,0,0,.35)";el.style.cursor="pointer";return el;
   }
   function initGL(home){
@@ -1349,7 +1368,8 @@
       if(!mappable(s))return;
       var bkt=bucketOf(s.type); if(!FILTER[bkt])return;
       var col=COLORS[s.type]||"#5d6f72";
-      var el=glDot(col,s.scope==="point"?15:13,2);
+      var approxPt=isApproxPoint(s);
+      var el=glDot(col,(s.scope==="point"&&!approxPt)?15:13,2,approxPt);
       var popup=new maplibregl.Popup({offset:12,maxWidth:"260px"}).setHTML(popupHTML(s));
       var marker=new maplibregl.Marker({element:el}).setLngLat([ll[1],ll[0]]).setPopup(popup).addTo(GL.map);
       el.addEventListener("mouseenter",function(){ if(GL.cur&&GL.cur!==popup)GL.cur.remove(); if(!popup.isOpen())marker.togglePopup(); GL.cur=popup; });

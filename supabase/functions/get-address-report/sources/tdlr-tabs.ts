@@ -34,6 +34,13 @@ export interface TabsSite {
   layer: string;                        // classified from scope_text (see classifyLayer)
   lat?: number;
   lng?: number;
+  // geocode quality (from the write-once cache, geocode-cache.ts) — carried through to
+  // development_reports.sites so the page can drive marker style off match_type and a
+  // review queue can find flagged points. Absent stays absent.
+  match_type?: string;                  // rooftop | parcel | range_interpolated | zip_centroid | county_centroid
+  matched_address?: string;             // the geocoder's returned/matched address string
+  geocode_source?: string;              // which geocoder produced the point
+  needs_review?: boolean;               // true when not rooftop/parcel (or geofence miss)
   e?: number;                           // miles E of the report anchor (engine fills)
   n?: number;                           // miles N of the report anchor (engine fills)
   src: string;                          // "TX TDLR TABS · TABS2024022676"
@@ -75,8 +82,12 @@ export interface TabsRefreshResult {
 export interface TabsDeps {
   /** fetch impl (edge runtime's fetch). */
   fetch: typeof fetch;
-  /** The engine's existing Census geocoder. Return null on failure → quarantine. */
-  geocode: (address: string) => Promise<{ lat: number; lng: number } | null>;
+  /** The engine's write-once geocode cache (geocode-cache.ts). Returns the point plus its
+   *  match quality; the extra fields are optional so any caller passing a bare {lat,lng}
+   *  still type-checks. Return null on failure → quarantine. */
+  geocode: (address: string) => Promise<
+    { lat: number; lng: number; match_type?: string; matched_address?: string | null; geocode_source?: string; needs_review?: boolean } | null
+  >;
   /** Polite delay between registry requests, ms. Default 1200. */
   delayMs?: number;
   /** Optional pinned search executor (set only after PIN_SEARCH exists). */
@@ -271,6 +282,12 @@ async function normalize(
     record_url: recordUrl(p.project_no),
     project_no: p.project_no,
   };
+  // Carry the geocode quality through (absent stays absent). Lets the page style markers
+  // off match_type and a review queue surface flagged points — no manual coord-checking.
+  if (geo.match_type) site.match_type = geo.match_type;
+  if (geo.matched_address) site.matched_address = geo.matched_address;
+  if (geo.geocode_source) site.geocode_source = geo.geocode_source;
+  if (geo.needs_review !== undefined) site.needs_review = geo.needs_review;
 
   // extension fields: copy ONLY what the page stated (absent stays absent)
   if (p.facility_name) site.facility_name = p.facility_name;

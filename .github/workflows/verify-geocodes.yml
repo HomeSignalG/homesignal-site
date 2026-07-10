@@ -1,0 +1,39 @@
+name: verify-geocodes
+
+# Automated geofence check for every GEOCODED point on the development tracker: each point is
+# reverse-looked-up to its containing ZCTA + county and compared to the ZIP/county it's filed
+# under. A point outside its stated polygon fails the run — bad geocodes surface with no manual
+# coordinate inspection. Runs where egress works (GitHub runner); the build sandbox cannot reach
+# the Census API. Zero-touch: reads the live development_reports + property_reports tables, so
+# newly-cached points are covered with no code change. No browser needed (pure data + HTTP).
+
+on:
+  workflow_dispatch:
+    inputs:
+      sample:
+        description: 'Optional: cap the number of points checked (e.g. "5" for a smoke run)'
+        required: false
+        default: ''
+  schedule:
+    - cron: '47 13 * * *'   # daily 13:47 UTC — just after verify-development
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/get-address-report/geocode-cache.ts'
+      - 'supabase/functions/get-address-report/sources/tdlr-tabs.ts'
+      - 'docs/geocodes-setup.sql'
+      - 'scripts/verify-geocodes.mjs'
+      - '.github/workflows/verify-geocodes.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Verify geocode geofence
+        env:
+          SAMPLE: ${{ github.event.inputs.sample }}
+        run: node scripts/verify-geocodes.mjs
