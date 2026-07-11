@@ -170,9 +170,16 @@ async function geocode(address: string): Promise<[number, number, string]> {
 async function devSites(supabase: ReturnType<typeof createClient>, homeLat: number, homeLng: number, communityIds: string[]): Promise<Record<string, unknown>[]> {
   const sites: Record<string, unknown>[] = [];
   if (!communityIds.length) return sites;   // ZIP has no modeled jurisdiction → facilities-only page (valid)
-  const floorIso = new Date(Date.now() - MEETING_LOOKBACK_DAYS * 86400000).toISOString().slice(0, 10);
+  // TASK 4 (universal) — devSites no longer reads the `meetings` table. Every row in `meetings` is a
+  // government meeting AGENDA (council/commission agendas, public-meeting notices) from an agenda
+  // source — CivicClerk, Granicus, Legistar, iQM2, CivicPlus, the Utah PMN meeting feed, and bespoke
+  // city sites alike. Agenda items mix land-use with all other government business and carry no
+  // structured type/status, so classifying one as development is guesswork (this produced the
+  // "Commissioners Court Employee Hearing" false positive on 78617). Development records now come from
+  // structured NOTICES (the alerts government_notice pull below) + structured permit/case feeds
+  // (socrataForZip / TABS / federal). The ingest meeting feeds stay ACTIVE — those meetings still
+  // populate the civic-alerts "Meetings" tile on community.html; they are just not development records.
   const { data: alerts } = await supabase.from("alerts").select("title,category,agency_name,geographic_reference,source_url,comment_deadline").in("community_id", communityIds).eq("pipeline_type", "government_notice").in("category", DEV_CATEGORIES).order("published_at", { ascending: false }).limit(100);
-  const { data: meetings } = await supabase.from("meetings").select("title,category,location,meeting_date,source_url,is_public_hearing,comment_period_open").in("community_id", communityIds).or("is_public_hearing.eq.true,comment_period_open.eq.true").gte("meeting_date", floorIso).order("meeting_date", { ascending: false }).limit(150);
   // AREA (jurisdiction-level) notices have NO trustworthy point — a county/city notice applies
   // county- or city-WIDE, not to one address. The page never trusts these coordinates: all three
   // map views position area items synthetically around the report anchor (homesignalmap.html
@@ -198,21 +205,7 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
     if (a.comment_deadline) s.comment_deadline = a.comment_deadline;
     sites.push(s);
   }
-  for (const m of meetings ?? []) {
-    // TASK 4 — CivicClerk agenda items are NOT development records. A CivicClerk meeting agenda
-    // mixes land-use with all other county business (personnel, budget, tax) and carries no
-    // structured type/status field, so tagging one as a proposed development is guesswork — this
-    // is what produced the "Commissioners Court Employee Hearing" false positive on 78617. The
-    // structured Socrata permit/case feeds (socrataForZip) replace it as the real proposed signal.
-    // Drop CivicClerk-sourced meetings from the development bands entirely. NOTE: the ingest feed
-    // (travis-tx-civicclerk-meetings) stays ACTIVE — these meetings still populate the civic-alerts
-    // "Meetings" tile on community.html; they are just no longer development records here.
-    // (Optional flag-gated hearing-annotation — matching a hearing date onto a proposed record by
-    // exact case number — is intentionally NOT enabled; default off per the brief.)
-    if (/civicclerk\.com/i.test((m.source_url as string) || "")) continue;
-    const [rel, relRule] = classifyRelevance((m.title as string) || "", (m.category as string) || "", "");
-    sites.push({ label: ((m.title as string) || "Public hearing").slice(0, 120), e: ae, n: an, lat: homeLat, lng: homeLng, scope: "area", type: "proposed", decided: false, relevance: rel, rel_rule: relRule, layer: classifyLayer((m.title as string) || "", m.category as string), src: m.is_public_hearing ? "Public hearing" : "Comment window", url: (m.source_url as string) || "", meeting_date: m.meeting_date });
-  }
+  // (meetings loop removed — see the TASK 4 note above; agenda meetings are no longer development records)
   // Dedup: ingest can emit the same notice more than once. First-seen wins.
   const seen = new Set<string>();
   const deduped = sites.filter((s) => {
