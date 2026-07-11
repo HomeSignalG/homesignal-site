@@ -698,7 +698,7 @@
     var d = (s.scope==="point" && typeof s.e==="number"&&typeof s.n==="number") ? Math.hypot(s.e,s.n) : null;
     var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from home");
     var vn = s.viol||0, link = s.url || s.record_url || "";
-    var recLink = link ? "<a href='"+esc(link)+"' target='_blank' rel='noopener'>Facility record ▸</a>" : "";
+    var recLink = link ? recordLink(s, link) : "";
     var echoLink = (s.scope==="point") ? "<a href='"+esc(s.violUrl||link)+"' target='_blank' rel='noopener'>EPA ECHO ▸</a>" : "";
     var vBlock = (s.scope==="point")
       ? "<div class='ci-v' style='color:"+(vn?"#ffb4a8":"#bfe8dd")+"'>"+vn+" recorded violation"+(vn===1?"":"s")+"</div>"
@@ -1070,9 +1070,38 @@
     });
   }
 
+  // The class of official document the record link opens, so the label states it up
+  // front ("EPA facility record ▸", "Meeting agenda ▸") instead of a bare "record ▸"
+  // that gives no hint whether it's an EPA registry entry, a state permit filing, or a
+  // hearing agenda. Keyed on the source label + destination host so it stays correct
+  // across every one of the 12,000+ development pages as coverage widens — a new
+  // county's civic-agenda portal is labeled right with zero code change. Every branch
+  // names a real, sourced public record (the anti-fabrication gate still drops any
+  // site with no record_url before this ever runs).
+  function recordKind(s){
+    var url = String((s && (s.record_url || s.url)) || "").toLowerCase();
+    var src = String((s && s.src) || "").toLowerCase();
+    // Federal facility registry → EPA ECHO detailed facility report.
+    if(/echo\.epa\.gov/.test(url) || /\bepa\s+frs\b/.test(src)) return "EPA facility record";
+    // State construction / licensing permit filings (carry a project number; e.g. TX TDLR TABS).
+    if((s && s.project_no) || /tdlr\.texas\.gov/.test(url)) return "Permit filing";
+    // Government meeting agendas — municipal AgendaCenter + the civic-agenda vendors.
+    if(/agendacenter|granicus|legistar|civicclerk|civicplus|primegov|iqm2|escribe|boarddocs/.test(url)) return "Meeting agenda";
+    // Public-notice portals (Utah PMN and equivalents).
+    if(/\/pmn\/|utah\.gov\/pmn|publicnotice|public-notice/.test(url)) return "Public notice";
+    // Any other sourced jurisdiction-wide notice is a government public record.
+    if(s && s.scope === "area") return "Public notice";
+    // A sourced point with no more specific signal.
+    return "Official record";
+  }
+  // An external record link labeled by the kind of document it opens (see recordKind).
+  function recordLink(s, url){
+    return "<a href='"+esc(url)+"' target='_blank' rel='noopener'>"+esc(recordKind(s))+" ▸</a>";
+  }
+
   function popupHTML(s){
     var link = s.url || s.record_url || "";
-    var a = link ? " · <a href='"+esc(link)+"' target='_blank' rel='noopener'>record ▸</a>" : "";
+    var a = link ? " · " + recordLink(s, link) : "";
     // Prefer the engine-stamped canonical_addr (v17 — the ONE normalizer is engine-side); the
     // filed location_addr is only a fallback for rows cached before v17. Same key + precedence
     // the list view uses (listInto) to route to our internal property page.
@@ -1119,8 +1148,10 @@
       // Prefer the engine-stamped canonical_addr (v17 — the ONE normalizer is engine-side);
       // the filed location_addr is only a fallback for rows cached before v17.
       var pkey = s.canonical_addr || s.location_addr;
-      if(pkey){ a = " · <a href='"+esc(propertyHref(pkey))+"'>record ▸</a>"; }
-      else if(link){ a = " · <a href='"+esc(link)+"' target='_blank' rel='noopener'>record ▸</a>"; }
+      // A filed street address routes to our internal per-address page (which itself
+      // links every fact to its own official record); label it as such, not "record ▸".
+      if(pkey){ a = " · <a href='"+esc(propertyHref(pkey))+"'>Address page →</a>"; }
+      else if(link){ a = " · " + recordLink(s, link); }
       var v = s.viol ? "<div class='vflag'>"+s.viol+" recorded violation"+(s.viol===1?"":"s")+" · EPA ECHO ▸</div>" : "";
       var tag = LAYER_LABEL[s.layer] || "Development";
       // A decided item (approved/denied/withdrawn) shows its plain date, not a "closes in N days"
@@ -1808,7 +1839,7 @@
       if(s.scope_text) summary.push(esc(s.scope_text));
       var math = (s.est_cost != null && s.sqft != null && Number(s.sqft) > 0)
         ? " <span class='fmath'>(≈ $" + Math.round(Number(s.est_cost)/Number(s.sqft)).toLocaleString() + "/sqft as filed)</span>" : "";
-      var rec = s.record_url ? " · " + recA(s.record_url, "record ▸") : "";
+      var rec = s.record_url ? " · " + recordLink(s, s.record_url) : "";
       return "<div class='filing'>" +
         "<div class='fdate'>" + esc(s.start_date ? fmtDate(s.start_date) : (s.status_text||"")) + "</div>" +
         "<div style='flex:1'><div class='ft'>" + (linkedUrls[s.record_url] ? "<span class='linkdot'></span>" : "") +
@@ -1829,7 +1860,7 @@
       return "<div class='filing'><div class='fdate'>" + esc(s.src||"") + "</div>" +
         "<div style='flex:1'><div class='ft'>" + esc(s.label) + "</div>" +
         "<div class='fs'>" + esc(facilityType(s)) + (s.scope_text ? " · " + esc(s.scope_text) : "") +
-        (link ? " · " + recA(link, "record ▸") : "") + "</div></div></div>";
+        (link ? " · " + recordLink(s, link) : "") + "</div></div></div>";
     }).join("");
     var checked = (row.sources_checked || []).map(function(c){
       return esc(c.src) + " — " + esc(c.result);
@@ -2042,7 +2073,7 @@
     var body = "";
     meetings.forEach(function(m){
       var when = m.meeting_date ? " · " + fmtDate(m.meeting_date) : "";
-      var link = m.source_url ? " · <a href='"+esc(m.source_url)+"' target='_blank' rel='noopener'>record ▸</a>" : "";
+      var link = m.source_url ? " · " + recordLink({ record_url:m.source_url, scope:"area" }, m.source_url) : "";
       body += "<div class='rec'><span class='dot' style='background:#0f766e'></span><div style='flex:1'>" +
         "<div class='t'>" + badge + esc(m.title||"Untitled meeting") + "</div>" +
         "<div class='s'>" + esc(m.category||"") + when + (m.agency_name?" · "+esc(m.agency_name):"") +
@@ -2050,7 +2081,7 @@
     });
     alerts.forEach(function(a){
       var when = (a.published_at||a.created_at) ? " · " + fmtDate(a.published_at||a.created_at) : "";
-      var link = a.source_url ? " · <a href='"+esc(a.source_url)+"' target='_blank' rel='noopener'>record ▸</a>" : "";
+      var link = a.source_url ? " · " + recordLink({ record_url:a.source_url, scope:"area" }, a.source_url) : "";
       body += "<div class='rec'><span class='dot' style='background:#3b5566'></span><div style='flex:1'>" +
         "<div class='t'>" + badge + esc(a.title||"Untitled notice") + "</div>" +
         "<div class='s'>" + esc(a.category||"") + when + (a.agency_name?" · "+esc(a.agency_name):"") +
