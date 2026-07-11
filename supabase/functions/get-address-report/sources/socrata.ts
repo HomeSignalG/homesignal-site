@@ -97,7 +97,9 @@ export interface SocrataRegistryEntry {
 export interface NormalizedRecord {
   source_id: string;                 // socrata:{domain}:{dataset_id}:{case_number|:id}
   source_class: string;              // "socrata"
-  registry_id: string;
+  // NOT `registry_id` — the page reserves that field for the EPA FRS RegistryId (frsRid) and
+  // would render any record carrying it with the "Facility · operating now" ECHO popup.
+  source_registry_id: string;        // which jurisdiction-registry entry produced this record
   jurisdiction: string;
   label: string;
   title: string;
@@ -306,7 +308,7 @@ async function normalizeRow(
   const rec: NormalizedRecord = {
     source_id: `socrata:${entry.domain}:${entry.dataset_id}:${caseNo ?? rowId(row) ?? title}`,
     source_class: "socrata",
-    registry_id: entry.registry_id,
+    source_registry_id: entry.registry_id,
     jurisdiction: entry.jurisdiction,
     label: (title || caseNo || "Development record").slice(0, 120),
     title,
