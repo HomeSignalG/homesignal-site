@@ -144,6 +144,14 @@ const CIVIC_TITLE = new RegExp([
   "surplus", "block grant", "newsletter", "mayor.?s\\b.*report",
 ].join("|"), "i");
 const DEV_CATEGORY = /planning|zoning|stratos|development/i;
+// A meeting becomes an orange "Proposed / weigh-in" area item when it's a public governing-body
+// meeting a resident could attend or comment at. Internal/administrative sessions are NOT comment
+// opportunities — exclude them BY TITLE. The old gate keyed only on is_public_hearing /
+// comment_period_open, which the civic-agenda vendors (CivicClerk/Granicus/Legistar) almost never
+// set (they title meetings "Voting Session"/"Board Meeting", never "…Hearing"), so off-Utah pages
+// showed ~0. This exclusion list is applied only to meetings the flags DON'T already admit, so the
+// gate is a strict superset of the old one (monotonic — no currently-shown meeting is ever dropped).
+const INTERNAL_MEETING_RE = /work session|study session|workshop|work meeting|press conference|ceremony|swearing|proclamation|flag raising|recognition|ribbon|executive session|closed session|briefing|retreat|training|orientation|agenda review|cancel/i;
 function classifyRelevance(title: string, category: string, agency: string): [string, string] {
   const t = title || "";
   if (DEV_TITLE.test(t)) return ["development", "title:landuse"];
@@ -171,7 +179,7 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
   if (!communityIds.length) return sites;   // ZIP has no modeled jurisdiction → facilities-only page (valid)
   const floorIso = new Date(Date.now() - MEETING_LOOKBACK_DAYS * 86400000).toISOString().slice(0, 10);
   const { data: alerts } = await supabase.from("alerts").select("title,category,agency_name,geographic_reference,source_url,comment_deadline").in("community_id", communityIds).eq("pipeline_type", "government_notice").in("category", DEV_CATEGORIES).order("published_at", { ascending: false }).limit(100);
-  const { data: meetings } = await supabase.from("meetings").select("title,category,location,meeting_date,source_url,is_public_hearing,comment_period_open").in("community_id", communityIds).or("is_public_hearing.eq.true,comment_period_open.eq.true").gte("meeting_date", floorIso).order("meeting_date", { ascending: false }).limit(150);
+  const { data: meetings } = await supabase.from("meetings").select("title,category,location,meeting_date,source_url,is_public_hearing,comment_period_open").in("community_id", communityIds).gte("meeting_date", floorIso).order("meeting_date", { ascending: false }).limit(400);
   // AREA (jurisdiction-level) notices have NO trustworthy point — a county/city notice applies
   // county- or city-WIDE, not to one address. The page never trusts these coordinates: all three
   // map views position area items synthetically around the report anchor (homesignalmap.html
@@ -198,8 +206,14 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
     sites.push(s);
   }
   for (const m of meetings ?? []) {
-    const [rel, relRule] = classifyRelevance((m.title as string) || "", (m.category as string) || "", "");
-    sites.push({ label: ((m.title as string) || "Public hearing").slice(0, 120), e: ae, n: an, lat: homeLat, lng: homeLng, scope: "area", type: "proposed", decided: false, relevance: rel, rel_rule: relRule, layer: classifyLayer((m.title as string) || "", m.category as string), src: m.is_public_hearing ? "Public hearing" : "Comment window", url: (m.source_url as string) || "", meeting_date: m.meeting_date });
+    const mtitle = (m.title as string) || "";
+    // Monotonic gate: a flagged hearing / open-comment meeting always shows; any other meeting shows
+    // unless its title marks it an internal/administrative session (work session, briefing, ceremony,
+    // cancellation, …). Never drops what the old is_public_hearing/comment_period_open gate admitted.
+    const openComment = m.is_public_hearing === true || m.comment_period_open === true;
+    if (!openComment && INTERNAL_MEETING_RE.test(mtitle)) continue;
+    const [rel, relRule] = classifyRelevance(mtitle, (m.category as string) || "", "");
+    sites.push({ label: (mtitle || "Public hearing").slice(0, 120), e: ae, n: an, lat: homeLat, lng: homeLng, scope: "area", type: "proposed", decided: false, relevance: rel, rel_rule: relRule, layer: classifyLayer(mtitle, m.category as string), src: m.is_public_hearing ? "Public hearing" : "Comment window", url: (m.source_url as string) || "", meeting_date: m.meeting_date });
   }
   // Dedup: ingest can emit the same notice more than once. First-seen wins.
   const seen = new Set<string>();
