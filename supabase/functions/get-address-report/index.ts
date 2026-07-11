@@ -40,6 +40,9 @@ import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import { siteKey, tceqForZip, type TceqCommunityRow, type TceqEntity } from "./sources/tceq-cr.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
 import { censusRung, datasetRung, resolveGeocode, supabaseStore } from "./geocode-cache.ts";
+import { socrataForZip, type SocrataCommunityRow, type SocrataRegistryEntry } from "./sources/socrata.ts";
+import jurisdictionRegistry from "./jurisdiction-registry.json" with { type: "json" };
+const SOCRATA_ENTRIES = (jurisdictionRegistry as unknown as { socrata?: SocrataRegistryEntry[] }).socrata ?? [];
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -170,9 +173,16 @@ async function geocode(address: string): Promise<[number, number, string]> {
 async function devSites(supabase: ReturnType<typeof createClient>, homeLat: number, homeLng: number, communityIds: string[]): Promise<Record<string, unknown>[]> {
   const sites: Record<string, unknown>[] = [];
   if (!communityIds.length) return sites;   // ZIP has no modeled jurisdiction → facilities-only page (valid)
-  const floorIso = new Date(Date.now() - MEETING_LOOKBACK_DAYS * 86400000).toISOString().slice(0, 10);
+  // TASK 4 (universal) — devSites no longer reads the `meetings` table. Every row in `meetings` is a
+  // government meeting AGENDA (council/commission agendas, public-meeting notices) from an agenda
+  // source — CivicClerk, Granicus, Legistar, iQM2, CivicPlus, the Utah PMN meeting feed, and bespoke
+  // city sites alike. Agenda items mix land-use with all other government business and carry no
+  // structured type/status, so classifying one as development is guesswork (this produced the
+  // "Commissioners Court Employee Hearing" false positive on 78617). Development records now come from
+  // structured NOTICES (the alerts government_notice pull below) + structured permit/case feeds
+  // (socrataForZip / TABS / federal). The ingest meeting feeds stay ACTIVE — those meetings still
+  // populate the civic-alerts "Meetings" tile on community.html; they are just not development records.
   const { data: alerts } = await supabase.from("alerts").select("title,category,agency_name,geographic_reference,source_url,comment_deadline").in("community_id", communityIds).eq("pipeline_type", "government_notice").in("category", DEV_CATEGORIES).order("published_at", { ascending: false }).limit(100);
-  const { data: meetings } = await supabase.from("meetings").select("title,category,location,meeting_date,source_url,is_public_hearing,comment_period_open").in("community_id", communityIds).or("is_public_hearing.eq.true,comment_period_open.eq.true").gte("meeting_date", floorIso).order("meeting_date", { ascending: false }).limit(150);
   // AREA (jurisdiction-level) notices have NO trustworthy point — a county/city notice applies
   // county- or city-WIDE, not to one address. The page never trusts these coordinates: all three
   // map views position area items synthetically around the report anchor (homesignalmap.html
@@ -198,10 +208,7 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
     if (a.comment_deadline) s.comment_deadline = a.comment_deadline;
     sites.push(s);
   }
-  for (const m of meetings ?? []) {
-    const [rel, relRule] = classifyRelevance((m.title as string) || "", (m.category as string) || "", "");
-    sites.push({ label: ((m.title as string) || "Public hearing").slice(0, 120), e: ae, n: an, lat: homeLat, lng: homeLng, scope: "area", type: "proposed", decided: false, relevance: rel, rel_rule: relRule, layer: classifyLayer((m.title as string) || "", m.category as string), src: m.is_public_hearing ? "Public hearing" : "Comment window", url: (m.source_url as string) || "", meeting_date: m.meeting_date });
-  }
+  // (meetings loop removed — see the TASK 4 note above; agenda meetings are no longer development records)
   // Dedup: ingest can emit the same notice more than once. First-seen wins.
   const seen = new Set<string>();
   const deduped = sites.filter((s) => {
@@ -525,6 +532,18 @@ Deno.serve(async (req: Request) => {
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
     });
+    // TASK 1 — structured open-data permit/case records (Socrata), coverage-gated per registry entry.
+    // Generic connector; adding a city is a jurisdiction-registry.json edit, never code here. Records
+    // are development point records (relevance:"development") bucketed by their status_to_bucket type.
+    const socrata = await socrataForZip(zip, (commRows ?? []) as SocrataCommunityRow[], SOCRATA_ENTRIES, {
+      fetch,
+      geocode: async (a: string) => {
+        const g = await resolveGeocode(geoStore, a, canonicalAddr(a), geoLadder);
+        if (g.lat == null || g.lng == null) return null;   // failed → quarantine (socrata.ts)
+        return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
+      },
+      appToken: Deno.env.get("SOCRATA_APP_TOKEN") || undefined,
+    });
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");
     // TABS filings are development records by construction (state permit registry) — stamp
@@ -533,6 +552,18 @@ Deno.serve(async (req: Request) => {
     const tabsSites: Record<string, unknown>[] = tabs.sites
       .filter((s) => (s.record_url || "").trim() !== "")
       .map((s) => { const [e, n] = toEN(clat, clng, s.lat!, s.lng!); return { ...s, e, n, relevance: "development", rel_rule: "source:tabs", canonical_addr: s.location_addr ? canonicalAddr(s.location_addr) : undefined }; });
+    // Socrata records → engine site shape. record_url is the anti-fabrication key; also mirror it to
+    // `url` so the shared dev gate + page link logic (which read `url`) treat them like other dev items.
+    // A point record (source coords or geocoded address) sits at its real lat/lng; a jurisdiction-scope
+    // record anchors at the report centroid like any area item (its coordinates are never displayed).
+    const socrataSites: Record<string, unknown>[] = (socrata.sites as unknown as Record<string, unknown>[])
+      .filter((s) => String(s.record_url || "").trim() !== "")
+      .map((s) => {
+        const lat = s.lat as number | null, lng = s.lng as number | null;
+        const pt = lat != null && lng != null;
+        const [e, n] = pt ? toEN(clat, clng, lat as number, lng as number) : [0, 0];
+        return { ...s, url: s.record_url, e, n, lat: pt ? lat : clat, lng: pt ? lng : clng };
+      });
     const fac = facRaw.filter((s) => (s.record_url as string) && (s.record_url as string).trim() !== "");
     // v17: persist the per-address dossier rows for this ZIP (small N; must never fail the page).
     const isTx = (commRows ?? []).some((c) => /^(tx|texas)$/i.test(String((c as { state?: string }).state || "").trim()));
@@ -544,7 +575,25 @@ Deno.serve(async (req: Request) => {
     // Only genuine land-use items count as development; civic notices are carried in sites
     // (the page lists them non-headlined) but never inflate the project counts.
     const devReal = dev.filter((s) => s.relevance !== "civic");
-    const allSites = [...dev, ...tabsSites, ...fac];
+    // TASK 5 — ONE PREDICATE PER NUMBER. Each band's count is the length of the exact record
+    // array that ships in that band's list, so a counter can never disagree with its rail. A
+    // development record is any non-civic land-use record (area planning notice + TABS filing +
+    // Socrata permit/case); its lifecycle `type` (built|approved|proposed) IS the band. The page
+    // groups sites[] by the same type, so counts.{proposed,approved,operating} === the rendered
+    // arrays by construction. counts.development stays the sum (back-compat).
+    const today = new Date().toISOString().slice(0, 10);
+    for (const s of devReal) {
+      // Stamp comment_open on an area notice that has a real, still-open comment deadline; the
+      // page renders exactly these as commentable, so counts.comment_open === the commentable set.
+      // Structured permit rows (TABS/Socrata) carry no comment window → comment_open stays false.
+      if (s.scope === "area" && !s.decided && s.comment_deadline && String(s.comment_deadline).slice(0, 10) >= today) s.comment_open = true;
+    }
+    const devRecords = [...devReal, ...tabsSites, ...socrataSites];
+    const proposedRecords = devRecords.filter((s) => s.type === "proposed");
+    const approvedRecords = devRecords.filter((s) => s.type === "approved");
+    const operatingRecords = devRecords.filter((s) => s.type === "built");
+    const commentOpenRecords = devRecords.filter((s) => s.comment_open === true);
+    const allSites = [...dev, ...tabsSites, ...socrataSites, ...fac];
     const access = await accessLevel(req, supabase);
     const sites = access === "full" ? allSites : allSites.slice(0, TEASER_LIMIT);
     const locked = access === "full" ? 0 : Math.max(0, allSites.length - sites.length);
@@ -552,7 +601,7 @@ Deno.serve(async (req: Request) => {
     const envEpa = fac.filter((s) => (s.env as { epa?: unknown } | undefined)?.epa).length;
     const envTceq = fac.filter((s) => (s.env as { tceq?: unknown } | undefined)?.tceq).length;
     // TABS records are development filings → counts.development, never counts.facilities.
-    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, development: devReal.length + tabsSites.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
+    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, proposed: proposedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
   }
 
   const address = (body.address || "").trim();
@@ -574,8 +623,18 @@ Deno.serve(async (req: Request) => {
   stripEnvInternals(fac);
   const allSites = [...dev, ...fac];
   const devReal = dev.filter((s) => s.relevance !== "civic");
+  // TASK 5 — same one-predicate-per-number counts as ZIP mode (address mode has no TABS/Socrata
+  // point records today, so the development set is the non-civic area notices).
+  const today = new Date().toISOString().slice(0, 10);
+  for (const s of devReal) {
+    if (s.scope === "area" && !s.decided && s.comment_deadline && String(s.comment_deadline).slice(0, 10) >= today) s.comment_open = true;
+  }
+  const proposedRecords = devReal.filter((s) => s.type === "proposed");
+  const approvedRecords = devReal.filter((s) => s.type === "approved");
+  const operatingRecords = devReal.filter((s) => s.type === "built");
+  const commentOpenRecords = devReal.filter((s) => s.comment_open === true);
   const access = await accessLevel(req, supabase);
   const sites = access === "full" ? allSites : allSites.slice(0, TEASER_LIMIT);
   const locked = access === "full" ? 0 : Math.max(0, allSites.length - sites.length);
-  return json({ address: matched, home: { lat, lng }, radius_mi: radiusMi, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, development: devReal.length, civic: dev.length - devReal.length, locked }, note: "Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
+  return json({ address: matched, home: { lat, lng }, radius_mi: radiusMi, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, proposed: proposedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, note: "Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
 });

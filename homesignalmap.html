@@ -1125,8 +1125,14 @@
     // engine contract (index.ts: counts.development already excludes civic; counts.civic carries the
     // rest). A row cached before the classifier has no `relevance` → treated as development (no regression).
     var isCivic = function(s){ return s.relevance === "civic"; };
-    var permits = sites.filter(isPermit);
-    var fac = sites.filter(function(s){ return s.scope==="point" && !isPermit(s); });
+    // A POINT record is a DEVELOPMENT record (permit/case: TABS, Socrata) when relevance==="development";
+    // otherwise it's an EPA facility (FRS facilities carry no relevance). Dev points bucket into the
+    // Operating/Approved/Proposed lists by lifecycle type — the SAME split the engine counts on, so the
+    // counters and these rails are projections of one predicate (Task 5). isPermit (project_no) is kept
+    // only to route a filing's "record ▸" to the property page.
+    var isDevPoint = function(s){ return s.scope==="point" && s.relevance==="development"; };
+    var permits = sites.filter(isDevPoint);
+    var fac = sites.filter(function(s){ return s.scope==="point" && s.relevance!=="development"; });
     var dev = sites.filter(function(s){ return s.scope==="area" && !isCivic(s); });
     var civic = sites.filter(function(s){ return s.scope==="area" && isCivic(s); });
     var appr = permits.filter(function(s){ return bucketOf(s.type)==="approved"; })
@@ -1134,20 +1140,20 @@
     var prop = permits.filter(function(s){ return bucketOf(s.type)==="proposed"; })
       .concat(dev.filter(function(s){ return bucketOf(s.type)==="proposed"; }));
     var builtRows = permits.filter(function(s){ return bucketOf(s.type)==="built"; }).concat(fac);
-    // "Open for public comment" = a genuine opportunity only: a PROPOSED item, not already
-    // decided (approved/denied/withdrawn), with a meeting/comment date that's today or later.
+    // "Open for public comment" (Task 5) = exactly the records the engine stamped comment_open=true.
+    // The page renders these as commentable, so the counter (counts.comment_open) === this set.
     var today = new Date().toISOString().slice(0,10);
-    var open = dev.filter(function(s){
-      return bucketOf(s.type)==="proposed" && !s.decided && s.meeting_date && s.meeting_date.slice(0,10) >= today;
-    });
+    var open = sites.filter(function(s){ return s.comment_open === true; });
     // Freshness stamp: ZIP pages are a cached snapshot — show when it was last refreshed so the
     // reader knows it's not live. Address mode is a live fetch.
     $("freshLine").textContent = ZIP_MODE
       ? (data.updated ? "Updated " + fmtDate(data.updated) : "")
       : "Live results · fetched just now";
-    $("cFac").textContent  = (data.counts && data.counts.facilities)  != null ? data.counts.facilities  : fac.length;
-    $("cDev").textContent  = (data.counts && data.counts.development)  != null ? data.counts.development  : dev.length;
-    $("cOpen").textContent = open.length;
+    $("cFac").textContent  = (data.counts && data.counts.facilities)   != null ? data.counts.facilities   : fac.length;
+    // cDev is the PROPOSED counter (its tile reads "New projects proposed nearby") — it must equal the
+    // orange Proposed rail. Read counts.proposed (a projection of the same array); fall back to prop.length.
+    $("cDev").textContent  = (data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length;
+    $("cOpen").textContent = (data.counts && data.counts.comment_open) != null ? data.counts.comment_open : open.length;
     $("cTot").textContent  = sites.length;
 
     // Open-for-comment banner — rebuilt every render (clears between searches; works in both
@@ -1155,7 +1161,7 @@
     // nothing is open. Shows the soonest deadline as a friendly countdown.
     var cbar = $("commentBar");
     if(open.length){
-      var soonest = open.map(function(s){ return s.meeting_date.slice(0,10); }).sort()[0];
+      var soonest = open.map(function(s){ return (s.comment_deadline || s.meeting_date || "").slice(0,10); }).filter(Boolean).sort()[0];
       var lead = open.length === 1
         ? "<strong>1 project near you</strong> is open for public comment"
         : "<strong>" + open.length + " projects near you</strong> are open for public comment";
