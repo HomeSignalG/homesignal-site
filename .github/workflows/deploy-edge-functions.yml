@@ -1,0 +1,63 @@
+name: deploy-edge-functions
+
+# Deploy Supabase Edge Functions straight from the repo — the transmission-free deploy path.
+# The Supabase CLI reads the function's multi-file source from disk on a GitHub runner (which has
+# egress), bundles it, and deploys. No hand-copied bundle, byte-exact every time, and the
+# non-technical founder never has to run anything locally. This is the durable replacement for the
+# MCP inline-bundle deploy (which has a ~30 KB payload ceiling and must be hand-transmitted).
+#
+# ONE-TIME SETUP (repo → Settings → Secrets and variables → Actions):
+#   • SUPABASE_ACCESS_TOKEN — a personal access token from https://supabase.com/dashboard/account/tokens
+#   (SUPABASE_PROJECT_REF is hard-coded below; it is not a secret — it's in docs already.)
+#
+# Manual by default so a deploy is always a deliberate act. Flip `push:` on if you want
+# auto-deploy when the function source changes on main.
+
+on:
+  workflow_dispatch:
+    inputs:
+      function:
+        description: 'Edge function slug to deploy'
+        required: true
+        default: 'get-address-report'
+  # Uncomment to auto-deploy on source changes to main:
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'supabase/functions/get-address-report/**'
+
+concurrency:
+  group: deploy-edge-${{ github.event.inputs.function || 'get-address-report' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy edge function (byte-exact, from repo source)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          FN="${{ github.event.inputs.function || 'get-address-report' }}"
+          echo "Deploying edge function: $FN → project $SUPABASE_PROJECT_REF"
+          # --no-verify-jwt: get-address-report authenticates via the anon apikey at the gateway and
+          # is called from the browser + pg_net; it has no per-request JWT gate (matches its live config).
+          supabase functions deploy "$FN" \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            --no-verify-jwt
+
+      - name: Reminder — repopulate the cache
+        run: |
+          echo "Deployed. New behavior is live for address mode immediately."
+          echo "For ZIP pages, re-cache so env populates: re-run the development_reports refresh"
+          echo "(pg_net → get-address-report {zip,lat,lng}) for the target ZIPs, or wait for the"
+          echo "daily dev_refresh cron. verify-development CI does the live browser check."
