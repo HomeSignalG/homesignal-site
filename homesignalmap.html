@@ -104,7 +104,12 @@
   .results{display:none;margin:8px 0 40px}
   .grid{display:grid;grid-template-columns:1.6fr 1fr;gap:18px;align-items:start}
   .grid.band{grid-template-columns:1fr 1fr 1fr}
-  @media(max-width:820px){.grid,.grid.band{grid-template-columns:1fr}}
+  /* Development summary/map grid: stack so the counts summary sits ABOVE a full-width map. */
+  .grid.stacked{grid-template-columns:1fr}
+  .grid.stacked .read{order:-1}                          /* counts summary above the map */
+  .grid.stacked .counts{grid-template-columns:repeat(4,1fr)}  /* wide count strip on top */
+  @media(max-width:820px){.grid,.grid.band,.grid.stacked .counts{grid-template-columns:1fr}}
+  @media(max-width:640px){.grid.stacked .counts{grid-template-columns:1fr 1fr}}
   .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
     box-shadow:0 14px 34px -26px rgba(8,30,28,.5)}
   .mapcard{padding:14px}
@@ -114,7 +119,7 @@
   .viewseg{display:inline-flex;background:#eef2f1;border:1px solid var(--line);border-radius:9px;overflow:hidden;flex:0 0 auto}
   .viewseg button{border:0;background:transparent;font:600 12px var(--font);color:var(--soft);padding:6px 13px;cursor:pointer}
   .viewseg button.on{background:var(--green);color:#fff}
-  .map-frame{position:relative;height:460px;border-radius:14px;overflow:hidden}
+  .map-frame{position:relative;height:600px;border-radius:14px;overflow:hidden}
   #map{position:absolute;inset:0;z-index:0}
   #mapInner{position:absolute;inset:0}
   .mapgl{position:absolute;inset:0;display:none;background:#0a1012;z-index:1}
@@ -354,7 +359,7 @@
     <div class="status" id="status"></div>
 
     <div class="results" id="results">
-      <div class="grid">
+      <div class="grid stacked">
         <div class="card mapcard">
           <div class="map-bar">
             <div class="map-cap">Development around this home</div>
