@@ -620,6 +620,24 @@ legal/framing change not covered by the one-time sign-off.
   84606 0→40, 84010 0→40); the rest are genuinely-empty west-desert/mountain ZIPs (Dugway, Ibapah,
   Wendover, Grouse Creek — 0 industrial is valid). Parked ref: `supabase/functions/get-address-report/index.ts`
   (deploy via MCP, not commit). Anti-fabrication invariant still 0 (every rendered site keeps a `record_url`).
+- 🟢 **Backbone geo-fabrication FIXED — engine v18 (deployed, get-address-report version 26)** (DB-verified).
+  Root cause found on the first non-Utah page to get government CONTENT (Travis County TX, ZIP 78617): the
+  `devSites()` placement of jurisdiction-level (scope=area) planning notices used a **Box-Elder-only place map**
+  (`centroid()`/`PLACES`). At national scale it was wrong two ways — (1) it **DROPPED every non-Box-Elder
+  ALERT** (`centroid()` → null → `continue`, so real out-of-state planning notices never rendered) and (2) it
+  **stamped every non-Box-Elder MEETING with Box Elder County, UT coordinates** (`?? PLACES["box elder county"]`
+  = 41.5105,-112.0155). Verified: the Travis County "Commissioners Court Employee Hearing" carried a Utah
+  lat/lng. **Standing answer (so no session re-derives): area items have NO trustworthy point — the page
+  positions them synthetically (all three map views use `placeAreaSites`/`siteLL`/`siteEN`), so the engine
+  anchors every area item at the REPORT CENTROID (`homeLat`/`homeLng`), never a hardcoded place.** `centroid()`,
+  `PLACES`, and the dead `BOX_ELDER_COMMUNITY_ID` were removed (they were the bug). The fix is
+  **display-identical everywhere** (area coordinates are never rendered) while removing the fabricated
+  coordinate and the dropped-record content loss. Blast radius before the fix was **1 live page** (78617 —
+  the only non-Utah page with meeting content so far), but it was the landmine for the 12,000-page rollout as
+  government content expands to the 13+ live non-Utah counties. Re-cached 78617 through the live v18 function
+  (`net.http_post`, 200): the meeting now anchors at 30.1745,-97.6134 (the ZIP centroid), counts unchanged
+  (facilities 29 · development 5 · civic 1). Cache-wide check: **0 area sites landing in Utah on any non-Utah
+  page.** Deployed as ONE esbuild bundle (multi-file source is the parked reference; §MCP-deploy ceiling note).
 - 🟢 **Staleness + status-accuracy hardened — engine v14 + auto-refresh + honest dating** (DB-verified).
   A tracker is worthless if it's a frozen snapshot with a hardcoded stage, so three fixes: **(1) it now
   updates** — `development_reports` was only ever refreshed by a MANUAL pg_net run (nothing re-ran it), so a
@@ -637,9 +655,7 @@ legal/framing change not covered by the one-time sign-off.
   than 90 days (`MEETING_LOOKBACK_DAYS`) so old items stop lingering as "Proposed" (Utah County 91→89 on
   re-cache — 2 stale items dropped). **Known residual (NOT fixed — needs ingest-side work):** there is still
   no project *identity/lifecycle* — each notice is classified independently, so "proposed→approved→built"
-  isn't tracked as one entity; and `centroid()`/`PLACES` geocoding of planning notices is Box-Elder-hardcoded
-  (inert today because area-scope items aren't map-pinned — `mappable()` is point-only — but the lat/lng on
-  non-Box-Elder notices are wrong). Also **EPA ECHO violations are effectively 0 everywhere** — the
+  isn't tracked as one entity. Also **EPA ECHO violations are effectively 0 everywhere** — the
   `echo_violation_counts` table is near-empty (3 rows, 0 with violations), so every facility shows "0 recorded
   violations" regardless of real history (fetched from a table, not live ECHO). Logged for a future build.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·

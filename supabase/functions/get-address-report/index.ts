@@ -1,4 +1,12 @@
-// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v17.
+// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v18.
+// v18 = BACKBONE FIX (area-item placement): jurisdiction-level (scope=area) planning notices and
+// meetings no longer geocode against the Box-Elder-only place map. That map DROPPED every
+// non-Box-Elder alert (centroid() → null → skipped) and stamped every non-Box-Elder meeting with
+// Box Elder County, UT coordinates (41.5105,-112.0155) — wrong cached data on a national build
+// (verified: a Travis County TX meeting carried a Utah lat/lng). Area items now anchor at the
+// report centroid (homeLat/homeLng); the page already positions them synthetically, so this is
+// display-identical everywhere (Box Elder included) while removing the fabricated coordinate and
+// the dropped-record content loss. centroid()/PLACES/BOX_ELDER_COMMUNITY_ID removed (were the bug).
 // PARKED IN REPO FOR REFERENCE/REPRODUCIBILITY — Supabase is the source of truth
 // (docs/development-tracker-source-of-truth.md §2). v11 = MULTI-COUNTY: resolveCommunityIds()
 // maps a ZIP to its own community chain (city+county) so each ZIP shows its OWN county's
@@ -40,7 +48,6 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const GEO_LADDER = (supabase: ReturnType<typeof createClient>) =>
   [datasetRung(supabase, "national_address_points", "openaddresses"), censusRung(fetch)];
 
-const BOX_ELDER_COMMUNITY_ID = "d67c558f-1f04-4811-a565-873ae2afd6f3";
 const DEV_CATEGORIES = [
   "Planning, zoning & development",
   "Stratos data center project",
@@ -64,16 +71,6 @@ const ZCTA_CENTROIDS: Record<string, [number, number]> = {
   "84302": [41.5079, -112.0152], // Brigham City, Box Elder County, UT — zipcodes v3.0.0
 };
 const ZIP_RADIUS_MI = 3; // centroid-radius approximation of a ZIP's extent
-
-const PLACES: Record<string, [number, number]> = {
-  "brigham city": [41.5105, -112.0155], "tremonton": [41.7130, -112.1655],
-  "garland": [41.7410, -112.1610], "perry": [41.4622, -112.0283],
-  "willard": [41.4099, -112.0361], "corinne": [41.5544, -112.1141],
-  "mantua": [41.5033, -111.9430], "honeyville": [41.6411, -112.0791],
-  "deweyville": [41.7002, -112.0930], "bear river city": [41.6161, -112.1319],
-  "fielding": [41.8125, -112.1136], "elwood": [41.6922, -112.1502],
-  "snowville": [41.9647, -112.7105], "box elder county": [41.5105, -112.0155],
-};
 
 const LAYER_KEYWORDS: [string, string[]][] = [
   ["datacenter", ["data center", "datacenter"]],
@@ -160,12 +157,6 @@ function toEN(homeLat: number, homeLng: number, lat: number, lng: number): [numb
   const e = (lng - homeLng) * MILES_PER_DEG_LAT * Math.cos((homeLat * Math.PI) / 180);
   return [Math.round(e * 1000) / 1000, Math.round(n * 1000) / 1000];
 }
-function centroid(geoRef: string): [number, number] | null {
-  const low = (geoRef || "").toLowerCase();
-  for (const [name, pt] of Object.entries(PLACES)) if (low.includes(name)) return pt;
-  if (low.includes("box elder") || low.includes("utah")) return PLACES["box elder county"];
-  return null;
-}
 async function geocode(address: string): Promise<[number, number, string]> {
   const q = new URLSearchParams({ address, benchmark: "Public_AR_Current", format: "json" });
   const r = await fetch(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?${q}`, { signal: AbortSignal.timeout(15000) });
@@ -181,24 +172,34 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
   const floorIso = new Date(Date.now() - MEETING_LOOKBACK_DAYS * 86400000).toISOString().slice(0, 10);
   const { data: alerts } = await supabase.from("alerts").select("title,category,agency_name,geographic_reference,source_url,comment_deadline").in("community_id", communityIds).eq("pipeline_type", "government_notice").in("category", DEV_CATEGORIES).order("published_at", { ascending: false }).limit(100);
   const { data: meetings } = await supabase.from("meetings").select("title,category,location,meeting_date,source_url,is_public_hearing,comment_period_open").in("community_id", communityIds).or("is_public_hearing.eq.true,comment_period_open.eq.true").gte("meeting_date", floorIso).order("meeting_date", { ascending: false }).limit(150);
+  // AREA (jurisdiction-level) notices have NO trustworthy point — a county/city notice applies
+  // county- or city-WIDE, not to one address. The page never trusts these coordinates: all three
+  // map views position area items synthetically around the report anchor (homesignalmap.html
+  // placeAreaSites / siteLL / siteEN). So the engine anchors every area item at the REPORT
+  // CENTROID (homeLat/homeLng) and never at a hardcoded place.
+  //   Why this changed (v18 backbone fix): the old code geocoded area items against a
+  //   Box-Elder-only place map (centroid()/PLACES). At national scale that was wrong two ways —
+  //   (1) it DROPPED every non-Box-Elder ALERT (centroid() returned null → `continue`, so real
+  //   out-of-state planning notices never rendered), and (2) it stamped every non-Box-Elder
+  //   MEETING with Box Elder County, UT coordinates (the `?? PLACES["box elder county"]` fallback)
+  //   — e.g. a Travis County, TX meeting cached with lat 41.5105, lng -112.0155. Anchoring to the
+  //   report centroid is honest (the item is "activity within the area you're viewing"), loses no
+  //   record, and — since area coordinates are never displayed — is display-identical everywhere,
+  //   Box Elder included. Every rendered fact still comes from the record's source_url.
+  const [ae, an] = toEN(homeLat, homeLng, homeLat, homeLng);   // [0,0] — the report anchor
   for (const a of alerts ?? []) {
-    const pt = centroid((a.geographic_reference as string) || (a.agency_name as string) || "");
-    if (!pt) continue;
-    const [e, n] = toEN(homeLat, homeLng, pt[0], pt[1]);
     const title = ((a.title as string) || "").trim();
     const approved = /\b(approved|approves|granted|adopted|entitled|permit issued|issued a permit|under construction|final plat|site plan approv|authoriz|ground ?break|breaks ground|begins construction|construction begins)\b/i.test(title);
     // A DECIDED item (approved OR denied/withdrawn/tabled) is not an open comment opportunity.
     const denied = /\b(denied|denies|deny|withdrawn|withdrew|withdraws|rejected|rejects|tabled|dismissed|vacated|rescinded)\b/i.test(title);
     const [rel, relRule] = classifyRelevance(title, (a.category as string) || "", (a.agency_name as string) || "");
-    const s: Record<string, unknown> = { label: title.slice(0, 120) || "Development item", e, n, lat: pt[0], lng: pt[1], scope: "area", type: approved ? "approved" : "proposed", decided: approved || denied, relevance: rel, rel_rule: relRule, layer: classifyLayer(title, a.category as string), src: ((a.agency_name as string) || (a.category as string) || "Planning record").trim(), url: (a.source_url as string) || "" };
+    const s: Record<string, unknown> = { label: title.slice(0, 120) || "Development item", e: ae, n: an, lat: homeLat, lng: homeLng, scope: "area", type: approved ? "approved" : "proposed", decided: approved || denied, relevance: rel, rel_rule: relRule, layer: classifyLayer(title, a.category as string), src: ((a.agency_name as string) || (a.category as string) || "Planning record").trim(), url: (a.source_url as string) || "" };
     if (a.comment_deadline) s.comment_deadline = a.comment_deadline;
     sites.push(s);
   }
   for (const m of meetings ?? []) {
-    const pt = centroid((m.location as string) || "") ?? PLACES["box elder county"];
-    const [e, n] = toEN(homeLat, homeLng, pt[0], pt[1]);
     const [rel, relRule] = classifyRelevance((m.title as string) || "", (m.category as string) || "", "");
-    sites.push({ label: ((m.title as string) || "Public hearing").slice(0, 120), e, n, lat: pt[0], lng: pt[1], scope: "area", type: "proposed", decided: false, relevance: rel, rel_rule: relRule, layer: classifyLayer((m.title as string) || "", m.category as string), src: m.is_public_hearing ? "Public hearing" : "Comment window", url: (m.source_url as string) || "", meeting_date: m.meeting_date });
+    sites.push({ label: ((m.title as string) || "Public hearing").slice(0, 120), e: ae, n: an, lat: homeLat, lng: homeLng, scope: "area", type: "proposed", decided: false, relevance: rel, rel_rule: relRule, layer: classifyLayer((m.title as string) || "", m.category as string), src: m.is_public_hearing ? "Public hearing" : "Comment window", url: (m.source_url as string) || "", meeting_date: m.meeting_date });
   }
   // Dedup: ingest can emit the same notice more than once. First-seen wins.
   const seen = new Set<string>();

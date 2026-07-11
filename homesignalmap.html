@@ -602,6 +602,38 @@
       s._mLng = home.lng + s._mE/(69*Math.cos(home.lat*Math.PI/180));
     });
   }
+  // Precise POINT records (EPA facilities, permit filings) pin at their exact coordinates. When
+  // several sit at the SAME real location — multiple filings on one parcel (e.g. the five 2200
+  // Caldwell Ln records), or several EPA registrations of one industrial site — their markers
+  // stack into a single dot, hiding all but one. placeStackedPoints() fans a co-located group into
+  // a tight on-site ring (~16–32 m) around the true point so every record is separately clickable.
+  // Presentation ONLY, exactly like placeAreaSites(): the record's TRUE lat/lng and e/n are left
+  // untouched (the popup still reads them for "at this address" / distance / the record link); only
+  // the display fields (_mLat/_mLng/_mE/_mN) move. A lone point is never nudged. Idempotent — it
+  // always recomputes from the untouched true coordinates, so re-renders don't drift.
+  function placeStackedPoints(sites, home){
+    var groups = {};
+    sites.forEach(function(s){
+      if(s.scope!=="point" || typeof s.lat!=="number" || typeof s.lng!=="number") return;
+      var k = s.lat.toFixed(4)+","+s.lng.toFixed(4);   // ~11 m cell: only genuine co-locations group
+      (groups[k] = groups[k] || []).push(s);
+    });
+    var cosLat = Math.cos(home.lat*Math.PI/180) || 1;
+    Object.keys(groups).forEach(function(k){
+      var g = groups[k];
+      if(g.length < 2){ return; }                      // a lone point stays exactly put
+      g.forEach(function(s, i){
+        var ang = i*2.399963;                           // golden angle — even, deterministic
+        var rad = 0.010 + 0.006*Math.sqrt(i);           // miles (~16–32 m) — a tight, on-site fan
+        var de = rad*Math.cos(ang), dn = rad*Math.sin(ang);
+        s._mE   = (typeof s.e==="number"?s.e:0) + de;
+        s._mN   = (typeof s.n==="number"?s.n:0) + dn;
+        s._mLat = s.lat + dn/69;
+        s._mLng = s.lng + de/(69*cosLat);
+        s._fan  = g.length;                             // marks a fanned point (popup discloses it)
+      });
+    });
+  }
   // A site's drawable position: the synthetic display point for area items (see above),
   // the real EPA coordinates for facilities.
   function siteLL(s){ return (s._mLat!=null) ? [s._mLat, s._mLng] : [s.lat, s.lng]; }
@@ -942,6 +974,7 @@
     var home = data.home || { lat:41.5105, lng:-112.0155 };
     MAP_SITES = sites;                       // feed both 3D views the same (sourced) data
     placeAreaSites(sites, home);             // display positions for jurisdiction-level items
+    placeStackedPoints(sites, home);         // fan co-located precise points so none is hidden
     LAST_HOME = home;
     LAST_ADDR = ZIP_MODE ? ("ZIP " + ZIP_CODE) : (data.address || "This address");
     if(V3.active){ build3DFacilities(); }
@@ -1063,8 +1096,13 @@
       ? "<div style='margin-top:4px;font-size:11px;color:#5d6f72'>County/city-wide notice — dot placed within the "
         +(ZIP_MODE?"ZIP":"search area")+", not at an exact project site.</div>"
       : "";
+    // Honesty note on fanned points: several records share this exact location; markers are spread
+    // a few metres so each is clickable (the coordinate above is still the true, filed location).
+    var fanNote = (s.scope==="point" && s._fan)
+      ? "<div style='margin-top:4px;font-size:11px;color:#5d6f72'>One of "+s._fan+" records at this exact location — markers spread slightly so each is clickable.</div>"
+      : "";
     return "<div class='pt'>"+esc(s.label)+"</div><div class='pk'>"+kind+distStr+"</div>"+
-      "<div style='margin-top:4px'>"+esc(s.src||"")+a+"</div>"+v+approxNote;
+      "<div style='margin-top:4px'>"+esc(s.src||"")+a+"</div>"+v+approxNote+fanNote;
   }
 
   function listInto(id, items, emptyMsg){
