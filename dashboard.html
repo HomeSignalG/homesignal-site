@@ -354,6 +354,22 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
 
   // Coverage/routing = the shared live-DB resolver (hs-resolve.js), the ONE source used by
   // add-community, the homepage, and the saved-follows list. Never the frozen communities.js map.
+  // If the homepage funneled a ZIP here (dashboard.html?zip=<zip>), prefill the add-community
+  // box once so the entered ZIP carries over — the resident lands ON the dashboard (not the
+  // alerts page) with their ZIP ready to save. Consumed once; never clobbers typed input.
+  var pendingZip = (function(){
+    try { var z = new URLSearchParams(window.location.search).get('zip'); return (z && window.HS.extractZip(z)) || null; }
+    catch(e){ return null; }
+  })();
+  function applyPendingZip(){
+    if (!pendingZip) return;
+    var input = $('add-zip');
+    if (!input) return;                 // no add box (logged out) -> retry after next render
+    if (!input.value) input.value = pendingZip;
+    pendingZip = null;
+    try { input.scrollIntoView({ behavior:'smooth', block:'center' }); } catch(e){}
+    try { input.focus({ preventScroll:true }); } catch(e){ try { input.focus(); } catch(_){} }
+  }
   function bindAddCommunity(){
     var btn = $('add-btn'), input = $('add-zip'), msg = $('add-msg');
     if (!btn || !input) return;
@@ -455,6 +471,7 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     }).join('');
     body.innerHTML = cards + addCommunityHtml();
     bindAddCommunity();
+    applyPendingZip();   // carry over a ZIP funneled from the homepage (dashboard.html?zip=)
   }
 
   async function render(){
