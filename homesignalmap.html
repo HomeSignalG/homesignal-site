@@ -450,6 +450,19 @@
         </div>
       </div>
 
+      <!-- Other civic notices & hearings: real public meetings the county posts (personnel/employee,
+           budgets, tax rates, canvassing, elections) that are NOT land-use development. The engine's
+           v15 classifier tags these relevance:"civic"; they are listed here — clearly separated from
+           the development buckets and excluded from the "proposed" project count — so an item like a
+           "Commissioners Court Employee Hearing" is never presented as proposed development. The band
+           hides itself when there are none (honest empty, never placeholder). -->
+      <div class="card read band" id="civicBand" style="display:none">
+        <div class="band-h" style="background:#64748b">Other civic notices &amp; hearings</div>
+        <div class="band-s">Public meetings in your area that aren't development — budgets, personnel,
+          tax rates, elections and the like. Listed for transparency; not counted as proposed projects.</div>
+        <div id="civicList"></div>
+      </div>
+
       <!-- ===== Development tracker: resolved-project anchor (a) + ZIP/county notices (b/c) =====
            Data comes verbatim from the homesignal-ingest resolved store (v_resolved_project_zip,
            v_resolved_project_parcels, resolved_projects) + geocoded alerts/meetings. Rendered by
@@ -1105,9 +1118,17 @@
     // a project_no) are not EPA facilities: they bucket into the Operating/Approved/Proposed
     // lists by lifecycle type, and their "record ▸" routes to the property page (§4.3).
     var isPermit = function(s){ return s.scope==="point" && !!s.project_no; };
+    // The engine's v15 classifier stamps every AREA item relevance:"development" or "civic". Only
+    // genuine land-use items belong in the Operating/Approved/Proposed buckets, the project count,
+    // and the map dots; procedural civic hearings (personnel/employee, budget, tax-rate, canvass,
+    // elections…) are listed separately below and NEVER counted as proposed development. Mirrors the
+    // engine contract (index.ts: counts.development already excludes civic; counts.civic carries the
+    // rest). A row cached before the classifier has no `relevance` → treated as development (no regression).
+    var isCivic = function(s){ return s.relevance === "civic"; };
     var permits = sites.filter(isPermit);
     var fac = sites.filter(function(s){ return s.scope==="point" && !isPermit(s); });
-    var dev = sites.filter(function(s){ return s.scope==="area"; });
+    var dev = sites.filter(function(s){ return s.scope==="area" && !isCivic(s); });
+    var civic = sites.filter(function(s){ return s.scope==="area" && isCivic(s); });
     var appr = permits.filter(function(s){ return bucketOf(s.type)==="approved"; })
       .concat(dev.filter(function(s){ return bucketOf(s.type)==="approved"; }));
     var prop = permits.filter(function(s){ return bucketOf(s.type)==="proposed"; })
@@ -1159,10 +1180,17 @@
     // ZIP load, so this never fights a manual radius pick (those re-render via drawMap directly).
     if(ZIP_MODE){ CUR_RADIUS = zipFitRadius(sites); setRadiusButton(CUR_RADIUS); V3.userZoom = false; }
 
-    drawMap(data, sites);
+    // Civic notices have no lifecycle stage and only a synthetic (jurisdiction-wide) position, so
+    // they are not plotted as development dots — the map shows genuine development + facilities only.
+    drawMap(data, sites.filter(function(s){ return !isCivic(s); }));
     listInto("builtList", builtRows, "No EPA-registered facility on record here.");
     listInto("apprList", appr, "Nothing approved on record right now.");
     listInto("propList", prop, "No proposed item on record right now.");
+    // Non-headlined civic list (engine contract): real public hearings that aren't development.
+    // Neutral dot + plain date (not a "closes in N days" comment countdown). Band hides when empty.
+    var civicBand = $("civicBand");
+    if(civic.length){ civicBand.style.display = ""; listInto("civicList", civic, "", { dotColor:"#64748b", plainDate:true }); }
+    else { civicBand.style.display = "none"; }
 
     var locked = data.counts && data.counts.locked ? data.counts.locked : 0;
     $("foot").innerHTML =
@@ -1384,11 +1412,12 @@
       "<div style='margin-top:4px'>"+esc(s.src||"")+a+"</div>"+envHtml+approxNote+fanNote;
   }
 
-  function listInto(id, items, emptyMsg){
+  function listInto(id, items, emptyMsg, opts){
+    opts = opts || {};
     var el = $(id);
     if(!items.length){ el.innerHTML = "<div class='empty'>"+emptyMsg+"</div>"; return; }
     el.innerHTML = items.slice(0,12).map(function(s){
-      var col = COLORS[s.type] || "#5d6f72";
+      var col = opts.dotColor || COLORS[s.type] || "#5d6f72";
       var link = s.url || s.record_url || "";
       // Property routing (§4.3): a point record with a FILED street address routes to its
       // internal property page — the external record link lives there, where every fact
@@ -1413,7 +1442,7 @@
       // A decided item (approved/denied/withdrawn) shows its plain date, not a "closes in N days"
       // countdown — it's resolved, not an open comment window — plus a "decided" marker.
       var mdate = s.meeting_date ? s.meeting_date.slice(0,10) : "";
-      var when = mdate ? " · " + (s.decided ? fmtDate(mdate) : friendlyDeadline(mdate)) : "";
+      var when = mdate ? " · " + ((opts.plainDate || s.decided) ? fmtDate(mdate) : friendlyDeadline(mdate)) : "";
       var decidedTag = s.decided ? " · <span class='decidedtag'>decided</span>" : "";
       var dm = (s.scope==="point" && typeof s.e==="number" && typeof s.n==="number" && !ZIP_MODE) ? Math.hypot(s.e,s.n) : null;
       var dstr = (dm!=null && dm>=0.1) ? " · "+(Math.round(dm*10)/10)+" mi away" : "";
