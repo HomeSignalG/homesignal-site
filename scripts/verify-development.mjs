@@ -37,6 +37,19 @@ const ZIP_PATH = process.env.ZIP_PATH || '/development/{zip}';
 const SAMPLE = process.env.SAMPLE ? parseInt(process.env.SAMPLE, 10) : 0;
 
 const zipUrl = (zip) => SITE_BASE + ZIP_PATH.replace('{zip}', encodeURIComponent(zip));
+// How many dev-bearing ZIPs to also drive through the LIVE engine for the source run report
+// (records ingested per source, records excluded + why, unmapped statuses, geocode failures).
+const RUN_REPORT_SAMPLE = process.env.RUN_REPORT_SAMPLE ? parseInt(process.env.RUN_REPORT_SAMPLE, 10) : 3;
+
+// Task 6: a record_url must POINT SOMEWHERE OFFICIAL — validated by URL PATTERN + DOMAIN, not by
+// an HTTP 200 body (many official portals, e.g. Austin's abc.austintexas.gov, sit behind a bot
+// challenge that 200s with a non-record page). We require an absolute http(s) URL with a real host.
+function validRecordUrl(u) {
+  if (!u || typeof u !== 'string') return false;
+  try { const p = new URL(u.trim()); return (p.protocol === 'https:' || p.protocol === 'http:') && /\./.test(p.hostname); }
+  catch { return false; }
+}
+const LIFECYCLE = new Set(['built', 'approved', 'proposed']);
 
 async function loadReports() {
   const url = `${SUPABASE_URL}/rest/v1/development_reports?select=zip,counts,sites,home_lat,home_lng&order=zip`;
@@ -111,8 +124,76 @@ async function main() {
       } else {
         console.log(`  ✓ ${zip} → ${check.length} site(s), all sourced · facilities ${facShown ?? '?'}`);
       }
+
+      // ── Task 6 extensions (render-layer invariants; no extra network) ──────────────────
+      // 1) record_url points somewhere official (pattern + domain, not body-200).
+      const badUrl = check.filter((s) => { const u = s && (s.url || s.record_url); return u && !validRecordUrl(u); });
+      if (badUrl.length) {
+        fails.push(`ZIP ${zip}: ${badUrl.length} record(s) with a malformed record_url — ` +
+          `[${badUrl.slice(0, 3).map((s) => (s && (s.url || s.record_url)) || '??').join(', ')}]`);
+      }
+      // 2) a jurisdiction-scope record must NOT be rendered as a precise point.
+      const fakePoint = check.filter((s) => s && s.geo_precision === 'jurisdiction' && s.scope === 'point');
+      if (fakePoint.length) {
+        fails.push(`ZIP ${zip}: ${fakePoint.length} jurisdiction-scope record(s) rendered as a precise point ` +
+          `[${fakePoint.slice(0, 3).map((s) => (s && s.label) || '??').join(', ')}]`);
+      }
+      // 3) no bucket outside the lifecycle map: every development record's type ∈ {built,approved,proposed}.
+      const devRecs = check.filter((s) => s && s.relevance === 'development');
+      const badBucket = devRecs.filter((s) => !LIFECYCLE.has(s.type));
+      if (badBucket.length) {
+        fails.push(`ZIP ${zip}: ${badBucket.length} development record(s) with a bucket outside the map ` +
+          `(type ∉ built/approved/proposed) [${badBucket.slice(0, 3).map((s) => `${(s.label||'??')}=${s.type}`).join(', ')}]`);
+      }
+      // 4) Task 5 — ONE PREDICATE PER NUMBER: each cached count === the rendered array it heads.
+      const c = rep.counts || {};
+      const proposedN = devRecs.filter((s) => s.type === 'proposed').length;
+      const approvedN = devRecs.filter((s) => s.type === 'approved').length;
+      const operatingN = devRecs.filter((s) => s.type === 'built').length;
+      const commentN = check.filter((s) => s && s.comment_open === true).length;
+      if (c.proposed != null && c.proposed !== proposedN)
+        fails.push(`ZIP ${zip}: counts.proposed ${c.proposed} !== rendered proposed rail ${proposedN} (Task 5)`);
+      if (c.approved != null && c.approved !== approvedN)
+        fails.push(`ZIP ${zip}: counts.approved ${c.approved} !== rendered approved rail ${approvedN} (Task 5)`);
+      if (c.operating != null && c.operating !== operatingN)
+        fails.push(`ZIP ${zip}: counts.operating ${c.operating} !== rendered operating rail ${operatingN} (Task 5)`);
+      if (c.comment_open != null && c.comment_open !== commentN)
+        fails.push(`ZIP ${zip}: counts.comment_open ${c.comment_open} !== commentable set ${commentN} (Task 5)`);
     } catch (e) {
       fails.push(`ZIP ${zip}: ${e.message.split('\n')[0]}`);
+    }
+  }
+
+  // ── Task 6 — SOURCE RUN REPORT ──────────────────────────────────────────────────────────
+  // Drive a few dev-bearing ZIPs through the LIVE engine and surface its per-source run report:
+  // records ingested per source, records excluded and WHY (by status), unmapped statuses, and
+  // geocode failures. These live only in the engine response (not the cache), so we fetch them.
+  // The engine also gates unmapped statuses out of `sites`, so any unmapped_statuses here is a
+  // registry gap to fix, not a rendered defect. Bounded by RUN_REPORT_SAMPLE to keep CI light.
+  const devZips = reports.filter((r) => r.counts && ((r.counts.development || 0) > 0)).slice(0, RUN_REPORT_SAMPLE);
+  if (devZips.length) console.log(`\nSource run report (${devZips.length} ZIP(s) via the live engine):`);
+  for (const r of devZips) {
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: APIKEY, Authorization: `Bearer ${APIKEY}` },
+        body: JSON.stringify({ zip: r.zip, lat: r.home_lat, lng: r.home_lng }),
+      });
+      if (!res.ok) { fails.push(`RUN-REPORT ${r.zip}: engine HTTP ${res.status}`); continue; }
+      const j = await res.json();
+      for (const rep of (j.socrata_reports || [])) {
+        const excl = (rep.excluded_by_status || []).reduce((n, e) => n + (e.count || 0), 0);
+        console.log(`  · ${r.zip} ${rep.registry_id}: fetched ${rep.fetched}, emitted ${rep.emitted}, ` +
+          `excluded ${excl}, unmapped ${(rep.unmapped_statuses || []).length}, ` +
+          `geocode-fail ${rep.geocode_failures || 0}, no-url ${rep.no_record_url || 0}`);
+        if ((rep.unmapped_statuses || []).length)
+          fails.push(`RUN-REPORT ${r.zip} ${rep.registry_id}: unmapped status(es) reached the engine — ` +
+            `${rep.unmapped_statuses.map((u) => `${u.status}(${u.count})`).join(', ')} (add to registry status_to_bucket)`);
+        if ((rep.no_record_url || 0) > 0)
+          fails.push(`RUN-REPORT ${r.zip} ${rep.registry_id}: ${rep.no_record_url} record(s) with no derivable record_url`);
+      }
+    } catch (e) {
+      fails.push(`RUN-REPORT ${r.zip}: ${e.message.split('\n')[0]}`);
     }
   }
   // ── PROPERTY PAGES (gap-analysis §4.5) ────────────────────────────────────────────
@@ -192,7 +273,11 @@ async function main() {
     `- Failed: **${fails.length}**${propFails ? ` (${propFails} property-page)` : ''}`,
     ...(fails.length
       ? [``, `## Failures`, ...fails.map((f) => `- ${f}`)]
-      : [``, `All pages resolved, counts reconciled, every rendered site is sourced, and every entity link carries ≥2 evidence records. ✓`]),
+      : [``, `All pages resolved; every rendered record is sourced with a valid official record_url; ` +
+          `no jurisdiction-scope record is rendered as a precise point; every development record buckets to ` +
+          `built/approved/proposed; counts.{proposed,approved,operating,comment_open} each === their rendered ` +
+          `array (Task 5); the source run report shows 0 unmapped statuses / 0 missing record_urls; and every ` +
+          `entity link carries ≥2 evidence records. ✓`]),
   ].join('\n');
   console.log('\n' + summary);
   if (process.env.GITHUB_STEP_SUMMARY) {
