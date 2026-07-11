@@ -115,7 +115,10 @@
   .mapcard{padding:14px}
   .map-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;gap:10px}
   .map-cap{font-weight:600;font-size:13px;color:var(--soft)}
-  .zipmode #radSel{display:none}   /* radius is an address-mode concept; a ZIP page is the whole ZIP */
+  /* In ZIP mode the radius selector controls how far out the 3D aerial view reaches: the cached
+     ZIP dataset can include records past the default frame (e.g. TABS filings a few miles out), and
+     the 3D view culls beyond CUR_RADIUS — so residents need this control to widen the view and see
+     them. (The 2D and 3D-satellite views already show every cached record and auto-fit.) */
   .viewseg{display:inline-flex;background:#eef2f1;border:1px solid var(--line);border-radius:9px;overflow:hidden;flex:0 0 auto}
   .viewseg button{border:0;background:transparent;font:600 12px var(--font);color:var(--soft);padding:6px 13px;cursor:pointer}
   .viewseg button.on{background:var(--green);color:#fff}
@@ -382,6 +385,8 @@
               <button data-r="2">2 mi</button>
               <button data-r="3">3 mi</button>
               <button data-r="5">5 mi</button>
+              <button data-r="10">10 mi</button>
+              <button data-r="20">20 mi</button>
             </div>
           </div>
           <div class="map-frame">
@@ -582,8 +587,10 @@
   var FILTER = { built:true, approved:true, proposed:true };
   var siteMarkers = [];
   var MAP_SITES = [];              // current sites, shared by the 2D map and both 3D views
+  var LAST_DRAW = null;            // {data,sites} of the last render — lets a radius change re-cull/re-frame the ZIP view with no network pull
   var LAST_HOME = { lat:41.5105, lng:-112.0155 };
-  var CUR_RADIUS = 1;              // search radius in miles (½ / 1 / 2 / 3 / 5)
+  var CUR_RADIUS = 1;              // search radius in miles (½ / 1 / 2 / 3 / 5 / 10 / 20)
+  var RADIUS_STOPS = [0.5,1,2,3,5,10,20];   // must match the #radSel buttons
   var CUR_ADDRESS = "";            // last searched address, for re-running on radius change
   var LAST_ADDR = "This address";  // matched address, shown in the home marker popup
   // ZIP mode (the crawlable /development/<zip> landing surface): the page reads a cached
@@ -878,14 +885,14 @@
         ZIP_COUNTY = keys.length === 1 ? keys[0] : null;
         updateCovNote();
       }).catch(function(){ updateCovNote(); });
-    CUR_RADIUS = 3;                                   // the ZIP-mode engine radius (development-tracker §3)
-    var rb = document.querySelector("#radSel button[data-r='3']");
-    if(rb){ [].forEach.call(document.querySelectorAll("#radSel button"),function(c){c.classList.remove("on");}); rb.classList.add("on"); }
+    CUR_RADIUS = 3;                                   // provisional ZIP-mode radius (development-tracker §3);
+    setRadiusButton(3);                               // render() re-picks it via zipFitRadius once the cached sites load
     $("eyebrow").textContent = "ZIP " + zip + " · development overview";
     document.title = "Development around " + zip + " — HomeSignal";
     // ZIP mode: the page is about the whole ZIP, not a Box Elder address. Re-word the hero so a
     // resident of ANY covered county sees copy that matches their ZIP (the static copy names Box
-    // Elder, which is wrong on every other ZIP page). The radius selector is hidden (address-only).
+    // Elder, which is wrong on every other ZIP page). The radius selector stays visible so residents
+    // can widen the 3D aerial view to reach cached records past the default frame.
     document.body.classList.add("zipmode");
     var _sub = document.querySelector(".sub");
     if(_sub){ _sub.textContent = "What's built and what's proposed across ZIP " + zip + " — "
@@ -990,6 +997,11 @@
     FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0;
     updateCovNote();
 
+    // ZIP mode: auto-frame to fit every cached record (loadZip seeds a fixed 3 mi, which can cull
+    // records the cache legitimately holds farther out — see zipFitRadius). render() runs once per
+    // ZIP load, so this never fights a manual radius pick (those re-render via drawMap directly).
+    if(ZIP_MODE){ CUR_RADIUS = zipFitRadius(sites); setRadiusButton(CUR_RADIUS); V3.userZoom = false; }
+
     drawMap(data, sites);
     listInto("builtList", builtRows, "No EPA-registered facility on record here.");
     listInto("apprList", appr, "Nothing approved on record right now.");
@@ -1003,8 +1015,33 @@
       (data.paywall ? (" " + locked + " more items are available with a subscription.") : " Free during launch.");
   }
 
+  // Reflect the active radius in the #radSel button row (used both on manual clicks and when
+  // ZIP mode auto-picks a default that fits the cached data).
+  function setRadiusButton(r){
+    var sel = document.getElementById("radSel"); if(!sel) return;
+    [].forEach.call(sel.querySelectorAll("button"), function(c){
+      c.classList.toggle("on", parseFloat(c.getAttribute("data-r")) === r);
+    });
+  }
+  // ZIP mode default: the cache is the authoritative ZIP dataset, and the 3D aerial culls beyond
+  // CUR_RADIUS (+0.3 mi). Pick the smallest radius stop whose cull still contains every cached
+  // record, so nothing legitimately cached (e.g. TABS filings a few miles out) is hidden on first
+  // load. No point data → keep the documented 3-mi ZIP default; data past 20 mi → clamp to 20.
+  function zipFitRadius(sites){
+    var md = 0;
+    (sites||[]).forEach(function(s){
+      if(!mappable(s)) return;
+      var en = siteEN(s);
+      if(typeof en[0]==="number" && typeof en[1]==="number"){ md = Math.max(md, Math.hypot(en[0],en[1])); }
+    });
+    if(md <= 0) return 3;
+    for(var i=0;i<RADIUS_STOPS.length;i++){ if(RADIUS_STOPS[i] + 0.3 >= md) return RADIUS_STOPS[i]; }
+    return 20;
+  }
+
   function drawMap(data, sites){
     var home = data.home || { lat:41.5105, lng:-112.0155 };
+    LAST_DRAW = { data:data, sites:sites };  // retained so a radius change can re-cull/re-frame without a re-fetch
     MAP_SITES = sites;                       // feed both 3D views the same (sourced) data
     placeAreaSites(sites, home);             // display positions for jurisdiction-level items
     placeStackedPoints(sites, home);         // fan co-located precise points so none is hidden
@@ -1038,9 +1075,17 @@
     }
 
     siteMarkers = [];
-    // fit the whole radius circle, even when few points fall inside it
-    var dLat = CUR_RADIUS/69, dLng = CUR_RADIUS/(69*Math.cos(home.lat*Math.PI/180));
-    var bounds = [[home.lat+dLat, home.lng+dLng], [home.lat-dLat, home.lng-dLng]];
+    // Address mode: fit the whole radius circle, even when few points fall inside it. ZIP mode:
+    // there's no home-centered radius, and the radius selector can go wider than the data — so seed
+    // the bounds with just the centroid and let the cached sites drive the fit (a 20-mi pick must
+    // not zoom the 2D map out past the records, which all sit within the ZIP's cached extent).
+    var bounds;
+    if(ZIP_MODE){
+      bounds = [[home.lat, home.lng]];
+    } else {
+      var dLat = CUR_RADIUS/69, dLng = CUR_RADIUS/(69*Math.cos(home.lat*Math.PI/180));
+      bounds = [[home.lat+dLat, home.lng+dLng], [home.lat-dLat, home.lng-dLng]];
+    }
     sites.forEach(function(s){
       var ll = siteLL(s);
       if(typeof ll[0]!=="number" || typeof ll[1]!=="number") return;
@@ -1300,8 +1345,8 @@
     var lbl=lblSprite(String(LAST_ADDR).split(",")[0]||"Your home","#0F1A1C","#fff");lbl.position.set(0,27,0);G.add(lbl);
   }
 
-  // Fixed reference rings: always ½, 1, 2, 3, 5 mi — show each that fits inside the radius.
-  function ringStops(R){ return [0.5,1,2,3,5].filter(function(r){ return r<=R+1e-9; }); }
+  // Fixed reference rings: ½, 1, 2, 3, 5, 10, 20 mi — show each that fits inside the framed extent.
+  function ringStops(R){ return [0.5,1,2,3,5,10,20].filter(function(r){ return r<=R+1e-9; }); }
   function drawRings(){
     if(!V3.inited)return;var G=V3.ringGrp;while(G.children.length)G.remove(G.children[0]);
     var stops=ringStops(V3.frameExt||CUR_RADIUS);
@@ -1535,7 +1580,8 @@
     [].forEach.call(this.querySelectorAll("button"),function(c){ c.classList.remove("on"); }); b.classList.add("on");
     CUR_RADIUS = parseFloat(b.getAttribute("data-r"));
     V3.userZoom = false;                    // let the 3D view re-frame to the new data
-    if(CUR_ADDRESS){ run(CUR_ADDRESS); }   // re-pull records at the new radius (address mode only)
+    if(CUR_ADDRESS){ run(CUR_ADDRESS); }           // address mode: re-pull records at the new radius
+    else if(ZIP_MODE && LAST_DRAW){ drawMap(LAST_DRAW.data, LAST_DRAW.sites); }  // ZIP mode: re-cull/re-frame the cached data (no network) so widening the radius reveals farther cached records
   });
   window.addEventListener("resize",function(){ if(V3.active)resize3D(); if(GL.active&&GL.map)GL.map.resize(); });
   buildLegend();
