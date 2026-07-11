@@ -605,12 +605,18 @@
   // Precise POINT records (EPA facilities, permit filings) pin at their exact coordinates. When
   // several sit at the SAME real location — multiple filings on one parcel (e.g. the five 2200
   // Caldwell Ln records), or several EPA registrations of one industrial site — their markers
-  // stack into a single dot, hiding all but one. placeStackedPoints() fans a co-located group into
-  // a tight on-site ring (~16–32 m) around the true point so every record is separately clickable.
-  // Presentation ONLY, exactly like placeAreaSites(): the record's TRUE lat/lng and e/n are left
-  // untouched (the popup still reads them for "at this address" / distance / the record link); only
-  // the display fields (_mLat/_mLng/_mE/_mN) move. A lone point is never nudged. Idempotent — it
-  // always recomputes from the untouched true coordinates, so re-renders don't drift.
+  // stack into a single dot, hiding all but one (the last-drawn colour wins — a blue "approved" can
+  // completely cover the green "operating" dots underneath). placeStackedPoints() tags a co-located
+  // group with its index + size so each view can fan it out. Presentation ONLY: the record's TRUE
+  // lat/lng and e/n are left untouched (the popup still reads them for "at this address" / distance /
+  // the record link). A lone point is never nudged.
+  //   The 2D Leaflet map is the important case and is fanned in SCREEN-PIXEL space
+  //   (spreadStackedMarkers, below) so the gap is a constant ~dot-width at ANY zoom — a fixed
+  //   geographic offset is sub-pixel when the view spans several miles (the Caldwell cluster sits
+  //   ~5 mi from the ZIP centroid), which is exactly why the first attempt still overlapped. The
+  //   geographic ring set here (_mLat/_mLng/_mE/_mN) is the fallback the 3D aerial + GL satellite
+  //   views read; it is sized larger so those two separate too. Idempotent — always recomputed from
+  //   the untouched true coordinates.
   function placeStackedPoints(sites, home){
     var groups = {};
     sites.forEach(function(s){
@@ -623,15 +629,29 @@
       var g = groups[k];
       if(g.length < 2){ return; }                      // a lone point stays exactly put
       g.forEach(function(s, i){
+        s._fanIdx = i; s._fanN = g.length; s._fan = g.length;   // consumed by spreadStackedMarkers + popup
         var ang = i*2.399963;                           // golden angle — even, deterministic
-        var rad = 0.010 + 0.006*Math.sqrt(i);           // miles (~16–32 m) — a tight, on-site fan
+        var rad = 0.02 + 0.02*Math.sqrt(i);             // miles — geographic ring for the 3D/GL views
         var de = rad*Math.cos(ang), dn = rad*Math.sin(ang);
         s._mE   = (typeof s.e==="number"?s.e:0) + de;
         s._mN   = (typeof s.n==="number"?s.n:0) + dn;
         s._mLat = s.lat + dn/69;
         s._mLng = s.lng + de/(69*cosLat);
-        s._fan  = g.length;                             // marks a fanned point (popup discloses it)
       });
+    });
+  }
+  // 2D map only: re-place each fanned marker a constant number of SCREEN PIXELS off its true point,
+  // so co-located records separate cleanly at whatever zoom fitBounds settled on (and re-separate
+  // when the reader zooms). Runs against the true [lat,lng] every time, so it never compounds.
+  function spreadStackedMarkers(){
+    if(!map) return;
+    siteMarkers.forEach(function(x){
+      var s = x.s;
+      if(!s || !s._fanN || s._fanN < 2 || typeof s.lat!=="number") return;
+      var base = map.latLngToLayerPoint([s.lat, s.lng]);           // the TRUE shared location
+      var ang = s._fanIdx*2.399963;                                 // golden angle
+      var rpx = 12 + 11*Math.sqrt(s._fanIdx);                       // pixels — one dot-width per step out
+      x.m.setLatLng(map.layerPointToLatLng(L.point(base.x + rpx*Math.cos(ang), base.y + rpx*Math.sin(ang))));
     });
   }
   // A site's drawable position: the synthetic display point for area items (see above),
@@ -985,6 +1005,7 @@
         maxZoom:19, attribution:"&copy; OpenStreetMap"
       }).addTo(map);
       layerGroup = L.layerGroup().addTo(map);
+      map.on("zoomend", spreadStackedMarkers);   // keep the pixel fan constant as the reader zooms
     } else {
       map.setView([home.lat, home.lng], 13);
       layerGroup.clearLayers();
@@ -1022,11 +1043,13 @@
         : { radius:5.5, color:"#fff", weight:1.5, dashArray:"2,3", fillColor:col, fillOpacity:.85 });
       m.bindPopup(popupHTML(s));
       m.on("mouseover", function(){ this.openPopup(); });
-      siteMarkers.push({ m:m, bucket:bucketOf(s.type) });
+      siteMarkers.push({ m:m, bucket:bucketOf(s.type), s:s });
       bounds.push(ll);
     });
     applyFilter();
-    if(bounds.length>1){ map.fitBounds(bounds, { padding:[30,30], maxZoom:14 }); }
+    // animate:false so the zoom is final synchronously and the pixel fan lands on the settled zoom.
+    if(bounds.length>1){ map.fitBounds(bounds, { padding:[30,30], maxZoom:14, animate:false }); }
+    spreadStackedMarkers();   // fan co-located dots in screen pixels at the settled zoom
     // If the resolved-project parcels have already loaded, draw them onto this same map (and let
     // their footprint re-frame the view — the parcel geometry is the point of the ZIP-precise page).
     drawParcels();
