@@ -721,45 +721,159 @@
     if(/\bmill\b/.test(n)) return "Mill";
     return LAYER_LABEL[s.layer] || "Industrial facility";
   }
-  // Clean hover-tooltip content for a 3D building.
+
+  // ───────────────────── ENVIRONMENTAL RECORDS (EPA ECHO + TCEQ) — shared render layer ─────────────────────
+  // A cached, geo-matched environmental-records layer. The engine (get-address-report) geo-matches
+  // each facility point against EPA ECHO (federal, keyed on the FRS registry_id — frsRid) and the
+  // TCEQ Central Registry (Texas state, keyed on the Regulated-Entity number — tceqRn) DURING data
+  // generation and stamps the interpreted facts onto s.env = {link_type, epa?, tceq?}. These helpers
+  // turn those stored facts into ONE resident-facing status line + honest provenance, and are shared
+  // by all four render paths (popupHTML, kind3, tip3, infoCard3) so the interpretation lives in
+  // exactly ONE place.
+  //
+  // HONESTY RULES (mirror the engine's anti-fabrication contract):
+  //   • link_type is ALWAYS "geo_matched": the record is matched to this FACILITY/SITE by geography,
+  //     never asserted against the resident's specific parcel. ENV_MATCH_NOTE says so on the popup.
+  //   • Absent stays absent: a year/count is shown ONLY when the engine stored a real one.
+  //   • Absence is a statement, not a blank: ENV_ABSENCE ("No regulated EPA/TCEQ facility …").
+
+  // The TCEQ Regulated-Entity number (RN) — the STATE analog of frsRid(). Present only when a TCEQ
+  // Central Registry entity geo-matched this facility. Returns the trimmed RN or "".
+  function tceqRn(s){ return (s && s.tceq_rn!=null) ? String(s.tceq_rn).trim() : ""; }
+  // True when this point carries ANY environmental record — federal (ECHO/FRS) or state (TCEQ).
+  function hasEnvRecord(s){ return !!(frsRid(s) || tceqRn(s)); }
+  var ENV_MATCH_NOTE = "Environmental records are geo-matched to this facility, not to a specific parcel.";
+  var ENV_ABSENCE = "No regulated EPA/TCEQ facility at this parcel.";
+
+  // EPA statute code → the plain word a resident understands.
+  var ENV_STATUTE_WORD = { CWA:"water", CAA:"air", RCRA:"hazardous-waste", SDWA:"drinking-water", TSCA:"chemical", FIFRA:"pesticide", EPCRA:"chemical-reporting" };
+  // TCEQ program_code → { plain-language meaning, tone }, matched by prefix so unseen variants of a
+  // known family still read right. Tones drive BOTH ordering (most serious first) and colour.
+  // Derived from the REAL Central-Registry vocabulary (verified live 2026-07-11).
+  //   alert   = active contamination / leak / open violation   watch = cleanup / tanks / waste
+  //   progress = a construction milestone (stormwater)          info  = a standing permit / registration
+  var ENV_TCEQ_PROGRAMS = [
+    [/^(LPST|LUST)/,                     { label:"leaking petroleum-tank cleanup on record", tone:"alert" }],
+    [/^(VCP|IOP|BROWNFIELD|SUPERFUND|STATESUP|CERCLA)/, { label:"enrolled in a state cleanup program", tone:"alert" }],
+    [/^(SPILL|EMERGENC)|^ER$/,           { label:"emergency-response / spill record", tone:"alert" }],
+    [/^PST/,                             { label:"petroleum storage tank on record", tone:"watch" }],
+    [/^IHW/,                             { label:"industrial / hazardous-waste handler", tone:"watch" }],
+    [/^MSW/,                             { label:"municipal solid-waste site", tone:"watch" }],
+    [/^TIRE/,                            { label:"scrap-tire site", tone:"watch" }],
+    [/^(USEDOIL|LIOL|WATEROL)/,          { label:"used-oil / registration on record", tone:"watch" }],
+    [/^SLUDGE/,                          { label:"biosolids / sludge registration", tone:"watch" }],
+    [/^STORM/,                           { label:"construction / industrial stormwater permit", tone:"progress" }],
+    [/^(WW|WQ|TPDES)/,                   { label:"wastewater / water-quality permit", tone:"info" }],
+    [/^PWS/,                             { label:"public water system", tone:"info" }],
+    [/^(AIR|NSR|AQ)/,                    { label:"air-quality permit", tone:"info" }],
+    [/^OSSF/,                            { label:"on-site sewage (septic) facility", tone:"info" }]
+  ];
+  var ENV_TONE_RANK = { alert:0, watch:1, progress:2, info:3, ok:4 };
+  function envProgramMeaning(code){
+    var c = String(code||"").toUpperCase();
+    for(var i=0;i<ENV_TCEQ_PROGRAMS.length;i++){ if(ENV_TCEQ_PROGRAMS[i][0].test(c)) return ENV_TCEQ_PROGRAMS[i][1]; }
+    return null;   // unknown program → not headlined; still shown raw in the detail card
+  }
+  // Interpret the stored env facts into resident-facing signals, MOST SERIOUS FIRST. Each signal is
+  // { text, tone }. No fact is invented: a violation year appears only from a real ECHO action date;
+  // a program line appears only for a program the registry actually lists. Framed for the three user
+  // goals — development risk (violations/contamination), transparency (a regulated facility here),
+  // and progress (a construction stormwater permit).
+  function envSignals(s){
+    if(!s || s.scope!=="point" || !hasEnvRecord(s)) return [];
+    var out=[], env=s.env||{}, epa=env.epa, tceq=env.tceq;
+    if(epa){
+      var inv = epa.in_violation || [];
+      if(inv.length){
+        var words = inv.map(function(c){ return ENV_STATUTE_WORD[c] || String(c).toLowerCase(); });
+        var yr = epa.action_year ? " ("+epa.action_year+")" : "";
+        out.push({ text: inv.length+" open "+words.join(" & ")+" violation"+(inv.length===1?"":"s")+yr, tone:"alert" });
+      } else if(epa.snc){
+        out.push({ text:"flagged for significant non-compliance (EPA)", tone:"alert" });
+      } else if(epa.quarters_nc>0){
+        out.push({ text: epa.quarters_nc+" of last 12 quarters out of compliance (EPA)"+(epa.action_year?", last action "+epa.action_year:""), tone:"watch" });
+      }
+    }
+    if(tceq && tceq.programs && tceq.programs.length){
+      var seen={}, sigs=[];
+      tceq.programs.forEach(function(code){ var m=envProgramMeaning(code); if(m && !seen[m.label]){ seen[m.label]=1; sigs.push({ text:m.label, tone:m.tone }); } });
+      sigs.sort(function(a,b){ return ENV_TONE_RANK[a.tone]-ENV_TONE_RANK[b.tone]; });
+      out = out.concat(sigs);
+    }
+    // Baseline for any EPA facility (keyed on the FRS id) that produced no stronger signal — so the
+    // ECHO affordance never disappears, including on cache rows written before the env layer (they
+    // have no s.env; fall back to the legacy s.viol count).
+    if(frsRid(s) && !out.length){
+      var lv = s.viol||0;
+      out.push(lv>0 ? { text: lv+" recorded violation"+(lv===1?"":"s"), tone:"alert" }
+                    : { text:"no recorded EPA violations", tone:"ok" });
+    }
+    return out;
+  }
+  // The single most-important env signal (compact renders show only this). null when none.
+  function envHeadline(s){ var g=envSignals(s); return g.length ? g[0] : null; }
+  // tone → colour, tuned per surface (2D popup = light, 3D card = dark).
+  function envColor(tone, dark){
+    if(tone==="alert")    return "#C0392B";
+    if(tone==="watch")    return dark ? "#ffca7a" : "#b06a1e";
+    if(tone==="progress") return dark ? "#8fd6b0" : "#1f7a4d";
+    if(tone==="ok")       return dark ? "#bfe8dd" : "#3f7d6e";
+    return dark ? "#c7d2d0" : "#5d6f72";   // info
+  }
+  // The official drill-down links for an env record: EPA ECHO (federal) + TCEQ Central Registry
+  // (state). ECHO is built from the FRS id so it resolves to THAT facility's report; the TCEQ link
+  // goes to the official Central Registry (the RN is shown alongside so it's directly verifiable).
+  function envLinks(s){
+    var out=[], rid=frsRid(s), rn=tceqRn(s);
+    if(rid) out.push("<a href='https://echo.epa.gov/detailed-facility-report?fid="+esc(rid)+"' target='_blank' rel='noopener' style='color:inherit'>EPA ECHO ▸</a>");
+    if(rn){ var u=s.tceq_url || "https://www15.tceq.texas.gov/crpub/";
+            out.push("<a href='"+esc(u)+"' target='_blank' rel='noopener' style='color:inherit'>TCEQ "+esc(rn)+" ▸</a>"); }
+    return out;
+  }
+  // Compact env tag for a TYPE line (kind3): " · 1 open water violation". "" when none.
+  function envTag(s){ var h=envHeadline(s); return h ? " · "+h.text : ""; }
+
+  // Clean hover-tooltip content for a 3D building. The env layer rides in via kind3 (the type
+  // line) — envTag() folds the headline env signal into it — and the type line is toned by
+  // severity when a facility carries an environmental record.
   function tip3(s){
     // Distance only for precise (point) sites: area items' raw e/n come from the engine's
     // untrusted jurisdiction coordinate, and their display spot is representative anyway.
     var d = (s.scope==="point" && typeof s.e==="number"&&typeof s.n==="number") ? Math.hypot(s.e,s.n) : null;
     var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from home");
-    var vn = s.viol||0;
-    // Violations belong only to EPA facilities (keyed on the FRS id, not scope) — a permit shows none.
-    var vline = frsRid(s)
-      ? "<div style='margin-top:3px;color:"+(vn?"#ffb4a8":"#bfe8dd")+"'>"+vn+" recorded violation"+(vn===1?"":"s")+"</div>"
-      : "";
+    var h = envHeadline(s);
+    var tyStyle = h ? " style='color:"+envColor(h.tone,true)+"'" : "";
     return "<div class='n'>"+esc(s.label||"")+"</div>"+
-           "<div class='ty'>"+esc(kind3(s))+(dist?" · "+dist:"")+"</div>"+vline;
+           "<div class='ty'"+tyStyle+">"+esc(kind3(s))+(dist?" · "+dist:"")+"</div>";
   }
-  // Type line for the 3D views: facility type for precise sites, honest lifecycle +
-  // jurisdiction-wide framing for area notices (never a pretend facility type).
+  // Type line for the 3D views: facility type + the headline env signal for precise sites (via the
+  // shared envTag helper), honest lifecycle + jurisdiction-wide framing for area notices.
   function kind3(s){
-    return s.scope==="point" ? facilityType(s)
+    return s.scope==="point" ? (facilityType(s) + envTag(s))
       : (bucketOf(s.type)==="approved" ? "Approved / permitted · jurisdiction-wide"
                                        : "Proposed / hearing · jurisdiction-wide");
   }
   // Detailed, persistent info card shown when a 3D building is CLICKED (links are clickable).
+  // Environmental records render through the shared helpers: every interpreted signal (colored by
+  // severity), the geo_matched honesty note, and the official ECHO + TCEQ drill-down links.
   function infoCard3(s){
     var d = (s.scope==="point" && typeof s.e==="number"&&typeof s.n==="number") ? Math.hypot(s.e,s.n) : null;
     var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from home");
-    var vn = s.viol||0, link = s.url || s.record_url || "";
-    var recLink = link ? recordLink(s, link) : "";
-    // EPA ECHO affordances key on the FRS Registry ID, never scope; the ECHO link is built from the
-    // id so it resolves to that facility's report (a TABS permit has no id → no ECHO line/link).
-    var rid = frsRid(s);
-    var echoLink = rid ? "<a href='https://echo.epa.gov/detailed-facility-report?fid="+esc(rid)+"' target='_blank' rel='noopener'>EPA ECHO ▸</a>" : "";
-    var vBlock = rid
-      ? "<div class='ci-v' style='color:"+(vn?"#ffb4a8":"#bfe8dd")+"'>"+vn+" recorded violation"+(vn===1?"":"s")+"</div>"
-      : "";
+    var link = s.url || s.record_url || "";
+    // Type line: bare facility type for points (env shows in its own block below, not duplicated);
+    // jurisdiction framing for area notices.
+    var typeLine = s.scope==="point" ? facilityType(s) : kind3(s);
+    var sigs = envSignals(s);
+    var envBlock = sigs.map(function(g){ return "<div class='ci-v' style='color:"+envColor(g.tone,true)+"'>"+esc(g.text)+"</div>"; }).join("");
+    if(sigs.length) envBlock += "<div class='ci-v' style='color:#9fb0ad;font-size:11px'>"+esc(ENV_MATCH_NOTE)+"</div>";
+    // A facility's record_url IS its ECHO report, so for env sites show the shared env links (ECHO +
+    // TCEQ); a non-env point (e.g. a TABS permit) keeps its labeled record link.
+    var links = hasEnvRecord(s) ? envLinks(s).join("") : (link ? recordLink(s, link) : "");
     return "<button class='cl' id='mk3close' aria-label='Close'>×</button>"+
       "<div class='ci-n'>"+esc(s.label||"")+"</div>"+
-      "<div class='ci-t'>"+esc(kind3(s))+(dist?" · "+dist:"")+"</div>"+
-      vBlock+
-      "<div class='ci-l'>"+[recLink,echoLink].filter(Boolean).join("")+"</div>";
+      "<div class='ci-t'>"+esc(typeLine)+(dist?" · "+dist:"")+"</div>"+
+      envBlock+
+      "<div class='ci-l'>"+links+"</div>";
   }
   function showInfoCard(s){
     var c=document.getElementById("mk3info"); if(!c)return;
@@ -1194,25 +1308,28 @@
 
   function popupHTML(s){
     var link = s.url || s.record_url || "";
-    var a = link ? " · " + recordLink(s, link) : "";
+    // For an environmental facility the record_url IS its ECHO report (shown in the env block
+    // below), so don't also render a duplicate "EPA facility record" link here; a non-env point
+    // (e.g. a TABS permit) keeps its labeled record link.
+    var a = (!hasEnvRecord(s) && link) ? " · " + recordLink(s, link) : "";
     // Prefer the engine-stamped canonical_addr (v17 — the ONE normalizer is engine-side); the
     // filed location_addr is only a fallback for rows cached before v17. Same key + precedence
     // the list view uses (listInto) to route to our internal property page.
     var pkey = s.canonical_addr || s.location_addr;
     if(pkey){ a += " · <a href='"+esc(propertyHref(pkey))+"'>View address page →</a>"; }
-    var vn = s.viol || 0;
-    // The EPA ECHO violations line belongs ONLY to EPA-registered facilities, keyed on a real FRS
-    // Registry ID — NOT on scope (a TABS construction permit is also scope:"point") and NOT on any
-    // recordKind display string. The ECHO link is built straight from registry_id so it always
-    // resolves to THAT facility's ECHO report; a point with no registry_id gets no ECHO line at all.
-    var rid = frsRid(s);
-    var isFRS = rid !== "";
-    var echo = isFRS ? " · <a href='https://echo.epa.gov/detailed-facility-report?fid="+esc(rid)+"' target='_blank' rel='noopener' style='color:inherit'>EPA ECHO ▸</a>" : "";
-    // EPA facilities always show a factual count (0 or more) + ECHO link; a non-EPA point never
-    // shows an ECHO affordance (a bare count survives only if some source ever stamps one).
-    var v = isFRS
-      ? "<div style='margin-top:5px;color:"+(vn?"#C0392B":"#5d6f72")+"'>"+vn+" recorded violation"+(vn===1?"":"s")+echo+"</div>"
-      : (vn ? "<div style='margin-top:5px;color:#C0392B'>"+vn+" recorded violation"+(vn===1?"":"s")+"</div>" : "");
+    var isFRS = frsRid(s) !== "";
+    // ENVIRONMENTAL RECORDS — the shared helper. Every interpreted signal (colored by severity),
+    // the official ECHO + TCEQ drill-down links, and the geo_matched honesty note. Keyed on the
+    // FRS id / TCEQ RN via hasEnvRecord — never on scope, so a permit never inherits an env line.
+    var sigs = envSignals(s), envHtml = "";
+    if(sigs.length){
+      envHtml = "<div style='margin-top:5px'>" + sigs.map(function(g){
+        return "<div style='color:"+envColor(g.tone,false)+"'>"+esc(g.text)+"</div>";
+      }).join("");
+      var lk = envLinks(s).join(" · ");
+      if(lk) envHtml += "<div style='margin-top:2px'>"+lk+"</div>";
+      envHtml += "<div style='margin-top:3px;font-size:11px;color:#5d6f72'>"+esc(ENV_MATCH_NOTE)+"</div></div>";
+    }
     // A scope:"point" record with no FRS registry ID is a permit/filing, not an EPA facility —
     // label it honestly so the dot's subheader doesn't read "Facility · operating now".
     var kind = s.scope==="point"
@@ -1233,7 +1350,7 @@
       ? "<div style='margin-top:4px;font-size:11px;color:#5d6f72'>One of "+s._fan+" records at this exact location — markers spread slightly so each is clickable.</div>"
       : "";
     return "<div class='pt'>"+esc(s.label)+"</div><div class='pk'>"+kind+distStr+"</div>"+
-      "<div style='margin-top:4px'>"+esc(s.src||"")+a+"</div>"+v+approxNote+fanNote;
+      "<div style='margin-top:4px'>"+esc(s.src||"")+a+"</div>"+envHtml+approxNote+fanNote;
   }
 
   function listInto(id, items, emptyMsg){
@@ -1254,7 +1371,13 @@
       // links every fact to its own official record); label it as such, not "record ▸".
       if(pkey){ a = " · <a href='"+esc(propertyHref(pkey))+"'>Address page →</a>"; }
       else if(link){ a = " · " + recordLink(s, link); }
-      var v = s.viol ? "<div class='vflag'>"+s.viol+" recorded violation"+(s.viol===1?"":"s")+" · EPA ECHO ▸</div>" : "";
+      // Environmental record (shared helper): the headline signal, colored by severity, with the
+      // official ECHO/TCEQ links. Only an alert/watch signal is worth a list flag — a clean
+      // "no recorded violations" stays quiet in the compact list.
+      var eh = envHeadline(s), v = "";
+      if(eh && eh.tone!=="ok"){
+        v = "<div class='vflag' style='color:"+envColor(eh.tone,false)+"'>"+esc(eh.text)+" · "+envLinks(s).join(" · ")+"</div>";
+      }
       var tag = LAYER_LABEL[s.layer] || "Development";
       // A decided item (approved/denied/withdrawn) shows its plain date, not a "closes in N days"
       // countdown — it's resolved, not an open comment window — plus a "decided" marker.
@@ -1968,21 +2091,29 @@
         sortedFilings.map(filingRow).join("") + "</div>";
     }
 
-    // federal records + "Also checked" (only what the row explicitly reports) ----
+    // environmental (EPA ECHO + TCEQ) + federal records + "Also checked" (only what the row reports)
     var fedRows = federal.map(function(s){
       var link = s.record_url || s.url;
+      // Environmental records via the shared helper: interpreted signals + official ECHO/TCEQ links.
+      var sigs = envSignals(s);
+      var envBits = sigs.map(function(g){ return "<span style='color:"+envColor(g.tone,false)+"'>"+esc(g.text)+"</span>"; }).join(" · ");
+      var links = hasEnvRecord(s) ? envLinks(s).join(" · ") : (link ? recordLink(s, link) : "");
       return "<div class='filing'><div class='fdate'>" + esc(s.src||"") + "</div>" +
         "<div style='flex:1'><div class='ft'>" + esc(s.label) + "</div>" +
-        "<div class='fs'>" + esc(facilityType(s)) + (s.scope_text ? " · " + esc(s.scope_text) : "") +
-        (link ? " · " + recordLink(s, link) : "") + "</div></div></div>";
+        "<div class='fs'>" + esc(facilityType(s)) + (envBits ? " · " + envBits : (s.scope_text ? " · " + esc(s.scope_text) : "")) +
+        (links ? " · " + links : "") +
+        (hasEnvRecord(s) ? "<div style='margin-top:2px;font-size:11px;color:var(--mute)'>"+esc(ENV_MATCH_NOTE)+"</div>" : "") +
+        "</div></div></div>";
     }).join("");
     var checked = (row.sources_checked || []).map(function(c){
       return esc(c.src) + " — " + esc(c.result);
     }).join(" · ");
     var fed = "";
     if(fedRows || checked){
-      fed = "<div class='prop-card'><h3>Federal records at this address</h3>" +
-        (fedRows || "<div class='fs' style='color:var(--mute);font-size:13px'>No federal registry record is in this property's cache.</div>") +
+      // Absence is a statement, not a blank (honest-absence rule): when nothing regulated matched
+      // this parcel, say so plainly rather than showing an empty or broken card.
+      fed = "<div class='prop-card'><h3>Environmental &amp; federal records at this address</h3>" +
+        (fedRows || "<div class='fs' style='color:var(--mute);font-size:13px'>" + esc(ENV_ABSENCE) + "</div>") +
         (checked ? "<div class='alsochecked'>Also checked: " + checked + ".</div>" : "") +
         "</div>";
     }

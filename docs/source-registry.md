@@ -75,24 +75,76 @@ every ZIP ships at least a facilities view even with zero enrichment sources.
 ---
 
 ### EPA ECHO — Enforcement and Compliance History Online
-- **Status:** LIVE (violation counts and violUrl enrichment on FRS sites)
+- **Status:** LIVE (v19 — real per-facility compliance geo-matched onto FRS sites)
 - **What it covers:** Compliance inspection history, violations detected,
   enforcement actions, and penalties assessed at EPA-regulated facilities.
-  ECHO is the source of the `viol` count and `violUrl` on each facility.
-- **Why it matters:** Turns a facility pin into "this plant has 7 recorded
-  violations — view the official record." The factual count + link is the
-  legal framing (source-of-truth §10): a count, not a verdict.
-- **API:** EPA ECHO REST
-  `https://echo.epa.gov/echo/cdr_download.html` (bulk)
-  `https://echo.epa.gov/effluents/index` (facility search)
-  EnviroFacts: `https://data.epa.gov/dmapservice/echo.fac_info/zip_code/equals/{zip}/JSON`
+  ECHO is the source of the `env.epa` block (and the legacy `viol` count) on each facility.
+- **Why it matters:** Turns a facility pin into "1 open water violation (2024)" /
+  "6 of last 12 quarters out of compliance (EPA)". The factual, interpreted status
+  + link is the legal framing (source-of-truth §10): a fact, not a verdict.
+- **API (v19, STEP-0 verified 2026-07-11 via pg_net — reachable + free + no key):**
+  ONE `get_facilities → get_qid` pair per report, keyed on lat/lng/radius, returns
+  every ECHO facility near the point WITH its compliance summary, keyed on RegistryID.
+  `https://echodata.epa.gov/echo/echo_rest_services.get_facilities?output=JSON&p_lat=&p_long=&p_radius=`
+  `https://echodata.epa.gov/echo/echo_rest_services.get_qid?output=JSON&qid=&responseset=`
+  Rich per-facility drill-down (Permits[] by statute):
+  `https://echodata.epa.gov/echo/dfr_rest_services.get_dfr?output=JSON&p_id={registry_id}`
+  (Prior EnviroFacts / echo_violation_counts table remains a best-effort fallback.)
 - **Record URL template:** `https://echo.epa.gov/detailed-facility-report?fid={registry_id}`
-- **Schema mapping:** Enriches existing FRS sites — adds `viol` (int) and
-  `violUrl` (string) fields. Does not create new site rows.
+- **Schema mapping (v19):** Enriches existing FRS sites — joins on `registry_id`
+  (reuse the `frsRid()` hook) and adds
+  `env = { link_type:"geo_matched", epa:{ in_violation:[statute codes currently in
+  violation], snc, quarters_nc, inspections, action_year, penalty_count, current_as_of } }`.
+  Also keeps the legacy `viol` (= # open violations) for back-compat. Interpreted into
+  one plain-language line client-side (the shared env render helper). Never creates rows.
+  Absent stays absent (a violation year appears ONLY from a real ECHO action date).
 - **Coverage scope:** `{national: true}`
 - **counts bucket:** enrichment only (no new count)
-- **Legal framing (§10, standing answer):** Render as "N recorded violation(s)"
-  with the ECHO link. Never render as "illegal," "criminal," or "dangerous."
+- **Legal framing (§10, standing answer):** Render the interpreted fact ("N open
+  <statute> violation(s)") + the ECHO link. Never "illegal," "criminal," or "dangerous."
+
+---
+
+### TCEQ Central Registry — Texas state environmental records  [CASE STUDY]
+- **Status:** LIVE (v19 — RN geo-matched onto FRS/ECHO facilities; TX-coverage-gated)
+- **What it covers:** The state analog of EPA ECHO/FRS — every entity TCEQ regulates
+  in Texas (its Regulated-Entity number, RN) and the state programs it is registered
+  for: stormwater (STORM), petroleum storage tanks (PSTREG), leaking-tank cleanup
+  (LPSTRMD/LUST), industrial & hazardous waste (IHW), municipal solid waste (MSW),
+  voluntary cleanup (VCP), air (AIRNSR/AQNP), wastewater (WWPERMIT/WQNP), and more.
+- **Why it matters:** Adds the state layer a federal-only view misses — an underground
+  fuel tank, a voluntary-cleanup enrollment, or a construction stormwater permit
+  (a progress milestone). Dedupes onto the FRS facility at the same site so it renders
+  ONCE with both the federal (ECHO) and state (TCEQ) badges, never twice.
+- **API (STEP-0 verified 2026-07-11 via pg_net — reachable + free + no key):**
+  Texas Open Data Portal (Socrata), five regional Central Registry datasets, queryable
+  by ZIP/county via SoQL and bulk-downloadable:
+  `https://data.texas.gov/resource/{dataset}.json?re_phys_loc_addr_zip={zip}&$limit=2000`
+  Datasets: Central Texas `msah-s2rv` (Travis/Austin), North Texas `5eqq-7nad`,
+  DFW `t34q-qzi3`, Coastal & East `tzyg-j7q4`, Border & Permian `9iad-hrn8`.
+  Fields: `ref_num_txt` (the RN), `reg_ent_name`, full physical address incl.
+  `re_phys_loc_addr_county`/`_zip`, `program_code`, `reg_ent_status_txt`.
+  **No lat/lng column** → geo-match is NOT by geocoding (no paid service): the adapter
+  DEDUPES each RN onto an FRS facility the engine already placed (siteKey = house# +
+  street word + ZIP, AND a shared name token — precision over recall, verified against
+  real 78617 data to reject same-address false positives like AutoZone↔parkade), and the
+  matched site reuses the FRS facility's own coordinate.
+- **Record URL:** the RN's official TCEQ Central Registry record. The RN string is
+  displayed (directly verifiable) and links to the official CR query
+  `https://www15.tceq.texas.gov/crpub/`. *(A byte-exact RN deep-link is a follow-up —
+  the crpub app is session/POST-based; a GET deep-link did not resolve in Step 0.)*
+- **Schema mapping (v19):** Enriches existing FRS/ECHO sites — adds `tceq_rn`,
+  `tceq_url`, and `env.tceq = { programs:[program_code…], status, name }`. Interpreted
+  into a plain-language line client-side. Never creates rows. Absent stays absent.
+- **Coverage scope:** `{state:"TX"}` — the source never runs for a non-TX ZIP. Widening
+  to another TX county = add one `TX_COUNTY_DATASET` entry (pure data); an unmapped TX
+  county quarantines with a note (facilities-only is valid), never a guess.
+- **counts bucket:** enrichment only (no new count)
+- **Legal framing (§10):** Render the factual program on record ("petroleum storage
+  tank on record", "enrolled in a state cleanup program") + the RN. Never a verdict.
+- **Scope note:** ECHO + Central Registry only for this build. Individual program
+  drill-downs (TPDES detail, PST/LUST detail, VCP status pages) are a later build,
+  held to the same labeling bar — not wired now.
 
 ---
 
@@ -553,6 +605,7 @@ These don't produce map markers directly. They feed the entity graph
 |------|--------|--------|----------|---------------|
 | 1 | EPA FRS | LIVE | National | facilities |
 | 1 | EPA ECHO | LIVE | National | enrichment |
+| 3 | TCEQ Central Registry | LIVE | TX only | enrichment |
 | 1 | EPA TRI | PLANNED | National | facilities |
 | 1 | EPA SEMS (Superfund) | PLANNED | National | facilities |
 | 2 | USDA APHIS | PLANNED | National | facilities |

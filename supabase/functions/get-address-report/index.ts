@@ -37,6 +37,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
+import { siteKey, tceqForZip, type TceqCommunityRow, type TceqEntity } from "./sources/tceq-cr.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
 import { censusRung, datasetRung, resolveGeocode, supabaseStore } from "./geocode-cache.ts";
 
@@ -262,7 +263,8 @@ async function facilitySites(homeLat: number, homeLng: number, radiusMi: number)
   kept.sort((a, b) => (a._d as number) - (b._d as number));
   return kept.slice(0, MAX_FACILITIES).map((f) => { delete f._d; return f; });
 }
-// Best-effort EPA ECHO violation-count enrichment (shared by both modes; read-only).
+// Best-effort EPA ECHO violation-count enrichment from the pre-cached table (shared by both
+// modes; read-only). Kept as a fallback under echoEnrich() (the live pull below wins).
 async function enrichViolations(supabase: ReturnType<typeof createClient>, fac: Record<string, unknown>[]): Promise<void> {
   const rids = fac.map((f) => f.registry_id as string).filter(Boolean);
   if (!rids.length) return;
@@ -271,6 +273,114 @@ async function enrichViolations(supabase: ReturnType<typeof createClient>, fac: 
     const byId = new Map((rows ?? []).map((r) => [r.registry_id as string, r.count as number]));
     for (const f of fac) { const c = byId.get(f.registry_id as string); if (c && c > 0) { f.viol = c; f.violUrl = f.record_url; } }
   } catch (_e) { /* best-effort */ }
+}
+
+// ── v19: ENVIRONMENTAL-RECORDS LAYER (EPA ECHO federal + TCEQ Central Registry state) ──────────
+// Cached, geo-matched enrichment (docs/source-registry.md). The two sources hang off the ids we
+// already carry — ECHO off the FRS registry_id (reuse frsRid), TCEQ off the RN — and stamp
+// s.env = { link_type:"geo_matched", epa?, tceq? }. The PAGE turns env into one plain-language
+// status line (all four render paths share that helper). Absent stays absent; nothing is invented.
+
+// Live EPA ECHO compliance enrichment. ONE get_facilities → get_qid pair per report (by
+// lat/lng/radius) returns every ECHO facility near the point WITH its interpreted compliance
+// summary, keyed on RegistryID — joined straight onto the FRS facilities we already placed
+// (ADDITIVE: FRS discovery is unchanged; this only annotates). This is the real-ECHO replacement
+// for the near-empty echo_violation_counts table. Fail-open: any hiccup leaves facilities
+// un-enriched, never blocking the page. Verified reachable + free (STEP 0, 2026-07-11).
+const ECHO_BASE = "https://echodata.epa.gov/echo";
+const ECHO_STATUTES: [string, string][] = [["CWA", "CWAComplianceStatus"], ["CAA", "CAAComplianceStatus"], ["RCRA", "RCRAComplianceStatus"], ["SDWA", "SDWAComplianceStatus"]];
+function echoParse(text: string): Record<string, any> { return JSON.parse(text.replace(/\\(?!["\\/bfnrtu])/g, "\\\\")); }
+function echoYear(mdY?: string): string | null { const all = String(mdY ?? "").match(/\d{4}/g); return all && all.length ? all[all.length - 1] : null; }
+// One ECHO facility row → the interpreted env.epa fact block (absent stays absent).
+function interpretEcho(row: Record<string, string>): Record<string, unknown> {
+  const inViolation: string[] = [];
+  for (const [code, field] of ECHO_STATUTES) {
+    const v = String(row[field] ?? "");
+    if (/violation|significant|non.?compliance/i.test(v) && !/no violation|no data/i.test(v)) inViolation.push(code);
+  }
+  const epa: Record<string, unknown> = { in_violation: inViolation };
+  if (row.FacSNCFlg === "Y") epa.snc = true;
+  const qtrs = parseInt(row.FacQtrsWithNC ?? "", 10); if (Number.isFinite(qtrs) && qtrs > 0) epa.quarters_nc = qtrs;
+  const insp = parseInt(row.FacInspectionCount ?? "", 10); if (Number.isFinite(insp) && insp > 0) epa.inspections = insp;
+  const yr = echoYear(row.FacDateLastFormalAction); if (yr) epa.action_year = yr;
+  const pen = parseInt(row.FacPenaltyCount ?? "", 10); if (Number.isFinite(pen) && pen > 0) epa.penalty_count = pen;
+  epa.current_as_of = new Date().toISOString().slice(0, 10);
+  return epa;
+}
+async function echoEnrich(fac: Record<string, unknown>[], lat: number, lng: number, radiusMi: number): Promise<void> {
+  if (!fac.some((f) => String(f.registry_id ?? "").trim())) return;
+  try {
+    const q1 = new URLSearchParams({ output: "JSON", p_lat: lat.toFixed(6), p_long: lng.toFixed(6), p_radius: String(Math.min(radiusMi, MAX_RADIUS_MI)) });
+    const r1 = await fetch(`${ECHO_BASE}/echo_rest_services.get_facilities?${q1}`, { signal: AbortSignal.timeout(25000) });
+    if (!r1.ok) return;
+    const qid = echoParse(await r1.text())?.Results?.QueryID;
+    if (!qid) return;
+    const q2 = new URLSearchParams({ output: "JSON", qid: String(qid), responseset: "500" });
+    const r2 = await fetch(`${ECHO_BASE}/echo_rest_services.get_qid?${q2}`, { signal: AbortSignal.timeout(25000) });
+    if (!r2.ok) return;
+    const rows = (echoParse(await r2.text())?.Results?.Facilities ?? []) as Record<string, string>[];
+    const byId = new Map<string, Record<string, string>>();
+    for (const row of rows) { const id = String(row.RegistryID ?? "").trim(); if (id) byId.set(id, row); }
+    for (const f of fac) {
+      const row = byId.get(String(f.registry_id ?? "").trim());
+      if (!row) continue;
+      const epa = interpretEcho(row);
+      const env = (f.env ??= {}) as Record<string, unknown>;
+      env.link_type = "geo_matched"; env.epa = epa;
+      f.viol = (epa.in_violation as string[]).length;         // back-compat: viol == # open violations
+      if (row.FacStreet) f._fstreet = String(row.FacStreet);  // verified address for the TCEQ dedup key
+      if (row.FacZip) f._fzip = String(row.FacZip).slice(0, 5);
+    }
+  } catch (_e) { /* best-effort — never block the page */ }
+}
+
+// TCEQ dedup + enrich: attach each TCEQ RN onto the FRS facility at the same physical site
+// (matched by siteKey = house# + street + ZIP, else by exact normalized name), so a facility with
+// BOTH an FRS id and a TCEQ RN renders ONCE with both badges. NO geocoding — the matched site
+// reuses the FRS coordinate (build rule: existing coords or free Census only, no paid services).
+const NAME_STOP = new Set(["THE", "OF", "AND", "LLC", "INC", "LP", "LTD", "CO", "CORP", "COMPANY", "CITY", "TX", "TEXAS", "WWTP", "WTP", "PLANT", "FACILITY", "CENTER", "STATION", "SITE"]);
+function nameTokens(s: string): Set<string> {
+  return new Set(String(s || "").toUpperCase().replace(/[^A-Z0-9 ]/g, " ").split(/\s+/).filter((t) => t.length > 1 && !NAME_STOP.has(t)));
+}
+function normName(s: string): string {
+  const toks = Array.from(nameTokens(s));
+  return toks.length ? toks.join(" ") : "";
+}
+function sharesToken(a: Set<string>, b: Set<string>): boolean { for (const t of a) if (b.has(t)) return true; return false; }
+// Dedup + enrich, PRECISION OVER RECALL (verified against real 78617 data — the siteKey alone
+// collides distinct businesses at a shared house#+road+ZIP, e.g. an AutoZone and a parkade at
+// "4700 ROSS"). A match is confident only when EITHER the normalized names are exactly equal, OR
+// the site keys match AND the names share at least one significant token. When several RNs sit at
+// one key we pick the token-sharing one — never an arbitrary neighbor. Missing a real match is
+// safe; attaching the wrong RN's programs would be fabrication.
+function enrichTceq(fac: Record<string, unknown>[], entities: TceqEntity[]): { matched: number } {
+  if (!entities.length) return { matched: 0 };
+  const byKey = new Map<string, TceqEntity[]>(), byName = new Map<string, TceqEntity>();
+  for (const e of entities) {
+    if (e.key) (byKey.get(e.key) ?? byKey.set(e.key, []).get(e.key)!).push(e);
+    const nk = normName(e.name); if (nk && !byName.has(nk)) byName.set(nk, e);
+  }
+  let matched = 0;
+  for (const f of fac) {
+    const fTok = nameTokens(String(f.label ?? ""));
+    const fk = siteKey(String(f._fstreet ?? ""), String(f._fzip ?? ""));
+    // 1) same site (key) AND a shared name token → confident.
+    let e = fk ? (byKey.get(fk) || []).find((c) => sharesToken(fTok, nameTokens(c.name))) : undefined;
+    // 2) exact normalized-name equality → confident regardless of address.
+    if (!e) { const nk = normName(String(f.label ?? "")); if (nk) e = byName.get(nk); }
+    if (!e) continue;
+    const env = (f.env ??= {}) as Record<string, unknown>;
+    env.link_type = "geo_matched";
+    env.tceq = { programs: e.programs, status: e.status, name: e.name };
+    f.tceq_rn = e.rn;
+    f.tceq_url = "https://www15.tceq.texas.gov/crpub/";   // official CR query (the RN is shown in the UI)
+    matched++;
+  }
+  return { matched };
+}
+// Strip the internal match-key fields so they never persist in the cache.
+function stripEnvInternals(fac: Record<string, unknown>[]): void {
+  for (const f of fac) { delete f._fstreet; delete f._fzip; }
 }
 // ── v17: the ONE canonical-address normalizer (case-study §4.3) ────────────────────────
 // Deterministic string normalization of a FILED street address, so records filed with
@@ -386,10 +496,17 @@ Deno.serve(async (req: Request) => {
     const communityIds = await resolveCommunityIds(supabase, zip);
     const [devRaw, facRaw] = await Promise.all([devSites(supabase, clat, clng, communityIds), facilitySites(clat, clng, zipRadius)]);
     await enrichViolations(supabase, facRaw);
+    // v19: live EPA ECHO compliance enrichment (real violations/programs, keyed on registry_id).
+    await echoEnrich(facRaw, clat, clng, zipRadius);
     // TX TDLR/TABS enrichment (v16, additive — runbook §1). Coverage-gated inside
     // tabsForZip(): the source never runs for a non-TX ZIP. Separate query keeps
     // resolveCommunityIds() untouched (additive-only rule, source-registry #4).
     const { data: commRows } = await supabase.from("communities").select("state,county").contains("zip_codes", [zip]);
+    // v19: TCEQ Central Registry (Texas state) — coverage-gated inside tceqForZip(). Dedupes each
+    // RN onto the FRS facility at the same physical site and stamps env.tceq (state programs).
+    const tceq = await tceqForZip(zip, (commRows ?? []) as TceqCommunityRow[], { fetch });
+    const tceqStats = enrichTceq(facRaw, tceq.entities);
+    stripEnvInternals(facRaw);
     // Geocoding goes through the write-once, quality-aware cache. ZERO-FEE LADDER, degrades in a
     // fixed precision order and NEVER hard-errors — each rung returns null on a miss so the next
     // is tried, ending at Census range_interpolation:
@@ -431,8 +548,11 @@ Deno.serve(async (req: Request) => {
     const access = await accessLevel(req, supabase);
     const sites = access === "full" ? allSites : allSites.slice(0, TEASER_LIMIT);
     const locked = access === "full" ? 0 : Math.max(0, allSites.length - sites.length);
+    // v19: env-records audit — how many facilities carry EPA ECHO compliance and/or a TCEQ RN.
+    const envEpa = fac.filter((s) => (s.env as { epa?: unknown } | undefined)?.epa).length;
+    const envTceq = fac.filter((s) => (s.env as { tceq?: unknown } | undefined)?.tceq).length;
     // TABS records are development filings → counts.development, never counts.facilities.
-    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, development: devReal.length + tabsSites.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
+    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, development: devReal.length + tabsSites.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
   }
 
   const address = (body.address || "").trim();
@@ -444,10 +564,14 @@ Deno.serve(async (req: Request) => {
   const zipM = matched.match(/\b(\d{5})\b/);
   const communityIds = await resolveCommunityIds(supabase, zipM ? zipM[1] : null);
   const [dev, fac] = await Promise.all([devSites(supabase, lat, lng, communityIds), facilitySites(lat, lng, radiusMi)]);
-  const rids = fac.map((f) => f.registry_id as string).filter(Boolean);
-  if (rids.length) {
-    try { const { data: rows } = await supabase.from("echo_violation_counts").select("registry_id,count").in("registry_id", rids); const byId = new Map((rows ?? []).map((r) => [r.registry_id as string, r.count as number])); for (const f of fac) { const c = byId.get(f.registry_id as string); if (c && c > 0) { f.viol = c; f.violUrl = f.record_url; } } } catch (_e) { /* best-effort */ }
-  }
+  await enrichViolations(supabase, fac);
+  // v19: same environmental-records layer as ZIP mode — live ECHO compliance + TCEQ Central
+  // Registry (coverage-gated to TX), geo-matched onto the facilities we already placed.
+  await echoEnrich(fac, lat, lng, radiusMi);
+  const { data: addrComm } = await supabase.from("communities").select("state,county").contains("zip_codes", [zipM ? zipM[1] : ""]);
+  const addrTceq = await tceqForZip(zipM ? zipM[1] : "", (addrComm ?? []) as TceqCommunityRow[], { fetch });
+  enrichTceq(fac, addrTceq.entities);
+  stripEnvInternals(fac);
   const allSites = [...dev, ...fac];
   const devReal = dev.filter((s) => s.relevance !== "civic");
   const access = await accessLevel(req, supabase);
