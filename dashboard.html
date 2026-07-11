@@ -378,11 +378,37 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
       if (!zip) { msg.style.color = '#b91c1c'; msg.textContent = 'Please enter a 5-digit ZIP code.'; return; }
       msg.style.color = 'var(--ts)'; msg.textContent = 'Finding your community…';
       btn.disabled = true;
-      var url = await window.HS.resolveCoverageUrl(zip);
+      // Add the community to the dashboard and let the resident CHOOSE where to go
+      // (Manage alerts vs Development) — don't jump straight to the alerts page.
+      var place = await window.HS.communityForZip(zip);
       btn.disabled = false;
-      if (url) { window.location.href = url; return; }
+      if (!place) {
+        msg.style.color = 'var(--ts)';
+        msg.innerHTML = "We don't cover that ZIP yet — you can request it on the <a href=\"index.html\" style=\"color:var(--green);font-weight:600\">home page</a>.";
+        return;
+      }
+      var page = window.HS.pageForCommunity(place, zip) || ('community.html?zip=' + encodeURIComponent(zip));
+      var g = { disp: place, page: page, topics: {}, zip: zip };
+      var name = (window.HS.displayName(place, zip) || zip);
+      var body = $('dash-body');
+      var key = (place && place.id) || zip;
+      var already = body.querySelector('.comm-card[data-key="' + (window.CSS && CSS.escape ? CSS.escape(String(key)) : String(key)) + '"]');
+      if (already) {
+        msg.style.color = 'var(--ts)'; msg.textContent = name + ' is already on your dashboard below.';
+        try { already.scrollIntoView({ behavior:'smooth', block:'center' }); } catch(e){}
+        return;
+      }
+      // Empty-state placeholder card no longer applies once a community is added.
+      var stateCard = body.querySelector('.state-card'); if (stateCard) stateCard.remove();
+      var wrap = document.createElement('div');
+      wrap.innerHTML = communityCardHtml(g);
+      var cardEl = wrap.firstChild;
+      var addCard = body.querySelector('.add-card');
+      if (addCard) body.insertBefore(cardEl, addCard); else body.appendChild(cardEl);
+      input.value = '';
       msg.style.color = 'var(--ts)';
-      msg.innerHTML = "We don't cover that ZIP yet — you can request it on the <a href=\"index.html\" style=\"color:var(--green);font-weight:600\">home page</a>.";
+      msg.textContent = 'Added ' + name + ' below — choose Manage alerts or Development.';
+      try { cardEl.scrollIntoView({ behavior:'smooth', block:'center' }); } catch(e){}
     }
     btn.addEventListener('click', go);
     input.addEventListener('keydown', function(e){ if (e.key === 'Enter') go(); });
@@ -407,6 +433,35 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
     });
     return out;
   }
+  // ONE card renderer, shared by the saved-follows list AND the "Add a community" box, so a
+  // just-added community looks identical to a followed one. data-key lets us dedupe an add
+  // against cards already on the page.
+  function communityCardHtml(g){
+    // Backbone standard: "Town Name (ZIP)" — pair the place with the ZIP the
+    // resident entered (g.zip), so a city/county card never shows a bare name.
+    var name = (g.disp && window.HS.displayName(g.disp, g.zip)) || 'Your community';
+    var lvl = g.disp ? levelLabel(g.disp.level) : '';
+    var levelChip = lvl ? ' <span style="font-size:11px;color:#6b7280;border:1px solid #e5e7eb;border-radius:999px;padding:1px 7px;margin-left:8px;white-space:nowrap">' + esc(lvl) + '</span>' : '';
+    var n = countTopics(g.topics);
+    var meta = n > 0 ? ('<span class="dot">' + n + '</span> topic' + (n===1?'':'s') + ' followed') : 'No topics selected yet';
+    // "Development" links to the homesignalmap.html tracker for the resident's ZIP — only
+    // shown when we actually know a ZIP (map mode needs one; no ZIP means no dev page).
+    var devBtn = g.zip
+      ? ' <a class="btn-outline" href="homesignalmap.html?zip=' + encodeURIComponent(g.zip) + '" style="text-decoration:none">Development</a>'
+      : '';
+    var key = (g.disp && g.disp.id) || g.zip || '';
+    return '<div class="comm-card" data-key="' + esc(key) + '">' +
+      '<div class="comm-card-main">' +
+        '<div class="comm-card-name"><a class="comm-card-link" href="' + esc(g.page) + '">' + esc(name) + '</a>' + levelChip + '</div>' +
+        '<div class="comm-card-meta">' + meta + '</div>' +
+      '</div>' +
+      '<span style="display:inline-flex;gap:8px;flex-wrap:wrap">' +
+      '<a class="btn-outline" href="' + esc(g.page) + '" style="text-decoration:none">Manage alerts</a>' +
+      devBtn +
+      '</span>' +
+    '</div>';
+  }
+
   async function renderFollows(follows){
     var body = $('dash-body');
     if (!follows.length){
@@ -447,30 +502,7 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
         groups.push({ disp: disp, page: page, topics: f.topics || {}, zip: f.zip_code });
       }
     });
-    var cards = groups.map(function(g){
-      // Backbone standard: "Town Name (ZIP)" — pair the place with the ZIP the
-      // resident entered (g.zip), so a city/county card never shows a bare name.
-      var name = (g.disp && window.HS.displayName(g.disp, g.zip)) || 'Your community';
-      var lvl = g.disp ? levelLabel(g.disp.level) : '';
-      var levelChip = lvl ? ' <span style="font-size:11px;color:#6b7280;border:1px solid #e5e7eb;border-radius:999px;padding:1px 7px;margin-left:8px;white-space:nowrap">' + esc(lvl) + '</span>' : '';
-      var n = countTopics(g.topics);
-      var meta = n > 0 ? ('<span class="dot">' + n + '</span> topic' + (n===1?'':'s') + ' followed') : 'No topics selected yet';
-      // "Development" links to the homesignalmap.html tracker for the resident's ZIP — only
-      // shown when we actually know a ZIP (map mode needs one; no ZIP means no dev page).
-      var devBtn = g.zip
-        ? ' <a class="btn-outline" href="homesignalmap.html?zip=' + encodeURIComponent(g.zip) + '" style="text-decoration:none">Development</a>'
-        : '';
-      return '<div class="comm-card">' +
-        '<div class="comm-card-main">' +
-          '<div class="comm-card-name"><a class="comm-card-link" href="' + esc(g.page) + '">' + esc(name) + '</a>' + levelChip + '</div>' +
-          '<div class="comm-card-meta">' + meta + '</div>' +
-        '</div>' +
-        '<span style="display:inline-flex;gap:8px;flex-wrap:wrap">' +
-        '<a class="btn-outline" href="' + esc(g.page) + '" style="text-decoration:none">Manage alerts</a>' +
-        devBtn +
-        '</span>' +
-      '</div>';
-    }).join('');
+    var cards = groups.map(communityCardHtml).join('');
     body.innerHTML = cards + addCommunityHtml();
     bindAddCommunity();
     applyPendingZip();   // carry over a ZIP funneled from the homepage (dashboard.html?zip=)
