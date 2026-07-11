@@ -428,19 +428,28 @@ function closeRequestModal(){
   document.body.style.overflow = '';
   if(requestTriggerInput){ try { requestTriggerInput.focus(); } catch(e){} } // return focus to the search box
 }
-// Coverage-aware navigation from the hero ZIP box + the "Alerts" surface card:
-// covered ZIP -> its community/alerts page; not covered -> the request modal.
+// Primary ZIP funnel (hero "Find my community" + the bottom CTA): a covered ZIP lands on
+// the DASHBOARD hub (carrying the ZIP so the dashboard prefills its "add community" box),
+// NOT straight onto the community/alerts page. An uncovered ZIP still opens the request
+// modal (lead capture). resolveCoverageUrl is used only as the coverage CHECK here.
 async function runZip(input, msg){
   const zip = extractZip(input ? input.value : '');
   if(!zip){ if(msg) msg.textContent = 'Please enter your 5-digit ZIP code.'; if(input) input.focus(); return; }
   const url = await resolveCoverageUrl(zip);
-  if(url){ window.location.href = url; return; }
+  if(url){ window.location.href = 'dashboard.html?zip=' + encodeURIComponent(zip); return; }
   // Not covered -> open the request modal (it carries the message); prefill ZIP + focus email.
   openRequestModal(zip, input);
 }
+// The "Alerts" surface card is an explicit "set up your alerts" destination: coverage-aware
+// route straight to the community/alerts page (request modal if not covered).
+async function goAlertsPage(zip, input){
+  const url = await resolveCoverageUrl(zip);
+  if(url){ window.location.href = url; return; }
+  openRequestModal(zip, input);
+}
 // The two "surfaces" both read the SINGLE hero ZIP box. Empty/invalid -> focus it
-// (per the brief) instead of navigating. Development goes straight to the map (it has
-// the national EPA-facilities floor for any ZIP); Alerts uses the coverage-aware route.
+// (per the brief) instead of navigating. Development goes straight to the map (it has the
+// national EPA-facilities floor for any ZIP); Alerts goes to the community/alerts page.
 function goSurface(kind){
   var input = document.getElementById('hero-zip');
   var msg = document.querySelector('.hero [data-zip-msg]');
@@ -452,7 +461,7 @@ function goSurface(kind){
   }
   if(msg) msg.textContent = '';
   if(kind === 'dev'){ window.location.href = 'homesignalmap.html?zip=' + encodeURIComponent(zip); return; }
-  runZip(input, msg);   // alerts -> covered page or request modal
+  goAlertsPage(zip, input);   // alerts card -> community/alerts page or request modal
 }
 document.addEventListener('DOMContentLoaded', function(){
   // Mobile hamburger: UI-only toggle for the nav dropdown (no auth).
