@@ -1464,12 +1464,10 @@ function applyCommunity(){
     var headerZip = (searchedZip || (COMMUNITY.zip_codes && COMMUNITY.zip_codes[0]) || '').trim();
     var t = document.getElementById('comm-title');
     if(t){
-      // If the community's own name already carries the ZIP (e.g. "Ogden (84401)"), don't
-      // repeat it. Otherwise pair name + ZIP — but LEAD with the ZIP when the place is a
-      // county, so no H1 starts with a bare county name; a town/city leads with its name.
-      t.textContent = (headerZip && COMMUNITY.name.indexOf(headerZip) === -1)
-        ? (COMMUNITY.level === 'county' ? (headerZip + ' · ' + COMMUNITY.name) : (COMMUNITY.name + ' · ' + headerZip))
-        : COMMUNITY.name;
+      // Backbone standard: "Town Name (ZIP)" — the same format the level=zip rows carry
+      // ("Ogden (84401)"), applied to every place so a city/county page never shows a
+      // bare name. Idempotent: a name that already carries "(#####)" is kept verbatim.
+      t.textContent = window.HS.displayName(COMMUNITY, headerZip) || COMMUNITY.name;
     }
     // SEO (§4): per-community <title>/description/canonical/og:* from the DB row, so
     // every one of the 12k+ dynamic pages is indexable with real metadata — no clones.

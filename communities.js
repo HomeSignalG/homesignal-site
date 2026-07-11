@@ -78,9 +78,43 @@
     return null;
   }
 
+  // ---------------------------------------------------------------------------
+  // Canonical resident-facing place label: "Town Name (ZIP)".
+  // The ZIP is the resident-facing identity of every page (see CLAUDE.md §2), so a
+  // place shown to a resident always pairs the town/place name with a 5-digit ZIP
+  // when one is known. This is the ONE backbone standard used on every alert page,
+  // the dashboard, the development pages and the emails — so "Ogden (84401)" and
+  // "Brigham City (84302)" read identically everywhere.
+  //
+  //  - `row`  a community row ({name, level, zip_codes})
+  //  - `zip`  the resident's ZIP context (the ZIP they entered / are viewing). Wins
+  //           over the row's own ZIP. Omit it and a single-ZIP row uses its own ZIP;
+  //           a multi-ZIP county (no single ZIP) falls back to the bare name.
+  //
+  // Idempotent: a level=zip row whose name already carries a "(#####)" (e.g.
+  // "Ogden (84401)") is returned verbatim, and a legacy ", State" suffix from the
+  // fallback registry is dropped so "Tremonton, Utah" reads "Tremonton (84337)".
+  function displayName(row, zip) {
+    if (!row) return '';
+    var base = String(row.name || '').trim();
+    if (!base) return '';
+    // Already "Town (#####)" — that IS the standard; keep it exactly.
+    if (/\(\d{5}\)\s*$/.test(base)) return base;
+    // Drop a trailing ", State" so the format matches the ZIP-level rows.
+    base = base.replace(/,\s*[A-Za-z][A-Za-z. ]+$/, '').trim();
+    var z = String(zip == null ? '' : zip).replace(/\D/g, '').slice(0, 5);
+    if (z.length !== 5) {
+      // No resident ZIP: use the row's own ZIP only when it has exactly one
+      // (a single-ZIP city). A multi-ZIP county has no single ZIP to show.
+      z = (row.zip_codes && row.zip_codes.length === 1) ? String(row.zip_codes[0]) : '';
+    }
+    return z ? (base + ' (' + z + ')') : base;
+  }
+
   window.HS = window.HS || {};
   window.HS.communities = COMMUNITIES;
   window.HS.extractZip = extractZip;
   window.HS.zipToCommunity = zipToCommunity;
   window.HS.getCommunity = getCommunity;
+  window.HS.displayName = displayName;
 })();

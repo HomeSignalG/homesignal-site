@@ -881,20 +881,43 @@
   }
 
   // ZIP mode: read the cached per-ZIP report (never a live pull) and render the aggregate.
+  // Canonical resident-facing label: "Town Name (ZIP)" — the same standard the community
+  // pages / dashboard use (window.HS.displayName), inlined here since the dev page is
+  // standalone. Picks the most-specific community name for the ZIP, then pairs it with
+  // the ZIP; a name that already carries "(#####)" (level=zip rows) is kept verbatim.
+  function zipPlaceLabel(rows, zip){
+    var rank = { neighborhood:4, zip:3, city:2, county:1 };
+    var best = null;
+    (rows||[]).forEach(function(r){
+      if(!r || !r.name) return;
+      if(!best || (rank[r.level]||0) > (rank[best.level]||0)) best = r;
+    });
+    if(!best) return "ZIP " + zip;
+    var base = String(best.name).replace(/,\s*[A-Za-z][A-Za-z. ]+$/, '').trim();
+    if(/\(\d{5}\)\s*$/.test(base)) return base;
+    return base + " (" + zip + ")";
+  }
+
   function loadZip(zip){
     ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
     FACILITIES_ONLY = false; ZIP_COUNTY = null;
     LAST_ADDR = "ZIP " + zip;
-    // Best-effort county name for the coverage note (the cache row has no county). Non-blocking:
-    // if it resolves after render(), updateCovNote() re-paints. If it fails, the note falls back
-    // to "this area". cs.{<zip>} = text[] contains; take the county only if it's unambiguous.
-    fetch(SUPABASE_URL + "/rest/v1/communities?select=county&zip_codes=cs.%7B" + encodeURIComponent(zip) + "%7D",
+    // Best-effort county name for the coverage note + the "Town Name (ZIP)" place label
+    // for the header (the cache row has neither). Non-blocking: if it resolves after
+    // render(), updateCovNote() re-paints. cs.{<zip>} = text[] contains; take the county
+    // only if it's unambiguous, and the town name from the most-specific community row.
+    fetch(SUPABASE_URL + "/rest/v1/communities?select=name,level,county&zip_codes=cs.%7B" + encodeURIComponent(zip) + "%7D",
       { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } })
       .then(function(r){ return r.ok ? r.json() : []; })
       .then(function(rows){
         var seen = {}; (rows||[]).forEach(function(r){ if(r.county) seen[r.county] = 1; });
         var keys = Object.keys(seen);
         ZIP_COUNTY = keys.length === 1 ? keys[0] : null;
+        // Backbone standard: pair the most-specific place name with the ZIP — "Ogden (84401)".
+        var label = zipPlaceLabel(rows, zip);
+        var _eb = $("eyebrow"); if(_eb) _eb.textContent = label + " · development overview";
+        document.title = "Development around " + label + " — HomeSignal";
+        var _cap2 = document.querySelector(".map-cap"); if(_cap2) _cap2.textContent = "Development across " + label;
         updateCovNote();
       }).catch(function(){ updateCovNote(); });
     CUR_RADIUS = 3;                                   // provisional ZIP-mode radius (development-tracker §3);
