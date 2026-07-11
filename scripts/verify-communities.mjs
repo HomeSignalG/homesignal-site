@@ -37,14 +37,19 @@ const SAMPLE = process.env.SAMPLE ? parseInt(process.env.SAMPLE, 10) : 0;
 // community.html:1065 — the resolution ranking we must mirror exactly.
 const LEVEL_RANK = { neighborhood: 4, zip: 3, city: 2, county: 1 };
 
-// community.html:1470-1472 (applyCommunity) — the H1 pairs name + ZIP (ZIP-first for a
-// county) unless the community's own name already carries the ZIP. Mirror exactly, or
-// every city/zip-level page — which is most of them — false-fails on a correct render.
+// community.html (applyCommunity) — the H1 is the backbone "Town Name (ZIP)" standard,
+// produced by window.HS.displayName. Mirror it EXACTLY, or every city/zip-level page whose
+// row name doesn't already carry the ZIP false-fails on a correct render. Same rules as the
+// helper: keep a name already ending in "(#####)"; drop a legacy ", State"; pair name + ZIP.
 function expectedTitle(want, zip) {
-  if (zip && want.name.indexOf(zip) === -1) {
-    return want.level === 'county' ? `${zip} · ${want.name}` : `${want.name} · ${zip}`;
+  const base = String(want.name || '').trim();
+  if (/\(\d{5}\)\s*$/.test(base)) return base;
+  const stripped = base.replace(/,\s*[A-Za-z][A-Za-z. ]+$/, '').trim();
+  let z = String(zip == null ? '' : zip).replace(/\D/g, '').slice(0, 5);
+  if (z.length !== 5) {
+    z = (want.zip_codes && want.zip_codes.length === 1) ? String(want.zip_codes[0]) : '';
   }
-  return want.name;
+  return z ? `${stripped} (${z})` : stripped;
 }
 
 async function loadCommunities() {
