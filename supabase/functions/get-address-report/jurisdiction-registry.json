@@ -11,8 +11,9 @@
     "    any bucket is logged in the run report, the record is EXCLUDED, and it never lands in a band.",
     "  • coverage is state + county (or state alone for a statewide dataset). The engine filters",
     "    to the ZIPs HomeSignal actually serves, so adding a ZIP never touches this file.",
-    "  • type_map maps a source classification field to Industrial|Development|Residential|Utility.",
-    "    An unmapped/absent type value → type:'unclassified' (never inferred from the title).",
+    "  • type_map maps a VERBATIM source classification value to one of the six use-types:",
+    "    Industrial | Development | Residential | Utility | Commercial | Civic/Public.",
+    "    An unmapped/absent value → use_type:'unclassified' (logged), never inferred from the title.",
     "  • record_url: from the column named in column_map.record_url when present (string, or an",
     "    object whose .url is used), else record_url_template with {case_number}/{<col>} filled,",
     "    else the dataset landing page with record_url_precision:'dataset'."
@@ -40,7 +41,13 @@
         "zip": "zip_code",
         "record_url": "link"
       },
-      "type_map": {},
+      "type_map": {
+        "Single Family": "Residential", "SF": "Residential", "MF": "Residential", "Multifamily": "Residential", "Multi Family": "Residential", "Multi-Family": "Residential", "Multi family": "Residential", "Multi-family": "Residential", "Duplex": "Residential", "DUP": "Residential", "Condominium": "Residential", "Housing": "Residential", "Residential": "Residential",
+        "Industrial": "Industrial", "IND": "Industrial", "Warehouse": "Industrial",
+        "Utility Line": "Utility", "Streets and Drainage": "Utility", "ROW": "Utility", "New Wireless Communications Tower": "Utility",
+        "Commercial": "Commercial", "Commercial Multi Family": "Commercial", "Office": "Commercial", "OFC": "Commercial", "Retail": "Commercial", "RET": "Commercial", "CS": "Commercial", "Mixed Use": "Commercial", "Restaurant": "Commercial", "Hotel": "Commercial",
+        "Public": "Civic/Public", "Public/Civic": "Civic/Public", "PUB": "Civic/Public", "Church": "Civic/Public", "School": "Civic/Public", "Park": "Civic/Public", "Religious Assembly": "Civic/Public", "Recreational": "Civic/Public"
+      },
       "status_to_bucket": {
         "proposed": ["Pending", "In Review", "Scheduled for Hearing", "CC Pending", "Internet Pending", "Intake Pending", "Waiting on Fiscal", "Waiting on Legal", "Intake Accepted - Fees Due", "Awaiting Update", "Admin Hold"],
         "approved": ["Approved", "Approved and Released", "CC Approved", "Awaiting Recordation"],
@@ -72,7 +79,13 @@
         "zip": "zip_code",
         "record_url": "link"
       },
-      "type_map": {},
+      "type_map": {
+        "Single Family": "Residential", "SF": "Residential", "MF": "Residential", "Multifamily": "Residential", "Multi Family": "Residential", "Multi-Family": "Residential", "Multi family": "Residential", "Multi-family": "Residential", "Duplex": "Residential", "DUP": "Residential", "Condominium": "Residential", "Housing": "Residential", "Residential": "Residential",
+        "Industrial": "Industrial", "IND": "Industrial", "Warehouse": "Industrial",
+        "Utility Line": "Utility", "Streets and Drainage": "Utility", "ROW": "Utility", "New Wireless Communications Tower": "Utility",
+        "Commercial": "Commercial", "Commercial Multi Family": "Commercial", "Office": "Commercial", "OFC": "Commercial", "Retail": "Commercial", "RET": "Commercial", "CS": "Commercial", "Mixed Use": "Commercial", "Restaurant": "Commercial", "Hotel": "Commercial",
+        "Public": "Civic/Public", "Public/Civic": "Civic/Public", "PUB": "Civic/Public", "Church": "Civic/Public", "School": "Civic/Public", "Park": "Civic/Public", "Religious Assembly": "Civic/Public", "Recreational": "Civic/Public"
+      },
       "status_to_bucket": {
         "proposed": ["Pending", "In Review", "Scheduled for Hearing", "Tolling - Hearing Pending", "CC Pending", "CC Pending - Fees Paid", "Internet Pending", "Intake Pending", "Waiting on Fiscal", "Waiting on Legal", "Intake Accepted - Fees Due", "Formal Intake Accepted - Fees Due", "Awaiting Update", "Suspended"],
         "approved": ["Approved", "Approved and Released", "CC Approved"],
@@ -104,7 +117,10 @@
         "zip": "original_zip",
         "record_url": "link"
       },
-      "type_map": {},
+      "type_map": {
+        "Residential": "Residential",
+        "Commercial": "Commercial"
+      },
       "status_to_bucket": {
         "proposed": ["Pending", "Pending Permit", "Re Review", "Inactive Pending Revision", "On Hold", "Suspended"],
         "approved": ["Active"],

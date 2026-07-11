@@ -425,12 +425,15 @@ const BUCKET_TO_TYPE: Record<Exclude<Bucket, "exclude">, "built" | "approved" | 
   operating: "built", approved: "approved", proposed: "proposed",
 };
 
-/** Map layer from the (already source-derived) classification — never from the title. */
+/** Map layer from the (already source-derived) classification — never from the title.
+ *  Use-types: Industrial | Development | Residential | Utility | Commercial | Civic/Public. */
 function layerFor(useType: string): string {
   switch (useType.toLowerCase()) {
     case "industrial": return "industrial";
     case "utility": return "energy";
     case "residential": return "residential";
+    case "commercial": return "commercial";
+    case "civic/public": return "civic";
     default: return "development";     // Development / unclassified → neutral
   }
 }
