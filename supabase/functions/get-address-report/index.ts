@@ -199,6 +199,17 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
     sites.push(s);
   }
   for (const m of meetings ?? []) {
+    // TASK 4 — CivicClerk agenda items are NOT development records. A CivicClerk meeting agenda
+    // mixes land-use with all other county business (personnel, budget, tax) and carries no
+    // structured type/status field, so tagging one as a proposed development is guesswork — this
+    // is what produced the "Commissioners Court Employee Hearing" false positive on 78617. The
+    // structured Socrata permit/case feeds (socrataForZip) replace it as the real proposed signal.
+    // Drop CivicClerk-sourced meetings from the development bands entirely. NOTE: the ingest feed
+    // (travis-tx-civicclerk-meetings) stays ACTIVE — these meetings still populate the civic-alerts
+    // "Meetings" tile on community.html; they are just no longer development records here.
+    // (Optional flag-gated hearing-annotation — matching a hearing date onto a proposed record by
+    // exact case number — is intentionally NOT enabled; default off per the brief.)
+    if (/civicclerk\.com/i.test((m.source_url as string) || "")) continue;
     const [rel, relRule] = classifyRelevance((m.title as string) || "", (m.category as string) || "", "");
     sites.push({ label: ((m.title as string) || "Public hearing").slice(0, 120), e: ae, n: an, lat: homeLat, lng: homeLng, scope: "area", type: "proposed", decided: false, relevance: rel, rel_rule: relRule, layer: classifyLayer((m.title as string) || "", m.category as string), src: m.is_public_hearing ? "Public hearing" : "Comment window", url: (m.source_url as string) || "", meeting_date: m.meeting_date });
   }
