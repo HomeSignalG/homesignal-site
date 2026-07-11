@@ -448,7 +448,9 @@ footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex;
       }
     });
     var cards = groups.map(function(g){
-      var name = g.disp ? g.disp.name : 'Your community';
+      // Backbone standard: "Town Name (ZIP)" — pair the place with the ZIP the
+      // resident entered (g.zip), so a city/county card never shows a bare name.
+      var name = (g.disp && window.HS.displayName(g.disp, g.zip)) || 'Your community';
       var lvl = g.disp ? levelLabel(g.disp.level) : '';
       var levelChip = lvl ? ' <span style="font-size:11px;color:#6b7280;border:1px solid #e5e7eb;border-radius:999px;padding:1px 7px;margin-left:8px;white-space:nowrap">' + esc(lvl) + '</span>' : '';
       var n = countTopics(g.topics);

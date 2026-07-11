@@ -711,7 +711,8 @@ function renderAlerts(alerts, localTotal, failed) {
   const universalItems = alerts.filter(isUniversal);
   count.textContent = localItems.length + ' local alert' + (localItems.length === 1 ? '' : 's') +
     (universalItems.length ? ' · ' + universalItems.length + ' regional/global' : '') + when;
-  const place = (typeof COMMUNITY !== 'undefined' && COMMUNITY && COMMUNITY.name) ? COMMUNITY.name : 'your area';
+  const place = (typeof COMMUNITY !== 'undefined' && COMMUNITY && COMMUNITY.name)
+    ? (window.HS.displayName(COMMUNITY, searchedZip) || COMMUNITY.name) : 'your area';
   // Card markup — shared by both sections (unchanged from the single-list version).
   const cardHtml = a => {
     const tag = getPipelineTag(a.pipeline_type, a.category);
@@ -1239,7 +1240,11 @@ function openModal(tile){
     d.groups.forEach(g=>{
       const isCounty = g.level==='county';
       const h=document.createElement('div'); h.className='modal-grp'; h.style.gridColumn='1/-1';
-      h.innerHTML='<span class="modal-grp-name">'+(isCounty?g.name:'Your town · '+g.name)+'</span><span class="modal-grp-reach">'+(isCounty?'reaches everyone in the county':'only shown to you')+'</span>';
+      // Town layer = the resident's own place, so it carries the "Town Name (ZIP)"
+      // standard; the county layer stays the bare county name (it reaches the WHOLE
+      // county, so a single resident's ZIP would misrepresent its reach).
+      var grpName = isCounty ? g.name : ('Your town · ' + (window.HS.displayName(g, searchedZip) || g.name));
+      h.innerHTML='<span class="modal-grp-name">'+grpName+'</span><span class="modal-grp-reach">'+(isCounty?'reaches everyone in the county':'only shown to you')+'</span>';
       list.appendChild(h);
       (g.topics||[]).forEach(addItem);
     });
@@ -1407,7 +1412,7 @@ function toggleMoreMeetings(){
 //   ?id=<uuid>  |  ?community=<slug>  |  ?zip=<zip>   (defaults to Box Elder)
 // ============================================================
 var COMMUNITY = null;
-function commName(){ return COMMUNITY ? COMMUNITY.name : 'your community'; }
+function commName(){ return COMMUNITY ? (window.HS.displayName(COMMUNITY, searchedZip) || COMMUNITY.name) : 'your community'; }
 
 // Level specificity for most-specific-live resolution (town wins over its county).
 var LEVEL_RANK = { neighborhood:4, zip:3, city:2, county:1 };
@@ -1458,19 +1463,16 @@ async function resolveCommunity(){
 
 function applyCommunity(){
   if(COMMUNITY){
-    var nm = COMMUNITY.name + (COMMUNITY.state ? ', ' + COMMUNITY.state : '');
-    // H1 reads as the ZIP/place the resident entered — never a bare county name. The county
-    // is context (shown in the sub-line as the layer that cascades in), not the page identity.
     var headerZip = (searchedZip || (COMMUNITY.zip_codes && COMMUNITY.zip_codes[0]) || '').trim();
+    // Backbone standard: "Town Name (ZIP)" — the same format the level=zip rows carry
+    // ("Ogden (84401)"), applied to every place so a city/county page never shows a
+    // bare name. Idempotent: a name that already carries "(#####)" is kept verbatim.
+    // The H1 and the SEO <title> both lead with this ONE label; the title keeps the
+    // state after it for human disambiguation across same-named towns.
+    var label = window.HS.displayName(COMMUNITY, headerZip) || COMMUNITY.name;
+    var nm = label + (COMMUNITY.state ? ', ' + COMMUNITY.state : '');
     var t = document.getElementById('comm-title');
-    if(t){
-      // If the community's own name already carries the ZIP (e.g. "Ogden (84401)"), don't
-      // repeat it. Otherwise pair name + ZIP — but LEAD with the ZIP when the place is a
-      // county, so no H1 starts with a bare county name; a town/city leads with its name.
-      t.textContent = (headerZip && COMMUNITY.name.indexOf(headerZip) === -1)
-        ? (COMMUNITY.level === 'county' ? (headerZip + ' · ' + COMMUNITY.name) : (COMMUNITY.name + ' · ' + headerZip))
-        : COMMUNITY.name;
-    }
+    if(t){ t.textContent = label; }
     // SEO (§4): per-community <title>/description/canonical/og:* from the DB row, so
     // every one of the 12k+ dynamic pages is indexable with real metadata — no clones.
     try {
@@ -1511,12 +1513,11 @@ function applyCommunity(){
     }
     var sub = document.getElementById('comm-sub');
     if(sub){
-      var forWhat = headerZip || COMMUNITY.name;
-      var line = 'Local alerts for ' + forWhat;
+      var line = 'Local alerts for ' + label;   // "Town Name (ZIP)" standard
       if(countyName && countyName !== COMMUNITY.name) line += ' + ' + countyName + ' updates';
       sub.textContent = line;
     }
-    var gh = document.getElementById('grp-local-head'); if(gh) gh.textContent = 'In ' + COMMUNITY.name;
+    var gh = document.getElementById('grp-local-head'); if(gh) gh.textContent = 'In ' + label;
     // Scoped government topics (this place + its county ancestors, siblings excluded)
     // drive BOTH gov popups; govGroups lets the popup group them by level.
     var govTopics = (COMMUNITY.govTopics && COMMUNITY.govTopics.length) ? COMMUNITY.govTopics : (COMMUNITY.government_topics || []);
