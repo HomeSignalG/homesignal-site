@@ -914,15 +914,23 @@
         var keys = Object.keys(seen);
         ZIP_COUNTY = keys.length === 1 ? keys[0] : null;
         // Backbone standard: pair the most-specific place name with the ZIP — "Ogden (84401)".
+        // The "Town Name (ZIP)" is the H1 (parity with the alerts page's comm-title) so a
+        // resident sees at a glance they're on the right ZIP page; "Development overview" is
+        // the small kicker above it.
         var label = zipPlaceLabel(rows, zip);
-        var _eb = $("eyebrow"); if(_eb) _eb.textContent = label + " · development overview";
+        var _eb = $("eyebrow"); if(_eb) _eb.textContent = "Development overview";
+        var _h1 = document.querySelector(".head h1"); if(_h1) _h1.textContent = label;
         document.title = "Development around " + label + " — HomeSignal";
         var _cap2 = document.querySelector(".map-cap"); if(_cap2) _cap2.textContent = "Development across " + label;
         updateCovNote();
       }).catch(function(){ updateCovNote(); });
     CUR_RADIUS = 3;                                   // provisional ZIP-mode radius (development-tracker §3);
     setRadiusButton(3);                               // render() re-picks it via zipFitRadius once the cached sites load
-    $("eyebrow").textContent = "ZIP " + zip + " · development overview";
+    // Provisional first paint (the async fetch above upgrades "ZIP 84302" to "Brigham City
+    // (84302)" once the community name resolves). H1 = the ZIP/place label, matching the
+    // alerts page comm-title, so the resident immediately sees which ZIP page they're on.
+    $("eyebrow").textContent = "Development overview";
+    var _h1z = document.querySelector(".head h1"); if(_h1z) _h1z.textContent = "ZIP " + zip;
     document.title = "Development around " + zip + " — HomeSignal";
     // ZIP mode: the page is about the whole ZIP, not a Box Elder address. Re-word the hero so a
     // resident of ANY covered county sees copy that matches their ZIP (the static copy names Box
