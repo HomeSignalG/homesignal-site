@@ -155,6 +155,10 @@
     color:#cfe8e2;font:600 11px var(--font);padding:5px 9px;cursor:pointer;display:flex;align-items:center;gap:6px}
   .c3-btn.on{background:var(--green);border-color:var(--green);color:#fff}
   .c3-time input{width:70px}
+  /* +/- zoom buttons: a paired square-ish group so trackpad/touch users can zoom the
+     3D scene without a scroll wheel (scroll still works). Font-size bumped, fixed width. */
+  .zoom3d{display:flex;align-items:center;gap:4px;pointer-events:auto}
+  .c3-z{padding:4px 0;width:26px;justify-content:center;font-size:15px;line-height:1}
 
   .read{padding:18px}
   .read h2{font-size:12px;letter-spacing:.02em;color:var(--mute);margin:0 0 4px;font-weight:600}
@@ -389,6 +393,10 @@
               <div class="hud3d">
                 <div class="h3-hint">drag to orbit · scroll to zoom · hover a building for details</div>
                 <div class="ctrl3d">
+                  <span class="zoom3d" title="Zoom">
+                    <button class="c3-btn c3-z" id="zoomOutBtn" aria-label="Zoom out" title="Zoom out">−</button>
+                    <button class="c3-btn c3-z" id="zoomInBtn" aria-label="Zoom in" title="Zoom in">+</button>
+                  </span>
                   <span class="c3-time" title="Time of day">☀<input type="range" id="todSlider" min="0" max="100" value="64"></span>
                   <button class="c3-btn" id="homeViewBtn">👁 From home</button>
                 </div>
@@ -1510,6 +1518,17 @@
   document.getElementById("homeViewBtn").addEventListener("click",function(){
     V3.homeView=!V3.homeView;this.classList.toggle("on",V3.homeView);
   });
+  // On-screen zoom for the 3D aerial view (mirrors the wheel handler: same dist bounds).
+  // Step is proportional to the current distance so it feels even at any zoom. dir>0 =
+  // zoom out (farther camera) so the outer-ring developments come into view; dir<0 = in.
+  function zoom3D(dir){
+    if(!V3.inited)return;
+    V3.userZoom=true;
+    if(V3.homeView){ V3.homeView=false; document.getElementById("homeViewBtn").classList.remove("on"); }
+    V3.dist=Math.max(mi(0.3),Math.min(mi(CUR_RADIUS*3),V3.dist+dir*V3.dist*0.22));
+  }
+  document.getElementById("zoomInBtn").addEventListener("click",function(){ zoom3D(-1); });
+  document.getElementById("zoomOutBtn").addEventListener("click",function(){ zoom3D(1); });
   document.getElementById("todSlider").addEventListener("input",function(){ setTimeOfDay(this.value/100); });
   document.getElementById("radSel").addEventListener("click",function(e){
     var b=e.target.closest("button"); if(!b) return;
