@@ -210,6 +210,73 @@ body { background: var(--bg-tertiary); font-size: 15px; }
 }
 </style>
 <style>
+/* ============================================================
+   How it works — page-specific layout (reuses shared design tokens;
+   no new color system, matches the site's green + info-blue accents).
+   Own container (.hiw-wrap) so it does NOT inherit .page-wrap's article
+   typography (p/h2/li) rules — this page controls its own type.
+   ============================================================ */
+.hiw-wrap { max-width: 1000px; margin: 32px auto; padding: 44px 48px; background: var(--bg-primary); border: 1px solid var(--bd-tertiary); border-radius: var(--r-lg); }
+
+/* per-panel accent (green = Development, info-blue = Alerts) */
+.hiw-green { --accent: var(--green); --accent-tint: var(--green-light); }
+.hiw-blue  { --accent: var(--tx-info); --accent-tint: var(--bg-info); }
+
+.hiw-head { text-align: center; max-width: 640px; margin: 0 auto 30px; }
+.hiw-head h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.12; margin-bottom: 10px; }
+.hiw-head p { color: var(--text-secondary); max-width: 520px; margin: 0 auto; }
+
+.hiw-panels { display: grid; gap: 20px; }
+.hiw-panel { display: block; border: 1px solid var(--border); border-radius: var(--radius); padding: 26px 28px; background: var(--bg); color: inherit; transition: border-color .15s, box-shadow .15s; }
+a.hiw-panel:hover, a.hiw-panel:focus-visible { border-color: var(--accent); box-shadow: 0 6px 22px rgba(0,0,0,.06); }
+.hiw-panel-top { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+.hiw-ic { width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--accent-tint); }
+.hiw-ic svg { width: 22px; height: 22px; fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hiw-kick { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-tertiary); }
+.hiw-panel-top h2 { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+.hiw-tagline { color: var(--text-secondary); font-size: 14px; margin: 0 0 18px 58px; }
+.hiw-vlist { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 30px; }
+.hiw-vlist li { display: flex; gap: 11px; align-items: flex-start; font-size: 14.5px; line-height: 1.5; color: var(--text); }
+.hiw-ck { width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-top: 1px; background: var(--accent); }
+.hiw-ck svg { width: 12px; height: 12px; stroke: #fff; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.hiw-go { display: inline-block; margin-top: 18px; font-size: 13px; font-weight: 600; color: var(--accent); }
+a.hiw-panel:hover .hiw-go { text-decoration: underline; }
+
+.hiw-sourcing { margin-top: 46px; }
+.hiw-sourcing h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 10px; }
+.hiw-sourcing > p { color: var(--text-secondary); line-height: 1.7; max-width: 620px; margin: 0 0 18px; }
+.hiw-chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.hiw-chip { border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 9px 16px; font-size: 13px; font-weight: 500; color: var(--text-secondary); background: var(--bg-secondary); }
+.hiw-marks { display: inline-flex; gap: 8px; font-size: 12px; color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 8px 16px; margin-top: 20px; }
+.hiw-marks b { color: var(--green-text); font-weight: 600; }
+
+.hiw-cta { margin-top: 46px; text-align: center; border: 1px solid var(--border); border-radius: var(--radius); padding: 40px 28px; background: var(--bg-secondary); }
+.hiw-cta h2 { font-size: 24px; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 16px; }
+.hiw-cta-form { display: flex; gap: 10px; max-width: 420px; margin: 0 auto; }
+.hiw-zf { flex: 1; position: relative; display: flex; align-items: center; }
+.hiw-zf svg { position: absolute; left: 14px; width: 16px; height: 16px; stroke: var(--text-tertiary); fill: none; stroke-width: 2; pointer-events: none; }
+.hiw-zf input { width: 100%; padding: 12px 14px 12px 40px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; background: var(--bg); color: var(--text); }
+.hiw-cta-form button { white-space: nowrap; }
+.zip-msg { font-size: 13px; color: #b91c1c; min-height: 1em; margin-top: 12px; }
+
+/* request modal (ported from index.html so the CTA funnel matches the homepage) */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 2100; }
+.modal-overlay.open { display: flex; }
+.modal { position: relative; background: var(--bg-primary); border: 1px solid var(--bd-tertiary); border-radius: var(--r-lg); padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+.modal input { width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px 13px; font-size: 14px; background: var(--bg-secondary); color: var(--text); }
+.modal-close { position: absolute; top: 8px; right: 8px; background: none; border: none; font-size: 24px; line-height: 1; color: var(--text-secondary); cursor: pointer; padding: 2px 8px; border-radius: var(--radius-sm); }
+.modal-close:hover { color: var(--text); background: var(--bg-secondary); }
+
+@media (min-width: 760px) { .hiw-head h1 { font-size: 34px; } }
+@media (max-width: 720px) {
+  .hiw-wrap { padding: 32px 20px 44px; margin: 20px auto; }
+  .hiw-vlist { grid-template-columns: 1fr; }
+  .hiw-tagline { margin-left: 0; }
+  .hiw-cta-form { flex-direction: column; }
+  .hiw-panel { padding: 22px 20px; }
+}
+</style>
+<style>
 /* ===== flex-gap compatibility: spacing via margins (works in every browser) ===== */
 .logo { gap: 0; }
 .logo > * + * { margin-left: 10px; }
@@ -287,15 +354,100 @@ body { background: var(--bg-tertiary); font-size: 15px; }
   <div class="nav-actions" id="nav-auth"><button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button></div>
 </div>
 </nav>
-<div class="page-wrap">
-<div class="page-eyebrow">How it works</div>
-<h1>From public record to your inbox.</h1>
-<p class="lead">Three steps to stay ahead of decisions that affect your home.</p>
-<div class="step"><div class="step-num">1</div><div><h2>Find your community</h2><p>Search by county, city, ZIP code, or project name to open your community page.</p></div></div>
-<div class="step"><div class="step-num">2</div><div><h2>Choose the alerts that matter</h2><p>Pick the meeting types and topics you care about — council meetings, data center development, water quality, and more.</p></div></div>
-<div class="step"><div class="step-num">3</div><div><h2>Get notified early</h2><p>We watch permit filings, government notices, and local news, and send you a heads-up while there is still time to act.</p></div></div>
-<h2>Where the information comes from</h2>
-<p>HomeSignal pulls from official sources such as government public notice websites and local news, then organizes them into a single, readable feed for your community.</p>
+<main class="hiw-wrap">
+  <!-- 1. What you get in every community -->
+  <div class="hiw-head">
+    <h1>What you get in every community.</h1>
+    <p>Two ways in — the same pairing you'll find on your dashboard for each place you follow.</p>
+  </div>
+
+  <div class="hiw-panels">
+    <!-- Development panel -> homesignalmap.html?zip= -->
+    <a class="hiw-panel hiw-green" data-hiw-panel data-target="homesignalmap.html" href="#hiw-find" aria-label="Open the development map for your area">
+      <div class="hiw-panel-top">
+        <span class="hiw-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3l6 3 6-3v15l-6 3-6-3-6 3V6z"/><path d="M9 3v15M15 6v15"/></svg></span>
+        <div><div class="hiw-kick">See it</div><h2>Development</h2></div>
+      </div>
+      <p class="hiw-tagline">See what's happening around your home.</p>
+      <ul class="hiw-vlist">
+        <li><span class="hiw-ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>Type in your address or ZIP and instantly see everything being built near you on one easy-to-read map</li>
+        <li><span class="hiw-ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>Get a heads-up the moment projects open for public comment — and how many days you have left to weigh in</li>
+        <li><span class="hiw-ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>Know your area at a glance: industrial sites near you, what's newly proposed, what's open for comment, and the total on record</li>
+        <li><span class="hiw-ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>View your neighborhood as a flat map, aerial, or satellite — and zoom in or out to focus on what's closest to home</li>
+        <li><span class="hiw-ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>See everything sorted into three plain buckets: operating now, approved and coming, and still proposed</li>
+        <li><span class="hiw-ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>Know exactly when each comment window closes, so you never miss your chance to speak up</li>
+        <li><span class="hiw-ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>Click any facility to see who it is, its status, and its violations — then jump to the official EPA or government record in one click to verify</li>
+      </ul>
+      <span class="hiw-go">Open the development map →</span>
+    </a>
+
+    <!-- Alerts panel -> community.html?zip= -->
+    <a class="hiw-panel hiw-blue" data-hiw-panel data-target="community.html" href="#hiw-find" aria-label="Set up alerts for your area">
+      <div class="hiw-panel-top">
+        <span class="hiw-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg></span>
+        <div><div class="hiw-kick">Follow it</div><h2>Alerts</h2></div>
+      </div>
+      <p class="hiw-tagline">Only hear about what matters to you.</p>
+      <ul class="hiw-vlist">
+        <li><span class="hiw-ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>Choose exactly what lands in your inbox instead of getting one firehose of everything</li>
+        <li><span class="hiw-ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>Turn whole categories on or off — government notices, upcoming meetings, local news</li>
+        <li><span class="hiw-ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>Fine-tune the topics you follow: planning &amp; zoning, property taxes, public safety, data centers, water quality, and more</li>
+        <li><span class="hiw-ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>Follow the bigger picture too — how peer communities handle the same issues, and new tech &amp; infrastructure proposals</li>
+        <li><span class="hiw-ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>Watch a live feed of what's new, split into what's happening right in your ZIP vs. regional and national context</li>
+        <li><span class="hiw-ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>See upcoming meetings with dates, spot the new ones at a glance, and sign up to attend or follow a specific one</li>
+        <li><span class="hiw-ck"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>Save your community once and come back anytime, tuned to exactly what you want to know</li>
+      </ul>
+      <span class="hiw-go">Set up your alerts →</span>
+    </a>
+  </div>
+
+  <!-- 2. Where the information comes from -->
+  <section class="hiw-sourcing">
+    <h2>Where the information comes from</h2>
+    <p>HomeSignal pulls from official sources such as government public notice websites and local news, then organizes them into a single, readable feed for your community.</p>
+    <div class="hiw-chips">
+      <span class="hiw-chip">Permits &amp; applications</span>
+      <span class="hiw-chip">Planning &amp; zoning hearings</span>
+      <span class="hiw-chip">City &amp; county agendas</span>
+      <span class="hiw-chip">Court &amp; legal filings</span>
+      <span class="hiw-chip">Local news sources</span>
+    </div>
+    <div class="hiw-marks"><b>Neutral</b> · <b>sourced</b> · <b>non-partisan</b></div>
+  </section>
+
+  <!-- 3. CTA -->
+  <section class="hiw-cta" id="hiw-find">
+    <h2>Find your community.</h2>
+    <div class="hiw-cta-form">
+      <div class="hiw-zf">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <input id="hiw-zip" type="text" placeholder="Enter your ZIP code" aria-label="ZIP code" inputmode="numeric" />
+      </div>
+      <button class="btn-primary" id="hiw-find-btn" type="button" style="padding:12px 18px">Find my community</button>
+    </div>
+    <p class="zip-msg" data-zip-msg role="status" aria-live="polite"></p>
+  </section>
+</main>
+
+<!-- Community request modal (opens on a not-covered ZIP — same lead-capture funnel as the homepage) -->
+<div class="modal-overlay" id="request-overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="request-heading">
+    <button type="button" class="modal-close" id="request-close" aria-label="Close">&times;</button>
+    <div id="request-card">
+      <p id="request-heading" style="font-size:15px;color:var(--text);margin:0 28px 16px 0">Your ZIP code is not on our list yet, but we would love to add it! Please add your email to the community request form below.</p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="request-email" type="email" placeholder="Your email" aria-label="Your email" autocomplete="email" />
+        <input id="request-zip" type="text" placeholder="ZIP code" aria-label="ZIP code" inputmode="numeric" />
+        <!-- Honeypot: off-screen (not display:none) so real browsers never see it but bots autofill it. -->
+        <div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true">
+          <label for="company_website">Company website</label>
+          <input id="company_website" name="company_website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" />
+        </div>
+        <button class="btn-primary" id="request-btn" type="button">Request my community</button>
+      </div>
+      <p class="zip-msg" id="request-msg" role="status" aria-live="polite"></p>
+    </div>
+  </div>
 </div>
 <footer>
   <div class="footer-left">
@@ -454,6 +606,115 @@ document.addEventListener('DOMContentLoaded', function(){
   var m = document.getElementById('nav-menu');
   if (t && m) t.addEventListener('click', function(){ m.classList.toggle('open'); });
 });
+</script>
+<!-- Shared live-DB community resolver (coverage check reused by the CTA funnel). -->
+<script src="communities.js"></script>
+<script src="hs-resolve.js"></script>
+<script>
+// ============================================================
+// How-it-works funnel:
+//  - Panels route to the real page with the visitor's ZIP (from the CTA box or
+//    ?zip=); with no ZIP they funnel to the CTA (the ZIP-entry flow).
+//  - The CTA "Find my community" mirrors the homepage's Find-my-community button:
+//    a COVERED ZIP -> dashboard.html?zip= (the hub, which prefills add-community),
+//    an UNCOVERED ZIP -> the community-request modal (lead capture via the
+//    submit-public-form Edge Function). resolveCoverageUrl is only the coverage CHECK.
+// ============================================================
+(function(){
+  var SUPABASE_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
+  function $(id){ return document.getElementById(id); }
+  function extractZip(q){ var m=(q||'').match(/\b\d{5}\b/); return m?m[0]:null; }
+  function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+  function urlZip(){ try{ return extractZip(new URLSearchParams(location.search).get('zip')||''); }catch(e){ return null; } }
+  function ctaInput(){ return $('hiw-zip'); }
+  function ctaMsg(){ return document.querySelector('.hiw-cta [data-zip-msg]'); }
+  // A ZIP typed in the CTA box wins; otherwise the one carried in ?zip=.
+  function currentZip(){ var el=ctaInput(); return extractZip(el?el.value:'') || urlZip(); }
+  async function coverageUrl(zip){ try{ return (window.HS && window.HS.resolveCoverageUrl) ? await window.HS.resolveCoverageUrl(zip) : null; }catch(e){ return null; } }
+
+  // ----- Panels -----
+  function focusCta(){
+    var el=ctaInput(); var m=ctaMsg();
+    if(m) m.textContent='Enter your ZIP above to open your community.';
+    if(el){ try{ el.scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){} try{ el.focus({preventScroll:true}); }catch(e){ el.focus(); } }
+  }
+  var panels = document.querySelectorAll('[data-hiw-panel]');
+  // If a ?zip= is already in the URL, make the panel hrefs real (works without JS too).
+  (function(){ var z=urlZip(); if(!z) return; panels.forEach(function(a){ a.setAttribute('href', a.getAttribute('data-target')+'?zip='+encodeURIComponent(z)); }); })();
+  panels.forEach(function(a){
+    a.addEventListener('click', function(e){
+      var zip=currentZip();
+      if(zip){ e.preventDefault(); window.location.href = a.getAttribute('data-target')+'?zip='+encodeURIComponent(zip); }
+      else { e.preventDefault(); focusCta(); }
+    });
+  });
+
+  // ----- Community request modal (opens only on a not-covered ZIP) -----
+  var REQUEST_FORM_HTML = null;   // captured template so the modal is reusable
+  var requestRenderedAt = 0;      // timing check for the honeypot
+  function wireRequestForm(){
+    var btn=$('request-btn');
+    if(btn) btn.addEventListener('click', submitCommunityRequest);
+    ['request-email','request-zip'].forEach(function(id){ var el=$(id); if(el) el.addEventListener('keydown', function(e){ if(e.key==='Enter') submitCommunityRequest(); }); });
+  }
+  function openRequestModal(zip){
+    var overlay=$('request-overlay'), card=$('request-card');
+    if(!overlay||!card) return;
+    if(REQUEST_FORM_HTML!==null){ card.innerHTML=REQUEST_FORM_HTML; wireRequestForm(); } // fresh form each open
+    var rzip=$('request-zip'); if(rzip) rzip.value=zip||'';
+    overlay.classList.add('open');
+    requestRenderedAt=Date.now();
+    var email=$('request-email'); if(email){ try{ email.focus(); }catch(e){} }
+  }
+  function closeRequestModal(){ var o=$('request-overlay'); if(o) o.classList.remove('open'); var el=ctaInput(); if(el){ try{ el.focus(); }catch(e){} } }
+  async function submitCommunityRequest(){
+    var emailEl=$('request-email'), zipEl=$('request-zip'), msgEl=$('request-msg'), card=$('request-card'), btn=$('request-btn');
+    var email=(emailEl?emailEl.value:'').trim();
+    if(!isValidEmail(email)){ if(msgEl) msgEl.textContent='Please enter a valid email.'; return; }
+    var zip=(zipEl?zipEl.value:'').trim();
+    if(btn) btn.disabled=true;
+    var hp=$('company_website');
+    try{
+      var res=await fetch(SUPABASE_URL+'/functions/v1/submit-public-form',{
+        method:'POST',
+        headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+SUPABASE_ANON_KEY, 'Content-Type':'application/json' },
+        body:JSON.stringify({ form_type:'community_request', company_website:(hp?hp.value:''), elapsed_ms:(Date.now()-requestRenderedAt), email:email, requested_zip:zip||null, requested_community:null })
+      });
+      if(res.status===400){ if(btn) btn.disabled=false; if(msgEl) msgEl.textContent='Please check your entries and try again.'; return; }
+      if(!res.ok) throw new Error('submit failed '+res.status);
+      var covered=await coverageUrl(extractZip(zip)||'');
+      var confirmText=covered
+        ? "Thanks — you're set. We'll email you when there's something new in your area."
+        : "Thanks — we'll email you the moment HomeSignal covers your area.";
+      if(card) card.innerHTML='<p style="font-size:14px;color:var(--tx-success);margin:0">'+confirmText+'</p>';
+    }catch(e){
+      if(btn) btn.disabled=false;
+      if(msgEl) msgEl.textContent='Something went wrong — please try again.';
+    }
+  }
+
+  // ----- CTA "Find my community" -> covered? dashboard hub : request modal -----
+  async function runFind(){
+    var input=ctaInput(), msg=ctaMsg();
+    var zip=extractZip(input?input.value:'');
+    if(!zip){ if(msg) msg.textContent='Please enter your 5-digit ZIP code.'; if(input) input.focus(); return; }
+    if(msg) msg.textContent='';
+    var url=await coverageUrl(zip);
+    if(url){ window.location.href='dashboard.html?zip='+encodeURIComponent(zip); return; }
+    openRequestModal(zip);
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    REQUEST_FORM_HTML=$('request-card') ? $('request-card').innerHTML : null;
+    wireRequestForm();
+    var findBtn=$('hiw-find-btn'); if(findBtn) findBtn.addEventListener('click', runFind);
+    var input=ctaInput(); if(input) input.addEventListener('keydown', function(e){ if(e.key==='Enter') runFind(); });
+    var rc=$('request-close'); if(rc) rc.addEventListener('click', closeRequestModal);
+    var ro=$('request-overlay'); if(ro) ro.addEventListener('click', function(e){ if(e.target===ro) closeRequestModal(); });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeRequestModal(); });
+  });
+})();
 </script>
 <script src="share.js" defer></script>
 </body>
