@@ -695,8 +695,16 @@
   // carries an official public-record URL. No source → never drawn, never listed, never
   // exposed. Enforced at the engine for ZIP mode; enforced again here for address mode.
   function sourced(s){ return !!(s && ((s.url && String(s.url).trim()) || (s.record_url && String(s.record_url).trim()))); }
+  // The single test for "is this an EPA-registered facility" — a real FRS Registry ID, present on
+  // every EPA FRS site and on nothing else (a TABS construction permit is also scope:"point" but
+  // has no registry_id). Every EPA affordance — the ECHO violations line, the ECHO link, the
+  // "Facility · operating now" label — keys on THIS, never on scope, so a permit never inherits
+  // an EPA-facility affordance. Returns the trimmed id or "".
+  function frsRid(s){ return (s && s.registry_id!=null) ? String(s.registry_id).trim() : ""; }
   // Friendly, plain-language building type from the facility name (falls back to its layer).
   function facilityType(s){
+    // A scope:"point" record with no FRS registry ID is a permit/filing, not an EPA facility.
+    if(!frsRid(s)) return "Permitted construction";
     var n = String(s.label||"").toLowerCase();
     if(/data cent/.test(n)) return "Data center";
     if(/aggregate|gravel|\bsand\b|quarry|\bpit\b/.test(n)) return "Aggregate / gravel";
@@ -720,7 +728,8 @@
     var d = (s.scope==="point" && typeof s.e==="number"&&typeof s.n==="number") ? Math.hypot(s.e,s.n) : null;
     var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from home");
     var vn = s.viol||0;
-    var vline = (s.scope==="point")
+    // Violations belong only to EPA facilities (keyed on the FRS id, not scope) — a permit shows none.
+    var vline = frsRid(s)
       ? "<div style='margin-top:3px;color:"+(vn?"#ffb4a8":"#bfe8dd")+"'>"+vn+" recorded violation"+(vn===1?"":"s")+"</div>"
       : "";
     return "<div class='n'>"+esc(s.label||"")+"</div>"+
@@ -739,8 +748,11 @@
     var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from home");
     var vn = s.viol||0, link = s.url || s.record_url || "";
     var recLink = link ? recordLink(s, link) : "";
-    var echoLink = (s.scope==="point") ? "<a href='"+esc(s.violUrl||link)+"' target='_blank' rel='noopener'>EPA ECHO ▸</a>" : "";
-    var vBlock = (s.scope==="point")
+    // EPA ECHO affordances key on the FRS Registry ID, never scope; the ECHO link is built from the
+    // id so it resolves to that facility's report (a TABS permit has no id → no ECHO line/link).
+    var rid = frsRid(s);
+    var echoLink = rid ? "<a href='https://echo.epa.gov/detailed-facility-report?fid="+esc(rid)+"' target='_blank' rel='noopener'>EPA ECHO ▸</a>" : "";
+    var vBlock = rid
       ? "<div class='ci-v' style='color:"+(vn?"#ffb4a8":"#bfe8dd")+"'>"+vn+" recorded violation"+(vn===1?"":"s")+"</div>"
       : "";
     return "<button class='cl' id='mk3close' aria-label='Close'>×</button>"+
@@ -1189,13 +1201,22 @@
     var pkey = s.canonical_addr || s.location_addr;
     if(pkey){ a += " · <a href='"+esc(propertyHref(pkey))+"'>View address page →</a>"; }
     var vn = s.viol || 0;
-    var vlink = s.violUrl || link;
-    var echo = vlink ? " · <a href='"+esc(vlink)+"' target='_blank' rel='noopener' style='color:inherit'>EPA ECHO ▸</a>" : "";
-    // Facilities always show a factual count (0 or more); dev items only when there are records.
-    var v = (s.scope==="point")
+    // The EPA ECHO violations line belongs ONLY to EPA-registered facilities, keyed on a real FRS
+    // Registry ID — NOT on scope (a TABS construction permit is also scope:"point") and NOT on any
+    // recordKind display string. The ECHO link is built straight from registry_id so it always
+    // resolves to THAT facility's ECHO report; a point with no registry_id gets no ECHO line at all.
+    var rid = frsRid(s);
+    var isFRS = rid !== "";
+    var echo = isFRS ? " · <a href='https://echo.epa.gov/detailed-facility-report?fid="+esc(rid)+"' target='_blank' rel='noopener' style='color:inherit'>EPA ECHO ▸</a>" : "";
+    // EPA facilities always show a factual count (0 or more) + ECHO link; a non-EPA point never
+    // shows an ECHO affordance (a bare count survives only if some source ever stamps one).
+    var v = isFRS
       ? "<div style='margin-top:5px;color:"+(vn?"#C0392B":"#5d6f72")+"'>"+vn+" recorded violation"+(vn===1?"":"s")+echo+"</div>"
-      : (vn ? "<div style='margin-top:5px;color:#C0392B'>"+vn+" recorded violation"+(vn===1?"":"s")+echo+"</div>" : "");
-    var kind = s.scope==="point" ? "Facility · operating now"
+      : (vn ? "<div style='margin-top:5px;color:#C0392B'>"+vn+" recorded violation"+(vn===1?"":"s")+"</div>" : "");
+    // A scope:"point" record with no FRS registry ID is a permit/filing, not an EPA facility —
+    // label it honestly so the dot's subheader doesn't read "Facility · operating now".
+    var kind = s.scope==="point"
+             ? (isFRS ? "Facility · operating now" : "Permitted construction")
              : (bucketOf(s.type)==="approved" ? "Approved / permitted" : "Proposed / hearing");
     // Real straight-line distance from the home (e/n are miles East/North of the home).
     var dist = (typeof s.e==="number" && typeof s.n==="number") ? Math.hypot(s.e, s.n) : null;
