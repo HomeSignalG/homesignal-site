@@ -658,6 +658,33 @@ legal/framing change not covered by the one-time sign-off.
   isn't tracked as one entity. Also **EPA ECHO violations are effectively 0 everywhere** — the
   `echo_violation_counts` table is near-empty (3 rows, 0 with violations), so every facility shows "0 recorded
   violations" regardless of real history (fetched from a table, not live ECHO). Logged for a future build.
+- 🟢 **ENVIRONMENTAL-RECORDS LAYER — engine v19 (real EPA ECHO + TCEQ Central Registry, geo-matched &
+  cached)** (STEP-0 + dedup verified via pg_net; **deploy is the remaining operator step**). This is the
+  "future build" the v14 note above logged: it replaces the near-empty `echo_violation_counts` table with a
+  **live ECHO pull** and adds **TCEQ** state records. **Cached, not live** — the engine geo-matches during
+  data generation and stamps `s.env = { link_type:"geo_matched", epa?, tceq? }`; the page renders the cached
+  fact (the "client-side rendering of cached data" property is preserved). **ECHO** (federal): one
+  `get_facilities → get_qid` pair per report joins each facility's real compliance summary onto the FRS
+  facility by `registry_id` (the `frsRid()` hook) → `env.epa` = statutes currently in violation, SNC flag,
+  quarters-in-non-compliance, last formal-action year, penalties. **TCEQ** (Texas state, coverage-gated):
+  the Central Registry via the Texas Open Data Portal (Socrata, free, no key) → each RN's state programs
+  (stormwater, petroleum tanks, leaking-tank cleanup, IHW/MSW, VCP, air, wastewater). **Dedup FRS↔RN**: a
+  site with BOTH an FRS id and a TCEQ RN renders **once** with both badges — matched by `siteKey`
+  (house# + street word + ZIP) **AND a shared name token** (precision over recall; verified against real
+  78617 data — 28 confident industrial matches, same-address false positives like AutoZone↔parkade rejected).
+  **No paid services** — ECHO/FRS coords are reused, TCEQ has no coords so it dedupes onto an existing FRS
+  point (no geocoder). **Honest labeling**: every env record carries `link_type:"geo_matched"` (site-level,
+  never parcel-keyed), one interpreted plain-language line ("1 open water violation (2024)", "enrolled in a
+  state cleanup program", "petroleum storage tank on record"), and an honest absence line ("No regulated
+  EPA/TCEQ facility at this parcel") — via **shared helpers wired into all four render paths**
+  (`popupHTML`, `kind3`, `tip3`, `infoCard3`) + the list view + the property page. Engine:
+  `supabase/functions/get-address-report/` (`index.ts` + new `sources/tceq-cr.ts`; parked bundle
+  `dist/get-address-report.bundle.mjs`, deploy via MCP). No schema change — `env` rides inside the existing
+  `sites` jsonb. Scope: ECHO + Central Registry only; program drill-downs (TPDES/PST/LUST/VCP detail) are a
+  later build. **Deploy note:** the build sandbox has no egress to Supabase's deploy API and the ~30 KB
+  inline-bundle MCP deploy could not be hand-transmitted this session — deploy the parked bundle via MCP
+  (`deploy_edge_function`, one file) then re-cache a TX ZIP (78617) to populate `env`; `verify-development`
+  CI does the live browser check.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
