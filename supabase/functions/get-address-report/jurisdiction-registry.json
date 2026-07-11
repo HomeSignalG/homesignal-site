@@ -129,7 +129,9 @@
       },
       "record_url_precision": "record",
       "incremental_field": "applieddate",
-      "recency_days": 365
+      "recency_days": 365,
+      "zip_mode": false,
+      "_zip_mode_note": "RESERVED FOR THE PER-ADDRESS PROPERTY PAGE (homesignalmap.html?addr=), not the ZIP aggregate. ~85% of rows carry no native coordinates, so ZIP-mode geocoding (1000s of addresses per refresh) would time out the edge function, and 1,300+ individual building permits would swamp the ZIP map. At a single address only that parcel's permits are shown (one geocode). Full status_to_bucket + type_map are kept so the property-page wiring is a pure-data activation (flip zip_mode + call the connector in address mode)."
     }
   ],
 

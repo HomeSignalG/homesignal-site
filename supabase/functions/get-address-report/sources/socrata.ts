@@ -76,6 +76,10 @@ export interface SocrataRegistryEntry {
   /** e.g. "https://…/{case_number}". Used only when column_map.record_url is absent. */
   record_url_template?: string;
   record_url_precision?: "record" | "dataset";
+  /** false → the entry is NOT run in ZIP-aggregate mode (reserved for the per-address property
+   *  page). Default true. Used for high-volume, geocode-heavy datasets (e.g. individual building
+   *  permits) that belong at a single address, not a whole-ZIP snapshot. */
+  zip_mode?: boolean;
   /** updated-at column for incremental `$where`; also the paging sort key when present. */
   incremental_field?: string;
   /** Optional: drop rows whose file_date/incremental_field is older than N days (volume cap
@@ -174,6 +178,7 @@ export async function socrataForZip(
   const reports: SocrataRunReport[] = [];
   for (const entry of entries) {
     if (entry.platform !== "socrata") continue;
+    if (entry.zip_mode === false) continue;                        // reserved for the per-address property page
     if (!coverageMatches(entry.coverage, communities)) continue;   // coverage gate
     const { records, report } = await runEntry(entry, zip, deps);
     sites.push(...records);
