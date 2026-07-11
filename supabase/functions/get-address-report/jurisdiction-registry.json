@@ -112,7 +112,8 @@
         "exclude": ["Withdrawn", "Expired", "Expired - License", "VOID", "Cancelled", "Cancelled - Contractor Required", "Cancelled - New Permit Required", "New Permit Required", "Aborted", "Denied but Closed", "Revoked", "Rejected", "Closed", "Inactive Contractor", "Application Incomplete", "Awaiting Upload"]
       },
       "record_url_precision": "record",
-      "incremental_field": "applieddate"
+      "incremental_field": "applieddate",
+      "recency_days": 365
     }
   ],
 
