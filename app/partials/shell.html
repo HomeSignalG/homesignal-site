@@ -1,0 +1,157 @@
+<!-- HomeSignal shared shell — full frame (sidebar + top bar) + all modals, with a
+     #hs-slot where each page's content drops in. Injected identically into every page
+     by shell.js (hard rule: byte-identical menu). Markup lifted from the approved mockup;
+     nav hrefs point at the real pages. -->
+<div class="sidebackdrop" id="sidebackdrop"></div>
+<div class="app">
+
+<aside class="side" id="hs-side">
+  <a class="logo" href="index.html"><span class="mk">◆</span> HomeSignal</a>
+  <nav class="nav" id="hs-nav">
+    <a href="today.html"       data-nav="today"><span class="ic">◎</span> Today's Priorities</a>
+    <a href="dashboard.html"   data-nav="dash"><span class="ic">▦</span> Dashboard</a>
+    <a href="alerts.html"      data-nav="alerts"><span class="ic">◐</span> Alerts</a>
+    <a href="development.html" data-nav="dev"><span class="ic">◈</span> Development</a>
+    <a href="maps.html"        data-nav="maps"><span class="ic">◉</span> Maps</a>
+    <a href="properties.html"  data-nav="props"><span class="ic">⌂</span> Properties</a>
+    <a href="community.html"   data-nav="comm" id="hs-nav-comm"><span class="ic">◍</span> Communities</a>
+    <a href="reports.html"     data-nav="reports"><span class="ic">▤</span> Reports</a>
+  </nav>
+  <div class="grow"></div>
+  <div class="upsell">
+    <div class="t">Get the full picture</div>
+    <div class="d">Premium reports, property intelligence &amp; more.</div>
+    <button type="button" onclick="HS.openModal('premiumModal')">Go Premium</button>
+  </div>
+  <div class="sidefoot">
+    <a href="contact.html">Contact</a>
+    <span class="dot">·</span>
+    <a href="privacy.html">Privacy</a>
+  </div>
+</aside>
+
+<div class="main">
+<div class="top" id="hs-top">
+  <button class="menubtn" type="button" aria-label="Menu" onclick="HS.toggleMenu()">☰</button>
+  <div class="loc" onclick="HS.openSwitcher()"><span class="pin">◉</span> <span id="locLabel">—</span> <span style="color:var(--ink-3)">▾</span></div>
+  <div class="search"><input id="hs-search" placeholder="Search HomeSignal — addresses, projects, topics…" autocomplete="off"><div id="hs-search-results" class="hidden"></div></div>
+  <div class="sp"></div>
+  <button class="sharebtn" type="button" onclick="HS.openModal('shareModal')">⤴ Share</button>
+  <button class="ib" type="button" aria-label="Notifications" onclick="location.href='alerts.html'">◔<span class="badge hidden" id="hs-bell-badge">0</span></button>
+  <div class="avatar" id="hs-avatar" title="Account" onclick="HS.onAvatar()">··</div>
+</div>
+
+  <div id="hs-slot"><!-- page content injected here --></div>
+  </div><!-- /.main -->
+</div><!-- /.app -->
+
+<!-- ======= LOCATION / REQUEST COMMUNITY MODAL ======= -->
+<div class="overlay" id="locModal" onclick="if(event.target===this)HS.closeModal('locModal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="locModalTitle">
+    <div class="mhead">
+      <button class="mclose" type="button" onclick="HS.closeModal('locModal')" aria-label="Close">✕</button>
+      <span class="mbadge">◉ Your community</span>
+      <h3 id="locModalTitle">Change your community</h3>
+      <p class="msub">Enter a ZIP code to open what's changing around that area.</p>
+    </div>
+    <div class="mbody">
+      <div id="locForm">
+        <div class="field">
+          <input id="locZip" inputmode="numeric" maxlength="5" placeholder="Enter ZIP (e.g., 78617)" onkeydown="if(event.key==='Enter')HS.findCommunity()">
+          <button class="mbtn" type="button" onclick="HS.findCommunity()">Find my community</button>
+        </div>
+      </div>
+      <div id="locRequest" class="hidden">
+        <div style="background:var(--amber-tint);border:1px solid #f0dcbd;border-radius:10px;padding:12px 14px;font-size:13px;color:var(--amber);margin-bottom:14px"><b>We're not in <span id="reqZipLabel">—</span> yet</b> — but we'd love to add it. Add your email and we'll notify you the moment it goes live.</div>
+        <div class="field" style="flex-direction:column;gap:10px">
+          <input id="reqEmail" type="email" placeholder="Your email" onkeydown="if(event.key==='Enter')HS.submitRequest()">
+          <button class="mbtn" type="button" onclick="HS.submitRequest()">Request my community</button>
+        </div>
+        <div class="mnote">We'll only email you when your area goes live. No spam.</div>
+      </div>
+      <div id="locDone" class="success hidden"><div class="ck">✓</div><h4 id="locDoneH">Request received</h4><p id="locDoneP">We'll email you the moment it's live.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= PROPERTY SWITCHER MODAL ======= -->
+<div class="overlay" id="switcherModal" onclick="if(event.target===this)HS.closeModal('switcherModal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="switcherTitle">
+    <div class="mhead">
+      <button class="mclose" type="button" onclick="HS.closeModal('switcherModal')" aria-label="Close">✕</button>
+      <span class="mbadge">⌂ Your properties</span>
+      <h3 id="switcherTitle">Switch property</h3>
+      <p class="msub" id="switcherSub">Pick one to focus the app on it.</p>
+    </div>
+    <div class="mbody">
+      <div id="switcherList"><!-- filled by shell.js --></div>
+      <button class="mbtn" type="button" style="width:100%;margin-top:12px" onclick="HS.closeModal('switcherModal');HS.openLoc()">+ Add a property</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======= TOPIC PICKER MODAL ======= -->
+<div class="overlay" id="topicsModal" onclick="if(event.target===this)HS.closeModal('topicsModal')">
+  <div class="modal" style="max-width:484px" role="dialog" aria-modal="true" aria-labelledby="tmTitle">
+    <div class="mhead">
+      <button class="mclose" type="button" onclick="HS.closeModal('topicsModal')" aria-label="Close">✕</button>
+      <span class="mbadge" id="tmBadge">◈ Topics</span>
+      <h3 id="tmTitle">Government Notices</h3>
+      <p class="msub" id="tmSub">Choose which notices you want alerts for</p>
+    </div>
+    <div class="mbody">
+      <div class="tgrid" id="tmGrid"></div>
+      <div class="tcount"><span>◔</span> <span id="tmCount">0 topics selected</span></div>
+      <label class="consent"><input type="checkbox" id="tmConsent"><span><b>OPTIONAL</b> I agree that HomeSignal may share anonymized, aggregated information about the topics and locations I follow to support its products, services, and research. No personal contact information is ever shared. <a href="privacy.html">Privacy Policy</a></span></label>
+      <div class="savingline">Saving to your account · <b id="tmEmail">not signed in</b></div>
+      <div id="tmForm">
+        <button class="mbtn" type="button" onclick="HS.saveTopics()">Save alerts</button>
+        <div class="mnote">No spam · Unsubscribe anytime</div>
+      </div>
+      <div id="tmDone" class="success hidden"><div class="ck">✓</div><h4>Alerts saved</h4><p id="tmDoneMsg">You'll be notified about these topics.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= PREMIUM WAITLIST MODAL ======= -->
+<div class="overlay" id="premiumModal" onclick="if(event.target===this)HS.closeModal('premiumModal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="premiumTitle">
+    <div class="mhead">
+      <button class="mclose" type="button" onclick="HS.closeModal('premiumModal')" aria-label="Close">✕</button>
+      <span class="mbadge">◆ Coming soon</span>
+      <h3 id="premiumTitle">Premium is being built</h3>
+      <p class="msub">Deep property reports, unlimited watched addresses, and cost-of-ownership &amp; insurance intelligence are on the way. Leave your email and we'll notify you the moment it's ready — nothing to pay until then.</p>
+    </div>
+    <div class="mbody">
+      <div id="premiumForm">
+        <div class="field">
+          <input id="premiumEmail" type="email" placeholder="you@email.com" onkeydown="if(event.key==='Enter')HS.submitWaitlist()">
+          <button class="mbtn" type="button" onclick="HS.submitWaitlist()">Notify me</button>
+        </div>
+        <div class="mnote">We'll only email you about Premium availability. No spam — unsubscribe anytime.</div>
+      </div>
+      <div id="premiumDone" class="success hidden">
+        <div class="ck">✓</div>
+        <h4>You're on the list</h4>
+        <p>We'll email you the moment Premium launches.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= SHARE MODAL ======= -->
+<div class="overlay" id="shareModal" onclick="if(event.target===this)HS.closeModal('shareModal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+    <div class="mhead">
+      <button class="mclose" type="button" onclick="HS.closeModal('shareModal')" aria-label="Close">✕</button>
+      <span class="mbadge">⤴ Share</span>
+      <h3 id="shareTitle">Share HomeSignal</h3>
+      <p class="msub">Send this to a neighbor. The more of your community that's watching, the sharper everyone's intelligence gets.</p>
+    </div>
+    <div class="mbody">
+      <div class="sharegrid" id="shareGrid"><!-- filled by shell.js with real share-intent URLs --></div>
+      <div class="linkbox"><span class="url" id="shareUrl">homesignal.net</span><button type="button" id="copyBtn" onclick="HS.copyLink()">Copy</button></div>
+      <div class="netnote"><span>◍</span><span><b>Why sharing matters:</b> community intelligence gets stronger as neighbors join — more eyes on local change, shared alerts, and bigger civic turnout at the hearings that shape your area.</span></div>
+    </div>
+  </div>
+</div>
