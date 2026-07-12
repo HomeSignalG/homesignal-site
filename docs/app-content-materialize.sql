@@ -1,0 +1,27 @@
+-- ============================================================================
+-- app_refresh_zip(_zip) — the reproducible materializer (APPLIED to prod).
+-- Rebuilds app_projects / app_changes / app_community_meta for ONE ZIP from REAL
+-- sources already in the DB — the get-address-report engine's `development_reports`
+-- (TDLR/TABS building permits + EPA/TCEQ facilities, every row with a record_url)
+-- and the CivicClerk `meetings` for the Travis County root — quality-gated.
+--
+--   * projects/changes: only records with a non-empty record_url are written
+--     (anti-fabrication: no source_ref → not written).
+--   * data_quality = 'pass' only when the ZIP produced ≥1 sourced project;
+--     otherwise 'coverage_coming' (the app renders a coverage-coming state, never blank).
+--   * Idempotent: deletes+reinserts that ZIP each run.
+--
+-- Run for one ZIP:      select public.app_refresh_zip('78617');
+-- Run for all Travis:   select z.zip, public.app_refresh_zip(z.zip)
+--                       from (select distinct unnest(zip_codes) zip from public.communities
+--                             where county='Travis' and state='TX') z;
+--
+-- The homesignal-ingest workflow calls this per ZIP AFTER the get-address-report
+-- engine (pg_net, Postgres egress) refreshes that ZIP's development_report — so a
+-- ZIP only "passes" once real permit/facility records exist for it.
+--
+-- The full function body is the applied migration `app_refresh_zip_materializer`
+-- (see supabase migration history) and docs/phase1-app-schema.sql for the tables.
+-- ============================================================================
+-- (function definition mirrored in the migration; see project migration
+--  `app_refresh_zip_materializer`. Kept here as the DDL-of-record pointer.)

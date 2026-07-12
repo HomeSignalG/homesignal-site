@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>HomeSignal — Today's Priorities</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
 <link rel="stylesheet" href="app.css">
@@ -99,13 +100,13 @@ HS.onReady(async function () {
   document.getElementById('tdBrief').innerHTML =
     'There are <b>' + changes.filter(function(c){return !c.quiet;}).length + ' changes</b> near you this week. '
     + (top ? 'The biggest is the <span class="hl">' + HS.esc(top.title) + '</span> — ' + HS.esc(top.plain_language) + ' ' : '')
-    + 'Your <span class="hl">value outlook stays positive at +' + c.value_trend + '%</span> over the next 12 months.';
+    + 'Your <span class="hl">value outlook · </span>' + '<span class="hl">' + HS.trend(c.value_trend) + ' over the next 12 months.</span>';
 
   // vitals + bars
   document.getElementById('tdRing').innerHTML = HS.tpl.scoreRing(c.community_score);
   document.getElementById('tdScoreTrend').textContent = 'Strong · growth pressure ' + c.growth_pressure;
   document.getElementById('tdVitals').innerHTML =
-    '<div class="vital"><span class="vl">Value outlook · 12 mo</span><span class="vv" style="color:var(--green)">+' + c.value_trend + '%</span></div>'
+    '<div class="vital"><span class="vl">Value outlook · 12 mo</span><span class="vv" style="color:var(--green)">' + HS.trend(c.value_trend) + '</span></div>'
     + '<div class="vital"><span class="vl">Projects tracked</span><span class="vv">' + (await HS.data.projects(S.zip, home)).length + '</span></div>'
     + '<div class="vital"><span class="vl">Active alerts</span><span class="vv">' + changes.filter(function(c){return HS.daysUntil(c.window_closes_at)>=0 || !c.quiet;}).length + '</span></div>'
     + '<div class="vital"><span class="vl">Growth pressure</span><span class="vv" style="color:var(--amber)">' + HS.esc(c.growth_pressure) + '</span></div>';

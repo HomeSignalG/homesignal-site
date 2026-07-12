@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>HomeSignal — Alerts</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
 <link rel="stylesheet" href="app.css">
@@ -70,7 +71,7 @@ HS.onReady(async function () {
   document.getElementById('alStrip').innerHTML =
     HS.tpl.statTile(open.length, 'Need you soon — windows closing', 'accent')
     + HS.tpl.statTile(rest.length + open.length, 'Changes worth knowing this week', '')
-    + HS.tpl.statTile('+' + c.value_trend + '%', 'Your value outlook, next 12 mo', 'g')
+    + HS.tpl.statTile(HS.trend(c.value_trend), 'Your value outlook, next 12 mo', 'g')
     + HS.tpl.statTile((nearest && nearest.dist ? nearest.dist.replace(' mi','') : '—') + '<span style="font-size:14px;font-weight:600;color:var(--ink-3)">mi</span>', 'Nearest active change', '');
 
   function sortItems(items, mode) {

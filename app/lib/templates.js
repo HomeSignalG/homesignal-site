@@ -7,6 +7,8 @@
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
   HS.esc = esc;
+  // null-safe display for an optional 12-mo value trend (real data may not have one)
+  HS.trend = v => (v == null || v === '') ? 'Tracking' : (v > 0 ? '+' : '') + v + '%';
 
   // color a card's left bar from impact score / status
   function barColor(item) {

@@ -51,3 +51,22 @@ search, sort segments, dev lenses + data view, map layer toggles + radius.
 - On sign-off: apply `docs/phase1-app-schema.sql`; wire real Travis County feeds in the engine
   adapters (Granicus/Legistar/CivicClerk/TCEQ/FEMA/TxDOT) replacing the seed; switch the app to
   `?data=supabase`; promote `/app/*` to the live path (or add the `?preview=1` guard).
+
+## Real-data wiring (Travis County) — DB-verified 2026-07-12
+- Applied ADDITIVE migration `phase1_app_tables_additive`: 10 `app_*` tables (prefixed to avoid the
+  pre-existing `projects` table), RLS on all. Scores live in `app_community_meta` (live `communities`
+  untouched). Verified: content tables anon-readable, `app_premium_waitlist` insert-only (emails not
+  anon-readable), owner tables gated by auth.uid().
+- Applied `app_refresh_zip(zip)` materializer: rebuilds app_projects/app_changes/app_community_meta
+  from REAL sources (development_reports = TDLR/TABS permits + EPA/TCEQ facilities; CivicClerk Travis
+  meetings). Anti-fabrication: only rows with a record_url are written; data_quality='pass' only when
+  ≥1 sourced project, else 'coverage_coming'.
+- **78617 (Del Valle) = PASS**: 24 real sourced projects (100% source_ref), 14 changes (8 real
+  meetings + 6 proposed permits). Idempotent (rerun → 24).
+- **85 other Travis ZIPs = coverage_coming** (real county meetings inherited, but no per-ZIP permit
+  report yet → gated to a coverage-coming state, never blank/fabricated).
+- Site: `/app/` now DATA_SOURCE='supabase' (reads app_* via anon+RLS); demo session kept (demo homes
+  client-side for distance). Data-quality gate in community.html. All /app/ pages `noindex` +
+  robots `Disallow: /app/`. Artifact preview stays seed (single-file, offline).
+- NOTE: supabase-mode live rendering not eyeballed from the sandbox (no egress; jsDelivr+Supabase
+  blocked in-browser here) — DB-verified + seed-mode regression-clean. Live check is CI / real site.

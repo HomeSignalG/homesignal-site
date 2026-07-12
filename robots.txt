@@ -6,5 +6,6 @@ Allow: /
 Disallow: /dashboard.html
 Disallow: /my-alerts.html
 Disallow: /unsubscribe.html
+Disallow: /app/
 
 Sitemap: https://homesignal.net/sitemap.xml
