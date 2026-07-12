@@ -51,3 +51,24 @@
 - Del Valle 78617 already has `docs/del-valle-78617-development-reports-seed.sql` and Texas
   community rows; Travis County real feeds (Granicus/Legistar/CivicClerk/EPA-ECHO/TCEQ) already
   exist in the engine. The seed step will **reuse/cross-check** these rather than invent parallel data.
+
+## LOCKED at the review gate (founder direction) — 2026-07-12
+- **A → Option 1, fully staged.** The entire new app lives under `/app`; live root pages
+  (`index/dashboard/community/contact/privacy`) are **byte-for-byte unchanged** (verified: 0-line
+  diff vs pre-build). Preview at `/app/...`; the canonical-URL `?preview=1` guard + promotion
+  (moving `/app/*` to root) is a separate sign-off-gated step. "Website, not an app" confirmed:
+  separate real HTML pages navigated by query-params, not an SPA.
+- **B → runtime fetch-and-inject** `partials/shell.html` (one injected frame with `#hs-slot`).
+- **C → additive + reuse.** `docs/phase1-app-schema.sql` adds score columns to live `communities`,
+  new tables for projects/changes/properties/follows/watchlist/requests/waitlist, reuses live
+  `meetings`/`contact_messages`, maps `topic_prefs` alongside `user_subscriptions`. **Parked, NOT
+  applied to production** (repo convention + "nothing on the live path without sign-off").
+- **D → branch only**, no PR (both repos on `claude/new-session-f6p7jj`).
+
+## Minimal-honest-action log (unspecified controls)
+Search = client-side filter → dropdown; bell = open-window count → alerts; Follow/Watch/Notify =
+persist `follows`, flip label; Noted = persist dismissal; Add-to-calendar = generated `.ics`;
+Comment/Read = open `source_ref`; sort segments + dev lenses + data-view = real re-sort/table;
+map layers Projects/Impact-radius toggle, Flood/Schools disabled w/ tooltip; Satellite/Street
+disabled w/ "Available with live map provider"; Compare = disabled "Coming soon"; Watchlist Edit =
+stubbed modal note (persists to `watchlist_items` when wired).

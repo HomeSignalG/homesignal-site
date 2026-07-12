@@ -35,3 +35,19 @@ search, sort segments, dev lenses + data view, map layer toggles + radius.
 - Python pipeline in homesignal-ingest (Connector/SourceAdapter/Scorer, run_community.py).
 - README (setup, Del Valle, run pipeline for another ZIP, auth, provider swaps).
 - E2E assertions; 390px screenshot pass for all pages.
+
+## COMPLETE (this session) — verified
+- 12 pages + shared shell, real Del Valle 78617 seed, all interactions wired. Playwright: 13
+  routes 0 JS errors; 10/10 E2E flows pass (consent-unchecked, coverage request, switcher,
+  waitlist, topics-persist-across-reload, mobile drawer, aria-modal, Escape). Desktop + 390px OK.
+- `docs/phase1-app-schema.sql` — additive schema + RLS (parked, not applied to prod).
+- `homesignal-ingest`: `homesignal_pipeline` (Connector/SourceAdapter/Scorer + writers) +
+  `run_community.py --zip`; 5/5 unit tests; proved scale on 78617 & 78719 (zero code change).
+- `app/README.md` — setup, pipeline, auth, provider swaps.
+- Live root pages byte-for-byte unchanged (0-line diff vs pre-build commit).
+
+## Remaining for the founder / promotion step
+- Review the Del Valle prototype at `/app/index.html` (seed mode) and sign off.
+- On sign-off: apply `docs/phase1-app-schema.sql`; wire real Travis County feeds in the engine
+  adapters (Granicus/Legistar/CivicClerk/TCEQ/FEMA/TxDOT) replacing the seed; switch the app to
+  `?data=supabase`; promote `/app/*` to the live path (or add the `?preview=1` guard).
