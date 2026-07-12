@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeSignal — Development</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-nav="dev">
+<template id="hs-content"><div class="page" id="devPage"></div></template>
+
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="lib/data.js"></script>
+<script src="lib/templates.js"></script>
+<script src="shell.js"></script>
+<script>
+HS.onReady(async function () {
+  var S = HS.state, home = S.activeProperty;
+  var projects = await HS.data.projects(S.zip, home);
+  var id = new URLSearchParams(location.search).get('id');
+  var page = document.getElementById('devPage');
+
+  if (id) { renderDetail(id); } else { renderList(); }
+
+  function statusRank(s){ return s==='Proposed'?0:s==='Active'?1:2; }
+
+  function renderList() {
+    var state2 = { lens: 0, sort: 'impact', dataView: false };
+    function sorted() {
+      var a = projects.slice();
+      if (state2.lens === 1) { // what's being built — group by type & stage
+        a.sort(function(x,y){ return (x.type>y.type?1:x.type<y.type?-1:0) || (statusRank(x.status)-statusRank(y.status)); });
+      } else if (state2.lens === 2 || state2.sort === 'distance') {
+        a.sort(function(x,y){return (x.distance_mi||9e9)-(y.distance_mi||9e9);});
+      } else if (state2.sort === 'newest') {
+        a.sort(function(x,y){return new Date(y.submitted_at)-new Date(x.submitted_at);});
+      } else {
+        a.sort(function(x,y){return (y.impact_score||0)-(x.impact_score||0);});
+      }
+      return a;
+    }
+    function paint() {
+      var a = sorted();
+      var body = state2.dataView ? dataTable(a) : ('<div class="devgrid">' + a.map(HS.tpl.devCard).join('') + '</div>');
+      page.innerHTML =
+        '<div class="ph"><div class="eyebrow">Development</div><h1>What\'s being built — and how it lands on you</h1>'
+        + '<p>Every active and proposed project near you, led by its effect on your daily life rather than its stage or unit count.</p></div>'
+        + '<div class="lensnav">'
+        + lens(0,'How could it affect me?','Impact-first · the default view')
+        + lens(1,'What\'s being built?','The projects themselves')
+        + lens(2,'Where are we growing?','The trajectory of the area')
+        + '</div>'
+        + '<div class="toolbar"><div class="seg" id="devSort">'
+        + seg('impact','Impact on me') + seg('distance','Distance') + seg('newest','Newest')
+        + '</div><div class="sp"></div>'
+        + '<button class="fpill">All types ▾</button><button class="fpill">Any status ▾</button>'
+        + '<button class="fpill" id="devDataBtn">⊞ Data view</button></div>'
+        + body;
+      wire();
+    }
+    function lens(i,q,d){ return '<button class="lenscard' + (state2.lens===i?' on':'') + '" data-lens="' + i + '"><span class="q">' + q + '</span><span class="d">' + d + '</span></button>'; }
+    function seg(k,label){ return '<button class="' + ((state2.sort===k && !state2.dataView)?'on':'') + '" data-sort="' + k + '">' + label + '</button>'; }
+    function dataTable(a){
+      return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th><th>Distance</th><th>Impact</th></tr></thead><tbody>'
+        + a.map(function(p){ return '<tr onclick="location.href=\'development.html?id=' + p.id + '\'" style="cursor:pointer">'
+          + '<td><b>' + HS.esc(p.name) + '</b></td><td>' + HS.esc(p.type) + '</td><td>' + HS.esc(p.status) + '</td>'
+          + '<td>' + HS.esc(p.stage||'') + '</td><td>' + HS.esc(p.dist||'') + '</td><td>' + (p.impact_score||'') + '</td></tr>'; }).join('')
+        + '</tbody></table>';
+    }
+    function wire() {
+      [].forEach.call(page.querySelectorAll('.lenscard'), function(b){ b.onclick=function(){ state2.lens=+b.dataset.lens; state2.dataView=false; paint(); }; });
+      var ds = page.querySelector('#devSort'); if (ds) ds.onclick=function(e){ var b=e.target.closest('button[data-sort]'); if(!b)return; state2.sort=b.dataset.sort; state2.dataView=false; paint(); };
+      var db = page.querySelector('#devDataBtn'); if (db) db.onclick=function(){ state2.dataView=!state2.dataView; paint(); };
+    }
+    paint();
+  }
+
+  function renderDetail(pid) {
+    var p = projects.find(function(x){return x.id===pid;});
+    if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button><div class="ph"><h1>Not found</h1></div>'; return; }
+    HS.data.meetings(S.zip, home).then(function (meetings) {
+      var mtg = meetings.find(function(m){return m.related_project_id===p.id;});
+      var thread = [
+        { date: HS.fmtDate(p.submitted_at, {year:'numeric',month:'long',day:'numeric'}), title: 'Application submitted', link: 'generated your alert' },
+        { date: HS.fmtDate(p.submitted_at, {month:'long',day:'numeric'}) , title: 'Impact analysis published', link: 'report available now' }
+      ];
+      if (mtg) thread.push({ date: HS.fmtDate(mtg.starts_at,{year:'numeric',month:'long',day:'numeric'}) + ' · in ' + HS.daysUntil(mtg.starts_at) + ' days', title: 'Public hearing — comment window open', link: 'you can act here', future: true });
+      thread.push({ date: 'Expected next quarter', title: 'Commission vote', future: true });
+
+      var statusClass = p.status==='Active'?'active':p.status==='Approved'?'appr':'prop';
+      var verdictHi = p.impact_dimensions.filter(function(i){return i.bad;}).slice(0,2).map(function(i){return i.label.toLowerCase();}).join(' and ') || 'change';
+      var verdictGood = (p.impact_dimensions.find(function(i){return !i.bad;})||{label:'the tax base'}).label.toLowerCase();
+      page.innerHTML =
+        '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button>'
+        + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">' + HS.esc(p.name) + ' <span class="status ' + statusClass + '">' + HS.esc(p.status) + '</span></div><h1 style="margin-bottom:2px">How this affects you</h1></div>'
+        + '<div class="detail"><div class="panel">'
+        + '<div class="kicker">The bottom line</div>'
+        + '<div class="verdict">Likely to <span class="hl">affect ' + HS.esc(verdictHi) + '</span> near you — with a <span class="hlg">lift to ' + HS.esc(verdictGood) + '</span>.</div>'
+        + '<div class="impacts">' + HS.tpl.impactChips(p.impact_dimensions) + '</div>'
+        + '<div class="divider"></div><div class="kicker">The story so far — and what\'s next</div>'
+        + '<div class="thread">' + HS.tpl.thread(thread) + '</div></div>'
+        + '<div class="panel side"><div class="kicker">What you can do</div><div class="doact">'
+        + '<button class="btn primary" onclick="window.open(\'' + HS.esc(p.source_ref) + '\',\'_blank\',\'noopener\')">Submit a public comment</button>'
+        + '<button class="btn" onclick="HS.addToCalendar(\'' + p.id + '\')">Add hearing to calendar</button>'
+        + '<button class="btn" onclick="window.open(\'' + HS.esc(p.source_ref) + '\',\'_blank\',\'noopener\')">Read the impact analysis</button>'
+        + '<button class="btn ghost" onclick="HS.toggleFollow(this,\'project\',\'' + p.id + '\')">Follow this project</button></div>'
+        + '<div class="divider"></div><div class="kicker">The specs</div><div class="specs">'
+        + specRow('Developer', p.developer) + specRow('Size', p.size) + specRow('Investment', p.investment)
+        + specRow('Jobs created', p.jobs) + specRow('Distance', p.dist) + specRow('Status', p.stage)
+        + '</div>' + (p.approx ? '<p style="font-size:11px;color:var(--ink-3);margin:12px 0 0">Some specifics are prototype placeholders pending the live feed — see the source record.</p>' : '') + '</div></div>';
+    });
+  }
+  function specRow(k,v){ return '<div class="row"><span>' + HS.esc(k) + '</span><b>' + HS.esc(v||'—') + '</b></div>'; }
+});
+
+// simple .ics generator for "Add hearing to calendar"
+HS.addToCalendar = async function (projectId) {
+  var meetings = await HS.data.meetings(HS.state.zip, HS.state.activeProperty);
+  var m = meetings.find(function(x){return x.related_project_id===projectId;}) || meetings[0];
+  if (!m) return;
+  function z(d){ return new Date(d).toISOString().replace(/[-:]/g,'').replace(/\.\d+/,''); }
+  var ics = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//HomeSignal//EN','BEGIN:VEVENT',
+    'UID:' + m.id + '@homesignal','DTSTART:' + z(m.starts_at),'SUMMARY:' + m.title,
+    'LOCATION:' + (m.location||''),'DESCRIPTION:' + (m.source_ref||''),'END:VEVENT','END:VCALENDAR'].join('\r\n');
+  var a = document.createElement('a');
+  a.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+  a.download = (m.title||'hearing').replace(/\W+/g,'-') + '.ics'; a.click();
+};
+</script>
+</body>
+</html>

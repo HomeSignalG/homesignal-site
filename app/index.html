@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeSignal — See what's changing around your home</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<template id="hs-content">
+  <div class="page">
+    <div class="hero">
+      <h1>See what's changing around your home — what it means, and what you can do about it.</h1>
+      <p class="sub">HomeSignal shows you the projects that impact your quality of life and home value. We track development and monitor civic meetings so you can participate in the trajectory of projects.</p>
+      <div class="ziprow">
+        <div class="zwrap"><span class="zpin">◉</span><input id="homeZip" inputmode="numeric" maxlength="5" placeholder="Enter your ZIP code" onkeydown="if(event.key==='Enter')homeFind()"></div>
+        <button class="find" onclick="homeFind()">Find my community</button>
+      </div>
+      <div class="freeline">Free — already following an area? <a href="dashboard.html">Go to your dashboard →</a></div>
+    </div>
+
+    <div class="homesec">
+      <div class="trio">
+        <div class="twin"><div class="ic">◉</div><div class="k">See it</div><h3>What's changing</h3><p>Every project, permit, and hearing near your home — mapped, with the ones that actually affect you.</p><div class="tchips"><span class="tc">Development</span><span class="tc">Hearings</span><span class="tc">Water quality</span><span class="tc">Zoning</span></div></div>
+        <div class="twin"><div class="ic">◈</div><div class="k">Understand it</div><h3>What it means</h3><p>Each change put in plain language and scored — how it impacts your traffic, water, safety, and home value.</p><div class="tchips"><span class="tc">Traffic</span><span class="tc">Water</span><span class="tc">Home value</span><span class="tc">Safety</span></div></div>
+        <div class="twin"><div class="ic">◔</div><div class="k">Act on it</div><h3>What you can do</h3><p>A clear next step on every item, and a heads-up before comment windows and votes close — while you can still weigh in.</p><div class="tchips"><span class="tc">Comment</span><span class="tc">Attend</span><span class="tc">Follow</span><span class="tc">Noted</span></div></div>
+      </div>
+    </div>
+
+    <div class="homesec">
+      <h2>This is what you'll see.</h2>
+      <p class="s2">Every change, translated into what it means for you — and what you can do about it.</p>
+      <div class="previewwrap">
+        <div id="homePreview"><!-- a real Del Valle card, rendered from data --></div>
+        <div class="previewcap" id="homePreviewCap">A real card from the Del Valle, TX community. Enter your ZIP to see your own.</div>
+      </div>
+    </div>
+
+    <div class="trustpanel">
+      <div class="badge">Neutral · Sourced · Non-partisan</div>
+      <h2>Built on public records. Free to follow your community.</h2>
+      <p>Every alert links back to the permit, agenda, or filing it came from. We don't take positions and we don't sell your personal information — we help you see what's changing and decide for yourself.</p>
+    </div>
+
+    <div class="homecta">
+      <h2>Know what's changing around your home.</h2>
+      <p>Open your community in a few seconds — no account needed to start.</p>
+      <button class="big" onclick="HS.openLoc()">Find my community</button>
+    </div>
+  </div>
+</template>
+
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="lib/data.js"></script>
+<script src="lib/templates.js"></script>
+<script src="shell.js"></script>
+<script>
+  async function homeFind() {
+    var el = document.getElementById('homeZip'), z = el.value.trim();
+    if (!/^\d{5}$/.test(z)) { el.style.borderColor = '#c23b34'; el.focus(); return; }
+    el.style.borderColor = '';
+    if (await HS.data.isCovered(z)) location.href = 'community.html?zip=' + z;
+    else { HS.openLoc(); document.getElementById('locZip').value = z; HS.findCommunity(); }
+  }
+  HS.onReady(async function () {
+    var home = HS.state.activeProperty;
+    var changes = await HS.data.changes(HS.state.zip, home);
+    var flagship = changes.find(function (c) { return c.related_project_id; }) || changes[0];
+    if (flagship) {
+      // render a real story card as the homepage preview
+      document.getElementById('homePreview').innerHTML = HS.tpl.storyCard(flagship);
+    }
+  });
+</script>
+</body>
+</html>

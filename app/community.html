@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeSignal — Community</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-nav="comm">
+<template id="hs-content"><div class="page" id="commPage"></div></template>
+
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="lib/data.js"></script>
+<script src="lib/templates.js"></script>
+<script src="shell.js"></script>
+<script>
+HS.onReady(async function () {
+  var zip = new URLSearchParams(location.search).get('zip') || HS.state.zip;
+  HS.state.zip = zip;
+  var page = document.getElementById('commPage');
+
+  var covered = await HS.data.isCovered(zip);
+  if (!covered) {
+    page.innerHTML = '<div class="ph"><div class="eyebrow">Communities</div><h1>' + HS.esc(zip) + ' isn\'t covered yet</h1>'
+      + '<p>We\'re not tracking this ZIP yet — request it and we\'ll email you when it goes live.</p>'
+      + '<button class="inlinebtn" style="margin-top:12px" onclick="HS.openLoc()">Request this community →</button></div>';
+    return;
+  }
+
+  var c = await HS.data.community(zip) || await HS.data.community(HS_CONFIG.DEFAULT_ZIP);
+  var home = HS.state.activeProperty;
+  var projects = await HS.data.projects(zip, home);
+  var changes = await HS.data.changes(zip, home);
+  var meetings = await HS.data.meetings(zip, home);
+  HS.shareUrlOverride = HS_CONFIG.BASE_URL + '/app/community.html?zip=' + zip;
+
+  var active = projects.filter(function(p){return p.status==='Active';});
+  var proposed = projects.filter(function(p){return p.status==='Proposed';});
+  var envChanges = changes.filter(function(x){return /environment|utilit|water/i.test(x.category);});
+  var civic = changes.filter(function(x){return /government|civic/i.test(x.category);});
+
+  page.innerHTML =
+    '<div class="ph"><div class="eyebrow">Communities</div><h1>' + HS.esc(zip) + ' · ' + HS.esc(c.name) + ', ' + HS.esc(c.state) + '</h1>'
+    + '<p>What\'s changing across your community — aggregated from the same feeds that power your alerts.</p>'
+    + '<button class="inlinebtn" style="margin-top:12px" onclick="HS.openModal(\'shareModal\')">◍ Invite your neighbors</button></div>'
+    + '<div class="strip">'
+    + HS.tpl.statTile(c.community_score, 'Community score · ↑ 8', 'g')
+    + HS.tpl.statTile(projects.length, 'Active projects', '')
+    + HS.tpl.statTile(meetings.length, 'Public meetings', 'accent')
+    + HS.tpl.statTile('<span style="font-size:19px">' + HS.esc(c.growth_pressure) + '</span>', 'Growth pressure ↑', '')
+    + '</div>'
+    + '<div class="lensnav">'
+    + '<button class="lenscard on"><span class="q">What\'s changing</span><span class="d">Live · built on existing feeds</span></button>'
+    + '<button class="lenscard" style="opacity:.55"><span class="q">🔒 Demographics</span><span class="d">Phase 1.5 · + Census (free)</span></button>'
+    + '<button class="lenscard" style="opacity:.55"><span class="q">🔒 Economy &amp; Market</span><span class="d">Phase 2 · + market data</span></button>'
+    + '</div>'
+    + '<div class="cols"><div>'
+    + '<div class="groupHead" style="margin-top:0"><span class="gd traffic"></span> Development &amp; growth <span class="gc">— ' + projects.length + ' active</span></div>'
+    + proposed.concat(active).slice(0,3).map(function(p){
+        return '<div class="card mini" style="border-left-color:' + HS.barColor(p) + ';margin-bottom:10px">'
+          + '<span class="lens">' + HS.esc(p.status) + ' · ' + HS.esc(p.dist||'') + '</span><h3>' + HS.esc(p.name) + '</h3>'
+          + '<p class="sowhat">' + HS.esc(p.sowhat||'') + '</p></div>';
+      }).join('')
+    + '<div class="groupHead"><span class="gd water"></span> Environment &amp; utilities <span class="gc">— ' + envChanges.length + ' change' + (envChanges.length===1?'':'s') + '</span></div>'
+    + envChanges.slice(0,2).map(function(ch){ return HS.tpl.miniCard(ch, ch.category); }).join('')
+    + '<div class="groupHead"><span class="gd" style="background:var(--violet)"></span> Government &amp; civic <span class="gc">— ' + meetings.length + ' upcoming</span></div>'
+    + '<div class="card mini" style="border-left-color:var(--violet)"><span class="lens">Civic</span><h3>' + HS.esc(meetings.map(function(m){return m.body;}).slice(0,2).join(' & ')) + '</h3>'
+    + '<p class="sowhat">Upcoming public meetings — development and environment items on the agendas.</p></div>'
+    + '</div><div>'
+    + '<div class="block"><h2 class="bt">Community pulse</h2>'
+    + '<div class="vital"><span class="vl">Development activity</span><span class="vv" style="color:var(--amber)">High</span></div>'
+    + '<div class="vital"><span class="vl">Environmental risk</span><span class="vv" style="color:var(--amber)">Moderate</span></div>'
+    + '<div class="vital"><span class="vl">Civic activity</span><span class="vv">' + HS.esc(c.civic_activity||'Active') + '</span></div>'
+    + '<div class="vital"><span class="vl">Value trend · 12 mo</span><span class="vv" style="color:var(--green)">+' + c.value_trend + '%</span></div></div>'
+    + '<div class="p2"><div class="p2h"><span>🔒</span> Community profile — Phase 1.5 / 2</div>'
+    + '<div class="p2sub">The "what\'s changing" view is live now; the demographic &amp; market profile activates with new feeds.</div>'
+    + '<div class="p2i"><div style="flex:1"><div class="t">Population &amp; demographics</div><div class="d">Community DNA radar, household mix</div></div><span class="feed">+ Census (free)</span></div>'
+    + '<div class="p2i"><div style="flex:1"><div class="t">Median home value &amp; market</div><div class="d">Prices, growth outlook</div></div><span class="feed">+ market data</span></div></div>'
+    + '</div></div>';
+});
+</script>
+</body>
+</html>

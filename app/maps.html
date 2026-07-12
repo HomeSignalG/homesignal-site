@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeSignal — Maps</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-nav="maps">
+<template id="hs-content">
+  <div class="page">
+    <div class="ph">
+      <div class="eyebrow">Maps</div>
+      <h1>What's changing around you</h1>
+      <p>Every project and alert near your home, placed on the map and colored by the part of life it touches — not by project type.</p>
+    </div>
+    <div class="toolbar">
+      <div class="seg" id="mapMode">
+        <button class="on" data-mode="impact">Impact</button>
+        <button data-mode="sat" title="Available with a live map provider">Satellite</button>
+        <button data-mode="street" title="Available with a live map provider">Street</button>
+      </div>
+      <div class="sp"></div>
+      <button class="fpill" id="radiusPill">◉ Impact radius: 1.5 mi ▾</button>
+      <button class="fpill">All dimensions ▾</button>
+    </div>
+    <div class="mapcols">
+      <div class="mapwrap" id="mapWrap">
+        <div class="mpanel">
+          <div class="mt">Pins colored by impact</div>
+          <div class="legrow"><span class="ld" style="background:var(--red)"></span> High impact on you</div>
+          <div class="legrow"><span class="ld" style="background:var(--amber)"></span> Moderate impact</div>
+          <div class="legrow"><span class="ld" style="background:var(--blue)"></span> Watch / minor</div>
+          <div class="legrow"><span class="ld" style="background:var(--green-2)"></span> Positive / distant</div>
+          <div class="layers">
+            <div class="mt">Layers</div>
+            <div class="lyr" id="lyrProjects"><span>Projects</span><span class="tg"></span></div>
+            <div class="lyr" id="lyrRadius"><span>Impact radius</span><span class="tg"></span></div>
+            <div class="lyr off" title="Available when flood data is ingested for this community"><span>Flood zones</span><span class="tg"></span></div>
+            <div class="lyr off" title="Available when school data is ingested for this community"><span>Schools</span><span class="tg"></span></div>
+          </div>
+        </div>
+        <div class="mgps" id="mapGps"></div>
+      </div>
+      <div class="pinlist" id="pinList"></div>
+    </div>
+  </div>
+</template>
+
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="lib/data.js"></script>
+<script src="lib/templates.js"></script>
+<script src="lib/map.js"></script>
+<script src="shell.js"></script>
+<script>
+HS.onReady(async function () {
+  var S = HS.state, home = S.activeProperty;
+  var c = await HS.data.community(S.zip);
+  var projects = await HS.data.projects(S.zip, home);
+  var changes = await HS.data.changes(S.zip, home);
+
+  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true };
+  var items = changes.filter(function(x){return !x.quiet;}).concat(projects)
+    .filter(function(x){return x.lat && x.lng;})
+    .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
+
+  // Capture the overlay panel ONCE, before any render() wipes the wrapper.
+  var panelHTML = document.querySelector('.mpanel').outerHTML;
+
+  function draw() {
+    var wrap = document.getElementById('mapWrap');
+    var shown = opts.showProjects ? items : items.filter(function(x){return !x.type;});
+    var pins = HS.MapProvider.render(wrap, {
+      home: home, items: shown, radiusMi: opts.radiusMi, showRadius: opts.showRadius, w: 780, h: 520
+    });
+    // render() set only the <svg>; re-add the legend/layers panel + gps chip.
+    wrap.insertAdjacentHTML('beforeend', panelHTML);
+    var within = shown.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;
+    wrap.insertAdjacentHTML('beforeend', '<div class="mgps">' + HS.esc(c.name + ', ' + c.state) + ' · ' + within + ' items within ' + opts.radiusMi + ' mi</div>');
+    // reflect current layer state + rewire toggles (panel was re-created)
+    document.getElementById('lyrProjects').classList.toggle('off', !opts.showProjects);
+    document.getElementById('lyrRadius').classList.toggle('off', !opts.showRadius);
+    document.getElementById('lyrProjects').onclick = function(){ opts.showProjects=!opts.showProjects; draw(); };
+    document.getElementById('lyrRadius').onclick = function(){ opts.showRadius=!opts.showRadius; draw(); };
+
+    document.getElementById('pinList').innerHTML =
+      '<div class="groupHead" style="margin-top:0">Near you · closest first</div>'
+      + pins.map(function (p) {
+        var it = p.item;
+        return '<div class="card mini" style="border-left-color:' + p.color + '">'
+          + '<span class="lens"><span class="letter" style="background:' + p.color + '">' + p.letter + '</span>&nbsp; '
+          + HS.esc(it.type || it.category || '') + ' · ' + HS.esc(it.dist||'') + '</span>'
+          + '<h3>' + HS.esc(it.name || it.title) + '</h3>'
+          + '<p class="sowhat">' + HS.esc(it.sowhat || it.plain_language || '') + '</p>'
+          + '<div class="impacts">' + HS.tpl.impactChips(it.impacts || it.impact_dimensions) + '</div></div>';
+      }).join('');
+  }
+  draw();
+
+  var radii = [0.5,1,1.5,2,3,5], ri = 2;
+  document.getElementById('radiusPill').onclick = function () {
+    ri = (ri + 1) % radii.length; opts.radiusMi = radii[ri];
+    this.textContent = '◉ Impact radius: ' + opts.radiusMi + ' mi ▾'; draw();
+  };
+
+  // Satellite / Street: not built in Phase 1 (needs a live tile provider). Give an
+  // honest, visible response on click instead of a silent disabled button.
+  document.getElementById('mapMode').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-mode]'); if (!btn) return;
+    if (btn.dataset.mode === 'impact') return;
+    HS.toast('Satellite & Street views arrive with a live map provider — Impact view is live now.');
+  });
+});
+</script>
+</body>
+</html>

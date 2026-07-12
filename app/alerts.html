@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeSignal — Alerts</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-nav="alerts">
+<template id="hs-content">
+  <div class="page">
+    <div class="ph">
+      <div class="eyebrow">Alerts</div>
+      <h1>What needs your attention near home</h1>
+      <p>Sorted by how much each change affects your daily life — not by when it arrived.</p>
+    </div>
+    <div class="strip" id="alStrip"></div>
+
+    <div class="topicsec">
+      <div class="th"><h2>Your alert topics — choose what you're notified about</h2><span style="font-size:12px;color:var(--ink-3)">Controls what you see here and what gets emailed</span></div>
+      <div class="tcats">
+        <button class="tcat" onclick="HS.openTopics('gov')"><div class="ci" style="background:var(--red)">▤</div><h4>Government Notices</h4><div class="cc" id="cc-gov">—</div><div class="cd">click to change</div></button>
+        <button class="tcat" onclick="HS.openTopics('meetings')"><div class="ci" style="background:var(--amber)">▦</div><h4>Upcoming Meetings</h4><div class="cc" id="cc-meetings">—</div><div class="cd">click to change</div></button>
+        <button class="tcat" onclick="HS.openTopics('news')"><div class="ci" style="background:var(--blue)">✉</div><h4>Local News</h4><div class="cc" id="cc-news">—</div><div class="cd">click to change</div></button>
+        <button class="tcat" onclick="HS.openTopics('dev')"><div class="ci" style="background:var(--green-2)">◈</div><h4>Development</h4><div class="cc" id="cc-dev">—</div><div class="cd">click to change</div></button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="seg" id="alSort"><button class="on" data-sort="impact">By life impact</button><button data-sort="distance">By distance</button><button data-sort="newest">Newest</button></div>
+      <div class="sp"></div>
+      <button class="fpill">All dimensions ▾</button>
+      <button class="fpill">Any distance ▾</button>
+    </div>
+
+    <div id="alBand"></div>
+    <div id="alGroups"></div>
+    <div id="alQuiet"></div>
+  </div>
+</template>
+
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="lib/data.js"></script>
+<script src="lib/templates.js"></script>
+<script src="shell.js"></script>
+<script>
+HS.onReady(async function () {
+  var S = HS.state, home = S.activeProperty;
+  var c = await HS.data.community(S.zip);
+  var all = await HS.data.changes(S.zip, home);
+
+  // topic counts
+  var cats = HS.data.topicCategories();
+  ['gov','meetings','news','dev'].forEach(function (k) {
+    var pref = S.topicPrefs[k];
+    var n = pref ? pref.topics.length : cats[k].on.length;
+    var el = document.getElementById('cc-' + k);
+    if (el) el.textContent = n + ' topic' + (n===1?'':'s') + ' followed';
+  });
+
+  var open = all.filter(function (x) { var d = HS.daysUntil(x.window_closes_at); return d != null && d >= 0; });
+  var rest = all.filter(function (x) { return open.indexOf(x) < 0 && !x.quiet; });
+  var quiet = all.filter(function (x) { return x.quiet; });
+
+  // strip
+  var nearest = all.slice().sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);})[0];
+  document.getElementById('alStrip').innerHTML =
+    HS.tpl.statTile(open.length, 'Need you soon — windows closing', 'accent')
+    + HS.tpl.statTile(rest.length + open.length, 'Changes worth knowing this week', '')
+    + HS.tpl.statTile('+' + c.value_trend + '%', 'Your value outlook, next 12 mo', 'g')
+    + HS.tpl.statTile((nearest && nearest.dist ? nearest.dist.replace(' mi','') : '—') + '<span style="font-size:14px;font-weight:600;color:var(--ink-3)">mi</span>', 'Nearest active change', '');
+
+  function sortItems(items, mode) {
+    var a = items.slice();
+    if (mode === 'distance') a.sort(function(x,y){return (x.distance_mi||9e9)-(y.distance_mi||9e9);});
+    else if (mode === 'newest') a.sort(function(x,y){return new Date(y.occurred_at)-new Date(x.occurred_at);});
+    else a.sort(function(x,y){return (y.impacts?y.impacts.length:0)-(x.impacts?x.impacts.length:0);});
+    return a;
+  }
+
+  function render(mode) {
+    // needs-you band
+    document.getElementById('alBand').innerHTML = open.length ? (
+      '<div class="band"><div class="band-h"><span class="lab"><span class="dotb"></span>Needs you soon</span>'
+      + '<span class="cnt">Action still changes the outcome</span></div>'
+      + sortItems(open, mode).map(function(ch){ return HS.tpl.storyCard(ch).replace('class="card"','class="card inband"'); }).join('')
+      + '</div>') : '';
+
+    // groups by category
+    var groups = {};
+    sortItems(rest, mode).forEach(function (ch) { (groups[ch.category] = groups[ch.category] || []).push(ch); });
+    var dotColor = { 'Traffic & getting around':'traffic','Home value & cost of living':'value','Environment & utilities':'water','Government & civic':'safety','Development':'traffic' };
+    document.getElementById('alGroups').innerHTML = Object.keys(groups).map(function (g) {
+      var col = dotColor[g] || 'traffic';
+      return '<div class="groupHead"><span class="gd ' + col + '"></span> ' + HS.esc(g)
+        + ' <span class="gc">— ' + groups[g].length + ' change' + (groups[g].length===1?'':'s') + '</span></div>'
+        + groups[g].map(function(ch){ return HS.tpl.storyCard(ch); }).join('');
+    }).join('');
+
+    // quiet
+    document.getElementById('alQuiet').innerHTML = quiet.length ? (
+      '<div class="groupHead" style="color:var(--ink-3)"><span class="gd" style="background:var(--line)"></span> Good to know · lower relevance to you</div>'
+      + '<div class="quiet">' + quiet.map(function(q){return '<b>' + HS.esc(q.title) + '</b>';}).join(' · ')
+      + '. &nbsp;Collapsed because they\'re unlikely to affect your home — expand any time.</div>') : '';
+  }
+
+  render('impact');
+  document.getElementById('alSort').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-sort]'); if (!b) return;
+    [].forEach.call(this.querySelectorAll('button'), function(x){x.classList.remove('on');});
+    b.classList.add('on'); render(b.dataset.sort);
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeSignal — Property</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-nav="props">
+<template id="hs-content"><div class="page" id="propPage"></div></template>
+
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="lib/data.js"></script>
+<script src="lib/templates.js"></script>
+<script src="shell.js"></script>
+<script>
+HS.onReady(async function () {
+  var S = HS.state;
+  var id = new URLSearchParams(location.search).get('id');
+  var p = S.properties.find(function(x){return x.id===id;}) || S.activeProperty;
+  if (p) HS.selectProperty(p.id);
+  var page = document.getElementById('propPage');
+  if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'properties.html\'">← All properties</button><div class="ph"><h1>No property</h1></div>'; return; }
+
+  var projects = HS.withDistance(await HS.data.projects(S.zip, p), p)
+    .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
+  var changes = HS.withDistance(await HS.data.changes(S.zip, p), p);
+  var env = await HS.data.envRisk(S.zip);
+  var near = projects.slice(0, 3);
+
+  var risk = env ? ['flood','wildfire','heat'].map(function (k) {
+    var r = env[k]; var color = r.tone==='green-2'?'var(--green-2)':r.tone==='blue'?'var(--blue)':'var(--amber)';
+    var label = k==='heat'?'Extreme heat':k.charAt(0).toUpperCase()+k.slice(1);
+    return '<div class="rk"><div class="rkl">' + label + '</div><div class="rkv" style="color:' + color + '">' + HS.esc(r.label) + '</div>'
+      + '<div class="track" style="margin-top:7px"><div class="fill" style="width:' + r.pct + '%;background:' + color + '"></div></div></div>';
+  }).join('') : '';
+
+  var thread = changes.slice(0,4).map(function(ch,i){
+    return { date: HS.fmtDate(ch.occurred_at, {year:'numeric',month:'long',day:'numeric'}), title: ch.title, future:false };
+  });
+
+  var openAlerts = changes.filter(function(x){return HS.daysUntil(x.window_closes_at)>=0 && (x.distance_mi||9e9)<=5;}).length;
+
+  page.innerHTML =
+    '<button class="backbtn" onclick="location.href=\'properties.html\'">← All properties</button>'
+    + '<div class="ph"><div class="eyebrow">' + HS.esc(p.tag||p.label) + '</div><h1>' + HS.esc(p.address) + '</h1>'
+    + '<p>' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + ' — everything changing around this specific address, and what it means for its value.</p></div>'
+    + '<div class="cols"><div>'
+    + '<div class="block"><div class="bt-row"><h2>What\'s changing near this property</h2><a href="development.html">All projects →</a></div>'
+    + near.map(function (pr) {
+        return '<div class="card mini" style="border-left-color:' + HS.barColor(pr) + ';margin-bottom:10px">'
+          + '<span class="lens"><span class="sw ' + HS.esc(pr.lens||'value') + '"></span>' + HS.esc(pr.dist||'') + ' · ' + HS.esc(pr.status.toLowerCase()) + '</span>'
+          + '<h3>' + HS.esc(pr.name) + '</h3><p class="sowhat"><b>Effect on this home:</b> ' + HS.esc(pr.sowhat||'') + '</p>'
+          + '<div class="impacts">' + HS.tpl.impactChips(pr.impact_dimensions) + '</div></div>';
+      }).join('')
+    + '</div>'
+    + '<div class="block"><h2 class="bt">Environmental risk for this parcel</h2><div class="riskgrid">' + risk + '</div>'
+    + '<p style="font-size:11px;color:var(--ink-3);margin:10px 0 0">From flood-zone, wildfire and climate layers already ingested.</p></div>'
+    + '<div class="block"><h2 class="bt">This property\'s timeline</h2><div class="thread">' + HS.tpl.thread(thread) + '</div></div>'
+    + '</div><div>'
+    + '<div class="block"><h2 class="bt">Property vitals</h2>'
+    + '<div style="display:flex;align-items:center;gap:15px;margin-bottom:12px">' + HS.tpl.scoreRing(p.score)
+    + '<div><div style="font-size:13px;color:var(--ink-2)">Property score</div><div style="font-size:13px;color:var(--green);font-weight:700">' + HS.esc(p.score_trend||'') + '</div></div></div>'
+    + '<div class="vital"><span class="vl">Value outlook · 12 mo</span><span class="vv" style="color:var(--green)">+' + p.value_outlook + '%</span></div>'
+    + '<div class="vital"><span class="vl">Insurance outlook</span><span class="vv">' + HS.esc(p.insurance_outlook||'Stable') + '</span></div>'
+    + '<div class="vital"><span class="vl">Nearby projects</span><span class="vv">' + near.length + '</span></div>'
+    + '<div class="vital"><span class="vl">Active alerts</span><span class="vv">' + openAlerts + '</span></div></div>'
+    + '<div class="block"><h2 class="bt">What you can do</h2><div class="doact">'
+    + '<button class="btn primary" onclick="HS.toggleFollow(this,\'property\',\'' + p.id + '\')">Watch this property</button>'
+    + '<button class="btn" onclick="location.href=\'reports.html\'">Generate property report</button>'
+    + '<button class="btn ghost" disabled title="Coming soon">Compare to nearby homes</button></div></div>'
+    + '<div class="p2"><div class="p2h"><span>🔒</span> Phase 2 — unlocked by new feeds</div><div class="p2sub">Layout ready; activates with these sources.</div>'
+    + '<div class="p2i"><div style="flex:1"><div class="t">Total cost of ownership</div><div class="d">Taxes, insurance, utilities, upkeep</div></div><span class="feed">+ assessor / tax</span></div>'
+    + '<div class="p2i"><div style="flex:1"><div class="t">Insurance comparison</div><div class="d">Quotes &amp; savings by carrier</div></div><span class="feed">+ insurance</span></div>'
+    + '<div class="p2i"><div style="flex:1"><div class="t">Document vault</div><div class="d">Deed, permits, warranties</div></div><span class="feed">+ uploads</span></div></div>'
+    + '</div></div>';
+});
+</script>
+</body>
+</html>
