@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeSignal — Alerts &amp; Development mockups</title>
+<style>
+  :root{
+    --bg:#f4f6f4; --panel:#ffffff; --ink:#16211c; --ink-2:#4a5a52; --ink-3:#8593; --ink-3:#83918a;
+    --line:#e4e8e4; --line-2:#eef1ee;
+    --green:#157a49; --green-2:#1f9d5c; --green-tint:#e9f5ee; --green-deep:#0f5c37;
+    --red:#c23b34; --red-tint:#fbeceb;
+    --amber:#c47a1a; --amber-tint:#fbf1e2;
+    --blue:#3f7fb0; --blue-tint:#eaf2f8;
+    --violet:#6b5bb5;
+    --shadow-sm:0 1px 2px rgba(16,33,28,.06);
+    --shadow:0 1px 2px rgba(16,33,28,.05),0 8px 24px rgba(16,33,28,.06);
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --sidebar:236px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.5;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+
+  .app{display:grid;grid-template-columns:var(--sidebar) 1fr;min-height:100vh}
+
+  /* ---------- SIDEBAR ---------- */
+  .side{background:#10231a;color:#c7d6cd;display:flex;flex-direction:column;padding:18px 14px;position:sticky;top:0;height:100vh}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;color:#fff;padding:6px 8px 18px}
+  .logo .mk{width:24px;height:24px;border-radius:7px;background:var(--green-2);display:grid;place-items:center;color:#fff;font-size:13px}
+  .nav{display:flex;flex-direction:column;gap:2px}
+  .nav a{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;color:#a9bcb1;text-decoration:none;font-size:13.5px;font-weight:500}
+  .nav a .ic{width:17px;text-align:center;opacity:.9;font-size:14px}
+  .nav a:hover{background:#193024;color:#eaf3ee}
+  .nav a.on{background:var(--green);color:#fff}
+  .nav a.on .ic{opacity:1}
+  .side .grow{flex:1}
+  .upsell{background:#193024;border:1px solid #24402f;border-radius:12px;padding:14px}
+  .upsell .t{font-size:13px;font-weight:700;color:#fff;margin-bottom:3px}
+  .upsell .d{font-size:11.5px;color:#93a89c;margin-bottom:10px}
+  .upsell button{width:100%;background:var(--green-2);color:#fff;border:none;padding:8px;border-radius:8px;font-size:12.5px;font-weight:600}
+
+  /* ---------- TOPBAR ---------- */
+  .main{display:flex;flex-direction:column;min-width:0}
+  .top{display:flex;align-items:center;gap:14px;padding:13px 26px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  .loc{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--ink);background:#f4f6f4;border:1px solid var(--line);padding:7px 12px;border-radius:9px}
+  .loc .pin{color:var(--green)}
+  .search{flex:1;max-width:520px}
+  .search input{width:100%;border:1px solid var(--line);background:#f7f9f7;border-radius:9px;padding:9px 13px;font-size:13px;color:var(--ink)}
+  .top .sp{flex:1}
+  .ib{width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;color:var(--ink-2);position:relative}
+  .ib .badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px}
+  .avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--green-2),var(--green-deep));color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700}
+
+  .page{padding:28px 34px 60px;max-width:1180px;width:100%;margin:0 auto}
+
+  /* ---------- PAGE HEADER ---------- */
+  .ph{margin-bottom:22px}
+  .ph .eyebrow{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green)}
+  .ph h1{font-size:27px;letter-spacing:-.02em;margin:6px 0 6px}
+  .ph p{font-size:15px;color:var(--ink-2);margin:0;max-width:640px}
+
+  /* summary strip */
+  .strip{display:flex;gap:14px;margin:20px 0 26px;flex-wrap:wrap}
+  .stat{flex:1;min-width:150px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px 17px;box-shadow:var(--shadow-sm)}
+  .stat .n{font-size:24px;font-weight:700;letter-spacing:-.02em}
+  .stat .l{font-size:12.5px;color:var(--ink-2);margin-top:1px}
+  .stat.accent{background:var(--red-tint);border-color:#f2d3d0}
+  .stat.accent .n{color:var(--red)}
+  .stat.g{background:var(--green-tint);border-color:#cbe7d5}
+  .stat.g .n{color:var(--green)}
+
+  /* filter row */
+  .toolbar{display:flex;align-items:center;gap:9px;margin-bottom:18px;flex-wrap:wrap}
+  .seg{display:inline-flex;background:#eef1ee;border-radius:10px;padding:3px}
+  .seg button{border:none;background:transparent;padding:7px 13px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--ink-2)}
+  .seg button.on{background:#fff;color:var(--ink);box-shadow:var(--shadow-sm)}
+  .toolbar .sp{flex:1}
+  .fpill{font-size:12.5px;padding:7px 12px;border:1px solid var(--line);border-radius:9px;color:var(--ink-2);background:#fff}
+
+  /* ---------- STORY CARD ---------- */
+  .band{border:1px solid #f0d2cf;background:linear-gradient(180deg,#fdf3f2,#fff 60%);border-radius:15px;padding:6px 8px 10px;margin-bottom:26px}
+  .band-h{display:flex;align-items:center;justify-content:space-between;padding:13px 12px 8px}
+  .band-h .lab{font-size:12.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--red);display:flex;align-items:center;gap:9px}
+  .band-h .lab .dotb{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 0 4px var(--red-tint)}
+  .band-h .cnt{font-size:12px;color:var(--ink-3)}
+
+  .groupHead{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);margin:26px 4px 12px}
+  .groupHead .gd{width:10px;height:10px;border-radius:50%}
+  .groupHead .gc{font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink-3);font-size:12px}
+
+  .card{background:#fff;border:1px solid var(--line);border-left-width:3px;border-radius:13px;padding:17px 18px 15px;box-shadow:var(--shadow-sm);margin-bottom:12px}
+  .card.inband{margin:0 4px 8px}
+  .card .lens{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-bottom:9px}
+  .card .lens .sw{width:8px;height:8px;border-radius:50%}
+  .card h3{font-size:16.5px;margin:0 0 7px;letter-spacing:-.01em}
+  .sowhat{font-size:14px;color:var(--ink-2);margin:0 0 13px}
+  .sowhat b{color:var(--ink)}
+  .impacts{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+  .ichip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;background:#f7f9f7;border:1px solid var(--line);padding:5px 9px;border-radius:8px;color:var(--ink)}
+  .ichip .cd{width:8px;height:8px;border-radius:50%}
+  .ichip .ar{font-weight:800}
+  .ichip.bad .ar{color:var(--red)} .ichip.good .ar{color:var(--green-2)}
+  .foot{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line-2);padding-top:12px;flex-wrap:wrap}
+  .meta{font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+  .meta .dist{color:var(--ink-2);font-weight:600}
+  .actions{display:flex;gap:8px}
+  .btn{font-size:12.5px;font-weight:600;padding:8px 13px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);white-space:nowrap}
+  .btn:hover{background:#f7f9f7}
+  .btn.primary{background:var(--green);color:#fff;border-color:var(--green)}
+  .btn.primary:hover{background:var(--green-deep)}
+  .btn.ghost{color:var(--ink-2);border-color:transparent}
+  .win{font-size:11.5px;font-weight:700;color:var(--red);background:var(--red-tint);padding:4px 9px;border-radius:7px;display:inline-flex;align-items:center;gap:5px}
+  .win.soft{color:var(--amber);background:var(--amber-tint)}
+
+  .cd.traffic{background:var(--amber)} .cd.water{background:var(--blue)} .cd.air{background:var(--violet)}
+  .cd.safety{background:var(--red)} .cd.value{background:var(--green-2)} .cd.cost{background:#c9902a} .cd.green{background:#3f9e6a}
+  .sw.traffic{background:var(--amber)} .sw.water{background:var(--blue)} .sw.value{background:var(--green-2)} .sw.safety{background:var(--red)}
+
+  .quiet{border:1px dashed var(--line);border-radius:13px;padding:15px 17px;color:var(--ink-3);font-size:13px;background:#fbfcfb;margin-top:6px}
+  .quiet b{color:var(--ink-2)}
+
+  /* ---------- DEVELOPMENT ---------- */
+  .lensnav{display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+  .lenscard{flex:1;min-width:180px;border:1px solid var(--line);border-radius:13px;padding:14px 16px;background:#fff;text-align:left;box-shadow:var(--shadow-sm)}
+  .lenscard.on{border-color:var(--green);background:var(--green-tint)}
+  .lenscard .q{display:block;font-size:14.5px;font-weight:700;margin-bottom:2px;color:var(--ink)}
+  .lenscard .d{font-size:12px;color:var(--ink-3)}
+  .devgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card.clickable{cursor:pointer;transition:transform .08s ease, box-shadow .12s ease}
+  .card.clickable:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  .status{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px}
+  .status.prop{color:var(--amber);background:var(--amber-tint)}
+  .status.active{color:var(--green);background:var(--green-tint)}
+  .status.appr{color:var(--blue);background:var(--blue-tint)}
+
+  /* detail */
+  .backbtn{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--green);background:none;border:none;padding:0;margin-bottom:16px}
+  .detail{display:grid;grid-template-columns:1.4fr .85fr;gap:16px}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:15px;padding:22px;box-shadow:var(--shadow-sm)}
+  .panel.side{background:#fbfcfb}
+  .kicker{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-bottom:10px}
+  .verdict{font-size:21px;font-weight:700;letter-spacing:-.01em;line-height:1.32;margin:2px 0 16px}
+  .verdict .hl{background:var(--red-tint);color:var(--red);padding:0 5px;border-radius:5px}
+  .verdict .hlg{background:var(--green-tint);color:var(--green);padding:0 5px;border-radius:5px}
+  .divider{height:1px;background:var(--line-2);margin:20px 0}
+  .thread{padding-left:4px}
+  .tev{display:flex;gap:13px;padding:0 0 17px;position:relative}
+  .tev:before{content:"";position:absolute;left:6px;top:15px;bottom:-3px;width:2px;background:var(--line)}
+  .tev:last-child:before{display:none}
+  .tev .tk{width:13px;height:13px;border-radius:50%;background:var(--green);flex:none;margin-top:3px;box-shadow:0 0 0 3px var(--green-tint)}
+  .tev.future .tk{background:#fff;border:2px solid var(--amber);box-shadow:0 0 0 3px var(--amber-tint)}
+  .tev .td{font-size:11.5px;color:var(--ink-3)}
+  .tev .tt{font-size:13.5px;font-weight:600}
+  .tev .tl{font-size:12px;color:var(--green);font-weight:600;margin-top:1px}
+  .tev.future .tl{color:var(--amber)}
+  .doact{display:flex;flex-direction:column;gap:9px;margin-bottom:6px}
+  .doact .btn{width:100%;justify-content:center;text-align:center;padding:11px}
+  .specs .row{display:flex;justify-content:space-between;font-size:13px;padding:8px 0;border-bottom:1px dashed var(--line)}
+  .specs .row:last-child{border-bottom:none}
+  .specs .row span{color:var(--ink-3)}
+  .specs .row b{color:var(--ink)}
+
+  /* ---------- SHARED LAYOUT (mission / dashboard) ---------- */
+  .cols{display:grid;grid-template-columns:1.55fr .95fr;gap:18px;align-items:start}
+  .block{background:#fff;border:1px solid var(--line);border-radius:15px;padding:20px;box-shadow:var(--shadow-sm);margin-bottom:18px}
+  .block h2.bt{font-size:15px;margin:0 0 14px;letter-spacing:-.01em}
+  .bt-row{display:flex;align-items:center;justify-content:space-between;margin:0 0 14px}
+  .bt-row h2{font-size:15px;margin:0}
+  .bt-row a{font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600}
+  .prow{display:flex;gap:13px;padding:14px 0;border-bottom:1px solid var(--line-2);align-items:flex-start}
+  .prow:last-child{border-bottom:none}
+  .prow .pk{width:9px;height:9px;border-radius:50%;margin-top:5px;flex:none}
+  .prow .pmain{flex:1;min-width:0}
+  .prow .pt{font-size:14px;font-weight:600;margin-bottom:2px}
+  .prow .pd{font-size:12.5px;color:var(--ink-2)}
+  .prow .pmeta{font-size:11.5px;color:var(--ink-3);margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .brief{font-size:14.5px;color:var(--ink-2);line-height:1.65;margin:0}
+  .brief b{color:var(--ink)}
+  .brief .hl{background:var(--green-tint);color:var(--green-deep);padding:0 4px;border-radius:4px;font-weight:600}
+  .vital{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line-2)}
+  .vital:last-child{border-bottom:none}
+  .vital .vl{font-size:13px;color:var(--ink-2)}
+  .vital .vv{font-size:15px;font-weight:700}
+  .ring{width:60px;height:60px;border-radius:50%;background:conic-gradient(var(--green) calc(var(--p,85)*1%),#e7ece7 0);display:grid;place-items:center;flex:none}
+  .ring .in{width:46px;height:46px;border-radius:50%;background:#fff;display:grid;place-items:center;font-size:15px;font-weight:700}
+  .aw{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--line-2)}
+  .aw:last-child{border-bottom:none}
+  .aw .ak{width:11px;height:11px;border-radius:50%;border:2px solid var(--amber);margin-top:3px;flex:none;box-shadow:0 0 0 3px var(--amber-tint)}
+  .aw .at{font-size:13.5px;font-weight:600}
+  .aw .ad{font-size:11.5px;color:var(--ink-3)}
+  .aw .au{font-size:11.5px;color:var(--amber);font-weight:700;margin-top:1px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .wchip{font-size:12.5px;font-weight:600;background:#f4f6f4;border:1px solid var(--line);padding:7px 12px;border-radius:999px;color:var(--ink)}
+
+  /* ---------- MAP ---------- */
+  .mapcols{display:grid;grid-template-columns:1fr 350px;gap:16px;align-items:start}
+  .mapwrap{position:relative;border:1px solid var(--line);border-radius:15px;overflow:hidden;box-shadow:var(--shadow-sm);background:#e4eadd}
+  .mapwrap svg{display:block;width:100%;height:auto}
+  .mpanel{position:absolute;top:14px;left:14px;background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:12px;padding:13px 15px;box-shadow:var(--shadow);width:196px}
+  .mpanel .mt{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin:0 0 9px}
+  .legrow{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink);margin-bottom:8px}
+  .legrow .ld{width:11px;height:11px;border-radius:50%;flex:none}
+  .layers{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-2)}
+  .lyr{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;padding:5px 0;color:var(--ink-2)}
+  .lyr .tg{width:30px;height:17px;border-radius:999px;background:var(--green);position:relative;flex:none}
+  .lyr .tg:after{content:"";position:absolute;right:2px;top:2px;width:13px;height:13px;border-radius:50%;background:#fff}
+  .lyr.off .tg{background:#cfd6cf}
+  .lyr.off .tg:after{right:auto;left:2px}
+  .mgps{position:absolute;bottom:14px;right:14px;background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:10px;font-size:11.5px;color:var(--ink-2);padding:7px 11px;box-shadow:var(--shadow-sm)}
+  .letter{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;flex:none}
+  .pinlist .card{margin-bottom:10px}
+  .card.mini{padding:14px 15px}
+  .card.mini h3{font-size:14.5px;margin:0 0 5px}
+  .card.mini .sowhat{font-size:12.5px;margin-bottom:10px}
+
+  /* ---------- PHASE 1 SCOPING ---------- */
+  .ribbon{display:flex;align-items:center;gap:12px;background:var(--green-tint);border-bottom:1px solid #cbe7d5;padding:10px 26px;font-size:12.5px;color:var(--green-deep)}
+  .ribbon .tag{background:var(--green);color:#fff;font-weight:700;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:999px;flex:none}
+  .ribbon b{font-weight:700}
+  .ribbon .rsp{flex:1}
+  .ribbon a{color:var(--green);font-weight:600;text-decoration:none;white-space:nowrap}
+  .p2{border:1px dashed #cdd6cf;border-radius:15px;padding:17px 18px;background:repeating-linear-gradient(135deg,#fafbfa,#fafbfa 10px,#f3f5f3 10px,#f3f5f3 20px)}
+  .p2 .p2h{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin-bottom:6px}
+  .p2 .p2sub{font-size:11.5px;color:var(--ink-3);margin-bottom:12px}
+  .p2 .p2i{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line-2)}
+  .p2 .p2i:last-child{border-bottom:none}
+  .p2 .p2i .t{font-size:13.5px;font-weight:600;color:var(--ink-2)}
+  .p2 .p2i .d{font-size:11.5px;color:var(--ink-3)}
+  .p2 .feed{font-size:10px;color:var(--amber);font-weight:700;background:var(--amber-tint);padding:3px 7px;border-radius:5px;white-space:nowrap;flex:none}
+  .why{margin:0 0 13px;border:1px solid var(--line);border-radius:9px;background:#fbfcfb}
+  .why summary{cursor:pointer;list-style:none;padding:9px 12px;font-size:12px;font-weight:600;color:var(--green);display:flex;align-items:center;gap:7px}
+  .why summary::-webkit-details-marker{display:none}
+  .why[open] summary{border-bottom:1px solid var(--line-2)}
+  .why .wbody{padding:10px 12px;font-size:12.5px;color:var(--ink-2)}
+  .why .wbody .r{padding:3px 0}
+  .why .wbody .r b{color:var(--ink)}
+  .scorebars{margin-top:14px;padding-top:14px;border-top:1px solid var(--line-2)}
+  .sb{margin-bottom:10px}
+  .sb .sl{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-2);margin-bottom:4px}
+  .sb .sl b{color:var(--ink)}
+  .sb .track{height:6px;border-radius:999px;background:#eef1ee;overflow:hidden}
+  .sb .fill{height:100%;border-radius:999px}
+  /* properties risk grid + reports */
+  .riskgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .rk{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}
+  .rk .rkl{font-size:11.5px;color:var(--ink-3)}
+  .rk .rkv{font-size:15px;font-weight:700}
+  .rgrid{display:grid;grid-template-columns:.92fr 1.08fr;gap:18px;align-items:start}
+  .rlist{display:flex;flex-direction:column;gap:10px}
+  .rrow{display:flex;align-items:center;gap:13px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 15px;box-shadow:var(--shadow-sm);cursor:pointer}
+  .rrow:hover{background:#fbfcfb}
+  .rrow .ricon{width:38px;height:38px;border-radius:10px;background:var(--green-tint);color:var(--green);display:grid;place-items:center;font-size:16px;flex:none}
+  .rrow .rmain{flex:1;min-width:0}
+  .rrow .rt{font-size:14px;font-weight:600}
+  .rrow .rd{font-size:11.5px;color:var(--ink-3)}
+  .rrow .rtype{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);background:#f4f6f4;padding:3px 8px;border-radius:5px;flex:none}
+  .doc{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .doc .dhead{padding:20px 22px;border-bottom:1px solid var(--line-2);background:linear-gradient(180deg,#fbfcfb,#fff)}
+  .doc .dhead .dk{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--green)}
+  .doc .dhead h3{margin:6px 0 3px;font-size:19px}
+  .doc .dhead .dm{font-size:11.5px;color:var(--ink-3)}
+  .doc .dbody{padding:20px 22px}
+  .doc .dsec{margin-bottom:18px}
+  .doc .dsec:last-child{margin-bottom:0}
+  .doc .dsec h4{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin:0 0 8px}
+  .doc .dsec p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.6}
+  /* share button + modals */
+  .sharebtn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer}
+  .sharebtn:hover{background:#f7f9f7}
+  .inlinebtn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--green);font-size:12.5px;font-weight:600;cursor:pointer}
+  .inlinebtn:hover{background:var(--green-tint)}
+  .overlay{position:fixed;inset:0;background:rgba(16,33,28,.5);z-index:100;display:none;align-items:center;justify-content:center;padding:24px}
+  .overlay.show{display:flex}
+  .modal{background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.32);width:100%;max-width:448px;overflow:hidden;animation:pop .18s ease}
+  @keyframes pop{from{transform:translateY(10px) scale(.98);opacity:0}to{transform:none;opacity:1}}
+  .modal .mhead{padding:24px 26px 0;position:relative}
+  .modal .mclose{position:absolute;top:16px;right:18px;border:none;background:#f2f4f2;width:30px;height:30px;border-radius:8px;color:var(--ink-2);font-size:14px;cursor:pointer}
+  .modal .mbadge{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--green);background:var(--green-tint);padding:5px 11px;border-radius:999px;margin-bottom:14px}
+  .modal h3{margin:0 0 8px;font-size:22px;letter-spacing:-.01em}
+  .modal p.msub{margin:0;font-size:14px;color:var(--ink-2);line-height:1.55}
+  .modal .mbody{padding:18px 26px 26px}
+  .field{display:flex;gap:8px;margin-top:4px}
+  .field input{flex:1;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px;font-family:inherit}
+  .field input:focus{outline:none;border-color:var(--green)}
+  .mbtn{background:var(--green);color:#fff;border:none;border-radius:10px;padding:12px 18px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .mbtn:hover{background:var(--green-deep)}
+  .mnote{font-size:11.5px;color:var(--ink-3);margin-top:12px}
+  .success{text-align:center;padding:14px 0 6px}
+  .success .ck{width:52px;height:52px;border-radius:50%;background:var(--green-tint);color:var(--green);display:grid;place-items:center;font-size:24px;margin:0 auto 14px}
+  .success h4{margin:0 0 6px;font-size:18px}
+  .success p{margin:0;font-size:13.5px;color:var(--ink-2)}
+  .linkbox{display:flex;gap:8px;align-items:center;background:#f4f6f4;border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px}
+  .linkbox .url{flex:1;font-size:12.5px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .linkbox button{background:var(--green);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer}
+  .sharegrid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px 6px;margin:8px 0 6px}
+  .sopt{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:11px;font-weight:600;color:var(--ink-2);background:none;border:none;cursor:pointer;text-decoration:none}
+  .sopt .si{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:19px;font-weight:700}
+  .sopt:hover .si{filter:brightness(.93)}
+  .sopt:hover{color:var(--ink)}
+  .netnote{display:flex;gap:10px;background:var(--green-tint);border-radius:10px;padding:11px 13px;margin-top:16px;font-size:12.5px;color:var(--green-deep)}
+  .netnote b{font-weight:700}
+  /* topic selection */
+  .topicsec{background:#fff;border:1px solid var(--line);border-radius:15px;padding:18px 20px;box-shadow:var(--shadow-sm);margin-bottom:22px}
+  .topicsec .th{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+  .topicsec .th h2{font-size:15px;margin:0}
+  .tcats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .tcat{border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left;background:#fff;cursor:pointer}
+  .tcat:hover{border-color:var(--green);background:var(--green-tint)}
+  .tcat .ci{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:15px;margin-bottom:10px;color:#fff}
+  .tcat h4{margin:0 0 3px;font-size:14px}
+  .tcat .cc{font-size:12px;color:var(--green);font-weight:600}
+  .tcat .cd{font-size:11.5px;color:var(--ink-3);margin-top:1px}
+  .tgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 2px}
+  .tchip{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:12.5px;font-weight:600;color:var(--ink-2);background:#fff;cursor:pointer;text-align:left}
+  .tchip .box{width:17px;height:17px;border-radius:5px;border:1.5px solid var(--line);display:grid;place-items:center;flex:none;font-size:11px;color:#fff}
+  .tchip.on{border-color:var(--green);background:var(--green-tint);color:var(--ink)}
+  .tchip.on .box{background:var(--green);border-color:var(--green)}
+  .tcount{font-size:12.5px;color:var(--ink-2);font-weight:600;background:#f4f6f4;border:1px solid var(--line);border-radius:9px;padding:9px 12px;margin:14px 0;display:flex;align-items:center;gap:8px}
+  .consent{display:flex;gap:10px;align-items:flex-start;font-size:11.5px;color:var(--ink-2);margin-bottom:16px;line-height:1.5}
+  .consent input{margin-top:2px;flex:none}
+  .consent b{color:var(--ink);font-weight:700}
+  .consent a{color:var(--green)}
+  .savingline{font-size:12px;color:var(--ink-3);margin-bottom:12px}
+  .savingline b{color:var(--ink-2)}
+  /* sidebar footer links */
+  .sidefoot{display:flex;align-items:center;justify-content:center;gap:9px;padding:14px 6px 4px;font-size:12px}
+  .sidefoot a{color:#7d938a;text-decoration:none}
+  .sidefoot a:hover{color:#cfe0d6}
+  .sidefoot .dot{color:#33493d}
+  .loc{cursor:pointer}
+  .prose h2.bt{margin-top:22px}
+  .prose h2.bt:first-child{margin-top:0}
+  .prose p{font-size:14px;color:var(--ink-2);line-height:1.62;margin:0 0 12px;max-width:720px}
+  .prose ul{margin:0 0 12px;padding-left:20px;max-width:720px}
+  .prose li{font-size:14px;color:var(--ink-2);margin-bottom:6px}
+  .prose a{color:var(--green)}
+  .cnote{background:var(--green-tint);border:1px solid #cbe7d5;border-radius:12px;padding:14px 16px;font-size:13.5px;color:var(--green-deep);margin:6px 0 4px;max-width:720px}
+  .cinput{border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px;font-family:inherit;width:100%}
+  .cinput:focus{outline:none;border-color:var(--green)}
+  /* homepage (a page inside the app — same menu as every page) */
+  .logo{cursor:pointer}
+  .pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--green);background:var(--green-tint);padding:6px 13px;border-radius:999px;margin-bottom:18px}
+  .hero{text-align:center;padding:34px 0 8px;max-width:720px;margin:0 auto}
+  .hero h1{font-size:40px;line-height:1.1;letter-spacing:-.025em;margin:0 0 16px}
+  .hero .sub{font-size:17px;color:var(--ink-2);max-width:580px;margin:0 auto 26px}
+  .ziprow{display:flex;gap:10px;max-width:480px;margin:0 auto;justify-content:center}
+  .zwrap{flex:1;position:relative;max-width:300px}
+  .zwrap .zpin{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--green)}
+  .zwrap input{width:100%;border:1px solid var(--line);border-radius:11px;padding:14px 16px 14px 40px;font-size:15px;font-family:inherit;box-shadow:var(--shadow)}
+  .zwrap input:focus{outline:none;border-color:var(--green)}
+  .find{background:var(--green);color:#fff;border:none;border-radius:11px;padding:14px 22px;font-size:15px;font-weight:600;white-space:nowrap;box-shadow:var(--shadow)}
+  .find:hover{background:var(--green-deep)}
+  .freeline{font-size:13.5px;color:var(--ink-3);margin-top:16px}
+  .freeline a{color:var(--green);font-weight:600;text-decoration:none;cursor:pointer}
+  .homesec{padding:40px 0 6px;text-align:center}
+  .homesec h2{font-size:26px;letter-spacing:-.02em;margin:0 0 8px}
+  .homesec .s2{font-size:15.5px;color:var(--ink-2);max-width:540px;margin:0 auto 26px}
+  .twins{display:grid;grid-template-columns:1fr 1fr;gap:16px;text-align:left}
+  .trio{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;text-align:left}
+  .twin{border:1px solid var(--line);border-radius:16px;padding:24px;background:#fff;box-shadow:var(--shadow-sm)}
+  .twin .ic{width:44px;height:44px;border-radius:12px;background:var(--green-tint);color:var(--green);display:grid;place-items:center;font-size:20px;margin-bottom:14px}
+  .twin .k{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--green);margin-bottom:6px}
+  .twin h3{font-size:20px;margin:0 0 8px}
+  .twin p{font-size:14.5px;color:var(--ink-2);margin:0 0 14px}
+  .tchips{display:flex;gap:7px;flex-wrap:wrap}
+  .tc{font-size:11.5px;font-weight:600;background:#f4f6f4;border:1px solid var(--line);padding:5px 10px;border-radius:999px;color:var(--ink-2)}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;text-align:left}
+  .step .n{width:32px;height:32px;border-radius:9px;background:var(--green);color:#fff;display:grid;place-items:center;font-weight:700;font-size:15px;margin-bottom:12px}
+  .step h4{margin:0 0 6px;font-size:16px}
+  .step p{margin:0;font-size:14px;color:var(--ink-2)}
+  .previewwrap{max-width:640px;margin:0 auto}
+  .previewcap{text-align:center;font-size:12.5px;color:var(--ink-3);margin-top:12px}
+  .trustpanel{background:#10231a;color:#dbe7e0;border-radius:16px;text-align:center;padding:40px 24px;margin-top:8px}
+  .trustpanel .badge{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#8fd0ab}
+  .trustpanel h2{color:#fff;font-size:24px;margin:12px 0 10px;letter-spacing:-.02em}
+  .trustpanel p{font-size:14.5px;color:#a9c1b4;margin:0 auto;max-width:560px}
+  .homecta{text-align:center;padding:44px 0 10px}
+  .homecta h2{font-size:26px;letter-spacing:-.02em;margin:0 0 8px}
+  .homecta p{font-size:15.5px;color:var(--ink-2);margin:0 0 20px}
+  .homecta .big{background:var(--green);color:#fff;border:none;border-radius:12px;padding:14px 26px;font-size:15px;font-weight:600;box-shadow:var(--shadow)}
+  .homecta .big:hover{background:var(--green-deep)}
+  /* multi-property */
+  .addbtn{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--green);background:var(--green-tint);border:1px solid #cbe7d5;border-radius:9px;padding:8px 13px;cursor:pointer}
+  .addbtn:hover{background:#dcefe3}
+  .propgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .propcard{display:flex;gap:14px;align-items:center;border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:#fff;box-shadow:var(--shadow-sm);cursor:pointer;text-align:left}
+  .propcard:hover{border-color:var(--green);box-shadow:var(--shadow)}
+  .propcard .pinfo{flex:1;min-width:0}
+  .propcard .ptag{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--green);margin-bottom:3px}
+  .propcard h3{font-size:16px;margin:0 0 2px}
+  .propcard .paddr{font-size:12.5px;color:var(--ink-3)}
+  .propcard .pmeta{font-size:12px;color:var(--ink-2);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap}
+  .propcard .needs{color:var(--red);font-weight:600}
+  .miniscore{width:40px;height:40px;border-radius:50%;background:var(--green-tint);color:var(--green);display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
+  .swrow{display:flex;align-items:center;gap:13px;padding:11px 10px;border-radius:11px;cursor:pointer;border:1px solid transparent}
+  .swrow:hover{background:#f7f9f7}
+  .swrow.active{border-color:var(--green);background:var(--green-tint)}
+  .swrow .pinfo{flex:1;min-width:0}
+  .swrow .pt{font-size:14px;font-weight:600}
+  .swrow .pa{font-size:12px;color:var(--ink-3)}
+  .swrow .chk{color:var(--green);font-weight:700}
+
+  .hidden{display:none}
+  .menubtn{display:none;width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:#fff;align-items:center;justify-content:center;font-size:17px;color:var(--ink-2);cursor:pointer;flex:none}
+  .sidebackdrop{position:fixed;inset:0;background:rgba(16,33,28,.45);z-index:55;display:none}
+  .sidebackdrop.show{display:block}
+  @media(max-width:900px){
+    .app{grid-template-columns:1fr}
+    .side{position:fixed;top:0;left:0;bottom:0;width:236px;z-index:60;transform:translateX(-100%);transition:transform .22s ease}
+    .side.open{transform:none;box-shadow:0 0 44px rgba(0,0,0,.35)}
+    .menubtn{display:flex}
+    .devgrid,.detail,.twins,.trio,.steps{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="sidebackdrop" id="sidebackdrop" onclick="toggleMenu()"></div>
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="side">
+    <div class="logo" onclick="go('home')"><span class="mk">◆</span> HomeSignal</div>
+    <nav class="nav">
+      <a href="#" id="nav-mission" onclick="go('mission');return false"><span class="ic">◎</span> Today's Priorities</a>
+      <a href="#" id="nav-dash" onclick="go('dash');return false"><span class="ic">▦</span> Dashboard</a>
+      <a href="#" id="nav-alerts" onclick="go('alerts');return false"><span class="ic">◐</span> Alerts</a>
+      <a href="#" id="nav-dev" onclick="go('dev');return false"><span class="ic">◈</span> Development</a>
+      <a href="#" id="nav-maps" onclick="go('maps');return false"><span class="ic">◉</span> Maps</a>
+      <a href="#" id="nav-props" onclick="go('props');return false"><span class="ic">⌂</span> Properties</a>
+      <a href="#" id="nav-comm" onclick="go('comm');return false"><span class="ic">◍</span> Communities</a>
+      <a href="#" id="nav-reports" onclick="go('reports');return false"><span class="ic">▤</span> Reports</a>
+    </nav>
+    <div class="grow"></div>
+    <div class="upsell">
+      <div class="t">Get the full picture</div>
+      <div class="d">Premium reports, property intelligence &amp; more.</div>
+      <button onclick="openModal('premiumModal')">Go Premium</button>
+    </div>
+    <div class="sidefoot">
+      <a href="#" onclick="go('contact');return false">Contact</a>
+      <span class="dot">·</span>
+      <a href="#" onclick="go('privacy');return false">Privacy</a>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main">
+    <div class="top">
+      <button class="menubtn" onclick="toggleMenu()">☰</button>
+      <div class="loc" onclick="openSwitcher()"><span class="pin">◉</span> <span id="locLabel">123 Blue Heron Dr</span> <span style="color:var(--ink-3)">▾</span></div>
+      <div class="search"><input placeholder="Search HomeSignal — addresses, projects, topics…"></div>
+      <div class="sp"></div>
+      <button class="sharebtn" onclick="openModal('shareModal')">⤴ Share</button>
+      <button class="ib">◔<span class="badge">3</span></button>
+      <div class="avatar">AR</div>
+    </div>
+
+    <!-- ======= HOMEPAGE ======= -->
+    <div class="page" id="page-home">
+      <div class="hero">
+        <h1>See what's changing around your home — what it means, and what you can do about it.</h1>
+        <p class="sub">HomeSignal shows you the projects that impact your quality of life and home value. We track development and monitor civic meetings so you can participate in the trajectory of projects.</p>
+        <div class="ziprow">
+          <div class="zwrap"><span class="zpin">◉</span><input id="homeZip" inputmode="numeric" maxlength="5" placeholder="Enter your ZIP code" onkeydown="if(event.key==='Enter')homeFind()"></div>
+          <button class="find" onclick="homeFind()">Find my community</button>
+        </div>
+        <div class="freeline">Free — already following an area? <a onclick="go('mission')">Go to your dashboard →</a></div>
+      </div>
+
+      <div class="homesec">
+        <div class="trio">
+          <div class="twin"><div class="ic">◉</div><div class="k">See it</div><h3>What's changing</h3><p>Every project, permit, and hearing near your home — mapped, with the ones that actually affect you.</p><div class="tchips"><span class="tc">Development</span><span class="tc">Hearings</span><span class="tc">Water quality</span><span class="tc">Zoning</span></div></div>
+          <div class="twin"><div class="ic">◈</div><div class="k">Understand it</div><h3>What it means</h3><p>Each change put in plain language and scored — how it impacts your traffic, water, safety, and home value.</p><div class="tchips"><span class="tc">Traffic</span><span class="tc">Water</span><span class="tc">Home value</span><span class="tc">Safety</span></div></div>
+          <div class="twin"><div class="ic">◔</div><div class="k">Act on it</div><h3>What you can do</h3><p>A clear next step on every item, and a heads-up before comment windows and votes close — while you can still weigh in.</p><div class="tchips"><span class="tc">Comment</span><span class="tc">Attend</span><span class="tc">Follow</span><span class="tc">Noted</span></div></div>
+        </div>
+      </div>
+
+      <div class="homesec">
+        <h2>This is what you'll see.</h2>
+        <p class="s2">Every change, translated into what it means for you — and what you can do about it.</p>
+        <div class="previewwrap">
+          <div class="card" style="border-left-color:var(--red);margin-bottom:0;text-align:left">
+            <span class="lens"><span class="sw traffic"></span>Traffic · Water · Home value</span>
+            <h3>A 250,000 sq ft data center is proposed 0.7 mi from your home</h3>
+            <p class="sowhat"><b>What it means for you:</b> facilities this size draw heavily on local water and power and add truck traffic — but they lift the tax base. It's still in application, so public input shapes the outcome.</p>
+            <div class="impacts"><span class="ichip bad"><span class="cd traffic"></span>Traffic <span class="ar">↑</span></span><span class="ichip bad"><span class="cd water"></span>Water demand <span class="ar">↑</span></span><span class="ichip good"><span class="cd cost"></span>Tax base <span class="ar">↑</span></span></div>
+            <div class="foot"><div class="meta"><span class="win">◔ Hearing in 7 days</span><span class="dist">0.7 mi</span></div><div class="actions"><button class="btn primary" onclick="go('alerts')">See it in Alerts →</button></div></div>
+          </div>
+          <div class="previewcap">A real card from the Horseshoe Bay, TX community. Enter your ZIP to see your own.</div>
+        </div>
+      </div>
+
+      <div class="trustpanel">
+        <div class="badge">Neutral · Sourced · Non-partisan</div>
+        <h2>Built on public records. Free to follow your community.</h2>
+        <p>Every alert links back to the permit, agenda, or filing it came from. We don't take positions and we don't sell your personal information — we help you see what's changing and decide for yourself.</p>
+      </div>
+
+      <div class="homecta">
+        <h2>Know what's changing around your home.</h2>
+        <p>Open your community in a few seconds — no account needed to start.</p>
+        <button class="big" onclick="openLoc()">Find my community</button>
+      </div>
+    </div>
+
+    <!-- ======= MISSION CONTROL ======= -->
+    <div class="page hidden" id="page-mission">
+      <div class="ph">
+        <div class="eyebrow">Today's Priorities</div>
+        <h1>Good morning, Alex — here's what needs you</h1>
+        <p>Sunday, July 12 · Horseshoe Bay, TX. Three things this week can still be shaped by your input.</p>
+      </div>
+      <div class="cols">
+        <div>
+          <div class="block">
+            <div class="bt-row"><h2>Needs you this week</h2><a href="#" onclick="go('alerts');return false">All alerts →</a></div>
+            <div class="prow">
+              <span class="pk" style="background:var(--red)"></span>
+              <div class="pmain">
+                <div class="pt">Comment on the Lakeside data center before the hearing</div>
+                <div class="pd">A 250k sq ft facility 0.7 mi away — pressures your water, traffic and home value.</div>
+                <div class="pmeta"><span class="win">◔ Hearing in 7 days</span><span style="color:var(--ink-2);font-weight:600">0.7 mi</span></div>
+              </div>
+              <button class="btn primary" onclick="go('detail')">Act</button>
+            </div>
+            <div class="prow">
+              <span class="pk" style="background:var(--amber)"></span>
+              <div class="pmain">
+                <div class="pt">Read the boil-water guidance for your service line</div>
+                <div class="pd">E. coli was flagged 2.3 mi away; an advisory is expected May 16.</div>
+                <div class="pmeta"><span class="win soft">Advisory expected May 16</span><span style="color:var(--ink-2);font-weight:600">2.3 mi</span></div>
+              </div>
+              <button class="btn" onclick="go('alerts')">Read</button>
+            </div>
+            <div class="prow">
+              <span class="pk" style="background:var(--amber)"></span>
+              <div class="pmain">
+                <div class="pt">Note the TX-71 timeline before detours begin</div>
+                <div class="pd">Final design reached — construction likely within 12 months on your route.</div>
+                <div class="pmeta"><span style="color:var(--ink-3)">Beat 3 of 5 in this project</span><span style="color:var(--ink-2);font-weight:600">1.1 mi</span></div>
+              </div>
+              <button class="btn" onclick="go('detail')">View</button>
+            </div>
+          </div>
+          <div class="block">
+            <h2 class="bt">Your briefing</h2>
+            <p class="brief">There are <b>3 high-impact changes</b> near you this week. The biggest is the <span class="hl">Lakeside data center proposal</span> within a mile of your home — it would raise local water and power demand and add truck traffic, though it lifts the tax base, and the <b>public comment window closes in 7 days</b>. Water quality was flagged nearby but is being treated. Your <span class="hl">property value outlook stays positive at +4.2%</span> over the next 12 months.</p>
+          </div>
+        </div>
+        <div>
+          <div class="block">
+            <h2 class="bt">Your vitals</h2>
+            <div style="display:flex;align-items:center;gap:15px;margin-bottom:12px">
+              <div class="ring" style="--p:85"><div class="in">85</div></div>
+              <div><div style="font-size:13px;color:var(--ink-2)">Community score</div><div style="font-size:13px;color:var(--green);font-weight:700">Very strong · ↑ 8 this month</div></div>
+            </div>
+            <div class="vital"><span class="vl">Value outlook · 12 mo</span><span class="vv" style="color:var(--green)">+4.2%</span></div>
+            <div class="vital"><span class="vl">Projects tracked</span><span class="vv">12</span></div>
+            <div class="vital"><span class="vl">Active alerts</span><span class="vv">3</span></div>
+            <div class="vital"><span class="vl">Growth pressure</span><span class="vv" style="color:var(--amber)">Medium</span></div>
+            <div class="scorebars">
+              <div class="sb"><div class="sl"><span>Development pressure</span><b>Medium</b></div><div class="track"><div class="fill" style="width:58%;background:var(--amber)"></div></div></div>
+              <div class="sb"><div class="sl"><span>Environmental risk</span><b>Low</b></div><div class="track"><div class="fill" style="width:26%;background:var(--green-2)"></div></div></div>
+              <div class="sb"><div class="sl"><span>Infrastructure change</span><b>Elevated</b></div><div class="track"><div class="fill" style="width:64%;background:var(--amber)"></div></div></div>
+              <div class="sb"><div class="sl"><span>Water &amp; utilities</span><b>Watch</b></div><div class="track"><div class="fill" style="width:48%;background:var(--blue)"></div></div></div>
+            </div>
+            <p style="font-size:11px;color:var(--ink-3);margin:8px 0 0">Component scores derived from feeds already ingested.</p>
+          </div>
+          <div class="block">
+            <div class="bt-row"><h2>Action windows</h2><a href="#" onclick="go('maps');return false">Map →</a></div>
+            <div class="aw"><span class="ak"></span><div><div class="at">Public hearing — Lakeside data center</div><div class="ad">May 26 · City Hall, 7:00 PM</div><div class="au">Comment window open · 7 days left</div></div></div>
+            <div class="aw"><span class="ak"></span><div><div class="at">City Council meeting</div><div class="ad">May 15 · 6:00 PM</div><div class="au">Water advisory on the agenda</div></div></div>
+            <div class="aw"><span class="ak"></span><div><div class="at">Planning &amp; Zoning Commission</div><div class="ad">May 15 · 3.2 mi away</div></div></div>
+          </div>
+          <div class="p2">
+            <div class="p2h"><span>🔒</span> Phase 2 — unlocked by new feeds</div>
+            <div class="p2sub">Designed into the layout now; lights up when these sources are added.</div>
+            <div class="p2i"><div style="flex:1"><div class="t">Opportunity Center</div><div class="d">Tax exemptions, rebates, grants, insurance savings</div></div><span class="feed">+ tax / incentive / insurance</span></div>
+            <div class="p2i"><div style="flex:1"><div class="t">Financial Intelligence</div><div class="d">Total cost of ownership, equity timeline</div></div><span class="feed">+ assessor / tax records</span></div>
+            <div class="p2i"><div style="flex:1"><div class="t">Home Document Vault</div><div class="d">Deeds, permits, warranties, policies</div></div><span class="feed">+ user uploads</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= DASHBOARD ======= -->
+    <div class="page hidden" id="page-dash">
+      <div class="ph">
+        <div class="eyebrow">Dashboard</div>
+        <h1>Welcome back, Alex</h1>
+        <p>3 homes followed — here's what needs you across them.</p>
+      </div>
+      <div class="strip">
+        <div class="stat"><div class="n">12</div><div class="l">Projects near you</div></div>
+        <div class="stat accent"><div class="n">2</div><div class="l">Action windows open</div></div>
+        <div class="stat"><div class="n" style="font-size:19px">Medium</div><div class="l">Growth pressure · trending up</div></div>
+        <div class="stat g"><div class="n">85</div><div class="l">Community score</div></div>
+      </div>
+      <div class="cols">
+        <div>
+          <div class="block" style="padding:16px 18px">
+            <div class="bt-row"><h2>What's changing around you</h2><a href="#" onclick="go('maps');return false">Open full map →</a></div>
+            <div class="mapwrap" style="box-shadow:none">
+              <svg viewBox="0 0 640 300" xmlns="http://www.w3.org/2000/svg">
+                <rect width="640" height="300" fill="#e4eadd"/>
+                <rect x="470" y="185" width="150" height="95" rx="14" fill="#d3e0c6"/>
+                <path d="M40 220 Q110 195 165 225 Q195 245 165 278 Q110 300 55 285 Q20 255 40 220 Z" fill="#bcd6e2"/>
+                <path d="M0 150 H640" stroke="#f4f2ec" stroke-width="12"/>
+                <path d="M330 0 V300" stroke="#f4f2ec" stroke-width="10"/>
+                <path d="M120 0 Q150 130 300 165 T560 190" stroke="#f4f2ec" stroke-width="8" fill="none"/>
+                <circle cx="330" cy="150" r="105" fill="#157a49" fill-opacity="0.07" stroke="#157a49" stroke-opacity="0.35" stroke-dasharray="6 6"/>
+                <circle cx="330" cy="150" r="11" fill="#157a49" stroke="#fff" stroke-width="3"/>
+                <text x="330" y="180" font-size="10" fill="#16211c" text-anchor="middle" font-weight="700" font-family="sans-serif">Your home</text>
+                <g><circle cx="392" cy="112" r="13" fill="#c23b34" stroke="#fff" stroke-width="3"/><text x="392" y="117" font-size="11" fill="#fff" text-anchor="middle" font-weight="700" font-family="sans-serif">A</text></g>
+                <g><circle cx="278" cy="205" r="13" fill="#c47a1a" stroke="#fff" stroke-width="3"/><text x="278" y="210" font-size="11" fill="#fff" text-anchor="middle" font-weight="700" font-family="sans-serif">B</text></g>
+                <g><circle cx="238" cy="92" r="13" fill="#c47a1a" stroke="#fff" stroke-width="3"/><text x="238" y="97" font-size="11" fill="#fff" text-anchor="middle" font-weight="700" font-family="sans-serif">C</text></g>
+                <g><circle cx="560" cy="70" r="13" fill="#1f9d5c" stroke="#fff" stroke-width="3"/><text x="560" y="75" font-size="11" fill="#fff" text-anchor="middle" font-weight="700" font-family="sans-serif">E</text></g>
+              </svg>
+            </div>
+          </div>
+          <div class="bt-row"><h2 style="font-size:15px;margin:0">Recent — ranked by impact on you</h2><a href="#" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600" onclick="go('alerts');return false">All alerts →</a></div>
+          <div class="card mini" style="border-left-color:var(--red)">
+            <span class="lens"><span class="sw water"></span>Water · Traffic · Home value</span>
+            <h3>A data center is proposed 0.7 mi from your home</h3>
+            <p class="sowhat"><b>What it means for you:</b> pressures water &amp; power, adds truck traffic — comment window closes in 7 days.</p>
+            <div class="foot"><div class="meta"><span class="win">◔ Hearing in 7 days</span><span class="dist">0.7 mi</span></div><div class="actions"><button class="btn" onclick="go('detail')">See detail →</button></div></div>
+          </div>
+          <div class="card mini" style="border-left-color:var(--amber)">
+            <span class="lens"><span class="sw water"></span>Water · Safety</span>
+            <h3>Your tap water was flagged this week</h3>
+            <p class="sowhat"><b>What it means for you:</b> E. coli above threshold nearby; homes on your line may get a boil notice.</p>
+            <div class="foot"><div class="meta"><span class="win soft">Advisory May 16</span><span class="dist">2.3 mi</span></div><div class="actions"><button class="btn" onclick="go('alerts')">Read →</button></div></div>
+          </div>
+        </div>
+        <div>
+          <div class="block">
+            <div class="bt-row"><h2>Your properties</h2><a href="#" onclick="go('props');return false">Manage →</a></div>
+            <div class="swrow" onclick="selectProperty('123 Blue Heron Dr');go('propdetail')"><div class="miniscore">82</div><div class="pinfo"><div class="pt">123 Blue Heron Dr <span style="font-size:10px;color:var(--green);font-weight:700">· HOME</span></div><div class="pa">2 need you · Horseshoe Bay</div></div></div>
+            <div class="swrow" onclick="selectProperty('27 Lakeside Dr');go('propdetail')"><div class="miniscore">79</div><div class="pinfo"><div class="pt">27 Lakeside Dr <span style="font-size:10px;color:var(--amber);font-weight:700">· RENTAL</span></div><div class="pa">1 needs you · Horseshoe Bay</div></div></div>
+            <div class="swrow" onclick="selectProperty('105 Summit Ridge');go('propdetail')"><div class="miniscore">86</div><div class="pinfo"><div class="pt">105 Summit Ridge <span style="font-size:10px;color:var(--blue);font-weight:700">· FAMILY</span></div><div class="pa">All clear · Marble Falls</div></div></div>
+            <button class="addbtn" style="width:100%;justify-content:center;margin-top:10px" onclick="openLoc()">+ Add a property</button>
+          </div>
+          <div class="block">
+            <div class="bt-row"><h2>Your watchlist</h2><a href="#">Edit</a></div>
+            <div class="chips"><span class="wchip">78657</span><span class="wchip">Lakeside DC</span><span class="wchip">TX-71</span><span class="wchip">Your street</span><span class="wchip">Lake LBJ</span></div>
+          </div>
+          <div class="block">
+            <h2 class="bt">Upcoming meetings</h2>
+            <div class="aw"><span class="ak"></span><div><div class="at">Planning Commission</div><div class="ad">May 21 · City Hall, 6:00 PM</div></div></div>
+            <div class="aw"><span class="ak"></span><div><div class="at">City Council</div><div class="ad">May 15 · 6:00 PM</div></div></div>
+            <div class="aw"><span class="ak"></span><div><div class="at">Data center public hearing</div><div class="ad">May 26 · 7:00 PM</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= ALERTS PAGE ======= -->
+    <div class="page hidden" id="page-alerts">
+      <div class="ph">
+        <div class="eyebrow">Alerts</div>
+        <h1>What needs your attention near home</h1>
+        <p>Sorted by how much each change affects your daily life — not by when it arrived. Two windows are still open for you to weigh in.</p>
+      </div>
+
+      <div class="strip">
+        <div class="stat accent"><div class="n">2</div><div class="l">Need you soon — windows closing</div></div>
+        <div class="stat"><div class="n">5</div><div class="l">Changes worth knowing this week</div></div>
+        <div class="stat g"><div class="n">+4.2%</div><div class="l">Your value outlook, next 12 mo</div></div>
+        <div class="stat"><div class="n">0.4<span style="font-size:14px;font-weight:600;color:var(--ink-3)">mi</span></div><div class="l">Nearest active change</div></div>
+      </div>
+
+      <div class="topicsec">
+        <div class="th"><h2>Your alert topics — choose what you're notified about</h2><span style="font-size:12px;color:var(--ink-3)">Controls what you see here and what gets emailed</span></div>
+        <div class="tcats">
+          <button class="tcat" onclick="openTopics('gov')"><div class="ci" style="background:var(--red)">▤</div><h4>Government Notices</h4><div class="cc" id="cc-gov">6 topics followed</div><div class="cd">click to change</div></button>
+          <button class="tcat" onclick="openTopics('meetings')"><div class="ci" style="background:var(--amber)">▦</div><h4>Upcoming Meetings</h4><div class="cc" id="cc-meetings">6 topics followed</div><div class="cd">click to change</div></button>
+          <button class="tcat" onclick="openTopics('news')"><div class="ci" style="background:var(--blue)">✉</div><h4>Local News</h4><div class="cc" id="cc-news">2 topics followed</div><div class="cd">click to change</div></button>
+          <button class="tcat" onclick="openTopics('dev')"><div class="ci" style="background:var(--green-2)">◈</div><h4>Development</h4><div class="cc" id="cc-dev">3 topics followed</div><div class="cd">click to change</div></button>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="seg"><button class="on">By life impact</button><button>By distance</button><button>Newest</button></div>
+        <div class="sp"></div>
+        <button class="fpill">All dimensions ▾</button>
+        <button class="fpill">Any distance ▾</button>
+      </div>
+
+      <!-- NEEDS YOU BAND -->
+      <div class="band">
+        <div class="band-h"><span class="lab"><span class="dotb"></span>Needs you soon</span><span class="cnt">Action still changes the outcome</span></div>
+
+        <div class="card inband" style="border-left-color:var(--red)">
+          <span class="lens"><span class="sw traffic"></span>Traffic · Water · Home value</span>
+          <h3>A 250,000 sq ft data center is proposed 0.7 mi from your home</h3>
+          <p class="sowhat"><b>What it means for you:</b> facilities this size draw heavily on local water and power and add truck traffic on your route to TX-71 — but they lift the tax base. It's still in application, so public input shapes the outcome.</p>
+          <div class="impacts">
+            <span class="ichip bad"><span class="cd traffic"></span>Traffic <span class="ar">↑</span></span>
+            <span class="ichip bad"><span class="cd water"></span>Water demand <span class="ar">↑</span></span>
+            <span class="ichip bad"><span class="cd air"></span>Noise <span class="ar">↑</span></span>
+            <span class="ichip good"><span class="cd cost"></span>Tax base <span class="ar">↑</span></span>
+          </div>
+          <details class="why">
+            <summary>ⓘ Why you're seeing this</summary>
+            <div class="wbody">
+              <div class="r"><b>Source:</b> County permit filing #DA-2025-0148 + Planning Commission agenda (May 26)</div>
+              <div class="r"><b>Why it ranks high for you:</b> within 0.7 mi of your home, touches 3 tracked priorities, comment window still open</div>
+              <div class="r"><b>Confidence:</b> High — matched across two public records</div>
+            </div>
+          </details>
+          <div class="foot">
+            <div class="meta"><span class="win">◔ Public hearing in 7 days</span><span class="dist">0.7 mi · your commute</span></div>
+            <div class="actions"><button class="btn primary">Comment before hearing</button><button class="btn ghost">Follow</button></div>
+          </div>
+        </div>
+
+        <div class="card inband" style="border-left-color:var(--red)">
+          <span class="lens"><span class="sw water"></span>Water · Safety</span>
+          <h3>Your tap water was flagged this week</h3>
+          <p class="sowhat"><b>What it means for you:</b> routine testing found E. coli above the safe threshold at a station 2.3 mi away. The utility is treating the source; homes on your service line may receive a boil-water notice.</p>
+          <div class="impacts">
+            <span class="ichip bad"><span class="cd water"></span>Water quality <span class="ar">↓</span></span>
+            <span class="ichip bad"><span class="cd safety"></span>Health <span class="ar">↓</span></span>
+          </div>
+          <div class="foot">
+            <div class="meta"><span class="win soft">Advisory expected May 16</span><span class="dist">2.3 mi · your service line</span></div>
+            <div class="actions"><button class="btn">Read what to do</button><button class="btn ghost">Notify me</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GROUP: TRAFFIC -->
+      <div class="groupHead"><span class="gd traffic"></span> Traffic &amp; getting around <span class="gc">— 1 change</span></div>
+      <div class="card" style="border-left-color:var(--amber)">
+        <span class="lens"><span class="sw traffic"></span>Traffic</span>
+        <h3>The TX-71 expansion just entered final design</h3>
+        <p class="sowhat"><b>What it means for you:</b> construction is now likely within 12 months on the road you use daily — short-term detours ahead, a smoother commute long-term. This is the latest beat in the road-expansion project you follow.</p>
+        <div class="impacts">
+          <span class="ichip bad"><span class="cd traffic"></span>Congestion during build <span class="ar">↑</span></span>
+          <span class="ichip good"><span class="cd traffic"></span>Commute after <span class="ar">↓</span></span>
+        </div>
+        <div class="foot">
+          <div class="meta"><span style="color:var(--ink-3)">Beat 3 of 5 in this project</span><span class="dist">1.1 mi</span></div>
+          <div class="actions"><button class="btn" onclick="go('detail')">See full timeline →</button></div>
+        </div>
+      </div>
+
+      <!-- GROUP: HOME & COST -->
+      <div class="groupHead"><span class="gd value"></span> Home value &amp; cost of living <span class="gc">— 1 change</span></div>
+      <div class="card" style="border-left-color:var(--green-2)">
+        <span class="lens"><span class="sw value"></span>Home value</span>
+        <h3>A 100-acre solar farm was approved 5.5 mi away</h3>
+        <p class="sowhat"><b>What it means for you:</b> too far to change your view or noise, but it broadens the local tax base and signals steady infrastructure investment in the area — a mild positive for long-term values.</p>
+        <div class="impacts">
+          <span class="ichip good"><span class="cd cost"></span>Tax base <span class="ar">↑</span></span>
+          <span class="ichip good"><span class="cd value"></span>Area investment <span class="ar">↑</span></span>
+        </div>
+        <div class="foot">
+          <div class="meta"><span style="color:var(--ink-3)">Approved May 7</span><span class="dist">5.5 mi</span></div>
+          <div class="actions"><button class="btn ghost">Noted</button></div>
+        </div>
+      </div>
+
+      <!-- QUIET -->
+      <div class="groupHead" style="color:var(--ink-3)"><span class="gd" style="background:var(--line)"></span> Good to know · lower relevance to you</div>
+      <div class="quiet"><b>Planning &amp; Zoning Commission meeting</b> scheduled May 15, 3.2 mi away · <b>Road resurfacing</b> completed on RR-2147, 4.1 mi away. &nbsp;Collapsed because they're unlikely to affect your home — expand any time.</div>
+    </div>
+
+    <!-- ======= DEVELOPMENT PAGE ======= -->
+    <div class="page hidden" id="page-dev">
+      <div class="ph">
+        <div class="eyebrow">Development</div>
+        <h1>What's being built — and how it lands on you</h1>
+        <p>Every active and proposed project near you, led by its effect on your daily life rather than its stage or unit count.</p>
+      </div>
+
+      <div class="lensnav">
+        <button class="lenscard on"><span class="q">How could it affect me?</span><span class="d">Impact-first · the default view</span></button>
+        <button class="lenscard"><span class="q">What's being built?</span><span class="d">The projects themselves</span></button>
+        <button class="lenscard"><span class="q">Where are we growing?</span><span class="d">The trajectory of the area</span></button>
+      </div>
+
+      <div class="toolbar">
+        <div class="seg"><button class="on">Impact on me</button><button>Distance</button><button>Newest</button></div>
+        <div class="sp"></div>
+        <button class="fpill">All types ▾</button>
+        <button class="fpill">Any status ▾</button>
+        <button class="fpill">⊞ Data view</button>
+      </div>
+
+      <div class="devgrid">
+        <!-- card 1 -->
+        <div class="card clickable" style="border-left-color:var(--red)" onclick="go('detail')">
+          <span class="lens"><span class="sw safety"></span>Proposed · closest to you</span>
+          <h3>Lakeside Data Center</h3>
+          <p class="sowhat"><b>How it lands on you:</b> the project most likely to change daily life near you — pressure on water and power, new truck traffic, a meaningful bump to the tax base. Still shapeable.</p>
+          <div class="impacts">
+            <span class="ichip bad"><span class="cd water"></span>Water <span class="ar">↑</span></span>
+            <span class="ichip bad"><span class="cd traffic"></span>Traffic <span class="ar">↑</span></span>
+            <span class="ichip good"><span class="cd cost"></span>Tax base <span class="ar">↑</span></span>
+          </div>
+          <div class="foot">
+            <div class="meta"><span class="win">◔ Comment window open</span><span class="dist">0.7 mi</span></div>
+            <div class="actions"><span class="status prop">Proposed</span></div>
+          </div>
+        </div>
+
+        <!-- card 2 -->
+        <div class="card clickable" style="border-left-color:var(--amber)" onclick="go('detail')">
+          <span class="lens"><span class="sw value"></span>Active · nearest build</span>
+          <h3>Horseshoe Bay Resort Expansion</h3>
+          <p class="sowhat"><b>How it lands on you:</b> 120 units under construction 0.4 mi away. Short-term traffic and noise; likely lifts nearby home values and adds walkable amenities.</p>
+          <div class="impacts">
+            <span class="ichip good"><span class="cd value"></span>Home value <span class="ar">↑</span></span>
+            <span class="ichip bad"><span class="cd traffic"></span>Constr. traffic <span class="ar">↑</span></span>
+            <span class="ichip good"><span class="cd green"></span>Amenities <span class="ar">↑</span></span>
+          </div>
+          <div class="foot">
+            <div class="meta"><span style="color:var(--ink-3)">Building now</span><span class="dist">0.4 mi</span></div>
+            <div class="actions"><span class="status active">Active</span></div>
+          </div>
+        </div>
+
+        <!-- card 3 -->
+        <div class="card clickable" style="border-left-color:var(--amber)" onclick="go('detail')">
+          <span class="lens"><span class="sw traffic"></span>Active · road</span>
+          <h3>TX-71 Expansion</h3>
+          <p class="sowhat"><b>How it lands on you:</b> your daily route. Detours during construction over the next year, then a smoother, faster commute. Now in final design.</p>
+          <div class="impacts">
+            <span class="ichip bad"><span class="cd traffic"></span>Build congestion <span class="ar">↑</span></span>
+            <span class="ichip good"><span class="cd traffic"></span>Commute after <span class="ar">↓</span></span>
+          </div>
+          <div class="foot">
+            <div class="meta"><span style="color:var(--ink-3)">Final design</span><span class="dist">1.1 mi</span></div>
+            <div class="actions"><span class="status active">Active</span></div>
+          </div>
+        </div>
+
+        <!-- card 4 -->
+        <div class="card clickable" style="border-left-color:var(--line)" onclick="go('detail')">
+          <span class="lens"><span class="sw value"></span>Proposed · lower impact</span>
+          <h3>Waterfront Condos</h3>
+          <p class="sowhat"><b>How it lands on you:</b> 36 units proposed 2.1 mi away, still at concept. Minimal effect on your block; worth watching for lake-access and traffic changes if it advances.</p>
+          <div class="impacts">
+            <span class="ichip good"><span class="cd value"></span>Area value <span class="ar">↑</span></span>
+            <span class="ichip bad"><span class="cd green"></span>Lake access <span class="ar">↓</span></span>
+          </div>
+          <div class="foot">
+            <div class="meta"><span style="color:var(--ink-3)">Concept</span><span class="dist">2.1 mi</span></div>
+            <div class="actions"><span class="status prop">Proposed</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="quiet" style="margin-top:14px">Showing the 4 projects most relevant to your home. <b>2 more</b> lower-impact projects (Hill Country Commercial 1.8 mi, Summit at Lake LBJ 1.2 mi) are collapsed. Switch to <b>⊞ Data view</b> for the full sortable table.</div>
+    </div>
+
+    <!-- ======= DEVELOPMENT DETAIL ======= -->
+    <div class="page hidden" id="page-detail">
+      <button class="backbtn" onclick="go('dev')">← Back to development</button>
+      <div class="ph" style="margin-bottom:16px">
+        <div class="eyebrow" style="display:flex;align-items:center;gap:10px">Lakeside Data Center <span class="status prop">Proposed</span></div>
+        <h1 style="margin-bottom:2px">How this affects you</h1>
+      </div>
+
+      <div class="detail">
+        <div class="panel">
+          <div class="kicker">The bottom line</div>
+          <div class="verdict">Likely to <span class="hl">increase truck traffic</span> and <span class="hl">strain local water &amp; power</span> near you — with a <span class="hlg">meaningful lift to the tax base</span>.</div>
+          <div class="impacts">
+            <span class="ichip bad"><span class="cd traffic"></span>Traffic <span class="ar">↑</span></span>
+            <span class="ichip bad"><span class="cd water"></span>Water demand <span class="ar">↑</span></span>
+            <span class="ichip bad"><span class="cd air"></span>Noise <span class="ar">↑</span></span>
+            <span class="ichip bad"><span class="cd cost"></span>Grid load <span class="ar">↑</span></span>
+            <span class="ichip good"><span class="cd value"></span>Tax base <span class="ar">↑</span></span>
+          </div>
+
+          <div class="divider"></div>
+          <div class="kicker">The story so far — and what's next</div>
+          <div class="thread">
+            <div class="tev"><span class="tk"></span><div><div class="td">May 8, 2025</div><div class="tt">Application submitted</div><div class="tl">↳ generated your “Data Center Proposal” alert</div></div></div>
+            <div class="tev"><span class="tk"></span><div><div class="td">May 10, 2025</div><div class="tt">Impact analysis published</div><div class="tl">↳ report available now</div></div></div>
+            <div class="tev future"><span class="tk"></span><div><div class="td">May 26, 2025 · in 7 days</div><div class="tt">Public hearing — comment window open</div><div class="tl">↳ you can act here</div></div></div>
+            <div class="tev future"><span class="tk"></span><div><div class="td">Expected Q3</div><div class="tt">Commission vote</div></div></div>
+          </div>
+        </div>
+
+        <div class="panel side">
+          <div class="kicker">What you can do</div>
+          <div class="doact">
+            <button class="btn primary">Submit a public comment</button>
+            <button class="btn">Add hearing to calendar</button>
+            <button class="btn">Read the impact analysis</button>
+            <button class="btn ghost">Follow this project</button>
+          </div>
+          <div class="divider"></div>
+          <div class="kicker">The specs</div>
+          <div class="specs">
+            <div class="row"><span>Developer</span><b>Blue Ridge Data Centers</b></div>
+            <div class="row"><span>Size</span><b>250,000 sq ft</b></div>
+            <div class="row"><span>Investment</span><b>$250M+</b></div>
+            <div class="row"><span>Jobs created</span><b>75–100</b></div>
+            <div class="row"><span>Distance</span><b>0.7 mi</b></div>
+            <div class="row"><span>Status</span><b>Application submitted</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= MAPS ======= -->
+    <div class="page hidden" id="page-maps">
+      <div class="ph">
+        <div class="eyebrow">Maps</div>
+        <h1>What's changing around you</h1>
+        <p>Every project and alert near your home, placed on the map and colored by the part of life it touches — not by project type.</p>
+      </div>
+      <div class="toolbar">
+        <div class="seg"><button class="on">Impact</button><button>Satellite</button><button>Street</button></div>
+        <div class="sp"></div>
+        <button class="fpill">◉ Impact radius: 1.5 mi ▾</button>
+        <button class="fpill">All dimensions ▾</button>
+      </div>
+      <div class="mapcols">
+        <div class="mapwrap">
+          <svg viewBox="0 0 780 520" xmlns="http://www.w3.org/2000/svg">
+            <rect width="780" height="520" fill="#e4eadd"/>
+            <path d="M40 60 Q120 40 190 90 Q250 130 240 200 Q150 190 60 172 Q30 110 40 60 Z" fill="#d3e0c6"/>
+            <rect x="545" y="330" width="185" height="160" rx="18" fill="#d3e0c6"/>
+            <text x="600" y="415" font-size="12" fill="#6f8a5f" font-family="sans-serif">Community Park</text>
+            <path d="M60 330 Q150 300 215 345 Q255 372 212 425 Q150 472 72 452 Q22 400 60 330 Z" fill="#bcd6e2"/>
+            <text x="115" y="410" font-size="13" fill="#5b7f92" font-family="sans-serif">Lake LBJ</text>
+            <path d="M0 255 H780" stroke="#f4f2ec" stroke-width="14"/>
+            <path d="M400 0 V520" stroke="#f4f2ec" stroke-width="12"/>
+            <path d="M120 0 Q160 200 330 260 Q500 320 640 300 L780 340" stroke="#f4f2ec" stroke-width="10" fill="none"/>
+            <path d="M0 120 Q200 150 320 60" stroke="#eeece5" stroke-width="8" fill="none"/>
+            <text x="650" y="247" font-size="12" fill="#9aa79b" font-family="sans-serif">TX-71</text>
+            <circle cx="400" cy="250" r="152" fill="#157a49" fill-opacity="0.07" stroke="#157a49" stroke-opacity="0.35" stroke-dasharray="7 7"/>
+            <text x="400" y="118" font-size="11" fill="#157a49" text-anchor="middle" font-family="sans-serif" opacity="0.8">1.5 mi impact radius</text>
+            <circle cx="400" cy="250" r="12" fill="#157a49" stroke="#fff" stroke-width="3"/>
+            <text x="400" y="283" font-size="11" fill="#16211c" text-anchor="middle" font-weight="700" font-family="sans-serif">Your home</text>
+            <g><circle cx="474" cy="198" r="15" fill="#c23b34" stroke="#fff" stroke-width="3"/><text x="474" y="203" font-size="13" fill="#fff" text-anchor="middle" font-weight="700" font-family="sans-serif">A</text></g>
+            <g><circle cx="340" cy="322" r="15" fill="#c47a1a" stroke="#fff" stroke-width="3"/><text x="340" y="327" font-size="13" fill="#fff" text-anchor="middle" font-weight="700" font-family="sans-serif">B</text></g>
+            <g><circle cx="300" cy="152" r="15" fill="#c47a1a" stroke="#fff" stroke-width="3"/><text x="300" y="157" font-size="13" fill="#fff" text-anchor="middle" font-weight="700" font-family="sans-serif">C</text></g>
+            <g><circle cx="212" cy="392" r="15" fill="#3f7fb0" stroke="#fff" stroke-width="3"/><text x="212" y="397" font-size="13" fill="#fff" text-anchor="middle" font-weight="700" font-family="sans-serif">D</text></g>
+            <g><circle cx="632" cy="120" r="15" fill="#1f9d5c" stroke="#fff" stroke-width="3"/><text x="632" y="125" font-size="13" fill="#fff" text-anchor="middle" font-weight="700" font-family="sans-serif">E</text></g>
+          </svg>
+          <div class="mpanel">
+            <div class="mt">Pins colored by impact</div>
+            <div class="legrow"><span class="ld" style="background:var(--red)"></span> High impact on you</div>
+            <div class="legrow"><span class="ld" style="background:var(--amber)"></span> Moderate impact</div>
+            <div class="legrow"><span class="ld" style="background:var(--blue)"></span> Watch / minor</div>
+            <div class="legrow"><span class="ld" style="background:var(--green-2)"></span> Positive / distant</div>
+            <div class="layers">
+              <div class="mt">Layers</div>
+              <div class="lyr"><span>Projects</span><span class="tg"></span></div>
+              <div class="lyr"><span>Impact radius</span><span class="tg"></span></div>
+              <div class="lyr off"><span>Flood zones</span><span class="tg"></span></div>
+              <div class="lyr off"><span>Schools</span><span class="tg"></span></div>
+            </div>
+          </div>
+          <div class="mgps">Horseshoe Bay, TX · 5 items within 1.5 mi</div>
+        </div>
+        <div class="pinlist">
+          <div class="groupHead" style="margin-top:0">Near you · closest first</div>
+          <div class="card mini" style="border-left-color:var(--red)">
+            <span class="lens"><span class="letter" style="background:var(--red)">A</span>&nbsp; Data center · 0.7 mi</span>
+            <h3>Lakeside Data Center</h3>
+            <p class="sowhat">Raises water &amp; traffic near you; still shapeable — hearing in 7 days.</p>
+            <div class="impacts"><span class="ichip bad"><span class="cd water"></span>Water <span class="ar">↑</span></span><span class="ichip bad"><span class="cd traffic"></span>Traffic <span class="ar">↑</span></span></div>
+          </div>
+          <div class="card mini" style="border-left-color:var(--amber)">
+            <span class="lens"><span class="letter" style="background:var(--amber)">B</span>&nbsp; Resort · 0.4 mi</span>
+            <h3>Horseshoe Bay Resort Expansion</h3>
+            <p class="sowhat">Nearest active build — short-term noise, likely lifts nearby values.</p>
+            <div class="impacts"><span class="ichip good"><span class="cd value"></span>Home value <span class="ar">↑</span></span></div>
+          </div>
+          <div class="card mini" style="border-left-color:var(--amber)">
+            <span class="lens"><span class="letter" style="background:var(--amber)">C</span>&nbsp; Road · 1.1 mi</span>
+            <h3>TX-71 Expansion</h3>
+            <p class="sowhat">Your daily route — detours during build, smoother commute after.</p>
+            <div class="impacts"><span class="ichip good"><span class="cd traffic"></span>Commute after <span class="ar">↓</span></span></div>
+          </div>
+          <div class="card mini" style="border-left-color:var(--blue)">
+            <span class="lens"><span class="letter" style="background:var(--blue)">D</span>&nbsp; Condos · 2.1 mi</span>
+            <h3>Waterfront Condos</h3>
+            <p class="sowhat">Concept stage; watch for lake-access and traffic changes if it advances.</p>
+            <div class="impacts"><span class="ichip bad"><span class="cd green"></span>Lake access <span class="ar">↓</span></span></div>
+          </div>
+          <div class="card mini" style="border-left-color:var(--green-2)">
+            <span class="lens"><span class="letter" style="background:var(--green-2)">E</span>&nbsp; Solar · 5.5 mi</span>
+            <h3>Solar Farm (approved)</h3>
+            <p class="sowhat">Outside your radius — broadens the tax base, mild long-term positive.</p>
+            <div class="impacts"><span class="ichip good"><span class="cd cost"></span>Tax base <span class="ar">↑</span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= PROPERTIES (list) ======= -->
+    <div class="page hidden" id="page-props">
+      <div class="ph">
+        <div class="eyebrow">Properties</div>
+        <h1>Your properties</h1>
+        <p>Follow as many homes as you like — yours, a rental, or a family member's. Each is watched independently, and you're alerted when something changes near any of them.</p>
+      </div>
+      <div class="strip">
+        <div class="stat"><div class="n">3</div><div class="l">Homes followed</div></div>
+        <div class="stat accent"><div class="n">3</div><div class="l">Need you across all homes</div></div>
+        <div class="stat"><div class="n">7</div><div class="l">Nearby projects total</div></div>
+        <div class="stat g"><div class="n">82</div><div class="l">Avg property score</div></div>
+      </div>
+      <div class="bt-row"><h2 style="font-size:15px;margin:0">Homes you follow</h2><button class="addbtn" onclick="openLoc()">+ Add a property</button></div>
+      <div class="propgrid">
+        <div class="propcard" onclick="selectProperty('123 Blue Heron Dr');go('propdetail')">
+          <div class="miniscore">82</div>
+          <div class="pinfo"><div class="ptag">Your home</div><h3>123 Blue Heron Dr</h3><div class="paddr">Horseshoe Bay, TX 78657</div><div class="pmeta"><span class="needs">◔ 2 need you</span><span>3 nearby projects</span><span style="color:var(--green);font-weight:600">+4.2%</span></div></div>
+        </div>
+        <div class="propcard" onclick="selectProperty('27 Lakeside Dr');go('propdetail')">
+          <div class="miniscore">79</div>
+          <div class="pinfo"><div class="ptag" style="color:var(--amber)">Rental</div><h3>27 Lakeside Dr</h3><div class="paddr">Horseshoe Bay, TX 78657</div><div class="pmeta"><span class="needs">◔ 1 needs you</span><span>2 nearby projects</span><span style="color:var(--green);font-weight:600">+3.8%</span></div></div>
+        </div>
+        <div class="propcard" onclick="selectProperty('105 Summit Ridge');go('propdetail')">
+          <div class="miniscore">86</div>
+          <div class="pinfo"><div class="ptag" style="color:var(--blue)">Family</div><h3>105 Summit Ridge</h3><div class="paddr">Marble Falls, TX 78654</div><div class="pmeta"><span style="color:var(--ink-3)">Nothing needs you</span><span>2 nearby projects</span><span style="color:var(--green);font-weight:600">+5.1%</span></div></div>
+        </div>
+        <div class="propcard" onclick="openLoc()" style="border-style:dashed;justify-content:center">
+          <div style="text-align:center"><div style="font-size:22px;color:var(--green);line-height:1">＋</div><div style="font-weight:600;color:var(--ink-2);font-size:13.5px;margin-top:4px">Add another property</div><div style="font-size:11.5px;color:var(--ink-3)">Free — follow as many as you like</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= PROPERTY DETAIL ======= -->
+    <div class="page hidden" id="page-propdetail">
+      <button class="backbtn" onclick="go('props')">← All properties</button>
+      <div class="ph">
+        <div class="eyebrow" id="pdTag">Your home</div>
+        <h1 id="pdTitle">123 Blue Heron Dr</h1>
+        <p><span id="pdAddr">Horseshoe Bay, TX 78657</span> — everything changing around this specific address, and what it means for its value.</p>
+      </div>
+      <div class="cols">
+        <div>
+          <div class="block">
+            <div class="bt-row"><h2>What's changing near this property</h2><a href="#" onclick="go('dev');return false">All projects →</a></div>
+            <div class="card mini" style="border-left-color:var(--red);margin-bottom:10px">
+              <span class="lens"><span class="sw water"></span>0.7 mi · proposed</span>
+              <h3>Lakeside Data Center</h3>
+              <p class="sowhat"><b>Effect on this home:</b> closest high-impact project — pressures water &amp; power, adds traffic; comment window open.</p>
+              <div class="impacts"><span class="ichip bad"><span class="cd water"></span>Water <span class="ar">↑</span></span><span class="ichip bad"><span class="cd traffic"></span>Traffic <span class="ar">↑</span></span></div>
+            </div>
+            <div class="card mini" style="border-left-color:var(--amber);margin-bottom:10px">
+              <span class="lens"><span class="sw value"></span>0.4 mi · active</span>
+              <h3>Horseshoe Bay Resort Expansion</h3>
+              <p class="sowhat"><b>Effect on this home:</b> nearest build; short-term noise, likely lifts this property's value.</p>
+              <div class="impacts"><span class="ichip good"><span class="cd value"></span>Home value <span class="ar">↑</span></span></div>
+            </div>
+            <div class="card mini" style="border-left-color:var(--amber)">
+              <span class="lens"><span class="sw traffic"></span>1.1 mi · active</span>
+              <h3>TX-71 Expansion</h3>
+              <p class="sowhat"><b>Effect on this home:</b> on the daily route — detours during build, smoother commute after.</p>
+              <div class="impacts"><span class="ichip good"><span class="cd traffic"></span>Commute after <span class="ar">↓</span></span></div>
+            </div>
+          </div>
+          <div class="block">
+            <h2 class="bt">Environmental risk for this parcel</h2>
+            <div class="riskgrid">
+              <div class="rk"><div class="rkl">Flood</div><div class="rkv" style="color:var(--green-2)">Low</div><div class="track" style="margin-top:7px"><div class="fill" style="width:22%;background:var(--green-2)"></div></div></div>
+              <div class="rk"><div class="rkl">Wildfire</div><div class="rkv" style="color:var(--amber)">Moderate</div><div class="track" style="margin-top:7px"><div class="fill" style="width:52%;background:var(--amber)"></div></div></div>
+              <div class="rk"><div class="rkl">Extreme heat</div><div class="rkv" style="color:var(--amber)">Rising</div><div class="track" style="margin-top:7px"><div class="fill" style="width:58%;background:var(--amber)"></div></div></div>
+            </div>
+            <p style="font-size:11px;color:var(--ink-3);margin:10px 0 0">From flood-zone, wildfire and climate layers already ingested.</p>
+          </div>
+          <div class="block">
+            <h2 class="bt">This property's timeline</h2>
+            <div class="thread">
+              <div class="tev"><span class="tk"></span><div><div class="td">May 8, 2025</div><div class="tt">Data center proposed 0.7 mi away</div><div class="tl">↳ value-relevant · monitored</div></div></div>
+              <div class="tev"><span class="tk"></span><div><div class="td">Apr 21, 2025</div><div class="tt">Water quality advisory nearby</div></div></div>
+              <div class="tev"><span class="tk"></span><div><div class="td">Apr 5, 2025</div><div class="tt">TX-71 expansion entered design</div></div></div>
+              <div class="tev future"><span class="tk"></span><div><div class="td">Upcoming</div><div class="tt">Data center hearing — May 26</div></div></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="block">
+            <h2 class="bt">Property vitals</h2>
+            <div style="display:flex;align-items:center;gap:15px;margin-bottom:12px">
+              <div class="ring" style="--p:82"><div class="in">82</div></div>
+              <div><div style="font-size:13px;color:var(--ink-2)">Property score</div><div style="font-size:13px;color:var(--green);font-weight:700">Very strong · ↑ 6 this month</div></div>
+            </div>
+            <div class="vital"><span class="vl">Value outlook · 12 mo</span><span class="vv" style="color:var(--green)">+4.2%</span></div>
+            <div class="vital"><span class="vl">Insurance outlook</span><span class="vv">Stable</span></div>
+            <div class="vital"><span class="vl">Nearby projects</span><span class="vv">3</span></div>
+            <div class="vital"><span class="vl">Active alerts</span><span class="vv">2</span></div>
+          </div>
+          <div class="block">
+            <h2 class="bt">What you can do</h2>
+            <div class="doact">
+              <button class="btn primary">Watch this property</button>
+              <button class="btn" onclick="go('reports')">Generate property report</button>
+              <button class="btn ghost">Compare to nearby homes</button>
+            </div>
+          </div>
+          <div class="p2">
+            <div class="p2h"><span>🔒</span> Phase 2 — unlocked by new feeds</div>
+            <div class="p2sub">Layout ready; activates with these sources.</div>
+            <div class="p2i"><div style="flex:1"><div class="t">Total cost of ownership</div><div class="d">Taxes, insurance, utilities, upkeep</div></div><span class="feed">+ assessor / tax</span></div>
+            <div class="p2i"><div style="flex:1"><div class="t">Insurance comparison</div><div class="d">Quotes &amp; savings by carrier</div></div><span class="feed">+ insurance</span></div>
+            <div class="p2i"><div style="flex:1"><div class="t">Document vault</div><div class="d">Deed, permits, warranties</div></div><span class="feed">+ uploads</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= COMMUNITIES ======= -->
+    <div class="page hidden" id="page-comm">
+      <div class="ph">
+        <div class="eyebrow">Communities</div>
+        <h1>78657 · Horseshoe Bay, TX</h1>
+        <p>What's changing across your community — aggregated from the same feeds that power your alerts.</p>
+        <button class="inlinebtn" style="margin-top:12px" onclick="openModal('shareModal')">◍ Invite your neighbors</button>
+      </div>
+      <div class="strip">
+        <div class="stat g"><div class="n">85</div><div class="l">Community score · ↑ 8</div></div>
+        <div class="stat"><div class="n">12</div><div class="l">Active projects</div></div>
+        <div class="stat accent"><div class="n">2</div><div class="l">Public hearings</div></div>
+        <div class="stat"><div class="n" style="font-size:19px">Medium</div><div class="l">Growth pressure ↑</div></div>
+      </div>
+      <div class="lensnav">
+        <button class="lenscard on"><span class="q">What's changing</span><span class="d">Live · built on existing feeds</span></button>
+        <button class="lenscard" style="opacity:.55"><span class="q">🔒 Demographics</span><span class="d">Phase 1.5 · + Census (free)</span></button>
+        <button class="lenscard" style="opacity:.55"><span class="q">🔒 Economy &amp; Market</span><span class="d">Phase 2 · + market data</span></button>
+      </div>
+      <div class="cols">
+        <div>
+          <div class="groupHead" style="margin-top:0"><span class="gd traffic"></span> Development &amp; growth <span class="gc">— 3 active</span></div>
+          <div class="card mini" style="border-left-color:var(--amber);margin-bottom:10px">
+            <span class="lens">Proposed · 0.7 mi</span><h3>Lakeside Data Center</h3>
+            <p class="sowhat">Largest proposed project in the ZIP; public hearing May 26.</p>
+          </div>
+          <div class="card mini" style="border-left-color:var(--amber)">
+            <span class="lens">Active · 0.4–1.1 mi</span><h3>Resort Expansion &amp; TX-71 widening</h3>
+            <p class="sowhat">Two active builds shaping traffic and home values this year.</p>
+          </div>
+          <div class="groupHead"><span class="gd water"></span> Environment &amp; utilities <span class="gc">— 1 change</span></div>
+          <div class="card mini" style="border-left-color:var(--blue)">
+            <span class="lens">Water · 2.3 mi</span><h3>Water quality advisory</h3>
+            <p class="sowhat">E. coli flagged; utility treating source, advisory expected May 16.</p>
+          </div>
+          <div class="groupHead"><span class="gd" style="background:var(--violet)"></span> Government &amp; civic <span class="gc">— 2 upcoming</span></div>
+          <div class="card mini" style="border-left-color:var(--violet)">
+            <span class="lens">Civic</span><h3>City Council &amp; Planning Commission</h3>
+            <p class="sowhat">Both meet May 15 — data center and water advisory on the agendas.</p>
+          </div>
+        </div>
+        <div>
+          <div class="block">
+            <h2 class="bt">Community pulse</h2>
+            <div class="vital"><span class="vl">Development activity</span><span class="vv" style="color:var(--amber)">High</span></div>
+            <div class="vital"><span class="vl">Environmental risk</span><span class="vv" style="color:var(--green-2)">Low</span></div>
+            <div class="vital"><span class="vl">Civic activity</span><span class="vv">Active</span></div>
+            <div class="vital"><span class="vl">Value trend · 12 mo</span><span class="vv" style="color:var(--green)">+4.6%</span></div>
+          </div>
+          <div class="p2">
+            <div class="p2h"><span>🔒</span> Community profile — Phase 1.5 / 2</div>
+            <div class="p2sub">The "what's changing" view is live now; the demographic &amp; market profile activates with new feeds.</div>
+            <div class="p2i"><div style="flex:1"><div class="t">Population &amp; demographics</div><div class="d">Community DNA radar, household mix</div></div><span class="feed">+ Census (free)</span></div>
+            <div class="p2i"><div style="flex:1"><div class="t">Median home value &amp; market</div><div class="d">Prices, growth outlook</div></div><span class="feed">+ market data</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= REPORTS ======= -->
+    <div class="page hidden" id="page-reports">
+      <div class="ph">
+        <div class="eyebrow">Reports</div>
+        <h1>Reports</h1>
+        <p>Shareable documents generated from the intelligence already tracked for you — no new data required.</p>
+      </div>
+      <div class="rgrid">
+        <div>
+          <div class="rlist">
+            <div class="rrow"><div class="ricon">⌂</div><div class="rmain"><div class="rt">123 Blue Heron Dr — Property Intelligence Report</div><div class="rd">Score, nearby projects, risk &amp; value outlook · updated today</div></div><span class="rtype">Property</span></div>
+            <div class="rrow"><div class="ricon">◍</div><div class="rmain"><div class="rt">78657 — Community Snapshot</div><div class="rd">What's changing across Horseshoe Bay · updated today</div></div><span class="rtype">Community</span></div>
+            <div class="rrow"><div class="ricon">◈</div><div class="rmain"><div class="rt">Lakeside Data Center — Impact Analysis</div><div class="rd">Full project impact, timeline &amp; recommended actions · May 10</div></div><span class="rtype">Project</span></div>
+            <div class="rrow"><div class="ricon">✉</div><div class="rmain"><div class="rt">Your Weekly Briefing — May 12</div><div class="rd">The 3 changes that mattered near you this week</div></div><span class="rtype">Briefing</span></div>
+          </div>
+          <div class="p2" style="margin-top:16px">
+            <div class="p2h"><span>🔒</span> Phase 2 report type</div>
+            <div class="p2i"><div style="flex:1"><div class="t">Cost-of-ownership report</div><div class="d">Taxes, insurance &amp; utilities forecast</div></div><span class="feed">+ tax / insurance</span></div>
+          </div>
+        </div>
+        <div class="doc">
+          <div class="dhead">
+            <div class="dk">Project impact analysis · preview</div>
+            <h3>Lakeside Data Center</h3>
+            <div class="dm">Prepared for 123 Blue Heron Dr · Horseshoe Bay, TX 78657 · May 10, 2025</div>
+            <button class="inlinebtn" style="margin-top:14px" onclick="openModal('shareModal')">⤴ Share this report</button>
+          </div>
+          <div class="dbody">
+            <div class="dsec"><h4>Bottom line</h4><p>A 250,000 sq ft data center proposed 0.7 mi away is likely to increase truck traffic and strain local water &amp; power, with a meaningful lift to the tax base. Public comment is open through the May 26 hearing.</p></div>
+            <div class="dsec"><h4>Impact on this property</h4>
+              <div class="impacts">
+                <span class="ichip bad"><span class="cd traffic"></span>Traffic <span class="ar">↑</span></span>
+                <span class="ichip bad"><span class="cd water"></span>Water <span class="ar">↑</span></span>
+                <span class="ichip bad"><span class="cd air"></span>Noise <span class="ar">↑</span></span>
+                <span class="ichip good"><span class="cd value"></span>Tax base <span class="ar">↑</span></span>
+              </div>
+            </div>
+            <div class="dsec"><h4>Recommended actions</h4><p>1 · Submit a public comment before May 26.&nbsp;&nbsp;2 · Add the hearing to your calendar.&nbsp;&nbsp;3 · Follow the project for permit and vote updates.</p></div>
+            <div class="dsec"><h4>Sources</h4><p>County permit filing #DA-2025-0148 · Planning Commission agenda (May 26) · FEMA flood layer · HomeSignal impact model. All public records.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= CONTACT ======= -->
+    <div class="page hidden" id="page-contact">
+      <div class="ph">
+        <div class="eyebrow">Contact</div>
+        <h1>Get in touch</h1>
+        <p>Questions, feedback, or a community you'd like us to add? We'd love to hear from you.</p>
+      </div>
+      <div class="cols">
+        <div>
+          <div class="block">
+            <h2 class="bt">Send us a message</h2>
+            <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 16px">Email us directly at <a href="mailto:hello@homesignal.net" style="color:var(--green);font-weight:600;text-decoration:none">hello@homesignal.net</a>, or use the form below.</p>
+            <div id="contactForm" style="display:flex;flex-direction:column;gap:10px">
+              <input class="cinput" id="cName" placeholder="Your name">
+              <input class="cinput" id="cEmail" type="email" placeholder="Your email">
+              <textarea class="cinput" id="cMsg" placeholder="Your message" style="min-height:120px;resize:vertical"></textarea>
+              <button class="mbtn" style="align-self:flex-start" onclick="sendContact()">Send message</button>
+            </div>
+            <div id="contactDone" class="cnote hidden">✓ Thanks — your message is on its way. We'll reply to your email shortly.</div>
+          </div>
+        </div>
+        <div>
+          <div class="block">
+            <h2 class="bt">Other ways to reach us</h2>
+            <div class="vital"><span class="vl">Email</span><span class="vv" style="font-size:13px">hello@homesignal.net</span></div>
+            <div class="vital"><span class="vl">Request a community</span><span class="vv" style="font-size:13px"><a href="#" onclick="openLoc();return false" style="color:var(--green);text-decoration:none">Add your ZIP →</a></span></div>
+            <div class="vital"><span class="vl">Follow</span><span class="vv" style="font-size:13px">Bluesky · Reddit</span></div>
+          </div>
+          <div class="block">
+            <h2 class="bt">Neutral · sourced · non-partisan</h2>
+            <p style="font-size:13px;color:var(--ink-2);margin:0">Everything HomeSignal shows is drawn from public records. We don't take positions — we help you see what's changing and decide for yourself.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= PRIVACY ======= -->
+    <div class="page hidden" id="page-privacy">
+      <div class="ph">
+        <div class="eyebrow">Privacy</div>
+        <h1>Privacy &amp; Terms</h1>
+        <p>Last updated July 2026. In plain language: we never sell your personal information, the intelligence comes from public records, and you control what you follow.</p>
+      </div>
+      <div class="block prose" style="max-width:840px">
+        <div class="cnote"><b>The short version:</b> we never sell your personal information. The intelligence we show comes from public government records — not from tracking you. You choose which topics and locations you follow, and you can update your preferences or unsubscribe at any time.</div>
+
+        <h2 class="bt">What we collect</h2>
+        <ul>
+          <li><b>Account information</b> — your email, and optionally your name, so you can save communities and receive alerts.</li>
+          <li><b>Your preferences</b> — the ZIP codes, properties, and topics you choose to follow.</li>
+          <li><b>Public records</b> — permits, hearings, agendas, environmental and infrastructure filings. Public data about places, not private data about you.</li>
+          <li><b>Basic usage data</b> — privacy-respecting analytics to keep the product reliable.</li>
+        </ul>
+
+        <h2 class="bt">How we use it</h2>
+        <p>We use your email and preferences to deliver the alerts and briefings you asked for, save your communities, and notify you about availability (new areas or Premium). Aggregate usage data helps us improve accuracy.</p>
+
+        <h2 class="bt">What we never do</h2>
+        <p>We do not sell your personal contact information, and we do not share your identity with advertisers. Alerts are based on where you choose to look — not on a hidden profile of you.</p>
+
+        <h2 class="bt">Optional anonymized insights</h2>
+        <p>When you opt in (the checkbox on the topic picker), HomeSignal may share <b>anonymized, aggregated</b> information about the topics and locations people follow — for example, "interest in data-center development rose in this county." No personal contact information is ever included, and it's off unless you choose it. Change it any time in your alert settings.</p>
+
+        <h2 class="bt">Your choices &amp; controls</h2>
+        <ul>
+          <li>Change the topics and communities you follow at any time.</li>
+          <li>Unsubscribe from any alert email with one click.</li>
+        </ul>
+
+        <h2 class="bt">Contact</h2>
+        <p>Questions about privacy? Email <a href="mailto:hello@homesignal.net">hello@homesignal.net</a> or use the <a href="#" onclick="go('contact');return false">contact page</a>.</p>
+
+        <div class="divider"></div>
+
+        <h2 class="bt" id="terms" style="font-size:18px">Terms of Use</h2>
+        <p>HomeSignal provides intelligence about your community for informational purposes. We source from authoritative public records and present them accurately, but HomeSignal is not legal, financial, or real-estate advice — verify anything you plan to act on with the relevant authority or a qualified professional.</p>
+        <p><b>Acceptable use.</b> Use HomeSignal for your own personal, non-commercial purpose of understanding and participating in your community. Don't scrape, resell, or misrepresent our intelligence, or use it to harass others.</p>
+        <p><b>Accuracy &amp; availability.</b> Public records can be incomplete, delayed, or amended. We show confidence and sources so you can judge for yourself, but can't guarantee every record is complete or current. The service is provided "as is," and features may change as the product evolves.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ======= LOCATION / REQUEST COMMUNITY MODAL ======= -->
+<div class="overlay" id="locModal" onclick="if(event.target===this)closeModal('locModal')">
+  <div class="modal">
+    <div class="mhead">
+      <button class="mclose" onclick="closeModal('locModal')">✕</button>
+      <span class="mbadge">◉ Your community</span>
+      <h3>Change your community</h3>
+      <p class="msub">Enter a ZIP code to open what's changing around that area.</p>
+    </div>
+    <div class="mbody">
+      <div id="locForm">
+        <div class="field">
+          <input id="locZip" inputmode="numeric" maxlength="5" placeholder="Enter ZIP (e.g., 78657)" onkeydown="if(event.key==='Enter')findCommunity()">
+          <button class="mbtn" onclick="findCommunity()">Find my community</button>
+        </div>
+        <div class="mnote">Try 78657 (covered) or 90025 (not covered yet).</div>
+      </div>
+      <div id="locRequest" class="hidden">
+        <div style="background:var(--amber-tint);border:1px solid #f0dcbd;border-radius:10px;padding:12px 14px;font-size:13px;color:var(--amber);margin-bottom:14px"><b>We're not in <span id="reqZipLabel">90025</span> yet</b> — but we'd love to add it. Add your email and we'll notify you the moment it goes live.</div>
+        <div class="field" style="flex-direction:column;gap:10px">
+          <input id="reqEmail" type="email" placeholder="Your email" onkeydown="if(event.key==='Enter')submitRequest()">
+          <button class="mbtn" onclick="submitRequest()">Request my community</button>
+        </div>
+        <div class="mnote">We'll only email you when your area goes live. No spam.</div>
+      </div>
+      <div id="locDone" class="success hidden"><div class="ck">✓</div><h4 id="locDoneH">Request received</h4><p id="locDoneP">We'll email you the moment it's live.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= PROPERTY SWITCHER MODAL ======= -->
+<div class="overlay" id="switcherModal" onclick="if(event.target===this)closeModal('switcherModal')">
+  <div class="modal">
+    <div class="mhead">
+      <button class="mclose" onclick="closeModal('switcherModal')">✕</button>
+      <span class="mbadge">⌂ Your properties</span>
+      <h3>Switch property</h3>
+      <p class="msub">You're following 3 homes. Pick one to focus the app on it.</p>
+    </div>
+    <div class="mbody">
+      <div class="swrow active" onclick="selectProperty('123 Blue Heron Dr');closeModal('switcherModal')"><div class="miniscore">82</div><div class="pinfo"><div class="pt">123 Blue Heron Dr</div><div class="pa">Your home · Horseshoe Bay, TX 78657</div></div><span class="chk">✓</span></div>
+      <div class="swrow" onclick="selectProperty('27 Lakeside Dr');closeModal('switcherModal')"><div class="miniscore">79</div><div class="pinfo"><div class="pt">27 Lakeside Dr</div><div class="pa">Rental · Horseshoe Bay, TX 78657</div></div></div>
+      <div class="swrow" onclick="selectProperty('105 Summit Ridge');closeModal('switcherModal')"><div class="miniscore">86</div><div class="pinfo"><div class="pt">105 Summit Ridge</div><div class="pa">Family · Marble Falls, TX 78654</div></div></div>
+      <button class="mbtn" style="width:100%;margin-top:12px" onclick="closeModal('switcherModal');openLoc()">+ Add a property</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======= TOPIC PICKER MODAL ======= -->
+<div class="overlay" id="topicsModal" onclick="if(event.target===this)closeModal('topicsModal')">
+  <div class="modal" style="max-width:484px">
+    <div class="mhead">
+      <button class="mclose" onclick="closeModal('topicsModal')">✕</button>
+      <span class="mbadge" id="tmBadge">◈ Topics</span>
+      <h3 id="tmTitle">Government Notices</h3>
+      <p class="msub" id="tmSub">Choose which notices you want alerts for</p>
+    </div>
+    <div class="mbody">
+      <div class="tgrid" id="tmGrid"></div>
+      <div class="tcount"><span>◔</span> <span id="tmCount">0 topics selected</span></div>
+      <label class="consent"><input type="checkbox" id="tmConsent"><span><b>OPTIONAL</b> I agree that HomeSignal may share anonymized, aggregated information about the topics and locations I follow to support its products, services, and research. No personal contact information is ever shared. <a href="#" onclick="closeModal('topicsModal');go('privacy');return false">Privacy Policy</a></span></label>
+      <div class="savingline">Saving to your account · <b>alex@email.com</b></div>
+      <div id="tmForm">
+        <button class="mbtn" onclick="saveTopics()">Save alerts</button>
+        <div class="mnote">No spam · Unsubscribe anytime</div>
+      </div>
+      <div id="tmDone" class="success hidden"><div class="ck">✓</div><h4>Alerts saved</h4><p id="tmDoneMsg">You'll be notified about these topics.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= PREMIUM WAITLIST MODAL ======= -->
+<div class="overlay" id="premiumModal" onclick="if(event.target===this)closeModal('premiumModal')">
+  <div class="modal">
+    <div class="mhead">
+      <button class="mclose" onclick="closeModal('premiumModal')">✕</button>
+      <span class="mbadge">◆ Coming soon</span>
+      <h3>Premium is being built</h3>
+      <p class="msub">Deep property reports, unlimited watched addresses, and cost-of-ownership &amp; insurance intelligence are on the way. Leave your email and we'll notify you the moment it's ready — nothing to pay until then.</p>
+    </div>
+    <div class="mbody">
+      <div id="premiumForm">
+        <div class="field">
+          <input id="premiumEmail" type="email" placeholder="you@email.com" onkeydown="if(event.key==='Enter')submitWaitlist()">
+          <button class="mbtn" onclick="submitWaitlist()">Notify me</button>
+        </div>
+        <div class="mnote">We'll only email you about Premium availability. No spam — unsubscribe anytime.</div>
+      </div>
+      <div id="premiumDone" class="success hidden">
+        <div class="ck">✓</div>
+        <h4>You're on the list</h4>
+        <p>We'll email you the moment Premium launches.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= SHARE MODAL ======= -->
+<div class="overlay" id="shareModal" onclick="if(event.target===this)closeModal('shareModal')">
+  <div class="modal">
+    <div class="mhead">
+      <button class="mclose" onclick="closeModal('shareModal')">✕</button>
+      <span class="mbadge">⤴ Share</span>
+      <h3>Share HomeSignal</h3>
+      <p class="msub">Send this to a neighbor. The more of your community that's watching, the sharper everyone's intelligence gets.</p>
+    </div>
+    <div class="mbody">
+      <div class="sharegrid">
+        <button class="sopt" onclick="copyLink()"><span class="si" style="background:var(--green)">⧉</span>Copy link</button>
+        <button class="sopt"><span class="si" style="background:#34c759">💬</span>Messages</button>
+        <button class="sopt"><span class="si" style="background:#7c8a82">✉</span>Email</button>
+        <button class="sopt"><span class="si" style="background:#1877f2">f</span>Facebook</button>
+        <button class="sopt"><span class="si" style="background:#00b246">◍</span>Nextdoor</button>
+        <button class="sopt"><span class="si" style="background:#25d366">✆</span>WhatsApp</button>
+        <button class="sopt"><span class="si" style="background:#29a9eb">➤</span>Telegram</button>
+        <button class="sopt"><span class="si" style="background:#3a76f0">◉</span>Signal</button>
+        <button class="sopt"><span class="si" style="background:#ff4500">R</span>Reddit</button>
+        <button class="sopt"><span class="si" style="background:#111">𝕏</span>X</button>
+        <button class="sopt"><span class="si" style="background:#1185fe">✦</span>Bluesky</button>
+        <button class="sopt"><span class="si" style="background:#0a66c2">in</span>LinkedIn</button>
+      </div>
+      <div class="linkbox"><span class="url" id="shareUrl">homesignal.net/c/78657-horseshoe-bay</span><button id="copyBtn" onclick="copyLink()">Copy</button></div>
+      <div class="netnote"><span>◍</span><span><b>Why sharing matters:</b> community intelligence gets stronger as neighbors join — more eyes on local change, shared alerts, and bigger civic turnout at the hearings that shape your area.</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function openModal(id){document.getElementById(id).classList.add('show');}
+  function closeModal(id){document.getElementById(id).classList.remove('show');}
+  function submitWaitlist(){
+    var el=document.getElementById('premiumEmail');var e=el.value.trim();
+    if(!e || e.indexOf('@')<1){el.style.borderColor='#c23b34';el.focus();return;}
+    document.getElementById('premiumForm').classList.add('hidden');
+    document.getElementById('premiumDone').classList.remove('hidden');
+  }
+  function copyLink(){
+    var t=document.getElementById('shareUrl').textContent;
+    try{navigator.clipboard.writeText(t);}catch(e){}
+    var b=document.getElementById('copyBtn');b.textContent='Copied ✓';
+    setTimeout(function(){b.textContent='Copy';},1800);
+  }
+  var TDATA={
+    gov:{title:'Government Notices',sub:'Choose which notices you want alerts for',badge:'▤ Notices',items:['County Commission & county business','Planning, zoning & development','Property taxes & assessments','Public safety & emergencies','Water companies','Elections & voting'],on:[0,1,2,3,4,5]},
+    meetings:{title:'Upcoming Meetings',sub:'Choose which meetings you want advance alerts for',badge:'▦ Meetings',items:['County Commission & county business','Planning, zoning & development','Property taxes & assessments','Public safety & emergencies','Water companies','Elections & voting'],on:[0,1,2,3,4,5]},
+    news:{title:'Local News',sub:'Select the news topics you want real-time alerts for',badge:'✉ News',items:['Water Quality','Air Quality','Soil Quality','Animal & Human Viruses / Diseases','Infrastructure','EMF','Noise Pollution','Light Pollution','Livestock, Crops, Pets & Wildlife Health','Weather & Climate Hazards','Radiation','Data Centers'],on:[0,4]},
+    dev:{title:'Development',sub:'Choose the project types you want to follow',badge:'◈ Development',items:['Data Centers','Residential','Commercial','Industrial','Roads & Infrastructure','Schools','Utilities','Parks & Green space'],on:[0,4,6]}
+  };
+  var TCUR=null;
+  function openTopics(key){
+    TCUR=key; var d=TDATA[key];
+    document.getElementById('tmTitle').textContent=d.title;
+    document.getElementById('tmSub').textContent=d.sub;
+    document.getElementById('tmBadge').textContent=d.badge;
+    var g=document.getElementById('tmGrid'); g.innerHTML='';
+    d.items.forEach(function(it,i){
+      var on=d.on.indexOf(i)>=0;
+      var b=document.createElement('button');
+      b.className='tchip'+(on?' on':'');
+      b.innerHTML='<span class="box">'+(on?'✓':'')+'</span><span>'+it+'</span>';
+      b.onclick=function(){var isOn=b.classList.toggle('on');b.querySelector('.box').textContent=isOn?'✓':'';updateTCount();};
+      g.appendChild(b);
+    });
+    document.getElementById('tmForm').classList.remove('hidden');
+    document.getElementById('tmDone').classList.add('hidden');
+    updateTCount(); openModal('topicsModal');
+  }
+  function updateTCount(){
+    var n=document.querySelectorAll('#tmGrid .tchip.on').length;
+    document.getElementById('tmCount').textContent=n+' topic'+(n===1?'':'s')+' selected';
+  }
+  function saveTopics(){
+    var n=document.querySelectorAll('#tmGrid .tchip.on').length;
+    document.getElementById('cc-'+TCUR).textContent=n+' topic'+(n===1?'':'s')+' followed';
+    document.getElementById('tmForm').classList.add('hidden');
+    document.getElementById('tmDoneMsg').textContent="You'll be alerted about "+n+" "+TDATA[TCUR].title.toLowerCase()+" topic"+(n===1?'':'s')+".";
+    document.getElementById('tmDone').classList.remove('hidden');
+  }
+  // ----- location / request-community -----
+  var COVERED=['78657','78654','78611','78620','78669','78734','78732'];
+  function openLoc(){
+    document.getElementById('locForm').classList.remove('hidden');
+    document.getElementById('locRequest').classList.add('hidden');
+    document.getElementById('locDone').classList.add('hidden');
+    var z=document.getElementById('locZip'); z.value=''; z.style.borderColor='';
+    openModal('locModal');
+  }
+  function findCommunity(){
+    var el=document.getElementById('locZip'); var z=el.value.trim();
+    if(!/^\d{5}$/.test(z)){el.style.borderColor='#c23b34';el.focus();return;}
+    el.style.borderColor='';
+    if(COVERED.indexOf(z)>=0){
+      document.getElementById('locForm').classList.add('hidden');
+      document.getElementById('locRequest').classList.add('hidden');
+      document.getElementById('locDoneH').textContent=z+' is live';
+      document.getElementById('locDoneP').textContent="We're already tracking development, alerts and civic decisions for this community.";
+      document.getElementById('locDone').classList.remove('hidden');
+    } else {
+      document.getElementById('reqZipLabel').textContent=z;
+      document.getElementById('locForm').classList.add('hidden');
+      document.getElementById('locRequest').classList.remove('hidden');
+    }
+  }
+  function submitRequest(){
+    var el=document.getElementById('reqEmail'); var e=el.value.trim();
+    if(!e||e.indexOf('@')<1){el.style.borderColor='#c23b34';el.focus();return;}
+    document.getElementById('locRequest').classList.add('hidden');
+    document.getElementById('locDoneH').textContent='Request received';
+    document.getElementById('locDoneP').textContent="We'll email you the moment "+document.getElementById('reqZipLabel').textContent+" is live on HomeSignal.";
+    document.getElementById('locDone').classList.remove('hidden');
+  }
+  function sendContact(){
+    var el=document.getElementById('cEmail');
+    if(!el.value.trim()||el.value.indexOf('@')<1){el.style.borderColor='#c23b34';el.focus();return;}
+    document.getElementById('contactForm').classList.add('hidden');
+    document.getElementById('contactDone').classList.remove('hidden');
+  }
+  function homeFind(){
+    var el=document.getElementById('homeZip'); var z=el.value.trim();
+    if(!/^\d{5}$/.test(z)){el.style.borderColor='#c23b34';el.focus();return;}
+    el.style.borderColor=''; openLoc();
+    document.getElementById('locZip').value=z; findCommunity();
+  }
+  function openSwitcher(){openModal('switcherModal');}
+  var PROPS={
+    '123 Blue Heron Dr':{addr:'Horseshoe Bay, TX 78657',tag:'Your home'},
+    '27 Lakeside Dr':{addr:'Horseshoe Bay, TX 78657',tag:'Rental'},
+    '105 Summit Ridge':{addr:'Marble Falls, TX 78654',tag:'Family'}
+  };
+  function selectProperty(name){
+    document.getElementById('locLabel').textContent=name;
+    var pd=document.getElementById('pdTitle'); if(pd) pd.textContent=name;
+    var info=PROPS[name];
+    if(info){
+      var a=document.getElementById('pdAddr'); if(a) a.textContent=info.addr;
+      var t=document.getElementById('pdTag'); if(t) t.textContent=info.tag;
+    }
+  }
+  function toggleMenu(){
+    document.querySelector('.side').classList.toggle('open');
+    document.getElementById('sidebackdrop').classList.toggle('show');
+  }
+  function closeMenu(){
+    document.querySelector('.side').classList.remove('open');
+    document.getElementById('sidebackdrop').classList.remove('show');
+  }
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){['topicsModal','premiumModal','shareModal','locModal','switcherModal'].forEach(closeModal);}});
+  function go(view){
+    var pages={home:'page-home',mission:'page-mission',dash:'page-dash',alerts:'page-alerts',dev:'page-dev',detail:'page-detail',maps:'page-maps',props:'page-props',propdetail:'page-propdetail',comm:'page-comm',reports:'page-reports',contact:'page-contact',privacy:'page-privacy'};
+    for(var k in pages){document.getElementById(pages[k]).classList.add('hidden');}
+    document.getElementById(pages[view]).classList.remove('hidden');
+    var navFor={mission:'nav-mission',dash:'nav-dash',alerts:'nav-alerts',dev:'nav-dev',detail:'nav-dev',maps:'nav-maps',props:'nav-props',propdetail:'nav-props',comm:'nav-comm',reports:'nav-reports'};
+    document.querySelectorAll('.nav a').forEach(function(a){a.classList.remove('on');});
+    if(navFor[view]) document.getElementById(navFor[view]).classList.add('on');
+    closeMenu();
+    window.scrollTo(0,0);
+  }
+</script>
+</body>
+</html>
