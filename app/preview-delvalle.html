@@ -1,0 +1,2492 @@
+<!-- HomeSignal Del Valle preview — GENERATED single-file bundle of /app. Seed mode, no DB. Source of truth is the multi-page app under /app. -->
+<title>HomeSignal — Del Valle (78617) preview</title>
+<style>
+/* HomeSignal app.css — design tokens + components lifted VERBATIM from the approved
+   mockup homesignalphase1_13.html <style> block. Do not restyle. Shared by every app page. */
+
+  :root{
+    --bg:#f4f6f4; --panel:#ffffff; --ink:#16211c; --ink-2:#4a5a52; --ink-3:#8593; --ink-3:#83918a;
+    --line:#e4e8e4; --line-2:#eef1ee;
+    --green:#157a49; --green-2:#1f9d5c; --green-tint:#e9f5ee; --green-deep:#0f5c37;
+    --red:#c23b34; --red-tint:#fbeceb;
+    --amber:#c47a1a; --amber-tint:#fbf1e2;
+    --blue:#3f7fb0; --blue-tint:#eaf2f8;
+    --violet:#6b5bb5;
+    --shadow-sm:0 1px 2px rgba(16,33,28,.06);
+    --shadow:0 1px 2px rgba(16,33,28,.05),0 8px 24px rgba(16,33,28,.06);
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --sidebar:236px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.5;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+
+  .app{display:grid;grid-template-columns:var(--sidebar) 1fr;min-height:100vh}
+
+  /* ---------- SIDEBAR ---------- */
+  .side{background:#10231a;color:#c7d6cd;display:flex;flex-direction:column;padding:18px 14px;position:sticky;top:0;height:100vh}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;color:#fff;padding:6px 8px 18px}
+  .logo .mk{width:24px;height:24px;border-radius:7px;background:var(--green-2);display:grid;place-items:center;color:#fff;font-size:13px}
+  .nav{display:flex;flex-direction:column;gap:2px}
+  .nav a{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;color:#a9bcb1;text-decoration:none;font-size:13.5px;font-weight:500}
+  .nav a .ic{width:17px;text-align:center;opacity:.9;font-size:14px}
+  .nav a:hover{background:#193024;color:#eaf3ee}
+  .nav a.on{background:var(--green);color:#fff}
+  .nav a.on .ic{opacity:1}
+  .side .grow{flex:1}
+  .upsell{background:#193024;border:1px solid #24402f;border-radius:12px;padding:14px}
+  .upsell .t{font-size:13px;font-weight:700;color:#fff;margin-bottom:3px}
+  .upsell .d{font-size:11.5px;color:#93a89c;margin-bottom:10px}
+  .upsell button{width:100%;background:var(--green-2);color:#fff;border:none;padding:8px;border-radius:8px;font-size:12.5px;font-weight:600}
+
+  /* ---------- TOPBAR ---------- */
+  .main{display:flex;flex-direction:column;min-width:0}
+  .top{display:flex;align-items:center;gap:14px;padding:13px 26px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  .loc{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--ink);background:#f4f6f4;border:1px solid var(--line);padding:7px 12px;border-radius:9px}
+  .loc .pin{color:var(--green)}
+  .search{flex:1;max-width:520px}
+  .search input{width:100%;border:1px solid var(--line);background:#f7f9f7;border-radius:9px;padding:9px 13px;font-size:13px;color:var(--ink)}
+  .top .sp{flex:1}
+  .ib{width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;color:var(--ink-2);position:relative}
+  .ib .badge{position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px}
+  .avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--green-2),var(--green-deep));color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700}
+
+  .page{padding:28px 34px 60px;max-width:1180px;width:100%;margin:0 auto}
+
+  /* ---------- PAGE HEADER ---------- */
+  .ph{margin-bottom:22px}
+  .ph .eyebrow{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green)}
+  .ph h1{font-size:27px;letter-spacing:-.02em;margin:6px 0 6px}
+  .ph p{font-size:15px;color:var(--ink-2);margin:0;max-width:640px}
+
+  /* summary strip */
+  .strip{display:flex;gap:14px;margin:20px 0 26px;flex-wrap:wrap}
+  .stat{flex:1;min-width:150px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px 17px;box-shadow:var(--shadow-sm)}
+  .stat .n{font-size:24px;font-weight:700;letter-spacing:-.02em}
+  .stat .l{font-size:12.5px;color:var(--ink-2);margin-top:1px}
+  .stat.accent{background:var(--red-tint);border-color:#f2d3d0}
+  .stat.accent .n{color:var(--red)}
+  .stat.g{background:var(--green-tint);border-color:#cbe7d5}
+  .stat.g .n{color:var(--green)}
+
+  /* filter row */
+  .toolbar{display:flex;align-items:center;gap:9px;margin-bottom:18px;flex-wrap:wrap}
+  .seg{display:inline-flex;background:#eef1ee;border-radius:10px;padding:3px}
+  .seg button{border:none;background:transparent;padding:7px 13px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--ink-2)}
+  .seg button.on{background:#fff;color:var(--ink);box-shadow:var(--shadow-sm)}
+  .toolbar .sp{flex:1}
+  .fpill{font-size:12.5px;padding:7px 12px;border:1px solid var(--line);border-radius:9px;color:var(--ink-2);background:#fff}
+
+  /* ---------- STORY CARD ---------- */
+  .band{border:1px solid #f0d2cf;background:linear-gradient(180deg,#fdf3f2,#fff 60%);border-radius:15px;padding:6px 8px 10px;margin-bottom:26px}
+  .band-h{display:flex;align-items:center;justify-content:space-between;padding:13px 12px 8px}
+  .band-h .lab{font-size:12.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--red);display:flex;align-items:center;gap:9px}
+  .band-h .lab .dotb{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 0 4px var(--red-tint)}
+  .band-h .cnt{font-size:12px;color:var(--ink-3)}
+
+  .groupHead{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);margin:26px 4px 12px}
+  .groupHead .gd{width:10px;height:10px;border-radius:50%}
+  .groupHead .gc{font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink-3);font-size:12px}
+
+  .card{background:#fff;border:1px solid var(--line);border-left-width:3px;border-radius:13px;padding:17px 18px 15px;box-shadow:var(--shadow-sm);margin-bottom:12px}
+  .card.inband{margin:0 4px 8px}
+  .card .lens{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-bottom:9px}
+  .card .lens .sw{width:8px;height:8px;border-radius:50%}
+  .card h3{font-size:16.5px;margin:0 0 7px;letter-spacing:-.01em}
+  .sowhat{font-size:14px;color:var(--ink-2);margin:0 0 13px}
+  .sowhat b{color:var(--ink)}
+  .impacts{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+  .ichip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;background:#f7f9f7;border:1px solid var(--line);padding:5px 9px;border-radius:8px;color:var(--ink)}
+  .ichip .cd{width:8px;height:8px;border-radius:50%}
+  .ichip .ar{font-weight:800}
+  .ichip.bad .ar{color:var(--red)} .ichip.good .ar{color:var(--green-2)}
+  .foot{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line-2);padding-top:12px;flex-wrap:wrap}
+  .meta{font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+  .meta .dist{color:var(--ink-2);font-weight:600}
+  .actions{display:flex;gap:8px}
+  .btn{font-size:12.5px;font-weight:600;padding:8px 13px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);white-space:nowrap}
+  .btn:hover{background:#f7f9f7}
+  .btn.primary{background:var(--green);color:#fff;border-color:var(--green)}
+  .btn.primary:hover{background:var(--green-deep)}
+  .btn.ghost{color:var(--ink-2);border-color:transparent}
+  .win{font-size:11.5px;font-weight:700;color:var(--red);background:var(--red-tint);padding:4px 9px;border-radius:7px;display:inline-flex;align-items:center;gap:5px}
+  .win.soft{color:var(--amber);background:var(--amber-tint)}
+
+  .cd.traffic{background:var(--amber)} .cd.water{background:var(--blue)} .cd.air{background:var(--violet)}
+  .cd.safety{background:var(--red)} .cd.value{background:var(--green-2)} .cd.cost{background:#c9902a} .cd.green{background:#3f9e6a}
+  .sw.traffic{background:var(--amber)} .sw.water{background:var(--blue)} .sw.value{background:var(--green-2)} .sw.safety{background:var(--red)}
+
+  .quiet{border:1px dashed var(--line);border-radius:13px;padding:15px 17px;color:var(--ink-3);font-size:13px;background:#fbfcfb;margin-top:6px}
+  .quiet b{color:var(--ink-2)}
+
+  /* ---------- DEVELOPMENT ---------- */
+  .lensnav{display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+  .lenscard{flex:1;min-width:180px;border:1px solid var(--line);border-radius:13px;padding:14px 16px;background:#fff;text-align:left;box-shadow:var(--shadow-sm)}
+  .lenscard.on{border-color:var(--green);background:var(--green-tint)}
+  .lenscard .q{display:block;font-size:14.5px;font-weight:700;margin-bottom:2px;color:var(--ink)}
+  .lenscard .d{font-size:12px;color:var(--ink-3)}
+  .devgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card.clickable{cursor:pointer;transition:transform .08s ease, box-shadow .12s ease}
+  .card.clickable:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  .status{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px}
+  .status.prop{color:var(--amber);background:var(--amber-tint)}
+  .status.active{color:var(--green);background:var(--green-tint)}
+  .status.appr{color:var(--blue);background:var(--blue-tint)}
+
+  /* detail */
+  .backbtn{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--green);background:none;border:none;padding:0;margin-bottom:16px}
+  .detail{display:grid;grid-template-columns:1.4fr .85fr;gap:16px}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:15px;padding:22px;box-shadow:var(--shadow-sm)}
+  .panel.side{background:#fbfcfb}
+  .kicker{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-bottom:10px}
+  .verdict{font-size:21px;font-weight:700;letter-spacing:-.01em;line-height:1.32;margin:2px 0 16px}
+  .verdict .hl{background:var(--red-tint);color:var(--red);padding:0 5px;border-radius:5px}
+  .verdict .hlg{background:var(--green-tint);color:var(--green);padding:0 5px;border-radius:5px}
+  .divider{height:1px;background:var(--line-2);margin:20px 0}
+  .thread{padding-left:4px}
+  .tev{display:flex;gap:13px;padding:0 0 17px;position:relative}
+  .tev:before{content:"";position:absolute;left:6px;top:15px;bottom:-3px;width:2px;background:var(--line)}
+  .tev:last-child:before{display:none}
+  .tev .tk{width:13px;height:13px;border-radius:50%;background:var(--green);flex:none;margin-top:3px;box-shadow:0 0 0 3px var(--green-tint)}
+  .tev.future .tk{background:#fff;border:2px solid var(--amber);box-shadow:0 0 0 3px var(--amber-tint)}
+  .tev .td{font-size:11.5px;color:var(--ink-3)}
+  .tev .tt{font-size:13.5px;font-weight:600}
+  .tev .tl{font-size:12px;color:var(--green);font-weight:600;margin-top:1px}
+  .tev.future .tl{color:var(--amber)}
+  .doact{display:flex;flex-direction:column;gap:9px;margin-bottom:6px}
+  .doact .btn{width:100%;justify-content:center;text-align:center;padding:11px}
+  .specs .row{display:flex;justify-content:space-between;font-size:13px;padding:8px 0;border-bottom:1px dashed var(--line)}
+  .specs .row:last-child{border-bottom:none}
+  .specs .row span{color:var(--ink-3)}
+  .specs .row b{color:var(--ink)}
+
+  /* ---------- SHARED LAYOUT (mission / dashboard) ---------- */
+  .cols{display:grid;grid-template-columns:1.55fr .95fr;gap:18px;align-items:start}
+  .block{background:#fff;border:1px solid var(--line);border-radius:15px;padding:20px;box-shadow:var(--shadow-sm);margin-bottom:18px}
+  .block h2.bt{font-size:15px;margin:0 0 14px;letter-spacing:-.01em}
+  .bt-row{display:flex;align-items:center;justify-content:space-between;margin:0 0 14px}
+  .bt-row h2{font-size:15px;margin:0}
+  .bt-row a{font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600}
+  .prow{display:flex;gap:13px;padding:14px 0;border-bottom:1px solid var(--line-2);align-items:flex-start}
+  .prow:last-child{border-bottom:none}
+  .prow .pk{width:9px;height:9px;border-radius:50%;margin-top:5px;flex:none}
+  .prow .pmain{flex:1;min-width:0}
+  .prow .pt{font-size:14px;font-weight:600;margin-bottom:2px}
+  .prow .pd{font-size:12.5px;color:var(--ink-2)}
+  .prow .pmeta{font-size:11.5px;color:var(--ink-3);margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .brief{font-size:14.5px;color:var(--ink-2);line-height:1.65;margin:0}
+  .brief b{color:var(--ink)}
+  .brief .hl{background:var(--green-tint);color:var(--green-deep);padding:0 4px;border-radius:4px;font-weight:600}
+  .vital{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line-2)}
+  .vital:last-child{border-bottom:none}
+  .vital .vl{font-size:13px;color:var(--ink-2)}
+  .vital .vv{font-size:15px;font-weight:700}
+  .ring{width:60px;height:60px;border-radius:50%;background:conic-gradient(var(--green) calc(var(--p,85)*1%),#e7ece7 0);display:grid;place-items:center;flex:none}
+  .ring .in{width:46px;height:46px;border-radius:50%;background:#fff;display:grid;place-items:center;font-size:15px;font-weight:700}
+  .aw{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--line-2)}
+  .aw:last-child{border-bottom:none}
+  .aw .ak{width:11px;height:11px;border-radius:50%;border:2px solid var(--amber);margin-top:3px;flex:none;box-shadow:0 0 0 3px var(--amber-tint)}
+  .aw .at{font-size:13.5px;font-weight:600}
+  .aw .ad{font-size:11.5px;color:var(--ink-3)}
+  .aw .au{font-size:11.5px;color:var(--amber);font-weight:700;margin-top:1px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .wchip{font-size:12.5px;font-weight:600;background:#f4f6f4;border:1px solid var(--line);padding:7px 12px;border-radius:999px;color:var(--ink)}
+
+  /* ---------- MAP ---------- */
+  .mapcols{display:grid;grid-template-columns:1fr 350px;gap:16px;align-items:start}
+  .mapwrap{position:relative;border:1px solid var(--line);border-radius:15px;overflow:hidden;box-shadow:var(--shadow-sm);background:#e4eadd}
+  .mapwrap svg{display:block;width:100%;height:auto}
+  .mpanel{position:absolute;top:14px;left:14px;background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:12px;padding:13px 15px;box-shadow:var(--shadow);width:196px}
+  .mpanel .mt{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin:0 0 9px}
+  .legrow{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink);margin-bottom:8px}
+  .legrow .ld{width:11px;height:11px;border-radius:50%;flex:none}
+  .layers{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-2)}
+  .lyr{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;padding:5px 0;color:var(--ink-2)}
+  .lyr .tg{width:30px;height:17px;border-radius:999px;background:var(--green);position:relative;flex:none}
+  .lyr .tg:after{content:"";position:absolute;right:2px;top:2px;width:13px;height:13px;border-radius:50%;background:#fff}
+  .lyr.off .tg{background:#cfd6cf}
+  .lyr.off .tg:after{right:auto;left:2px}
+  .mgps{position:absolute;bottom:14px;right:14px;background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:10px;font-size:11.5px;color:var(--ink-2);padding:7px 11px;box-shadow:var(--shadow-sm)}
+  .letter{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;flex:none}
+  .pinlist .card{margin-bottom:10px}
+  .card.mini{padding:14px 15px}
+  .card.mini h3{font-size:14.5px;margin:0 0 5px}
+  .card.mini .sowhat{font-size:12.5px;margin-bottom:10px}
+
+  /* ---------- PHASE 1 SCOPING ---------- */
+  .ribbon{display:flex;align-items:center;gap:12px;background:var(--green-tint);border-bottom:1px solid #cbe7d5;padding:10px 26px;font-size:12.5px;color:var(--green-deep)}
+  .ribbon .tag{background:var(--green);color:#fff;font-weight:700;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:999px;flex:none}
+  .ribbon b{font-weight:700}
+  .ribbon .rsp{flex:1}
+  .ribbon a{color:var(--green);font-weight:600;text-decoration:none;white-space:nowrap}
+  .p2{border:1px dashed #cdd6cf;border-radius:15px;padding:17px 18px;background:repeating-linear-gradient(135deg,#fafbfa,#fafbfa 10px,#f3f5f3 10px,#f3f5f3 20px)}
+  .p2 .p2h{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin-bottom:6px}
+  .p2 .p2sub{font-size:11.5px;color:var(--ink-3);margin-bottom:12px}
+  .p2 .p2i{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line-2)}
+  .p2 .p2i:last-child{border-bottom:none}
+  .p2 .p2i .t{font-size:13.5px;font-weight:600;color:var(--ink-2)}
+  .p2 .p2i .d{font-size:11.5px;color:var(--ink-3)}
+  .p2 .feed{font-size:10px;color:var(--amber);font-weight:700;background:var(--amber-tint);padding:3px 7px;border-radius:5px;white-space:nowrap;flex:none}
+  .why{margin:0 0 13px;border:1px solid var(--line);border-radius:9px;background:#fbfcfb}
+  .why summary{cursor:pointer;list-style:none;padding:9px 12px;font-size:12px;font-weight:600;color:var(--green);display:flex;align-items:center;gap:7px}
+  .why summary::-webkit-details-marker{display:none}
+  .why[open] summary{border-bottom:1px solid var(--line-2)}
+  .why .wbody{padding:10px 12px;font-size:12.5px;color:var(--ink-2)}
+  .why .wbody .r{padding:3px 0}
+  .why .wbody .r b{color:var(--ink)}
+  .scorebars{margin-top:14px;padding-top:14px;border-top:1px solid var(--line-2)}
+  .sb{margin-bottom:10px}
+  .sb .sl{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-2);margin-bottom:4px}
+  .sb .sl b{color:var(--ink)}
+  .sb .track{height:6px;border-radius:999px;background:#eef1ee;overflow:hidden}
+  .sb .fill{height:100%;border-radius:999px}
+  /* properties risk grid + reports */
+  .riskgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .rk{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}
+  .rk .rkl{font-size:11.5px;color:var(--ink-3)}
+  .rk .rkv{font-size:15px;font-weight:700}
+  .rgrid{display:grid;grid-template-columns:.92fr 1.08fr;gap:18px;align-items:start}
+  .rlist{display:flex;flex-direction:column;gap:10px}
+  .rrow{display:flex;align-items:center;gap:13px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 15px;box-shadow:var(--shadow-sm);cursor:pointer}
+  .rrow:hover{background:#fbfcfb}
+  .rrow .ricon{width:38px;height:38px;border-radius:10px;background:var(--green-tint);color:var(--green);display:grid;place-items:center;font-size:16px;flex:none}
+  .rrow .rmain{flex:1;min-width:0}
+  .rrow .rt{font-size:14px;font-weight:600}
+  .rrow .rd{font-size:11.5px;color:var(--ink-3)}
+  .rrow .rtype{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);background:#f4f6f4;padding:3px 8px;border-radius:5px;flex:none}
+  .doc{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .doc .dhead{padding:20px 22px;border-bottom:1px solid var(--line-2);background:linear-gradient(180deg,#fbfcfb,#fff)}
+  .doc .dhead .dk{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--green)}
+  .doc .dhead h3{margin:6px 0 3px;font-size:19px}
+  .doc .dhead .dm{font-size:11.5px;color:var(--ink-3)}
+  .doc .dbody{padding:20px 22px}
+  .doc .dsec{margin-bottom:18px}
+  .doc .dsec:last-child{margin-bottom:0}
+  .doc .dsec h4{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin:0 0 8px}
+  .doc .dsec p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.6}
+  /* share button + modals */
+  .sharebtn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer}
+  .sharebtn:hover{background:#f7f9f7}
+  .inlinebtn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--green);font-size:12.5px;font-weight:600;cursor:pointer}
+  .inlinebtn:hover{background:var(--green-tint)}
+  .overlay{position:fixed;inset:0;background:rgba(16,33,28,.5);z-index:100;display:none;align-items:center;justify-content:center;padding:24px}
+  .overlay.show{display:flex}
+  .modal{background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.32);width:100%;max-width:448px;overflow:hidden;animation:pop .18s ease}
+  @keyframes pop{from{transform:translateY(10px) scale(.98);opacity:0}to{transform:none;opacity:1}}
+  .modal .mhead{padding:24px 26px 0;position:relative}
+  .modal .mclose{position:absolute;top:16px;right:18px;border:none;background:#f2f4f2;width:30px;height:30px;border-radius:8px;color:var(--ink-2);font-size:14px;cursor:pointer}
+  .modal .mbadge{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--green);background:var(--green-tint);padding:5px 11px;border-radius:999px;margin-bottom:14px}
+  .modal h3{margin:0 0 8px;font-size:22px;letter-spacing:-.01em}
+  .modal p.msub{margin:0;font-size:14px;color:var(--ink-2);line-height:1.55}
+  .modal .mbody{padding:18px 26px 26px}
+  .field{display:flex;gap:8px;margin-top:4px}
+  .field input{flex:1;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px;font-family:inherit}
+  .field input:focus{outline:none;border-color:var(--green)}
+  .mbtn{background:var(--green);color:#fff;border:none;border-radius:10px;padding:12px 18px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .mbtn:hover{background:var(--green-deep)}
+  .mnote{font-size:11.5px;color:var(--ink-3);margin-top:12px}
+  .success{text-align:center;padding:14px 0 6px}
+  .success .ck{width:52px;height:52px;border-radius:50%;background:var(--green-tint);color:var(--green);display:grid;place-items:center;font-size:24px;margin:0 auto 14px}
+  .success h4{margin:0 0 6px;font-size:18px}
+  .success p{margin:0;font-size:13.5px;color:var(--ink-2)}
+  .linkbox{display:flex;gap:8px;align-items:center;background:#f4f6f4;border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px}
+  .linkbox .url{flex:1;font-size:12.5px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .linkbox button{background:var(--green);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer}
+  .sharegrid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px 6px;margin:8px 0 6px}
+  .sopt{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:11px;font-weight:600;color:var(--ink-2);background:none;border:none;cursor:pointer;text-decoration:none}
+  .sopt .si{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:19px;font-weight:700}
+  .sopt:hover .si{filter:brightness(.93)}
+  .sopt:hover{color:var(--ink)}
+  .netnote{display:flex;gap:10px;background:var(--green-tint);border-radius:10px;padding:11px 13px;margin-top:16px;font-size:12.5px;color:var(--green-deep)}
+  .netnote b{font-weight:700}
+  /* topic selection */
+  .topicsec{background:#fff;border:1px solid var(--line);border-radius:15px;padding:18px 20px;box-shadow:var(--shadow-sm);margin-bottom:22px}
+  .topicsec .th{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+  .topicsec .th h2{font-size:15px;margin:0}
+  .tcats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .tcat{border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left;background:#fff;cursor:pointer}
+  .tcat:hover{border-color:var(--green);background:var(--green-tint)}
+  .tcat .ci{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:15px;margin-bottom:10px;color:#fff}
+  .tcat h4{margin:0 0 3px;font-size:14px}
+  .tcat .cc{font-size:12px;color:var(--green);font-weight:600}
+  .tcat .cd{font-size:11.5px;color:var(--ink-3);margin-top:1px}
+  .tgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 2px}
+  .tchip{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:12.5px;font-weight:600;color:var(--ink-2);background:#fff;cursor:pointer;text-align:left}
+  .tchip .box{width:17px;height:17px;border-radius:5px;border:1.5px solid var(--line);display:grid;place-items:center;flex:none;font-size:11px;color:#fff}
+  .tchip.on{border-color:var(--green);background:var(--green-tint);color:var(--ink)}
+  .tchip.on .box{background:var(--green);border-color:var(--green)}
+  .tcount{font-size:12.5px;color:var(--ink-2);font-weight:600;background:#f4f6f4;border:1px solid var(--line);border-radius:9px;padding:9px 12px;margin:14px 0;display:flex;align-items:center;gap:8px}
+  .consent{display:flex;gap:10px;align-items:flex-start;font-size:11.5px;color:var(--ink-2);margin-bottom:16px;line-height:1.5}
+  .consent input{margin-top:2px;flex:none}
+  .consent b{color:var(--ink);font-weight:700}
+  .consent a{color:var(--green)}
+  .savingline{font-size:12px;color:var(--ink-3);margin-bottom:12px}
+  .savingline b{color:var(--ink-2)}
+  /* sidebar footer links */
+  .sidefoot{display:flex;align-items:center;justify-content:center;gap:9px;padding:14px 6px 4px;font-size:12px}
+  .sidefoot a{color:#7d938a;text-decoration:none}
+  .sidefoot a:hover{color:#cfe0d6}
+  .sidefoot .dot{color:#33493d}
+  .loc{cursor:pointer}
+  .prose h2.bt{margin-top:22px}
+  .prose h2.bt:first-child{margin-top:0}
+  .prose p{font-size:14px;color:var(--ink-2);line-height:1.62;margin:0 0 12px;max-width:720px}
+  .prose ul{margin:0 0 12px;padding-left:20px;max-width:720px}
+  .prose li{font-size:14px;color:var(--ink-2);margin-bottom:6px}
+  .prose a{color:var(--green)}
+  .cnote{background:var(--green-tint);border:1px solid #cbe7d5;border-radius:12px;padding:14px 16px;font-size:13.5px;color:var(--green-deep);margin:6px 0 4px;max-width:720px}
+  .cinput{border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px;font-family:inherit;width:100%}
+  .cinput:focus{outline:none;border-color:var(--green)}
+  /* homepage (a page inside the app — same menu as every page) */
+  .logo{cursor:pointer}
+  .pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--green);background:var(--green-tint);padding:6px 13px;border-radius:999px;margin-bottom:18px}
+  .hero{text-align:center;padding:34px 0 8px;max-width:720px;margin:0 auto}
+  .hero h1{font-size:40px;line-height:1.1;letter-spacing:-.025em;margin:0 0 16px}
+  .hero .sub{font-size:17px;color:var(--ink-2);max-width:580px;margin:0 auto 26px}
+  .ziprow{display:flex;gap:10px;max-width:480px;margin:0 auto;justify-content:center}
+  .zwrap{flex:1;position:relative;max-width:300px}
+  .zwrap .zpin{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--green)}
+  .zwrap input{width:100%;border:1px solid var(--line);border-radius:11px;padding:14px 16px 14px 40px;font-size:15px;font-family:inherit;box-shadow:var(--shadow)}
+  .zwrap input:focus{outline:none;border-color:var(--green)}
+  .find{background:var(--green);color:#fff;border:none;border-radius:11px;padding:14px 22px;font-size:15px;font-weight:600;white-space:nowrap;box-shadow:var(--shadow)}
+  .find:hover{background:var(--green-deep)}
+  .freeline{font-size:13.5px;color:var(--ink-3);margin-top:16px}
+  .freeline a{color:var(--green);font-weight:600;text-decoration:none;cursor:pointer}
+  .homesec{padding:40px 0 6px;text-align:center}
+  .homesec h2{font-size:26px;letter-spacing:-.02em;margin:0 0 8px}
+  .homesec .s2{font-size:15.5px;color:var(--ink-2);max-width:540px;margin:0 auto 26px}
+  .twins{display:grid;grid-template-columns:1fr 1fr;gap:16px;text-align:left}
+  .trio{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;text-align:left}
+  .twin{border:1px solid var(--line);border-radius:16px;padding:24px;background:#fff;box-shadow:var(--shadow-sm)}
+  .twin .ic{width:44px;height:44px;border-radius:12px;background:var(--green-tint);color:var(--green);display:grid;place-items:center;font-size:20px;margin-bottom:14px}
+  .twin .k{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--green);margin-bottom:6px}
+  .twin h3{font-size:20px;margin:0 0 8px}
+  .twin p{font-size:14.5px;color:var(--ink-2);margin:0 0 14px}
+  .tchips{display:flex;gap:7px;flex-wrap:wrap}
+  .tc{font-size:11.5px;font-weight:600;background:#f4f6f4;border:1px solid var(--line);padding:5px 10px;border-radius:999px;color:var(--ink-2)}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;text-align:left}
+  .step .n{width:32px;height:32px;border-radius:9px;background:var(--green);color:#fff;display:grid;place-items:center;font-weight:700;font-size:15px;margin-bottom:12px}
+  .step h4{margin:0 0 6px;font-size:16px}
+  .step p{margin:0;font-size:14px;color:var(--ink-2)}
+  .previewwrap{max-width:640px;margin:0 auto}
+  .previewcap{text-align:center;font-size:12.5px;color:var(--ink-3);margin-top:12px}
+  .trustpanel{background:#10231a;color:#dbe7e0;border-radius:16px;text-align:center;padding:40px 24px;margin-top:8px}
+  .trustpanel .badge{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#8fd0ab}
+  .trustpanel h2{color:#fff;font-size:24px;margin:12px 0 10px;letter-spacing:-.02em}
+  .trustpanel p{font-size:14.5px;color:#a9c1b4;margin:0 auto;max-width:560px}
+  .homecta{text-align:center;padding:44px 0 10px}
+  .homecta h2{font-size:26px;letter-spacing:-.02em;margin:0 0 8px}
+  .homecta p{font-size:15.5px;color:var(--ink-2);margin:0 0 20px}
+  .homecta .big{background:var(--green);color:#fff;border:none;border-radius:12px;padding:14px 26px;font-size:15px;font-weight:600;box-shadow:var(--shadow)}
+  .homecta .big:hover{background:var(--green-deep)}
+  /* multi-property */
+  .addbtn{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--green);background:var(--green-tint);border:1px solid #cbe7d5;border-radius:9px;padding:8px 13px;cursor:pointer}
+  .addbtn:hover{background:#dcefe3}
+  .propgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .propcard{display:flex;gap:14px;align-items:center;border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:#fff;box-shadow:var(--shadow-sm);cursor:pointer;text-align:left}
+  .propcard:hover{border-color:var(--green);box-shadow:var(--shadow)}
+  .propcard .pinfo{flex:1;min-width:0}
+  .propcard .ptag{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--green);margin-bottom:3px}
+  .propcard h3{font-size:16px;margin:0 0 2px}
+  .propcard .paddr{font-size:12.5px;color:var(--ink-3)}
+  .propcard .pmeta{font-size:12px;color:var(--ink-2);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap}
+  .propcard .needs{color:var(--red);font-weight:600}
+  .miniscore{width:40px;height:40px;border-radius:50%;background:var(--green-tint);color:var(--green);display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
+  .swrow{display:flex;align-items:center;gap:13px;padding:11px 10px;border-radius:11px;cursor:pointer;border:1px solid transparent}
+  .swrow:hover{background:#f7f9f7}
+  .swrow.active{border-color:var(--green);background:var(--green-tint)}
+  .swrow .pinfo{flex:1;min-width:0}
+  .swrow .pt{font-size:14px;font-weight:600}
+  .swrow .pa{font-size:12px;color:var(--ink-3)}
+  .swrow .chk{color:var(--green);font-weight:700}
+
+  .hidden{display:none}
+  .menubtn{display:none;width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:#fff;align-items:center;justify-content:center;font-size:17px;color:var(--ink-2);cursor:pointer;flex:none}
+  .sidebackdrop{position:fixed;inset:0;background:rgba(16,33,28,.45);z-index:55;display:none}
+  .sidebackdrop.show{display:block}
+  @media(max-width:900px){
+    .app{grid-template-columns:1fr}
+    .side{position:fixed;top:0;left:0;bottom:0;width:236px;z-index:60;transform:translateX(-100%);transition:transform .22s ease}
+    .side.open{transform:none;box-shadow:0 0 44px rgba(0,0,0,.35)}
+    .menubtn{display:flex}
+    .devgrid,.detail,.twins,.trio,.steps{grid-template-columns:1fr}
+  }
+
+/* ============================================================================
+   APP-ONLY additive styles (NOT in the mockup) — support the real search
+   dropdown, the shell mount, and preview affordances. Kept minimal; no restyle
+   of any mockup component above. */
+.search{position:relative}
+#hs-search-results{position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);z-index:40;overflow:hidden;max-height:340px;overflow-y:auto}
+#hs-search-results a{display:flex;flex-direction:column;gap:1px;padding:9px 13px;text-decoration:none;border-bottom:1px solid var(--line-2)}
+#hs-search-results a:last-child{border-bottom:none}
+#hs-search-results a:hover{background:#f7f9f7}
+#hs-search-results a b{font-size:13px;color:var(--ink);font-weight:600}
+#hs-search-results a span{font-size:11.5px;color:var(--ink-3)}
+#hs-search-results .empty{padding:11px 13px;font-size:12.5px;color:var(--ink-3)}
+.data-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;font-size:13px}
+.data-table th,.data-table td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line-2)}
+.data-table th{background:#f7f9f7;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);cursor:pointer;user-select:none}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:#fbfcfb}
+.hs-preview-ribbon{background:#10231a;color:#cfe0d6;font-size:12px;text-align:center;padding:6px 14px}
+.hs-preview-ribbon b{color:#8fd0ab}
+.hs-approx{font-size:10.5px;color:var(--amber);background:var(--amber-tint);border-radius:5px;padding:1px 6px;margin-left:6px;font-weight:700;white-space:nowrap}
+
+</style>
+<div id="hs-preview-note" class="hs-preview-ribbon">Preview · <b>Del Valle, TX 78617</b> · seed data · staged under /app (live site untouched)</div>
+<script>
+// HomeSignal app runtime config — the ONE place URLs/keys live (never hardcode per page).
+// Reuses the existing homesignal.net Supabase project + public anon key (same values the
+// live community.html/index.html already ship). The anon key is public by design; RLS is the
+// gate. Base/share URLs are derived from the runtime origin, never hardcoded.
+window.HS_CONFIG = {
+  SUPABASE_URL: 'https://qwnnmljucajnexpxdgxr.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U',
+
+  // Data source: 'seed' runs the whole app with zero DB (the review/prototype path);
+  // 'supabase' reads the live project. Overridable at runtime with ?data=seed|supabase.
+  DATA_SOURCE: 'seed',
+
+  // Local-dev only: pretend a demo user is signed in so authed screens render.
+  // On the real site this is false and the existing Supabase session is used.
+  // Overridable with ?demo=1 for preview.
+  DEMO_SESSION: true,
+
+  // The prototype community for Phase 1 (Del Valle, TX — Travis County).
+  DEFAULT_ZIP: '78617',
+
+  // Base URL for share links; derived from origin so it works in preview and prod.
+  get BASE_URL() { return window.location.origin; }
+};
+
+// Runtime overrides via query string (?data=, ?demo=).
+(function () {
+  var q = new URLSearchParams(window.location.search);
+  if (q.get('data'))  window.HS_CONFIG.DATA_SOURCE = q.get('data');
+  if (q.get('demo'))  window.HS_CONFIG.DEMO_SESSION = q.get('demo') !== '0';
+})();
+
+window.HS_CONFIG.DATA_SOURCE = 'seed'; window.HS_CONFIG.DEMO_SESSION = true;
+</script>
+<script>
+// ============================================================================
+// HomeSignal seed — Del Valle, TX 78617 (Travis County). The Phase-1 prototype
+// community and the review artifact. NOT lorem-ipsum: every item uses a real
+// Travis County entity and an official first-party source_ref domain.
+//
+// CLAIMS DISCIPLINE (per repo CLAUDE.md): the sandbox has no egress to verify
+// live records, so any specific value that could not be verified from a primary
+// record is marked `approx:true` with an honest `note`. Real named entities
+// (Tesla Giga Texas, SH-130/SH-71, Austin-Bergstrom, Del Valle ISD, Travis
+// County Commissioners Court, Colorado River) and source domains are real;
+// exact permit #s / dates / dollar figures flagged approx are prototype
+// placeholders to render the card and MUST be reconciled by the Python engine
+// against the real feed before this ships to the live path.
+//
+// Coordinates: 78617 centroid ≈ 30.1745,-97.6134 (matches the engine's pinned
+// zipcodes centroid). Distances are COMPUTED from the active property, never
+// stored (see lib/data.js haversine / PostGIS seam).
+// ============================================================================
+window.HS_SEED = (function () {
+
+  const community = {
+    zip: '78617', slug: 'del-valle', name: 'Del Valle', city: 'Del Valle',
+    county: 'Travis', state: 'TX', covered: true,
+    lat: 30.1745, lng: -97.6134,
+    community_score: 78, growth_pressure: 'High', value_trend: 5.3,
+    component_scores: {
+      development_pressure: { label: 'High',     pct: 74, tone: 'amber' },
+      environmental_risk:   { label: 'Moderate', pct: 48, tone: 'amber' },
+      infrastructure_change:{ label: 'Elevated', pct: 66, tone: 'amber' },
+      water_utilities:      { label: 'Watch',    pct: 52, tone: 'blue'  }
+    },
+    civic_activity: 'Active',
+    // headline copy is templated, not editorializing
+    blurb: "Southeast Travis County is one of the fastest-changing areas around Austin — " +
+           "the SH-130 industrial corridor, Austin-Bergstrom, and Giga Texas are reshaping " +
+           "traffic, jobs, water demand and home values along the Colorado River."
+  };
+
+  // ---- Demo user + properties (clearly-demo addresses in the 78617 area) ----
+  const demoUser = { id: 'demo-user', email: 'demo@homesignal.net', name: 'Alex Rivera', initials: 'AR' };
+  const properties = [
+    { id:'p1', label:'Your home', tag:'Your home', tag_tone:'green',
+      address:'4400 Wildhorse Trail', city:'Del Valle', state:'TX', zip:'78617',
+      lat:30.1760, lng:-97.6098, score:79, score_trend:'↑ 6 this month',
+      value_outlook:5.3, insurance_outlook:'Stable', demo:true,
+      note:'demo address for the prototype' },
+    { id:'p2', label:'Rental', tag:'Rental', tag_tone:'amber',
+      address:'13100 Elroy Rd', city:'Del Valle', state:'TX', zip:'78617',
+      lat:30.1585, lng:-97.6009, score:76, score_trend:'↑ 3 this month',
+      value_outlook:4.8, insurance_outlook:'Stable', demo:true,
+      note:'demo address for the prototype' },
+    { id:'p3', label:'Family', tag:'Family', tag_tone:'blue',
+      address:'231 Meadow Vista Dr', city:'Del Valle', state:'TX', zip:'78617',
+      lat:30.1912, lng:-97.6321, score:83, score_trend:'↑ 5 this month',
+      value_outlook:5.9, insurance_outlook:'Stable', demo:true,
+      note:'demo address for the prototype' }
+  ];
+
+  // ---- Projects (Development) ------------------------------------------------
+  const projects = [
+    { id:'proj-datacenter', name:'SH-130 Data Center Campus', type:'Data Center',
+      status:'Proposed', stage:'Application submitted', lens:'safety',
+      developer:'(applicant on county filing)', size:'≈300,000 sq ft', investment:'$300M+',
+      jobs:'40–80', submitted_at:'2026-06-18', lat:30.1832, lng:-97.5996,
+      impact_score:88, impact_dimensions:[
+        {k:'water', dir:'up', label:'Water', bad:true},
+        {k:'traffic', dir:'up', label:'Traffic', bad:true},
+        {k:'cost', dir:'up', label:'Tax base', bad:false}],
+      source_ref:'https://www.traviscountytx.gov/tnr/development-services',
+      sowhat:"the project most likely to change daily life near you — pressure on water and power, new truck traffic, a meaningful bump to the tax base. Still shapeable.",
+      approx:true, note:'Data centers are actively proliferating in the SH-130 corridor; exact applicant/size/filing # are prototype placeholders pending the county-filing feed.' },
+
+    { id:'proj-giga', name:'Giga Texas Expansion (Tesla)', type:'Industrial',
+      status:'Active', stage:'Under construction', lens:'value',
+      developer:'Tesla, Inc.', size:'Multi-phase campus', investment:'$1B+ (phase)',
+      jobs:'Thousands (site)', submitted_at:'2026-02-10', lat:30.2225, lng:-97.6169,
+      impact_score:72, impact_dimensions:[
+        {k:'value', dir:'up', label:'Home value', bad:false},
+        {k:'traffic', dir:'up', label:'Constr. traffic', bad:true},
+        {k:'cost', dir:'up', label:'Tax base', bad:false}],
+      source_ref:'https://www.traviscountytx.gov/',
+      sowhat:"the region's biggest employer keeps expanding 5+ mi north — more jobs and tax base, more corridor traffic; a long-term lift to area values.",
+      approx:true, note:'Giga Texas (1 Tesla Rd, Del Valle 78617) is real; the specific phase/investment/date here are prototype placeholders pending the permit feed.' },
+
+    { id:'proj-sh71', name:'SH-71 / SH-130 Corridor Improvements', type:'Roads & Infrastructure',
+      status:'Active', stage:'Final design', lens:'traffic',
+      developer:'TxDOT', size:'Corridor project', investment:'—', jobs:'—',
+      submitted_at:'2026-01-15', lat:30.1901, lng:-97.6412,
+      impact_score:64, impact_dimensions:[
+        {k:'traffic', dir:'up', label:'Build congestion', bad:true},
+        {k:'traffic', dir:'down', label:'Commute after', bad:false}],
+      source_ref:'https://www.txdot.gov/projects/projects-studies.html',
+      sowhat:"your daily route. Detours during construction over the next year, then a smoother, faster commute. Now in final design.",
+      approx:true, note:'TxDOT SH-71/SH-130 work is real; exact stage/dates are prototype placeholders pending the TxDOT feed.' },
+
+    { id:'proj-abia', name:'Austin-Bergstrom (AUS) Expansion', type:'Infrastructure',
+      status:'Active', stage:'Under construction', lens:'traffic',
+      developer:'City of Austin — Aviation Dept.', size:'New concourse + terminal', investment:'$4B+ program',
+      jobs:'—', submitted_at:'2025-11-01', lat:30.1944, lng:-97.6699,
+      impact_score:58, impact_dimensions:[
+        {k:'cost', dir:'up', label:'Jobs', bad:false},
+        {k:'traffic', dir:'up', label:'Traffic', bad:true},
+        {k:'air', dir:'up', label:'Noise', bad:true}],
+      source_ref:'https://www.austintexas.gov/airport',
+      sowhat:"the airport 3.5 mi away is in a multi-year build-out — more jobs and access, more corridor traffic and flight noise on some days.",
+      approx:true, note:'The AUS "Journey With AUS" expansion is real; figures here are prototype placeholders pending the City of Austin feed.' },
+
+    { id:'proj-eastonpark', name:'Easton Park (master-planned community)', type:'Residential',
+      status:'Active', stage:'Building out', lens:'value',
+      developer:'Brookfield Residential', size:'10,000+ homes (planned)', investment:'—', jobs:'—',
+      submitted_at:'2025-09-20', lat:30.1668, lng:-97.6689,
+      impact_score:46, impact_dimensions:[
+        {k:'value', dir:'up', label:'Area value', bad:false},
+        {k:'traffic', dir:'up', label:'Traffic', bad:true}],
+      source_ref:'https://www.austintexas.gov/department/planning',
+      sowhat:"a large master-planned community continues building out nearby — more neighbors and amenities, more local traffic; broadly supportive of area values.",
+      approx:true, note:'Easton Park is a real Del Valle master-planned community; scale/date here are prototype placeholders.' },
+
+    { id:'proj-cota', name:'COTA Area Event Infrastructure', type:'Commercial',
+      status:'Proposed', stage:'Concept', lens:'value',
+      developer:'Circuit of the Americas', size:'—', investment:'—', jobs:'—',
+      submitted_at:'2026-05-05', lat:30.1327, lng:-97.6349,
+      impact_score:34, impact_dimensions:[
+        {k:'cost', dir:'up', label:'Tax base', bad:false},
+        {k:'traffic', dir:'up', label:'Event traffic', bad:true}],
+      source_ref:'https://www.traviscountytx.gov/',
+      sowhat:"lower-impact and early-stage; mostly matters on event days — worth watching for traffic if it advances.",
+      approx:true, note:'COTA is real; this concept item is a prototype placeholder to exercise the lower-impact bucket.' }
+  ];
+
+  // ---- Changes / impact stories (Alerts) ------------------------------------
+  const changes = [
+    { id:'chg-datacenter', category:'Development', related_project_id:'proj-datacenter',
+      lens:'safety', confidence:'High', occurred_at:'2026-06-18',
+      window_closes_at:'2026-07-19', lat:30.1832, lng:-97.5996,
+      title:'A ~300,000 sq ft data center is proposed in the SH-130 corridor near your home',
+      plain_language:"facilities this size draw heavily on local water and power and add truck traffic on your route to SH-71 — but they lift the tax base. It's still in application, so public input shapes the outcome.",
+      impacts:[
+        {k:'traffic', dir:'up', label:'Traffic', bad:true},
+        {k:'water', dir:'up', label:'Water demand', bad:true},
+        {k:'air', dir:'up', label:'Noise', bad:true},
+        {k:'cost', dir:'up', label:'Tax base', bad:false}],
+      source_ref:'https://www.traviscountytx.gov/tnr/development-services',
+      why:{ source:'Travis County TNR development filing + Commissioners Court agenda',
+            rank:'within ~1.5 mi of your home, touches 3 tracked priorities, comment window still open',
+            confidence:'High — matched across two public records' },
+      approx:true, note:'exact filing # and hearing date are prototype placeholders pending the county feed' },
+
+    { id:'chg-water', category:'Environment & utilities', related_project_id:null,
+      lens:'water', confidence:'Medium', occurred_at:'2026-06-30',
+      window_closes_at:null, lat:30.1512, lng:-97.6402,
+      title:'A water-quality advisory was posted for a nearby public water system',
+      plain_language:"routine testing flagged a contaminant above the reporting threshold at a station a few miles away. The utility is treating the source; homes on the affected service line may receive an advisory.",
+      impacts:[
+        {k:'water', dir:'down', label:'Water quality', bad:true},
+        {k:'safety', dir:'down', label:'Health', bad:true}],
+      source_ref:'https://www.tceq.texas.gov/drinkingwater',
+      why:{ source:'TCEQ Drinking Water Watch + EPA ECHO', rank:'affects service lines near your ZIP',
+            confidence:'Medium — single public record' },
+      approx:true, note:'system name/date are prototype placeholders pending the TCEQ/ECHO feed' },
+
+    { id:'chg-sh71', category:'Traffic & getting around', related_project_id:'proj-sh71',
+      lens:'traffic', confidence:'High', occurred_at:'2026-06-12',
+      window_closes_at:null, lat:30.1901, lng:-97.6412,
+      title:'The SH-71 / SH-130 corridor project just entered final design',
+      plain_language:"construction is now likely within 12 months on the road you use daily — short-term detours ahead, a smoother commute long-term. This is the latest beat in the corridor project you follow.",
+      impacts:[
+        {k:'traffic', dir:'up', label:'Congestion during build', bad:true},
+        {k:'traffic', dir:'down', label:'Commute after', bad:false}],
+      source_ref:'https://www.txdot.gov/projects/projects-studies.html',
+      why:{ source:'TxDOT project page', rank:'on your daily route, 1.x mi away', confidence:'High' },
+      beat:'Beat 3 of 5 in this project',
+      approx:true, note:'stage/date are prototype placeholders pending the TxDOT feed' },
+
+    { id:'chg-flood', category:'Environment & utilities', related_project_id:null,
+      lens:'water', confidence:'High', occurred_at:'2026-05-28',
+      window_closes_at:null, lat:30.1602, lng:-97.6255,
+      title:'Updated Colorado River / Onion Creek flood mapping for southeast Travis County',
+      plain_language:"FEMA and the county refreshed flood layers along the Colorado River and Onion Creek — parts of 78617 sit in or near the mapped floodplain, which can affect insurance and building.",
+      impacts:[
+        {k:'safety', dir:'down', label:'Flood exposure', bad:true},
+        {k:'cost', dir:'up', label:'Insurance', bad:true}],
+      source_ref:'https://msc.fema.gov/portal/home',
+      why:{ source:'FEMA Flood Map Service Center + Travis County', rank:'parcel-relevant flood layer', confidence:'High' } },
+
+    { id:'chg-dvisd', category:'Government & civic', related_project_id:null,
+      lens:'value', confidence:'Medium', occurred_at:'2026-06-24',
+      window_closes_at:null, lat:30.1915, lng:-97.6183,
+      title:'Del Valle ISD is discussing a facilities plan for enrollment growth',
+      plain_language:"the district serving your area is planning for fast enrollment growth — new/expanded schools can shape taxes and nearby home values.",
+      impacts:[
+        {k:'value', dir:'up', label:'Schools', bad:false},
+        {k:'cost', dir:'up', label:'Taxes', bad:true}],
+      source_ref:'https://www.dvisd.net/',
+      why:{ source:'Del Valle ISD Board agenda', rank:'district-wide, affects your ZIP', confidence:'Medium' },
+      approx:true, note:'agenda specifics are prototype placeholders pending the DVISD feed' },
+
+    { id:'chg-solar', category:'Home value & cost of living', related_project_id:null,
+      lens:'value', confidence:'Medium', occurred_at:'2026-06-02',
+      window_closes_at:null, lat:30.2380, lng:-97.5600,
+      title:'A utility-scale solar project was approved several miles east',
+      plain_language:"too far to change your view or noise, but it broadens the local tax base and signals steady infrastructure investment — a mild positive for long-term values.",
+      impacts:[
+        {k:'cost', dir:'up', label:'Tax base', bad:false},
+        {k:'value', dir:'up', label:'Area investment', bad:false}],
+      source_ref:'https://www.traviscountytx.gov/',
+      quiet:true,
+      approx:true, note:'prototype placeholder to exercise the low-relevance/quiet bucket' }
+  ];
+
+  // ---- Meetings (action windows) --------------------------------------------
+  const meetings = [
+    { id:'mtg-commissioners', body:'Travis County Commissioners Court',
+      title:'Commissioners Court — voting session', starts_at:'2026-07-14T09:00:00-05:00',
+      location:'700 Lavaca St, Austin', lat:30.2687, lng:-97.7420,
+      related_project_id:'proj-datacenter',
+      agenda:['Development items','Roads & bridges','Consent agenda'],
+      source_ref:'https://www.traviscountytx.gov/commissioners-court' },
+    { id:'mtg-dvisd', body:'Del Valle ISD Board of Trustees',
+      title:'Board of Trustees — regular meeting', starts_at:'2026-07-15T18:30:00-05:00',
+      location:'Del Valle ISD Admin, 5301 Ross Rd', lat:30.1915, lng:-97.6183,
+      related_project_id:'chg-dvisd',
+      agenda:['Facilities plan','Enrollment growth','Budget'],
+      source_ref:'https://www.dvisd.net/' },
+    { id:'mtg-hearing', body:'Travis County — public hearing',
+      title:'Public hearing — SH-130 data center', starts_at:'2026-07-19T18:00:00-05:00',
+      location:'Travis County (see agenda)', lat:30.1832, lng:-97.5996,
+      related_project_id:'proj-datacenter',
+      agenda:['Applicant presentation','Public comment','Commission discussion'],
+      source_ref:'https://www.traviscountytx.gov/commissioners-court',
+      approx:true, note:'hearing date is a prototype placeholder pending the county agenda feed' }
+  ];
+
+  // ---- Environmental risk (per parcel / ZIP) --------------------------------
+  const environmental_risk = {
+    '78617': { flood:{label:'Moderate', pct:54, tone:'amber'},
+               wildfire:{label:'Low', pct:24, tone:'green-2'},
+               heat:{label:'Rising', pct:62, tone:'amber'},
+               source_ref:'https://msc.fema.gov/portal/home',
+               note:'Del Valle has real Colorado River / Onion Creek flood exposure; exact parcel bands pending the FEMA/engine layer.' }
+  };
+
+  // ---- Coverage (covered ZIPs = 78617 + neighboring Travis County) -----------
+  // Any ZIP not here is "not covered" → request flow.
+  const coverage = [
+    { zip:'78617', name:'Del Valle',        covered:true },
+    { zip:'78719', name:'Austin (ABIA)',    covered:true },
+    { zip:'78612', name:'Cedar Creek',      covered:true },
+    { zip:'78742', name:'Austin (E. Riverside)', covered:true },
+    { zip:'78744', name:'Austin (SE)',      covered:true },
+    { zip:'78725', name:'Austin (Hornsby Bend)', covered:true },
+    { zip:'78653', name:'Manor',            covered:true }
+  ];
+
+  // ---- Topic picker categories (mockup categories; reconciled to live taxonomy
+  //      at the persistence layer — see DECISIONS.md). Consent defaults UNCHECKED. --
+  const topicCategories = {
+    gov:      { title:'Government Notices', sub:'Choose which notices you want alerts for', badge:'▤ Notices',
+                items:['County Commission & county business','Planning, zoning & development','Property taxes & assessments','Public safety & emergencies','Water companies','Elections & voting'], on:[0,1,2,3,4,5] },
+    meetings: { title:'Upcoming Meetings', sub:'Choose which meetings you want advance alerts for', badge:'▦ Meetings',
+                items:['County Commission & county business','Planning, zoning & development','Property taxes & assessments','Public safety & emergencies','Water companies','Elections & voting'], on:[0,1,2,3,4,5] },
+    news:     { title:'Local News', sub:'Select the news topics you want real-time alerts for', badge:'✉ News',
+                items:['Water Quality','Air Quality','Soil Quality','Animal & Human Viruses / Diseases','Infrastructure','EMF','Noise Pollution','Light Pollution','Livestock, Crops, Pets & Wildlife Health','Weather & Climate Hazards','Radiation','Data Centers'], on:[0,4] },
+    dev:      { title:'Development', sub:'Choose the project types you want to follow', badge:'◈ Development',
+                items:['Data Centers','Residential','Commercial','Industrial','Roads & Infrastructure','Schools','Utilities','Parks & Green space'], on:[0,4,6] }
+  };
+
+  return { community, demoUser, properties, projects, changes, meetings,
+           environmental_risk, coverage, topicCategories };
+})();
+
+</script>
+<script>
+// HomeSignal data layer — ONE interface, two backends.
+//   DATA_SOURCE='seed'      -> reads window.HS_SEED (runs the whole app with zero DB; the review path)
+//   DATA_SOURCE='supabase'  -> reads the live project with the anon key (RLS-gated)
+// Every read is async so pages don't care which backend is live. Distances are ALWAYS
+// computed here from the active property's lat/lng (haversine now; PostGIS RPC seam noted),
+// never stored — matching the prompt's "distance is computed" rule.
+(function () {
+  const HS = (window.HS = window.HS || {});
+  const CFG = window.HS_CONFIG;
+
+  // --- Supabase client (only created if/when needed; jsDelivr build matches the live CSP) ---
+  let _sb = null;
+  function sb() {
+    if (!_sb && window.supabase) _sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+    return _sb;
+  }
+  HS.sb = sb;
+
+  // --- geo: haversine miles (client-side seed path). Supabase path uses an ST_Distance RPC. ---
+  function distanceMi(aLat, aLng, bLat, bLng) {
+    if ([aLat, aLng, bLat, bLng].some(v => v == null || isNaN(v))) return null;
+    const R = 3958.7613, toR = d => (d * Math.PI) / 180;
+    const dLat = toR(bLat - aLat), dLng = toR(bLng - aLng);
+    const s = Math.sin(dLat / 2) ** 2 +
+      Math.cos(toR(aLat)) * Math.cos(toR(bLat)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.asin(Math.min(1, Math.sqrt(s)));
+  }
+  function fmtMi(mi) { return mi == null ? '' : (mi < 10 ? mi.toFixed(1) : Math.round(mi)) + ' mi'; }
+  HS.distanceMi = distanceMi;
+  HS.fmtMi = fmtMi;
+
+  // Attach a computed `.distance_mi` (+ formatted `.dist`) to items relative to a home point.
+  function withDistance(items, home) {
+    const hLat = home && home.lat, hLng = home && home.lng;
+    return (items || []).map(it => {
+      const mi = distanceMi(hLat, hLng, it.lat, it.lng);
+      return Object.assign({}, it, { distance_mi: mi, dist: fmtMi(mi) });
+    });
+  }
+  HS.withDistance = withDistance;
+
+  const isSeed = () => (CFG.DATA_SOURCE || 'seed') === 'seed';
+
+  // ---------------------------------------------------------------- reads ----
+  const data = {
+    async community(zip) {
+      zip = zip || CFG.DEFAULT_ZIP;
+      if (isSeed()) {
+        const c = window.HS_SEED.community;
+        return c.zip === zip ? c : null;
+      }
+      const { data } = await sb().from('communities')
+        .select('*').contains('zip_codes', [zip]).limit(1);
+      return (data && data[0]) || null;
+    },
+    async coverage() {
+      if (isSeed()) return window.HS_SEED.coverage.slice();
+      // live: resolve against communities.zip_codes; a ZIP present == covered.
+      return null;
+    },
+    async isCovered(zip) {
+      if (isSeed()) return window.HS_SEED.coverage.some(c => c.zip === zip && c.covered);
+      const { data } = await sb().from('communities')
+        .select('id').contains('zip_codes', [zip]).limit(1);
+      return !!(data && data.length);
+    },
+    async projects(zip, home) {
+      const list = isSeed() ? window.HS_SEED.projects.slice() : await _sbList('projects', zip);
+      return withDistance(list, home);
+    },
+    async changes(zip, home) {
+      const list = isSeed() ? window.HS_SEED.changes.slice() : await _sbList('changes', zip);
+      return withDistance(list, home);
+    },
+    async meetings(zip, home) {
+      const list = isSeed() ? window.HS_SEED.meetings.slice() : await _sbList('meetings', zip);
+      return withDistance(list, home);
+    },
+    async envRisk(zip) {
+      zip = zip || CFG.DEFAULT_ZIP;
+      if (isSeed()) return window.HS_SEED.environmental_risk[zip] || null;
+      const { data } = await sb().from('environmental_risk')
+        .select('*').eq('zip', zip).limit(1);
+      return (data && data[0]) || null;
+    },
+    async properties() {
+      // In seed/demo mode the demo user's homes; in live mode the signed-in user's `properties`.
+      if (isSeed()) return withDistance(window.HS_SEED.properties.slice(), null)
+        .map(p => Object.assign({}, p)); // properties are homes themselves
+      if (!HS.state.session) return [];
+      const { data } = await sb().from('properties')
+        .select('*').eq('user_id', HS.state.session.user.id).order('created_at');
+      return data || [];
+    },
+    topicCategories() {
+      return isSeed() ? window.HS_SEED.topicCategories : window.HS_SEED.topicCategories; // taxonomy same either way
+    },
+    project(id, list) { return (list || []).find(p => p.id === id) || null; }
+  };
+  async function _sbList(table, zip) {
+    const { data } = await sb().from(table).select('*').eq('zip', zip || CFG.DEFAULT_ZIP);
+    return data || [];
+  }
+  HS.data = data;
+})();
+
+</script>
+<script>
+// HomeSignal component templates — small vanilla functions that turn data into the
+// mockup's component vocabulary (story card, impact chips, score ring/bars, timeline
+// thread, meeting rows, stat tiles). Markup mirrors homesignalphase1_13.html verbatim.
+(function () {
+  const HS = (window.HS = window.HS || {});
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+  HS.esc = esc;
+
+  // color a card's left bar from impact score / status
+  function barColor(item) {
+    if (item.status === 'Active') return 'var(--amber)';
+    if (item.status === 'Approved') return 'var(--blue)';
+    const s = item.impact_score != null ? item.impact_score : (item.confidence === 'High' ? 80 : 40);
+    if (s >= 75) return 'var(--red)';
+    if (s >= 45) return 'var(--amber)';
+    if (item.impacts && item.impacts.every(i => !i.bad)) return 'var(--green-2)';
+    return 'var(--blue)';
+  }
+  HS.barColor = barColor;
+
+  function daysUntil(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr), now = new Date();
+    return Math.ceil((d - now) / 86400000);
+  }
+  HS.daysUntil = daysUntil;
+
+  function fmtDate(dateStr, opts) {
+    if (!dateStr) return '';
+    try { return new Date(dateStr).toLocaleDateString('en-US',
+      opts || { month: 'short', day: 'numeric' }); } catch (e) { return dateStr; }
+  }
+  HS.fmtDate = fmtDate;
+
+  const arrow = dir => dir === 'down' ? '↓' : '↑';
+
+  const tpl = {
+    impactChips(impacts) {
+      return (impacts || []).map(i =>
+        `<span class="ichip ${i.bad ? 'bad' : 'good'}"><span class="cd ${esc(i.k)}"></span>${esc(i.label)} <span class="ar">${arrow(i.dir)}</span></span>`
+      ).join('');
+    },
+
+    windowPill(item) {
+      const d = daysUntil(item.window_closes_at);
+      if (item.window_closes_at && d != null && d >= 0)
+        return `<span class="win">◔ ${d === 0 ? 'Window closes today' : 'Window closes in ' + d + ' day' + (d === 1 ? '' : 's')}</span>`;
+      if (item.category && /water|environment/i.test(item.category) && item.confidence === 'Medium')
+        return `<span class="win soft">Advisory possible</span>`;
+      return '';
+    },
+
+    // Full alerts story card
+    storyCard(c) {
+      const why = c.why ? `
+        <details class="why"><summary>ⓘ Why you're seeing this</summary>
+          <div class="wbody">
+            ${c.why.source ? `<div class="r"><b>Source:</b> ${esc(c.why.source)}</div>` : ''}
+            ${c.why.rank ? `<div class="r"><b>Why it ranks high for you:</b> ${esc(c.why.rank)}</div>` : ''}
+            ${c.why.confidence ? `<div class="r"><b>Confidence:</b> ${esc(c.why.confidence)}</div>` : ''}
+          </div></details>` : '';
+      const win = tpl.windowPill(c);
+      const beat = c.beat ? `<span style="color:var(--ink-3)">${esc(c.beat)}</span>` : '';
+      const href = c.related_project_id ? `development.html?id=${encodeURIComponent(c.related_project_id)}` : (c.source_ref || '#');
+      return `
+      <div class="card" style="border-left-color:${barColor(c)}">
+        <span class="lens"><span class="sw ${esc(c.lens || 'traffic')}"></span>${esc(c.category || '')}</span>
+        <h3>${esc(c.title)}</h3>
+        <p class="sowhat"><b>What it means for you:</b> ${esc(c.plain_language)}</p>
+        <div class="impacts">${tpl.impactChips(c.impacts)}</div>
+        ${why}
+        <div class="foot">
+          <div class="meta">${win || beat}${c.dist ? `<span class="dist">${esc(c.dist)}</span>` : ''}</div>
+          <div class="actions">${tpl.cardActions(c)}</div>
+        </div>
+      </div>`;
+    },
+
+    cardActions(c) {
+      if (c.related_project_id)
+        return `<button class="btn primary" onclick="location.href='development.html?id=${encodeURIComponent(c.related_project_id)}'">See detail →</button>`;
+      const ref = c.source_ref
+        ? `<button class="btn" onclick="window.open('${esc(c.source_ref)}','_blank','noopener')">Read →</button>` : '';
+      return ref + `<button class="btn ghost" onclick="HS.toggleFollow(this,'change','${esc(c.id)}')">Notify me</button>`;
+    },
+
+    // compact card (dashboard / maps / community / property)
+    miniCard(item, lensLabel) {
+      return `
+      <div class="card mini" style="border-left-color:${barColor(item)}">
+        <span class="lens"><span class="sw ${esc(item.lens || 'traffic')}"></span>${esc(lensLabel || item.category || '')}</span>
+        <h3>${esc(item.title || item.name)}</h3>
+        <p class="sowhat">${item.plain_language ? '<b>What it means for you:</b> ' + esc(item.plain_language) : esc(item.sowhat || '')}</p>
+        <div class="impacts">${tpl.impactChips(item.impacts || item.impact_dimensions)}</div>
+      </div>`;
+    },
+
+    // clickable development project card
+    devCard(p) {
+      const statusClass = p.status === 'Active' ? 'active' : p.status === 'Approved' ? 'appr' : 'prop';
+      return `
+      <div class="card clickable" style="border-left-color:${barColor(p)}" onclick="location.href='development.html?id=${encodeURIComponent(p.id)}'">
+        <span class="lens"><span class="sw ${esc(p.lens || 'value')}"></span>${esc(p.status)} · ${esc(p.dist || p.type)}</span>
+        <h3>${esc(p.name)}</h3>
+        <p class="sowhat"><b>How it lands on you:</b> ${esc(p.sowhat || '')}</p>
+        <div class="impacts">${tpl.impactChips(p.impact_dimensions)}</div>
+        <div class="foot">
+          <div class="meta"><span style="color:var(--ink-3)">${esc(p.stage || '')}</span>${p.dist ? `<span class="dist">${esc(p.dist)}</span>` : ''}</div>
+          <div class="actions"><span class="status ${statusClass}">${esc(p.status)}</span></div>
+        </div>
+      </div>`;
+    },
+
+    statTile(n, label, cls) {
+      return `<div class="stat ${cls || ''}"><div class="n">${n}</div><div class="l">${esc(label)}</div></div>`;
+    },
+
+    scoreRing(score, pct) {
+      const p = pct != null ? pct : score;
+      return `<div class="ring" style="--p:${p}"><div class="in">${esc(score)}</div></div>`;
+    },
+
+    scoreBars(components) {
+      return Object.keys(components || {}).map(k => {
+        const c = components[k], label = k.replace(/_/g, ' ').replace(/\b\w/g, m => m.toUpperCase());
+        const fill = c.tone === 'blue' ? 'var(--blue)' : c.tone === 'green-2' ? 'var(--green-2)' : 'var(--amber)';
+        return `<div class="sb"><div class="sl"><span>${esc(label)}</span><b>${esc(c.label)}</b></div>
+          <div class="track"><div class="fill" style="width:${c.pct}%;background:${fill}"></div></div></div>`;
+      }).join('');
+    },
+
+    thread(events) {
+      return (events || []).map(e => `
+        <div class="tev ${e.future ? 'future' : ''}"><span class="tk"></span><div>
+          <div class="td">${esc(e.date)}</div><div class="tt">${esc(e.title)}</div>
+          ${e.link ? `<div class="tl">↳ ${esc(e.link)}</div>` : ''}</div></div>`).join('');
+    },
+
+    meetingRow(m) {
+      const when = fmtDate(m.starts_at) + ' · ' +
+        new Date(m.starts_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+      const d = daysUntil(m.window_closes_at || m.starts_at);
+      return `<div class="aw"><span class="ak"></span><div>
+        <div class="at">${esc(m.title || m.body)}</div>
+        <div class="ad">${esc(when)}${m.location ? ' · ' + esc(m.location) : ''}</div>
+        ${d != null && d >= 0 && d <= 10 ? `<div class="au">${d === 0 ? 'Today' : d + ' day' + (d === 1 ? '' : 's') + ' away'}</div>` : ''}
+      </div></div>`;
+    }
+  };
+  HS.tpl = tpl;
+})();
+
+</script>
+<script>
+// HomeSignal schematic map — the mockup's vector map, but data-driven and behind a
+// swappable MapProvider seam (a real tile provider — Mapbox/Google — can replace
+// `render` later without changing callers). No paid provider is hardcoded.
+(function () {
+  const HS = (window.HS = window.HS || {});
+
+  // impact tier -> pin color (matches the mockup legend)
+  function tier(item) {
+    const s = item.impact_score != null ? item.impact_score
+      : (item.confidence === 'High' ? 80 : item.confidence === 'Medium' ? 55 : 40);
+    if (item.status === 'Approved') return { c: 'var(--blue)', k: 'watch' };
+    if (item.impacts && item.impacts.length && item.impacts.every(i => !i.bad) && (item.distance_mi || 0) > 3)
+      return { c: 'var(--green-2)', k: 'positive' };
+    if (s >= 75) return { c: 'var(--red)', k: 'high' };
+    if (s >= 45) return { c: 'var(--amber)', k: 'moderate' };
+    return { c: 'var(--blue)', k: 'watch' };
+  }
+  HS.mapTier = tier;
+
+  const MapProvider = {
+    name: 'schematic',
+    // render into `el`; returns [{letter,item,color}] in draw order for a synced pin list
+    render(el, opts) {
+      const { home, items = [], radiusMi = 1.5, showRadius = true, w = 780, h = 520 } = opts;
+      const cx = w / 2, cy = h / 2, radiusPx = Math.min(w, h) * 0.29;
+      const pxPerMile = radiusPx / radiusMi;
+      const hLat = home ? home.lat : (items[0] && items[0].lat) || 0;
+      const hLng = home ? home.lng : (items[0] && items[0].lng) || 0;
+      const place = (lat, lng) => {
+        const north = (lat - hLat) * 69;               // mi north
+        const east = (lng - hLng) * 69 * Math.cos(hLat * Math.PI / 180); // mi east
+        return { x: Math.max(20, Math.min(w - 20, cx + east * pxPerMile)),
+                 y: Math.max(20, Math.min(h - 20, cy - north * pxPerMile)) };
+      };
+      const letters = 'ABCDEFGHIJKLMNOP';
+      const shown = items.slice(0, letters.length);
+      const pins = shown.map((it, i) => {
+        const p = place(it.lat, it.lng), t = tier(it);
+        return { letter: letters[i], item: it, color: t.c, x: p.x, y: p.y };
+      });
+      const bg = `
+        <rect width="${w}" height="${h}" fill="#e4eadd"/>
+        <path d="M40 60 Q120 40 190 90 Q250 130 240 200 Q150 190 60 172 Q30 110 40 60 Z" fill="#d3e0c6"/>
+        <rect x="${w-235}" y="${h-190}" width="185" height="160" rx="18" fill="#d3e0c6"/>
+        <path d="M60 ${h*0.63} Q150 ${h*0.58} 215 ${h*0.66} Q255 ${h*0.72} 212 ${h*0.82} Q150 ${h*0.9} 72 ${h*0.87} Q22 ${h*0.77} 60 ${h*0.63} Z" fill="#bcd6e2"/>
+        <path d="M0 ${cy+5} H${w}" stroke="#f4f2ec" stroke-width="14"/>
+        <path d="M${cx} 0 V${h}" stroke="#f4f2ec" stroke-width="12"/>`;
+      const radius = showRadius ? `
+        <circle cx="${cx}" cy="${cy}" r="${radiusPx}" fill="#157a49" fill-opacity="0.07" stroke="#157a49" stroke-opacity="0.35" stroke-dasharray="7 7"/>
+        <text x="${cx}" y="${cy-radiusPx-6}" font-size="11" fill="#157a49" text-anchor="middle" font-family="sans-serif" opacity="0.8">${radiusMi} mi impact radius</text>` : '';
+      const homeMark = `
+        <circle cx="${cx}" cy="${cy}" r="12" fill="#157a49" stroke="#fff" stroke-width="3"/>
+        <text x="${cx}" y="${cy+31}" font-size="11" fill="#16211c" text-anchor="middle" font-weight="700" font-family="sans-serif">Your home</text>`;
+      const pinSvg = pins.map(p => `<g><circle cx="${p.x}" cy="${p.y}" r="15" fill="${p.color}" stroke="#fff" stroke-width="3"/>
+        <text x="${p.x}" y="${p.y+5}" font-size="13" fill="#fff" text-anchor="middle" font-weight="700" font-family="sans-serif">${p.letter}</text></g>`).join('');
+      el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${bg}${radius}${homeMark}${pinSvg}</svg>`;
+      return pins;
+    }
+  };
+  HS.MapProvider = MapProvider;
+})();
+
+</script>
+<script>
+// HomeSignal shell orchestrator (classic script, no build step).
+// Injects partials/shell.html into every page, wires the shared chrome (nav, mobile
+// drawer, all 5 modals, search, share, topics, property switcher, follows, waitlist,
+// contact/community-request), boots session + active-property state, then hands control
+// to the page via HS.onReady(). Persistence: seed mode -> localStorage; supabase mode -> DB.
+(function () {
+  const HS = (window.HS = window.HS || {});
+  const CFG = window.HS_CONFIG;
+  const $ = (id) => document.getElementById(id);
+
+  // ------------------------------------------------------------------ state --
+  const LS = {
+    get(k, d) { try { return JSON.parse(localStorage.getItem('hs:' + k)) ?? d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('hs:' + k, JSON.stringify(v)); } catch (e) {} }
+  };
+  const state = HS.state = {
+    session: null,           // {user:{id,email}} or null
+    zip: CFG.DEFAULT_ZIP,
+    properties: [],
+    activePropId: LS.get('activeProp', null),
+    follows: new Set(LS.get('follows', [])),
+    dismissed: new Set(LS.get('dismissed', [])),
+    topicPrefs: LS.get('topicPrefs', {}),
+    get activeProperty() {
+      return this.properties.find(p => p.id === this.activePropId) || this.properties[0] || null;
+    }
+  };
+
+  // ------------------------------------------------------------- ready gate --
+  let _resolveReady;
+  HS.ready = new Promise(r => (_resolveReady = r));
+  HS.onReady = (fn) => HS.ready.then(fn);
+
+  // -------------------------------------------------------------- modals -----
+  let _lastFocus = null;
+  HS.openModal = function (id) {
+    const el = $(id); if (!el) return;
+    _lastFocus = document.activeElement;
+    el.classList.add('show');
+    const f = el.querySelector('input,button,[tabindex]'); if (f) f.focus();
+    el._trap = trapFocus(el);
+    document.addEventListener('keydown', el._trap);
+  };
+  HS.closeModal = function (id) {
+    const el = $(id); if (!el) return;
+    el.classList.remove('show');
+    if (el._trap) document.removeEventListener('keydown', el._trap);
+    if (_lastFocus && _lastFocus.focus) _lastFocus.focus();
+  };
+  function trapFocus(el) {
+    return function (e) {
+      if (e.key !== 'Tab') return;
+      const f = el.querySelectorAll('a[href],button:not([disabled]),input,[tabindex]:not([tabindex="-1"])');
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') ['topicsModal', 'premiumModal', 'shareModal', 'locModal', 'switcherModal']
+      .forEach(HS.closeModal);
+  });
+
+  // ------------------------------------------------------------- mobile nav --
+  HS.toggleMenu = function () {
+    document.querySelector('.side').classList.toggle('open');
+    $('sidebackdrop').classList.toggle('show');
+  };
+  function closeMenu() {
+    const s = document.querySelector('.side'); if (s) s.classList.remove('open');
+    const b = $('sidebackdrop'); if (b) b.classList.remove('show');
+  }
+
+  // -------------------------------------------------------------- session ----
+  async function bootSession() {
+    if ((CFG.DATA_SOURCE === 'supabase') && window.supabase) {
+      try {
+        const { data } = await HS.sb().auth.getSession();
+        state.session = data && data.session ? data.session : null;
+      } catch (e) { state.session = null; }
+    }
+    if (!state.session && CFG.DEMO_SESSION) {
+      const u = (window.HS_SEED && window.HS_SEED.demoUser) || { id: 'demo', email: 'demo@homesignal.net', name: 'Demo', initials: 'DE' };
+      state.session = { user: { id: u.id, email: u.email }, demo: true, name: u.name, initials: u.initials };
+    }
+  }
+  HS.requireAuth = function (thenLabel) {
+    if (state.session) return true;
+    // route to existing homesignal.net sign-in, returning here to complete the action
+    const back = encodeURIComponent(location.href);
+    HS.nav= '/index.html?signin=1&return=' + back + (thenLabel ? '&do=' + encodeURIComponent(thenLabel) : '');
+    return false;
+  };
+  HS.onAvatar = function () {
+    if (state.session && !state.session.demo) {
+      if (confirm('Sign out?')) HS.sb().auth.signOut().then(() => location.reload());
+    } else { HS.requireAuth(); }
+  };
+
+  // -------------------------------------------------- active property / topbar
+  HS.selectProperty = function (id) {
+    state.activePropId = id; LS.set('activeProp', id);
+    paintTopbar();
+    document.dispatchEvent(new CustomEvent('hs:property', { detail: { id } }));
+  };
+  function paintTopbar() {
+    const p = state.activeProperty;
+    if ($('locLabel')) $('locLabel').textContent = p ? p.address : (window.HS_SEED ? window.HS_SEED.community.name : '—');
+    const av = $('hs-avatar');
+    if (av) av.textContent = state.session ? (state.session.initials ||
+      (state.session.user.email || '?').slice(0, 2).toUpperCase()) : '··';
+    const commNav = $('hs-nav-comm');
+    if (commNav) commNav.setAttribute('href', 'community.html?zip=' + encodeURIComponent(state.zip));
+  }
+  HS.openSwitcher = function () {
+    const list = $('switcherList'); if (!list) return;
+    $('switcherSub').textContent = "You're following " + state.properties.length + " home" +
+      (state.properties.length === 1 ? '' : 's') + '. Pick one to focus the app on it.';
+    list.innerHTML = state.properties.map(p => `
+      <div class="swrow ${p.id === state.activePropId ? 'active' : ''}" onclick="HS.selectProperty('${p.id}');HS.closeModal('switcherModal')">
+        <div class="miniscore">${p.score || ''}</div>
+        <div class="pinfo"><div class="pt">${HS.esc(p.address)}</div>
+          <div class="pa">${HS.esc(p.tag || p.label)} · ${HS.esc(p.city)}, ${HS.esc(p.state)} ${HS.esc(p.zip)}</div></div>
+        ${p.id === state.activePropId ? '<span class="chk">✓</span>' : ''}
+      </div>`).join('');
+    HS.openModal('switcherModal');
+  };
+
+  // -------------------------------------------------- location / community ----
+  HS.openLoc = function () {
+    $('locForm').classList.remove('hidden');
+    $('locRequest').classList.add('hidden');
+    $('locDone').classList.add('hidden');
+    const z = $('locZip'); z.value = ''; z.style.borderColor = '';
+    HS.openModal('locModal');
+  };
+  HS.findCommunity = async function () {
+    const el = $('locZip'), z = el.value.trim();
+    if (!/^\d{5}$/.test(z)) { el.style.borderColor = '#c23b34'; el.focus(); return; }
+    el.style.borderColor = '';
+    const covered = await HS.data.isCovered(z);
+    if (covered) {
+      HS.nav= 'community.html?zip=' + z;
+    } else {
+      $('reqZipLabel').textContent = z;
+      $('locForm').classList.add('hidden');
+      $('locRequest').classList.remove('hidden');
+    }
+  };
+  HS.submitRequest = async function () {
+    const el = $('reqEmail'), e = el.value.trim();
+    if (!e || e.indexOf('@') < 1) { el.style.borderColor = '#c23b34'; el.focus(); return; }
+    await persistEmail('community_requests', { email: e, zip: $('reqZipLabel').textContent });
+    $('locRequest').classList.add('hidden');
+    $('locDoneH').textContent = 'Request received';
+    $('locDoneP').textContent = "We'll email you the moment " + $('reqZipLabel').textContent + ' is live on HomeSignal.';
+    $('locDone').classList.remove('hidden');
+  };
+
+  // -------------------------------------------------- topic picker ------------
+  let TCUR = null;
+  HS.openTopics = function (key) {
+    TCUR = key;
+    const cats = HS.data.topicCategories(), d = cats[key];
+    $('tmTitle').textContent = d.title; $('tmSub').textContent = d.sub; $('tmBadge').textContent = d.badge;
+    $('tmEmail').textContent = state.session ? state.session.user.email : 'sign in to save';
+    const saved = state.topicPrefs[key];
+    const onSet = saved ? new Set(saved.topics) : new Set(d.on.map(i => d.items[i]));
+    const g = $('tmGrid'); g.innerHTML = '';
+    d.items.forEach(it => {
+      const on = onSet.has(it);
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'tchip' + (on ? ' on' : '');
+      b.innerHTML = '<span class="box">' + (on ? '✓' : '') + '</span><span>' + HS.esc(it) + '</span>';
+      b.onclick = function () { const o = b.classList.toggle('on'); b.querySelector('.box').textContent = o ? '✓' : ''; updTCount(); };
+      g.appendChild(b);
+    });
+    // consent ALWAYS defaults unchecked unless the user previously opted in (policy > mockup)
+    $('tmConsent').checked = saved ? !!saved.share_consent : false;
+    $('tmForm').classList.remove('hidden'); $('tmDone').classList.add('hidden');
+    updTCount(); HS.openModal('topicsModal');
+  };
+  function updTCount() {
+    const n = document.querySelectorAll('#tmGrid .tchip.on').length;
+    $('tmCount').textContent = n + ' topic' + (n === 1 ? '' : 's') + ' selected';
+  }
+  HS.saveTopics = async function () {
+    if (!HS.requireAuth('save-topics')) return;
+    const chips = [...document.querySelectorAll('#tmGrid .tchip.on span:last-child')].map(s => s.textContent);
+    const cats = HS.data.topicCategories();
+    state.topicPrefs[TCUR] = { topics: chips, share_consent: $('tmConsent').checked };
+    LS.set('topicPrefs', state.topicPrefs);
+    await persistTopics(TCUR, chips, $('tmConsent').checked);
+    const cc = $('cc-' + TCUR); if (cc) cc.textContent = chips.length + ' topic' + (chips.length === 1 ? '' : 's') + ' followed';
+    $('tmForm').classList.add('hidden');
+    $('tmDoneMsg').textContent = "You'll be alerted about " + chips.length + ' ' + cats[TCUR].title.toLowerCase() + ' topic' + (chips.length === 1 ? '' : 's') + '.';
+    $('tmDone').classList.remove('hidden');
+  };
+
+  // -------------------------------------------------- premium waitlist --------
+  HS.submitWaitlist = async function () {
+    const el = $('premiumEmail'), e = el.value.trim();
+    if (!e || e.indexOf('@') < 1) { el.style.borderColor = '#c23b34'; el.focus(); return; }
+    await persistEmail('premium_waitlist', { email: e });
+    $('premiumForm').classList.add('hidden');
+    $('premiumDone').classList.remove('hidden');
+  };
+
+  // -------------------------------------------------- follows / watch ---------
+  HS.toggleFollow = function (btn, type, id) {
+    if (!HS.requireAuth('follow')) return;
+    const key = type + ':' + id;
+    if (state.follows.has(key)) { state.follows.delete(key); btn.textContent = btn.dataset.follow || 'Follow'; }
+    else {
+      state.follows.add(key);
+      btn.dataset.follow = btn.textContent;
+      btn.textContent = (type === 'property') ? 'Watching ✓' : 'Following ✓';
+    }
+    LS.set('follows', [...state.follows]);
+    persistFollow(type, id, state.follows.has(key));
+  };
+
+  // -------------------------------------------------- share -------------------
+  const SHARE = [
+    { t: 'Copy link', bg: 'var(--green)', ic: '⧉', fn: 'copy' },
+    { t: 'Messages', bg: '#34c759', ic: '💬', u: u => 'sms:?&body=' + u },
+    { t: 'Email', bg: '#7c8a82', ic: '✉', u: (u, x) => 'mailto:?subject=' + x + '&body=' + u },
+    { t: 'Facebook', bg: '#1877f2', ic: 'f', u: u => 'https://www.facebook.com/sharer/sharer.php?u=' + u },
+    { t: 'Nextdoor', bg: '#00b246', ic: '◍', u: u => 'https://nextdoor.com/sharekit/?source=share&body=' + u },
+    { t: 'WhatsApp', bg: '#25d366', ic: '✆', u: u => 'https://wa.me/?text=' + u },
+    { t: 'Telegram', bg: '#29a9eb', ic: '➤', u: (u, x) => 'https://t.me/share/url?url=' + u + '&text=' + x },
+    { t: 'Signal', bg: '#3a76f0', ic: '◉', fn: 'copy' },
+    { t: 'Reddit', bg: '#ff4500', ic: 'R', u: (u, x) => 'https://www.reddit.com/submit?url=' + u + '&title=' + x },
+    { t: 'X', bg: '#111', ic: '𝕏', u: (u, x) => 'https://twitter.com/intent/tweet?url=' + u + '&text=' + x },
+    { t: 'Bluesky', bg: '#1185fe', ic: '✦', u: (u, x) => 'https://bsky.app/intent/compose?text=' + x + '%20' + u },
+    { t: 'LinkedIn', bg: '#0a66c2', ic: 'in', u: u => 'https://www.linkedin.com/sharing/share-offsite/?url=' + u }
+  ];
+  function shareUrl() {
+    // share the current page URL (centralized, like the live site's share.js)
+    return HS.shareUrlOverride || location.href;
+  }
+  function buildShare() {
+    const grid = $('shareGrid'); if (!grid) return;
+    $('shareUrl').textContent = shareUrl().replace(/^https?:\/\//, '');
+    const u = encodeURIComponent(shareUrl()), x = encodeURIComponent('See what’s changing around your home on HomeSignal');
+    grid.innerHTML = SHARE.map((s, i) => {
+      const href = s.u ? s.u(u, x) : '#';
+      const tag = s.u ? 'a' : 'button';
+      const attr = s.u ? `href="${href}" target="_blank" rel="noopener"` : `type="button" onclick="HS.copyLink()"`;
+      return `<${tag} class="sopt" ${attr}><span class="si" style="background:${s.bg}">${s.ic}</span>${HS.esc(s.t)}</${tag}>`;
+    }).join('');
+  }
+  HS.copyLink = function () {
+    const t = shareUrl();
+    try { navigator.clipboard.writeText(t); } catch (e) {}
+    const b = $('copyBtn'); if (b) { b.textContent = 'Copied ✓'; setTimeout(() => (b.textContent = 'Copy'), 1800); }
+  };
+
+  // -------------------------------------------------- search ------------------
+  async function wireSearch() {
+    const input = $('hs-search'), box = $('hs-search-results');
+    if (!input || !box) return;
+    const home = state.activeProperty;
+    const [projects, changes] = await Promise.all([
+      HS.data.projects(state.zip, home), HS.data.changes(state.zip, home)]);
+    const idx = [
+      ...projects.map(p => ({ label: p.name, sub: p.type, href: 'development.html?id=' + p.id })),
+      ...changes.map(c => ({ label: c.title, sub: c.category, href: c.related_project_id ? 'development.html?id=' + c.related_project_id : 'alerts.html' })),
+      ...state.properties.map(p => ({ label: p.address, sub: p.city + ', ' + p.state, href: 'property.html?id=' + p.id }))
+    ];
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      if (!q) { box.classList.add('hidden'); return; }
+      const hits = idx.filter(i => (i.label + ' ' + i.sub).toLowerCase().includes(q)).slice(0, 8);
+      box.innerHTML = hits.map(h => `<a href="${h.href}"><b>${HS.esc(h.label)}</b><span>${HS.esc(h.sub)}</span></a>`).join('')
+        || '<div class="empty">No matches</div>';
+      box.classList.remove('hidden');
+    });
+    document.addEventListener('click', e => { if (!box.contains(e.target) && e.target !== input) box.classList.add('hidden'); });
+  }
+
+  // -------------------------------------------------- bell badge --------------
+  async function paintBell() {
+    const badge = $('hs-bell-badge'); if (!badge) return;
+    const changes = await HS.data.changes(state.zip, state.activeProperty);
+    const open = changes.filter(c => { const d = HS.daysUntil(c.window_closes_at); return d != null && d >= 0; }).length;
+    if (open > 0) { badge.textContent = open; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
+  }
+
+  // -------------------------------------------------- persistence seam --------
+  async function persistEmail(table, row) {
+    if (CFG.DATA_SOURCE !== 'supabase') { LS.set('pending:' + table, [...(LS.get('pending:' + table, [])), row]); return; }
+    try { await HS.sb().from(table).insert(row); } catch (e) { console.warn('persist', table, e); }
+  }
+  async function persistFollow(type, id, on) {
+    if (CFG.DATA_SOURCE !== 'supabase' || !state.session) return;
+    try {
+      if (on) await HS.sb().from('follows').insert({ user_id: state.session.user.id, target_type: type, target_id: id });
+      else await HS.sb().from('follows').delete().match({ user_id: state.session.user.id, target_type: type, target_id: id });
+    } catch (e) { console.warn('follow', e); }
+  }
+  async function persistTopics(category, topics, consent) {
+    if (CFG.DATA_SOURCE !== 'supabase' || !state.session) return;
+    try {
+      await HS.sb().from('topic_prefs').upsert({
+        user_id: state.session.user.id, category, topics, share_consent: consent
+      }, { onConflict: 'user_id,category' });
+    } catch (e) { console.warn('topics', e); }
+  }
+
+  // -------------------------------------------------- boot --------------------
+  async function injectShell() {
+    const root = document.createElement('div');
+    root.id = 'hs-app-root';
+    const html = window.__SHELL_HTML;
+    root.innerHTML = html;
+    // move page content (from <template id="hs-content">) into the slot
+    const tpl = $('hs-content');
+    const slot = root.querySelector('#hs-slot');
+    if (tpl && slot) slot.appendChild(tpl.content.cloneNode(true));
+    document.body.insertBefore(root, document.body.firstChild);
+    $('sidebackdrop').addEventListener('click', closeMenu);
+    // active nav
+    const nav = document.body.dataset.nav;
+    if (nav) { const a = document.querySelector('.nav a[data-nav="' + nav + '"]'); if (a) a.classList.add('on'); }
+    // close menu on nav click (mobile)
+    document.querySelectorAll('.nav a').forEach(a => a.addEventListener('click', closeMenu));
+  }
+
+  async function boot() {
+    await injectShell();
+    await bootSession();
+    state.properties = await HS.data.properties();
+    if (!state.activePropId && state.properties[0]) state.activePropId = state.properties[0].id;
+    paintTopbar();
+    buildShare();
+    wireSearch();
+    paintBell();
+    _resolveReady(HS);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+
+</script>
+<script>
+
+// ---- single-file preview router (client-side; the real app uses separate pages) ----
+window.__SHELL_HTML = `<!-- HomeSignal shared shell — full frame (sidebar + top bar) + all modals, with a
+     #hs-slot where each page's content drops in. Injected identically into every page
+     by shell.js (hard rule: byte-identical menu). Markup lifted from the approved mockup;
+     nav hrefs point at the real pages. -->
+<div class="sidebackdrop" id="sidebackdrop"></div>
+<div class="app">
+
+<aside class="side" id="hs-side">
+  <a class="logo" href="index.html"><span class="mk">◆</span> HomeSignal</a>
+  <nav class="nav" id="hs-nav">
+    <a href="today.html"       data-nav="today"><span class="ic">◎</span> Today's Priorities</a>
+    <a href="dashboard.html"   data-nav="dash"><span class="ic">▦</span> Dashboard</a>
+    <a href="alerts.html"      data-nav="alerts"><span class="ic">◐</span> Alerts</a>
+    <a href="development.html" data-nav="dev"><span class="ic">◈</span> Development</a>
+    <a href="maps.html"        data-nav="maps"><span class="ic">◉</span> Maps</a>
+    <a href="properties.html"  data-nav="props"><span class="ic">⌂</span> Properties</a>
+    <a href="community.html"   data-nav="comm" id="hs-nav-comm"><span class="ic">◍</span> Communities</a>
+    <a href="reports.html"     data-nav="reports"><span class="ic">▤</span> Reports</a>
+  </nav>
+  <div class="grow"></div>
+  <div class="upsell">
+    <div class="t">Get the full picture</div>
+    <div class="d">Premium reports, property intelligence &amp; more.</div>
+    <button type="button" onclick="HS.openModal('premiumModal')">Go Premium</button>
+  </div>
+  <div class="sidefoot">
+    <a href="contact.html">Contact</a>
+    <span class="dot">·</span>
+    <a href="privacy.html">Privacy</a>
+  </div>
+</aside>
+
+<div class="main">
+<div class="top" id="hs-top">
+  <button class="menubtn" type="button" aria-label="Menu" onclick="HS.toggleMenu()">☰</button>
+  <div class="loc" onclick="HS.openSwitcher()"><span class="pin">◉</span> <span id="locLabel">—</span> <span style="color:var(--ink-3)">▾</span></div>
+  <div class="search"><input id="hs-search" placeholder="Search HomeSignal — addresses, projects, topics…" autocomplete="off"><div id="hs-search-results" class="hidden"></div></div>
+  <div class="sp"></div>
+  <button class="sharebtn" type="button" onclick="HS.openModal('shareModal')">⤴ Share</button>
+  <button class="ib" type="button" aria-label="Notifications" onclick="location.href='alerts.html'">◔<span class="badge hidden" id="hs-bell-badge">0</span></button>
+  <div class="avatar" id="hs-avatar" title="Account" onclick="HS.onAvatar()">··</div>
+</div>
+
+  <div id="hs-slot"><!-- page content injected here --></div>
+  </div><!-- /.main -->
+</div><!-- /.app -->
+
+<!-- ======= LOCATION / REQUEST COMMUNITY MODAL ======= -->
+<div class="overlay" id="locModal" onclick="if(event.target===this)HS.closeModal('locModal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="locModalTitle">
+    <div class="mhead">
+      <button class="mclose" type="button" onclick="HS.closeModal('locModal')" aria-label="Close">✕</button>
+      <span class="mbadge">◉ Your community</span>
+      <h3 id="locModalTitle">Change your community</h3>
+      <p class="msub">Enter a ZIP code to open what's changing around that area.</p>
+    </div>
+    <div class="mbody">
+      <div id="locForm">
+        <div class="field">
+          <input id="locZip" inputmode="numeric" maxlength="5" placeholder="Enter ZIP (e.g., 78617)" onkeydown="if(event.key==='Enter')HS.findCommunity()">
+          <button class="mbtn" type="button" onclick="HS.findCommunity()">Find my community</button>
+        </div>
+      </div>
+      <div id="locRequest" class="hidden">
+        <div style="background:var(--amber-tint);border:1px solid #f0dcbd;border-radius:10px;padding:12px 14px;font-size:13px;color:var(--amber);margin-bottom:14px"><b>We're not in <span id="reqZipLabel">—</span> yet</b> — but we'd love to add it. Add your email and we'll notify you the moment it goes live.</div>
+        <div class="field" style="flex-direction:column;gap:10px">
+          <input id="reqEmail" type="email" placeholder="Your email" onkeydown="if(event.key==='Enter')HS.submitRequest()">
+          <button class="mbtn" type="button" onclick="HS.submitRequest()">Request my community</button>
+        </div>
+        <div class="mnote">We'll only email you when your area goes live. No spam.</div>
+      </div>
+      <div id="locDone" class="success hidden"><div class="ck">✓</div><h4 id="locDoneH">Request received</h4><p id="locDoneP">We'll email you the moment it's live.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= PROPERTY SWITCHER MODAL ======= -->
+<div class="overlay" id="switcherModal" onclick="if(event.target===this)HS.closeModal('switcherModal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="switcherTitle">
+    <div class="mhead">
+      <button class="mclose" type="button" onclick="HS.closeModal('switcherModal')" aria-label="Close">✕</button>
+      <span class="mbadge">⌂ Your properties</span>
+      <h3 id="switcherTitle">Switch property</h3>
+      <p class="msub" id="switcherSub">Pick one to focus the app on it.</p>
+    </div>
+    <div class="mbody">
+      <div id="switcherList"><!-- filled by shell.js --></div>
+      <button class="mbtn" type="button" style="width:100%;margin-top:12px" onclick="HS.closeModal('switcherModal');HS.openLoc()">+ Add a property</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======= TOPIC PICKER MODAL ======= -->
+<div class="overlay" id="topicsModal" onclick="if(event.target===this)HS.closeModal('topicsModal')">
+  <div class="modal" style="max-width:484px" role="dialog" aria-modal="true" aria-labelledby="tmTitle">
+    <div class="mhead">
+      <button class="mclose" type="button" onclick="HS.closeModal('topicsModal')" aria-label="Close">✕</button>
+      <span class="mbadge" id="tmBadge">◈ Topics</span>
+      <h3 id="tmTitle">Government Notices</h3>
+      <p class="msub" id="tmSub">Choose which notices you want alerts for</p>
+    </div>
+    <div class="mbody">
+      <div class="tgrid" id="tmGrid"></div>
+      <div class="tcount"><span>◔</span> <span id="tmCount">0 topics selected</span></div>
+      <label class="consent"><input type="checkbox" id="tmConsent"><span><b>OPTIONAL</b> I agree that HomeSignal may share anonymized, aggregated information about the topics and locations I follow to support its products, services, and research. No personal contact information is ever shared. <a href="privacy.html">Privacy Policy</a></span></label>
+      <div class="savingline">Saving to your account · <b id="tmEmail">not signed in</b></div>
+      <div id="tmForm">
+        <button class="mbtn" type="button" onclick="HS.saveTopics()">Save alerts</button>
+        <div class="mnote">No spam · Unsubscribe anytime</div>
+      </div>
+      <div id="tmDone" class="success hidden"><div class="ck">✓</div><h4>Alerts saved</h4><p id="tmDoneMsg">You'll be notified about these topics.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= PREMIUM WAITLIST MODAL ======= -->
+<div class="overlay" id="premiumModal" onclick="if(event.target===this)HS.closeModal('premiumModal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="premiumTitle">
+    <div class="mhead">
+      <button class="mclose" type="button" onclick="HS.closeModal('premiumModal')" aria-label="Close">✕</button>
+      <span class="mbadge">◆ Coming soon</span>
+      <h3 id="premiumTitle">Premium is being built</h3>
+      <p class="msub">Deep property reports, unlimited watched addresses, and cost-of-ownership &amp; insurance intelligence are on the way. Leave your email and we'll notify you the moment it's ready — nothing to pay until then.</p>
+    </div>
+    <div class="mbody">
+      <div id="premiumForm">
+        <div class="field">
+          <input id="premiumEmail" type="email" placeholder="you@email.com" onkeydown="if(event.key==='Enter')HS.submitWaitlist()">
+          <button class="mbtn" type="button" onclick="HS.submitWaitlist()">Notify me</button>
+        </div>
+        <div class="mnote">We'll only email you about Premium availability. No spam — unsubscribe anytime.</div>
+      </div>
+      <div id="premiumDone" class="success hidden">
+        <div class="ck">✓</div>
+        <h4>You're on the list</h4>
+        <p>We'll email you the moment Premium launches.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= SHARE MODAL ======= -->
+<div class="overlay" id="shareModal" onclick="if(event.target===this)HS.closeModal('shareModal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+    <div class="mhead">
+      <button class="mclose" type="button" onclick="HS.closeModal('shareModal')" aria-label="Close">✕</button>
+      <span class="mbadge">⤴ Share</span>
+      <h3 id="shareTitle">Share HomeSignal</h3>
+      <p class="msub">Send this to a neighbor. The more of your community that's watching, the sharper everyone's intelligence gets.</p>
+    </div>
+    <div class="mbody">
+      <div class="sharegrid" id="shareGrid"><!-- filled by shell.js with real share-intent URLs --></div>
+      <div class="linkbox"><span class="url" id="shareUrl">homesignal.net</span><button type="button" id="copyBtn" onclick="HS.copyLink()">Copy</button></div>
+      <div class="netnote"><span>◍</span><span><b>Why sharing matters:</b> community intelligence gets stronger as neighbors join — more eyes on local change, shared alerts, and bigger civic turnout at the hearings that shape your area.</span></div>
+    </div>
+  </div>
+</div>
+`;
+HS.__search = '';
+HS.pages = {
+  'home': { nav: '', html: `
+  <div class="page">
+    <div class="hero">
+      <h1>See what's changing around your home — what it means, and what you can do about it.</h1>
+      <p class="sub">HomeSignal shows you the projects that impact your quality of life and home value. We track development and monitor civic meetings so you can participate in the trajectory of projects.</p>
+      <div class="ziprow">
+        <div class="zwrap"><span class="zpin">◉</span><input id="homeZip" inputmode="numeric" maxlength="5" placeholder="Enter your ZIP code" onkeydown="if(event.key==='Enter')homeFind()"></div>
+        <button class="find" onclick="homeFind()">Find my community</button>
+      </div>
+      <div class="freeline">Free — already following an area? <a href="today.html">Go to your dashboard →</a></div>
+    </div>
+
+    <div class="homesec">
+      <div class="trio">
+        <div class="twin"><div class="ic">◉</div><div class="k">See it</div><h3>What's changing</h3><p>Every project, permit, and hearing near your home — mapped, with the ones that actually affect you.</p><div class="tchips"><span class="tc">Development</span><span class="tc">Hearings</span><span class="tc">Water quality</span><span class="tc">Zoning</span></div></div>
+        <div class="twin"><div class="ic">◈</div><div class="k">Understand it</div><h3>What it means</h3><p>Each change put in plain language and scored — how it impacts your traffic, water, safety, and home value.</p><div class="tchips"><span class="tc">Traffic</span><span class="tc">Water</span><span class="tc">Home value</span><span class="tc">Safety</span></div></div>
+        <div class="twin"><div class="ic">◔</div><div class="k">Act on it</div><h3>What you can do</h3><p>A clear next step on every item, and a heads-up before comment windows and votes close — while you can still weigh in.</p><div class="tchips"><span class="tc">Comment</span><span class="tc">Attend</span><span class="tc">Follow</span><span class="tc">Noted</span></div></div>
+      </div>
+    </div>
+
+    <div class="homesec">
+      <h2>This is what you'll see.</h2>
+      <p class="s2">Every change, translated into what it means for you — and what you can do about it.</p>
+      <div class="previewwrap">
+        <div id="homePreview"><!-- a real Del Valle card, rendered from data --></div>
+        <div class="previewcap" id="homePreviewCap">A real card from the Del Valle, TX community. Enter your ZIP to see your own.</div>
+      </div>
+    </div>
+
+    <div class="trustpanel">
+      <div class="badge">Neutral · Sourced · Non-partisan</div>
+      <h2>Built on public records. Free to follow your community.</h2>
+      <p>Every alert links back to the permit, agenda, or filing it came from. We don't take positions and we don't sell your personal information — we help you see what's changing and decide for yourself.</p>
+    </div>
+
+    <div class="homecta">
+      <h2>Know what's changing around your home.</h2>
+      <p>Open your community in a few seconds — no account needed to start.</p>
+      <button class="big" onclick="HS.openLoc()">Find my community</button>
+    </div>
+  </div>
+`, init: function(){
+
+  async function homeFind() {
+    var el = document.getElementById('homeZip'), z = el.value.trim();
+    if (!/^\d{5}$/.test(z)) { el.style.borderColor = '#c23b34'; el.focus(); return; }
+    el.style.borderColor = '';
+    if (await HS.data.isCovered(z)) HS.nav= 'community.html?zip=' + z;
+    else { HS.openLoc(); document.getElementById('locZip').value = z; HS.findCommunity(); }
+  }
+  HS.onReady(async function () {
+    var home = HS.state.activeProperty;
+    var changes = await HS.data.changes(HS.state.zip, home);
+    var flagship = changes.find(function (c) { return c.related_project_id; }) || changes[0];
+    if (flagship) {
+      // render a real story card as the homepage preview
+      document.getElementById('homePreview').innerHTML = HS.tpl.storyCard(flagship);
+    }
+  });
+
+window.homeFind=homeFind;
+} },
+  'today': { nav: 'today', html: `
+  <div class="page">
+    <div class="ph">
+      <div class="eyebrow">Today's Priorities</div>
+      <h1 id="tdGreeting">Here's what needs you</h1>
+      <p id="tdSub"></p>
+    </div>
+    <div class="cols">
+      <div>
+        <div class="block">
+          <div class="bt-row"><h2>Needs you this week</h2><a href="alerts.html">All alerts →</a></div>
+          <div id="tdPriorities"></div>
+        </div>
+        <div class="block">
+          <h2 class="bt">Your briefing</h2>
+          <p class="brief" id="tdBrief"></p>
+        </div>
+      </div>
+      <div>
+        <div class="block">
+          <h2 class="bt">Your vitals</h2>
+          <div style="display:flex;align-items:center;gap:15px;margin-bottom:12px">
+            <div id="tdRing"></div>
+            <div><div style="font-size:13px;color:var(--ink-2)">Community score</div><div style="font-size:13px;color:var(--green);font-weight:700" id="tdScoreTrend"></div></div>
+          </div>
+          <div id="tdVitals"></div>
+          <div class="scorebars" id="tdBars"></div>
+          <p style="font-size:11px;color:var(--ink-3);margin:8px 0 0">Component scores derived from feeds already ingested.</p>
+        </div>
+        <div class="block">
+          <div class="bt-row"><h2>Action windows</h2><a href="maps.html">Map →</a></div>
+          <div id="tdWindows"></div>
+        </div>
+        <div class="p2">
+          <div class="p2h"><span>🔒</span> Phase 2 — unlocked by new feeds</div>
+          <div class="p2sub">Designed into the layout now; lights up when these sources are added.</div>
+          <div class="p2i"><div style="flex:1"><div class="t">Opportunity Center</div><div class="d">Tax exemptions, rebates, grants, insurance savings</div></div><span class="feed">+ tax / incentive / insurance</span></div>
+          <div class="p2i"><div style="flex:1"><div class="t">Financial Intelligence</div><div class="d">Total cost of ownership, equity timeline</div></div><span class="feed">+ assessor / tax records</span></div>
+          <div class="p2i"><div style="flex:1"><div class="t">Home Document Vault</div><div class="d">Deeds, permits, warranties, policies</div></div><span class="feed">+ user uploads</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+`, init: function(){
+
+HS.onReady(async function () {
+  var S = HS.state, home = S.activeProperty;
+  var c = await HS.data.community(S.zip);
+  var changes = await HS.data.changes(S.zip, home);
+  var meetings = await HS.data.meetings(S.zip, home);
+
+  // greeting
+  var name = (S.session && S.session.name || 'there').split(' ')[0];
+  var today = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+  document.getElementById('tdGreeting').textContent = 'Good morning, ' + name + ' — here’s what needs you';
+  document.getElementById('tdSub').textContent = today + ' · ' + c.name + ', ' + c.state + '.';
+
+  // priorities: rank by impact, prefer open windows
+  var ranked = changes.slice().sort(function (a, b) {
+    var aw = HS.daysUntil(a.window_closes_at), bw = HS.daysUntil(b.window_closes_at);
+    var ao = (aw != null && aw >= 0) ? 1 : 0, bo = (bw != null && bw >= 0) ? 1 : 0;
+    if (ao !== bo) return bo - ao;
+    return (b.impacts ? b.impacts.length : 0) - (a.impacts ? a.impacts.length : 0);
+  }).filter(function (c) { return !c.quiet; }).slice(0, 3);
+
+  document.getElementById('tdPriorities').innerHTML = ranked.map(function (ch) {
+    var d = HS.daysUntil(ch.window_closes_at);
+    var open = d != null && d >= 0;
+    var pk = open ? 'var(--red)' : 'var(--amber)';
+    var win = open ? '<span class="win">◔ Window closes in ' + d + ' day' + (d===1?'':'s') + '</span>'
+                   : (ch.beat ? '<span style="color:var(--ink-3)">' + HS.esc(ch.beat) + '</span>' : '');
+    var href = ch.related_project_id ? "development.html?id=" + ch.related_project_id : (ch.source_ref || 'alerts.html');
+    return '<div class="prow"><span class="pk" style="background:' + pk + '"></span>'
+      + '<div class="pmain"><div class="pt">' + HS.esc(ch.title) + '</div>'
+      + '<div class="pd">' + HS.esc(ch.plain_language) + '</div>'
+      + '<div class="pmeta">' + win + (ch.dist ? '<span style="color:var(--ink-2);font-weight:600">' + HS.esc(ch.dist) + '</span>' : '') + '</div></div>'
+      + '<button class="btn ' + (open ? 'primary' : '') + '" onclick="window.open(\'' + href + '\',\'_self\')">' + (open ? 'Act' : 'View') + '</button></div>';
+  }).join('');
+
+  // briefing
+  var top = ranked[0];
+  document.getElementById('tdBrief').innerHTML =
+    'There are <b>' + changes.filter(function(c){return !c.quiet;}).length + ' changes</b> near you this week. '
+    + (top ? 'The biggest is the <span class="hl">' + HS.esc(top.title) + '</span> — ' + HS.esc(top.plain_language) + ' ' : '')
+    + 'Your <span class="hl">value outlook stays positive at +' + c.value_trend + '%</span> over the next 12 months.';
+
+  // vitals + bars
+  document.getElementById('tdRing').innerHTML = HS.tpl.scoreRing(c.community_score);
+  document.getElementById('tdScoreTrend').textContent = 'Strong · growth pressure ' + c.growth_pressure;
+  document.getElementById('tdVitals').innerHTML =
+    '<div class="vital"><span class="vl">Value outlook · 12 mo</span><span class="vv" style="color:var(--green)">+' + c.value_trend + '%</span></div>'
+    + '<div class="vital"><span class="vl">Projects tracked</span><span class="vv">' + (await HS.data.projects(S.zip, home)).length + '</span></div>'
+    + '<div class="vital"><span class="vl">Active alerts</span><span class="vv">' + changes.filter(function(c){return HS.daysUntil(c.window_closes_at)>=0 || !c.quiet;}).length + '</span></div>'
+    + '<div class="vital"><span class="vl">Growth pressure</span><span class="vv" style="color:var(--amber)">' + HS.esc(c.growth_pressure) + '</span></div>';
+  document.getElementById('tdBars').innerHTML = HS.tpl.scoreBars(c.component_scores);
+
+  // action windows
+  document.getElementById('tdWindows').innerHTML = meetings.map(HS.tpl.meetingRow).join('');
+});
+
+} },
+  'dash': { nav: 'dash', html: `
+  <div class="page">
+    <div class="ph">
+      <div class="eyebrow">Dashboard</div>
+      <h1 id="dashHi">Welcome back</h1>
+      <p id="dashSub"></p>
+    </div>
+    <div class="strip" id="dashStrip"></div>
+    <div class="cols">
+      <div>
+        <div class="block" style="padding:16px 18px">
+          <div class="bt-row"><h2>What's changing around you</h2><a href="maps.html">Open full map →</a></div>
+          <div class="mapwrap" id="dashMap" style="box-shadow:none"></div>
+        </div>
+        <div class="bt-row"><h2 style="font-size:15px;margin:0">Recent — ranked by impact on you</h2><a href="alerts.html" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">All alerts →</a></div>
+        <div id="dashRecent"></div>
+      </div>
+      <div>
+        <div class="block">
+          <div class="bt-row"><h2>Your properties</h2><a href="properties.html">Manage →</a></div>
+          <div id="dashProps"></div>
+          <button class="addbtn" style="width:100%;justify-content:center;margin-top:10px" onclick="HS.openLoc()">+ Add a property</button>
+        </div>
+        <div class="block">
+          <div class="bt-row"><h2>Your watchlist</h2><a href="#" onclick="alert('Watchlist edit — persists to watchlist_items');return false">Edit</a></div>
+          <div class="chips" id="dashWatch"></div>
+        </div>
+        <div class="block">
+          <h2 class="bt">Upcoming meetings</h2>
+          <div id="dashMeetings"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+`, init: function(){
+
+HS.onReady(async function () {
+  var S = HS.state, home = S.activeProperty;
+  var c = await HS.data.community(S.zip);
+  var projects = await HS.data.projects(S.zip, home);
+  var changes = await HS.data.changes(S.zip, home);
+  var meetings = await HS.data.meetings(S.zip, home);
+
+  var name = (S.session && S.session.name || 'there').split(' ')[0];
+  document.getElementById('dashHi').textContent = 'Welcome back, ' + name;
+  document.getElementById('dashSub').textContent = S.properties.length + ' home' + (S.properties.length===1?'':'s') + ' followed — here\'s what needs you across them.';
+
+  var openCount = changes.filter(function(x){var d=HS.daysUntil(x.window_closes_at);return d!=null&&d>=0;}).length;
+  document.getElementById('dashStrip').innerHTML =
+    HS.tpl.statTile(projects.length, 'Projects near you', '')
+    + HS.tpl.statTile(openCount, 'Action windows open', 'accent')
+    + HS.tpl.statTile('<span style="font-size:19px">' + HS.esc(c.growth_pressure) + '</span>', 'Growth pressure · trending up', '')
+    + HS.tpl.statTile(c.community_score, 'Community score', 'g');
+
+  // schematic map preview (impact-colored pins)
+  var items = changes.filter(function(x){return !x.quiet;}).concat(projects).slice(0, 6);
+  HS.MapProvider.render(document.getElementById('dashMap'), { home: home, items: items, radiusMi: 1.5, w: 640, h: 300 });
+
+  // recent — ranked by impact
+  var recent = changes.filter(function(x){return !x.quiet;})
+    .sort(function(a,b){return (b.impacts?b.impacts.length:0)-(a.impacts?a.impacts.length:0);}).slice(0,2);
+  document.getElementById('dashRecent').innerHTML = recent.map(function(ch){ return HS.tpl.miniCard(ch, ch.category); }).join('');
+
+  // properties
+  document.getElementById('dashProps').innerHTML = S.properties.map(function(p){
+    return '<div class="swrow" onclick="HS.selectProperty(\'' + p.id + '\');HS.nav=\'property.html?id=' + p.id + '\'">'
+      + '<div class="miniscore">' + (p.score||'') + '</div>'
+      + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + ' <span style="font-size:10px;color:var(--green);font-weight:700">· ' + HS.esc((p.tag||p.label).toUpperCase()) + '</span></div>'
+      + '<div class="pa">' + HS.esc(p.city) + '</div></div></div>';
+  }).join('');
+
+  // watchlist (seeded from real entities near this home)
+  var watch = [c.zip, 'SH-130 Data Center', 'SH-71', 'Your street', 'Colorado River'];
+  document.getElementById('dashWatch').innerHTML = watch.map(function(w){return '<span class="wchip">' + HS.esc(w) + '</span>';}).join('');
+
+  document.getElementById('dashMeetings').innerHTML = meetings.map(HS.tpl.meetingRow).join('');
+});
+
+} },
+  'alerts': { nav: 'alerts', html: `
+  <div class="page">
+    <div class="ph">
+      <div class="eyebrow">Alerts</div>
+      <h1>What needs your attention near home</h1>
+      <p>Sorted by how much each change affects your daily life — not by when it arrived.</p>
+    </div>
+    <div class="strip" id="alStrip"></div>
+
+    <div class="topicsec">
+      <div class="th"><h2>Your alert topics — choose what you're notified about</h2><span style="font-size:12px;color:var(--ink-3)">Controls what you see here and what gets emailed</span></div>
+      <div class="tcats">
+        <button class="tcat" onclick="HS.openTopics('gov')"><div class="ci" style="background:var(--red)">▤</div><h4>Government Notices</h4><div class="cc" id="cc-gov">—</div><div class="cd">click to change</div></button>
+        <button class="tcat" onclick="HS.openTopics('meetings')"><div class="ci" style="background:var(--amber)">▦</div><h4>Upcoming Meetings</h4><div class="cc" id="cc-meetings">—</div><div class="cd">click to change</div></button>
+        <button class="tcat" onclick="HS.openTopics('news')"><div class="ci" style="background:var(--blue)">✉</div><h4>Local News</h4><div class="cc" id="cc-news">—</div><div class="cd">click to change</div></button>
+        <button class="tcat" onclick="HS.openTopics('dev')"><div class="ci" style="background:var(--green-2)">◈</div><h4>Development</h4><div class="cc" id="cc-dev">—</div><div class="cd">click to change</div></button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="seg" id="alSort"><button class="on" data-sort="impact">By life impact</button><button data-sort="distance">By distance</button><button data-sort="newest">Newest</button></div>
+      <div class="sp"></div>
+      <button class="fpill">All dimensions ▾</button>
+      <button class="fpill">Any distance ▾</button>
+    </div>
+
+    <div id="alBand"></div>
+    <div id="alGroups"></div>
+    <div id="alQuiet"></div>
+  </div>
+`, init: function(){
+
+HS.onReady(async function () {
+  var S = HS.state, home = S.activeProperty;
+  var c = await HS.data.community(S.zip);
+  var all = await HS.data.changes(S.zip, home);
+
+  // topic counts
+  var cats = HS.data.topicCategories();
+  ['gov','meetings','news','dev'].forEach(function (k) {
+    var pref = S.topicPrefs[k];
+    var n = pref ? pref.topics.length : cats[k].on.length;
+    var el = document.getElementById('cc-' + k);
+    if (el) el.textContent = n + ' topic' + (n===1?'':'s') + ' followed';
+  });
+
+  var open = all.filter(function (x) { var d = HS.daysUntil(x.window_closes_at); return d != null && d >= 0; });
+  var rest = all.filter(function (x) { return open.indexOf(x) < 0 && !x.quiet; });
+  var quiet = all.filter(function (x) { return x.quiet; });
+
+  // strip
+  var nearest = all.slice().sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);})[0];
+  document.getElementById('alStrip').innerHTML =
+    HS.tpl.statTile(open.length, 'Need you soon — windows closing', 'accent')
+    + HS.tpl.statTile(rest.length + open.length, 'Changes worth knowing this week', '')
+    + HS.tpl.statTile('+' + c.value_trend + '%', 'Your value outlook, next 12 mo', 'g')
+    + HS.tpl.statTile((nearest && nearest.dist ? nearest.dist.replace(' mi','') : '—') + '<span style="font-size:14px;font-weight:600;color:var(--ink-3)">mi</span>', 'Nearest active change', '');
+
+  function sortItems(items, mode) {
+    var a = items.slice();
+    if (mode === 'distance') a.sort(function(x,y){return (x.distance_mi||9e9)-(y.distance_mi||9e9);});
+    else if (mode === 'newest') a.sort(function(x,y){return new Date(y.occurred_at)-new Date(x.occurred_at);});
+    else a.sort(function(x,y){return (y.impacts?y.impacts.length:0)-(x.impacts?x.impacts.length:0);});
+    return a;
+  }
+
+  function render(mode) {
+    // needs-you band
+    document.getElementById('alBand').innerHTML = open.length ? (
+      '<div class="band"><div class="band-h"><span class="lab"><span class="dotb"></span>Needs you soon</span>'
+      + '<span class="cnt">Action still changes the outcome</span></div>'
+      + sortItems(open, mode).map(function(ch){ return HS.tpl.storyCard(ch).replace('class="card"','class="card inband"'); }).join('')
+      + '</div>') : '';
+
+    // groups by category
+    var groups = {};
+    sortItems(rest, mode).forEach(function (ch) { (groups[ch.category] = groups[ch.category] || []).push(ch); });
+    var dotColor = { 'Traffic & getting around':'traffic','Home value & cost of living':'value','Environment & utilities':'water','Government & civic':'safety','Development':'traffic' };
+    document.getElementById('alGroups').innerHTML = Object.keys(groups).map(function (g) {
+      var col = dotColor[g] || 'traffic';
+      return '<div class="groupHead"><span class="gd ' + col + '"></span> ' + HS.esc(g)
+        + ' <span class="gc">— ' + groups[g].length + ' change' + (groups[g].length===1?'':'s') + '</span></div>'
+        + groups[g].map(function(ch){ return HS.tpl.storyCard(ch); }).join('');
+    }).join('');
+
+    // quiet
+    document.getElementById('alQuiet').innerHTML = quiet.length ? (
+      '<div class="groupHead" style="color:var(--ink-3)"><span class="gd" style="background:var(--line)"></span> Good to know · lower relevance to you</div>'
+      + '<div class="quiet">' + quiet.map(function(q){return '<b>' + HS.esc(q.title) + '</b>';}).join(' · ')
+      + '. &nbsp;Collapsed because they\'re unlikely to affect your home — expand any time.</div>') : '';
+  }
+
+  render('impact');
+  document.getElementById('alSort').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-sort]'); if (!b) return;
+    [].forEach.call(this.querySelectorAll('button'), function(x){x.classList.remove('on');});
+    b.classList.add('on'); render(b.dataset.sort);
+  });
+});
+
+} },
+  'dev': { nav: 'dev', html: `<div class="page" id="devPage"></div>`, init: function(){
+
+HS.onReady(async function () {
+  var S = HS.state, home = S.activeProperty;
+  var projects = await HS.data.projects(S.zip, home);
+  var id = new URLSearchParams(HS.__search||'').get('id');
+  var page = document.getElementById('devPage');
+
+  if (id) { renderDetail(id); } else { renderList(); }
+
+  function statusRank(s){ return s==='Proposed'?0:s==='Active'?1:2; }
+
+  function renderList() {
+    var state2 = { lens: 0, sort: 'impact', dataView: false };
+    function sorted() {
+      var a = projects.slice();
+      if (state2.lens === 1) { // what's being built — group by type & stage
+        a.sort(function(x,y){ return (x.type>y.type?1:x.type<y.type?-1:0) || (statusRank(x.status)-statusRank(y.status)); });
+      } else if (state2.lens === 2 || state2.sort === 'distance') {
+        a.sort(function(x,y){return (x.distance_mi||9e9)-(y.distance_mi||9e9);});
+      } else if (state2.sort === 'newest') {
+        a.sort(function(x,y){return new Date(y.submitted_at)-new Date(x.submitted_at);});
+      } else {
+        a.sort(function(x,y){return (y.impact_score||0)-(x.impact_score||0);});
+      }
+      return a;
+    }
+    function paint() {
+      var a = sorted();
+      var body = state2.dataView ? dataTable(a) : ('<div class="devgrid">' + a.map(HS.tpl.devCard).join('') + '</div>');
+      page.innerHTML =
+        '<div class="ph"><div class="eyebrow">Development</div><h1>What\'s being built — and how it lands on you</h1>'
+        + '<p>Every active and proposed project near you, led by its effect on your daily life rather than its stage or unit count.</p></div>'
+        + '<div class="lensnav">'
+        + lens(0,'How could it affect me?','Impact-first · the default view')
+        + lens(1,'What\'s being built?','The projects themselves')
+        + lens(2,'Where are we growing?','The trajectory of the area')
+        + '</div>'
+        + '<div class="toolbar"><div class="seg" id="devSort">'
+        + seg('impact','Impact on me') + seg('distance','Distance') + seg('newest','Newest')
+        + '</div><div class="sp"></div>'
+        + '<button class="fpill">All types ▾</button><button class="fpill">Any status ▾</button>'
+        + '<button class="fpill" id="devDataBtn">⊞ Data view</button></div>'
+        + body;
+      wire();
+    }
+    function lens(i,q,d){ return '<button class="lenscard' + (state2.lens===i?' on':'') + '" data-lens="' + i + '"><span class="q">' + q + '</span><span class="d">' + d + '</span></button>'; }
+    function seg(k,label){ return '<button class="' + ((state2.sort===k && !state2.dataView)?'on':'') + '" data-sort="' + k + '">' + label + '</button>'; }
+    function dataTable(a){
+      return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th><th>Distance</th><th>Impact</th></tr></thead><tbody>'
+        + a.map(function(p){ return '<tr onclick="HS.nav=\'development.html?id=' + p.id + '\'" style="cursor:pointer">'
+          + '<td><b>' + HS.esc(p.name) + '</b></td><td>' + HS.esc(p.type) + '</td><td>' + HS.esc(p.status) + '</td>'
+          + '<td>' + HS.esc(p.stage||'') + '</td><td>' + HS.esc(p.dist||'') + '</td><td>' + (p.impact_score||'') + '</td></tr>'; }).join('')
+        + '</tbody></table>';
+    }
+    function wire() {
+      [].forEach.call(page.querySelectorAll('.lenscard'), function(b){ b.onclick=function(){ state2.lens=+b.dataset.lens; state2.dataView=false; paint(); }; });
+      var ds = page.querySelector('#devSort'); if (ds) ds.onclick=function(e){ var b=e.target.closest('button[data-sort]'); if(!b)return; state2.sort=b.dataset.sort; state2.dataView=false; paint(); };
+      var db = page.querySelector('#devDataBtn'); if (db) db.onclick=function(){ state2.dataView=!state2.dataView; paint(); };
+    }
+    paint();
+  }
+
+  function renderDetail(pid) {
+    var p = projects.find(function(x){return x.id===pid;});
+    if (!p) { page.innerHTML = '<button class="backbtn" onclick="HS.nav=\'development.html\'">← Back to development</button><div class="ph"><h1>Not found</h1></div>'; return; }
+    HS.data.meetings(S.zip, home).then(function (meetings) {
+      var mtg = meetings.find(function(m){return m.related_project_id===p.id;});
+      var thread = [
+        { date: HS.fmtDate(p.submitted_at, {year:'numeric',month:'long',day:'numeric'}), title: 'Application submitted', link: 'generated your alert' },
+        { date: HS.fmtDate(p.submitted_at, {month:'long',day:'numeric'}) , title: 'Impact analysis published', link: 'report available now' }
+      ];
+      if (mtg) thread.push({ date: HS.fmtDate(mtg.starts_at,{year:'numeric',month:'long',day:'numeric'}) + ' · in ' + HS.daysUntil(mtg.starts_at) + ' days', title: 'Public hearing — comment window open', link: 'you can act here', future: true });
+      thread.push({ date: 'Expected next quarter', title: 'Commission vote', future: true });
+
+      var statusClass = p.status==='Active'?'active':p.status==='Approved'?'appr':'prop';
+      var verdictHi = p.impact_dimensions.filter(function(i){return i.bad;}).slice(0,2).map(function(i){return i.label.toLowerCase();}).join(' and ') || 'change';
+      var verdictGood = (p.impact_dimensions.find(function(i){return !i.bad;})||{label:'the tax base'}).label.toLowerCase();
+      page.innerHTML =
+        '<button class="backbtn" onclick="HS.nav=\'development.html\'">← Back to development</button>'
+        + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">' + HS.esc(p.name) + ' <span class="status ' + statusClass + '">' + HS.esc(p.status) + '</span></div><h1 style="margin-bottom:2px">How this affects you</h1></div>'
+        + '<div class="detail"><div class="panel">'
+        + '<div class="kicker">The bottom line</div>'
+        + '<div class="verdict">Likely to <span class="hl">affect ' + HS.esc(verdictHi) + '</span> near you — with a <span class="hlg">lift to ' + HS.esc(verdictGood) + '</span>.</div>'
+        + '<div class="impacts">' + HS.tpl.impactChips(p.impact_dimensions) + '</div>'
+        + '<div class="divider"></div><div class="kicker">The story so far — and what\'s next</div>'
+        + '<div class="thread">' + HS.tpl.thread(thread) + '</div></div>'
+        + '<div class="panel side"><div class="kicker">What you can do</div><div class="doact">'
+        + '<button class="btn primary" onclick="window.open(\'' + HS.esc(p.source_ref) + '\',\'_blank\',\'noopener\')">Submit a public comment</button>'
+        + '<button class="btn" onclick="HS.addToCalendar(\'' + p.id + '\')">Add hearing to calendar</button>'
+        + '<button class="btn" onclick="window.open(\'' + HS.esc(p.source_ref) + '\',\'_blank\',\'noopener\')">Read the impact analysis</button>'
+        + '<button class="btn ghost" onclick="HS.toggleFollow(this,\'project\',\'' + p.id + '\')">Follow this project</button></div>'
+        + '<div class="divider"></div><div class="kicker">The specs</div><div class="specs">'
+        + specRow('Developer', p.developer) + specRow('Size', p.size) + specRow('Investment', p.investment)
+        + specRow('Jobs created', p.jobs) + specRow('Distance', p.dist) + specRow('Status', p.stage)
+        + '</div>' + (p.approx ? '<p style="font-size:11px;color:var(--ink-3);margin:12px 0 0">Some specifics are prototype placeholders pending the live feed — see the source record.</p>' : '') + '</div></div>';
+    });
+  }
+  function specRow(k,v){ return '<div class="row"><span>' + HS.esc(k) + '</span><b>' + HS.esc(v||'—') + '</b></div>'; }
+});
+
+// simple .ics generator for "Add hearing to calendar"
+HS.addToCalendar = async function (projectId) {
+  var meetings = await HS.data.meetings(HS.state.zip, HS.state.activeProperty);
+  var m = meetings.find(function(x){return x.related_project_id===projectId;}) || meetings[0];
+  if (!m) return;
+  function z(d){ return new Date(d).toISOString().replace(/[-:]/g,'').replace(/\.\d+/,''); }
+  var ics = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//HomeSignal//EN','BEGIN:VEVENT',
+    'UID:' + m.id + '@homesignal','DTSTART:' + z(m.starts_at),'SUMMARY:' + m.title,
+    'LOCATION:' + (m.location||''),'DESCRIPTION:' + (m.source_ref||''),'END:VEVENT','END:VCALENDAR'].join('\r\n');
+  var a = document.createElement('a');
+  a.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+  a.download = (m.title||'hearing').replace(/\W+/g,'-') + '.ics'; a.click();
+};
+
+} },
+  'maps': { nav: 'maps', html: `
+  <div class="page">
+    <div class="ph">
+      <div class="eyebrow">Maps</div>
+      <h1>What's changing around you</h1>
+      <p>Every project and alert near your home, placed on the map and colored by the part of life it touches — not by project type.</p>
+    </div>
+    <div class="toolbar">
+      <div class="seg" id="mapMode">
+        <button class="on" data-mode="impact">Impact</button>
+        <button data-mode="sat" disabled title="Available with live map provider">Satellite</button>
+        <button data-mode="street" disabled title="Available with live map provider">Street</button>
+      </div>
+      <div class="sp"></div>
+      <button class="fpill" id="radiusPill">◉ Impact radius: 1.5 mi ▾</button>
+      <button class="fpill">All dimensions ▾</button>
+    </div>
+    <div class="mapcols">
+      <div class="mapwrap" id="mapWrap">
+        <div class="mpanel">
+          <div class="mt">Pins colored by impact</div>
+          <div class="legrow"><span class="ld" style="background:var(--red)"></span> High impact on you</div>
+          <div class="legrow"><span class="ld" style="background:var(--amber)"></span> Moderate impact</div>
+          <div class="legrow"><span class="ld" style="background:var(--blue)"></span> Watch / minor</div>
+          <div class="legrow"><span class="ld" style="background:var(--green-2)"></span> Positive / distant</div>
+          <div class="layers">
+            <div class="mt">Layers</div>
+            <div class="lyr" id="lyrProjects"><span>Projects</span><span class="tg"></span></div>
+            <div class="lyr" id="lyrRadius"><span>Impact radius</span><span class="tg"></span></div>
+            <div class="lyr off" title="Available when flood data is ingested for this community"><span>Flood zones</span><span class="tg"></span></div>
+            <div class="lyr off" title="Available when school data is ingested for this community"><span>Schools</span><span class="tg"></span></div>
+          </div>
+        </div>
+        <div class="mgps" id="mapGps"></div>
+      </div>
+      <div class="pinlist" id="pinList"></div>
+    </div>
+  </div>
+`, init: function(){
+
+HS.onReady(async function () {
+  var S = HS.state, home = S.activeProperty;
+  var c = await HS.data.community(S.zip);
+  var projects = await HS.data.projects(S.zip, home);
+  var changes = await HS.data.changes(S.zip, home);
+
+  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true };
+  var items = changes.filter(function(x){return !x.quiet;}).concat(projects)
+    .filter(function(x){return x.lat && x.lng;})
+    .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
+
+  // Capture the overlay panel ONCE, before any render() wipes the wrapper.
+  var panelHTML = document.querySelector('.mpanel').outerHTML;
+
+  function draw() {
+    var wrap = document.getElementById('mapWrap');
+    var shown = opts.showProjects ? items : items.filter(function(x){return !x.type;});
+    var pins = HS.MapProvider.render(wrap, {
+      home: home, items: shown, radiusMi: opts.radiusMi, showRadius: opts.showRadius, w: 780, h: 520
+    });
+    // render() set only the <svg>; re-add the legend/layers panel + gps chip.
+    wrap.insertAdjacentHTML('beforeend', panelHTML);
+    var within = shown.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;
+    wrap.insertAdjacentHTML('beforeend', '<div class="mgps">' + HS.esc(c.name + ', ' + c.state) + ' · ' + within + ' items within ' + opts.radiusMi + ' mi</div>');
+    // reflect current layer state + rewire toggles (panel was re-created)
+    document.getElementById('lyrProjects').classList.toggle('off', !opts.showProjects);
+    document.getElementById('lyrRadius').classList.toggle('off', !opts.showRadius);
+    document.getElementById('lyrProjects').onclick = function(){ opts.showProjects=!opts.showProjects; draw(); };
+    document.getElementById('lyrRadius').onclick = function(){ opts.showRadius=!opts.showRadius; draw(); };
+
+    document.getElementById('pinList').innerHTML =
+      '<div class="groupHead" style="margin-top:0">Near you · closest first</div>'
+      + pins.map(function (p) {
+        var it = p.item;
+        return '<div class="card mini" style="border-left-color:' + p.color + '">'
+          + '<span class="lens"><span class="letter" style="background:' + p.color + '">' + p.letter + '</span>&nbsp; '
+          + HS.esc(it.type || it.category || '') + ' · ' + HS.esc(it.dist||'') + '</span>'
+          + '<h3>' + HS.esc(it.name || it.title) + '</h3>'
+          + '<p class="sowhat">' + HS.esc(it.sowhat || it.plain_language || '') + '</p>'
+          + '<div class="impacts">' + HS.tpl.impactChips(it.impacts || it.impact_dimensions) + '</div></div>';
+      }).join('');
+  }
+  draw();
+
+  var radii = [0.5,1,1.5,2,3,5], ri = 2;
+  document.getElementById('radiusPill').onclick = function () {
+    ri = (ri + 1) % radii.length; opts.radiusMi = radii[ri];
+    this.textContent = '◉ Impact radius: ' + opts.radiusMi + ' mi ▾'; draw();
+  };
+});
+
+} },
+  'props': { nav: 'props', html: `
+  <div class="page">
+    <div class="ph">
+      <div class="eyebrow">Properties</div>
+      <h1>Your properties</h1>
+      <p>Follow as many homes as you like — yours, a rental, or a family member's. Each is watched independently, and you're alerted when something changes near any of them.</p>
+    </div>
+    <div class="strip" id="propStrip"></div>
+    <div class="bt-row"><h2 style="font-size:15px;margin:0">Homes you follow</h2><button class="addbtn" onclick="HS.openLoc()">+ Add a property</button></div>
+    <div class="propgrid" id="propGrid"></div>
+  </div>
+`, init: function(){
+
+HS.onReady(async function () {
+  var S = HS.state;
+  var changes = await HS.data.changes(S.zip, null);
+  var projects = await HS.data.projects(S.zip, null);
+  var avg = Math.round(S.properties.reduce(function(s,p){return s+(p.score||0);},0) / (S.properties.length||1));
+
+  document.getElementById('propStrip').innerHTML =
+    HS.tpl.statTile(S.properties.length, 'Homes followed', '')
+    + HS.tpl.statTile(changes.filter(function(x){return HS.daysUntil(x.window_closes_at)>=0;}).length, 'Need you across all homes', 'accent')
+    + HS.tpl.statTile(projects.length, 'Nearby projects total', '')
+    + HS.tpl.statTile(avg, 'Avg property score', 'g');
+
+  var tone = { 'Your home':'var(--green)', 'Rental':'var(--amber)', 'Family':'var(--blue)' };
+  document.getElementById('propGrid').innerHTML = S.properties.map(function (p) {
+    // per-property computed: nearest N projects, open windows
+    var near = HS.withDistance(projects, p).filter(function(x){return (x.distance_mi||9e9) <= 5;});
+    var needs = HS.withDistance(changes, p).filter(function(x){return HS.daysUntil(x.window_closes_at)>=0 && (x.distance_mi||9e9)<=5;}).length;
+    return '<div class="propcard" onclick="HS.selectProperty(\'' + p.id + '\');HS.nav=\'property.html?id=' + p.id + '\'">'
+      + '<div class="miniscore">' + (p.score||'') + '</div>'
+      + '<div class="pinfo"><div class="ptag" style="color:' + (tone[p.tag]||'var(--green)') + '">' + HS.esc(p.tag||p.label) + '</div>'
+      + '<h3>' + HS.esc(p.address) + '</h3><div class="paddr">' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + '</div>'
+      + '<div class="pmeta">' + (needs ? '<span class="needs">◔ ' + needs + ' need' + (needs===1?'s':'') + ' you</span>' : '<span style="color:var(--ink-3)">Nothing needs you</span>')
+      + '<span>' + near.length + ' nearby projects</span><span style="color:var(--green);font-weight:600">+' + p.value_outlook + '%</span></div></div></div>';
+  }).join('')
+  + '<div class="propcard" onclick="HS.openLoc()" style="border-style:dashed;justify-content:center">'
+  + '<div style="text-align:center"><div style="font-size:22px;color:var(--green);line-height:1">＋</div>'
+  + '<div style="font-weight:600;color:var(--ink-2);font-size:13.5px;margin-top:4px">Add another property</div>'
+  + '<div style="font-size:11.5px;color:var(--ink-3)">Free — follow as many as you like</div></div></div>';
+});
+
+} },
+  'prop': { nav: 'props', html: `<div class="page" id="propPage"></div>`, init: function(){
+
+HS.onReady(async function () {
+  var S = HS.state;
+  var id = new URLSearchParams(HS.__search||'').get('id');
+  var p = S.properties.find(function(x){return x.id===id;}) || S.activeProperty;
+  if (p) HS.selectProperty(p.id);
+  var page = document.getElementById('propPage');
+  if (!p) { page.innerHTML = '<button class="backbtn" onclick="HS.nav=\'properties.html\'">← All properties</button><div class="ph"><h1>No property</h1></div>'; return; }
+
+  var projects = HS.withDistance(await HS.data.projects(S.zip, p), p)
+    .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
+  var changes = HS.withDistance(await HS.data.changes(S.zip, p), p);
+  var env = await HS.data.envRisk(S.zip);
+  var near = projects.slice(0, 3);
+
+  var risk = env ? ['flood','wildfire','heat'].map(function (k) {
+    var r = env[k]; var color = r.tone==='green-2'?'var(--green-2)':r.tone==='blue'?'var(--blue)':'var(--amber)';
+    var label = k==='heat'?'Extreme heat':k.charAt(0).toUpperCase()+k.slice(1);
+    return '<div class="rk"><div class="rkl">' + label + '</div><div class="rkv" style="color:' + color + '">' + HS.esc(r.label) + '</div>'
+      + '<div class="track" style="margin-top:7px"><div class="fill" style="width:' + r.pct + '%;background:' + color + '"></div></div></div>';
+  }).join('') : '';
+
+  var thread = changes.slice(0,4).map(function(ch,i){
+    return { date: HS.fmtDate(ch.occurred_at, {year:'numeric',month:'long',day:'numeric'}), title: ch.title, future:false };
+  });
+
+  var openAlerts = changes.filter(function(x){return HS.daysUntil(x.window_closes_at)>=0 && (x.distance_mi||9e9)<=5;}).length;
+
+  page.innerHTML =
+    '<button class="backbtn" onclick="HS.nav=\'properties.html\'">← All properties</button>'
+    + '<div class="ph"><div class="eyebrow">' + HS.esc(p.tag||p.label) + '</div><h1>' + HS.esc(p.address) + '</h1>'
+    + '<p>' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + ' — everything changing around this specific address, and what it means for its value.</p></div>'
+    + '<div class="cols"><div>'
+    + '<div class="block"><div class="bt-row"><h2>What\'s changing near this property</h2><a href="development.html">All projects →</a></div>'
+    + near.map(function (pr) {
+        return '<div class="card mini" style="border-left-color:' + HS.barColor(pr) + ';margin-bottom:10px">'
+          + '<span class="lens"><span class="sw ' + HS.esc(pr.lens||'value') + '"></span>' + HS.esc(pr.dist||'') + ' · ' + HS.esc(pr.status.toLowerCase()) + '</span>'
+          + '<h3>' + HS.esc(pr.name) + '</h3><p class="sowhat"><b>Effect on this home:</b> ' + HS.esc(pr.sowhat||'') + '</p>'
+          + '<div class="impacts">' + HS.tpl.impactChips(pr.impact_dimensions) + '</div></div>';
+      }).join('')
+    + '</div>'
+    + '<div class="block"><h2 class="bt">Environmental risk for this parcel</h2><div class="riskgrid">' + risk + '</div>'
+    + '<p style="font-size:11px;color:var(--ink-3);margin:10px 0 0">From flood-zone, wildfire and climate layers already ingested.</p></div>'
+    + '<div class="block"><h2 class="bt">This property\'s timeline</h2><div class="thread">' + HS.tpl.thread(thread) + '</div></div>'
+    + '</div><div>'
+    + '<div class="block"><h2 class="bt">Property vitals</h2>'
+    + '<div style="display:flex;align-items:center;gap:15px;margin-bottom:12px">' + HS.tpl.scoreRing(p.score)
+    + '<div><div style="font-size:13px;color:var(--ink-2)">Property score</div><div style="font-size:13px;color:var(--green);font-weight:700">' + HS.esc(p.score_trend||'') + '</div></div></div>'
+    + '<div class="vital"><span class="vl">Value outlook · 12 mo</span><span class="vv" style="color:var(--green)">+' + p.value_outlook + '%</span></div>'
+    + '<div class="vital"><span class="vl">Insurance outlook</span><span class="vv">' + HS.esc(p.insurance_outlook||'Stable') + '</span></div>'
+    + '<div class="vital"><span class="vl">Nearby projects</span><span class="vv">' + near.length + '</span></div>'
+    + '<div class="vital"><span class="vl">Active alerts</span><span class="vv">' + openAlerts + '</span></div></div>'
+    + '<div class="block"><h2 class="bt">What you can do</h2><div class="doact">'
+    + '<button class="btn primary" onclick="HS.toggleFollow(this,\'property\',\'' + p.id + '\')">Watch this property</button>'
+    + '<button class="btn" onclick="HS.nav=\'reports.html\'">Generate property report</button>'
+    + '<button class="btn ghost" disabled title="Coming soon">Compare to nearby homes</button></div></div>'
+    + '<div class="p2"><div class="p2h"><span>🔒</span> Phase 2 — unlocked by new feeds</div><div class="p2sub">Layout ready; activates with these sources.</div>'
+    + '<div class="p2i"><div style="flex:1"><div class="t">Total cost of ownership</div><div class="d">Taxes, insurance, utilities, upkeep</div></div><span class="feed">+ assessor / tax</span></div>'
+    + '<div class="p2i"><div style="flex:1"><div class="t">Insurance comparison</div><div class="d">Quotes &amp; savings by carrier</div></div><span class="feed">+ insurance</span></div>'
+    + '<div class="p2i"><div style="flex:1"><div class="t">Document vault</div><div class="d">Deed, permits, warranties</div></div><span class="feed">+ uploads</span></div></div>'
+    + '</div></div>';
+});
+
+} },
+  'comm': { nav: 'comm', html: `<div class="page" id="commPage"></div>`, init: function(){
+
+HS.onReady(async function () {
+  var zip = new URLSearchParams(HS.__search||'').get('zip') || HS.state.zip;
+  HS.state.zip = zip;
+  var page = document.getElementById('commPage');
+
+  var covered = await HS.data.isCovered(zip);
+  if (!covered) {
+    page.innerHTML = '<div class="ph"><div class="eyebrow">Communities</div><h1>' + HS.esc(zip) + ' isn\'t covered yet</h1>'
+      + '<p>We\'re not tracking this ZIP yet — request it and we\'ll email you when it goes live.</p>'
+      + '<button class="inlinebtn" style="margin-top:12px" onclick="HS.openLoc()">Request this community →</button></div>';
+    return;
+  }
+
+  var c = await HS.data.community(zip) || await HS.data.community(HS_CONFIG.DEFAULT_ZIP);
+  var home = HS.state.activeProperty;
+  var projects = await HS.data.projects(zip, home);
+  var changes = await HS.data.changes(zip, home);
+  var meetings = await HS.data.meetings(zip, home);
+  HS.shareUrlOverride = HS_CONFIG.BASE_URL + '/app/community.html?zip=' + zip;
+
+  var active = projects.filter(function(p){return p.status==='Active';});
+  var proposed = projects.filter(function(p){return p.status==='Proposed';});
+  var envChanges = changes.filter(function(x){return /environment|utilit|water/i.test(x.category);});
+  var civic = changes.filter(function(x){return /government|civic/i.test(x.category);});
+
+  page.innerHTML =
+    '<div class="ph"><div class="eyebrow">Communities</div><h1>' + HS.esc(zip) + ' · ' + HS.esc(c.name) + ', ' + HS.esc(c.state) + '</h1>'
+    + '<p>What\'s changing across your community — aggregated from the same feeds that power your alerts.</p>'
+    + '<button class="inlinebtn" style="margin-top:12px" onclick="HS.openModal(\'shareModal\')">◍ Invite your neighbors</button></div>'
+    + '<div class="strip">'
+    + HS.tpl.statTile(c.community_score, 'Community score · ↑ 8', 'g')
+    + HS.tpl.statTile(projects.length, 'Active projects', '')
+    + HS.tpl.statTile(meetings.length, 'Public meetings', 'accent')
+    + HS.tpl.statTile('<span style="font-size:19px">' + HS.esc(c.growth_pressure) + '</span>', 'Growth pressure ↑', '')
+    + '</div>'
+    + '<div class="lensnav">'
+    + '<button class="lenscard on"><span class="q">What\'s changing</span><span class="d">Live · built on existing feeds</span></button>'
+    + '<button class="lenscard" style="opacity:.55"><span class="q">🔒 Demographics</span><span class="d">Phase 1.5 · + Census (free)</span></button>'
+    + '<button class="lenscard" style="opacity:.55"><span class="q">🔒 Economy &amp; Market</span><span class="d">Phase 2 · + market data</span></button>'
+    + '</div>'
+    + '<div class="cols"><div>'
+    + '<div class="groupHead" style="margin-top:0"><span class="gd traffic"></span> Development &amp; growth <span class="gc">— ' + projects.length + ' active</span></div>'
+    + proposed.concat(active).slice(0,3).map(function(p){
+        return '<div class="card mini" style="border-left-color:' + HS.barColor(p) + ';margin-bottom:10px">'
+          + '<span class="lens">' + HS.esc(p.status) + ' · ' + HS.esc(p.dist||'') + '</span><h3>' + HS.esc(p.name) + '</h3>'
+          + '<p class="sowhat">' + HS.esc(p.sowhat||'') + '</p></div>';
+      }).join('')
+    + '<div class="groupHead"><span class="gd water"></span> Environment &amp; utilities <span class="gc">— ' + envChanges.length + ' change' + (envChanges.length===1?'':'s') + '</span></div>'
+    + envChanges.slice(0,2).map(function(ch){ return HS.tpl.miniCard(ch, ch.category); }).join('')
+    + '<div class="groupHead"><span class="gd" style="background:var(--violet)"></span> Government &amp; civic <span class="gc">— ' + meetings.length + ' upcoming</span></div>'
+    + '<div class="card mini" style="border-left-color:var(--violet)"><span class="lens">Civic</span><h3>' + HS.esc(meetings.map(function(m){return m.body;}).slice(0,2).join(' & ')) + '</h3>'
+    + '<p class="sowhat">Upcoming public meetings — development and environment items on the agendas.</p></div>'
+    + '</div><div>'
+    + '<div class="block"><h2 class="bt">Community pulse</h2>'
+    + '<div class="vital"><span class="vl">Development activity</span><span class="vv" style="color:var(--amber)">High</span></div>'
+    + '<div class="vital"><span class="vl">Environmental risk</span><span class="vv" style="color:var(--amber)">Moderate</span></div>'
+    + '<div class="vital"><span class="vl">Civic activity</span><span class="vv">' + HS.esc(c.civic_activity||'Active') + '</span></div>'
+    + '<div class="vital"><span class="vl">Value trend · 12 mo</span><span class="vv" style="color:var(--green)">+' + c.value_trend + '%</span></div></div>'
+    + '<div class="p2"><div class="p2h"><span>🔒</span> Community profile — Phase 1.5 / 2</div>'
+    + '<div class="p2sub">The "what\'s changing" view is live now; the demographic &amp; market profile activates with new feeds.</div>'
+    + '<div class="p2i"><div style="flex:1"><div class="t">Population &amp; demographics</div><div class="d">Community DNA radar, household mix</div></div><span class="feed">+ Census (free)</span></div>'
+    + '<div class="p2i"><div style="flex:1"><div class="t">Median home value &amp; market</div><div class="d">Prices, growth outlook</div></div><span class="feed">+ market data</span></div></div>'
+    + '</div></div>';
+});
+
+} },
+  'reports': { nav: 'reports', html: `
+  <div class="page">
+    <div class="ph">
+      <div class="eyebrow">Reports</div>
+      <h1>Reports</h1>
+      <p>Shareable documents generated from the intelligence already tracked for you — no new data required.</p>
+    </div>
+    <div class="rgrid">
+      <div><div class="rlist" id="repList"></div>
+        <div class="p2" style="margin-top:16px">
+          <div class="p2h"><span>🔒</span> Phase 2 report type</div>
+          <div class="p2i"><div style="flex:1"><div class="t">Cost-of-ownership report</div><div class="d">Taxes, insurance &amp; utilities forecast</div></div><span class="feed">+ tax / insurance</span></div>
+        </div>
+      </div>
+      <div class="doc" id="repDoc"></div>
+    </div>
+  </div>
+`, init: function(){
+
+HS.onReady(async function () {
+  var S = HS.state, home = S.activeProperty;
+  var c = await HS.data.community(S.zip);
+  var projects = await HS.data.projects(S.zip, home);
+  var flagship = projects.slice().sort(function(a,b){return (b.impact_score||0)-(a.impact_score||0);})[0];
+  var today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+
+  var reports = [
+    { icon:'⌂', t: (home?home.address:'Your home') + ' — Property Intelligence Report', d:'Score, nearby projects, risk & value outlook · updated today', type:'Property' },
+    { icon:'◍', t: c.zip + ' — Community Snapshot', d:'What\'s changing across ' + c.name + ' · updated today', type:'Community' },
+    { icon:'◈', t: flagship.name + ' — Impact Analysis', d:'Full project impact, timeline & recommended actions · ' + today, type:'Project' },
+    { icon:'✉', t:'Your Weekly Briefing — ' + today, d:'The changes that mattered near you this week', type:'Briefing' }
+  ];
+  document.getElementById('repList').innerHTML = reports.map(function (r) {
+    return '<div class="rrow"><div class="ricon">' + r.icon + '</div><div class="rmain"><div class="rt">' + HS.esc(r.t) + '</div>'
+      + '<div class="rd">' + HS.esc(r.d) + '</div></div><span class="rtype">' + HS.esc(r.type) + '</span></div>';
+  }).join('');
+
+  // rendered preview = flagship project impact analysis (on the fly)
+  HS.shareUrlOverride = HS_CONFIG.BASE_URL + '/app/development.html?id=' + flagship.id;
+  document.getElementById('repDoc').innerHTML =
+    '<div class="dhead"><div class="dk">Project impact analysis · preview</div><h3>' + HS.esc(flagship.name) + '</h3>'
+    + '<div class="dm">Prepared for ' + HS.esc(home?home.address:c.name) + ' · ' + HS.esc(c.city) + ', ' + HS.esc(c.state) + ' ' + HS.esc(c.zip) + ' · ' + today + '</div>'
+    + '<button class="inlinebtn" style="margin-top:14px" onclick="HS.openModal(\'shareModal\')">⤴ Share this report</button></div>'
+    + '<div class="dbody">'
+    + '<div class="dsec"><h4>Bottom line</h4><p>' + HS.esc(flagship.sowhat||'') + '</p></div>'
+    + '<div class="dsec"><h4>Impact on this property</h4><div class="impacts">' + HS.tpl.impactChips(flagship.impact_dimensions) + '</div></div>'
+    + '<div class="dsec"><h4>Recommended actions</h4><p>1 · Submit a public comment before the hearing.&nbsp;&nbsp;2 · Add the hearing to your calendar.&nbsp;&nbsp;3 · Follow the project for permit and vote updates.</p></div>'
+    + '<div class="dsec"><h4>Sources</h4><p>' + HS.esc(flagship.source_ref) + ' · HomeSignal impact model. All public records.</p></div>'
+    + '</div>';
+});
+
+} },
+  'contact': { nav: '', html: `
+  <div class="page">
+    <div class="ph">
+      <div class="eyebrow">Contact</div>
+      <h1>Get in touch</h1>
+      <p>Questions, feedback, or a community you'd like us to add? We'd love to hear from you.</p>
+    </div>
+    <div class="cols">
+      <div>
+        <div class="block">
+          <h2 class="bt">Send us a message</h2>
+          <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 16px">Email us directly at <a href="mailto:hello@homesignal.net" style="color:var(--green);font-weight:600;text-decoration:none">hello@homesignal.net</a>, or use the form below.</p>
+          <div id="contactForm" style="display:flex;flex-direction:column;gap:10px">
+            <input class="cinput" id="cName" placeholder="Your name">
+            <input class="cinput" id="cEmail" type="email" placeholder="Your email">
+            <textarea class="cinput" id="cMsg" placeholder="Your message" style="min-height:120px;resize:vertical"></textarea>
+            <button class="mbtn" style="align-self:flex-start" onclick="sendContact()">Send message</button>
+          </div>
+          <div id="contactDone" class="cnote hidden">✓ Thanks — your message is on its way. We'll reply to your email shortly.</div>
+        </div>
+      </div>
+      <div>
+        <div class="block">
+          <h2 class="bt">Other ways to reach us</h2>
+          <div class="vital"><span class="vl">Email</span><span class="vv" style="font-size:13px">hello@homesignal.net</span></div>
+          <div class="vital"><span class="vl">Request a community</span><span class="vv" style="font-size:13px"><a href="#" onclick="HS.openLoc();return false" style="color:var(--green);text-decoration:none">Add your ZIP →</a></span></div>
+          <div class="vital"><span class="vl">Follow</span><span class="vv" style="font-size:13px">Bluesky · Reddit</span></div>
+        </div>
+        <div class="block">
+          <h2 class="bt">Neutral · sourced · non-partisan</h2>
+          <p style="font-size:13px;color:var(--ink-2);margin:0">Everything HomeSignal shows is drawn from public records. We don't take positions — we help you see what's changing and decide for yourself.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+`, init: function(){
+
+async function sendContact() {
+  var el = document.getElementById('cEmail');
+  if (!el.value.trim() || el.value.indexOf('@') < 1) { el.style.borderColor='#c23b34'; el.focus(); return; }
+  var row = { name: document.getElementById('cName').value.trim(), email: el.value.trim(), message: document.getElementById('cMsg').value.trim() };
+  if (HS_CONFIG.DATA_SOURCE === 'supabase' && window.supabase) {
+    try { await HS.sb().from('contact_messages').insert(row); } catch (e) { console.warn(e); }
+  }
+  document.getElementById('contactForm').classList.add('hidden');
+  document.getElementById('contactDone').classList.remove('hidden');
+}
+
+window.sendContact=sendContact;
+} },
+  'privacy': { nav: '', html: `
+  <div class="page">
+    <div class="ph">
+      <div class="eyebrow">Privacy</div>
+      <h1>Privacy &amp; Terms</h1>
+      <p>Last updated July 2026. In plain language: we never sell your personal information, the intelligence comes from public records, and you control what you follow.</p>
+    </div>
+    <div class="block prose" style="max-width:840px">
+      <div class="cnote"><b>The short version:</b> we never sell your personal information. The intelligence we show comes from public government records — not from tracking you. You choose which topics and locations you follow, and you can update your preferences or unsubscribe at any time.</div>
+
+      <h2 class="bt">What we collect</h2>
+      <ul>
+        <li><b>Account information</b> — your email, and optionally your name, so you can save communities and receive alerts.</li>
+        <li><b>Your preferences</b> — the ZIP codes, properties, and topics you choose to follow.</li>
+        <li><b>Public records</b> — permits, hearings, agendas, environmental and infrastructure filings. Public data about places, not private data about you.</li>
+        <li><b>Basic usage data</b> — privacy-respecting analytics to keep the product reliable.</li>
+      </ul>
+
+      <h2 class="bt">How we use it</h2>
+      <p>We use your email and preferences to deliver the alerts and briefings you asked for, save your communities, and notify you about availability (new areas or Premium). Aggregate usage data helps us improve accuracy.</p>
+
+      <h2 class="bt">What we never do</h2>
+      <p>We do not sell your personal contact information, and we do not share your identity with advertisers. Alerts are based on where you choose to look — not on a hidden profile of you.</p>
+
+      <h2 class="bt">Optional anonymized insights</h2>
+      <p>When you opt in (the checkbox on the topic picker), HomeSignal may share <b>anonymized, aggregated</b> information about the topics and locations people follow — for example, "interest in data-center development rose in this county." No personal contact information is ever included, and it's off unless you choose it. Change it any time in your alert settings.</p>
+
+      <h2 class="bt">Your choices &amp; controls</h2>
+      <ul>
+        <li>Change the topics and communities you follow at any time.</li>
+        <li>Unsubscribe from any alert email with one click.</li>
+      </ul>
+
+      <h2 class="bt">Contact</h2>
+      <p>Questions about privacy? Email <a href="mailto:hello@homesignal.net">hello@homesignal.net</a> or use the <a href="contact.html">contact page</a>.</p>
+
+      <div class="divider"></div>
+
+      <h2 class="bt" id="terms" style="font-size:18px">Terms of Use</h2>
+      <p>HomeSignal provides intelligence about your community for informational purposes. We source from authoritative public records and present them accurately, but HomeSignal is not legal, financial, or real-estate advice — verify anything you plan to act on with the relevant authority or a qualified professional.</p>
+      <p><b>Acceptable use.</b> Use HomeSignal for your own personal, non-commercial purpose of understanding and participating in your community. Don't scrape, resell, or misrepresent our intelligence, or use it to harass others.</p>
+      <p><b>Accuracy &amp; availability.</b> Public records can be incomplete, delayed, or amended. We show confidence and sources so you can judge for yourself, but can't guarantee every record is complete or current. The service is provided "as is," and features may change as the product evolves.</p>
+    </div>
+  </div>
+`, init: function(){
+
+} }
+};
+Object.defineProperty(HS, 'nav', { configurable:true, set:function(u){ HS.route(u); } });
+HS.route = function(u){
+  if(!u) return;
+  if(/^(https?:|mailto:|data:|blob:)/i.test(u)){ window.open(u,'_blank','noopener'); return; }
+  var parts = String(u).split('?'); var file = parts[0].split('/').pop();
+  HS.__search = parts[1] ? ('?'+parts[1]) : '';
+  var M = {'index.html':'home','':'home','today.html':'today','dashboard.html':'dash',
+    'alerts.html':'alerts','development.html':'dev','maps.html':'maps','properties.html':'props',
+    'property.html':'prop','community.html':'comm','reports.html':'reports',
+    'contact.html':'contact','privacy.html':'privacy'};
+  HS.showPage(M[file] || 'home');
+};
+HS.showPage = function(name){
+  var p = HS.pages[name] || HS.pages.home;
+  var slot = document.getElementById('hs-slot'); if(!slot) return;
+  slot.innerHTML = p.html;
+  document.querySelectorAll('.nav a').forEach(function(a){ a.classList.remove('on'); });
+  if(p.nav){ var a = document.querySelector('.nav a[data-nav="'+p.nav+'"]'); if(a) a.classList.add('on'); }
+  window.scrollTo(0,0);
+  try { p.init(); } catch(e){ console.error('page init', name, e); }
+};
+document.addEventListener('click', function(e){
+  var a = e.target.closest && e.target.closest('a[href]'); if(!a) return;
+  var h = a.getAttribute('href');
+  if(h && /\.html(\?|$)/.test(h)){ e.preventDefault(); HS.route(h); }
+});
+HS.onReady(function(){ HS.route('index.html'); });
+
+</script>
