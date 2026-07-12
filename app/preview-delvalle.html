@@ -460,6 +460,13 @@
   .hero h1{font-size:30px}
 }
 
+/* app-only: transient toast for honest "not built yet" feedback (no dead clicks) */
+.hs-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);
+  background:#10231a;color:#eaf3ee;font-size:13px;font-weight:600;padding:11px 17px;border-radius:11px;
+  box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;
+  z-index:200;max-width:90vw;text-align:center}
+.hs-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
 </style>
 <div id="hs-preview-note" class="hs-preview-ribbon">Preview · <b>Del Valle, TX 78617</b> · seed data · staged under /app (live site untouched)</div>
 <script>
@@ -1357,6 +1364,14 @@ window.HS_SEED = (function () {
     const b = $('copyBtn'); if (b) { b.textContent = 'Copied ✓'; setTimeout(() => (b.textContent = 'Copy'), 1800); }
   };
 
+  // -------------------------------------------------- toast -------------------
+  HS.toast = function (msg) {
+    let t = $('hs-toast');
+    if (!t) { t = document.createElement('div'); t.id = 'hs-toast'; t.className = 'hs-toast'; document.body.appendChild(t); }
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2800);
+  };
+
   // -------------------------------------------------- search ------------------
   async function wireSearch() {
     const input = $('hs-search'), box = $('hs-search-results');
@@ -2078,8 +2093,8 @@ HS.addToCalendar = async function (projectId) {
     <div class="toolbar">
       <div class="seg" id="mapMode">
         <button class="on" data-mode="impact">Impact</button>
-        <button data-mode="sat" disabled title="Available with live map provider">Satellite</button>
-        <button data-mode="street" disabled title="Available with live map provider">Street</button>
+        <button data-mode="sat" title="Available with a live map provider">Satellite</button>
+        <button data-mode="street" title="Available with a live map provider">Street</button>
       </div>
       <div class="sp"></div>
       <button class="fpill" id="radiusPill">◉ Impact radius: 1.5 mi ▾</button>
@@ -2157,6 +2172,14 @@ HS.onReady(async function () {
     ri = (ri + 1) % radii.length; opts.radiusMi = radii[ri];
     this.textContent = '◉ Impact radius: ' + opts.radiusMi + ' mi ▾'; draw();
   };
+
+  // Satellite / Street: not built in Phase 1 (needs a live tile provider). Give an
+  // honest, visible response on click instead of a silent disabled button.
+  document.getElementById('mapMode').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-mode]'); if (!btn) return;
+    if (btn.dataset.mode === 'impact') return;
+    HS.toast('Satellite & Street views arrive with a live map provider — Impact view is live now.');
+  });
 });
 
 } },
@@ -2409,8 +2432,15 @@ HS.onReady(async function () {
         <div class="block">
           <h2 class="bt">Other ways to reach us</h2>
           <div class="vital"><span class="vl">Email</span><span class="vv" style="font-size:13px">hello@homesignal.net</span></div>
-          <div class="vital"><span class="vl">Request a community</span><span class="vv" style="font-size:13px"><a href="#" onclick="HS.openLoc();return false" style="color:var(--green);text-decoration:none">Add your ZIP →</a></span></div>
-          <div class="vital"><span class="vl">Follow</span><span class="vv" style="font-size:13px">Bluesky · Reddit</span></div>
+          <div class="vital"><span class="vl">Follow</span><span class="vv" style="display:inline-flex;gap:8px;align-items:center">
+            <a href="https://bsky.app/profile/homesignal-tracker.bsky.social" target="_blank" rel="noopener" aria-label="HomeSignal on Bluesky" title="Bluesky" style="display:inline-flex;width:30px;height:30px;border-radius:50%;background:#1185fe;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="16" height="16" fill="#fff" aria-hidden="true"><path d="M5.5 4.3c2.4 1.8 5 5.5 6 7.5 1-2 3.6-5.7 6-7.5 1.7-1.3 4.5-2.3 4.5.9 0 .6-.4 5.2-.6 6-.7 2.6-3.3 3.2-5.7 2.8 4.1.7 5.2 3 2.9 5.3-4.3 4.4-6.2-1.1-6.7-2.5-.1-.3-.2-.5-.2-.3 0-.2-.1.1-.2 2.5-.5 1.4-2.4 6.9-6.7 2.5-2.3-2.3-1.2-4.6 2.9-5.3-2.4.4-5-.2-5.7-2.8C1.4 10.4 1 5.8 1 5.2c0-3.2 2.8-2.2 4.5-.9z"/></svg></a>
+            <a href="https://www.reddit.com/user/HomeSignalnet" target="_blank" rel="noopener" aria-label="HomeSignal on Reddit" title="Reddit" style="display:inline-flex;width:30px;height:30px;border-radius:50%;background:#ff4500;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="16" height="16" fill="#fff" aria-hidden="true"><path d="M22 12a2.04 2.04 0 0 0-3.46-1.46 10 10 0 0 0-5.27-1.67l.9-4.23 2.94.62a1.5 1.5 0 1 0 .16-1l-3.28-.7a.5.5 0 0 0-.59.38l-1 4.7a10 10 0 0 0-5.34 1.66 2.04 2.04 0 1 0-2.2 3.36c-.03.21-.05.43-.05.65 0 3.31 3.58 6 8 6s8-2.69 8-6c0-.22-.02-.44-.05-.65A2.04 2.04 0 0 0 22 12zM7 13.5a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0zm8.1 4.2c-.86.86-2.6.93-3.1.93-.5 0-2.24-.07-3.1-.93a.34.34 0 0 1 .48-.48c.54.54 1.7.73 2.62.73.92 0 2.08-.19 2.62-.73a.34.34 0 0 1 .48.48zM15.5 15a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg></a>
+          </span></div>
+        </div>
+        <div class="block">
+          <h2 class="bt">Request a community</h2>
+          <p style="font-size:13px;color:var(--ink-2);margin:0 0 13px">Don't see your area yet? Add your ZIP and we'll notify you the moment HomeSignal goes live there.</p>
+          <button class="inlinebtn" onclick="HS.openLoc()">◉ Add your ZIP →</button>
         </div>
         <div class="block">
           <h2 class="bt">Neutral · sourced · non-partisan</h2>

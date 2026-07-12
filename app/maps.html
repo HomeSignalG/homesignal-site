@@ -18,8 +18,8 @@
     <div class="toolbar">
       <div class="seg" id="mapMode">
         <button class="on" data-mode="impact">Impact</button>
-        <button data-mode="sat" disabled title="Available with live map provider">Satellite</button>
-        <button data-mode="street" disabled title="Available with live map provider">Street</button>
+        <button data-mode="sat" title="Available with a live map provider">Satellite</button>
+        <button data-mode="street" title="Available with a live map provider">Street</button>
       </div>
       <div class="sp"></div>
       <button class="fpill" id="radiusPill">◉ Impact radius: 1.5 mi ▾</button>
@@ -105,6 +105,14 @@ HS.onReady(async function () {
     ri = (ri + 1) % radii.length; opts.radiusMi = radii[ri];
     this.textContent = '◉ Impact radius: ' + opts.radiusMi + ' mi ▾'; draw();
   };
+
+  // Satellite / Street: not built in Phase 1 (needs a live tile provider). Give an
+  // honest, visible response on click instead of a silent disabled button.
+  document.getElementById('mapMode').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-mode]'); if (!btn) return;
+    if (btn.dataset.mode === 'impact') return;
+    HS.toast('Satellite & Street views arrive with a live map provider — Impact view is live now.');
+  });
 });
 </script>
 </body>

@@ -257,6 +257,14 @@
     const b = $('copyBtn'); if (b) { b.textContent = 'Copied ✓'; setTimeout(() => (b.textContent = 'Copy'), 1800); }
   };
 
+  // -------------------------------------------------- toast -------------------
+  HS.toast = function (msg) {
+    let t = $('hs-toast');
+    if (!t) { t = document.createElement('div'); t.id = 'hs-toast'; t.className = 'hs-toast'; document.body.appendChild(t); }
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2800);
+  };
+
   // -------------------------------------------------- search ------------------
   async function wireSearch() {
     const input = $('hs-search'), box = $('hs-search-results');

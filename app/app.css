@@ -456,3 +456,10 @@
   .top .loc{max-width:44vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
   .hero h1{font-size:30px}
 }
+
+/* app-only: transient toast for honest "not built yet" feedback (no dead clicks) */
+.hs-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);
+  background:#10231a;color:#eaf3ee;font-size:13px;font-weight:600;padding:11px 17px;border-radius:11px;
+  box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;
+  z-index:200;max-width:90vw;text-align:center}
+.hs-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
