@@ -104,7 +104,7 @@ document.addEventListener('click', function(e){
 });
 HS.onReady(function(){ HS.route('index.html'); });
 """
-router = ROUTER.replace("SHELL_HTML_PLACEHOLDER", "`" + js_backtick(shell_html) + "`") \
+router = ROUTER.replace("SHELL_HTML_PLACEHOLDER", "`" + js_backtick(rewrite_nav(shell_html)) + "`") \
                .replace("PAGE_DEFS", page_defs)
 
 banner = ("<!-- HomeSignal Del Valle preview — GENERATED single-file bundle of /app. "
