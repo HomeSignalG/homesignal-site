@@ -434,6 +434,32 @@
 .hs-preview-ribbon b{color:#8fd0ab}
 .hs-approx{font-size:10.5px;color:var(--amber);background:var(--amber-tint);border-radius:5px;padding:1px 6px;margin-left:6px;font-weight:700;white-space:nowrap}
 
+/* ============================================================================
+   APP-ONLY responsive fixes (NOT in the mockup) — HomeSignal is a website used
+   on computer AND phone, so every two-column grid stacks on small screens.
+   Additive only; does not alter any mockup component rule above. */
+@media (max-width: 900px){
+  .cols{grid-template-columns:1fr}
+  .mapcols{grid-template-columns:1fr}
+  .rgrid{grid-template-columns:1fr}
+  .propgrid{grid-template-columns:1fr}
+  .mapcols .mapwrap{order:1}
+  .mapcols .pinlist{order:2}
+  .tcats{grid-template-columns:1fr 1fr}
+}
+@media (max-width: 620px){
+  .tcats{grid-template-columns:1fr}
+  .riskgrid{grid-template-columns:1fr}
+  .sharegrid{grid-template-columns:repeat(3,1fr)}
+  .strip .stat{min-width:calc(50% - 7px)}
+  .page{padding:20px 16px 48px}
+  /* top bar: let the search shrink gracefully instead of clipping to "Se" */
+  .top{gap:8px;padding:11px 14px}
+  .top .search{min-width:0}
+  .top .loc{max-width:44vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .hero h1{font-size:30px}
+}
+
 </style>
 <div id="hs-preview-note" class="hs-preview-ribbon">Preview · <b>Del Valle, TX 78617</b> · seed data · staged under /app (live site untouched)</div>
 <script>
