@@ -95,11 +95,35 @@ async function main() {
           || document.querySelector('#map .leaflet-container, #map canvas');
       }, { timeout: 15000 });
 
-      const st = await page.evaluate(() => ({
-        rendered: Array.isArray(window.__HS_SITES) ? window.__HS_SITES : null,
-        facText: (document.getElementById('cFac') || {}).textContent || null,
-        mapInited: !!document.querySelector('#map .leaflet-container, #map canvas'),
-      }));
+      const st = await page.evaluate(() => {
+        const sites = Array.isArray(window.__HS_SITES) ? window.__HS_SITES : null;
+        // LABEL↔COLOUR AGREEMENT (regression guard for the 12,000-page mislabel): the label a
+        // resident reads and the dot's colour must both derive from the record's lifecycle stage.
+        // Compute both in-page and flag any development point where they disagree — e.g. an orange
+        // "proposed" dot whose subheader says "operating now", or a green recorded subdivision
+        // labelled "Permitted construction". Falls back to no-op if the page didn't expose the hook.
+        const OK = { built: ['operating now', 'built', 'recorded'], approved: ['approved'], proposed: ['proposed'] };
+        const mislabeled = [];
+        if (sites && typeof window.__HS_KIND === 'function' && window.__HS_COLORS) {
+          for (const s of sites) {
+            if (!s || s.relevance !== 'development' || s.scope !== 'point') continue;
+            const kind = String(window.__HS_KIND(s) || '').toLowerCase();
+            const colorBucket = s.type === 'built' ? 'built' : (s.type === 'approved' ? 'approved' : 'proposed');
+            const allow = OK[colorBucket] || [];
+            if (!allow.some((w) => kind.includes(w))) mislabeled.push(`${s.label || '??'} [${s.type}]→"${window.__HS_KIND(s)}"`);
+          }
+        }
+        return {
+          rendered: sites,
+          facText: (document.getElementById('cFac') || {}).textContent || null,
+          mapInited: !!document.querySelector('#map .leaflet-container, #map canvas'),
+          mislabeled,
+        };
+      });
+      if (st.mislabeled && st.mislabeled.length) {
+        fails.push(`ZIP ${zip}: ${st.mislabeled.length} record(s) whose label contradicts its dot colour ` +
+          `[${st.mislabeled.slice(0, 3).join(', ')}] (stage/colour must agree)`);
+      }
 
       if (!st.mapInited) {
         fails.push(`ZIP ${zip}: map did not initialize`);
