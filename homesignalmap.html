@@ -615,6 +615,31 @@
   var HOME_SVG = "<svg width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='#fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z'/><path d='M9.5 20.5v-6h5v6'/></svg>";
   function homePinEl(){ var el=document.createElement("div"); el.className="homepin"; el.innerHTML=HOME_SVG; return el; }
   function bucketOf(t){ return t==="built" ? "built" : (t==="approved" ? "approved" : "proposed"); }
+  // ───────────────────── LIFECYCLE STAGE LABEL — the ONE source of truth for a record's words ──────────
+  // A record's resident-facing stage MUST come from the SAME signal that colours its dot, or the two
+  // disagree (the 12,000-page bug: an orange "proposed" dot whose popup read "operating now", and a
+  // green recorded subdivision whose popup read "Permitted construction"). The old code labelled a
+  // POINT by asking "is it an EPA FRS facility?" and, if not, hardcoded "Permitted construction" —
+  // correct only back when the sole non-FRS points were TABS building permits. Socrata (and every
+  // future ArcGIS/federal) source emits points across proposed/approved/operating, so that fallback
+  // mislabelled all of them. Fix: derive the word from the lifecycle stage, source-agnostically.
+  //   • s.bucket is the engine's PRECISE stage (the connectors stamp proposed|approved|operating);
+  //     when absent (EPA facilities, area notices, TABS, pre-connector cache rows) fall back to the
+  //     coarse page bucket bucketOf(s.type) — the exact field COLORS keys on, so word ≡ colour.
+  //   • An EPA FRS facility is the one physical-facility case; callers short-circuit on frsRid()
+  //     BEFORE stageWord (facilityType names the kind, popupHTML says "Facility · operating now").
+  var STAGE_WORD = { proposed:"Proposed / hearing", approved:"Approved / permitted",
+                     operating:"Recorded / operating", built:"Built / operating" };
+  function stageOf(s){ return (s && typeof s.bucket==="string" && s.bucket) ? s.bucket : bucketOf(s && s.type); }
+  function stageWord(s){ return STAGE_WORD[stageOf(s)] || "Official record"; }
+  // The one popup/subheader label for any record. EPA FRS facility → the physical-facility line;
+  // everything else → its lifecycle stage. Named + exposed (window.__HS_KIND) so verify-development
+  // can assert, live, that the label a resident sees agrees with the dot's colour — the regression
+  // guard for the class of bug where the two were computed from different signals.
+  function kindLabel(s){ return (frsRid(s) !== "") ? "Facility · operating now" : stageWord(s); }
+  // The jurisdiction/source line shown under a record. Socrata rows carry no s.src but do carry a
+  // s.jurisdiction ("City of Austin"); fall back to it so the line is never blank (page-only, no re-cache).
+  function srcLabel(s){ return (s && (s.src || s.jurisdiction)) || ""; }
   // Facilities (scope "point") pin at their exact EPA-registered coordinates. Development
   // notices (scope "area") are jurisdiction-level — county/city-wide, no street address —
   // and the engine's raw lat/lng on them can't be trusted (its place lookup only knows Box
@@ -716,8 +741,10 @@
   function frsRid(s){ return (s && s.registry_id!=null) ? String(s.registry_id).trim() : ""; }
   // Friendly, plain-language building type from the facility name (falls back to its layer).
   function facilityType(s){
-    // A scope:"point" record with no FRS registry ID is a permit/filing, not an EPA facility.
-    if(!frsRid(s)) return "Permitted construction";
+    // A scope:"point" record with no FRS registry ID is a planning/permit filing, not an EPA
+    // facility — label it by its lifecycle STAGE (proposed/approved/operating/built), never by a
+    // hardcoded "Permitted construction" (that was true only for the old TABS-only point set).
+    if(!frsRid(s)) return stageWord(s);
     var n = String(s.label||"").toLowerCase();
     if(/data cent/.test(n)) return "Data center";
     if(/aggregate|gravel|\bsand\b|quarry|\bpit\b/.test(n)) return "Aggregate / gravel";
@@ -863,8 +890,7 @@
   // shared envTag helper), honest lifecycle + jurisdiction-wide framing for area notices.
   function kind3(s){
     return s.scope==="point" ? (facilityType(s) + envTag(s))
-      : (bucketOf(s.type)==="approved" ? "Approved / permitted · jurisdiction-wide"
-                                       : "Proposed / hearing · jurisdiction-wide");
+      : (stageWord(s) + " · jurisdiction-wide");
   }
   // Detailed, persistent info card shown when a 3D building is CLICKED (links are clickable).
   // Environmental records render through the shared helpers: every interpreted signal (colored by
@@ -1113,6 +1139,9 @@
     // Anti-fabrication gate + expose the rendered set for scripts/verify-development.mjs.
     var sites = (data.sites || []).filter(sourced);
     window.__HS_SITES = sites;
+    // Expose the label backbone so the verifier can assert, live, that the resident-facing label
+    // agrees with the dot's colour (both derive from the lifecycle stage — see kindLabel/stageOf).
+    window.__HS_KIND = kindLabel; window.__HS_STAGE = stageOf; window.__HS_COLORS = COLORS;
 
     // Point-scope DEVELOPMENT records (state permit filings, e.g. TX TDLR/TABS — they carry
     // a project_no) are not EPA facilities: they bucket into the Operating/Approved/Proposed
@@ -1382,7 +1411,6 @@
     // the list view uses (listInto) to route to our internal property page.
     var pkey = s.canonical_addr || s.location_addr;
     if(pkey){ a += " · <a href='"+esc(propertyHref(pkey))+"'>View address page →</a>"; }
-    var isFRS = frsRid(s) !== "";
     // ENVIRONMENTAL RECORDS — the shared helper. Every interpreted signal (colored by severity),
     // the official ECHO + TCEQ drill-down links, and the geo_matched honesty note. Keyed on the
     // FRS id / TCEQ RN via hasEnvRecord — never on scope, so a permit never inherits an env line.
@@ -1395,11 +1423,11 @@
       if(lk) envHtml += "<div style='margin-top:2px'>"+lk+"</div>";
       envHtml += "<div style='margin-top:3px;font-size:11px;color:#5d6f72'>"+esc(ENV_MATCH_NOTE)+"</div></div>";
     }
-    // A scope:"point" record with no FRS registry ID is a permit/filing, not an EPA facility —
-    // label it honestly so the dot's subheader doesn't read "Facility · operating now".
-    var kind = s.scope==="point"
-             ? (isFRS ? "Facility · operating now" : "Permitted construction")
-             : (bucketOf(s.type)==="approved" ? "Approved / permitted" : "Proposed / hearing");
+    // Label by lifecycle STAGE, not by source class (kindLabel): an EPA FRS facility is the one
+    // physical-facility case ("operating now"); every other record — point or area, TABS/Socrata/
+    // PMN/future source — reads its true stage, so the subheader can never contradict the dot's
+    // colour (the old "any non-FRS point == Permitted construction" mislabelled proposed & operating).
+    var kind = kindLabel(s);
     // Real straight-line distance from the home (e/n are miles East/North of the home).
     var dist = (typeof s.e==="number" && typeof s.n==="number") ? Math.hypot(s.e, s.n) : null;
     var distStr = (s.scope==="point" && dist!=null && !ZIP_MODE)
@@ -1415,7 +1443,7 @@
       ? "<div style='margin-top:4px;font-size:11px;color:#5d6f72'>One of "+s._fan+" records at this exact location — markers spread slightly so each is clickable.</div>"
       : "";
     return "<div class='pt'>"+esc(s.label)+"</div><div class='pk'>"+kind+distStr+"</div>"+
-      "<div style='margin-top:4px'>"+esc(s.src||"")+a+"</div>"+envHtml+approxNote+fanNote;
+      "<div style='margin-top:4px'>"+esc(srcLabel(s))+a+"</div>"+envHtml+approxNote+fanNote;
   }
 
   function listInto(id, items, emptyMsg, opts){
@@ -1454,7 +1482,7 @@
       var dstr = (dm!=null && dm>=0.1) ? " · "+(Math.round(dm*10)/10)+" mi away" : "";
       return "<div class='rec'><span class='dot' style='background:"+col+"'></span>"+
         "<div style='flex:1'><div class='t'>"+esc(s.label)+"</div>"+
-        "<div class='s'>"+esc(tag)+dstr+when+decidedTag+" · "+esc(s.src||"")+a+"</div>"+v+"</div></div>";
+        "<div class='s'>"+esc(tag)+dstr+when+decidedTag+" · "+esc(srcLabel(s))+a+"</div>"+v+"</div></div>";
     }).join("");
   }
 
