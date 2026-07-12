@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>HomeSignal — Community</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
 <link rel="stylesheet" href="app.css">
@@ -22,15 +23,26 @@ HS.onReady(async function () {
   HS.state.zip = zip;
   var page = document.getElementById('commPage');
 
-  var covered = await HS.data.isCovered(zip);
-  if (!covered) {
+  // DATA-QUALITY GATE: only render the full page when the ZIP has real, sourced data.
+  var status = await HS.data.coverageStatus(zip);   // 'pass' | 'coverage_coming' | null
+  var meta = status ? await HS.data.community(zip) : null;
+  if (!status) {
     page.innerHTML = '<div class="ph"><div class="eyebrow">Communities</div><h1>' + HS.esc(zip) + ' isn\'t covered yet</h1>'
       + '<p>We\'re not tracking this ZIP yet — request it and we\'ll email you when it goes live.</p>'
       + '<button class="inlinebtn" style="margin-top:12px" onclick="HS.openLoc()">Request this community →</button></div>';
     return;
   }
+  if (status !== 'pass') {
+    page.innerHTML = '<div class="ph"><div class="eyebrow">Communities</div><h1>' + HS.esc(zip) + (meta && meta.name ? ' · ' + HS.esc(meta.name) : '') + ', ' + HS.esc((meta&&meta.state)||'TX') + '</h1>'
+      + '<p>Coverage for this ZIP is being wired. We show a community only when it has real, sourced records — no placeholder cards. '
+      + 'The government meetings and permit feeds for this area are on the way.</p></div>'
+      + '<div class="quiet" style="margin-top:6px"><b>Coverage coming.</b> We never show made-up activity. When Travis County meeting and permit feeds are wired for '
+      + HS.esc(zip) + ', this page fills with real records — each linked to its official source.'
+      + '<div style="margin-top:12px"><button class="inlinebtn" onclick="HS.openLoc()">◉ Notify me when it\'s live →</button></div></div>';
+    return;
+  }
 
-  var c = await HS.data.community(zip) || await HS.data.community(HS_CONFIG.DEFAULT_ZIP);
+  var c = meta || await HS.data.community(HS_CONFIG.DEFAULT_ZIP);
   var home = HS.state.activeProperty;
   var projects = await HS.data.projects(zip, home);
   var changes = await HS.data.changes(zip, home);
@@ -47,7 +59,7 @@ HS.onReady(async function () {
     + '<p>What\'s changing across your community — aggregated from the same feeds that power your alerts.</p>'
     + '<button class="inlinebtn" style="margin-top:12px" onclick="HS.openModal(\'shareModal\')">◍ Invite your neighbors</button></div>'
     + '<div class="strip">'
-    + HS.tpl.statTile(c.community_score, 'Community score · ↑ 8', 'g')
+    + HS.tpl.statTile(c.community_score, 'Community score', 'g')
     + HS.tpl.statTile(projects.length, 'Active projects', '')
     + HS.tpl.statTile(meetings.length, 'Public meetings', 'accent')
     + HS.tpl.statTile('<span style="font-size:19px">' + HS.esc(c.growth_pressure) + '</span>', 'Growth pressure ↑', '')
@@ -74,7 +86,7 @@ HS.onReady(async function () {
     + '<div class="vital"><span class="vl">Development activity</span><span class="vv" style="color:var(--amber)">High</span></div>'
     + '<div class="vital"><span class="vl">Environmental risk</span><span class="vv" style="color:var(--amber)">Moderate</span></div>'
     + '<div class="vital"><span class="vl">Civic activity</span><span class="vv">' + HS.esc(c.civic_activity||'Active') + '</span></div>'
-    + '<div class="vital"><span class="vl">Value trend · 12 mo</span><span class="vv" style="color:var(--green)">+' + c.value_trend + '%</span></div></div>'
+    + '<div class="vital"><span class="vl">Value trend · 12 mo</span><span class="vv" style="color:var(--green)">' + HS.trend(c.value_trend) + '</span></div></div>'
     + '<div class="p2"><div class="p2h"><span>🔒</span> Community profile — Phase 1.5 / 2</div>'
     + '<div class="p2sub">The "what\'s changing" view is live now; the demographic &amp; market profile activates with new feeds.</div>'
     + '<div class="p2i"><div style="flex:1"><div class="t">Population &amp; demographics</div><div class="d">Community DNA radar, household mix</div></div><span class="feed">+ Census (free)</span></div>'

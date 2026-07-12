@@ -6,9 +6,10 @@ window.HS_CONFIG = {
   SUPABASE_URL: 'https://qwnnmljucajnexpxdgxr.supabase.co',
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U',
 
-  // Data source: 'seed' runs the whole app with zero DB (the review/prototype path);
-  // 'supabase' reads the live project. Overridable at runtime with ?data=seed|supabase.
-  DATA_SOURCE: 'seed',
+  // Data source: 'supabase' reads the live project (REAL app_* data, RLS-gated) — this is
+  // what /app/ serves. 'seed' runs with zero DB (the single-file artifact preview forces it).
+  // Overridable at runtime with ?data=seed|supabase.
+  DATA_SOURCE: 'supabase',
 
   // Local-dev only: pretend a demo user is signed in so authed screens render.
   // On the real site this is false and the existing Supabase session is used.
