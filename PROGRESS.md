@@ -20,3 +20,18 @@ Staged under `app/` (live root pages byte-for-byte untouched until promotion). R
 
 ## Verify
 `python3 -m http.server 8099` then open `/app/index.html`. Playwright check: `/tmp/hs-verify.cjs`.
+
+## Update — all 12 pages built & verified (seed mode)
+Built: today, dashboard, alerts, development(+detail), maps, properties, property(+detail),
+community(?zip=), reports, contact, privacy — plus lib/map.js (schematic MapProvider seam).
+Playwright pass: all 13 routes render with the shared shell, 0 JS errors, real Del Valle data,
+computed distances. Screenshots in /tmp/hs-shots match the mockup (alerts, maps, dev-detail
+eyeballed). Interactive: topic picker (consent default unchecked), property switcher, coverage
+modal, premium/community-request/contact persistence seam, follows, share intents, .ics calendar,
+search, sort segments, dev lenses + data view, map layer toggles + radius.
+
+## Still to do
+- Supabase migrations (additive) + RLS policies (docs/*.sql) + apply.
+- Python pipeline in homesignal-ingest (Connector/SourceAdapter/Scorer, run_community.py).
+- README (setup, Del Valle, run pipeline for another ZIP, auth, provider swaps).
+- E2E assertions; 390px screenshot pass for all pages.

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeSignal — Reports</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-nav="reports">
+<template id="hs-content">
+  <div class="page">
+    <div class="ph">
+      <div class="eyebrow">Reports</div>
+      <h1>Reports</h1>
+      <p>Shareable documents generated from the intelligence already tracked for you — no new data required.</p>
+    </div>
+    <div class="rgrid">
+      <div><div class="rlist" id="repList"></div>
+        <div class="p2" style="margin-top:16px">
+          <div class="p2h"><span>🔒</span> Phase 2 report type</div>
+          <div class="p2i"><div style="flex:1"><div class="t">Cost-of-ownership report</div><div class="d">Taxes, insurance &amp; utilities forecast</div></div><span class="feed">+ tax / insurance</span></div>
+        </div>
+      </div>
+      <div class="doc" id="repDoc"></div>
+    </div>
+  </div>
+</template>
+
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="lib/data.js"></script>
+<script src="lib/templates.js"></script>
+<script src="shell.js"></script>
+<script>
+HS.onReady(async function () {
+  var S = HS.state, home = S.activeProperty;
+  var c = await HS.data.community(S.zip);
+  var projects = await HS.data.projects(S.zip, home);
+  var flagship = projects.slice().sort(function(a,b){return (b.impact_score||0)-(a.impact_score||0);})[0];
+  var today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+
+  var reports = [
+    { icon:'⌂', t: (home?home.address:'Your home') + ' — Property Intelligence Report', d:'Score, nearby projects, risk & value outlook · updated today', type:'Property' },
+    { icon:'◍', t: c.zip + ' — Community Snapshot', d:'What\'s changing across ' + c.name + ' · updated today', type:'Community' },
+    { icon:'◈', t: flagship.name + ' — Impact Analysis', d:'Full project impact, timeline & recommended actions · ' + today, type:'Project' },
+    { icon:'✉', t:'Your Weekly Briefing — ' + today, d:'The changes that mattered near you this week', type:'Briefing' }
+  ];
+  document.getElementById('repList').innerHTML = reports.map(function (r) {
+    return '<div class="rrow"><div class="ricon">' + r.icon + '</div><div class="rmain"><div class="rt">' + HS.esc(r.t) + '</div>'
+      + '<div class="rd">' + HS.esc(r.d) + '</div></div><span class="rtype">' + HS.esc(r.type) + '</span></div>';
+  }).join('');
+
+  // rendered preview = flagship project impact analysis (on the fly)
+  HS.shareUrlOverride = HS_CONFIG.BASE_URL + '/app/development.html?id=' + flagship.id;
+  document.getElementById('repDoc').innerHTML =
+    '<div class="dhead"><div class="dk">Project impact analysis · preview</div><h3>' + HS.esc(flagship.name) + '</h3>'
+    + '<div class="dm">Prepared for ' + HS.esc(home?home.address:c.name) + ' · ' + HS.esc(c.city) + ', ' + HS.esc(c.state) + ' ' + HS.esc(c.zip) + ' · ' + today + '</div>'
+    + '<button class="inlinebtn" style="margin-top:14px" onclick="HS.openModal(\'shareModal\')">⤴ Share this report</button></div>'
+    + '<div class="dbody">'
+    + '<div class="dsec"><h4>Bottom line</h4><p>' + HS.esc(flagship.sowhat||'') + '</p></div>'
+    + '<div class="dsec"><h4>Impact on this property</h4><div class="impacts">' + HS.tpl.impactChips(flagship.impact_dimensions) + '</div></div>'
+    + '<div class="dsec"><h4>Recommended actions</h4><p>1 · Submit a public comment before the hearing.&nbsp;&nbsp;2 · Add the hearing to your calendar.&nbsp;&nbsp;3 · Follow the project for permit and vote updates.</p></div>'
+    + '<div class="dsec"><h4>Sources</h4><p>' + HS.esc(flagship.source_ref) + ' · HomeSignal impact model. All public records.</p></div>'
+    + '</div>';
+});
+</script>
+</body>
+</html>

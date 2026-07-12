@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeSignal — Contact</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-nav="">
+<template id="hs-content">
+  <div class="page">
+    <div class="ph">
+      <div class="eyebrow">Contact</div>
+      <h1>Get in touch</h1>
+      <p>Questions, feedback, or a community you'd like us to add? We'd love to hear from you.</p>
+    </div>
+    <div class="cols">
+      <div>
+        <div class="block">
+          <h2 class="bt">Send us a message</h2>
+          <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 16px">Email us directly at <a href="mailto:hello@homesignal.net" style="color:var(--green);font-weight:600;text-decoration:none">hello@homesignal.net</a>, or use the form below.</p>
+          <div id="contactForm" style="display:flex;flex-direction:column;gap:10px">
+            <input class="cinput" id="cName" placeholder="Your name">
+            <input class="cinput" id="cEmail" type="email" placeholder="Your email">
+            <textarea class="cinput" id="cMsg" placeholder="Your message" style="min-height:120px;resize:vertical"></textarea>
+            <button class="mbtn" style="align-self:flex-start" onclick="sendContact()">Send message</button>
+          </div>
+          <div id="contactDone" class="cnote hidden">✓ Thanks — your message is on its way. We'll reply to your email shortly.</div>
+        </div>
+      </div>
+      <div>
+        <div class="block">
+          <h2 class="bt">Other ways to reach us</h2>
+          <div class="vital"><span class="vl">Email</span><span class="vv" style="font-size:13px">hello@homesignal.net</span></div>
+          <div class="vital"><span class="vl">Request a community</span><span class="vv" style="font-size:13px"><a href="#" onclick="HS.openLoc();return false" style="color:var(--green);text-decoration:none">Add your ZIP →</a></span></div>
+          <div class="vital"><span class="vl">Follow</span><span class="vv" style="font-size:13px">Bluesky · Reddit</span></div>
+        </div>
+        <div class="block">
+          <h2 class="bt">Neutral · sourced · non-partisan</h2>
+          <p style="font-size:13px;color:var(--ink-2);margin:0">Everything HomeSignal shows is drawn from public records. We don't take positions — we help you see what's changing and decide for yourself.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="lib/data.js"></script>
+<script src="lib/templates.js"></script>
+<script src="shell.js"></script>
+<script>
+async function sendContact() {
+  var el = document.getElementById('cEmail');
+  if (!el.value.trim() || el.value.indexOf('@') < 1) { el.style.borderColor='#c23b34'; el.focus(); return; }
+  var row = { name: document.getElementById('cName').value.trim(), email: el.value.trim(), message: document.getElementById('cMsg').value.trim() };
+  if (HS_CONFIG.DATA_SOURCE === 'supabase' && window.supabase) {
+    try { await HS.sb().from('contact_messages').insert(row); } catch (e) { console.warn(e); }
+  }
+  document.getElementById('contactForm').classList.add('hidden');
+  document.getElementById('contactDone').classList.remove('hidden');
+}
+</script>
+</body>
+</html>
