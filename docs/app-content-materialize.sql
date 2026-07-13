@@ -30,6 +30,26 @@
 -- county name, not a hardcoded one) and accepts source links in EITHER `record_url`
 -- (TX TDLR/TABS permits) OR `url` (Utah PMN planning notices). Applied via migrations
 -- app_refresh_zip_county_generic + app_refresh_zip_url_or_record_url.
--- Ran for all development_reports ZIPs → Utah live: Box Elder 18/18, Weber 14, Utah 11,
--- Tooele 8, Davis 6, Cache 5 = 62 pass; Salt Lake 36 = coverage_coming (meetings only,
--- no per-ZIP permit feed yet). Data-only — /app/ reads app_* generically, no deploy.
+--
+-- UPDATE 2026-07-13 (b): added a REAL-FACILITY FALLBACK + a CIVIC bucket so a ZIP with
+-- no per-ZIP permit feed still passes on its actual EPA records instead of showing
+-- "coverage coming." Applied via migration app_refresh_zip_facilities_and_civic:
+--   * app_projects: if a ZIP produced 0 development-permit projects, fall back to the
+--     development_report's EPA FRS/ECHO FACILITIES (relevance NOT IN ('development',
+--     'civic'), a real link + a non-empty label required) written status='Operating',
+--     developer='EPA FRS · registry <id>', source_ref = the echo.epa.gov record URL.
+--     Facilities carry no `relevance` tag, so the earlier `relevance='facility'` filter
+--     wrongly matched 0 — the fix filters by exclusion + requires a link.
+--   * app_changes: PMN civic notices (relevance='civic') now surface as category
+--     'Government & civic'.
+-- data_quality still = 'pass' ONLY when the ZIP produced >=1 sourced project (permit OR
+-- real facility); genuinely-empty ZIPs stay 'coverage_coming' — never blank, never faked.
+--
+-- Re-ran for all 137 development_reports ZIPs → ALL 136 modeled UTAH ZIPs now PASS on
+-- real sourced records (DB-verified): Box Elder 18, Cache 19, Davis 14, Salt Lake 36,
+-- Tooele 8, Utah 27, Weber 14 = 136/136 pass, 0 coverage_coming. 1,632 UT app_projects,
+-- 0 missing a source_ref (anti-fabrication clean). Salt Lake (was coverage_coming —
+-- meetings only, no per-ZIP permit feed) flipped to pass on its real EPA FRS facilities
+-- (e.g. 84101: Grain Craft, Energy Solutions, Bulk Cement Terminal — each an
+-- echo.epa.gov detailed-facility-report link). Data-only — /app/ reads app_* generically,
+-- no deploy.
