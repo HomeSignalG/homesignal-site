@@ -1,11 +1,21 @@
 # HomeSignal — robots.txt
-# Public marketing + community pages are indexable; the logged-in app
-# and one-off utility pages are not.
+# New layout is live site-wide. Only the homepage, Utah community pages, and the
+# development-tracker pages are advertised to search (see sitemap.xml + the per-page
+# noindex in community.html for non-Utah). The logged-in/personal app surfaces and
+# one-off utility pages are never indexed.
 User-agent: *
 Allow: /
 Disallow: /dashboard.html
+Disallow: /today.html
+Disallow: /alerts.html
+Disallow: /properties.html
+Disallow: /property.html
+Disallow: /reports.html
+Disallow: /maps.html
+Disallow: /development.html
 Disallow: /my-alerts.html
 Disallow: /unsubscribe.html
-Disallow: /app/
+Disallow: /acquisition.html
+Disallow: /homesignalphase1_13.html
 
 Sitemap: https://homesignal.net/sitemap.xml

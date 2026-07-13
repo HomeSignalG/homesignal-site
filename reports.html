@@ -49,7 +49,7 @@ HS.onReady(async function () {
   }).join('');
 
   // rendered preview = flagship project impact analysis (on the fly)
-  HS.shareUrlOverride = HS_CONFIG.BASE_URL + '/app/development.html?id=' + flagship.id;
+  HS.shareUrlOverride = HS_CONFIG.BASE_URL + '/development.html?id=' + flagship.id;
   document.getElementById('repDoc').innerHTML =
     '<div class="dhead"><div class="dk">Project impact analysis · preview</div><h3>' + HS.esc(flagship.name) + '</h3>'
     + '<div class="dm">Prepared for ' + HS.esc(home?home.address:c.name) + ' · ' + HS.esc(c.city) + ', ' + HS.esc(c.state) + ' ' + HS.esc(c.zip) + ' · ' + today + '</div>'

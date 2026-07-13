@@ -44,9 +44,11 @@
           <div class="legrow"><span class="ld" style="background:var(--amber)"></span> Moderate impact</div>
           <div class="legrow"><span class="ld" style="background:var(--blue)"></span> Watch / minor</div>
           <div class="legrow"><span class="ld" style="background:var(--green-2)"></span> Positive / distant</div>
+          <div class="legrow" id="legFacility" style="display:none"><span class="ld" style="background:#6f42c1;border-radius:2px"></span> Regulated facility</div>
           <div class="layers">
             <div class="mt">Layers</div>
             <div class="lyr" id="lyrProjects"><span>Projects</span><span class="tg"></span></div>
+            <div class="lyr" id="lyrFacilities" style="display:none"><span>Regulated facilities</span><span class="tg"></span></div>
             <div class="lyr" id="lyrRadius"><span>Impact radius</span><span class="tg"></span></div>
             <div class="lyr off" title="Available when flood data is ingested for this community"><span>Flood zones</span><span class="tg"></span></div>
             <div class="lyr off" title="Available when school data is ingested for this community"><span>Schools</span><span class="tg"></span></div>
@@ -71,14 +73,24 @@
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
   var c = await HS.data.community(S.zip);
-  var projects = await HS.data.projects(S.zip, home);
+  var projects = await HS.data.projects(S.zip, home);       // DEVELOPMENT only (permits / planning)
   var changes = await HS.data.changes(S.zip, home);
+  var facilities = await HS.data.facilities(S.zip, home);   // EPA/ECHO regulated facilities — own layer, env context
 
   var LET = 'ABCDEFGHIJKLMNOP';
-  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, mode: 'impact' };
+  var FACILITY_HEX = '#6f42c1';   // regulated facilities — distinct from the impact-tier pin colors
+  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact' };
+  // Development/alert pins (impact-tiered). Facilities are deliberately NOT concatenated here —
+  // they render in their own labeled layer (facs) so they read as environmental context, never development.
   var all = changes.filter(function(x){return !x.quiet;}).concat(projects)
     .filter(function(x){return x.lat && x.lng;})
     .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
+  var facs = (facilities || []).filter(function(x){return x.lat && x.lng;})
+    .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);}).slice(0, 24);
+  if (facs.length) {   // reveal the facilities legend + layer toggle only when there are any
+    var _lf = document.getElementById('legFacility'); if (_lf) _lf.style.display = '';
+    var _lyf = document.getElementById('lyrFacilities'); if (_lyf) _lyf.style.display = '';
+  }
 
   function shownItems() {
     var a = opts.showProjects ? all : all.filter(function(x){return !x.type;});
@@ -112,6 +124,11 @@ HS.onReady(async function () {
     document.getElementById('lyrRadius').classList.toggle('off', !opts.showRadius);
     document.getElementById('lyrProjects').onclick = function(){ opts.showProjects=!opts.showProjects; redraw(); };
     document.getElementById('lyrRadius').onclick = function(){ opts.showRadius=!opts.showRadius; redraw(); };
+    var lyf = document.getElementById('lyrFacilities');
+    if (lyf && facs.length) {
+      lyf.classList.toggle('off', !opts.showFacilities);
+      lyf.onclick = function(){ opts.showFacilities=!opts.showFacilities; redraw(); };
+    }
   }
 
   // ---------- schematic (Impact) ----------
@@ -121,8 +138,37 @@ HS.onReady(async function () {
     HS.MapProvider.render(document.getElementById('mapSch'), {
       home: center, items: items, radiusMi: opts.radiusMi, showRadius: opts.showRadius, w: 780, h: 520
     });
+    overlayFacilities(document.getElementById('mapSch'));
     setGps(items); renderPins(items);
     wirePanel(function(){ if (opts.mode==='impact') drawSchematic(); else drawGL(); });
+  }
+
+  // Overlay regulated facilities onto the schematic SVG as distinct purple squares
+  // (labeled "Regulated facility" in the legend). Same projection the MapProvider uses,
+  // so they sit correctly relative to home. Kept separate from the impact pins above.
+  function overlayFacilities(el){
+    if (!opts.showFacilities || !facs.length) return;
+    var svg = el && el.querySelector('svg'); if (!svg) return;
+    var w=780, h=520, cx=w/2, cy=h/2, radiusPx=Math.min(w,h)*0.29, pxPerMile=radiusPx/opts.radiusMi;
+    var hLat=center.lat, hLng=center.lng, NS='http://www.w3.org/2000/svg';
+    facs.forEach(function(f){
+      var north=(f.lat-hLat)*69, east=(f.lng-hLng)*69*Math.cos(hLat*Math.PI/180);
+      var x=Math.max(20,Math.min(w-20, cx+east*pxPerMile)), y=Math.max(20,Math.min(h-20, cy-north*pxPerMile));
+      var rect=document.createElementNS(NS,'rect');
+      rect.setAttribute('x',x-7); rect.setAttribute('y',y-7); rect.setAttribute('width',14); rect.setAttribute('height',14);
+      rect.setAttribute('rx',3); rect.setAttribute('fill',FACILITY_HEX); rect.setAttribute('stroke','#fff'); rect.setAttribute('stroke-width',3);
+      var t=document.createElementNS(NS,'title');
+      t.textContent = f.name + ' · Regulated facility' + (f.dist?' · '+f.dist:'');
+      rect.appendChild(t);
+      if (f.source_ref) {   // keep the official record link on the marker
+        var a=document.createElementNS(NS,'a');
+        a.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href',f.source_ref);
+        a.setAttribute('href',f.source_ref); a.setAttribute('target','_blank'); a.setAttribute('rel','noopener');
+        a.appendChild(rect); svg.appendChild(a);
+      } else {
+        svg.appendChild(rect);
+      }
+    });
   }
 
   // ---------- MapLibre (Satellite / Street) ----------
@@ -148,6 +194,16 @@ HS.onReady(async function () {
         +'<div style="font-size:11px;color:#5a6b63">'+HS.esc(it.type||it.category||'')+(it.dist?' · '+HS.esc(it.dist):'')+'</div>'
         +(it.source_ref?'<a href="'+HS.esc(it.source_ref)+'" target="_blank" rel="noopener" style="font-size:11.5px;color:#157a49;font-weight:600">official record ▸</a>':'');
       glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([it.lng,it.lat])
+        .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(html)).addTo(glMap));
+    });
+    // Regulated facilities — a DISTINCT layer (purple squares), env context, not development.
+    if (opts.showFacilities) facs.forEach(function(f){
+      var el=document.createElement('div');
+      el.style.cssText='width:20px;height:20px;border-radius:3px;background:'+FACILITY_HEX+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer';
+      var html='<div style="font:600 13px/1.3 var(--font)">'+HS.esc(f.name)+'</div>'
+        +'<div style="font-size:11px;color:#5a6b63">Regulated facility'+(f.developer?' · '+HS.esc(f.developer):'')+(f.dist?' · '+HS.esc(f.dist):'')+'</div>'
+        +(f.source_ref?'<a href="'+HS.esc(f.source_ref)+'" target="_blank" rel="noopener" style="font-size:11.5px;color:#157a49;font-weight:600">View public record ▸</a>':'');
+      glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([f.lng,f.lat])
         .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(html)).addTo(glMap));
     });
   }
