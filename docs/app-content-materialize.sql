@@ -53,3 +53,16 @@
 -- (e.g. 84101: Grain Craft, Energy Solutions, Bulk Cement Terminal — each an
 -- echo.epa.gov detailed-facility-report link). Data-only — /app/ reads app_* generically,
 -- no deploy.
+--
+-- UPDATE 2026-07-13 (c): record_kind split + auto-sync cron. Applied via migrations
+-- app_refresh_zip_record_kind_split and app_content_refresh_cron:
+--   * app_projects gains `record_kind` ('development' | 'facility'); app_refresh_zip now
+--     ALWAYS materializes the report's EPA/ECHO facilities as record_kind='facility'
+--     (status 'Operating'), separate from development permits/planning (record_kind=
+--     'development'). data.js splits projects() (development-only) from facilities().
+--   * app_refresh_all() loops app_refresh_zip over every development_reports ZIP.
+--   * pg_cron job 'app-content-refresh' runs app_refresh_all() daily at 09:20 UTC — 12 min
+--     AFTER dev_refresh_collect (09:08) — so app_* never drifts from the live engine cache.
+--     (Found drift: the nightly dev_refresh had aged out concluded hearings >90d, so app_*
+--     was showing more development than the engine had — Cache 5→1, Davis 6→2, Utah 11→4 on
+--     resync. All 136 UT ZIPs still PASS on the facility floor.)
