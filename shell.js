@@ -273,7 +273,7 @@
     }
     LS.set('myZip', zip); state.zip = zip;   // make it the primary area
     if (CFG.DATA_SOURCE === 'supabase' && state.session && !state.session.demo && HS.sb) {
-      try { HS.sb().from('follows').insert({ user_id: state.session.user.id, target_type: 'community', target_id: zip }); } catch (e) {}
+      try { HS.sb().from('app_follows').insert({ user_id: state.session.user.id, target_type: 'community', target_id: zip }); } catch (e) {}
     }
   };
   HS.unfollowCommunity = function (zip) {
@@ -285,7 +285,7 @@
       LS.set('myZip', next); state.zip = next || CFG.DEFAULT_ZIP;
     }
     if (CFG.DATA_SOURCE === 'supabase' && state.session && !state.session.demo && HS.sb) {
-      try { HS.sb().from('follows').delete().match({ user_id: state.session.user.id, target_type: 'community', target_id: zip }); } catch (e) {}
+      try { HS.sb().from('app_follows').delete().match({ user_id: state.session.user.id, target_type: 'community', target_id: zip }); } catch (e) {}
     }
   };
   HS.toggleFollowCommunityBtn = function (btn) {
@@ -460,8 +460,8 @@
   async function persistFollow(type, id, on) {
     if (CFG.DATA_SOURCE !== 'supabase' || !state.session) return;
     try {
-      if (on) await HS.sb().from('follows').insert({ user_id: state.session.user.id, target_type: type, target_id: id });
-      else await HS.sb().from('follows').delete().match({ user_id: state.session.user.id, target_type: type, target_id: id });
+      if (on) await HS.sb().from('app_follows').insert({ user_id: state.session.user.id, target_type: type, target_id: id });
+      else await HS.sb().from('app_follows').delete().match({ user_id: state.session.user.id, target_type: type, target_id: id });
     } catch (e) { console.warn('follow', e); }
   }
   async function persistTopics(category, topics, consent) {
@@ -492,9 +492,43 @@
     document.querySelectorAll('.nav a').forEach(a => a.addEventListener('click', closeMenu));
   }
 
+  // Cross-device sync of followed communities. On a signed-in boot, merge the
+  // account's app_follows(community) rows with the local list both ways: pull any
+  // account follows this device hasn't seen (resolving each ZIP's name), and push
+  // any local-only follows up to the account. RLS scopes app_follows to auth.uid().
+  async function syncFollowsFromAccount() {
+    if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) return;
+    let rows;
+    try {
+      const res = await HS.sb().from('app_follows').select('target_id').eq('target_type', 'community');
+      if (res.error) return; rows = res.data || [];
+    } catch (e) { return; }
+    const local = HS.followedCommunities();
+    const localZips = new Set(local.map(c => String(c.zip)));
+    const acctZips = new Set(rows.map(r => String(r.target_id)));
+    // pull: account -> local (resolve the display name for ones we don't have)
+    for (const r of rows) {
+      const zip = String(r.target_id);
+      if (!localZips.has(zip)) {
+        let meta = null; try { meta = await HS.data.community(zip); } catch (e) {}
+        local.push({ zip: zip, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
+        localZips.add(zip);
+      }
+    }
+    LS.set('myCommunities', local);
+    if (!LS.get('myZip', null) && local[0]) { LS.set('myZip', String(local[0].zip)); state.zip = String(local[0].zip); }
+    // push: local-only follows -> account
+    for (const c of local) {
+      if (!acctZips.has(String(c.zip))) {
+        try { await HS.sb().from('app_follows').insert({ user_id: state.session.user.id, target_type: 'community', target_id: String(c.zip) }); } catch (e) {}
+      }
+    }
+  }
+
   async function boot() {
     await injectShell();
     await bootSession();
+    await syncFollowsFromAccount();
     state.properties = await HS.data.properties();
     if (!state.activePropId && state.properties[0]) state.activePropId = state.properties[0].id;
     paintTopbar();
