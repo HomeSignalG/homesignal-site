@@ -1,0 +1,24 @@
+-- ============================================================================
+-- DALLAS + TARRANT + EL PASO counties per-ZIP seed — DDL-of-record pointer.
+-- Applied 2026-07-13 as migration `dallas_tarrant_elpaso_communities_seed`
+-- (staging-table pattern: public._dfw_zips(zip,city,county,lat,lng) from the
+-- zipcodes PyPI v3.0.0 crosswalk — 418 ZIPs, 0 quarantined — then county roots
+-- + level=zip pages built server-side with pre-claimed-ZIP and dup-slug guards).
+--
+-- RESULT (DB-verified): 419 rows — 3 county roots (dallas-county-tx,
+-- tarrant-county-tx, el-paso-county-tx; 6 canonical topics each) + 416 ZIP pages
+-- "<place> (<ZIP>)" inheriting via cascade (2 ZIPs skipped by the pre-claimed
+-- guard). Resolution probe passed (75201/76102/79901/75054 -> own zip pages);
+-- 0 dup slugs. PO-box blocks share the city centroid (Austin-block precedent).
+--
+-- development_reports cached for all 416 via pg_net waves (85/wave, transient-
+-- safe collect, straggler retry) with pinned centroids from the same staging
+-- table; app_refresh_all() materialized the pages. Nightly dev_refresh +
+-- app-content-refresh crons cover the new rows automatically. TX is an
+-- advertised state (INDEX_STATES) so pass pages here are indexable + join the
+-- sitemap zero-touch.
+--
+-- To re-run: re-apply the migration (idempotent), then the texas seed's
+-- fire/collect pattern against public._dfw_zips (see
+-- docs/texas-development-reports-seed.sql steps 2-6).
+-- ============================================================================
