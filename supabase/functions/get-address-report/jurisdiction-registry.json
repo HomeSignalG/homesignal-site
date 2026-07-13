@@ -322,5 +322,90 @@
       "_zip_mode_note": "RESERVED FOR THE PER-ADDRESS PROPERTY PAGE (homesignalmap.html?addr=), not the ZIP aggregate. ~85% of rows carry no native coordinates, so ZIP-mode geocoding (1000s of addresses per refresh) would time out the edge function, and 1,300+ individual building permits would swamp the ZIP map. At a single address only that parcel's permits are shown (one geocode). Full status_to_bucket + type_map are kept so the property-page wiring is a pure-data activation (flip zip_mode + call the connector in address mode)."
     }
   ],
-  "arcgis": []
+  "arcgis": [
+    {
+      "registry_id": "slc-planning-petitions",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/mMBpeYj0vPFotzbe/arcgis/rest/services/Planning_Petition/FeatureServer/0",
+      "dataset_url": "https://gis-slcgov.opendata.arcgis.com/",
+      "jurisdiction": "Salt Lake City",
+      "coverage": [
+        {
+          "state": "UT",
+          "county": "Salt Lake"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "ApplicationSubType",
+          "ProjectName"
+        ],
+        "status_raw": "ApplicationStatus",
+        "type_source": "ApplicationSubType",
+        "file_date": "AppliedDate",
+        "decision_date": "IssuedDate",
+        "address": "Location",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "PermitNum",
+        "zip": "ZIPCODE",
+        "record_url": "link"
+      },
+      "type_map": {
+        "Minor Alteration": "Development",
+        "Special Exception": "Development",
+        "Conditional Use": "Development",
+        "Request for Rebuild": "Development",
+        "Zoning Amendment": "Development",
+        "Routine and Uncontest Home Occ": "Residential",
+        "Planned Dev - Conditional Use": "Development",
+        "Consolidation": "Development",
+        "Preliminary Subdiv": "Development",
+        "Conditional Design Review": "Development",
+        "Final Plat Approval": "Development",
+        "Major Alter or Minor Construct": "Development",
+        "Lot Line Adjustment": "Development",
+        "New Construction": "Development",
+        "Alley Vacation": "Utility",
+        "Street Closure": "Utility",
+        "Transit Station Development": "Development",
+        "Variance": "Development",
+        "Preliminary Condo-New": "Residential",
+        "Master Plan Amendment": "Development",
+        "Planned Development": "Development",
+        "Routine and Uncontested": "Residential",
+        "Certificate of Appropriateness": "Development",
+        "Subdivision Amendment": "Development",
+        "Preliminary Subdiv-Minor": "Development",
+        "Demolition - Contributing": "Development",
+        "Demolition - Non Contributing": "Development",
+        "Designation": "Civic/Public",
+        "Master Plan": "Development",
+        "Home Daycare or Preschool": "Residential",
+        "Annexation": "Development",
+        "Relocation": "Development",
+        "Economic Hardship": "Development",
+        "Conservation District": "Civic/Public",
+        "Inclusion": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Active",
+          "Additional Information",
+          "Accepted",
+          "Pre-screen",
+          "In Progress"
+        ],
+        "approved": [
+          "Approved"
+        ],
+        "exclude": [
+          "Closed"
+        ]
+      },
+      "record_url_precision": "record",
+      "incremental_field": "AppliedDate",
+      "extra_where": "ApplicationSubType NOT IN ('Zoning Verification Letter','Administrative Interpretation','Appeal Admin Decision','Appeal Comm Decision','Determination Non-Conform Use')"
+    }
+  ]
 }

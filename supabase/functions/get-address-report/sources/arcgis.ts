@@ -55,6 +55,9 @@ export interface ArcgisRegistryEntry {
   max_rows?: number;
   /** output spatial reference for geometry; default 4326 (WGS84 lat/lng). */
   out_sr?: number;
+  /** Optional VERBATIM SQL clause AND'd into every query (entry-driven scoping — e.g. drop
+   *  administrative-paperwork subtypes). Data, not code: the connector never inspects it. */
+  extra_where?: string;
 }
 
 export interface ArcgisRunReport {
@@ -300,6 +303,7 @@ async function fetchRows(
 function buildWhere(entry: ArcgisRegistryEntry, zip: string, zipCol: string): string {
   // ArcGIS SQL string equality; the ZIP is a 5-digit code (safe chars only). Escape quotes.
   const clauses = [`${zipCol}='${zip.replace(/'/g, "''")}'`];
+  if (entry.extra_where && entry.extra_where.trim()) clauses.push(`(${entry.extra_where.trim()})`);
   if (entry.recency_days && entry.recency_days > 0) {
     const dateCol = firstCol(entry.column_map.file_date) || entry.incremental_field;
     if (dateCol) {
