@@ -106,7 +106,14 @@
   };
   function paintTopbar() {
     const p = state.activeProperty;
-    if ($('locLabel')) $('locLabel').textContent = p ? p.address : (window.HS_SEED ? window.HS_SEED.community.name : '—');
+    if ($('locLabel')) {
+      // A signed-in subscriber viewing their own home shows their real address.
+      // Everyone else is looking at the default prototype community (Del Valle,
+      // 78617) as an EXAMPLE — flag it clearly as a sample ZIP so it is never
+      // mistaken for the visitor's own area.
+      $('locLabel').textContent = p ? p.address
+        : ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample ZIP)');
+    }
     const av = $('hs-avatar');
     if (av) av.textContent = state.session ? (state.session.initials ||
       (state.session.user.email || '?').slice(0, 2).toUpperCase()) : '··';
