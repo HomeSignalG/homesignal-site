@@ -71,7 +71,10 @@ HS.onReady(async function () {
   var name = (S.session && S.session.name || 'there').split(' ')[0];
   var today = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
   document.getElementById('tdGreeting').textContent = 'Good morning, ' + name + ' — here’s what needs you';
-  document.getElementById('tdSub').textContent = today + ' · ' + c.name + ', ' + c.state + '.';
+  // When the visitor has not chosen their own area we are showing the default
+  // prototype community as an example, so flag it as a sample zip in the dateline.
+  var sampleTag = home ? '' : ' — (Sample Zip Code)';
+  document.getElementById('tdSub').textContent = today + ' · ' + c.name + sampleTag + ', ' + c.state + '.';
 
   // priorities: rank by impact, prefer open windows
   var ranked = changes.slice().sort(function (a, b) {
