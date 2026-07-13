@@ -38,6 +38,7 @@
   <div class="sp"></div>
   <button class="sharebtn" type="button" onclick="HS.openModal('shareModal')">⤴ Share</button>
   <button class="ib" type="button" aria-label="Notifications" onclick="location.href='alerts.html'">◔<span class="badge hidden" id="hs-bell-badge">0</span></button>
+  <button class="sharebtn" type="button" id="hs-signin" style="display:none" onclick="HS.openAuth()">Sign in</button>
   <div class="avatar" id="hs-avatar" title="Account" onclick="HS.onAvatar()">··</div>
 </div>
 
@@ -70,6 +71,30 @@
         <div class="mnote">We'll only email you when your area goes live. No spam.</div>
       </div>
       <div id="locDone" class="success hidden"><div class="ck">✓</div><h4 id="locDoneH">Request received</h4><p id="locDoneP">We'll email you the moment it's live.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= SIGN IN / SIGN UP (email code) MODAL ======= -->
+<div class="overlay" id="authModal" onclick="if(event.target===this)HS.closeModal('authModal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="mhead">
+      <button class="mclose" type="button" onclick="HS.closeModal('authModal')" aria-label="Close">✕</button>
+      <span class="mbadge">◉ Your account</span>
+      <h3 id="authTitle">Sign in or sign up</h3>
+      <p class="msub" id="authSub">Enter your email and we'll send you a 6-digit code — no password needed.</p>
+    </div>
+    <div class="mbody">
+      <div id="authForm">
+        <div class="field" style="flex-direction:column;gap:10px">
+          <input id="authEmail" type="email" placeholder="you@email.com" autocomplete="email" onkeydown="if(event.key==='Enter')HS.authSubmit()">
+          <input id="authCode" type="text" inputmode="numeric" maxlength="8" autocomplete="one-time-code" placeholder="Enter the 6-digit code" class="hidden" style="letter-spacing:6px;text-align:center" onkeydown="if(event.key==='Enter')HS.authSubmit()">
+          <button class="mbtn" type="button" id="authSubmitBtn" onclick="HS.authSubmit()">Send me a code</button>
+        </div>
+        <div class="mnote" id="authMsg">New here? Entering your email creates your free account — no password, no spam.</div>
+        <div class="mnote hidden" id="authBackWrap"><a href="#" onclick="HS.authReset();return false;">Use a different email</a></div>
+      </div>
+      <div id="authDone" class="success hidden"><div class="ck">✓</div><h4>You're signed in</h4><p>Loading your account…</p></div>
     </div>
   </div>
 </div>
