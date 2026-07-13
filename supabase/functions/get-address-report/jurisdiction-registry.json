@@ -639,6 +639,83 @@
    "zip_where_template": "'{zip}' = '78666'",
    "_receipts": "Verified live 2026-07-13 via pg_net: city ArcGIS Server (smgis.sanmarcostx.gov), PlanningCase_Point layer 15, point geometry, fresh (created_date Jul 2026), 11 statuses + 36 case types VERBATIM from groupBy. Address has no ZIP and no ZIP column, so the constant zip_where_template scopes the whole city feed to San Marcos's principal ZIP 78666 (records still place by their OWN per-parcel geometry; blank statuses are excluded by the connector's blank->exclude rule). Paperwork/non-development types (Pre-Development Meeting 1689, Zoning Verification 343, Short Term Rental/Home-Share registrations, Release from ETJ, Out-of-City utility connections, blank 347) dropped at source via extra_where. No per-record link -> official REST layer as dataset_url fallback. recency_days=365 added after first live cache: the layer holds the full multi-year case archive (2,154 dev records on 78666) \u2014 the Austin issued-permits precedent window keeps the page a what's-changing view, not an archive.",
    "recency_days": 365
+  },
+  {
+   "registry_id": "fort-worth-development-permits",
+   "platform": "arcgis",
+   "service_url": "https://mapit.fortworthtexas.gov/ags/rest/services/CIVIC/Permits/MapServer/0",
+   "dataset_url": "https://mapit.fortworthtexas.gov/ags/rest/services/CIVIC/Permits/MapServer/0",
+   "jurisdiction": "Fort Worth",
+   "coverage": [
+    {
+     "state": "TX",
+     "county": "Tarrant"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "Permit_Type",
+     "Address"
+    ],
+    "status_raw": "Current_Status",
+    "type_source": "Permit_Type",
+    "file_date": "File_Date",
+    "decision_date": "Status_Date",
+    "address": "Address",
+    "zip": "Zip_Code",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "Permit_No"
+   },
+   "extra_where": "Permit_Type IN ('Commercial Building Permit','Residential Building Permit','Residential Accessory Struct','Commercial Accessory Structure','Commercial Grading Permit','Design Review')",
+   "type_map": {
+    "Commercial Building Permit": "Commercial",
+    "Commercial Accessory Structure": "Commercial",
+    "Commercial Grading Permit": "Commercial",
+    "Residential Building Permit": "Residential",
+    "Residential Accessory Struct": "Residential",
+    "Design Review": "Development"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "Pending",
+     "Plan Review",
+     "In Review",
+     "Accepted",
+     "Awaiting Client Reply",
+     "Incomplete Submittal",
+     "Pending Fees",
+     "Pending HCLC Review",
+     "Hold",
+     "Appeal",
+     "Continued"
+    ],
+    "approved": [
+     "Issued",
+     "Approved",
+     "Administrative Approval",
+     "Approved w/Conditions",
+     "Partial Approval",
+     "Issued Without Contractor"
+    ],
+    "operating": [
+     "Finaled",
+     "Complete"
+    ],
+    "exclude": [
+     "Expired",
+     "Withdrawn",
+     "Void",
+     "Denied",
+     "Closed",
+     "Close",
+     "Closed By Rule",
+     "Opt-Out"
+    ]
+   },
+   "incremental_field": "File_Date",
+   "recency_days": 365,
+   "_receipts": "Verified live 2026-07-13 via pg_net: City of Fort Worth's own Enterprise server (mapit.fortworthtexas.gov, CIVIC/Permits, CFW_AGOL_ADMIN org item) - a full Accela extract with point geometry, NATIVE Zip_Code column, 28 Current_Status values + 11 Permit_Type values enumerated VERBATIM via groupBy, fresh through File_Date 2026-07-12. Trade permits (Mechanical 120k, Electrical 162k, Plumbing 167k+74k backflow, Urban Forestry) dropped at source via extra_where; 6 construction/design types kept. recency_days=365 keeps a what's-changing view (the layer holds 1M+ historical rows; Finaled 562k -> bucket operating). Discovery note: the city's Socrata portal (data.fortworthtexas.gov) is decommissioned - its catalog entry for 'Development Permits quz7-xnsy' 404s; this Enterprise layer is the live successor. No per-record link -> official REST layer as dataset_url fallback."
   }
  ]
 }
