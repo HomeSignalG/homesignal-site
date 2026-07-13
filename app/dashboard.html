@@ -5,8 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>HomeSignal — Dashboard</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://*.tile.openstreetmap.org; form-action 'self'">
 <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>#dashMap{height:300px}#dashMap .maplibregl-canvas{border-radius:15px}</style>
 </head>
 <body data-nav="dash">
 <template id="hs-content">
@@ -48,6 +50,7 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="lib/data.js"></script>
 <script src="lib/templates.js"></script>
 <script src="lib/map.js"></script>
@@ -71,9 +74,16 @@ HS.onReady(async function () {
     + HS.tpl.statTile('<span style="font-size:19px">' + HS.esc(c.growth_pressure) + '</span>', 'Growth pressure · trending up', '')
     + HS.tpl.statTile(c.community_score, 'Community score', 'g');
 
-  // schematic map preview (impact-colored pins)
-  var items = changes.filter(function(x){return !x.quiet;}).concat(projects).slice(0, 6);
-  HS.MapProvider.render(document.getElementById('dashMap'), { home: home, items: items, radiusMi: 1.5, w: 640, h: 300 });
+  // map preview — real satellite tiles when available, schematic otherwise
+  var items = changes.filter(function(x){return !x.quiet;}).concat(projects)
+    .filter(function(x){return x.lat && x.lng;}).slice(0, 6);
+  var dashMap = document.getElementById('dashMap');
+  var center = home || items[0] || (c && c.lat ? {lat:c.lat,lng:c.lng} : {lat:30.17,lng:-97.61});
+  if (window.maplibregl) {
+    HS.buildGL(dashMap, { center: center, items: items, mode: 'satellite', interactive: false, zoom: 12.4, radiusMi: 1.5 });
+  } else {
+    HS.MapProvider.render(dashMap, { home: center, items: items, radiusMi: 1.5, w: 640, h: 300 });
+  }
 
   // recent — ranked by impact
   var recent = changes.filter(function(x){return !x.quiet;})

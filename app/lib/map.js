@@ -58,4 +58,53 @@
     }
   };
   HS.MapProvider = MapProvider;
+
+  // ---- shared real-tile helpers (MapLibre) — used by Maps + Dashboard preview ----
+  HS._tierHex = function (it) {
+    const k = tier(it).k;
+    return { high: '#c23b34', moderate: '#c47a1a', watch: '#3f7fb0', positive: '#1f9d5c' }[k] || '#3f7fb0';
+  };
+  HS._circle = function (lat, lng, rMi) {
+    const pts = [], R = rMi / 69.0, cs = Math.cos(lat * Math.PI / 180);
+    for (let i = 0; i <= 64; i++) { const a = i / 64 * 2 * Math.PI; pts.push([lng + (R * Math.sin(a)) / cs, lat + R * Math.cos(a)]); }
+    return { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [pts] } }] };
+  };
+  HS._glSources = function () {
+    return {
+      sat: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, attribution: '© Esri, Maxar' },
+      osm: { type: 'raster', tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png', 'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png', 'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, attribution: '© OpenStreetMap' }
+    };
+  };
+  // Build a compact real map (returns the map, or null if MapLibre isn't available -> caller falls back).
+  HS.buildGL = function (el, o) {
+    if (!window.maplibregl) return null;
+    const center = o.center, mode = o.mode || 'satellite';
+    const map = new maplibregl.Map({
+      container: el,
+      style: { version: 8, sources: HS._glSources(), layers: [
+        { id: 'osm', type: 'raster', source: 'osm', layout: { visibility: mode === 'street' ? 'visible' : 'none' } },
+        { id: 'sat', type: 'raster', source: 'sat', layout: { visibility: mode === 'street' ? 'none' : 'visible' } }
+      ] },
+      center: [center.lng, center.lat], zoom: o.zoom || 12,
+      interactive: o.interactive !== false, attributionControl: false
+    });
+    map.on('load', function () {
+      if (o.radiusMi) {
+        map.addSource('r', { type: 'geojson', data: HS._circle(center.lat, center.lng, o.radiusMi) });
+        map.addLayer({ id: 'rf', type: 'fill', source: 'r', paint: { 'fill-color': '#157a49', 'fill-opacity': 0.08 } });
+        map.addLayer({ id: 'rl', type: 'line', source: 'r', paint: { 'line-color': '#157a49', 'line-width': 2, 'line-opacity': 0.6, 'line-dasharray': [2, 2] } });
+      }
+      const h = document.createElement('div');
+      h.style.cssText = 'width:18px;height:18px;border-radius:50%;background:#157a49;border:3px solid #fff;box-shadow:0 0 0 5px rgba(21,122,73,.18)';
+      new maplibregl.Marker({ element: h }).setLngLat([center.lng, center.lat]).addTo(map);
+      (o.items || []).forEach(function (it) {
+        if (it.lat == null || it.lng == null) return;
+        const d = document.createElement('div'), col = HS._tierHex(it);
+        d.style.cssText = 'width:20px;height:20px;border-radius:50%;background:' + col + ';border:2.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)';
+        new maplibregl.Marker({ element: d }).setLngLat([it.lng, it.lat]).addTo(map);
+      });
+      if (o.onReady) o.onReady(map);
+    });
+    return map;
+  };
 })();
