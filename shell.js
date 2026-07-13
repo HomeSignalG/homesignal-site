@@ -15,7 +15,8 @@
   };
   const state = HS.state = {
     session: null,           // {user:{id,email}} or null
-    zip: CFG.DEFAULT_ZIP,
+    // The visitor's saved ZIP (their chosen area) wins over the Del Valle sample.
+    zip: LS.get('myZip', null) || CFG.DEFAULT_ZIP,
     properties: [],
     activePropId: LS.get('activeProp', null),
     follows: new Set(LS.get('follows', [])),
@@ -25,6 +26,11 @@
       return this.properties.find(p => p.id === this.activePropId) || this.properties[0] || null;
     }
   };
+
+  // Has the visitor set their own area yet (a saved property OR a saved ZIP)?
+  // When false, the app is showing the Del Valle sample and labels say so.
+  HS.hasArea = function () { return !!(state.activeProperty || LS.get('myZip', null)); };
+  HS.isSample = function () { return !HS.hasArea(); };
 
   // ------------------------------------------------------------- ready gate --
   let _resolveReady;
@@ -58,7 +64,7 @@
     };
   }
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') ['topicsModal', 'premiumModal', 'shareModal', 'locModal', 'switcherModal']
+    if (e.key === 'Escape') ['topicsModal', 'premiumModal', 'shareModal', 'locModal', 'switcherModal', 'authModal']
       .forEach(HS.closeModal);
   });
 
@@ -86,16 +92,83 @@
     }
   }
   HS.requireAuth = function (thenLabel) {
-    if (state.session) return true;
-    // route to existing homesignal.net sign-in, returning here to complete the action
-    const back = encodeURIComponent(location.href);
-    location.href = '/index.html?signin=1&return=' + back + (thenLabel ? '&do=' + encodeURIComponent(thenLabel) : '');
+    if (state.session && !state.session.demo) return true;
+    // open the in-page email sign-in / sign-up modal (no redirect)
+    HS.openAuth();
     return false;
   };
   HS.onAvatar = function () {
     if (state.session && !state.session.demo) {
       if (confirm('Sign out?')) HS.sb().auth.signOut().then(() => location.reload());
-    } else { HS.requireAuth(); }
+    } else { HS.openAuth(); }
+  };
+
+  // -------------------------------------------------- sign in / sign up -------
+  // Passwordless email code (Supabase OTP): enter email -> get a 6-digit code ->
+  // verify. shouldCreateUser:true means the same flow signs up a new visitor and
+  // signs in a returning one. On success we bounce to ?return= (or reload) so the
+  // now-persisted Supabase session is picked up by bootSession().
+  let _authStep = 'email', _authEmail = '';
+  function authMsg(t, err) {
+    const m = $('authMsg'); if (!m) return;
+    m.textContent = t || ''; m.style.color = err ? '#c23b34' : '';
+  }
+  HS.openAuth = function () {
+    _authStep = 'email'; _authEmail = '';
+    const e = $('authEmail'), c = $('authCode'), b = $('authSubmitBtn');
+    if (e) { e.value = ''; e.classList.remove('hidden'); }
+    if (c) { c.value = ''; c.classList.add('hidden'); }
+    if ($('authSub')) $('authSub').textContent = "Enter your email and we'll send you a 6-digit code — no password needed.";
+    if (b) { b.textContent = 'Send me a code'; b.disabled = false; }
+    if ($('authBackWrap')) $('authBackWrap').classList.add('hidden');
+    if ($('authForm')) $('authForm').classList.remove('hidden');
+    if ($('authDone')) $('authDone').classList.add('hidden');
+    authMsg('New here? Entering your email creates your free account — no password, no spam.', false);
+    HS.openModal('authModal');
+    setTimeout(() => { if ($('authEmail')) $('authEmail').focus(); }, 50);
+  };
+  HS.authReset = function () { HS.openAuth(); };
+  HS.authSubmit = async function () {
+    if (!window.supabase) { authMsg('Sign-in is unavailable right now — please try again.', true); return; }
+    const btn = $('authSubmitBtn');
+    if (_authStep === 'code') {
+      const code = ($('authCode').value || '').trim();
+      if (code.length < 4) { authMsg('Enter the code from your email.', true); return; }
+      btn.disabled = true; authMsg('Checking…', false);
+      try {
+        const r = await HS.sb().auth.verifyOtp({ email: _authEmail, token: code, type: 'email' });
+        if (r.error) { authMsg(r.error.message, true); btn.disabled = false; return; }
+        $('authForm').classList.add('hidden'); $('authDone').classList.remove('hidden');
+        // reflect the new session in the top bar without a full reload
+        try { const s = await HS.sb().auth.getSession(); if (s && s.data && s.data.session) state.session = s.data.session; } catch (e) {}
+        paintTopbar();
+        setTimeout(() => {
+          HS.closeModal('authModal');
+          const back = new URLSearchParams(location.search).get('return');
+          if (!LS.get('myZip', null)) {
+            // brand-new account with no saved area -> onboard: ask for their ZIP
+            HS.openLoc(true);
+          } else {
+            location.href = back ? decodeURIComponent(back) : location.pathname;
+          }
+        }, 700);
+      } catch (e) { authMsg('Something went wrong — please try again.', true); btn.disabled = false; }
+    } else {
+      const email = ($('authEmail').value || '').trim();
+      if (!email || email.indexOf('@') < 1) { authMsg('Please enter a valid email address.', true); return; }
+      btn.disabled = true; authMsg('Sending your code…', false);
+      try {
+        const r = await HS.sb().auth.signInWithOtp({ email: email, options: { shouldCreateUser: true } });
+        if (r.error) { authMsg(r.error.message, true); btn.disabled = false; return; }
+        _authEmail = email; _authStep = 'code';
+        $('authEmail').classList.add('hidden'); $('authCode').classList.remove('hidden');
+        $('authSub').textContent = 'We emailed a code to ' + email + '. Enter it below to finish.';
+        btn.textContent = 'Verify & continue'; btn.disabled = false;
+        $('authBackWrap').classList.remove('hidden');
+        authMsg('', false);
+        setTimeout(() => { $('authCode').focus(); }, 50);
+      } catch (e) { authMsg('Something went wrong — please try again.', true); btn.disabled = false; }
+    }
   };
 
   // -------------------------------------------------- active property / topbar
@@ -106,10 +179,23 @@
   };
   function paintTopbar() {
     const p = state.activeProperty;
-    if ($('locLabel')) $('locLabel').textContent = p ? p.address : (window.HS_SEED ? window.HS_SEED.community.name : '—');
+    if ($('locLabel')) {
+      // A saved home shows its address; a saved ZIP shows "ZIP <zip>"; otherwise
+      // the visitor is on the default Del Valle sample, so flag it clearly.
+      const myZip = LS.get('myZip', null);
+      $('locLabel').textContent = p ? p.address
+        : (myZip ? ('ZIP ' + myZip)
+        : ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample Zip Code)'));
+    }
     const av = $('hs-avatar');
-    if (av) av.textContent = state.session ? (state.session.initials ||
-      (state.session.user.email || '?').slice(0, 2).toUpperCase()) : '··';
+    if (av) {
+      av.textContent = state.session ? (state.session.initials ||
+        (state.session.user.email || '?').slice(0, 2).toUpperCase()) : '··';
+      // signed out -> hide the avatar and show the "Sign in" button instead
+      av.style.display = state.session ? '' : 'none';
+    }
+    const signinBtn = $('hs-signin');
+    if (signinBtn) signinBtn.style.display = state.session ? 'none' : '';
     const commNav = $('hs-nav-comm');
     if (commNav) commNav.setAttribute('href', 'community.html?zip=' + encodeURIComponent(state.zip));
   }
@@ -128,12 +214,19 @@
   };
 
   // -------------------------------------------------- location / community ----
-  HS.openLoc = function () {
+  HS.openLoc = function (onboarding) {
     $('locForm').classList.remove('hidden');
     $('locRequest').classList.add('hidden');
     $('locDone').classList.add('hidden');
     const z = $('locZip'); z.value = ''; z.style.borderColor = '';
+    // First-run onboarding right after sign-up gets welcoming, save-oriented copy.
+    if ($('locModalTitle')) $('locModalTitle').textContent = onboarding ? "You're in — set your community" : 'Change your community';
+    const sub = document.querySelector('#locModal .msub');
+    if (sub) sub.textContent = onboarding
+      ? "Enter your ZIP code to save your area and open what's changing around your home."
+      : "Enter a ZIP code to open what's changing around that area.";
     HS.openModal('locModal');
+    setTimeout(() => { if (z) z.focus(); }, 50);
   };
   HS.findCommunity = async function () {
     const el = $('locZip'), z = el.value.trim();
@@ -141,6 +234,7 @@
     el.style.borderColor = '';
     const covered = await HS.data.isCovered(z);
     if (covered) {
+      LS.set('myZip', z);   // remember the visitor's area so the sample stops showing
       location.href = 'community.html?zip=' + z;
     } else {
       $('reqZipLabel').textContent = z;
@@ -346,6 +440,8 @@
     buildShare();
     wireSearch();
     paintBell();
+    // legacy deep link: /index.html?signin=1 (or any page) opens the sign-in modal
+    if (!state.session && new URLSearchParams(location.search).get('signin') === '1') HS.openAuth();
     _resolveReady(HS);
   }
 

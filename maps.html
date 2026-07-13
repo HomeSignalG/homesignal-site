@@ -117,7 +117,8 @@ HS.onReady(async function () {
   }
   function setGps(items){
     var within = items.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;
-    gpsEl.textContent = (c ? c.name + ', ' + c.state : 'Your area') + ' · ' + within + ' items within ' + opts.radiusMi + ' mi';
+    var place = c ? ((HS.isSample && HS.isSample()) ? c.name + ' — (Sample Zip Code)' : c.name + ', ' + c.state) : 'Your area';
+    gpsEl.textContent = place + ' · ' + within + ' items within ' + opts.radiusMi + ' mi';
   }
   function wirePanel(redraw){
     document.getElementById('lyrProjects').classList.toggle('off', !opts.showProjects);

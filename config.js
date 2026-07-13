@@ -13,8 +13,11 @@ window.HS_CONFIG = {
 
   // Local-dev only: pretend a demo user is signed in so authed screens render.
   // On the real site this is false and the existing Supabase session is used.
-  // Overridable with ?demo=1 for preview.
-  DEMO_SESSION: true,
+  // MUST stay false in production: the homepage must never show a person's initials
+  // or a home address unless a real, signed-in subscriber's Supabase session provides
+  // them. With this on, the demo persona ("AR" / "4400 Wildhorse Trail") leaks into the
+  // public chrome as if someone were logged in. Overridable with ?demo=1 for preview.
+  DEMO_SESSION: false,
 
   // The prototype community for Phase 1 (Del Valle, TX — Travis County).
   DEFAULT_ZIP: '78617',
