@@ -52,12 +52,21 @@ function validRecordUrl(u) {
 const LIFECYCLE = new Set(['built', 'approved', 'proposed']);
 
 async function loadReports() {
-  const url = `${SUPABASE_URL}/rest/v1/development_reports?select=zip,counts,sites,home_lat,home_lng&order=zip`;
-  const res = await fetch(url, {
-    headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` },
-  });
-  if (!res.ok) throw new Error(`Supabase development_reports read failed: ${res.status} ${await res.text()}`);
-  return res.json();
+  // Paginated: one unbounded select of every row's `sites` jsonb started timing out
+  // (57014) once the cache passed ~800 ZIPs (the Dallas/Tarrant/El Paso batch).
+  const rows = [];
+  const STEP = 40;
+  for (let off = 0; ; off += STEP) {
+    const url = `${SUPABASE_URL}/rest/v1/development_reports?select=zip,counts,sites,home_lat,home_lng&order=zip&limit=${STEP}&offset=${off}`;
+    const res = await fetch(url, {
+      headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` },
+    });
+    if (!res.ok) throw new Error(`Supabase development_reports read failed: ${res.status} ${await res.text()}`);
+    const page = await res.json();
+    rows.push(...page);
+    if (page.length < STEP) break;
+  }
+  return rows;
 }
 
 // The set of ZIPs in the advertised states (UT + TX). A tracker page is indexable ONLY
