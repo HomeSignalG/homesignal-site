@@ -112,7 +112,7 @@
       // 78617) as an EXAMPLE — flag it clearly as a sample ZIP so it is never
       // mistaken for the visitor's own area.
       $('locLabel').textContent = p ? p.address
-        : ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample ZIP)');
+        : ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample Zip Code)');
     }
     const av = $('hs-avatar');
     if (av) av.textContent = state.session ? (state.session.initials ||
