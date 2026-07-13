@@ -18,7 +18,18 @@
     "    object whose .url is used), else record_url_template with {case_number}/{<col>} filled,",
     "    else the dataset landing page with record_url_precision:'dataset'."
   ],
-
+  "_arcgis_readme": [
+    "ArcGIS FeatureServer connector (sources/arcgis.ts) — the Esri twin of the Socrata one.",
+    "Same discipline: append an entry here, never edit the connector. An entry needs:",
+    "  registry_id, platform:'arcgis', service_url (the LAYER query base .../FeatureServer/0),",
+    "  dataset_url (record_url fallback), jurisdiction, coverage[{state,county}],",
+    "  column_map (read point lat/lng from geometry via the flattened '__lat'/'__lng' columns),",
+    "  status_to_bucket (VERBATIM live distinct values — query first, never guess),",
+    "  type_map (verbatim class -> Industrial|Development|Residential|Utility|Commercial|Civic/Public),",
+    "  optional: record_url_template, recency_days, max_rows, out_sr (default 4326).",
+    "The ZIP column is MANDATORY. STATUS: connector BUILT + unit-tested + wired (arcgisForZip).",
+    "Add verified entries here as clean per-address permit/case FeatureServers are confirmed."
+  ],
   "socrata": [
     {
       "registry_id": "austin-subdivision-cases",
@@ -27,14 +38,23 @@
       "dataset_id": "s7gx-9m54",
       "dataset_url": "https://data.austintexas.gov/Building-and-Development/Subdivision-Cases/s7gx-9m54",
       "jurisdiction": "City of Austin",
-      "coverage": [{ "state": "TX", "county": "Travis" }],
+      "coverage": [
+        {
+          "state": "TX",
+          "county": "Travis"
+        }
+      ],
       "column_map": {
         "title": "case_name",
         "status_raw": "status",
         "type_source": "proposed_land_use",
         "file_date": "application_start_date",
         "decision_date": "status_date",
-        "address": ["street_number", "street_name", "street_type"],
+        "address": [
+          "street_number",
+          "street_name",
+          "street_type"
+        ],
         "lat": "latitude",
         "lng": "longitude",
         "case_number": "permitnum",
@@ -42,22 +62,85 @@
         "record_url": "link"
       },
       "type_map": {
-        "Single Family": "Residential", "SF": "Residential", "MF": "Residential", "Multifamily": "Residential", "Multi Family": "Residential", "Multi-Family": "Residential", "Multi family": "Residential", "Multi-family": "Residential", "Duplex": "Residential", "DUP": "Residential", "Condominium": "Residential", "Housing": "Residential", "Residential": "Residential",
-        "Industrial": "Industrial", "IND": "Industrial", "Warehouse": "Industrial",
-        "Utility Line": "Utility", "Streets and Drainage": "Utility", "ROW": "Utility", "New Wireless Communications Tower": "Utility",
-        "Commercial": "Commercial", "Commercial Multi Family": "Commercial", "Office": "Commercial", "OFC": "Commercial", "Retail": "Commercial", "RET": "Commercial", "CS": "Commercial", "Mixed Use": "Commercial", "Restaurant": "Commercial", "Hotel": "Commercial",
-        "Public": "Civic/Public", "Public/Civic": "Civic/Public", "PUB": "Civic/Public", "Church": "Civic/Public", "School": "Civic/Public", "Park": "Civic/Public", "Religious Assembly": "Civic/Public", "Recreational": "Civic/Public"
+        "Single Family": "Residential",
+        "SF": "Residential",
+        "MF": "Residential",
+        "Multifamily": "Residential",
+        "Multi Family": "Residential",
+        "Multi-Family": "Residential",
+        "Multi family": "Residential",
+        "Multi-family": "Residential",
+        "Duplex": "Residential",
+        "DUP": "Residential",
+        "Condominium": "Residential",
+        "Housing": "Residential",
+        "Residential": "Residential",
+        "Industrial": "Industrial",
+        "IND": "Industrial",
+        "Warehouse": "Industrial",
+        "Utility Line": "Utility",
+        "Streets and Drainage": "Utility",
+        "ROW": "Utility",
+        "New Wireless Communications Tower": "Utility",
+        "Commercial": "Commercial",
+        "Commercial Multi Family": "Commercial",
+        "Office": "Commercial",
+        "OFC": "Commercial",
+        "Retail": "Commercial",
+        "RET": "Commercial",
+        "CS": "Commercial",
+        "Mixed Use": "Commercial",
+        "Restaurant": "Commercial",
+        "Hotel": "Commercial",
+        "Public": "Civic/Public",
+        "Public/Civic": "Civic/Public",
+        "PUB": "Civic/Public",
+        "Church": "Civic/Public",
+        "School": "Civic/Public",
+        "Park": "Civic/Public",
+        "Religious Assembly": "Civic/Public",
+        "Recreational": "Civic/Public"
       },
       "status_to_bucket": {
-        "proposed": ["Pending", "In Review", "Scheduled for Hearing", "CC Pending", "Internet Pending", "Intake Pending", "Waiting on Fiscal", "Waiting on Legal", "Intake Accepted - Fees Due", "Awaiting Update", "Admin Hold"],
-        "approved": ["Approved", "Approved and Released", "CC Approved", "Awaiting Recordation"],
-        "operating": ["Subdivision Recorded"],
-        "exclude": ["Withdrawn", "Expired", "Denied", "VOID", "Vacated", "Cancelled", "Aborted", "CC Rejected", "Closed", "Review Completed", "Inactive"]
+        "proposed": [
+          "Pending",
+          "In Review",
+          "Scheduled for Hearing",
+          "CC Pending",
+          "Internet Pending",
+          "Intake Pending",
+          "Waiting on Fiscal",
+          "Waiting on Legal",
+          "Intake Accepted - Fees Due",
+          "Awaiting Update",
+          "Admin Hold"
+        ],
+        "approved": [
+          "Approved",
+          "Approved and Released",
+          "CC Approved",
+          "Awaiting Recordation"
+        ],
+        "operating": [
+          "Subdivision Recorded"
+        ],
+        "exclude": [
+          "Withdrawn",
+          "Expired",
+          "Denied",
+          "VOID",
+          "Vacated",
+          "Cancelled",
+          "Aborted",
+          "CC Rejected",
+          "Closed",
+          "Review Completed",
+          "Inactive"
+        ]
       },
       "record_url_precision": "record",
       "incremental_field": "update_date"
     },
-
     {
       "registry_id": "austin-site-plan-cases",
       "platform": "socrata",
@@ -65,14 +148,23 @@
       "dataset_id": "mavg-96ck",
       "dataset_url": "https://data.austintexas.gov/Building-and-Development/Site-Plan-Cases/mavg-96ck",
       "jurisdiction": "City of Austin",
-      "coverage": [{ "state": "TX", "county": "Travis" }],
+      "coverage": [
+        {
+          "state": "TX",
+          "county": "Travis"
+        }
+      ],
       "column_map": {
         "title": "case_name",
         "status_raw": "status",
         "type_source": "proposed_land_use",
         "file_date": "application_start_date",
         "decision_date": "status_date",
-        "address": ["street_number", "street_name", "street_type"],
+        "address": [
+          "street_number",
+          "street_name",
+          "street_type"
+        ],
         "lat": "latitude",
         "lng": "longitude",
         "case_number": "permit_number",
@@ -80,22 +172,85 @@
         "record_url": "link"
       },
       "type_map": {
-        "Single Family": "Residential", "SF": "Residential", "MF": "Residential", "Multifamily": "Residential", "Multi Family": "Residential", "Multi-Family": "Residential", "Multi family": "Residential", "Multi-family": "Residential", "Duplex": "Residential", "DUP": "Residential", "Condominium": "Residential", "Housing": "Residential", "Residential": "Residential",
-        "Industrial": "Industrial", "IND": "Industrial", "Warehouse": "Industrial",
-        "Utility Line": "Utility", "Streets and Drainage": "Utility", "ROW": "Utility", "New Wireless Communications Tower": "Utility",
-        "Commercial": "Commercial", "Commercial Multi Family": "Commercial", "Office": "Commercial", "OFC": "Commercial", "Retail": "Commercial", "RET": "Commercial", "CS": "Commercial", "Mixed Use": "Commercial", "Restaurant": "Commercial", "Hotel": "Commercial",
-        "Public": "Civic/Public", "Public/Civic": "Civic/Public", "PUB": "Civic/Public", "Church": "Civic/Public", "School": "Civic/Public", "Park": "Civic/Public", "Religious Assembly": "Civic/Public", "Recreational": "Civic/Public"
+        "Single Family": "Residential",
+        "SF": "Residential",
+        "MF": "Residential",
+        "Multifamily": "Residential",
+        "Multi Family": "Residential",
+        "Multi-Family": "Residential",
+        "Multi family": "Residential",
+        "Multi-family": "Residential",
+        "Duplex": "Residential",
+        "DUP": "Residential",
+        "Condominium": "Residential",
+        "Housing": "Residential",
+        "Residential": "Residential",
+        "Industrial": "Industrial",
+        "IND": "Industrial",
+        "Warehouse": "Industrial",
+        "Utility Line": "Utility",
+        "Streets and Drainage": "Utility",
+        "ROW": "Utility",
+        "New Wireless Communications Tower": "Utility",
+        "Commercial": "Commercial",
+        "Commercial Multi Family": "Commercial",
+        "Office": "Commercial",
+        "OFC": "Commercial",
+        "Retail": "Commercial",
+        "RET": "Commercial",
+        "CS": "Commercial",
+        "Mixed Use": "Commercial",
+        "Restaurant": "Commercial",
+        "Hotel": "Commercial",
+        "Public": "Civic/Public",
+        "Public/Civic": "Civic/Public",
+        "PUB": "Civic/Public",
+        "Church": "Civic/Public",
+        "School": "Civic/Public",
+        "Park": "Civic/Public",
+        "Religious Assembly": "Civic/Public",
+        "Recreational": "Civic/Public"
       },
       "status_to_bucket": {
-        "proposed": ["Pending", "In Review", "Scheduled for Hearing", "Tolling - Hearing Pending", "CC Pending", "CC Pending - Fees Paid", "Internet Pending", "Intake Pending", "Waiting on Fiscal", "Waiting on Legal", "Intake Accepted - Fees Due", "Formal Intake Accepted - Fees Due", "Awaiting Update", "Suspended"],
-        "approved": ["Approved", "Approved and Released", "CC Approved"],
+        "proposed": [
+          "Pending",
+          "In Review",
+          "Scheduled for Hearing",
+          "Tolling - Hearing Pending",
+          "CC Pending",
+          "CC Pending - Fees Paid",
+          "Internet Pending",
+          "Intake Pending",
+          "Waiting on Fiscal",
+          "Waiting on Legal",
+          "Intake Accepted - Fees Due",
+          "Formal Intake Accepted - Fees Due",
+          "Awaiting Update",
+          "Suspended"
+        ],
+        "approved": [
+          "Approved",
+          "Approved and Released",
+          "CC Approved"
+        ],
         "operating": [],
-        "exclude": ["Withdrawn", "Expired", "Denied", "VOID", "Cancelled", "Aborted", "CC Rejected", "Intake Rejected", "Closed", "Inactive", "Application Incomplete"]
+        "exclude": [
+          "Withdrawn",
+          "Expired",
+          "Denied",
+          "VOID",
+          "Cancelled",
+          "Aborted",
+          "CC Rejected",
+          "Intake Rejected",
+          "Closed",
+          "Inactive",
+          "Application Incomplete"
+        ]
       },
       "record_url_precision": "record",
       "incremental_field": "update_date"
     },
-
     {
       "registry_id": "austin-issued-construction-permits",
       "platform": "socrata",
@@ -103,7 +258,12 @@
       "dataset_id": "3syk-w9eu",
       "dataset_url": "https://data.austintexas.gov/Building-and-Development/Issued-Construction-Permits/3syk-w9eu",
       "jurisdiction": "City of Austin",
-      "coverage": [{ "state": "TX", "county": "Travis" }],
+      "coverage": [
+        {
+          "state": "TX",
+          "county": "Travis"
+        }
+      ],
       "column_map": {
         "title": "description",
         "status_raw": "status_current",
@@ -122,10 +282,38 @@
         "Commercial": "Commercial"
       },
       "status_to_bucket": {
-        "proposed": ["Pending", "Pending Permit", "Re Review", "Inactive Pending Revision", "On Hold", "Suspended"],
-        "approved": ["Active"],
-        "operating": ["Final"],
-        "exclude": ["Withdrawn", "Expired", "Expired - License", "VOID", "Cancelled", "Cancelled - Contractor Required", "Cancelled - New Permit Required", "New Permit Required", "Aborted", "Denied but Closed", "Revoked", "Rejected", "Closed", "Inactive Contractor", "Application Incomplete", "Awaiting Upload"]
+        "proposed": [
+          "Pending",
+          "Pending Permit",
+          "Re Review",
+          "Inactive Pending Revision",
+          "On Hold",
+          "Suspended"
+        ],
+        "approved": [
+          "Active"
+        ],
+        "operating": [
+          "Final"
+        ],
+        "exclude": [
+          "Withdrawn",
+          "Expired",
+          "Expired - License",
+          "VOID",
+          "Cancelled",
+          "Cancelled - Contractor Required",
+          "Cancelled - New Permit Required",
+          "New Permit Required",
+          "Aborted",
+          "Denied but Closed",
+          "Revoked",
+          "Rejected",
+          "Closed",
+          "Inactive Contractor",
+          "Application Incomplete",
+          "Awaiting Upload"
+        ]
       },
       "record_url_precision": "record",
       "incremental_field": "applieddate",
@@ -134,6 +322,90 @@
       "_zip_mode_note": "RESERVED FOR THE PER-ADDRESS PROPERTY PAGE (homesignalmap.html?addr=), not the ZIP aggregate. ~85% of rows carry no native coordinates, so ZIP-mode geocoding (1000s of addresses per refresh) would time out the edge function, and 1,300+ individual building permits would swamp the ZIP map. At a single address only that parcel's permits are shown (one geocode). Full status_to_bucket + type_map are kept so the property-page wiring is a pure-data activation (flip zip_mode + call the connector in address mode)."
     }
   ],
-
-  "arcgis": []
+  "arcgis": [
+    {
+      "registry_id": "slc-planning-petitions",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/mMBpeYj0vPFotzbe/arcgis/rest/services/Planning_Petition/FeatureServer/0",
+      "dataset_url": "https://gis-slcgov.opendata.arcgis.com/",
+      "jurisdiction": "Salt Lake City",
+      "coverage": [
+        {
+          "state": "UT",
+          "county": "Salt Lake"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "ApplicationSubType",
+          "ProjectName"
+        ],
+        "status_raw": "ApplicationStatus",
+        "type_source": "ApplicationSubType",
+        "file_date": "AppliedDate",
+        "decision_date": "IssuedDate",
+        "address": "Location",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "PermitNum",
+        "zip": "ZIPCODE",
+        "record_url": "link"
+      },
+      "type_map": {
+        "Minor Alteration": "Development",
+        "Special Exception": "Development",
+        "Conditional Use": "Development",
+        "Request for Rebuild": "Development",
+        "Zoning Amendment": "Development",
+        "Routine and Uncontest Home Occ": "Residential",
+        "Planned Dev - Conditional Use": "Development",
+        "Consolidation": "Development",
+        "Preliminary Subdiv": "Development",
+        "Conditional Design Review": "Development",
+        "Final Plat Approval": "Development",
+        "Major Alter or Minor Construct": "Development",
+        "Lot Line Adjustment": "Development",
+        "New Construction": "Development",
+        "Alley Vacation": "Utility",
+        "Street Closure": "Utility",
+        "Transit Station Development": "Development",
+        "Variance": "Development",
+        "Preliminary Condo-New": "Residential",
+        "Master Plan Amendment": "Development",
+        "Planned Development": "Development",
+        "Routine and Uncontested": "Residential",
+        "Certificate of Appropriateness": "Development",
+        "Subdivision Amendment": "Development",
+        "Preliminary Subdiv-Minor": "Development",
+        "Demolition - Contributing": "Development",
+        "Demolition - Non Contributing": "Development",
+        "Designation": "Civic/Public",
+        "Master Plan": "Development",
+        "Home Daycare or Preschool": "Residential",
+        "Annexation": "Development",
+        "Relocation": "Development",
+        "Economic Hardship": "Development",
+        "Conservation District": "Civic/Public",
+        "Inclusion": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Active",
+          "Additional Information",
+          "Accepted",
+          "Pre-screen",
+          "In Progress"
+        ],
+        "approved": [
+          "Approved"
+        ],
+        "exclude": [
+          "Closed"
+        ]
+      },
+      "record_url_precision": "record",
+      "incremental_field": "AppliedDate",
+      "extra_where": "ApplicationSubType NOT IN ('Zoning Verification Letter','Administrative Interpretation','Appeal Admin Decision','Appeal Comm Decision','Determination Non-Conform Use')"
+    }
+  ]
 }
