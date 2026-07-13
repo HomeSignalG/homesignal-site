@@ -60,6 +60,15 @@ async function loadReports() {
   return res.json();
 }
 
+// The set of Utah ZIPs (index-only-Utah policy). A tracker page is indexable ONLY for a
+// Utah ZIP that has content; everything else stays noindex. Data-driven off the live table.
+async function loadUtahZips() {
+  const url = `${SUPABASE_URL}/rest/v1/app_community_meta?select=zip&state=eq.UT`;
+  const res = await fetch(url, { headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` } });
+  if (!res.ok) return new Set();
+  return new Set((await res.json()).map((r) => r.zip));
+}
+
 // Property dossier rows (gap-analysis §4.5) — zero-touch: every cached address is verified.
 async function loadPropertyReports() {
   const url = `${SUPABASE_URL}/rest/v1/property_reports?select=address,zip,counts,sites,sources_checked&order=address`;
@@ -74,7 +83,8 @@ async function main() {
   let reports = await loadReports();
   reports.sort((a, b) => a.zip.localeCompare(b.zip));
   if (SAMPLE > 0) reports = reports.slice(0, SAMPLE);
-  console.log(`Verifying ${reports.length} ZIP development page(s) against ${SITE_BASE}`);
+  const utahZips = await loadUtahZips();
+  console.log(`Verifying ${reports.length} ZIP development page(s) against ${SITE_BASE} (${utahZips.size} Utah ZIPs indexable)`);
 
   const browser = await chromium.launch();
   const page = await browser.newPage();
@@ -113,13 +123,27 @@ async function main() {
             if (!allow.some((w) => kind.includes(w))) mislabeled.push(`${s.label || '??'} [${s.type}]→"${window.__HS_KIND(s)}"`);
           }
         }
+        const rm = document.getElementById('robots-meta');
         return {
           rendered: sites,
           facText: (document.getElementById('cFac') || {}).textContent || null,
           mapInited: !!document.querySelector('#map .leaflet-container, #map canvas'),
           mislabeled,
+          shell: !!document.querySelector('.side, .nav'),                 // new left-sidebar shell present
+          robots: rm ? (rm.getAttribute('content') || '') : '',
         };
       });
+
+      // NEW LAYOUT: every tracker page must render the shared left-sidebar shell.
+      if (!st.shell) fails.push(`ZIP ${zip}: new sidebar shell did not render (old layout?)`);
+      // INDEX-ONLY-UTAH: indexable iff a Utah ZIP that has content; else noindex.
+      const renderedForPolicy = st.rendered != null ? st.rendered : sites;
+      const isIndex = /(^|[^n])index/i.test(st.robots) && !/noindex/i.test(st.robots);
+      const expectIndex = utahZips.has(zip) && renderedForPolicy.length > 0;
+      if (isIndex !== expectIndex) {
+        fails.push(`ZIP ${zip}: robots="${st.robots}" (indexable=${isIndex}) violates index-only-Utah ` +
+          `(expected ${expectIndex ? 'index' : 'noindex'}; utah=${utahZips.has(zip)}, sites=${renderedForPolicy.length})`);
+      }
       if (st.mislabeled && st.mislabeled.length) {
         fails.push(`ZIP ${zip}: ${st.mislabeled.length} record(s) whose label contradicts its dot colour ` +
           `[${st.mislabeled.slice(0, 3).join(', ')}] (stage/colour must agree)`);

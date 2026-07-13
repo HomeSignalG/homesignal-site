@@ -7,6 +7,8 @@
      and the map imagery hosts the three views need. MapLibre spins workers from blob:. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com https://elevation-tiles-prod.s3.amazonaws.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://elevation-tiles-prod.s3.amazonaws.com; font-src 'self'; form-action 'self'"/>
 <title>HomeSignal — Development around your home</title>
+<!-- Default noindex; the page init flips this to index only for a Utah ZIP that has real, sourced content. -->
+<meta name="robots" content="noindex, nofollow" id="robots-meta"/>
 <meta name="description" content="See what's built and what's proposed near your home — EPA-registered facilities, planning hearings and open comment windows — every item linked to its official public record."/>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
 <link rel="canonical" href="https://homesignal.net/homesignalmap.html"/>
@@ -19,6 +21,8 @@
 <meta name="twitter:image" content="https://homesignal.net/og-default.png"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css"/>
+<!-- Shared shell stylesheet FIRST, so the page's map-specific inline CSS below still wins where it overrides. -->
+<link rel="stylesheet" href="app.css"/>
 <style>
   :root{
     --ink:#0F1A1C; --soft:#46565A; --mute:#5b6d71; --line:#E7ECEA; --paper:#EEF2F1; --card:#fff;
@@ -35,49 +39,9 @@
   .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
   a{color:var(--green)}
 
-  /* top bar — shared nav shell, identical structure/classes to dashboard.html / community.html */
-  .topbar{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:100}
-  .topbar .wrap{display:flex;align-items:center;gap:16px;height:62px;position:relative}
-  .logo{display:flex;align-items:center;gap:10px;text-decoration:none}
-  .logo .sq{width:30px;height:30px;border-radius:8px;background:var(--green);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
-  .brand{font-weight:700;font-size:18px;letter-spacing:-.01em;color:var(--ink)}
-  .brand em{font-style:normal;color:var(--green)}
-  .nav-menu{display:contents}
-  .nav{margin-left:18px;display:flex;gap:4px}
-  .nav a{font-size:13.5px;color:var(--soft);text-decoration:none;padding:7px 12px;border-radius:8px}
-  .nav a:hover{background:#f1f5f3}
-  .nav-toggle{display:none;background:none;border:none;cursor:pointer;color:var(--ink);padding:4px}
-  .nav-actions{display:flex;gap:10px;align-items:center;margin-left:auto}
-  .btn-outline{background:transparent;border:1px solid var(--line);color:var(--ink);padding:8px 16px;border-radius:8px;font:500 13px var(--font);cursor:pointer;text-decoration:none;display:inline-block}
-  .btn-outline:hover{background:#f1f5f3}
-  .btn-primary{background:var(--green);color:#fff;border:none;padding:8px 16px;border-radius:8px;font:600 13px var(--font);cursor:pointer}
-  .btn-primary:hover{opacity:.9}
-  @media(max-width:720px){
-    .topbar .wrap{flex-wrap:wrap;height:auto;padding:12px 0}
-    .nav-toggle{display:flex;align-items:center}
-    .nav-menu{display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;
-      gap:0;background:#fff;border-bottom:1px solid var(--line);padding:6px 20px 14px;
-      box-shadow:0 8px 16px rgba(0,0,0,.07);z-index:50}
-    .nav-menu.open{display:flex}
-    .nav{flex-direction:column;align-items:stretch;gap:0;margin-left:0;width:100%}
-    .nav a{display:block;padding:12px 0;border-bottom:1px solid var(--line)}
-    .nav-actions{flex-direction:column;align-items:stretch;gap:8px;width:100%;margin:12px 0 0}
-    .nav-actions>*{width:100%;padding:12px;text-align:center}
-  }
-
-  /* AUTH MODAL — shared markup, identical across pages */
-  .auth-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;align-items:center;justify-content:center}
-  .auth-modal{background:#fff;border-radius:14px;padding:28px;width:100%;max-width:380px;margin:16px;border:1px solid var(--line);position:relative}
-  .auth-modal h2{font-size:20px;font-weight:700;margin-bottom:4px;color:var(--ink)}
-  .auth-sub{font-size:13px;color:var(--soft);margin-bottom:18px}
-  .auth-input{width:100%;border:1px solid var(--line);border-radius:8px;padding:11px 13px;font-size:14px;background:var(--paper);color:var(--ink);margin-bottom:10px;font-family:var(--font)}
-  .auth-submit{width:100%;background:var(--green);color:#fff;border:none;padding:12px;border-radius:8px;font:600 14px var(--font);cursor:pointer}
-  .auth-submit:hover{opacity:.9}
-  .auth-submit:disabled{opacity:.6;cursor:default}
-  .auth-msg{font-size:13px;color:var(--green-dark);margin-top:12px;min-height:1em}
-  .auth-toggle{font-size:13px;color:var(--soft);margin-top:16px;text-align:center}
-  .auth-toggle a{color:var(--green);font-weight:600}
-  .auth-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:22px;line-height:1;color:var(--mute);cursor:pointer}
+  /* NOTE: the page's old top-bar + auth-modal CSS was removed in the shell conversion — the shared
+     left-sidebar shell (app.css + partials/shell.html) now owns nav, auth and share. Only map/page
+     content CSS remains below, and it deliberately overrides app.css for this page's content. */
 
   .head{padding:34px 0 8px}
   .eyebrow{font-size:12px;letter-spacing:.02em;color:var(--mute);text-transform:none}
@@ -320,33 +284,12 @@
     margin:0 3px 0 9px;border:1px solid rgba(0,0,0,.15)}
 </style>
 </head>
-<body>
-  <div class="topbar"><div class="wrap">
-    <a class="logo" href="index.html">
-      <span class="sq"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z"/><path d="M9.5 20.5v-6h5v6"/></svg></span>
-      <div class="brand">Home<em>Signal</em></div>
-    </a>
-    <button class="nav-toggle" id="nav-toggle" aria-label="Open menu"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-    <div class="nav-menu" id="nav-menu"><nav class="nav"><a href="how-it-works.html">How it works</a><a href="about.html">About</a></nav></div>
-    <button class="nav-share" type="button" onclick="sharePage()" aria-label="Share this page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg><span>Share</span></button>
-    <div class="nav-actions" id="nav-auth"><button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button></div>
-  </div></div>
-
-  <!-- AUTH MODAL (shared markup, identical across pages) -->
-  <div id="auth-overlay" class="auth-overlay">
-    <div class="auth-modal">
-      <button class="auth-close" id="auth-close">&times;</button>
-      <h2 id="auth-title">Log in or sign up</h2>
-      <p class="auth-sub" id="auth-sub">Enter your email and we'll send you a code &mdash; no password needed.</p>
-      <input type="email" id="auth-email" class="auth-input" placeholder="Email address" autocomplete="email" / aria-label="Email address">
-      <input type="text" id="auth-code" class="auth-input" placeholder="Enter your code" inputmode="numeric" maxlength="8" autocomplete="one-time-code" style="display:none;letter-spacing:6px;text-align:center;font-size:18px;" / aria-label="Enter your code">
-      <button id="auth-submit" class="auth-submit">Send me a code</button>
-      <div id="auth-msg" class="auth-msg"></div>
-      <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><a href="#" id="auth-back-link">Use a different email</a></div>
-    </div>
-  </div>
-
+<body data-nav="dev">
+<!-- Shell conversion: the shared left-sidebar chrome (sidebar + top bar + all modals, incl. auth &
+     share) is injected by shell.js. This page's own top-bar and email-OTP auth modal were removed —
+     the shell owns them now. Page content lives in the <template> below; shell.js moves it into
+     #hs-slot on boot, so any DOM-touching init must run inside HS.onReady (see the bottom script). -->
+<template id="hs-content">
   <div class="wrap">
     <div class="head">
       <div class="eyebrow" id="eyebrow">Box Elder County · Utah</div>
@@ -418,7 +361,7 @@
                when nothing is open. Sits above the counts so a worried resident sees it first. -->
           <div class="commentbar" id="commentBar" style="display:none"></div>
           <div class="counts">
-            <div class="cc"><div class="n" id="cFac">0</div><div class="k">Industrial sites near you</div></div>
+            <div class="cc"><div class="n" id="cFac">0</div><div class="k">Regulated facilities nearby</div></div>
             <div class="cc"><div class="n" id="cDev">0</div><div class="k">New projects proposed nearby</div></div>
             <div class="cc flag"><div class="n" id="cOpen">0</div><div class="k">Open for public comment</div></div>
             <div class="cc"><div class="n" id="cTot">0</div><div class="k">Total records nearby</div></div>
@@ -499,93 +442,29 @@
          page / many cached rows, keyed by canonical address (?addr=…). -->
     <div id="property"></div>
   </div>
+</template>
 
+<!-- Shared shell chain — loads config + data libs + shell.js so HS / HS.onReady / HS.data /
+     HS_CONFIG exist before this page's own scripts run. shell.js injects partials/shell.html,
+     moves the <template> content into #hs-slot, then resolves HS.ready (HS.onReady). -->
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-// ============================================================
-// Shared auth module (identical across pages). Exposes
-// window.hsUser / hsToken / hsOpenAuth and calls hsOnAuthChange.
-// ============================================================
-(function(){
-  var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
-  var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
-  var client = window.supabase.createClient(SB_URL, SB_ANON);
-  window.hsClient = client;
-  window.hsUser = null;
-  var step = 'email';
-  var pendingEmail = '';
-  function $(id){ return document.getElementById(id); }
-  function showMsg(text, isError){ var m = $('auth-msg'); m.textContent = text || ''; m.style.color = isError ? '#b91c1c' : 'var(--green-dark)'; }
-  function setStep(s){
-    step = s;
-    if (s === 'code') {
-      $('auth-sub').textContent = 'We emailed a code to ' + pendingEmail + '. Enter it below.';
-      $('auth-email').style.display = 'none'; $('auth-code').style.display = 'block';
-      $('auth-submit').textContent = 'Verify & continue'; $('auth-back-wrap').style.display = 'block';
-      setTimeout(function(){ $('auth-code').focus(); }, 50);
-    } else {
-      $('auth-sub').innerHTML = "Enter your email and we'll send you a code &mdash; no password needed.";
-      $('auth-email').style.display = 'block'; $('auth-code').style.display = 'none'; $('auth-code').value = '';
-      $('auth-submit').textContent = 'Send me a code'; $('auth-back-wrap').style.display = 'none';
-      setTimeout(function(){ $('auth-email').focus(); }, 50);
-    }
-  }
-  function openAuth(){ pendingEmail=''; $('auth-email').value=''; showMsg('', false); setStep('email'); $('auth-overlay').style.display = 'flex'; }
-  function closeAuth(){ $('auth-overlay').style.display = 'none'; }
-  window.hsOpenAuth = openAuth;
-  async function sendCode(){
-    var email = ($('auth-email').value || '').trim();
-    if (!email || email.indexOf('@') === -1) { showMsg('Please enter a valid email address.', true); return; }
-    $('auth-submit').disabled = true; showMsg('Sending your code…', false);
-    try { var r = await client.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true } });
-      if (r.error) { showMsg(r.error.message, true); } else { pendingEmail = email; setStep('code'); showMsg('', false); }
-    } catch (e) { showMsg('Something went wrong — please try again.', true); }
-    $('auth-submit').disabled = false;
-  }
-  async function verifyCode(){
-    var code = ($('auth-code').value || '').trim();
-    if (code.length < 4) { showMsg('Enter the code from your email.', true); return; }
-    $('auth-submit').disabled = true; showMsg('Checking…', false);
-    try { var r = await client.auth.verifyOtp({ email: pendingEmail, token: code, type: 'email' });
-      if (r.error) { showMsg(r.error.message, true); $('auth-submit').disabled = false; return; } closeAuth();
-    } catch (e) { showMsg('Something went wrong — please try again.', true); }
-    $('auth-submit').disabled = false;
-  }
-  function submitAuth(){ if (step === 'code') verifyCode(); else sendCode(); }
-  function bindAuthButtons(){ var li = $('btn-login'), su = $('btn-signup'); if (li) li.addEventListener('click', function(){ openAuth(); }); if (su) su.addEventListener('click', function(){ openAuth(); }); }
-  function updateNav(session){
-    window.hsUser = (session && session.user) ? session.user : null;
-    window.hsToken = (session && session.access_token) ? session.access_token : null;
-    var box = $('nav-auth');
-    if (box) {
-      if (window.hsUser) {
-        box.innerHTML = '<a class="btn-outline" href="dashboard.html" style="text-decoration:none">Dashboard</a>' + '<span style="display:inline-flex;align-items:center;gap:10px;margin-left:12px;vertical-align:middle">' + '<span title="' + window.hsUser.email + '" style="font-size:12.5px;color:#6b7280;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle">' + window.hsUser.email + '</span>' + '<button type="button" id="btn-logout" style="background:none;border:none;padding:0;color:#6b7280;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline">Log out</button>' + '</span>';
-        var lo = $('btn-logout'); if (lo) lo.addEventListener('click', function(){ client.auth.signOut(); });
-      } else {
-        box.innerHTML = '<button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button>';
-        bindAuthButtons();
-      }
-    }
-    if (typeof window.hsOnAuthChange === 'function') { try { window.hsOnAuthChange(window.hsUser); } catch(e){} }
-  }
-  document.addEventListener('DOMContentLoaded', function(){
-    bindAuthButtons();
-    $('auth-close').addEventListener('click', closeAuth);
-    $('auth-submit').addEventListener('click', submitAuth);
-    $('auth-email').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
-    $('auth-code').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
-    $('auth-back-link').addEventListener('click', function(e){ e.preventDefault(); showMsg('', false); setStep('email'); });
-    $('auth-overlay').addEventListener('click', function(e){ if (e.target === $('auth-overlay')) closeAuth(); });
-    client.auth.getSession().then(function(res){ updateNav(res.data.session); });
-    client.auth.onAuthStateChange(function(evt, session){ updateNav(session); });
-  });
-})();
-</script>
+<script src="lib/data.js"></script>
+<script src="lib/templates.js"></script>
+<script src="lib/map.js"></script>
+<script src="shell.js"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+// Shell conversion: the entire page runtime runs INSIDE HS.onReady, because the page content
+// (the <template> above) isn't in the DOM until shell.js injects it. Every top-level statement
+// below that touches the DOM (form/legend/view wiring + the ?zip=/?addr= boot IIFE) therefore
+// runs after injection. Global function/var definitions live in this closure — no page-content
+// onclick depends on them being global (the only inline onclick, the old top-bar share, is gone).
+HS.onReady(function(){
   // --- config -------------------------------------------------------------
   var ENDPOINT = "https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/get-address-report";
   var APIKEY   = "sb_publishable_ZLf937bYRsWOVeTDVaHI7Q_LKfDmsE-"; // public key, safe in the browser
@@ -611,6 +490,14 @@
   // home — no "this address" pin until the resident searches (development-tracker §0/§3).
   var ZIP_MODE = false, ZIP_CODE = null, HOME_ANCHOR = false;
   var ZIP_COUNTY = null, FACILITIES_ONLY = false;   // drives the honest facilities-only coverage note
+  // SEO policy (shell conversion): index ONLY a Utah ZIP page that has real, sourced content. Default
+  // is noindex (set in <head>); ZIP_STATE resolves from the communities lookup in loadZip(), HAS_CONTENT
+  // from render()'s sourced set. Address mode, property mode, non-Utah and empty ZIPs all stay noindex.
+  var ZIP_STATE = null, HAS_CONTENT = false;
+  function setIndexable(ok){
+    var m = document.getElementById("robots-meta");
+    if(m) m.setAttribute("content", ok ? "index, follow" : "noindex, nofollow");
+  }
   // HomeSignal house logo, reused as the "your home" marker across all three maps.
   var HOME_SVG = "<svg width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='#fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z'/><path d='M9.5 20.5v-6h5v6'/></svg>";
   function homePinEl(){ var el=document.createElement("div"); el.className="homepin"; el.innerHTML=HOME_SVG; return el; }
@@ -1054,18 +941,27 @@
   function loadZip(zip){
     ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
     FACILITIES_ONLY = false; ZIP_COUNTY = null;
+    ZIP_STATE = null; HAS_CONTENT = false; setIndexable(false);   // start noindex; flip on only for a Utah ZIP with content
     LAST_ADDR = "ZIP " + zip;
     // Best-effort county name for the coverage note + the "Town Name (ZIP)" place label
     // for the header (the cache row has neither). Non-blocking: if it resolves after
     // render(), updateCovNote() re-paints. cs.{<zip>} = text[] contains; take the county
     // only if it's unambiguous, and the town name from the most-specific community row.
-    fetch(SUPABASE_URL + "/rest/v1/communities?select=name,level,county&zip_codes=cs.%7B" + encodeURIComponent(zip) + "%7D",
+    fetch(SUPABASE_URL + "/rest/v1/communities?select=name,level,county,state&zip_codes=cs.%7B" + encodeURIComponent(zip) + "%7D",
       { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } })
       .then(function(r){ return r.ok ? r.json() : []; })
       .then(function(rows){
         var seen = {}; (rows||[]).forEach(function(r){ if(r.county) seen[r.county] = 1; });
         var keys = Object.keys(seen);
         ZIP_COUNTY = keys.length === 1 ? keys[0] : null;
+        // SEO: capture the ZIP's state (unambiguous only) — Utah 'UT' is the sole indexable state.
+        // Normalize since seed rows carry 'Utah' or 'UT'. Re-evaluate indexability (render() may have
+        // already set HAS_CONTENT; whichever of the two lookups lands last paints the final robots value).
+        var st = {}; (rows||[]).forEach(function(r){ if(r.state) st[String(r.state).trim().toUpperCase()] = 1; });
+        var sk = Object.keys(st);
+        var s0 = sk.length === 1 ? sk[0] : null;
+        ZIP_STATE = (s0 === "UTAH") ? "UT" : s0;
+        setIndexable(ZIP_MODE && ZIP_STATE === "UT" && HAS_CONTENT);
         // Backbone standard: pair the most-specific place name with the ZIP — "Ogden (84401)".
         // The "Town Name (ZIP)" is the H1 (parity with the alerts page's comm-title) so a
         // resident sees at a glance they're on the right ZIP page; "Development overview" is
@@ -1112,10 +1008,11 @@
           render({ address:"ZIP "+zip, home:{ lat:row.home_lat, lng:row.home_lng },
                    counts:row.counts||{}, sites:row.sites||[], paywall:!!row.paywall, updated:row.refreshed_at });
         } else {
-          // No cached row yet → still a valid, empty page. Empty is valid, not an error.
+          // No cached row yet → still a valid, empty page. Empty is valid (never fabricated), not an error.
           window.__HS_SITES = [];
+          setIndexable(false);              // empty ZIP is never indexed
           $("results").style.display = "block";
-          status("No cached report for ZIP " + zip + " yet. Enter your address for the live 1-mile view.");
+          status("Coverage coming — we don't have development records for ZIP " + zip + " yet. Enter your street address for the live 1-mile view.");
         }
       })
       .catch(function(){
@@ -1139,6 +1036,11 @@
     // Anti-fabrication gate + expose the rendered set for scripts/verify-development.mjs.
     var sites = (data.sites || []).filter(sourced);
     window.__HS_SITES = sites;
+    // SEO policy: index only a Utah ZIP page that has real, sourced content. Address mode (ZIP_MODE
+    // false), non-Utah and empty ZIPs stay noindex. ZIP_STATE resolves async in loadZip(); whichever
+    // of the two setIndexable() calls lands last wins (same pattern as updateCovNote).
+    HAS_CONTENT = ZIP_MODE && sites.length > 0;
+    setIndexable(ZIP_MODE && ZIP_STATE === "UT" && sites.length > 0);
     // Expose the label backbone so the verifier can assert, live, that the resident-facing label
     // agrees with the dot's colour (both derive from the lifecycle stage — see kindLabel/stageOf).
     window.__HS_KIND = kindLabel; window.__HS_STAGE = stageOf; window.__HS_COLORS = COLORS;
@@ -2249,7 +2151,8 @@
     // evidence snapshot: a self-contained HTML file built from this cache row only.
     var wb = $("propWatch");
     if(wb) wb.addEventListener("click", function(){
-      if(!window.hsUser){ if(window.hsOpenAuth) window.hsOpenAuth(); return; }
+      // Auth is owned by the shell now: HS.requireAuth routes to /index.html?signin=1 when signed out.
+      if(window.HS && HS.requireAuth){ if(!HS.requireAuth('watch')) return; }
       wb.disabled = true; wb.textContent = "Watch requests aren't live yet";
     });
     var xb = $("propExport");
@@ -2547,12 +2450,7 @@
     if(!z){ var m = u.pathname.match(/\/development\/(\d{5})\b/); if(m) z = m[1]; }
     if(z && /^\d{5}$/.test(z)){ loadZip(z); loadDevTracker(z); }
   })();
+});  // end HS.onReady — the page runtime above ran after the shell injected #hs-content
 </script>
-<script>
-  var navToggle = document.getElementById('nav-toggle');
-  var navMenu = document.getElementById('nav-menu');
-  if (navToggle && navMenu) navToggle.addEventListener('click', function(){ navMenu.classList.toggle('open'); });
-</script>
-<script src="share.js" defer></script>
 </body>
 </html>

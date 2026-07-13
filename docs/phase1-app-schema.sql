@@ -24,6 +24,9 @@ create table if not exists public.app_projects (
   submitted_at date, lat double precision, lng double precision,
   impact_score int, impact_dimensions jsonb, lens text,
   source_ref text not null,             -- anti-fabrication: every row keeps its record URL
+  record_kind text not null default 'development',  -- 'development' | 'facility' (guardrail #3:
+                                        -- EPA/ECHO regulated facilities render in their own
+                                        -- "Regulated facilities nearby" section, NEVER as development)
   created_at timestamptz default now()
 );
 create index if not exists app_projects_zip_idx on public.app_projects(zip);

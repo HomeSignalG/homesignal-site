@@ -20,7 +20,8 @@
 <script>
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
-  var projects = await HS.data.projects(S.zip, home);
+  var projects = await HS.data.projects(S.zip, home);      // DEVELOPMENT only (permits / planning)
+  var facilities = await HS.data.facilities(S.zip, home);  // EPA/ECHO regulated facilities — env context, own section
   var id = new URLSearchParams(location.search).get('id');
   var page = document.getElementById('devPage');
 
@@ -59,8 +60,26 @@ HS.onReady(async function () {
         + '</div><div class="sp"></div>'
         + '<button class="fpill">All types ▾</button><button class="fpill">Any status ▾</button>'
         + '<button class="fpill" id="devDataBtn">⊞ Data view</button></div>'
-        + body;
+        + body
+        + facSection();   // regulated facilities are appended in their OWN labeled section, never the dev list
       wire();
+    }
+    // Regulated facilities (EPA/ECHO) — environmental context, kept out of every
+    // development / "what's being built" list above. Renders nothing when empty.
+    function facSection() {
+      if (!facilities || !facilities.length) return '';
+      return '<div class="ph" style="margin-top:40px"><div class="eyebrow">Regulated facilities nearby</div>'
+        + '<h2 style="margin-bottom:2px">EPA/ECHO-registered facilities near this ZIP</h2>'
+        + '<p>EPA/ECHO-registered facilities near this ZIP — a factual public-record count, not development and not a verdict on any operator.</p></div>'
+        + '<div class="devgrid">' + facilities.map(facCard).join('') + '</div>';
+    }
+    function facCard(f) {
+      return '<div class="card" style="border-left-color:var(--ink-3)">'
+        + '<span class="lens">' + HS.esc(f.type || 'Regulated facility') + (f.dist ? ' · ' + HS.esc(f.dist) : '') + '</span>'
+        + '<h3>' + HS.esc(f.name) + '</h3>'
+        + (f.developer ? '<p class="sowhat">' + HS.esc(f.developer) + '</p>' : '')
+        + (f.source_ref ? '<div class="foot"><div class="actions"><a class="btn" href="' + HS.esc(f.source_ref) + '" target="_blank" rel="noopener">View public record →</a></div></div>' : '')
+        + '</div>';
     }
     function lens(i,q,d){ return '<button class="lenscard' + (state2.lens===i?' on':'') + '" data-lens="' + i + '"><span class="q">' + q + '</span><span class="d">' + d + '</span></button>'; }
     function seg(k,label){ return '<button class="' + ((state2.sort===k && !state2.dataView)?'on':'') + '" data-sort="' + k + '">' + label + '</button>'; }

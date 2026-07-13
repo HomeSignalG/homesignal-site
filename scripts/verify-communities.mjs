@@ -1,200 +1,148 @@
-// verify-communities.mjs — automated, live end-to-end check of every community page.
+// verify-communities.mjs — live end-to-end check of the NEW-layout community page.
 //
 // WHY THIS EXISTS: the build sandbox has no network egress to Supabase / homesignal.net,
-// so a community build can only be verified by data + code inspection, never an actual
-// browser load (see docs/community-build-source-of-truth.md §13.8/§13.9 "not eyeballed
-// live"). This script closes that gap by running where egress works — GitHub Actions —
-// and driving the REAL site with a headless browser. It is fully zero-touch: it reads the
-// live `communities` table, so every newly-added community is covered with no code change.
+// so the go-live can only be verified by data + code inspection, never an actual browser
+// load. This script closes that gap by running where egress works — GitHub Actions — and
+// driving the REAL site with a headless browser.
 //
-// WHAT IT ASSERTS, per ZIP that any community covers:
-//   1. community.html?zip=<zip> resolves to the MOST-SPECIFIC community the DB says
-//      contains that ZIP (mirrors community.html LEVEL_RANK: zip > city > county), i.e.
-//      the rendered <#comm-title> equals that community's name.
-//   2. The page actually renders a subscribable topic set (the government/topics UI).
-// A mismatch or a broken page fails the run and is listed in the job summary.
+// The site was switched to the new layout (community.html reads the app_* tables via the
+// public anon key + RLS and the data-quality gate). INDEX-ONLY-UTAH is the current policy,
+// so this asserts, live:
+//   1. Every Utah community page (app_community_meta.state='UT') renders REAL, sourced
+//      content (the pass state — stat strip + record cards) and is INDEXABLE
+//      (<meta name=robots> = index) — that's the advertised set.
+//   2. A sample of NON-Utah pages renders WITHOUT error (coverage-coming or not-covered)
+//      and is NOINDEXED — nothing outside Utah is advertised until its data is accurate.
+//   3. Anti-fabrication: every "View public record" link on a Utah page is a real http URL.
 //
-// Config via env: SITE_BASE (default https://homesignal.net), COUNTY (optional filter,
-// e.g. "Salt Lake" to scope a run), SAMPLE (optional integer cap for a quick smoke run).
+// Config via env: SITE_BASE (default https://homesignal.net), SAMPLE (cap Utah ZIPs for a
+// quick smoke run), CONCURRENCY (default 8).
 
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 
-// ── Single source of truth for the anon key + URL: read them out of community.html so the
-//    key never gets duplicated/forked (it's the PUBLIC anon key, already shipped there). ──
-const html = readFileSync(new URL('../community.html', import.meta.url), 'utf8');
+// ── Single source of truth for the anon key + URL: read them out of config.js (the ONE
+//    place the app config lives now). Format: `SUPABASE_URL: 'https://…'`. ──
+const cfg = readFileSync(new URL('../config.js', import.meta.url), 'utf8');
 const grab = (name) => {
-  const m = html.match(new RegExp(`const ${name}\\s*=\\s*'([^']+)'`));
-  if (!m) throw new Error(`Could not read ${name} from community.html`);
+  const m = cfg.match(new RegExp(`${name}\\s*:\\s*'([^']+)'`));
+  if (!m) throw new Error(`Could not read ${name} from config.js`);
   return m[1];
 };
 const SUPABASE_URL = grab('SUPABASE_URL');
 const SUPABASE_ANON_KEY = grab('SUPABASE_ANON_KEY');
 const SITE_BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
-const COUNTY = process.env.COUNTY || '';
 const SAMPLE = process.env.SAMPLE ? parseInt(process.env.SAMPLE, 10) : 0;
+const CONCURRENCY = Math.max(1, process.env.CONCURRENCY ? parseInt(process.env.CONCURRENCY, 10) : 8);
 
-// community.html:1065 — the resolution ranking we must mirror exactly.
-const LEVEL_RANK = { neighborhood: 4, zip: 3, city: 2, county: 1 };
-
-// community.html (applyCommunity) — the H1 is the backbone "Town Name (ZIP)" standard,
-// produced by window.HS.displayName. Mirror it EXACTLY, or every city/zip-level page whose
-// row name doesn't already carry the ZIP false-fails on a correct render. Same rules as the
-// helper: keep a name already ending in "(#####)"; drop a legacy ", State"; pair name + ZIP.
-function expectedTitle(want, zip) {
-  const base = String(want.name || '').trim();
-  if (/\(\d{5}\)\s*$/.test(base)) return base;
-  const stripped = base.replace(/,\s*[A-Za-z][A-Za-z. ]+$/, '').trim();
-  let z = String(zip == null ? '' : zip).replace(/\D/g, '').slice(0, 5);
-  if (z.length !== 5) {
-    z = (want.zip_codes && want.zip_codes.length === 1) ? String(want.zip_codes[0]) : '';
-  }
-  return z ? `${stripped} (${z})` : stripped;
+async function rest(path) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+  });
+  if (!res.ok) throw new Error(`Supabase read failed (${path}): ${res.status} ${await res.text()}`);
+  return res.json();
 }
 
-async function loadCommunities() {
-  // PostgREST caps a single read at 1000 rows (the Supabase default max-rows). The table is
-  // now several thousand rows, so we MUST page through it with Range headers — a single fetch
-  // silently truncated to the first 1000-by-name, which made every alphabetically-late ZIP
-  // page (Westland, Ypsilanti, Zeeland, …) invisible and produced false "resolved zip !=
-  // expected county" failures. Page until a short page comes back.
-  const base = `${SUPABASE_URL}/rest/v1/communities?select=id,name,county,level,zip_codes,slug,government_topics&order=name.asc,id.asc`;
-  const PAGE = 1000;
-  let rows = [];
-  for (let from = 0; ; from += PAGE) {
-    const to = from + PAGE - 1;
-    const res = await fetch(base, {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        Range: `${from}-${to}`,
-        'Range-Unit': 'items',
-      },
-    });
-    if (!res.ok) throw new Error(`Supabase communities read failed: ${res.status} ${await res.text()}`);
-    const page = await res.json();
-    rows = rows.concat(page);
-    if (page.length < PAGE) break; // last page
-  }
-  if (COUNTY) rows = rows.filter((r) => (r.county || '').toLowerCase() === COUNTY.toLowerCase() ||
-    // county not selected above (kept select tight); fall back to name/slug contains
-    (r.name || '').toLowerCase().includes(COUNTY.toLowerCase()));
-  return rows;
+// Read the rendered community page state: which gate branch rendered, whether it's
+// indexable, the H1, and the record links (for the anti-fabrication check).
+async function readPage(page, zip) {
+  const target = `${SITE_BASE}/community.html?zip=${zip}`;
+  await page.goto(target, { waitUntil: 'networkidle', timeout: 30000 });
+  // The loader renders into #commPage after the async data reads resolve. Wait for content.
+  await page.waitForFunction(() => {
+    const p = document.getElementById('commPage');
+    return !!(p && p.textContent && p.textContent.trim().length > 0);
+  }, { timeout: 15000 });
+  return page.evaluate(() => {
+    const p = document.getElementById('commPage');
+    const robots = (document.getElementById('robots-meta') || {}).getAttribute
+      ? document.getElementById('robots-meta').getAttribute('content') : '';
+    const txt = p.textContent || '';
+    const h1 = (p.querySelector('h1') || {}).textContent || '';
+    const isPass = !!p.querySelector('.strip');                      // pass renders the stat strip
+    const isCoverage = /Coverage coming/i.test(txt);
+    const isNotCovered = /isn.?t covered yet/i.test(txt);
+    const recordLinks = [...p.querySelectorAll('a')]
+      .filter(a => /public record/i.test(a.textContent || ''))
+      .map(a => a.getAttribute('href') || '');
+    return { robots: robots || '', h1, isPass, isCoverage, isNotCovered, recordLinks };
+  });
 }
 
-// For each ZIP, the community community.html WOULD resolve to (most-specific-live).
-function expectedByZip(rows) {
-  const byZip = new Map();
-  for (const r of rows) for (const z of r.zip_codes || []) {
-    if (!byZip.has(z)) byZip.set(z, []);
-    byZip.get(z).push(r);
-  }
-  const expected = new Map();
-  for (const [z, list] of byZip) {
-    list.sort((a, b) =>
-      (LEVEL_RANK[b.level] || 0) - (LEVEL_RANK[a.level] || 0) ||
-      (a.zip_codes || []).length - (b.zip_codes || []).length);
-    expected.set(z, list[0]); // rank desc, then fewest ZIPs — matches community.html:1089
-  }
-  return expected;
-}
+const indexable = (r) => /(^|[^n])index/i.test(r) && !/noindex/i.test(r);
 
 async function main() {
-  const rows = await loadCommunities();
-  const expected = expectedByZip(rows);
-  let zips = [...expected.keys()].sort();
-  if (SAMPLE > 0) zips = zips.slice(0, SAMPLE);
-  console.log(`Verifying ${zips.length} ZIP(s) against ${SITE_BASE} (from ${rows.length} communities)`);
+  // 1) The advertised set: every Utah community page.
+  let utah = await rest(`app_community_meta?select=zip,name,state,data_quality&state=eq.UT&order=zip.asc`);
+  if (SAMPLE > 0) utah = utah.slice(0, SAMPLE);
+  // 2) A sample of non-Utah pages that MUST stay noindexed: some modeled coverage-coming
+  //    (in app_community_meta) + a few well-known modeled ZIPs that were never materialized.
+  const nonUtMeta = await rest(`app_community_meta?select=zip,state,data_quality&state=neq.UT&limit=6`);
+  const nonUtSample = ['78701', '60601', '98101', '02138']; // modeled elsewhere; no app_* row → not-covered
+  const nonUt = [...nonUtMeta.map(r => r.zip), ...nonUtSample];
+
+  console.log(`Verifying ${utah.length} Utah page(s) + ${nonUt.length} non-Utah page(s) against ${SITE_BASE}`);
 
   const browser = await chromium.launch();
   const fails = [];
-  // Bounded concurrency: a pool of reused pages pulls ZIPs off a shared cursor. The check is
-  // network-bound (each ZIP is a page load + Supabase reads), so sequential ran ~1 ZIP/sec —
-  // a national corpus (10k+ ZIPs) approached the 6h job cap. N workers cut wall-clock ~Nx
-  // with IDENTICAL assertions. Override with CONCURRENCY (default 8).
-  const CONCURRENCY = Math.max(1, process.env.CONCURRENCY ? parseInt(process.env.CONCURRENCY, 10) : 8);
+
+  // --- Utah pages: must be pass + indexable + sourced ---
   let cursor = 0;
-  async function checkOne(page, zip) {
-    const want = expected.get(zip);
-    const target = `${SITE_BASE}/community.html?zip=${zip}`;
-    try {
-      await page.goto(target, { waitUntil: 'networkidle', timeout: 30000 });
-      // Wait until resolveCommunity()/applyCommunity() has stamped the title AND loaded the
-      // universal topic set into the global `cats` state (community.html:1114/1135).
-      await page.waitForFunction(() => {
-        const t = document.getElementById('comm-title');
-        return !!(t && t.textContent && t.textContent.trim().length > 0 &&
-          typeof cats !== 'undefined' && cats.news && cats.news.items && cats.news.items.length > 0);
-      }, { timeout: 15000 });
-      // Read the resolved runtime state directly (deterministic; no modal/consent-overlay
-      // click flakiness). `cats.meetings.items` is the cascaded government topic set
-      // (community.html:1131); `cats.news.items` is the universal set (1135).
-      const st = await page.evaluate(() => ({
-        title: (document.getElementById('comm-title') || {}).textContent?.trim() || '',
-        name: (typeof COMMUNITY !== 'undefined' && COMMUNITY) ? COMMUNITY.name : null,
-        universal: (typeof cats !== 'undefined' && cats.news && cats.news.items) ? cats.news.items.length : 0,
-        gov: (typeof cats !== 'undefined' && cats.meetings && cats.meetings.items) ? cats.meetings.items.length : 0,
-      }));
-      const wantTitle = expectedTitle(want, zip);
-      if (st.title !== wantTitle || st.name !== want.name) {
-        // The core correctness gate: did ?zip= resolve to the most-specific community?
-        fails.push(`ZIP ${zip}: resolved "${st.title || st.name}" != expected most-specific "${wantTitle}" (${want.level})`);
-      } else if (st.universal < 1) {
-        // Universal topics are community-agnostic and always present — 0 means the page's
-        // subscribe flow failed to initialize (a real breakage), not an empty-but-valid tile.
-        fails.push(`ZIP ${zip} (${want.name}): resolved but subscribe flow rendered no topics (JS init failed)`);
-      } else {
-        // gov=0 is VALID (empty government tile until feeds exist) — report, don't fail.
-        console.log(`  ✓ ${zip} → ${want.name} (${want.level}) · gov ${st.gov} · universal ${st.universal}`);
-      }
-      // Local-first baseline guard (zero-touch, applies to every ZIP that renders sections):
-      //   1. the "Local to <place>" section must render ABOVE "Regional & global";
-      //   2. the Local section must NOT contain universal cards (data-cat emerging/global) —
-      //      i.e. the news catch-all de-dilution is holding.
-      // Best-effort: if the feed hasn't rendered sections (slow/empty page), skip — only a real
-      // wrong-ordering or a leaked universal card fails the run.
-      const feed = await page.evaluate(() => {
-        const f = document.getElementById('alert-feed');
-        if (!f) return null;
-        const secs = [...f.querySelectorAll('.feed-section .feed-section-head')].map(h => h.textContent.trim());
-        const localIdx = secs.findIndex(t => /^Local to /.test(t));
-        const globalIdx = secs.findIndex(t => /^Regional & global/.test(t));
-        const localSec = [...f.querySelectorAll('.feed-section')]
-          .find(s => /^Local to /.test((s.querySelector('.feed-section-head') || {}).textContent || ''));
-        const localHasUniversal = localSec
-          ? !!localSec.querySelector('.alert-card[data-cat="emerging"], .alert-card[data-cat="global"]') : false;
-        return { localIdx, globalIdx, localHasUniversal };
-      });
-      if (feed && feed.localIdx > -1 && feed.globalIdx > -1 && feed.localIdx > feed.globalIdx) {
-        fails.push(`ZIP ${zip} (${want.name}): "Regional & global" rendered ABOVE "Local to …" (local-first broken)`);
-      }
-      if (feed && feed.localHasUniversal) {
-        fails.push(`ZIP ${zip} (${want.name}): universal (emerging/global) card inside the Local section (news de-dilution broken)`);
-      }
-    } catch (e) {
-      fails.push(`ZIP ${zip} (${want.name}): ${e.message.split('\n')[0]}`);
-    }
-  }
-  async function worker() {
+  async function utahWorker() {
     const page = await browser.newPage();
     for (;;) {
       const i = cursor++;
-      if (i >= zips.length) break;
-      await checkOne(page, zips[i]);
+      if (i >= utah.length) break;
+      const row = utah[i];
+      try {
+        const st = await readPage(page, row.zip);
+        if (!st.isPass) {
+          fails.push(`UT ${row.zip} (${row.name}): expected a PASS page (real records) but got ${st.isCoverage ? 'coverage-coming' : st.isNotCovered ? 'not-covered' : 'an unrecognized state'}`);
+        } else if (!indexable(st.robots)) {
+          fails.push(`UT ${row.zip} (${row.name}): Utah pass page is NOT indexable (robots="${st.robots}")`);
+        } else if (!st.h1.includes(row.zip)) {
+          fails.push(`UT ${row.zip} (${row.name}): rendered H1 "${st.h1}" does not contain the ZIP`);
+        } else {
+          const bad = st.recordLinks.filter(h => !/^https?:\/\//i.test(h));
+          if (bad.length) fails.push(`UT ${row.zip} (${row.name}): ${bad.length} "public record" link(s) without a real http URL (anti-fabrication)`);
+          else console.log(`  ✓ UT ${row.zip} → ${row.name} · pass · indexable · ${st.recordLinks.length} record link(s)`);
+        }
+      } catch (e) {
+        fails.push(`UT ${row.zip} (${row.name}): ${e.message.split('\n')[0]}`);
+      }
     }
     await page.close();
   }
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, zips.length || 1) }, () => worker()));
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, utah.length || 1) }, () => utahWorker()));
+
+  // --- Non-Utah pages: must render (no crash) AND be noindexed ---
+  for (const zip of nonUt) {
+    const page = await browser.newPage();
+    try {
+      const st = await readPage(page, zip);
+      if (indexable(st.robots)) {
+        fails.push(`non-UT ${zip}: page is INDEXABLE but only Utah may be indexed (robots="${st.robots}")`);
+      } else if (!(st.isPass || st.isCoverage || st.isNotCovered)) {
+        fails.push(`non-UT ${zip}: page rendered an unrecognized state (possible error)`);
+      } else {
+        console.log(`  ✓ non-UT ${zip} → noindex · ${st.isPass ? 'pass(hidden)' : st.isCoverage ? 'coverage-coming' : 'not-covered'}`);
+      }
+    } catch (e) {
+      fails.push(`non-UT ${zip}: ${e.message.split('\n')[0]}`);
+    }
+    await page.close();
+  }
+
   await browser.close();
 
   const summary = [
-    `# Community page verification`,
+    `# Community page verification (new layout · index-only-Utah)`,
     ``,
     `- Site: ${SITE_BASE}`,
-    `- ZIPs checked: **${zips.length}**`,
-    `- Passed: **${zips.length - fails.length}**`,
+    `- Utah pages checked: **${utah.length}** (must be pass + indexable)`,
+    `- Non-Utah pages checked: **${nonUt.length}** (must be noindexed)`,
     `- Failed: **${fails.length}**`,
-    ...(fails.length ? [``, `## Failures`, ...fails.map((f) => `- ${f}`)] : [``, `All pages resolved most-specific and render topics. ✓`]),
+    ...(fails.length ? [``, `## Failures`, ...fails.map((f) => `- ${f}`)] : [``, `All Utah pages render real records and are indexable; all sampled non-Utah pages are noindexed. ✓`]),
   ].join('\n');
   console.log('\n' + summary);
   if (process.env.GITHUB_STEP_SUMMARY) {

@@ -3,463 +3,64 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
-<title>HomeSignal — Privacy</title>
-<meta name="description" content="HomeSignal's privacy policy: what we collect, how we use it, and the choices you have.">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://homesignal.net/privacy.html">
-<meta property="og:title" content="HomeSignal — Privacy">
-<meta property="og:description" content="HomeSignal's privacy policy: what we collect, how we use it, and the choices you have.">
-<meta name="twitter:card" content="summary_large_image">
-<meta property="og:image" content="https://homesignal.net/og-default.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta name="twitter:image" content="https://homesignal.net/og-default.png">
-<meta name="twitter:title" content="HomeSignal — Privacy">
-<meta name="twitter:description" content="HomeSignal's privacy policy: what we collect, how we use it, and the choices you have.">
+<meta name="robots" content="index, follow">
 <link rel="canonical" href="https://homesignal.net/privacy.html">
-<style>
-/* ============================================================
-   HomeSignal — shared styles
-   Design tokens, reset, base typography, nav, footer.
-   Loaded on every page before the page-specific stylesheet.
-   ============================================================ */
-
-:root {
-  /* Ported to the index.html / box-elder design system: system font, brand
-     green #1f5130, warm-neutral surfaces, hairline borders, gray page. Token
-     NAMES are kept and re-pointed so all existing rules adopt the shared look. */
-  --bg-primary:#ffffff; --bg-tertiary:#f3f4f6; --bg-band:#f3f4f6;
-  --bg-info:#e6f1fb; --tx-info:#0c447c;
-  --bg-success:#e1f5ee; --tx-success:#0f6e56; --bd-success:#9fe1cb;
-  --bg-warning:#faeeda; --tx-warning:#854f0b;
-  --green-tx:#ffffff;
-  --tx-primary:#1c1c1a; --tx-secondary:#5f5e5a; --tx-tertiary:#6f6e69;
-  --bd-tertiary:rgba(0,0,0,.12); --bd-secondary:rgba(0,0,0,.22);
-  --r-md:8px; --r-lg:12px; --r-xl:16px;
-  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-
-  --green: #1f5130;
-  --green-light: #e1f5ee;
-  --green-mid: #9fe1cb;
-  --green-dark: #0f6e56;
-  --green-text: #0f6e56;
-  --text: #1c1c1a;
-  --text-secondary: #5f5e5a;
-  --text-tertiary: #6f6e69;
-  --border: rgba(0,0,0,.12);
-  --bg: #ffffff;
-  --bg-secondary: #f4f4f5;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --radius-pill: 100px;
-
-  /* shorthand aliases used by the community page */
-  --gl: var(--green-light);
-  --gm: var(--green-mid);
-  --gd: var(--green-dark);
-  --ts: var(--text-secondary);
-  --tt: var(--text-tertiary);
-  --bg2: var(--bg-secondary);
-  --r: var(--radius);
-  --rs: var(--radius-sm);
-}
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-a { text-decoration: none; }
-input, button, textarea { font-family: inherit; outline: none; }
-input:focus, textarea:focus { border-color: var(--green) !important; }
-
-a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-body {
-  font-family: var(--font);
-  color: var(--text);
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-}
-
-/* ---------- NAV (shared across all pages) ---------- */
-nav {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px max(24px, calc((100% - 1200px) / 2 + 24px));
-  border-bottom: 0.5px solid var(--border);
-  background: var(--bg); position: sticky; top: 0; z-index: 100;
-}
-.logo { display: flex; align-items: center; gap: 10px; }
-.logo-icon { width: 34px; height: 34px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-.logo-icon svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.logo-text { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
-.logo-text span { color: var(--green); }
-.nav-links { display: flex; align-items: center; gap: 36px; list-style: none; }
-.nav-links a { color: var(--text-secondary); font-size: 14px; }
-.nav-links a:hover { color: var(--text); }
-.nav-actions { display: flex; gap: 10px; }
-.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 8px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; }
-.btn-outline:hover { background: var(--bg-secondary); }
-.btn-primary { background: var(--green); color: #fff; border: none; padding: 8px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; }
-.btn-primary:hover { opacity: 0.9; }
-
-/* ---------- FOOTER (shared across all pages) ---------- */
-footer {
-  max-width: 1200px; margin: 0 auto;
-  padding: 32px 24px; border-top: 0.5px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: 16px; background: var(--bg);
-}
-.footer-left .logo-text { font-size: 15px; margin-bottom: 4px; }
-.footer-tagline { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
-.footer-links { display: flex; gap: 20px; }
-.footer-links a { font-size: 13px; color: var(--text-tertiary); display: inline-block; padding: 4px 0; }
-.footer-links a:hover { color: var(--text); }
-
-</style>
-<style>
-/* ============================================================
-   HomeSignal — content page styles (about, how-it-works, legal, contact)
-   ============================================================ */
-
-body { background: var(--bg-tertiary); font-size: 15px; }
-
-.page-wrap { max-width: 1200px; margin: 32px auto; padding: 48px 56px; background: var(--bg-primary); border: 1px solid var(--bd-tertiary); border-radius: var(--r-lg); }
-.page-eyebrow { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--green); margin-bottom: 12px; }
-.page-wrap h1 { font-size: 46px; font-weight: 600; letter-spacing: -0.022em; margin-bottom: 18px; line-height: 1.08; }
-.page-wrap h2 { font-size: 27px; font-weight: 600; letter-spacing: -0.015em; margin: 32px 0 10px; }
-.page-wrap p { color: var(--text-secondary); line-height: 1.75; margin-bottom: 14px; max-width: 68ch; }
-.page-wrap ul { color: var(--text-secondary); line-height: 1.75; margin: 0 0 14px 20px; }
-.page-wrap li { margin-bottom: 6px; }
-.page-wrap a.inline { color: var(--green); }
-.lead { font-size: 17px; color: var(--text); margin-bottom: 24px; max-width: 68ch; }
-.muted { font-size: 13px; color: var(--text-tertiary); margin-top: 32px; }
-
-/* simple steps for how-it-works */
-.step { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 20px; }
-.step-num { width: 30px; height: 30px; border-radius: 50%; background: var(--green-light); color: var(--green-dark); font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.step h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
-.step p { margin-bottom: 0; }
-
-/* contact form */
-.contact-form { display: flex; flex-direction: column; gap: 12px; max-width: 460px; margin-top: 8px; }
-.contact-form input, .contact-form textarea { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px 13px; font-size: 14px; background: var(--bg-secondary); color: var(--text); width: 100%; }
-.contact-form textarea { min-height: 120px; resize: vertical; }
-.contact-form button { align-self: flex-start; background: var(--green); color: #fff; border: none; padding: 11px 22px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; }
-.contact-form button:hover { opacity: 0.9; }
-
-/* meetings list page */
-.meeting-row { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; display: flex; gap: 14px; align-items: flex-start; }
-.meeting-date { background: var(--green-light); color: var(--green-dark); border-radius: var(--radius-sm); padding: 8px 12px; text-align: center; flex-shrink: 0; min-width: 64px; }
-.meeting-date .m { font-size: 11px; font-weight: 600; text-transform: uppercase; }
-.meeting-date .d { font-size: 20px; font-weight: 700; line-height: 1; }
-.meeting-body h3 { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
-.meeting-body .time { font-size: 13px; color: var(--text-secondary); }
-.meeting-open { display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 600; color: #dc2626; }
-
-</style>
-
-<style>
-/* ===== Responsive nav + mobile layout ===== */
-.nav-toggle { display: none; background: none; border: none; cursor: pointer; color: var(--text); padding: 4px; }
-.nav-menu { display: contents; }
-
-@media (max-width: 720px) {
-  nav { padding: 12px 20px; }
-  .nav-toggle { display: flex; align-items: center; }
-  .nav-menu {
-    display: none; position: absolute; top: 100%; left: 0; right: 0;
-    flex-direction: column; align-items: stretch; gap: 0;
-    background: var(--bg); border-bottom: 1px solid var(--border);
-    padding: 6px 20px 14px; box-shadow: 0 8px 16px rgba(0,0,0,0.07);
-  }
-  .nav-menu.open { display: flex; }
-  .nav-links { flex-direction: column; align-items: stretch; gap: 0; width: 100%; }
-  .nav-links a { display: block; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
-  .nav-actions { flex-direction: column; align-items: stretch; gap: 8px; width: 100%; margin-top: 12px; }
-  .nav-actions button { width: 100%; padding: 12px; }
-
-  /* homepage */
-  .hero { padding: 48px 20px 40px; }
-  .hero h1 { font-size: 32px; }
-  .hero-sub { font-size: 15px; }
-  .search-card { padding: 20px; }
-  .search-row { flex-direction: column; }
-  .btn-search { width: 100%; }
-  .not-listed-band { padding: 20px; }
-  .not-listed-inner { gap: 14px; }
-  .nl-form { width: 100%; }
-  .nl-input { width: 100%; }
-  .btn-request { width: 100%; }
-  .topics-section { padding: 24px 20px; }
-
-  /* community page */
-  .comm-header { padding: 18px 20px; }
-  .comm-top { flex-direction: column; gap: 12px; }
-  .cat-section { padding: 16px 20px; }
-  .page-body { grid-template-columns: 1fr; padding: 18px 20px; }
-  .signup-band { flex-direction: column; align-items: stretch; }
-  .signup-input { width: 100%; }
-  .sub-list { grid-template-columns: 1fr; }
-  .modal { margin: 12px; }
-
-  /* content pages */
-  .page-wrap { padding: 40px 20px 56px; }
-  .page-wrap h1 { font-size: 28px; }
-  .contact-form { max-width: 100%; }
-
-  /* footer */
-  footer { padding: 24px 20px; flex-direction: column; align-items: flex-start; gap: 14px; }
-}
-</style>
-<style>
-/* ===== flex-gap compatibility: spacing via margins (works in every browser) ===== */
-.logo { gap: 0; }
-.logo > * + * { margin-left: 10px; }
-.nav-links { gap: 0; }
-.nav-links li + li { margin-left: 36px; }
-.nav-actions { gap: 0; }
-.nav-actions > * + * { margin-left: 10px; }
-.footer-links { gap: 0; }
-.footer-links > * + * { margin-left: 20px; }
-.eyebrow { gap: 0; }
-.eyebrow > * + * { margin-left: 7px; }
-.search-row { gap: 0; }
-.search-row > * + * { margin-left: 10px; }
-.not-listed-inner { gap: 0; }
-.not-listed-inner > * + * { margin-left: 20px; }
-.nl-form { gap: 0; }
-.nl-form > * + * { margin-left: 8px; }
-.topics-row .topic-pill { gap: 0; }
-.topic-pill > svg { margin-right: 9px; }
-
-/* community page */
-.save-btn { gap: 0; }
-.save-btn > :first-child { margin-right: 6px; }
-.neutral-note { gap: 0; }
-.neutral-note > :first-child { margin-right: 9px; }
-.instruction { gap: 0; }
-.instruction > :first-child { margin-right: 8px; }
-.groups { gap: 0; }
-.groups > * + * { margin-top: 12px; }
-.row-label { gap: 0; }
-.row-label > :first-child { margin-right: 7px; }
-.cat-tiles { gap: 0; }
-.cat-tiles > * + * { margin-top: 8px; }
-.cat-tile { gap: 0; }
-.cat-tile > :first-child { margin-right: 10px; }
-.signup-band { gap: 0; }
-.signup-band > * + * { margin-left: 10px; }
-.signup-label { gap: 0; }
-.signup-label > :first-child { margin-right: 7px; }
-.ptag { gap: 0; }
-.ptag > :first-child { margin-right: 4px; }
-.alert-top { gap: 0; }
-.alert-top > * + * { margin-left: 10px; }
-.aactions { gap: 0; }
-.aactions > * + * { margin-left: 6px; }
-.mdate { gap: 0; }
-.mdate > :first-child { margin-right: 7px; }
-.modal-title-row { gap: 0; }
-.modal-title-row > :first-child { margin-right: 10px; }
-.sub-item { gap: 0; }
-.sub-item > :first-child { margin-right: 9px; }
-.modal-info { gap: 0; }
-.modal-info > :first-child { margin-right: 8px; }
-.modal-footer { gap: 0; }
-.modal-footer > * + * { margin-left: 8px; }
-
-@media (max-width: 720px) {
-  .nav-links li + li { margin-left: 0; }
-  .nav-actions > * + * { margin-left: 0; margin-top: 8px; }
-  .not-listed-inner > * + * { margin-left: 0; }
-  .signup-band > * + * { margin-left: 0; margin-top: 8px; }
-  .comm-top > * + * { margin-top: 12px; }
-  footer > * + * { margin-top: 14px; }
-}
-</style>
+<title>HomeSignal — Privacy &amp; Terms</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<link rel="stylesheet" href="app.css">
 </head>
-<body>
-<nav>
-  <a class="logo" href="index.html">
-    <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
-    <div class="logo-text">Home<span>Signal</span></div>
-  </a>
-  <button class="nav-toggle" id="nav-toggle" aria-label="Open menu"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="nav-menu" id="nav-menu"><ul class="nav-links"><li><a href="how-it-works.html">How it works</a></li><li><a href="about.html">About</a></li></ul>
-  <button class="nav-share" type="button" onclick="sharePage()" aria-label="Share this page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg><span>Share</span></button>
-  <div class="nav-actions" id="nav-auth"><button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button></div>
-</div>
-</nav>
-<div class="page-wrap">
-<div class="page-eyebrow">Privacy</div>
-<h1>Privacy Policy</h1>
-<h2>Information we collect</h2>
-<p>When you sign up for alerts, we collect the email address and ZIP code you provide, along with the community and topics you choose. We use this to send you the alerts you requested.</p>
-<h2>How we use it</h2>
-<p>We use your information to deliver alerts and to operate and improve HomeSignal. We never sell or share your personal contact information.</p>
-<h2>Data sharing</h2>
-<p>At signup you can choose whether to agree to data sharing. This is optional — you can decline and still receive every alert. If you agree (recorded as the data-licensing agreement, version 2026-06-20), HomeSignal may share anonymized and aggregated information about the topics and locations you follow with third parties, to support its products, services, and research. Your personal contact information — such as your name and email — is never shared, whether or not you agree.</p>
-<p>The agreement does not specify which third parties receive this information, or whether any sharing is in exchange for compensation. It is limited to anonymized and aggregated data about the topics and locations you follow.</p>
-<h2>Your choices</h2>
-<p>You can unsubscribe from alerts at any time using the link in any email we send.</p>
-<p>Data sharing is optional — you choose at signup whether to agree.</p>
-<p class="muted">Last updated: June 25, 2026.</p>
-</div>
-<footer>
-  <div class="footer-left">
-    <a class="logo" href="index.html" style="margin-bottom:4px;">
-      <div class="logo-icon" style="width:28px;height:28px;"><svg viewBox="0 0 24 24" style="width:15px;height:15px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
-      <div class="logo-text" style="font-size:14px;">Home<span>Signal</span></div>
-    </a>
-    <div class="footer-tagline">Community change.</div>
-    <div class="footer-tagline" style="margin-top:6px">© 2026 HomeSignal, Inc. · Neutral · sourced · non-partisan</div>
-    <div class="footer-tagline" style="margin-top:6px">Follow HomeSignal: <a href="https://bsky.app/profile/homesignal-tracker.bsky.social" aria-label="Bluesky" style="display:inline-flex;width:24px;height:24px;border-radius:50%;background:#1185fe;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px"><svg viewBox="0 0 24 24" width="14" height="14" fill="#fff" aria-hidden="true"><path d="M5.5 4.3c2.4 1.8 5 5.5 6 7.5 1-2 3.6-5.7 6-7.5 1.7-1.3 4.5-2.3 4.5.9 0 .6-.4 5.2-.6 6-.7 2.6-3.3 3.2-5.7 2.8 4.1.7 5.2 3 2.9 5.3-4.3 4.4-6.2-1.1-6.7-2.5-.1-.3-.2-.5-.2-.3 0-.2-.1.1-.2 2.5-.5 1.4-2.4 6.9-6.7 2.5-2.3-2.3-1.2-4.6 2.9-5.3-2.4.4-5-.2-5.7-2.8C1.4 10.4 1 5.8 1 5.2c0-3.2 2.8-2.2 4.5-.9z"/></svg></a><a href="https://www.reddit.com/user/HomeSignalnet" aria-label="Reddit" style="display:inline-flex;width:24px;height:24px;border-radius:50%;background:#ff4500;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px"><svg viewBox="0 0 24 24" width="14" height="14" fill="#fff" aria-hidden="true"><path d="M22 12a2.04 2.04 0 0 0-3.46-1.46 10 10 0 0 0-5.27-1.67l.9-4.23 2.94.62a1.5 1.5 0 1 0 .16-1l-3.28-.7a.5.5 0 0 0-.59.38l-1 4.7a10 10 0 0 0-5.34 1.66 2.04 2.04 0 1 0-2.2 3.36c-.03.21-.05.43-.05.65 0 3.31 3.58 6 8 6s8-2.69 8-6c0-.22-.02-.44-.05-.65A2.04 2.04 0 0 0 22 12zM7 13.5a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0zm8.1 4.2c-.86.86-2.6.93-3.1.93-.5 0-2.24-.07-3.1-.93a.34.34 0 0 1 .48-.48c.54.54 1.7.73 2.62.73.92 0 2.08-.19 2.62-.73a.34.34 0 0 1 .48.48zM15.5 15a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg></a></div>
-  </div>
-  <div class="footer-links">
-    <a href="how-it-works.html">How it works</a>
-    <a href="about.html">About</a>
-    <a href="privacy.html">Privacy</a>
-    <a href="terms.html">Terms of use</a>
-    <a href="contact.html">Contact</a>
-  </div>
-</footer>
+<body data-nav="">
+<template id="hs-content">
+  <div class="page">
+    <div class="ph">
+      <div class="eyebrow">Privacy</div>
+      <h1>Privacy &amp; Terms</h1>
+      <p>Last updated July 2026. In plain language: we never sell your personal information, the intelligence comes from public records, and you control what you follow.</p>
+    </div>
+    <div class="block prose" style="max-width:840px">
+      <div class="cnote"><b>The short version:</b> we never sell your personal information. The intelligence we show comes from public government records — not from tracking you. You choose which topics and locations you follow, and you can update your preferences or unsubscribe at any time.</div>
 
-<style>
-  .auth-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center; }
-  .auth-modal { background:#fff; border-radius:14px; padding:28px; width:100%; max-width:380px; margin:16px; border:1px solid var(--border); position:relative; }
-  .auth-modal h2 { font-size:20px; font-weight:700; margin-bottom:4px; color:var(--text); }
-  .auth-sub { font-size:13px; color:var(--text-secondary); margin-bottom:18px; }
-  .auth-input { width:100%; border:1px solid var(--border); border-radius:var(--radius-sm); padding:11px 13px; font-size:14px; background:var(--bg-secondary); color:var(--text); margin-bottom:10px; }
-  .auth-submit { width:100%; background:var(--green); color:#fff; border:none; padding:12px; border-radius:var(--radius-sm); font-size:14px; font-weight:600; cursor:pointer; }
-  .auth-submit:hover { opacity:0.9; }
-  .auth-submit:disabled { opacity:0.6; cursor:default; }
-  .auth-msg { font-size:13px; color:var(--green-dark); margin-top:12px; min-height:1em; }
-  .auth-toggle { font-size:13px; color:var(--text-secondary); margin-top:16px; text-align:center; }
-  .auth-toggle a { color:var(--green); font-weight:600; }
-  .auth-close { position:absolute; top:14px; right:16px; background:none; border:none; font-size:22px; line-height:1; color:var(--text-tertiary); cursor:pointer; }
-</style>
+      <h2 class="bt">What we collect</h2>
+      <ul>
+        <li><b>Account information</b> — your email, and optionally your name, so you can save communities and receive alerts.</li>
+        <li><b>Your preferences</b> — the ZIP codes, properties, and topics you choose to follow.</li>
+        <li><b>Public records</b> — permits, hearings, agendas, environmental and infrastructure filings. Public data about places, not private data about you.</li>
+        <li><b>Basic usage data</b> — privacy-respecting analytics to keep the product reliable.</li>
+      </ul>
 
-<div id="auth-overlay" class="auth-overlay">
-  <div class="auth-modal">
-    <button class="auth-close" id="auth-close">&times;</button>
-    <h2 id="auth-title">Log in or sign up</h2>
-    <p class="auth-sub" id="auth-sub">Enter your email and we'll send you a code &mdash; no password needed.</p>
-    <input type="email" id="auth-email" class="auth-input" placeholder="Email address" autocomplete="email" />
-    <input type="text" id="auth-code" class="auth-input" placeholder="Enter your code" inputmode="numeric" maxlength="8" autocomplete="one-time-code" style="display:none;letter-spacing:6px;text-align:center;font-size:18px;" />
-    <button id="auth-submit" class="auth-submit">Send me a code</button>
-    <div id="auth-msg" class="auth-msg"></div>
-    <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><a href="#" id="auth-back-link">Use a different email</a></div>
+      <h2 class="bt">How we use it</h2>
+      <p>We use your email and preferences to deliver the alerts and briefings you asked for, save your communities, and notify you about availability (new areas or Premium). Aggregate usage data helps us improve accuracy.</p>
+
+      <h2 class="bt">What we never do</h2>
+      <p>We do not sell your personal contact information, and we do not share your identity with advertisers. Alerts are based on where you choose to look — not on a hidden profile of you.</p>
+
+      <h2 class="bt">Optional anonymized insights</h2>
+      <p>When you opt in (the checkbox on the topic picker), HomeSignal may share <b>anonymized, aggregated</b> information about the topics and locations people follow — for example, "interest in data-center development rose in this county." No personal contact information is ever included, and it's off unless you choose it. Change it any time in your alert settings.</p>
+
+      <h2 class="bt">Your choices &amp; controls</h2>
+      <ul>
+        <li>Change the topics and communities you follow at any time.</li>
+        <li>Unsubscribe from any alert email with one click.</li>
+      </ul>
+
+      <h2 class="bt">Contact</h2>
+      <p>Questions about privacy? Email <a href="mailto:hello@homesignal.net">hello@homesignal.net</a> or use the <a href="contact.html">contact page</a>.</p>
+
+      <div class="divider"></div>
+
+      <h2 class="bt" id="terms" style="font-size:18px">Terms of Use</h2>
+      <p>HomeSignal provides intelligence about your community for informational purposes. We source from authoritative public records and present them accurately, but HomeSignal is not legal, financial, or real-estate advice — verify anything you plan to act on with the relevant authority or a qualified professional.</p>
+      <p><b>Acceptable use.</b> Use HomeSignal for your own personal, non-commercial purpose of understanding and participating in your community. Don't scrape, resell, or misrepresent our intelligence, or use it to harass others.</p>
+      <p><b>Accuracy &amp; availability.</b> Public records can be incomplete, delayed, or amended. We show confidence and sources so you can judge for yourself, but can't guarantee every record is complete or current. The service is provided "as is," and features may change as the product evolves.</p>
+    </div>
   </div>
-</div>
+</template>
 
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-(function(){
-  var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
-  var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
-  var client = window.supabase.createClient(SB_URL, SB_ANON);
-  window.hsClient = client;   // shared so the rest of the page can use the logged-in session
-  window.hsUser = null;       // current logged-in user (null when logged out)
-  var step = 'email';         // 'email' -> 'code'
-  var pendingEmail = '';
-  function $(id){ return document.getElementById(id); }
-
-  function showMsg(text, isError){
-    var m = $('auth-msg');
-    m.textContent = text || '';
-    m.style.color = isError ? '#b91c1c' : 'var(--green-dark)';
-  }
-
-  function setStep(s){
-    step = s;
-    if (s === 'code') {
-      $('auth-sub').textContent = 'We emailed a code to ' + pendingEmail + '. Enter it below.';
-      $('auth-email').style.display = 'none';
-      $('auth-code').style.display = 'block';
-      $('auth-submit').textContent = 'Verify & continue';
-      $('auth-back-wrap').style.display = 'block';
-      setTimeout(function(){ $('auth-code').focus(); }, 50);
-    } else {
-      $('auth-sub').innerHTML = "Enter your email and we'll send you a code &mdash; no password needed.";
-      $('auth-email').style.display = 'block';
-      $('auth-code').style.display = 'none';
-      $('auth-code').value = '';
-      $('auth-submit').textContent = 'Send me a code';
-      $('auth-back-wrap').style.display = 'none';
-      setTimeout(function(){ $('auth-email').focus(); }, 50);
-    }
-  }
-
-  function openAuth(){ pendingEmail=''; $('auth-email').value=''; showMsg('', false); setStep('email'); $('auth-overlay').style.display = 'flex'; }
-  function closeAuth(){ $('auth-overlay').style.display = 'none'; }
-  window.hsOpenAuth = openAuth;
-
-  async function sendCode(){
-    var email = ($('auth-email').value || '').trim();
-    if (!email || email.indexOf('@') === -1) { showMsg('Please enter a valid email address.', true); return; }
-    $('auth-submit').disabled = true; showMsg('Sending your code\u2026', false);
-    try {
-      var r = await client.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true } });
-      if (r.error) { showMsg(r.error.message, true); }
-      else { pendingEmail = email; setStep('code'); showMsg('', false); }
-    } catch (e) { showMsg('Something went wrong \u2014 please try again.', true); }
-    $('auth-submit').disabled = false;
-  }
-
-  async function verifyCode(){
-    var code = ($('auth-code').value || '').trim();
-    if (code.length < 4) { showMsg('Enter the code from your email.', true); return; }
-    $('auth-submit').disabled = true; showMsg('Checking\u2026', false);
-    try {
-      var r = await client.auth.verifyOtp({ email: pendingEmail, token: code, type: 'email' });
-      if (r.error) { showMsg(r.error.message, true); $('auth-submit').disabled = false; return; }
-      closeAuth();
-    } catch (e) { showMsg('Something went wrong \u2014 please try again.', true); }
-    $('auth-submit').disabled = false;
-  }
-
-  function submitAuth(){ if (step === 'code') verifyCode(); else sendCode(); }
-
-  function bindAuthButtons(){
-    var li = $('btn-login'), su = $('btn-signup');
-    if (li) li.addEventListener('click', function(){ openAuth(); });
-    if (su) su.addEventListener('click', function(){ openAuth(); });
-  }
-
-  function updateNav(session){
-    window.hsUser = (session && session.user) ? session.user : null;
-    var box = $('nav-auth');
-    if (box) {
-      if (window.hsUser) {
-        box.innerHTML = '<a class="btn-outline" href="dashboard.html" style="text-decoration:none">Dashboard</a>' + '<span style="display:inline-flex;align-items:center;gap:10px;margin-left:12px;vertical-align:middle">' + '<span title="' + window.hsUser.email + '" style="font-size:12.5px;color:#6b7280;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle">' + window.hsUser.email + '</span>' + '<button type="button" id="btn-logout" style="background:none;border:none;padding:0;color:#6b7280;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline">Log out</button>' + '</span>';
-        var lo = $('btn-logout');
-        if (lo) lo.addEventListener('click', function(){ client.auth.signOut(); });
-      } else {
-        box.innerHTML = '<button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button>';
-        bindAuthButtons();
-      }
-    }
-    if (typeof window.hsOnAuthChange === 'function') { try { window.hsOnAuthChange(window.hsUser); } catch(e){} }
-  }
-
-  document.addEventListener('DOMContentLoaded', function(){
-    bindAuthButtons();
-    $('auth-close').addEventListener('click', closeAuth);
-    $('auth-submit').addEventListener('click', submitAuth);
-    $('auth-email').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
-    $('auth-code').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
-    $('auth-back-link').addEventListener('click', function(e){ e.preventDefault(); showMsg('', false); setStep('email'); });
-    $('auth-overlay').addEventListener('click', function(e){ if (e.target === $('auth-overlay')) closeAuth(); });
-    client.auth.getSession().then(function(res){ updateNav(res.data.session); });
-    client.auth.onAuthStateChange(function(evt, session){ updateNav(session); });
-  });
-})();
-</script>
-
-<script>
-document.addEventListener('DOMContentLoaded', function(){
-  var t = document.getElementById('nav-toggle');
-  var m = document.getElementById('nav-menu');
-  if (t && m) t.addEventListener('click', function(){ m.classList.toggle('open'); });
-});
-</script>
-<script src="share.js" defer></script>
+<script src="lib/data.js"></script>
+<script src="lib/templates.js"></script>
+<script src="shell.js"></script>
 </body>
 </html>

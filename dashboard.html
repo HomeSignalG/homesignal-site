@@ -3,498 +3,107 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<meta name="robots" content="noindex, nofollow">
 <title>HomeSignal — Dashboard</title>
-<meta name="description" content="Manage your HomeSignal alerts — the communities and topics you follow.">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://homesignal.net/dashboard.html">
-<meta property="og:title" content="HomeSignal — Dashboard">
-<meta property="og:description" content="Manage your HomeSignal alerts — the communities and topics you follow.">
-<meta name="twitter:card" content="summary_large_image">
-<meta property="og:image" content="https://homesignal.net/og-default.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta name="twitter:image" content="https://homesignal.net/og-default.png">
-<meta name="twitter:title" content="HomeSignal — Dashboard">
-<meta name="twitter:description" content="Manage your HomeSignal alerts — the communities and topics you follow.">
-<link rel="canonical" href="https://homesignal.net/dashboard.html">
-<style>
-/* ============================================================
-   HomeSignal — shared styles (tokens, reset, nav, footer)
-   ============================================================ */
-:root {
-  /* Ported to the index.html / box-elder design system: system font, brand
-     green #1f5130, warm-neutral surfaces, hairline borders. Token NAMES are
-     kept and re-pointed so all existing rules adopt the shared look. */
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --green: #1f5130; --green-light: #e1f5ee; --green-mid: #9fe1cb;
-  --green-dark: #0f6e56; --green-text: #0f6e56;
-  --text: #1c1c1a; --text-secondary: #5f5e5a; --text-tertiary: #6f6e69;
-  --border: rgba(0,0,0,.12); --bg: #ffffff; --bg-secondary: #f4f4f5;
-  --radius: 12px; --radius-sm: 8px; --radius-pill: 100px;
-  --gl: var(--green-light); --gm: var(--green-mid); --gd: var(--green-dark);
-  --ts: var(--text-secondary); --tt: var(--text-tertiary); --bg2: var(--bg-secondary);
-  --r: var(--radius); --rs: var(--radius-sm);
-}
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-a { text-decoration: none; }
-input, button, textarea { font-family: inherit; outline: none; }
-input:focus, textarea:focus { border-color: var(--green) !important; }
-a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-body { font-family: var(--font); color: var(--text); line-height: 1.6; background: #f3f4f6; font-size: 14px; }
-
-nav { display: flex; align-items: center; justify-content: space-between; padding: 14px max(24px, calc((100% - 1200px) / 2 + 24px)); border-bottom: 0.5px solid var(--border); background: var(--bg); position: sticky; top: 0; z-index: 100; }
-.logo { display: flex; align-items: center; gap: 10px; }
-.logo-icon { width: 34px; height: 34px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-.logo-icon svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.logo-text { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
-.logo-text span { color: var(--green); }
-.nav-links { display: flex; align-items: center; gap: 36px; list-style: none; }
-.nav-links a { color: var(--text-secondary); font-size: 14px; }
-.nav-links a:hover { color: var(--text); }
-.nav-actions { display: flex; gap: 10px; align-items: center; }
-.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 8px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; }
-.btn-outline:hover { background: var(--bg-secondary); }
-.btn-primary { background: var(--green); color: #fff; border: none; padding: 8px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; }
-.btn-primary:hover { opacity: 0.9; }
-
-footer { padding: 32px 48px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; background: var(--bg-secondary); }
-.footer-left .logo-text { font-size: 15px; margin-bottom: 4px; }
-.footer-tagline { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
-.footer-links { display: flex; gap: 20px; }
-.footer-links a { font-size: 13px; color: var(--text-tertiary); display: inline-block; padding: 4px 0; }
-.footer-links a:hover { color: var(--text); }
-
-/* ===== Responsive nav ===== */
-.nav-toggle { display: none; background: none; border: none; cursor: pointer; color: var(--text); padding: 4px; }
-.nav-menu { display: contents; }
-@media (max-width: 720px) {
-  nav { padding: 12px 20px; }
-  .nav-toggle { display: flex; align-items: center; }
-  .nav-menu { display: none; position: absolute; top: 100%; left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 0; background: var(--bg); border-bottom: 1px solid var(--border); padding: 6px 20px 14px; box-shadow: 0 8px 16px rgba(0,0,0,0.07); }
-  .nav-menu.open { display: flex; }
-  .nav-links { flex-direction: column; align-items: stretch; gap: 0; width: 100%; }
-  .nav-links a { display: block; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
-  .nav-actions { flex-direction: column; align-items: stretch; gap: 8px; width: 100%; margin-top: 12px; }
-  .nav-actions > * { width: 100%; padding: 12px; text-align: center; }
-  footer { padding: 24px 20px; flex-direction: column; align-items: flex-start; gap: 14px; }
-}
-
-/* ============================================================
-   My alerts dashboard
-   ============================================================ */
-.dash-wrap { max-width: 760px; margin: 0 auto; padding: 36px 24px 64px; }
-.dash-head { margin-bottom: 24px; }
-.dash-head h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
-.dash-head p { font-size: 14px; color: var(--ts); }
-
-.state-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 28px; text-align: center; }
-.state-card h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
-.state-card p { font-size: 13px; color: var(--ts); margin-bottom: 16px; }
-
-.comm-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); padding: 18px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.comm-card-main { min-width: 0; }
-.comm-card-name { font-size: 16px; font-weight: 600; margin-bottom: 3px; }
-.comm-card-link { color: var(--green); text-decoration: none; cursor: pointer; transition: color .12s ease; }
-.comm-card-link:hover { color: var(--green-dark); text-decoration: underline; }
-.comm-card-link:active { color: #0d3a1f; text-decoration: underline; }
-.comm-card:hover { border-color: var(--green-mid); }
-.comm-card-meta { font-size: 12.5px; color: var(--ts); }
-.comm-card-meta .dot { color: var(--green); font-weight: 700; }
-
-.add-card { background: var(--bg); border: 1px dashed var(--gm); border-radius: var(--r); padding: 18px; margin-top: 18px; }
-.add-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
-.add-card p { font-size: 12.5px; color: var(--ts); margin-bottom: 12px; }
-.add-row { display: flex; gap: 10px; flex-wrap: wrap; }
-.add-input { flex: 1; min-width: 140px; border: 1px solid var(--border); border-radius: var(--rs); padding: 10px 13px; font-size: 13px; background: var(--bg2); color: var(--text); }
-.add-input::placeholder { color: var(--tt); }
-.add-msg { font-size: 12.5px; margin-top: 10px; min-height: 1em; color: var(--ts); }
-.loading { text-align: center; padding: 48px 20px; color: var(--tt); font-size: 14px; }
-@media (max-width: 720px) {
-  .dash-wrap { padding: 28px 16px 48px; }
-  .comm-card { align-items: stretch; }
-  .add-row { flex-direction: column; }
-  .add-input, .add-row .btn-primary { width: 100%; }
-}
-</style>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://*.tile.openstreetmap.org; form-action 'self'">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>#dashMap{height:300px}#dashMap .maplibregl-canvas{border-radius:15px}</style>
 </head>
-<body>
-
-<!-- NAV -->
-<nav>
-  <a class="logo" href="index.html">
-    <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
-    <div class="logo-text">Home<span>Signal</span></div>
-  </a>
-  <button class="nav-toggle" id="nav-toggle" aria-label="Open menu"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="nav-menu" id="nav-menu"><ul class="nav-links"><li><a href="how-it-works.html">How it works</a></li><li><a href="about.html">About</a></li></ul>
-  <button class="nav-share" type="button" onclick="sharePage()" aria-label="Share this page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg><span>Share</span></button>
-  <div class="nav-actions" id="nav-auth"><button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button></div>
-</div>
-</nav>
-
-<div class="dash-wrap">
-  <div class="dash-head">
-    <h1>Your community dashboard</h1>
-    <p>The communities you follow and the topics you get alerts for.</p>
+<body data-nav="dash">
+<template id="hs-content">
+  <div class="page">
+    <div class="ph">
+      <div class="eyebrow">Dashboard</div>
+      <h1 id="dashHi">Welcome back</h1>
+      <p id="dashSub"></p>
+    </div>
+    <div class="strip" id="dashStrip"></div>
+    <div class="cols">
+      <div>
+        <div class="block" style="padding:16px 18px">
+          <div class="bt-row"><h2>What's changing around you</h2><a href="maps.html">Open full map →</a></div>
+          <div class="mapwrap" id="dashMap" style="box-shadow:none"></div>
+        </div>
+        <div class="bt-row"><h2 style="font-size:15px;margin:0">Recent — ranked by impact on you</h2><a href="alerts.html" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">All alerts →</a></div>
+        <div id="dashRecent"></div>
+      </div>
+      <div>
+        <div class="block">
+          <div class="bt-row"><h2>Your properties</h2><a href="properties.html">Manage →</a></div>
+          <div id="dashProps"></div>
+          <button class="addbtn" style="width:100%;justify-content:center;margin-top:10px" onclick="HS.openLoc()">+ Add a property</button>
+        </div>
+        <div class="block">
+          <div class="bt-row"><h2>Your watchlist</h2><a href="#" onclick="alert('Watchlist edit — persists to watchlist_items');return false">Edit</a></div>
+          <div class="chips" id="dashWatch"></div>
+        </div>
+        <div class="block">
+          <h2 class="bt">Upcoming meetings</h2>
+          <div id="dashMeetings"></div>
+        </div>
+      </div>
+    </div>
   </div>
-  <div id="dash-body">
-    <div class="loading">Loading your alerts…</div>
-  </div>
-</div>
+</template>
 
-<footer>
-  <div class="footer-left">
-    <a class="logo" href="index.html" style="margin-bottom:4px;">
-      <div class="logo-icon" style="width:28px;height:28px;"><svg viewBox="0 0 24 24" style="width:15px;height:15px;"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
-      <div class="logo-text" style="font-size:14px;">Home<span>Signal</span></div>
-    </a>
-    <div class="footer-tagline">Community change.</div>
-    <div class="footer-tagline" style="margin-top:6px">© 2026 HomeSignal, Inc. · Neutral · sourced · non-partisan</div>
-    <div class="footer-tagline" style="margin-top:6px">Follow HomeSignal: <a href="https://bsky.app/profile/homesignal-tracker.bsky.social" aria-label="Bluesky" style="display:inline-flex;width:24px;height:24px;border-radius:50%;background:#1185fe;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px"><svg viewBox="0 0 24 24" width="14" height="14" fill="#fff" aria-hidden="true"><path d="M5.5 4.3c2.4 1.8 5 5.5 6 7.5 1-2 3.6-5.7 6-7.5 1.7-1.3 4.5-2.3 4.5.9 0 .6-.4 5.2-.6 6-.7 2.6-3.3 3.2-5.7 2.8 4.1.7 5.2 3 2.9 5.3-4.3 4.4-6.2-1.1-6.7-2.5-.1-.3-.2-.5-.2-.3 0-.2-.1.1-.2 2.5-.5 1.4-2.4 6.9-6.7 2.5-2.3-2.3-1.2-4.6 2.9-5.3-2.4.4-5-.2-5.7-2.8C1.4 10.4 1 5.8 1 5.2c0-3.2 2.8-2.2 4.5-.9z"/></svg></a><a href="https://www.reddit.com/user/HomeSignalnet" aria-label="Reddit" style="display:inline-flex;width:24px;height:24px;border-radius:50%;background:#ff4500;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px"><svg viewBox="0 0 24 24" width="14" height="14" fill="#fff" aria-hidden="true"><path d="M22 12a2.04 2.04 0 0 0-3.46-1.46 10 10 0 0 0-5.27-1.67l.9-4.23 2.94.62a1.5 1.5 0 1 0 .16-1l-3.28-.7a.5.5 0 0 0-.59.38l-1 4.7a10 10 0 0 0-5.34 1.66 2.04 2.04 0 1 0-2.2 3.36c-.03.21-.05.43-.05.65 0 3.31 3.58 6 8 6s8-2.69 8-6c0-.22-.02-.44-.05-.65A2.04 2.04 0 0 0 22 12zM7 13.5a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0zm8.1 4.2c-.86.86-2.6.93-3.1.93-.5 0-2.24-.07-3.1-.93a.34.34 0 0 1 .48-.48c.54.54 1.7.73 2.62.73.92 0 2.08-.19 2.62-.73a.34.34 0 0 1 .48.48zM15.5 15a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg></a></div>
-  </div>
-  <div class="footer-links">
-    <a href="how-it-works.html">How it works</a>
-    <a href="about.html">About</a>
-    <a href="privacy.html">Privacy</a>
-    <a href="terms.html">Terms of use</a>
-    <a href="contact.html">Contact</a>
-  </div>
-</footer>
-
-<!-- AUTH MODAL (shared markup) -->
-<style>
-  .auth-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center; }
-  .auth-modal { background:#fff; border-radius:14px; padding:28px; width:100%; max-width:380px; margin:16px; border:1px solid var(--border); position:relative; }
-  .auth-modal h2 { font-size:20px; font-weight:700; margin-bottom:4px; color:var(--text); }
-  .auth-sub { font-size:13px; color:var(--text-secondary); margin-bottom:18px; }
-  .auth-input { width:100%; border:1px solid var(--border); border-radius:var(--radius-sm); padding:11px 13px; font-size:14px; background:var(--bg-secondary); color:var(--text); margin-bottom:10px; }
-  .auth-submit { width:100%; background:var(--green); color:#fff; border:none; padding:12px; border-radius:var(--radius-sm); font-size:14px; font-weight:600; cursor:pointer; }
-  .auth-submit:hover { opacity:0.9; }
-  .auth-submit:disabled { opacity:0.6; cursor:default; }
-  .auth-msg { font-size:13px; color:var(--green-dark); margin-top:12px; min-height:1em; }
-  .auth-toggle { font-size:13px; color:var(--text-secondary); margin-top:16px; text-align:center; }
-  .auth-toggle a { color:var(--green); font-weight:600; }
-  .auth-close { position:absolute; top:14px; right:16px; background:none; border:none; font-size:22px; line-height:1; color:var(--text-tertiary); cursor:pointer; }
-</style>
-<div id="auth-overlay" class="auth-overlay">
-  <div class="auth-modal">
-    <button class="auth-close" id="auth-close">&times;</button>
-    <h2 id="auth-title">Log in or sign up</h2>
-    <p class="auth-sub" id="auth-sub">Enter your email and we'll send you a code &mdash; no password needed.</p>
-    <input type="email" id="auth-email" class="auth-input" placeholder="Email address" autocomplete="email" / aria-label="Email address">
-    <input type="text" id="auth-code" class="auth-input" placeholder="Enter your code" inputmode="numeric" maxlength="8" autocomplete="one-time-code" style="display:none;letter-spacing:6px;text-align:center;font-size:18px;" / aria-label="Enter your code">
-    <button id="auth-submit" class="auth-submit">Send me a code</button>
-    <div id="auth-msg" class="auth-msg"></div>
-    <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><a href="#" id="auth-back-link">Use a different email</a></div>
-  </div>
-</div>
-
-<script src="communities.js"></script>
-<script src="hs-resolve.js"></script>
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="lib/data.js"></script>
+<script src="lib/templates.js"></script>
+<script src="lib/map.js"></script>
+<script src="shell.js"></script>
 <script>
-// ============================================================
-// Shared auth module (identical across pages). Exposes
-// window.hsUser / hsToken / hsOpenAuth and calls hsOnAuthChange.
-// ============================================================
-(function(){
-  var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
-  var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
-  var client = window.supabase.createClient(SB_URL, SB_ANON);
-  window.hsClient = client;
-  window.hsUser = null;
-  var step = 'email';
-  var pendingEmail = '';
-  function $(id){ return document.getElementById(id); }
-  function showMsg(text, isError){ var m = $('auth-msg'); m.textContent = text || ''; m.style.color = isError ? '#b91c1c' : 'var(--green-dark)'; }
-  function setStep(s){
-    step = s;
-    if (s === 'code') {
-      $('auth-sub').textContent = 'We emailed a code to ' + pendingEmail + '. Enter it below.';
-      $('auth-email').style.display = 'none'; $('auth-code').style.display = 'block';
-      $('auth-submit').textContent = 'Verify & continue'; $('auth-back-wrap').style.display = 'block';
-      setTimeout(function(){ $('auth-code').focus(); }, 50);
-    } else {
-      $('auth-sub').innerHTML = "Enter your email and we'll send you a code &mdash; no password needed.";
-      $('auth-email').style.display = 'block'; $('auth-code').style.display = 'none'; $('auth-code').value = '';
-      $('auth-submit').textContent = 'Send me a code'; $('auth-back-wrap').style.display = 'none';
-      setTimeout(function(){ $('auth-email').focus(); }, 50);
-    }
-  }
-  function openAuth(){ pendingEmail=''; $('auth-email').value=''; showMsg('', false); setStep('email'); $('auth-overlay').style.display = 'flex'; }
-  function closeAuth(){ $('auth-overlay').style.display = 'none'; }
-  window.hsOpenAuth = openAuth;
-  async function sendCode(){
-    var email = ($('auth-email').value || '').trim();
-    if (!email || email.indexOf('@') === -1) { showMsg('Please enter a valid email address.', true); return; }
-    $('auth-submit').disabled = true; showMsg('Sending your code…', false);
-    try { var r = await client.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true } });
-      if (r.error) { showMsg(r.error.message, true); } else { pendingEmail = email; setStep('code'); showMsg('', false); }
-    } catch (e) { showMsg('Something went wrong — please try again.', true); }
-    $('auth-submit').disabled = false;
-  }
-  async function verifyCode(){
-    var code = ($('auth-code').value || '').trim();
-    if (code.length < 4) { showMsg('Enter the code from your email.', true); return; }
-    $('auth-submit').disabled = true; showMsg('Checking…', false);
-    try { var r = await client.auth.verifyOtp({ email: pendingEmail, token: code, type: 'email' });
-      if (r.error) { showMsg(r.error.message, true); $('auth-submit').disabled = false; return; } closeAuth();
-    } catch (e) { showMsg('Something went wrong — please try again.', true); }
-    $('auth-submit').disabled = false;
-  }
-  function submitAuth(){ if (step === 'code') verifyCode(); else sendCode(); }
-  function bindAuthButtons(){ var li = $('btn-login'), su = $('btn-signup'); if (li) li.addEventListener('click', function(){ openAuth(); }); if (su) su.addEventListener('click', function(){ openAuth(); }); }
-  function updateNav(session){
-    window.hsUser = (session && session.user) ? session.user : null;
-    window.hsToken = (session && session.access_token) ? session.access_token : null;
-    var box = $('nav-auth');
-    if (box) {
-      if (window.hsUser) {
-        box.innerHTML = '<a class="btn-outline" href="dashboard.html" style="text-decoration:none">Dashboard</a>' + '<span style="display:inline-flex;align-items:center;gap:10px;margin-left:12px;vertical-align:middle">' + '<span title="' + window.hsUser.email + '" style="font-size:12.5px;color:#6b7280;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle">' + window.hsUser.email + '</span>' + '<button type="button" id="btn-logout" style="background:none;border:none;padding:0;color:#6b7280;font:inherit;font-size:13px;cursor:pointer;text-decoration:underline">Log out</button>' + '</span>';
-        var lo = $('btn-logout'); if (lo) lo.addEventListener('click', function(){ client.auth.signOut(); });
-      } else {
-        box.innerHTML = '<button class="btn-outline" id="btn-login">Log in</button><button class="btn-primary" id="btn-signup">Sign up</button>';
-        bindAuthButtons();
-      }
-    }
-    if (typeof window.hsOnAuthChange === 'function') { try { window.hsOnAuthChange(window.hsUser); } catch(e){} }
-  }
-  document.addEventListener('DOMContentLoaded', function(){
-    bindAuthButtons();
-    $('auth-close').addEventListener('click', closeAuth);
-    $('auth-submit').addEventListener('click', submitAuth);
-    $('auth-email').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
-    $('auth-code').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAuth(); });
-    $('auth-back-link').addEventListener('click', function(e){ e.preventDefault(); showMsg('', false); setStep('email'); });
-    $('auth-overlay').addEventListener('click', function(e){ if (e.target === $('auth-overlay')) closeAuth(); });
-    client.auth.getSession().then(function(res){ updateNav(res.data.session); });
-    client.auth.onAuthStateChange(function(evt, session){ updateNav(session); });
-  });
-})();
-</script>
+HS.onReady(async function () {
+  var S = HS.state, home = S.activeProperty;
+  var c = await HS.data.community(S.zip);
+  var projects = await HS.data.projects(S.zip, home);
+  var changes = await HS.data.changes(S.zip, home);
+  var meetings = await HS.data.meetings(S.zip, home);
 
-<script>
-// ============================================================
-// My alerts dashboard
-// Reads the communities a user follows. Tries the new
-// user_communities table first; if it isn't there yet (or is
-// empty), falls back to the single-county users row, so the
-// page works both before and after the data-model migration.
-// ============================================================
-(function(){
-  var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
-  var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
-  function $(id){ return document.getElementById(id); }
-  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  var name = (S.session && S.session.name || 'there').split(' ')[0];
+  document.getElementById('dashHi').textContent = 'Welcome back, ' + name;
+  document.getElementById('dashSub').textContent = S.properties.length + ' home' + (S.properties.length===1?'':'s') + ' followed — here\'s what needs you across them.';
 
-  // Count how many topics are followed across a topics object like
-  // { meetings:[...], news:[...] }.
-  function countTopics(topics){
-    if (!topics || typeof topics !== 'object') return 0;
-    var n = 0;
-    Object.keys(topics).forEach(function(k){ if (Array.isArray(topics[k])) n += topics[k].length; });
-    return n;
+  var openCount = changes.filter(function(x){var d=HS.daysUntil(x.window_closes_at);return d!=null&&d>=0;}).length;
+  document.getElementById('dashStrip').innerHTML =
+    HS.tpl.statTile(projects.length, 'Projects near you', '')
+    + HS.tpl.statTile(openCount, 'Action windows open', 'accent')
+    + HS.tpl.statTile('<span style="font-size:19px">' + HS.esc(c.growth_pressure) + '</span>', 'Growth pressure · trending up', '')
+    + HS.tpl.statTile(c.community_score, 'Community score', 'g');
+
+  // map preview — real satellite tiles when available, schematic otherwise
+  var items = changes.filter(function(x){return !x.quiet;}).concat(projects)
+    .filter(function(x){return x.lat && x.lng;}).slice(0, 6);
+  var dashMap = document.getElementById('dashMap');
+  var center = home || items[0] || (c && c.lat ? {lat:c.lat,lng:c.lng} : {lat:30.17,lng:-97.61});
+  if (window.maplibregl) {
+    HS.buildGL(dashMap, { center: center, items: items, mode: 'satellite', interactive: false, zoom: 12.4, radiusMi: 1.5 });
+  } else {
+    HS.MapProvider.render(dashMap, { home: center, items: items, radiusMi: 1.5, w: 640, h: 300 });
   }
 
-  function authHeaders(){
-    var token = window.hsToken || SB_ANON;
-    return { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + token };
-  }
+  // recent — ranked by impact
+  var recent = changes.filter(function(x){return !x.quiet;})
+    .sort(function(a,b){return (b.impacts?b.impacts.length:0)-(a.impacts?a.impacts.length:0);}).slice(0,2);
+  document.getElementById('dashRecent').innerHTML = recent.map(function(ch){ return HS.tpl.miniCard(ch, ch.category); }).join('');
 
-  // Returns an array of { community_id, topics } for the logged-in user.
-  async function loadFollows(email){
-    // 1) New model: user_communities (one row per county).
-    try {
-      var res = await fetch(SB_URL + '/rest/v1/user_communities?user_email=eq.' + encodeURIComponent(email) + '&select=community_id,topics,zip_code', { headers: authHeaders() });
-      if (res.ok) {
-        var rows = await res.json();
-        if (Array.isArray(rows) && rows.length) return rows;
-      }
-    } catch (e) { /* table may not exist yet — fall through */ }
-    // 2) Fallback: single-county users row.
-    try {
-      var res2 = await fetch(SB_URL + '/rest/v1/users?email=eq.' + encodeURIComponent(email) + '&select=community_id,topics,zip_code', { headers: authHeaders() });
-      if (res2.ok) {
-        var urows = await res2.json();
-        if (Array.isArray(urows) && urows.length) {
-          // users is keyed per (email, community_id) — return EVERY community the user
-          // follows, not just urows[0]. That single-row cap hid real DB follows.
-          var mapped = urows.filter(function (r) { return r.community_id; })
-            .map(function (r) { return { community_id: r.community_id, topics: r.topics || {}, zip_code: r.zip_code }; });
-          if (mapped.length) return mapped;
-        }
-      }
-    } catch (e) {}
-    return [];
-  }
+  // properties
+  document.getElementById('dashProps').innerHTML = S.properties.map(function(p){
+    return '<div class="swrow" onclick="HS.selectProperty(\'' + p.id + '\');location.href=\'property.html?id=' + p.id + '\'">'
+      + '<div class="miniscore">' + (p.score||'') + '</div>'
+      + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + ' <span style="font-size:10px;color:var(--green);font-weight:700">· ' + HS.esc((p.tag||p.label).toUpperCase()) + '</span></div>'
+      + '<div class="pa">' + HS.esc(p.city) + '</div></div></div>';
+  }).join('');
 
-  function renderLoggedOut(){
-    $('dash-body').innerHTML =
-      '<div class="state-card">' +
-        '<h2>Log in to see your alerts</h2>' +
-        '<p>Sign in with your email to view the communities and topics you follow.</p>' +
-        '<button class="btn-primary" id="dash-login">Log in</button>' +
-      '</div>';
-    var b = $('dash-login');
-    if (b) b.addEventListener('click', function(){ if (window.hsOpenAuth) window.hsOpenAuth(); });
-  }
+  // watchlist (seeded from real entities near this home)
+  var watch = [c.zip, 'SH-130 Data Center', 'SH-71', 'Your street', 'Colorado River'];
+  document.getElementById('dashWatch').innerHTML = watch.map(function(w){return '<span class="wchip">' + HS.esc(w) + '</span>';}).join('');
 
-  function addCommunityHtml(){
-    return '<div class="add-card">' +
-      '<h3>Add a community</h3>' +
-      '<p>Enter a ZIP code to open that area, then tap <strong>Save location</strong> (or pick topics) to follow it.</p>' +
-      '<div class="add-row">' +
-        '<input class="add-input" id="add-zip" type="text" inputmode="numeric" maxlength="5" placeholder="Enter a ZIP code" />' +
-        '<button class="btn-primary" id="add-btn">Find community</button>' +
-      '</div>' +
-      '<div class="add-msg" id="add-msg"></div>' +
-    '</div>';
-  }
-
-  // Coverage/routing = the shared live-DB resolver (hs-resolve.js), the ONE source used by
-  // add-community, the homepage, and the saved-follows list. Never the frozen communities.js map.
-  // If the homepage funneled a ZIP here (dashboard.html?zip=<zip>), prefill the add-community
-  // box once so the entered ZIP carries over — the resident lands ON the dashboard (not the
-  // alerts page) with their ZIP ready to save. Consumed once; never clobbers typed input.
-  var pendingZip = (function(){
-    try { var z = new URLSearchParams(window.location.search).get('zip'); return (z && window.HS.extractZip(z)) || null; }
-    catch(e){ return null; }
-  })();
-  function applyPendingZip(){
-    if (!pendingZip) return;
-    var input = $('add-zip');
-    if (!input) return;                 // no add box (logged out) -> retry after next render
-    if (!input.value) input.value = pendingZip;
-    pendingZip = null;
-    try { input.scrollIntoView({ behavior:'smooth', block:'center' }); } catch(e){}
-    try { input.focus({ preventScroll:true }); } catch(e){ try { input.focus(); } catch(_){} }
-  }
-  function bindAddCommunity(){
-    var btn = $('add-btn'), input = $('add-zip'), msg = $('add-msg');
-    if (!btn || !input) return;
-    async function go(){
-      var zip = window.HS.extractZip(input.value);
-      if (!zip) { msg.style.color = '#b91c1c'; msg.textContent = 'Please enter a 5-digit ZIP code.'; return; }
-      msg.style.color = 'var(--ts)'; msg.textContent = 'Finding your community…';
-      btn.disabled = true;
-      var url = await window.HS.resolveCoverageUrl(zip);
-      btn.disabled = false;
-      if (url) { window.location.href = url; return; }
-      msg.style.color = 'var(--ts)';
-      msg.innerHTML = "We don't cover that ZIP yet — you can request it on the <a href=\"index.html\" style=\"color:var(--green);font-weight:600\">home page</a>.";
-    }
-    btn.addEventListener('click', go);
-    input.addEventListener('keydown', function(e){ if (e.key === 'Enter') go(); });
-  }
-
-  function levelLabel(lvl){
-    return ({ county:'County', city:'City', zip:'ZIP area', neighborhood:'Neighborhood' })[lvl] || '';
-  }
-  // Union topic arrays per category across two follow rows that resolve to the SAME displayed
-  // place (e.g. one row anchored to the right community, another to a mismatched/corrupted
-  // community_id but the same zip_code) so a merged card shows every followed topic once.
-  function mergeTopics(a, b){
-    var out = {};
-    [a, b].forEach(function(t){
-      if (!t) return;
-      Object.keys(t).forEach(function(k){
-        if (!Array.isArray(t[k])) return;
-        var list = out[k] || [];
-        t[k].forEach(function(v){ if (list.indexOf(v) === -1) list.push(v); });
-        out[k] = list;
-      });
-    });
-    return out;
-  }
-  async function renderFollows(follows){
-    var body = $('dash-body');
-    if (!follows.length){
-      body.innerHTML =
-        '<div class="state-card">' +
-          '<h2>You’re not following any communities yet</h2>' +
-          '<p>Find your area and pick the topics you want alerts for.</p>' +
-          '<a class="btn-primary" href="index.html" style="display:inline-block">Find my community</a>' +
-        '</div>' + addCommunityHtml();
-      bindAddCommunity();
-      return;
-    }
-    // Resolve name + level + page for EVERY followed community from the LIVE communities
-    // table (source of truth) — never the frozen communities.js map, which silently dropped
-    // communities it didn't know (Weber County, Box Elder County, …).
-    var byId = await window.HS.communitiesByIds(follows.map(function(f){ return f.community_id; }));
-    // Show the ZIP the user ENTERED (users.zip_code) as the follow's place — not the county the
-    // subscription is anchored to. Resolve each zip to its most-specific community for DISPLAY;
-    // the follow's community_id is unchanged, so alerts keep delivering from the county row.
-    var places = await Promise.all(follows.map(function(f){ return f.zip_code ? window.HS.communityForZip(f.zip_code) : null; }));
-    // Group by the DISPLAYED place, not the raw row, so two follow rows that resolve to the same
-    // place (e.g. a mismatched community_id/zip_code pair) render as ONE card, not a duplicate.
-    var groups = [];
-    var indexByKey = {};
-    follows.forEach(function(f, i){
-      var place  = places[i];                       // the entered ZIP's community (display)
-      var county = byId[f.community_id] || null;     // the content anchor (fallback name/page)
-      var disp   = place || county;                 // prefer the resident's ZIP/place
-      var page = (place && f.zip_code && window.HS.pageForCommunity(place, f.zip_code))
-              || (county && window.HS.pageForCommunity(county))
-              || ('community.html?id=' + encodeURIComponent(f.community_id));
-      var key = (disp && disp.id) || f.community_id;
-      if (Object.prototype.hasOwnProperty.call(indexByKey, key)) {
-        var g = groups[indexByKey[key]];
-        g.topics = mergeTopics(g.topics, f.topics);
-      } else {
-        indexByKey[key] = groups.length;
-        groups.push({ disp: disp, page: page, topics: f.topics || {}, zip: f.zip_code });
-      }
-    });
-    var cards = groups.map(function(g){
-      // Backbone standard: "Town Name (ZIP)" — pair the place with the ZIP the
-      // resident entered (g.zip), so a city/county card never shows a bare name.
-      var name = (g.disp && window.HS.displayName(g.disp, g.zip)) || 'Your community';
-      var lvl = g.disp ? levelLabel(g.disp.level) : '';
-      var levelChip = lvl ? ' <span style="font-size:11px;color:#6b7280;border:1px solid #e5e7eb;border-radius:999px;padding:1px 7px;margin-left:8px;white-space:nowrap">' + esc(lvl) + '</span>' : '';
-      var n = countTopics(g.topics);
-      var meta = n > 0 ? ('<span class="dot">' + n + '</span> topic' + (n===1?'':'s') + ' followed') : 'No topics selected yet';
-      // "Development" links to the homesignalmap.html tracker for the resident's ZIP — only
-      // shown when we actually know a ZIP (map mode needs one; no ZIP means no dev page).
-      var devBtn = g.zip
-        ? ' <a class="btn-outline" href="homesignalmap.html?zip=' + encodeURIComponent(g.zip) + '" style="text-decoration:none">Development</a>'
-        : '';
-      return '<div class="comm-card">' +
-        '<div class="comm-card-main">' +
-          '<div class="comm-card-name"><a class="comm-card-link" href="' + esc(g.page) + '">' + esc(name) + '</a>' + levelChip + '</div>' +
-          '<div class="comm-card-meta">' + meta + '</div>' +
-        '</div>' +
-        '<span style="display:inline-flex;gap:8px;flex-wrap:wrap">' +
-        '<a class="btn-outline" href="' + esc(g.page) + '" style="text-decoration:none">Manage alerts</a>' +
-        devBtn +
-        '</span>' +
-      '</div>';
-    }).join('');
-    body.innerHTML = cards + addCommunityHtml();
-    bindAddCommunity();
-    applyPendingZip();   // carry over a ZIP funneled from the homepage (dashboard.html?zip=)
-  }
-
-  async function render(){
-    if (!window.hsUser){ renderLoggedOut(); return; }
-    $('dash-body').innerHTML = '<div class="loading">Loading your alerts…</div>';
-    var follows = await loadFollows(window.hsUser.email);
-    await renderFollows(follows);
-  }
-
-  // Re-render whenever auth state resolves/changes.
-  window.hsOnAuthChange = function(){ render(); };
-})();
-</script>
-
-<script>
-document.addEventListener('DOMContentLoaded', function(){
-  var t = document.getElementById('nav-toggle');
-  var m = document.getElementById('nav-menu');
-  if (t && m) t.addEventListener('click', function(){ m.classList.toggle('open'); });
+  document.getElementById('dashMeetings').innerHTML = meetings.map(HS.tpl.meetingRow).join('');
 });
 </script>
-<script src="share.js" defer></script>
 </body>
 </html>

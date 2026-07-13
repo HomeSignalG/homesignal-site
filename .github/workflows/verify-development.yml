@@ -19,6 +19,10 @@ on:
     branches: [main]
     paths:
       - 'homesignalmap.html'
+      - 'config.js'
+      - 'shell.js'
+      - 'partials/shell.html'
+      - 'lib/data.js'
       - 'docs/*-development-reports-seed.sql'
       - 'docs/development-reports-cache.sql'
       - 'scripts/verify-development.mjs'

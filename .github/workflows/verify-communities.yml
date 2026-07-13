@@ -1,9 +1,11 @@
 name: verify-communities
 
-# Automated, live end-to-end check that every community page resolves correctly on the
-# real site. Runs where network egress works (GitHub-hosted runner) — the piece the build
-# sandbox cannot do (docs/community-build-source-of-truth.md §13.8/§13.9). Zero-touch: it
-# reads the live `communities` table, so new communities are covered with no code change.
+# Automated, live end-to-end check of the new-layout community page on the real site.
+# Runs where network egress works (GitHub-hosted runner) — the piece the build sandbox
+# cannot do. INDEX-ONLY-UTAH policy: asserts every Utah page renders real sourced records
+# and is indexable, and that non-Utah pages are noindexed. Zero-touch: it reads the live
+# app_community_meta table (anon key from config.js), so new Utah ZIPs are covered with no
+# code change.
 
 on:
   workflow_dispatch:
@@ -18,7 +20,8 @@ on:
     branches: [main]
     paths:
       - 'community.html'
-      - 'communities.js'
+      - 'config.js'
+      - 'lib/data.js'
       - 'docs/*-communities-seed.sql'
       - 'scripts/verify-communities.mjs'
       - '.github/workflows/verify-communities.yml'
