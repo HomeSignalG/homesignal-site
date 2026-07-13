@@ -62,3 +62,20 @@ select cron.schedule('dev-reports-refresh-collect', '8 9 * * *', 'select public.
 --                                       select public.dev_refresh_collect();
 -- To inspect: select jobname, schedule, active from cron.job where jobname like 'dev-reports-refresh%';
 --             select * from cron.job_run_details order by start_time desc limit 10;
+
+-- UPDATE 2026-07-13: dev_refresh_collect hardened against non-JSON 200s. It cast EVERY recent
+-- 200's content to jsonb before the mode filter could exclude it, so a single non-JSON 200 in
+-- the 20-min window (e.g. an ad-hoc HTML/ArcGIS probe made while debugging) threw
+-- "invalid input syntax for type json" and aborted the whole nightly upsert. Guard added:
+-- `and left(ltrim(content),1) = '{'` — only JSON-object bodies are considered. Applied via
+-- migration dev_refresh_collect_guard_nonjson. Normal cron operation only ever fires
+-- get-address-report (all JSON), so this is defensive; behavior is otherwise identical.
+--
+-- Also 2026-07-13: Provo Planning Applications (arcgis) went live in the engine; re-cached the
+-- 6 Provo ZIPs via net.http_post → the scoped-upsert form of this collect (filtered to those
+-- request ids to avoid the non-JSON probe rows). Result: 84601 dev 10→92 (82 per-parcel Provo
+-- points), 84604 →82 (72 pts), 84606 →50 (40 pts); 84603/84605 stay facility-floor (PO-box ZIPs,
+-- 0 Provo addresses — correct, not fabricated); 84602 (BYU campus) timed out that run and stays
+-- on its prior facility-floor row (re-collects on the next nightly fire). app_projects then
+-- materialized 136 Provo development rows across 84601/84604/84606, 0 missing coords/source_ref,
+-- statuses Approved+Proposed (honest), sourced to provo.gov/174/Projects-and-Planning.
