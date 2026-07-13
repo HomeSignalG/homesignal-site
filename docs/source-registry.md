@@ -664,3 +664,35 @@ These don't produce map markers directly. They feed the entity graph
 
 8. **counts bucket is declared here.** Don't invent a new bucket. If the
    right bucket isn't clear, add a note here and ask before building.
+
+---
+
+## ArcGIS FeatureServer (generic connector) — `sources/arcgis.ts`
+
+The Esri twin of the Socrata connector: one connector for every ArcGIS/AGO FeatureServer
+permit/case layer; coverage grows by appending a `jurisdiction-registry.json` `arcgis` entry
+(see `_arcgis_readme` there for the entry schema). Same five rules, same NormalizedRecord
+shape, same run report (`arcgis_reports` in the engine response). Entry-driven `extra_where`
+(verbatim SQL, ANDed into every query) scopes out non-development rows at source.
+Built + unit-tested offline + deployed 2026-07-13 (get-address-report version 31, via the
+deploy-edge-functions.yml CLI workflow).
+
+### slc-planning-petitions — Salt Lake City `Planning_Petition` (LIVE)
+- **API:** `https://services.arcgis.com/mMBpeYj0vPFotzbe/arcgis/rest/services/Planning_Petition/FeatureServer/0`
+  (Salt Lake City's own AGO org — found via the gis-slcgov site-scoped DCAT + org service
+  enumeration; NOTE the lookalike hits "Building_Permits" (Brampton, ON) and SGID
+  "Building Permit latest" (Atlanta, GA) are mislabeled foreign data and were rejected).
+- **Coverage:** UT / Salt Lake. **counts bucket:** development.
+- **What it is:** 3,113 planning petitions (Conditional Use, Zoning Amendment, subdivisions,
+  planned developments, demolitions …) with per-parcel POINT geometry, `ZIPCODE` (12 modeled
+  SLC ZIPs), and a per-record official Accela link (`aca.slcgov.com … CapDetail.aspx`) = the
+  anti-fabrication record_url.
+- **Statuses (VERBATIM, queried 2026-07-13):** Active / Additional Information / Accepted /
+  Pre-screen / In Progress → proposed; Approved → approved; **Closed → exclude** (carries no
+  outcome; mapping it would fabricate one).
+- **extra_where:** drops administrative paperwork subtypes (Zoning Verification Letter,
+  Administrative Interpretation, appeals, determinations — 658 rows) at source.
+- **Verified live end-to-end:** 12/12 SLC ZIPs emit arcgis point records (570 total; e.g.
+  84103 = 132), 0 unsourced, 0 quarantined, and the coverage gate held (84302 UT + 78617 TX
+  → 0 arcgis fetches). Re-cached through v31; `app_projects` now carries per-parcel Salt Lake
+  development rows (448, 100% with coords, each linked to its Accela record).
