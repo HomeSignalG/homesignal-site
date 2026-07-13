@@ -66,3 +66,23 @@
 --     (Found drift: the nightly dev_refresh had aged out concluded hearings >90d, so app_*
 --     was showing more development than the engine had — Cache 5→1, Davis 6→2, Utah 11→4 on
 --     resync. All 136 UT ZIPs still PASS on the facility floor.)
+--
+-- UPDATE 2026-07-13 (d): AUDIT FIXES — point-only projects, real statuses, derived meta.
+-- Applied via migrations app_refresh_zip_point_projects_honest_meta +
+-- app_refresh_zip_recency_order_keep_approved:
+--   * record_kind='development' ONLY for parcel-precise sites (scope='point' — ArcGIS/TABS
+--     permits & petitions). Jurisdiction-wide PMN notices/agendas ("Public Hearing",
+--     "Planning Commission Meeting Agenda …") are NOT projects — they materialize into
+--     app_changes as category 'Planning & zoning' (real records, civic rendering). Kills
+--     the junk project names + the ×N-per-county-ZIP duplication the audit found.
+--   * status comes from the engine's bucket/decided — 'Proposed'/'Approved'/'Active'/
+--     'Operating'/'Decided'; unknown -> 'On file'. NEVER defaulted (the audit found all
+--     1,284 rows stamped 'Proposed', including 32 genuinely-Approved SLC petitions and
+--     items titled "…Meeting Cancelled"). Projects ordered by recency (a proposed-first
+--     sort + cap starved every Approved record out; verified fixed: UT 376 Proposed +
+--     32 Approved, TX 78617 23/21/4 Proposed/Approved/Operating).
+--   * component_scores pct = the real record count capped at 100 (was hardcoded 82/55/45,
+--     which made the derived "Community score" 61 on every page); civic_activity derived
+--     from the upcoming-meeting count (was the literal 'Active').
+--   * data_quality gate counts projects + facilities + sourced notices/meetings, so
+--     notice-only ZIPs keep their pass (verified: 136/136 UT still pass).
