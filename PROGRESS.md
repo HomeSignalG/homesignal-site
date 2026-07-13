@@ -70,3 +70,9 @@ search, sort segments, dev lenses + data view, map layer toggles + radius.
   robots `Disallow: /app/`. Artifact preview stays seed (single-file, offline).
 - NOTE: supabase-mode live rendering not eyeballed from the sandbox (no egress; jsDelivr+Supabase
   blocked in-browser here) — DB-verified + seed-mode regression-clean. Live check is CI / real site.
+
+## Utah real-data (2026-07-13)
+- Made app_refresh_zip county-generic + url-aware (Utah PMN notices use `url`, not `record_url`).
+- Ran for all 136 Utah development_reports ZIPs. **62 pass** (Box Elder 18, Weber 14, Utah 11,
+  Tooele 8, Davis 6, Cache 5), all 100% sourced. Salt Lake 36 = coverage_coming (has real
+  meetings but no per-ZIP permit feed yet → gated). Data-only; /app/ already reads app_* live.
