@@ -5,8 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>HomeSignal — Maps</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://*.tile.openstreetmap.org; form-action 'self'">
 <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+  /* app-only: real-tile map container sits under the schematic + overlay panel */
+  #mapWrap{min-height:300px}
+  #mapgl{width:100%;height:520px;border-radius:15px;overflow:hidden}
+  @media(max-width:900px){ #mapgl{height:60vw;min-height:320px} }
+  .maplibregl-popup-content{font-family:var(--font);font-size:13px;border-radius:10px;padding:9px 12px}
+</style>
 </head>
 <body data-nav="maps">
 <template id="hs-content">
@@ -19,8 +27,8 @@
     <div class="toolbar">
       <div class="seg" id="mapMode">
         <button class="on" data-mode="impact">Impact</button>
-        <button data-mode="sat" title="Available with a live map provider">Satellite</button>
-        <button data-mode="street" title="Available with a live map provider">Street</button>
+        <button data-mode="satellite">Satellite</button>
+        <button data-mode="street">Street</button>
       </div>
       <div class="sp"></div>
       <button class="fpill" id="radiusPill">◉ Impact radius: 1.5 mi ▾</button>
@@ -28,6 +36,8 @@
     </div>
     <div class="mapcols">
       <div class="mapwrap" id="mapWrap">
+        <div id="mapSch"></div>
+        <div id="mapgl" style="display:none"></div>
         <div class="mpanel">
           <div class="mt">Pins colored by impact</div>
           <div class="legrow"><span class="ld" style="background:var(--red)"></span> High impact on you</div>
@@ -52,6 +62,7 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="lib/data.js"></script>
 <script src="lib/templates.js"></script>
 <script src="lib/map.js"></script>
@@ -63,57 +74,154 @@ HS.onReady(async function () {
   var projects = await HS.data.projects(S.zip, home);
   var changes = await HS.data.changes(S.zip, home);
 
-  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true };
-  var items = changes.filter(function(x){return !x.quiet;}).concat(projects)
+  var LET = 'ABCDEFGHIJKLMNOP';
+  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, mode: 'impact' };
+  var all = changes.filter(function(x){return !x.quiet;}).concat(projects)
     .filter(function(x){return x.lat && x.lng;})
     .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
 
-  // Capture the overlay panel ONCE, before any render() wipes the wrapper.
+  function shownItems() {
+    var a = opts.showProjects ? all : all.filter(function(x){return !x.type;});
+    return a.slice(0, 16).map(function(it,i){ return Object.assign({}, it, {_letter: LET[i]}); });
+  }
+  var center = home || all[0] || { lat: c && c.lat || 30.17, lng: c && c.lng || -97.61 };
+
+  function tierHex(it){ var k = HS.mapTier(it).k; return {high:'#c23b34',moderate:'#c47a1a',watch:'#3f7fb0',positive:'#1f9d5c'}[k] || '#3f7fb0'; }
+
   var panelHTML = document.querySelector('.mpanel').outerHTML;
+  var gpsEl = document.getElementById('mapGps');
 
-  function draw() {
-    var wrap = document.getElementById('mapWrap');
-    var shown = opts.showProjects ? items : items.filter(function(x){return !x.type;});
-    var pins = HS.MapProvider.render(wrap, {
-      home: home, items: shown, radiusMi: opts.radiusMi, showRadius: opts.showRadius, w: 780, h: 520
-    });
-    // render() set only the <svg>; re-add the legend/layers panel + gps chip.
-    wrap.insertAdjacentHTML('beforeend', panelHTML);
-    var within = shown.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;
-    wrap.insertAdjacentHTML('beforeend', '<div class="mgps">' + HS.esc(c.name + ', ' + c.state) + ' · ' + within + ' items within ' + opts.radiusMi + ' mi</div>');
-    // reflect current layer state + rewire toggles (panel was re-created)
-    document.getElementById('lyrProjects').classList.toggle('off', !opts.showProjects);
-    document.getElementById('lyrRadius').classList.toggle('off', !opts.showRadius);
-    document.getElementById('lyrProjects').onclick = function(){ opts.showProjects=!opts.showProjects; draw(); };
-    document.getElementById('lyrRadius').onclick = function(){ opts.showRadius=!opts.showRadius; draw(); };
-
+  function renderPins(items) {
     document.getElementById('pinList').innerHTML =
       '<div class="groupHead" style="margin-top:0">Near you · closest first</div>'
-      + pins.map(function (p) {
-        var it = p.item;
-        return '<div class="card mini" style="border-left-color:' + p.color + '">'
-          + '<span class="lens"><span class="letter" style="background:' + p.color + '">' + p.letter + '</span>&nbsp; '
+      + items.map(function (it) {
+        var col = tierHex(it);
+        return '<div class="card mini" style="border-left-color:' + col + '">'
+          + '<span class="lens"><span class="letter" style="background:' + col + '">' + it._letter + '</span>&nbsp; '
           + HS.esc(it.type || it.category || '') + ' · ' + HS.esc(it.dist||'') + '</span>'
           + '<h3>' + HS.esc(it.name || it.title) + '</h3>'
-          + '<p class="sowhat">' + HS.esc(it.sowhat || it.plain_language || '') + '</p>'
-          + '<div class="impacts">' + HS.tpl.impactChips(it.impacts || it.impact_dimensions) + '</div></div>';
+          + '<p class="sowhat">' + HS.esc(it.sowhat || it.plain_language || '') + '</p></div>';
       }).join('');
   }
-  draw();
+  function setGps(items){
+    var within = items.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;
+    gpsEl.textContent = (c ? c.name + ', ' + c.state : 'Your area') + ' · ' + within + ' items within ' + opts.radiusMi + ' mi';
+  }
+  function wirePanel(redraw){
+    document.getElementById('lyrProjects').classList.toggle('off', !opts.showProjects);
+    document.getElementById('lyrRadius').classList.toggle('off', !opts.showRadius);
+    document.getElementById('lyrProjects').onclick = function(){ opts.showProjects=!opts.showProjects; redraw(); };
+    document.getElementById('lyrRadius').onclick = function(){ opts.showRadius=!opts.showRadius; redraw(); };
+  }
+
+  // ---------- schematic (Impact) ----------
+  function drawSchematic() {
+    var items = shownItems();
+    // render into #mapSch only; the overlay panel + gps chip are static siblings in #mapWrap
+    HS.MapProvider.render(document.getElementById('mapSch'), {
+      home: center, items: items, radiusMi: opts.radiusMi, showRadius: opts.showRadius, w: 780, h: 520
+    });
+    setGps(items); renderPins(items);
+    wirePanel(function(){ if (opts.mode==='impact') drawSchematic(); else drawGL(); });
+  }
+
+  // ---------- MapLibre (Satellite / Street) ----------
+  var glMap = null, glMarkers = [], glReady = false;
+  function circle(lat, lng, rMi){
+    var pts=[], R=rMi/69.0, cs=Math.cos(lat*Math.PI/180);
+    for(var i=0;i<=64;i++){var a=i/64*2*Math.PI; pts.push([lng + (R*Math.sin(a))/cs, lat + R*Math.cos(a)]);}
+    return {type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'Polygon',coordinates:[pts]}}]};
+  }
+  function zoomFor(r){ return ({'0.5':14,'1':13,'1.5':12.4,'2':12,'3':11.4,'5':10.7})[String(r)] || 12; }
+  function clearMarkers(){ glMarkers.forEach(function(m){m.remove();}); glMarkers=[]; }
+  function addMarkers(items){
+    clearMarkers();
+    var h=document.createElement('div');
+    h.style.cssText='width:20px;height:20px;border-radius:50%;background:#157a49;border:3px solid #fff;box-shadow:0 0 0 6px rgba(21,122,73,.18)';
+    glMarkers.push(new maplibregl.Marker({element:h}).setLngLat([center.lng,center.lat])
+      .setPopup(new maplibregl.Popup({offset:14}).setHTML('<b>Your home</b>')).addTo(glMap));
+    items.forEach(function(it){
+      var col=tierHex(it), el=document.createElement('div');
+      el.style.cssText='width:26px;height:26px;border-radius:50%;background:'+col+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font:700 12px/1 sans-serif;cursor:pointer';
+      el.textContent=it._letter;
+      var html='<div style="font:600 13px/1.3 var(--font)">'+HS.esc(it.name||it.title)+'</div>'
+        +'<div style="font-size:11px;color:#5a6b63">'+HS.esc(it.type||it.category||'')+(it.dist?' · '+HS.esc(it.dist):'')+'</div>'
+        +(it.source_ref?'<a href="'+HS.esc(it.source_ref)+'" target="_blank" rel="noopener" style="font-size:11.5px;color:#157a49;font-weight:600">official record ▸</a>':'');
+      glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([it.lng,it.lat])
+        .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(html)).addTo(glMap));
+    });
+  }
+  function ensureGL(){
+    if (glMap) return;
+    glMap = new maplibregl.Map({
+      container:'mapgl',
+      style:{ version:8, sources:{
+        sat:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,attribution:'© Esri, Maxar'},
+        osm:{type:'raster',tiles:['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png','https://b.tile.openstreetmap.org/{z}/{x}/{y}.png','https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,attribution:'© OpenStreetMap'}
+      }, layers:[
+        {id:'osm',type:'raster',source:'osm',layout:{visibility:'none'}},
+        {id:'sat',type:'raster',source:'sat',layout:{visibility:'none'}}
+      ]},
+      center:[center.lng,center.lat], zoom: zoomFor(opts.radiusMi)
+    });
+    glMap.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
+    glMap.on('load', function(){
+      glMap.addSource('radius',{type:'geojson',data:circle(center.lat,center.lng,opts.radiusMi)});
+      glMap.addLayer({id:'radius-fill',type:'fill',source:'radius',paint:{'fill-color':'#157a49','fill-opacity':0.08}});
+      glMap.addLayer({id:'radius-line',type:'line',source:'radius',paint:{'line-color':'#157a49','line-width':2,'line-opacity':0.7,'line-dasharray':[2,2]}});
+      glReady=true; drawGL();
+    });
+  }
+  function drawGL(){
+    var items = shownItems();
+    document.getElementById('mapSch').style.display='none';
+    document.getElementById('mapgl').style.display='block';
+    ensureGL();
+    if (!glReady){ setGps(items); renderPins(items); return; }
+    glMap.resize();
+    // base layer per mode
+    glMap.setLayoutProperty('sat','visibility', opts.mode==='satellite'?'visible':'none');
+    glMap.setLayoutProperty('osm','visibility', opts.mode==='street'?'visible':'none');
+    // radius + markers
+    glMap.getSource('radius').setData(opts.showRadius ? circle(center.lat,center.lng,opts.radiusMi) : {type:'FeatureCollection',features:[]});
+    glMap.setLayoutProperty('radius-fill','visibility', opts.showRadius?'visible':'none');
+    glMap.setLayoutProperty('radius-line','visibility', opts.showRadius?'visible':'none');
+    glMap.easeTo({ center:[center.lng,center.lat], zoom: zoomFor(opts.radiusMi), duration:300 });
+    addMarkers(items);
+    setGps(items); renderPins(items);
+    wirePanel(drawGL);   // panel + gps are static siblings in #mapWrap, over both maps
+  }
+
+  function showSchematic(){
+    document.getElementById('mapgl').style.display='none';
+    document.getElementById('mapSch').style.display='block';
+    drawSchematic();
+  }
+
+  // initial: Impact schematic
+  showSchematic();
+
+  // mode toggle
+  document.getElementById('mapMode').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-mode]'); if (!btn) return;
+    [].forEach.call(this.querySelectorAll('button'), function(b){ b.classList.remove('on'); });
+    btn.classList.add('on');
+    opts.mode = btn.dataset.mode;
+    if (opts.mode === 'impact') { showSchematic(); return; }
+    if (!window.maplibregl) {   // offline/artifact fallback: no tiles available
+      btn.classList.remove('on'); this.querySelector('[data-mode="impact"]').classList.add('on'); opts.mode='impact';
+      HS.toast('Satellite & Street need a network map connection — Impact view is live now.');
+      showSchematic(); return;
+    }
+    drawGL();
+  });
 
   var radii = [0.5,1,1.5,2,3,5], ri = 2;
   document.getElementById('radiusPill').onclick = function () {
     ri = (ri + 1) % radii.length; opts.radiusMi = radii[ri];
-    this.textContent = '◉ Impact radius: ' + opts.radiusMi + ' mi ▾'; draw();
+    this.textContent = '◉ Impact radius: ' + opts.radiusMi + ' mi ▾';
+    if (opts.mode === 'impact') showSchematic(); else drawGL();
   };
-
-  // Satellite / Street: not built in Phase 1 (needs a live tile provider). Give an
-  // honest, visible response on click instead of a silent disabled button.
-  document.getElementById('mapMode').addEventListener('click', function (e) {
-    var btn = e.target.closest('button[data-mode]'); if (!btn) return;
-    if (btn.dataset.mode === 'impact') return;
-    HS.toast('Satellite & Street views arrive with a live map provider — Impact view is live now.');
-  });
 });
 </script>
 </body>
