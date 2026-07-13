@@ -734,3 +734,44 @@ deploy-edge-functions.yml CLI workflow).
   shell), so it is NOT used. record_url falls back to the official public
   `https://www.provo.gov/174/Projects-and-Planning` (dataset_url, precision "dataset"). The record
   DATA (name/address/status/date/point) is all from Provo's authoritative public GIS.
+
+## TX metro permit sources (wired 2026-07-13 — Texas depth pass, SLC/Provo recipe)
+
+Three new `arcgis` registry entries, all live-verified via pg_net groupBy before registration
+(statuses/types VERBATIM; full receipts in each entry's `_receipts`):
+
+- **round-rock-large-development-projects** — Round Rock's official `Large_Development_Projects_view`
+  (roundrockgis org). 190 current land-use cases (Zoning 112, Preliminary Plat 26, PUD 14, …),
+  point geometry, fresh (Sep 2026). ZIP scoping via `zip_where_template` on ADDRESS
+  ('… ROUND ROCK TX 786xx'). 14 statuses mapped verbatim; REJECTED/CONVERTED excluded.
+  Coverage TX/Williamson (modeled ZIPs 78664/78665/78681/78682).
+- **san-antonio-permits-issued** — CoSAGIS_Opendata `Permits_Issued`. Fresh (Jul 2026), point
+  geometry, Address carries ZIP. NO status column because every record IS an issued permit
+  (dataset-level fact): status_raw reads Permit_Type and the 12 INCLUDED construction types
+  (Comm/Res New Building, Additions, Shell, Finish Out, Sitework, Pad Site, ADU, Manufactured
+  Home, Demolition) map to bucket 'approved'; the other 56 types (Garage Sale, trade permits,
+  signs, fences, re-roofs …) are dropped at source via extra_where. Coverage TX/Bexar
+  (modeled ZIPs 78260/78261).
+- **san-marcos-planning-cases** — City ArcGIS Server `PlanningFeatures/MapServer/15`
+  (PlanningCase_Point). Fresh (Jul 2026), point geometry, 11 statuses + 36 case types verbatim.
+  No ZIP anywhere, so a constant `zip_where_template` scopes the city feed to its principal ZIP
+  78666 (records still place by their OWN per-parcel geometry). Paperwork types
+  (Pre-Development Meeting 1689, Zoning Verification 343, rental registrations, …) dropped at
+  source. Coverage TX/Hays.
+
+### Rejected in the same pass (anti-fabrication receipts — do not re-derive)
+- **Plano**: dashboard.plano.gov's catalog API only federates OTHER cities' datasets (the
+  "Permit Applications" hit is Orlando's data.cityoforlando.net; also NOLA/NYC) — Plano
+  publishes no first-party permit resource there; /resource/ 404s. No verifiable open feed.
+- **Frisco**: geo.friscotexas.gov blocks external IPs (TLS handshake timeout) — feed exists
+  ("Active Building Permits"/"Active Zoning and SUP Cases") but is unreachable for the engine.
+- **Denton County** DEV_Permits: frozen archive — newest record Jun 2023.
+- **Denton city**: data.cityofdenton.com is dead (404).
+- **McKinney** UnderConstruction: newest IssueDate Sep 2023 (stale); other datasets are static
+  year snapshots (ADR_2023_*).
+- **Allen** Current_Development_Projects: POLYGON geometry with intersection-style locations —
+  no point/ZIP path without new connector code (deferred, not wired).
+- **Houston** (cohgis): only sidewalk-permit ranges 2020-23; no live building-permit layer found.
+- **Dallas / Fort Worth / Arlington / El Paso**: their counties have ZERO modeled ZIPs in the
+  communities table — wiring them cannot lift any live page today; revisit when those metros
+  are modeled.
