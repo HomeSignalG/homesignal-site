@@ -53,14 +53,17 @@ HS.onReady(async function () {
 
   var c = meta;
   var following = HS.isFollowingCommunity(zip);
+  // Never measure real public records from the FICTIONAL demo home — even on its own
+  // ZIP (78617). Only a real saved property produces distance labels here.
   var home = HS.state.activeProperty;
+  if (home && home.sample) home = null;
   var projects = await HS.data.projects(zip, home);      // DEVELOPMENT only (guardrail #3)
   var facilities = await HS.data.facilities(zip, home);  // regulated facilities — own section
   var changes = await HS.data.changes(zip, home);
   var meetings = await HS.data.meetings(zip, home);
   HS.shareUrlOverride = HS_CONFIG.BASE_URL + '/community.html?zip=' + zip;
 
-  var active = projects.filter(function(p){return p.status==='Active'||p.status==='Approved';});
+  var active = projects.filter(function(p){return p.status==='Active'||p.status==='Approved'||p.status==='Operating';});
   var proposed = projects.filter(function(p){return p.status==='Proposed';});
   // Top cards: proposed + active first; if a county's records carry other real statuses
   // (Decided / Operating / On file), fall back to the full list rather than hiding them.
@@ -71,11 +74,20 @@ HS.onReady(async function () {
   var notices = changes.filter(function(x){
     return /planning|government|civic/i.test(x.category) && !/^Public meeting/.test(x.title||'');
   });
+  // TRUE totals come from the meta score labels (uncapped engine counts); the
+  // materialized lists are capped, so caption them "latest N shown" when smaller.
+  function metaCount(key, floor){
+    var s = c.component_scores && c.component_scores[key];
+    var v = s && parseInt(s.label, 10);
+    return (typeof v === 'number' && !isNaN(v) && v >= floor) ? v : floor;
+  }
+  var devTotal = metaCount('development projects', projects.length);
+  var facTotal = metaCount('regulated facilities', facilities.length);
 
   // Guardrail #3: EPA/ECHO regulated facilities render in their OWN clearly-labeled section —
   // never under Development / what's changing. Factual public-record count, not a verdict.
   var facHtml = facilities.length
-    ? '<div class="groupHead"><span class="gd" style="background:#3f7fb0"></span> Regulated facilities nearby <span class="gc">— ' + facilities.length + ' on record · environmental context</span></div>'
+    ? '<div class="groupHead"><span class="gd" style="background:#3f7fb0"></span> Regulated facilities nearby <span class="gc">— ' + facTotal + ' on record' + (facTotal > facilities.length ? ' · ' + facilities.length + ' shown' : '') + ' · environmental context</span></div>'
       + '<div class="quiet" style="margin:-2px 0 10px;font-size:12.5px">EPA/ECHO-registered facilities near this ZIP — a factual public-record count, not development and not a verdict on any operator.</div>'
       + facilities.slice(0,6).map(function(f){
           return '<div class="card mini" style="border-left-color:#3f7fb0;margin-bottom:10px">'
@@ -95,9 +107,9 @@ HS.onReady(async function () {
     + '<div style="margin-top:14px"><div class="bt" style="font-size:13px;color:var(--ink-2);margin-bottom:6px">Your communities</div><div id="commStrip">' + HS.communitiesStripHTML() + '</div></div></div>'
     + '<div class="strip">'
     + HS.tpl.statTile(c.community_score, 'Community score', 'g')
-    + HS.tpl.statTile(projects.length, 'Development projects', '')
+    + HS.tpl.statTile(devTotal, 'Development projects', '')
     + HS.tpl.statTile(meetings.length, 'Public meetings', 'accent')
-    + HS.tpl.statTile(facilities.length, 'Regulated facilities', '')
+    + HS.tpl.statTile(facTotal, 'Regulated facilities', '')
     + '</div>'
     + '<div class="lensnav">'
     + '<button class="lenscard on"><span class="q">What\'s changing</span><span class="d">Live · built on existing feeds</span></button>'
@@ -105,7 +117,7 @@ HS.onReady(async function () {
     + '<button class="lenscard" style="opacity:.55"><span class="q">🔒 Economy &amp; Market</span><span class="d">Phase 2 · + market data</span></button>'
     + '</div>'
     + '<div class="cols"><div>'
-    + '<div class="groupHead" style="margin-top:0"><span class="gd traffic"></span> Development &amp; growth <span class="gc">— ' + projects.length + (projects.length===1?' record':' records') + '</span></div>'
+    + '<div class="groupHead" style="margin-top:0"><span class="gd traffic"></span> Development &amp; growth <span class="gc">— ' + devTotal + (devTotal===1?' record':' records') + (devTotal > projects.length ? ' · latest ' + projects.length + ' shown' : '') + '</span></div>'
     + (projects.length ? topProjects.slice(0,3).map(function(p){
         return '<div class="card mini" style="border-left-color:' + HS.barColor(p) + ';margin-bottom:10px">'
           + '<span class="lens">' + HS.esc(p.status) + ' · ' + HS.esc(p.dist||'') + '</span><h3>' + HS.esc(p.name) + '</h3>'

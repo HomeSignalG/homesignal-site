@@ -86,3 +86,16 @@
 --     from the upcoming-meeting count (was the literal 'Active').
 --   * data_quality gate counts projects + facilities + sourced notices/meetings, so
 --     notice-only ZIPs keep their pass (verified: 136/136 UT still pass).
+--
+-- UPDATE 2026-07-13 (e): DEL VALLE AUDIT — count consistency + sample-home honesty.
+-- Applied via migration app_meta_scores_match_page_concepts:
+--   * component_scores keys/labels now describe the SAME concepts the pages render,
+--     with TRUE (uncapped) counts: 'development projects' = parcel-precise dev records
+--     in the cache (78617: 427; Box Elder 84302: honestly 0), 'planning & civic notices'
+--     = the ZIP's sourced notice/meeting rows, 'regulated facilities' = the cache's
+--     facility count. Pages read the label as the true total and caption their capped
+--     lists "latest N shown" (78617 previously showed tile=48 vs bar label=427).
+--   * Front-end pair (same commit): demo sample homes are stamped sample:true in
+--     lib/data.js, and community.html refuses to measure real records from the
+--     fictional Del Valle demo address even on its own ZIP; 'Operating' projects
+--     join the active card group so built/operating permits can be carded.
