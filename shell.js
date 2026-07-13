@@ -15,7 +15,8 @@
   };
   const state = HS.state = {
     session: null,           // {user:{id,email}} or null
-    zip: CFG.DEFAULT_ZIP,
+    // The visitor's saved ZIP (their chosen area) wins over the Del Valle sample.
+    zip: LS.get('myZip', null) || CFG.DEFAULT_ZIP,
     properties: [],
     activePropId: LS.get('activeProp', null),
     follows: new Set(LS.get('follows', [])),
@@ -25,6 +26,11 @@
       return this.properties.find(p => p.id === this.activePropId) || this.properties[0] || null;
     }
   };
+
+  // Has the visitor set their own area yet (a saved property OR a saved ZIP)?
+  // When false, the app is showing the Del Valle sample and labels say so.
+  HS.hasArea = function () { return !!(state.activeProperty || LS.get('myZip', null)); };
+  HS.isSample = function () { return !HS.hasArea(); };
 
   // ------------------------------------------------------------- ready gate --
   let _resolveReady;
@@ -133,8 +139,19 @@
         const r = await HS.sb().auth.verifyOtp({ email: _authEmail, token: code, type: 'email' });
         if (r.error) { authMsg(r.error.message, true); btn.disabled = false; return; }
         $('authForm').classList.add('hidden'); $('authDone').classList.remove('hidden');
-        const back = new URLSearchParams(location.search).get('return');
-        setTimeout(() => { location.href = back ? decodeURIComponent(back) : location.pathname; }, 700);
+        // reflect the new session in the top bar without a full reload
+        try { const s = await HS.sb().auth.getSession(); if (s && s.data && s.data.session) state.session = s.data.session; } catch (e) {}
+        paintTopbar();
+        setTimeout(() => {
+          HS.closeModal('authModal');
+          const back = new URLSearchParams(location.search).get('return');
+          if (!LS.get('myZip', null)) {
+            // brand-new account with no saved area -> onboard: ask for their ZIP
+            HS.openLoc(true);
+          } else {
+            location.href = back ? decodeURIComponent(back) : location.pathname;
+          }
+        }, 700);
       } catch (e) { authMsg('Something went wrong — please try again.', true); btn.disabled = false; }
     } else {
       const email = ($('authEmail').value || '').trim();
@@ -163,12 +180,12 @@
   function paintTopbar() {
     const p = state.activeProperty;
     if ($('locLabel')) {
-      // A signed-in subscriber viewing their own home shows their real address.
-      // Everyone else is looking at the default prototype community (Del Valle,
-      // 78617) as an EXAMPLE — flag it clearly as a sample ZIP so it is never
-      // mistaken for the visitor's own area.
+      // A saved home shows its address; a saved ZIP shows "ZIP <zip>"; otherwise
+      // the visitor is on the default Del Valle sample, so flag it clearly.
+      const myZip = LS.get('myZip', null);
       $('locLabel').textContent = p ? p.address
-        : ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample Zip Code)');
+        : (myZip ? ('ZIP ' + myZip)
+        : ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample Zip Code)'));
     }
     const av = $('hs-avatar');
     if (av) {
@@ -197,12 +214,19 @@
   };
 
   // -------------------------------------------------- location / community ----
-  HS.openLoc = function () {
+  HS.openLoc = function (onboarding) {
     $('locForm').classList.remove('hidden');
     $('locRequest').classList.add('hidden');
     $('locDone').classList.add('hidden');
     const z = $('locZip'); z.value = ''; z.style.borderColor = '';
+    // First-run onboarding right after sign-up gets welcoming, save-oriented copy.
+    if ($('locModalTitle')) $('locModalTitle').textContent = onboarding ? "You're in — set your community" : 'Change your community';
+    const sub = document.querySelector('#locModal .msub');
+    if (sub) sub.textContent = onboarding
+      ? "Enter your ZIP code to save your area and open what's changing around your home."
+      : "Enter a ZIP code to open what's changing around that area.";
     HS.openModal('locModal');
+    setTimeout(() => { if (z) z.focus(); }, 50);
   };
   HS.findCommunity = async function () {
     const el = $('locZip'), z = el.value.trim();
@@ -210,6 +234,7 @@
     el.style.borderColor = '';
     const covered = await HS.data.isCovered(z);
     if (covered) {
+      LS.set('myZip', z);   // remember the visitor's area so the sample stops showing
       location.href = 'community.html?zip=' + z;
     } else {
       $('reqZipLabel').textContent = z;

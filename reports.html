@@ -52,7 +52,7 @@ HS.onReady(async function () {
   HS.shareUrlOverride = HS_CONFIG.BASE_URL + '/development.html?id=' + flagship.id;
   document.getElementById('repDoc').innerHTML =
     '<div class="dhead"><div class="dk">Project impact analysis · preview</div><h3>' + HS.esc(flagship.name) + '</h3>'
-    + '<div class="dm">Prepared for ' + (home ? HS.esc(home.address) + ' · ' + HS.esc(c.city) + ', ' + HS.esc(c.state) + ' ' + HS.esc(c.zip) : HS.esc(c.name) + ' — (Sample Zip Code)') + ' · ' + today + '</div>'
+    + '<div class="dm">Prepared for ' + ((HS.isSample && HS.isSample()) ? HS.esc(c.name) + ' — (Sample Zip Code)' : (home ? HS.esc(home.address) : HS.esc(c.name)) + ' · ' + HS.esc(c.city) + ', ' + HS.esc(c.state) + ' ' + HS.esc(c.zip)) + ' · ' + today + '</div>'
     + '<button class="inlinebtn" style="margin-top:14px" onclick="HS.openModal(\'shareModal\')">⤴ Share this report</button></div>'
     + '<div class="dbody">'
     + '<div class="dsec"><h4>Bottom line</h4><p>' + HS.esc(flagship.sowhat||'') + '</p></div>'

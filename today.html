@@ -73,7 +73,7 @@ HS.onReady(async function () {
   document.getElementById('tdGreeting').textContent = 'Good morning, ' + name + ' — here’s what needs you';
   // When the visitor has not chosen their own area we are showing the default
   // prototype community as an example, so flag it as a sample zip in the dateline.
-  var sampleTag = home ? '' : ' — (Sample Zip Code)';
+  var sampleTag = (HS.isSample && HS.isSample()) ? ' — (Sample Zip Code)' : '';
   document.getElementById('tdSub').textContent = today + ' · ' + c.name + sampleTag + '.';
 
   // priorities: rank by impact, prefer open windows
