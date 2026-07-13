@@ -60,10 +60,11 @@ async function loadReports() {
   return res.json();
 }
 
-// The set of Utah ZIPs (index-only-Utah policy). A tracker page is indexable ONLY for a
-// Utah ZIP that has content; everything else stays noindex. Data-driven off the live table.
+// The set of ZIPs in the advertised states (UT + TX). A tracker page is indexable ONLY
+// for one of these ZIPs when it has content; everything else stays noindex. Data-driven
+// off the live table — widen the state filter when a new state is signed off.
 async function loadUtahZips() {
-  const url = `${SUPABASE_URL}/rest/v1/app_community_meta?select=zip&state=eq.UT`;
+  const url = `${SUPABASE_URL}/rest/v1/app_community_meta?select=zip&state=in.(UT,TX)`;
   const res = await fetch(url, { headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` } });
   if (!res.ok) return new Set();
   return new Set((await res.json()).map((r) => r.zip));
@@ -84,7 +85,7 @@ async function main() {
   reports.sort((a, b) => a.zip.localeCompare(b.zip));
   if (SAMPLE > 0) reports = reports.slice(0, SAMPLE);
   const utahZips = await loadUtahZips();
-  console.log(`Verifying ${reports.length} ZIP development page(s) against ${SITE_BASE} (${utahZips.size} Utah ZIPs indexable)`);
+  console.log(`Verifying ${reports.length} ZIP development page(s) against ${SITE_BASE} (${utahZips.size} UT+TX ZIPs indexable)`);
 
   const browser = await chromium.launch();
   const page = await browser.newPage();
@@ -141,8 +142,8 @@ async function main() {
       const isIndex = /(^|[^n])index/i.test(st.robots) && !/noindex/i.test(st.robots);
       const expectIndex = utahZips.has(zip) && renderedForPolicy.length > 0;
       if (isIndex !== expectIndex) {
-        fails.push(`ZIP ${zip}: robots="${st.robots}" (indexable=${isIndex}) violates index-only-Utah ` +
-          `(expected ${expectIndex ? 'index' : 'noindex'}; utah=${utahZips.has(zip)}, sites=${renderedForPolicy.length})`);
+        fails.push(`ZIP ${zip}: robots="${st.robots}" (indexable=${isIndex}) violates index-only-UT+TX ` +
+          `(expected ${expectIndex ? 'index' : 'noindex'}; advertised=${utahZips.has(zip)}, sites=${renderedForPolicy.length})`);
       }
       if (st.mislabeled && st.mislabeled.length) {
         fails.push(`ZIP ${zip}: ${st.mislabeled.length} record(s) whose label contradicts its dot colour ` +

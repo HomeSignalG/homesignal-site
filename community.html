@@ -29,10 +29,12 @@ HS.onReady(async function () {
   var status = await HS.data.coverageStatus(zip);   // 'pass' | 'coverage_coming' | null
   var meta = status ? await HS.data.community(zip) : null;
 
-  // G2: index ONLY Utah community pages that pass the data-quality gate. Every other page
-  // (non-Utah, or coverage-coming) stays noindexed until its data is accurate. Default is
-  // noindex (set in <head>); we only flip it ON for a Utah pass page.
-  setIndexable(!!(meta && meta.state === 'UT' && status === 'pass'));
+  // G2 (widened 2026-07-13): index Utah + Texas community pages that pass the data-quality
+  // gate — TX signed off after the statewide batch (249/249 cached, honest statuses).
+  // Every other page (other states, or coverage-coming) stays noindexed until its data is
+  // accurate. Default is noindex (set in <head>); flipped ON only for a pass page below.
+  var INDEX_STATES = ['UT', 'TX'];
+  setIndexable(!!(meta && INDEX_STATES.indexOf(meta.state) !== -1 && status === 'pass'));
 
   if (!status) {
     page.innerHTML = '<div class="ph"><div class="eyebrow">Communities</div><h1>' + HS.esc(zip) + ' isn\'t covered yet</h1>'

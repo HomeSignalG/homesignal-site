@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Generate sitemap.xml — INDEX ONLY UTAH for now (new-layout go-live).
+"""Generate sitemap.xml — INDEX ONLY the states in INDEX_STATES (UT + TX today).
 
-The whole site now uses the new layout, but only Utah community pages have accurate,
-sourced data, so ONLY Utah is advertised to search (the rest of the country stays a
-real, reachable page but noindexed until its data is accurate — see robots + the
-per-page noindex in community.html). This reads the live DB (public anon key + RLS read)
-and emits one <url> per **Utah** community (community.html?community=<slug>) plus the
-Utah development-tracker ZIP pages and the static pages. Zero-touch: as Utah communities
-are added they appear here automatically; when a new state's data is made accurate,
-widen INDEX_STATES below — no other edit.
+The whole site uses the new layout; a state is advertised to search only once its
+community pages carry accurate, sourced data (the rest of the country stays a real,
+reachable page but noindexed until its data is accurate — see robots + the per-page
+noindex in community.html). This reads the live DB (public anon key + RLS read) and
+emits one <url> per PASS ZIP page (community.html?zip=<zip> — the new-layout page is
+?zip=-keyed; the old ?community=<slug> URLs are no longer emitted because the new page
+resolves only ?zip=) plus the matching development-tracker ZIP pages and the static
+pages. Only data_quality='pass' ZIPs are advertised — coverage-coming pages are
+noindexed, so putting them in the sitemap would contradict their robots value.
+Zero-touch: new pass ZIPs appear automatically; to advertise a new state, widen
+INDEX_STATES below — no other edit.
 
 Uses only the public anon key (same one shipped in community.html); no secrets.
 """
@@ -24,34 +27,33 @@ ANON = ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6In
         "MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U")
 BASE = "https://homesignal.net"
 # States whose community pages are accurate enough to advertise to search. Widen as
-# per-state data accuracy lands (e.g. add "TX" once Travis is signed off). Utah only today.
-INDEX_STATES = ["UT"]
+# per-state data accuracy lands. TX added 2026-07-13 (statewide batch signed off).
+INDEX_STATES = ["UT", "TX"]
 STATIC = [("/", "weekly", "1.0"), ("/how-it-works.html", "monthly", "0.7"),
           ("/about.html", "monthly", "0.6"), ("/contact.html", "monthly", "0.5"),
           ("/privacy.html", "yearly", "0.3")]
 STEP = 1000
 
 
-def fetch_utah():
-    """Utah communities: their slugs (for community?community=<slug> URLs) and the set of
-    Utah ZIPs (to keep the development-tracker sitemap Utah-only too)."""
-    slugs, zips, off = [], set(), 0
+def fetch_index_zips():
+    """The advertised set: every PASS ZIP page in an INDEX_STATES state, straight from
+    app_community_meta (the same table the page's data-quality gate reads). Only pass
+    pages flip robots to index, so only pass pages belong in the sitemap."""
+    zips, off = set(), 0
     state_filter = "in.(" + ",".join(INDEX_STATES) + ")"
     while True:
-        url = (f"{SUPA}/rest/v1/communities?select=slug,zip_codes&state={state_filter}"
-               f"&order=slug.asc.nullslast&limit={STEP}&offset={off}")
+        url = (f"{SUPA}/rest/v1/app_community_meta?select=zip&state={state_filter}"
+               f"&data_quality=eq.pass&order=zip.asc&limit={STEP}&offset={off}")
         req = urllib.request.Request(url, headers={"apikey": ANON, "Authorization": f"Bearer {ANON}"})
         with urllib.request.urlopen(req, timeout=90) as r:
             page = json.loads(r.read().decode("utf-8"))
         for x in page:
-            if x.get("slug"):
-                slugs.append(x["slug"])
-            for z in (x.get("zip_codes") or []):
-                zips.add(z)
+            if x.get("zip"):
+                zips.add(x["zip"])
         if len(page) < STEP:
             break
         off += STEP
-    return slugs, zips
+    return zips
 
 
 def fetch_dev_zips():
@@ -78,31 +80,33 @@ def url_el(loc, freq, pri):
 
 
 def main():
-    slugs, ut_zips = fetch_utah()
-    if not slugs:
-        print("ERROR: fetched 0 Utah slugs — refusing to overwrite sitemap.xml")
+    index_zips = fetch_index_zips()
+    if not index_zips:
+        print("ERROR: fetched 0 pass ZIPs — refusing to overwrite sitemap.xml")
         sys.exit(1)
-    # development-tracker ZIP pages, Utah-only (index only Utah). 78617/other non-UT dev ZIPs
+    # development-tracker ZIP pages for the same advertised set. Other cached dev ZIPs
     # are real pages but stay out of the sitemap until their state is advertised.
-    dev_zips = [z for z in fetch_dev_zips() if z in ut_zips]
+    dev_zips = [z for z in fetch_dev_zips() if z in index_zips]
+    comm_zips = sorted(index_zips)
+    states = "+".join(INDEX_STATES)
     lines = ['<?xml version="1.0" encoding="UTF-8"?>',
-             '<!-- GENERATED by scripts/gen_sitemap.py — INDEX ONLY UTAH (new-layout go-live).',
-             '     Utah community + development pages only; the rest of the country is a real,',
-             '     reachable page but noindexed until its data is accurate. do NOT hand-edit.',
-             f'     {len(slugs)} Utah communities + {len(dev_zips)} Utah development ZIP pages + '
-             f'{len(STATIC)} static pages. Regenerated on a schedule. -->',
+             f'<!-- GENERATED by scripts/gen_sitemap.py — INDEX ONLY {states} (pass pages).',
+             '     Community + development ZIP pages for advertised states only; the rest of the',
+             '     country is a real, reachable page but noindexed until its data is accurate.',
+             f'     do NOT hand-edit. {len(comm_zips)} community ZIP pages + {len(dev_zips)} '
+             f'development ZIP pages + {len(STATIC)} static pages. Regenerated on a schedule. -->',
              '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for loc, freq, pri in STATIC:
         lines.append(url_el(BASE + loc, freq, pri))
-    for slug in slugs:
-        lines.append(url_el(f"{BASE}/community.html?community={urllib.parse.quote(slug)}", "daily", "0.8"))
+    for z in comm_zips:
+        lines.append(url_el(f"{BASE}/community.html?zip={urllib.parse.quote(z)}", "daily", "0.8"))
     for z in dev_zips:
         lines.append(url_el(f"{BASE}/homesignalmap.html?zip={urllib.parse.quote(z)}", "daily", "0.8"))
     lines.append("</urlset>")
     with open("sitemap.xml", "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
-    total = len(slugs) + len(dev_zips) + len(STATIC)
-    print(f"wrote sitemap.xml (Utah-only): {len(slugs)} community + {len(dev_zips)} development + "
+    total = len(comm_zips) + len(dev_zips) + len(STATIC)
+    print(f"wrote sitemap.xml ({states}): {len(comm_zips)} community + {len(dev_zips)} development + "
           f"{len(STATIC)} static = {total} total")
     if total > 45000:
         print("WARNING: approaching the 50,000-URL sitemap limit — split into a sitemap index soon.")
