@@ -72,16 +72,18 @@ async function readPage(page, zip) {
 const indexable = (r) => /(^|[^n])index/i.test(r) && !/noindex/i.test(r);
 
 async function main() {
-  // 1) The advertised set: every Utah community page.
-  let utah = await rest(`app_community_meta?select=zip,name,state,data_quality&state=eq.UT&order=zip.asc`);
+  // 1) The advertised set: every community page in an INDEX_STATES state (UT + TX).
+  //    pass rows must render real records AND be indexable; coverage_coming rows must
+  //    render the honest coverage state AND stay noindexed.
+  let utah = await rest(`app_community_meta?select=zip,name,state,data_quality&state=in.(UT,TX)&order=zip.asc`);
   if (SAMPLE > 0) utah = utah.slice(0, SAMPLE);
-  // 2) A sample of non-Utah pages that MUST stay noindexed: some modeled coverage-coming
-  //    (in app_community_meta) + a few well-known modeled ZIPs that were never materialized.
-  const nonUtMeta = await rest(`app_community_meta?select=zip,state,data_quality&state=neq.UT&limit=6`);
-  const nonUtSample = ['78701', '60601', '98101', '02138']; // modeled elsewhere; no app_* row → not-covered
+  // 2) A sample of other-state pages that MUST stay noindexed: any modeled meta rows
+  //    outside the advertised states + a few well-known modeled ZIPs never materialized.
+  const nonUtMeta = await rest(`app_community_meta?select=zip,state,data_quality&state=not.in.(UT,TX)&limit=6`);
+  const nonUtSample = ['80202', '60601', '98101', '02138']; // modeled elsewhere; no app_* row → not-covered
   const nonUt = [...nonUtMeta.map(r => r.zip), ...nonUtSample];
 
-  console.log(`Verifying ${utah.length} Utah page(s) + ${nonUt.length} non-Utah page(s) against ${SITE_BASE}`);
+  console.log(`Verifying ${utah.length} UT+TX page(s) + ${nonUt.length} other-state page(s) against ${SITE_BASE}`);
 
   const browser = await chromium.launch();
   const fails = [];
@@ -96,19 +98,25 @@ async function main() {
       const row = utah[i];
       try {
         const st = await readPage(page, row.zip);
-        if (!st.isPass) {
-          fails.push(`UT ${row.zip} (${row.name}): expected a PASS page (real records) but got ${st.isCoverage ? 'coverage-coming' : st.isNotCovered ? 'not-covered' : 'an unrecognized state'}`);
+        const tag = `${row.state} ${row.zip} (${row.name})`;
+        if (row.data_quality !== 'pass') {
+          // coverage_coming in an advertised state: honest coverage page, never indexed.
+          if (st.isPass) fails.push(`${tag}: meta says coverage_coming but the page rendered a PASS state`);
+          else if (indexable(st.robots)) fails.push(`${tag}: coverage-coming page is INDEXABLE (robots="${st.robots}")`);
+          else console.log(`  ✓ ${tag} · coverage-coming · noindex`);
+        } else if (!st.isPass) {
+          fails.push(`${tag}: expected a PASS page (real records) but got ${st.isCoverage ? 'coverage-coming' : st.isNotCovered ? 'not-covered' : 'an unrecognized state'}`);
         } else if (!indexable(st.robots)) {
-          fails.push(`UT ${row.zip} (${row.name}): Utah pass page is NOT indexable (robots="${st.robots}")`);
+          fails.push(`${tag}: pass page in an advertised state is NOT indexable (robots="${st.robots}")`);
         } else if (!st.h1.includes(row.zip)) {
-          fails.push(`UT ${row.zip} (${row.name}): rendered H1 "${st.h1}" does not contain the ZIP`);
+          fails.push(`${tag}: rendered H1 "${st.h1}" does not contain the ZIP`);
         } else {
           const bad = st.recordLinks.filter(h => !/^https?:\/\//i.test(h));
-          if (bad.length) fails.push(`UT ${row.zip} (${row.name}): ${bad.length} "public record" link(s) without a real http URL (anti-fabrication)`);
-          else console.log(`  ✓ UT ${row.zip} → ${row.name} · pass · indexable · ${st.recordLinks.length} record link(s)`);
+          if (bad.length) fails.push(`${tag}: ${bad.length} "public record" link(s) without a real http URL (anti-fabrication)`);
+          else console.log(`  ✓ ${tag} · pass · indexable · ${st.recordLinks.length} record link(s)`);
         }
       } catch (e) {
-        fails.push(`UT ${row.zip} (${row.name}): ${e.message.split('\n')[0]}`);
+        fails.push(`${row.state} ${row.zip} (${row.name}): ${e.message.split('\n')[0]}`);
       }
     }
     await page.close();
@@ -121,7 +129,7 @@ async function main() {
     try {
       const st = await readPage(page, zip);
       if (indexable(st.robots)) {
-        fails.push(`non-UT ${zip}: page is INDEXABLE but only Utah may be indexed (robots="${st.robots}")`);
+        fails.push(`non-UT ${zip}: page is INDEXABLE but only UT+TX may be indexed (robots="${st.robots}")`);
       } else if (!(st.isPass || st.isCoverage || st.isNotCovered)) {
         fails.push(`non-UT ${zip}: page rendered an unrecognized state (possible error)`);
       } else {
