@@ -25,3 +25,11 @@
 -- ============================================================================
 -- (function definition mirrored in the migration; see project migration
 --  `app_refresh_zip_materializer`. Kept here as the DDL-of-record pointer.)
+
+-- UPDATE 2026-07-13: app_refresh_zip is now COUNTY-GENERIC (uses each ZIP's real
+-- county name, not a hardcoded one) and accepts source links in EITHER `record_url`
+-- (TX TDLR/TABS permits) OR `url` (Utah PMN planning notices). Applied via migrations
+-- app_refresh_zip_county_generic + app_refresh_zip_url_or_record_url.
+-- Ran for all development_reports ZIPs → Utah live: Box Elder 18/18, Weber 14, Utah 11,
+-- Tooele 8, Davis 6, Cache 5 = 62 pass; Salt Lake 36 = coverage_coming (meetings only,
+-- no per-ZIP permit feed yet). Data-only — /app/ reads app_* generically, no deploy.
