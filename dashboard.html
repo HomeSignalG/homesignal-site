@@ -35,6 +35,10 @@
           <button class="addbtn" style="width:100%;justify-content:center;margin-top:10px" onclick="HS.openLoc()">+ Add a property</button>
         </div>
         <div class="block">
+          <div class="bt-row"><h2>Your communities</h2><a href="community.html">Open →</a></div>
+          <div id="dashCommunities"></div>
+        </div>
+        <div class="block">
           <div class="bt-row"><h2>Your watchlist</h2><a href="#" onclick="alert('Watchlist edit — persists to watchlist_items');return false">Edit</a></div>
           <div class="chips" id="dashWatch"></div>
         </div>
@@ -97,6 +101,9 @@ HS.onReady(async function () {
       + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + ' <span style="font-size:10px;color:var(--green);font-weight:700">· ' + HS.esc((p.tag||p.label).toUpperCase()) + '</span></div>'
       + '<div class="pa">' + HS.esc(p.city) + '</div></div></div>';
   }).join('');
+
+  // your followed communities
+  document.getElementById('dashCommunities').innerHTML = HS.communitiesStripHTML();
 
   // watchlist (seeded from real entities near this home)
   var watch = [c.zip, 'SH-130 Data Center', 'SH-71', 'Your street', 'Colorado River'];
