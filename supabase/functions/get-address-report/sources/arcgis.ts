@@ -58,6 +58,12 @@ export interface ArcgisRegistryEntry {
   /** Optional VERBATIM SQL clause AND'd into every query (entry-driven scoping — e.g. drop
    *  administrative-paperwork subtypes). Data, not code: the connector never inspects it. */
   extra_where?: string;
+  /** Optional ZIP-scoping override for layers with NO ZIP column but a ZIP embedded in a text
+   *  field (e.g. a full "…, UT 84604" address). A VERBATIM SQL template with a `{zip}` token,
+   *  used as the ZIP clause INSTEAD of `{zip_col}='{zip}'` (e.g.
+   *  "Address LIKE '%UT {zip}%'"). When present, column_map.zip is not required. The point
+   *  geometry still supplies the precise location; this only scopes which rows the ZIP pulls. */
+  zip_where_template?: string;
 }
 
 export interface ArcgisRunReport {
@@ -143,8 +149,8 @@ async function runEntry(
   const records: NormalizedRecord[] = [];
 
   const zipCol = firstCol(entry.column_map.zip);
-  if (!zipCol) {
-    report.quarantined.push({ reason: "no zip column mapped — statewide dataset skipped for ZIP report", sample: entry.service_url });
+  if (!zipCol && !entry.zip_where_template) {
+    report.quarantined.push({ reason: "no zip column mapped and no zip_where_template — statewide dataset skipped for ZIP report", sample: entry.service_url });
     return { records, report };
   }
 
@@ -154,7 +160,7 @@ async function runEntry(
 
   let rows: Record<string, unknown>[];
   try {
-    rows = await fetchRows(entry, zip, zipCol, deps);
+    rows = await fetchRows(entry, zip, zipCol ?? "", deps);
   } catch (e) {
     report.quarantined.push({ reason: `fetch failed: ${(e as Error).message}`, sample: entry.service_url });
     return { records, report };
@@ -302,7 +308,13 @@ async function fetchRows(
 /** ZIP filter (mandatory) AND'd with an optional recency window (ArcGIS DATE literal). */
 function buildWhere(entry: ArcgisRegistryEntry, zip: string, zipCol: string): string {
   // ArcGIS SQL string equality; the ZIP is a 5-digit code (safe chars only). Escape quotes.
-  const clauses = [`${zipCol}='${zip.replace(/'/g, "''")}'`];
+  const safeZip = zip.replace(/'/g, "''");
+  // ZIP scoping: a `zip_where_template` (verbatim, {zip}-substituted) wins for layers whose ZIP
+  // lives in a text field; otherwise the default `{zipCol}='{zip}'` exact match on a ZIP column.
+  const zipClause = entry.zip_where_template && entry.zip_where_template.trim()
+    ? entry.zip_where_template.replaceAll("{zip}", safeZip)
+    : `${zipCol}='${safeZip}'`;
+  const clauses = [zipClause];
   if (entry.extra_where && entry.extra_where.trim()) clauses.push(`(${entry.extra_where.trim()})`);
   if (entry.recency_days && entry.recency_days > 0) {
     const dateCol = firstCol(entry.column_map.file_date) || entry.incremental_field;
