@@ -1,0 +1,29 @@
+name: spot-check-shell
+
+# On-demand, read-only spot-check of arbitrary ZIP pages on the live site: asserts the
+# v13 left-sidebar shell renders (present + positioned) on BOTH page types and that each
+# page shows an honest state (populated / coverage-coming / not-covered — never blank or
+# unrecognized). Complements the full verifiers, which walk the advertised states only.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zips:
+        description: 'Comma-separated ZIPs to check (e.g. 84302,78617,94545)'
+        required: true
+
+jobs:
+  spot-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Spot-check pages
+        env:
+          SITE_BASE: https://homesignal.net
+          ZIPS: ${{ github.event.inputs.zips }}
+        run: node scripts/spot-check-shell.mjs
