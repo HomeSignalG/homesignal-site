@@ -634,7 +634,8 @@
    },
    "incremental_field": "created_date",
    "zip_where_template": "'{zip}' = '78666'",
-   "_receipts": "Verified live 2026-07-13 via pg_net: city ArcGIS Server (smgis.sanmarcostx.gov), PlanningCase_Point layer 15, point geometry, fresh (created_date Jul 2026), 11 statuses + 36 case types VERBATIM from groupBy. Address has no ZIP and no ZIP column, so the constant zip_where_template scopes the whole city feed to San Marcos's principal ZIP 78666 (records still place by their OWN per-parcel geometry; blank statuses are excluded by the connector's blank->exclude rule). Paperwork/non-development types (Pre-Development Meeting 1689, Zoning Verification 343, Short Term Rental/Home-Share registrations, Release from ETJ, Out-of-City utility connections, blank 347) dropped at source via extra_where. No per-record link -> official REST layer as dataset_url fallback."
+   "_receipts": "Verified live 2026-07-13 via pg_net: city ArcGIS Server (smgis.sanmarcostx.gov), PlanningCase_Point layer 15, point geometry, fresh (created_date Jul 2026), 11 statuses + 36 case types VERBATIM from groupBy. Address has no ZIP and no ZIP column, so the constant zip_where_template scopes the whole city feed to San Marcos's principal ZIP 78666 (records still place by their OWN per-parcel geometry; blank statuses are excluded by the connector's blank->exclude rule). Paperwork/non-development types (Pre-Development Meeting 1689, Zoning Verification 343, Short Term Rental/Home-Share registrations, Release from ETJ, Out-of-City utility connections, blank 347) dropped at source via extra_where. No per-record link -> official REST layer as dataset_url fallback. recency_days=365 added after first live cache: the layer holds the full multi-year case archive (2,154 dev records on 78666) \u2014 the Austin issued-permits precedent window keeps the page a what's-changing view, not an archive.",
+   "recency_days": 365
   }
  ]
 }
