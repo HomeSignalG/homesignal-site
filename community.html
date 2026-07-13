@@ -52,6 +52,7 @@ HS.onReady(async function () {
   }
 
   var c = meta;
+  var following = HS.isFollowingCommunity(zip);
   var home = HS.state.activeProperty;
   var projects = await HS.data.projects(zip, home);      // DEVELOPMENT only (guardrail #3)
   var facilities = await HS.data.facilities(zip, home);  // regulated facilities — own section
@@ -80,7 +81,11 @@ HS.onReady(async function () {
   page.innerHTML =
     '<div class="ph"><div class="eyebrow">Communities</div><h1>' + HS.esc(zip) + ' · ' + HS.esc(c.name) + ', ' + HS.esc(c.state) + '</h1>'
     + '<p>What\'s changing across your community — aggregated from the same feeds that power your alerts.</p>'
-    + '<button class="inlinebtn" style="margin-top:12px" onclick="HS.openModal(\'shareModal\')">◍ Invite your neighbors</button></div>'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'
+    + '<button class="inlinebtn' + (following ? ' following' : '') + '" id="commFollowBtn" data-zip="' + HS.esc(zip) + '" data-name="' + HS.esc(c.name||'') + '" data-state="' + HS.esc(c.state||'') + '" onclick="HS.toggleFollowCommunityBtn(this)">' + (following ? '✓ Following' : '＋ Follow this community') + '</button>'
+    + '<button class="inlinebtn" onclick="HS.openModal(\'shareModal\')">◍ Invite your neighbors</button>'
+    + '</div>'
+    + '<div style="margin-top:14px"><div class="bt" style="font-size:13px;color:var(--ink-2);margin-bottom:6px">Your communities</div><div id="commStrip">' + HS.communitiesStripHTML() + '</div></div></div>'
     + '<div class="strip">'
     + HS.tpl.statTile(c.community_score, 'Community score', 'g')
     + HS.tpl.statTile(projects.length, 'Development projects', '')
