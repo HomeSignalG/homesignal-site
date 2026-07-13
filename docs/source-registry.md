@@ -696,3 +696,41 @@ deploy-edge-functions.yml CLI workflow).
   84103 = 132), 0 unsourced, 0 quarantined, and the coverage gate held (84302 UT + 78617 TX
   → 0 arcgis fetches). Re-cached through v31; `app_projects` now carries per-parcel Salt Lake
   development rows (448, 100% with coords, each linked to its Accela record).
+
+### provo-planning-applications — Provo `CurrentProjects/Planning Application` (LIVE)
+- **API:** `https://gispublicweb.provo.gov/ArcGIS/rest/services/DevServ/CurrentProjects/MapServer/0`
+  (Provo City's OWN authoritative ArcGIS Server, folder `DevServ`, service `CurrentProjects` —
+  serviceDescription "Current projects for planning and building permits", SR wkid 3566 = Utah
+  Central State Plane, confirming Utah. NOTE the lookalike hit `services6.arcgis.com/ONZht79c…/
+  Building_Permits` is **Canadian census data** (2016_Census_CD_CSD, Ward_Boundary_2018_2022) and a
+  geometry-less Table — rejected. Ogden's `EnerGov` folder exposes only Parcels/AddressPoints, no
+  permit-record layer — rejected. West Jordan's AGO org (owner trey.olson) has only parks/trails
+  apps — rejected.)
+- **Coverage:** UT / Utah (county). **counts bucket:** development. **Layer 0 only** (Planning
+  Application, 198 current land-use cases). **Layer 1 (Building Permits) intentionally NOT wired** —
+  a 67,002-row historical archive dominated by Closed/Legacy Closed/Expired; wrong signal for a
+  "what's changing" view.
+- **What it is:** 198 current planning applications (rezones, subdivisions, planned developments,
+  conditional uses …) with per-parcel POINT geometry, `PAName` (project name), `PermitNumber`
+  (e.g. PLRZ20260221), `Address`, `StatusDescription`, `DateReceived`. Real records verified live:
+  "Stadium View Subdivision" (Planning Commission), "Vesper Amphitheater Rezone" (Council),
+  "Courtyard at Jamestown Expansion" (Monitoring Conditions) — points at real Provo coords
+  (−111.68, 40.26).
+- **ZIP scoping — `zip_where_template` (NEW connector capability):** the layer has NO ZIP column,
+  but every Address carries "…, UT 84604". The entry sets
+  `zip_where_template: "…_Address LIKE '%UT {zip}%'"`, a generic, additive connector option used as
+  the ZIP clause instead of `{zip_col}='{zip}'` (the point geometry still supplies the precise
+  location). Verified distribution: 84601=82, 84604=72, 84606=40 (194/198). A non-Provo Utah-County
+  ZIP (e.g. Lehi 84043) matches 0 rows in Provo's own layer, so the county-scoped entry never leaks
+  another city's records — the ZIP-in-address filter IS the city scope.
+- **Statuses (VERBATIM, queried 2026-07-13):** Approved / Monitoring Conditions / Awaiting Signatures
+  → approved; Open / Complete Application / Incomplete Application / Under Review / Reviews Complete /
+  Pending / Waiting for Revisions / Waiting for Submittals / Waiting for Conditions / Waiting for
+  Appeal / Planning Commission / Council / Heritage Board → proposed. (The layer holds only CURRENT
+  cases — no Closed/Denied to exclude, unlike SLC.)
+- **record_url — dataset precision:** no per-record PUBLIC link exists. The CityView
+  `cvportal.provo.org/CityViewPortal/Planning/StatusReference?referencenumber=<PermitNumber>` deep
+  link is **login-walled** (verified: real + bogus refs both return the identical "Log On" SPA
+  shell), so it is NOT used. record_url falls back to the official public
+  `https://www.provo.gov/174/Projects-and-Planning` (dataset_url, precision "dataset"). The record
+  DATA (name/address/status/date/point) is all from Provo's authoritative public GIS.

@@ -2,29 +2,29 @@
   "_readme": [
     "Jurisdiction registry for the generic open-data connectors (Socrata, ArcGIS).",
     "COVERAGE GROWS BY APPENDING ENTRIES, NEVER BY WRITING CONNECTOR CODE. There is no",
-    "jurisdiction-specific logic anywhere in sources/socrata.ts or sources/arcgis.ts — a new",
+    "jurisdiction-specific logic anywhere in sources/socrata.ts or sources/arcgis.ts \u2014 a new",
     "city is one more object in this file. See docs/source-registry.md.",
     "",
     "RULES (enforced by the connector + the run report):",
-    "  • status_to_bucket values are copied VERBATIM from the dataset's live distinct status",
-    "    values (query SELECT DISTINCT via SoQL first — never guessed). A status not listed in",
+    "  \u2022 status_to_bucket values are copied VERBATIM from the dataset's live distinct status",
+    "    values (query SELECT DISTINCT via SoQL first \u2014 never guessed). A status not listed in",
     "    any bucket is logged in the run report, the record is EXCLUDED, and it never lands in a band.",
-    "  • coverage is state + county (or state alone for a statewide dataset). The engine filters",
+    "  \u2022 coverage is state + county (or state alone for a statewide dataset). The engine filters",
     "    to the ZIPs HomeSignal actually serves, so adding a ZIP never touches this file.",
-    "  • type_map maps a VERBATIM source classification value to one of the six use-types:",
+    "  \u2022 type_map maps a VERBATIM source classification value to one of the six use-types:",
     "    Industrial | Development | Residential | Utility | Commercial | Civic/Public.",
-    "    An unmapped/absent value → use_type:'unclassified' (logged), never inferred from the title.",
-    "  • record_url: from the column named in column_map.record_url when present (string, or an",
+    "    An unmapped/absent value \u2192 use_type:'unclassified' (logged), never inferred from the title.",
+    "  \u2022 record_url: from the column named in column_map.record_url when present (string, or an",
     "    object whose .url is used), else record_url_template with {case_number}/{<col>} filled,",
     "    else the dataset landing page with record_url_precision:'dataset'."
   ],
   "_arcgis_readme": [
-    "ArcGIS FeatureServer connector (sources/arcgis.ts) — the Esri twin of the Socrata one.",
+    "ArcGIS FeatureServer connector (sources/arcgis.ts) \u2014 the Esri twin of the Socrata one.",
     "Same discipline: append an entry here, never edit the connector. An entry needs:",
     "  registry_id, platform:'arcgis', service_url (the LAYER query base .../FeatureServer/0),",
     "  dataset_url (record_url fallback), jurisdiction, coverage[{state,county}],",
     "  column_map (read point lat/lng from geometry via the flattened '__lat'/'__lng' columns),",
-    "  status_to_bucket (VERBATIM live distinct values — query first, never guess),",
+    "  status_to_bucket (VERBATIM live distinct values \u2014 query first, never guess),",
     "  type_map (verbatim class -> Industrial|Development|Residential|Utility|Commercial|Civic/Public),",
     "  optional: record_url_template, recency_days, max_rows, out_sr (default 4326).",
     "The ZIP column is MANDATORY. STATUS: connector BUILT + unit-tested + wired (arcgisForZip).",
@@ -406,6 +406,52 @@
       "record_url_precision": "record",
       "incremental_field": "AppliedDate",
       "extra_where": "ApplicationSubType NOT IN ('Zoning Verification Letter','Administrative Interpretation','Appeal Admin Decision','Appeal Comm Decision','Determination Non-Conform Use')"
+    },
+    {
+      "registry_id": "provo-planning-applications",
+      "platform": "arcgis",
+      "service_url": "https://gispublicweb.provo.gov/ArcGIS/rest/services/DevServ/CurrentProjects/MapServer/0",
+      "dataset_url": "https://www.provo.gov/174/Projects-and-Planning",
+      "jurisdiction": "Provo",
+      "coverage": [
+        {
+          "state": "UT",
+          "county": "Utah"
+        }
+      ],
+      "column_map": {
+        "title": "xxClient_Planning_Application_View_PAName",
+        "status_raw": "xxClient_Planning_Application_View_StatusDescription",
+        "file_date": "xxClient_Planning_Application_View_DateReceived",
+        "address": "xxClient_Planning_Application_View_Address",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "xxClient_Planning_Application_View_PermitNumber"
+      },
+      "status_to_bucket": {
+        "approved": [
+          "Approved",
+          "Monitoring Conditions",
+          "Awaiting Signatures"
+        ],
+        "proposed": [
+          "Open",
+          "Complete Application",
+          "Incomplete Application",
+          "Under Review",
+          "Reviews Complete",
+          "Pending",
+          "Waiting for Revisions",
+          "Waiting for Submittals",
+          "Waiting for Conditions",
+          "Waiting for Appeal",
+          "Planning Commission",
+          "Council",
+          "Heritage Board"
+        ]
+      },
+      "incremental_field": "xxClient_Planning_Application_View_DateReceived",
+      "zip_where_template": "xxClient_Planning_Application_View_Address LIKE '%UT {zip}%'"
     }
   ]
 }
