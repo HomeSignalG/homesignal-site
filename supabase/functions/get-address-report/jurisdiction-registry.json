@@ -525,7 +525,10 @@
     }
    ],
    "column_map": {
-    "title": "Project_Name",
+    "title": [
+     "Permit_Type",
+     "Address"
+    ],
     "status_raw": "Permit_Type",
     "type_source": "Permit_Type",
     "file_date": "Date_Submitted",
@@ -568,7 +571,7 @@
    },
    "incremental_field": "Date_Issued",
    "zip_where_template": "Address LIKE '%{zip}%'",
-   "_receipts": "Verified live 2026-07-13 via pg_net: official CoSAGIS_Opendata org, point geometry, fresh (Date_Issued Jul 2026), Address carries '..., City of San Antonio, TX 78xxx' (zip_where_template; 1,523 raw rows matched 78260 pre-filter). Dataset has NO status column because every record IS an issued permit - the dataset-level fact. status_raw therefore reads Permit_Type and every INCLUDED construction type maps to bucket 'approved' (issued = approved to build); nothing is guessed per-record. All 68 Permit_Type values enumerated via groupBy; trade/noise permits (Garage Sale 5421, Electrical General 12460, plumbing/mechanical/reroof/fence/sign/pool etc.) are dropped at source via extra_where, mirroring the SLC paperwork-drop. No per-record link -> the official REST layer is the dataset_url fallback."
+   "_receipts": "Verified live 2026-07-13 via pg_net: official CoSAGIS_Opendata org, point geometry, fresh (Date_Issued Jul 2026), Address carries '..., City of San Antonio, TX 78xxx' (zip_where_template; 1,523 raw rows matched 78260 pre-filter). Dataset has NO status column because every record IS an issued permit - the dataset-level fact. status_raw therefore reads Permit_Type and every INCLUDED construction type maps to bucket 'approved' (issued = approved to build); nothing is guessed per-record. All 68 Permit_Type values enumerated via groupBy; trade/noise permits (Garage Sale 5421, Electrical General 12460, plumbing/mechanical/reroof/fence/sign/pool etc.) are dropped at source via extra_where, mirroring the SLC paperwork-drop. No per-record link -> the official REST layer is the dataset_url fallback. title changed Project_Name -> [Permit_Type, Address] after first cache: Project_Name is frequently boilerplate ('Building No: ; Unit No: N/A') \u2014 the SLC-style concat title is always real and distinct."
   },
   {
    "registry_id": "san-marcos-planning-cases",
