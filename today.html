@@ -74,7 +74,7 @@ HS.onReady(async function () {
   // When the visitor has not chosen their own area we are showing the default
   // prototype community as an example, so flag it as a sample zip in the dateline.
   var sampleTag = home ? '' : ' — (Sample Zip Code)';
-  document.getElementById('tdSub').textContent = today + ' · ' + c.name + sampleTag + ', ' + c.state + '.';
+  document.getElementById('tdSub').textContent = today + ' · ' + c.name + sampleTag + '.';
 
   // priorities: rank by impact, prefer open windows
   var ranked = changes.slice().sort(function (a, b) {
