@@ -64,6 +64,13 @@ export interface ArcgisRegistryEntry {
    *  "Address LIKE '%UT {zip}%'"). When present, column_map.zip is not required. The point
    *  geometry still supplies the precise location; this only scopes which rows the ZIP pulls. */
   zip_where_template?: string;
+  /** SPATIAL ZIP-scoping for point layers with NO ZIP column and no ZIP anywhere in a text
+   *  field (e.g. Denver's construction-permit layers: ADDRESS has no ZIP). Queries an
+   *  ArcGIS envelope of ± this many miles around the ZIP centroid (deps.zipCentroid) — the
+   *  engine's standard centroid+radius ZIP approximation (same shape as the EPA FRS floor
+   *  and ZIP_RADIUS_MI). Records still place by their OWN per-parcel geometry; nothing is
+   *  guessed. When present, column_map.zip / zip_where_template are not required. */
+  spatial_zip_radius_mi?: number;
 }
 
 export interface ArcgisRunReport {
@@ -88,6 +95,9 @@ export interface ArcgisDeps {
   >;
   /** Polite page size. Default 1000. */
   pageSize?: number;
+  /** ZIP centroid of the report being built — required only by entries using
+   *  spatial_zip_radius_mi (the engine passes its home lat/lng). */
+  zipCentroid?: { lat: number; lng: number } | null;
 }
 
 export interface ArcgisCommunityRow { state?: string | null; county?: string | null; }
@@ -149,7 +159,12 @@ async function runEntry(
   const records: NormalizedRecord[] = [];
 
   const zipCol = firstCol(entry.column_map.zip);
-  if (!zipCol && !entry.zip_where_template) {
+  const spatial = (entry.spatial_zip_radius_mi ?? 0) > 0;
+  if (spatial && !deps.zipCentroid) {
+    report.quarantined.push({ reason: "spatial_zip_radius_mi set but no zipCentroid provided — skipped", sample: entry.service_url });
+    return { records, report };
+  }
+  if (!zipCol && !entry.zip_where_template && !spatial) {
     report.quarantined.push({ reason: "no zip column mapped and no zip_where_template — statewide dataset skipped for ZIP report", sample: entry.service_url });
     return { records, report };
   }
@@ -270,11 +285,23 @@ async function fetchRows(
   const where = buildWhere(entry, zip, zipCol);
   const orderBy = entry.incremental_field ? `${entry.incremental_field} DESC` : "";
 
+  // Spatial ZIP scoping (entry-driven): an envelope of ±radius miles around the ZIP centroid,
+  // for point layers with no ZIP attribute anywhere. Standard ArcGIS spatial query params.
+  const spatial = (entry.spatial_zip_radius_mi ?? 0) > 0 && deps.zipCentroid ? {
+    ...envelopeFor(deps.zipCentroid.lat, deps.zipCentroid.lng, entry.spatial_zip_radius_mi as number),
+  } : null;
+
   const out: Record<string, unknown>[] = [];
   let offset = 0;
   while (out.length < maxRows) {
     const url = new URL(`${entry.service_url.replace(/\/$/, "")}/query`);
     url.searchParams.set("where", where);
+    if (spatial) {
+      url.searchParams.set("geometry", `${spatial.xmin},${spatial.ymin},${spatial.xmax},${spatial.ymax}`);
+      url.searchParams.set("geometryType", "esriGeometryEnvelope");
+      url.searchParams.set("inSR", "4326");
+      url.searchParams.set("spatialRel", "esriSpatialRelIntersects");
+    }
     url.searchParams.set("outFields", "*");
     url.searchParams.set("returnGeometry", "true");
     url.searchParams.set("outSR", String(outSr));
@@ -311,9 +338,13 @@ function buildWhere(entry: ArcgisRegistryEntry, zip: string, zipCol: string): st
   const safeZip = zip.replace(/'/g, "''");
   // ZIP scoping: a `zip_where_template` (verbatim, {zip}-substituted) wins for layers whose ZIP
   // lives in a text field; otherwise the default `{zipCol}='{zip}'` exact match on a ZIP column.
-  const zipClause = entry.zip_where_template && entry.zip_where_template.trim()
-    ? entry.zip_where_template.replaceAll("{zip}", safeZip)
-    : `${zipCol}='${safeZip}'`;
+  // A spatial_zip_radius_mi entry scopes via the envelope query params instead (fetchRows), so
+  // its WHERE carries only the extra/recency clauses.
+  const zipClause = (entry.spatial_zip_radius_mi ?? 0) > 0
+    ? "1=1"
+    : entry.zip_where_template && entry.zip_where_template.trim()
+      ? entry.zip_where_template.replaceAll("{zip}", safeZip)
+      : `${zipCol}='${safeZip}'`;
   const clauses = [zipClause];
   if (entry.extra_where && entry.extra_where.trim()) clauses.push(`(${entry.extra_where.trim()})`);
   if (entry.recency_days && entry.recency_days > 0) {
@@ -427,3 +458,10 @@ function isoDay(v: unknown): string | null {
 }
 
 function sleep(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)); }
+
+/** WGS84 envelope of ±radius miles around a point (1° lat ≈ 69 mi; lng scaled by cos(lat)). */
+export function envelopeFor(lat: number, lng: number, radiusMi: number): { xmin: number; ymin: number; xmax: number; ymax: number } {
+  const dLat = radiusMi / 69;
+  const dLng = radiusMi / (69 * Math.max(Math.cos(lat * Math.PI / 180), 0.1));
+  return { xmin: lng - dLng, ymin: lat - dLat, xmax: lng + dLng, ymax: lat + dLat };
+}

@@ -775,3 +775,49 @@ Three new `arcgis` registry entries, all live-verified via pg_net groupBy before
 - **Dallas / Fort Worth / Arlington / El Paso**: their counties have ZERO modeled ZIPs in the
   communities table — wiring them cannot lift any live page today; revisit when those metros
   are modeled.
+
+## CO metro permit sources (wired 2026-07-14 — Colorado readiness pass, TX recipe + spatial ZIP scoping)
+
+Five new `arcgis` registry entries, all live-verified via pg_net groupBy before registration
+(statuses/types VERBATIM; full receipts in each entry's `_receipts`). This pass added ONE
+additive connector capability — **`spatial_zip_radius_mi`** (sources/arcgis.ts): for point
+layers with NO ZIP attribute anywhere (Denver, Colorado Springs), the query carries an ArcGIS
+envelope of ±N miles around the ZIP centroid (the engine's standard centroid+radius ZIP
+approximation, same shape as the EPA FRS floor). Records still place by their OWN per-parcel
+geometry — nothing is guessed. Offline-unit-tested (envelope math, spatial params, WHERE
+composition, fail-closed without centroid, classic-path regression).
+
+- **denver-commercial-construction-permits** + **denver-residential-construction-permits** —
+  Denver's own AGO Open Data layers (ODC_DEV_*CONSTPERMIT_P, point geometry, fresh Jul 2026,
+  2,438 commercial permits/yr). Issued-permit dataset-level fact (San Antonio precedent):
+  dev-relevant CLASS values → bucket approved; Repair/Replace, Special Event, remodel and
+  legacy-code noise + cancelled rows dropped at source. NOTE the two layers use different
+  casing (commercial mixed-case, residential UPPERCASE) — mapped verbatim per layer.
+- **boulder-construction-permits** — City of Boulder's BLDS-style permit TABLE (no geometry):
+  rows geocode via the full address (geocode-cache-backed) and carry a NATIVE OriginalZip;
+  fresh 2026-07-07; 24 statuses + 29 types verbatim; trade noise (Mechanical 71k, Electrical
+  66k, …) dropped at source. ~100–240 active rows/yr per Boulder ZIP.
+- **fort-collins-building-permits** — FC's 'Current Building Permits' AGO layer (point, native
+  ZIP, **per-record Accela CapDetail link** → record-precision record_url). Found via the
+  successor hub open-data-fcgov.hub.arcgis.com — the old opendata.fcgov.com Socrata portal is
+  DECOMMISSIONED (503 'This site has moved'). Curated current snapshot (2,177 rows, no date
+  column → no recency filter; Provo precedent). 'Issued FF' (1 row) left unmapped on purpose.
+- **colorado-springs-planning-applications** — the city's own Development Tracker backend
+  (gis.coloradosprings.gov Planning/PlanDevTracker_PRO, point geometry, 967 current land-use
+  cases, 9 statuses + 15 types verbatim, no trade noise). Spatial ZIP scoping (no ZIP column).
+
+### Rejected in the same pass (anti-fabrication receipts — do not re-derive)
+- **Aurora**: data.auroragov.org DNS does not resolve (ENOTFOUND). Monitor re-probes nightly.
+- **Douglas County CO**: data-dougco.opendata.arcgis.com DCAT → HTTP 500 CONT_0001.
+- **Arapahoe / Larimer / Weld counties**: no `data-<name>.opendata.arcgis.com` domain record
+  (404 "Domain record(s) not found") — no first-party open-data catalog found at the standard
+  Hub pattern; county permit systems not discoverable this pass.
+- **Adams County / Jefferson County**: catalogs live (DCAT 200) but the only permit/land-use
+  hits are ZONING DISTRICT / SUBDIVISION BOUNDARY polygons (base-map layers, not case/permit
+  records) — nothing wireable without fabricating case data from districts.
+- **Boulder 'Development Review Cases'** (gis.bouldercolorado.gov plan/DevelopmentReview/0):
+  esriGeometryPolygon — deferred with the other polygon-only layers (needs point derivation).
+- **Colorado Springs Accela folder**: only AccelaAddressesParcels/webmap/scripting services —
+  the record layer is the PlanDevTracker (wired above).
+- **data.colorado.gov 'Building Permit Counts in Colorado'**: statewide AGGREGATE counts by
+  jurisdiction, not per-permit records — wrong shape (Houston-CKAN class), not wired.
