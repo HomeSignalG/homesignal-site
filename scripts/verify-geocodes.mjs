@@ -41,9 +41,18 @@ const sb = (path) =>
   fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` } });
 
 async function loadDevReports() {
-  const res = await sb('development_reports?select=zip,sites&order=zip');
-  if (!res.ok) throw new Error(`development_reports read failed: ${res.status} ${await res.text()}`);
-  return res.json();
+  // Paginated: one unbounded select of every row's sites jsonb hits the Postgres
+  // statement timeout (57014) with ~1,000 cached ZIPs — same fix as verify-development.
+  const rows = [];
+  const STEP = 40;
+  for (let off = 0; ; off += STEP) {
+    const res = await sb(`development_reports?select=zip,sites&order=zip&limit=${STEP}&offset=${off}`);
+    if (!res.ok) throw new Error(`development_reports read failed: ${res.status} ${await res.text()}`);
+    const page = await res.json();
+    rows.push(...page);
+    if (page.length < STEP) break;
+  }
+  return rows;
 }
 async function loadPropertyReports() {
   const res = await sb('property_reports?select=address,zip,county,lat,lng,sites');
