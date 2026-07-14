@@ -685,6 +685,28 @@ legal/framing change not covered by the one-time sign-off.
   inline-bundle MCP deploy could not be hand-transmitted this session — deploy the parked bundle via MCP
   (`deploy_edge_function`, one file) then re-cache a TX ZIP (78617) to populate `env`; `verify-development`
   CI does the live browser check.
+- 🟢 **COLORADO IS POPULATED TO THE GO-LIVE STANDARD — 139/139 modeled CO ZIPs cached, 5
+  first-party permit sources, NOINDEXED until the founder flips it** (DB-verified 2026-07-14).
+  The Texas playbook, third state: every modeled Front Range ZIP has a cached
+  `development_reports` row (zipcodes v3.0.0 centroids, 0 quarantined) and a materialized
+  app page — **135 pass + 4 coverage_coming honest empties** (Sedalia/Bellvue/Calhan rural;
+  Broomfield 80020 returns 0 consistently from the live engine — logged residual). **65 of
+  139 ZIPs are development-backed (47%)** via 5 live-verified first-party sources
+  (jurisdiction-registry.json + docs/source-registry.md "CO metro permit sources"): Denver
+  commercial+residential construction permits, Boulder construction permits (BLDS table,
+  native ZIP, geocoded addresses), Fort Collins current building permits (point + native ZIP
+  + PER-RECORD Accela links), Colorado Springs Planning_Applications (the city's own
+  Development Tracker backend). 0 unsourced sites, 0 rows missing source_ref/coords; UT
+  136 / TX 654 pass unchanged. **New additive connector capability — `spatial_zip_radius_mi`**
+  (sources/arcgis.ts): point layers with NO ZIP attribute anywhere query an envelope ±N mi
+  around the ZIP centroid (the engine's standard ZIP approximation); records keep their OWN
+  per-parcel points. **Standing answer:** ArcGIS groupBy statistics can CASE-FOLD values
+  (Denver residential returned UPPERCASE from groupBy but stores mixed case) — always confirm
+  value casing with `returnDistinctValues`, never groupBy alone; the fail-closed status lookup
+  correctly published nothing until the entry was corrected. Rejections with receipts: Aurora
+  DNS-dead, Douglas 500, Arapahoe/Larimer/Weld no first-party catalog, Adams/Jeffco polygon
+  district layers only, data.colorado.gov aggregate-only. Reproducible seed:
+  `docs/colorado-development-reports-seed.sql`. Index policy UNCHANGED (INDEX_STATES = UT+TX).
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
