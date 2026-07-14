@@ -795,29 +795,29 @@
     "case_number": "PERMIT_NUM"
    },
    "spatial_zip_radius_mi": 3,
-   "extra_where": "CANCEL IS NULL AND CLASS IN ('NEW BUILDING','ADDITION','NEW NON-BUILDING STRUCTURE','PHASED CONSTRUCTION','FOUNDATION ONLY/EXCAVATION','FOUNDATION ONLY/ EXCAVATION')",
+   "extra_where": "CANCEL IS NULL AND CLASS IN ('New Building','Addition','New Non-Building Structure','Phased Construction','Foundation Only/Excavation','Foundation Only/ Excavation')",
    "type_map": {
-    "NEW BUILDING": "Residential",
-    "ADDITION": "Residential",
-    "NEW NON-BUILDING STRUCTURE": "Residential",
-    "PHASED CONSTRUCTION": "Residential",
-    "FOUNDATION ONLY/EXCAVATION": "Residential",
-    "FOUNDATION ONLY/ EXCAVATION": "Residential"
+    "New Building": "Residential",
+    "Addition": "Residential",
+    "New Non-Building Structure": "Residential",
+    "Phased Construction": "Residential",
+    "Foundation Only/Excavation": "Residential",
+    "Foundation Only/ Excavation": "Residential"
    },
    "status_to_bucket": {
     "approved": [
-     "NEW BUILDING",
-     "ADDITION",
-     "NEW NON-BUILDING STRUCTURE",
-     "PHASED CONSTRUCTION",
-     "FOUNDATION ONLY/EXCAVATION",
-     "FOUNDATION ONLY/ EXCAVATION"
+     "New Building",
+     "Addition",
+     "New Non-Building Structure",
+     "Phased Construction",
+     "Foundation Only/Excavation",
+     "Foundation Only/ Excavation"
     ]
    },
    "incremental_field": "DATE_ISSUED",
    "recency_days": 365,
    "record_url_precision": "dataset",
-   "_receipts": "Verified live 2026-07-14 via pg_net: same Denver AGO org/layer family as the commercial entry - POINT geometry, fresh through DATE_ISSUED 2026-07-11. CLASS values on THIS layer are UPPERCASE (enumerated verbatim via groupBy: NEW BUILDING 33705, ADDITION 7043, PHASED CONSTRUCTION 3828, ...). Residential remodel noise (ALTERATION/TENANT FINISH 28239, REPAIR/REPLACE 3437, CHANGE OF CONTRACTOR, SPECIAL EVENT, MOVE, WRECK, legacy numeric codes) dropped at source; issued-permit dataset-level fact -> included classes map to bucket approved. Spatial ZIP scoping (spatial_zip_radius_mi 3) - no ZIP attribute on the layer."
+   "_receipts": "Verified live 2026-07-14 via pg_net: same Denver AGO org/layer family as the commercial entry - POINT geometry, fresh through DATE_ISSUED 2026-07-11. STANDING ANSWER learned on first re-cache: the groupBy statistics endpoint on THIS layer CASE-FOLDS values to UPPERCASE ('NEW BUILDING 33705'), but the actual stored row values are MIXED CASE ('New Building') - verified via returnDistinctValues=true (Repair/Replace | Addition | New Non-Building Structure | Phased Construction | Foundation Only/Excavation | New Building | ...). The first registration used the uppercase groupBy values, the case-sensitive status lookup excluded every fetched row (fail-closed working as designed - 0 records, nothing wrong published), and this corrected entry uses the row-verbatim mixed-case values. ALWAYS confirm casing with returnDistinctValues, never groupBy alone. Residential remodel noise (Alteration/Tenant Finish, Repair/Replace, Change of Contractor/Use, Wreck, legacy codes) dropped at source; issued-permit dataset-level fact -> included classes map to bucket approved. Spatial ZIP scoping (spatial_zip_radius_mi 3)."
   },
   {
    "registry_id": "boulder-construction-permits",
