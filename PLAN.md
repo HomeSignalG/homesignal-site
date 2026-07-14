@@ -347,3 +347,97 @@ what connector work each needs, never guessed.
 **Reversibility:** a wire is one bot commit ("source-monitor: auto-wire …") touching one
 appended registry entry + the report. `git revert` + redeploy undoes it completely.
 `DEMO_SESSION: true` and all page code are untouched — the monitor writes config + docs only.
+
+---
+
+## 11. NATIONWIDE INDEX POLICY — "indexable substance" gate (PROPOSAL — ⏸ PAUSED FOR FOUNDER APPROVAL)
+
+**Status: NOTHING LIVE HAS CHANGED.** `INDEX_STATES = ['UT','TX']` still governs
+`community.html`, `homesignalmap.html`, `scripts/gen_sitemap.py`, and both CI verifiers.
+This section is the decision document; implementation starts only on an approved threshold.
+
+**The policy change requested:** replace state-scoped indexing (UT/TX only) with a
+per-page rule — *index every verified-real page nationwide; noindex only empties.*
+Empty / coverage-coming / not-covered pages are ALWAYS noindexed under every option below.
+
+### 11.1 What "nationwide" means today (measured 2026-07-14, live DB)
+
+The site models ~12,500 communities across all 50 states, but a page can only be
+"verified-real" once its ZIP is cached through the engine and materialized into the
+`app_*` tables. Materialized today: **942 ZIP pages across 4 states** — UT 136 pass,
+TX 659 pass (+6 coverage_coming), CO 135 pass (+4 coverage_coming), NM 2 pass (two
+stray earlier caches) = **932 pass + 10 coverage_coming**. The other ~11,600 modeled
+pages render the honest "coverage coming / not covered" state and stay noindexed under
+every option — they auto-qualify page-by-page as future state batches are cached.
+Two technical facts that bound the thresholds: `app_projects` caps facility rows at
+**16 per ZIP** (materializer cap — thresholds above 15 are meaningless), and the
+`pass` gate already requires ≥1 sourced record (project OR facility OR sourced notice),
+so even option (b) never indexes a zero-record page.
+
+### 11.2 Candidate thresholds — measured page counts (nationwide, today)
+
+Currently indexed for comparison: **795** (UT 136 + TX 659 pass).
+
+| Threshold ("pass AND …") | Pages indexed | Δ vs today | De-indexes currently-live pages |
+|---|---|---|---|
+| (a) dev-backed only (≥1 parcel-precise development record) | **170** | −625 | 689 UT/TX pages lose indexing |
+| (b) any pass page (incl. facility floor) | **932** | +137 | 0 |
+| **(c) RECOMMENDED: dev-backed OR ≥3 facility records** | **886** | +91 | 42 |
+| (c-alt1) dev-backed OR ≥5 facility records | 788 | −7 | 132 |
+| (c-alt2) dev-backed OR ≥10 facility records | 735 | −60 | 180 |
+
+**Recommendation: (c) — dev-backed OR ≥3 facilities.** (a) guts the EPA facility floor
+that is real, sourced content and would de-index 689 live pages — rejected. (b) is
+closest to "index every verified-real page," but 134 pass pages carry only 1–2 facility
+pins and nothing else; those are the thin-content pages most likely to be judged
+low-value at scale. (c) keeps the spirit of (b) while noindexing exactly that
+one-or-two-pin tail: +91 pages net today, and only **42** currently-indexed UT/TX pages
+(1–2-facility, zero-development) drop out. Measured per-state under (c):
+**UT 106/136 · TX 647/659 · CO 131/135 · NM 2/2 = 886/932 pass pages.** These counts
+are point-in-time receipts; at implementation the materializer stamps the flag and CI
+asserts it — the numbers are never hand-maintained.
+
+### 11.3 Thin-content safety — ramp recommendation
+
+Today's approved delta is small (+91 to +137 URLs on a site already indexing 795), so
+**push the currently-qualifying set in one shot — no ramp needed at this scale.**
+The ramp matters for the *future*: a single state batch can materialize 500+ pages
+overnight. Recommendation: build a **throttle constant into `gen_sitemap.py`**
+(`MAX_NEW_URLS_PER_RUN = 250`): the daily sitemap run adds at most 250 not-yet-listed
+qualifying URLs (oldest-cached first), so a 12,000-page future rolls out over weeks
+without a sitemap cliff, with zero human steps. Pages themselves flip `index` the day
+they qualify (robots meta), which is fine — the sitemap is the crawl-rate control.
+
+### 11.4 Exact changes (one PR, applied only on approval)
+
+The rule is computed ONCE, in the materializer, and read everywhere — no page-side
+duplication of the threshold:
+1. **DB / materializer:** `app_refresh_zip` stamps a boolean `indexable` on
+   `app_community_meta` = `data_quality='pass' AND (dev_records>0 OR facility_records>=3)`
+   (threshold as ONE SQL constant). Parked DDL updated in `docs/app-content-materialize.sql`.
+2. **`community.html`:** delete `INDEX_STATES`; `setIndexable(!!(meta && meta.indexable))`.
+3. **`homesignalmap.html`:** delete the UT/TX state check; index when the ZIP's
+   `app_community_meta.indexable` is true (same one flag).
+4. **`scripts/gen_sitemap.py`:** delete `INDEX_STATES`; emit `community.html?zip=` +
+   `homesignalmap.html?zip=` for `indexable=true` rows nationwide; add
+   `MAX_NEW_URLS_PER_RUN` throttle (§11.3).
+5. **CI:** `verify-communities.mjs` walks ALL meta rows (drop `state=in.(UT,TX)`):
+   `indexable=true` ⇒ page renders records AND robots=index; `indexable=false` ⇒
+   robots=noindex (pass-but-thin AND coverage-coming both prove noindexed).
+   `verify-development.mjs`: same nationwide predicate for tracker pages.
+   The fixed "non-UT sample must be noindexed" list is replaced by the flag assertion.
+6. Untouched: v13 shell, anti-fabrication gates, `DEMO_SESSION: true`, all engine
+   sources, the pass/coverage_coming data-quality gate itself.
+
+### 11.5 Revert — one step back to state-scoped
+
+Everything ships as **one squash-merged PR** (`nationwide-substance-gate`) whose diff
+*removes* the `INDEX_STATES` constants in place: `git revert <merge-sha>` restores the
+UT/TX state-scoped policy byte-for-byte in all four files + verifiers (Pages redeploys
+on push; the daily sitemap run regenerates the UT/TX-only sitemap). The one DB step is
+re-running the prior `app_refresh_zip` body, which the same revert restores in
+`docs/app-content-materialize.sql` — apply it via one migration. The `indexable` column
+is additive and can stay (ignored by the reverted readers).
+
+**⏸ STOP LINE: awaiting founder approval of a threshold — (a) 170 / (b) 932 /
+(c) 886 (recommended) — before any of §11.4 is implemented.**
