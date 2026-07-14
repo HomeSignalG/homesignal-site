@@ -41,16 +41,27 @@ const sb = (path) =>
   fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` } });
 
 async function loadDevReports() {
-  // Paginated: one unbounded select of every row's sites jsonb hits the Postgres
-  // statement timeout (57014) with ~1,000 cached ZIPs — same fix as verify-development.
+  // KEYSET-paginated: one unbounded select of every row's sites jsonb hits the Postgres
+  // statement timeout (57014) at ~1,000 cached ZIPs, and even OFFSET pages re-scan all
+  // prior rows (O(offset) per page) — under concurrent verifier load a late page timed
+  // out too. zip=gt.<last> is O(1) per page on the zip index. Transient-retried.
   const rows = [];
   const STEP = 40;
-  for (let off = 0; ; off += STEP) {
-    const res = await sb(`development_reports?select=zip,sites&order=zip&limit=${STEP}&offset=${off}`);
-    if (!res.ok) throw new Error(`development_reports read failed: ${res.status} ${await res.text()}`);
-    const page = await res.json();
+  let last = '';
+  for (;;) {
+    const path = `development_reports?select=zip,sites&order=zip.asc&limit=${STEP}` +
+      (last ? `&zip=gt.${encodeURIComponent(last)}` : '');
+    let page = null;
+    for (let attempt = 0; attempt < 3 && page === null; attempt++) {
+      const res = await sb(path);
+      if (res.ok) { page = await res.json(); break; }
+      const body = await res.text();
+      if (attempt === 2) throw new Error(`development_reports read failed: ${res.status} ${body}`);
+      await sleep(2000 * (attempt + 1)); // 57014 here is contention with the other verifiers
+    }
     rows.push(...page);
     if (page.length < STEP) break;
+    last = page[page.length - 1].zip;
   }
   return rows;
 }
