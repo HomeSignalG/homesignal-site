@@ -46,6 +46,10 @@
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
 
 const DRY = process.argv.includes('--dry-run');
+// Gate-validation mode (DRY-RUN ONLY): probe targets even when a registry entry already
+// exists, so the full auto-wire entry builder runs against a known-good live layer and its
+// output can be compared to the human-approved entry. Never combined with a real write.
+const INCLUDE_WIRED = DRY && process.argv.includes('--include-wired');
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const TARGETS_PATH = `${ROOT}/scripts/source-monitor-targets.json`;
 const LEXICON_PATH = `${ROOT}/scripts/source-lexicon.json`;
@@ -116,9 +120,13 @@ function vendorOf(url) {
   }
   return null;
 }
-const alreadyWired = (url, datasetId) =>
+const alreadyWired = (url, datasetId) => !INCLUDE_WIRED && (
   (registry.arcgis || []).some((e) => e.service_url === url) ||
-  (registry.socrata || []).some((e) => e.dataset_id && e.dataset_id === datasetId);
+  (registry.socrata || []).some((e) => e.dataset_id && e.dataset_id === datasetId));
+// Never probe the same endpoint twice in one run (a service can be listed at the root AND
+// inside a folder, or appear in both reprobe and discovery).
+const probedUrls = new Set();
+const seenBefore = (key) => probedUrls.has(key) ? true : (probedUrls.add(key), false);
 
 // ---------------------------------------------------------------- ArcGIS probing
 
@@ -346,12 +354,13 @@ async function walkArcgisRoot(target, findings) {
     for (const layer of layers) {
       if (probed++ >= MAX_CANDIDATES_PER_TARGET) return;
       const layerUrl = `${svcUrl}/${layer.id}`;
-      if (alreadyWired(layerUrl)) continue;
+      if (seenBefore(layerUrl) || alreadyWired(layerUrl)) continue;
       if (!hostAllowed(layerUrl, target.hosts)) continue;
       const res = await probeArcgisLayer(layerUrl, target);
       findings.push(row({ ...target, id: `${target.id} → ${svc.name}/${layer.name}` }, res.result, res.evidence, res, layerUrl));
     }
   }
+  if (!probed) findings.push(row(target, 'no-candidates', `${interesting.length} permit-pattern service(s) but every layer was filtered, duplicate, or already wired`));
 }
 
 async function walkSocrataCatalog(target, findings) {
@@ -360,13 +369,16 @@ async function walkSocrataCatalog(target, findings) {
   if (!r.ok) { findings.push(row(target, r.status === 404 || r.status === 0 ? 'still-dead' : 'unreachable', `catalog HTTP ${r.status} ${r.text || ''}`)); return; }
   const own = (r.json.results || []).filter((d) => (d.metadata?.domain || '') === target.domain);
   if (!own.length) { findings.push(row(target, 'no-candidates', `catalog reachable but 0 first-party datasets for q=permit (${(r.json.results || []).length} federated hits ignored — the Plano trap)`)); return; }
+  let emitted = 0;
   for (const d of own.slice(0, MAX_CANDIDATES_PER_TARGET)) {
     const id = d.resource?.id;
-    if (!id || alreadyWired(null, id)) continue;
+    if (!id || seenBefore(`socrata:${target.domain}:${id}`) || alreadyWired(null, id)) continue;
     if (!NAME_PATTERN.test(d.resource?.name || '') || NAME_EXCLUDE.test(d.resource?.name || '')) continue;
     const res = await probeSocrataResource(target.domain, id, target);
     findings.push(row({ ...target, id: `${target.id} → ${d.resource.name} (${id})` }, res.result, res.evidence, res));
+    emitted++;
   }
+  if (!emitted) findings.push(row(target, 'no-candidates', `${own.length} first-party dataset(s) for q=permit but none matched the permit/land-use pattern (or all duplicate/already wired)`));
 }
 
 async function walkDcat(target, findings) {
@@ -387,7 +399,7 @@ async function walkDcat(target, findings) {
     }
     if (probed++ >= MAX_CANDIDATES_PER_TARGET) return;
     const layerUrl = /\/\d+(\?|$)/.test(esri) ? esri.replace(/\?.*$/, '') : `${esri.replace(/\/?(\?.*)?$/, '')}/0`;
-    if (alreadyWired(layerUrl)) continue;
+    if (seenBefore(layerUrl) || alreadyWired(layerUrl)) continue;
     if (!hostAllowed(layerUrl, target.hosts)) { findings.push(row({ ...target, id: `${target.id} → ${d.title}` }, 'skipped', `host ${hostOf(layerUrl)} not on the target allowlist`)); continue; }
     const res = await probeArcgisLayer(layerUrl, target);
     findings.push(row({ ...target, id: `${target.id} → ${d.title}` }, res.result, res.evidence, res, layerUrl));
@@ -438,9 +450,11 @@ for (const t of targets.reprobe) {
   let res;
   if (t.kind === 'arcgis-layer') {
     if (!hostAllowed(t.url, t.hosts)) { findings.push(row(t, 'skipped', 'host not on allowlist')); continue; }
+    seenBefore(t.url);
     res = alreadyWired(t.url) ? { result: 'already-wired', evidence: 'registry entry exists' } : await probeArcgisLayer(t.url, t);
     findings.push(row(t, res.result, res.evidence, res, t.url));
   } else if (t.kind === 'socrata-resource') {
+    seenBefore(`socrata:${t.domain}:${t.dataset_id}`);
     res = alreadyWired(null, t.dataset_id) ? { result: 'already-wired', evidence: 'registry entry exists' } : await probeSocrataResource(t.domain, t.dataset_id, t);
     findings.push(row(t, res.result, res.evidence, res));
   } else if (t.kind === 'socrata-catalog') {
@@ -460,9 +474,10 @@ for (const t of targets.discovery) {
 for (const f of findings) {
   if (f.res?.result === 'wire' && f.res.entry) {
     const list = f.res.entry.platform === 'arcgis' ? (registry.arcgis = registry.arcgis || []) : (registry.socrata = registry.socrata || []);
-    if (!list.some((e) => e.registry_id === f.res.entry.registry_id)) {
-      list.push(f.res.entry);
+    if (!list.some((e) => e.registry_id === f.res.entry.registry_id) || INCLUDE_WIRED) {
+      if (!INCLUDE_WIRED) list.push(f.res.entry);
       wired.push(f.res.entry.registry_id);
+      if (DRY) console.log(`\n--- entry the gate built for ${f.res.entry.registry_id} (dry-run, not written) ---\n${JSON.stringify(f.res.entry, null, 2)}\n`);
     }
   }
 }

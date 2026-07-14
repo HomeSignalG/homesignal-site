@@ -107,6 +107,15 @@
       "rejected": "2026-07-13: frozen — dataset not updated for years"
     },
     {
+      "id": "fort-worth-development-permits-gate-validation",
+      "kind": "arcgis-layer",
+      "url": "https://mapit.fortworthtexas.gov/ags/rest/services/CIVIC/Permits/MapServer/0",
+      "jurisdiction": "Fort Worth",
+      "coverage": { "state": "TX", "county": "Tarrant" },
+      "hosts": ["mapit.fortworthtexas.gov"],
+      "rejected": "NOT rejected — this is the known-good LIVE wired layer, kept here as the auto-wire gate's validation reference. Nightly it reports 'already-wired' (doubling as a freshness check that the endpoint still answers); with --dry-run --include-wired the monitor rebuilds its entry from live data so the output can be diffed against the human-approved fort-worth-development-permits registry entry."
+    },
+    {
       "id": "denton-city-portal",
       "kind": "socrata-catalog",
       "domain": "data.cityofdenton.com",
