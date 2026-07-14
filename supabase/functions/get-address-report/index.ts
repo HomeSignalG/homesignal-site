@@ -1,4 +1,10 @@
-// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr), DEPLOYED v18.
+// get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr).
+// v20 = GEOCODE GEOFENCE (sources/arcgis.ts): a GEOCODED point (never source-supplied geometry)
+// is trusted only when (a) the Census matched-address ZIP equals the record's filed ZIP and
+// (b) the point sits within GEOCODE_FENCE_MI (25) of the report ZIP centroid. A miss NULLS the
+// coords (record stays listed, area scope) — verify-geocodes caught 23 live out-of-polygon
+// geocodes incl. Fort Worth permits rendering in Michigan/South Carolina (Census range
+// interpolation matching the same street name in another state).
 // v18 = BACKBONE FIX (area-item placement): jurisdiction-level (scope=area) planning notices and
 // meetings no longer geocode against the Box-Elder-only place map. That map DROPPED every
 // non-Box-Elder alert (centroid() → null → skipped) and stamped every non-Box-Elder meeting with

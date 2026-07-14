@@ -188,7 +188,7 @@ async function runEntry(
     const bucket = lookup.get(statusRaw);
     if (bucket === undefined) { unmappedCount.set(statusRaw, (unmappedCount.get(statusRaw) ?? 0) + 1); continue; }
     if (bucket === "exclude") { excludeCount.set(statusRaw, (excludeCount.get(statusRaw) ?? 0) + 1); continue; }
-    const rec = await normalizeRow(row, entry, statusRaw, bucket, deps, report);
+    const rec = await normalizeRow(row, entry, statusRaw, bucket, zip, deps, report);
     if (rec) records.push(rec);
   }
 
@@ -203,6 +203,7 @@ async function normalizeRow(
   entry: ArcgisRegistryEntry,
   statusRaw: string,
   bucket: Exclude<Bucket, "exclude">,
+  reportZip: string,
   deps: ArcgisDeps,
   report: ArcgisRunReport,
 ): Promise<NormalizedRecord | null> {
@@ -234,11 +235,33 @@ async function normalizeRow(
     const g = await deps.geocode(address);
     if (!g) { report.geocode_failures++; report.quarantined.push({ reason: "geocode failed", sample: address }); lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area"; }
     else {
-      lat = g.lat; lng = g.lng; geoPrecision = "address"; scope = "point";
-      if (g.match_type) geoQuality.match_type = g.match_type;
-      if (g.matched_address) geoQuality.matched_address = g.matched_address;
-      if (g.geocode_source) geoQuality.geocode_source = g.geocode_source;
-      if (g.needs_review !== undefined) geoQuality.needs_review = g.needs_review;
+      // GEOFENCE (anti-fabrication): a geocoded point is trusted only when the geocoder's
+      // own output agrees with where the record is filed. Census range-interpolation can
+      // match the same street name in another city/state (live example: a Fort Worth permit
+      // rendered in Michigan). Two local checks, no extra lookups; a miss NULLS the coords —
+      // the record stays listed as an area item, the untrusted marker is never rendered.
+      const filedZip = (String(readCol(row, cm.zip) ?? "").match(/\b\d{5}\b/)?.[0]) || reportZip || null;
+      const matchedZip = ((g.matched_address || "").match(/\b(\d{5})(?:-\d{4})?\s*$/)?.[1]) ?? null;
+      const zipMismatch = !!(filedZip && matchedZip && filedZip !== matchedZip);
+      const c = deps.zipCentroid;
+      const fenceMiles = c ? milesBetween(c.lat, c.lng, g.lat, g.lng) : null;
+      const outOfFence = fenceMiles != null && fenceMiles > GEOCODE_FENCE_MI;
+      if (zipMismatch || outOfFence) {
+        report.geocode_failures++;
+        report.quarantined.push({
+          reason: zipMismatch
+            ? `geocode geofence: matched ZIP ${matchedZip} != filed ${filedZip} — coords nulled`
+            : `geocode geofence: point ${Math.round(fenceMiles!)} mi from ZIP centroid (> ${GEOCODE_FENCE_MI}) — coords nulled`,
+          sample: address,
+        });
+        lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area";
+      } else {
+        lat = g.lat; lng = g.lng; geoPrecision = "address"; scope = "point";
+        if (g.match_type) geoQuality.match_type = g.match_type;
+        if (g.matched_address) geoQuality.matched_address = g.matched_address;
+        if (g.geocode_source) geoQuality.geocode_source = g.geocode_source;
+        if (g.needs_review !== undefined) geoQuality.needs_review = g.needs_review;
+      }
     }
   } else {
     geoPrecision = "jurisdiction"; scope = "area"; lat = null; lng = null;
@@ -464,4 +487,16 @@ export function envelopeFor(lat: number, lng: number, radiusMi: number): { xmin:
   const dLat = radiusMi / 69;
   const dLng = radiusMi / (69 * Math.max(Math.cos(lat * Math.PI / 180), 0.1));
   return { xmin: lng - dLng, ymin: lat - dLat, xmax: lng + dLng, ymax: lat + dLat };
+}
+
+/** Geofence for GEOCODED points (source-supplied geometry is never fenced): a Census
+ *  interpolation landing farther than this from the report's ZIP centroid cannot be an
+ *  address inside that ZIP — the coords are nulled, the record stays listed (area scope). */
+export const GEOCODE_FENCE_MI = 25;
+
+/** Equirectangular distance in miles — plenty at fence scale. */
+export function milesBetween(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const dLat = (lat2 - lat1) * 69;
+  const dLng = (lng2 - lng1) * 69 * Math.cos(((lat1 + lat2) / 2) * Math.PI / 180);
+  return Math.sqrt(dLat * dLat + dLng * dLng);
 }
