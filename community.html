@@ -29,12 +29,12 @@ HS.onReady(async function () {
   var status = await HS.data.coverageStatus(zip);   // 'pass' | 'coverage_coming' | null
   var meta = status ? await HS.data.community(zip) : null;
 
-  // G2 (widened 2026-07-13): index Utah + Texas community pages that pass the data-quality
-  // gate — TX signed off after the statewide batch (249/249 cached, honest statuses).
-  // Every other page (other states, or coverage-coming) stays noindexed until its data is
-  // accurate. Default is noindex (set in <head>); flipped ON only for a pass page below.
-  var INDEX_STATES = ['UT', 'TX'];
-  setIndexable(!!(meta && INDEX_STATES.indexOf(meta.state) !== -1 && status === 'pass'));
+  // NATIONWIDE SUBSTANCE GATE (founder-approved 2026-07-14, PLAN.md §11 threshold c):
+  // the materializer stamps app_community_meta.indexable = pass AND (>=1 development
+  // record OR >=3 facility records) — computed ONCE in SQL, read here. Empty /
+  // coverage-coming / thin pages stay noindexed. Default is noindex (set in <head>);
+  // flipped ON only when the stamped flag says the page has indexable substance.
+  setIndexable(!!(meta && meta.indexable === true && status === 'pass'));
 
   if (!status) {
     page.innerHTML = '<div class="ph"><div class="eyebrow">Communities</div><h1>' + HS.esc(zip) + ' isn\'t covered yet</h1>'

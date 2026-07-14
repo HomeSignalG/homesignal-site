@@ -6,17 +6,18 @@
 // driving the REAL site with a headless browser.
 //
 // The site was switched to the new layout (community.html reads the app_* tables via the
-// public anon key + RLS and the data-quality gate). INDEX-ONLY-UTAH is the current policy,
-// so this asserts, live:
-//   1. Every Utah community page (app_community_meta.state='UT') renders REAL, sourced
-//      content (the pass state — stat strip + record cards) and is INDEXABLE
-//      (<meta name=robots> = index) — that's the advertised set.
-//   2. A sample of NON-Utah pages renders WITHOUT error (coverage-coming or not-covered)
-//      and is NOINDEXED — nothing outside Utah is advertised until its data is accurate.
-//   3. Anti-fabrication: every "View public record" link on a Utah page is a real http URL.
+// public anon key + RLS and the data-quality gate). The NATIONWIDE SUBSTANCE GATE is the
+// current policy (PLAN.md §11, founder-approved threshold c): the materializer stamps
+// app_community_meta.indexable = pass AND (dev-backed OR >=3 facilities), and this
+// asserts, live, for EVERY materialized page in any state:
+//   1. indexable=true  ⇒ the page renders REAL, sourced content (stat strip + record
+//      cards) AND <meta name=robots> = index — that's the advertised set.
+//   2. indexable=false ⇒ robots = noindex (pass-but-thin AND coverage-coming both), and
+//      a sample of never-materialized ZIPs renders without error, noindexed.
+//   3. Anti-fabrication: every "View public record" link is a real http URL.
 //
-// Config via env: SITE_BASE (default https://homesignal.net), SAMPLE (cap Utah ZIPs for a
-// quick smoke run), CONCURRENCY (default 8).
+// Config via env: SITE_BASE (default https://homesignal.net), SAMPLE (cap walked ZIPs for
+// a quick smoke run), CONCURRENCY (default 8).
 
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
@@ -72,48 +73,52 @@ async function readPage(page, zip) {
 const indexable = (r) => /(^|[^n])index/i.test(r) && !/noindex/i.test(r);
 
 async function main() {
-  // 1) The advertised set: every community page in an INDEX_STATES state (UT + TX).
-  //    pass rows must render real records AND be indexable; coverage_coming rows must
-  //    render the honest coverage state AND stay noindexed.
-  let utah = await rest(`app_community_meta?select=zip,name,state,data_quality&state=in.(UT,TX)&order=zip.asc`);
-  if (SAMPLE > 0) utah = utah.slice(0, SAMPLE);
-  // 2) A sample of other-state pages that MUST stay noindexed: any modeled meta rows
-  //    outside the advertised states + a few well-known modeled ZIPs never materialized.
-  const nonUtMeta = await rest(`app_community_meta?select=zip,state,data_quality&state=not.in.(UT,TX)&limit=6`);
-  const nonUtSample = ['80202', '60601', '98101', '02138']; // modeled elsewhere; no app_* row → not-covered
-  const nonUt = [...nonUtMeta.map(r => r.zip), ...nonUtSample];
+  // NATIONWIDE SUBSTANCE GATE (PLAN.md §11, founder-approved threshold c): every
+  // materialized page is verified against its materializer-stamped `indexable` flag —
+  // pass AND (dev-backed OR >=3 facilities), ONE rule computed in SQL and read by the
+  // pages, the sitemap generator, and this verifier. Assertions:
+  //   indexable=true  ⇒ page renders real records AND robots=index
+  //   indexable=false ⇒ robots=noindex (pass-but-thin AND coverage-coming both prove it)
+  let walked = await rest(`app_community_meta?select=zip,name,state,data_quality,indexable&order=zip.asc&limit=100000`);
+  if (SAMPLE > 0) walked = walked.slice(0, SAMPLE);
+  // A sample of modeled-but-never-materialized ZIPs (no app_* row): must render the
+  // honest not-covered state and stay noindexed.
+  const nonUt = ['60601', '98101', '02138', '35801'];
 
-  console.log(`Verifying ${utah.length} UT+TX page(s) + ${nonUt.length} other-state page(s) against ${SITE_BASE}`);
+  console.log(`Verifying ${walked.length} materialized page(s) + ${nonUt.length} unmaterialized page(s) against ${SITE_BASE}`);
 
   const browser = await chromium.launch();
   const fails = [];
 
-  // --- Utah pages: must be pass + indexable + sourced ---
+  // --- Materialized pages: substance flag drives BOTH assertions ---
   let cursor = 0;
-  async function utahWorker() {
+  async function walkWorker() {
     const page = await browser.newPage();
     for (;;) {
       const i = cursor++;
-      if (i >= utah.length) break;
-      const row = utah[i];
+      if (i >= walked.length) break;
+      const row = walked[i];
       try {
         const st = await readPage(page, row.zip);
         const tag = `${row.state} ${row.zip} (${row.name})`;
         if (row.data_quality !== 'pass') {
-          // coverage_coming in an advertised state: honest coverage page, never indexed.
+          // coverage_coming: honest coverage page, never indexed (flag must be false too).
           if (st.isPass) fails.push(`${tag}: meta says coverage_coming but the page rendered a PASS state`);
+          else if (row.indexable) fails.push(`${tag}: coverage_coming row has indexable=true (materializer bug)`);
           else if (indexable(st.robots)) fails.push(`${tag}: coverage-coming page is INDEXABLE (robots="${st.robots}")`);
           else console.log(`  ✓ ${tag} · coverage-coming · noindex`);
         } else if (!st.isPass) {
           fails.push(`${tag}: expected a PASS page (real records) but got ${st.isCoverage ? 'coverage-coming' : st.isNotCovered ? 'not-covered' : 'an unrecognized state'}`);
-        } else if (!indexable(st.robots)) {
-          fails.push(`${tag}: pass page in an advertised state is NOT indexable (robots="${st.robots}")`);
+        } else if (row.indexable && !indexable(st.robots)) {
+          fails.push(`${tag}: substance-flagged page is NOT indexable (robots="${st.robots}")`);
+        } else if (!row.indexable && indexable(st.robots)) {
+          fails.push(`${tag}: pass-but-thin page is INDEXABLE (robots="${st.robots}") — must stay noindex`);
         } else if (!st.h1.includes(row.zip)) {
           fails.push(`${tag}: rendered H1 "${st.h1}" does not contain the ZIP`);
         } else {
           const bad = st.recordLinks.filter(h => !/^https?:\/\//i.test(h));
           if (bad.length) fails.push(`${tag}: ${bad.length} "public record" link(s) without a real http URL (anti-fabrication)`);
-          else console.log(`  ✓ ${tag} · pass · indexable · ${st.recordLinks.length} record link(s)`);
+          else console.log(`  ✓ ${tag} · pass · ${row.indexable ? 'indexable' : 'thin/noindex'} · ${st.recordLinks.length} record link(s)`);
         }
       } catch (e) {
         fails.push(`${row.state} ${row.zip} (${row.name}): ${e.message.split('\n')[0]}`);
@@ -121,36 +126,37 @@ async function main() {
     }
     await page.close();
   }
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, utah.length || 1) }, () => utahWorker()));
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, walked.length || 1) }, () => walkWorker()));
 
-  // --- Non-Utah pages: must render (no crash) AND be noindexed ---
+  // --- Unmaterialized pages: must render (no crash) AND be noindexed ---
   for (const zip of nonUt) {
     const page = await browser.newPage();
     try {
       const st = await readPage(page, zip);
       if (indexable(st.robots)) {
-        fails.push(`non-UT ${zip}: page is INDEXABLE but only UT+TX may be indexed (robots="${st.robots}")`);
+        fails.push(`unmaterialized ${zip}: page is INDEXABLE but has no substance flag (robots="${st.robots}")`);
       } else if (!(st.isPass || st.isCoverage || st.isNotCovered)) {
-        fails.push(`non-UT ${zip}: page rendered an unrecognized state (possible error)`);
+        fails.push(`unmaterialized ${zip}: page rendered an unrecognized state (possible error)`);
       } else {
-        console.log(`  ✓ non-UT ${zip} → noindex · ${st.isPass ? 'pass(hidden)' : st.isCoverage ? 'coverage-coming' : 'not-covered'}`);
+        console.log(`  ✓ unmaterialized ${zip} → noindex · ${st.isPass ? 'pass(hidden)' : st.isCoverage ? 'coverage-coming' : 'not-covered'}`);
       }
     } catch (e) {
-      fails.push(`non-UT ${zip}: ${e.message.split('\n')[0]}`);
+      fails.push(`unmaterialized ${zip}: ${e.message.split('\n')[0]}`);
     }
     await page.close();
   }
 
   await browser.close();
 
+  const nIdx = walked.filter((r) => r.indexable).length;
   const summary = [
-    `# Community page verification (new layout · index-only-Utah)`,
+    `# Community page verification (nationwide substance gate)`,
     ``,
     `- Site: ${SITE_BASE}`,
-    `- Utah pages checked: **${utah.length}** (must be pass + indexable)`,
-    `- Non-Utah pages checked: **${nonUt.length}** (must be noindexed)`,
+    `- Materialized pages checked: **${walked.length}** (${nIdx} substance-flagged ⇒ must be indexable; rest ⇒ noindex)`,
+    `- Unmaterialized pages checked: **${nonUt.length}** (must be noindexed)`,
     `- Failed: **${fails.length}**`,
-    ...(fails.length ? [``, `## Failures`, ...fails.map((f) => `- ${f}`)] : [``, `All Utah pages render real records and are indexable; all sampled non-Utah pages are noindexed. ✓`]),
+    ...(fails.length ? [``, `## Failures`, ...fails.map((f) => `- ${f}`)] : [``, `Every substance-flagged page renders real records and is indexable; every thin/empty/unmaterialized page is noindexed. ✓`]),
   ].join('\n');
   console.log('\n' + summary);
   if (process.env.GITHUB_STEP_SUMMARY) {
