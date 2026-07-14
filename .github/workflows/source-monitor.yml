@@ -24,6 +24,10 @@ on:
         description: 'true = probe + report to logs only; write/commit nothing'
         required: false
         default: 'false'
+      include_wired:
+        description: 'true = gate-validation: also rebuild entries for already-wired targets (forces dry-run)'
+        required: false
+        default: 'false'
 
 permissions:
   contents: write
@@ -47,6 +51,7 @@ jobs:
         run: |
           ARGS=""
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then ARGS="--dry-run"; fi
+          if [ "${{ github.event.inputs.include_wired }}" = "true" ]; then ARGS="--dry-run --include-wired"; fi
           node scripts/source-monitor.mjs $ARGS | tee monitor-out.txt
           if grep -q '^REGISTRY_CHANGED=1$' monitor-out.txt; then
             echo "registry_changed=true" >> "$GITHUB_OUTPUT"
