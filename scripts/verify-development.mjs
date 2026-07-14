@@ -52,19 +52,29 @@ function validRecordUrl(u) {
 const LIFECYCLE = new Set(['built', 'approved', 'proposed']);
 
 async function loadReports() {
-  // Paginated: one unbounded select of every row's `sites` jsonb started timing out
-  // (57014) once the cache passed ~800 ZIPs (the Dallas/Tarrant/El Paso batch).
+  // KEYSET-paginated: one unbounded select of every row's `sites` jsonb started timing out
+  // (57014) once the cache passed ~800 ZIPs, and even OFFSET pages re-scan all prior rows
+  // (O(offset) per page) — under concurrent verifier load a late page timed out too.
+  // zip=gt.<last> is O(1) per page on the zip index. Transient-retried.
   const rows = [];
   const STEP = 40;
-  for (let off = 0; ; off += STEP) {
-    const url = `${SUPABASE_URL}/rest/v1/development_reports?select=zip,counts,sites,home_lat,home_lng&order=zip&limit=${STEP}&offset=${off}`;
-    const res = await fetch(url, {
-      headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` },
-    });
-    if (!res.ok) throw new Error(`Supabase development_reports read failed: ${res.status} ${await res.text()}`);
-    const page = await res.json();
+  let last = '';
+  for (;;) {
+    const url = `${SUPABASE_URL}/rest/v1/development_reports?select=zip,counts,sites,home_lat,home_lng&order=zip.asc&limit=${STEP}` +
+      (last ? `&zip=gt.${encodeURIComponent(last)}` : '');
+    let page = null;
+    for (let attempt = 0; attempt < 3 && page === null; attempt++) {
+      const res = await fetch(url, {
+        headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` },
+      });
+      if (res.ok) { page = await res.json(); break; }
+      const body = await res.text();
+      if (attempt === 2) throw new Error(`Supabase development_reports read failed: ${res.status} ${body}`);
+      await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+    }
     rows.push(...page);
     if (page.length < STEP) break;
+    last = page[page.length - 1].zip;
   }
   return rows;
 }
