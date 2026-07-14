@@ -99,3 +99,19 @@
 --     lib/data.js, and community.html refuses to measure real records from the
 --     fictional Del Valle demo address even on its own ZIP; 'Operating' projects
 --     join the active card group so built/operating permits can be carded.
+
+-- ---------------------------------------------------------------------------
+-- Applied 2026-07-14 via migration `app_meta_indexable_substance_gate`
+-- (founder-approved PLAN.md §11 threshold c — the nationwide index policy):
+--   * app_community_meta gains `indexable boolean not null default false`.
+--   * app_refresh_zip stamps it from the TRUE uncapped totals:
+--       indexable := (pass) AND (_ndp > 0 OR _nfc >= 3)
+--     i.e. >=1 parcel-precise development record OR >=3 facility records.
+--     Empty / coverage_coming rows are always false. This is the ONE place the
+--     threshold lives; community.html, homesignalmap.html, gen_sitemap.py and
+--     both CI verifiers only read the flag.
+--   * Backfilled with select public.app_refresh_all();  (942 rows; flag counts
+--     at apply time: UT 106 / TX 647 / CO 131 / NM 2 = 886 of 932 pass pages.)
+-- REVERT: re-apply the pre-2026-07-14 app_refresh_zip body (this file's history)
+-- and git-revert the nationwide-substance-gate PR; the column is additive and
+-- may remain (ignored by state-scoped readers).

@@ -439,5 +439,5 @@ re-running the prior `app_refresh_zip` body, which the same revert restores in
 `docs/app-content-materialize.sql` — apply it via one migration. The `indexable` column
 is additive and can stay (ignored by the reverted readers).
 
-**⏸ STOP LINE: awaiting founder approval of a threshold — (a) 170 / (b) 932 /
-(c) 886 (recommended) — before any of §11.4 is implemented.**
+**✅ APPROVED 2026-07-14: founder chose (c) — dev-backed OR ≥3 facilities (886 pages
+at approval time). Implemented per §11.4; revert per §11.5.**

@@ -69,11 +69,13 @@ async function loadReports() {
   return rows;
 }
 
-// The set of ZIPs in the advertised states (UT + TX). A tracker page is indexable ONLY
-// for one of these ZIPs when it has content; everything else stays noindex. Data-driven
-// off the live table — widen the state filter when a new state is signed off.
-async function loadUtahZips() {
-  const url = `${SUPABASE_URL}/rest/v1/app_community_meta?select=zip&state=in.(UT,TX)`;
+// NATIONWIDE SUBSTANCE GATE (PLAN.md §11, founder-approved threshold c): the advertised
+// set is the ZIPs whose materializer-stamped app_community_meta.indexable is true —
+// pass AND (dev-backed OR >=3 facilities), ONE rule computed in SQL and read everywhere.
+// A tracker page is indexable ONLY for one of these ZIPs when it rendered content;
+// everything else (thin, empty, coverage-coming, unmaterialized states) stays noindex.
+async function loadIndexableZips() {
+  const url = `${SUPABASE_URL}/rest/v1/app_community_meta?select=zip&indexable=is.true&limit=100000`;
   const res = await fetch(url, { headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` } });
   if (!res.ok) return new Set();
   return new Set((await res.json()).map((r) => r.zip));
@@ -93,8 +95,8 @@ async function main() {
   let reports = await loadReports();
   reports.sort((a, b) => a.zip.localeCompare(b.zip));
   if (SAMPLE > 0) reports = reports.slice(0, SAMPLE);
-  const utahZips = await loadUtahZips();
-  console.log(`Verifying ${reports.length} ZIP development page(s) against ${SITE_BASE} (${utahZips.size} UT+TX ZIPs indexable)`);
+  const indexableZips = await loadIndexableZips();
+  console.log(`Verifying ${reports.length} ZIP development page(s) against ${SITE_BASE} (${indexableZips.size} ZIPs indexable under the substance gate)`);
 
   const browser = await chromium.launch();
   const page = await browser.newPage();
@@ -146,13 +148,13 @@ async function main() {
 
       // NEW LAYOUT: every tracker page must render the shared left-sidebar shell.
       if (!st.shell) fails.push(`ZIP ${zip}: new sidebar shell did not render (old layout?)`);
-      // INDEX-ONLY-UTAH: indexable iff a Utah ZIP that has content; else noindex.
+      // SUBSTANCE GATE: indexable iff the stamped flag is true AND the page rendered content.
       const renderedForPolicy = st.rendered != null ? st.rendered : sites;
       const isIndex = /(^|[^n])index/i.test(st.robots) && !/noindex/i.test(st.robots);
-      const expectIndex = utahZips.has(zip) && renderedForPolicy.length > 0;
+      const expectIndex = indexableZips.has(zip) && renderedForPolicy.length > 0;
       if (isIndex !== expectIndex) {
-        fails.push(`ZIP ${zip}: robots="${st.robots}" (indexable=${isIndex}) violates index-only-UT+TX ` +
-          `(expected ${expectIndex ? 'index' : 'noindex'}; advertised=${utahZips.has(zip)}, sites=${renderedForPolicy.length})`);
+        fails.push(`ZIP ${zip}: robots="${st.robots}" (indexable=${isIndex}) violates the substance gate ` +
+          `(expected ${expectIndex ? 'index' : 'noindex'}; flag=${indexableZips.has(zip)}, sites=${renderedForPolicy.length})`);
       }
       if (st.mislabeled && st.mislabeled.length) {
         fails.push(`ZIP ${zip}: ${st.mislabeled.length} record(s) whose label contradicts its dot colour ` +

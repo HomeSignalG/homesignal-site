@@ -490,10 +490,14 @@ HS.onReady(function(){
   // home — no "this address" pin until the resident searches (development-tracker §0/§3).
   var ZIP_MODE = false, ZIP_CODE = null, HOME_ANCHOR = false;
   var ZIP_COUNTY = null, FACILITIES_ONLY = false;   // drives the honest facilities-only coverage note
-  // SEO policy (shell conversion): index ONLY a Utah ZIP page that has real, sourced content. Default
-  // is noindex (set in <head>); ZIP_STATE resolves from the communities lookup in loadZip(), HAS_CONTENT
-  // from render()'s sourced set. Address mode, property mode, non-Utah and empty ZIPs all stay noindex.
-  var ZIP_STATE = null, HAS_CONTENT = false;
+  // SEO policy — NATIONWIDE SUBSTANCE GATE (founder-approved 2026-07-14, PLAN.md §11
+  // threshold c): index a ZIP page only when the materializer stamped
+  // app_community_meta.indexable for this ZIP (pass AND dev-backed OR >=3 facilities —
+  // ONE rule computed in SQL, read here) AND the page rendered real sourced content.
+  // Default is noindex (set in <head>); ZIP_INDEXABLE resolves async in loadZip(),
+  // HAS_CONTENT from render()'s sourced set. Address mode, property mode, thin and
+  // empty ZIPs all stay noindex.
+  var ZIP_STATE = null, ZIP_INDEXABLE = false, HAS_CONTENT = false;
   function setIndexable(ok){
     var m = document.getElementById("robots-meta");
     if(m) m.setAttribute("content", ok ? "index, follow" : "noindex, nofollow");
@@ -941,7 +945,16 @@ HS.onReady(function(){
   function loadZip(zip){
     ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
     FACILITIES_ONLY = false; ZIP_COUNTY = null;
-    ZIP_STATE = null; HAS_CONTENT = false; setIndexable(false);   // start noindex; flip on only for a Utah ZIP with content
+    ZIP_STATE = null; ZIP_INDEXABLE = false; HAS_CONTENT = false; setIndexable(false);   // start noindex; flip on only via the stamped substance flag
+    // NATIONWIDE SUBSTANCE GATE: read the materializer-stamped flag for this ZIP.
+    // Non-blocking, last-wins with render() (same pattern as the communities lookup below).
+    fetch(SUPABASE_URL + "/rest/v1/app_community_meta?select=indexable&zip=eq." + encodeURIComponent(zip),
+      { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } })
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(rows){
+        ZIP_INDEXABLE = !!(rows && rows[0] && rows[0].indexable === true);
+        setIndexable(ZIP_MODE && ZIP_INDEXABLE && HAS_CONTENT);
+      }).catch(function(){});
     LAST_ADDR = "ZIP " + zip;
     // Best-effort county name for the coverage note + the "Town Name (ZIP)" place label
     // for the header (the cache row has neither). Non-blocking: if it resolves after
@@ -961,7 +974,7 @@ HS.onReady(function(){
         var sk = Object.keys(st);
         var s0 = sk.length === 1 ? sk[0] : null;
         ZIP_STATE = (s0 === "UTAH") ? "UT" : (s0 === "TEXAS") ? "TX" : s0;
-        setIndexable(ZIP_MODE && (ZIP_STATE === "UT" || ZIP_STATE === "TX") && HAS_CONTENT);
+        // (indexability is driven by the stamped substance flag, not the state — see loadZip top)
         // Backbone standard: pair the most-specific place name with the ZIP — "Ogden (84401)".
         // The "Town Name (ZIP)" is the H1 (parity with the alerts page's comm-title) so a
         // resident sees at a glance they're on the right ZIP page; "Development overview" is
@@ -1036,11 +1049,11 @@ HS.onReady(function(){
     // Anti-fabrication gate + expose the rendered set for scripts/verify-development.mjs.
     var sites = (data.sites || []).filter(sourced);
     window.__HS_SITES = sites;
-    // SEO policy: index only a Utah ZIP page that has real, sourced content. Address mode (ZIP_MODE
-    // false), non-Utah and empty ZIPs stay noindex. ZIP_STATE resolves async in loadZip(); whichever
-    // of the two setIndexable() calls lands last wins (same pattern as updateCovNote).
+    // SEO policy: index only a ZIP page whose stamped substance flag is true AND that rendered
+    // real sourced content. Address mode (ZIP_MODE false), thin and empty ZIPs stay noindex.
+    // ZIP_INDEXABLE resolves async in loadZip(); whichever setIndexable() call lands last wins.
     HAS_CONTENT = ZIP_MODE && sites.length > 0;
-    setIndexable(ZIP_MODE && (ZIP_STATE === "UT" || ZIP_STATE === "TX") && sites.length > 0);
+    setIndexable(ZIP_MODE && ZIP_INDEXABLE && sites.length > 0);
     // Expose the label backbone so the verifier can assert, live, that the resident-facing label
     // agrees with the dot's colour (both derive from the lifecycle stage — see kindLabel/stageOf).
     window.__HS_KIND = kindLabel; window.__HS_STAGE = stageOf; window.__HS_COLORS = COLORS;
