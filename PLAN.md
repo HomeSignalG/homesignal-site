@@ -285,3 +285,65 @@ URL, Copy works).
   **not** open PRs until you ask (default per repo rules).
 
 I'll implement §3–§8 immediately on your answers to A–D. Nothing is scaffolded yet.
+
+---
+
+## 10. Automated source-monitor (nightly) — DESIGN (built 2026-07-14)
+
+**Goal:** Texas-style development depth grows without manual re-checks. Every night the
+system re-probes rejected sources, hunts for new permit/land-use feeds on facility-floor
+jurisdictions, auto-wires anything the existing generic connectors already handle, and
+flags (never guesses) genuinely new portal shapes.
+
+**Where it lives — homesignal-site, not homesignal-ingest (deliberate).** The things the
+monitor operates on all live here: `jurisdiction-registry.json` (the pure-data coverage
+config), the generic connectors (`sources/arcgis.ts`, `sources/socrata.ts`), and
+`deploy-edge-functions.yml`. This repo's scheduled workflows also run reliably, while the
+ingest repo's CLAUDE.md documents GitHub dropping its scheduled runs. It is still "in the
+nightly engine" in the operational sense: it is the first link of the nightly chain —
+**07:00 UTC source-monitor → (on wire) deploy-edge-functions → 09:00 UTC `dev_refresh_fire`
+(pg_cron) → 09:08 collect → 09:20 `app-content-refresh`** — so a source wired at 07:00 is
+serving records on live pages the same morning with zero human steps.
+
+**Pieces (all pure data + one script + one workflow):**
+- `scripts/source-monitor-targets.json` — targets. `reprobe[]`: every source
+  `docs/source-registry.md` rejected (dead/stale/frozen/blocked/broken/polygon-only), with
+  the exact endpoint + rejection receipt. `discovery[]`: official first-party catalogs
+  (ArcGIS service roots, Socrata catalogs, DCAT feeds, CKAN) for jurisdictions on the
+  facility floor. Per-target human-pinned `coverage` (state/county) and `hosts` allowlist.
+  Extending the monitor = appending entries here.
+- `scripts/source-lexicon.json` — the fail-closed vocabulary. Status→bucket, type→include
+  and candidate column names, aggregated ONLY from human-approved registry entries.
+  Anything not listed is unknown; statuses that ever conflicted across approved entries
+  (e.g. 'Active') are deliberately absent so they can never be guessed.
+- `scripts/source-monitor.mjs` — probe + gate + wire + report (Node 20, no deps).
+- `.github/workflows/source-monitor.yml` — nightly 07:00 UTC + `workflow_dispatch`
+  (with `dry_run`). Commits the report (+ registry entry on a wire) and dispatches the
+  engine deploy only when the registry changed.
+- `docs/source-monitor-report.md` — append-only run log: re-probed / auto-wired /
+  flagged + a dev-backed-ZIPs snapshot so the next run shows each wire's delta.
+
+**The fail-closed auto-wire gate (v18 stays absolute):**
+1. Host on the target's allowlist (kills the documented Brampton/Atlanta lookalike trap).
+2. Coverage inherited verbatim from the human-pinned target — never derived from data.
+3. ArcGIS: point geometry + Query capability. Polygon layers → flagged.
+4. Native ZIP column required; ZIP-in-address needs a human `zip_where_template` → flagged.
+5. Date column required and newest record within `FRESH_DAYS` (400) — frozen stays rejected.
+6. Statuses enumerated LIVE (groupBy) and mapped only through the lexicon; unknown statuses
+   are excluded-at-runtime by the connector (its normal fail-closed behavior), and if
+   lexicon-known statuses cover <60% of rows (or none are proposed/approved) → flagged.
+7. Types: ArcGIS entries scope AT SOURCE to lexicon-known types via `extra_where IN (…)`;
+   Socrata has no at-source filter, so it wires only when lexicon-known types cover ≥95%
+   of rows — else flagged.
+8. record_url: per-record column when present, else the official layer/dataset landing page
+   with `record_url_precision:'dataset'` (the Provo precedent).
+9. Every wired entry carries `_wired_by` + `_receipts` (live counts, newest date, run id).
+
+**What is NOT auto-wired, by design:** CKAN datasets and vendor portals (Accela, eTRAKiT,
+CitizenServe, OpenGov, Tyler EnerGov, CivicPlus — detected via `vendor_fingerprints`) —
+the generic connectors don't handle those shapes, so per the spec they are flagged with
+what connector work each needs, never guessed.
+
+**Reversibility:** a wire is one bot commit ("source-monitor: auto-wire …") touching one
+appended registry entry + the report. `git revert` + redeploy undoes it completely.
+`DEMO_SESSION: true` and all page code are untouched — the monitor writes config + docs only.
