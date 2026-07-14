@@ -556,6 +556,9 @@ Deno.serve(async (req: Request) => {
         if (g.lat == null || g.lng == null) return null;   // failed → quarantine (arcgis.ts)
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
+      // ZIP centroid for entries using spatial_zip_radius_mi (layers with no ZIP attribute) —
+      // the engine's standard centroid+radius ZIP approximation; records keep their own points.
+      zipCentroid: { lat: clat, lng: clng },
     });
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");

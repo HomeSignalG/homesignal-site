@@ -716,6 +716,307 @@
    "incremental_field": "File_Date",
    "recency_days": 365,
    "_receipts": "Verified live 2026-07-13 via pg_net: City of Fort Worth's own Enterprise server (mapit.fortworthtexas.gov, CIVIC/Permits, CFW_AGOL_ADMIN org item) - a full Accela extract with point geometry, NATIVE Zip_Code column, 28 Current_Status values + 11 Permit_Type values enumerated VERBATIM via groupBy, fresh through File_Date 2026-07-12. Trade permits (Mechanical 120k, Electrical 162k, Plumbing 167k+74k backflow, Urban Forestry) dropped at source via extra_where; 6 construction/design types kept. recency_days=365 keeps a what's-changing view (the layer holds 1M+ historical rows; Finaled 562k -> bucket operating). Discovery note: the city's Socrata portal (data.fortworthtexas.gov) is decommissioned - its catalog entry for 'Development Permits quz7-xnsy' 404s; this Enterprise layer is the live successor. No per-record link -> official REST layer as dataset_url fallback."
+  },
+  {
+   "registry_id": "denver-commercial-construction-permits",
+   "platform": "arcgis",
+   "service_url": "https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_DEV_COMMERCIALCONSTPERMIT_P/FeatureServer/317",
+   "dataset_url": "https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_DEV_COMMERCIALCONSTPERMIT_P/FeatureServer/317",
+   "jurisdiction": "City and County of Denver",
+   "coverage": [
+    {
+     "state": "CO",
+     "county": "Denver"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "CLASS",
+     "ADDRESS"
+    ],
+    "status_raw": "CLASS",
+    "type_source": "CLASS",
+    "file_date": "DATE_ISSUED",
+    "address": "ADDRESS",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "PERMIT_NUM"
+   },
+   "spatial_zip_radius_mi": 3,
+   "extra_where": "CANCEL IS NULL AND CLASS IN ('New Building','Addition','New Non-Building Structure','Phased Construction','Foundation Only/Excavation','Foundation Only/ Excavation','Alteration/Tenant Finish')",
+   "type_map": {
+    "New Building": "Commercial",
+    "Addition": "Commercial",
+    "New Non-Building Structure": "Commercial",
+    "Phased Construction": "Commercial",
+    "Foundation Only/Excavation": "Commercial",
+    "Foundation Only/ Excavation": "Commercial",
+    "Alteration/Tenant Finish": "Commercial"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "New Building",
+     "Addition",
+     "New Non-Building Structure",
+     "Phased Construction",
+     "Foundation Only/Excavation",
+     "Foundation Only/ Excavation",
+     "Alteration/Tenant Finish"
+    ]
+   },
+   "incremental_field": "DATE_ISSUED",
+   "recency_days": 365,
+   "record_url_precision": "dataset",
+   "_receipts": "Verified live 2026-07-14 via pg_net: Denver's own AGO org (zdB7qR0BtYrg0Xpl, Open Data Catalog ODC_DEV layers) - POINT geometry (wkid 2877 -> outSR 4326), fresh through DATE_ISSUED 2026-07-09, 2,438 permits issued in the past year city-wide. NO ZIP attribute anywhere (ADDRESS carries no ZIP, LOCATION null) -> first consumer of the additive spatial_zip_radius_mi connector option: an envelope +-3 mi around the ZIP centroid (the engine's standard ZIP approximation; records keep their OWN per-parcel points). Every record IS an issued permit (dataset-level fact, san-antonio precedent) so the 7 dev-relevant CLASS values map to bucket approved; noise classes (Repair/Replace 2533, Special Event 758, Change of Contractor 493, Change of Use Only, Move, legacy numeric codes) + cancelled rows (CANCEL IS NULL) dropped at source. CLASS values are VERBATIM from a live groupBy (mixed case - the residential layer is UPPERCASE, mapped separately). No per-record link -> official REST layer as dataset_url fallback."
+  },
+  {
+   "registry_id": "denver-residential-construction-permits",
+   "platform": "arcgis",
+   "service_url": "https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_DEV_RESIDENTIALCONSTPERMIT_P/FeatureServer/316",
+   "dataset_url": "https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_DEV_RESIDENTIALCONSTPERMIT_P/FeatureServer/316",
+   "jurisdiction": "City and County of Denver",
+   "coverage": [
+    {
+     "state": "CO",
+     "county": "Denver"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "CLASS",
+     "ADDRESS"
+    ],
+    "status_raw": "CLASS",
+    "type_source": "CLASS",
+    "file_date": "DATE_ISSUED",
+    "address": "ADDRESS",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "PERMIT_NUM"
+   },
+   "spatial_zip_radius_mi": 3,
+   "extra_where": "CANCEL IS NULL AND CLASS IN ('NEW BUILDING','ADDITION','NEW NON-BUILDING STRUCTURE','PHASED CONSTRUCTION','FOUNDATION ONLY/EXCAVATION','FOUNDATION ONLY/ EXCAVATION')",
+   "type_map": {
+    "NEW BUILDING": "Residential",
+    "ADDITION": "Residential",
+    "NEW NON-BUILDING STRUCTURE": "Residential",
+    "PHASED CONSTRUCTION": "Residential",
+    "FOUNDATION ONLY/EXCAVATION": "Residential",
+    "FOUNDATION ONLY/ EXCAVATION": "Residential"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "NEW BUILDING",
+     "ADDITION",
+     "NEW NON-BUILDING STRUCTURE",
+     "PHASED CONSTRUCTION",
+     "FOUNDATION ONLY/EXCAVATION",
+     "FOUNDATION ONLY/ EXCAVATION"
+    ]
+   },
+   "incremental_field": "DATE_ISSUED",
+   "recency_days": 365,
+   "record_url_precision": "dataset",
+   "_receipts": "Verified live 2026-07-14 via pg_net: same Denver AGO org/layer family as the commercial entry - POINT geometry, fresh through DATE_ISSUED 2026-07-11. CLASS values on THIS layer are UPPERCASE (enumerated verbatim via groupBy: NEW BUILDING 33705, ADDITION 7043, PHASED CONSTRUCTION 3828, ...). Residential remodel noise (ALTERATION/TENANT FINISH 28239, REPAIR/REPLACE 3437, CHANGE OF CONTRACTOR, SPECIAL EVENT, MOVE, WRECK, legacy numeric codes) dropped at source; issued-permit dataset-level fact -> included classes map to bucket approved. Spatial ZIP scoping (spatial_zip_radius_mi 3) - no ZIP attribute on the layer."
+  },
+  {
+   "registry_id": "boulder-construction-permits",
+   "platform": "arcgis",
+   "service_url": "https://services.arcgis.com/ePKBjXrBZ2vEEgWd/arcgis/rest/services/Construction_Permits/FeatureServer/0",
+   "dataset_url": "https://services.arcgis.com/ePKBjXrBZ2vEEgWd/arcgis/rest/services/Construction_Permits/FeatureServer/0",
+   "jurisdiction": "City of Boulder",
+   "coverage": [
+    {
+     "state": "CO",
+     "county": "Boulder"
+    }
+   ],
+   "column_map": {
+    "title": "Description",
+    "status_raw": "StatusCurrent",
+    "type_source": "PermitType",
+    "file_date": "AppliedDate",
+    "decision_date": "IssuedDate",
+    "address": [
+     "OriginalAddress",
+     "OriginalCity",
+     "OriginalState"
+    ],
+    "zip": "OriginalZip",
+    "case_number": "PermitNum"
+   },
+   "extra_where": "PermitType IN ('Building Permit - Single Family Detached Dwelling','Building Permit - Non-Residential','Building Permit - Accessory','Building Permit - Multifamily','Building Permit - Single Family Attached Dwelling','Building Permit - Townhome','Building Permit - Mixed Use','Demolition Permit','Grading Permit','Mobile Home Permit')",
+   "type_map": {
+    "Building Permit - Single Family Detached Dwelling": "Residential",
+    "Building Permit - Single Family Attached Dwelling": "Residential",
+    "Building Permit - Multifamily": "Residential",
+    "Building Permit - Townhome": "Residential",
+    "Building Permit - Accessory": "Residential",
+    "Mobile Home Permit": "Residential",
+    "Building Permit - Non-Residential": "Commercial",
+    "Building Permit - Mixed Use": "Commercial",
+    "Demolition Permit": "Development",
+    "Grading Permit": "Development"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "In Review",
+     "Revisions - Resubmit",
+     "Payment Pending",
+     "Pending at Applicant",
+     "Received",
+     "Received - Online",
+     "Approved for Issuance",
+     "On Hold",
+     "Pending",
+     "Decision Pending",
+     "TCO - Payment Pending"
+    ],
+    "approved": [
+     "Issued",
+     "Approved"
+    ],
+    "operating": [
+     "Certificate of Occupancy",
+     "Temporary Certificate of Occupancy",
+     "Letter of Completion",
+     "Warranty"
+    ],
+    "exclude": [
+     "Void",
+     "Closed",
+     "Withdrawn",
+     "Declined - Denied",
+     "Enforcement",
+     "Code Violation",
+     "Monitoring"
+    ]
+   },
+   "incremental_field": "AppliedDate",
+   "recency_days": 365,
+   "record_url_precision": "dataset",
+   "_receipts": "Verified live 2026-07-14 via pg_net: City of Boulder's own AGO org (ePKBjXrBZ2vEEgWd, found via the open-data.bouldercolorado.gov DCAT) - a BLDS-style permit TABLE (no geometry): rows geocode via the full OriginalAddress+City+State (connector's address path, geocode-cache-backed) and carry a NATIVE OriginalZip. Fresh through AppliedDate 2026-07-07 (string ISO dates). 24 StatusCurrent values + 29 PermitType values enumerated VERBATIM via groupBy; trade noise (Mechanical 71549, Electrical 66045, Roofing 28236, Plumbing 28210, ROW 21952, fences/signs/events) dropped at source, keeping the 10 building/demolition/grading types. Per-ZIP active volume ~100-240 rows/yr (80301-80305) - geocoding-manageable; if the first live re-cache times out, flip zip_mode:false (Austin precedent) as the one-field fallback. No per-record public link -> REST layer dataset fallback."
+  },
+  {
+   "registry_id": "fort-collins-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://services1.arcgis.com/dLpFH5mwVvxSN4OE/arcgis/rest/services/Building_Permits/FeatureServer/0",
+   "dataset_url": "https://services1.arcgis.com/dLpFH5mwVvxSN4OE/arcgis/rest/services/Building_Permits/FeatureServer/0",
+   "jurisdiction": "City of Fort Collins",
+   "coverage": [
+    {
+     "state": "CO",
+     "county": "Larimer"
+    }
+   ],
+   "column_map": {
+    "title": "B1_WORK_DESC",
+    "status_raw": "B1_APPL_STATUS",
+    "type_source": "PERMITTYPE",
+    "address": "ADDRESS",
+    "zip": "ZIP",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "PERMITNUM",
+    "record_url": "WEB"
+   },
+   "extra_where": "PERMITTYPE IN ('Residential New Single Family Attached','Residential New Single Family Detached','Residential New Multi-Family','Residential New Duplex','Residential Addition','Residential New Secondary Building','Commercial New Com-Ind-Mixed-Use Building','Commercial New Secondary Building','Commercial Addition','Demolition')",
+   "type_map": {
+    "Residential New Single Family Attached": "Residential",
+    "Residential New Single Family Detached": "Residential",
+    "Residential New Multi-Family": "Residential",
+    "Residential New Duplex": "Residential",
+    "Residential Addition": "Residential",
+    "Residential New Secondary Building": "Residential",
+    "Commercial New Com-Ind-Mixed-Use Building": "Commercial",
+    "Commercial New Secondary Building": "Commercial",
+    "Commercial Addition": "Commercial",
+    "Demolition": "Development"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "Routed for Review",
+     "Code Update Required",
+     "Resubmittal Requested",
+     "Applied",
+     "Plan Check Fee Due",
+     "LUC Hold",
+     "Additional Info Required",
+     "Ready to Issue"
+    ],
+    "approved": [
+     "Issued Full",
+     "Re-Issued Full",
+     "Approved"
+    ],
+    "operating": [
+     "Issued TCO"
+    ],
+    "exclude": [
+     "Revoked"
+    ]
+   },
+   "record_url_precision": "record",
+   "_receipts": "Verified live 2026-07-14 via pg_net: City of Fort Collins' own AGO org (dLpFH5mwVvxSN4OE) 'Current Building Permits' layer, found via the successor hub open-data-fcgov.hub.arcgis.com (the old opendata.fcgov.com Socrata portal is DECOMMISSIONED - 503 'This site has moved'). POINT geometry, NATIVE ZIP column, and a PER-RECORD official Accela link (WEB -> accela-aca.fcgov.com CapDetail) = record-precision record_url. A curated CURRENT-permits snapshot (2,177 rows; no date column -> no recency filter; the layer itself is the currency guarantee, Provo CurrentProjects precedent). 14 statuses + 13 types enumerated VERBATIM via groupBy; Stock Plan (647) and General Alteration remodel noise (708) dropped at source, keeping the 10 new-construction/addition/demolition types. 'Issued FF' (1 row) left unmapped on purpose (ambiguous semantics -> connector excludes + surfaces it)."
+  },
+  {
+   "registry_id": "colorado-springs-planning-applications",
+   "platform": "arcgis",
+   "service_url": "https://gis.coloradosprings.gov/arcgis/rest/services/Planning/PlanDevTracker_PRO/MapServer/0",
+   "dataset_url": "https://gis.coloradosprings.gov/arcgis/rest/services/Planning/PlanDevTracker_PRO/MapServer/0",
+   "jurisdiction": "City of Colorado Springs",
+   "coverage": [
+    {
+     "state": "CO",
+     "county": "El Paso"
+    }
+   ],
+   "column_map": {
+    "title": "record_name",
+    "status_raw": "record_status",
+    "type_source": "record_type",
+    "address": "record_address",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "record_id"
+   },
+   "spatial_zip_radius_mi": 3,
+   "type_map": {
+    "Development Plans": "Development",
+    "Subdivision (Major and Minor)": "Development",
+    "Administrative Adjustment": "Development",
+    "PDZ Development Plan": "Development",
+    "Zone Change": "Development",
+    "Annexation": "Development",
+    "Conditional Use": "Development",
+    "Land Use Plan": "Development",
+    "Non-Use Variance": "Development",
+    "FBZ - All Applications": "Development",
+    "Historic Preservation": "Development",
+    "Development Standards Adjustment": "Development",
+    "PDZ Land Use Plan": "Development",
+    "PDZ Zone Change": "Development",
+    "Use Variance": "Development"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "In Review",
+     "Corrections Required",
+     "Documents Received",
+     "Responses Received",
+     "Hearing Scheduled",
+     "Project Routing"
+    ],
+    "approved": [
+     "Approved"
+    ],
+    "exclude": [
+     "Denied",
+     "Void"
+    ]
+   },
+   "record_url_precision": "dataset",
+   "_receipts": "Verified live 2026-07-14 via pg_net: Colorado Springs' OWN ArcGIS Server (gis.coloradosprings.gov, Planning/PlanDevTracker_PRO - 'Map Service referenced in the Web Map Item for the Development Tracker site', i.e. the city's own Development Tracker backend). POINT geometry Planning_Applications layer, 967 current land-use cases; 9 record_status + 15 record_type values enumerated VERBATIM via groupBy (all planning/land-use case types - no trade noise to drop). record_address carries NO ZIP and there is no date column -> spatial_zip_radius_mi 3 (second consumer of the additive envelope option) and no recency filter (the tracker holds only current cases; real samples: 'FRONT RANGE BARBECUE - Development Plan' DEPN-23-0205 Approved, 'Project Rockrimmon' DEPN-24-0029). No per-record public deep link derivable from record_id -> official REST layer dataset fallback."
   }
  ]
 }
