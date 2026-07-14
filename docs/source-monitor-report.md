@@ -27,3 +27,90 @@ v18 anti-fabrication is absolute throughout: nothing is classified without a rea
 status/type, every emitted row keeps a real source reference, and EPA facilities stay
 `record_kind='facility'` — the monitor only ever appends registry entries; it never touches
 facility sources or existing entries.
+
+## Run 2026-07-14T00:25:29.855Z
+
+- Sources re-probed: **12** · discovery targets walked: **7** · candidates evaluated: **49**
+- Auto-wired: **none**
+- Flagged new shapes (connector work needed — never guessed): **21**
+- Dev-backed ZIPs snapshot: **103**
+
+| target | result | evidence |
+|---|---|---|
+| denton-county-dev-permits | still-stale | newest DateReceiv = 2023-06-09 (> 400d old) |
+| mckinney-underconstruction | still-stale | newest IssueDate = 2023-09-26 (> 400d old) |
+| frisco-active-building-permits | unreachable | HTTP 0 UND_ERR_CONNECT_TIMEOUT |
+| frisco-active-zoning-sup-cases | unreachable | HTTP 0 UND_ERR_CONNECT_TIMEOUT |
+| allen-current-development-projects | flag | layer "Current Development Projects" is esriGeometryPolygon |
+| el-paso-new-commercial | flag | fresh (newest 2026-06-30); lexicon maps 5120/11322 rows; unmapped:   (4165); Revisions Required (2); Hold for Corrections (8); Out for Corrections (4); TCO Issued (67); Inspection (1956) |
+| el-paso-accela-building-permits | error | service error 404: Service OpenData_Accela/BuildingPermits/MapServer not found  |
+| dallas-building-permits-e7gq | still-stale | rowsUpdatedAt = 2020-08-30 (> 400d old) |
+| dallas-building-permits-6ik7 | still-stale | rowsUpdatedAt = 2018-02-09 (> 400d old) |
+| fort-worth-development-permits-gate-validation | already-wired | registry entry exists |
+| denton-city-portal | still-dead | catalog HTTP 404 <!DOCTYPE html>
+<!--[if IE 9]> <html lang="en" class="ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html lang="en"> <!--<![endif]-->
+  <head>
+    <meta charset="utf-8" />
+      <meta name="generator" con |
+| plano-portal | no-candidates | 1 first-party dataset(s) for q=permit but none matched the permit/land-use pattern (or all duplicate/already wired) |
+| houston-ckan | flag | CKAN catalog with 4 permit-pattern dataset(s): Combustible Storage Permits (Waste or Dumpster Permits) Sold from May 2012 th...; City of Houston Active Commercial Vehicle Loading Zone Permits; City of Houston Residential Building Permits by Month and Year; All Paid Vehicle Permits 05/01/2011 to 04/3 |
+| houston-cohgis → HoustonMap/Landuse/Land Use (Grouped)  | flag | layer "Land Use (Grouped) " is esriGeometryPolygon |
+| houston-cohgis → HoustonMap/Planning_and_Development/Towers | still-stale | newest ActionDate = 2001-05-31 (> 400d old) |
+| houston-cohgis → HoustonMap/Planning_and_Development/Schools Primary Entrance | still-stale | newest School_Status_Date = 2023-04-06 (> 400d old) |
+| houston-cohgis → HoustonMap/Planning_and_Development/Restricted Lot Driveway Access | flag | layer "Restricted Lot Driveway Access" is esriGeometryPolyline |
+| houston-cohgis → HoustonMap/Planning_and_Development/Conservation Districts | flag | layer "Conservation Districts" is esriGeometryPolygon |
+| houston-cohgis → HoustonMap/Planning_and_Development/Green Corridor | flag | layer "Green Corridor" is esriGeometryPolygon |
+| houston-cohgis → HoustonMap/Planning_and_Development/Prohibited Yard Parking Applications | flag | layer "Prohibited Yard Parking Applications" is esriGeometryPolygon |
+| houston-cohgis → PDD/Permits_Viewer_Verify_Areas/CALL 832-393-6556 BEFORE ASSIGNING ADDRESS | flag | layer "CALL 832-393-6556 BEFORE ASSIGNING ADDRESS" is esriGeometryPolygon |
+| el-paso-open-data | unreachable | DCAT HTTP 0 ENOTFOUND |
+| arlington-open-data | unreachable | DCAT HTTP 0 ENOTFOUND |
+| dallas-open-data → Building Permits for Fiscal Year 2017 - 2018 (w2uy-zn9f) | still-stale | rowsUpdatedAt = 2020-04-15 (> 400d old) |
+| dallas-open-data → Building Permits for Fiscal Year 2011 - 2012 (azf5-sdcr) | still-stale | rowsUpdatedAt = 2020-04-15 (> 400d old) |
+| dallas-open-data → Building Permits for Fiscal Year 2013 - 2014 (fs84-rv8z) | still-stale | rowsUpdatedAt = 2020-04-15 (> 400d old) |
+| dallas-open-data → Building Permits for Fiscal Year 2015 - 2016 (rzm4-tcqx) | still-stale | rowsUpdatedAt = 2021-07-29 (> 400d old) |
+| dallas-open-data → ROW Permits - Points (bw6g-a3ur) | flag | updated 2026-07-11; columns: the_geom, objectid, jobid, externalfilenum, permittype, commercialorresidential, statusdescription, createddate, issuedate, completeddate, expirationdate, rowrequestedstartdate, rowestimatedcompletiondate, warrantyexpiration, rowreasonforjob… |
+| dallas-open-data → Jill SRF 14 08 Permit W Location (4xqw-i3tz) | still-stale | rowsUpdatedAt = 2014-11-04 (> 400d old) |
+| dallas-open-data → ROW Permits - Lines (xd3q-ipis) | flag | updated 2026-07-11; columns: the_geom, objectid, jobid, externalfilenum, permittype, commercialorresidential, statusdescription, createddate, issuedate, completeddate, expirationdate, rowrequestedstartdate, rowestimatedcompletiondate, warrantyexpiration, rowreasonforjob… |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Custer West Exhibit | flag | layer "Custer West Exhibit" is (none) |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Craig Ranch Exhibit | not-a-layer | no fields[] — unrecognized shape |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Honey Creek Investment District Exhibit | not-a-layer | no fields[] — unrecognized shape |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Huntington Park Land Use Plan Exhibit | not-a-layer | no fields[] — unrecognized shape |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/MTC Regulating Exhibit | flag | layer "MTC Regulating Exhibit" is (none) |
+| mckinney-arcgis → MapServices/DevelopmentExhibits/Stonebridge Ranch Exhibit | flag | layer "Stonebridge Ranch Exhibit" is (none) |
+| mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Drive Times 1 | not-a-layer | no fields[] — unrecognized shape |
+| mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Origin 1 | error | max(created_date) query failed |
+| mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Drive Time Areas 1 | flag | layer "Drive Time Areas 1" is esriGeometryPolygon |
+| mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Drive Times 2 | not-a-layer | no fields[] — unrecognized shape |
+| denton-county-arcgis → Addresses911Permits_GC/911 Addresses | error | max(created_date) query failed |
+| denton-county-arcgis → CityETJPermits_GC/City and ETJ | not-a-layer | no fields[] — unrecognized shape |
+| denton-county-arcgis → CityETJPermits_GC/City Labels | flag | layer "City Labels" is esriGeometryPolygon |
+| denton-county-arcgis → CityETJPermits_GC/ETJ Labels | flag | layer "ETJ Labels" is esriGeometryPolygon |
+| denton-county-arcgis → CityETJPermits_GC/City and ETJ | flag | layer "City and ETJ" is esriGeometryPolygon |
+| denton-county-arcgis → ContourPermits_GC/1 Foot Contours - 2017 | flag | layer "1 Foot Contours - 2017" is esriGeometryPolyline |
+| denton-county-arcgis → ContourPermits_GC/2 Foot Contours - 2005 | flag | layer "2 Foot Contours - 2005" is esriGeometryPolyline |
+| denton-county-arcgis → ContourPermits_GC/2 Foot Contours - LIDAR 2000 | flag | layer "2 Foot Contours - LIDAR 2000" is esriGeometryPolyline |
+| denton-county-arcgis → DEV_Permits/Permits | still-stale | newest DateReceiv = 2023-06-09 (> 400d old) |
+
+### Flagged shapes — what connector work each needs
+- **allen-current-development-projects** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **el-paso-new-commercial** — statuses unknown to the lexicon: a human to extend scripts/source-lexicon.json with these VERBATIM statuses (only from a human-approved mapping)
+- **houston-ckan** — CKAN catalog: a CKAN connector (generic connectors handle ArcGIS + Socrata only) — or wire the dataset directly if a distribution exposes an ArcGIS/Socrata API
+- **houston-cohgis → HoustonMap/Landuse/Land Use (Grouped) ** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **houston-cohgis → HoustonMap/Planning_and_Development/Restricted Lot Driveway Access** — esriGeometryPolyline geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **houston-cohgis → HoustonMap/Planning_and_Development/Conservation Districts** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **houston-cohgis → HoustonMap/Planning_and_Development/Green Corridor** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **houston-cohgis → HoustonMap/Planning_and_Development/Prohibited Yard Parking Applications** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **houston-cohgis → PDD/Permits_Viewer_Verify_Areas/CALL 832-393-6556 BEFORE ASSIGNING ADDRESS** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **dallas-open-data → ROW Permits - Points (bw6g-a3ur)** — socrata resource missing: status, type, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **dallas-open-data → ROW Permits - Lines (xd3q-ipis)** — socrata resource missing: status, type, native ZIP, date, lat/lng columns: a human column-map (auto-wire requires status+type+ZIP+date+point columns resolvable via the lexicon)
+- **mckinney-arcgis → MapServices/DevelopmentExhibits/Custer West Exhibit** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **mckinney-arcgis → MapServices/DevelopmentExhibits/MTC Regulating Exhibit** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **mckinney-arcgis → MapServices/DevelopmentExhibits/Stonebridge Ranch Exhibit** — (none) geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **mckinney-arcgis → MapServices/FireStation14PlanningDriveTimes/Drive Time Areas 1** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → CityETJPermits_GC/City Labels** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → CityETJPermits_GC/ETJ Labels** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → CityETJPermits_GC/City and ETJ** — esriGeometryPolygon geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → ContourPermits_GC/1 Foot Contours - 2017** — esriGeometryPolyline geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → ContourPermits_GC/2 Foot Contours - 2005** — esriGeometryPolyline geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
+- **denton-county-arcgis → ContourPermits_GC/2 Foot Contours - LIDAR 2000** — esriGeometryPolyline geometry: point-derivation (centroid) support in sources/arcgis.ts, or reject: intersection-style locations carry no parcel point
