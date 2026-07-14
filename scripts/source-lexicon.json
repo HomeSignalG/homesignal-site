@@ -1,0 +1,75 @@
+{
+  "_readme": "Curated cross-jurisdiction lexicon that makes AUTO-WIRING safe. Every mapping here was HUMAN-APPROVED in an existing jurisdiction-registry entry (SLC, Provo, Round Rock, San Antonio, San Marcos, Fort Worth, Austin x3). The monitor maps ONLY exact-match values; anything not listed is UNKNOWN and fails closed (status -> excluded, type -> not included). Statuses that ever conflicted across approved entries (e.g. 'Active': proposed in SLC petitions, approved in Austin permits) are deliberately ABSENT - unknown - so they can never be guessed. Extend this file only from a human-approved registry entry.",
+  "status_to_bucket": {
+    "proposed": [
+      "Additional Information", "Accepted", "Pre-screen", "In Progress", "Open",
+      "Complete Application", "Incomplete Application", "Under Review", "Reviews Complete",
+      "Pending", "Waiting for Revisions", "Waiting for Submittals", "Waiting for Conditions",
+      "Waiting for Appeal", "Planning Commission", "Council", "Heritage Board", "In Review",
+      "Scheduled for Hearing", "CC Pending", "CC Pending - Fees Paid", "Internet Pending",
+      "Intake Pending", "Waiting on Fiscal", "Waiting on Legal", "Intake Accepted - Fees Due",
+      "Formal Intake Accepted - Fees Due", "Awaiting Update", "Admin Hold", "Plan Review",
+      "Awaiting Client Reply", "Incomplete Submittal", "Pending Fees", "Pending HCLC Review",
+      "Hold", "Appeal", "Continued", "Pending Review", "Pending Issuance", "Ready to Issue",
+      "PENDINGCC", "REC_PHASE", "REC_SUBMIT", "REVIEW", "STAFFRVWAD", "STAFFRVWCC", "STAFFRVWPZ",
+      "Awaiting Revision", "Incomplete", "Pre-Development Active", "Pending Permit", "Re Review",
+      "Inactive Pending Revision", "On Hold", "Suspended", "Tolling - Hearing Pending"
+    ],
+    "approved": [
+      "Approved", "Approved and Released", "CC Approved", "Awaiting Recordation", "Issued",
+      "Administrative Approval", "Approved w/Conditions", "Partial Approval",
+      "Issued Without Contractor", "Monitoring Conditions", "Awaiting Signatures",
+      "ADMINAPPRV", "APPRVDBYCC", "CCAPPROVED", "P&ZAPPROVE", "PLNAPPROVE",
+      "Revisions Approved", "Issued Certificate", "Issue Certificate",
+      "Awaiting Completion", "Completed"
+    ],
+    "operating": ["Finaled", "Complete", "Final", "Subdivision Recorded"],
+    "exclude": [
+      "Withdrawn", "Expired", "Denied", "VOID", "Void", "Vacated", "Cancelled", "Aborted",
+      "Closed", "Close", "Closed By Rule", "Opt-Out", "Rejected", "REJECTED", "CONVERTED",
+      "Revoked", "Dormant", "Pre-Development Closed", "Pre-Development Dormant",
+      "Expired - License", "Cancelled - Contractor Required", "Cancelled - New Permit Required",
+      "New Permit Required", "Denied but Closed", "Inactive Contractor",
+      "Application Incomplete", "Awaiting Upload", "Tabled", "Rescinded"
+    ]
+  },
+  "type_include": {
+    "Commercial": [
+      "Comm New Building Permit", "Comm Addition Permit", "Comm Shell Permit",
+      "Comm Finish Out Permit", "Comm Sitework Permit", "Comm Pad Site Permit",
+      "Commercial Building Permit", "Commercial Accessory Structure", "Commercial Grading Permit",
+      "Commercial", "Mixed Use", "Office", "Retail", "Restaurant", "Hotel"
+    ],
+    "Residential": [
+      "Residential Building Permit", "Residential Accessory Struct", "Res New Building Permit",
+      "Home Addition Permit", "Res Accessory Dwelling Permit", "Res Accessory-Addition Permit",
+      "Manufactured Home Permit", "Residential", "Single Family", "Multifamily", "Multi-Family",
+      "Multi Family", "Duplex", "Condominium"
+    ],
+    "Development": [
+      "Zoning", "PUD", "Concept Plan", "Preliminary Plat", "Final Plat", "Minor Plat", "Replat",
+      "Annexation", "Zoning Change", "Zoning Amendment", "Conditional Use", "Conditional Use Permit",
+      "Planned Development", "Design Review", "Demolition Permit", "Subdivision", "Variance",
+      "Special Exception", "Site Plan", "Development Agreement", "Planned Development Agreement",
+      "Amending Plat", "Simple Amendment to Plat", "Land Use Amendment",
+      "Certificate of Appropriateness", "New Construction", "Master Plan Amendment"
+    ]
+  },
+  "fields": {
+    "status": ["Current_Status", "ApplicationStatus", "B1_APPL_ST", "STATUS", "Status", "PermitStat", "status", "status_current", "Request_Status", "LifeCycleStatus"],
+    "type": ["Permit_Type", "ApplicationSubType", "CASE_TYPE", "CaseType", "PermitType", "Record_Typ", "permit_type", "Request_Type", "ApplicationType"],
+    "zip": ["Zip_Code", "ZIPCODE", "StreetZIP", "B1_SITUS_Z", "zip_code", "ZipCode", "ZIP", "Zip", "original_zip"],
+    "date": ["File_Date", "AppliedDate", "DATE_CREATED", "DateReceiv", "ISSUEDATE", "Issued_Dat", "IssueDate", "Date_Submitted", "Date_Issued", "created_date", "issued_date", "applieddate", "application_start_date", "REC_DATE"],
+    "case": ["Permit_No", "PermitNum", "Permit_Number", "PROJECT_NO", "CaseNumber", "Case_Number", "permit_number", "PermitID", "B1_ALT_ID"],
+    "title": ["PROJECT_NAME", "ProjectName", "Project_Name", "case_name", "B1_WORK_DESC", "work_description"],
+    "address": ["Address", "ADDRESS", "Site_Address", "Location", "street_address", "Street_Add", "permit_location", "SITEADDR_S"]
+  },
+  "vendor_fingerprints": {
+    "eTRAKiT": ["etrakit"],
+    "CitizenServe": ["citizenserve.com"],
+    "Tyler EnerGov": ["energov", "selfservice#"],
+    "OpenGov": ["opengov.com", "viewpointcloud"],
+    "CivicPlus AgendaCenter": ["agendacenter"],
+    "Accela Citizen Portal": ["citizenaccess", "aca-prod.accela.com", "/aca/"]
+  }
+}

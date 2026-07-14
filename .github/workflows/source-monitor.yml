@@ -1,0 +1,83 @@
+name: source-monitor
+
+# Nightly automated source monitor — Texas-style depth grows without manual re-checks.
+#
+# 07:00 UTC (before the 09:00 UTC dev_refresh pg_cron): re-probes every source
+# docs/source-registry.md rejected (dead/stale/frozen/blocked), walks official first-party
+# catalogs for facility-floor jurisdictions, and:
+#   • AUTO-WIRES any candidate the generic connectors (ArcGIS/Socrata) already handle that
+#     passes the fail-closed lexicon gate → commits the jurisdiction-registry.json entry +
+#     report, then dispatches deploy-edge-functions so the 09:00 refresh ingests it the
+#     same night. No human step.
+#   • FLAGS (never guesses) new portal shapes into docs/source-monitor-report.md.
+#
+# Hosted HERE (not homesignal-ingest) because the registry + connectors live here and this
+# repo's scheduled workflows run reliably. Reversible: each run that wires something is one
+# commit ("source-monitor: auto-wire …"); revert it + redeploy to undo.
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'true = probe + report to logs only; write/commit nothing'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: source-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run source monitor
+        id: monitor
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then ARGS="--dry-run"; fi
+          node scripts/source-monitor.mjs $ARGS | tee monitor-out.txt
+          if grep -q '^REGISTRY_CHANGED=1$' monitor-out.txt; then
+            echo "registry_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "registry_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit report (+ any auto-wired registry entries)
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          git config user.name "source-monitor[bot]"
+          git config user.email "source-monitor@users.noreply.github.com"
+          git add docs/source-monitor-report.md supabase/functions/get-address-report/jurisdiction-registry.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit (report unchanged?)"; exit 0
+          fi
+          if [ "${{ steps.monitor.outputs.registry_changed }}" = "true" ]; then
+            git commit -m "source-monitor: auto-wire new source(s) + nightly report"
+          else
+            git commit -m "source-monitor: nightly report"
+          fi
+          git push origin "HEAD:${{ github.ref_name }}"
+
+      - name: Deploy engine so the 09:00 UTC refresh ingests the new source(s)
+        if: github.event.inputs.dry_run != 'true' && steps.monitor.outputs.registry_changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run deploy-edge-functions.yml \
+            --repo "${{ github.repository }}" \
+            --ref "${{ github.ref_name }}" \
+            -f function=get-address-report
+          echo "deploy-edge-functions dispatched; the nightly dev_refresh (09:00 UTC) + app-content"
+          echo "refresh (09:20 UTC) will materialize the new records onto pages tonight."
