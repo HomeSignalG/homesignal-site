@@ -707,6 +707,18 @@ legal/framing change not covered by the one-time sign-off.
   DNS-dead, Douglas 500, Arapahoe/Larimer/Weld no first-party catalog, Adams/Jeffco polygon
   district layers only, data.colorado.gov aggregate-only. Reproducible seed:
   `docs/colorado-development-reports-seed.sql`. Index policy UNCHANGED (INDEX_STATES = UT+TX).
+- 🟢 **GEOCODE GEOFENCE — engine v20 (arcgis connector)** (unit-tested offline; deployed via
+  `deploy-edge-functions.yml`). The first full `verify-geocodes` run (after its pagination fix —
+  the unbounded `development_reports` read hit the 57014 statement timeout at ~1,000 cached ZIPs,
+  PR #221) surfaced **23 real out-of-polygon geocodes**: Census range-interpolation matched the
+  same street name in another city/state, so Fort Worth permits rendered markers in **Michigan /
+  South Carolina** and Boulder permits crossed adjacent-ZIP lines. **Standing answer (so no
+  session re-derives): a GEOCODED point is trusted only when (a) the Census matched-address ZIP
+  equals the record's filed ZIP and (b) it sits within `GEOCODE_FENCE_MI` (25) of the report ZIP
+  centroid; a miss NULLS the coords (record stays listed, area scope — no content loss, no
+  fabricated marker). Source-supplied geometry is NEVER fenced** (a real parcel can legitimately
+  sit far from a big county's centroid). PR #222; affected FW/Boulder ZIPs re-cached through the
+  live v20 engine.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
