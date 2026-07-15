@@ -780,6 +780,35 @@ legal/framing change not covered by the one-time sign-off.
   permit services, Kane publishes only adopt-a-highway/bridge layers, DuPage's
   address-points is an address registry (not permits). Receipts: docs/source-registry.md
   "ILLINOIS WIRE PASS". Reproducible seed: docs/illinois-development-reports-seed.sql.
+- 🟢 **MICHIGAN IS LIVE UNDER THE SUBSTANCE GATE — 360/360 modeled MI ZIPs cached, 5
+  first-party permit sources, 331 pages auto-indexable (no manual flip)** (DB-verified
+  2026-07-15). Seventh development state, and the first with a FRESHNESS-FIRST gate on
+  the headline source: the Detroit BSEED trio was verified FRESH before wiring (max
+  issued_date — building/trades 2026-07-14, demolition 2026-07-10; pg_net max-stat
+  receipts). Every modeled MI ZIP has a cached row (zipcodes v3.0.0 centroids, 0
+  quarantined) and a materialized page — **355 pass + 5 coverage_coming honest empties;
+  0 unsourced sites, 0 count mismatches, 0 sites missing coords**. **50 of 360 ZIPs
+  dev-backed (14%), 27,506 dev records** via 5 sources: **detroit-building/trades/
+  demolition-permits** (native zip_code + own lat/lng; issuance ledgers with NO status
+  column → NEW additive arcgis **`status_const`** option, guarded by `issued_date IS NOT
+  NULL`; **Trades kept — FOUNDER-SPECIFIED trio**, unlike the trades-noise drop in
+  WA/MN/IL; single-entry revert restores comparability), plus two corrected-URL retry
+  captures: **ann-arbor-energov-permits** (Tyler EnerGov behind the city's Public Permit
+  Map web map; fresh 2026-07-14; **per-record STREAMURL → stream.a2gov.org,
+  record-precision**; Building kept / trades dropped; spatial ZIP scoping) and
+  **independence-twp-construction-permits** (the "Oakland County" retry's real find —
+  10,020 rows fresh 2026-07-09, extent = the township only, named honestly; public view
+  NULLs addresses — rows place by their own points). **The recon "lexicon lacks
+  issued_date" flag was a TYPE gap**: Detroit's dates are `esriFieldTypeDateOnly`
+  (string-serialized) and the monitor recognized only `esriFieldTypeDate` — both now
+  count (standing answer; the engine's `DATE '…'` recency literal was live-verified
+  against DateOnly). Firm rejects with receipts: Grand Rapids (org-scoped: 0 permit
+  layers; SESC service = base layers; EPA_* = aggregate counters), Macomb (live host, no
+  public REST), Kent (no org; AGO hits are DE/RI Kent — cross-state trap), Lansing (both
+  domains dead). Also: unknown `<guess>.maps.arcgis.com` subdomains return the GENERIC
+  anonymous portal (a 200 there is NOT an org). Receipts: docs/source-registry.md
+  "MICHIGAN WIRE PASS" + "MI checkpoint C". Reproducible seed:
+  docs/michigan-development-reports-seed.sql.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
