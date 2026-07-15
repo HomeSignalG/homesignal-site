@@ -1106,3 +1106,49 @@ a 200 there is NOT an org; resolve orgs via the Hub domains API or item owners i
   "Kent County" AGO permit hit is another state's Kent (DE/RI — the cross-state trap).
 - **Lansing — FIRM REJECT**: data.lansingmi.gov and maps.lansingmi.gov both ENOTFOUND; AGO
   search yields only an MS4 stormwater StoryMap and a polling-places map.
+
+---
+
+## 2026-07-15 — MASSACHUSETTS WIRE PASS (founder-approved open of MA, incl. Boston)
+
+Recon (read-only, founder-reviewed before wiring) covered the statewide portals + the four
+metros. **No statewide per-record permit source exists**: MassGIS (org hGdibHYSPO59RG1h)
+carries MassDEP environmental permits / land-use polygons / EDIP districts, not development
+records; data.mass.gov is an ArcGIS Hub, not Socrata (catalog API 404).
+
+### Wired (4 entries; receipts in each entry's `_receipts`)
+- **cambridge-building-permits-new-construction / -addition-alteration /
+  cambridge-demolition-permits** (Socrata data.cambridgema.gov 9qm7-wbdc / qu2z-8suj /
+  kcfi-ackv): all fresh (daily refresh; New Construction max issue_date 2026-07-08).
+  Statuses VERBATIM via SODA group-by: Active/Complete only. The `coordinates` column is a
+  Socrata `point` → the IL spatial within_circle option scopes them (full_address embeds
+  the ZIP but no zip column exists). Dataset-precision record_url.
+- **boston-approved-building-permits** — the FIRST `ckan` entry, on the new ADDITIVE
+  `sources/ckan.ts` connector (datastore_search_sql, LIMIT/OFFSET paging, same
+  coverage-gate/fail-closed/anti-fabrication contract as socrata/arcgis; offline
+  unit-tested incl. a bidirectional gate proof). Fresh TODAY (issued_date 2026-07-15T01:47).
+  Native `zip` + own lat/lng. Statuses VERBATIM over all 656,762 rows: Open+Issued→approved,
+  Closed→operating, Stop Work→exclude. FOUNDER WHITELIST: keep Erect/New Construction,
+  Long Form/Alteration, Amendment to a Long Form, Foundation, Use of Premises; DROP Short
+  Form Bldg Permit (189k minor jobs) + trades/CO noise. FOUNDER-ACCEPTED dataset-precision
+  record_url (no per-row URL column; no verified portal URL pattern — v18 forbids guessing).
+  Enabled by the founder-approved **Suffolk 35-ZIP expansion** (Boston/Chelsea/Revere/
+  Winthrop `level=zip` pages under the existing suffolk-county-ma root; zipcodes v3.0.0).
+
+### Rejected with receipts (do not re-derive)
+- **Worcester — STALLED (the St. Paul class)**: Building_Permits (services1/j8dqo2DJE7mVUBU1)
+  is a real 52,108-row ledger (statuses Complete/Active verbatim) but a geometry-less TABLE
+  whose newest issuance is **2025-09-09** (10 months stale; verified by ordering on the
+  string date column). Added to the nightly monitor's reprobe list — wire if it resumes.
+  STANDING ANSWER: this hosted table returned count 0 for `LIKE '%2025%'` despite matching
+  rows — LIKE counts on AGO hosted tables are unreliable; order-by-desc is the freshness probe.
+- **Springfield**: no first-party source — no Hub domain record (data.springfield-ma.gov
+  404), springfieldma.maps.arcgis.com is the generic anonymous portal, no MA-plausible AGO
+  items ("Springfield" collides with MO/IL/OH).
+- **Boston gisportal**: Permitting/Permits/MapServer → 404 "Service not found" (dead
+  reference); the AGO org's own permit layers are street-access/moving-truck/food-truck/
+  well only.
+- **Somerville** (recon receipt, unchanged): vxgw-vmky frozen 2023-05-16; nneb-s3f7 fresh
+  but no address/coords/ZIP — ungeolocatable under v18.
+- **Cambridge noise companions**: Roof/Siding/Tent/Mechanical + the deprecated 1-2 Family
+  set — dropped at source / not wired.

@@ -532,6 +532,132 @@
    "spatial_point_col": "location",
    "recency_days": 365,
    "_receipts": "2026-07-15: max issue_date 2026-07-13; 11 permit_type + 7 permit_status values VERBATIM (groupBy); noise dropped at source (Express/Easy programs, SIGNS, ELEVATOR, SCAFFOLDING, reinstate/extension - NOTE the express value uses an EN-DASH); 323,651 rows carry NULL permit_status and are skipped fail-closed by the blank-status rule (never bucketed); NO ZIP column -> NEW socrata spatial_zip_radius_mi 3 on the `location` Point column (live within_circle receipt: 8,414 records in 3 mi of the Loop since 2025-07); records keep their own per-parcel latitude/longitude; no per-record link column -> dataset_url precision."
+  },
+  {
+   "registry_id": "cambridge-building-permits-new-construction",
+   "platform": "socrata",
+   "domain": "data.cambridgema.gov",
+   "jurisdiction": "City of Cambridge",
+   "coverage": [
+    {
+     "state": "MA",
+     "county": "Middlesex"
+    }
+   ],
+   "dataset_id": "9qm7-wbdc",
+   "dataset_url": "https://data.cambridgema.gov/d/9qm7-wbdc",
+   "column_map": {
+    "title": [
+     "permit_type",
+     "description_of_work"
+    ],
+    "status_raw": "status",
+    "type_source": "permit_type",
+    "file_date": "applicant_submit_date",
+    "decision_date": "issue_date",
+    "address": "full_address",
+    "lat": "latitude",
+    "lng": "longitude",
+    "case_number": "id"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Active"
+    ],
+    "operating": [
+     "Complete"
+    ]
+   },
+   "type_map": {
+    "New Construction": "Development"
+   },
+   "spatial_zip_radius_mi": 3,
+   "spatial_point_col": "coordinates",
+   "recency_days": 365,
+   "_receipts": "2026-07-15 MA wire pass: fresh (max issue_date 2026-07-08; portal refreshes daily, rowsUpdatedAt 2026-07-13). Statuses VERBATIM via SODA group-by: Active(190)/Complete(159) \u2014 Active->approved, Complete->operating; nothing unmapped. Point column `coordinates` (dataTypeName point, live-verified) -> socrata spatial within_circle scoping (full_address embeds the ZIP but there is no zip column). Receipt row: 9 Copley St, Cambridge MA 02138 \u2014 3-story 6-unit new construction issued 2026-07-08. No per-row URL column -> dataset-precision record_url."
+  },
+  {
+   "registry_id": "cambridge-building-permits-addition-alteration",
+   "platform": "socrata",
+   "domain": "data.cambridgema.gov",
+   "jurisdiction": "City of Cambridge",
+   "coverage": [
+    {
+     "state": "MA",
+     "county": "Middlesex"
+    }
+   ],
+   "dataset_id": "qu2z-8suj",
+   "dataset_url": "https://data.cambridgema.gov/d/qu2z-8suj",
+   "column_map": {
+    "title": [
+     "permit_type",
+     "description_of_work"
+    ],
+    "status_raw": "status",
+    "type_source": "permit_type",
+    "file_date": "applicant_submit_date",
+    "decision_date": "issue_date",
+    "address": "full_address",
+    "lat": "latitude",
+    "lng": "longitude",
+    "case_number": "id"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Active"
+    ],
+    "operating": [
+     "Complete"
+    ]
+   },
+   "type_map": {
+    "Addition/Alteration": "Development"
+   },
+   "spatial_zip_radius_mi": 3,
+   "spatial_point_col": "coordinates",
+   "recency_days": 365,
+   "_receipts": "2026-07-15 MA wire pass: fresh (rowsUpdatedAt 2026-07-13 daily). Statuses VERBATIM: Active(8607)/Complete(5535). Same schema family as 9qm7-wbdc (point `coordinates`, full_address, issue_date). 365d window caps the 14k-row history. Dataset-precision record_url."
+  },
+  {
+   "registry_id": "cambridge-demolition-permits",
+   "platform": "socrata",
+   "domain": "data.cambridgema.gov",
+   "jurisdiction": "City of Cambridge",
+   "coverage": [
+    {
+     "state": "MA",
+     "county": "Middlesex"
+    }
+   ],
+   "dataset_id": "kcfi-ackv",
+   "dataset_url": "https://data.cambridgema.gov/d/kcfi-ackv",
+   "column_map": {
+    "title": [
+     "building_use",
+     "full_address"
+    ],
+    "status_raw": "status",
+    "type_source": "permit_type",
+    "file_date": "applicant_submit_date",
+    "decision_date": "issue_date",
+    "address": "full_address",
+    "lat": "latitude",
+    "lng": "longitude",
+    "case_number": "id"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Active"
+    ],
+    "operating": [
+     "Complete"
+    ]
+   },
+   "spatial_zip_radius_mi": 3,
+   "spatial_point_col": "coordinates",
+   "recency_days": 365,
+   "_receipts": "2026-07-15 MA wire pass: fresh (rowsUpdatedAt 2026-07-13 daily). Statuses VERBATIM: Active(182)/Complete(133). NO permit_type column (single-purpose demolition ledger \u2014 use_type stays unclassified); title falls back building_use -> full_address. Dataset-precision record_url."
   }
  ],
  "arcgis": [
@@ -1891,6 +2017,59 @@
    "spatial_zip_radius_mi": 3,
    "recency_days": 365,
    "_receipts": "2026-07-15 MI retry pass ('Oakland County' target): the county org (GE4Idg9FL97XBa3P) hosts NO county-wide permit layer \u2014 the real find is Independence Township's Construction Activity solution (ConstructionActivity_Public, 'Building Permits' layer 0) in the county org. FRESH: 10,020 rows, max Date_Issued 2026-07-09. Extent bbox 42.704\u201342.794 x -83.449\u2013-83.330 = Independence Twp ONLY (~Clarkston 48346/48348) \u2014 jurisdiction named honestly; the spatial 3-mi scope means only nearby pages get rows. Statuses VERBATIM: ISSUED->approved, FINALED->operating, CLOSED/EXPIRED/CANCELED/SUSPENDED (FEE) excluded (conservative \u2014 Minneapolis 'Closed' precedent). Types verbatim: kept Building + LAND USE; Electrical/Plumbing/Mechanical/TEMP SIGN/WATER-SEWER/CODE-STATUS dropped at source. Public view NULLS Address (absent stays absent; rows place by their own points); Work_Description is populated (receipt: 'ATTACHED GARAGE W/ BONUS ROOM\u2026'). No per-row URL column -> dataset-precision record_url (AGO item page)."
+  }
+ ],
+ "ckan": [
+  {
+   "registry_id": "boston-approved-building-permits",
+   "platform": "ckan",
+   "base_url": "https://data.boston.gov",
+   "resource_id": "6ddcd912-32a0-43df-9908-63574f8c7e77",
+   "dataset_url": "https://data.boston.gov/dataset/approved-building-permits",
+   "jurisdiction": "City of Boston",
+   "coverage": [
+    {
+     "state": "MA",
+     "county": "Suffolk"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "permittypedescr",
+     "description"
+    ],
+    "status_raw": "status",
+    "type_source": "permittypedescr",
+    "file_date": "issued_date",
+    "decision_date": null,
+    "address": "address",
+    "lat": "y_latitude",
+    "lng": "x_longitude",
+    "case_number": "permitnumber",
+    "zip": "zip"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Open",
+     "Issued"
+    ],
+    "operating": [
+     "Closed"
+    ],
+    "exclude": [
+     "Stop Work"
+    ]
+   },
+   "type_map": {
+    "Erect/New Construction": "Development",
+    "Long Form/Alteration Permit": "Development",
+    "Amendment to a Long Form": "Development",
+    "Foundation Permit": "Development",
+    "Use of Premises": "Development"
+   },
+   "extra_where": "\"permittypedescr\" IN ('Erect/New Construction','Long Form/Alteration Permit','Amendment to a Long Form','Foundation Permit','Use of Premises')",
+   "recency_days": 365,
+   "_receipts": "2026-07-15 MA wire pass (FIRST ckan entry \u2014 new additive sources/ckan.ts, datastore_search_sql): fresh TODAY (newest issued_date 2026-07-15T01:47; resource last_modified 2026-07-15T18:26). Native `zip` column + own y_latitude/x_longitude per record. Statuses VERBATIM via SQL group-by over all 656,762 rows: Open(376,412)+Issued(3)->approved, Closed(280,345)->operating, Stop Work(2)->exclude. 13 permittypedescr values VERBATIM; FOUNDER WHITELIST 2026-07-15: keep Erect/New Construction, Long Form/Alteration Permit, Amendment to a Long Form, Foundation Permit, Use of Premises; DROP Short Form Bldg Permit (189k minor jobs \u2014 founder call) + all Electrical variants/Plumbing/Gas/Certificate of Occupancy. FOUNDER-ACCEPTED dataset-precision record_url (no per-row URL column; no verified portal URL pattern \u2014 templating one would be guessing)."
   }
  ]
 }
