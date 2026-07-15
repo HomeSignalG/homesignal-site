@@ -108,6 +108,7 @@ function collectPoints(devReports, propReports) {
         src: 'development_reports', label: s.label, project_no: s.project_no || '',
         lat: s.lat, lng: s.lng, statedZip: dr.zip, statedCounty: s.location_county || '',
         match_type: s.match_type, needs_review: !!s.needs_review, record_url: s.record_url || s.url || '',
+        matched_address: s.matched_address || '',
       });
     }
   }
@@ -129,6 +130,7 @@ async function main() {
   if (SAMPLE > 0) points = points.slice(0, SAMPLE);
 
   const fails = [];       // geocode fell outside its stated ZIP (and county, when stated)
+  const borderline = [];  // ZCTA disagrees but source + forward geocoder both state the filed ZIP
   const skipped = [];     // reverse-lookup unavailable — reported, never a false fail
   let checked = 0;
   const tierCount = {};   // match_type telemetry — surfaces silent degradation
@@ -145,7 +147,14 @@ async function main() {
       const bits = [];
       if (!zipOk) bits.push(`ZIP: filed ${p.statedZip}, point sits in ${c.zcta}`);
       if (!countyOk) bits.push(`county: filed "${p.statedCounty}", point sits in "${c.county}"`);
-      fails.push(`${p.label} (${p.project_no || p.src}) @ ${p.lat},${p.lng} — ${bits.join('; ')} [${p.match_type}] ${p.record_url}`);
+      const line = `${p.label} (${p.project_no || p.src}) @ ${p.lat},${p.lng} — ${bits.join('; ')} [${p.match_type}] ${p.record_url}`;
+      // USPS-ZIP vs Census-ZCTA boundary case: the source filed the ZIP and the FORWARD
+      // geocoder matched the address in that same ZIP — only the reverse ZCTA polygon
+      // disagrees (2-to-1, and USPS ZIPs legitimately cross ZCTA lines near borders).
+      // That is a review item, not a wrong-segment geocode; hard-fail everything else.
+      const matchedZip = (p.matched_address || '').match(/\b(\d{5})(?:-\d{4})?\s*$/)?.[1] ?? null;
+      if (!zipOk && countyOk && matchedZip === String(p.statedZip)) borderline.push(line);
+      else fails.push(line);
     }
   }
 
@@ -156,8 +165,9 @@ async function main() {
     `- Geocoded points found: **${points.length}**`,
     `- Reverse-checked: **${checked}**   (skipped/unavailable: ${skipped.length})`,
     `- Match-quality tiers: ${tierLine}`,
-    `- Outside stated ZIP/county: **${fails.length}**`,
+    `- Outside stated ZIP/county: **${fails.length}**   (borderline USPS-vs-ZCTA: ${borderline.length}, review only)`,
     ...(fails.length ? [``, `## Out-of-polygon geocodes (review queue)`, ...fails.map((f) => `- ${f}`)] : []),
+    ...(borderline.length ? [``, `## Borderline — USPS ZIP vs Census ZCTA boundary (source + forward geocoder agree on the filed ZIP; review, not a failure)`, ...borderline.map((b) => `- ${b}`)] : []),
     ...(skipped.length ? [``, `## Skipped (lookup unavailable — not a failure)`, ...skipped.map((s) => `- ${s}`)] : []),
     ...(!fails.length ? [``, `Every geocoded point falls inside its stated ZIP/county. ✓`] : []),
     ``,
