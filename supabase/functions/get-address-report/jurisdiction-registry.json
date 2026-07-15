@@ -1801,6 +1801,96 @@
    "extra_where": "issued_date IS NOT NULL",
    "recency_days": 365,
    "_receipts": "2026-07-15: FRESH \u2014 max issued_date 2026-07-10. Point layer, native zip_code + lat/lng; NO permit_type column (single-purpose demolition ledger \u2014 use_type stays unclassified, absent stays absent) and NO status column -> status_const 'Issued' + issued_date IS NOT NULL guard. Title falls back work_description -> address."
+  },
+  {
+   "registry_id": "ann-arbor-energov-permits",
+   "platform": "arcgis",
+   "service_url": "https://utility.arcgis.com/usrsvcs/servers/7f4ea28cb31e4c618bc0f291c69dad36/rest/services/CustomMaps/PublicStaffPermits/FeatureServer/0",
+   "dataset_url": "https://www.arcgis.com/home/item.html?id=20a0a96dc9074244a68aa594330b8ced",
+   "jurisdiction": "City of Ann Arbor",
+   "coverage": [
+    {
+     "state": "MI",
+     "county": "Washtenaw"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "TYPE",
+     "ADDRESS"
+    ],
+    "status_raw": "STATUS",
+    "type_source": "TYPE",
+    "file_date": "APPLICATIONDATE",
+    "decision_date": "ISSUEDATE",
+    "address": "ADDRESS",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "PERMITNUMBER",
+    "record_url": "STREAMURL"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Issued",
+     "Issued in Trakit"
+    ]
+   },
+   "type_map": {
+    "Building (Commercial)": "Commercial",
+    "Building (Residential)": "Residential"
+   },
+   "extra_where": "TYPE IN ('Building (Commercial)','Building (Residential)')",
+   "spatial_zip_radius_mi": 3,
+   "recency_days": 365,
+   "_receipts": "2026-07-15 MI retry pass: the recon 'data.a2gov.org DCAT 404' stands (no Hub domain record) but the city's REAL permit layer sits behind its 'Public Permit Map' web map (AGO item 20a0a96d\u2026, org cenCPuKxOZuq6BCE): egPublicPermit on the org's utility.arcgis.com proxy \u2014 Tyler EnerGov public permits. FRESH: 731 rows, max ISSUEDATE 2026-07-14. Statuses VERBATIM (returnDistinctValues): 'Issued', 'Issued in Trakit' (both approved \u2014 the layer publishes issued permits only). 8 TYPE/CLASS pairs verbatim; kept Building (Commercial)/(Residential); Electrical Generator + Plumbing Water/Sewer/Storm dropped at source (trades noise, standard rule). PER-RECORD STREAMURL -> stream.a2gov.org EnerGov self-service (record-precision record_url). ADDRESS has no ZIP + no zip column -> spatial_zip_radius_mi 3 (Denver pattern), own points (outSR 4326 verified). Receipt row: BLDGC26-0266 'Building (Commercial) / Alteration-Repair' 615 Oswego St issued 2026-07-14. NOTE the org's stale 'Development_Pipeline' (27 rows, max EditDate 2024-01) was REJECTED as a frozen snapshot."
+  },
+  {
+   "registry_id": "independence-twp-construction-permits",
+   "platform": "arcgis",
+   "service_url": "https://services1.arcgis.com/GE4Idg9FL97XBa3P/arcgis/rest/services/ConstructionActivity_Public/FeatureServer/0",
+   "dataset_url": "https://www.arcgis.com/home/item.html?id=388966f722254770afc38c2cd0ff0fe9",
+   "jurisdiction": "Independence Township (Oakland County)",
+   "coverage": [
+    {
+     "state": "MI",
+     "county": "Oakland"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "Permit_Type",
+     "Work_Description"
+    ],
+    "status_raw": "Status",
+    "type_source": "Permit_Type",
+    "file_date": "Date_Issued",
+    "address": "Address",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "Permit_Number"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "ISSUED"
+    ],
+    "operating": [
+     "FINALED"
+    ],
+    "exclude": [
+     "CLOSED",
+     "EXPIRED",
+     "CANCELED",
+     "SUSPENDED (FEE)"
+    ]
+   },
+   "type_map": {
+    "Building": "Development",
+    "LAND USE": "Land use"
+   },
+   "extra_where": "Permit_Type IN ('Building','LAND USE')",
+   "spatial_zip_radius_mi": 3,
+   "recency_days": 365,
+   "_receipts": "2026-07-15 MI retry pass ('Oakland County' target): the county org (GE4Idg9FL97XBa3P) hosts NO county-wide permit layer \u2014 the real find is Independence Township's Construction Activity solution (ConstructionActivity_Public, 'Building Permits' layer 0) in the county org. FRESH: 10,020 rows, max Date_Issued 2026-07-09. Extent bbox 42.704\u201342.794 x -83.449\u2013-83.330 = Independence Twp ONLY (~Clarkston 48346/48348) \u2014 jurisdiction named honestly; the spatial 3-mi scope means only nearby pages get rows. Statuses VERBATIM: ISSUED->approved, FINALED->operating, CLOSED/EXPIRED/CANCELED/SUSPENDED (FEE) excluded (conservative \u2014 Minneapolis 'Closed' precedent). Types verbatim: kept Building + LAND USE; Electrical/Plumbing/Mechanical/TEMP SIGN/WATER-SEWER/CODE-STATUS dropped at source. Public view NULLS Address (absent stays absent; rows place by their own points); Work_Description is populated (receipt: 'ATTACHED GARAGE W/ BONUS ROOM\u2026'). No per-row URL column -> dataset-precision record_url (AGO item page)."
   }
  ]
 }
