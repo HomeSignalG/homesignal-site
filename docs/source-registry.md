@@ -1038,3 +1038,44 @@ The retries found REAL portals behind every first-pass URL-guess failure; none w
 - **DuPage County**: "Address Points Under Development" FIRM REJECT — an address-assignment
   registry (no date column, no permit status/type; it records address creation, not permit
   cases). The county publishes no permit-record layer on gis.dupageco.org.
+
+---
+
+## 2026-07-15 — MICHIGAN WIRE PASS, checkpoint A+B (founder-approved open of MI)
+
+**Freshness-first verdict on the Detroit BSEED trio: FRESH — wire approved.** The founder's
+gate was "verify recent issue dates before wiring; stale → monitor, don't wire." pg_net
+max-stat receipts (2026-07-15): `bseed_building_permits` max issued_date **2026-07-14**,
+`bseed_trades_permits` **2026-07-14**, `bseed_demolition_permits` **2026-07-10**.
+
+**Why recon had flagged it (now fixed):** the recon note said "the lexicon lacks the
+issued_date spelling" — the real gap was the TYPE, not the spelling: `issued_date` was in
+the lexicon all along, but Detroit's date fields are **`esriFieldTypeDateOnly`** (the newer
+ArcGIS temporal type, serialized as `"YYYY-MM-DD"` strings) and the monitor's field filter
+recognized only `esriFieldTypeDate`, so the layers read as "no date column" and the
+freshness probe blocked. `source-monitor.mjs` now recognizes both; `arcgisMaxDate` already
+parses string dates (`Date.parse`), and the engine's `DATE '…'` recency literal was
+live-verified against the DateOnly field (522 building permits city-wide since 2026-06-15).
+
+### Wired (3 entries, one reversible registry entry each; receipts in `_receipts`)
+All three: point layers on Detroit's AGO org (services2/qvkbeam7Wirps6zC), native `zip_code`
++ own `latitude`/`longitude` columns, `record_id` (Accela id) as case number, 365-day window
+on `issued_date`, dataset-precision record_url (Hub item-id pages from the search API — the
+guessed pretty slugs for trades/demolition do NOT resolve; item ids follow the Minneapolis
+precedent). **None of the trio has a status column** — they are issuance ledgers (field doc:
+"The permit is issued when the permit application is approved"), so this pass adds the
+additive connector option **`status_const`**: a dataset-level status applied verbatim to
+every row and bucketed through `status_to_bucket` like any live value, guarded by
+`issued_date IS NOT NULL` in `extra_where` so the constant never outruns the data (offline
+unit test: constant bucketing, unmapped-constant fail-closed, no-option regressions).
+- **detroit-building-permits**: 16 permit_type values VERBATIM (returnDistinctValues); kept
+  12 (New / New Revision / Addition / Add Addition Use / Add Additional Occupancy-Use /
+  Alteration / Alter Revision / Foundation Only / Accessory-Utility Structure / Change of
+  Occupancy-Use / Change of Use / Residential Rehab); dropped at source: Correct Violation,
+  Fire Insurance Escrow, Fire Repair, Other. Receipt row 48226: BLD2026-00771 "Alteration"
+  issued 2026-05-26 (13-story DTE GO Building).
+- **detroit-trades-permits**: 7 permit_type values VERBATIM, **all kept — FOUNDER-SPECIFIED**
+  (the requested trio explicitly includes Trades; note this differs from the trades-noise
+  drop in WA/MN/IL — dropping the one registry entry restores cross-state comparability).
+- **detroit-demolition-permits**: single-purpose demolition ledger; NO permit_type column →
+  use_type stays unclassified (absent stays absent); title falls back work_description → address.
