@@ -92,10 +92,11 @@ async function main() {
   if (SAMPLE > 0) walked = walked.slice(0, SAMPLE);
   // A sample of modeled-but-never-materialized ZIPs (no app_* row): must render the
   // honest not-covered state and stay noindexed.
-  // (98101 left this sample when Washington materialized; 60601 left it when Illinois
-  //  materialized — both are now real indexable pages. Each replacement holds its slot
-  //  until its state gets a development build.)
-  const nonUt = ['97201', '48226', '02138', '35801'];
+  // (98101 left this sample when Washington materialized; 60601 when Illinois did;
+  //  48226 when Michigan did — each is now a real indexable page. A replacement holds
+  //  its slot only until its state gets a development build, so when a state opens,
+  //  swap its ZIP out here in the same pass.)
+  const nonUt = ['97201', '30303', '02138', '35801'];
 
   console.log(`Verifying ${walked.length} materialized page(s) + ${nonUt.length} unmaterialized page(s) against ${SITE_BASE}`);
 
