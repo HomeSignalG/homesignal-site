@@ -730,3 +730,69 @@ on conflict do nothing;
 --          (select p.name from public.communities p where p.id = c.parent_id) as parent
 --   from public.communities c where c.state='MA'
 --   order by array_position(array['county','city','zip','neighborhood'], c.level), zip_codes[1];
+
+-- ============================================================================
+-- SUFFOLK COUNTY EXPANSION — 2026-07-15 (founder-approved, MA wire pass;
+-- applied live as migration `suffolk_boston_zip_expansion` — this section keeps the
+-- parked seed doc reproducible and supersedes the 'Suffolk … single ZIP (02212)' note above)
+-- 35 STANDARD+active Suffolk ZIPs from the zipcodes PyPI v3.0.0 crosswalk
+-- (Boston neighborhoods + Chelsea + Revere + Winthrop), each its own level=zip
+-- page under the suffolk-county-ma root — the pages Boston's approved-building-
+-- permits data (CKAN, jurisdiction-registry) lands on. Idempotent. The county
+-- root's zip_codes array is updated to carry all covered ZIPs (matching every
+-- other MA county root); none of these ZIPs appears on any other county row
+-- (crosswalk-verified, no cross-county collision).
+-- ============================================================================
+insert into public.communities (name, county, state, level, slug, zip_codes, government_topics, parent_id)
+values
+('Boston (02108)','Suffolk','MA','zip','boston-02108',array['02108'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02109)','Suffolk','MA','zip','boston-02109',array['02109'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02110)','Suffolk','MA','zip','boston-02110',array['02110'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02111)','Suffolk','MA','zip','boston-02111',array['02111'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02113)','Suffolk','MA','zip','boston-02113',array['02113'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02114)','Suffolk','MA','zip','boston-02114',array['02114'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02115)','Suffolk','MA','zip','boston-02115',array['02115'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02116)','Suffolk','MA','zip','boston-02116',array['02116'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02118)','Suffolk','MA','zip','boston-02118',array['02118'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Roxbury (02119)','Suffolk','MA','zip','roxbury-02119',array['02119'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Roxbury Crossing (02120)','Suffolk','MA','zip','roxbury-crossing-02120',array['02120'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Dorchester (02121)','Suffolk','MA','zip','dorchester-02121',array['02121'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Dorchester (02122)','Suffolk','MA','zip','dorchester-02122',array['02122'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Dorchester Center (02124)','Suffolk','MA','zip','dorchester-center-02124',array['02124'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Dorchester (02125)','Suffolk','MA','zip','dorchester-02125',array['02125'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Mattapan (02126)','Suffolk','MA','zip','mattapan-02126',array['02126'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('South Boston (02127)','Suffolk','MA','zip','south-boston-02127',array['02127'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('East Boston (02128)','Suffolk','MA','zip','east-boston-02128',array['02128'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Charlestown (02129)','Suffolk','MA','zip','charlestown-02129',array['02129'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Jamaica Plain (02130)','Suffolk','MA','zip','jamaica-plain-02130',array['02130'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Roslindale (02131)','Suffolk','MA','zip','roslindale-02131',array['02131'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('West Roxbury (02132)','Suffolk','MA','zip','west-roxbury-02132',array['02132'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02133)','Suffolk','MA','zip','boston-02133',array['02133'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Allston (02134)','Suffolk','MA','zip','allston-02134',array['02134'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Brighton (02135)','Suffolk','MA','zip','brighton-02135',array['02135'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Hyde Park (02136)','Suffolk','MA','zip','hyde-park-02136',array['02136'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Chelsea (02150)','Suffolk','MA','zip','chelsea-02150',array['02150'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Revere (02151)','Suffolk','MA','zip','revere-02151',array['02151'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Winthrop (02152)','Suffolk','MA','zip','winthrop-02152',array['02152'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02163)','Suffolk','MA','zip','boston-02163',array['02163'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02199)','Suffolk','MA','zip','boston-02199',array['02199'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02203)','Suffolk','MA','zip','boston-02203',array['02203'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02210)','Suffolk','MA','zip','boston-02210',array['02210'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02215)','Suffolk','MA','zip','boston-02215',array['02215'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma')),
+('Boston (02222)','Suffolk','MA','zip','boston-02222',array['02222'],array[]::text[],(select id from public.communities where slug='suffolk-county-ma'))
+on conflict do nothing;
+
+-- County root carries every covered ZIP (consistent with all other MA roots).
+update public.communities c
+set zip_codes = (
+  select array_agg(distinct z order by z)
+  from (
+    select unnest(c.zip_codes) z
+    union
+    select unnest(k.zip_codes) from public.communities k
+    where k.parent_id = c.id and k.level='zip'
+  ) u
+)
+where c.slug='suffolk-county-ma';
+-- Probe (run after): 36/36 Suffolk ZIPs resolve most-specific zip>county;
+-- 0 dup slugs, 0 orphan pages statewide (verified live 2026-07-15).
