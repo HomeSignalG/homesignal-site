@@ -1152,3 +1152,41 @@ records; data.mass.gov is an ArcGIS Hub, not Socrata (catalog API 404).
   but no address/coords/ZIP — ungeolocatable under v18.
 - **Cambridge noise companions**: Roof/Siding/Tent/Mechanical + the deprecated 1-2 Family
   set — dropped at source / not wired.
+
+---
+
+## 2026-07-15 — NEW YORK WIRE PASS (founder-approved four-state run, state 1 of 4)
+
+**Key structural finding:** NY's modeled counties (Suffolk/Westchester/Erie/Nassau/Monroe/
+Albany/Dutchess/Saratoga/Rockland/Putnam) did NOT include the five NYC boroughs — so the NYC
+DOB feeds had zero page lift until the **five-borough expansion** (Boston precedent, §3
+standing authority): migration `nyc_borough_zip_expansion` adds 5 county roots + 245
+`level=zip` pages (zipcodes v3.0.0 standard ZIPs; **10470 excluded** — already live as
+"Bronx (10470)" under Westchester via the Census crosswalk; one page per ZIP). NY: 519→764
+ZIP pages.
+
+### Wired (2 entries; receipts in `_receipts`)
+- **nyc-dobnow-approved-permits** (Socrata rbx6-tga4): fresh same-day; native zip + lat/lng;
+  Permit Issued/Signed-off verbatim; 21 work_types verbatim, 5 kept (General Construction,
+  Structural, Foundation, Earth Work, Full Demolition), 16 noise types dropped at source.
+- **nyc-dob-permit-issuance** (Socrata ipu4-2q9a, BIS legacy): still updates daily (legacy
+  jobs keep issuing/renewing — complements DOB NOW, no dual-filing); ISSUED/RE-ISSUED/
+  IN PROCESS/REVOKED verbatim (11,225 blanks drop fail-closed); NB/DM/AL/FO whitelist drops
+  EW (1.79M equipment work), PL, EQ (fences/sheds/scaffolds), SG at source.
+
+### Rejected with receipts (do not re-derive)
+- **Buffalo**: every catalog permit item is a filtered VIEW with restricted rows —
+  `e48j-dfaz` ("All permits since 1/1/2018", updated same-day) returns **403 "Cannot read
+  rows"**; a datasets-only catalog query returns zero public parents. Not wireable anonymously.
+- **Syracuse — STALLED (the St. Paul/Worcester class)**: `Permit_Requests` (services6/
+  bdPqSfflsdgFRVVM) is the right shape (47,902 points, Permit_Number/Full_Address/Issue_Date/
+  Permit_Type/LAT/LONG) but newest Issue_Date = **2025-08-16** (11 months). Added to the
+  nightly reprobe list; its "Building Permits (2013-2019)" companion is stale by name.
+- **Rochester**: org (yoz1ZtATTCokO9nU, DataROC) has no permit-record layer; "Demolitions
+  Open Data" requires a token (499) — not public.
+- **Albany**: no Socrata catalog at data.albanyny.gov (404); the only Albany permits data is
+  the state portal's "City of Albany Building Permits Issued 2009-2013" (frozen).
+- **NY State (data.ny.gov)**: no per-record building/development permit source — code-report
+  aggregates, highway work permits, SPDES facility lists only.
+- **Yonkers / Westchester / Nassau / Suffolk County NY**: no Hub domain records (all 404) and
+  no first-party permit portals found this pass.

@@ -250,6 +250,20 @@
     "services1.arcgis.com"
    ],
    "rejected": "2026-07-15: STALLED snapshot - newest Permit_License_Issued_Date 2025-09-09 (10 months; verified by order-by-desc \u2014 LIKE counts on this hosted table are unreliable). Right shape otherwise (52,108 rows, statuses Complete/Active verbatim, addresses embed 'Worcester MA <zip>'); geometry NONE (table) so a wire needs the geocode path. Wire if the city resumes publishing."
+  },
+  {
+   "id": "syracuse-permit-requests",
+   "kind": "arcgis-layer",
+   "url": "https://services6.arcgis.com/bdPqSfflsdgFRVVM/arcgis/rest/services/Permit_Requests/FeatureServer/0",
+   "jurisdiction": "Syracuse",
+   "coverage": {
+    "state": "NY",
+    "county": "Onondaga"
+   },
+   "hosts": [
+    "services6.arcgis.com"
+   ],
+   "rejected": "2026-07-15: STALLED snapshot - newest Issue_Date 2025-08-16 (11 months). Right shape (47,902 points, Permit_Number/Full_Address/Issue_Date/Permit_Type/LAT/LONG; no status column -> status_const pattern if it resumes). Wire if the city resumes publishing."
   }
  ],
  "discovery": [

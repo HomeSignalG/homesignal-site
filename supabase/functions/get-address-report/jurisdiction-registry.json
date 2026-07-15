@@ -658,6 +658,139 @@
    "spatial_point_col": "coordinates",
    "recency_days": 365,
    "_receipts": "2026-07-15 MA wire pass: fresh (rowsUpdatedAt 2026-07-13 daily). Statuses VERBATIM: Active(182)/Complete(133). NO permit_type column (single-purpose demolition ledger \u2014 use_type stays unclassified); title falls back building_use -> full_address. Dataset-precision record_url."
+  },
+  {
+   "registry_id": "nyc-dobnow-approved-permits",
+   "platform": "socrata",
+   "domain": "data.cityofnewyork.us",
+   "dataset_id": "rbx6-tga4",
+   "dataset_url": "https://data.cityofnewyork.us/d/rbx6-tga4",
+   "jurisdiction": "New York City (DOB NOW)",
+   "coverage": [
+    {
+     "state": "NY",
+     "county": "New York"
+    },
+    {
+     "state": "NY",
+     "county": "Kings"
+    },
+    {
+     "state": "NY",
+     "county": "Queens"
+    },
+    {
+     "state": "NY",
+     "county": "Bronx"
+    },
+    {
+     "state": "NY",
+     "county": "Richmond"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "work_type",
+     "job_description"
+    ],
+    "status_raw": "permit_status",
+    "type_source": "work_type",
+    "file_date": "issued_date",
+    "address": [
+     "house_no",
+     "street_name"
+    ],
+    "lat": "latitude",
+    "lng": "longitude",
+    "case_number": "job_filing_number",
+    "zip": "zip_code"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Permit Issued"
+    ],
+    "operating": [
+     "Signed-off"
+    ]
+   },
+   "type_map": {
+    "General Construction": "Development",
+    "Structural": "Development",
+    "Foundation": "Development",
+    "Earth Work": "Development",
+    "Full Demolition": "Development"
+   },
+   "extra_where": "work_type in ('General Construction','Structural','Foundation','Earth Work','Full Demolition')",
+   "recency_days": 365,
+   "_receipts": "2026-07-15 NY wire pass: fresh SAME-DAY (rowsUpdatedAt 2026-07-15). Native zip_code + latitude/longitude. Statuses VERBATIM via SODA group-by: 'Permit Issued'(352,273)->approved, 'Signed-off'(616,514)->operating. 21 work_type values VERBATIM; kept General Construction/Structural/Foundation/Earth Work/Full Demolition; dropped at source: Plumbing, Sidewalk Shed, Mechanical Systems, Construction Fence, Sprinklers, Scaffolds, Sign, Solar, Curb Cut, Antenna, Standpipe, Boiler, Protection & Mechanical Methods, Support of Excavation, Green Roof. No per-row URL column -> dataset-precision. Page lift via the NYC five-borough expansion (migration nyc_borough_zip_expansion: 5 county roots + 245 zip pages; 10470 excluded \u2014 already live under Westchester)."
+  },
+  {
+   "registry_id": "nyc-dob-permit-issuance",
+   "platform": "socrata",
+   "domain": "data.cityofnewyork.us",
+   "dataset_id": "ipu4-2q9a",
+   "dataset_url": "https://data.cityofnewyork.us/d/ipu4-2q9a",
+   "jurisdiction": "New York City (DOB BIS legacy)",
+   "coverage": [
+    {
+     "state": "NY",
+     "county": "New York"
+    },
+    {
+     "state": "NY",
+     "county": "Kings"
+    },
+    {
+     "state": "NY",
+     "county": "Queens"
+    },
+    {
+     "state": "NY",
+     "county": "Bronx"
+    },
+    {
+     "state": "NY",
+     "county": "Richmond"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "permit_type",
+     "street_name"
+    ],
+    "status_raw": "permit_status",
+    "type_source": "permit_type",
+    "file_date": "issuance_date",
+    "address": [
+     "house__",
+     "street_name"
+    ],
+    "lat": "gis_latitude",
+    "lng": "gis_longitude",
+    "case_number": "job__",
+    "zip": "zip_code"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "ISSUED",
+     "RE-ISSUED"
+    ],
+    "proposed": [
+     "IN PROCESS"
+    ],
+    "exclude": [
+     "REVOKED"
+    ]
+   },
+   "type_map": {
+    "NB": "Development",
+    "DM": "Development",
+    "AL": "Development",
+    "FO": "Development"
+   },
+   "extra_where": "permit_type in ('NB','DM','AL','FO')",
+   "recency_days": 365,
+   "_receipts": "2026-07-15 NY wire pass: the legacy BIS ledger still updates DAILY (rowsUpdatedAt 2026-07-15) \u2014 pre-DOB-NOW jobs keep issuing/renewing here, so it complements rbx6-tga4 (different system, no dual-filing). Statuses VERBATIM: ISSUED(3,908,261)+RE-ISSUED(48,878)->approved, IN PROCESS(20,980)->proposed, REVOKED(5)->exclude; 11,225 blank statuses drop fail-closed. permit_type whitelist NB/DM/AL/FO at source (drops EW equipment work 1.79M, PL plumbing, EQ construction equipment/fences/sheds, SG signs). Native zip_code + gis_latitude/gis_longitude. Dataset-precision record_url."
   }
  ],
  "arcgis": [
