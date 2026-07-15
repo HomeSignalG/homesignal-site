@@ -45,23 +45,31 @@ async function loadDevReports() {
   // statement timeout (57014) at ~1,000 cached ZIPs, and even OFFSET pages re-scan all
   // prior rows (O(offset) per page) — under concurrent verifier load a late page timed
   // out too. zip=gt.<last> is O(1) per page on the zip index. Transient-retried.
+  // ADAPTIVE page size (mirrors verify-development): page cost is dominated by row SIZE —
+  // a dense-metro row can carry thousands of `sites`, so even a small page can blow the
+  // statement timeout. On a failed page, halve the size (floor 5); recover after clean pages.
   const rows = [];
-  const STEP = 40;
+  let step = 40;
   let last = '';
+  let clean = 0;
+  let floorRetries = 0;
   for (;;) {
-    const path = `development_reports?select=zip,sites&order=zip.asc&limit=${STEP}` +
-      (last ? `&zip=gt.${encodeURIComponent(last)}` : '');
-    let page = null;
-    for (let attempt = 0; attempt < 3 && page === null; attempt++) {
-      const res = await sb(path);
-      if (res.ok) { page = await res.json(); break; }
+    const res = await sb(`development_reports?select=zip,sites&order=zip.asc&limit=${step}` +
+      (last ? `&zip=gt.${encodeURIComponent(last)}` : ''));
+    if (!res.ok) {
       const body = await res.text();
-      if (attempt === 2) throw new Error(`development_reports read failed: ${res.status} ${body}`);
-      await sleep(2000 * (attempt + 1)); // 57014 here is contention with the other verifiers
+      if (step > 5) { step = Math.max(5, Math.floor(step / 2)); clean = 0; continue; }
+      floorRetries++;
+      if (floorRetries > 3) throw new Error(`development_reports read failed at floor page size: ${res.status} ${body}`);
+      await sleep(2500 * floorRetries);
+      continue;
     }
+    floorRetries = 0;
+    const page = await res.json();
     rows.push(...page);
-    if (page.length < STEP) break;
+    if (page.length < step) break;
     last = page[page.length - 1].zip;
+    if (++clean >= 3 && step < 40) { step = Math.min(40, step * 2); clean = 0; }
   }
   return rows;
 }
