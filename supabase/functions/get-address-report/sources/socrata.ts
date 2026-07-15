@@ -85,6 +85,9 @@ export interface SocrataRegistryEntry {
   /** Optional: drop rows whose file_date/incremental_field is older than N days (volume cap
    *  for high-history permit datasets). Absent ⇒ no recency filter. */
   recency_days?: number;
+  /** Optional VERBATIM SoQL clause ANDed into every query (drop noise types at source —
+   *  mirror of the arcgis connector's extra_where). Data, not code. */
+  extra_where?: string;
   /** true → fetch `.geojson` (geographic datasets expose geometry). */
   geographic?: boolean;
   /** Optional hard cap on rows pulled per dataset (safety net). Default 20000. */
@@ -364,9 +367,13 @@ async function fetchRows(
   return out.slice(0, maxRows);
 }
 
-/** ZIP filter (mandatory) AND'd with an optional recency window on file_date/incremental_field. */
+/** ZIP filter (mandatory) AND'd with an optional entry-driven extra clause and recency window. */
 function buildWhere(entry: SocrataRegistryEntry, zip: string, zipCol: string): string {
   const clauses = [`upper(${zipCol})='${zip.replace(/'/g, "''")}'`];
+  // extra_where (additive, data-driven — the arcgis connector's twin): a VERBATIM SoQL
+  // clause ANDed into every query, used to drop noise types AT SOURCE (e.g. Seattle's
+  // ECA/street-exception and roof permits). The connector never inspects it.
+  if (entry.extra_where && entry.extra_where.trim()) clauses.push(`(${entry.extra_where.trim()})`);
   if (entry.recency_days && entry.recency_days > 0) {
     const dateCol = firstCol(entry.column_map.file_date) || entry.incremental_field;
     if (dateCol) {

@@ -320,6 +320,161 @@
    "recency_days": 365,
    "zip_mode": false,
    "_zip_mode_note": "RESERVED FOR THE PER-ADDRESS PROPERTY PAGE (homesignalmap.html?addr=), not the ZIP aggregate. ~85% of rows carry no native coordinates, so ZIP-mode geocoding (1000s of addresses per refresh) would time out the edge function, and 1,300+ individual building permits would swamp the ZIP map. At a single address only that parcel's permits are shown (one geocode). Full status_to_bucket + type_map are kept so the property-page wiring is a pure-data activation (flip zip_mode + call the connector in address mode)."
+  },
+  {
+   "registry_id": "seattle-building-permits",
+   "platform": "socrata",
+   "domain": "data.seattle.gov",
+   "dataset_id": "76t5-zqzr",
+   "dataset_url": "https://data.seattle.gov/Built-Environment/Building-Permits/76t5-zqzr",
+   "jurisdiction": "City of Seattle",
+   "coverage": [
+    {
+     "state": "WA",
+     "county": "King"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "permitclass",
+     "description"
+    ],
+    "status_raw": "statuscurrent",
+    "type_source": "permitclass",
+    "file_date": "applieddate",
+    "decision_date": "issueddate",
+    "address": "originaladdress1",
+    "lat": "latitude",
+    "lng": "longitude",
+    "case_number": "permitnum",
+    "zip": "originalzip",
+    "record_url": "link"
+   },
+   "type_map": {
+    "Single Family/Duplex": "Residential",
+    "Multifamily": "Residential",
+    "Commercial": "Commercial",
+    "Institutional": "Commercial",
+    "Industrial": "Industrial",
+    "Vacant Land": "Development"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "Additional Info Requested",
+     "Corrections Required",
+     "Scheduled",
+     "Application Completed",
+     "Ready for Issuance",
+     "Awaiting Information",
+     "Reviews In Process",
+     "Reviews Completed",
+     "Active",
+     "Ready for Intake",
+     "Initiated",
+     "Scheduled and Submitted",
+     "Corrections Submitted",
+     "Pending",
+     "Published",
+     "Ready for Publication"
+    ],
+    "approved": [
+     "Issued",
+     "Phase Issued",
+     "Approved to Occupy",
+     "Inspections Completed"
+    ],
+    "operating": [
+     "Completed"
+    ],
+    "exclude": [
+     "Expired",
+     "Closed",
+     "Canceled",
+     "Withdrawn",
+     "Denied"
+    ]
+   },
+   "extra_where": "permittypemapped in ('Building','Demolition','Grading')",
+   "incremental_field": "applieddate",
+   "recency_days": 365,
+   "_receipts": "2026-07-15: max issueddate 2026-07-11 / applieddate 2026-07-10; 24 statuses + 7 classes VERBATIM (groupBy); native originalzip (98103=12,981 all-time rows -> 365d window); per-record link.url (services.seattle.gov LinkToRecord). ECA/Shoreline-exemption + Roof noise dropped at source via extra_where (permittypemapped)."
+  },
+  {
+   "registry_id": "seattle-land-use-permits",
+   "platform": "socrata",
+   "domain": "data.seattle.gov",
+   "dataset_id": "ht3q-kdvx",
+   "dataset_url": "https://data.seattle.gov/Permitting/Land-Use-Permits/ht3q-kdvx",
+   "jurisdiction": "City of Seattle",
+   "coverage": [
+    {
+     "state": "WA",
+     "county": "King"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "permittypemapped",
+     "description"
+    ],
+    "status_raw": "statuscurrent",
+    "type_source": "permitclass",
+    "file_date": "applieddate",
+    "decision_date": "issueddate",
+    "address": "originaladdress1",
+    "lat": "latitude",
+    "lng": "longitude",
+    "case_number": "permitnum",
+    "zip": "originalzip",
+    "record_url": "link"
+   },
+   "type_map": {
+    "Single Family/Duplex": "Residential",
+    "Multifamily": "Residential",
+    "Commercial": "Commercial",
+    "Institutional": "Commercial",
+    "Industrial": "Industrial",
+    "Vacant Land": "Development"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "Additional Info Requested",
+     "Corrections Required",
+     "Scheduled",
+     "Application Completed",
+     "Ready for Issuance",
+     "Awaiting Information",
+     "Reviews In Process",
+     "Reviews Completed",
+     "Active",
+     "Ready for Intake",
+     "Initiated",
+     "Scheduled and Submitted",
+     "Corrections Submitted",
+     "Pending",
+     "Published",
+     "Ready for Publication"
+    ],
+    "approved": [
+     "Issued",
+     "Phase Issued",
+     "Approved to Occupy",
+     "Inspections Completed"
+    ],
+    "operating": [
+     "Completed"
+    ],
+    "exclude": [
+     "Expired",
+     "Closed",
+     "Canceled",
+     "Withdrawn",
+     "Denied"
+    ]
+   },
+   "incremental_field": "applieddate",
+   "recency_days": 365,
+   "_receipts": "2026-07-15: max applieddate 2026-07-13; 19 statuses VERBATIM (distinct); types Master Use Permit (21,169) + Early Design Guidance (3,320) - both kept, no noise; per-record link.url. Successor of the DEAD uyyd-8gak id (views API 404)."
   }
  ],
  "arcgis": [
@@ -1017,6 +1172,394 @@
    },
    "record_url_precision": "dataset",
    "_receipts": "Verified live 2026-07-14 via pg_net: Colorado Springs' OWN ArcGIS Server (gis.coloradosprings.gov, Planning/PlanDevTracker_PRO - 'Map Service referenced in the Web Map Item for the Development Tracker site', i.e. the city's own Development Tracker backend). POINT geometry Planning_Applications layer, 967 current land-use cases; 9 record_status + 15 record_type values enumerated VERBATIM via groupBy (all planning/land-use case types - no trade noise to drop). record_address carries NO ZIP and there is no date column -> spatial_zip_radius_mi 3 (second consumer of the additive envelope option) and no recency filter (the tracker holds only current cases; real samples: 'FRONT RANGE BARBECUE - Development Plan' DEPN-23-0205 Approved, 'Project Rockrimmon' DEPN-24-0029). No per-record public deep link derivable from record_id -> official REST layer dataset fallback."
+  },
+  {
+   "registry_id": "bellevue-permits",
+   "platform": "arcgis",
+   "service_url": "https://services1.arcgis.com/EYzEZbDhXZjURPbP/arcgis/rest/services/Bellevue_Permits/FeatureServer/0",
+   "dataset_url": "https://data.bellevuewa.gov/datasets/7d938bb5f7a34458baec15fe395e46ce",
+   "jurisdiction": "City of Bellevue",
+   "coverage": [
+    {
+     "state": "WA",
+     "county": "King"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "PERMITTYPEDESCRIPTION",
+     "PROJECTNAME"
+    ],
+    "status_raw": "PERMITSTATUS",
+    "type_source": "PERMITTYPEDESCRIPTION",
+    "file_date": "APPLIEDDATE",
+    "decision_date": "ISSUEDDATE",
+    "address": "SITEADDRESS",
+    "case_number": "PERMITNUMBER",
+    "zip": "ZIPCODE"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "Accepted",
+     "Appealed",
+     "Completeness Check",
+     "Incomplete",
+     "Not Complete",
+     "On Hold",
+     "Open",
+     "Pending",
+     "Ready to Issue",
+     "Recommended",
+     "Screening",
+     "In Litigation"
+    ],
+    "approved": [
+     "Issued",
+     "TCO",
+     "Monitoring"
+    ],
+    "exclude": [
+     "Canceled",
+     "Closed",
+     "Denied",
+     "Expired",
+     "Inaccessible",
+     "Not Required",
+     "Revoked",
+     "Screened Out",
+     "Suspended",
+     "Violations"
+    ]
+   },
+   "type_map": {
+    "Single Family New": "Residential",
+    "Single Family Addition": "Residential",
+    "Middle Housing New": "Residential",
+    "Accessory Dwelling Unit Registration": "Residential",
+    "Major Commercial Project": "Commercial",
+    "Major Commercial Project w/ SEPA": "Commercial",
+    "Medium Commercial Project": "Commercial",
+    "Minor Commercial Project": "Commercial",
+    "Tenant Improvement": "Commercial",
+    "Tenant Improvement - New Use": "Commercial",
+    "Demolition": "Development",
+    "Demolition No Plan Review": "Development",
+    "Foundation Permit": "Development",
+    "Shoring Permit": "Development",
+    "Detention Vault": "Development",
+    "Clearing & Grading": "Development",
+    "Clearing & Grading in Critical Areas": "Development",
+    "Minor Clearing & Grading": "Development",
+    "Plat Infrastructure": "Development",
+    "Preliminary Plat": "Development",
+    "Final Plat": "Development",
+    "Preliminary Short Plat": "Development",
+    "Final Short Plat": "Development",
+    "Binding Site Plan": "Development",
+    "Planned Unit Development": "Development",
+    "Master Development Plan": "Development",
+    "Rezone": "Development",
+    "Conditional Use": "Development",
+    "Administrative Conditional Use": "Development",
+    "Design Review": "Development",
+    "Land Use Approval Amendment": "Development",
+    "Boundary Line Adjustment": "Development",
+    "Substantial Shoreline Development": "Development",
+    "Comprehensive Plan Amendment": "Development",
+    "Environmental Impact Statement": "Development"
+   },
+   "extra_where": "PERMITTYPE IN ('BS','BR','BB','BA','BM','BW','BZ','BY','BE','BC','BJ','BV','BH','GD','GJ','GH','GA','GE','LL','LG','LN','LF','LU','LK','LP','LQ','LB','LA','LD','LI','LW','WG','AC','LE','LX')",
+   "recency_days": 365,
+   "_receipts": "2026-07-15: max APPLIEDDATE 2026-07-13 (item advertises daily ~6AM refresh); 25 statuses VERBATIM via returnDistinctValues (note 'Suspended' carries trailing whitespace at source - connector trims); native ZIPCODE (98004=27,744 all-time -> 365d window); PERMITTYPE 2-letter CODES whitelisted at source (descriptions carry trailing-space variants, codes do not); type_map keys are TRIMMED PERMITTYPEDESCRIPTION values. No per-record link column -> dataset_url precision."
+  },
+  {
+   "registry_id": "tacoma-accela-permits",
+   "platform": "arcgis",
+   "service_url": "https://services3.arcgis.com/SCwJH1pD8WSn5T5y/arcgis/rest/services/accela_permit_data/FeatureServer/0",
+   "dataset_url": "https://geohub.cityoftacoma.org/datasets/a12d6fbf58e4434b8ff5070c09646f19",
+   "jurisdiction": "City of Tacoma",
+   "coverage": [
+    {
+     "state": "WA",
+     "county": "Pierce"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "permit_type",
+     "description"
+    ],
+    "status_raw": "current_status",
+    "type_source": "permit_type",
+    "file_date": "application_date",
+    "decision_date": "issued_date",
+    "address": "address_line_1",
+    "lat": "latitude",
+    "lng": "longitude",
+    "case_number": "permit_number",
+    "zip": "zip",
+    "record_url": "link"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "Active",
+     "Additional Info Needed",
+     "Awaiting PW Inspection",
+     "Awaiting Resubmittal",
+     "Awaiting Resubmittal/Revisions",
+     "Comments Provided",
+     "Complete Application",
+     "Consultation Meeting Required",
+     "Correction Review in Process",
+     "Decision Pending",
+     "Electronic Review",
+     "Field Revisions",
+     "Final Design in Review",
+     "In Review",
+     "Incomplete Application",
+     "Incomplete Resubmittal",
+     "Initial Billing Completed",
+     "Meeting Scheduled",
+     "Missing or Incorrect Info",
+     "Missing Required Documents",
+     "NPDES Inspection Required",
+     "Pending Intake Screening",
+     "Pending Internal Action",
+     "Pending Payment",
+     "Permit Fees Due",
+     "Plan Review in Process",
+     "Plan Review in Progress",
+     "Plans Routed for Review",
+     "Precon Meeting Required",
+     "Precon Meeting Scheduled",
+     "Precon Scheduled",
+     "Resubmittal Required",
+     "Review Complete",
+     "Review Fees Due",
+     "Review in Process - Cycle 1",
+     "Revision Required",
+     "Revision Review in Process",
+     "Revisions Approved",
+     "Revisions Required",
+     "Revisions Routed for Review",
+     "Revisons Required",
+     "Staff Report Complete",
+     "Staff Report In Process",
+     "Waiting for Information",
+     "Recording Revisions Routed"
+    ],
+    "approved": [
+     "Approved",
+     "Approved - Draft in Process",
+     "Associated Permit Issued",
+     "C of O Issued",
+     "Cert of Completion Issued",
+     "Decision Issued",
+     "Determination Issued",
+     "Final Decision",
+     "Permit Issued",
+     "Permit Ready to Issue",
+     "Ready to Issue",
+     "Released",
+     "Temp CO Issued",
+     "Recording Complete"
+    ],
+    "operating": [
+     "Final",
+     "Finaled",
+     "Permit Finaled",
+     "Final Inspection",
+     "Final Billing Completed",
+     "Financial Closeout Complete",
+     "Final Determination Complete"
+    ],
+    "exclude": [
+     "Canceled",
+     "Cancelled",
+     "Cancelled - Write Off",
+     "Closed",
+     "Closed - No Inspect Required",
+     "Closed - See Land Use Case",
+     "Denied",
+     "Exempted",
+     "Expired",
+     "Permit Canceled",
+     "Permit Denied",
+     "Permit Expired",
+     "Reconsideration Denied",
+     "Voided",
+     "Withdrawn"
+    ]
+   },
+   "type_map": {
+    "Building": "Development",
+    "Land Use": "Development",
+    "Site": "Development"
+   },
+   "extra_where": "permit_type IN ('Building','Land Use','Site')",
+   "recency_days": 365,
+   "_receipts": "2026-07-15: max application_date 2026-07-13 (item modified 2026-07-14); 80 statuses + 10 permit_type values VERBATIM via returnDistinctValues; native zip (98402=8,359 all-time -> 365d window); per-record Accela link column. Noise types (ePermit trades, Sign, Special Event, ROW, Utility Connection, Historic, Pre-Application) dropped at source. Found via org-scoped AGO search (orgid:SCwJH1pD8WSn5T5y) - the geohub DCAT path serves HTML, and an UNSCOPED sharing/rest/search returns Calgary lookalikes."
+  },
+  {
+   "registry_id": "pierce-county-pals-permits",
+   "platform": "arcgis",
+   "service_url": "https://services2.arcgis.com/1UvBaQ5y1ubjUPmd/arcgis/rest/services/Permits_Pierce_County/FeatureServer/0",
+   "dataset_url": "https://gisdata-piercecowa.opendata.arcgis.com/datasets/7a2af86e0b64463b9caeb08c374a24ac",
+   "jurisdiction": "Pierce County (PALS)",
+   "coverage": [
+    {
+     "state": "WA",
+     "county": "Pierce"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "applicationType",
+     "projectName"
+    ],
+    "status_raw": "applicationStatus",
+    "type_source": "applicationType",
+    "file_date": "applicationDate",
+    "decision_date": "issuedDate",
+    "address": "siteAddress",
+    "case_number": "applicationNumber",
+    "record_url": "urlOnlinePermits"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "Accepted",
+     "Hold",
+     "Pending Payment"
+    ],
+    "approved": [
+     "Approved",
+     "Issued",
+     "Issued (NCA)",
+     "Final Pending"
+    ],
+    "operating": [
+     "Final",
+     "Administrative Final"
+    ],
+    "exclude": [
+     "Annual",
+     "Cancelled",
+     "Closed",
+     "Denied",
+     "Expired",
+     "Expired Application",
+     "Stopped",
+     "Suspended",
+     "Suspended for Fees"
+    ]
+   },
+   "type_map": {
+    "Construction Commercial": "Commercial",
+    "Construction Residential": "Residential",
+    "Accessory Dwelling Unit": "Residential",
+    "Mobile/Manuf Home Park": "Residential",
+    "Commercial Demolition": "Development",
+    "Residential Demolition": "Development",
+    "Conditional Use": "Development",
+    "Conditional Use-Major Amend": "Development",
+    "Conditional Use-Minor Amend": "Development",
+    "Land Division": "Development",
+    "Land Div - Preliminary/BSP": "Development",
+    "Land Div - Final": "Development",
+    "Land Div - Amend/Alter": "Development",
+    "Land Div - BLA": "Development",
+    "Land Div - Lot Combo/Seg": "Development",
+    "Land Use Action": "Development",
+    "Land Use Permit": "Development",
+    "Land Use Variance": "Development",
+    "Short plat": "Development",
+    "Short Plat Alteration": "Development",
+    "Preliminary Short Plat": "Development",
+    "Final Short Plat": "Development",
+    "Preliminary Large Lot": "Development",
+    "Large Lot": "Development",
+    "Large Lot Alteration": "Development",
+    "Large Lot Final": "Development",
+    "Plat - Major Amendment": "Development",
+    "Plat - Minor Amendment": "Development",
+    "Plat Amendment": "Development",
+    "Planned Development District": "Development",
+    "Planned Unit Development": "Development",
+    "Planned/Phased Development": "Development",
+    "Rezone": "Development",
+    "Rezone-Major Amendment": "Development",
+    "Rezone-Minor Amend to Rezone": "Development",
+    "Site Dev Commercial": "Commercial",
+    "Site Dev Residential": "Residential",
+    "Site Development": "Development",
+    "Site Plan Review": "Development",
+    "Site Plan Review by Plan Dir": "Development",
+    "Site Plan Review-Major Amend": "Development",
+    "Site Plan Review-Minor Amend": "Development",
+    "Binding Site Plan Review": "Development",
+    "Alteration of Binding Site Plan": "Development",
+    "Shoreline Substantial Develop": "Development",
+    "Shoreline Permit": "Development",
+    "Civil Infrastructure On-site": "Development",
+    "Civil Infrastructure Offsite": "Development",
+    "Grading, Filling & Clearing": "Development",
+    "Excavation, Filling, Grading, Surface Mines": "Development",
+    "Residential Site Development": "Residential",
+    "SEPA Review": "Development",
+    "Environmental Impact Statement": "Development"
+   },
+   "extra_where": "applicationType IN ('Construction Commercial','Construction Residential','Accessory Dwelling Unit','Mobile/Manuf Home Park','Commercial Demolition','Residential Demolition','Conditional Use','Conditional Use-Major Amend','Conditional Use-Minor Amend','Land Division','Land Div - Preliminary/BSP','Land Div - Final','Land Div - Amend/Alter','Land Div - BLA','Land Div - Lot Combo/Seg','Land Use Action','Land Use Permit','Land Use Variance','Short plat','Short Plat Alteration','Preliminary Short Plat','Final Short Plat','Preliminary Large Lot','Large Lot','Large Lot Alteration','Large Lot Final','Plat - Major Amendment','Plat - Minor Amendment','Plat Amendment','Planned Development District','Planned Unit Development','Planned/Phased Development','Rezone','Rezone-Major Amendment','Rezone-Minor Amend to Rezone','Site Dev Commercial','Site Dev Residential','Site Development','Site Plan Review','Site Plan Review by Plan Dir','Site Plan Review-Major Amend','Site Plan Review-Minor Amend','Binding Site Plan Review','Alteration of Binding Site Plan','Shoreline Substantial Develop','Shoreline Permit','Civil Infrastructure On-site','Civil Infrastructure Offsite','Grading, Filling & Clearing','Excavation, Filling, Grading, Surface Mines','Residential Site Development','SEPA Review','Environmental Impact Statement')",
+   "spatial_zip_radius_mi": 3,
+   "recency_days": 365,
+   "_receipts": "2026-07-15: max applicationDate 2026-07-09 (item modified 2026-07-10); 18 statuses + ~250 applicationType values VERBATIM via returnDistinctValues; 53-type development whitelist at source (fire/operational/event noise dropped); per-record PALS link (urlOnlinePermits); siteAddress has NO ZIP + no ZIP column -> spatial_zip_radius_mi 3 (records keep their own PALS XY points, native wkid 2927 served as outSR 4326)."
+  },
+  {
+   "registry_id": "clark-county-active-dev-permits",
+   "platform": "arcgis",
+   "service_url": "https://gis.clark.wa.gov/arcgisfed/rest/services/DevelopmentPermits/ActiveDevelopmentPermits/FeatureServer/0",
+   "dataset_url": "https://gis.clark.wa.gov/gishome/",
+   "jurisdiction": "Clark County",
+   "coverage": [
+    {
+     "state": "WA",
+     "county": "Clark"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "SpecificType",
+     "MarketingName"
+    ],
+    "status_raw": "StatusDescription",
+    "type_source": "SpecificType",
+    "file_date": "Received",
+    "decision_date": "DecisionIssued",
+    "address": "address",
+    "case_number": "PermitNumber",
+    "record_url": "PublicNoticeURL"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "In Review",
+     "Applicant Revisions",
+     "On Hold",
+     "Findings"
+    ],
+    "approved": [
+     "Decision - Approved"
+    ],
+    "exclude": [
+     "Decision - Denied"
+    ]
+   },
+   "type_map": {
+    "Other Land Use Review": "Development",
+    "Preliminary Land Division": "Development",
+    "Preliminary Site Plan": "Development",
+    "Special Land Use Review": "Development"
+   },
+   "spatial_zip_radius_mi": 3,
+   "_receipts": "2026-07-15: max Received 2026-05-22 (ACTIVE-cases layer, small + self-pruning -> no recency window); 6 statuses + 4 SpecificType values VERBATIM via returnDistinctValues; per-record PublicNoticeURL (DecisionURL/StaffReportURL also present); no ZIP column -> spatial_zip_radius_mi 3 with own XY points. REAL server path is gis.clark.wa.gov/arcgisfed/ - the /arcgis/ and /gisserver/ roots 404 (the recon 'dead' was a wrong-URL guess); found via org-scoped AGO search (orgid:ylxwjFBdCPBzP16d)."
   }
  ]
 }
