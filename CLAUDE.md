@@ -809,6 +809,36 @@ legal/framing change not covered by the one-time sign-off.
   anonymous portal (a 200 there is NOT an org). Receipts: docs/source-registry.md
   "MICHIGAN WIRE PASS" + "MI checkpoint C". Reproducible seed:
   docs/michigan-development-reports-seed.sql.
+- 🟢 **MASSACHUSETTS IS LIVE UNDER THE SUBSTANCE GATE — 627/627 modeled MA ZIPs cached
+  (incl. the founder-approved SUFFOLK 35-ZIP EXPANSION), 4 first-party permit sources,
+  587 pages auto-indexable (no manual flip)** (DB-verified 2026-07-15). Eighth
+  development state, and the first with a **CKAN source**: the new ADDITIVE
+  `sources/ckan.ts` connector (datastore_search_sql; same coverage-gate/fail-closed/
+  anti-fabrication contract as socrata/arcgis; offline unit-tested incl. a bidirectional
+  gate proof) carries **boston-approved-building-permits** — fresh same-day (issued_date
+  2026-07-15T01:47), native `zip` + own lat/lng over 656,762 rows, statuses verbatim
+  (Open+Issued→approved, Closed→operating, Stop Work→exclude), FOUNDER WHITELIST (keep
+  Erect/New Construction, Long Form/Alteration, Amendment to a Long Form, Foundation,
+  Use of Premises; DROP Short Form Bldg Permit — 189k minor jobs), founder-accepted
+  dataset-precision record_url (no per-row URL column — templating one would be
+  guessing). Boston pages exist because the **Suffolk expansion** modeled 35 standard
+  ZIPs (Boston/Chelsea/Revere/Winthrop, migration `suffolk_boston_zip_expansion`) under
+  the existing county root. Plus the **Cambridge Socrata trio** (new-construction /
+  addition-alteration / demolition; fresh daily; Active/Complete verbatim; Socrata
+  `point` column → the IL spatial within_circle option, zero new code). Every modeled
+  MA ZIP has a cached row (zipcodes v3.0.0, 0 quarantined — 05501/05544 are Andover IRS
+  ZIPs physically in MA) and a materialized page — **610 pass + 17 coverage_coming
+  honest empties; 0 unsourced, 0 count mismatches, 0 sites missing coords**. **53 of
+  627 ZIPs dev-backed (8%), 22,112 dev records.** The **bidirectional coverage-gate
+  proof ran with live receipts**: 02128 carries ONLY boston-*, 02138 ONLY cambridge-*
+  (the Suffolk entry stayed off the Middlesex page), 48226 ONLY detroit-* — plus the
+  unit-level never-fetches assertions. Statewide/metro rejects with receipts: no MA
+  statewide per-record permit source exists (MassGIS = MassDEP environmental permits +
+  polygons; data.mass.gov is a Hub, not Socrata); **Worcester STALLED at 2025-09-09**
+  (→ nightly reprobe list; NOTE: AGO hosted-table LIKE counts are unreliable — order-by-
+  desc is the freshness probe); Springfield has no first-party source; Somerville
+  ungeolocatable. Receipts: docs/source-registry.md "MASSACHUSETTS WIRE PASS".
+  Reproducible seed: docs/massachusetts-development-reports-seed.sql.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
