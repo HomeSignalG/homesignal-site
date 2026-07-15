@@ -759,6 +759,27 @@ legal/framing change not covered by the one-time sign-off.
   reach 3.5 MB / 3,160 sites (Minneapolis 55407), so verify-development/geocodes now use
   ADAPTIVE page sizes (halve on failure, floor 1 = the live page's own single-row read
   path, verified servable). Reproducible seed: docs/minnesota-development-reports-seed.sql.
+- 🟢 **ILLINOIS IS LIVE UNDER THE SUBSTANCE GATE — 474/474 modeled IL ZIPs cached, 1
+  first-party permit source, 445 pages auto-indexable (no manual flip)** (DB-verified
+  2026-07-15). Sixth development state: every modeled IL ZIP has a cached row (zipcodes
+  v3.0.0 centroids) and a materialized page — **469 pass + 5 coverage_coming honest
+  empties; 0 unsourced sites, 0 count mismatches, 0 sites missing coords**. **131 of 474
+  ZIPs dev-backed (28%)** via **chicago-building-permits** (Socrata `ydr8-5enu`, the
+  city's own permit ledger) — carried by a NEW additive **socrata spatial-scope option**
+  (`spatial_zip_radius_mi` + `spatial_point_col` → SoQL `within_circle`, mirroring the
+  arcgis pattern) because the dataset has per-record lat/lng but NO ZIP column; noise
+  permit classes (signs, electrical, easy-permit, elevator, scaffolding) are dropped AT
+  SOURCE via `extra_where` (only NEW CONSTRUCTION / RENOVATION-ALTERATION /
+  WRECKING-DEMOLITION / PORCH count), 365-day recency, fail-closed status buckets.
+  Dense-metro note: adjacent Chicago pages' 3-mi circles overlap, so the same permit
+  legitimately appears on neighboring ZIP pages (per-page counts are honest; heaviest row
+  618 KB — well under the MN 3.5 MB adaptive-loader ceiling). The corrected-URL retries
+  closed all five first-pass rejections with FIRM receipts — none wireable: Rockford org
+  live but 0 permit services, Champaign's "Building_Permit_Data" is a mislabeled 1-row
+  subdivision polygon layer, Will County's real root (gis.willcogis.org) exposes 0 public
+  permit services, Kane publishes only adopt-a-highway/bridge layers, DuPage's
+  address-points is an address registry (not permits). Receipts: docs/source-registry.md
+  "ILLINOIS WIRE PASS". Reproducible seed: docs/illinois-development-reports-seed.sql.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
