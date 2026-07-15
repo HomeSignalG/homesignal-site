@@ -58,6 +58,13 @@ export interface ArcgisRegistryEntry {
   /** Optional VERBATIM SQL clause AND'd into every query (entry-driven scoping — e.g. drop
    *  administrative-paperwork subtypes). Data, not code: the connector never inspects it. */
   extra_where?: string;
+  /** Dataset-level status for issued-ledger layers that carry NO status column (e.g. Detroit
+   *  BSEED: the layer publishes issuances only, so every row IS an issued permit). Applied
+   *  verbatim as each row's status_raw and bucketed through status_to_bucket like any live
+   *  value. Pair it with an extra_where guard on the row-level fact that backs the constant
+   *  (e.g. `issued_date IS NOT NULL`) so it never outruns the data. Never use it to override
+   *  a real status column — entries that have one keep mapping it. */
+  status_const?: string;
   /** Optional ZIP-scoping override for layers with NO ZIP column but a ZIP embedded in a text
    *  field (e.g. a full "…, UT 84604" address). A VERBATIM SQL template with a `{zip}` token,
    *  used as the ZIP clause INSTEAD of `{zip_col}='{zip}'` (e.g.
@@ -183,7 +190,7 @@ async function runEntry(
   report.fetched = rows.length;
 
   for (const row of rows) {
-    const statusRaw = String(readCol(row, entry.column_map.status_raw) ?? "").trim();
+    const statusRaw = String(entry.status_const ?? readCol(row, entry.column_map.status_raw) ?? "").trim();
     if (!statusRaw) { report.blank_status++; continue; }
     const bucket = lookup.get(statusRaw);
     if (bucket === undefined) { unmappedCount.set(statusRaw, (unmappedCount.get(statusRaw) ?? 0) + 1); continue; }

@@ -155,7 +155,9 @@ async function probeArcgisLayer(url, target) {
   if (!m.fields) return { result: 'not-a-layer', evidence: `no fields[] — ${m.mapName || m.serviceDescription ? 'service root, not a layer' : 'unrecognized shape'}` };
 
   const fieldNames = m.fields.map((f) => f.name);
-  const dateFields = m.fields.filter((f) => f.type === 'esriFieldTypeDate').map((f) => f.name);
+  // esriFieldTypeDateOnly is the newer temporal type (e.g. Detroit BSEED's issued_date) —
+  // recognizing only esriFieldTypeDate made those layers read as "no date column".
+  const dateFields = m.fields.filter((f) => f.type === 'esriFieldTypeDate' || f.type === 'esriFieldTypeDateOnly').map((f) => f.name);
   const geom = m.geometryType || '(none)';
   const info = { name: m.name || '', geom, rows: null };
 

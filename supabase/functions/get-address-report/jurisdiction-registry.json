@@ -1671,6 +1671,136 @@
    "spatial_zip_radius_mi": 3,
    "recency_days": 365,
    "_receipts": "2026-07-15: max issueDate 2026-07-13 (item modified 2026-07-14; monitor freshness probe agreed); 10 statuses + 6 permitType values VERBATIM via returnDistinctValues; Mechanical/Plumbing trade noise dropped at source. NO ZIP column and NO site-address column (applicantAddress1 is the APPLICANT's address - never used) -> spatial_zip_radius_mi 3, points from layer geometry (__lat/__lng, native wkid 4269 served as outSR 4326). 'Closed' EXCLUDED on purpose (ambiguous finaled-vs-administrative semantics - conservative, never fabricates a lifecycle). No per-record link column -> dataset_url precision."
+  },
+  {
+   "registry_id": "detroit-building-permits",
+   "platform": "arcgis",
+   "jurisdiction": "City of Detroit",
+   "coverage": [
+    {
+     "state": "MI",
+     "county": "Wayne"
+    }
+   ],
+   "service_url": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/bseed_building_permits/FeatureServer/0",
+   "dataset_url": "https://data.detroitmi.gov/datasets/86d47e86062e4beeb19344eb125b75d2",
+   "column_map": {
+    "title": [
+     "permit_type",
+     "work_description"
+    ],
+    "status_raw": null,
+    "type_source": "permit_type",
+    "file_date": "issued_date",
+    "address": "address",
+    "lat": "latitude",
+    "lng": "longitude",
+    "case_number": "record_id",
+    "zip": "zip_code"
+   },
+   "status_const": "Issued",
+   "status_to_bucket": {
+    "approved": [
+     "Issued"
+    ]
+   },
+   "type_map": {
+    "New": "Development",
+    "New Revision": "Development",
+    "Foundation Only": "Development",
+    "Addition": "Development",
+    "Add Addition Use": "Development",
+    "Add Additional Occupancy/Use": "Development",
+    "Alteration": "Development",
+    "Alter Revision": "Development",
+    "Accessory/Utility Structure": "Development",
+    "Change of Occupancy/Use": "Development",
+    "Change of Use": "Development",
+    "Residential Rehab": "Residential"
+   },
+   "extra_where": "issued_date IS NOT NULL AND permit_type IN ('Accessory/Utility Structure','Add Addition Use','Add Additional Occupancy/Use','Addition','Alter Revision','Alteration','Change of Occupancy/Use','Change of Use','Foundation Only','New','New Revision','Residential Rehab')",
+   "recency_days": 365,
+   "_receipts": "2026-07-15: FRESH \u2014 max issued_date 2026-07-14 (pg_net stat). esriGeometryPoint, native zip_code + latitude/longitude columns; 16 permit_type values VERBATIM (returnDistinctValues) \u2014 Correct Violation / Fire Insurance Escrow / Fire Repair / Other dropped at source; NO status column (issuance ledger; field description: 'The permit is issued when the permit application is approved') -> dataset-level status via NEW status_const 'Issued', guarded by issued_date IS NOT NULL. issued_date is esriFieldTypeDateOnly (string dates; DATE literal filter live-verified: 522 rows since 2026-06-15). Receipt row 48226: BLD2026-00771 'Alteration' issued 2026-05-26. record_id is an Accela id but no per-row URL column and no verified portal URL pattern -> dataset-precision record_url (Denver/Minneapolis precedent). submitted_date exists but is unmapped (recency keys on issuance \u2014 the event this ledger records)."
+  },
+  {
+   "registry_id": "detroit-trades-permits",
+   "platform": "arcgis",
+   "jurisdiction": "City of Detroit",
+   "coverage": [
+    {
+     "state": "MI",
+     "county": "Wayne"
+    }
+   ],
+   "service_url": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/bseed_trades_permits/FeatureServer/0",
+   "dataset_url": "https://data.detroitmi.gov/datasets/f77e9fd44b7e44089b41d3f8161631fa",
+   "column_map": {
+    "title": [
+     "permit_type",
+     "work_description"
+    ],
+    "status_raw": null,
+    "type_source": "permit_type",
+    "file_date": "issued_date",
+    "address": "address",
+    "lat": "latitude",
+    "lng": "longitude",
+    "case_number": "record_id",
+    "zip": "zip_code"
+   },
+   "status_const": "Issued",
+   "status_to_bucket": {
+    "approved": [
+     "Issued"
+    ]
+   },
+   "type_map": {
+    "Boiler PV Permit": "Trades",
+    "Electrical Permit": "Trades",
+    "Elevator Permit": "Trades",
+    "Fire Alarm Permit": "Trades",
+    "Generator Permit": "Trades",
+    "Mechanical Permit": "Trades",
+    "Plumbing Permit": "Trades"
+   },
+   "extra_where": "issued_date IS NOT NULL AND permit_type IN ('Boiler PV Permit','Electrical Permit','Elevator Permit','Fire Alarm Permit','Generator Permit','Mechanical Permit','Plumbing Permit')",
+   "recency_days": 365,
+   "_receipts": "2026-07-15: FRESH \u2014 max issued_date 2026-07-14. Point layer, native zip_code + lat/lng; 7 permit_type values VERBATIM (all kept \u2014 FOUNDER-SPECIFIED: the Detroit trio explicitly includes Trades, unlike the trades-noise drop in WA/MN/IL; single-entry revert restores comparability). No status column -> status_const 'Issued' + issued_date IS NOT NULL guard."
+  },
+  {
+   "registry_id": "detroit-demolition-permits",
+   "platform": "arcgis",
+   "jurisdiction": "City of Detroit",
+   "coverage": [
+    {
+     "state": "MI",
+     "county": "Wayne"
+    }
+   ],
+   "service_url": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/bseed_demolition_permits/FeatureServer/0",
+   "dataset_url": "https://data.detroitmi.gov/datasets/56b20af695134bd1b4ab65e1876ae79b",
+   "column_map": {
+    "title": [
+     "work_description",
+     "address"
+    ],
+    "status_raw": null,
+    "file_date": "issued_date",
+    "address": "address",
+    "lat": "latitude",
+    "lng": "longitude",
+    "case_number": "record_id",
+    "zip": "zip_code"
+   },
+   "status_const": "Issued",
+   "status_to_bucket": {
+    "approved": [
+     "Issued"
+    ]
+   },
+   "extra_where": "issued_date IS NOT NULL",
+   "recency_days": 365,
+   "_receipts": "2026-07-15: FRESH \u2014 max issued_date 2026-07-10. Point layer, native zip_code + lat/lng; NO permit_type column (single-purpose demolition ledger \u2014 use_type stays unclassified, absent stays absent) and NO status column -> status_const 'Issued' + issued_date IS NOT NULL guard. Title falls back work_description -> address."
   }
  ]
 }
