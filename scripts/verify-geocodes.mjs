@@ -47,7 +47,7 @@ async function loadDevReports() {
   // out too. zip=gt.<last> is O(1) per page on the zip index. Transient-retried.
   // ADAPTIVE page size (mirrors verify-development): page cost is dominated by row SIZE —
   // a dense-metro row can carry thousands of `sites`, so even a small page can blow the
-  // statement timeout. On a failed page, halve the size (floor 5); recover after clean pages.
+  // statement timeout. On a failed page, halve the size (floor 1 — single-row keyset = the live page's own read path); recover after clean pages.
   const rows = [];
   let step = 40;
   let last = '';
@@ -58,7 +58,7 @@ async function loadDevReports() {
       (last ? `&zip=gt.${encodeURIComponent(last)}` : ''));
     if (!res.ok) {
       const body = await res.text();
-      if (step > 5) { step = Math.max(5, Math.floor(step / 2)); clean = 0; continue; }
+      if (step > 1) { step = Math.max(1, Math.floor(step / 2)); clean = 0; continue; }
       floorRetries++;
       if (floorRetries > 3) throw new Error(`development_reports read failed at floor page size: ${res.status} ${body}`);
       await sleep(2500 * floorRetries);

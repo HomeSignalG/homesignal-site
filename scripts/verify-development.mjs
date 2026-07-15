@@ -73,7 +73,7 @@ async function loadReports() {
     });
     if (!res.ok) {
       const body = await res.text();
-      if (step > 5) { step = Math.max(5, Math.floor(step / 2)); clean = 0; continue; }
+      if (step > 1) { step = Math.max(1, Math.floor(step / 2)); clean = 0; continue; }
       floorRetries++;
       if (floorRetries > 3) throw new Error(`Supabase development_reports read failed at floor page size: ${res.status} ${body}`);
       await new Promise((r) => setTimeout(r, 2500 * floorRetries));
