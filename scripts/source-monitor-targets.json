@@ -1,424 +1,438 @@
 {
-  "_readme": [
-    "Targets for the nightly source-monitor (scripts/source-monitor.mjs). PURE DATA \u2014",
-    "extending coverage of the monitor = appending an entry here, never editing the script.",
-    "",
-    "Two lists:",
-    "  \u2022 reprobe[] \u2014 sources previously REJECTED (dead / stale / frozen / blocked / broken /",
-    "    polygon-only) with the exact endpoint that was probed and the rejection receipt.",
-    "    The monitor re-probes each one nightly; if it has come back to life AND passes the",
-    "    fail-closed auto-wire gate, it is wired automatically. Source of these receipts:",
-    "    docs/source-registry.md 'Rejected' sections (2026-07-13 Texas passes).",
-    "  \u2022 discovery[] \u2014 jurisdictions currently on the facility floor (modeled ZIP pages,",
-    "    no development feed). Each carries its OFFICIAL first-party catalog endpoints only.",
-    "    The monitor walks these catalogs for permit/land-use layers and evaluates candidates",
-    "    through the same gate. NEVER add a search-engine or third-party aggregator here.",
-    "",
-    "hosts[] is a per-target allowlist: a candidate layer is only ever wired if its URL host",
-    "is in the target's allowlist. This is what stops the documented lookalike trap (the",
-    "'Building_Permits' hits that were actually Brampton, ON and Atlanta, GA data \u2014",
-    "docs/source-registry.md, slc-planning-petitions receipts).",
-    "",
-    "coverage is HUMAN-PINNED per target (state + county of the jurisdiction). The monitor",
-    "never derives coverage from data \u2014 a wired entry inherits it verbatim."
-  ],
-  "reprobe": [
-    {
-      "id": "denton-county-dev-permits",
-      "kind": "arcgis-layer",
-      "url": "https://gis.dentoncounty.gov/arcgis/rest/services/DEV_Permits/MapServer/0",
-      "jurisdiction": "Denton County",
-      "coverage": {
-        "state": "TX",
-        "county": "Denton"
-      },
-      "hosts": [
-        "gis.dentoncounty.gov"
-      ],
-      "rejected": "2026-07-13: frozen archive \u2014 newest record Jun 2023 (source-registry.md)"
-    },
-    {
-      "id": "mckinney-underconstruction",
-      "kind": "arcgis-layer",
-      "url": "https://services1.arcgis.com/B8MwidgHpU2dWUmv/arcgis/rest/services/UnderConstruction/FeatureServer/0",
-      "jurisdiction": "McKinney",
-      "coverage": {
-        "state": "TX",
-        "county": "Collin"
-      },
-      "hosts": [
-        "services1.arcgis.com"
-      ],
-      "rejected": "2026-07-13: stale \u2014 newest IssueDate Sep 2023 (source-registry.md)"
-    },
-    {
-      "id": "frisco-active-building-permits",
-      "kind": "arcgis-layer",
-      "url": "https://geo.friscotexas.gov/arcgis/rest/services/Layers_External/MapServer/77",
-      "jurisdiction": "Frisco",
-      "coverage": {
-        "state": "TX",
-        "county": "Collin"
-      },
-      "hosts": [
-        "geo.friscotexas.gov"
-      ],
-      "rejected": "2026-07-13: host blocks external IPs (TLS handshake timeout) \u2014 feed exists but unreachable"
-    },
-    {
-      "id": "frisco-active-zoning-sup-cases",
-      "kind": "arcgis-layer",
-      "url": "https://geo.friscotexas.gov/arcgis/rest/services/Layers_External/MapServer/73",
-      "jurisdiction": "Frisco",
-      "coverage": {
-        "state": "TX",
-        "county": "Collin"
-      },
-      "hosts": [
-        "geo.friscotexas.gov"
-      ],
-      "rejected": "2026-07-13: host blocks external IPs (TLS handshake timeout)"
-    },
-    {
-      "id": "allen-current-development-projects",
-      "kind": "arcgis-layer",
-      "url": "https://gismaps.cityofallen.org/arcgis/rest/services/CommunityDevelopment/Current_Development_Projects/FeatureServer/0",
-      "jurisdiction": "Allen",
-      "coverage": {
-        "state": "TX",
-        "county": "Collin"
-      },
-      "hosts": [
-        "gismaps.cityofallen.org"
-      ],
-      "rejected": "2026-07-13: POLYGON geometry with intersection-style locations \u2014 no point/ZIP path without new connector code"
-    },
-    {
-      "id": "el-paso-new-commercial",
-      "kind": "arcgis-layer",
-      "url": "https://gis.elpasotexas.gov/arcgis/rest/services/Planning/NewCommercial/MapServer/0",
-      "jurisdiction": "El Paso",
-      "coverage": {
-        "state": "TX",
-        "county": "El Paso"
-      },
-      "hosts": [
-        "gis.elpasotexas.gov"
-      ],
-      "rejected": "2026-07-13: broken attributes \u2014 blank statuses, year values in non-year fields"
-    },
-    {
-      "id": "el-paso-accela-building-permits",
-      "kind": "arcgis-layer",
-      "url": "https://gis.elpasotexas.gov/dev/rest/services/OpenData_Accela/BuildingPermits/FeatureServer/0",
-      "jurisdiction": "El Paso",
-      "coverage": {
-        "state": "TX",
-        "county": "El Paso"
-      },
-      "hosts": [
-        "gis.elpasotexas.gov"
-      ],
-      "rejected": "2026-07-13: OpenData_Accela extract probed during the max-coverage pass; did not pass the gate"
-    },
-    {
-      "id": "dallas-building-permits-e7gq",
-      "kind": "socrata-resource",
-      "domain": "www.dallasopendata.com",
-      "dataset_id": "e7gq-4sah",
-      "jurisdiction": "Dallas",
-      "coverage": {
-        "state": "TX",
-        "county": "Dallas"
-      },
-      "hosts": [
-        "www.dallasopendata.com"
-      ],
-      "rejected": "2026-07-13: frozen \u2014 dataset not updated for years"
-    },
-    {
-      "id": "dallas-building-permits-6ik7",
-      "kind": "socrata-resource",
-      "domain": "www.dallasopendata.com",
-      "dataset_id": "6ik7-4gqj",
-      "jurisdiction": "Dallas",
-      "coverage": {
-        "state": "TX",
-        "county": "Dallas"
-      },
-      "hosts": [
-        "www.dallasopendata.com"
-      ],
-      "rejected": "2026-07-13: frozen \u2014 dataset not updated for years"
-    },
-    {
-      "id": "fort-worth-development-permits-gate-validation",
-      "kind": "arcgis-layer",
-      "url": "https://mapit.fortworthtexas.gov/ags/rest/services/CIVIC/Permits/MapServer/0",
-      "jurisdiction": "Fort Worth",
-      "coverage": {
-        "state": "TX",
-        "county": "Tarrant"
-      },
-      "hosts": [
-        "mapit.fortworthtexas.gov"
-      ],
-      "rejected": "NOT rejected \u2014 this is the known-good LIVE wired layer, kept here as the auto-wire gate's validation reference. Nightly it reports 'already-wired' (doubling as a freshness check that the endpoint still answers); with --dry-run --include-wired the monitor rebuilds its entry from live data so the output can be diffed against the human-approved fort-worth-development-permits registry entry."
-    },
-    {
-      "id": "denton-city-portal",
-      "kind": "socrata-catalog",
-      "domain": "data.cityofdenton.com",
-      "jurisdiction": "Denton (city)",
-      "coverage": {
-        "state": "TX",
-        "county": "Denton"
-      },
-      "hosts": [
-        "data.cityofdenton.com"
-      ],
-      "rejected": "2026-07-13: portal dead (404)"
-    },
-    {
-      "id": "plano-portal",
-      "kind": "socrata-catalog",
-      "domain": "dashboard.plano.gov",
-      "jurisdiction": "Plano",
-      "coverage": {
-        "state": "TX",
-        "county": "Collin"
-      },
-      "hosts": [
-        "dashboard.plano.gov"
-      ],
-      "rejected": "2026-07-13: catalog only federates OTHER cities' datasets (Orlando/NOLA/NYC); no first-party permit resource"
-    },
-    {
-      "id": "aurora-open-data",
-      "kind": "dcat",
-      "url": "https://data.auroragov.org/api/feed/dcat-us/1.1.json",
-      "jurisdiction": "Aurora",
-      "coverage": {
-        "state": "CO",
-        "county": "Arapahoe"
-      },
-      "hosts": [
-        "data.auroragov.org",
-        "services.arcgis.com"
-      ],
-      "rejected": "2026-07-14: DNS does not resolve (ENOTFOUND) during the CO pass"
-    },
-    {
-      "id": "douglas-co-dcat",
-      "kind": "dcat",
-      "url": "https://data-dougco.opendata.arcgis.com/api/feed/dcat-us/1.1.json",
-      "jurisdiction": "Douglas County CO",
-      "coverage": {
-        "state": "CO",
-        "county": "Douglas"
-      },
-      "hosts": [
-        "data-dougco.opendata.arcgis.com",
-        "services.arcgis.com"
-      ],
-      "rejected": "2026-07-14: HTTP 500 CONT_0001 Item does not exist or is inaccessible"
-    },
-    {
-      "id": "stpaul-approved-building-permits",
-      "kind": "arcgis-layer",
-      "url": "https://services1.arcgis.com/9meaaHE3uiba0zr8/arcgis/rest/services/Approved_Building_Permits/FeatureServer/0",
-      "jurisdiction": "Saint Paul",
-      "coverage": {
-        "state": "MN",
-        "county": "Ramsey"
-      },
-      "hosts": [
-        "services1.arcgis.com"
-      ],
-      "rejected": "2026-07-15: STALLED snapshot - max ISSUEDATE 2025-06-30 (>12 months). Right shape (point, STATUS, FOLDER_TYPE Building/Demolition); wire if the city resumes publishing."
-    }
-  ],
-  "discovery": [
-    {
-      "id": "houston-ckan",
-      "kind": "ckan-catalog",
-      "url": "https://data.houstontx.gov",
-      "jurisdiction": "Houston",
-      "coverage": {
-        "state": "TX",
-        "county": "Harris"
-      },
-      "hosts": [
-        "data.houstontx.gov"
-      ]
-    },
-    {
-      "id": "houston-cohgis",
-      "kind": "arcgis-root",
-      "url": "https://mycity2.houstontx.gov/pubgis02/rest/services",
-      "jurisdiction": "Houston",
-      "coverage": {
-        "state": "TX",
-        "county": "Harris"
-      },
-      "hosts": [
-        "mycity2.houstontx.gov"
-      ]
-    },
-    {
-      "id": "el-paso-open-data",
-      "kind": "dcat",
-      "url": "https://data.elpasotexas.gov/api/feed/dcat-us/1.1.json",
-      "jurisdiction": "El Paso",
-      "coverage": {
-        "state": "TX",
-        "county": "El Paso"
-      },
-      "hosts": [
-        "data.elpasotexas.gov",
-        "gis.elpasotexas.gov",
-        "services.arcgis.com"
-      ]
-    },
-    {
-      "id": "arlington-open-data",
-      "kind": "dcat",
-      "url": "https://data.arlingtontx.gov/api/feed/dcat-us/1.1.json",
-      "jurisdiction": "Arlington",
-      "coverage": {
-        "state": "TX",
-        "county": "Tarrant"
-      },
-      "hosts": [
-        "data.arlingtontx.gov",
-        "gis.arlingtontx.gov",
-        "gis2.arlingtontx.gov",
-        "services.arcgis.com"
-      ]
-    },
-    {
-      "id": "dallas-open-data",
-      "kind": "socrata-catalog",
-      "domain": "www.dallasopendata.com",
-      "jurisdiction": "Dallas",
-      "coverage": {
-        "state": "TX",
-        "county": "Dallas"
-      },
-      "hosts": [
-        "www.dallasopendata.com"
-      ]
-    },
-    {
-      "id": "mckinney-arcgis",
-      "kind": "arcgis-root",
-      "url": "https://maps.mckinneytexas.org/mckinney/rest/services",
-      "jurisdiction": "McKinney",
-      "coverage": {
-        "state": "TX",
-        "county": "Collin"
-      },
-      "hosts": [
-        "maps.mckinneytexas.org"
-      ]
-    },
-    {
-      "id": "denton-county-arcgis",
-      "kind": "arcgis-root",
-      "url": "https://gis.dentoncounty.gov/arcgis/rest/services",
-      "jurisdiction": "Denton County",
-      "coverage": {
-        "state": "TX",
-        "county": "Denton"
-      },
-      "hosts": [
-        "gis.dentoncounty.gov"
-      ]
-    },
-    {
-      "id": "jeffco-dcat",
-      "kind": "dcat",
-      "url": "https://data-jeffersoncounty.opendata.arcgis.com/api/feed/dcat-us/1.1.json",
-      "jurisdiction": "Jefferson County CO",
-      "coverage": {
-        "state": "CO",
-        "county": "Jefferson"
-      },
-      "hosts": [
-        "data-jeffersoncounty.opendata.arcgis.com",
-        "gisportal.jeffco.us",
-        "services.arcgis.com"
-      ]
-    },
-    {
-      "id": "adams-co-dcat",
-      "kind": "dcat",
-      "url": "https://data-adcogov.opendata.arcgis.com/api/feed/dcat-us/1.1.json",
-      "jurisdiction": "Adams County CO",
-      "coverage": {
-        "state": "CO",
-        "county": "Adams"
-      },
-      "hosts": [
-        "data-adcogov.opendata.arcgis.com",
-        "services3.arcgis.com"
-      ]
-    },
-    {
-      "id": "boulder-city-dcat",
-      "kind": "dcat",
-      "url": "https://open-data.bouldercolorado.gov/api/feed/dcat-us/1.1.json",
-      "jurisdiction": "City of Boulder",
-      "coverage": {
-        "state": "CO",
-        "county": "Boulder"
-      },
-      "hosts": [
-        "open-data.bouldercolorado.gov",
-        "gis.bouldercolorado.gov",
-        "services.arcgis.com"
-      ]
-    },
-    {
-      "id": "fort-collins-hub-dcat",
-      "kind": "dcat",
-      "url": "https://open-data-fcgov.hub.arcgis.com/api/feed/dcat-us/1.1.json",
-      "jurisdiction": "City of Fort Collins",
-      "coverage": {
-        "state": "CO",
-        "county": "Larimer"
-      },
-      "hosts": [
-        "open-data-fcgov.hub.arcgis.com",
-        "services1.arcgis.com"
-      ]
-    },
-    {
-      "id": "denver-dcat",
-      "kind": "dcat",
-      "url": "https://opendata-geospatialdenver.hub.arcgis.com/api/feed/dcat-us/1.1.json",
-      "jurisdiction": "City and County of Denver",
-      "coverage": {
-        "state": "CO",
-        "county": "Denver"
-      },
-      "hosts": [
-        "opendata-geospatialdenver.hub.arcgis.com",
-        "services1.arcgis.com"
-      ]
-    },
-    {
-      "id": "springs-gis-root",
-      "kind": "arcgis-root",
-      "url": "https://gis.coloradosprings.gov/arcgis/rest/services",
-      "jurisdiction": "City of Colorado Springs",
-      "coverage": {
-        "state": "CO",
-        "county": "El Paso"
-      },
-      "hosts": [
-        "gis.coloradosprings.gov"
-      ]
-    }
-  ]
+ "_readme": [
+  "Targets for the nightly source-monitor (scripts/source-monitor.mjs). PURE DATA \u2014",
+  "extending coverage of the monitor = appending an entry here, never editing the script.",
+  "",
+  "Two lists:",
+  "  \u2022 reprobe[] \u2014 sources previously REJECTED (dead / stale / frozen / blocked / broken /",
+  "    polygon-only) with the exact endpoint that was probed and the rejection receipt.",
+  "    The monitor re-probes each one nightly; if it has come back to life AND passes the",
+  "    fail-closed auto-wire gate, it is wired automatically. Source of these receipts:",
+  "    docs/source-registry.md 'Rejected' sections (2026-07-13 Texas passes).",
+  "  \u2022 discovery[] \u2014 jurisdictions currently on the facility floor (modeled ZIP pages,",
+  "    no development feed). Each carries its OFFICIAL first-party catalog endpoints only.",
+  "    The monitor walks these catalogs for permit/land-use layers and evaluates candidates",
+  "    through the same gate. NEVER add a search-engine or third-party aggregator here.",
+  "",
+  "hosts[] is a per-target allowlist: a candidate layer is only ever wired if its URL host",
+  "is in the target's allowlist. This is what stops the documented lookalike trap (the",
+  "'Building_Permits' hits that were actually Brampton, ON and Atlanta, GA data \u2014",
+  "docs/source-registry.md, slc-planning-petitions receipts).",
+  "",
+  "coverage is HUMAN-PINNED per target (state + county of the jurisdiction). The monitor",
+  "never derives coverage from data \u2014 a wired entry inherits it verbatim."
+ ],
+ "reprobe": [
+  {
+   "id": "denton-county-dev-permits",
+   "kind": "arcgis-layer",
+   "url": "https://gis.dentoncounty.gov/arcgis/rest/services/DEV_Permits/MapServer/0",
+   "jurisdiction": "Denton County",
+   "coverage": {
+    "state": "TX",
+    "county": "Denton"
+   },
+   "hosts": [
+    "gis.dentoncounty.gov"
+   ],
+   "rejected": "2026-07-13: frozen archive \u2014 newest record Jun 2023 (source-registry.md)"
+  },
+  {
+   "id": "mckinney-underconstruction",
+   "kind": "arcgis-layer",
+   "url": "https://services1.arcgis.com/B8MwidgHpU2dWUmv/arcgis/rest/services/UnderConstruction/FeatureServer/0",
+   "jurisdiction": "McKinney",
+   "coverage": {
+    "state": "TX",
+    "county": "Collin"
+   },
+   "hosts": [
+    "services1.arcgis.com"
+   ],
+   "rejected": "2026-07-13: stale \u2014 newest IssueDate Sep 2023 (source-registry.md)"
+  },
+  {
+   "id": "frisco-active-building-permits",
+   "kind": "arcgis-layer",
+   "url": "https://geo.friscotexas.gov/arcgis/rest/services/Layers_External/MapServer/77",
+   "jurisdiction": "Frisco",
+   "coverage": {
+    "state": "TX",
+    "county": "Collin"
+   },
+   "hosts": [
+    "geo.friscotexas.gov"
+   ],
+   "rejected": "2026-07-13: host blocks external IPs (TLS handshake timeout) \u2014 feed exists but unreachable"
+  },
+  {
+   "id": "frisco-active-zoning-sup-cases",
+   "kind": "arcgis-layer",
+   "url": "https://geo.friscotexas.gov/arcgis/rest/services/Layers_External/MapServer/73",
+   "jurisdiction": "Frisco",
+   "coverage": {
+    "state": "TX",
+    "county": "Collin"
+   },
+   "hosts": [
+    "geo.friscotexas.gov"
+   ],
+   "rejected": "2026-07-13: host blocks external IPs (TLS handshake timeout)"
+  },
+  {
+   "id": "allen-current-development-projects",
+   "kind": "arcgis-layer",
+   "url": "https://gismaps.cityofallen.org/arcgis/rest/services/CommunityDevelopment/Current_Development_Projects/FeatureServer/0",
+   "jurisdiction": "Allen",
+   "coverage": {
+    "state": "TX",
+    "county": "Collin"
+   },
+   "hosts": [
+    "gismaps.cityofallen.org"
+   ],
+   "rejected": "2026-07-13: POLYGON geometry with intersection-style locations \u2014 no point/ZIP path without new connector code"
+  },
+  {
+   "id": "el-paso-new-commercial",
+   "kind": "arcgis-layer",
+   "url": "https://gis.elpasotexas.gov/arcgis/rest/services/Planning/NewCommercial/MapServer/0",
+   "jurisdiction": "El Paso",
+   "coverage": {
+    "state": "TX",
+    "county": "El Paso"
+   },
+   "hosts": [
+    "gis.elpasotexas.gov"
+   ],
+   "rejected": "2026-07-13: broken attributes \u2014 blank statuses, year values in non-year fields"
+  },
+  {
+   "id": "el-paso-accela-building-permits",
+   "kind": "arcgis-layer",
+   "url": "https://gis.elpasotexas.gov/dev/rest/services/OpenData_Accela/BuildingPermits/FeatureServer/0",
+   "jurisdiction": "El Paso",
+   "coverage": {
+    "state": "TX",
+    "county": "El Paso"
+   },
+   "hosts": [
+    "gis.elpasotexas.gov"
+   ],
+   "rejected": "2026-07-13: OpenData_Accela extract probed during the max-coverage pass; did not pass the gate"
+  },
+  {
+   "id": "dallas-building-permits-e7gq",
+   "kind": "socrata-resource",
+   "domain": "www.dallasopendata.com",
+   "dataset_id": "e7gq-4sah",
+   "jurisdiction": "Dallas",
+   "coverage": {
+    "state": "TX",
+    "county": "Dallas"
+   },
+   "hosts": [
+    "www.dallasopendata.com"
+   ],
+   "rejected": "2026-07-13: frozen \u2014 dataset not updated for years"
+  },
+  {
+   "id": "dallas-building-permits-6ik7",
+   "kind": "socrata-resource",
+   "domain": "www.dallasopendata.com",
+   "dataset_id": "6ik7-4gqj",
+   "jurisdiction": "Dallas",
+   "coverage": {
+    "state": "TX",
+    "county": "Dallas"
+   },
+   "hosts": [
+    "www.dallasopendata.com"
+   ],
+   "rejected": "2026-07-13: frozen \u2014 dataset not updated for years"
+  },
+  {
+   "id": "fort-worth-development-permits-gate-validation",
+   "kind": "arcgis-layer",
+   "url": "https://mapit.fortworthtexas.gov/ags/rest/services/CIVIC/Permits/MapServer/0",
+   "jurisdiction": "Fort Worth",
+   "coverage": {
+    "state": "TX",
+    "county": "Tarrant"
+   },
+   "hosts": [
+    "mapit.fortworthtexas.gov"
+   ],
+   "rejected": "NOT rejected \u2014 this is the known-good LIVE wired layer, kept here as the auto-wire gate's validation reference. Nightly it reports 'already-wired' (doubling as a freshness check that the endpoint still answers); with --dry-run --include-wired the monitor rebuilds its entry from live data so the output can be diffed against the human-approved fort-worth-development-permits registry entry."
+  },
+  {
+   "id": "denton-city-portal",
+   "kind": "socrata-catalog",
+   "domain": "data.cityofdenton.com",
+   "jurisdiction": "Denton (city)",
+   "coverage": {
+    "state": "TX",
+    "county": "Denton"
+   },
+   "hosts": [
+    "data.cityofdenton.com"
+   ],
+   "rejected": "2026-07-13: portal dead (404)"
+  },
+  {
+   "id": "plano-portal",
+   "kind": "socrata-catalog",
+   "domain": "dashboard.plano.gov",
+   "jurisdiction": "Plano",
+   "coverage": {
+    "state": "TX",
+    "county": "Collin"
+   },
+   "hosts": [
+    "dashboard.plano.gov"
+   ],
+   "rejected": "2026-07-13: catalog only federates OTHER cities' datasets (Orlando/NOLA/NYC); no first-party permit resource"
+  },
+  {
+   "id": "aurora-open-data",
+   "kind": "dcat",
+   "url": "https://data.auroragov.org/api/feed/dcat-us/1.1.json",
+   "jurisdiction": "Aurora",
+   "coverage": {
+    "state": "CO",
+    "county": "Arapahoe"
+   },
+   "hosts": [
+    "data.auroragov.org",
+    "services.arcgis.com"
+   ],
+   "rejected": "2026-07-14: DNS does not resolve (ENOTFOUND) during the CO pass"
+  },
+  {
+   "id": "douglas-co-dcat",
+   "kind": "dcat",
+   "url": "https://data-dougco.opendata.arcgis.com/api/feed/dcat-us/1.1.json",
+   "jurisdiction": "Douglas County CO",
+   "coverage": {
+    "state": "CO",
+    "county": "Douglas"
+   },
+   "hosts": [
+    "data-dougco.opendata.arcgis.com",
+    "services.arcgis.com"
+   ],
+   "rejected": "2026-07-14: HTTP 500 CONT_0001 Item does not exist or is inaccessible"
+  },
+  {
+   "id": "stpaul-approved-building-permits",
+   "kind": "arcgis-layer",
+   "url": "https://services1.arcgis.com/9meaaHE3uiba0zr8/arcgis/rest/services/Approved_Building_Permits/FeatureServer/0",
+   "jurisdiction": "Saint Paul",
+   "coverage": {
+    "state": "MN",
+    "county": "Ramsey"
+   },
+   "hosts": [
+    "services1.arcgis.com"
+   ],
+   "rejected": "2026-07-15: STALLED snapshot - max ISSUEDATE 2025-06-30 (>12 months). Right shape (point, STATUS, FOLDER_TYPE Building/Demolition); wire if the city resumes publishing."
+  },
+  {
+   "id": "worcester-building-permits",
+   "kind": "arcgis-layer",
+   "url": "https://services1.arcgis.com/j8dqo2DJE7mVUBU1/arcgis/rest/services/Building_Permits/FeatureServer/0",
+   "jurisdiction": "Worcester",
+   "coverage": {
+    "state": "MA",
+    "county": "Worcester"
+   },
+   "hosts": [
+    "services1.arcgis.com"
+   ],
+   "rejected": "2026-07-15: STALLED snapshot - newest Permit_License_Issued_Date 2025-09-09 (10 months; verified by order-by-desc \u2014 LIKE counts on this hosted table are unreliable). Right shape otherwise (52,108 rows, statuses Complete/Active verbatim, addresses embed 'Worcester MA <zip>'); geometry NONE (table) so a wire needs the geocode path. Wire if the city resumes publishing."
+  }
+ ],
+ "discovery": [
+  {
+   "id": "houston-ckan",
+   "kind": "ckan-catalog",
+   "url": "https://data.houstontx.gov",
+   "jurisdiction": "Houston",
+   "coverage": {
+    "state": "TX",
+    "county": "Harris"
+   },
+   "hosts": [
+    "data.houstontx.gov"
+   ]
+  },
+  {
+   "id": "houston-cohgis",
+   "kind": "arcgis-root",
+   "url": "https://mycity2.houstontx.gov/pubgis02/rest/services",
+   "jurisdiction": "Houston",
+   "coverage": {
+    "state": "TX",
+    "county": "Harris"
+   },
+   "hosts": [
+    "mycity2.houstontx.gov"
+   ]
+  },
+  {
+   "id": "el-paso-open-data",
+   "kind": "dcat",
+   "url": "https://data.elpasotexas.gov/api/feed/dcat-us/1.1.json",
+   "jurisdiction": "El Paso",
+   "coverage": {
+    "state": "TX",
+    "county": "El Paso"
+   },
+   "hosts": [
+    "data.elpasotexas.gov",
+    "gis.elpasotexas.gov",
+    "services.arcgis.com"
+   ]
+  },
+  {
+   "id": "arlington-open-data",
+   "kind": "dcat",
+   "url": "https://data.arlingtontx.gov/api/feed/dcat-us/1.1.json",
+   "jurisdiction": "Arlington",
+   "coverage": {
+    "state": "TX",
+    "county": "Tarrant"
+   },
+   "hosts": [
+    "data.arlingtontx.gov",
+    "gis.arlingtontx.gov",
+    "gis2.arlingtontx.gov",
+    "services.arcgis.com"
+   ]
+  },
+  {
+   "id": "dallas-open-data",
+   "kind": "socrata-catalog",
+   "domain": "www.dallasopendata.com",
+   "jurisdiction": "Dallas",
+   "coverage": {
+    "state": "TX",
+    "county": "Dallas"
+   },
+   "hosts": [
+    "www.dallasopendata.com"
+   ]
+  },
+  {
+   "id": "mckinney-arcgis",
+   "kind": "arcgis-root",
+   "url": "https://maps.mckinneytexas.org/mckinney/rest/services",
+   "jurisdiction": "McKinney",
+   "coverage": {
+    "state": "TX",
+    "county": "Collin"
+   },
+   "hosts": [
+    "maps.mckinneytexas.org"
+   ]
+  },
+  {
+   "id": "denton-county-arcgis",
+   "kind": "arcgis-root",
+   "url": "https://gis.dentoncounty.gov/arcgis/rest/services",
+   "jurisdiction": "Denton County",
+   "coverage": {
+    "state": "TX",
+    "county": "Denton"
+   },
+   "hosts": [
+    "gis.dentoncounty.gov"
+   ]
+  },
+  {
+   "id": "jeffco-dcat",
+   "kind": "dcat",
+   "url": "https://data-jeffersoncounty.opendata.arcgis.com/api/feed/dcat-us/1.1.json",
+   "jurisdiction": "Jefferson County CO",
+   "coverage": {
+    "state": "CO",
+    "county": "Jefferson"
+   },
+   "hosts": [
+    "data-jeffersoncounty.opendata.arcgis.com",
+    "gisportal.jeffco.us",
+    "services.arcgis.com"
+   ]
+  },
+  {
+   "id": "adams-co-dcat",
+   "kind": "dcat",
+   "url": "https://data-adcogov.opendata.arcgis.com/api/feed/dcat-us/1.1.json",
+   "jurisdiction": "Adams County CO",
+   "coverage": {
+    "state": "CO",
+    "county": "Adams"
+   },
+   "hosts": [
+    "data-adcogov.opendata.arcgis.com",
+    "services3.arcgis.com"
+   ]
+  },
+  {
+   "id": "boulder-city-dcat",
+   "kind": "dcat",
+   "url": "https://open-data.bouldercolorado.gov/api/feed/dcat-us/1.1.json",
+   "jurisdiction": "City of Boulder",
+   "coverage": {
+    "state": "CO",
+    "county": "Boulder"
+   },
+   "hosts": [
+    "open-data.bouldercolorado.gov",
+    "gis.bouldercolorado.gov",
+    "services.arcgis.com"
+   ]
+  },
+  {
+   "id": "fort-collins-hub-dcat",
+   "kind": "dcat",
+   "url": "https://open-data-fcgov.hub.arcgis.com/api/feed/dcat-us/1.1.json",
+   "jurisdiction": "City of Fort Collins",
+   "coverage": {
+    "state": "CO",
+    "county": "Larimer"
+   },
+   "hosts": [
+    "open-data-fcgov.hub.arcgis.com",
+    "services1.arcgis.com"
+   ]
+  },
+  {
+   "id": "denver-dcat",
+   "kind": "dcat",
+   "url": "https://opendata-geospatialdenver.hub.arcgis.com/api/feed/dcat-us/1.1.json",
+   "jurisdiction": "City and County of Denver",
+   "coverage": {
+    "state": "CO",
+    "county": "Denver"
+   },
+   "hosts": [
+    "opendata-geospatialdenver.hub.arcgis.com",
+    "services1.arcgis.com"
+   ]
+  },
+  {
+   "id": "springs-gis-root",
+   "kind": "arcgis-root",
+   "url": "https://gis.coloradosprings.gov/arcgis/rest/services",
+   "jurisdiction": "City of Colorado Springs",
+   "coverage": {
+    "state": "CO",
+    "county": "El Paso"
+   },
+   "hosts": [
+    "gis.coloradosprings.gov"
+   ]
+  }
+ ]
 }
