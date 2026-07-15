@@ -821,3 +821,104 @@ composition, fail-closed without centroid, classic-path regression).
   the record layer is the PlanDevTracker (wired above).
 - **data.colorado.gov 'Building Permit Counts in Colorado'**: statewide AGGREGATE counts by
   jurisdiction, not per-permit records — wrong shape (Houston-CKAN class), not wired.
+
+---
+
+## 2026-07-15 — FIVE-STATE DISCOVERY PASS (MI / WA / IL / MN / MA) — RECON ONLY, NOTHING WIRED
+
+Reconnaissance for the "which state to populate next" decision. Method: 41 recon targets
+(Socrata catalogs, ArcGIS Hub DCAT feeds, county ArcGIS roots, CKAN portals, 3 known-candidate
+socrata resources) run through the source-monitor's fail-closed gate in `--dry-run` on a GitHub
+runner (run 29380144863, branch-only target set — NOT added to the nightly monitor), plus
+targeted pg_net receipts on the two headline datasets. 222 findings, 131 flagged, 0 auto-wired
+(dry-run; the gate requires human column-maps regardless). Every wire decision below still
+requires a human pass — this section is the evidence base, not a wiring change.
+
+### Verified-live structured candidates (receipts; NOT wired)
+- **Seattle — Building Permits** (Socrata `data.seattle.gov/76t5-zqzr`): max issueddate
+  **2026-07-11**, native `originalzip` (receipt row: 98199), `statuscurrent` ("Completed"),
+  `permitclass` ("Single Family/Duplex"), latitude/longitude. Existing socrata connector +
+  human column-map. Companion **Land Use Permits `ht3q-kdvx`** (found by catalog walk; the old
+  `uyyd-8gak` id is DEAD — views API 404). Lift: 47 modeled Seattle ZIPs.
+- **Chicago — Building Permits** (Socrata `data.cityofchicago.org/ydr8-5enu`): max issue_date
+  **2026-07-13**, latitude/longitude + street_number/street_name; `permit_status` sparse;
+  permit types include noise (receipt sample: "PERMIT - SIGNS") → type filter at source.
+  **No ZIP column** → needs a socrata-side spatial ZIP scope (within_circle mirror of the
+  arcgis `spatial_zip_radius_mi`) or geocode volume. Lift: 84 modeled Chicago ZIPs.
+- **Minneapolis — CCS Permits** (ArcGIS Hub `opendata.minneapolismn.gov` → CCS Permits layer):
+  **fresh, newest 2026-07-13** (monitor freshness probe), point layer, no address/ZIP columns →
+  exactly the Denver `spatial_zip_radius_mi` pattern. Lift: 42 modeled Minneapolis ZIPs.
+- **Detroit — Building / Trades / Demolition Permits + Plan Reviews** (ArcGIS Hub
+  `data.detroitmi.gov`): point layers with `address`, `submitted_date`/`issued_date`,
+  `permit_type`, `zip_code` (native), council_district. Flagged only because the lexicon lacks
+  the `issued_date` spelling — human column-map trivially resolves. **Freshness NOT yet
+  verified** (probe blocked on the date column) — verify max(issued_date) before any wire.
+  Lift: 31 modeled Detroit ZIPs.
+- **Cambridge MA — 10 permit datasets** (Socrata `data.cambridgema.gov`): Building Permits
+  New Construction `9qm7-wbdc` / Addition-Alteration `qu2z-8suj` / Demolition `kcfi-ackv` etc.,
+  all updated **2026-07-13** (daily), `full_address` + latitude/longitude + `status` +
+  issue_date. Human column-map only. Lift: 6 modeled Cambridge ZIPs.
+- **Bellevue WA — "Bellevue Permits (Pending, Ready to Issue, Issued, Open)"** (ArcGIS Hub
+  `data.bellevuewa.gov`, layer on services1.arcgis.com — probe skipped this pass only because
+  services1 wasn't on the recon allowlist): named-status permit layer, strong candidate,
+  needs the follow-up probe. Lift: 7 modeled Bellevue ZIPs.
+- **Pierce County WA — "Permits Pierce County"** (ArcGIS Hub `gisdata-piercecowa`): point
+  layer, **no status column** → San Antonio-style dataset-level-status judgment call. Lift:
+  subset of 65 Pierce ZIPs (county-issued/unincorporated; bound unknown).
+- **Worcester MA — Building/Electrical/Plumbing/Gas/Mechanical Permits** (ArcGIS Hub
+  `opendata.worcesterma.gov`): geometry "(none)" = TABLES → Boulder-style geocode path;
+  fields/freshness not yet probed. Lift: 15 modeled Worcester ZIPs if usable.
+- **DuPage County IL — "Address Points Under Development"** (gis.dupageco.org): point layer
+  with MUNICIPALITY + ZIPCODE but no date column, and it records address creation, not permit
+  cases — borderline semantics; needs a human judgment before any wire.
+- **Boston — "Approved Building Permits"** (CKAN `data.boston.gov`): live and excellent data,
+  BUT (a) generic connectors handle ArcGIS + Socrata only (CKAN connector = new code) and
+  (b) only **1 modeled Suffolk ZIP** (02212, a P.O. block) — near-zero lift today.
+
+### Rejected / dead / wrong-shape (receipts — do not re-derive)
+- **St. Paul MN**: `information.stpaul.gov` Socrata catalog API 404 ("Cannot GET
+  /api/catalog/v1") — the domain no longer serves a Socrata catalog. St. Paul open data has
+  moved/retired; no first-party permit feed found this pass.
+- **Ramsey County MN**: catalog reachable, **0 first-party** q=permit datasets (2 federated
+  hits ignored — the Plano trap).
+- **MN Geospatial Commons** (`gisdata.mn.gov`): CKAN API path differs from standard
+  (`/api/3/action/package_search` → non-success 200) — statewide commons carries aggregate/
+  reference layers anyway; not a per-permit source.
+- **Rochester MN / Dakota County MN**: `data.rochestermn.gov` ENOTFOUND; `gis.co.dakota.mn.us`
+  returns non-JSON 200 (not an open ArcGIS REST root at that path).
+- **Evanston IL**: `data.cityofevanston.org` Socrata catalog 404 — portal retired.
+- **Naperville IL**: `data.naperville.il.us` Socrata catalog 404 — portal retired.
+- **Cook County IL Socrata**: permit-pattern datasets are Assessor/asbestos/solid-waste/rock-
+  crusher (county regulatory, no lat/lng/date shape) — no municipal building-permit records
+  (suburban permitting is per-municipality; Cook does not publish it).
+- **Chicago Socrata (non-building)**: Transportation/CDPH/parking/park-event permit datasets —
+  wrong domain (street use, environmental, events), not development.
+- **Rockford IL**: `data-rockford.opendata.arcgis.com` — no Hub domain record (404).
+- **Champaign IL / Will County IL**: guessed ArcGIS roots 404 (no public REST root at
+  `gisportal.champaignil.gov` / `gis.willcountyillinois.com`). **Kane County IL**: ENOTFOUND.
+- **Lake County IL**: Hub live but permit-pattern hits are township ZONING polygons/UDO docs —
+  no case/permit records.
+- **Grand Rapids MI**: Hub live (`grdata-grandrapids`) but the only permit/planning-pattern
+  layer is "Planning - Historic Landmarks" — **no permit/case layers published**.
+- **Ann Arbor MI**: `data.a2gov.org` DCAT 404 (page exists, no DCAT feed at the Hub path).
+- **Oakland County MI**: `gisservices.oakgov.com` root live but planning/land-use hits are
+  POLYGON base-maps (Composite Master Plan, Current Land Use, Development Authority districts)
+  — no permit records. **Macomb / Kent County MI**: ArcGIS roots 404. **Lansing MI**:
+  `data.lansingmi.gov` ENOTFOUND.
+- **King County WA Socrata**: 2 first-party q=permit datasets, neither a development-permit
+  shape. **King County GIS Hub**: polygons + "Industrial Waste Permits" (enrichment-class, not
+  development). Unincorporated-King permit records not found this pass.
+- **Tacoma WA**: `geohub.cityoftacoma.org` DCAT path returns non-JSON 200 — Hub exists but the
+  standard feed path is wrong; needs a follow-up with the correct DCAT/search path.
+- **Bellingham WA**: `data.cob.org` same non-JSON-200 class. **Everett WA**: Hub domain 404.
+- **Spokane city/county WA**: guessed roots ENOTFOUND (`gis.spokanecity.org`,
+  `gis.spokanecounty.org`). **Clark County WA**: `gis.clark.wa.gov` root 404.
+  **Snohomish County WA**: `gis.snoco.org` root 404. **Vancouver WA**:
+  `data.cityofvancouver.us` ENOTFOUND. (All are URL-guess failures, not proof the counties
+  publish nothing — a second pass with correct portal URLs is warranted before final "no".)
+- **Somerville MA**: `Permits (vxgw-vmky)` frozen 2023-05-16; `Applications for Permits and
+  Licenses (nneb-s3f7)` fresh 2026-07-14 but **no address / lat/lng / ZIP columns** —
+  application ledger, ungeolocatable → unusable under v18 (no fabricated placement).
+- **Springfield MA**: no first-party open-data catalog found (guessed Hub domain 404).
+- **Minneapolis (non-CCS)**: planning/zoning layers are POLYGON base-maps; "Honey Bee Permits
+  2017" is stale/irrelevant.
