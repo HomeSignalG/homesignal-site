@@ -551,6 +551,7 @@ Deno.serve(async (req: Request) => {
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
       appToken: Deno.env.get("SOCRATA_APP_TOKEN") || undefined,
+      zipCentroid: { lat: clat, lng: clng },
     });
     // TASK 1 (ArcGIS twin) — same generic, coverage-gated connector for Esri/ArcGIS FeatureServer
     // permit/case layers (e.g. Salt Lake City building permits). Adding a jurisdiction is a

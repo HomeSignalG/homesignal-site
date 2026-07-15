@@ -88,6 +88,12 @@ export interface SocrataRegistryEntry {
   /** Optional VERBATIM SoQL clause ANDed into every query (drop noise types at source —
    *  mirror of the arcgis connector's extra_where). Data, not code. */
   extra_where?: string;
+  /** SPATIAL ZIP-scoping for datasets with NO ZIP column (mirror of the arcgis option):
+   *  within_circle(spatial_point_col, centroid, ±this many miles). Requires
+   *  spatial_point_col and deps.zipCentroid; records keep their own per-parcel points. */
+  spatial_zip_radius_mi?: number;
+  /** The Socrata Point column within_circle scopes on (e.g. Chicago's `location`). */
+  spatial_point_col?: string;
   /** true → fetch `.geojson` (geographic datasets expose geometry). */
   geographic?: boolean;
   /** Optional hard cap on rows pulled per dataset (safety net). Default 20000. */
@@ -158,6 +164,9 @@ export interface SocrataDeps {
   appToken?: string;
   /** Polite page size. Default 1000 (Socrata max without token is 1000). */
   pageSize?: number;
+  /** ZIP centroid of the report being built — required only by entries using
+   *  spatial_zip_radius_mi (the engine passes its home lat/lng). */
+  zipCentroid?: { lat: number; lng: number } | null;
 }
 
 // ───────────────────────────── engine entry point ─────────────────────────────
@@ -221,7 +230,12 @@ async function runEntry(
   const records: NormalizedRecord[] = [];
 
   const zipCol = firstCol(entry.column_map.zip);
-  if (!zipCol) {
+  const spatial = (entry.spatial_zip_radius_mi ?? 0) > 0;
+  if (spatial && (!deps.zipCentroid || !entry.spatial_point_col)) {
+    report.quarantined.push({ reason: "spatial_zip_radius_mi set but no zipCentroid/spatial_point_col — skipped", sample: entry.dataset_id });
+    return { records, report };
+  }
+  if (!zipCol && !spatial) {
     report.quarantined.push({ reason: "no zip column mapped — statewide dataset skipped for ZIP report", sample: entry.dataset_id });
     return { records, report };
   }
@@ -346,7 +360,7 @@ async function fetchRows(
   const pageSize = deps.pageSize ?? 1000;
   const maxRows = entry.max_rows ?? 20000;
   const ext = entry.geographic ? "geojson" : "json";
-  const where = buildWhere(entry, zip, zipCol);
+  const where = buildWhere(entry, zip, zipCol, deps.zipCentroid ?? null);
   const order = entry.incremental_field || ":id";
 
   const out: Record<string, unknown>[] = [];
@@ -367,9 +381,16 @@ async function fetchRows(
   return out.slice(0, maxRows);
 }
 
-/** ZIP filter (mandatory) AND'd with an optional entry-driven extra clause and recency window. */
-function buildWhere(entry: SocrataRegistryEntry, zip: string, zipCol: string): string {
-  const clauses = [`upper(${zipCol})='${zip.replace(/'/g, "''")}'`];
+/** ZIP filter (mandatory) AND'd with an optional entry-driven extra clause and recency window.
+ *  SPATIAL ZIP-scoping (entry-driven, mirror of arcgis spatial_zip_radius_mi): datasets with
+ *  NO ZIP column but a Socrata Point column (entry.spatial_point_col, e.g. Chicago's
+ *  `location`) scope via within_circle around the ZIP centroid — the engine's standard
+ *  centroid+radius ZIP approximation. Records keep their OWN per-parcel points. */
+function buildWhere(entry: SocrataRegistryEntry, zip: string, zipCol: string, centroid: { lat: number; lng: number } | null): string {
+  const spatial = (entry.spatial_zip_radius_mi ?? 0) > 0 && centroid && entry.spatial_point_col;
+  const clauses = [spatial
+    ? `within_circle(${entry.spatial_point_col}, ${centroid.lat}, ${centroid.lng}, ${Math.round((entry.spatial_zip_radius_mi as number) * 1609.34)})`
+    : `upper(${zipCol})='${zip.replace(/'/g, "''")}'`];
   // extra_where (additive, data-driven — the arcgis connector's twin): a VERBATIM SoQL
   // clause ANDed into every query, used to drop noise types AT SOURCE (e.g. Seattle's
   // ECA/street-exception and roof permits). The connector never inspects it.

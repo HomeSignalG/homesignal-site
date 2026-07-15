@@ -1004,3 +1004,22 @@ portals and produced substantive receipts. None yielded a wireable feed:
   = gis2.co.dakota.mn.us DCGIS MapServer/32 — an **assessor-style annual extract** (TAXPIN,
   PLAT, THEYEAR smallint, no status/type richness), **max THEYEAR = 2025** and year-granularity
   dates: wrong shape for a what's-changing tracker (v18: no structured status; no real dates).
+
+---
+
+## 2026-07-15 — ILLINOIS WIRE PASS, checkpoint A+B (founder-approved open of IL)
+
+New ADDITIVE connector option — **socrata `spatial_zip_radius_mi` + `spatial_point_col`**
+(mirror of the arcgis envelope option): datasets with NO ZIP column but a Socrata Point
+column scope via `within_circle(<col>, centroid, radius_m)`; records keep their OWN
+per-parcel points; fail-closed without a centroid/point column; offline unit-tested incl.
+classic zip-column regression.
+
+### Wired
+- **chicago-building-permits** (Socrata data.cityofchicago.org ydr8-5enu): fresh
+  **2026-07-13** (max issue_date); 11 types + 7 statuses VERBATIM; construction whitelist at
+  source (NEW CONSTRUCTION / RENOVATION-ALTERATION / WRECKING-DEMOLITION / PORCH — the
+  Express-program value uses an EN-DASH, captured verbatim); **323,651 NULL-status rows are
+  skipped fail-closed** (blank-status rule, never bucketed); spatial scoping on the `location`
+  Point column (live within_circle receipt: 8,414 in 3 mi of the Loop since 2025-07);
+  365-day window; dataset_url precision (no per-record link column).

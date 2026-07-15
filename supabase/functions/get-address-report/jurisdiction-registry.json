@@ -475,6 +475,63 @@
    "incremental_field": "applieddate",
    "recency_days": 365,
    "_receipts": "2026-07-15: max applieddate 2026-07-13; 19 statuses VERBATIM (distinct); types Master Use Permit (21,169) + Early Design Guidance (3,320) - both kept, no noise; per-record link.url. Successor of the DEAD uyyd-8gak id (views API 404)."
+  },
+  {
+   "registry_id": "chicago-building-permits",
+   "platform": "socrata",
+   "domain": "data.cityofchicago.org",
+   "dataset_id": "ydr8-5enu",
+   "dataset_url": "https://data.cityofchicago.org/Buildings/Building-Permits/ydr8-5enu",
+   "jurisdiction": "City of Chicago",
+   "coverage": [
+    {
+     "state": "IL",
+     "county": "Cook"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "permit_type",
+     "work_description"
+    ],
+    "status_raw": "permit_status",
+    "type_source": "permit_type",
+    "file_date": "issue_date",
+    "address": [
+     "street_number",
+     "street_direction",
+     "street_name"
+    ],
+    "lat": "latitude",
+    "lng": "longitude",
+    "case_number": "permit_"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "ACTIVE",
+     "PHASED PERMITTING"
+    ],
+    "operating": [
+     "COMPLETE"
+    ],
+    "exclude": [
+     "EXPIRED",
+     "SUSPENDED",
+     "CANCELLED",
+     "REVOKED"
+    ]
+   },
+   "type_map": {
+    "PERMIT - NEW CONSTRUCTION": "Development",
+    "PERMIT - RENOVATION/ALTERATION": "Development",
+    "PERMIT - WRECKING/DEMOLITION": "Development",
+    "PERMIT - PORCH CONSTRUCTION": "Residential"
+   },
+   "extra_where": "permit_type in ('PERMIT - NEW CONSTRUCTION','PERMIT - RENOVATION/ALTERATION','PERMIT - WRECKING/DEMOLITION','PERMIT - PORCH CONSTRUCTION')",
+   "spatial_zip_radius_mi": 3,
+   "spatial_point_col": "location",
+   "recency_days": 365,
+   "_receipts": "2026-07-15: max issue_date 2026-07-13; 11 permit_type + 7 permit_status values VERBATIM (groupBy); noise dropped at source (Express/Easy programs, SIGNS, ELEVATOR, SCAFFOLDING, reinstate/extension - NOTE the express value uses an EN-DASH); 323,651 rows carry NULL permit_status and are skipped fail-closed by the blank-status rule (never bucketed); NO ZIP column -> NEW socrata spatial_zip_radius_mi 3 on the `location` Point column (live within_circle receipt: 8,414 records in 3 mi of the Loop since 2025-07); records keep their own per-parcel latitude/longitude; no per-record link column -> dataset_url precision."
   }
  ],
  "arcgis": [
