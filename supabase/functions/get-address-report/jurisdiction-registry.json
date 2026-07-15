@@ -569,12 +569,12 @@
     ]
    },
    "type_map": {
-    "New Construction": "Development"
+    "Building: New Construction": "Development"
    },
    "spatial_zip_radius_mi": 3,
    "spatial_point_col": "coordinates",
    "recency_days": 365,
-   "_receipts": "2026-07-15 MA wire pass: fresh (max issue_date 2026-07-08; portal refreshes daily, rowsUpdatedAt 2026-07-13). Statuses VERBATIM via SODA group-by: Active(190)/Complete(159) \u2014 Active->approved, Complete->operating; nothing unmapped. Point column `coordinates` (dataTypeName point, live-verified) -> socrata spatial within_circle scoping (full_address embeds the ZIP but there is no zip column). Receipt row: 9 Copley St, Cambridge MA 02138 \u2014 3-story 6-unit new construction issued 2026-07-08. No per-row URL column -> dataset-precision record_url."
+   "_receipts": "2026-07-15 MA wire pass: fresh (max issue_date 2026-07-08; portal refreshes daily, rowsUpdatedAt 2026-07-13). Statuses VERBATIM via SODA group-by: Active(190)/Complete(159) \u2014 Active->approved, Complete->operating; nothing unmapped. Point column `coordinates` (dataTypeName point, live-verified) -> socrata spatial within_circle scoping (full_address embeds the ZIP but there is no zip column). Receipt row: 9 Copley St, Cambridge MA 02138 \u2014 3-story 6-unit new construction issued 2026-07-08. No per-row URL column -> dataset-precision record_url. CORRECTION 2026-07-15: verbatim permit_type is 'Building: New Construction' (prefixed) \u2014 type_map key fixed; display-identical (unclassified and Development both render on the neutral development layer)."
   },
   {
    "registry_id": "cambridge-building-permits-addition-alteration",
@@ -612,12 +612,12 @@
     ]
    },
    "type_map": {
-    "Addition/Alteration": "Development"
+    "Building: Alteration and Addition": "Development"
    },
    "spatial_zip_radius_mi": 3,
    "spatial_point_col": "coordinates",
    "recency_days": 365,
-   "_receipts": "2026-07-15 MA wire pass: fresh (rowsUpdatedAt 2026-07-13 daily). Statuses VERBATIM: Active(8607)/Complete(5535). Same schema family as 9qm7-wbdc (point `coordinates`, full_address, issue_date). 365d window caps the 14k-row history. Dataset-precision record_url."
+   "_receipts": "2026-07-15 MA wire pass: fresh (rowsUpdatedAt 2026-07-13 daily). Statuses VERBATIM: Active(8607)/Complete(5535). Same schema family as 9qm7-wbdc (point `coordinates`, full_address, issue_date). 365d window caps the 14k-row history. Dataset-precision record_url. CORRECTION 2026-07-15: verbatim permit_type is 'Building: Alteration and Addition' \u2014 type_map key fixed; display-identical."
   },
   {
    "registry_id": "cambridge-demolition-permits",
