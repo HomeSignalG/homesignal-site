@@ -1023,3 +1023,18 @@ classic zip-column regression.
   skipped fail-closed** (blank-status rule, never bucketed); spatial scoping on the `location`
   Point column (live within_circle receipt: 8,414 in 3 mi of the Loop since 2025-07);
   365-day window; dataset_url precision (no per-record link column).
+
+### IL checkpoint C — corrected-URL retry results (receipts — do not re-derive)
+The retries found REAL portals behind every first-pass URL-guess failure; none wireable:
+- **Rockford**: live AGO org (`Fh2bD9911cyi2gO2`) — org-scoped permit search returns **0
+  permit feature services**.
+- **Champaign**: live AGO org (`tpnvcOxxttZuMwYB`) — "Building_Permit_Data" (item 2019) is a
+  MISLABELED subdivision-polygon layer containing **1 row**; "Zoning - Special Use Permits"
+  is a zoning-district polygon base map. Nothing wireable.
+- **Will County**: real GIS root found at **gis.willcogis.org** (the willcountyillinois.com
+  guess was wrong) but it publishes **0 public services**.
+- **Kane County**: live AGO org (`oRKmdBXD6EbdmVgJ`) — only adopt-a-highway routes and 2019
+  bridge inspections; 0 permit layers.
+- **DuPage County**: "Address Points Under Development" FIRM REJECT — an address-assignment
+  registry (no date column, no permit status/type; it records address creation, not permit
+  cases). The county publishes no permit-record layer on gis.dupageco.org.
