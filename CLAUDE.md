@@ -839,6 +839,31 @@ legal/framing change not covered by the one-time sign-off.
   desc is the freshness probe); Springfield has no first-party source; Somerville
   ungeolocatable. Receipts: docs/source-registry.md "MASSACHUSETTS WIRE PASS".
   Reproducible seed: docs/massachusetts-development-reports-seed.sql.
+- 🟢 **NEW YORK IS LIVE UNDER THE SUBSTANCE GATE — 764/764 modeled NY ZIPs cached (incl.
+  the FIVE-BOROUGH EXPANSION), 2 first-party permit sources, 734 pages auto-indexable
+  (no manual flip)** (DB-verified 2026-07-15). Ninth development state, state 1 of the
+  founder's four-state run. **Key structural fix:** NY's modeled counties didn't include
+  the NYC boroughs, so the DOB feeds had zero page lift until migration
+  `nyc_borough_zip_expansion` (Boston precedent) added the New York/Kings/Queens/Bronx/
+  Richmond county roots + 245 `level=zip` pages (zipcodes v3.0.0; 10470 excluded — already
+  live under Westchester via the Census crosswalk); NY 519→764 ZIP pages, 0 dup slugs.
+  Every ZIP has a cached row and a materialized page — **758 pass + 6 coverage_coming
+  honest empties; 0 unsourced, 0 count mismatches, 0 sites missing coords**. **210 of 764
+  ZIPs dev-backed (27%), 66,006 dev records** via **nyc-dobnow-approved-permits** (Socrata
+  rbx6-tga4, fresh same-day; native zip + lat/lng; Permit Issued/Signed-off verbatim; 5 of
+  21 verbatim work_types kept — General Construction/Structural/Foundation/Earth Work/Full
+  Demolition; 16 noise types dropped at source) + **nyc-dob-permit-issuance** (ipu4-2q9a
+  BIS legacy — still updates daily for pre-DOB-NOW jobs; ISSUED/RE-ISSUED→approved,
+  IN PROCESS→proposed, REVOKED excluded, 11k blanks fail closed; NB/DM/AL/FO whitelist
+  drops EW 1.79M equipment-work rows, PL, EQ fences/sheds, SG signs at source). Receipts:
+  Brooklyn 11201 → 1,013 permits, UWS 10025 → 748, Staten Island 10306 → 716; Buffalo/
+  Rochester/Hempstead honest-0 on the facilities floor. Firm rejects with receipts:
+  Buffalo (every catalog permit item is a restricted VIEW — 403 "Cannot read rows"),
+  Syracuse (STALLED 2025-08-16 → nightly reprobe list), Rochester (no permit layer;
+  demolitions token-required), Albany (no portal; state copy frozen 2013), NY State (no
+  per-record source), Yonkers/Westchester/Nassau/Suffolk NY (no portals found). Receipts:
+  docs/source-registry.md "NEW YORK WIRE PASS". Reproducible seed:
+  docs/new-york-development-reports-seed.sql.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
