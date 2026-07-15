@@ -922,3 +922,53 @@ requires a human pass — this section is the evidence base, not a wiring change
 - **Springfield MA**: no first-party open-data catalog found (guessed Hub domain 404).
 - **Minneapolis (non-CCS)**: planning/zoning layers are POLYGON base-maps; "Honey Bee Permits
   2017" is stale/irrelevant.
+
+---
+
+## 2026-07-15 — WASHINGTON WIRE PASS (founder-approved open of WA)
+
+Six first-party feeds live-verified via pg_net (statuses/types VERBATIM via
+returnDistinctValues — never groupBy alone) and registered. New ADDITIVE connector option:
+**socrata `extra_where`** (twin of the arcgis one; ANDed into `$where`; offline unit-tested)
+so noise types drop AT SOURCE on Socrata datasets too.
+
+### Wired (receipts in each entry's `_receipts`)
+- **seattle-building-permits** (Socrata 76t5-zqzr): fresh 2026-07-11; native originalzip;
+  24 statuses/7 classes verbatim; per-record LinkToRecord url; ECA-exemption + Roof noise
+  dropped at source; 365d window (98103 = 12,981 all-time rows).
+- **seattle-land-use-permits** (Socrata ht3q-kdvx): fresh 2026-07-13; 19 statuses verbatim;
+  Master Use Permit + Early Design Guidance; per-record link. Replaces the DEAD uyyd-8gak.
+- **bellevue-permits** (AGO services1/EYzEZbDhXZjURPbP): fresh 2026-07-13, daily ~6AM refresh;
+  native ZIPCODE; 25 statuses verbatim (one with source trailing whitespace — connector trims);
+  35-code PERMITTYPE whitelist at source (descriptions carry trailing-space variants; codes
+  don't); 365d window (98004 = 27,744 all-time).
+- **tacoma-accela-permits** (AGO services3/SCwJH1pD8WSn5T5y): fresh 2026-07-13; native zip;
+  80 Accela statuses verbatim; permit_type whitelist Building/Land Use/Site; per-record
+  Accela link; 365d window (98402 = 8,359 all-time).
+- **pierce-county-pals-permits** (AGO services2/1UvBaQ5y1ubjUPmd): fresh 2026-07-09; 18
+  statuses + ~250 types verbatim, 53-type development whitelist at source; per-record PALS
+  link; NO ZIP column → spatial_zip_radius_mi 3 (own XY points, wkid 2927 → outSR 4326).
+- **clark-county-active-dev-permits** (gis.clark.wa.gov/**arcgisfed**/): ACTIVE land-use
+  cases, max Received 2026-05-22; 6 statuses + 4 types verbatim; per-record PublicNoticeURL;
+  spatial ZIP scoping. **The recon "dead" was a wrong-URL guess** — /arcgis/ and /gisserver/
+  404 but /arcgisfed/ serves; found via org-scoped AGO search.
+
+### Corrected-URL retry results — rejections with receipts (do not re-derive)
+- **STANDING ANSWER: `<org>.maps.arcgis.com/sharing/rest/search` WITHOUT `orgid:` searches ALL
+  of ArcGIS Online** — an unscoped q=permits returned Calgary, ON/AB lookalikes. Always scope
+  `q=… orgid:<orgId>` (orgId from `/sharing/rest/portals/self`).
+- **Snohomish County**: org is live (43 hits) but "Active Permits" (fresh 2026-07-14) is a
+  POLYGON parcel-join with only generalized GrpCategory/GrpStatus fields — no permit numbers,
+  addresses, dates, or record URLs (the recon polygon class). "Issued_Permits"/"Points_LDA_D_Issued"
+  frozen 2023-10. Nothing wireable without fabricating case identity.
+- **King County (unincorporated)**: gismaps.kingcounty.gov root IS live (earlier guess wrong)
+  but Accela folder is EMPTY and DLS/Planning folders carry district/zoning MapServers only —
+  no permit-record layer published.
+- **Spokane (city + county)**: no public AGO org found (cityofspokane/spokanecity portals/self
+  → generic portal); data-spokanecity Hub domain = PRIVATE org (401). No first-party feed
+  reachable this pass.
+- **Vancouver / Everett**: Hub domains exist but orgs are PRIVATE (401 "private org id … not
+  accessible").
+- **Bellingham**: data.cob.org serves the city WordPress site — no open-data API.
+- **Tacoma Socrata** (data.cityoftacoma.org): catalog probe returned empty/unreachable — the
+  city's live path is the AGO org (wired above).
