@@ -972,3 +972,35 @@ so noise types drop AT SOURCE on Socrata datasets too.
 - **Bellingham**: data.cob.org serves the city WordPress site — no open-data API.
 - **Tacoma Socrata** (data.cityoftacoma.org): catalog probe returned empty/unreachable — the
   city's live path is the AGO org (wired above).
+
+---
+
+## 2026-07-15 — MINNESOTA WIRE PASS (founder-approved open of MN)
+
+### Wired
+- **minneapolis-ccs-permits** (AGO services.arcgis.com/afSMGVsC7QlRK1kZ CCS_Permits): fresh
+  **2026-07-13** (max issueDate; item modified 2026-07-14); point layer, NO ZIP column and NO
+  site-address column → the Denver `spatial_zip_radius_mi` pattern, zero new code; 10 statuses
+  + 6 permitType values VERBATIM via returnDistinctValues; Mechanical/Plumbing trade noise
+  dropped at source; 'Closed' EXCLUDED on purpose (ambiguous finaled-vs-administrative
+  semantics — conservative, never fabricates a lifecycle); dataset_url record precision.
+
+### Corrected-URL retry results — rejections with receipts (do not re-derive)
+The four first-pass rejections were all URL-guess artifacts; the retries found the REAL
+portals and produced substantive receipts. None yielded a wireable feed:
+- **St. Paul**: live AGO org FOUND (`9meaaHE3uiba0zr8` "Saint Paul GIS" — the Socrata domain
+  is retired). "Approved Building Permits" has the right shape (point, STATUS, ISSUEDATE,
+  FOLDER_TYPE Building/Demolition whitelist-able) but is a **STALLED snapshot: max ISSUEDATE
+  2025-06-30**, >12 months old (McKinney-class reject). "PAULIE" (item fresh 2026-07) is the
+  city's ADDRESS REGISTRY (ADDRESSID/HOUSENUMBER/ZIP5), not permit records. Nothing else
+  fresher in the org. Re-probe candidate for the nightly monitor: the ABP layer, in case the
+  city resumes publishing.
+- **Ramsey County**: live AGO org FOUND (`527XtFVf9JKOTqu5`) but an org-scoped permit search
+  returns **0 permit feature services** (the Socrata catalog's 0-first-party receipt stands).
+- **Rochester / Olmsted County**: no public AGO org at any tried alias
+  (rochestermn / cityofrochester / olmstedcounty); data.rochestermn.gov DNS-dead. No
+  first-party structured permit feed found.
+- **Dakota County**: live AGO org FOUND (`CfhoRi2v351nuUH7`); "Building Permits (web layer)"
+  = gis2.co.dakota.mn.us DCGIS MapServer/32 — an **assessor-style annual extract** (TAXPIN,
+  PLAT, THEYEAR smallint, no status/type richness), **max THEYEAR = 2025** and year-granularity
+  dates: wrong shape for a what's-changing tracker (v18: no structured status; no real dates).

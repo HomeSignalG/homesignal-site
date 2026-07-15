@@ -1560,6 +1560,60 @@
    },
    "spatial_zip_radius_mi": 3,
    "_receipts": "2026-07-15: max Received 2026-05-22 (ACTIVE-cases layer, small + self-pruning -> no recency window); 6 statuses + 4 SpecificType values VERBATIM via returnDistinctValues; per-record PublicNoticeURL (DecisionURL/StaffReportURL also present); no ZIP column -> spatial_zip_radius_mi 3 with own XY points. REAL server path is gis.clark.wa.gov/arcgisfed/ - the /arcgis/ and /gisserver/ roots 404 (the recon 'dead' was a wrong-URL guess); found via org-scoped AGO search (orgid:ylxwjFBdCPBzP16d)."
+  },
+  {
+   "registry_id": "minneapolis-ccs-permits",
+   "platform": "arcgis",
+   "service_url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/CCS_Permits/FeatureServer/0",
+   "dataset_url": "https://opendata.minneapolismn.gov/datasets/91d7cc54f31a45b0982fca5117f16a0f",
+   "jurisdiction": "City of Minneapolis (CCS)",
+   "coverage": [
+    {
+     "state": "MN",
+     "county": "Hennepin"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "permitType",
+     "comments"
+    ],
+    "status_raw": "status",
+    "type_source": "permitType",
+    "file_date": "issueDate",
+    "decision_date": "completeDate",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "permitNumber"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "In Process",
+     "Open"
+    ],
+    "approved": [
+     "Issued"
+    ],
+    "exclude": [
+     "Cancelled",
+     "Closed",
+     "Denied",
+     "Expired",
+     "Stop Work",
+     "Void",
+     "Withdrawn"
+    ]
+   },
+   "type_map": {
+    "Commercial": "Commercial",
+    "Res": "Residential",
+    "Site": "Development",
+    "Wrecking": "Development"
+   },
+   "extra_where": "permitType IN ('Commercial','Res','Site','Wrecking')",
+   "spatial_zip_radius_mi": 3,
+   "recency_days": 365,
+   "_receipts": "2026-07-15: max issueDate 2026-07-13 (item modified 2026-07-14; monitor freshness probe agreed); 10 statuses + 6 permitType values VERBATIM via returnDistinctValues; Mechanical/Plumbing trade noise dropped at source. NO ZIP column and NO site-address column (applicantAddress1 is the APPLICANT's address - never used) -> spatial_zip_radius_mi 3, points from layer geometry (__lat/__lng, native wkid 4269 served as outSR 4326). 'Closed' EXCLUDED on purpose (ambiguous finaled-vs-administrative semantics - conservative, never fabricates a lifecycle). No per-record link column -> dataset_url precision."
   }
  ]
 }
