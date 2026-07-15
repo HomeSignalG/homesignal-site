@@ -222,6 +222,20 @@
         "services.arcgis.com"
       ],
       "rejected": "2026-07-14: HTTP 500 CONT_0001 Item does not exist or is inaccessible"
+    },
+    {
+      "id": "stpaul-approved-building-permits",
+      "kind": "arcgis-layer",
+      "url": "https://services1.arcgis.com/9meaaHE3uiba0zr8/arcgis/rest/services/Approved_Building_Permits/FeatureServer/0",
+      "jurisdiction": "Saint Paul",
+      "coverage": {
+        "state": "MN",
+        "county": "Ramsey"
+      },
+      "hosts": [
+        "services1.arcgis.com"
+      ],
+      "rejected": "2026-07-15: STALLED snapshot - max ISSUEDATE 2025-06-30 (>12 months). Right shape (point, STATUS, FOLDER_TYPE Building/Demolition); wire if the city resumes publishing."
     }
   ],
   "discovery": [

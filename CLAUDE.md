@@ -742,6 +742,23 @@ legal/framing change not covered by the one-time sign-off.
   Rejections with receipts: Snohomish polygon-only generalization, King County no permit
   layer, Spokane/Vancouver/Everett private or absent orgs, Bellingham no API. Reproducible
   seed: docs/washington-development-reports-seed.sql.
+- 🟢 **MINNESOTA IS LIVE UNDER THE SUBSTANCE GATE — 172/172 modeled MN ZIPs cached, 1
+  first-party permit source, 166 pages auto-indexable (no manual flip)** (DB + CI-verified
+  2026-07-15). Fifth development state: every modeled MN ZIP has a cached row (zipcodes
+  v3.0.0 centroids, 0 quarantined) and a materialized page — **170 pass + 2 coverage_coming
+  honest empties; 0 unsourced sites**. **28 of 172 ZIPs dev-backed (16%), 1,344 parcel-precise
+  records** via **minneapolis-ccs-permits** (fresh 2026-07-13, the Denver
+  `spatial_zip_radius_mi` pattern — zero new code; trades dropped at source; 'Closed'
+  EXCLUDED on purpose, conservative lifecycle). The corrected-URL retries found the REAL
+  portals behind all four first-pass URL-guess rejections — none wireable: **St. Paul's org
+  is live but its permits layer STALLED at 2025-06-30** (added to the nightly monitor's
+  reprobe list; PAULIE is an address registry, not permits), Ramsey org has 0 permit
+  services, Rochester/Olmsted have no public org, Dakota's layer is a year-granularity
+  assessor extract through 2025. Receipts: docs/source-registry.md "MINNESOTA WIRE PASS".
+  **New standing answer: verifier bulk reads are row-SIZE-dominated** — dense-metro rows
+  reach 3.5 MB / 3,160 sites (Minneapolis 55407), so verify-development/geocodes now use
+  ADAPTIVE page sizes (halve on failure, floor 1 = the live page's own single-row read
+  path, verified servable). Reproducible seed: docs/minnesota-development-reports-seed.sql.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
