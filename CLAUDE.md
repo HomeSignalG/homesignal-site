@@ -719,6 +719,29 @@ legal/framing change not covered by the one-time sign-off.
   fabricated marker). Source-supplied geometry is NEVER fenced** (a real parcel can legitimately
   sit far from a big county's centroid). PR #222; affected FW/Boulder ZIPs re-cached through the
   live v20 engine.
+- 🟢 **WASHINGTON IS LIVE UNDER THE SUBSTANCE GATE — 361/361 modeled WA ZIPs cached, 6
+  first-party permit sources, 327 pages auto-indexable (no manual flip)** (DB + CI-verified
+  2026-07-15). Fourth development state (UT/TX/CO playbook): every modeled WA ZIP has a cached
+  `development_reports` row (zipcodes v3.0.0 centroids, 0 quarantined) and a materialized app
+  page — **350 pass + 11 coverage_coming honest empties**; **0 unsourced sites**. **118 of 361
+  ZIPs carry development records (33%); 76 ZIPs carry parcel-precise projects (2,239 records)**
+  via 6 live-verified first-party sources (receipts in jurisdiction-registry `_receipts` +
+  docs/source-registry.md "WASHINGTON WIRE PASS"): Seattle Building + Land Use Permits
+  (Socrata, native ZIP, per-record links; noise dropped at source via the NEW additive
+  **socrata `extra_where`**), Bellevue (native ZIPCODE, 35-code type whitelist), Tacoma Accela
+  (native zip, per-record links), Pierce County PALS (53-type whitelist, spatial ZIP scoping),
+  Clark County active cases (the recon "dead" was a wrong-URL guess — live at /arcgisfed/).
+  **The substance gate did the index decision autonomously**: 327 pass+substance pages stamped
+  indexable, 23 pass-but-thin + 11 empties stay noindexed; the throttled sitemap listed 250
+  newcomers day one and deferred 77 to the next daily run. All three verifiers green on the
+  full walk — which surfaced and fixed a latent class: **PostgREST caps un-paginated reads at
+  1,000 rows** (bare `limit=100000` truncated silently once the meta table passed 1,000 rows) —
+  every verifier read is now keyset-paginated. Standing answer: unscoped
+  `sharing/rest/search` on ArcGIS Online returns cross-org lookalikes (a Calgary
+  "Building_Permits" surfaced for three WA orgs) — always scope `q=… orgid:<orgId>`.
+  Rejections with receipts: Snohomish polygon-only generalization, King County no permit
+  layer, Spokane/Vancouver/Everett private or absent orgs, Bellingham no API. Reproducible
+  seed: docs/washington-development-reports-seed.sql.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
