@@ -85,10 +85,20 @@ async function loadReports() {
 // A tracker page is indexable ONLY for one of these ZIPs when it rendered content;
 // everything else (thin, empty, coverage-coming, unmaterialized states) stays noindex.
 async function loadIndexableZips() {
-  const url = `${SUPABASE_URL}/rest/v1/app_community_meta?select=zip&indexable=is.true&limit=100000`;
-  const res = await fetch(url, { headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` } });
-  if (!res.ok) return new Set();
-  return new Set((await res.json()).map((r) => r.zip));
+  // KEYSET-paginated: PostgREST caps un-paginated reads at 1,000 rows — a bare
+  // limit=100000 silently truncated the advertised set once it passed 1,000 indexable
+  // ZIPs (WA's 99xxx pages read as flag=false and false-failed the gate assertion).
+  const zips = new Set();
+  for (let last = ''; ;) {
+    const url = `${SUPABASE_URL}/rest/v1/app_community_meta?select=zip&indexable=is.true&order=zip.asc&limit=1000` + (last ? `&zip=gt.${encodeURIComponent(last)}` : '');
+    const res = await fetch(url, { headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` } });
+    if (!res.ok) return zips;
+    const page = await res.json();
+    for (const r of page) zips.add(r.zip);
+    if (page.length < 1000) break;
+    last = page[page.length - 1].zip;
+  }
+  return zips;
 }
 
 // Property dossier rows (gap-analysis §4.5) — zero-touch: every cached address is verified.

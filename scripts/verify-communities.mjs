@@ -79,11 +79,22 @@ async function main() {
   // pages, the sitemap generator, and this verifier. Assertions:
   //   indexable=true  ⇒ page renders real records AND robots=index
   //   indexable=false ⇒ robots=noindex (pass-but-thin AND coverage-coming both prove it)
-  let walked = await rest(`app_community_meta?select=zip,name,state,data_quality,indexable&order=zip.asc&limit=100000`);
+  // KEYSET-paginated: PostgREST caps un-paginated reads at 1,000 rows — a bare
+  // limit=100000 silently truncated the walk once WA pushed the meta table past 1,000
+  // (the 99xxx ZIPs were never checked). zip=gt.<last> pages cover every row.
+  let walked = [];
+  for (let last = ''; ;) {
+    const page = await rest(`app_community_meta?select=zip,name,state,data_quality,indexable&order=zip.asc&limit=1000` + (last ? `&zip=gt.${encodeURIComponent(last)}` : ''));
+    walked.push(...page);
+    if (page.length < 1000) break;
+    last = page[page.length - 1].zip;
+  }
   if (SAMPLE > 0) walked = walked.slice(0, SAMPLE);
   // A sample of modeled-but-never-materialized ZIPs (no app_* row): must render the
   // honest not-covered state and stay noindexed.
-  const nonUt = ['60601', '98101', '02138', '35801'];
+  // (98101 left this sample when Washington materialized — it is now a real indexable
+  //  page; 48226 Detroit takes its place until Michigan gets a development build.)
+  const nonUt = ['60601', '48226', '02138', '35801'];
 
   console.log(`Verifying ${walked.length} materialized page(s) + ${nonUt.length} unmaterialized page(s) against ${SITE_BASE}`);
 
