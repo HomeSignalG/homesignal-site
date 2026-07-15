@@ -1079,3 +1079,30 @@ unit test: constant bucketing, unmapped-constant fail-closed, no-option regressi
   drop in WA/MN/IL — dropping the one registry entry restores cross-state comparability).
 - **detroit-demolition-permits**: single-purpose demolition ledger; NO permit_type column →
   use_type stays unclassified (absent stays absent); title falls back work_description → address.
+
+### MI checkpoint C — corrected-URL retries (2 bonus wires + 4 firm rejections)
+The same second-pass that caught Tacoma/Clark (WA). Standing answer reconfirmed: unknown
+`<guess>.maps.arcgis.com` subdomains return the GENERIC anonymous portal self (no org id) —
+a 200 there is NOT an org; resolve orgs via the Hub domains API or item owners instead.
+- **Ann Arbor — BONUS WIRE (`ann-arbor-energov-permits`)**: recon's "data.a2gov.org DCAT 404"
+  was true but incomplete — the portal exists (non-Hub) and the city's real permit layer sits
+  behind its "Public Permit Map" web map: `egPublicPermit` (Tyler EnerGov) on the org's
+  utility.arcgis.com proxy. Fresh (max ISSUEDATE 2026-07-14), verbatim statuses
+  Issued / Issued in Trakit, **per-record STREAMURL → stream.a2gov.org self-service
+  (record-precision)**, Building types kept / trades dropped at source, spatial ZIP scoping.
+  Org's `Development_Pipeline` rejected separately: 27 rows frozen at EditDate 2024-01.
+- **"Oakland County" — BONUS WIRE, honestly scoped (`independence-twp-construction-permits`)**:
+  the county org hosts no county-wide permit layer; the real find is Independence Township's
+  Construction Activity deployment (10,020 rows, fresh 2026-07-09) whose extent bbox covers
+  the township only (~Clarkston). Wired with the township named as the jurisdiction; public
+  view NULLs Address (rows place by their own points, absent stays absent).
+- **Grand Rapids — FIRM REJECT**: org-scoped search (org L81TiOwAPO1ZvU9b via the Hub domains
+  API) shows NO building/development permit record layer — "Soil Erosion Permits" MapServer
+  exposes only base/utility layers (Municipal Boundaries, Parcels, storm assets; 0 permit
+  layers), "Temp Use Permits" is event permits, EPA_4_1/5_x are AGGREGATE BI counters.
+- **Macomb County — FIRM REJECT**: gis.macombgov.org is live but serves no public ArcGIS REST
+  (404 at /arcgis/rest/services); global AGO search has zero Macomb MI permit items.
+- **Kent County — FIRM REJECT**: no public org; gis.accesskent.com does not resolve; every
+  "Kent County" AGO permit hit is another state's Kent (DE/RI — the cross-state trap).
+- **Lansing — FIRM REJECT**: data.lansingmi.gov and maps.lansingmi.gov both ENOTFOUND; AGO
+  search yields only an MS4 stormwater StoryMap and a polling-places map.
