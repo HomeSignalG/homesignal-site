@@ -495,6 +495,18 @@ function readCol(row: Record<string, unknown>, ref?: ColumnRef): unknown {
     const parts = ref.map((c) => row[c]).filter((v) => v != null && String(v).trim() !== "").map((v) => String(v).trim());
     return parts.length ? parts.join(" ") : undefined;
   }
+  // Dot-path support for Socrata `location`-type columns (e.g. Montgomery County MD's
+  // nested location.latitude/location.longitude). An exact column of that name always
+  // wins; the path walk only runs when no such column exists. Additive — flat refs and
+  // every existing entry behave byte-identically.
+  if (row[ref] === undefined && ref.includes(".")) {
+    let v: unknown = row;
+    for (const seg of ref.split(".")) {
+      if (v == null || typeof v !== "object") return undefined;
+      v = (v as Record<string, unknown>)[seg];
+    }
+    return v;
+  }
   return row[ref];
 }
 

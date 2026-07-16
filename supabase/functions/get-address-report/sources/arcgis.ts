@@ -78,6 +78,13 @@ export interface ArcgisRegistryEntry {
    *  and ZIP_RADIUS_MI). Records still place by their OWN per-parcel geometry; nothing is
    *  guessed. When present, column_map.zip / zip_where_template are not required. */
   spatial_zip_radius_mi?: number;
+  /** ATTRIBUTE-BBOX spatial scoping for geometry-less TABLES that carry per-record
+   *  Latitude/Longitude COLUMNS instead (e.g. Scottsdale's OpenData_Tabular permits —
+   *  the Detroit-tables cousin). Pair with spatial_zip_radius_mi: instead of an ArcGIS
+   *  geometry-envelope param (meaningless on a table), the envelope is AND'd into WHERE
+   *  as `lat_col BETWEEN ymin AND ymax AND lng_col BETWEEN xmin AND xmax`. Rows still
+   *  place by their OWN column coordinates (column_map.lat/lng); nothing is guessed. */
+  spatial_latlng_cols?: { lat: string; lng: string };
 }
 
 export interface ArcgisRunReport {
@@ -317,15 +324,22 @@ async function fetchRows(
 
   // Spatial ZIP scoping (entry-driven): an envelope of ±radius miles around the ZIP centroid,
   // for point layers with no ZIP attribute anywhere. Standard ArcGIS spatial query params.
-  const spatial = (entry.spatial_zip_radius_mi ?? 0) > 0 && deps.zipCentroid ? {
-    ...envelopeFor(deps.zipCentroid.lat, deps.zipCentroid.lng, entry.spatial_zip_radius_mi as number),
-  } : null;
+  // ATTRIBUTE-BBOX mode (spatial_latlng_cols): geometry-less tables with lat/lng COLUMNS get
+  // the same envelope AND'd into WHERE instead — a geometry param is meaningless on a table.
+  const attrCols = entry.spatial_latlng_cols;
+  const env = (entry.spatial_zip_radius_mi ?? 0) > 0 && deps.zipCentroid
+    ? envelopeFor(deps.zipCentroid.lat, deps.zipCentroid.lng, entry.spatial_zip_radius_mi as number)
+    : null;
+  const spatial = env && !attrCols ? env : null;
+  const attrWhere = env && attrCols
+    ? ` AND (${attrCols.lat} >= ${env.ymin} AND ${attrCols.lat} <= ${env.ymax} AND ${attrCols.lng} >= ${env.xmin} AND ${attrCols.lng} <= ${env.xmax})`
+    : "";
 
   const out: Record<string, unknown>[] = [];
   let offset = 0;
   while (out.length < maxRows) {
     const url = new URL(`${entry.service_url.replace(/\/$/, "")}/query`);
-    url.searchParams.set("where", where);
+    url.searchParams.set("where", where + attrWhere);
     if (spatial) {
       url.searchParams.set("geometry", `${spatial.xmin},${spatial.ymin},${spatial.xmax},${spatial.ymax}`);
       url.searchParams.set("geometryType", "esriGeometryEnvelope");

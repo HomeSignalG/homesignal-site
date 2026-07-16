@@ -1316,3 +1316,72 @@ staging + seed docs are pre-built: docs/{california,arizona,maryland}-developmen
 - **ArcGIS Hub DCAT hosts**: dataset distributions frequently live on a DIFFERENT host than the hub
   (bcgisdata.…, baltegis.…, maps.scottsdaleaz.gov, gis.anaheim.net, gis.slocounty.ca.gov,
   gis.tucsonaz.gov) — pin those hosts in the target allowlist or every candidate is skipped.
+
+---
+
+## 2026-07-16 — CALIFORNIA WIRE PASS (finishing the CA/AZ/MD trio, state 2 of the four-state run)
+
+The DB is back; every recon verdict re-verified LIVE at wire time (pg_net + a runner
+`csv_stats` sweep — the new additive recon-fetch aggregate that prints distinct-value
+counts + max dates for CSVs far over the 2 MB log cap).
+
+### Wired (2 entries; receipts in each entry's `_receipts`)
+- **san-diego-approved-permits** — the FIRST `csv` entry, on the new ADDITIVE
+  `sources/csv.ts` connector (published-CSV portals; fetch-ONCE-per-cache-window module
+  memo + include_types/recency/column projection applied at parse time; same
+  coverage-gate/fail-closed/anti-fabrication contract; offline unit-tested incl. a
+  bidirectional gate proof, 18 checks). FRESH SAME-DAY: max APPROVAL_ISSUE_DATE
+  2026-07-15 over 28,515 YTD-2026 rows (15.0 MB file; runner receipt run 29508593119).
+  Vocab VERBATIM: 151 type|status combos enumerated; kept 10 construction/land-use types
+  (Combination Building Permit, Building Permit, Demolition, Grading, Construction
+  Change - Building, Conditional Use, Neighborhood Development, Coastal Development,
+  Parcel Map, Master Plan Establish); DROPPED at parse: Traffic Control (5,807), No-Plan
+  trades combos, Photovoltaic SB 379, Construction Noise, Transportation, ROW permits,
+  Electrical/Mechanical/Plumbing, Fire Pmt variants, Sign Pmt + paperwork classes.
+  Statuses Issued/Inspecting/Inspection Followup→approved, Closed→operating,
+  Cancelled→exclude. NO ZIP column → `spatial_zip_radius_mi: 3` on each row's OWN
+  GIS_LATITUDE/GIS_LONGITUDE — which also self-excludes the file's garbage-coordinate
+  rows (observed max GIS_LONGITUDE=324108.6; a bad point can never sit near a centroid).
+  **RECORD-PRECISION record_url VERIFIED**: the OpenDSD API discriminates real vs bogus
+  (ApprovalId 2618042 → full record matching the CSV row; 999999999 → "could not be
+  found"), so `opendsd.sandiego.gov/web/approvals/{APPROVAL_ID}` is a real per-record
+  official page (the earlier SPA-shell probe alone was NOT sufficient — the API check is
+  what verified it).
+- **anaheim-land-use-cases** (arcgis, services3/hPs600I3X0RTaaaq
+  `Open_Data_Land_Use_Permits/FeatureServer/0`): a GEOMETRY-LESS TABLE → rows geocode via
+  `Location_Primary_Address` (Boulder precedent; v20 geofence applies). FRESH: newest
+  Application_Received 2026/06/30 (PAZ2026-00384). No ZIP column; every address embeds
+  "…, Anaheim, Ca 92xxx" → `zip_where_template` LIKE (receipt: 92805 → 6,333 all-time).
+  23 statuses VERBATIM (returnDistinctValues 2026-07-16); 'Modified' left unmapped ON
+  PURPOSE; Closed/Complete excluded (MN 'Closed' precedent). **STANDING ANSWER: dates
+  here are `yyyy/mm/dd` STRINGS — `recency_days` (which emits an ArcGIS `DATE '…'`
+  literal) would fail; recency rides in `extra_where` as a string compare
+  (`Application_Received >= '2025/07/01'`, live-verified: 845 of 26,883 rows).**
+  'Sex-Oriented Business' type dropped at source (licensing, not development).
+  Smoke receipt: 92805 → 40 facilities + 187 dev records through the live engine.
+
+### New standing answers from this pass
+- **WORKER_RESOURCE_LIMIT (546) on big-file parse**: the naive per-char `field += ch`
+  CSV parse blew the edge worker's CPU budget on the 15 MB San Diego file (37 s → 546).
+  `parseCsv` is now SLICE-BASED (indexOf for quoted spans; no string concat churn):
+  ~15 MB in <400 ms, behavior unit-test-identical. Any future big-text parsing in the
+  engine must be slice-based from the start.
+- **recon-fetch `csv_stats`** (additive): a targets entry may carry
+  `csv_stats: {group_by: [cols], max: [cols], top: N}` — the runner parses the FULL CSV
+  before the 2 MB truncation and prints aggregate receipts (the vocab channel for files
+  pg_net can't carry).
+- **An SPA shell that returns 200 for real AND bogus ids proves nothing** — check the
+  app's underlying API for real-vs-bogus discrimination before accepting a per-record
+  URL template (OpenDSD: HTML identical, API discriminates → template VERIFIED).
+
+### Rejected with receipts (do not re-derive)
+- **san-jose planningpermits30 (CKAN 711a7de0…, fresh same-day) — FIRM REJECT**: every
+  row in the 30-day window carries the single opaque numeric status "30" (no documented
+  semantics — nothing to map verbatim; fail-closed), and the type mix is
+  paperwork-dominated (Over the Counter 64 / Zoning Verification Letters 32 / Tree
+  Removal 32 vs 7 Development Permits). The 60-180-day companion is the same shape.
+  Wiring would require guessing what "30" means — v18 forbids it.
+- **sonoma m689-iiuu / 88ms-k5e7** (recon verdict stands): bare street addresses, no
+  city, no ZIP, no coords → cannot scope at source, cannot geocode reliably.
+- **san-diego OpenDSD /web/approvals SPA shell**: identical HTML for real/bogus — only
+  the API check above rescued the template (kept here as the receipt for WHY).
