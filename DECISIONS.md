@@ -103,3 +103,28 @@ Decisions from the "Maps is PARTIAL / schematic" review. Files: `maps.html`, `li
   home & get alerts" nudge shows, doubling as a follow/signup prompt (opens the set-area flow).
   Matches the development tracker's "no home pin until the resident searches"; upholds the never-faked
   rule (a centroid stand-in labeled "Your home" would show a fake location as real).
+
+## Signup wiring restored + strict opt-in consent (2026-07-16, founder-approved)
+The /app promotion severed the resident signup path: nothing called `signup_complete`
+(the sole writer of users + user_subscriptions), the shell saved only `topic_prefs`
+(which digest.py does not read), so new signups never created a deliverable subscriber
+(users_total frozen at 2; notify-signup never fired). Restored in `shell.js::persistSignup()`:
+the topics-modal Save calls the live RPC with the complete deliverable set — labels from
+the LIVE community chain (word-for-word rule; never the seed), anchored at the chain ROOT,
+fail-loud (an RPC error shows in the modal; "Alerts saved" only after the write confirms).
+- **Consent: STRICT OPT-IN — every alert topic starts UNCHECKED for a new user (founder
+  decision, for the record: pre-ticked ≠ valid consent under GDPR/CAN-SPAM; this is the one
+  surface with real legal exposure, and "converts better" loses to "honest by default").**
+  Consent version '2026-07-16'; the RPC derives marketing_consent from subscriptions
+  actually saved, with timestamp + shown copy. The share-consent checkbox stays default-
+  unchecked (unchanged).
+- **data_licensing_agreed never silently downgrades**: the live RPC overwrites it on every
+  upsert (the old page's "does not downgrade" comment was wrong vs the live body), so the
+  client passes true if ANY stored category consent is true or the box is checked now.
+- **`dev` category picks are app-local only** — no delivery pipeline exists for them; they
+  are never sent to signup_complete (honest: no implied emails).
+- **Referral stamp rides along**: p_referral_source/p_referral_campaign (additive params,
+  first-touch preserved server-side via coalesce). Migration of record:
+  `docs/referral-attribution-migration.sql` (now carries the FULL signup_complete
+  definition — pulled live via pg_get_functiondef, no longer live-only). The client
+  retries without referral args on PGRST202 so deploy order doesn't matter.

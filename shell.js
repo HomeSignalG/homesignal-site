@@ -359,14 +359,34 @@
   };
 
   // -------------------------------------------------- topic picker ------------
+  // Category -> delivery pipeline (VERBATIM from the pre-promotion community.html /
+  // topics.js — the word-for-word matching rule). `dev` has NO delivery pipeline:
+  // those picks stay app-local prefs and are never sent to signup_complete.
+  const CAT_TO_PIPELINE = { gov: 'government_notice', meetings: 'government_notice', news: 'news_alert' };
+  // Shell category -> users.topics jsonb key (Option A shape digest.py reads).
+  const CAT_TO_TOPICS_KEY = { gov: 'notices', meetings: 'meetings', news: 'news' };
+  const CONSENT_VERSION = '2026-07-16';
+  const CONSENT_COPY = "You'll be alerted about the topics you selected. No spam · Unsubscribe anytime.";
   let TCUR = null;
-  HS.openTopics = function (key) {
+  HS.openTopics = async function (key) {
     TCUR = key;
-    const cats = HS.data.topicCategories(), d = cats[key];
+    const cats = HS.data.topicCategories(), d = Object.assign({}, cats[key]);
+    // Government categories render the LIVE community's labels (cascaded up the
+    // chain), never the seed's — the popup must show this place's topics
+    // word-for-word. Seed mode / unmodeled ZIP falls back to the seed list.
+    if (CAT_TO_TOPICS_KEY[key] && key !== 'news' && HS.data.communityGovTopics) {
+      try {
+        const ct = await HS.data.communityGovTopics(state.zip);
+        if (ct && ct.labels && ct.labels.length) d.items = ct.labels;
+      } catch (e) { /* fall back to seed labels; save still anchors via its own lookup */ }
+    }
     $('tmTitle').textContent = d.title; $('tmSub').textContent = d.sub; $('tmBadge').textContent = d.badge;
     $('tmEmail').textContent = state.session ? state.session.user.email : 'sign in to save';
     const saved = state.topicPrefs[key];
-    const onSet = saved ? new Set(saved.topics) : new Set(d.on.map(i => d.items[i]));
+    // STRICT OPT-IN (founder decision 2026-07-16): a brand-new user starts with
+    // every topic UNCHECKED — pre-ticked boxes are not valid consent. Only the
+    // user's own previously-saved picks come back checked.
+    const onSet = new Set(saved ? saved.topics : []);
     const g = $('tmGrid'); g.innerHTML = '';
     d.items.forEach(it => {
       const on = onSet.has(it);
@@ -392,11 +412,63 @@
     state.topicPrefs[TCUR] = { topics: chips, share_consent: $('tmConsent').checked };
     LS.set('topicPrefs', state.topicPrefs);
     await persistTopics(TCUR, chips, $('tmConsent').checked);
+    // THE signup write: users row + user_subscriptions via signup_complete — the
+    // thing that makes digest emails actually deliver. FAIL LOUD: if it errors,
+    // the modal shows the failure and never claims "Alerts saved" (topic_prefs
+    // alone is app state, not a subscription).
+    try {
+      await persistSignup();
+    } catch (e) {
+      const m = $('tmCount');
+      if (m) m.textContent = "Couldn't save your alerts — please try again. (" + ((e && e.message) || 'save error') + ')';
+      return;
+    }
     const cc = $('cc-' + TCUR); if (cc) cc.textContent = chips.length + ' topic' + (chips.length === 1 ? '' : 's') + ' followed';
     $('tmForm').classList.add('hidden');
     $('tmDoneMsg').textContent = "You'll be alerted about " + chips.length + ' ' + cats[TCUR].title.toLowerCase() + ' topic' + (chips.length === 1 ? '' : 's') + '.';
     $('tmDone').classList.remove('hidden');
   };
+  // Build the COMPLETE desired subscription set across all deliverable categories
+  // and reconcile it server-side via signup_complete (SECURITY DEFINER; the sole
+  // writer of users + user_subscriptions — restores the path severed at the /app
+  // promotion). Mirrors the pre-promotion community.html byte-for-byte in shape.
+  async function persistSignup() {
+    if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo) return;   // seed/demo: app-local only
+    const email = state.session.user.email;
+    const zip = String(state.zip || '').trim();
+    if (!/^\d{5}$/.test(zip)) throw new Error('no valid ZIP on file — set your area first');
+    const ct = await HS.data.communityGovTopics(zip);
+    if (!ct || !ct.rootId) throw new Error('this ZIP has no community to subscribe to yet');
+    const topics = {}, subs = [], seen = {};
+    Object.keys(CAT_TO_PIPELINE).forEach(cat => {
+      const picks = (state.topicPrefs[cat] && state.topicPrefs[cat].topics) || [];
+      topics[CAT_TO_TOPICS_KEY[cat]] = picks;
+      picks.forEach(t => {
+        const k = CAT_TO_PIPELINE[cat] + ' ' + t;
+        if (!seen[k]) { seen[k] = 1; subs.push({ pipeline_type: CAT_TO_PIPELINE[cat], topic: t }); }
+      });
+    });
+    // data_licensing consent must NEVER silently downgrade: the live RPC overwrites
+    // it on every upsert, so pass true if ANY stored category consent is true or the
+    // checkbox is checked right now.
+    const licensing = $('tmConsent').checked ||
+      Object.keys(state.topicPrefs).some(k => state.topicPrefs[k] && state.topicPrefs[k].share_consent);
+    const ref = HS.referral() || {};
+    const args = {
+      p_email: email, p_community_id: ct.rootId, p_zip_code: zip,
+      p_topics: topics, p_consent_version: CONSENT_VERSION, p_subscriptions: subs,
+      p_data_licensing_agreed: !!licensing, p_marketing_consent_copy: CONSENT_COPY,
+      p_referral_source: ref.source || null, p_referral_campaign: ref.campaign || null
+    };
+    let r = await HS.sb().rpc('signup_complete', args);
+    if (r.error && r.error.code === 'PGRST202') {
+      // referral params not applied to the DB yet (migration pending) — retry with
+      // the original 8-arg signature so signups keep working either deploy order.
+      delete args.p_referral_source; delete args.p_referral_campaign;
+      r = await HS.sb().rpc('signup_complete', args);
+    }
+    if (r.error) throw new Error(r.error.message || 'subscription save failed');
+  }
 
   // -------------------------------------------------- premium waitlist --------
   HS.submitWaitlist = async function () {
