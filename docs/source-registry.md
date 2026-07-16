@@ -1573,6 +1573,14 @@ nothing wired on training knowledge.
   without a source-side type filter fetched every scope in dense Miami. Added
   `extra_where` with the 4-type ScopeofWork IN filter (noise dropped AT SOURCE, the
   standing rule); scoped citywide count = 11,453 rows/365d, fast.
+- **Smoke fix 2 — NEW additive arcgis `out_fields` option (Miami is its first
+  consumer)**: even scoped, the report hit the edge worker CPU limit (HTTP 546 —
+  the CA WORKER_RESOURCE_LIMIT class). Cause: `outFields=*` on 44-column permit
+  rows over a dense central-Miami envelope (~1.3 MB per 1,000-row page). The
+  connector now accepts an optional `out_fields: [...]` projection (absent ⇒ `*`,
+  every existing entry byte-identical); Miami projects its 6 mapped columns.
+  **Standing answer: on dense-metro ArcGIS layers, project the mapped columns —
+  never ship outFields=* wide rows through the worker.**
 
 ### REJECTED AT SMOKE — orlando-permit-applications (Socrata, City of Orlando)
 **Wired provisionally, then REJECTED on live-smoke evidence — ungeolocatable at

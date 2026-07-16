@@ -2749,10 +2749,19 @@
     "noise_dropped": "ELECTRICAL/PLUMBING/MECHANICAL/FIRE/ELEVATOR/BOILER trades, SIGN, LANDSCAPING, TREE PERMIT, BUILDING ROOFING re-roofs, SPECIAL/TEMPORARY EVENTS, ANNUAL FACILITY, RECERTIFICATION, SHOP DRAWINGS, COOKIE CUTTER (ambiguous, not guessed), REMODELING/REPAIRS (minor-repair mix, Boston Short-Form precedent)",
     "no_zip_column": "point geometry + Latitude/Longitude attrs; spatial ZIP scoping (Denver pattern)",
     "record_url": "dataset-precision (no per-row URL column; templating one would be guessing)",
-    "extra_where_added_at_smoke": "envelope query without a source-side type filter fetched every scope in dense Miami and timed out the 120s report; scoped citywide count = 11,453/365d (fast). Noise now dropped AT SOURCE (standing rule)."
+    "extra_where_added_at_smoke": "envelope query without a source-side type filter fetched every scope in dense Miami and timed out the 120s report; scoped citywide count = 11,453/365d (fast). Noise now dropped AT SOURCE (standing rule).",
+    "out_fields_added_at_smoke": "outFields=* on 44-col rows over the dense-Miami envelope hit the worker CPU limit (HTTP 546); projecting the 6 mapped columns cut the payload ~7x. First consumer of the additive arcgis out_fields option."
    },
    "service_url": "https://services1.arcgis.com/CvuPhqcTQpZPT9qY/arcgis/rest/services/Building_Permits_Since_2014/FeatureServer/0",
-   "extra_where": "ScopeofWork IN ('NEW CONSTRUCTION','DEMOLITION','ADDITION AND REMODELING','PHASED PERMIT')"
+   "extra_where": "ScopeofWork IN ('NEW CONSTRUCTION','DEMOLITION','ADDITION AND REMODELING','PHASED PERMIT')",
+   "out_fields": [
+    "ScopeofWork",
+    "PropertyType",
+    "BuildingPermitStatusDescription",
+    "IssuedDate",
+    "DeliveryAddress",
+    "PermitNumber"
+   ]
   }
  ],
  "ckan": [
