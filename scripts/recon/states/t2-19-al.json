@@ -1,0 +1,26 @@
+[
+ {
+  "id": "al-birmingham-ckan",
+  "url": "https://data.birminghamal.gov/api/3/action/package_search?q=permit&rows=20"
+ },
+ {
+  "id": "al-huntsville-dcat",
+  "url": "https://data-huntsvilleal.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "al-mobile-dcat",
+  "url": "https://data-cityofmobile.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "al-montgomery-dcat",
+  "url": "https://data-montgomeryal.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "al-tuscaloosa-dcat",
+  "url": "https://data-tuscaloosa.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "al-baldwin-dcat",
+  "url": "https://data-baldwincountyal.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

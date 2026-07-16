@@ -1,0 +1,38 @@
+[
+ {
+  "id": "oh-cincinnati-socrata",
+  "url": "https://data.cincinnati-oh.gov/api/catalog/v1?search_context=data.cincinnati-oh.gov&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "oh-columbus-dcat",
+  "url": "https://opendata.columbus.gov/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "oh-franklin-dcat",
+  "url": "https://data-fcpublichealth.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "oh-cleveland-dcat",
+  "url": "https://data-clevelandgis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "oh-cuyahoga-dcat",
+  "url": "https://data-cuyahoga.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "oh-akron-summit-dcat",
+  "url": "https://data-summitgis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "oh-dayton-dcat",
+  "url": "https://data-daytonohio.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "oh-toledo-dcat",
+  "url": "https://data-toledo.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "oh-hamilton-cagis-root",
+  "url": "https://cagis.hamilton-co.org/arcgis/rest/services?f=json"
+ }
+]

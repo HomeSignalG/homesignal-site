@@ -1,0 +1,50 @@
+[
+ {
+  "id": "pa-wprdc-ckan-permits",
+  "url": "https://data.wprdc.org/api/3/action/package_search?q=permit&rows=20"
+ },
+ {
+  "id": "pa-philly-carto-permits-fresh",
+  "url": "https://phl.carto.com/api/v2/sql?q=SELECT%20max(permitissuedate)%20FROM%20permits"
+ },
+ {
+  "id": "pa-philly-carto-permits-cols",
+  "url": "https://phl.carto.com/api/v2/sql?q=SELECT%20*%20FROM%20permits%20LIMIT%202"
+ },
+ {
+  "id": "pa-montgomery-dcat",
+  "url": "https://data-montcopa.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "pa-bucks-dcat",
+  "url": "https://data-buckscounty.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "pa-chester-dcat",
+  "url": "https://data-chesco.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "pa-lancaster-dcat",
+  "url": "https://data-lancastercountypa.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "pa-york-dcat",
+  "url": "https://data-ycpc.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "pa-delco-dcat",
+  "url": "https://data-delcopa.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "pa-statecollege-dcat",
+  "url": "https://data-centrecountygov.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "pa-lehigh-allentown-dcat",
+  "url": "https://data-allentownpa.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "pa-harrisburg-socrata",
+  "url": "https://data.pa.gov/api/catalog/v1?search_context=data.pa.gov&q=permit&only=datasets&limit=30"
+ }
+]

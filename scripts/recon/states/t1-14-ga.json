@@ -1,0 +1,34 @@
+[
+ {
+  "id": "ga-atlanta-dcat",
+  "url": "https://gis.atlantaga.gov/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ga-atlanta-dpcd-dcat",
+  "url": "https://dpcd-coaplangis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ga-fulton-dcat",
+  "url": "https://data-fulcogis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ga-dekalb-dcat",
+  "url": "https://data-dekalbcountyga.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ga-cobb-dcat",
+  "url": "https://data-cobbcountyga.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ga-gwinnett-dcat",
+  "url": "https://data-gwinnettcounty.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ga-savannah-sagis-dcat",
+  "url": "https://data-sagis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ga-hall-dcat",
+  "url": "https://data-hallcounty.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

@@ -1,0 +1,22 @@
+[
+ {
+  "id": "ok-okc-socrata",
+  "url": "https://data.okc.gov/api/catalog/v1?search_context=data.okc.gov&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "ok-okc-dcat",
+  "url": "https://data.okc.gov/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ok-tulsa-dcat",
+  "url": "https://opendata-cityoftulsa.hub.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ok-norman-dcat",
+  "url": "https://data-normanok.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ok-edmond-dcat",
+  "url": "https://data-edmondgis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

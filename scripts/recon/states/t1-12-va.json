@@ -1,0 +1,34 @@
+[
+ {
+  "id": "va-fairfax-dcat",
+  "url": "https://data-fairfaxcountygis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "va-loudoun-dcat",
+  "url": "https://geohub-loudoungis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "va-arlington-dcat",
+  "url": "https://data-arlgis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "va-vabeach-dcat",
+  "url": "https://data.virginiabeach.gov/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "va-henrico-dcat",
+  "url": "https://data-henrico.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "va-chesterfield-dcat",
+  "url": "https://data-chesterfieldcounty.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "va-pwc-dcat",
+  "url": "https://gisdata-pwcgov.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "va-albemarle-dcat",
+  "url": "https://opendata-albemarle.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

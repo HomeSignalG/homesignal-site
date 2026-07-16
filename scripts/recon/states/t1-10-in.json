@@ -1,0 +1,26 @@
+[
+ {
+  "id": "in-indy-dcat",
+  "url": "https://data.indy.gov/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "in-fortwayne-allen-dcat",
+  "url": "https://data-acimap.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "in-bloomington-ckan",
+  "url": "https://data.bloomington.in.gov/api/3/action/package_search?q=permit&rows=20"
+ },
+ {
+  "id": "in-lake-dcat",
+  "url": "https://data-lakecountyin.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "in-tippecanoe-dcat",
+  "url": "https://data-tippecanoe.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "in-hamilton-dcat",
+  "url": "https://data-hamiltoncounty.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

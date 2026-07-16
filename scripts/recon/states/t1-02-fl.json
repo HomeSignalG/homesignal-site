@@ -1,0 +1,58 @@
+[
+ {
+  "id": "fl-miamidade-dcat",
+  "url": "https://gis-mdc.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "fl-miami-city-dcat",
+  "url": "https://datahub-miamigis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "fl-tampa-dcat",
+  "url": "https://city-tampa.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "fl-hillsborough-dcat",
+  "url": "https://hub-hillsboroughcounty.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "fl-broward-dcat",
+  "url": "https://open-broward.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "fl-fortlauderdale-dcat",
+  "url": "https://data-fortlauderdale.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "fl-palmbeach-dcat",
+  "url": "https://data-pbcgov.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "fl-orlando-socrata",
+  "url": "https://data.cityoforlando.net/api/catalog/v1?search_context=data.cityoforlando.net&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "fl-orange-dcat",
+  "url": "https://data-ocfl.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "fl-stpete-socrata",
+  "url": "https://stat.stpete.org/api/catalog/v1?search_context=stat.stpete.org&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "fl-pinellas-dcat",
+  "url": "https://data-pinellas-egis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "fl-lee-capecoral-dcat",
+  "url": "https://data-capegis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "fl-sarasota-dcat",
+  "url": "https://data-sarasotacounty.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "fl-collier-dcat",
+  "url": "https://hub-colliercountyfl.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

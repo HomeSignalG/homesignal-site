@@ -1,0 +1,38 @@
+[
+ {
+  "id": "nc-raleigh-dcat",
+  "url": "https://data.raleighnc.gov/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nc-wake-dcat",
+  "url": "https://data.wake.gov/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nc-charlotte-dcat",
+  "url": "https://data.charlottenc.gov/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nc-mecklenburg-dcat",
+  "url": "https://maps.mecknc.gov/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nc-durham-ckan",
+  "url": "https://live-durhamnc.opendata.arcgis.com/api/3/action/package_search?q=permit&rows=20"
+ },
+ {
+  "id": "nc-durham-dcat",
+  "url": "https://live-durhamnc.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nc-asheville-dcat",
+  "url": "https://data-avl.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nc-buncombe-socrata",
+  "url": "https://data.buncombecounty.org/api/catalog/v1?search_context=data.buncombecounty.org&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "nc-newhanover-dcat",
+  "url": "https://data-nhcgov.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

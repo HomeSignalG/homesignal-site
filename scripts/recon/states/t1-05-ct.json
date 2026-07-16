@@ -1,0 +1,26 @@
+[
+ {
+  "id": "ct-state-socrata",
+  "url": "https://data.ct.gov/api/catalog/v1?search_context=data.ct.gov&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "ct-hartford-socrata",
+  "url": "https://data.hartford.gov/api/catalog/v1?search_context=data.hartford.gov&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "ct-stamford-socrata",
+  "url": "https://data.stamfordct.gov/api/catalog/v1?search_context=data.stamfordct.gov&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "ct-newhaven-dcat",
+  "url": "https://data-newhavenct.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ct-bridgeport-dcat",
+  "url": "https://data-bridgeportct.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ct-norwalk-dcat",
+  "url": "https://data-norwalkct.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

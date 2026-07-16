@@ -1,0 +1,14 @@
+[
+ {
+  "id": "me-portland-dcat",
+  "url": "https://data-portlandme.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "me-geolibrary-dcat",
+  "url": "https://maine.hub.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "me-bangor-dcat",
+  "url": "https://data-bangorme.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

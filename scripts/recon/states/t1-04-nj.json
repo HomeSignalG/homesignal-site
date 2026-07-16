@@ -1,0 +1,38 @@
+[
+ {
+  "id": "nj-state-socrata",
+  "url": "https://data.nj.gov/api/catalog/v1?search_context=data.nj.gov&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "nj-njgin-dcat",
+  "url": "https://njogis-newjersey.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nj-jerseycity-socrata",
+  "url": "https://data.jerseycitynj.gov/api/catalog/v1?search_context=data.jerseycitynj.gov&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "nj-newark-socrata",
+  "url": "https://data.ci.newark.nj.us/api/catalog/v1?search_context=data.ci.newark.nj.us&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "nj-bergen-dcat",
+  "url": "https://data-bergencountynj.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nj-morris-dcat",
+  "url": "https://data-morrisgis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nj-monmouth-dcat",
+  "url": "https://data-monmouthnj.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nj-middlesex-dcat",
+  "url": "https://data-middlesexcountynj.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nj-hudson-dcat",
+  "url": "https://data-hudsoncountynj.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

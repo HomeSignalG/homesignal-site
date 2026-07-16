@@ -1,0 +1,26 @@
+[
+ {
+  "id": "nv-clark-dcat",
+  "url": "https://opendata-clarkcountynv.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nv-lasvegas-dcat",
+  "url": "https://opendataportal-lasvegas.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nv-henderson-dcat",
+  "url": "https://data-cohgis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nv-northlv-dcat",
+  "url": "https://data-cnlv.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nv-reno-dcat",
+  "url": "https://data.reno.gov/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nv-washoe-dcat",
+  "url": "https://data-washoe.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

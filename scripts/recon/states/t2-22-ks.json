@@ -1,0 +1,22 @@
+[
+ {
+  "id": "ks-wichita-dcat",
+  "url": "https://opendata-wichitagis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ks-johnson-aims-dcat",
+  "url": "https://data-jocogov.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ks-topeka-dcat",
+  "url": "https://data-topeka.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ks-wyandotte-ug-dcat",
+  "url": "https://data-unifiedgov.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ks-lawrence-dcat",
+  "url": "https://data-lawrenceks.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]
