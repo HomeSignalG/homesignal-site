@@ -264,6 +264,21 @@
         "services6.arcgis.com"
       ],
       "rejected": "2026-07-15: STALLED snapshot - newest Issue_Date 2025-08-16 (11 months). Right shape (47,902 points, Permit_Number/Full_Address/Issue_Date/Permit_Type/LAT/LONG; no status column -> status_const pattern if it resumes). Wire if the city resumes publishing."
+    },
+    {
+      "id": "howard-county-permits",
+      "kind": "socrata-resource",
+      "domain": "opendata.howardcountymd.gov",
+      "dataset_id": "kvz2-j5cj",
+      "jurisdiction": "Howard County",
+      "coverage": {
+        "state": "MD",
+        "county": "Howard"
+      },
+      "hosts": [
+        "opendata.howardcountymd.gov"
+      ],
+      "rejected": "2026-07-16: STALLED \u2014 newest issue_date rows Nov 2025, rowsUpdatedAt 2025-12-04 (recon receipts, DB-outage recon night); also no status/point columns (would be status_const + zip-only)"
     }
   ],
   "discovery": [
