@@ -52,7 +52,7 @@ for (const t of targets) {
   // Print an excerpt into the job log too — the build sandbox can read logs via the
   // API but cannot reach the artifact blob store, so the log IS the receipt channel.
   try {
-    const excerpt = readFileSync(`results/${t.id}.body`, 'utf8').slice(0, parseInt(process.env.PRINT_BODY_CHARS || '5000', 10));
+    const excerpt = readFileSync(`results/${t.id}.body`, 'utf8').slice(0, t.print_chars || parseInt(process.env.PRINT_BODY_CHARS || '5000', 10));
     console.log(`----- BEGIN ${t.id} -----\n${excerpt}\n----- END ${t.id} -----`);
   } catch { /* fetch failed; nothing to print */ }
 }
