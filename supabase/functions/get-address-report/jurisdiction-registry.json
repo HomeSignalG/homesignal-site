@@ -42,6 +42,14 @@
   "column -> template -> dataset landing page. Batches should fire csv-covered ZIPs in modest",
   "waves so cold isolates don't multiply the file download."
  ],
+ "_carto_readme": [
+  "Carto SQL-API connector (sources/carto.ts) - for Carto-hosted open-data portals",
+  "(first consumer: Philadelphia's phl.carto.com permits table). Same discipline: append",
+  "an entry here, never edit the connector. SQL dialect is PostgreSQL; ZIP scoping is a",
+  "LIKE '{zip}%' prefix because Carto portals store ZIP+4; geometry rides PostGIS",
+  "(geom_col -> SELECT ST_Y/ST_X AS __lat/__lng - rows place by their OWN parcel point).",
+  "Statuses/types VERBATIM, fail-closed, record_url column -> template -> dataset page."
+ ],
  "socrata": [
   {
    "registry_id": "austin-subdivision-cases",
@@ -2728,6 +2736,66 @@
    "extra_where": "\"permittypedescr\" IN ('Erect/New Construction','Long Form/Alteration Permit','Amendment to a Long Form','Foundation Permit','Use of Premises')",
    "recency_days": 365,
    "_receipts": "2026-07-15 MA wire pass (FIRST ckan entry \u2014 new additive sources/ckan.ts, datastore_search_sql): fresh TODAY (newest issued_date 2026-07-15T01:47; resource last_modified 2026-07-15T18:26). Native `zip` column + own y_latitude/x_longitude per record. Statuses VERBATIM via SQL group-by over all 656,762 rows: Open(376,412)+Issued(3)->approved, Closed(280,345)->operating, Stop Work(2)->exclude. 13 permittypedescr values VERBATIM; FOUNDER WHITELIST 2026-07-15: keep Erect/New Construction, Long Form/Alteration Permit, Amendment to a Long Form, Foundation Permit, Use of Premises; DROP Short Form Bldg Permit (189k minor jobs \u2014 founder call) + all Electrical variants/Plumbing/Gas/Certificate of Occupancy. FOUNDER-ACCEPTED dataset-precision record_url (no per-row URL column; no verified portal URL pattern \u2014 templating one would be guessing)."
+  },
+  {
+   "registry_id": "pittsburgh-pli-permits",
+   "platform": "ckan",
+   "base_url": "https://data.wprdc.org",
+   "resource_id": "f4d1177a-f597-4c32-8cbf-7885f56253f6",
+   "dataset_url": "https://data.wprdc.org/dataset/pli-permits",
+   "jurisdiction": "City of Pittsburgh",
+   "coverage": [
+    {
+     "state": "PA",
+     "county": "Allegheny"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "permit_type",
+     "work_description"
+    ],
+    "status_raw": "status",
+    "type_source": "permit_type",
+    "file_date": "issue_date",
+    "address": "address",
+    "lat": "latitude",
+    "lng": "longitude",
+    "zip": "zip_code",
+    "case_number": "permit_id"
+   },
+   "extra_where": "\"permit_type\" IN ('BUILDING','Building & Development Application','Demolition Permit','Land Operations Permit')",
+   "type_map": {
+    "BUILDING": "Development",
+    "Building & Development Application": "Development",
+    "Demolition Permit": "Development",
+    "Land Operations Permit": "Development"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "In Review",
+     "Ready For Issue",
+     "Application Finalization",
+     "Applicant Revisions",
+     "Amendment Review",
+     "Amendment Requested",
+     "Amendment Applicant Revisions",
+     "Amendment Application Incomplete"
+    ],
+    "approved": [
+     "Issued"
+    ],
+    "operating": [
+     "Completed"
+    ],
+    "exclude": [
+     "Expired",
+     "Revoked",
+     "Stop Work"
+    ]
+   },
+   "recency_days": 365,
+   "_receipts": "2026-07-16 PA wire pass (WPRDC - Pittsburgh's regional CKAN portal, the founder-directed reuse of sources/ckan.ts). FRESH SAME-DAY: max issue_date 2026-07-15 over 63,520 rows; datastore modified 2026-07-16T03:20. Native zip_code + own latitude/longitude per record. 13 statuses VERBATIM via datastore SQL group-by: Issued(15,435)->approved, Completed(42,423)->operating, In Review/Ready For Issue/Application Finalization/Applicant Revisions/Amendment-* -> proposed, Expired(4,624)/Revoked(688)/Stop Work(29) excluded. 14 permit_type values VERBATIM: kept BUILDING(17,784) + Building & Development Application(8,264) + Demolition Permit(1,254) + Land Operations Permit(87); DROPPED at source: ELECTRICAL(20,007)/MECHANICAL(7,999)/Suppression/Fire Alarm/Occupancy Only/Sign/Floodplain/Occupant Load Placard/Storm Water/Plan Review Meeting. No per-row URL column -> dataset-precision record_url (landing page live-verified 200)."
   }
  ],
  "csv": [
@@ -2796,6 +2864,76 @@
    "record_url_template": "https://opendsd.sandiego.gov/web/approvals/{APPROVAL_ID}",
    "spatial_zip_radius_mi": 3,
    "_receipts": "2026-07-16 CA wire pass (FIRST csv entry - new additive sources/csv.ts, fetch-once memo). FRESH SAME-DAY: max APPROVAL_ISSUE_DATE 2026-07-15 over 28,515 rows (15.0 MB YTD-2026 file; runner csv_stats receipt, run 29508593119). Vocabulary VERBATIM from the same run: statuses Issued/Closed/Inspecting/Inspection Followup/Cancelled -> Issued+Inspecting+Inspection Followup=approved, Closed=operating (Boston precedent), Cancelled=exclude; 151 type|status combos enumerated - kept 10 construction/land-use types, DROPPED at parse: Traffic Control (5,807), No-Plan trades combos, Photovoltaic SB 379 (rooftop solar), Construction Noise, Transportation, Right Of Way Pmt-Const Plan, Electrical/Mechanical/Plumbing Pmt, Fire Pmt variants, Sign Pmt, Zone History Letter + paperwork classes. NO ZIP column -> spatial_zip_radius_mi 3 on each row's OWN GIS_LATITUDE/GIS_LONGITUDE (which also self-excludes the file's garbage-coordinate rows: max GIS_LONGITUDE=324108.6 observed - a bad point can never sit near a centroid). RECORD-PRECISION record_url VERIFIED: opendsd.sandiego.gov API discriminates (ApprovalId 2618042 -> full record matching the CSV row; 999999999 -> 'could not be found') so /web/approvals/{APPROVAL_ID} is a real per-record official page. PROJECT_STATUS NOT used (17,813 blanks); APPROVAL_STATUS is the status column. File is YTD-2026 (inherent recency window)."
+  }
+ ],
+ "carto": [
+  {
+   "registry_id": "philadelphia-li-permits",
+   "platform": "carto",
+   "sql_url": "https://phl.carto.com/api/v2/sql",
+   "table": "permits",
+   "dataset_url": "https://phl.carto.com/api/v2/sql?q=SELECT%20*%20FROM%20permits%20LIMIT%2010",
+   "jurisdiction": "City of Philadelphia",
+   "coverage": [
+    {
+     "state": "PA",
+     "county": "Philadelphia"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "typeofwork",
+     "permitdescription"
+    ],
+    "status_raw": "status",
+    "type_source": "typeofwork",
+    "file_date": "permitissuedate",
+    "address": "address",
+    "zip": "zip",
+    "case_number": "permitnumber"
+   },
+   "geom_col": "the_geom",
+   "extra_where": "permittype IN ('Building','Residential Building','Demolition','Zoning') AND typeofwork IN ('Addition and/or Alteration','Change of Use','New construction, addition, GFA change','New Construction','New Construction (Shell Only)','City Demolition','Full Demolition','Minor Demolition','Major Demolition','Lot Line Relocation','Combined Lot Line Relocation and New Development','Conditional Zoning Approval')",
+   "type_map": {
+    "Addition and/or Alteration": "Development",
+    "Change of Use": "Development",
+    "New construction, addition, GFA change": "Development",
+    "New Construction": "Development",
+    "New Construction (Shell Only)": "Development",
+    "City Demolition": "Development",
+    "Full Demolition": "Development",
+    "Minor Demolition": "Development",
+    "Major Demolition": "Development",
+    "Lot Line Relocation": "Development",
+    "Combined Lot Line Relocation and New Development": "Development",
+    "Conditional Zoning Approval": "Development"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "Amendment Review",
+     "Amendment Application Incomplete",
+     "Amendment Applicant Revisions",
+     "Amendment Ready For Issue",
+     "Amendment Requested"
+    ],
+    "approved": [
+     "Issued"
+    ],
+    "operating": [
+     "Completed"
+    ],
+    "exclude": [
+     "Expired",
+     "Cancelled",
+     "Amendment Denied",
+     "Withdrawn",
+     "Stop Work",
+     "Refused",
+     "Denied"
+    ]
+   },
+   "recency_days": 365,
+   "_receipts": "2026-07-16 PA wire pass (FIRST carto entry - new additive sources/carto.ts, SQL API; 16 offline unit checks incl. bidirectional gate proof). FRESH: max permitissuedate 2026-07-10 over the city's official L&I permits table (live SQL receipt). Statuses VERBATIM within the kept types over 365d: Issued 9,302 / Completed 2,611 / Amendment-* lifecycle -> proposed / Expired+Cancelled+Amendment Denied+Withdrawn (+ Stop Work/Refused/Denied from the full-table + sample receipts) excluded. typeofwork vocab VERBATIM: kept 12 construction/land-use values (Addition and/or Alteration 5,007, Change of Use 2,406, New construction+GFA 1,877, New Construction 971, demolition classes, lot-line actions); DROPPED at source: Make Safe permits (safety orders), Signs, Parking Only, Family Daycare, Fences Only, Site Clearing + the Plumbing 13,300/Electrical 8,187/Mechanical/Fire Suppression trade classes via the permittype IN-list. ZIP is ZIP+4 ('19143-3005') -> the connector's LIKE prefix scoping + 5-digit truncation. Geometry via PostGIS ST_Y/ST_X(the_geom) - live-verified real Philly coords. record_url dataset-precision on the SQL endpoint (OpenDataPhilly portal 404s - retired; no per-record public URL pattern verified; the machine endpoint IS the official record interface - Boulder precedent). NOTE: recency on permitissuedate excludes null-issue-date zoning applications (they carry Refused/Denied statuses in the sample - excluded anyway)."
   }
  ]
 }

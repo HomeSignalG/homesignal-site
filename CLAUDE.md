@@ -930,6 +930,40 @@ legal/framing change not covered by the one-time sign-off.
   52-ZIP gap was filled from the same pinned zipcodes v3.0.0 source (seed appendix).
   Receipts: docs/source-registry.md "MARYLAND WIRE PASS". Reproducible seed:
   docs/maryland-development-reports-seed.sql.
+- 🟢 **PENNSYLVANIA IS LIVE UNDER THE SUBSTANCE GATE — 560/560 modeled PA ZIPs cached
+  (incl. the PHILADELPHIA COUNTY EXPANSION), 2 first-party permit sources, 522 pages
+  auto-indexable (no manual flip)** (DB-verified 2026-07-16). Thirteenth development
+  state, Tier 1 state 1 of 17 in the founder wire order, and the first with a **Carto
+  source**: the new ADDITIVE `sources/carto.ts` connector (Carto SQL API — raw
+  PostgreSQL/PostGIS over HTTP; geometry extracted in the SELECT via `ST_Y/ST_X` so
+  records place by their OWN point; **ZIP+4 handled with a prefix `LIKE '<zip>%'`** and
+  the emitted zip truncated to 5; recency as a PG interval; fail-closed statuses;
+  SQL-error quarantine; 16 offline fixture tests incl. a bidirectional gate proof)
+  carries **philadelphia-li-permits** — the L&I permit ledger on `phl.carto.com`, fresh
+  2026-07-10 (the city's normal batch cadence), Building/Residential Building/
+  Demolition/Zoning kept + 12-value verbatim typeofwork whitelist (trades/re-roof noise
+  dropped at source), Issued→approved / Completed→operating / Amendment-*→proposed /
+  Expired+Cancelled+Withdrawn+Stop Work+Refused+Denied→exclude, dataset-precision
+  record_url (OpenDataPhilly is retired/404 — the SQL endpoint is the machine URL,
+  Boulder precedent). Philadelphia pages exist because the **Philadelphia County
+  expansion** (migration `philadelphia_county_zip_expansion`, NYC-borough/Boston-Suffolk
+  precedent) added the county root + 46 `level=zip` pages (19118/19128 stay Montgomery,
+  19153 Delaware — Census crosswalk, most-specific wins); PA 514→560 ZIP pages, 0 dup
+  slugs. Plus **pittsburgh-pli-permits** (WPRDC **CKAN — connector reused, zero new
+  code**; fresh 2026-07-15, 63,520 rows; 4-type permit whitelist of 14 enumerated;
+  13 verbatim statuses; native zip_code + per-record lat/lng). Every modeled PA ZIP has
+  a cached row (zipcodes v3.0.0 centroids, 0 quarantined) and a materialized page —
+  **551 pass + 9 coverage_coming honest empties; 0 unsourced, 0 count mismatches, 0
+  point sites missing coords**. **72 of 560 ZIPs dev-backed (13%), 15,246 dev records**
+  (Philly 10,490 across 45 ZIPs; Pittsburgh 4,756 across 27). Bidirectional gate proof
+  with live receipts: philadelphia-li-permits rides ONLY Philadelphia County pages,
+  pittsburgh-pli-permits ONLY Allegheny pages. Firm rejects with receipts: Allegheny
+  ACCD (a stormwater engineering extract — no zip/address, rejected on schema),
+  OpenDataPhilly (retired portal), Montgomery DCAT hub live but 0 permit datasets, six
+  county-hub URL guesses 404 (Bucks/Chester/Lancaster/York/Delaware/Centre → nightly
+  reprobe list; their ZIPs ship on the EPA facilities floor). Receipts:
+  docs/source-registry.md "PENNSYLVANIA WIRE PASS". Reproducible seed:
+  docs/pennsylvania-development-reports-seed.sql.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
