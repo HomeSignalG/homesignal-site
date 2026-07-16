@@ -238,6 +238,10 @@ HS.onReady(async function () {
   function overlayFacilities(el){
     if (!opts.showFacilities || !facs.length) return;
     var svg = el && el.querySelector('svg'); if (!svg) return;
+    // Facilities slot in UNDER the home mark (drawn last by MapProvider) so the
+    // resident's own home is never buried by a nearby facility square.
+    var homeG = svg.querySelector('.hs-home');
+    var put = function(node){ if (homeG) svg.insertBefore(node, homeG); else svg.appendChild(node); };
     var w=780, h=520, cx=w/2, cy=h/2, radiusPx=Math.min(w,h)*0.29, pxPerMile=radiusPx/opts.radiusMi;
     var hLat=center.lat, hLng=center.lng, NS='http://www.w3.org/2000/svg';
     facs.forEach(function(f){
@@ -253,9 +257,9 @@ HS.onReady(async function () {
         var a=document.createElementNS(NS,'a');
         a.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href',f.source_ref);
         a.setAttribute('href',f.source_ref); a.setAttribute('target','_blank'); a.setAttribute('rel','noopener');
-        a.appendChild(rect); svg.appendChild(a);
+        a.appendChild(rect); put(a);
       } else {
-        svg.appendChild(rect);
+        put(rect);
       }
     });
   }
@@ -278,10 +282,11 @@ HS.onReady(async function () {
     clearMarkers();
     // Only pin a REAL resident home — never a centroid stand-in (never-faked rule).
     if (hasRealHome) {
-      var h=document.createElement('div');
-      h.style.cssText='width:20px;height:20px;border-radius:50%;background:#157a49;border:3px solid #fff;box-shadow:0 0 0 6px rgba(21,122,73,.18)';
+      // The home marker is the HomeSignal LOGO tile (shared builder in lib/map.js).
+      var hw=document.createElement('div'); hw.innerHTML=HS.homeMarkerHTML(26);
+      var h=hw.firstChild; h.style.zIndex='5';
       glMarkers.push(new maplibregl.Marker({element:h}).setLngLat([center.lng,center.lat])
-        .setPopup(new maplibregl.Popup({offset:14}).setHTML('<b>Your home</b>')).addTo(glMap));
+        .setPopup(new maplibregl.Popup({offset:16}).setHTML('<b>Your home</b>')).addTo(glMap));
     }
     items.forEach(function(it){
       var col=tierHex(it), el=document.createElement('div');
@@ -415,7 +420,8 @@ HS.onReady(async function () {
     clearLfMarkers();
     // Only pin a REAL resident home — never a centroid stand-in (never-faked rule).
     if (hasRealHome) {
-      lfMarkers.push(L.marker([center.lat,center.lng],{icon:lfDivIcon('<div style="width:20px;height:20px;border-radius:50%;background:#157a49;border:3px solid #fff;box-shadow:0 0 0 6px rgba(21,122,73,.18)"></div>',20)})
+      // The home marker is the HomeSignal LOGO tile (shared builder in lib/map.js).
+      lfMarkers.push(L.marker([center.lat,center.lng],{zIndexOffset:1000,icon:lfDivIcon(HS.homeMarkerHTML(26),26)})
         .bindPopup('<b>Your home</b>').addTo(lfMap));
     }
     items.forEach(function(it){
