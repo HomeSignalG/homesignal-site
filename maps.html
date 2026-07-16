@@ -214,7 +214,10 @@ HS.onReady(async function () {
   }
 
   // ---------- MapLibre (real tiles: Esri World Imagery + OSM) ----------
-  var glMap = null, glMarkers = [], glReady = false, glFailed = false, glTileErrs = 0;
+  var glMap = null, glMarkers = [], glReady = false, glFailed = false, glTileErrs = 0, glTilesOK = 0;
+  // Console triage handle (read-only): window.__HS_GL.tilesOK / errs / ready / failed.
+  window.__HS_GL = { get tilesOK(){return glTilesOK;}, get errs(){return glTileErrs;},
+                     get ready(){return glReady;}, get failed(){return glFailed;} };
   function circle(lat, lng, rMi){
     var pts=[], R=rMi/69.0, cs=Math.cos(lat*Math.PI/180);
     for(var i=0;i<=64;i++){var a=i/64*2*Math.PI; pts.push([lng + (R*Math.sin(a))/cs, lat + R*Math.cos(a)]);}
@@ -254,7 +257,12 @@ HS.onReady(async function () {
   }
   function ensureGL(){
     if (glMap) return;
-    glMap = new maplibregl.Map({
+    // WebGL can be unavailable entirely (hardened browsers disable it for
+    // fingerprint protection — seen live in Brave: "Failed to initialize WebGL"
+    // thrown from the constructor). Unguarded, that throw killed the rest of
+    // init (no degrade, dead mode buttons). Catch -> impact diagram.
+    try {
+      glMap = new maplibregl.Map({
       container:'mapgl',
       style:{ version:8, sources:{
         sat:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,attribution:'© Esri, Maxar'},
@@ -264,7 +272,13 @@ HS.onReady(async function () {
         {id:'sat',type:'raster',source:'sat',layout:{visibility:'none'}}
       ]},
       center:[center.lng,center.lat], zoom: zoomFor(opts.radiusMi)
-    });
+      });
+    } catch (e) {
+      console.warn('[maps] WebGL unavailable — showing the impact diagram.', e);
+      glMap = null;
+      degradeToSchematic();
+      return;
+    }
     glMap.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
     // GUARDRAIL (required companion to the Satellite default): Esri World Imagery / OSM
     // are free, keyless and NOT production-contracted, so a traffic spike can be
@@ -274,11 +288,34 @@ HS.onReady(async function () {
     glMap.on('error', function(ev){
       if (!ev) return;
       var src = ev.sourceId, msg = ev.error && String(ev.error.message || ev.error);
+      console.warn('[maps] gl error', src || '(no source)', msg || ev);   // triage: always visible
+      // WebGL failure can surface ASYNC (live Brave console: "Uncaught (in promise)
+      // ... webglcontextcreationerror ... Failed to initialize WebGL") — the ctor
+      // try/catch misses that path. Any WebGL error = no GL map possible: degrade NOW.
+      if (msg && /webgl/i.test(msg)) { degradeToSchematic(); return; }
       if (src==='sat' || src==='osm' || (msg && /429|rate|tile|failed to fetch|network/i.test(msg))) {
         if (++glTileErrs >= 4) degradeToSchematic();
       }
     });
+    // Count SUCCESSFUL raster tile loads — the third guard keys on this.
+    glMap.on('data', function(ev){
+      if (ev && ev.tile && (ev.sourceId==='sat' || ev.sourceId==='osm')) glTilesOK++;
+    });
+    // Guard 1: stalled load (style never finishes) -> diagram.
     setTimeout(function(){ if (!glReady) degradeToSchematic(); }, 9000);
+    // Guard 3 (SILENT-BLANK): the map "loads", vector layers paint (radius/pins),
+    // but ZERO raster tiles ever arrive and no error events fire — seen live on
+    // deployed #253 (blank green canvas; e.g. a privacy shield or middlebox that
+    // swallows tile requests without a network error). If no tile has loaded a
+    // while after style-load while a tile mode is active, degrade to the diagram.
+    glMap.on('load', function(){
+      setTimeout(function(){
+        if (!glFailed && glTilesOK === 0 && opts.mode !== 'impact') {
+          console.warn('[maps] no raster tiles painted after load — degrading (tilesOK=0, errs=' + glTileErrs + ')');
+          degradeToSchematic();
+        }
+      }, 8000);
+    });
     glMap.on('load', function(){
       glMap.addSource('radius',{type:'geojson',data:circle(center.lat,center.lng,opts.radiusMi)});
       glMap.addLayer({id:'radius-fill',type:'fill',source:'radius',paint:{'fill-color':'#157a49','fill-opacity':0.08}});
@@ -291,6 +328,7 @@ HS.onReady(async function () {
     document.getElementById('mapSch').style.display='none';
     document.getElementById('mapgl').style.display='block';
     ensureGL();
+    if (glFailed || !glMap) return;      // WebGL init failed -> already degraded
     if (!glReady){ setGps(items); renderPins(items); return; }
     glMap.resize();
     // base layer per mode
