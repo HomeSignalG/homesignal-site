@@ -30,6 +30,18 @@
   "The ZIP column is MANDATORY. STATUS: connector BUILT + unit-tested + wired (arcgisForZip).",
   "Add verified entries here as clean per-address permit/case FeatureServers are confirmed."
  ],
+ "_csv_readme": [
+  "CSV-file connector (sources/csv.ts) - for first-party portals whose interface is a published",
+  "CSV file (first consumer: San Diego's seshat.datasd.org approvals ledger). Same discipline:",
+  "append an entry here, never edit the connector. The file is fetched ONCE per cache window",
+  "(module memo, cache_minutes default 360) with include_types + recency + column projection",
+  "applied at parse time, then every ZIP in the batch is served from the compact cached rows.",
+  "ZIP scoping: column_map.zip when the file has one, else spatial_zip_radius_mi (each row's",
+  "OWN coords vs the ZIP centroid - a garbage coordinate can never land near a centroid, so",
+  "bad source geometry self-excludes). Statuses/types VERBATIM, fail-closed, record_url",
+  "column -> template -> dataset landing page. Batches should fire csv-covered ZIPs in modest",
+  "waves so cold isolates don't multiply the file download."
+ ],
  "socrata": [
   {
    "registry_id": "austin-subdivision-cases",
@@ -2150,6 +2162,70 @@
    "spatial_zip_radius_mi": 3,
    "recency_days": 365,
    "_receipts": "2026-07-15 MI retry pass ('Oakland County' target): the county org (GE4Idg9FL97XBa3P) hosts NO county-wide permit layer \u2014 the real find is Independence Township's Construction Activity solution (ConstructionActivity_Public, 'Building Permits' layer 0) in the county org. FRESH: 10,020 rows, max Date_Issued 2026-07-09. Extent bbox 42.704\u201342.794 x -83.449\u2013-83.330 = Independence Twp ONLY (~Clarkston 48346/48348) \u2014 jurisdiction named honestly; the spatial 3-mi scope means only nearby pages get rows. Statuses VERBATIM: ISSUED->approved, FINALED->operating, CLOSED/EXPIRED/CANCELED/SUSPENDED (FEE) excluded (conservative \u2014 Minneapolis 'Closed' precedent). Types verbatim: kept Building + LAND USE; Electrical/Plumbing/Mechanical/TEMP SIGN/WATER-SEWER/CODE-STATUS dropped at source. Public view NULLS Address (absent stays absent; rows place by their own points); Work_Description is populated (receipt: 'ATTACHED GARAGE W/ BONUS ROOM\u2026'). No per-row URL column -> dataset-precision record_url (AGO item page)."
+  },
+  {
+   "registry_id": "anaheim-land-use-cases",
+   "platform": "arcgis",
+   "service_url": "https://services3.arcgis.com/hPs600I3X0RTaaaq/arcgis/rest/services/Open_Data_Land_Use_Permits/FeatureServer/0",
+   "dataset_url": "https://services3.arcgis.com/hPs600I3X0RTaaaq/arcgis/rest/services/Open_Data_Land_Use_Permits/FeatureServer/0",
+   "jurisdiction": "City of Anaheim",
+   "coverage": [
+    {
+     "state": "CA",
+     "county": "Orange"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "Application_Type",
+     "Case_Description_Details"
+    ],
+    "status_raw": "Status",
+    "type_source": "Application_Type",
+    "file_date": "Application_Received",
+    "address": "Location_Primary_Address",
+    "case_number": "Case_Number"
+   },
+   "zip_where_template": "Location_Primary_Address LIKE '%{zip}%'",
+   "extra_where": "Application_Type <> 'Sex-Oriented Business' AND Application_Received >= '2025/07/01'",
+   "type_map": {
+    "Planning and Zoning": "Development",
+    "Development Project": "Development",
+    "CEQA": "Development",
+    "Advanced Planning": "Civic/Public"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "Received",
+     "In Review",
+     "Hearing Scheduled",
+     "Recommend Approval",
+     "Continued",
+     "Incomplete",
+     "Incomplete Submittal",
+     "Intro Ordinance",
+     "Application Phase Complete"
+    ],
+    "approved": [
+     "Approved",
+     "Adopted",
+     "Recorded"
+    ],
+    "operating": [
+     "Exercised"
+    ],
+    "exclude": [
+     "Withdrawn",
+     "Terminated",
+     "Void",
+     "Revoked",
+     "Denied",
+     "Expired",
+     "Closed",
+     "Complete"
+    ]
+   },
+   "_receipts": "2026-07-16 CA wire pass. Anaheim's own AGO org (services3/hPs600I3X0RTaaaq, service list enumerated live). GEOMETRY-LESS TABLE (geometryType null) -> rows geocode via Location_Primary_Address (Boulder precedent; v20 geofence applies). No ZIP column; every address embeds '..., Anaheim, Ca 92xxx' -> zip_where_template LIKE (live receipt: 92805 -> 6,333 rows all-time). FRESH: newest Application_Received 2026/06/30 (PAZ2026-00384, matches recon). 26,883 rows total / 845 since 2025-07-01 -> recency via extra_where STRING compare (dates are yyyy/mm/dd STRINGS; the connector's recency_days DATE literal would fail on a string field - do NOT set it). 23 statuses VERBATIM via returnDistinctValues 2026-07-16: 'Modified' left unmapped ON PURPOSE (ambiguous outcome - surfaces in run report); Closed/Complete excluded (MN 'Closed' precedent: no trustworthy lifecycle). 'Sex-Oriented Business' type dropped at source (licensing class, not development). record_url dataset-precision (no per-record public link; CityView-class portals are login-walled - Provo precedent)."
   }
  ],
  "ckan": [
@@ -2203,6 +2279,74 @@
    "extra_where": "\"permittypedescr\" IN ('Erect/New Construction','Long Form/Alteration Permit','Amendment to a Long Form','Foundation Permit','Use of Premises')",
    "recency_days": 365,
    "_receipts": "2026-07-15 MA wire pass (FIRST ckan entry \u2014 new additive sources/ckan.ts, datastore_search_sql): fresh TODAY (newest issued_date 2026-07-15T01:47; resource last_modified 2026-07-15T18:26). Native `zip` column + own y_latitude/x_longitude per record. Statuses VERBATIM via SQL group-by over all 656,762 rows: Open(376,412)+Issued(3)->approved, Closed(280,345)->operating, Stop Work(2)->exclude. 13 permittypedescr values VERBATIM; FOUNDER WHITELIST 2026-07-15: keep Erect/New Construction, Long Form/Alteration Permit, Amendment to a Long Form, Foundation Permit, Use of Premises; DROP Short Form Bldg Permit (189k minor jobs \u2014 founder call) + all Electrical variants/Plumbing/Gas/Certificate of Occupancy. FOUNDER-ACCEPTED dataset-precision record_url (no per-row URL column; no verified portal URL pattern \u2014 templating one would be guessing)."
+  }
+ ],
+ "csv": [
+  {
+   "registry_id": "san-diego-approved-permits",
+   "platform": "csv",
+   "url": "https://seshat.datasd.org/development_permits/approvals_issued_2026_datasd.csv",
+   "dataset_url": "https://data.sandiego.gov/datasets/development-permits-set1/",
+   "jurisdiction": "City of San Diego",
+   "coverage": [
+    {
+     "state": "CA",
+     "county": "San Diego"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "APPROVAL_TYPE",
+     "PROJECT_TITLE"
+    ],
+    "status_raw": "APPROVAL_STATUS",
+    "type_source": "APPROVAL_TYPE",
+    "file_date": "APPROVAL_ISSUE_DATE",
+    "address": "GIS_ADDRESS",
+    "lat": "GIS_LATITUDE",
+    "lng": "GIS_LONGITUDE",
+    "case_number": "APPROVAL_ID"
+   },
+   "include_types": [
+    "Combination Building Permit",
+    "Building Permit",
+    "Approval - Construction - Demolition Pmt",
+    "Approval - Construction - Grading-Right of Way Pmt",
+    "Construction Change - Building",
+    "Conditional Use Permit",
+    "Neighborhood Development Permit",
+    "Coastal Development",
+    "Map - Parcel Map",
+    "Approval - Construction - Master Plan Establish"
+   ],
+   "type_map": {
+    "Combination Building Permit": "Development",
+    "Building Permit": "Development",
+    "Approval - Construction - Demolition Pmt": "Development",
+    "Approval - Construction - Grading-Right of Way Pmt": "Development",
+    "Construction Change - Building": "Development",
+    "Conditional Use Permit": "Development",
+    "Neighborhood Development Permit": "Development",
+    "Coastal Development": "Development",
+    "Map - Parcel Map": "Development",
+    "Approval - Construction - Master Plan Establish": "Development"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Issued",
+     "Inspecting",
+     "Inspection Followup"
+    ],
+    "operating": [
+     "Closed"
+    ],
+    "exclude": [
+     "Cancelled"
+    ]
+   },
+   "record_url_template": "https://opendsd.sandiego.gov/web/approvals/{APPROVAL_ID}",
+   "spatial_zip_radius_mi": 3,
+   "_receipts": "2026-07-16 CA wire pass (FIRST csv entry - new additive sources/csv.ts, fetch-once memo). FRESH SAME-DAY: max APPROVAL_ISSUE_DATE 2026-07-15 over 28,515 rows (15.0 MB YTD-2026 file; runner csv_stats receipt, run 29508593119). Vocabulary VERBATIM from the same run: statuses Issued/Closed/Inspecting/Inspection Followup/Cancelled -> Issued+Inspecting+Inspection Followup=approved, Closed=operating (Boston precedent), Cancelled=exclude; 151 type|status combos enumerated - kept 10 construction/land-use types, DROPPED at parse: Traffic Control (5,807), No-Plan trades combos, Photovoltaic SB 379 (rooftop solar), Construction Noise, Transportation, Right Of Way Pmt-Const Plan, Electrical/Mechanical/Plumbing Pmt, Fire Pmt variants, Sign Pmt, Zone History Letter + paperwork classes. NO ZIP column -> spatial_zip_radius_mi 3 on each row's OWN GIS_LATITUDE/GIS_LONGITUDE (which also self-excludes the file's garbage-coordinate rows: max GIS_LONGITUDE=324108.6 observed - a bad point can never sit near a centroid). RECORD-PRECISION record_url VERIFIED: opendsd.sandiego.gov API discriminates (ApprovalId 2618042 -> full record matching the CSV row; 999999999 -> 'could not be found') so /web/approvals/{APPROVAL_ID} is a real per-record official page. PROJECT_STATUS NOT used (17,813 blanks); APPROVAL_STATUS is the status column. File is YTD-2026 (inherent recency window)."
   }
  ]
 }
