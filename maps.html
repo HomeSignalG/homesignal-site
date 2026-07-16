@@ -109,17 +109,32 @@ HS.onReady(async function () {
   var panelHTML = document.querySelector('.mpanel').outerHTML;
   var gpsEl = document.getElementById('mapGps');
 
+  // Route a pin-list card the same way cards navigate everywhere else (no dead clicks):
+  // projects -> their detail page; changes -> the related project's detail, else the
+  // official record. Items with no destination stay non-clickable (honest, not dead).
+  function pinHref(it) {
+    if (it.type) return { url: 'development.html?id=' + encodeURIComponent(it.id), ext: false };
+    if (it.related_project_id) return { url: 'development.html?id=' + encodeURIComponent(it.related_project_id), ext: false };
+    if (it.source_ref) return { url: it.source_ref, ext: true };
+    return null;
+  }
   function renderPins(items) {
     document.getElementById('pinList').innerHTML =
       '<div class="groupHead" style="margin-top:0">Near you · closest first</div>'
-      + items.map(function (it) {
-        var col = tierHex(it);
-        return '<div class="card mini" style="border-left-color:' + col + '">'
+      + items.map(function (it, i) {
+        var col = tierHex(it), to = pinHref(it);
+        return '<div class="card mini' + (to ? ' clickable" data-pin="' + i : '') + '" style="border-left-color:' + col + '">'
           + '<span class="lens"><span class="letter" style="background:' + col + '">' + it._letter + '</span>&nbsp; '
           + HS.esc(it.type || it.category || '') + ' · ' + HS.esc(it.dist||'') + '</span>'
           + '<h3>' + HS.esc(it.name || it.title) + '</h3>'
           + '<p class="sowhat">' + HS.esc(it.sowhat || it.plain_language || '') + '</p></div>';
       }).join('');
+    document.querySelectorAll('#pinList [data-pin]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var to = pinHref(items[parseInt(el.getAttribute('data-pin'), 10)]); if (!to) return;
+        if (to.ext) window.open(to.url, '_blank', 'noopener'); else location.href = to.url;
+      });
+    });
   }
   function setGps(items){
     var within = items.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;

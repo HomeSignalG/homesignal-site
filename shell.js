@@ -62,6 +62,15 @@
   }
   // Read seam for the (later, schema-gated) conversion-stamp step.
   HS.referral = function () { return LS.get('referral', null); };
+  // Compact provenance token for a conversion row's `source` column, alongside the
+  // existing hand-set tokens ('homepage_zip', 'contact_page'). Prefixed 'ref:' so
+  // analytics can tell referral-attributed rows from page-provenance rows at a
+  // glance: "ref:bluesky/box-elder-meetings". Null when there's no first touch.
+  HS.referralToken = function () {
+    const r = HS.referral(); if (!r || !r.source) return null;
+    const tok = 'ref:' + r.source + (r.campaign ? '/' + r.campaign : '');
+    return tok.replace(/\s+/g, '_').slice(0, 120);
+  };
 
   // ------------------------------------------------------------- ready gate --
   let _resolveReady;
@@ -279,7 +288,12 @@
   HS.submitRequest = async function () {
     const el = $('reqEmail'), e = el.value.trim();
     if (!e || e.indexOf('@') < 1) { el.style.borderColor = '#c23b34'; el.focus(); return; }
-    await persistEmail('community_requests', { email: e, zip: $('reqZipLabel').textContent });
+    // Referral stamp: carry the first-touch source onto the area-request row
+    // (community_requests.source — same column submit-public-form stamps with
+    // 'homepage_zip'). Only set when a first touch exists; absent stays absent.
+    const row = { email: e, zip: $('reqZipLabel').textContent };
+    const ref = HS.referralToken(); if (ref) row.source = ref;
+    await persistEmail('community_requests', row);
     $('locRequest').classList.add('hidden');
     $('locDoneH').textContent = 'Request received';
     $('locDoneP').textContent = "We'll email you the moment " + $('reqZipLabel').textContent + ' is live on HomeSignal.';
