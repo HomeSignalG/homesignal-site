@@ -1547,3 +1547,79 @@ gate proof (Allegheny + Utah ZIPs → 0 fetches) and the SQL-error quarantine.
   dev 243; ckan emitted 243/246; Revoked 3 excluded).
 - **522 pages auto-indexable** under the substance gate (no manual flip);
   nationwide indexable after PA: 4,929.
+
+## 2026-07-16 — FLORIDA WIRE PASS (Tier 1 state 2 of 17, founder wire order)
+
+**Three metros wired (Miami, Orlando, Tampa), all on EXISTING connectors — zero new
+code.** All receipts are live pg_net probes from 2026-07-16 (response ids 1413-1447);
+nothing wired on training knowledge.
+
+### WIRED — miami-building-permits (ArcGIS, City of Miami / Miami-Dade County)
+- **FRESH**: max `IssuedDate` = **2026-07-15** (epoch 1784153820000, live statistics
+  probe). Hub-catalog `modified` 2026-07-16.
+- `Building_Permits_Since_2014/FeatureServer/0` (services1.arcgis.com/CvuPhqcTQpZPT9qY)
+  — point features, one row per permit, Latitude/Longitude + real geometry.
+- 5 statuses VERBATIM (returnDistinctValues): Active→approved, Final→operating,
+  Hold→proposed (Scottsdale ON HOLD precedent), Expired/Revoked→exclude.
+- 22 `ScopeofWork` values enumerated; kept: NEW CONSTRUCTION / DEMOLITION / ADDITION
+  AND REMODELING / PHASED PERMIT. Dropped at source: ELECTRICAL/PLUMBING/MECHANICAL/
+  FIRE/ELEVATOR/BOILER trades, SIGN, LANDSCAPING, TREE PERMIT, BUILDING ROOFING
+  (re-roofs), SPECIAL/TEMPORARY EVENTS, ANNUAL FACILITY, BUILDING RECERTIFICATION,
+  SHOP DRAWINGS, COOKIE CUTTER (ambiguous city jargon — dropped, not guessed),
+  REMODELING/REPAIRS (minor-repair mix — Boston Short-Form precedent).
+- No ZIP column → `spatial_zip_radius_mi: 3` (Denver pattern; records keep their OWN
+  parcel points). record_url dataset-precision (no per-row URL column).
+
+### WIRED — orlando-permit-applications (Socrata, City of Orlando / Orange County)
+- **FRESH same-day**: max `processed_date` AND max `issue_permit_date` = **2026-07-16**
+  (live SoQL probe). Dataset ryhf-m453 on data.cityoforlando.net, updated daily.
+- 66 `worktype` values enumerated; 19 construction/land-use types kept verbatim (New
+  167,170 / Alteration 108,474 / Comm 54,124 / Addition 35,841 / Townhomes / MF / MFHR /
+  Duplex / MixedUse / HotelMotel / ADU / Foundation / Construct / ChangeUse / ChangeOccu /
+  Conversion / Demo / DEM / SFSubd). Dropped at source: Repair 137,791, Roof 87,196,
+  LowVoltage 52,284, Fence, Pool, Irrigation, Solar, FireSupp, ELE/MEC/FIR/GAS trades,
+  Dumpster, AlrmStickr; blank worktype (60,150) fails the whitelist closed.
+- Statuses VERBATIM: Open→proposed, Finaled/Completed→operating; Void/Stop Work/Hold/
+  Hardhold/HardHold→exclude. **`Closed` (385,290 rows) left UNMAPPED ON PURPOSE** — it
+  spans completed AND dead applications with no disambiguating column; fail-closed, it
+  surfaces in `unmapped_statuses`, never guessed. Note: 25,273 `Open` rows carry an
+  issue date (the city keeps status Open post-issuance) — mapped verbatim to proposed
+  per the city's own label.
+- No zip column → Socrata point col `geocoded_column` + `within_circle` spatial scoping
+  (the Chicago pattern, zero new code).
+
+### WIRED — tampa-single-family-permits (ArcGIS, City of Tampa / Hillsborough County)
+- **FRESH**: max `LASTUPDATE` = **2026-07-15**; 1,020 rows — a live snapshot of current
+  single-family permits on the CITY'S OWN ArcGIS Server
+  (arcgis.tampagov.net OpenData/Planning/MapServer/32, Accela-backed).
+- **Granularity verified**: one row per `RECORD_ID` (groupBy count = 1 across sample) —
+  per-permit, not a task log.
+- Native `ZIP` column + per-row geometry. Statuses VERBATIM (the snapshot carries only
+  two): Issued→approved, Revision→proposed. APPLICATION_TYPE verbatim include:
+  "Residential New Construction and Additions (1 and 2 Family)" + "Residential New
+  Construction and Additions".
+- Found via the Hub domains API (`orgId IbNXlmt2RVVRCZ6M`) → org-scoped AGO search →
+  the item's `url` pointed at the city server (the Hub DCAT only exposed Experience
+  Builder apps).
+
+### Rejections / not wired (receipts)
+- **Fort Lauderdale Building/Land Use Permits (gis.fortlauderdale.gov MapServer/27)** —
+  perfect schema (PERMITTYPE/PERMITSTAT/APPROVEDT/FULLADDR) but **STALLED: max
+  LASTUPDATEDATE = 2021-01-05**. → nightly reprobe list. Broward ships facilities-floor.
+- **Broward County GeoHub** (corrected URL geohub-bcgis.opendata.arcgis.com, live 200):
+  0 permit/construction/demolition datasets in the DCAT — GIS layers only.
+- **Hillsborough County GeoHub** (corrected URL gis2017-…-hillsborough, live 200):
+  0 permit datasets; the county's permit reports live behind HillsGovHub (Accela app,
+  no public dataset). Tampa city covers the metro core.
+- **Miami-Dade County hub** (gis-mdc, 200 after a transient 500): 0 permit datasets —
+  county GIS only; the CITY ledger above carries the metro.
+- **Tampa "Active Residential / Commercial Permits"**: exists only as an Experience
+  Builder app; no public Feature Service in the org (org-scoped search receipt) — the
+  SF layer is the city's public permits dataset.
+- **St. Petersburg**: stat.stpete.org redirects to the city CMS (no Socrata catalog);
+  no first-party permit API found. Facilities-floor.
+- First-pass 404s (domain-not-found): hub-hillsboroughcounty, open-broward,
+  data-fortlauderdale, data-pbcgov, data-ocfl, data-pinellas-egis, data-capegis,
+  data-sarasotacounty, hub-colliercountyfl — all re-run against their REAL portals
+  above where one exists; Palm Beach/Pinellas/Lee/Sarasota/Collier/St. Johns have no
+  first-party per-record permit source found this pass → facilities floor.
