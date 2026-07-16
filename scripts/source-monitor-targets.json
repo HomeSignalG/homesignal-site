@@ -264,6 +264,21 @@
         "services6.arcgis.com"
       ],
       "rejected": "2026-07-15: STALLED snapshot - newest Issue_Date 2025-08-16 (11 months). Right shape (47,902 points, Permit_Number/Full_Address/Issue_Date/Permit_Type/LAT/LONG; no status column -> status_const pattern if it resumes). Wire if the city resumes publishing."
+    },
+    {
+      "id": "howard-county-permits",
+      "kind": "socrata-resource",
+      "domain": "opendata.howardcountymd.gov",
+      "dataset_id": "kvz2-j5cj",
+      "jurisdiction": "Howard County",
+      "coverage": {
+        "state": "MD",
+        "county": "Howard"
+      },
+      "hosts": [
+        "opendata.howardcountymd.gov"
+      ],
+      "rejected": "2026-07-16: STALLED \u2014 newest issue_date rows Nov 2025, rowsUpdatedAt 2025-12-04 (recon receipts, DB-outage recon night); also no status/point columns (would be status_const + zip-only)"
     }
   ],
   "discovery": [
@@ -509,9 +524,9 @@
         "state": "CA",
         "county": "Santa Clara"
       },
-      "url": "https://data-sunnyvale.opendata.arcgis.com/api/feed/dcat-us/1.1.json",
+      "url": "https://data.sunnyvale.ca.gov/api/feed/dcat-us/1.1.json",
       "hosts": [
-        "data-sunnyvale.opendata.arcgis.com",
+        "data.sunnyvale.ca.gov",
         "services2.arcgis.com",
         "services.arcgis.com",
         "services1.arcgis.com",
@@ -572,7 +587,8 @@
         "services.arcgis.com",
         "services1.arcgis.com",
         "services2.arcgis.com",
-        "services3.arcgis.com"
+        "services3.arcgis.com",
+        "gis.anaheim.net"
       ]
     },
     {
@@ -641,7 +657,8 @@
         "services.arcgis.com",
         "services1.arcgis.com",
         "services2.arcgis.com",
-        "services3.arcgis.com"
+        "services3.arcgis.com",
+        "gis.slocounty.ca.gov"
       ]
     },
     {
@@ -741,7 +758,8 @@
         "services.arcgis.com",
         "services1.arcgis.com",
         "services2.arcgis.com",
-        "services3.arcgis.com"
+        "services3.arcgis.com",
+        "maps.scottsdaleaz.gov"
       ]
     },
     {
@@ -771,7 +789,8 @@
         "services.arcgis.com",
         "services1.arcgis.com",
         "services2.arcgis.com",
-        "services3.arcgis.com"
+        "services3.arcgis.com",
+        "gis.tucsonaz.gov"
       ]
     },
     {
@@ -785,19 +804,6 @@
       "url": "https://gis.pima.gov/arcgis/rest/services",
       "hosts": [
         "gis.pima.gov"
-      ]
-    },
-    {
-      "id": "baltimore-city-socrata",
-      "kind": "socrata-catalog",
-      "jurisdiction": "Baltimore City",
-      "coverage": {
-        "state": "MD",
-        "county": "Baltimore city"
-      },
-      "domain": "data.baltimorecity.gov",
-      "hosts": [
-        "data.baltimorecity.gov"
       ]
     },
     {
@@ -853,7 +859,8 @@
         "services.arcgis.com",
         "services1.arcgis.com",
         "services2.arcgis.com",
-        "services3.arcgis.com"
+        "services3.arcgis.com",
+        "bcgisdata.baltimorecountymd.gov"
       ]
     },
     {
@@ -888,6 +895,24 @@
         "services1.arcgis.com",
         "services2.arcgis.com",
         "services3.arcgis.com"
+      ]
+    },
+    {
+      "id": "baltimore-city-dcat",
+      "kind": "dcat",
+      "jurisdiction": "Baltimore City",
+      "coverage": {
+        "state": "MD",
+        "county": "Baltimore city"
+      },
+      "url": "https://data.baltimorecity.gov/api/feed/dcat-us/1.1.json",
+      "hosts": [
+        "data.baltimorecity.gov",
+        "services1.arcgis.com",
+        "services.arcgis.com",
+        "services2.arcgis.com",
+        "services3.arcgis.com",
+        "egisdata.baltimorecity.gov"
       ]
     }
   ]

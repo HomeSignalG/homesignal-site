@@ -1,0 +1,9 @@
+[
+  { "id": "sj-pkg-abp-full", "url": "https://data.sanjoseca.gov/api/3/action/package_show?id=active-building-permits", "print_chars": 20000 },
+  { "id": "balt-county-dcat-full", "url": "https://opendata.baltimorecountymd.gov/api/feed/dcat-us/1.1.json", "print_chars": 120000 },
+  { "id": "balt-city-dcat-full", "url": "https://data.baltimorecity.gov/api/feed/dcat-us/1.1.json", "print_chars": 120000 },
+  { "id": "scottsdale-dcat-full", "url": "https://data.scottsdaleaz.gov/api/feed/dcat-us/1.1.json", "print_chars": 120000 },
+  { "id": "anaheim-dcat-full", "url": "https://data-anaheim.opendata.arcgis.com/api/feed/dcat-us/1.1.json", "print_chars": 120000 },
+  { "id": "sd-permits-page-full", "url": "https://data.sandiego.gov/datasets/development-permits-set1/", "print_chars": 46000 },
+  { "id": "mesa-fresh-retry", "url": "https://data.mesaaz.gov/resource/dzpk-hxfb.json?$select=max(issued_date)" }
+]

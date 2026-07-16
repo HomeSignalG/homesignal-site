@@ -1,0 +1,4 @@
+[
+  { "id": "sj-abp-sql-correct", "url": "https://data.sanjoseca.gov/api/3/action/datastore_search_sql?sql=SELECT%20*%20FROM%20%22761b7ae8-3be1-4ad6-923d-c7af6404a904%22%20LIMIT%202", "print_chars": 5000 },
+  { "id": "sj-planning30d-pkg", "url": "https://data.sanjoseca.gov/api/3/action/package_show?id=last-30-days-planning-permits", "extract": "\"url\": \"[^\"]+download[^\"]+\"", "extract_context": 300, "extract_max": 3 }
+]

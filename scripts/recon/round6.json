@@ -1,0 +1,12 @@
+[
+  { "id": "baltco-permits-meta", "url": "https://bcgisdata.baltimorecountymd.gov/arcgis/rest/services/DevelopmentManagement/ActiveDevelopment/MapServer/4?f=json", "print_chars": 9000 },
+  { "id": "baltco-permits-sample", "url": "https://bcgisdata.baltimorecountymd.gov/arcgis/rest/services/DevelopmentManagement/ActiveDevelopment/MapServer/4/query?where=1%3D1&outFields=*&resultRecordCount=2&f=json", "print_chars": 6000 },
+  { "id": "baltcity-hbp-meta", "url": "https://baltegis.baltimorecity.gov/mapping/rest/services/Housing/DHCD_Open_Baltimore_Datasets/FeatureServer/3?f=json", "print_chars": 9000 },
+  { "id": "baltcity-hbp-sample", "url": "https://baltegis.baltimorecity.gov/mapping/rest/services/Housing/DHCD_Open_Baltimore_Datasets/FeatureServer/3/query?where=1%3D1&outFields=*&resultRecordCount=2&f=json", "print_chars": 6000 },
+  { "id": "scottsdale-bp-meta", "url": "https://maps.scottsdaleaz.gov/arcgis/rest/services/OpenData_Tabular/MapServer/12?f=json", "print_chars": 9000 },
+  { "id": "scottsdale-bp-sample", "url": "https://maps.scottsdaleaz.gov/arcgis/rest/services/OpenData_Tabular/MapServer/12/query?where=1%3D1&outFields=*&resultRecordCount=2&f=json", "print_chars": 6000 },
+  { "id": "anaheim-lup-meta", "url": "https://services3.arcgis.com/hPs600I3X0RTaaaq/arcgis/rest/services/Open_Data_Land_Use_Permits/FeatureServer/0?f=json", "print_chars": 9000 },
+  { "id": "anaheim-lup-sample", "url": "https://services3.arcgis.com/hPs600I3X0RTaaaq/arcgis/rest/services/Open_Data_Land_Use_Permits/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=2&f=json", "print_chars": 6000 },
+  { "id": "sj-abp-sql", "url": "https://data.sanjoseca.gov/api/3/action/datastore_search_sql?sql=SELECT%20*%20FROM%20%22fd9ceb0c-75e0-402e-9fe3-3f6e04f2c23f%22%20LIMIT%202", "print_chars": 6000 },
+  { "id": "sd-issued-2026-head", "url": "https://seshat.datasd.org/development_permits/approvals_issued_2026_datasd.csv", "print_chars": 3500 }
+]

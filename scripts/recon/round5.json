@@ -1,0 +1,8 @@
+[
+  { "id": "sj-pkg-abp-full", "url": "https://data.sanjoseca.gov/api/3/action/package_show?id=active-building-permits", "extract": "\"resources\": \\[", "extract_context": 4000, "extract_max": 1 },
+  { "id": "balt-county-permits-dist", "url": "https://opendata.baltimorecountymd.gov/api/feed/dcat-us/1.1.json", "extract": "\"title\": \"(Permits|Use and Occupancy Permits)\"", "extract_context": 2500, "extract_max": 4 },
+  { "id": "balt-city-hbp-dist", "url": "https://data.baltimorecity.gov/api/feed/dcat-us/1.1.json", "extract": "Housing and Building Permits", "extract_context": 2500, "extract_max": 3 },
+  { "id": "scottsdale-bp-dist", "url": "https://data.scottsdaleaz.gov/api/feed/dcat-us/1.1.json", "extract": "Planning and Development (Building Permits|Cases)", "extract_context": 2500, "extract_max": 4 },
+  { "id": "anaheim-lup-dist", "url": "https://data-anaheim.opendata.arcgis.com/api/feed/dcat-us/1.1.json", "extract": "(Open Data Land Use Permits|Hotel Permits)", "extract_context": 2500, "extract_max": 4 },
+  { "id": "sd-page-csv-links", "url": "https://data.sandiego.gov/datasets/development-permits-set1/", "extract": "seshat\\.datasd\\.org[^\"']*", "extract_context": 400, "extract_max": 8 }
+]
