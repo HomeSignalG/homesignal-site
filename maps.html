@@ -12,9 +12,10 @@
   /* app-only: real MapLibre tile map (Esri/OSM) is the default; the schematic SVG
      sits beneath it as the offline / rate-limit fallback, with a shared overlay panel */
   #mapWrap{min-height:300px}
-  #mapgl{width:100%;height:520px;border-radius:15px;overflow:hidden}
-  @media(max-width:900px){ #mapgl{height:60vw;min-height:320px} }
+  #mapgl,#maplf{width:100%;height:520px;border-radius:15px;overflow:hidden}
+  @media(max-width:900px){ #mapgl,#maplf{height:60vw;min-height:320px} }
   .maplibregl-popup-content{font-family:var(--font);font-size:13px;border-radius:10px;padding:9px 12px}
+  .leaflet-popup-content{font-family:var(--font);font-size:13px}
 </style>
 </head>
 <body data-nav="maps">
@@ -39,6 +40,7 @@
       <div class="mapwrap" id="mapWrap">
         <div id="mapSch"></div>
         <div id="mapgl" style="display:none"></div>
+        <div id="maplf" style="display:none"></div>
         <div class="mpanel">
           <div class="mt">Pins colored by impact</div>
           <div class="legrow"><span class="ld" style="background:var(--red)"></span> High impact on you</div>
@@ -142,9 +144,11 @@ HS.onReady(async function () {
     gpsEl.textContent = place + ' · ' + within + ' items within ' + opts.radiusMi + ' mi';
     updateHomePrompt();
   }
-  // Set-your-home nudge — shown ONLY when there's no real resident home to pin.
-  // Doubles as a follow/signup prompt (opens the set-your-area flow). Removed once
-  // a real home exists (then the home marker renders instead).
+  // Set-your-AREA nudge — shown ONLY when there's no real resident home to pin.
+  // Doubles as a follow/signup prompt (opens the set-your-area ZIP flow — the only
+  // location flow that exists; nothing writes app_properties yet, so the copy must
+  // promise "area", never "home address"). Removed once a real home exists (then
+  // the home marker renders instead).
   function updateHomePrompt(){
     var wrap = document.getElementById('mapWrap'), el = document.getElementById('mapHomePrompt');
     if (hasRealHome) { if (el) el.remove(); return; }
@@ -155,7 +159,7 @@ HS.onReady(async function () {
       el.style.cssText = 'position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;'
         + 'background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 15px;'
         + 'font:600 12.5px/1 var(--font);color:var(--ink);box-shadow:var(--shadow);cursor:pointer';
-      el.textContent = '◎ Set your area to map your home & get alerts';
+      el.textContent = '◎ Set your area to see alerts near you';
       el.onclick = function(){ if (HS.openLoc) HS.openLoc(); };
       if (wrap) wrap.appendChild(el);
     }
@@ -182,7 +186,7 @@ HS.onReady(async function () {
     });
     overlayFacilities(document.getElementById('mapSch'));
     setGps(items); renderPins(items);
-    wirePanel(function(){ if (opts.mode==='impact') drawSchematic(); else drawGL(); });
+    wirePanel(function(){ if (opts.mode==='impact') drawSchematic(); else drawTiles(); });
   }
 
   // Overlay regulated facilities onto the schematic SVG as distinct purple squares
@@ -217,7 +221,9 @@ HS.onReady(async function () {
   var glMap = null, glMarkers = [], glReady = false, glFailed = false, glTileErrs = 0, glTilesOK = 0;
   // Console triage handle (read-only): window.__HS_GL.tilesOK / errs / ready / failed.
   window.__HS_GL = { get tilesOK(){return glTilesOK;}, get errs(){return glTileErrs;},
-                     get ready(){return glReady;}, get failed(){return glFailed;} };
+                     get ready(){return glReady;}, get failed(){return glFailed;},
+                     get lfTilesOK(){return lfTilesOK;}, get lfErrs(){return lfTileErrs;},
+                     get lfFailed(){return lfFailed;} };
   function circle(lat, lng, rMi){
     var pts=[], R=rMi/69.0, cs=Math.cos(lat*Math.PI/180);
     for(var i=0;i<=64;i++){var a=i/64*2*Math.PI; pts.push([lng + (R*Math.sin(a))/cs, lat + R*Math.cos(a)]);}
@@ -238,22 +244,27 @@ HS.onReady(async function () {
       var col=tierHex(it), el=document.createElement('div');
       el.style.cssText='width:26px;height:26px;border-radius:50%;background:'+col+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font:700 12px/1 sans-serif;cursor:pointer';
       el.textContent=it._letter;
-      var html='<div style="font:600 13px/1.3 var(--font)">'+HS.esc(it.name||it.title)+'</div>'
-        +'<div style="font-size:11px;color:#5a6b63">'+HS.esc(it.type||it.category||'')+(it.dist?' · '+HS.esc(it.dist):'')+'</div>'
-        +(it.source_ref?'<a href="'+HS.esc(it.source_ref)+'" target="_blank" rel="noopener" style="font-size:11.5px;color:#157a49;font-weight:600">official record ▸</a>':'');
       glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([it.lng,it.lat])
-        .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(html)).addTo(glMap));
+        .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(itemPopupHTML(it))).addTo(glMap));
     });
     // Regulated facilities — a DISTINCT layer (purple squares), env context, not development.
     if (opts.showFacilities) facs.forEach(function(f){
       var el=document.createElement('div');
       el.style.cssText='width:20px;height:20px;border-radius:3px;background:'+FACILITY_HEX+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer';
-      var html='<div style="font:600 13px/1.3 var(--font)">'+HS.esc(f.name)+'</div>'
-        +'<div style="font-size:11px;color:#5a6b63">Regulated facility'+(f.developer?' · '+HS.esc(f.developer):'')+(f.dist?' · '+HS.esc(f.dist):'')+'</div>'
-        +(f.source_ref?'<a href="'+HS.esc(f.source_ref)+'" target="_blank" rel="noopener" style="font-size:11.5px;color:#157a49;font-weight:600">View public record ▸</a>':'');
       glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([f.lng,f.lat])
-        .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(html)).addTo(glMap));
+        .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(facPopupHTML(f))).addTo(glMap));
     });
+  }
+  // Shared popup bodies — used by BOTH tile engines (MapLibre + the Leaflet fallback).
+  function itemPopupHTML(it){
+    return '<div style="font:600 13px/1.3 var(--font)">'+HS.esc(it.name||it.title)+'</div>'
+      +'<div style="font-size:11px;color:#5a6b63">'+HS.esc(it.type||it.category||'')+(it.dist?' · '+HS.esc(it.dist):'')+'</div>'
+      +(it.source_ref?'<a href="'+HS.esc(it.source_ref)+'" target="_blank" rel="noopener" style="font-size:11.5px;color:#157a49;font-weight:600">official record ▸</a>':'');
+  }
+  function facPopupHTML(f){
+    return '<div style="font:600 13px/1.3 var(--font)">'+HS.esc(f.name)+'</div>'
+      +'<div style="font-size:11px;color:#5a6b63">Regulated facility'+(f.developer?' · '+HS.esc(f.developer):'')+(f.dist?' · '+HS.esc(f.dist):'')+'</div>'
+      +(f.source_ref?'<a href="'+HS.esc(f.source_ref)+'" target="_blank" rel="noopener" style="font-size:11.5px;color:#157a49;font-weight:600">View public record ▸</a>':'');
   }
   function ensureGL(){
     if (glMap) return;
@@ -326,6 +337,7 @@ HS.onReady(async function () {
   function drawGL(){
     var items = shownItems();
     document.getElementById('mapSch').style.display='none';
+    document.getElementById('maplf').style.display='none';
     document.getElementById('mapgl').style.display='block';
     ensureGL();
     if (glFailed || !glMap) return;      // WebGL init failed -> already degraded
@@ -344,8 +356,103 @@ HS.onReady(async function () {
     wirePanel(drawGL);   // panel + gps are static siblings in #mapWrap, over both maps
   }
 
+  // ---------- Leaflet raster fallback (real tiles WITHOUT WebGL) ----------
+  // MapLibre requires WebGL, which hardened browsers disable (seen live: Brave with
+  // fingerprint protection = "Failed to initialize WebGL"). Leaflet paints the SAME
+  // Esri/OSM rasters as plain <img> tiles — already allowed by this page's img-src
+  // CSP — so Satellite/Street keep working there. Loaded lazily from jsDelivr only
+  // when the GL map can't run; healthy-WebGL visitors never fetch it. The impact
+  // diagram stays the FINAL fallback when tiles truly can't load (offline, 429s).
+  var lfMap=null, lfSat=null, lfOsm=null, lfBase=null, lfRadius=null, lfMarkers=[],
+      lfFailed=false, lfTilesOK=0, lfTileErrs=0, lfWatchdogArmed=false;
+  function loadLeaflet(cb){
+    if (window.L && window.L.map) return cb(true);
+    if (loadLeaflet._q) { loadLeaflet._q.push(cb); return; }
+    var q = loadLeaflet._q = [cb];
+    var css=document.createElement('link'); css.rel='stylesheet';
+    css.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(css);
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
+    s.onload=function(){ var ok=!!(window.L&&window.L.map); loadLeaflet._q=null; q.forEach(function(f){f(ok);}); };
+    s.onerror=function(){ loadLeaflet._q=null; q.forEach(function(f){f(false);}); };
+    document.head.appendChild(s);
+  }
+  function lfDivIcon(html,size){ return L.divIcon({html:html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2]}); }
+  function clearLfMarkers(){ lfMarkers.forEach(function(m){ try{ lfMap.removeLayer(m); }catch(e){} }); lfMarkers=[]; }
+  function addLfMarkers(items){
+    clearLfMarkers();
+    // Only pin a REAL resident home — never a centroid stand-in (never-faked rule).
+    if (hasRealHome) {
+      lfMarkers.push(L.marker([center.lat,center.lng],{icon:lfDivIcon('<div style="width:20px;height:20px;border-radius:50%;background:#157a49;border:3px solid #fff;box-shadow:0 0 0 6px rgba(21,122,73,.18)"></div>',20)})
+        .bindPopup('<b>Your home</b>').addTo(lfMap));
+    }
+    items.forEach(function(it){
+      var col=tierHex(it);
+      lfMarkers.push(L.marker([it.lat,it.lng],{icon:lfDivIcon('<div style="width:26px;height:26px;border-radius:50%;background:'+col+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font:700 12px/1 sans-serif;cursor:pointer">'+it._letter+'</div>',26)})
+        .bindPopup(itemPopupHTML(it),{maxWidth:260}).addTo(lfMap));
+    });
+    if (opts.showFacilities) facs.forEach(function(f){
+      lfMarkers.push(L.marker([f.lat,f.lng],{icon:lfDivIcon('<div style="width:20px;height:20px;border-radius:3px;background:'+FACILITY_HEX+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer"></div>',20)})
+        .bindPopup(facPopupHTML(f),{maxWidth:260}).addTo(lfMap));
+    });
+  }
+  function lfFail(){
+    if (lfFailed) { schematicFinal(); return; }
+    lfFailed = true;
+    try { if (lfMap) lfMap.remove(); } catch (e) {}
+    lfMap = null;
+    schematicFinal();
+  }
+  function drawLF(){
+    var items = shownItems();
+    document.getElementById('mapSch').style.display='none';
+    document.getElementById('mapgl').style.display='none';
+    document.getElementById('maplf').style.display='block';
+    if (!lfMap){
+      lfMap = L.map('maplf', { zoomSnap: 0.2 });
+      lfSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {attribution:'© Esri, Maxar', maxZoom:19});
+      lfOsm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OpenStreetMap', maxZoom:19, subdomains:'abc'});
+      [lfSat,lfOsm].forEach(function(t){
+        t.on('tileload',  function(){ lfTilesOK++; });
+        // Same spirit as the GL guardrail: repeated failures with NOTHING painted -> diagram.
+        t.on('tileerror', function(){ if (++lfTileErrs >= 4 && lfTilesOK === 0) lfFail(); });
+      });
+    }
+    if (!lfWatchdogArmed){
+      lfWatchdogArmed = true;   // silent-blank watchdog, Leaflet edition
+      setTimeout(function(){
+        if (!lfFailed && lfMap && lfTilesOK === 0 && opts.mode !== 'impact') {
+          console.warn('[maps] no raster tiles painted on the fallback map — showing the impact diagram.');
+          lfFail();
+        }
+      }, 8000);
+    }
+    var want = (opts.mode === 'street') ? lfOsm : lfSat;
+    if (lfBase !== want){ if (lfBase) lfMap.removeLayer(lfBase); want.addTo(lfMap); lfBase = want; }
+    lfMap.setView([center.lat, center.lng], zoomFor(opts.radiusMi));
+    if (lfRadius){ lfMap.removeLayer(lfRadius); lfRadius = null; }
+    if (opts.showRadius) lfRadius = L.circle([center.lat,center.lng], { radius: opts.radiusMi*1609.34,
+      color:'#157a49', weight:2, dashArray:'4 4', fillColor:'#157a49', fillOpacity:0.08 }).addTo(lfMap);
+    addLfMarkers(items);
+    setGps(items); renderPins(items);
+    wirePanel(drawLF);
+  }
+  // Route a tile-mode request (Satellite/Street) to whichever live engine can run:
+  // healthy WebGL -> MapLibre; WebGL failed or lib absent -> Leaflet rasters;
+  // both failed -> the impact diagram (final, always available).
+  function drawTiles(){
+    if (!glFailed && window.maplibregl) { drawGL(); return; }
+    if (lfFailed) { schematicFinal(); return; }
+    loadLeaflet(function(ok){
+      if (opts.mode === 'impact') return;   // user switched away while the lib loaded
+      if (ok && !lfFailed) drawLF(); else lfFail();
+    });
+  }
+
   function showSchematic(){
     document.getElementById('mapgl').style.display='none';
+    document.getElementById('maplf').style.display='none';
     document.getElementById('mapSch').style.display='block';
     drawSchematic();
   }
@@ -355,24 +462,41 @@ HS.onReady(async function () {
     var seg = document.getElementById('mapMode');
     [].forEach.call(seg.querySelectorAll('button'), function(b){ b.classList.toggle('on', b.dataset.mode === mode); });
   }
-  // Fall back from the live tile map to the always-available impact diagram (offline,
-  // missing lib, or a tile-provider rate-limit/failure). Idempotent + user-visible.
+  // The GL map failed (WebGL unavailable, tile-provider errors, or a stalled/blank
+  // load). Don't give up on real tiles yet — drawTiles() tries the Leaflet raster
+  // fallback next (no WebGL needed); the impact diagram is the final stop.
   function degradeToSchematic(){
     if (glFailed) return;
     glFailed = true;
     try { if (glMap) glMap.remove(); } catch (e) {}
     glMap = null; glReady = false;
+    if (opts.mode === 'impact') { showSchematic(); return; }   // user already left tiles
+    drawTiles();
+  }
+  // BOTH tile engines are gone this session: land on the diagram, grey the tile
+  // modes (so they read as unavailable, not broken), and say so once.
+  var tilesDead = false;
+  function schematicFinal(){
+    if (!tilesDead){
+      tilesDead = true;
+      var seg = document.getElementById('mapMode');
+      ['satellite','street'].forEach(function(m){
+        var b = seg.querySelector('[data-mode="'+m+'"]'); if (!b) return;
+        b.style.opacity = '.45'; b.setAttribute('aria-disabled','true');
+        b.title = "Live map tiles aren't available in this browser or network right now";
+      });
+      if (HS.toast) HS.toast("Live map tiles aren't loading right now — showing the impact diagram.");
+    }
     setActiveMode('impact');
     showSchematic();
-    if (HS.toast) HS.toast('Live map is busy — showing the impact diagram. Try Satellite again shortly.');
   }
 
-  // initial view: the REAL Satellite map for covered ZIPs that have something to plot
-  // (Del Valle 78617 / Utah pass ZIPs). Falls back to the impact diagram when the live
-  // map library is unavailable (offline / artifact preview) or there's nothing to map.
-  if (window.maplibregl && (all.length || facs.length)) {
+  // initial view: REAL tiles for covered ZIPs that have something to plot (Del Valle
+  // 78617 / state pass ZIPs) — MapLibre when WebGL works, Leaflet rasters otherwise.
+  // The impact diagram is the empty-page default and the final fallback.
+  if (all.length || facs.length) {
     setActiveMode('satellite');
-    drawGL();
+    drawTiles();
   } else {
     setActiveMode('impact');
     showSchematic();
@@ -381,24 +505,22 @@ HS.onReady(async function () {
   // mode toggle
   document.getElementById('mapMode').addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-mode]'); if (!btn) return;
+    if (btn.getAttribute('aria-disabled') === 'true') {   // both tile engines failed this session
+      if (HS.toast) HS.toast("Live map tiles aren't available right now — the impact diagram shows the same items.");
+      return;
+    }
     [].forEach.call(this.querySelectorAll('button'), function(b){ b.classList.remove('on'); });
     btn.classList.add('on');
     opts.mode = btn.dataset.mode;
     if (opts.mode === 'impact') { showSchematic(); return; }
-    if (!window.maplibregl || glFailed) {   // offline / no lib, or a live-map failure this session
-      btn.classList.remove('on'); this.querySelector('[data-mode="impact"]').classList.add('on'); opts.mode='impact';
-      HS.toast(glFailed ? 'Live map is unavailable right now — showing the impact diagram.'
-                        : 'Satellite & Street need a network map connection — Impact view is live now.');
-      showSchematic(); return;
-    }
-    drawGL();
+    drawTiles();
   });
 
   var radii = [0.5,1,1.5,2,3,5], ri = 2;
   document.getElementById('radiusPill').onclick = function () {
     ri = (ri + 1) % radii.length; opts.radiusMi = radii[ri];
     this.textContent = '◉ Impact radius: ' + opts.radiusMi + ' mi ▾';
-    if (opts.mode === 'impact') showSchematic(); else drawGL();
+    if (opts.mode === 'impact') showSchematic(); else drawTiles();
   };
 });
 </script>
