@@ -289,6 +289,10 @@ HS.onReady(async function () {
       if (!ev) return;
       var src = ev.sourceId, msg = ev.error && String(ev.error.message || ev.error);
       console.warn('[maps] gl error', src || '(no source)', msg || ev);   // triage: always visible
+      // WebGL failure can surface ASYNC (live Brave console: "Uncaught (in promise)
+      // ... webglcontextcreationerror ... Failed to initialize WebGL") — the ctor
+      // try/catch misses that path. Any WebGL error = no GL map possible: degrade NOW.
+      if (msg && /webgl/i.test(msg)) { degradeToSchematic(); return; }
       if (src==='sat' || src==='osm' || (msg && /429|rate|tile|failed to fetch|network/i.test(msg))) {
         if (++glTileErrs >= 4) degradeToSchematic();
       }
