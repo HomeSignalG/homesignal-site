@@ -1,0 +1,22 @@
+[
+ {
+  "id": "ky-louisville-dcat",
+  "url": "https://data.louisvilleky.gov/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ky-lexington-dcat",
+  "url": "https://data.lexingtonky.gov/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ky-nky-linkgis-root",
+  "url": "https://gis.linkgis.org/arcgis/rest/services?f=json"
+ },
+ {
+  "id": "ky-daviess-owensboro-dcat",
+  "url": "https://data-owensboro.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ky-warren-bg-dcat",
+  "url": "https://data-bgky.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

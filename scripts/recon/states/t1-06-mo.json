@@ -1,0 +1,26 @@
+[
+ {
+  "id": "mo-kcmo-socrata",
+  "url": "https://data.kcmo.org/api/catalog/v1?search_context=data.kcmo.org&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "mo-stlouis-city-dcat",
+  "url": "https://data-stlcogis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "mo-stlouis-county-dcat",
+  "url": "https://data-stlouisco.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "mo-springfield-dcat",
+  "url": "https://gisdata-cosmo.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "mo-stcharles-dcat",
+  "url": "https://data-sccmo.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "mo-columbia-boone-dcat",
+  "url": "https://data-como.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

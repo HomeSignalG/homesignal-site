@@ -1,0 +1,26 @@
+[
+ {
+  "id": "sc-greenville-dcat",
+  "url": "https://data-greenvillesc.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "sc-charleston-dcat",
+  "url": "https://data-charleston-sc.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "sc-charlestoncounty-dcat",
+  "url": "https://data-ccgis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "sc-columbia-richland-dcat",
+  "url": "https://data-richlandmaps.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "sc-horry-dcat",
+  "url": "https://data-horrycounty.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "sc-spartanburg-dcat",
+  "url": "https://data-spartanburgcounty.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

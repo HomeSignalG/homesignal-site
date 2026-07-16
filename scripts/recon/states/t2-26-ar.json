@@ -1,0 +1,22 @@
+[
+ {
+  "id": "ar-littlerock-socrata",
+  "url": "https://data.littlerock.gov/api/catalog/v1?search_context=data.littlerock.gov&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "ar-fayetteville-socrata",
+  "url": "https://data.fayetteville-ar.gov/api/catalog/v1?search_context=data.fayetteville-ar.gov&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "ar-bentonville-dcat",
+  "url": "https://data-bentonvillear.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ar-fortsmith-dcat",
+  "url": "https://data-fortsmithar.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ar-pulaski-dcat",
+  "url": "https://data-pagis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

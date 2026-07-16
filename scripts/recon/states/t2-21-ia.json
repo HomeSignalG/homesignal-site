@@ -1,0 +1,26 @@
+[
+ {
+  "id": "ia-desmoines-dcat",
+  "url": "https://data-dmgov.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ia-cedarrapids-dcat",
+  "url": "https://data-cedarrapids.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ia-iowacity-dcat",
+  "url": "https://data-iowacity.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ia-dubuque-socrata",
+  "url": "https://data.cityofdubuque.org/api/catalog/v1?search_context=data.cityofdubuque.org&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "ia-ames-dcat",
+  "url": "https://data-amesgis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ia-polk-dcat",
+  "url": "https://data-polkcountyiowa.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

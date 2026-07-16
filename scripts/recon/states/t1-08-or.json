@@ -1,0 +1,34 @@
+[
+ {
+  "id": "or-portland-pdx-dcat",
+  "url": "https://gis-pdx.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "or-portlandmaps-ags",
+  "url": "https://www.portlandmaps.com/arcgis/rest/services?f=json"
+ },
+ {
+  "id": "or-eugene-dcat",
+  "url": "https://mapping-eugene-pwe.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "or-salem-dcat",
+  "url": "https://data-salem.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "or-washingtonco-dcat",
+  "url": "https://data-washco.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "or-clackamas-dcat",
+  "url": "https://data-clackamascounty.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "or-bend-dcat",
+  "url": "https://data-bendoregon.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "or-medford-jackson-dcat",
+  "url": "https://data-mfd.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

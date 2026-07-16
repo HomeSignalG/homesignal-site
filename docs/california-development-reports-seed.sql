@@ -2,12 +2,21 @@
 -- CALIFORNIA development_reports seed — REPRODUCIBLE pg_net REFRESH SCRIPT
 -- (pattern: docs/michigan-development-reports-seed.sql; run in the Supabase SQL editor)
 --
--- Prepared 2026-07-16 (during the Supabase outage; batch runs when the DB returns):
--- all 523 modeled CA ZIPs (San Diego/Orange/Santa Clara/Alameda/Contra Costa/Sonoma/Ventura/San Mateo/San Luis Obispo/Marin).
--- Centroids pinned to zipcodes PyPI v3.0.0 (offline USPS dataset); 0 quarantined;
--- all bbox-validated. First-party permit sources are wired in the CA wire pass
--- (docs/source-registry.md "CALIFORNIA WIRE PASS") before this batch fires — this header
--- is finalized with the wired-source list in the go-live PR.
+-- Prepared 2026-07-16 (during the Supabase outage); EXECUTED 2026-07-16 after the DB
+-- returned: all 523 modeled CA ZIPs (San Diego/Orange/Santa Clara/Alameda/Contra Costa/
+-- Sonoma/Ventura/San Mateo/San Luis Obispo/Marin) cached, 523/523.
+-- Centroids pinned to zipcodes PyPI v3.0.0 (offline USPS dataset); 0 quarantined.
+-- WIRED SOURCES (docs/source-registry.md "CALIFORNIA WIRE PASS"):
+--   • san-diego-approved-permits — FIRST sources/csv.ts entry (15 MB YTD approvals ledger,
+--     fetch-once memo, spatial ZIP scoping, RECORD-precision OpenDSD URLs, fresh same-day)
+--   • anaheim-land-use-cases — arcgis geometry-less TABLE, geocode path, string-date
+--     recency via extra_where (never recency_days on a string field)
+--   Rejected with receipts: san-jose planningpermits30 (opaque status code "30"),
+--   sonoma (ungeolocatable). Batch fired SD-county ZIPs in waves of 25 (csv fetch-once
+--   discipline), others in waves of 65-90.
+-- RESULT (DB-verified 2026-07-16): 523 cached · 496 pass · 27 coverage_coming ·
+-- 461 auto-indexable · 69 dev-backed ZIPs · 21,864 dev records · 0 unsourced ·
+-- 0 count mismatches · 0 point sites missing coords.
 -- INDEX POLICY: substance gate stamps indexable automatically; throttled sitemap
 -- (250 newcomers/day) rolls new pages in — no manual flip.
 -- ============================================================================

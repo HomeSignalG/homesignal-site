@@ -51,8 +51,10 @@ import jurisdictionRegistry from "./jurisdiction-registry.json" with { type: "js
 const SOCRATA_ENTRIES = (jurisdictionRegistry as unknown as { socrata?: SocrataRegistryEntry[] }).socrata ?? [];
 import { arcgisForZip, type ArcgisRegistryEntry } from "./sources/arcgis.ts";
 import { ckanForZip, type CkanCommunityRow, type CkanRegistryEntry } from "./sources/ckan.ts";
+import { csvForZip, type CsvCommunityRow, type CsvRegistryEntry } from "./sources/csv.ts";
 const ARCGIS_ENTRIES = (jurisdictionRegistry as unknown as { arcgis?: ArcgisRegistryEntry[] }).arcgis ?? [];
 const CKAN_ENTRIES = (jurisdictionRegistry as unknown as { ckan?: CkanRegistryEntry[] }).ckan ?? [];
+const CSV_ENTRIES = (jurisdictionRegistry as unknown as { csv?: CsvRegistryEntry[] }).csv ?? [];
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -580,6 +582,19 @@ Deno.serve(async (req: Request) => {
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
     });
+    // TASK 1 (CSV twin) — same generic, coverage-gated connector for first-party portals whose
+    // interface is a published CSV file (e.g. San Diego's seshat.datasd.org approvals ledger).
+    // Adding a jurisdiction is a jurisdiction-registry.json `csv` edit, never code here. The
+    // file is fetched once per cache window (module memo) and served to every ZIP in the batch.
+    const csv = await csvForZip(zip, (commRows ?? []) as CsvCommunityRow[], CSV_ENTRIES, {
+      fetch,
+      geocode: async (a: string) => {
+        const g = await resolveGeocode(geoStore, a, canonicalAddr(a), geoLadder);
+        if (g.lat == null || g.lng == null) return null;   // failed → quarantine (csv.ts)
+        return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
+      },
+      zipCentroid: { lat: clat, lng: clng },
+    });
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");
     // TABS filings are development records by construction (state permit registry) — stamp
@@ -618,6 +633,15 @@ Deno.serve(async (req: Request) => {
         const [e, n] = pt ? toEN(clat, clng, lat as number, lng as number) : [0, 0];
         return { ...s, url: s.record_url, e, n, lat: pt ? lat : clat, lng: pt ? lng : clng };
       });
+    // CSV records → engine site shape (identical mapping to socrataSites above).
+    const csvSites: Record<string, unknown>[] = (csv.sites as unknown as Record<string, unknown>[])
+      .filter((s) => String(s.record_url || "").trim() !== "")
+      .map((s) => {
+        const lat = s.lat as number | null, lng = s.lng as number | null;
+        const pt = lat != null && lng != null;
+        const [e, n] = pt ? toEN(clat, clng, lat as number, lng as number) : [0, 0];
+        return { ...s, url: s.record_url, e, n, lat: pt ? lat : clat, lng: pt ? lng : clng };
+      });
     const fac = facRaw.filter((s) => (s.record_url as string) && (s.record_url as string).trim() !== "");
     // v17: persist the per-address dossier rows for this ZIP (small N; must never fail the page).
     const isTx = (commRows ?? []).some((c) => /^(tx|texas)$/i.test(String((c as { state?: string }).state || "").trim()));
@@ -642,12 +666,12 @@ Deno.serve(async (req: Request) => {
       // Structured permit rows (TABS/Socrata) carry no comment window → comment_open stays false.
       if (s.scope === "area" && !s.decided && s.comment_deadline && String(s.comment_deadline).slice(0, 10) >= today) s.comment_open = true;
     }
-    const devRecords = [...devReal, ...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites];
+    const devRecords = [...devReal, ...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...csvSites];
     const proposedRecords = devRecords.filter((s) => s.type === "proposed");
     const approvedRecords = devRecords.filter((s) => s.type === "approved");
     const operatingRecords = devRecords.filter((s) => s.type === "built");
     const commentOpenRecords = devRecords.filter((s) => s.comment_open === true);
-    const allSites = [...dev, ...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...fac];
+    const allSites = [...dev, ...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...csvSites, ...fac];
     const access = await accessLevel(req, supabase);
     const sites = access === "full" ? allSites : allSites.slice(0, TEASER_LIMIT);
     const locked = access === "full" ? 0 : Math.max(0, allSites.length - sites.length);
@@ -655,7 +679,7 @@ Deno.serve(async (req: Request) => {
     const envEpa = fac.filter((s) => (s.env as { epa?: unknown } | undefined)?.epa).length;
     const envTceq = fac.filter((s) => (s.env as { tceq?: unknown } | undefined)?.tceq).length;
     // TABS records are development filings → counts.development, never counts.facilities.
-    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, proposed: proposedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
+    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, proposed: proposedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, csv_reports: csv.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
   }
 
   const address = (body.address || "").trim();

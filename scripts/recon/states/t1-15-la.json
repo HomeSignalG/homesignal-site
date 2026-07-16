@@ -1,0 +1,26 @@
+[
+ {
+  "id": "la-nola-socrata",
+  "url": "https://data.nola.gov/api/catalog/v1?search_context=data.nola.gov&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "la-batonrouge-socrata",
+  "url": "https://data.brla.gov/api/catalog/v1?search_context=data.brla.gov&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "la-shreveport-dcat",
+  "url": "https://data-shreveport.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "la-lafayette-dcat",
+  "url": "https://data-lafayette.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "la-jefferson-dcat",
+  "url": "https://data-jeffparish.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "la-sttammany-dcat",
+  "url": "https://data-stpgov.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

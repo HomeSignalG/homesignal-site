@@ -1,0 +1,14 @@
+[
+ {
+  "id": "nh-granit-dcat",
+  "url": "https://granit-nhgranit.hub.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nh-manchester-dcat",
+  "url": "https://data-manchesternh.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nh-nashua-dcat",
+  "url": "https://data-nashuanh.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

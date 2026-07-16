@@ -1,0 +1,30 @@
+[
+ {
+  "id": "wi-milwaukee-ckan",
+  "url": "https://data.milwaukee.gov/api/3/action/package_search?q=permit&rows=20"
+ },
+ {
+  "id": "wi-madison-dcat",
+  "url": "https://data-cityofmadison.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "wi-dane-dcat",
+  "url": "https://gis-countyofdane.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "wi-waukesha-dcat",
+  "url": "https://data-waukeshacounty.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "wi-greenbay-dcat",
+  "url": "https://data-gbms.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "wi-appleton-dcat",
+  "url": "https://data-appleton.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "wi-eauclaire-dcat",
+  "url": "https://data-eauclairecounty.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

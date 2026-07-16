@@ -864,6 +864,34 @@ legal/framing change not covered by the one-time sign-off.
   per-record source), Yonkers/Westchester/Nassau/Suffolk NY (no portals found). Receipts:
   docs/source-registry.md "NEW YORK WIRE PASS". Reproducible seed:
   docs/new-york-development-reports-seed.sql.
+- 🟢 **CALIFORNIA IS LIVE UNDER THE SUBSTANCE GATE — 523/523 modeled CA ZIPs cached, 2
+  first-party permit sources, 461 pages auto-indexable (no manual flip)** (DB-verified
+  2026-07-16). Tenth development state, state 2 of the founder's four-state run, and the
+  first with a **published-CSV source**: the new ADDITIVE `sources/csv.ts` connector
+  (fetch-ONCE-per-cache-window module memo; include_types/recency/column projection at
+  parse time; same coverage-gate/fail-closed/anti-fabrication contract; 18 offline unit
+  checks incl. a bidirectional gate proof) carries **san-diego-approved-permits** — fresh
+  same-day (max APPROVAL_ISSUE_DATE 2026-07-15 over 28,515 YTD rows, 15.0 MB file), 10
+  construction/land-use types kept of 151 type|status combos (Traffic Control 5,807 +
+  trades/PV/signs dropped at parse), **RECORD-precision record_url VERIFIED** (the OpenDSD
+  API discriminates real-vs-bogus ApprovalIds — the SPA shell alone did NOT; new standing
+  answer), and spatial ZIP scoping on each row's OWN coords (which self-excludes the
+  file's garbage-coordinate rows — max GIS_LONGITUDE=324108.6 observed). Plus
+  **anaheim-land-use-cases** (arcgis geometry-less TABLE → Boulder geocode path; 23
+  statuses verbatim; **string `yyyy/mm/dd` dates → recency rides in extra_where as a
+  string compare, never recency_days' `DATE` literal** — standing answer). Every modeled
+  CA ZIP has a cached row (zipcodes v3.0.0 centroids, 0 quarantined) and a materialized
+  page — **496 pass + 27 coverage_coming honest empties; 0 unsourced, 0 count mismatches,
+  0 point sites missing coords**. **69 of 523 ZIPs dev-backed (13%), 21,864 dev records.**
+  Two engine hardening pieces shipped with this build: **slice-based parseCsv** (the naive
+  per-char parse blew the edge worker's CPU budget on the 15 MB file — WORKER_RESOURCE_LIMIT
+  546 after 37 s; now <400 ms, unit-test-identical) and the **recon-fetch `csv_stats`**
+  aggregate (runner-side distinct-counts/max-date receipts for files pg_net can't carry).
+  Firm rejects with receipts: San Jose planningpermits30 (every row carries the single
+  opaque status code "30" — nothing to map verbatim, fail-closed) + the 60-180-day
+  companion; Sonoma county datasets (no city/ZIP/coords — cannot scope or geocode).
+  Receipts: docs/source-registry.md "CALIFORNIA WIRE PASS". Reproducible seed:
+  docs/california-development-reports-seed.sql.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:

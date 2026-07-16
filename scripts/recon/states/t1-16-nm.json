@@ -1,0 +1,26 @@
+[
+ {
+  "id": "nm-abq-ckan",
+  "url": "https://www.cabq.gov/api/3/action/package_search?q=permit&rows=20"
+ },
+ {
+  "id": "nm-abq-coagis-root",
+  "url": "https://coagisweb.cabq.gov/arcgis/rest/services?f=json"
+ },
+ {
+  "id": "nm-abq-dcat",
+  "url": "https://abq-community-data-cabq.hub.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nm-bernalillo-dcat",
+  "url": "https://data-bernco.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nm-santafe-dcat",
+  "url": "https://opendata-cosfgis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "nm-lascruces-dcat",
+  "url": "https://data-lascruces.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

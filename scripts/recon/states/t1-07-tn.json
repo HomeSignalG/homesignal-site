@@ -1,0 +1,30 @@
+[
+ {
+  "id": "tn-nashville-socrata",
+  "url": "https://data.nashville.gov/api/catalog/v1?search_context=data.nashville.gov&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "tn-memphis-socrata",
+  "url": "https://data.memphistn.gov/api/catalog/v1?search_context=data.memphistn.gov&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "tn-shelby-dcat",
+  "url": "https://data-shelbycountytn.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "tn-chattanooga-socrata",
+  "url": "https://www.chattadata.org/api/catalog/v1?search_context=www.chattadata.org&q=permit&only=datasets&limit=30"
+ },
+ {
+  "id": "tn-knoxville-dcat",
+  "url": "https://data-knoxgis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "tn-knox-kgis-root",
+  "url": "https://www.kgis.org/arcgis/rest/services?f=json"
+ },
+ {
+  "id": "tn-rutherford-dcat",
+  "url": "https://data-rutherfordcountytn.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

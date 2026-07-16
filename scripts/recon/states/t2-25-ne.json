@@ -1,0 +1,18 @@
+[
+ {
+  "id": "ne-lincoln-dcat",
+  "url": "https://opendata.lincoln.ne.gov/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ne-omaha-douglas-dcat",
+  "url": "https://dataomaha-dogis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ },
+ {
+  "id": "ne-dogis-root",
+  "url": "https://gis.dogis.org/arcgis/rest/services?f=json"
+ },
+ {
+  "id": "ne-sarpy-dcat",
+  "url": "https://data-sarpygis.opendata.arcgis.com/api/feed/dcat-us/1.1.json"
+ }
+]

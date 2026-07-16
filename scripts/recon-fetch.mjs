@@ -41,6 +41,37 @@ for (const t of targets) {
     status = r.status;
     let body = await r.text();
     bytes = body.length;
+    // csv_stats (additive): aggregate a large CSV on the runner BEFORE truncation, so
+    // vocab receipts (distinct value counts, max dates) exist for files far over the
+    // 2 MB body cap — e.g. San Diego's 14.9 MB approvals ledger. Read-only, prints only
+    // aggregates into the log (the receipt channel), never the raw rows.
+    if (t.csv_stats) {
+      try {
+        const rows = parseCsv(body);
+        const header = rows.shift() || [];
+        const idx = (name) => header.indexOf(name);
+        const lines = [`rows=${rows.length}`];
+        for (const col of t.csv_stats.max || []) {
+          const i = idx(col);
+          let max = '';
+          if (i >= 0) for (const r2 of rows) { const v = (r2[i] || '').trim(); if (v > max) max = v; }
+          lines.push(`max(${col})=${max || '(col missing or empty)'}`);
+        }
+        if (t.csv_stats.group_by && t.csv_stats.group_by.length) {
+          const gi = t.csv_stats.group_by.map(idx);
+          const counts = new Map();
+          for (const r2 of rows) {
+            const key = gi.map((i) => i >= 0 ? (r2[i] || '').trim() : '??').join(' | ');
+            counts.set(key, (counts.get(key) || 0) + 1);
+          }
+          const top = [...counts].sort((a, b) => b[1] - a[1]).slice(0, t.csv_stats.top || 60);
+          lines.push(`distinct(${t.csv_stats.group_by.join(' | ')}) — top ${top.length} of ${counts.size}:`);
+          for (const [k, c] of top) lines.push(`  ${c}\t${k}`);
+        }
+        console.log(`----- CSV STATS ${t.id} -----\n${lines.join('\n')}\n----- END CSV STATS ${t.id} -----`);
+        writeFileSync(`results/${t.id}.csvstats.txt`, lines.join('\n'));
+      } catch (e) { console.log(`csv_stats failed for ${t.id}: ${String(e && e.message || e).slice(0, 200)}`); }
+    }
     if (body.length > MAX_BODY) { body = body.slice(0, MAX_BODY); note = 'truncated'; }
     writeFileSync(`results/${t.id}.body`, body);
   } catch (e) {
@@ -74,3 +105,21 @@ for (const t of targets) {
 
 writeFileSync('results/summary.json', JSON.stringify(summary, null, 2));
 console.log(`\n${summary.length} targets probed; results/ written`);
+
+// Minimal RFC-4180 CSV parser (quotes, escaped quotes, embedded commas/newlines).
+// Used only by the csv_stats aggregate above — read-only recon, no deps.
+function parseCsv(text) {
+  const rows = []; let row = []; let field = ''; let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === '\n') { row.push(field); field = ''; if (row.length > 1 || row[0] !== '') rows.push(row); row = []; }
+    else if (ch !== '\r') field += ch;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}

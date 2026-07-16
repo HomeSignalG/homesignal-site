@@ -1,0 +1,14 @@
+[
+  { "id": "sd-issued-2026-vocab",
+    "url": "https://seshat.datasd.org/development_permits/approvals_issued_2026_datasd.csv",
+    "csv_stats": { "group_by": ["APPROVAL_TYPE", "APPROVAL_STATUS"], "max": ["APPROVAL_ISSUE_DATE"], "top": 80 },
+    "print_chars": 1 },
+  { "id": "sd-issued-2026-projstatus",
+    "url": "https://seshat.datasd.org/development_permits/approvals_issued_2026_datasd.csv",
+    "csv_stats": { "group_by": ["PROJECT_STATUS"], "max": ["APPROVAL_ISSUE_DATE"], "top": 20 },
+    "print_chars": 1 },
+  { "id": "sd-issued-2026-coords-coverage",
+    "url": "https://seshat.datasd.org/development_permits/approvals_issued_2026_datasd.csv",
+    "csv_stats": { "group_by": [], "max": ["GIS_LATITUDE", "GIS_LONGITUDE", "APPROVAL_ISSUE_DATE"], "top": 1 },
+    "print_chars": 1 }
+]
