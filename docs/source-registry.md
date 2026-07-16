@@ -1468,3 +1468,66 @@ All recon verdicts re-verified LIVE at wire time (pg_net; fresh-date + verbatim 
   only on explicit direction.
 - **Howard County kvz2-j5cj**: STALLED (newest rows Nov 2025) → stays on the nightly
   reprobe list. Anne Arundel: polygon layers only. Frederick/Harford: no Hub domains.
+
+## 2026-07-16 — PENNSYLVANIA WIRE PASS (Tier 1 state 1 of 17, founder wire order)
+
+**Two metros wired, one NEW connector built (Carto — the founder-flagged Philadelphia
+platform), zero guessed values.** All receipts are live pg_net/recon-fetch pulls from
+2026-07-16; nothing wired on training knowledge.
+
+### NEW CONNECTOR — `sources/carto.ts` (Carto SQL API)
+Philadelphia's open data runs on **Carto** (`phl.carto.com/api/v2/sql`), a raw
+PostgreSQL/PostGIS SQL-over-HTTP API — not Socrata/ArcGIS/CKAN. Built the additive
+`sources/carto.ts` mirroring the CKAN connector's contract exactly: registry-driven
+(`CartoRegistryEntry`: `sql_url`, `table`, `geom_col`, column_map, verbatim
+`status_to_bucket`/`type_map`, `extra_where`, `recency_days`), bidirectional coverage
+gate, fail-closed on blank/unmapped status, quarantine-don't-stop on the Carto SQL
+`error` array, per-record `record_url` with dataset-precision fallback. Carto-specific
+mechanics: geometry extracted in the SELECT (`ST_Y(the_geom) AS __lat, ST_X(the_geom)
+AS __lng` — records place by their OWN PostGIS point), **ZIP+4 handled with a prefix
+`LIKE '<zip>%'`** (Philly stores `19143-3005`) and the emitted `zip` truncated to 5,
+recency as a PostgreSQL interval (`<date> > now() - interval 'N days'`). 16 offline
+fixture tests (`scripts/carto.fixture-test.ts`), all passing — incl. the bidirectional
+gate proof (Allegheny + Utah ZIPs → 0 fetches) and the SQL-error quarantine.
+
+### WIRED — philadelphia-li-permits (Carto, City of Philadelphia L&I)
+- **FRESH**: newest `permitissuedate` **2026-07-10** (live receipt; the city loads in
+  batches — a ≤1-week lag is its normal cadence, confirmed against its own metadata).
+- Table `permits` (L&I permit ledger). Scoped at source with `extra_where`:
+  `permittype IN ('Building','Residential Building','Demolition','Zoning')` — drops
+  Electrical/Plumbing/Mechanical/Fire-Suppression trades noise (WA/MN/IL precedent) —
+  AND `typeofwork` whitelist of 12 kept values from the live scoped enumeration (New
+  Construction / Full Demolition / Addition and/or Alteration variants / Foundation
+  Only / Shell Only / Change of Use...); re-roof/siding/repair minor classes dropped.
+- Statuses VERBATIM from the scoped live enumeration: Issued (9,302)→approved,
+  Completed (2,611)→operating, Amendment-in-review variants→proposed;
+  Expired/Cancelled/Amendment Denied/Withdrawn/Stop Work/Refused/Denied→exclude.
+- Native `zip` (ZIP+4 → prefix LIKE), geometry `the_geom` per record. `record_url`:
+  dataset-precision (the SQL endpoint is the machine URL — **OpenDataPhilly is 404/
+  retired**, so the Boulder machine-endpoint precedent applies; no per-row URL column
+  exists and templating one would be guessing).
+
+### WIRED — pittsburgh-pli-permits (CKAN, WPRDC — connector REUSED, zero new code)
+- **FRESH**: newest `issue_date` **2026-07-15**, 63,520 rows (live datastore_search_sql
+  receipt). Resource `f4d1177a-f597-4c32-8cbf-7885f56253f6` (PLI Permits) on
+  `data.wprdc.org` — the founder's PA note said Pittsburgh=CKAN; confirmed live.
+- `extra_where`: `"permit_type" IN ('BUILDING','Building & Development Application',
+  'Demolition Permit','Land Operations Permit')` — 14 verbatim permit types enumerated;
+  Electrical/Mechanical/HVAC/Fire/Sign/Occupancy noise dropped at source.
+- 13 verbatim statuses mapped: Issued→approved, Completed→operating, In Review/Ready
+  For Issue/Application Finalization/Applicant Revisions/Amendment-*→proposed,
+  Expired/Revoked/Stop Work→exclude. Native `zip_code` + per-record
+  `latitude`/`longitude`. `dataset_url` = the WPRDC dataset page (human-linkable).
+
+### Rejections / not wired (receipts)
+- **Allegheny County ACCD permits (WPRDC)** — NOT a building-permit ledger: the live
+  column set is a stormwater engineering extract (Acres / PreImperv / Dschrg_Pts...),
+  no zip, no address, coverage label "2020-2025". Rejected on schema, not URL.
+- **OpenDataPhilly.org** — HTTP 404, portal retired; datasets live on phl.carto.com
+  directly (hence the machine-endpoint record_url above).
+- **Six county-hub URL guesses 404'd** (Bucks/Chester/Lancaster/York/Delaware/Centre +
+  allentown domain guesses); **Montgomery County PA DCAT hub live but 0 permit
+  datasets** in its catalog. Per the corrected-URL-retry rule these were re-probed
+  against their real portals where findable; none exposes a first-party per-record
+  permit API. Logged for the nightly reprobe list, non-blocking — their ZIPs ship on
+  the EPA facilities floor.
