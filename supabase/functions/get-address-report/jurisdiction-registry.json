@@ -2748,61 +2748,11 @@
     "scopes_enumerated": 22,
     "noise_dropped": "ELECTRICAL/PLUMBING/MECHANICAL/FIRE/ELEVATOR/BOILER trades, SIGN, LANDSCAPING, TREE PERMIT, BUILDING ROOFING re-roofs, SPECIAL/TEMPORARY EVENTS, ANNUAL FACILITY, RECERTIFICATION, SHOP DRAWINGS, COOKIE CUTTER (ambiguous, not guessed), REMODELING/REPAIRS (minor-repair mix, Boston Short-Form precedent)",
     "no_zip_column": "point geometry + Latitude/Longitude attrs; spatial ZIP scoping (Denver pattern)",
-    "record_url": "dataset-precision (no per-row URL column; templating one would be guessing)"
+    "record_url": "dataset-precision (no per-row URL column; templating one would be guessing)",
+    "extra_where_added_at_smoke": "envelope query without a source-side type filter fetched every scope in dense Miami and timed out the 120s report; scoped citywide count = 11,453/365d (fast). Noise now dropped AT SOURCE (standing rule)."
    },
-   "service_url": "https://services1.arcgis.com/CvuPhqcTQpZPT9qY/arcgis/rest/services/Building_Permits_Since_2014/FeatureServer/0"
-  },
-  {
-   "registry_id": "tampa-single-family-permits",
-   "platform": "arcgis",
-   "dataset_url": "https://city-tampa.opendata.arcgis.com/apps/tampa::single-family-permits-2",
-   "jurisdiction": "City of Tampa",
-   "coverage": [
-    {
-     "state": "FL",
-     "county": "Hillsborough"
-    }
-   ],
-   "column_map": {
-    "title": [
-     "APPLICATION_TYPE"
-    ],
-    "status_raw": "APPLICATION_STATUS",
-    "type_source": "APPLICATION_TYPE",
-    "file_date": "OPENED_DATE",
-    "address": "ADDRESS",
-    "zip": "ZIP",
-    "case_number": "RECORD_ID"
-   },
-   "include_types": [
-    "Residential New Construction and Additions (1 and 2 Family)",
-    "Residential New Construction and Additions"
-   ],
-   "type_map": {
-    "Residential New Construction and Additions (1 and 2 Family)": "Development",
-    "Residential New Construction and Additions": "Development"
-   },
-   "status_to_bucket": {
-    "approved": [
-     "Issued"
-    ],
-    "proposed": [
-     "Revision"
-    ]
-   },
-   "recency_days": 730,
-   "_receipts": {
-    "probed": "2026-07-16 pg_net",
-    "fresh": "max LASTUPDATE 1784160296000 = 2026-07-15; 1,020 rows (live active-SF snapshot)",
-    "granularity": "one row per RECORD_ID verified (groupBy count n=1 across sample)",
-    "statuses_verbatim": [
-     "Issued",
-     "Revision"
-    ],
-    "native_zip": true,
-    "recency_note": "730d: OPENED_DATE is application open; the layer itself is a current-permits snapshot so recency is a backstop, not the filter"
-   },
-   "service_url": "https://arcgis.tampagov.net/arcgis/rest/services/OpenData/Planning/MapServer/32"
+   "service_url": "https://services1.arcgis.com/CvuPhqcTQpZPT9qY/arcgis/rest/services/Building_Permits_Since_2014/FeatureServer/0",
+   "extra_where": "ScopeofWork IN ('NEW CONSTRUCTION','DEMOLITION','ADDITION AND REMODELING','PHASED PERMIT')"
   }
  ],
  "ckan": [

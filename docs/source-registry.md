@@ -1569,6 +1569,10 @@ nothing wired on training knowledge.
   REMODELING/REPAIRS (minor-repair mix — Boston Short-Form precedent).
 - No ZIP column → `spatial_zip_radius_mi: 3` (Denver pattern; records keep their OWN
   parcel points). record_url dataset-precision (no per-row URL column).
+- **Smoke fix**: the first smoke on 33127 timed out at 120s — the envelope query
+  without a source-side type filter fetched every scope in dense Miami. Added
+  `extra_where` with the 4-type ScopeofWork IN filter (noise dropped AT SOURCE, the
+  standing rule); scoped citywide count = 11,453 rows/365d, fast.
 
 ### REJECTED AT SMOKE — orlando-permit-applications (Socrata, City of Orlando)
 **Wired provisionally, then REJECTED on live-smoke evidence — ungeolocatable at
@@ -1600,7 +1604,17 @@ nightly-reprobe record (if the city revives its geocode pipeline, wire it).
 - No zip column → Socrata point col `geocoded_column` + `within_circle` spatial scoping
   (the Chicago pattern, zero new code).
 
-### WIRED — tampa-single-family-permits (ArcGIS, City of Tampa / Hillsborough County)
+### REJECTED AT SMOKE — tampa-single-family-permits (ArcGIS, City of Tampa)
+**Wired provisionally, then REJECTED on live-smoke evidence — ENGINE-UNREACHABLE.**
+The city server's WAF returns **HTTP 403 to Supabase edge-runtime egress** while the
+IDENTICAL URL returns 200 from pg_net (DB-host egress) — verified byte-for-byte, and
+UA variation makes no difference (Deno UA and browser UA both 200 from pg_net), so
+it is an IP-range block, not a header rule. The engine runs on the edge runtime, so
+the source cannot be fetched at report time; wiring it would cache permanent
+quarantines. Layer stays verified live/fresh (receipts below) — revisit only if the
+engine's egress path changes. Hillsborough/Tampa ships on the facilities floor.
+
+#### (recon detail, kept for the record)
 - **FRESH**: max `LASTUPDATE` = **2026-07-15**; 1,020 rows — a live snapshot of current
   single-family permits on the CITY'S OWN ArcGIS Server
   (arcgis.tampagov.net OpenData/Planning/MapServer/32, Accela-backed).
