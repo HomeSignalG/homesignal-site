@@ -1,29 +1,51 @@
 name: spot-check-shell
 
-# On-demand, read-only spot-check of arbitrary ZIP pages on the live site: asserts the
-# v13 left-sidebar shell renders (present + positioned) on BOTH page types and that each
-# page shows an honest state (populated / coverage-coming / not-covered — never blank or
-# unrecognized). Complements the full verifiers, which walk the advertised states only.
+# BRANCH-LOCAL OVERRIDE (claude/vibrant-brahmagupta-l4wu5d only — main is untouched):
+# repurposed to run the live signup E2E, because this repo only registers workflows
+# from the default branch, so the new e2e-signup.yml on this branch is not
+# dispatchable by name. Dispatching THIS registered workflow with ref=this-branch
+# runs this file. The real E2E definition lives in .github/workflows/e2e-signup.yml
+# + verify/e2e-signup.mjs.
 
 on:
   workflow_dispatch:
     inputs:
       zips:
-        description: 'Comma-separated ZIPs to check (e.g. 84302,78617,94545)'
+        description: 'Covered ZIP to onboard the E2E signup with'
         required: true
+        default: '84302'
+      email:
+        description: 'Signup email (blank = sdsutca+e2e-run<id>@proton.me)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
 
 jobs:
-  spot-check:
+  e2e-signup:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Install Playwright (chromium)
-        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
-      - name: Spot-check pages
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i --no-save playwright >/dev/null
+          npx playwright install --with-deps chromium
+      - name: Run signup E2E
         env:
-          SITE_BASE: https://homesignal.net
-          ZIPS: ${{ github.event.inputs.zips }}
-        run: node scripts/spot-check-shell.mjs
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_EMAIL: ${{ inputs.email }}
+          E2E_ZIP: ${{ inputs.zips }}
+        run: node verify/e2e-signup.mjs
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-signup-evidence
+          path: e2e-out/
+          if-no-files-found: warn
