@@ -1,0 +1,46 @@
+# Live signup E2E (PR #253 acceptance) in a truly fresh browser session.
+# Manual-only: it creates a REAL user + subscriptions on the live project, so a
+# human decides when it runs. Screenshots + summary land in the run artifact.
+name: e2e-signup
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: Signup email (blank = sdsutca+e2e-run<id>@proton.me)
+        required: false
+        default: ''
+      zip:
+        description: Covered ZIP to onboard with
+        required: false
+        default: '84302'
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i --no-save playwright >/dev/null
+          npx playwright install --with-deps chromium
+      - name: Run signup E2E
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_EMAIL: ${{ inputs.email }}
+          E2E_ZIP: ${{ inputs.zip }}
+        run: node verify/e2e-signup.mjs
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-signup-evidence
+          path: e2e-out/
+          if-no-files-found: warn
