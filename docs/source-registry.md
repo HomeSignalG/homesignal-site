@@ -1190,3 +1190,129 @@ ZIP pages.
   aggregates, highway work permits, SPDES facility lists only.
 - **Yonkers / Westchester / Nassau / Suffolk County NY**: no Hub domain records (all 404) and
   no first-party permit portals found this pass.
+
+---
+
+## 2026-07-16 — CA / AZ / MD RECON PASS (runner-based probes during the Supabase outage)
+
+The database was down all night (no pg_net), so this recon ran on GitHub runners:
+the source-monitor dry-run sweep (31 new discovery targets) + the new `recon-fetch.yml`
+(8 probe rounds, receipts printed into job logs — the sandbox cannot reach the artifact
+blob store). Every verdict below carries a live receipt from runs 29468575646 /
+29468850713 and recon-fetch rounds 1–8 (2026-07-16 03:16–03:42 UTC). NOTHING is wired
+yet — wiring, deploy, and the three state batches run when the DB returns (centroid
+staging + seed docs are pre-built: docs/{california,arizona,maryland}-development-reports-seed.sql).
+
+### CALIFORNIA (modeled: San Diego, Orange, Santa Clara, Alameda, Contra Costa, Sonoma, Ventura, San Mateo, SLO, Marin)
+
+**Wire candidates (each needs one small, additive piece — none pure-data tonight):**
+- **san-diego approvals (CSV, city portal)** — `seshat.datasd.org/development_permits/approvals_issued_*.csv`,
+  portal page says "Updated Jul 15, 2026"; per-record APPROVAL_TYPE / APPROVAL_STATUS ("Issued") /
+  APPROVAL_ISSUE_DATE / GIS_LATITUDE/LONGITUDE / GIS_ADDRESS / DU counts. NEEDS: a `sources/csv.ts`
+  connector + a caching strategy — the issued-2026 file alone is **14.9 MB**, so per-ZIP runtime
+  fetches are out; fetch-once-per-refresh (staged or memoized) is the design. Biggest CA county
+  (115 modeled ZIPs) — highest-value CA item.
+- **anaheim-land-use-cases (ArcGIS table)** — `services3.arcgis.com/hPs600I3X0RTaaaq/.../Open_Data_Land_Use_Permits/FeatureServer/0`,
+  fresh (newest Application_Received 2026/06/30, PAZ2026-00384); real planning lifecycle statuses
+  (Received / In Review / Hearing Scheduled / Approved / Adopted / Denied / Withdrawn / Void / Revoked);
+  types Planning and Zoning / Development Project / CEQA / Advanced Planning. ZIP embedded in
+  `Location_Primary_Address` → `zip_where_template: "Location_Primary_Address LIKE '%{zip}%'"`.
+  CAVEAT to check at wire time: ALL dates are strings ("2026/06/30") — recency must go through
+  `extra_where` string compare (zero-padded yyyy/mm/dd sorts correctly) and the connector's date
+  parsing must not fabricate/drop.
+- **sonoma-county planning (m689-iiuu) + construction (88ms-k5e7) Socrata** — both updated 2026-07-15,
+  clean statuses (construction: Issued 9,174 / Finaled 15,129 / Denied / Expired; planning: Active /
+  Approved / Denied lifecycle), types incl. Building Permit With/No Plan Check, Demolition, Grading.
+  BUT rows carry bare street addresses (no city), NO zip column, NO coords → cannot scope the query
+  at source and cannot geocode reliably. FLAG: needs a fetch-all+geocode mode no connector has.
+- **san-jose (CKAN)** — datastore alive (correct RESOURCE id 761b7ae8…; `fd9ceb0c…` is the PACKAGE id —
+  standing answer: CKAN package_show's top-level id is NOT the datastore relation). But the
+  active-building-permits ledger has NO address/zip column, `gx_location` is blank text, and ISSUEDATE
+  is text "4/10/2018 12:00:00 AM" (m/d/yyyy — unsortable). `planningpermits30.csv` (30-day window,
+  small) is the viable object → same `sources/csv.ts` bucket as San Diego.
+
+**Rejected with receipts (do not re-derive):**
+- Oakland Socrata: only Residential Parking Permit Zones, rowsUpdatedAt 2019-09-03 (stale).
+- Alameda County data.acgov.org: catalog HTTP 404 (domain dead).
+- San Mateo data.smcgov.org: catalog reachable, 0 first-party q=permit datasets (3 federated ignored — Plano trap).
+- Marin data.marincounty.org: HTTP 200 non-JSON (not a Socrata catalog).
+- San Diego County gis-public root: 61 services, none permit-pattern. Orange County ocgis.com root: 67 services, none.
+- Sunnyvale: no Hub domain (data-sunnyvale 404; data.sunnyvale.ca.gov connect-timeout).
+- Contra Costa gis.cccounty.us: polygon zoning layers only. Ventura maps.ventura.org: polygon land-use +
+  Communication Facilities stale (newest 2025-01-10). SLO hub: polygon planning layers + a 1965-wells inventory table.
+- San Diego city data.json + seshat /api: 404 / AccessDenied — the portal is a static site; CSVs are the interface.
+
+### ARIZONA (modeled: Maricopa, Pima, Navajo, Pinal, Yavapai, Coconino, Mohave, Cochise, Yuma, Santa Cruz)
+
+**Wire-ready:**
+- **mesa-building-permits (Socrata dzpk-hxfb)** — updated 2026-07-15 (sample: PMT26-12214, new SFR
+  in Hawes Crossing, status_date 2026-07-10); statuses enumerated live (Issued 25,387 / Finaled 82,767 /
+  Approved / C of O Issued / C of C Issued / In Review / Under Review / Fees Due …); `type_of_work`
+  vocab captured (keep Commercial/Industrial Projects, Com (PJT)/(MFR) project types, Additions,
+  Multi-Family Residential, Single Family, Demolition types, ADUs, Renovations/Remodels; DROP
+  Electrical/Plumbing/Mechanical/Fire Alarms/Fire Sprinklers at source); GeoJSON `location` point +
+  `latitude`/`longitude`, NO zip column → the IL/Cambridge `spatial_zip_radius_mi` + `spatial_point_col`
+  pattern, zero new code.
+
+**Candidates:**
+- **scottsdale-building-permits (MapServer/12, OpenData_Tabular)** — hosted TABLE, fresh (newest
+  IssueDate 2026-07-10, #324234), statuses ACTIVE / FINALLED / PENDING / EXPIRED / WITHDRAWN / REFUND /
+  ON HOLD / null (fail-closed handles null), `PermitType`, per-record `Latitude`/`Longitude` COLUMNS but
+  NO zip and no geometry → needs a small additive arcgis option (attribute-bbox where on lat/lng columns,
+  the Detroit-tables cousin). /13 Cases + /15 Certificates of Occupancy same shape.
+- Maricopa County GIO/PermitHistory Permit History (Point): fresh 2026-07-15 but NO status column
+  (CaseType/WorkClass/ApplicationDate case-queue) — no status_const semantic fits an application queue; flagged.
+
+**Rejected with receipts:**
+- Phoenix CKAN "Phoenix, AZ Building Permit Data": a HUD SOCDS **aggregate export** — org "External Data",
+  author U.S. HUD, last_modified 2023-03-24, size 1,034 bytes. Not first-party, not per-record, stale.
+  (Phoenix has NO first-party per-record permit dataset on its portal — q=building permit returns only this.)
+- Tempe data.tempe.gov / Gilbert data.gilbertaz.gov: Socrata catalogs 404 (dead domains).
+- Chandler data.chandlerpd.com DCAT: 404. Pima County gis.pima.gov + gismaps variants: 404.
+- Tucson hub: zoning/subdivision/rezoning POLYGONS only, no permit records.
+
+### MARYLAND (modeled: Baltimore County, Montgomery, Anne Arundel, Frederick, Charles, Howard, Harford, Baltimore city, Calvert)
+
+**Wire-ready:**
+- **montgomery-county residential (m88u-pqki) / commercial (i26v-w6bd) / demolition (b6ht-fw3x)** —
+  `max(issueddate)` = 2026-07-14 (res + com, live receipts); statuses exactly {Open, Issued, Finaled,
+  Stop Work} (+ Completed on demolition) → Open→proposed, Issued→approved, Finaled/Completed→operating,
+  Stop Work→exclude; native `zip`; nested Socrata `location.latitude/longitude` point (wire-time note:
+  readCol is flat-only today — either a dot-path readCol enhancement (additive) or location-type point
+  parsing); `worktype` vocab captured (keep CONSTRUCT / ADD / ALTER / BUILD FOUNDATION / DEMOLISH /
+  COMMERCIAL CHANGE OF USE; drop RESTORE AND / OR REPAIR re-roofs, INSTALL, REPLACE at source).
+  Mechanical/Electrical/Fence/Sign datasets exist and are DROPPED as trades/noise (WA/MN/IL precedent).
+- **baltimore-county-permits (bcgisdata …/DevelopmentManagement/ActiveDevelopment/MapServer/4)** —
+  POINT geometry, native `ZIP`, newest ISSDATE 2026-07-14 (C25-01091); statuses {ISSUE, OPEN, CLOSED,
+  EXPIRED, CANCELLED, BL-EXPIRED} → ISSUE→approved, OPEN→proposed, CLOSED→operating, rest excluded;
+  DESCRIPTION_TYPE vocab captured (keep New Structure/Shell, New Dwelling, Addition, Alteration,
+  Alteration/Addition, Razing, Grading, Foundation Only; drop Fence/Deck/Pool/Solar/Sign/Sprinkler/
+  Tanks/Tents/Antennas noise). Hub layers /5 Electrical /8 U&O = trades/occupancy, dropped.
+
+**Candidate (founder call):**
+- **baltimore-city Housing and Building Permits 2019–Present**
+  (`baltegis.baltimorecity.gov/mapping/rest/services/Housing/DHCD_Open_Baltimore_Datasets/FeatureServer/3`) —
+  POINT layer, hub-modified nightly (2026-07-16T00:05), but newest IssuedDate = 2026-05-06 (~2-month
+  issuance lag) and it is an issuance ledger with NO status and NO work-type column (only free-text
+  Description + IsPermitModification). Wireable via status_const 'Issued' + IssuedDate IS NOT NULL +
+  spatial scoping — but with no type column the minor-repair noise cannot be dropped at source
+  (sample: "Repair one damaged rafter"). DECISION NEEDED: include-all vs skip (Boston precedent dropped
+  Short Form minor jobs; here there is no column to do it with).
+
+**Rejected with receipts:**
+- Howard County kvz2-j5cj: STALLED — newest rows Nov 2025, rowsUpdatedAt 2025-12-04; also no
+  status/point columns. → added to the nightly reprobe list.
+- Anne Arundel gis.aacounty.org: Development Policy Area / land-use-plan POLYGONS only.
+- Frederick / Harford: no ArcGIS Hub domains found (guessed hub hostnames 404).
+- Baltimore city Socrata (data.baltimorecity.gov catalog): dead — the city moved to ArcGIS Hub (probed above).
+
+### New standing answers from this pass
+- **The recon-fetch pattern**: when the DB (pg_net) is down, recon runs on a GitHub runner —
+  `recon-fetch.yml` + committed `scripts/recon/roundN.json`; receipts print into the job log
+  (`----- BEGIN <id> -----` blocks) because the sandbox cannot reach the artifact blob store.
+- **CKAN ids**: `package_show`'s top-level `id` is the PACKAGE id; the datastore relation is
+  `resources[].resource_id`/`id` INSIDE the resources array — querying the package id yields
+  "relation does not exist" even when `datastore_active: true`.
+- **ArcGIS Hub DCAT hosts**: dataset distributions frequently live on a DIFFERENT host than the hub
+  (bcgisdata.…, baltegis.…, maps.scottsdaleaz.gov, gis.anaheim.net, gis.slocounty.ca.gov,
+  gis.tucsonaz.gov) — pin those hosts in the target allowlist or every candidate is skipped.
