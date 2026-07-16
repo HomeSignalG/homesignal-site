@@ -1385,3 +1385,86 @@ counts + max dates for CSVs far over the 2 MB log cap).
   city, no ZIP, no coords → cannot scope at source, cannot geocode reliably.
 - **san-diego OpenDSD /web/approvals SPA shell**: identical HTML for real/bogus — only
   the API check above rescued the template (kept here as the receipt for WHY).
+
+---
+
+## 2026-07-16 — ARIZONA WIRE PASS (state 3 of the four-state run)
+
+All recon verdicts re-verified LIVE at wire time (pg_net; fresh-date + verbatim vocab).
+
+### Wired (2 entries; receipts in each entry's `_receipts`)
+- **mesa-building-permits** (Socrata data.mesaaz.gov dzpk-hxfb): FRESH — max issued_date
+  2026-07-14 (newest row PMT26-12214, new SFR in Hawes Crossing, matches recon). 22
+  statuses VERBATIM via SoQL group-by **incl. BOTH hyphen and en-dash "Finaled – C of C
+  Required" variants** (both mapped); Closed excluded (MN precedent). ~100 type_of_work
+  values enumerated over TWO probe pages — **standing answer: Socrata group-by is capped
+  by $limit and silently truncates the vocabulary; page with $offset until exhausted**
+  (the A–R page alone was missing Single Family (Detached) 18,461 + 12,555 across the
+  dataset's two prefix eras). Kept 47 construction/land-use values; dropped at source:
+  Electrical/Plumbing/Mechanical/Fire, Swimming Pool (9,216+5,500), Sign Permits (5,534),
+  Use Permits/COO/Records, "Other Commercial" (5,795 — ambiguous), mobile-home/park-model
+  classes, "-- Not Selected --" + 12,868 blanks (fail-closed). NO ZIP column → spatial
+  within_circle on the native `location` point column (IL/Cambridge pattern, zero new
+  code). Smoke receipt: 85201 (Mesa) → 170 fetched / 170 emitted, 0 unmapped.
+- **scottsdale-building-permits** (classic ArcGIS Server maps.scottsdaleaz.gov
+  OpenData_Tabular/MapServer/12): FIRST consumer of the additive arcgis
+  `spatial_latlng_cols` option (geometry-less TABLE with per-record Latitude/Longitude
+  COLUMNS → the envelope is AND'd into WHERE; a geometry param is meaningless on a
+  table). FRESH: newest IssueDate 2026-07-10 (#324234). 7 statuses verbatim
+  (ACTIVE→approved, FINALLED→operating, PENDING/ON HOLD→proposed, rest excluded; nulls
+  fail closed). ~190 PermitType values enumerated; 70 construction/development classes
+  kept verbatim; TI/signs/pools/fences/patio/solar/water-heater/minimum-charge noise
+  dropped at source. **STANDING ANSWER (found live): classic ArcGIS Server on IIS caps
+  GET query strings at 2,048 chars (404.15) — a long verbatim type whitelist 404s as a
+  GET. `getWithBackoff` now auto-switches to a form-encoded POST when the query URL
+  exceeds ~1,900 chars (ArcGIS accepts identical params via POST); behavior-identical
+  for short queries (offline-tested).** Re-smoke receipt: 85251 (Scottsdale) → 18/18
+  emitted, 0 quarantined.
+
+### Not wired (recon verdicts stand)
+- **Maricopa County GIO/PermitHistory**: fresh but an application QUEUE with no status
+  column — no status_const semantic fits (an application is not an issuance).
+- **Phoenix**: no first-party per-record permit dataset (the CKAN hit is a 1 KB HUD
+  SOCDS aggregate, stale 2023). Tempe/Gilbert/Chandler/Pima portals dead or polygon-only.
+
+---
+
+## 2026-07-16 — MARYLAND WIRE PASS (state 4 of the four-state run, closing the trio)
+
+All recon verdicts re-verified LIVE at wire time (pg_net; fresh-date + verbatim vocab).
+
+### Wired (4 entries; receipts in each entry's `_receipts`)
+- **montgomery-county-residential/-commercial/-demolition-permits** (Socrata
+  data.montgomerycountymd.gov m88u-pqki / i26v-w6bd / b6ht-fw3x): FRESH — max issueddate
+  **2026-07-15** (res + com live receipts). Statuses VERBATIM: Open→proposed,
+  Issued→approved, Finaled (+Completed on demolition)→operating, Stop Work→exclude.
+  worktype vocab VERBATIM (res: CONSTRUCT 84,198 / ALTER 52,593 / ADD 43,607 / BUILD
+  FOUNDATION; com adds COMMERCIAL CHANGE OF USE 1,019 + DEMOLISH); RESTORE AND / OR
+  REPAIR re-roofs + INSTALL/REPLACE noise dropped at source; blanks fail closed. Native
+  `zip`; coordinates ride the nested Socrata `location` column → FIRST consumer of the
+  additive **socrata dot-path readCol** (`location.latitude`/`location.longitude`; an
+  exact column of that name always wins; offline-tested with flat-ref regression).
+  Recency on `addeddate` (not issueddate) so Open applications stay visible
+  pre-issuance. Mechanical/Electrical/Fence/Sign companion datasets dropped as
+  trades/noise (WA/MN/IL precedent).
+- **baltimore-county-permits** (the county's own ArcGIS Server bcgisdata
+  DevelopmentManagement/ActiveDevelopment/MapServer/4 — the Hub *distribution* host):
+  FRESH — newest ISSDATE **2026-07-15** (R24-07845/R26-03840; esriFieldTypeDate →
+  recency_days valid). 6 STATUS values VERBATIM: ISSUE→approved, OPEN→proposed,
+  CLOSED→operating, EXPIRED/CANCELLED/BL-EXPIRED excluded. DESCRIPTION_TYPE vocab is
+  the "Comm. Permit - X"/"Res. Permit - X" format (the recon note paraphrased — the
+  IN-list is byte-exact from the live enumeration): 11 construction/land-use classes
+  kept; Sign/Pool/Deck/Fence/Solar/Tanks/COO/Sprinkler/Towers/Temporary/Retaining-Wall/
+  Bulkhead/Piers/Moving/Storm-Water/Cranes/Bridge/Access-Point + Env-Health variants
+  dropped at source. Native ZIP + per-record LATITUDE/LONGITUDE columns; recency on
+  APPL_DATE keeps OPEN applications (ISSDATE null pre-issuance).
+
+### Not wired (unchanged verdicts, receipts above)
+- **baltimore-city Housing/Building Permits (baltegis …/FeatureServer/3)** — still the
+  recon's DECISION NEEDED: an issuance ledger with NO status and NO work-type column, so
+  minor-repair noise ("Repair one damaged rafter") cannot be dropped at source; wiring
+  include-all would flood pages with trivial jobs (Boston dropped Short Form for exactly
+  this). **Founder call, logged, non-blocking** — wire via status_const + include-all
+  only on explicit direction.
+- **Howard County kvz2-j5cj**: STALLED (newest rows Nov 2025) → stays on the nightly
+  reprobe list. Anne Arundel: polygon layers only. Frederick/Harford: no Hub domains.

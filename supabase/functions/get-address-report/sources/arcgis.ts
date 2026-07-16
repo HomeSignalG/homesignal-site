@@ -403,14 +403,30 @@ function buildWhere(entry: ArcgisRegistryEntry, zip: string, zipCol: string): st
 
 async function getWithBackoff(url: string, deps: ArcgisDeps): Promise<unknown> {
   const headers: Record<string, string> = { "Accept": "application/json", "User-Agent": "HomeSignal public-records refresh (contact: admin@homesignal.net)" };
+  // LONG-QUERY POST FALLBACK (Scottsdale class, 2026-07-16): classic ArcGIS Server on IIS
+  // caps GET query strings at 2,048 chars (IIS maxQueryString → 404.15), so a long verbatim
+  // type whitelist in the WHERE 404s as a GET. ArcGIS query endpoints accept the identical
+  // parameters as a form-encoded POST — switch automatically when the URL would overflow.
+  // Behavior-identical for every existing entry (their URLs are far under the cap).
+  const qs = url.indexOf("?");
+  const usePost = url.length > 1900 && qs > 0;
+  const fetchUrl = usePost ? url.slice(0, qs) : url;
+  const makeInit = (): RequestInit => usePost
+    ? {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded" },
+        body: url.slice(qs + 1),
+        signal: AbortSignal.timeout(30000),
+      }
+    : { headers, signal: AbortSignal.timeout(30000) };
   let delay = 800;
   for (let attempt = 0; attempt < 4; attempt++) {
-    const res = await deps.fetch(url, { headers, signal: AbortSignal.timeout(30000) });
+    const res = await deps.fetch(fetchUrl, makeInit());
     if (res.status === 429 || res.status >= 500) { await sleep(delay); delay *= 2; continue; }
-    if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${fetchUrl}`);
     return await res.json();
   }
-  throw new Error(`rate-limited/5xx after retries: ${url}`);
+  throw new Error(`rate-limited/5xx after retries: ${fetchUrl}`);
 }
 
 // ───────────────────────────── helpers (mirror socrata.ts, kept local so that file is untouched) ─────────────────────────────

@@ -2,12 +2,21 @@
 -- MARYLAND development_reports seed — REPRODUCIBLE pg_net REFRESH SCRIPT
 -- (pattern: docs/michigan-development-reports-seed.sql; run in the Supabase SQL editor)
 --
--- Prepared 2026-07-16 (during the Supabase outage; batch runs when the DB returns):
--- all 263 modeled MD ZIPs (Baltimore County/Montgomery/Anne Arundel/Frederick/Charles/Howard/Harford/Baltimore city/Calvert).
--- Centroids pinned to zipcodes PyPI v3.0.0 (offline USPS dataset); 0 quarantined;
--- all bbox-validated. First-party permit sources are wired in the MD wire pass
--- (docs/source-registry.md "MARYLAND WIRE PASS") before this batch fires — this header
--- is finalized with the wired-source list in the go-live PR.
+-- Prepared 2026-07-16 (during the Supabase outage); EXECUTED 2026-07-16 after the DB
+-- returned: ALL 315 modeled MD ZIPs cached, 315/315 (the outage-night seed's 263 across
+-- 9 counties + the 52-ZIP APPENDIX below — Prince George's and Queen Anne's were missing;
+-- see the appendix standing answer). Centroids pinned to zipcodes PyPI v3.0.0; 0 quarantined.
+-- WIRED SOURCES (docs/source-registry.md "MARYLAND WIRE PASS"):
+--   • montgomery-county-residential/-commercial/-demolition-permits — Socrata, native zip,
+--     FIRST consumer of the additive dot-path readCol (location.latitude/longitude);
+--     recency on addeddate so Open applications stay visible
+--   • baltimore-county-permits — county ArcGIS Server (bcgisdata), native ZIP +
+--     per-record LATITUDE/LONGITUDE, 11-class verbatim type whitelist
+--   Not wired: baltimore-city (DECISION NEEDED — no type column to drop minor-repair
+--   noise; founder call, logged); Howard (stalled, nightly reprobe list).
+-- RESULT (DB-verified 2026-07-16): 315 cached · 283 pass · 32 coverage_coming honest
+-- empties · 239 auto-indexable · 44 dev-backed ZIPs (14%) · 6,755 dev records ·
+-- 0 unsourced · 0 point sites missing coords.
 -- INDEX POLICY: substance gate stamps indexable automatically; throttled sitemap
 -- (250 newcomers/day) rolls new pages in — no manual flip.
 -- ============================================================================
@@ -97,3 +106,25 @@ where not exists (select 1 from public.development_reports dr where dr.zip = z.z
 select public.app_refresh_all();
 select (select count(*) from public.development_reports dr join public._md_zips z on z.zip=dr.zip) as md_cached,
        (select count(*) from public.app_community_meta m join public._md_zips z on z.zip=m.zip where m.indexable) as md_indexable;
+
+
+-- ============================================================================
+-- APPENDIX (2026-07-16, applied at go-live): the outage-night seed enumerated 9
+-- counties (263 ZIPs) but MD models 11 roots / 315 ZIP pages — Prince George's (36)
+-- and Queen Anne's (16) were MISSING. The 52 gap centroids below came from the same
+-- pinned source (zipcodes PyPI v3.0.0, bbox-validated, 0 quarantined). Standing
+-- answer: a state seed's ZIP list must be generated FROM the live communities rows
+-- (level='zip' by state), never from the recon-pass county list.
+-- ============================================================================
+insert into public._md_zips(zip,lat,lng) values
+('20607',38.672,-77.0162), ('20608',38.5825,-76.7149), ('20613',38.6922,-76.832), ('20623',38.7531,-76.8369), ('20705',39.0455,-76.9242), ('20706',38.9675,-76.8551),
+('20707',39.1077,-76.872), ('20708',39.0499,-76.8345), ('20710',38.9421,-76.9261), ('20712',38.9431,-76.9652), ('20715',38.9797,-76.7435), ('20716',38.9263,-76.7098),
+('20720',38.9885,-76.791), ('20721',38.9194,-76.7871), ('20722',38.9407,-76.9531), ('20735',38.7549,-76.9026), ('20737',38.9624,-76.9153), ('20740',38.9963,-76.9299),
+('20742',38.9896,-76.9457), ('20743',38.8897,-76.8925), ('20744',38.7587,-76.9835), ('20745',38.8108,-76.9898), ('20746',38.8425,-76.9222), ('20747',38.8539,-76.8891),
+('20748',38.8222,-76.9478), ('20762',38.8062,-76.8756), ('20769',38.9766,-76.8053), ('20770',38.9996,-76.884), ('20771',39.0046,-76.8755), ('20772',38.8377,-76.798),
+('20774',38.8682,-76.8156), ('20781',38.9506,-76.9347), ('20782',38.9647,-76.9649), ('20783',39.0005,-76.9723), ('20784',38.9513,-76.8958), ('20785',38.9223,-76.8755),
+('21607',39.1299,-75.8601), ('21617',39.0564,-76.045), ('21619',38.9583,-76.2842), ('21620',39.2125,-76.0802), ('21623',39.146,-75.988), ('21628',39.233,-75.9195),
+('21638',38.9456,-76.1997), ('21640',39.0672,-75.7948), ('21644',39.1182,-75.8769), ('21649',39.1082,-75.7622), ('21651',39.2743,-75.8951), ('21657',38.9456,-75.9777),
+('21658',39.0025,-76.1424), ('21666',38.9394,-76.3371), ('21668',39.1823,-75.85), ('21679',38.9281,-76.0814)
+on conflict (zip) do nothing;
+

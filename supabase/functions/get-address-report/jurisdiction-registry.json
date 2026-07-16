@@ -803,6 +803,301 @@
    "extra_where": "permit_type in ('NB','DM','AL','FO')",
    "recency_days": 365,
    "_receipts": "2026-07-15 NY wire pass: the legacy BIS ledger still updates DAILY (rowsUpdatedAt 2026-07-15) \u2014 pre-DOB-NOW jobs keep issuing/renewing here, so it complements rbx6-tga4 (different system, no dual-filing). Statuses VERBATIM: ISSUED(3,908,261)+RE-ISSUED(48,878)->approved, IN PROCESS(20,980)->proposed, REVOKED(5)->exclude; 11,225 blank statuses drop fail-closed. permit_type whitelist NB/DM/AL/FO at source (drops EW equipment work 1.79M, PL plumbing, EQ construction equipment/fences/sheds, SG signs). Native zip_code + gis_latitude/gis_longitude. Dataset-precision record_url."
+  },
+  {
+   "registry_id": "mesa-building-permits",
+   "platform": "socrata",
+   "domain": "data.mesaaz.gov",
+   "dataset_id": "dzpk-hxfb",
+   "dataset_url": "https://data.mesaaz.gov/d/dzpk-hxfb",
+   "jurisdiction": "City of Mesa",
+   "coverage": [
+    {
+     "state": "AZ",
+     "county": "Maricopa"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "type_of_work",
+     "description_of_work"
+    ],
+    "status_raw": "status",
+    "type_source": "type_of_work",
+    "file_date": "issued_date",
+    "decision_date": "finaled_date",
+    "address": "property_address",
+    "lat": "latitude",
+    "lng": "longitude",
+    "case_number": "permit_number"
+   },
+   "type_map": {
+    "Commercial/Industrial Projects": "Commercial",
+    "Com (PJT) -- Amusement/Theatre/Bowling/Skating": "Commercial",
+    "Com (PJT) -- Banks/Professional Offices": "Commercial",
+    "Com (PJT) -- Charter School (Non-Exempt)": "Commercial",
+    "Com (PJT) -- Churches/Other Religious": "Commercial",
+    "Com (PJT) -- Commercial Buildings": "Commercial",
+    "Com (PJT) -- Cust. Svc. (Stores, Restaurants, etc)": "Commercial",
+    "Com (PJT) -- Educational": "Commercial",
+    "Com (PJT) -- Hospital/Institutional": "Commercial",
+    "Com (PJT) -- Hotels/Motels/Resorts": "Commercial",
+    "Com (PJT) -- Industrial Warehouse": "Industrial",
+    "Com (PJT) -- Mini-mart (w/Fuel)": "Commercial",
+    "Com (PJT) -- Non-Housekeeping Shelter": "Commercial",
+    "Com (PJT) -- Repair Garage": "Commercial",
+    "Com (PJT) -- Service Station (w/Fuel & Repair)": "Commercial",
+    "Com (PJT) -- Storage/Post Office/Jail/Dog Pound": "Commercial",
+    "Com (MFR) -- Five to Nine Family": "Commercial",
+    "Com (MFR) -- Publicly Owned Housing": "Commercial",
+    "Com (MFR) -- Ten or More Family": "Commercial",
+    "Com (MFR) -- Three & Four Family": "Commercial",
+    "Com (MSC) -- Demolition": "Development",
+    "Com (MSC) -- Foundation Permits": "Development",
+    "Com (MSC) -- Residential-to-Commercial": "Development",
+    "Com (OTH) -- Additions": "Commercial",
+    "Com (OTH) -- Remodeling with Addition": "Commercial",
+    "Com (OTH) -- Renovations/Remodels": "Commercial",
+    "Additions": "Residential",
+    "Remodeling With Addition": "Residential",
+    "Renovations/Remodels": "Residential",
+    "Accessory Dwelling Units": "Residential",
+    "Multi-Family Residential": "Residential",
+    "Single Family (Attached)": "Residential",
+    "Single Family (Detached)": "Residential",
+    "Two-Family Duplex": "Residential",
+    "Res (SFR) -- Single Family (Attached)": "Residential",
+    "Res (SFR) -- Single Family (Detached)": "Residential",
+    "Res (SFR) -- Two Family Duplex": "Residential",
+    "Res (SFR) -- Guesthouse": "Residential",
+    "Guesthouse": "Residential",
+    "Res (OTH) -- Additions": "Residential",
+    "Res (OTH) -- Remodeling With Addition": "Residential",
+    "Res (OTH) -- Renovations/Remodels": "Residential",
+    "Res (MSC) -- Demolition (Single Family)": "Development",
+    "Res (MSC) -- Demolition (Two Family Duplex)": "Development",
+    "Res (MSC) -- Demolition (Three or Four Family)": "Development",
+    "Res (MSC) -- Demolition (Five or More Family)": "Development",
+    "Res (MSC) -- Demolition Accessory Structure": "Development"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "In Review",
+     "Under Review",
+     "Plan Review",
+     "Submitted",
+     "Revisions Required",
+     "Revisions Received",
+     "Fees Due",
+     "Fees Paid",
+     "Ready to Issue"
+    ],
+    "approved": [
+     "Approved",
+     "Issued",
+     "Issued - Self Certified",
+     "Temporary C of O"
+    ],
+    "operating": [
+     "Finaled",
+     "Finaled - C of C Required",
+     "Finaled \u2013 C of C Required",
+     "Finaled - C of O Required",
+     "Finaled \u2013 C of O Required",
+     "C of C Issued",
+     "C of O Issued",
+     "CofO Issued"
+    ],
+    "exclude": [
+     "Closed"
+    ]
+   },
+   "extra_where": "type_of_work in ('Commercial/Industrial Projects', 'Com (PJT) -- Amusement/Theatre/Bowling/Skating', 'Com (PJT) -- Banks/Professional Offices', 'Com (PJT) -- Charter School (Non-Exempt)', 'Com (PJT) -- Churches/Other Religious', 'Com (PJT) -- Commercial Buildings', 'Com (PJT) -- Cust. Svc. (Stores, Restaurants, etc)', 'Com (PJT) -- Educational', 'Com (PJT) -- Hospital/Institutional', 'Com (PJT) -- Hotels/Motels/Resorts', 'Com (PJT) -- Industrial Warehouse', 'Com (PJT) -- Mini-mart (w/Fuel)', 'Com (PJT) -- Non-Housekeeping Shelter', 'Com (PJT) -- Repair Garage', 'Com (PJT) -- Service Station (w/Fuel & Repair)', 'Com (PJT) -- Storage/Post Office/Jail/Dog Pound', 'Com (MFR) -- Five to Nine Family', 'Com (MFR) -- Publicly Owned Housing', 'Com (MFR) -- Ten or More Family', 'Com (MFR) -- Three & Four Family', 'Com (MSC) -- Demolition', 'Com (MSC) -- Foundation Permits', 'Com (MSC) -- Residential-to-Commercial', 'Com (OTH) -- Additions', 'Com (OTH) -- Remodeling with Addition', 'Com (OTH) -- Renovations/Remodels', 'Additions', 'Remodeling With Addition', 'Renovations/Remodels', 'Accessory Dwelling Units', 'Multi-Family Residential', 'Single Family (Attached)', 'Single Family (Detached)', 'Two-Family Duplex', 'Res (SFR) -- Single Family (Attached)', 'Res (SFR) -- Single Family (Detached)', 'Res (SFR) -- Two Family Duplex', 'Res (SFR) -- Guesthouse', 'Guesthouse', 'Res (OTH) -- Additions', 'Res (OTH) -- Remodeling With Addition', 'Res (OTH) -- Renovations/Remodels', 'Res (MSC) -- Demolition (Single Family)', 'Res (MSC) -- Demolition (Two Family Duplex)', 'Res (MSC) -- Demolition (Three or Four Family)', 'Res (MSC) -- Demolition (Five or More Family)', 'Res (MSC) -- Demolition Accessory Structure')",
+   "spatial_zip_radius_mi": 3,
+   "spatial_point_col": "location",
+   "recency_days": 365,
+   "_receipts": "2026-07-16 AZ wire pass. FRESH: max issued_date 2026-07-14 / max status_date 2026-12-11 (live SoQL receipts; newest row PMT26-12214, new SFR in Hawes Crossing - matches recon). 22 statuses VERBATIM via SoQL group-by incl. BOTH hyphen AND en-dash 'Finaled - C of C Required' variants (mapped both); Closed excluded (MN precedent). ~100 type_of_work values enumerated over TWO probe pages (the $limit=100 group cut A-R; the $offset tail carried Single Family (Detached) 18,461 + 12,555 across two prefix eras) - kept 47 construction/land-use values verbatim per the recon keep list (Commercial/Industrial Projects, Com (PJT)/(MFR) project types, Additions, Multi-Family, Single Family, Demolition types, ADUs/Guesthouse, Renovations/Remodels); DROPPED at source: Electrical (4,167+4,252), Plumbing, Mechanical, Fire Alarms/Sprinklers, Swimming Pool (9,216+5,500), Svc (PSF) Sign Permits (5,534), Use Permits, COO, Other Commercial (5,795 - ambiguous 'other'), mobile-home/park-model classes, '-- Not Selected --' (523) + 12,868 blanks (fail-closed). NO ZIP column -> spatial within_circle on the native `location` point col (IL/Cambridge pattern, zero new code); rows place by their own latitude/longitude columns. No per-row URL column -> dataset-precision record_url."
+  },
+  {
+   "registry_id": "montgomery-county-residential-permits",
+   "platform": "socrata",
+   "domain": "data.montgomerycountymd.gov",
+   "dataset_id": "m88u-pqki",
+   "dataset_url": "https://data.montgomerycountymd.gov/d/m88u-pqki",
+   "jurisdiction": "Montgomery County",
+   "coverage": [
+    {
+     "state": "MD",
+     "county": "Montgomery"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "worktype",
+     "description"
+    ],
+    "status_raw": "status",
+    "type_source": "worktype",
+    "file_date": "addeddate",
+    "decision_date": "issueddate",
+    "address": [
+     "stno",
+     "predir",
+     "stname",
+     "suffix",
+     "postdir",
+     "city",
+     "state"
+    ],
+    "lat": "location.latitude",
+    "lng": "location.longitude",
+    "zip": "zip",
+    "case_number": "permitno"
+   },
+   "type_map": {
+    "CONSTRUCT": "Residential",
+    "ADD": "Residential",
+    "ALTER": "Residential",
+    "BUILD FOUNDATION": "Development"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "Open"
+    ],
+    "approved": [
+     "Issued"
+    ],
+    "operating": [
+     "Finaled",
+     "Completed"
+    ],
+    "exclude": [
+     "Stop Work"
+    ]
+   },
+   "recency_days": 365,
+   "_receipts": "2026-07-16 MD wire pass (residential). FRESH: max issueddate 2026-07-15 (res+com live receipts; demolition newest row 2026-02-27 added-date sample). Statuses VERBATIM via SoQL group-by: Open->proposed, Issued->approved, Finaled(+Completed on demolition)->operating, Stop Work->exclude. worktype vocab VERBATIM (res: ADD 43,607/ALTER 52,593/CONSTRUCT 84,198/BUILD FOUNDATION/...; com adds COMMERCIAL CHANGE OF USE 1,019 + DEMOLISH); noise dropped at source per the recon keep list (RESTORE AND / OR REPAIR re-roofs, INSTALL, REPLACE, blanks fail closed). Native `zip` column; coordinates ride the nested Socrata location column -> the NEW additive dot-path readCol (location.latitude/location.longitude; exact-column-name always wins; offline-tested). Recency on addeddate keeps Open applications visible (issueddate is null pre-issuance). No per-row URL column -> dataset-precision record_url. Mechanical/Electrical/Fence/Sign companion datasets DROPPED as trades/noise (WA/MN/IL precedent).",
+   "extra_where": "worktype in ('CONSTRUCT', 'ADD', 'ALTER', 'BUILD FOUNDATION')"
+  },
+  {
+   "registry_id": "montgomery-county-commercial-permits",
+   "platform": "socrata",
+   "domain": "data.montgomerycountymd.gov",
+   "dataset_id": "i26v-w6bd",
+   "dataset_url": "https://data.montgomerycountymd.gov/d/i26v-w6bd",
+   "jurisdiction": "Montgomery County",
+   "coverage": [
+    {
+     "state": "MD",
+     "county": "Montgomery"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "worktype",
+     "description"
+    ],
+    "status_raw": "status",
+    "type_source": "worktype",
+    "file_date": "addeddate",
+    "decision_date": "issueddate",
+    "address": [
+     "stno",
+     "predir",
+     "stname",
+     "suffix",
+     "postdir",
+     "city",
+     "state"
+    ],
+    "lat": "location.latitude",
+    "lng": "location.longitude",
+    "zip": "zip",
+    "case_number": "permitno"
+   },
+   "type_map": {
+    "CONSTRUCT": "Commercial",
+    "ADD": "Commercial",
+    "ALTER": "Commercial",
+    "BUILD FOUNDATION": "Development",
+    "COMMERCIAL CHANGE OF USE": "Development",
+    "DEMOLISH": "Development"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "Open"
+    ],
+    "approved": [
+     "Issued"
+    ],
+    "operating": [
+     "Finaled",
+     "Completed"
+    ],
+    "exclude": [
+     "Stop Work"
+    ]
+   },
+   "recency_days": 365,
+   "_receipts": "2026-07-16 MD wire pass (commercial). FRESH: max issueddate 2026-07-15 (res+com live receipts; demolition newest row 2026-02-27 added-date sample). Statuses VERBATIM via SoQL group-by: Open->proposed, Issued->approved, Finaled(+Completed on demolition)->operating, Stop Work->exclude. worktype vocab VERBATIM (res: ADD 43,607/ALTER 52,593/CONSTRUCT 84,198/BUILD FOUNDATION/...; com adds COMMERCIAL CHANGE OF USE 1,019 + DEMOLISH); noise dropped at source per the recon keep list (RESTORE AND / OR REPAIR re-roofs, INSTALL, REPLACE, blanks fail closed). Native `zip` column; coordinates ride the nested Socrata location column -> the NEW additive dot-path readCol (location.latitude/location.longitude; exact-column-name always wins; offline-tested). Recency on addeddate keeps Open applications visible (issueddate is null pre-issuance). No per-row URL column -> dataset-precision record_url. Mechanical/Electrical/Fence/Sign companion datasets DROPPED as trades/noise (WA/MN/IL precedent).",
+   "extra_where": "worktype in ('CONSTRUCT', 'ADD', 'ALTER', 'BUILD FOUNDATION', 'COMMERCIAL CHANGE OF USE', 'DEMOLISH')"
+  },
+  {
+   "registry_id": "montgomery-county-demolition-permits",
+   "platform": "socrata",
+   "domain": "data.montgomerycountymd.gov",
+   "dataset_id": "b6ht-fw3x",
+   "dataset_url": "https://data.montgomerycountymd.gov/d/b6ht-fw3x",
+   "jurisdiction": "Montgomery County",
+   "coverage": [
+    {
+     "state": "MD",
+     "county": "Montgomery"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "worktype",
+     "description"
+    ],
+    "status_raw": "status",
+    "type_source": "worktype",
+    "file_date": "addeddate",
+    "decision_date": "issueddate",
+    "address": [
+     "stno",
+     "predir",
+     "stname",
+     "suffix",
+     "postdir",
+     "city",
+     "state"
+    ],
+    "lat": "location.latitude",
+    "lng": "location.longitude",
+    "zip": "zip",
+    "case_number": "permitno"
+   },
+   "type_map": {
+    "DEMOLISH": "Development"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "Open"
+    ],
+    "approved": [
+     "Issued"
+    ],
+    "operating": [
+     "Finaled",
+     "Completed"
+    ],
+    "exclude": [
+     "Stop Work"
+    ]
+   },
+   "recency_days": 365,
+   "_receipts": "2026-07-16 MD wire pass (demolition). FRESH: max issueddate 2026-07-15 (res+com live receipts; demolition newest row 2026-02-27 added-date sample). Statuses VERBATIM via SoQL group-by: Open->proposed, Issued->approved, Finaled(+Completed on demolition)->operating, Stop Work->exclude. worktype vocab VERBATIM (res: ADD 43,607/ALTER 52,593/CONSTRUCT 84,198/BUILD FOUNDATION/...; com adds COMMERCIAL CHANGE OF USE 1,019 + DEMOLISH); noise dropped at source per the recon keep list (RESTORE AND / OR REPAIR re-roofs, INSTALL, REPLACE, blanks fail closed). Native `zip` column; coordinates ride the nested Socrata location column -> the NEW additive dot-path readCol (location.latitude/location.longitude; exact-column-name always wins; offline-tested). Recency on addeddate keeps Open applications visible (issueddate is null pre-issuance). No per-row URL column -> dataset-precision record_url. Mechanical/Electrical/Fence/Sign companion datasets DROPPED as trades/noise (WA/MN/IL precedent)."
   }
  ],
  "arcgis": [
@@ -2226,6 +2521,160 @@
     ]
    },
    "_receipts": "2026-07-16 CA wire pass. Anaheim's own AGO org (services3/hPs600I3X0RTaaaq, service list enumerated live). GEOMETRY-LESS TABLE (geometryType null) -> rows geocode via Location_Primary_Address (Boulder precedent; v20 geofence applies). No ZIP column; every address embeds '..., Anaheim, Ca 92xxx' -> zip_where_template LIKE (live receipt: 92805 -> 6,333 rows all-time). FRESH: newest Application_Received 2026/06/30 (PAZ2026-00384, matches recon). 26,883 rows total / 845 since 2025-07-01 -> recency via extra_where STRING compare (dates are yyyy/mm/dd STRINGS; the connector's recency_days DATE literal would fail on a string field - do NOT set it). 23 statuses VERBATIM via returnDistinctValues 2026-07-16: 'Modified' left unmapped ON PURPOSE (ambiguous outcome - surfaces in run report); Closed/Complete excluded (MN 'Closed' precedent: no trustworthy lifecycle). 'Sex-Oriented Business' type dropped at source (licensing class, not development). record_url dataset-precision (no per-record public link; CityView-class portals are login-walled - Provo precedent)."
+  },
+  {
+   "registry_id": "scottsdale-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://maps.scottsdaleaz.gov/arcgis/rest/services/OpenData_Tabular/MapServer/12",
+   "dataset_url": "https://maps.scottsdaleaz.gov/arcgis/rest/services/OpenData_Tabular/MapServer/12",
+   "jurisdiction": "City of Scottsdale",
+   "coverage": [
+    {
+     "state": "AZ",
+     "county": "Maricopa"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "PermitType",
+     "Subdivision"
+    ],
+    "status_raw": "PermitStatus",
+    "type_source": "PermitType",
+    "file_date": "IssueDate",
+    "address": "Address",
+    "lat": "Latitude",
+    "lng": "Longitude",
+    "case_number": "PermitNumber"
+   },
+   "extra_where": "PermitType IN ('SFR-STANDARD','SFR-STANDARD-GREEN','SFR-STANDARD-MULTI-LEVELS','SFR-STANDARD-MULTI-LEV-GREEN','SFR-CUSTOM IN SUBDIVISION','SFR-CUSTOM METES AND BOUNDS','SFR-CUSTOM-GREEN','SFR-CUSTOM-MULTI-LEVELS','SFR-CUSTOM-MULTI-LEV-GREEN','SFR-SINGLE FAMILY ATTACHED','SFR-SINGLE FAMILY ATTACH GREEN','SFR-ADDITION','SFR-ADDITION MCD','SFR-ADDITION GREEN','SFR-ADDITION GREEN MCD','SFR-ADDITION-MULTI-LEVELS','SFR-ADDITION LESS 500 SQ FT','SFR-REMODEL','SFR-REMODEL MCD','SFR-REMODEL GREEN','SFR-REMODEL GREEN MCD','SFR-REMODEL W/ ROOF MODIFY','SFR-MODEL-HOMES','SFR-MODEL-HOMES GREEN','MULTI-FAMILY DWELLING','MULTI-FAMILY (BASE FEE)','MULTI-FAMILY GREEN','MULTI-FAMILY SHELL','MULTI-FAMILY SHELL GREEN','MULTI-FAMILY BUILDOUT','MULTI-FAMILY BUILDOUT GREEN','APARTMENTS','COMMERCIAL NEW','COMMERCIAL GREEN','COMMERCIAL ADDITION','COMMERCIAL ADDITION MCD','COMMERCIAL ADDITION GREEN','COMM SHELL','COMM SHELL GREEN','COMM SHELL (BASE FEE)','COMM SHELL EXCLUSIVE OF STRUCT','COMM SHELL EXCLUDE FOUNDATION','COMM FOUNDATION ONLY','COMM FOUNDATION/STRUC ONLY','COMM STRUCTURE ONLY','COMM BUILD-OUT EXCL FOUNDATION','COMM BUILD-OUT EXCL STRUCTURE','COMM BUILD-OUT EXCL FOUND-GRN','DOWNTOWN NEW COMM GREEN','DOWNTOWN COMMERCIAL BLDG','DOWNTOWN ADDITION','DOWNTOWN ADDITION/REMODEL','HOTEL/MOTEL','HOTEL/MOTEL GREEN','CHURCH','CHURCH GREEN','SCHOOL-PRIVATE','SCHOOL-PUBLIC','CARE HOME NEW','DEMOLITION-SFR','DEMOLITION-COMM','DEMOLITION-MULTI-FAMILY','DEMOLITION-OTHER','FOUNDATION ONLY-SFR','FOUNDATION ONLY-SFR-GREEN','GUEST HOUSE','GUEST HOUSE GREEN','GUEST HOUSE MCD','GUEST HOUSE - STD PLAN','GUEST HOUSE - FAX PERMIT')",
+   "type_map": {
+    "MULTI-FAMILY DWELLING": "Residential",
+    "MULTI-FAMILY (BASE FEE)": "Residential",
+    "MULTI-FAMILY GREEN": "Residential",
+    "MULTI-FAMILY SHELL": "Residential",
+    "MULTI-FAMILY SHELL GREEN": "Residential",
+    "MULTI-FAMILY BUILDOUT": "Residential",
+    "MULTI-FAMILY BUILDOUT GREEN": "Residential",
+    "APARTMENTS": "Residential",
+    "COMMERCIAL NEW": "Commercial",
+    "COMMERCIAL GREEN": "Commercial",
+    "COMMERCIAL ADDITION": "Commercial",
+    "COMMERCIAL ADDITION MCD": "Commercial",
+    "COMMERCIAL ADDITION GREEN": "Commercial",
+    "COMM SHELL": "Commercial",
+    "COMM SHELL GREEN": "Commercial",
+    "COMM SHELL (BASE FEE)": "Commercial",
+    "COMM SHELL EXCLUSIVE OF STRUCT": "Commercial",
+    "COMM SHELL EXCLUDE FOUNDATION": "Commercial",
+    "COMM FOUNDATION ONLY": "Commercial",
+    "COMM FOUNDATION/STRUC ONLY": "Commercial",
+    "COMM STRUCTURE ONLY": "Commercial",
+    "COMM BUILD-OUT EXCL FOUNDATION": "Commercial",
+    "COMM BUILD-OUT EXCL STRUCTURE": "Commercial",
+    "COMM BUILD-OUT EXCL FOUND-GRN": "Commercial",
+    "DOWNTOWN NEW COMM GREEN": "Commercial",
+    "DOWNTOWN COMMERCIAL BLDG": "Commercial",
+    "DOWNTOWN ADDITION": "Commercial",
+    "DOWNTOWN ADDITION/REMODEL": "Commercial",
+    "HOTEL/MOTEL": "Commercial",
+    "HOTEL/MOTEL GREEN": "Commercial",
+    "CHURCH": "Civic/Public",
+    "CHURCH GREEN": "Civic/Public",
+    "SCHOOL-PRIVATE": "Civic/Public",
+    "SCHOOL-PUBLIC": "Civic/Public",
+    "CARE HOME NEW": "Civic/Public",
+    "DEMOLITION-SFR": "Development",
+    "DEMOLITION-COMM": "Development",
+    "DEMOLITION-MULTI-FAMILY": "Development",
+    "DEMOLITION-OTHER": "Development",
+    "FOUNDATION ONLY-SFR": "Development",
+    "FOUNDATION ONLY-SFR-GREEN": "Development"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "PENDING",
+     "ON HOLD"
+    ],
+    "approved": [
+     "ACTIVE"
+    ],
+    "operating": [
+     "FINALLED"
+    ],
+    "exclude": [
+     "EXPIRED",
+     "WITHDRAWN",
+     "REFUND"
+    ]
+   },
+   "spatial_zip_radius_mi": 3,
+   "spatial_latlng_cols": {
+    "lat": "Latitude",
+    "lng": "Longitude"
+   },
+   "recency_days": 365,
+   "_receipts": "2026-07-16 AZ wire pass. FIRST consumer of the additive arcgis `spatial_latlng_cols` option (attribute-bbox: a geometry-less hosted TABLE whose rows carry per-record Latitude/Longitude COLUMNS - the Detroit-tables cousin; a geometry envelope param is meaningless on a table, so the envelope is AND'd into WHERE; offline unit-tested incl. envelope-mode regression). FRESH: newest IssueDate 2026-07-10 (#324234, live receipt; esriFieldTypeDate -> recency_days DATE literal valid). 7 PermitStatus values VERBATIM (REFUND/EXPIRED/ACTIVE/FINALLED/PENDING/WITHDRAWN/ON HOLD; nulls fail closed): ACTIVE->approved, FINALLED->operating, PENDING+ON HOLD->proposed, rest excluded. ~190 PermitType values enumerated live; kept 70 construction/development classes verbatim (SFR new/addition/remodel, multi-family, commercial new/shell/addition, hotels, churches/schools/care, demolition, foundation-only, guest houses); DROPPED at source: tenant improvements, signs, pools/spas, fences/walls, patio covers/carports, solar, water heaters, minimum-charge trade permits, special events, native-plant/NAOS paperwork. NOTE 'APARTMENTS GREEN' carries trailing whitespace at source (Bellevue-class variant) and is NOT in the keep list - rows of that class surface as excluded-by-extra_where, never guessed. Types /13 Cases + /15 COO same shape (not wired: COO=occupancy noise; Cases=queue). No per-row URL column -> dataset-precision record_url."
+  },
+  {
+   "registry_id": "baltimore-county-permits",
+   "platform": "arcgis",
+   "service_url": "https://bcgisdata.baltimorecountymd.gov/arcgis/rest/services/DevelopmentManagement/ActiveDevelopment/MapServer/4",
+   "dataset_url": "https://bcgisdata.baltimorecountymd.gov/arcgis/rest/services/DevelopmentManagement/ActiveDevelopment/MapServer/4",
+   "jurisdiction": "Baltimore County",
+   "coverage": [
+    {
+     "state": "MD",
+     "county": "Baltimore County"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "DESCRIPTION_TYPE",
+     "DESC_WORK"
+    ],
+    "status_raw": "STATUS",
+    "type_source": "DESCRIPTION_TYPE",
+    "file_date": "APPL_DATE",
+    "decision_date": "ISSDATE",
+    "address": "P_ADDRESS",
+    "lat": "LATITUDE",
+    "lng": "LONGITUDE",
+    "zip": "ZIP",
+    "case_number": "PERMITNO"
+   },
+   "extra_where": "DESCRIPTION_TYPE IN ('Comm. Permit - New Structure/Shell','Res. Permit - New Dwelling','Comm. Permit - Addition','Comm. Permit - Alteration','Res. Permit - Alteration/Addition','Comm. Permit - Razing','Res. Permit - Razing','Comm. Permit - Grading','Res. Permit - Grading','Comm. Permit - Foundation Only','Res. Permit - Accessory Structure')",
+   "type_map": {
+    "Comm. Permit - New Structure/Shell": "Commercial",
+    "Comm. Permit - Addition": "Commercial",
+    "Comm. Permit - Alteration": "Commercial",
+    "Res. Permit - New Dwelling": "Residential",
+    "Res. Permit - Alteration/Addition": "Residential",
+    "Res. Permit - Accessory Structure": "Residential",
+    "Comm. Permit - Razing": "Development",
+    "Res. Permit - Razing": "Development",
+    "Comm. Permit - Grading": "Development",
+    "Res. Permit - Grading": "Development",
+    "Comm. Permit - Foundation Only": "Development"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "OPEN"
+    ],
+    "approved": [
+     "ISSUE"
+    ],
+    "operating": [
+     "CLOSED"
+    ],
+    "exclude": [
+     "EXPIRED",
+     "CANCELLED",
+     "BL-EXPIRED"
+    ]
+   },
+   "recency_days": 365,
+   "_receipts": "2026-07-16 MD wire pass. The county's own ArcGIS Server (bcgisdata, DevelopmentManagement/ActiveDevelopment layer 4 - the Hub distribution host, NOT the hub domain). FRESH: newest ISSDATE 2026-07-15 (epoch 1784073600000; R24-07845/R26-03840 live receipt; esriFieldTypeDate -> recency_days valid). 6 STATUS values VERBATIM (returnDistinctValues): ISSUE->approved, OPEN->proposed, CLOSED->operating, EXPIRED/CANCELLED/BL-EXPIRED->exclude. DESCRIPTION_TYPE vocab VERBATIM ('Comm. Permit - X'/'Res. Permit - X' format - the recon note paraphrased; the IN-list here is byte-exact from the live enumeration): kept 11 construction/land-use classes; DROPPED at source: Sign, Swimming Pool, Deck, Fence, Solar, Tanks, Fireplace, COO, Sprinkler, Towers/Antennas, Temporary*, Retaining Wall, Bulkhead, Piers, Moving, Storm Water, Cranes, Private Bridge, Access Point + Env Health variants (restaurant-scoped). Native ZIP + per-record LATITUDE/LONGITUDE columns; recency on APPL_DATE keeps OPEN applications (ISSDATE null pre-issuance) - wait, file_date is APPL_DATE for exactly that reason. No per-row URL column -> dataset-precision record_url. Hub layers /5 Electrical /8 U&O dropped (trades/occupancy)."
   }
  ],
  "ckan": [
