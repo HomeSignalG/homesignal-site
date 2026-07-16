@@ -257,7 +257,12 @@ HS.onReady(async function () {
   }
   function ensureGL(){
     if (glMap) return;
-    glMap = new maplibregl.Map({
+    // WebGL can be unavailable entirely (hardened browsers disable it for
+    // fingerprint protection — seen live in Brave: "Failed to initialize WebGL"
+    // thrown from the constructor). Unguarded, that throw killed the rest of
+    // init (no degrade, dead mode buttons). Catch -> impact diagram.
+    try {
+      glMap = new maplibregl.Map({
       container:'mapgl',
       style:{ version:8, sources:{
         sat:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,attribution:'© Esri, Maxar'},
@@ -267,7 +272,13 @@ HS.onReady(async function () {
         {id:'sat',type:'raster',source:'sat',layout:{visibility:'none'}}
       ]},
       center:[center.lng,center.lat], zoom: zoomFor(opts.radiusMi)
-    });
+      });
+    } catch (e) {
+      console.warn('[maps] WebGL unavailable — showing the impact diagram.', e);
+      glMap = null;
+      degradeToSchematic();
+      return;
+    }
     glMap.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
     // GUARDRAIL (required companion to the Satellite default): Esri World Imagery / OSM
     // are free, keyless and NOT production-contracted, so a traffic spike can be
@@ -313,6 +324,7 @@ HS.onReady(async function () {
     document.getElementById('mapSch').style.display='none';
     document.getElementById('mapgl').style.display='block';
     ensureGL();
+    if (glFailed || !glMap) return;      // WebGL init failed -> already degraded
     if (!glReady){ setGps(items); renderPins(items); return; }
     glMap.resize();
     // base layer per mode
