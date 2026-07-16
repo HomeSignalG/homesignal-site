@@ -1,0 +1,10 @@
+[
+  { "id": "sj-pkg-active-building-permits", "url": "https://data.sanjoseca.gov/api/3/action/package_show?id=active-building-permits" },
+  { "id": "sj-ckan-permit-search", "url": "https://data.sanjoseca.gov/api/3/action/package_search?q=permit&rows=20" },
+  { "id": "sd-datasd-dcat", "url": "https://data.sandiego.gov/data.json" },
+  { "id": "sd-datasd-permits-page", "url": "https://data.sandiego.gov/datasets/development-permits-set1/" },
+  { "id": "phoenix-ckan-permit-search", "url": "https://www.phoenixopendata.com/api/3/action/package_search?q=permit&rows=20" },
+  { "id": "mesa-socrata-catalog", "url": "https://data.mesaaz.gov/api/catalog/v1?q=permit&only=datasets&limit=20&search_context=data.mesaaz.gov" },
+  { "id": "baltimore-socrata-catalog", "url": "https://data.baltimorecity.gov/api/catalog/v1?q=permit&only=datasets&limit=20&search_context=data.baltimorecity.gov" },
+  { "id": "montgomery-socrata-catalog", "url": "https://data.montgomerycountymd.gov/api/catalog/v1?q=permit&only=datasets&limit=20&search_context=data.montgomerycountymd.gov" }
+]

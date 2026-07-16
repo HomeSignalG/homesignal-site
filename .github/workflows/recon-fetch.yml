@@ -1,0 +1,32 @@
+name: recon-fetch
+
+# Generic read-only recon prober (see scripts/recon-fetch.mjs). Dispatched manually
+# during state-open source recon: fetches the committed target list on a runner
+# (which has egress) and uploads the raw responses as an artifact. Writes nothing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets_file:
+        description: 'Repo path to the JSON target list, e.g. scripts/recon/ca-round1.json'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Probe targets
+        run: node scripts/recon-fetch.mjs "${{ github.event.inputs.targets_file }}"
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: recon-results
+          path: results/
+          retention-days: 7
