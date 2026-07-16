@@ -110,7 +110,40 @@
     </div>
     <div class="mbody">
       <div id="switcherList"><!-- filled by shell.js --></div>
-      <button class="mbtn" type="button" style="width:100%;margin-top:12px" onclick="HS.closeModal('switcherModal');HS.openLoc()">+ Add a property</button>
+      <button class="mbtn" type="button" style="width:100%;margin-top:12px" onclick="HS.closeModal('switcherModal');HS.openHome()">+ Add a home</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======= ADD YOUR HOME MODAL (the ONE writer of app_properties) =======
+     Honesty rules: we save ONLY the U.S. Census geocoder's confirmed match,
+     shown back to the resident for explicit confirmation — never raw input,
+     never a guessed point. Signed-in only (RLS: owner-only rows). -->
+<div class="overlay" id="homeModal" onclick="if(event.target===this)HS.closeModal('homeModal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="homeTitle">
+    <div class="mhead">
+      <button class="mclose" type="button" onclick="HS.closeModal('homeModal')" aria-label="Close">✕</button>
+      <span class="mbadge">⌂ Your home</span>
+      <h3 id="homeTitle">Add your home</h3>
+      <p class="msub">Enter your street address. We confirm it against U.S. Census address records and only pin the confirmed match.</p>
+    </div>
+    <div class="mbody">
+      <div id="homeForm">
+        <div class="field" style="flex-direction:column;gap:10px">
+          <input id="homeAddr" type="text" autocomplete="street-address" placeholder="123 Main St, Del Valle, TX" onkeydown="if(event.key==='Enter')HS.findHome()">
+          <button class="mbtn" type="button" onclick="HS.findHome()">Find my address</button>
+        </div>
+        <div class="mnote" id="homeMsg">Your address is stored on your account only — never shared, never public.</div>
+      </div>
+      <div id="homeConfirm" class="hidden">
+        <div style="background:#eaf4ee;border:1px solid #cfe5d7;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px"><b>Confirmed:</b> <span id="homeMatched">—</span></div>
+        <div class="field" style="flex-direction:column;gap:10px">
+          <button class="mbtn" type="button" onclick="HS.saveHome()">Save as my home</button>
+          <button class="mbtn" type="button" style="background:transparent;color:var(--ink);border:1px solid var(--line)" onclick="document.getElementById('homeConfirm').classList.add('hidden');document.getElementById('homeForm').classList.remove('hidden')">Edit address</button>
+        </div>
+        <div class="mnote" id="homeConfirmMsg"></div>
+      </div>
+      <div id="homeDone" class="success hidden"><div class="ck">✓</div><h4>Home saved</h4><p>Reloading with your home on the map…</p></div>
     </div>
   </div>
 </div>
