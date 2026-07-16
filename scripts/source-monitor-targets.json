@@ -509,9 +509,9 @@
         "state": "CA",
         "county": "Santa Clara"
       },
-      "url": "https://data-sunnyvale.opendata.arcgis.com/api/feed/dcat-us/1.1.json",
+      "url": "https://data.sunnyvale.ca.gov/api/feed/dcat-us/1.1.json",
       "hosts": [
-        "data-sunnyvale.opendata.arcgis.com",
+        "data.sunnyvale.ca.gov",
         "services2.arcgis.com",
         "services.arcgis.com",
         "services1.arcgis.com",
@@ -572,7 +572,8 @@
         "services.arcgis.com",
         "services1.arcgis.com",
         "services2.arcgis.com",
-        "services3.arcgis.com"
+        "services3.arcgis.com",
+        "gis.anaheim.net"
       ]
     },
     {
@@ -641,7 +642,8 @@
         "services.arcgis.com",
         "services1.arcgis.com",
         "services2.arcgis.com",
-        "services3.arcgis.com"
+        "services3.arcgis.com",
+        "gis.slocounty.ca.gov"
       ]
     },
     {
@@ -741,7 +743,8 @@
         "services.arcgis.com",
         "services1.arcgis.com",
         "services2.arcgis.com",
-        "services3.arcgis.com"
+        "services3.arcgis.com",
+        "maps.scottsdaleaz.gov"
       ]
     },
     {
@@ -771,7 +774,8 @@
         "services.arcgis.com",
         "services1.arcgis.com",
         "services2.arcgis.com",
-        "services3.arcgis.com"
+        "services3.arcgis.com",
+        "gis.tucsonaz.gov"
       ]
     },
     {
@@ -785,19 +789,6 @@
       "url": "https://gis.pima.gov/arcgis/rest/services",
       "hosts": [
         "gis.pima.gov"
-      ]
-    },
-    {
-      "id": "baltimore-city-socrata",
-      "kind": "socrata-catalog",
-      "jurisdiction": "Baltimore City",
-      "coverage": {
-        "state": "MD",
-        "county": "Baltimore city"
-      },
-      "domain": "data.baltimorecity.gov",
-      "hosts": [
-        "data.baltimorecity.gov"
       ]
     },
     {
@@ -853,7 +844,8 @@
         "services.arcgis.com",
         "services1.arcgis.com",
         "services2.arcgis.com",
-        "services3.arcgis.com"
+        "services3.arcgis.com",
+        "bcgisdata.baltimorecountymd.gov"
       ]
     },
     {
@@ -888,6 +880,24 @@
         "services1.arcgis.com",
         "services2.arcgis.com",
         "services3.arcgis.com"
+      ]
+    },
+    {
+      "id": "baltimore-city-dcat",
+      "kind": "dcat",
+      "jurisdiction": "Baltimore City",
+      "coverage": {
+        "state": "MD",
+        "county": "Baltimore city"
+      },
+      "url": "https://data.baltimorecity.gov/api/feed/dcat-us/1.1.json",
+      "hosts": [
+        "data.baltimorecity.gov",
+        "services1.arcgis.com",
+        "services.arcgis.com",
+        "services2.arcgis.com",
+        "services3.arcgis.com",
+        "egisdata.baltimorecity.gov"
       ]
     }
   ]
