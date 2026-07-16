@@ -1554,7 +1554,24 @@ gate proof (Allegheny + Utah ZIPs → 0 fetches) and the SQL-error quarantine.
 code.** All receipts are live pg_net probes from 2026-07-16 (response ids 1413-1447);
 nothing wired on training knowledge.
 
-### WIRED — miami-building-permits (ArcGIS, City of Miami / Miami-Dade County)
+### REJECTED AT SMOKE — miami-building-permits (ArcGIS, City of Miami)
+**Wired provisionally, then REJECTED on live-smoke evidence — ENGINE-UNREACHABLE
+WITHIN THE WORKER BUDGET (slow host, not a block).** Five smoke rounds with
+receipts: the layer's host answers Supabase edge-runtime requests ~30-60s per
+request REGARDLESS of size (the identical scoped query returns in seconds from
+pg_net), so the report burns its wall/CPU budget on fetch alone — 546 at 3mi
+(141s), 546 after the out_fields projection (111s), 546 at 1.5mi (~1,400 rows,
+115s), 504 at the gateway wall limit with a single page_size=2000 request. A
+**Detroit control report ran 200 with 734 arcgis records mid-investigation**, so
+the arcgis path itself is healthy — this is host-specific latency toward edge
+egress. Two ADDITIVE connector options shipped from the investigation and stay
+(both default-off, existing entries byte-identical): **`out_fields`** (project
+mapped columns — dense-metro wide rows at outFields=* are a CPU hazard) and
+**`page_size`** (fewer, larger pages for slow hosts). Miami-Dade ships on the
+facilities floor; → nightly reprobe list (revisit if host latency or the engine
+budget changes).
+
+#### (recon detail, kept for the record)
 - **FRESH**: max `IssuedDate` = **2026-07-15** (epoch 1784153820000, live statistics
   probe). Hub-catalog `modified` 2026-07-16.
 - `Building_Permits_Since_2014/FeatureServer/0` (services1.arcgis.com/CvuPhqcTQpZPT9qY)
