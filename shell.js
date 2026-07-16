@@ -318,7 +318,10 @@
     }
     LS.set('myZip', zip); state.zip = zip;   // make it the primary area
     if (CFG.DATA_SOURCE === 'supabase' && state.session && !state.session.demo && HS.sb) {
-      try { HS.sb().from('app_follows').insert({ user_id: state.session.user.id, target_type: 'community', target_id: zip }); } catch (e) {}
+      // .then() is required: supabase-js query builders are lazy and only send the
+      // request when awaited/then'd. Fire-and-forget, but it MUST actually fire so the
+      // follow reaches app_follows and shows on the Dashboard / other devices.
+      try { HS.sb().from('app_follows').insert({ user_id: state.session.user.id, target_type: 'community', target_id: zip }).then(function () {}, function () {}); } catch (e) {}
     }
   };
   HS.unfollowCommunity = function (zip) {
@@ -330,7 +333,8 @@
       LS.set('myZip', next); state.zip = next || CFG.DEFAULT_ZIP;
     }
     if (CFG.DATA_SOURCE === 'supabase' && state.session && !state.session.demo && HS.sb) {
-      try { HS.sb().from('app_follows').delete().match({ user_id: state.session.user.id, target_type: 'community', target_id: zip }); } catch (e) {}
+      // .then() required — see followCommunity note; without it the delete never fires.
+      try { HS.sb().from('app_follows').delete().match({ user_id: state.session.user.id, target_type: 'community', target_id: zip }).then(function () {}, function () {}); } catch (e) {}
     }
   };
   HS.toggleFollowCommunityBtn = function (btn) {
