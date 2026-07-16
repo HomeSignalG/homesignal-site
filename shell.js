@@ -584,7 +584,9 @@
   async function persistTopics(category, topics, consent) {
     if (CFG.DATA_SOURCE !== 'supabase' || !state.session) return;
     try {
-      await HS.sb().from('topic_prefs').upsert({
+      // Table is app_topic_prefs (phase1 schema) — the un-prefixed 'topic_prefs'
+      // never existed, so this upsert had silently failed since the promotion.
+      await HS.sb().from('app_topic_prefs').upsert({
         user_id: state.session.user.id, category, topics, share_consent: consent
       }, { onConflict: 'user_id,category' });
     } catch (e) { console.warn('topics', e); }
