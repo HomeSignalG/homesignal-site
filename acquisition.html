@@ -11,14 +11,17 @@
 <link rel="canonical" href="https://homesignal.net/acquisition.html">
 <style>
 /* ============================================================
-   Dashboard design tokens + styles (from the artifact — DESIGN ONLY,
-   no data). All numbers/tables are fetched from the gated RPC.
+   Dashboard styles (structure from the artifact — DESIGN ONLY, no
+   data; all numbers/tables come from the gated RPC). Tokens re-based
+   on the site's app.css palette (light theme, brand green) so this
+   page matches homesignal.net without adopting the injected shell.
    ============================================================ */
-:root{--bg:#0b1220;--panel:#141f38;--panel2:#111b30;--line:#2c3c5c;--ink:#e8eef7;
---muted:#9fb0cc;--accent:#4f9cff;--real:#2fbf71;--persist:#e0a423;--pending:#8592ae;}
+:root{--bg:#f4f6f4;--panel:#ffffff;--panel2:#f7f9f7;--line:#e4e8e4;--ink:#16211c;
+--muted:#4a5a52;--accent:#157a49;--real:#1f9d5c;--persist:#c47a1a;--pending:#83918a;
+--shadow-sm:0 1px 2px rgba(16,33,28,.06);}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-header.top{padding:22px 26px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#132038,#0b1220)}
+header.top{padding:22px 26px;border-bottom:1px solid var(--line);background:var(--panel)}
 header.top h1{margin:0;font-size:20px;letter-spacing:.2px}
 header.top .meta{color:var(--muted);font-size:12.5px;margin-top:6px}
 .legend{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;font-size:12.5px}
@@ -26,15 +29,16 @@ header.top .meta{color:var(--muted);font-size:12.5px;margin-top:6px}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
 .dot.real{background:var(--real)}.dot.persist{background:var(--persist)}.dot.pending{background:var(--pending)}
 nav.tabs{display:flex;flex-wrap:wrap;gap:4px;padding:10px 18px;position:sticky;top:0;z-index:5;
-background:var(--panel2);border-bottom:1px solid var(--line)}
+background:var(--panel);border-bottom:1px solid var(--line)}
 nav.tabs button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 12px;
 border-radius:8px;cursor:pointer;font-size:13px}
-nav.tabs button:hover{color:var(--ink)}
-nav.tabs button.active{background:var(--panel);color:var(--ink);border-color:var(--line)}
+nav.tabs button:hover{color:var(--ink);background:var(--panel2)}
+nav.tabs button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .winbar{display:inline-flex;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:4px}
 .winbar button{background:transparent;border:0;color:var(--muted);padding:6px 14px;border-radius:7px;cursor:pointer;font-size:12.5px}
 .winbar button:hover{color:var(--ink)}
 .winbar button.active{background:var(--accent);color:#fff;font-weight:600}
+.winbar button.active:hover{color:#fff}
 .dayctl{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px}
 .dayctl input[type=range]{flex:1;min-width:200px;accent-color:var(--accent);cursor:pointer}
 .daylabel{color:var(--ink);font-size:13px;font-weight:600;min-width:120px}
@@ -43,12 +47,12 @@ nav.tabs button.active{background:var(--panel);color:var(--ink);border-color:var
 main{padding:20px 24px;max-width:1180px;margin:0 auto}
 .tab{display:none}.tab.active{display:block}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:12px;margin:8px 0 18px}
-.tile{background:var(--panel);border:1px solid var(--line);border-left-width:4px;border-radius:10px;padding:13px 14px}
+.tile{background:var(--panel);border:1px solid var(--line);border-left-width:4px;border-radius:10px;padding:13px 14px;box-shadow:var(--shadow-sm)}
 .tile.s-real{border-left-color:var(--real)}.tile.s-persist{border-left-color:var(--persist)}
 .tile.s-pending{border-left-color:var(--pending)}
 .tile-val{font-size:24px;font-weight:700;letter-spacing:.3px}
 .tile.s-pending .tile-val{font-size:15px;color:var(--muted);font-weight:600;padding-top:6px}
-.tile-label{color:#d4e1f6;margin-top:3px;font-size:13px}
+.tile-label{color:#33423a;margin-top:3px;font-size:13px}
 .tile-note{color:var(--muted);font-size:12px;margin-top:6px}
 .tile-tag{display:inline-block;margin-top:8px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;
 padding:2px 7px;border-radius:20px;border:1px solid var(--line)}
@@ -56,38 +60,38 @@ padding:2px 7px;border-radius:20px;border:1px solid var(--line)}
 .bsky-btn{border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer}
 .bsky-btn:hover{filter:brightness(1.1)}
 .tile-tag.t-real{color:var(--real)}.tile-tag.t-persist{color:var(--persist)}.tile-tag.t-pending{color:var(--pending)}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0;box-shadow:var(--shadow-sm)}
 .card h3{margin:0 0 4px;font-size:15px}
 .card .sub{color:var(--muted);font-size:12.5px;margin:0 0 12px}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:820px){.two-col{grid-template-columns:1fr}}
 .bars{display:flex;flex-direction:column;gap:7px}
 .bar-row{display:grid;grid-template-columns:170px 1fr 54px;gap:10px;align-items:center;font-size:13px}
-.bar-label{color:#cddaf1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-label{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bar-track{background:var(--panel2);border-radius:6px;height:14px;overflow:hidden;border:1px solid var(--line)}
-.bar-fill{height:100%;background:linear-gradient(90deg,#3d6fd6,#4f9cff)}
+.bar-fill{height:100%;background:linear-gradient(90deg,#1f9d5c,#157a49)}
 .bar-n{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
 .tbl{width:100%;border-collapse:collapse;font-size:13px}
 .tbl th,.tbl td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
 .content{max-width:360px}
-.content>summary{cursor:pointer;color:#cddaf1;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;list-style:revert}
+.content>summary{cursor:pointer;color:var(--muted);max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;list-style:revert}
 .content>summary:hover{color:var(--accent)}
-.content-full{white-space:pre-wrap;max-width:360px;color:#d4e1f6;font-size:12.5px;line-height:1.55;padding-top:5px}
+.content-full{white-space:pre-wrap;max-width:360px;color:var(--muted);font-size:12.5px;line-height:1.55;padding-top:5px}
 .tbl th{color:var(--muted);font-weight:600;position:sticky;top:0}
-.tbl tr:hover td{background:#0f1a30}
+.tbl tr:hover td{background:#f4f6f4}
 .muted{color:var(--muted)}
 .pending-panel{background:var(--panel2);border:1px dashed var(--line);border-radius:10px;padding:11px 13px;margin:8px 0 14px;font-size:12.5px}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:4px 10px;font-size:12px;color:#dbe6f7}
+.chip{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:4px 10px;font-size:12px;color:var(--muted)}
 .pillars{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 14px}
-.pillar{flex:1 1 180px;text-align:center;background:linear-gradient(180deg,#16233d,#101a2e);border:1px solid var(--line);
-border-radius:10px;padding:11px;font-size:12.5px;color:#d4e1f6;font-weight:600}
+.pillar{flex:1 1 180px;text-align:center;background:linear-gradient(180deg,#ffffff,#f4f6f4);border:1px solid var(--line);
+border-radius:10px;padding:11px;font-size:12.5px;color:#33423a;font-weight:600}
 footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid var(--line);max-width:1180px;margin:0 auto}
 
 /* ===== Gate (login / no-access / loading) — shown until authorized ===== */
 #dash-root{display:none}
 #gate{min-height:80vh;display:flex;align-items:center;justify-content:center;padding:40px 20px}
-.gate-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:34px 30px;max-width:440px;width:100%;text-align:center}
+.gate-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:34px 30px;max-width:440px;width:100%;text-align:center;box-shadow:var(--shadow-sm)}
 .gate-card h2{margin:0 0 8px;font-size:19px}
 .gate-card p{color:var(--muted);font-size:13px;margin:0 0 18px;line-height:1.6}
 .gate-btn{background:var(--accent);color:#fff;border:none;padding:11px 22px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
@@ -95,8 +99,8 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
 .gate-btn.secondary{background:transparent;border:1px solid var(--line);color:var(--ink)}
 .gate-loading{color:var(--muted);font-size:14px;padding:8px}
 
-/* ===== Auth modal (email OTP) — dark themed ===== */
-.auth-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;align-items:center;justify-content:center}
+/* ===== Auth modal (email OTP) — matches the site's light theme ===== */
+.auth-overlay{display:none;position:fixed;inset:0;background:rgba(16,33,28,.45);z-index:2000;align-items:center;justify-content:center}
 .auth-modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;width:100%;max-width:380px;margin:16px;position:relative}
 .auth-modal h2{margin:0 0 4px;font-size:19px}
 .auth-sub{color:var(--muted);font-size:13px;margin-bottom:16px}
@@ -170,7 +174,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
   window.hsClient = client; window.hsUser = null; window.hsToken = null;
   var step = 'email', pendingEmail = '';
   function $(id){ return document.getElementById(id); }
-  function showMsg(t,e){ var m=$('auth-msg'); m.textContent=t||''; m.style.color=e?'#ff6b6b':'var(--accent)'; }
+  function showMsg(t,e){ var m=$('auth-msg'); m.textContent=t||''; m.style.color=e?'#c23b34':'var(--accent)'; }
   function setStep(s){
     step = s;
     if (s==='code'){
@@ -276,12 +280,12 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
       function X(i){ return p+(W-2*p)*(i/(n-1)); }
       function Y(v){ return H-p-(H-2*p)*(v/mx); }
       x.beginPath(); x.moveTo(X(0),Y(0)); for(i=0;i<n;i++) x.lineTo(X(i),Y(S[i][4])); x.lineTo(X(n-1),Y(0)); x.closePath();
-      x.fillStyle="rgba(79,156,255,0.13)"; x.fill();
+      x.fillStyle="rgba(21,122,73,0.12)"; x.fill();
       x.beginPath(); for(i=0;i<n;i++){ if(i) x.lineTo(X(i),Y(S[i][4])); else x.moveTo(X(i),Y(S[i][4])); }
-      x.strokeStyle="#4f9cff"; x.lineWidth=2; x.stroke();
-      x.strokeStyle="rgba(200,215,240,0.35)"; x.lineWidth=1; x.beginPath(); x.moveTo(X(sel),p-8); x.lineTo(X(sel),H-p+8); x.stroke();
-      x.beginPath(); x.arc(X(sel),Y(S[sel][4]),4.5,0,7); x.fillStyle="#4f9cff"; x.fill(); x.strokeStyle="#fff"; x.lineWidth=1.5; x.stroke();
-      x.fillStyle="#8ea3c2"; x.font="11px sans-serif"; x.fillText(S[0][0].slice(5),X(0)-6,H-9); x.fillText(S[n-1][0].slice(5),X(n-1)-16,H-9);
+      x.strokeStyle="#157a49"; x.lineWidth=2; x.stroke();
+      x.strokeStyle="rgba(22,33,28,0.28)"; x.lineWidth=1; x.beginPath(); x.moveTo(X(sel),p-8); x.lineTo(X(sel),H-p+8); x.stroke();
+      x.beginPath(); x.arc(X(sel),Y(S[sel][4]),4.5,0,7); x.fillStyle="#157a49"; x.fill(); x.strokeStyle="#fff"; x.lineWidth=1.5; x.stroke();
+      x.fillStyle="#83918a"; x.font="11px sans-serif"; x.fillText(S[0][0].slice(5),X(0)-6,H-9); x.fillText(S[n-1][0].slice(5),X(n-1)-16,H-9);
     }
     var sl=$("dayslider"); if(!sl) return;
     sl.max=S.length-1; sl.value=S.length-1;
@@ -441,7 +445,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
   //      Acquisition Metrics tab: KPIs, the 30-day funnel, topic demand, and paid
   //      conversion — all current, above the static snapshot below. ----
   function barCell(pct){
-    return '<div style="background:rgba(79,156,255,.18);border-radius:4px;height:8px;min-width:60px">'+
+    return '<div style="background:rgba(21,122,73,.14);border-radius:4px;height:8px;min-width:60px">'+
       '<div style="background:var(--accent);height:8px;border-radius:4px;width:'+Math.max(pct,0.5)+'%"></div></div>';
   }
   function acqMetricsCard(d){
@@ -531,9 +535,9 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
       '<div class="muted" style="font-size:12px;margin-bottom:10px">'+esc(tags)+' &nbsp;·&nbsp; '+
         (p.source_url?('<a href="'+esc(p.source_url)+'" target="_blank" rel="noopener" style="color:var(--accent)">verify source ↗</a> (approval = fact-check)'):'<span style="color:var(--persist)">NO source_url — not postable</span>')+'</div>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-        (p.status!=='approved'?'<button class="bsky-btn" data-act="approve" style="background:var(--real);color:#04240f">Approve</button>':'')+
-        '<button class="bsky-btn" data-act="edit" style="background:#2a3550;color:#dce6f7">Edit</button>'+
-        '<button class="bsky-btn" data-act="skip" style="background:#3a2530;color:#f2c0cf">Skip</button>'+
+        (p.status!=='approved'?'<button class="bsky-btn" data-act="approve" style="background:var(--accent);color:#fff">Approve</button>':'')+
+        '<button class="bsky-btn" data-act="edit" style="background:#e4e8e4;color:#16211c">Edit</button>'+
+        '<button class="bsky-btn" data-act="skip" style="background:#fbeceb;color:#c23b34">Skip</button>'+
       '</div></div>';
   }
   async function refreshBluesky(){
@@ -601,7 +605,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
     var days=Math.floor((Date.now()-snap.getTime())/86400000);
     if(days<1 || document.getElementById('stale-banner')) return;
     var b=document.createElement('div'); b.id='stale-banner';
-    b.style.cssText='background:rgba(224,164,35,.12);border-bottom:1px solid var(--persist);color:#f0d089;padding:9px 16px;font-size:12.5px;text-align:center;line-height:1.5';
+    b.style.cssText='background:#fbf1e2;border-bottom:1px solid var(--persist);color:#8a5c10;padding:9px 16px;font-size:12.5px;text-align:center;line-height:1.5';
     b.innerHTML='⚠ The tabbed snapshot is '+days+' day'+(days===1?'':'s')+' old (as of '+esc(String(meta.snapshot).slice(0,10))+'). '+
       'The <b>Acquisition &amp; retention</b>, <b>Coverage demand</b>, <b>Bluesky followers</b> and <b>Feed inventory</b> panels are live; the rest updates when the snapshot is regenerated.';
     var root=$('dash-root'); root.insertBefore(b, root.firstChild);
@@ -672,9 +676,9 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
     function Y(v){ return H-pad-(H-2*pad)*((v-mn)/rng); }
     var pts=daily.map(function(r,i){ return [X(i),Y(r.followers)]; });
     var line=pts.map(function(p,i){ return (i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1); }).join(' ');
-    var dots=pts.map(function(p,i){ return '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.6" fill="#2fbf71"><title>'+esc(fmtDay(daily[i].day))+': '+daily[i].followers+'</title></circle>'; }).join('');
+    var dots=pts.map(function(p,i){ return '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.6" fill="#157a49"><title>'+esc(fmtDay(daily[i].day))+': '+daily[i].followers+'</title></circle>'; }).join('');
     return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:300px;display:block" role="img" aria-label="Follower trend">'+
-      '<path d="'+line+'" fill="none" stroke="#2fbf71" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+dots+'</svg>';
+      '<path d="'+line+'" fill="none" stroke="#157a49" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+dots+'</svg>';
   }
   function followerCard(d){
     var daily=d.daily||[];
