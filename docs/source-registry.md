@@ -1531,3 +1531,19 @@ gate proof (Allegheny + Utah ZIPs → 0 fetches) and the SQL-error quarantine.
   against their real portals where findable; none exposes a first-party per-record
   permit API. Logged for the nightly reprobe list, non-blocking — their ZIPs ship on
   the EPA facilities floor.
+
+### PA go-live results (2026-07-16, DB-verified)
+- **560/560 modeled PA ZIPs cached** (incl. the Philadelphia County expansion —
+  migration `philadelphia_county_zip_expansion`: county root + 46 zip pages; PA
+  514→560, 0 dup slugs, 0 orphans). Centroids zipcodes v3.0.0, 0 quarantined.
+- **551 pass + 9 coverage_coming honest empties; 0 unsourced, 0 count mismatches,
+  0 point sites missing coords.**
+- **72 of 560 ZIPs dev-backed (13%), 15,246 dev records**: philadelphia-li-permits
+  10,490 records / 45 ZIPs; pittsburgh-pli-permits 4,756 records / 27 ZIPs.
+- **Bidirectional coverage-gate receipt**: philadelphia-li-permits appears ONLY on
+  Philadelphia County pages; pittsburgh-pli-permits ONLY on Allegheny County pages.
+- Smoke receipts: 19143 → 430 sites (fac 30 + dev 400; carto emitted 400/405, 0
+  unmapped, 0 blank; Expired 3 / Cancelled 2 excluded); 15213 → 283 sites (fac 40 +
+  dev 243; ckan emitted 243/246; Revoked 3 excluded).
+- **522 pages auto-indexable** under the substance gate (no manual flip);
+  nationwide indexable after PA: 4,929.

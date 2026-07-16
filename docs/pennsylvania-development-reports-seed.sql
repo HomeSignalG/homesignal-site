@@ -606,22 +606,37 @@ on conflict (zip) do update set lat = excluded.lat, lng = excluded.lng;
 -- update public._pa_zips z set request_id = f.request_id, status = 'fired'
 -- from fired f where z.zip = f.zip;
 
--- 3. Collect (transient-safe: never overwrite content with an empty response):
--- insert into public.development_reports (zip, lat, lng, sites, counts, refreshed_at)
--- select z.zip, z.lat, z.lng,
---        (r.content::jsonb)->'sites', (r.content::jsonb)->'counts', now()
--- from public._pa_zips z
--- join net._http_response r on r.id = z.request_id
--- where z.status = 'fired' and r.status_code = 200
---   and (r.content::jsonb) ? 'sites'
--- on conflict (zip) do update set
---   sites = excluded.sites, counts = excluded.counts,
---   lat = excluded.lat, lng = excluded.lng, refreshed_at = excluded.refreshed_at
--- where jsonb_array_length(excluded.sites) > 0
---    or jsonb_array_length(public.development_reports.sites) = 0;
+-- 3. COLLECT after each wave (transient-safe upsert; proven MD/AZ/CA statement):
+-- insert into public.development_reports (zip, home_lat, home_lng, counts, sites, paywall, source_vintage, refreshed_at)
+-- select (j->>'zip'), (j->'home'->>'lat')::float8, (j->'home'->>'lng')::float8, j->'counts', j->'sites',
+--        coalesce((j->>'paywall')::bool,false),
+--        'zipcodes PyPI v3.0.0 centroid; get-address-report ZIP mode; Pennsylvania batch 2026-07-16',
+--        now()
+-- from (
+--   select distinct on ((content::jsonb->>'zip')) content::jsonb j
+--   from net._http_response resp
+--   where resp.status_code = 200 and left(ltrim(resp.content),1)='{'
+--     and (content::jsonb->>'zip') in (select zip from public._pa_zips)
+--     and resp.created > now() - interval '30 minutes'
+--   order by (content::jsonb->>'zip'), resp.created desc
+-- ) r
+-- on conflict (zip) do update set home_lat=excluded.home_lat, home_lng=excluded.home_lng,
+--   counts=excluded.counts, sites=excluded.sites, paywall=excluded.paywall,
+--   source_vintage=excluded.source_vintage, refreshed_at=excluded.refreshed_at
+-- where jsonb_array_length(excluded.sites) > 0 or jsonb_array_length(public.development_reports.sites) = 0;
 
--- 4. Mark collected + re-fire stragglers (repeat 2-3 for status='pending').
+-- 4. Mark collected + count stragglers; RE-FIRE any ZIP with no cached row
+-- (180s timeout) and re-collect until every staged ZIP has a row:
 -- update public._pa_zips z set status = 'done'
 -- from public.development_reports d where d.zip = z.zip and z.status = 'fired';
--- update public._pa_zips set status = 'pending', request_id = null
--- where status = 'fired';
+-- select count(net.http_post(
+--   'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/get-address-report',
+--   jsonb_build_object('zip', z.zip, 'lat', z.lat, 'lng', z.lng),
+--   '{}'::jsonb, '{"Content-Type":"application/json"}'::jsonb, 180000)) as refired
+-- from public._pa_zips z
+-- where not exists (select 1 from public.development_reports dr where dr.zip = z.zip);
+
+-- 5. MATERIALIZE + verify:
+-- select public.app_refresh_all();
+-- select (select count(*) from public.development_reports dr join public._pa_zips z on z.zip=dr.zip) as pa_cached,
+--        (select count(*) from public.app_community_meta m join public._pa_zips z on z.zip=m.zip where m.indexable) as pa_indexable;
