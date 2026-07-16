@@ -78,16 +78,20 @@ HS.onReady(async function () {
     + HS.tpl.statTile('<span style="font-size:19px">' + HS.esc(c.growth_pressure) + '</span>', 'Growth pressure · trending up', '')
     + HS.tpl.statTile(c.community_score, 'Community score', 'g');
 
-  // map preview — real satellite tiles when available, schematic otherwise
+  // map preview — HS.buildLive is the guarded backbone chain (GL -> Leaflet raster
+  // -> schematic; never throws into this init). NEVER-FAKED rule: the home dot and
+  // home-anchored center exist ONLY for a real resident home in this ZIP — otherwise
+  // the ZIP centroid (app_community_meta.lat/lng) anchors, else the first record.
+  // No hardcoded fallback coordinates.
   var items = changes.filter(function(x){return !x.quiet;}).concat(projects)
     .filter(function(x){return x.lat && x.lng;}).slice(0, 6);
   var dashMap = document.getElementById('dashMap');
-  var center = home || items[0] || (c && c.lat ? {lat:c.lat,lng:c.lng} : {lat:30.17,lng:-97.61});
-  if (window.maplibregl) {
-    HS.buildGL(dashMap, { center: center, items: items, mode: 'satellite', interactive: false, zoom: 12.4, radiusMi: 1.5 });
-  } else {
-    HS.MapProvider.render(dashMap, { home: center, items: items, radiusMi: 1.5, w: 640, h: 300 });
-  }
+  var hasRealHome = !!(home && !home.sample && home.zip === S.zip);
+  var center = (hasRealHome ? {lat:home.lat,lng:home.lng} : null)
+    || (c && c.lat != null && c.lng != null ? {lat:c.lat,lng:c.lng} : null)
+    || (items[0] ? {lat:items[0].lat,lng:items[0].lng} : null);
+  HS.buildLive(dashMap, { center: center, items: items, home: hasRealHome ? home : null,
+    interactive: false, zoom: 12.4, radiusMi: 1.5, w: 640, h: 300 });
 
   // recent — ranked by impact
   var recent = changes.filter(function(x){return !x.quiet;})
@@ -98,7 +102,7 @@ HS.onReady(async function () {
   document.getElementById('dashProps').innerHTML = S.properties.map(function(p){
     return '<div class="swrow" onclick="HS.selectProperty(\'' + p.id + '\');location.href=\'property.html?id=' + p.id + '\'">'
       + '<div class="miniscore">' + (p.score||'') + '</div>'
-      + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + ' <span style="font-size:10px;color:var(--green);font-weight:700">· ' + HS.esc((p.tag||p.label).toUpperCase()) + '</span></div>'
+      + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + ' <span style="font-size:10px;color:var(--green);font-weight:700">· ' + HS.esc(String(p.tag || p.label || 'home').toUpperCase()) + '</span></div>'
       + '<div class="pa">' + HS.esc(p.city) + '</div></div></div>';
   }).join('');
 

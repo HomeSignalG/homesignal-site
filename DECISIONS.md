@@ -128,3 +128,40 @@ fail-loud (an RPC error shows in the modal; "Alerts saved" only after the write 
   `docs/referral-attribution-migration.sql` (now carries the FULL signup_complete
   definition — pulled live via pg_get_functiondef, no longer live-only). The client
   retries without referral args on PGRST202 so deploy order doesn't matter.
+
+## 2026-07-16 — Maps backbone: pins are colored by PERMIT STATUS, never "impact" (founder-directed audit fix)
+
+Audit receipts: the stored `impact_score` decoded to a status->constant table
+(facility 30 / Approved 55 / Proposed 72 / Operating 45 — counts matched statuses
+1:1), the red "High impact" legend tier was unreachable (max 72 < the 75
+threshold), the green "Positive" tier required fields that never render, and all
+5,030 `app_changes` rows have no coordinates so the "alerts" the header promised
+never plotted. Decisions, applied across ALL map surfaces (maps.html +
+dashboard.html via the ONE backbone in lib/map.js):
+
+- **Legend = permit status** (Proposed / Approved / Operating-built; unknown =
+  neutral "On file" gray — never a guessed severity). `HS.mapStatus` is the one
+  color authority; the impact tiers are deleted. `impact_score` is still written
+  by the materializer but nothing on the map interprets it as impact.
+- **Area-wide notices are LISTED, never plotted** — they have no honest point;
+  inventing one would fabricate a location. Own labeled section ("whole area,
+  not one address") under the pin list + counted in the chip.
+- **The chip never claims distances it doesn't have**: with a real home in the
+  ZIP it counts within-radius across ALL mapped records; without one it says
+  "N items mapped" (the old chip showed "0 items within X mi" under a full map).
+- **Caps are disclosed** ("latest 16 of N shown") and projects order by RECENCY
+  (score-ordering re-starved Approved under the cap — the same bug the
+  materializer fixed once on its side).
+- **Viewport anchors: real home > ZIP centroid > first record — never hardcoded
+  coordinates.** `app_community_meta.lat/lng` added (stamped from the engine's
+  USPS-pinned centroid; backfilled 5,462/5,462). The Del Valle literal is gone.
+- **Dashboard preview obeys the never-faked rule** (home dot only for a real
+  home; the old buildGL always fabricated one) and runs the same guarded
+  GL -> Leaflet -> schematic chain (`HS.buildLive`), so a WebGL-off browser gets
+  a real map and a map failure can no longer kill the page init.
+- **Date sanity in the materializer**: an area-notice file_date outside
+  [2000-01-01, today+2y] falls back to current_date (the cache carried a 1986
+  date); existing out-of-window rows purged. Migration of record:
+  `docs/app-maps-backbone-migration.sql` (applied live as
+  `app_maps_backbone_centroids_and_date_sanity`; function body pulled verbatim
+  via pg_get_functiondef, additive edits only).

@@ -24,7 +24,7 @@
     <div class="ph">
       <div class="eyebrow">Maps</div>
       <h1>What's changing around you</h1>
-      <p>Every project and alert near your home, placed on the map and colored by the part of life it touches — not by project type.</p>
+      <p>Every project near your home, placed on the map and colored by its permit status. Area-wide notices — which apply to the whole area, not one address — are listed beside the map.</p>
     </div>
     <div class="toolbar">
       <div class="seg" id="mapMode">
@@ -33,7 +33,7 @@
         <button data-mode="street">Street</button>
       </div>
       <div class="sp"></div>
-      <button class="fpill" id="radiusPill">◉ Impact radius: 1.5 mi ▾</button>
+      <button class="fpill" id="radiusPill">◉ Radius: 1.5 mi ▾</button>
       <button class="fpill">All dimensions ▾</button>
     </div>
     <div class="mapcols">
@@ -42,17 +42,19 @@
         <div id="mapgl" style="display:none"></div>
         <div id="maplf" style="display:none"></div>
         <div class="mpanel">
-          <div class="mt">Pins colored by impact</div>
-          <div class="legrow"><span class="ld" style="background:var(--red)"></span> High impact on you</div>
-          <div class="legrow"><span class="ld" style="background:var(--amber)"></span> Moderate impact</div>
-          <div class="legrow"><span class="ld" style="background:var(--blue)"></span> Watch / minor</div>
-          <div class="legrow"><span class="ld" style="background:var(--green-2)"></span> Positive / distant</div>
+          <!-- HONEST LEGEND (2026-07-16 audit): colors encode PERMIT STATUS — the only
+               per-record fact the data carries. The old "impact" tiers were a
+               status->constant lookup; the red "High impact" row could never appear. -->
+          <div class="mt">Pins colored by permit status</div>
+          <div class="legrow"><span class="ld" style="background:#c47a1a"></span> Proposed</div>
+          <div class="legrow"><span class="ld" style="background:#3f7fb0"></span> Approved</div>
+          <div class="legrow"><span class="ld" style="background:#1f9d5c"></span> Operating / built</div>
           <div class="legrow" id="legFacility" style="display:none"><span class="ld" style="background:#6f42c1;border-radius:2px"></span> Regulated facility</div>
           <div class="layers">
             <div class="mt">Layers</div>
             <div class="lyr" id="lyrProjects"><span>Projects</span><span class="tg"></span></div>
             <div class="lyr" id="lyrFacilities" style="display:none"><span>Regulated facilities</span><span class="tg"></span></div>
-            <div class="lyr" id="lyrRadius"><span>Impact radius</span><span class="tg"></span></div>
+            <div class="lyr" id="lyrRadius"><span>Radius ring</span><span class="tg"></span></div>
             <div class="lyr off" title="Available when flood data is ingested for this community"><span>Flood zones</span><span class="tg"></span></div>
             <div class="lyr off" title="Available when school data is ingested for this community"><span>Schools</span><span class="tg"></span></div>
           </div>
@@ -81,9 +83,9 @@ HS.onReady(async function () {
   var facilities = await HS.data.facilities(S.zip, home);   // EPA/ECHO regulated facilities — own layer, env context
 
   var LET = 'ABCDEFGHIJKLMNOP';
-  var FACILITY_HEX = '#6f42c1';   // regulated facilities — distinct from the impact-tier pin colors
+  var FACILITY_HEX = '#6f42c1';   // regulated facilities — distinct from the status pin colors
   var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact' };
-  // Development/alert pins (impact-tiered). Facilities are deliberately NOT concatenated here —
+  // Development pins (colored by permit STATUS — HS.mapStatus). Facilities are deliberately NOT concatenated here —
   // they render in their own labeled layer (facs) so they read as environmental context, never development.
   var all = changes.filter(function(x){return !x.quiet;}).concat(projects)
     .filter(function(x){return x.lat && x.lng;})
@@ -99,14 +101,23 @@ HS.onReady(async function () {
     var a = opts.showProjects ? all : all.filter(function(x){return !x.type;});
     return a.slice(0, 16).map(function(it,i){ return Object.assign({}, it, {_letter: LET[i]}); });
   }
-  var center = home || all[0] || { lat: c && c.lat || 30.17, lng: c && c.lng || -97.61 };
   // NEVER-FAKED rule: only a real signed-in resident home (in THIS ZIP, not the
-  // Del Valle sample) may be pinned as "Your home". For everyone else the centroid
-  // only centers/zooms the viewport — we pin nothing and show a set-your-home nudge
-  // (matches the development tracker's "no home pin until the resident searches").
+  // Del Valle sample) may be pinned as "Your home" or used as the viewport anchor.
+  // For everyone else the ZIP centroid (app_community_meta.lat/lng, pinned to the
+  // USPS dataset) centers the viewport; first mapped record is the last resort.
+  // No hardcoded fallback coordinates — a wrong-state anchor is worse than none.
   var hasRealHome = !!(home && !home.sample && home.zip === S.zip);
+  var cCentroid = (c && c.lat != null && c.lng != null) ? { lat: c.lat, lng: c.lng } : null;
+  var center = (hasRealHome ? home : null) || cCentroid || all[0] || facs[0] || null;
 
-  function tierHex(it){ var k = HS.mapTier(it).k; return {high:'#c23b34',moderate:'#c47a1a',watch:'#3f7fb0',positive:'#1f9d5c'}[k] || '#3f7fb0'; }
+  // Area-wide notices: REAL records with no parcel point (jurisdiction-level
+  // planning/civic items). They have no honest map position, so they are LISTED,
+  // never plotted — inventing a point would fabricate a location.
+  var area = changes.filter(function(x){ return !x.quiet && !(x.lat && x.lng); })
+    .sort(function(a,b){ return String(b.occurred_at||'').localeCompare(String(a.occurred_at||'')); })
+    .slice(0, 8);
+
+  function tierHex(it){ return HS.mapStatus(it).hex; }
 
   var panelHTML = document.querySelector('.mpanel').outerHTML;
   var gpsEl = document.getElementById('mapGps');
@@ -121,27 +132,59 @@ HS.onReady(async function () {
     return null;
   }
   function renderPins(items) {
-    document.getElementById('pinList').innerHTML =
+    var html =
       '<div class="groupHead" style="margin-top:0">Near you · closest first</div>'
       + items.map(function (it, i) {
-        var col = tierHex(it), to = pinHref(it);
+        var col = tierHex(it), to = pinHref(it), st = it.status ? HS.esc(it.status) : '';
         return '<div class="card mini' + (to ? ' clickable" data-pin="' + i : '') + '" style="border-left-color:' + col + '">'
           + '<span class="lens"><span class="letter" style="background:' + col + '">' + it._letter + '</span>&nbsp; '
-          + HS.esc(it.type || it.category || '') + ' · ' + HS.esc(it.dist||'') + '</span>'
+          + HS.esc(it.type || it.category || '') + (st ? ' · ' + st : '') + (it.dist ? ' · ' + HS.esc(it.dist) : '') + '</span>'
           + '<h3>' + HS.esc(it.name || it.title) + '</h3>'
           + '<p class="sowhat">' + HS.esc(it.sowhat || it.plain_language || '') + '</p></div>';
       }).join('');
+    // Area-wide notices ride BELOW the lettered pins: real records, no map letter,
+    // clearly labeled as applying to the whole area (never plotted at a fake point).
+    if (area.length) {
+      html += '<div class="groupHead">Area-wide notices · whole area, not one address</div>'
+        + area.map(function (it, i) {
+          return '<div class="card mini' + (it.source_ref ? ' clickable" data-area="' + i : '') + '" style="border-left-color:#6b7f76">'
+            + '<span class="lens">' + HS.esc(it.category || 'Notice')
+            + (it.occurred_at ? ' · ' + HS.esc(String(it.occurred_at).slice(0, 10)) : '') + '</span>'
+            + '<h3>' + HS.esc(it.title || '') + '</h3>'
+            + '<p class="sowhat">' + HS.esc(it.plain_language || '') + '</p></div>';
+        }).join('');
+    }
+    document.getElementById('pinList').innerHTML = html;
     document.querySelectorAll('#pinList [data-pin]').forEach(function (el) {
       el.addEventListener('click', function () {
         var to = pinHref(items[parseInt(el.getAttribute('data-pin'), 10)]); if (!to) return;
         if (to.ext) window.open(to.url, '_blank', 'noopener'); else location.href = to.url;
       });
     });
+    document.querySelectorAll('#pinList [data-area]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var it = area[parseInt(el.getAttribute('data-area'), 10)];
+        if (it && it.source_ref) window.open(it.source_ref, '_blank', 'noopener');
+      });
+    });
   }
   function setGps(items){
-    var within = items.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;
     var place = c ? ((HS.isSample && HS.isSample()) ? c.name + ' — (Sample Zip Code)' : c.name + ', ' + c.state) : 'Your area';
-    gpsEl.textContent = place + ' · ' + within + ' items within ' + opts.radiusMi + ' mi';
+    var total = opts.showProjects ? all.length : all.filter(function(x){return !x.type;}).length;
+    var txt;
+    if (hasRealHome) {
+      // Distances exist only from a real home in this ZIP — count against ALL
+      // mapped records, not just the 16 shown (the old chip undercounted).
+      var pool = opts.showProjects ? all : all.filter(function(x){return !x.type;});
+      var within = pool.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;
+      txt = within + ' within ' + opts.radiusMi + ' mi';
+    } else {
+      // No home -> no distances (by design, never fabricated). Say what IS shown.
+      txt = items.length + (total > items.length ? ' of ' + total : '') + ' items mapped';
+    }
+    if (hasRealHome && total > items.length) txt += ' · latest ' + items.length + ' of ' + total + ' shown';
+    if (area.length) txt += ' · ' + area.length + ' area-wide listed';
+    gpsEl.textContent = place + ' · ' + txt;
     updateHomePrompt();
   }
   // Set-your-AREA nudge — shown ONLY when there's no real resident home to pin.
@@ -365,19 +408,7 @@ HS.onReady(async function () {
   // diagram stays the FINAL fallback when tiles truly can't load (offline, 429s).
   var lfMap=null, lfSat=null, lfOsm=null, lfBase=null, lfRadius=null, lfMarkers=[],
       lfFailed=false, lfTilesOK=0, lfTileErrs=0, lfWatchdogArmed=false;
-  function loadLeaflet(cb){
-    if (window.L && window.L.map) return cb(true);
-    if (loadLeaflet._q) { loadLeaflet._q.push(cb); return; }
-    var q = loadLeaflet._q = [cb];
-    var css=document.createElement('link'); css.rel='stylesheet';
-    css.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(css);
-    var s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
-    s.onload=function(){ var ok=!!(window.L&&window.L.map); loadLeaflet._q=null; q.forEach(function(f){f(ok);}); };
-    s.onerror=function(){ loadLeaflet._q=null; q.forEach(function(f){f(false);}); };
-    document.head.appendChild(s);
-  }
+  var loadLeaflet = HS.loadLeaflet;   // shared backbone loader (lib/map.js)
   function lfDivIcon(html,size){ return L.divIcon({html:html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2]}); }
   function clearLfMarkers(){ lfMarkers.forEach(function(m){ try{ lfMap.removeLayer(m); }catch(e){} }); lfMarkers=[]; }
   function addLfMarkers(items){
@@ -446,6 +477,7 @@ HS.onReady(async function () {
   // healthy WebGL -> MapLibre; WebGL failed or lib absent -> Leaflet rasters;
   // both failed -> the impact diagram (final, always available).
   function drawTiles(){
+    if (!center) { setActiveMode('impact'); showSchematic(); return; }   // nothing to anchor a live map on
     if (!glFailed && window.maplibregl) { drawGL(); return; }
     if (lfFailed) { schematicFinal(); return; }
     loadLeaflet(function(ok){
@@ -523,7 +555,7 @@ HS.onReady(async function () {
   var radii = [0.5,1,1.5,2,3,5], ri = 2;
   document.getElementById('radiusPill').onclick = function () {
     ri = (ri + 1) % radii.length; opts.radiusMi = radii[ri];
-    this.textContent = '◉ Impact radius: ' + opts.radiusMi + ' mi ▾';
+    this.textContent = '◉ Radius: ' + opts.radiusMi + ' mi ▾';
     if (opts.mode === 'impact') showSchematic(); else drawTiles();
   };
 });
