@@ -161,3 +161,13 @@ commit;
 -- category consent is true or the box is checked now, so consent never silently
 -- downgrades. A server-side coalesce-preserve is a possible future hardening —
 -- deliberately NOT changed here to keep this migration additive-only.
+
+-- ---------------------------------------------------------------------------
+-- 4. FOLLOW-UP RESOLVED (2026-07-16): what does the dashboard's users_total count?
+--    Pulled from the LIVE hs_acquisition_live + hs_acquisition_metrics bodies:
+--      'users_total', (select count(*) from public.users)
+--    i.e. RAW ROW COUNT — no distinct-email, no unsubscribed filter. One row per
+--    (email, community_id) pair (signup_complete's upsert key), so one email
+--    following N communities = N rows. Baseline at migration time: 7 rows /
+--    3 distinct emails. A fresh-email single-community signup = exactly +1 (7->8).
+--    users_active additionally filters coalesce(unsubscribed,false)=false.
