@@ -2,12 +2,21 @@
 -- MARYLAND development_reports seed — REPRODUCIBLE pg_net REFRESH SCRIPT
 -- (pattern: docs/michigan-development-reports-seed.sql; run in the Supabase SQL editor)
 --
--- Prepared 2026-07-16 (during the Supabase outage; batch runs when the DB returns):
--- all 263 modeled MD ZIPs (Baltimore County/Montgomery/Anne Arundel/Frederick/Charles/Howard/Harford/Baltimore city/Calvert).
--- Centroids pinned to zipcodes PyPI v3.0.0 (offline USPS dataset); 0 quarantined;
--- all bbox-validated. First-party permit sources are wired in the MD wire pass
--- (docs/source-registry.md "MARYLAND WIRE PASS") before this batch fires — this header
--- is finalized with the wired-source list in the go-live PR.
+-- Prepared 2026-07-16 (during the Supabase outage); EXECUTED 2026-07-16 after the DB
+-- returned: ALL 315 modeled MD ZIPs cached, 315/315 (the outage-night seed's 263 across
+-- 9 counties + the 52-ZIP APPENDIX below — Prince George's and Queen Anne's were missing;
+-- see the appendix standing answer). Centroids pinned to zipcodes PyPI v3.0.0; 0 quarantined.
+-- WIRED SOURCES (docs/source-registry.md "MARYLAND WIRE PASS"):
+--   • montgomery-county-residential/-commercial/-demolition-permits — Socrata, native zip,
+--     FIRST consumer of the additive dot-path readCol (location.latitude/longitude);
+--     recency on addeddate so Open applications stay visible
+--   • baltimore-county-permits — county ArcGIS Server (bcgisdata), native ZIP +
+--     per-record LATITUDE/LONGITUDE, 11-class verbatim type whitelist
+--   Not wired: baltimore-city (DECISION NEEDED — no type column to drop minor-repair
+--   noise; founder call, logged); Howard (stalled, nightly reprobe list).
+-- RESULT (DB-verified 2026-07-16): 315 cached · 283 pass · 32 coverage_coming honest
+-- empties · 239 auto-indexable · 44 dev-backed ZIPs (14%) · 6,755 dev records ·
+-- 0 unsourced · 0 point sites missing coords.
 -- INDEX POLICY: substance gate stamps indexable automatically; throttled sitemap
 -- (250 newcomers/day) rolls new pages in — no manual flip.
 -- ============================================================================

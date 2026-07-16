@@ -911,6 +911,25 @@ legal/framing change not covered by the one-time sign-off.
   per-record dataset — the CKAN hit is a 1 KB HUD aggregate). Receipts:
   docs/source-registry.md "ARIZONA WIRE PASS". Reproducible seed:
   docs/arizona-development-reports-seed.sql.
+- 🟢 **MARYLAND IS LIVE UNDER THE SUBSTANCE GATE — 315/315 modeled MD ZIPs cached, 4
+  first-party permit sources, 239 pages auto-indexable (no manual flip)** (DB-verified
+  2026-07-16). Twelfth development state, state 4 of the four-state run — the CA/AZ/MD
+  trio is CLOSED. **283 pass + 32 coverage_coming honest empties; 0 unsourced, 0 point
+  sites missing coords. 44 of 315 ZIPs dev-backed (14%), 6,755 dev records.** Sources:
+  the **Montgomery County trio** (Socrata res m88u-pqki / com i26v-w6bd / demo b6ht-fw3x,
+  fresh 07-15; FIRST consumer of the additive socrata **dot-path readCol** for the nested
+  `location.latitude/longitude` columns; recency rides `addeddate` so Open applications
+  stay visible pre-issuance) + **baltimore-county-permits** (the county's own ArcGIS
+  Server, native ZIP + per-record lat/lng columns, ISSDATE fresh 07-15, 11-class verbatim
+  whitelist). **Baltimore city stays un-wired — the recon's DECISION NEEDED stands** (an
+  issuance ledger with no status and no work-type column: minor-repair noise like "Repair
+  one damaged rafter" cannot be dropped at source; founder call, logged, non-blocking).
+  **Standing answer (found at go-live): a state seed's ZIP list must be generated FROM
+  the live communities rows (level='zip' by state), never from the recon-pass county
+  list** — the outage-night MD seed missed Prince George's (36) + Queen Anne's (16); the
+  52-ZIP gap was filled from the same pinned zipcodes v3.0.0 source (seed appendix).
+  Receipts: docs/source-registry.md "MARYLAND WIRE PASS". Reproducible seed:
+  docs/maryland-development-reports-seed.sql.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
