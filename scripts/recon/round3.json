@@ -1,0 +1,14 @@
+[
+  { "id": "sj-abp-datastore", "url": "https://data.sanjoseca.gov/api/3/action/datastore_search?resource_id=fd9ceb0c-75e0-402e-9fe3-3f6e04f2c23f&limit=2" },
+  { "id": "sj-planning-datastore", "url": "https://data.sanjoseca.gov/api/3/action/datastore_search?resource_id=a890329b-b2a6-450e-aba4-58ae9c1967b8&limit=2" },
+  { "id": "mesa-status-vocab", "url": "https://data.mesaaz.gov/resource/dzpk-hxfb.json?$select=status,count(1)&$group=status&$limit=60" },
+  { "id": "mesa-workclass-vocab", "url": "https://data.mesaaz.gov/resource/dzpk-hxfb.json?$select=type_of_work,count(1)&$group=type_of_work&$limit=100" },
+  { "id": "montgomery-res-worktype", "url": "https://data.montgomerycountymd.gov/resource/m88u-pqki.json?$select=worktype,count(1)&$group=worktype&$limit=60" },
+  { "id": "montgomery-com-worktype", "url": "https://data.montgomerycountymd.gov/resource/i26v-w6bd.json?$select=worktype,count(1)&$group=worktype&$limit=60" },
+  { "id": "montgomery-dem-status", "url": "https://data.montgomerycountymd.gov/resource/b6ht-fw3x.json?$select=status,count(1)&$group=status&$limit=50" },
+  { "id": "montgomery-res-fresh", "url": "https://data.montgomerycountymd.gov/resource/m88u-pqki.json?$select=max(issueddate)" },
+  { "id": "montgomery-com-fresh", "url": "https://data.montgomerycountymd.gov/resource/i26v-w6bd.json?$select=max(issueddate)" },
+  { "id": "mesa-fresh", "url": "https://data.mesaaz.gov/resource/dzpk-hxfb.json?$select=max(issued_date)" },
+  { "id": "phoenix-pkg-bpd", "url": "https://www.phoenixopendata.com/api/3/action/package_show?id=phoenix-az-building-permit-data" },
+  { "id": "sd-permits-page", "url": "https://data.sandiego.gov/datasets/development-permits-set1/" }
+]
