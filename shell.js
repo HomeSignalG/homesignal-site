@@ -286,13 +286,22 @@
     if (q.length < 8 || q.indexOf(' ') < 0) { el.style.borderColor = '#c23b34'; el.focus(); return; }
     el.style.borderColor = '';
     $('homeMsg').textContent = 'Looking up the official address…';
-    let m = null;
+    // Via the geocode-address edge function — the Census API sends no CORS
+    // headers, so the browser can't call it directly (found live 2026-07-16:
+    // a perfectly valid address failed for every visitor). The function
+    // returns {match} or a 502 'geocoder_unavailable', so a service outage
+    // and a genuine no-match get DIFFERENT honest messages.
+    let m = null, unavailable = false;
     try {
-      const r = await fetch('https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=json&address=' + encodeURIComponent(q));
-      const j = await r.json();
-      m = (j && j.result && j.result.addressMatches && j.result.addressMatches[0]) || null;
-    } catch (e) { m = null; }
-    if (!m || !m.coordinates || !(m.addressComponents && m.addressComponents.zip)) {
+      const r = await HS.sb().functions.invoke('geocode-address', { body: { address: q } });
+      if (r.error) unavailable = true;
+      else m = (r.data && r.data.match) || null;
+    } catch (e) { unavailable = true; }
+    if (unavailable) {
+      $('homeMsg').textContent = "The address service couldn't be reached — please try again in a minute.";
+      return;
+    }
+    if (!m || m.lat == null || m.lng == null || !m.zip) {
       $('homeMsg').textContent = "We couldn't confirm that address against U.S. Census records — check the street, city and state, then try again.";
       return;
     }
@@ -304,12 +313,11 @@
   HS.saveHome = async function () {
     const m = _homeMatch; if (!m || !state.session) return;
     $('homeConfirmMsg').textContent = 'Saving…';
-    const ac = m.addressComponents || {};
     const row = {
       user_id: state.session.user.id,
       address: String(m.matchedAddress || '').split(',')[0],
-      city: ac.city || null, state: ac.state || null, zip: ac.zip,
-      lat: m.coordinates.y, lng: m.coordinates.x, label: 'home'
+      city: m.city || null, state: m.state || null, zip: m.zip,
+      lat: m.lat, lng: m.lng, label: 'home'
     };
     let r = null;
     try { r = await HS.sb().from('app_properties').insert(row).select().single(); } catch (e) { r = { error: e }; }
@@ -320,9 +328,9 @@
     LS.set('activeProp', r.data.id);
     // Focus the app on the home's area when it's covered (same follow the ZIP flow does).
     try {
-      if (await HS.data.isCovered(ac.zip)) {
-        let meta = null; try { meta = await HS.data.community(ac.zip); } catch (e) {}
-        HS.followCommunity({ zip: ac.zip, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
+      if (await HS.data.isCovered(m.zip)) {
+        let meta = null; try { meta = await HS.data.community(m.zip); } catch (e) {}
+        HS.followCommunity({ zip: m.zip, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
       }
     } catch (e) {}
     $('homeConfirm').classList.add('hidden');
