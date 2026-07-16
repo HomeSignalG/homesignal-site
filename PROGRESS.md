@@ -23,7 +23,10 @@ Staged under `app/` (live root pages byte-for-byte untouched until promotion). R
 
 ## Update — all 12 pages built & verified (seed mode)
 Built: today, dashboard, alerts, development(+detail), maps, properties, property(+detail),
-community(?zip=), reports, contact, privacy — plus lib/map.js (schematic MapProvider seam).
+community(?zip=), reports, contact, privacy — plus lib/map.js. Maps (2026-07-16): the REAL
+MapLibre tile map (Esri satellite / OSM street, keyless) is the DEFAULT for covered ZIPs, with
+the schematic SVG as the tile-failure/offline fallback; no "Your home" pin until a resident sets
+an address (nudge instead). See DECISIONS.md "Maps — real tiles…" for the full contract.
 Playwright pass: all 13 routes render with the shared shell, 0 JS errors, real Del Valle data,
 computed distances. Screenshots in /tmp/hs-shots match the mockup (alerts, maps, dev-detail
 eyeballed). Interactive: topic picker (consent default unchecked), property switcher, coverage

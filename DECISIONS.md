@@ -34,9 +34,9 @@
 - **Distances are always computed** from the active property's lat/lng (PostGIS), never stored;
   the mockup's printed distances are the computed value for the default home.
 - **Reports render on the fly** from existing data — no `reports` table.
-- **Map is a schematic SVG behind a swappable `MapProvider`**; Satellite/Street and Flood/Schools
-  layers are rendered-but-disabled with the "Available with live map provider" tooltip unless real
-  data exists for the community.
+- **Map: real MapLibre tiles are the default** (see the 2026-07-16 decision block below — this
+  supersedes the original "schematic SVG only" assumption). The schematic SVG is retained as the
+  graceful fallback. Flood/Schools layers stay rendered-but-disabled until that data is ingested.
 - **Del Valle 78617 is community #1 through the shared code path** — never special-cased; the
   mockup's Horseshoe Bay content is sample data and is replaced by sourced Del Valle content.
 - **No paid keys to run:** no paid map provider, no paid LLM; plain-language text is templated with
@@ -72,3 +72,34 @@ Comment/Read = open `source_ref`; sort segments + dev lenses + data-view = real 
 map layers Projects/Impact-radius toggle, Flood/Schools disabled w/ tooltip; Satellite/Street
 disabled w/ "Available with live map provider"; Compare = disabled "Coming soon"; Watchlist Edit =
 stubbed modal note (persists to `watchlist_items` when wired).
+
+## Maps — real tiles, default view, home pin, scale ceiling (2026-07-16)
+Decisions from the "Maps is PARTIAL / schematic" review. Files: `maps.html`, `lib/map.js`.
+
+- **#1 — the tile provider IS wired (label was stale).** MapLibre GL JS + **Esri World Imagery**
+  (satellite) + **OpenStreetMap** (street) raster tiles, keyless, already live in `maps.html`/
+  `lib/map.js::buildGL`. The old "schematic map, real tile provider not wired" note was inaccurate;
+  corrected here and in the file headers.
+- **#2 — default view is now the REAL map (Satellite) for covered ZIPs.** On load, a ZIP with real
+  points to plot (Del Valle 78617 / Utah pass ZIPs) opens on the Esri satellite map with
+  impact-tiered pins + a real geodesic radius. Satellite chosen over Street for aerial recognition
+  (matches the development tracker `homesignalmap.html`) — one-line change to prefer Street. The
+  impact **diagram** (schematic SVG) is retained as the fallback, not the default.
+- **#3 (DECIDED, unchanged behavior) — jurisdiction-wide notices are NEVER plotted as map points.**
+  A "Planning Commission Meeting" / "Public Hearing" has no trustworthy parcel coordinate (engine
+  v18: area items have no point). They render in the list / notices tiles, never as a
+  centroid-stacked pin. Anti-fabrication consistent; this is already how the data flows
+  (`app_changes`, no lat/lng → dropped by the map's `lat && lng` filter).
+- **#4 (SCALE CEILING — gated on Build C, NOT built) — free tiles aren't production-contracted.**
+  OSM's public tile server and Esri's public World Imagery are fine at low volume but carry ToS /
+  reliability risk at scale. A contracted provider (Mapbox / MapTiler / Esri paid) is deferred until
+  **Build C map-load analytics** can size the plan. Swap seam = `ensureGL` / `HS.buildGL` (one place).
+  **Guardrail shipped now (required companion to #2):** repeated tile/source errors (429 rate-limit,
+  tile host failure) or a stalled load (9s) **degrade gracefully to the impact diagram + a toast**,
+  so a traffic spike degrades to a usable state instead of a broken map.
+- **#5 (DECIDED + BUILT) — no "Your home" pin until the resident sets an address.** Only a real
+  signed-in resident home (in this ZIP, not the Del Valle sample) is pinned. For everyone else the
+  centroid **only centers/zooms the viewport** — nothing is pinned — and a "Set your area to map your
+  home & get alerts" nudge shows, doubling as a follow/signup prompt (opens the set-area flow).
+  Matches the development tracker's "no home pin until the resident searches"; upholds the never-faked
+  rule (a centroid stand-in labeled "Your home" would show a fake location as real).
