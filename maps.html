@@ -9,7 +9,8 @@
 <link rel="stylesheet" href="app.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
-  /* app-only: real-tile map container sits under the schematic + overlay panel */
+  /* app-only: real MapLibre tile map (Esri/OSM) is the default; the schematic SVG
+     sits beneath it as the offline / rate-limit fallback, with a shared overlay panel */
   #mapWrap{min-height:300px}
   #mapgl{width:100%;height:520px;border-radius:15px;overflow:hidden}
   @media(max-width:900px){ #mapgl{height:60vw;min-height:320px} }
@@ -97,6 +98,11 @@ HS.onReady(async function () {
     return a.slice(0, 16).map(function(it,i){ return Object.assign({}, it, {_letter: LET[i]}); });
   }
   var center = home || all[0] || { lat: c && c.lat || 30.17, lng: c && c.lng || -97.61 };
+  // NEVER-FAKED rule: only a real signed-in resident home (in THIS ZIP, not the
+  // Del Valle sample) may be pinned as "Your home". For everyone else the centroid
+  // only centers/zooms the viewport — we pin nothing and show a set-your-home nudge
+  // (matches the development tracker's "no home pin until the resident searches").
+  var hasRealHome = !!(home && !home.sample && home.zip === S.zip);
 
   function tierHex(it){ var k = HS.mapTier(it).k; return {high:'#c23b34',moderate:'#c47a1a',watch:'#3f7fb0',positive:'#1f9d5c'}[k] || '#3f7fb0'; }
 
@@ -119,6 +125,25 @@ HS.onReady(async function () {
     var within = items.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;
     var place = c ? ((HS.isSample && HS.isSample()) ? c.name + ' — (Sample Zip Code)' : c.name + ', ' + c.state) : 'Your area';
     gpsEl.textContent = place + ' · ' + within + ' items within ' + opts.radiusMi + ' mi';
+    updateHomePrompt();
+  }
+  // Set-your-home nudge — shown ONLY when there's no real resident home to pin.
+  // Doubles as a follow/signup prompt (opens the set-your-area flow). Removed once
+  // a real home exists (then the home marker renders instead).
+  function updateHomePrompt(){
+    var wrap = document.getElementById('mapWrap'), el = document.getElementById('mapHomePrompt');
+    if (hasRealHome) { if (el) el.remove(); return; }
+    if (!el) {
+      if (wrap && getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
+      el = document.createElement('button');
+      el.id = 'mapHomePrompt'; el.type = 'button';
+      el.style.cssText = 'position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;'
+        + 'background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 15px;'
+        + 'font:600 12.5px/1 var(--font);color:var(--ink);box-shadow:var(--shadow);cursor:pointer';
+      el.textContent = '◎ Set your area to map your home & get alerts';
+      el.onclick = function(){ if (HS.openLoc) HS.openLoc(); };
+      if (wrap) wrap.appendChild(el);
+    }
   }
   function wirePanel(redraw){
     document.getElementById('lyrProjects').classList.toggle('off', !opts.showProjects);
@@ -132,12 +157,13 @@ HS.onReady(async function () {
     }
   }
 
-  // ---------- schematic (Impact) ----------
+  // ---------- impact diagram (schematic SVG — the fallback view) ----------
   function drawSchematic() {
     var items = shownItems();
     // render into #mapSch only; the overlay panel + gps chip are static siblings in #mapWrap
     HS.MapProvider.render(document.getElementById('mapSch'), {
-      home: center, items: items, radiusMi: opts.radiusMi, showRadius: opts.showRadius, w: 780, h: 520
+      home: center, items: items, radiusMi: opts.radiusMi, showRadius: opts.showRadius,
+      showHome: hasRealHome, w: 780, h: 520
     });
     overlayFacilities(document.getElementById('mapSch'));
     setGps(items); renderPins(items);
@@ -172,8 +198,8 @@ HS.onReady(async function () {
     });
   }
 
-  // ---------- MapLibre (Satellite / Street) ----------
-  var glMap = null, glMarkers = [], glReady = false;
+  // ---------- MapLibre (real tiles: Esri World Imagery + OSM) ----------
+  var glMap = null, glMarkers = [], glReady = false, glFailed = false, glTileErrs = 0;
   function circle(lat, lng, rMi){
     var pts=[], R=rMi/69.0, cs=Math.cos(lat*Math.PI/180);
     for(var i=0;i<=64;i++){var a=i/64*2*Math.PI; pts.push([lng + (R*Math.sin(a))/cs, lat + R*Math.cos(a)]);}
@@ -183,10 +209,13 @@ HS.onReady(async function () {
   function clearMarkers(){ glMarkers.forEach(function(m){m.remove();}); glMarkers=[]; }
   function addMarkers(items){
     clearMarkers();
-    var h=document.createElement('div');
-    h.style.cssText='width:20px;height:20px;border-radius:50%;background:#157a49;border:3px solid #fff;box-shadow:0 0 0 6px rgba(21,122,73,.18)';
-    glMarkers.push(new maplibregl.Marker({element:h}).setLngLat([center.lng,center.lat])
-      .setPopup(new maplibregl.Popup({offset:14}).setHTML('<b>Your home</b>')).addTo(glMap));
+    // Only pin a REAL resident home — never a centroid stand-in (never-faked rule).
+    if (hasRealHome) {
+      var h=document.createElement('div');
+      h.style.cssText='width:20px;height:20px;border-radius:50%;background:#157a49;border:3px solid #fff;box-shadow:0 0 0 6px rgba(21,122,73,.18)';
+      glMarkers.push(new maplibregl.Marker({element:h}).setLngLat([center.lng,center.lat])
+        .setPopup(new maplibregl.Popup({offset:14}).setHTML('<b>Your home</b>')).addTo(glMap));
+    }
     items.forEach(function(it){
       var col=tierHex(it), el=document.createElement('div');
       el.style.cssText='width:26px;height:26px;border-radius:50%;background:'+col+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font:700 12px/1 sans-serif;cursor:pointer';
@@ -222,6 +251,19 @@ HS.onReady(async function () {
       center:[center.lng,center.lat], zoom: zoomFor(opts.radiusMi)
     });
     glMap.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
+    // GUARDRAIL (required companion to the Satellite default): Esri World Imagery / OSM
+    // are free, keyless and NOT production-contracted, so a traffic spike can be
+    // rate-limited (429) or a tile host can fail. Rather than a broken map, degrade to
+    // the impact diagram. Trip on repeated tile/source errors (not one edge-tile 404),
+    // or if the map never finishes loading (stalled provider).
+    glMap.on('error', function(ev){
+      if (!ev) return;
+      var src = ev.sourceId, msg = ev.error && String(ev.error.message || ev.error);
+      if (src==='sat' || src==='osm' || (msg && /429|rate|tile|failed to fetch|network/i.test(msg))) {
+        if (++glTileErrs >= 4) degradeToSchematic();
+      }
+    });
+    setTimeout(function(){ if (!glReady) degradeToSchematic(); }, 9000);
     glMap.on('load', function(){
       glMap.addSource('radius',{type:'geojson',data:circle(center.lat,center.lng,opts.radiusMi)});
       glMap.addLayer({id:'radius-fill',type:'fill',source:'radius',paint:{'fill-color':'#157a49','fill-opacity':0.08}});
@@ -254,9 +296,34 @@ HS.onReady(async function () {
     document.getElementById('mapSch').style.display='block';
     drawSchematic();
   }
+  // Move the active-mode highlight in the toolbar segment.
+  function setActiveMode(mode){
+    opts.mode = mode;
+    var seg = document.getElementById('mapMode');
+    [].forEach.call(seg.querySelectorAll('button'), function(b){ b.classList.toggle('on', b.dataset.mode === mode); });
+  }
+  // Fall back from the live tile map to the always-available impact diagram (offline,
+  // missing lib, or a tile-provider rate-limit/failure). Idempotent + user-visible.
+  function degradeToSchematic(){
+    if (glFailed) return;
+    glFailed = true;
+    try { if (glMap) glMap.remove(); } catch (e) {}
+    glMap = null; glReady = false;
+    setActiveMode('impact');
+    showSchematic();
+    if (HS.toast) HS.toast('Live map is busy — showing the impact diagram. Try Satellite again shortly.');
+  }
 
-  // initial: Impact schematic
-  showSchematic();
+  // initial view: the REAL Satellite map for covered ZIPs that have something to plot
+  // (Del Valle 78617 / Utah pass ZIPs). Falls back to the impact diagram when the live
+  // map library is unavailable (offline / artifact preview) or there's nothing to map.
+  if (window.maplibregl && (all.length || facs.length)) {
+    setActiveMode('satellite');
+    drawGL();
+  } else {
+    setActiveMode('impact');
+    showSchematic();
+  }
 
   // mode toggle
   document.getElementById('mapMode').addEventListener('click', function (e) {
@@ -265,9 +332,10 @@ HS.onReady(async function () {
     btn.classList.add('on');
     opts.mode = btn.dataset.mode;
     if (opts.mode === 'impact') { showSchematic(); return; }
-    if (!window.maplibregl) {   // offline/artifact fallback: no tiles available
+    if (!window.maplibregl || glFailed) {   // offline / no lib, or a live-map failure this session
       btn.classList.remove('on'); this.querySelector('[data-mode="impact"]').classList.add('on'); opts.mode='impact';
-      HS.toast('Satellite & Street need a network map connection — Impact view is live now.');
+      HS.toast(glFailed ? 'Live map is unavailable right now — showing the impact diagram.'
+                        : 'Satellite & Street need a network map connection — Impact view is live now.');
       showSchematic(); return;
     }
     drawGL();

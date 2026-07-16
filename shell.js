@@ -32,6 +32,37 @@
   HS.hasArea = function () { return !!(state.activeProperty || LS.get('myZip', null)); };
   HS.isSample = function () { return !HS.hasArea(); };
 
+  // ---------------------------------------------- referral (first-touch) ------
+  // FIRST-TOUCH-WINS marketing attribution. When a visitor arrives with utm_*
+  // params (e.g. from a Bluesky post link) OR an external referrer, remember it
+  // once, in localStorage only — so a later conversion (area request, topic
+  // follow, signup) can be credited to that first source. Never overwritten by a
+  // later organic visit, never sent anywhere here (this is capture only; a
+  // separate, schema-gated step stamps it onto the conversion row). No PII.
+  function captureReferral() {
+    try {
+      if (LS.get('referral', null)) return;           // already have a first touch
+      const q = new URLSearchParams(location.search);
+      const src = q.get('utm_source');
+      // Only record when there's a real signal: an explicit utm_source, or an
+      // off-site referrer. Same-origin navigations are not a new "first touch".
+      let refHost = '';
+      try { refHost = document.referrer ? new URL(document.referrer).host : ''; } catch (e) {}
+      const offsite = refHost && refHost !== location.host;
+      if (!src && !offsite) return;
+      LS.set('referral', {
+        source:   src || (offsite ? refHost : null),
+        medium:   q.get('utm_medium') || (src ? null : 'referral'),
+        campaign: q.get('utm_campaign') || null,
+        referrer: document.referrer || null,
+        landing:  location.pathname + location.search,
+        ts:       new Date().toISOString()
+      });
+    } catch (e) { /* attribution must never break the page */ }
+  }
+  // Read seam for the (later, schema-gated) conversion-stamp step.
+  HS.referral = function () { return LS.get('referral', null); };
+
   // ------------------------------------------------------------- ready gate --
   let _resolveReady;
   HS.ready = new Promise(r => (_resolveReady = r));
@@ -526,6 +557,7 @@
   }
 
   async function boot() {
+    captureReferral();          // first-touch attribution, before anything can fail
     await injectShell();
     await bootSession();
     await syncFollowsFromAccount();
