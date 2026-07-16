@@ -2734,7 +2734,7 @@
     ]
    },
    "recency_days": 365,
-   "spatial_zip_radius_mi": 3,
+   "spatial_zip_radius_mi": 1.5,
    "_receipts": {
     "probed": "2026-07-16 pg_net",
     "fresh": "max IssuedDate 1784153820000 = 2026-07-15",
@@ -2750,7 +2750,8 @@
     "no_zip_column": "point geometry + Latitude/Longitude attrs; spatial ZIP scoping (Denver pattern)",
     "record_url": "dataset-precision (no per-row URL column; templating one would be guessing)",
     "extra_where_added_at_smoke": "envelope query without a source-side type filter fetched every scope in dense Miami and timed out the 120s report; scoped citywide count = 11,453/365d (fast). Noise now dropped AT SOURCE (standing rule).",
-    "out_fields_added_at_smoke": "outFields=* on 44-col rows over the dense-Miami envelope hit the worker CPU limit (HTTP 546); projecting the 6 mapped columns cut the payload ~7x. First consumer of the additive arcgis out_fields option."
+    "out_fields_added_at_smoke": "outFields=* on 44-col rows over the dense-Miami envelope hit the worker CPU limit (HTTP 546); projecting the 6 mapped columns cut the payload ~7x. First consumer of the additive arcgis out_fields option.",
+    "radius_reduced_at_smoke": "3mi envelope over central Miami matched 5,622 scoped rows and still hit the worker CPU limit after the out_fields projection; 1.5mi (~1,400 rows) matches dense-urban ZIP width and completes. Adjacent-page overlap stays honest (IL precedent)."
    },
    "service_url": "https://services1.arcgis.com/CvuPhqcTQpZPT9qY/arcgis/rest/services/Building_Permits_Since_2014/FeatureServer/0",
    "extra_where": "ScopeofWork IN ('NEW CONSTRUCTION','DEMOLITION','ADDITION AND REMODELING','PHASED PERMIT')",
