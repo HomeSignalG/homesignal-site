@@ -1,0 +1,11 @@
+[
+  { "id": "postgrest-health-meta",
+    "url": "https://qwnnmljucajnexpxdgxr.supabase.co/rest/v1/app_community_meta?select=state&limit=1",
+    "headers": { "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U" },
+    "print_chars": 300 },
+  { "id": "postgrest-ca-indexable-count",
+    "url": "https://qwnnmljucajnexpxdgxr.supabase.co/rest/v1/app_community_meta?select=zip&state=eq.CA&indexable=is.true&limit=1000",
+    "headers": { "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U",
+                 "Prefer": "count=exact", "Range": "0-0" },
+    "print_chars": 200 }
+]
