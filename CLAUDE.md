@@ -892,6 +892,25 @@ legal/framing change not covered by the one-time sign-off.
   companion; Sonoma county datasets (no city/ZIP/coords — cannot scope or geocode).
   Receipts: docs/source-registry.md "CALIFORNIA WIRE PASS". Reproducible seed:
   docs/california-development-reports-seed.sql.
+- 🟢 **ARIZONA IS LIVE UNDER THE SUBSTANCE GATE — 364/364 modeled AZ ZIPs cached, 2
+  first-party permit sources, 230 pages auto-indexable (no manual flip)** (DB-verified
+  2026-07-16). Eleventh development state, state 3 of the four-state run. **293 pass +
+  71 coverage_coming honest empties** (rural desert ZIPs — Navajo/Apache/Cochise; valid);
+  **0 unsourced, 0 point sites missing coords. 37 of 364 ZIPs dev-backed (10%), 3,430
+  dev records.** Sources: **mesa-building-permits** (Socrata dzpk-hxfb, fresh 07-14;
+  22 statuses verbatim incl. BOTH hyphen and en-dash 'Finaled – C of C Required'
+  variants; 47-type whitelist — **standing answer: Socrata group-by vocab is silently
+  truncated by $limit; page with $offset until exhausted**, the missing S–Z page carried
+  Single Family (Detached) 18,461+12,555) and **scottsdale-building-permits** (classic
+  ArcGIS Server table — FIRST consumer of the additive `spatial_latlng_cols`
+  attribute-bbox option; **standing answer: IIS caps GET query strings at 2,048 chars
+  (404.15), so long verbatim whitelists 404 as GETs — `getWithBackoff` now auto-switches
+  to form-encoded POST past ~1,900 chars, offline-tested**). Smoke receipts: 85201 →
+  170/170 emitted 0 unmapped; 85251 → 18/18 after the POST fix. Not wired: Maricopa
+  PermitHistory (application queue, no status semantic), Phoenix (no first-party
+  per-record dataset — the CKAN hit is a 1 KB HUD aggregate). Receipts:
+  docs/source-registry.md "ARIZONA WIRE PASS". Reproducible seed:
+  docs/arizona-development-reports-seed.sql.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:

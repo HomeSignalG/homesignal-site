@@ -2,12 +2,21 @@
 -- ARIZONA development_reports seed — REPRODUCIBLE pg_net REFRESH SCRIPT
 -- (pattern: docs/michigan-development-reports-seed.sql; run in the Supabase SQL editor)
 --
--- Prepared 2026-07-16 (during the Supabase outage; batch runs when the DB returns):
--- all 364 modeled AZ ZIPs (Maricopa/Pima/Navajo/Pinal/Yavapai/Coconino/Mohave/Cochise/Yuma/Santa Cruz).
--- Centroids pinned to zipcodes PyPI v3.0.0 (offline USPS dataset); 0 quarantined;
--- all bbox-validated. First-party permit sources are wired in the AZ wire pass
--- (docs/source-registry.md "ARIZONA WIRE PASS") before this batch fires — this header
--- is finalized with the wired-source list in the go-live PR.
+-- Prepared 2026-07-16 (during the Supabase outage); EXECUTED 2026-07-16 after the DB
+-- returned: all 364 modeled AZ ZIPs cached, 364/364
+-- (Maricopa/Pima/Navajo/Pinal/Yavapai/Coconino/Mohave/Cochise/Yuma/Santa Cruz).
+-- Centroids pinned to zipcodes PyPI v3.0.0 (offline USPS dataset); 0 quarantined.
+-- WIRED SOURCES (docs/source-registry.md "ARIZONA WIRE PASS"):
+--   • mesa-building-permits — Socrata, native location point col (spatial within_circle),
+--     47-type verbatim whitelist (vocab paged past the group-by $limit cap — standing answer)
+--   • scottsdale-building-permits — FIRST consumer of arcgis spatial_latlng_cols
+--     (attribute-bbox on a geometry-less table) + the new auto-POST fallback for
+--     IIS's 2048-char GET cap (404.15 — standing answer)
+--   Not wired: Maricopa PermitHistory (application queue, no status semantic);
+--   Phoenix (no first-party per-record dataset).
+-- RESULT (DB-verified 2026-07-16): 364 cached · 293 pass · 71 coverage_coming honest
+-- empties (rural desert ZIPs) · 230 auto-indexable · 37 dev-backed ZIPs · 3,430 dev
+-- records · 0 unsourced · 0 point sites missing coords.
 -- INDEX POLICY: substance gate stamps indexable automatically; throttled sitemap
 -- (250 newcomers/day) rolls new pages in — no manual flip.
 -- ============================================================================
