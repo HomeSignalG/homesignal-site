@@ -57,7 +57,9 @@ HS.onReady(async function () {
   var cats = HS.data.topicCategories();
   ['gov','meetings','news','dev'].forEach(function (k) {
     var pref = S.topicPrefs[k];
-    var n = pref ? pref.topics.length : cats[k].on.length;
+    // STRICT OPT-IN: no saved picks = 0 followed. Never display the old seed
+    // defaults as "followed" — that claims subscriptions the user never chose.
+    var n = pref ? pref.topics.length : 0;
     var el = document.getElementById('cc-' + k);
     if (el) el.textContent = n + ' topic' + (n===1?'':'s') + ' followed';
   });
