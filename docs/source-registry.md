@@ -1570,7 +1570,19 @@ nothing wired on training knowledge.
 - No ZIP column → `spatial_zip_radius_mi: 3` (Denver pattern; records keep their OWN
   parcel points). record_url dataset-precision (no per-row URL column).
 
-### WIRED — orlando-permit-applications (Socrata, City of Orlando / Orange County)
+### REJECTED AT SMOKE — orlando-permit-applications (Socrata, City of Orlando)
+**Wired provisionally, then REJECTED on live-smoke evidence — ungeolocatable at
+source (Somerville precedent).** The dataset is fresh same-day and rich, but:
+`geocoded_column` is populated on only **67,257 of 1,104,026 rows (6%)** and just
+**6 rows in the last 365 days** — a stale one-time geocode, so `within_circle`
+scoping returns ~nothing (smoke on 32801: 3 rows, all geocode-quarantined);
+`permit_address` is street-only (no ZIP embedded, receipts: "10084 TIDAL WAVE ST",
+"240 S SEMORAN BLVD"); there is no ZIP column. No source-side ZIP scope exists →
+per-ZIP pages cannot be honestly filled. Orange County ships on the facilities
+floor. Entry removed before go-live; the recon detail below is kept for the
+nightly-reprobe record (if the city revives its geocode pipeline, wire it).
+
+#### (recon detail, kept for the record)
 - **FRESH same-day**: max `processed_date` AND max `issue_permit_date` = **2026-07-16**
   (live SoQL probe). Dataset ryhf-m453 on data.cityoforlando.net, updated daily.
 - 66 `worktype` values enumerated; 19 construction/land-use types kept verbatim (New

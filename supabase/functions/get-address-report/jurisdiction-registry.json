@@ -1106,111 +1106,6 @@
    },
    "recency_days": 365,
    "_receipts": "2026-07-16 MD wire pass (demolition). FRESH: max issueddate 2026-07-15 (res+com live receipts; demolition newest row 2026-02-27 added-date sample). Statuses VERBATIM via SoQL group-by: Open->proposed, Issued->approved, Finaled(+Completed on demolition)->operating, Stop Work->exclude. worktype vocab VERBATIM (res: ADD 43,607/ALTER 52,593/CONSTRUCT 84,198/BUILD FOUNDATION/...; com adds COMMERCIAL CHANGE OF USE 1,019 + DEMOLISH); noise dropped at source per the recon keep list (RESTORE AND / OR REPAIR re-roofs, INSTALL, REPLACE, blanks fail closed). Native `zip` column; coordinates ride the nested Socrata location column -> the NEW additive dot-path readCol (location.latitude/location.longitude; exact-column-name always wins; offline-tested). Recency on addeddate keeps Open applications visible (issueddate is null pre-issuance). No per-row URL column -> dataset-precision record_url. Mechanical/Electrical/Fence/Sign companion datasets DROPPED as trades/noise (WA/MN/IL precedent)."
-  },
-  {
-   "registry_id": "orlando-permit-applications",
-   "platform": "socrata",
-   "domain": "data.cityoforlando.net",
-   "dataset_id": "ryhf-m453",
-   "dataset_url": "https://data.cityoforlando.net/d/ryhf-m453",
-   "jurisdiction": "City of Orlando",
-   "coverage": [
-    {
-     "state": "FL",
-     "county": "Orange"
-    }
-   ],
-   "column_map": {
-    "title": [
-     "worktype",
-     "application_type"
-    ],
-    "status_raw": "application_status",
-    "type_source": "worktype",
-    "file_date": "processed_date",
-    "address": "permit_address",
-    "case_number": "permit_number"
-   },
-   "include_types": [
-    "New",
-    "Alteration",
-    "Addition",
-    "Comm",
-    "Townhomes",
-    "MF",
-    "MFHR",
-    "Duplex",
-    "MixedUse",
-    "HotelMotel",
-    "ADU",
-    "Foundation",
-    "Construct",
-    "ChangeUse",
-    "ChangeOccu",
-    "Conversion",
-    "Demo",
-    "DEM",
-    "SFSubd"
-   ],
-   "type_map": {
-    "New": "Development",
-    "Alteration": "Development",
-    "Addition": "Development",
-    "Comm": "Development",
-    "Townhomes": "Development",
-    "MF": "Development",
-    "MFHR": "Development",
-    "Duplex": "Development",
-    "MixedUse": "Development",
-    "HotelMotel": "Development",
-    "ADU": "Development",
-    "Foundation": "Development",
-    "Construct": "Development",
-    "ChangeUse": "Development",
-    "ChangeOccu": "Development",
-    "Conversion": "Development",
-    "Demo": "Development",
-    "DEM": "Development",
-    "SFSubd": "Development"
-   },
-   "status_to_bucket": {
-    "proposed": [
-     "Open"
-    ],
-    "operating": [
-     "Finaled",
-     "Completed"
-    ],
-    "exclude": [
-     "Void",
-     "Stop Work",
-     "Hold",
-     "Hardhold",
-     "HardHold"
-    ]
-   },
-   "recency_days": 365,
-   "spatial_zip_radius_mi": 3,
-   "spatial_point_col": "geocoded_column",
-   "_receipts": {
-    "probed": "2026-07-16 pg_net",
-    "fresh": "max processed_date AND max issue_permit_date = 2026-07-16 (same-day)",
-    "statuses_verbatim": [
-     "Closed",
-     "Completed",
-     "Finaled",
-     "Hardhold",
-     "HardHold",
-     "Hold",
-     "Open",
-     "Stop Work",
-     "Void"
-    ],
-    "closed_unmapped_on_purpose": "Closed (385,290 rows) spans completed AND dead applications with no disambiguating column; fail-closed \u2014 surfaces in unmapped_statuses, never guessed. Also 25,273 'Open' rows carry an issue date (city keeps status Open post-issuance); mapped verbatim to proposed per the city's own label.",
-    "worktypes_enumerated": 66,
-    "noise_dropped": "Repair 137k, Roof 87k, LowVoltage 52k, Fence, Pool, Irrigation, Solar, FireSupp, ELE/MEC/FIR/GAS trades, Dumpster, AlrmStickr, blanks fail closed",
-    "no_zip_column": "geocoded_column Socrata point -> within_circle spatial scoping (Chicago pattern)"
-   }
   }
  ],
  "arcgis": [
@@ -2792,7 +2687,6 @@
   {
    "registry_id": "miami-building-permits",
    "platform": "arcgis",
-   "layer_url": "https://services1.arcgis.com/CvuPhqcTQpZPT9qY/arcgis/rest/services/Building_Permits_Since_2014/FeatureServer/0",
    "dataset_url": "https://datahub-miamigis.opendata.arcgis.com/datasets/MiamiGIS::building-permits-since-2014",
    "jurisdiction": "City of Miami",
    "coverage": [
@@ -2855,12 +2749,12 @@
     "noise_dropped": "ELECTRICAL/PLUMBING/MECHANICAL/FIRE/ELEVATOR/BOILER trades, SIGN, LANDSCAPING, TREE PERMIT, BUILDING ROOFING re-roofs, SPECIAL/TEMPORARY EVENTS, ANNUAL FACILITY, RECERTIFICATION, SHOP DRAWINGS, COOKIE CUTTER (ambiguous, not guessed), REMODELING/REPAIRS (minor-repair mix, Boston Short-Form precedent)",
     "no_zip_column": "point geometry + Latitude/Longitude attrs; spatial ZIP scoping (Denver pattern)",
     "record_url": "dataset-precision (no per-row URL column; templating one would be guessing)"
-   }
+   },
+   "service_url": "https://services1.arcgis.com/CvuPhqcTQpZPT9qY/arcgis/rest/services/Building_Permits_Since_2014/FeatureServer/0"
   },
   {
    "registry_id": "tampa-single-family-permits",
    "platform": "arcgis",
-   "layer_url": "https://arcgis.tampagov.net/arcgis/rest/services/OpenData/Planning/MapServer/32",
    "dataset_url": "https://city-tampa.opendata.arcgis.com/apps/tampa::single-family-permits-2",
    "jurisdiction": "City of Tampa",
    "coverage": [
@@ -2907,7 +2801,8 @@
     ],
     "native_zip": true,
     "recency_note": "730d: OPENED_DATE is application open; the layer itself is a current-permits snapshot so recency is a backstop, not the filter"
-   }
+   },
+   "service_url": "https://arcgis.tampagov.net/arcgis/rest/services/OpenData/Planning/MapServer/32"
   }
  ],
  "ckan": [
