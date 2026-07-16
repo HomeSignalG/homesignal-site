@@ -104,7 +104,7 @@
     };
   }
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') ['topicsModal', 'premiumModal', 'shareModal', 'locModal', 'switcherModal', 'authModal']
+    if (e.key === 'Escape') ['topicsModal', 'premiumModal', 'shareModal', 'locModal', 'switcherModal', 'authModal', 'homeModal']
       .forEach(HS.closeModal);
   });
 
@@ -251,6 +251,83 @@
         ${p.id === state.activePropId ? '<span class="chk">✓</span>' : ''}
       </div>`).join('');
     HS.openModal('switcherModal');
+  };
+
+  // -------------------------------------------------- your home ---------------
+  // The ONE writer of app_properties (nothing else in the app writes it).
+  // Geocoder: the U.S. Census one-line locator — free, keyless, the same source
+  // the engine uses server-side. HONESTY RULES:
+  //   * only the geocoder's CONFIRMED match is saved, shown back to the resident
+  //     for explicit confirmation first — never raw input, never a guessed point;
+  //   * no match -> no save (an unpinnable address stays unpinned);
+  //   * signed-in only (app_properties is RLS'd to the owner). Signed-out users
+  //     get the sign-in modal — the nudge doubles as the signup prompt.
+  let _homeMatch = null;
+  HS.openHome = function () {
+    if (CFG.DATA_SOURCE !== 'supabase') { if (HS.toast) HS.toast('Adding a home needs the live site.'); return; }
+    if (!state.session || state.session.demo) {
+      HS.openAuth();
+      const sub = $('authSub');
+      if (sub) sub.textContent = 'Sign in first — then add your home address to see what’s changing around it.';
+      return;
+    }
+    _homeMatch = null;
+    $('homeForm').classList.remove('hidden');
+    $('homeConfirm').classList.add('hidden');
+    $('homeDone').classList.add('hidden');
+    $('homeConfirmMsg').textContent = '';
+    $('homeMsg').textContent = 'Your address is stored on your account only — never shared, never public.';
+    const a = $('homeAddr'); a.value = ''; a.style.borderColor = '';
+    HS.openModal('homeModal');
+    setTimeout(() => { if (a) a.focus(); }, 50);
+  };
+  HS.findHome = async function () {
+    const el = $('homeAddr'), q = el.value.trim();
+    if (q.length < 8 || q.indexOf(' ') < 0) { el.style.borderColor = '#c23b34'; el.focus(); return; }
+    el.style.borderColor = '';
+    $('homeMsg').textContent = 'Looking up the official address…';
+    let m = null;
+    try {
+      const r = await fetch('https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=json&address=' + encodeURIComponent(q));
+      const j = await r.json();
+      m = (j && j.result && j.result.addressMatches && j.result.addressMatches[0]) || null;
+    } catch (e) { m = null; }
+    if (!m || !m.coordinates || !(m.addressComponents && m.addressComponents.zip)) {
+      $('homeMsg').textContent = "We couldn't confirm that address against U.S. Census records — check the street, city and state, then try again.";
+      return;
+    }
+    _homeMatch = m;
+    $('homeMatched').textContent = m.matchedAddress || q;
+    $('homeForm').classList.add('hidden');
+    $('homeConfirm').classList.remove('hidden');
+  };
+  HS.saveHome = async function () {
+    const m = _homeMatch; if (!m || !state.session) return;
+    $('homeConfirmMsg').textContent = 'Saving…';
+    const ac = m.addressComponents || {};
+    const row = {
+      user_id: state.session.user.id,
+      address: String(m.matchedAddress || '').split(',')[0],
+      city: ac.city || null, state: ac.state || null, zip: ac.zip,
+      lat: m.coordinates.y, lng: m.coordinates.x, label: 'home'
+    };
+    let r = null;
+    try { r = await HS.sb().from('app_properties').insert(row).select().single(); } catch (e) { r = { error: e }; }
+    if (!r || r.error || !r.data) {
+      $('homeConfirmMsg').textContent = "Couldn't save your home — please try again.";
+      return;
+    }
+    LS.set('activeProp', r.data.id);
+    // Focus the app on the home's area when it's covered (same follow the ZIP flow does).
+    try {
+      if (await HS.data.isCovered(ac.zip)) {
+        let meta = null; try { meta = await HS.data.community(ac.zip); } catch (e) {}
+        HS.followCommunity({ zip: ac.zip, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
+      }
+    } catch (e) {}
+    $('homeConfirm').classList.add('hidden');
+    $('homeDone').classList.remove('hidden');
+    setTimeout(() => location.reload(), 900);   // rebuild every tile/map with the real home
   };
 
   // -------------------------------------------------- location / community ----

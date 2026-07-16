@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>HomeSignal — Maps</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com https://cdn.jsdelivr.net; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://*.tile.openstreetmap.org https://cdn.jsdelivr.net; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com https://cdn.jsdelivr.net; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://geocoding.geo.census.gov https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://*.tile.openstreetmap.org https://cdn.jsdelivr.net; form-action 'self'">
 <link rel="stylesheet" href="app.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
@@ -187,11 +187,11 @@ HS.onReady(async function () {
     gpsEl.textContent = place + ' · ' + txt;
     updateHomePrompt();
   }
-  // Set-your-AREA nudge — shown ONLY when there's no real resident home to pin.
-  // Doubles as a follow/signup prompt (opens the set-your-area ZIP flow — the only
-  // location flow that exists; nothing writes app_properties yet, so the copy must
-  // promise "area", never "home address"). Removed once a real home exists (then
-  // the home marker renders instead).
+  // Add-your-home nudge — shown ONLY when there's no real resident home to pin.
+  // Opens the add-home flow (shell.js::HS.openHome — Census-confirmed address ->
+  // app_properties); for signed-out visitors that flow shows the sign-in modal,
+  // so the nudge doubles as the signup prompt. Removed once a real home exists
+  // (then the home marker renders instead).
   function updateHomePrompt(){
     var wrap = document.getElementById('mapWrap'), el = document.getElementById('mapHomePrompt');
     if (hasRealHome) { if (el) el.remove(); return; }
@@ -202,8 +202,8 @@ HS.onReady(async function () {
       el.style.cssText = 'position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;'
         + 'background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 15px;'
         + 'font:600 12.5px/1 var(--font);color:var(--ink);box-shadow:var(--shadow);cursor:pointer';
-      el.textContent = '◎ Set your area to see alerts near you';
-      el.onclick = function(){ if (HS.openLoc) HS.openLoc(); };
+      el.textContent = '◎ Add your home to see what’s near you';
+      el.onclick = function(){ if (HS.openHome) HS.openHome(); else if (HS.openLoc) HS.openLoc(); };
       if (wrap) wrap.appendChild(el);
     }
   }
