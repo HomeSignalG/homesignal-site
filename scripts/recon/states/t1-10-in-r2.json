@@ -1,0 +1,8 @@
+[
+ {"id":"in-indy-hub-permit","url":"https://data.indy.gov/api/search/v1/collections/dataset/items?q=permit&limit=40"},
+ {"id":"in-indy-hub-building","url":"https://data.indy.gov/api/search/v1/collections/dataset/items?q=building&limit=40"},
+ {"id":"in-indy-hub-case","url":"https://data.indy.gov/api/search/v1/collections/dataset/items?q=petition&limit=40"},
+ {"id":"in-fortwayne-hub","url":"https://data-fortwayne.opendata.arcgis.com/api/feed/dcat-us/1.1.json"},
+ {"id":"in-bloomington-arcgis","url":"https://bloomington.in.gov/gisdata/rest/services?f=json"},
+ {"id":"in-allen-hub","url":"https://data-allencountyauditor.opendata.arcgis.com/api/feed/dcat-us/1.1.json"}
+]
