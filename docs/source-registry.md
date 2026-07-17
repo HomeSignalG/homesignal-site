@@ -1780,3 +1780,38 @@ No cached page was wrongly downgraded.
 while verifier walks were running — the evidence (pg_net fast vs edge slow,
 Detroit control passing) still points at the host, but re-test Miami in an idle
 window before Florida's next reprobe pass.
+
+## 2026-07-17 — NEW JERSEY WIRE PASS (Tier 1 state 4 of 17, founder wire order)
+
+**Facilities-floor state — no wireable per-record source survived recon** (all
+receipts live pg_net/recon-fetch 2026-07-17). NJ is unusual: the STATE mandates
+permit reporting, but the mandated dataset is aggregate-by-design.
+
+### Rejections / not wired (receipts)
+- **NJ Construction Permit Data (data.nj.gov w9se-dmra, NJ DCA)** — the one
+  statewide mandated dataset (N.J.A.C. 5:23-4.5(d)), fresh monthly (data through
+  2026-07-07, updated 07-08), 60-month rolling window. **Rejected: no honest ZIP
+  scope exists.** The DCA's own description states: "We do not get property
+  address, geocoding, owner names, type of work… What we have here is all we get."
+  Columns are municipality code + tax block/lot + fees/status/use-group. Mapping
+  municipality→ZIP would be guessed geography (USPS city ≠ NJ municipality;
+  townships/boroughs overlap ZIPs) — the Orlando/Somerville class. Logged as a
+  possible FUTURE muni-level area enrichment if an authoritative muni→ZIP
+  crosswalk is ever adopted (founder decision, non-blocking).
+- **Jersey City (data.jerseycitynj.gov — real portal found, Opendatasoft not
+  Socrata)**: the 36 permit-tagged assets are a planning-application DOCUMENT
+  library (per-case PDFs: staff reports, affidavits, notice packages) — no
+  structured per-record ledger to map verbatim. Reject on schema.
+- **Newark (data.ci.newark.nj.us)**: 503 Cloudflare bot-challenge to non-browser
+  clients on repeated probes — engine-unreachable class (the Tampa precedent).
+  Newark's **NewGIN** AGO hub (found via corrected-URL retry) carries only
+  environmental/zoning layers (TRI/NJDEP facilities, permitted-use zones) — no
+  permit ledger.
+- **NJ DCA hub (njdca-data-hub-njdca.hub.arcgis.com)**: "Building Permit Data" /
+  "Demolition Permit Data" / "Raw Permit Data" are hub DOCUMENTS whose GeoService
+  links point back at the same muni-level DCA reporter page — not feature services.
+- **NJGIN state catalog** (6.8 MB DCAT): permit-ish titles are NJDEP air-quality
+  facility layers (environmental registries, already covered by the EPA floor),
+  a 2018 archive, and DOT status layers — no construction-permit ledger.
+- **County hub guesses** (Bergen/Morris/Monmouth/Middlesex/Hudson): domain-not-found
+  404s; no first-party county hubs located. → nightly reprobe list.
