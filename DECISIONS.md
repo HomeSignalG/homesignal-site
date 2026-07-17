@@ -185,3 +185,19 @@ dashboard.html via the ONE backbone in lib/map.js):
   never a guess; the UI does not block on backfill.
 - **Facilities keep the same coverage gating as projects for free** (rows are ZIP-keyed by
   the same materializer from the same coverage-gated engine cache; no parallel gate added).
+
+## Staging _*_zips RLS cleanup (2026-07-17)
+- **Dead scratch is DROPPED, not secured** (13 tables): every completed state's
+  `_<st>_zips` worklist is recreated verbatim by its committed seed script (which itself
+  starts `drop table if exists`), and `_dfw_zips`/`_den_zips`/`_den_res_dbg` were
+  comment-only or unreferenced debug scratch. 0 references in pg_proc / pg_views /
+  cron.job for all of them — verified before dropping.
+- **`_fl_zips` is KEPT — it's an in-flight Florida batch** (441 ZIPs all cached,
+  refreshed 2026-07-17 00:05 UTC, live request_id/status worklist columns; a concurrent
+  session owns it). Secured instead: RLS on + anon/authenticated grants revoked + an
+  explicit service_role policy. Zero impact on the batch (service-role bypasses RLS).
+  The owning session drops it at build end.
+- **`spatial_ref_sys` stays RLS-off on purpose** (PostGIS system table — founder call);
+  it is the ONE remaining `rls_disabled_in_public` advisory line, expected.
+- DDL of record: `docs/staging-zips-cleanup.sql` (applied as migration
+  `staging_zips_cleanup_rls`).
