@@ -152,7 +152,7 @@ async function main() {
     const sites = Array.isArray(rep.sites) ? rep.sites : [];
     const target = zipUrl(zip);
     try {
-      await page.goto(target, { waitUntil: 'networkidle', timeout: 30000 });
+      await gotoWithRetry(page, target);
       // Wait until the page has rendered its results block (the app exposes the rendered
       // sites on window for verification; if it doesn't yet, add: window.__HS_SITES = sites).
       await page.waitForFunction(() => {
@@ -313,7 +313,7 @@ async function main() {
   for (const row of props) {
     const target = `${SITE_BASE}/homesignalmap.html?addr=${encodeURIComponent(row.address)}`;
     try {
-      await page.goto(target, { waitUntil: 'networkidle', timeout: 30000 });
+      await gotoWithRetry(page, target);
       await page.waitForFunction(() => Array.isArray(window.__HS_PROP), { timeout: 15000 });
       const st = await page.evaluate(() => ({
         rendered: window.__HS_PROP,
