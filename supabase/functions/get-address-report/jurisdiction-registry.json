@@ -2819,8 +2819,20 @@
      "Permit Issued"
     ],
     "types": "GENERAL_TYPE 12 values; New Structure + Demolition kept, '- Other' catch-alls + Graphics Permit (signs) + Other + null dropped/fail-closed",
-    "record_precision": "native B1_SITUS_ZIP + per-record ACA_URL (Accela)"
-   }
+    "record_precision": "native B1_SITUS_ZIP + per-record ACA_URL (Accela)",
+    "dense_zip_projection": "dense Columbus ZIPs (e.g. 43214 = 2,413 construction rows/365d) at outFields=* on the 44-col schema timed the report out (Miami class); project the 8 mapped columns + page_size=2000"
+   },
+   "out_fields": [
+    "GENERAL_TYPE",
+    "B1_PER_SUB_TYPE",
+    "PERMIT_STATUS",
+    "ISSUED_DT",
+    "SITE_ADDRESS",
+    "B1_SITUS_ZIP",
+    "B1_ALT_ID",
+    "ACA_URL"
+   ],
+   "page_size": 2000
   },
   {
    "registry_id": "cleveland-issued-building-permits",
@@ -2944,6 +2956,98 @@
     "issuance_ledger": "no status column -> Detroit status_const pattern, guarded Date_Issued IS NOT NULL",
     "types": "34-value verbatim domain; 12 construction/land-use classes kept; Rehab/storm/fire repairs, Roofing-Siding, Signs, Tree Removal, U&O, Change-Contractor, Amend, Moving, Temporary dropped at source",
     "native_zip_and_coords": "ZIP + Lat/Lon columns",
+    "record_url": "dataset-precision (no per-row URL column)"
+   }
+  },
+  {
+   "registry_id": "portland-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://www.portlandmaps.com/od/rest/services/COP_OpenData_PlanningDevelopment/MapServer/89",
+   "dataset_url": "https://gis-pdx.opendata.arcgis.com/datasets/PDX::residential-building-permits",
+   "jurisdiction": "City of Portland",
+   "coverage": [
+    {
+     "state": "OR",
+     "county": "Multnomah"
+    },
+    {
+     "state": "OR",
+     "county": "Washington"
+    },
+    {
+     "state": "OR",
+     "county": "Clackamas"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "NEWTYPE",
+     "WORKDESC"
+    ],
+    "status_raw": "STATUS",
+    "type_source": "NEWCLASS",
+    "file_date": "ISSUEDATE",
+    "address": "PROP_ADDRE",
+    "case_number": "FOLDERNUMB"
+   },
+   "include_types": [
+    "New Construction",
+    "Addition",
+    "Replacement",
+    "First",
+    "Move"
+   ],
+   "type_map": {
+    "New Construction": "Development",
+    "Addition": "Development",
+    "Replacement": "Development",
+    "First": "Development",
+    "Move": "Development"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Issued",
+     "Approved to Issue"
+    ],
+    "operating": [
+     "Final",
+     "Under Inspection"
+    ],
+    "proposed": [
+     "Application",
+     "Fees Due"
+    ],
+    "exclude": [
+     "Expired"
+    ]
+   },
+   "recency_days": 365,
+   "spatial_zip_radius_mi": 3,
+   "out_fields": [
+    "NEWTYPE",
+    "WORKDESC",
+    "STATUS",
+    "NEWCLASS",
+    "ISSUEDATE",
+    "PROP_ADDRE",
+    "FOLDERNUMB"
+   ],
+   "_receipts": {
+    "probed": "2026-07-17 pg_net (ids 3806-3813)",
+    "fresh": "max ISSUEDATE 2026-06-10; 36,263 rows; item on portlandmaps.com/od (custom AGS host, PDX open data)",
+    "found_via": "PDX Hub search (gis-pdx.opendata.arcgis.com); the recon portlandmaps root has empty top-level services[] \u2014 the /od/rest tree is the real one",
+    "no_zip_col": "X_COORD/Y_COORD state-plane + Shape point geometry, no ZIP field -> spatial_zip_radius_mi (envelope on geometry)",
+    "statuses_verbatim": [
+     "Approved to Issue",
+     "Issued",
+     "Expired",
+     "Final",
+     "Under Inspection",
+     "Application",
+     "Fees Due"
+    ],
+    "types": "NEWCLASS 6-value construction axis; New Construction/Addition/Replacement/First/Move kept, Alteration + null dropped; NEWTYPE (occupancy) rides in the title",
+    "coverage_note": "Portland spans Multnomah/Washington/Clackamas; spatial envelope self-limits to the city footprint regardless",
     "record_url": "dataset-precision (no per-row URL column)"
    }
   }

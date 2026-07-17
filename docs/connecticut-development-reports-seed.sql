@@ -302,3 +302,6 @@ insert into public._ct_zips (zip, lat, lng) values
  ('06906', 41.0692, -73.5236),
  ('06907', 41.0942, -73.5203)
 on conflict (zip) do update set lat = excluded.lat, lng = excluded.lng;
+
+-- GO-LIVE RESULTS (2026-07-17, DB-verified): 288/288 cached on the facilities
+-- floor; 282 pass + 6 coverage_coming; 0 unsourced, 0 coordless; 254 indexable.

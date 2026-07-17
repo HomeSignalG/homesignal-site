@@ -279,3 +279,6 @@ insert into public._mo_zips (zip, lat, lng) values
  ('65810', 37.1136, -93.2896),
  ('65897', 37.1987, -93.2784)
 on conflict (zip) do update set lat = excluded.lat, lng = excluded.lng;
+
+-- GO-LIVE RESULTS (2026-07-17, DB-verified): 264/264 cached on the facilities
+-- floor; 241 pass + 23 coverage_coming; 0 unsourced, 0 coordless; 200 indexable.
