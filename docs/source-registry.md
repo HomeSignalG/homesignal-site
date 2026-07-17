@@ -1836,3 +1836,26 @@ consolidated per-record permit ledgers anywhere we could find.
   no structured ledger.
 - **Bridgeport / Norwalk / New Haven hub guesses**: domain-not-found 404s.
 → all on the nightly reprobe list.
+
+## 2026-07-17 — MISSOURI WIRE PASS (Tier 1 state 6 of 17, founder wire order)
+
+**Facilities-floor state** (receipts: recon runs 29548344593/29548658065 + pg_net
+1998-2004).
+
+### Rejections / not wired (receipts)
+- **Kansas City "Permits - CPD Dataset" (data.kcmo.org ntw8-aacc)** — a perfect
+  BLDS-class ledger (native originalzip, lat/lng, per-record CompassKC link,
+  permittypemapped) but **STALLED: max :updated_at = 2025-05-09** (14 months;
+  confirmed in-data, not just catalog metadata). The companion status-change
+  dataset stalled 2024-10. **Top of the nightly reprobe list** — if KCMO revives
+  the feed it wires in minutes.
+- **St. Louis Regional Data Exchange (rdx.stldata.org, CKAN)** — hosts the city's
+  building-permits database (updated ~monthly per the city site) but the host is
+  **UNREACHABLE from BOTH egress paths** (pg_net 30s+60s timeouts AND GitHub-runner
+  fetch failed ×2) — engine could never fetch it. → nightly reprobe list.
+- **St. Louis city's own portal (stlouis-mo.gov/data)**: building permits ship as
+  a ~monthly 30 MB Microsoft Access ZIP download — no API, not wireable as data.
+- **Springfield (gisdata-cosmo hub, live)**: 0 permit/construction datasets in the
+  DCAT (GIS base layers only).
+- **St. Charles hub**: CONT_0001 item-inaccessible; **Columbia/Boone + both St.
+  Louis hub guesses**: domain-not-found 404s.
