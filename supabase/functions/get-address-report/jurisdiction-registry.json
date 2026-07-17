@@ -3052,6 +3052,66 @@
     "coverage_note": "Portland spans Multnomah/Washington/Clackamas; spatial envelope self-limits to the city footprint regardless",
     "record_url": "dataset-precision (no per-row URL column)"
    }
+  },
+  {
+   "registry_id": "madison-planning-projects",
+   "platform": "arcgis",
+   "service_url": "https://maps.cityofmadison.com/arcgis/rest/services/Planning/Current_Planning_Projects/MapServer/0",
+   "dataset_url": "https://www.cityofmadison.com/dpced/planning/development-projects",
+   "jurisdiction": "City of Madison",
+   "coverage": [
+    {
+     "state": "WI",
+     "county": "Dane"
+    }
+   ],
+   "column_map": {
+    "title": "Project_Description",
+    "status_raw": "RECORD_Status",
+    "file_date": "DATES_SubmittedDate",
+    "address": "APO_ADDRESS_PARTIAL_LINE",
+    "case_number": "RECORD_RecordID",
+    "record_url": "ProjectURL",
+    "lat": "__lat",
+    "lng": "__lng"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "Additional Info Required",
+     "Application Under Review",
+     "In Process",
+     "Waiting for Fees"
+    ],
+    "approved": [
+     "Approved and Recorded",
+     "Approved Preliminary Plat",
+     "Approved, Final Review Pending",
+     "Approved, Under Final Review",
+     "Final Approval Granted",
+     "Recorded"
+    ],
+    "operating": [
+     "Approval Granted, Completed",
+     "Approved, Constructed",
+     "Approved, Demolished"
+    ],
+    "exclude": [
+     "Approval(s) expired",
+     "Inactive",
+     "Placed on File or Denied"
+    ]
+   },
+   "spatial_zip_radius_mi": 3,
+   "record_url_precision": "record",
+   "_receipts": {
+    "probed": "2026-07-17 recon runs 29575253459/29575421175 + pg_net 11575-11578",
+    "layer": "Planning/Current_Planning_Projects/MapServer/0 = 'Current Planning Project Points' (esriGeometryPoint)",
+    "count": "599 current planning projects (all active \u2014 no recency filter; the city's own curated live set)",
+    "geometry": "native WI state-plane (wkid 103412/8193) but the layer reprojects to WGS84 on outSR=4326 (verified {x:-89.29,y:43.14}); fast host (~90ms). column_map maps __lat/__lng -> per-parcel points (source geometry, never geofenced)",
+    "record_url": "ProjectURL per-record (cityofmadison.com/dpced/planning/development.cfm?record=LNDUSE-<id>)",
+    "statuses_verbatim": "16 RECORD_Status values (returnDistinctValues) all mapped: proposed(4)/approved(6)/operating(3)/exclude(3)",
+    "found_via": "Madison AGS root -> Planning folder -> Current_Planning_Projects (5 recon rounds; Milwaukee CKAN had no ZIP/coords, Madison Hub only parking-permit polygons)"
+   }
   }
  ],
  "ckan": [
