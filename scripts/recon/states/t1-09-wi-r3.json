@@ -1,0 +1,5 @@
+[
+ {"id":"wi-madison-planning-folder","url":"https://maps.cityofmadison.com/arcgis/rest/services/Planning?f=json"},
+ {"id":"wi-madison-public-folder","url":"https://maps.cityofmadison.com/arcgis/rest/services/Public?f=json"},
+ {"id":"wi-madison-city-eng","url":"https://maps.cityofmadison.com/arcgis/rest/services/City_Engineering?f=json"}
+]
