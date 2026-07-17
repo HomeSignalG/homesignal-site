@@ -1760,3 +1760,23 @@ THROW; a new top-level handler wrapper converts the throw into an explicit JSON 
 refresh cron's transient-safe upsert never sees it — so no report can ever again be
 cached with silently-closed gates. **Standing answer: a gate-critical read NEVER
 fails soft — wrong data is worse than no data.**
+
+### Fail-loud fix — LOAD-TEST RECEIPTS (2026-07-17, fix deployed mid-verifier-walk)
+Re-ran the exact ZIPs under the same nationwide verifier load that reproduced the bug:
+- Cleveland 44113 → 200, dev **4,566** (exact match to pre-load run)
+- Cleveland 44114 → 200, dev **3,450** (was WRONGLY 0 under the old code)
+- Columbus 43215 → 200, dev **1,706** (was WRONGLY 0 / 504 — the entry fires and
+  completes; the earlier Columbus 504 was load contention, NOT the Miami slow-host class)
+- Cincinnati 45202 → 1,561 / Philadelphia 19143 → 400 / Pittsburgh 15213 → 243 —
+  regression-exact
+- Columbus-suburb 43230 → explicit **504 IDLE_TIMEOUT** — the fail-LOUD outcome:
+  visible, retryable, never collected. No silent empty anywhere.
+**Cache-integrity audit of already-live pages:** the only covered-city zeros are
+HONEST — Philadelphia 19110: source-side scoped count = 0 (verified against
+phl.carto.com); the 8 Pittsburgh dev-zero 152xx ZIPs: zero rows in the PLI feed at
+all (suburb/campus ZIPs outside city jurisdiction; verified against WPRDC SQL).
+No cached page was wrongly downgraded.
+**Follow-up logged (non-blocking):** the Miami slow-host rejection was measured
+while verifier walks were running — the evidence (pg_net fast vs edge slow,
+Detroit control passing) still points at the host, but re-test Miami in an idle
+window before Florida's next reprobe pass.
