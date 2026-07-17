@@ -202,9 +202,11 @@ HS.onReady(async function () {
     if (hasRealHome) {
       // Distances exist only from a real home in this ZIP — count against ALL
       // mapped records, not just the 16 shown (the old chip undercounted).
+      // Name the logged address the radius is measured from, so "within N mi"
+      // is anchored to a stated home, not an unexplained symbol.
       var pool = opts.showProjects ? all : all.filter(function(x){return !x.type;});
       var within = pool.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;
-      txt = within + ' within ' + opts.radiusMi + ' mi';
+      txt = within + ' within ' + opts.radiusMi + ' mi of ' + home.address;
     } else {
       // No home -> no distances (by design, never fabricated). Say what IS shown.
       txt = items.length + (total > items.length ? ' of ' + total : '') + ' items mapped';
@@ -252,7 +254,7 @@ HS.onReady(async function () {
     // render into #mapSch only; the overlay panel + gps chip are static siblings in #mapWrap
     HS.MapProvider.render(document.getElementById('mapSch'), {
       home: center, items: items, radiusMi: opts.radiusMi, showRadius: opts.showRadius,
-      showHome: hasRealHome, w: 780, h: 520
+      showHome: hasRealHome, homeLabel: hasRealHome ? home.address : '', w: 780, h: 520
     });
     overlayFacilities(document.getElementById('mapSch'));
     setGps(items); renderPins(items);
@@ -311,8 +313,11 @@ HS.onReady(async function () {
       // The home marker is the HomeSignal LOGO tile (shared builder in lib/map.js).
       var hw=document.createElement('div'); hw.innerHTML=HS.homeMarkerHTML(26);
       var h=hw.firstChild; h.style.zIndex='5';
+      h.title='Your home · '+HS.homeAddressLine(home);
+      // The popup names the LOGGED address (HS.homePopupHTML) — a bare "Your
+      // home" label never said which address the app had on file.
       glMarkers.push(new maplibregl.Marker({element:h}).setLngLat([center.lng,center.lat])
-        .setPopup(new maplibregl.Popup({offset:16}).setHTML('<b>Your home</b>')).addTo(glMap));
+        .setPopup(new maplibregl.Popup({offset:16,maxWidth:'260px'}).setHTML(HS.homePopupHTML(home))).addTo(glMap));
     }
     items.forEach(function(it){
       var col=tierHex(it), el=document.createElement('div');
@@ -450,9 +455,11 @@ HS.onReady(async function () {
     clearLfMarkers();
     // Only pin a REAL resident home — never a centroid stand-in (never-faked rule).
     if (hasRealHome) {
-      // The home marker is the HomeSignal LOGO tile (shared builder in lib/map.js).
-      lfMarkers.push(L.marker([center.lat,center.lng],{zIndexOffset:1000,icon:lfDivIcon(HS.homeMarkerHTML(26),26)})
-        .bindPopup('<b>Your home</b>').addTo(lfMap));
+      // The home marker is the HomeSignal LOGO tile (shared builder in lib/map.js);
+      // the popup names the LOGGED address (HS.homePopupHTML), same as the GL engine.
+      lfMarkers.push(L.marker([center.lat,center.lng],{zIndexOffset:1000,icon:lfDivIcon(HS.homeMarkerHTML(26),26),
+          title:'Your home · '+HS.homeAddressLine(home)})
+        .bindPopup(HS.homePopupHTML(home),{maxWidth:260}).addTo(lfMap));
     }
     items.forEach(function(it){
       var col=tierHex(it);
