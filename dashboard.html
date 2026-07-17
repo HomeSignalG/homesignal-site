@@ -69,9 +69,7 @@ HS.onReady(async function () {
 
   var name = (S.session && S.session.name || 'there').split(' ')[0];
   document.getElementById('dashHi').textContent = 'Welcome back, ' + name;
-  document.getElementById('dashSub').textContent = HS.isSample()
-    ? 'Sample homes — sign in to add your own.'
-    : (S.properties.length + ' home' + (S.properties.length===1?'':'s') + ' followed — here\'s what needs you across them.');
+  document.getElementById('dashSub').textContent = S.properties.length + ' home' + (S.properties.length===1?'':'s') + ' followed — here\'s what needs you across them.';
 
   var openCount = changes.filter(function(x){var d=HS.daysUntil(x.window_closes_at);return d!=null&&d>=0;}).length;
   document.getElementById('dashStrip').innerHTML =
