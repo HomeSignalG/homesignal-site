@@ -275,6 +275,39 @@
     const commNav = $('hs-nav-comm');
     if (commNav) commNav.setAttribute('href', 'community.html?zip=' + encodeURIComponent(state.zip));
   }
+  // -------------------------------------------- page-header context line ------
+  // Say up front WHICH address (or area) the page is about, on every app page
+  // with a .ph header — ONE shared injector (a new page gets it for free; a
+  // page that must not carry it sets data-no-where on <body>). A real saved
+  // property IN the viewed ZIP shows its full logged address; otherwise the
+  // viewed area — never a demo/sample address presented as the visitor's own
+  // (the same never-faked gate the maps use). Idempotent: pages that rebuild
+  // their .ph dynamically (development.html) just call it again after painting.
+  HS.paintWhereLine = async function () {
+    try {
+      const ph = document.querySelector('#hs-slot .ph');
+      if (!ph || document.body.dataset.noWhere != null) return;
+      let el = document.getElementById('phWhere');
+      if (!el || !el.isConnected) {
+        el = document.createElement('p');
+        el.id = 'phWhere'; el.className = 'ph-where'; el.style.display = 'none';
+        const h1 = ph.querySelector('h1');
+        if (h1) h1.insertAdjacentElement('afterend', el); else ph.appendChild(el);
+      }
+      const p = state.activeProperty;
+      if (p && !p.sample && p.zip === state.zip) {
+        const tag = HS.isRealHome(p) ? 'Your home' : (p.tag || p.label || 'Your property');
+        el.textContent = '⌂ ' + tag + ' · ' + HS.homeAddressLine(p);
+      } else {
+        let c = null;
+        try { c = HS.data ? await HS.data.community(state.zip) : null; } catch (e) {}
+        el.textContent = c ? ('◍ ' + c.name + (c.state ? ', ' + c.state : '')
+          + (HS.isSample() ? ' — (Sample Zip Code)' : '')) : '';
+      }
+      el.style.display = el.textContent ? '' : 'none';
+    } catch (e) { /* a missing context line must never break the page */ }
+  };
+
   HS.openSwitcher = function () {
     const list = $('switcherList'); if (!list) return;
     $('switcherSub').textContent = "You're following " + state.properties.length + " home" +
@@ -777,6 +810,7 @@
     state.properties = await HS.data.properties();
     if (!state.activePropId && state.properties[0]) state.activePropId = state.properties[0].id;
     paintTopbar();
+    HS.paintWhereLine();   // shared header context line (async, never blocks boot)
     buildShare();
     wireSearch();
     paintBell();
