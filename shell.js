@@ -233,6 +233,19 @@
     paintTopbar();
     document.dispatchEvent(new CustomEvent('hs:property', { detail: { id } }));
   };
+  // Switcher-modal path: pages compute their home-anchored data (pin, header
+  // address, distances) once at load, so switching focus reloads the current
+  // page to rebuild everything for the newly active home (same pattern as
+  // saveHome). Only on an actual change — re-picking the active home just
+  // closes the modal. Other selectProperty callers must NOT reload: property
+  // cards navigate right after selecting, and property.html syncs the active
+  // home during page load (a reload there would loop).
+  HS.switchProperty = function (id) {
+    const changed = id !== state.activePropId;
+    HS.selectProperty(id);
+    HS.closeModal('switcherModal');
+    if (changed) location.reload();
+  };
   function paintTopbar() {
     const p = state.activeProperty;
     if ($('locLabel')) {
@@ -267,7 +280,7 @@
     $('switcherSub').textContent = "You're following " + state.properties.length + " home" +
       (state.properties.length === 1 ? '' : 's') + '. Pick one to focus the app on it.';
     list.innerHTML = state.properties.map(p => `
-      <div class="swrow ${p.id === state.activePropId ? 'active' : ''}" onclick="HS.selectProperty('${p.id}');HS.closeModal('switcherModal')">
+      <div class="swrow ${p.id === state.activePropId ? 'active' : ''}" onclick="HS.switchProperty('${p.id}')">
         <div class="miniscore">${p.score || ''}</div>
         <div class="pinfo"><div class="pt">${HS.esc(p.address)}</div>
           <div class="pa">${HS.esc(HS.isRealHome(p) ? 'Your home' : (p.tag || p.label))} · ${HS.esc(p.city)}, ${HS.esc(p.state)} ${HS.esc(p.zip)}</div></div>
