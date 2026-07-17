@@ -1,0 +1,8 @@
+[
+ {"id":"wi-mke-mapservices-root","url":"https://mapservices.milwaukee.gov/arcgis/rest/services?f=json"},
+ {"id":"wi-mke-gis-root","url":"https://gis.milwaukee.gov/arcgis/rest/services?f=json"},
+ {"id":"wi-mke-hub-search-permit","url":"https://data.milwaukee.gov/api/3/action/package_search?q=permit&rows=30"},
+ {"id":"wi-madison-hub-search-permit","url":"https://data-cityofmadison.opendata.arcgis.com/api/search/v1/collections/dataset/items?q=permit&limit=30"},
+ {"id":"wi-madison-arcgis-root","url":"https://maps.cityofmadison.com/arcgis/rest/services?f=json"},
+ {"id":"wi-dane-arcgis-root","url":"https://gis.countyofdane.com/arcgis/rest/services?f=json"}
+]
