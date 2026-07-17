@@ -91,12 +91,33 @@ async function main() {
   }
   if (SAMPLE > 0) walked = walked.slice(0, SAMPLE);
   // A sample of modeled-but-never-materialized ZIPs (no app_* row): must render the
-  // honest not-covered state and stay noindexed.
-  // (98101 left this sample when Washington materialized; 60601 when Illinois did;
-  //  48226 when Michigan did; 02138 when Massachusetts did — each is now a real
-  //  indexable page. A replacement holds its slot only until its state gets a
-  //  development build, so when a state opens, swap its ZIP out here in the same pass.)
-  const nonUt = ['97201', '30303', '44113', '35801'];
+  // honest not-covered state and stay noindexed. DERIVED DYNAMICALLY (not hardcoded)
+  // so it never needs a manual swap when a state opens — a hardcoded list silently
+  // rots the moment its ZIP materializes (44113 broke this the day Ohio opened; 97201
+  // the day Oregon did). We pull modeled level=zip ZIPs and keep the first few that
+  // have NO app_community_meta row, confirmed against the same meta set we just walked.
+  const materializedZips = new Set();
+  {
+    let mlast = '';
+    for (;;) {
+      const page = await rest(`app_community_meta?select=zip&order=zip.asc&limit=1000` + (mlast ? `&zip=gt.${encodeURIComponent(mlast)}` : ''));
+      if (!page.length) break;
+      for (const r of page) materializedZips.add(r.zip);
+      mlast = page[page.length - 1].zip;
+    }
+  }
+  const nonUt = [];
+  {
+    // One page of modeled ZIP rows is plenty to find a handful with no meta row.
+    const rows = await rest(`communities?select=zip_codes&level=eq.zip&order=id.asc&limit=4000`);
+    for (const row of rows) {
+      for (const z of (row.zip_codes || [])) {
+        if (/^\d{5}$/.test(z) && !materializedZips.has(z) && !nonUt.includes(z)) { nonUt.push(z); break; }
+      }
+      if (nonUt.length >= 4) break;
+    }
+  }
+  if (!nonUt.length) console.log('  (no unmaterialized modeled ZIP found to sample — every modeled ZIP is materialized)');
 
   console.log(`Verifying ${walked.length} materialized page(s) + ${nonUt.length} unmaterialized page(s) against ${SITE_BASE}`);
 

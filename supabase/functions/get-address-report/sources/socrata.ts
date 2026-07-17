@@ -266,7 +266,7 @@ async function runEntry(
       continue;
     }
 
-    const rec = await normalizeRow(row, entry, statusRaw, bucket, deps, report);
+    const rec = await normalizeRow(row, entry, statusRaw, bucket, deps, report, zip);
     if (rec) records.push(rec);
   }
 
@@ -276,6 +276,16 @@ async function runEntry(
   return { records, report };
 }
 
+// GEOCODE geofence constant + distance — kept in lockstep with sources/arcgis.ts
+// (GEOCODE_FENCE_MI / milesBetween). A geocoded point farther than this from the report
+// ZIP centroid is an untrusted cross-city/state match and is nulled (area scope).
+const GEOCODE_FENCE_MI_GEO = 25;
+function milesBetweenGeo(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const dLat = (lat2 - lat1) * 69;
+  const dLng = (lng2 - lng1) * 69 * Math.cos(((lat1 + lat2) / 2) * Math.PI / 180);
+  return Math.sqrt(dLat * dLat + dLng * dLng);
+}
+
 async function normalizeRow(
   row: Record<string, unknown>,
   entry: SocrataRegistryEntry,
@@ -283,6 +293,7 @@ async function normalizeRow(
   bucket: Exclude<Bucket, "exclude">,
   deps: SocrataDeps,
   report: SocrataRunReport,
+  reportZip: string | null,
 ): Promise<NormalizedRecord | null> {
   const cm = entry.column_map;
   const title = String(readCol(row, cm.title) ?? "").trim();
@@ -312,11 +323,34 @@ async function normalizeRow(
     const g = await deps.geocode(address);
     if (!g) { report.geocode_failures++; report.quarantined.push({ reason: `geocode failed`, sample: address }); lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area"; }
     else {
-      lat = g.lat; lng = g.lng; geoPrecision = "address"; scope = "point";
-      if (g.match_type) geoQuality.match_type = g.match_type;
-      if (g.matched_address) geoQuality.matched_address = g.matched_address;
-      if (g.geocode_source) geoQuality.geocode_source = g.geocode_source;
-      if (g.needs_review !== undefined) geoQuality.needs_review = g.needs_review;
+      // GEOFENCE (anti-fabrication) — identical to the arcgis connector. Census
+      // range-interpolation can match the same street name in another city/state (live
+      // example: a Cincinnati permit rendered in Missouri). Two local checks, no extra
+      // lookups; a miss NULLS the coords — the record stays listed as an area item, the
+      // untrusted marker is never rendered. Source-supplied coords (the branch above) are
+      // NEVER fenced.
+      const filedZip = (String(readCol(row, cm.zip) ?? "").match(/\b\d{5}\b/)?.[0]) || reportZip || null;
+      const matchedZip = ((g.matched_address || "").match(/\b(\d{5})(?:-\d{4})?\s*$/)?.[1]) ?? null;
+      const zipMismatch = !!(filedZip && matchedZip && filedZip !== matchedZip);
+      const c = deps.zipCentroid;
+      const fenceMiles = c ? milesBetweenGeo(c.lat, c.lng, g.lat, g.lng) : null;
+      const outOfFence = fenceMiles != null && fenceMiles > GEOCODE_FENCE_MI_GEO;
+      if (zipMismatch || outOfFence) {
+        report.geocode_failures++;
+        report.quarantined.push({
+          reason: zipMismatch
+            ? `geocode geofence: matched ZIP ${matchedZip} != filed ${filedZip} — coords nulled`
+            : `geocode geofence: point ${Math.round(fenceMiles!)} mi from ZIP centroid (> ${GEOCODE_FENCE_MI_GEO}) — coords nulled`,
+          sample: address,
+        });
+        lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area";
+      } else {
+        lat = g.lat; lng = g.lng; geoPrecision = "address"; scope = "point";
+        if (g.match_type) geoQuality.match_type = g.match_type;
+        if (g.matched_address) geoQuality.matched_address = g.matched_address;
+        if (g.geocode_source) geoQuality.geocode_source = g.geocode_source;
+        if (g.needs_review !== undefined) geoQuality.needs_review = g.needs_review;
+      }
     }
   } else {
     geoPrecision = "jurisdiction"; scope = "area"; lat = null; lng = null;
