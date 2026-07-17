@@ -1741,3 +1741,22 @@ nothing wired on training knowledge.
 - **Franklin/Dayton/Toledo hub URL guesses**: 404 (domain-not-found) — no first-party
   per-record permit source found for Dayton/Toledo this pass → facilities floor;
   nightly reprobe list.
+
+
+## 2026-07-17 — ENGINE HARDENING: fail-loud communities lookup (founder directive)
+**Bug (observed live during the FL verifier walk):** the two communities reads that
+GATE content — `resolveCommunityIds` (civic-notices layer) and the `commRows`
+state/county read (EVERY connector's coverage gate) — discarded the PostgREST
+`error`, so a read that failed under load silently resolved to "no communities" and
+closed every gate. Receipts: OH smoke 44114/43215 returned 200 with
+`arcgis_reports: []` and dev 0 while the identical ZIPs returned thousands of
+records minutes earlier (Cleveland 44113 → 4,566), coinciding with both nationwide
+verifier walks hammering PostgREST. A page cached in that window would be wrongly
+downgraded to facilities-floor/empty — the exact "plausible but wrong" failure the
+anti-fabrication rules exist to prevent.
+**Fix (engine, additive):** `mustReadCommunities()` — 3 attempts with backoff, then
+THROW; a new top-level handler wrapper converts the throw into an explicit JSON 500.
+**A 500 is never collected** (the batch collect requires 200 + a `sites` key) and the
+refresh cron's transient-safe upsert never sees it — so no report can ever again be
+cached with silently-closed gates. **Standing answer: a gate-critical read NEVER
+fails soft — wrong data is worse than no data.**
