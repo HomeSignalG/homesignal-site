@@ -140,3 +140,36 @@
 --     honest "permit status not yet confirmed" state, never a guess (spec §8).
 -- REVERT: drop the two columns (additive; readers null-check) and re-apply the
 -- prior function body from this file's history.
+
+-- ---------------------------------------------------------------------------
+-- Applied 2026-07-17 via migrations `app_refresh_zip_gov_notices` +
+-- `app_refresh_zip_gov_notices_window14_cap48` (the drip-destination fix):
+--   * WHY: the civic-alerts source of truth (public.alerts, pipeline_type=
+--     'government_notice') never reached app_changes — the function read only
+--     development_reports + meetings — so the notices residents get emails and
+--     Bluesky posts about were INVISIBLE on the community/alerts pages those
+--     posts link to (verified: "Budget Amendment", zip 84003, 0 rows pre-fix).
+--   * ONE added statement (after the meetings insert, before the _nc count):
+--     recent sourced gov notices for the chain root -> app_changes as
+--     'Government & civic' (plain_language prefix 'Government notice…',
+--     occurred_at = created_at::date, window_closes_at = comment_deadline,
+--     confidence 'High', lens 'safety'). source_url REQUIRED (anti-fabrication);
+--     deduped by source_url against rows the same run already wrote (the PMN
+--     civic insert can carry the same records via development_reports).
+--   * Window/cap: 14 days / newest 48 — generate.mjs drafts EVERY sourced gov
+--     notice from the last 7 days, so every such notice must stay on-page for
+--     the screenshot + click-through; the busiest county (Utah County, ~35
+--     notices/week) crowded a 7-day-old notice out of the first pass's
+--     newest-8 cap (21 newer siblings — verified), hence 48 (the function's
+--     largest existing cap precedent).
+--   * Counts toward _nc, so notice-backed ZIPs keep/gain 'pass' (consistent
+--     with the documented data-quality gate). Refresh rides the existing daily
+--     pg_cron 'app-content-refresh' — no new infra. Backfilled the 285 ZIPs of
+--     every community with a sourced gov notice in the window: 285/285 pass;
+--     2,069 gov-notice rows; 90 of 92 queued Bluesky gov_notice drafts now have
+--     their notice on a live page (the 2 misses predate the window — honest).
+--   * OBSERVED, pre-existing, NOT touched: 117 zip+source_ref duplicate pairs
+--     from the meetings insert vs the dev-report civic insert (same PMN URL via
+--     both paths — none involve the new statement's rows). Flagged to founder.
+-- REVERT: re-apply the app_refresh_zip_facility_entity body from this file's
+-- history (drops the added statement; no schema change to revert).
