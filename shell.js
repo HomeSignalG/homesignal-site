@@ -23,13 +23,14 @@
     dismissed: new Set(LS.get('dismissed', [])),
     topicPrefs: LS.get('topicPrefs', {}),
     get activeProperty() {
-      return this.properties.find(p => p.id === this.activePropId) || this.properties[0] || null;
+      // Never a demo/sample home — see lib/data.js::pickActiveProperty (config.js:14-20).
+      return HS.pickActiveProperty(this.properties, this.activePropId);
     }
   };
 
   // Has the visitor set their own area yet (a saved property OR a saved ZIP)?
   // When false, the app is showing the Del Valle sample and labels say so.
-  HS.hasArea = function () { var p = state.activeProperty; return !!((p && !p.sample) || LS.get('myZip', null)); };
+  HS.hasArea = function () { return !!(state.activeProperty || LS.get('myZip', null)); };
   HS.isSample = function () { return !HS.hasArea(); };
 
   // The ONE formatter for a property's logged address ("13313 Coomes Dr, Del

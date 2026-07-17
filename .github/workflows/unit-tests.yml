@@ -19,7 +19,7 @@ jobs:
           node-version: '20'
       - name: Landing decision test
         run: node test/landing.test.mjs
-      - name: Sample-view test
-        run: node test/sample-view.test.mjs
+      - name: Signed-out persona guard test
+        run: node test/signed-out-guard.test.mjs
       - name: realHome single-source test
         run: node test/realhome.test.mjs
