@@ -578,7 +578,8 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
       '<div style="white-space:pre-wrap;margin:10px 0;line-height:1.5">'+esc(p.post_text)+'</div>'+
       '<div class="muted" style="font-size:12px;margin-bottom:10px">'+esc(tags)+' &nbsp;·&nbsp; '+
         (p.source_url?('<a href="'+esc(p.source_url)+'" target="_blank" rel="noopener" style="color:var(--accent)">verify source ↗</a> (approval = fact-check)'):'<span style="color:var(--persist)">NO source_url — not postable</span>')+
-        ((p.embed&&p.embed.uri)?(' &nbsp;·&nbsp; <a href="'+esc(p.embed.uri)+'" target="_blank" rel="noopener" style="color:var(--accent)">post links to ↗</a> (link card)'):' &nbsp;·&nbsp; <span style="color:var(--persist)">NO site link on this draft</span>')+'</div>'+
+        ((p.embed&&p.embed.uri)?(' &nbsp;·&nbsp; <a href="'+esc(p.embed.uri)+'" target="_blank" rel="noopener" style="color:var(--accent)">post links to ↗</a> (link card)'):' &nbsp;·&nbsp; <span style="color:var(--persist)">NO site link on this draft</span>')+
+        (p.image_bucket_path?' &nbsp;·&nbsp; <span class="t-real">📷 real screenshot attached</span>':' &nbsp;·&nbsp; <span style="color:var(--persist)">no image yet</span>')+'</div>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
         (p.status!=='approved'?'<button class="bsky-btn" data-act="approve" style="background:var(--accent);color:#fff">Approve</button>':'')+
         '<button class="bsky-btn" data-act="edit" style="background:#e4e8e4;color:#16211c">Edit</button>'+
@@ -637,15 +638,35 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
     var card=$('bsky-prev-card'), note=$('bsky-prev-note');
     var e=(p&&p.embed)||{};
     if(p && p.embed_kind==='external' && e.uri){
-      var img=e.thumb||e.image||e.image_url||null; // no current draft sets these; render if ever present
+      var img=e.thumb||e.image||e.image_url||null; // direct URL if the embed ever carries one
       card.innerHTML='<div class="bsky-prev-card">'+
-        (img?('<img src="'+esc(img)+'" alt="link card image">'):'')+
+        (img?('<img src="'+esc(img)+'" alt="link card image">'):'<div id="bsky-prev-img-slot"></div>')+
         '<div class="bsky-prev-card-body">'+
           '<div class="bsky-prev-card-title">'+esc(e.title||'')+'</div>'+
           '<div class="bsky-prev-card-desc">'+esc(e.description||'')+'</div>'+
           '<div class="bsky-prev-card-host">'+esc(bskyHost(e.uri))+' &nbsp;·&nbsp; <a href="'+esc(e.uri)+'" target="_blank" rel="noopener" style="color:var(--accent)">open link ↗</a></div>'+
         '</div></div>';
-      note.textContent=img?'':'No image on this draft — it posts as text + this link card. (Images here would require a real live-page screenshot; never a generated graphic.)';
+      if(img){ note.textContent=''; }
+      else if(p.image_bucket_path){
+        // Real live-page screenshot in the private social-images bucket — fetch an
+        // admin signed URL and drop it into the card top, like Bluesky renders it.
+        note.textContent='Loading the real screenshot…';
+        (function(pid, key){
+          window.hsClient.storage.from('social-images').createSignedUrl(key, 600).then(function(r){
+            if(bskyEditId!==pid) return; // modal moved on to another post
+            var slot=document.getElementById('bsky-prev-img-slot');
+            if(r && r.data && r.data.signedUrl && slot){
+              slot.outerHTML='<img src="'+esc(r.data.signedUrl)+'" alt="real live-page screenshot">';
+              $('bsky-prev-note').textContent='Real screenshot of the live page — posts as the link card image.';
+            } else {
+              $('bsky-prev-note').textContent='A real screenshot is attached ('+key+') but the preview could not load it'+(r&&r.error?' — '+(r.error.message||''):'')+'. It will still post as the card image.';
+            }
+          }).catch(function(){ $('bsky-prev-note').textContent='A real screenshot is attached but the preview could not load it. It will still post as the card image.'; });
+        })(p.id, p.image_bucket_path);
+      }
+      else{
+        note.textContent='No image on this draft yet — it posts as text + this link card. (Screenshots are captured from the live page by the engine; never a generated graphic.)';
+      }
     } else {
       card.innerHTML='';
       note.textContent='No link card on this draft — it posts as plain text only.';
