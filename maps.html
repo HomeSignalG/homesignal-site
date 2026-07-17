@@ -24,6 +24,10 @@
     <div class="ph">
       <div class="eyebrow">Maps</div>
       <h1>What's changing around you</h1>
+      <!-- WHICH address/area this page is about — filled by the page script:
+           the LOGGED home address when a real home is saved, else the viewed
+           area. Never a demo/sample address presented as "your home". -->
+      <p id="phWhere" style="display:none;margin:2px 0 8px;font-size:13.5px;font-weight:600;color:var(--ink)"></p>
       <p>Every project near your home, placed on the map and colored by its permit status. Area-wide notices — which apply to the whole area, not one address — are listed beside the map.</p>
     </div>
     <div class="toolbar">
@@ -113,6 +117,20 @@ HS.onReady(async function () {
   var hasRealHome = !!(home && !home.sample && home.zip === S.zip);
   var cCentroid = (c && c.lat != null && c.lng != null) ? { lat: c.lat, lng: c.lng } : null;
   var center = (hasRealHome ? home : null) || cCentroid || all[0] || facs[0] || null;
+
+  // Page-header context line: say up front WHICH address (or area) this page
+  // is about. A real saved home shows its full logged address; otherwise the
+  // viewed area (never a demo/sample address presented as "your home").
+  var phWhere = document.getElementById('phWhere');
+  if (phWhere) {
+    if (hasRealHome) {
+      phWhere.textContent = '⌂ Your home · ' + HS.homeAddressLine(home);
+    } else if (c) {
+      phWhere.textContent = '◍ ' + c.name + (c.state ? ', ' + c.state : '')
+        + ((HS.isSample && HS.isSample()) ? ' — (Sample Zip Code)' : '');
+    }
+    phWhere.style.display = phWhere.textContent ? 'block' : 'none';
+  }
 
   // Area-wide notices: REAL records with no parcel point (jurisdiction-level
   // planning/civic items). They have no honest map position, so they are LISTED,
