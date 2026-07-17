@@ -122,6 +122,17 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
 .bsky-edit-textarea:focus{outline:none;border-color:var(--accent)}
 .bsky-edit-count{font-size:12px;margin:8px 0 16px;font-variant-numeric:tabular-nums;color:var(--muted)}
 .bsky-edit-count.over{color:var(--persist);font-weight:700}
+/* Bluesky-style preview: what will ACTUALLY post — text, then the external link card */
+.bsky-prev{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--panel2);margin:0 0 16px}
+.bsky-prev-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.bsky-prev-text{white-space:pre-wrap;font-size:14px;line-height:1.5;margin-bottom:10px}
+.bsky-prev-card{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+.bsky-prev-card img{display:block;width:100%;max-height:180px;object-fit:cover}
+.bsky-prev-card-body{padding:10px 12px}
+.bsky-prev-card-title{font-size:13.5px;font-weight:600}
+.bsky-prev-card-desc{font-size:12.5px;color:var(--muted);margin-top:2px}
+.bsky-prev-card-host{font-size:11.5px;color:var(--muted);margin-top:6px;border-top:1px solid var(--line);padding-top:6px}
+.bsky-prev-note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
 .bsky-edit-actions{display:flex;gap:8px;justify-content:flex-end}
 .bsky-edit-close{position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;line-height:1;color:var(--muted);cursor:pointer}
 </style>
@@ -181,6 +192,12 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
     <p class="bsky-edit-sub">Max 300 graphemes. Facts must stay verbatim from the source — this is phrasing/hashtag edits only.</p>
     <textarea id="bsky-edit-textarea" class="bsky-edit-textarea"></textarea>
     <div id="bsky-edit-count" class="bsky-edit-count">0/300</div>
+    <div class="bsky-prev">
+      <div class="bsky-prev-label">Bluesky preview — this is the actual post</div>
+      <div id="bsky-prev-text" class="bsky-prev-text"></div>
+      <div id="bsky-prev-card"></div>
+      <div id="bsky-prev-note" class="bsky-prev-note"></div>
+    </div>
     <div class="bsky-edit-actions">
       <button class="bsky-btn" id="bsky-edit-cancel" style="background:#e4e8e4;color:#16211c">Cancel</button>
       <button class="bsky-btn" id="bsky-edit-save" style="background:var(--accent);color:#fff">Save</button>
@@ -560,7 +577,8 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
       '</div>'+
       '<div style="white-space:pre-wrap;margin:10px 0;line-height:1.5">'+esc(p.post_text)+'</div>'+
       '<div class="muted" style="font-size:12px;margin-bottom:10px">'+esc(tags)+' &nbsp;·&nbsp; '+
-        (p.source_url?('<a href="'+esc(p.source_url)+'" target="_blank" rel="noopener" style="color:var(--accent)">verify source ↗</a> (approval = fact-check)'):'<span style="color:var(--persist)">NO source_url — not postable</span>')+'</div>'+
+        (p.source_url?('<a href="'+esc(p.source_url)+'" target="_blank" rel="noopener" style="color:var(--accent)">verify source ↗</a> (approval = fact-check)'):'<span style="color:var(--persist)">NO source_url — not postable</span>')+
+        ((p.embed&&p.embed.uri)?(' &nbsp;·&nbsp; <a href="'+esc(p.embed.uri)+'" target="_blank" rel="noopener" style="color:var(--accent)">post links to ↗</a> (link card)'):' &nbsp;·&nbsp; <span style="color:var(--persist)">NO site link on this draft</span>')+'</div>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
         (p.status!=='approved'?'<button class="bsky-btn" data-act="approve" style="background:var(--accent);color:#fff">Approve</button>':'')+
         '<button class="bsky-btn" data-act="edit" style="background:#e4e8e4;color:#16211c">Edit</button>'+
@@ -575,6 +593,9 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
         .in('status',['draft','approved']).order('scheduled_slot',{ascending:true,nullsFirst:false}).order('created_at',{ascending:true});
       if(r.error){ body.innerHTML='<div class="muted">Queue unavailable ('+esc(r.error.message||'')+').</div>'; return; }
       var rows=r.data||[];
+      // Stash full rows so the edit modal can preview embed data (link card /
+      // image), which lives outside post_text and isn't in the rendered DOM.
+      _bskyRows={}; rows.forEach(function(p){ _bskyRows[p.id]=p; });
       // metrics strip
       var today=new Date(); today.setHours(0,0,0,0);
       var startWeek=new Date(Date.now()-7*864e5);
@@ -604,15 +625,38 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
   }
   // ---- Bluesky edit modal (real textarea — a native prompt() box is too small
   // to show a multi-line, near-300-char post with its \n\n hashtag block) -------
-  var bskyEditId=null;
+  var bskyEditId=null, _bskyRows={};
   function bskyEditCountUpdate(){
     var ta=$('bsky-edit-textarea'); var n=graphemeLen(ta.value);
     var c=$('bsky-edit-count'); c.textContent=n+'/300'; c.className='bsky-edit-count'+(n>300?' over':'');
+    // live preview: the text is what you type; the embed card is fixed row data
+    $('bsky-prev-text').textContent=ta.value;
+  }
+  function bskyHost(u){ try{ return new URL(u).host; }catch(e){ return u||''; } }
+  function bskyRenderPreviewCard(p){
+    var card=$('bsky-prev-card'), note=$('bsky-prev-note');
+    var e=(p&&p.embed)||{};
+    if(p && p.embed_kind==='external' && e.uri){
+      var img=e.thumb||e.image||e.image_url||null; // no current draft sets these; render if ever present
+      card.innerHTML='<div class="bsky-prev-card">'+
+        (img?('<img src="'+esc(img)+'" alt="link card image">'):'')+
+        '<div class="bsky-prev-card-body">'+
+          '<div class="bsky-prev-card-title">'+esc(e.title||'')+'</div>'+
+          '<div class="bsky-prev-card-desc">'+esc(e.description||'')+'</div>'+
+          '<div class="bsky-prev-card-host">'+esc(bskyHost(e.uri))+' &nbsp;·&nbsp; <a href="'+esc(e.uri)+'" target="_blank" rel="noopener" style="color:var(--accent)">open link ↗</a></div>'+
+        '</div></div>';
+      note.textContent=img?'':'No image on this draft — it posts as text + this link card. (Images here would require a real live-page screenshot; never a generated graphic.)';
+    } else {
+      card.innerHTML='';
+      note.textContent='No link card on this draft — it posts as plain text only.';
+    }
   }
   function openBskyEdit(id){
-    var cur=document.querySelector('[data-post="'+id+'"] div[style*="pre-wrap"]');
     bskyEditId=id;
-    var ta=$('bsky-edit-textarea'); ta.value=cur?cur.textContent:'';
+    var p=_bskyRows[id]||null;
+    var cur=document.querySelector('[data-post="'+id+'"] div[style*="pre-wrap"]');
+    var ta=$('bsky-edit-textarea'); ta.value=(p&&p.post_text!=null)?p.post_text:(cur?cur.textContent:'');
+    bskyRenderPreviewCard(p);
     bskyEditCountUpdate();
     $('bsky-edit-overlay').style.display='flex';
     ta.focus();
