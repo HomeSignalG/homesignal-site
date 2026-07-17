@@ -6,6 +6,7 @@ on:
       - '**/*.js'
       - '**/*.html'
       - 'test/**'
+      - 'topics.canon.json'
       - '.github/workflows/unit-tests.yml'
   workflow_dispatch: {}
 
@@ -23,3 +24,5 @@ jobs:
         run: node test/signed-out-guard.test.mjs
       - name: realHome single-source test
         run: node test/realhome.test.mjs
+      - name: Topic-canon drift test
+        run: node test/topic-canon.test.mjs

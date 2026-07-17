@@ -1,0 +1,57 @@
+{
+  "_comment": "GENERATED / VENDORED from homesignal-ingest/topics/canon.yaml (the authored source of record). Phase 1A: descriptive + inert — used ONLY by test/topic-canon.test.mjs to detect drift against topics.js. Nothing in the runtime imports this. Do not hand-edit; regenerate from the ingest artifact. Copied 2026-07-17.",
+  "_government_topics_comment": "government_topics_active = strings delivered by the notices digest today (digest.py::CANONICAL_TOPICS). government_topics_pending = real per-city government_notice categories present in feeds.csv but NOT yet delivered (silently dropped today). Pending is recorded here only to make the delivery gap canonical + CI-tracked; NO site runtime reads it and it does NOT change subscription writes or matching.",
+  "version": 1,
+  "government_topics_active": [
+    "County Commission & county business",
+    "Planning, zoning & development",
+    "Property taxes & assessments",
+    "Public safety & emergencies",
+    "Water companies",
+    "Elections & voting",
+    "Stratos data center project",
+    "Eagle Mountain data center project",
+    "City government (Brigham City)",
+    "City government (Tremonton)"
+  ],
+  "government_topics_pending": [
+    "City government (Alpine)",
+    "City government (American Fork)",
+    "City government (Bluffdale)",
+    "City government (Cedar Valley)",
+    "City government (Goshen)",
+    "City government (Lehi)",
+    "City government (Lindon)",
+    "City government (Mapleton)",
+    "City government (Orem)",
+    "City government (Payson)",
+    "City government (Pleasant Grove)",
+    "City government (Provo)",
+    "City government (Salem)",
+    "City government (Santaquin)",
+    "City government (Saratoga Springs)",
+    "City government (Spanish Fork)",
+    "City government (Springville)",
+    "City government (Woodland Hills)"
+  ],
+  "news_subtopics": [
+    "Water Quality",
+    "Air Quality",
+    "Soil Quality",
+    "Data Centers",
+    "EMF",
+    "Radiation",
+    "Infrastructure",
+    "Noise Pollution",
+    "Light Pollution",
+    "Weather & Climate Hazards",
+    "Animal & Human Viruses / Diseases",
+    "Livestock, Crops, Pets & Wildlife Health"
+  ],
+  "pipeline_types": [
+    "government_notice",
+    "news_alert",
+    "emerging_technology",
+    "global_best_practices"
+  ]
+}
