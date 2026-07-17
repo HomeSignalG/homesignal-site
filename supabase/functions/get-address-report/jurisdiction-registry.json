@@ -2988,7 +2988,9 @@
     "type_source": "NEWCLASS",
     "file_date": "ISSUEDATE",
     "address": "PROP_ADDRE",
-    "case_number": "FOLDERNUMB"
+    "case_number": "FOLDERNUMB",
+    "lat": "__lat",
+    "lng": "__lng"
    },
    "include_types": [
     "New Construction",
