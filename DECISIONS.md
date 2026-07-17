@@ -165,3 +165,23 @@ dashboard.html via the ONE backbone in lib/map.js):
   `docs/app-maps-backbone-migration.sql` (applied live as
   `app_maps_backbone_centroids_and_date_sanity`; function body pulled verbatim
   via pg_get_functiondef, additive edits only).
+
+## Regulated facilities as first-class entities (2026-07-17)
+- **Facilities got the entity → UI pipeline, not a new table.** The spec's original
+  `resolved_facilities` idea was dropped after the repo read: `resolved_projects` is the
+  dormant Stratos entity, and facilities are ALREADY `app_projects` rows
+  (`record_kind='facility'`). The build enriches that row (`registry_id` + `facility_env`
+  jsonb, additive) and renders it — no parallel pipeline, no Stratos work.
+- **The dossier reuses `development.html?id=` branching on `record_kind`** (founder call):
+  one detail surface, one code path; header/labels read "Regulated facility," never
+  development — a facility is an existing condition, not activity. A record-kind-neutral
+  rename of development.html is flagged as a possible later cleanup (logged, non-blocking).
+- **ICIS-NPDES permit status is fetched (engine v21) because it is the honest core:**
+  ECHO's compliance fields alone can't say WHY zeros are meaningful. Statuses are verbatim
+  ("Admin Continued", live-verified); tracking_on = {Effective, Admin Continued, Expired}.
+  **Enforcement zeros render as a positive signal ONLY while tracking is on** — a
+  Terminated/Retired/Pending permit shows the tracking-off caveat instead (the DALFEN
+  FRS 110071346495 example). Unknown status → explicit "permit status not yet confirmed",
+  never a guess; the UI does not block on backfill.
+- **Facilities keep the same coverage gating as projects for free** (rows are ZIP-keyed by
+  the same materializer from the same coverage-gated engine cache; no parallel gate added).

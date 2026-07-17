@@ -1,4 +1,11 @@
 // get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr).
+// v21 = ICIS-NPDES PERMIT STATUS (cwaPermitEnrich): one cwa_rest_services get_facilities→get_qid
+// pair per report stamps env.epa.permits[] (npdes_id/statute/status/type, verbatim) plus the
+// most-active env.epa.permit_status and derived env.epa.compliance_tracking_on onto each FRS
+// facility — the honest core behind the "regulated facilities as first-class entities" build
+// (docs/regulated-facilities-entity-spec: a Terminated permit's zero-violation counts reflect an
+// UNTRACKED permit, not a verified clean history, so the page must know the status). Additive,
+// fail-open, keyed on registry_id like echoEnrich; unknown/blank statuses stamp nothing.
 // v20 = GEOCODE GEOFENCE (sources/arcgis.ts): a GEOCODED point (never source-supplied geometry)
 // is trusted only when (a) the Census matched-address ZIP equals the record's filed ZIP and
 // (b) the point sits within GEOCODE_FENCE_MI (25) of the report ZIP centroid. A miss NULLS the
@@ -355,6 +362,69 @@ async function echoEnrich(fac: Record<string, unknown>[], lat: number, lng: numb
   } catch (_e) { /* best-effort — never block the page */ }
 }
 
+// ── v21: ICIS-NPDES PERMIT STATUS (the "regulated facilities as entities" honest core) ─────────
+// The v19 ECHO pull reads only *ComplianceStatus fields; it never captured the NPDES permit
+// status (Effective / Admin Continued / Expired / Pending / Not Needed / Retired / Terminated),
+// so the page could not say WHY a facility's zeros are or aren't meaningful — a Terminated
+// permit's "0 violations" is an untracked permit, not a verified clean history. ONE
+// cwa_rest_services get_facilities → get_qid pair per report (same shape as echoEnrich),
+// qcolumns pinned to CWPName/SourceID/RegistryID/Statute/CWPPermitStatusDesc/CWPPermitTypeDesc
+// (ids 1,2,9,11,51,54 — column ids verified against cwa_rest_services.metadata 2026-07-17;
+// DALFEN FRS 110071346495 returns CWPPermitStatusDesc "Terminated" live). A facility can hold
+// several NPDES permits: ALL ride as env.epa.permits[] children; env.epa.permit_status is the
+// most-active one (precedence below) and env.epa.compliance_tracking_on derives from it —
+// tracking is ON only for Effective / Admin Continued / Expired (ECHO still counts Expired as
+// active). Verbatim statuses only; an unknown/blank status stamps NOTHING (absent stays absent,
+// the page renders "permit status not yet confirmed"). Additive + fail-open like echoEnrich.
+const CWA_QCOLUMNS = "1,2,9,11,51,54"; // CWPName,SourceID,RegistryID,Statute,CWPPermitStatusDesc,CWPPermitTypeDesc
+const PERMIT_STATUS_PRECEDENCE = ["Effective", "Admin Continued", "Administratively Continued", "Expired", "Pending", "Not Needed", "Retired", "Terminated"];
+const PERMIT_TRACKING_ON = new Set(["Effective", "Admin Continued", "Administratively Continued", "Expired"]);
+async function cwaPermitEnrich(fac: Record<string, unknown>[], lat: number, lng: number, radiusMi: number): Promise<void> {
+  if (!fac.some((f) => String(f.registry_id ?? "").trim())) return;
+  try {
+    const q1 = new URLSearchParams({ output: "JSON", p_lat: lat.toFixed(6), p_long: lng.toFixed(6), p_radius: String(Math.min(radiusMi, MAX_RADIUS_MI)) });
+    const r1 = await fetch(`${ECHO_BASE}/cwa_rest_services.get_facilities?${q1}`, { signal: AbortSignal.timeout(25000) });
+    if (!r1.ok) return;
+    const qid = echoParse(await r1.text())?.Results?.QueryID;
+    if (!qid) return;
+    const q2 = new URLSearchParams({ output: "JSON", qid: String(qid), qcolumns: CWA_QCOLUMNS, responseset: "500" });
+    const r2 = await fetch(`${ECHO_BASE}/cwa_rest_services.get_qid?${q2}`, { signal: AbortSignal.timeout(25000) });
+    if (!r2.ok) return;
+    const rows = (echoParse(await r2.text())?.Results?.Facilities ?? []) as Record<string, string>[];
+    const byId = new Map<string, Record<string, string>[]>();
+    for (const row of rows) {
+      const id = String(row.RegistryID ?? "").trim();
+      if (id) (byId.get(id) ?? byId.set(id, []).get(id)!).push(row);
+    }
+    for (const f of fac) {
+      const rws = byId.get(String(f.registry_id ?? "").trim());
+      if (!rws || !rws.length) continue;
+      // Children: every NPDES permit on this FRS id, verbatim (absent fields stay absent).
+      const permits = rws.map((r) => {
+        const p: Record<string, unknown> = {};
+        if (r.SourceID) p.npdes_id = String(r.SourceID);
+        if (r.Statute) p.statute = String(r.Statute);
+        if (r.CWPPermitStatusDesc) p.status = String(r.CWPPermitStatusDesc);
+        if (r.CWPPermitTypeDesc) p.type = String(r.CWPPermitTypeDesc);
+        return p;
+      }).filter((p) => Object.keys(p).length);
+      if (!permits.length) continue;
+      const statuses = permits.map((p) => String(p.status ?? "")).filter(Boolean);
+      const env = (f.env ??= {}) as Record<string, unknown>;
+      env.link_type = "geo_matched";
+      const epa = (env.epa ??= {}) as Record<string, unknown>;
+      epa.permits = permits;
+      // The headline status is the MOST-ACTIVE one across this facility's permits; only a
+      // verbatim known status is stamped, and tracking_on derives from that same value.
+      const head = PERMIT_STATUS_PRECEDENCE.find((s) => statuses.includes(s));
+      if (head) {
+        epa.permit_status = head;
+        epa.compliance_tracking_on = PERMIT_TRACKING_ON.has(head);
+      }
+    }
+  } catch (_e) { /* best-effort — never block the page */ }
+}
+
 // TCEQ dedup + enrich: attach each TCEQ RN onto the FRS facility at the same physical site
 // (matched by siteKey = house# + street + ZIP, else by exact normalized name), so a facility with
 // BOTH an FRS id and a TCEQ RN renders ONCE with both badges. NO geocoding — the matched site
@@ -519,6 +589,8 @@ Deno.serve(async (req: Request) => {
     await enrichViolations(supabase, facRaw);
     // v19: live EPA ECHO compliance enrichment (real violations/programs, keyed on registry_id).
     await echoEnrich(facRaw, clat, clng, zipRadius);
+    // v21: ICIS-NPDES permit status (env.epa.permits[] + permit_status + compliance_tracking_on).
+    await cwaPermitEnrich(facRaw, clat, clng, zipRadius);
     // TX TDLR/TABS enrichment (v16, additive — runbook §1). Coverage-gated inside
     // tabsForZip(): the source never runs for a non-TX ZIP. Separate query keeps
     // resolveCommunityIds() untouched (additive-only rule, source-registry #4).
@@ -718,6 +790,8 @@ Deno.serve(async (req: Request) => {
   // v19: same environmental-records layer as ZIP mode — live ECHO compliance + TCEQ Central
   // Registry (coverage-gated to TX), geo-matched onto the facilities we already placed.
   await echoEnrich(fac, lat, lng, radiusMi);
+  // v21: ICIS-NPDES permit status (env.epa.permits[] + permit_status + compliance_tracking_on).
+  await cwaPermitEnrich(fac, lat, lng, radiusMi);
   const { data: addrComm } = await supabase.from("communities").select("state,county").contains("zip_codes", [zipM ? zipM[1] : ""]);
   const addrTceq = await tceqForZip(zipM ? zipM[1] : "", (addrComm ?? []) as TceqCommunityRow[], { fetch });
   enrichTceq(fac, addrTceq.entities);

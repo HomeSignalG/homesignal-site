@@ -92,6 +92,10 @@ HS.onReady(async function () {
     .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
   var facs = (facilities || []).filter(function(x){return x.lat && x.lng;})
     .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);}).slice(0, 24);
+  // Sidebar rows list EVERY facility on record (closest-first), not just the mappable
+  // ones — a facility with no stored coordinate still exists and still gets its dossier row.
+  var facRows = (facilities || []).slice()
+    .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
   if (facs.length) {   // reveal the facilities legend + layer toggle only when there are any
     var _lf = document.getElementById('legFacility'); if (_lf) _lf.style.display = '';
     var _lyf = document.getElementById('lyrFacilities'); if (_lyf) _lyf.style.display = '';
@@ -154,7 +158,30 @@ HS.onReady(async function () {
             + '<p class="sowhat">' + HS.esc(it.plain_language || '') + '</p></div>';
         }).join('');
     }
+    // Regulated facilities — the THIRD entity type, own section (never folded into the
+    // A–P development list: a facility is an existing condition, not activity — spec §6).
+    // Closest-first; each row routes into the facility DOSSIER (development.html?id=),
+    // never straight to ECHO. Empty state is said out loud, not left blank.
+    html += '<div class="groupHead">Regulated facilities · nearby</div>';
+    if (facRows.length) {
+      html += facRows.map(function (f, i) {
+        var interp = HS.fac.interpret(f.facility_env || null);
+        return '<div class="card mini clickable" data-fac="' + i + '" style="border-left-color:' + FACILITY_HEX + '">'
+          + '<span class="lens">' + HS.esc(f.type || 'Regulated facility') + (f.dist ? ' · ' + HS.esc(f.dist) : '') + '</span>'
+          + '<h3>' + HS.esc(f.name) + '</h3>'
+          + '<p class="sowhat">' + HS.esc(interp ? interp.line : 'Permit status not yet confirmed — open the facility record.') + '</p></div>';
+      }).join('');
+    } else {
+      html += '<div class="card mini" style="border-left-color:' + FACILITY_HEX + '">'
+        + '<p class="sowhat">No regulated facilities on record near this ZIP.</p></div>';
+    }
     document.getElementById('pinList').innerHTML = html;
+    document.querySelectorAll('#pinList [data-fac]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var f = facRows[parseInt(el.getAttribute('data-fac'), 10)];
+        if (f) location.href = 'development.html?id=' + encodeURIComponent(f.id);
+      });
+    });
     document.querySelectorAll('#pinList [data-pin]').forEach(function (el) {
       el.addEventListener('click', function () {
         var to = pinHref(items[parseInt(el.getAttribute('data-pin'), 10)]); if (!to) return;
@@ -253,14 +280,13 @@ HS.onReady(async function () {
       var t=document.createElementNS(NS,'title');
       t.textContent = f.name + ' · Regulated facility' + (f.dist?' · '+f.dist:'');
       rect.appendChild(t);
-      if (f.source_ref) {   // keep the official record link on the marker
-        var a=document.createElementNS(NS,'a');
-        a.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href',f.source_ref);
-        a.setAttribute('href',f.source_ref); a.setAttribute('target','_blank'); a.setAttribute('rel','noopener');
-        a.appendChild(rect); put(a);
-      } else {
-        put(rect);
-      }
+      // The marker opens the HomeSignal facility dossier (the interpreted panel); the
+      // official ECHO/TCEQ record links live inside the dossier, never on the pin itself.
+      var a=document.createElementNS(NS,'a');
+      var dossier='development.html?id='+encodeURIComponent(f.id);
+      a.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href',dossier);
+      a.setAttribute('href',dossier);
+      a.appendChild(rect); put(a);
     });
   }
 
@@ -310,9 +336,13 @@ HS.onReady(async function () {
       +(it.source_ref?'<a href="'+HS.esc(it.source_ref)+'" target="_blank" rel="noopener" style="font-size:11.5px;color:#157a49;font-weight:600">official record ▸</a>':'');
   }
   function facPopupHTML(f){
+    // Routes into the HomeSignal facility DOSSIER, not an external ECHO tab — the official
+    // ECHO/TCEQ record links live inside the dossier's Source section (spec §7 / §10).
+    var interp = HS.fac.interpret(f.facility_env || null);
     return '<div style="font:600 13px/1.3 var(--font)">'+HS.esc(f.name)+'</div>'
-      +'<div style="font-size:11px;color:#5a6b63">Regulated facility'+(f.developer?' · '+HS.esc(f.developer):'')+(f.dist?' · '+HS.esc(f.dist):'')+'</div>'
-      +(f.source_ref?'<a href="'+HS.esc(f.source_ref)+'" target="_blank" rel="noopener" style="font-size:11.5px;color:#157a49;font-weight:600">View public record ▸</a>':'');
+      +'<div style="font-size:11px;color:#5a6b63">Regulated facility'+(f.dist?' · '+HS.esc(f.dist):'')+'</div>'
+      +(interp?'<div style="font-size:11px;color:#5a6b63">'+HS.esc(interp.line)+'</div>':'')
+      +'<a href="development.html?id='+encodeURIComponent(f.id)+'" style="font-size:11.5px;color:#157a49;font-weight:600">Facility record ▸</a>';
   }
   function ensureGL(){
     if (glMap) return;

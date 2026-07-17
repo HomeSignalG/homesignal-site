@@ -74,11 +74,13 @@ HS.onReady(async function () {
         + '<div class="devgrid">' + facilities.map(facCard).join('') + '</div>';
     }
     function facCard(f) {
-      return '<div class="card" style="border-left-color:var(--ink-3)">'
+      // Routes into the facility dossier (the interpreted panel) — the official ECHO/TCEQ
+      // record links live THERE, so the dossier is the one EPA-link path (spec §3/§7).
+      var interp = HS.fac.interpret(f.facility_env || null);
+      return '<div class="card clickable" style="border-left-color:var(--ink-3)" onclick="location.href=\'development.html?id=' + encodeURIComponent(f.id) + '\'">'
         + '<span class="lens">' + HS.esc(f.type || 'Regulated facility') + (f.dist ? ' · ' + HS.esc(f.dist) : '') + '</span>'
         + '<h3>' + HS.esc(f.name) + '</h3>'
-        + (f.developer ? '<p class="sowhat">' + HS.esc(f.developer) + '</p>' : '')
-        + (f.source_ref ? '<div class="foot"><div class="actions"><a class="btn" href="' + HS.esc(f.source_ref) + '" target="_blank" rel="noopener">View public record →</a></div></div>' : '')
+        + '<p class="sowhat">' + HS.esc(interp ? interp.line : 'Permit status not yet confirmed — open the facility record.') + '</p>'
         + '</div>';
     }
     function lens(i,q,d){ return '<button class="lenscard' + (state2.lens===i?' on':'') + '" data-lens="' + i + '"><span class="q">' + q + '</span><span class="d">' + d + '</span></button>'; }
@@ -100,6 +102,13 @@ HS.onReady(async function () {
 
   function renderDetail(pid) {
     var p = projects.find(function(x){return x.id===pid;});
+    // Facilities share this route/page but branch to their own dossier template —
+    // a regulated facility is an EXISTING CONDITION, not development activity, so the
+    // header/labels read "Regulated facility" throughout (spec §7).
+    if (!p) {
+      var f = facilities.find(function(x){return x.id===pid;});
+      if (f) { renderFacility(f); return; }
+    }
     if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button><div class="ph"><h1>Not found</h1></div>'; return; }
     HS.data.meetings(S.zip, home).then(function (meetings) {
       var mtg = meetings.find(function(m){return m.related_project_id===p.id;});
@@ -132,6 +141,65 @@ HS.onReady(async function () {
         + specRow('Jobs created', p.jobs) + specRow('Distance', p.dist) + specRow('Status', p.stage)
         + '</div>' + (p.approx ? '<p style="font-size:11px;color:var(--ink-3);margin:12px 0 0">Some specifics are prototype placeholders pending the live feed — see the source record.</p>' : '') + '</div></div>';
     });
+  }
+  // Facility dossier (spec §7) — Identity / Interpreted status / Permit history /
+  // Enforcement & compliance / Source. Every rendered field traces to the materialized
+  // ECHO/TCEQ record (app_projects.registry_id + facility_env); absent stays absent and
+  // is SAID to be absent, never guessed. Enforcement zeros render as a positive signal
+  // ONLY while compliance tracking is on (§5) — otherwise the tracking-off caveat shows.
+  function renderFacility(f) {
+    var fenv = f.facility_env || null;
+    var interp = HS.fac.interpret(fenv);
+    var sigs = HS.fac.signals(fenv);
+    var links = HS.fac.links(f);
+    var permits = (fenv && fenv.epa && fenv.epa.permits) || [];
+    var statutes = permits.map(function(pm){ return pm.statute; }).filter(Boolean)
+      .filter(function(s, i, a){ return a.indexOf(s) === i; });
+
+    var statusHtml = interp
+      ? '<div class="verdict">' + HS.esc(interp.line) + '</div>'
+        + (interp.caveat ? '<p class="sowhat" style="font-style:italic">' + HS.esc(interp.caveat) + '</p>' : '')
+      : '<div class="verdict">Permit status not yet confirmed for this facility.</div>'
+        + '<p class="sowhat">EPA lists this facility in its registry, but its permit status isn\'t in our archived record yet — see the official source below.</p>';
+
+    var permitsHtml = permits.length
+      ? permits.map(function(pm){
+          var bits = [pm.npdes_id, pm.type, pm.status].filter(Boolean).map(HS.esc);
+          return '<div class="row"><span>' + HS.esc(pm.statute || 'Permit') + '</span><b>' + bits.join(' · ') + '</b></div>';
+        }).join('')
+      : '<p class="sowhat">No individual permit records in the archived report.</p>';
+
+    var enfHtml = sigs.length
+      ? sigs.map(function(g){ return '<div class="row"><span>' + (g.tone === 'alert' ? '⚠' : g.tone === 'watch' ? '◔' : '·') + '</span><b>' + HS.esc(g.text) + '</b></div>'; }).join('')
+      : (interp && interp.tracking === false
+          ? '<p class="sowhat">' + HS.esc(interp.caveat) + '</p>'
+          : '<p class="sowhat">No enforcement or compliance entries in the archived record.</p>');
+
+    var linksHtml = links.map(function(l){
+      return '<button class="btn' + (links[0] === l ? ' primary' : '') + '" onclick="window.open(\'' + HS.esc(l.url) + '\',\'_blank\',\'noopener\')">' + HS.esc(l.label) + '</button>';
+    }).join('');
+
+    page.innerHTML =
+      '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button>'
+      + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">Regulated facility <span class="status active">Operating</span></div>'
+      + '<h1 style="margin-bottom:2px">' + HS.esc(f.name) + '</h1>'
+      + '<p style="margin:6px 0 0">An existing regulated facility on the public record — environmental context, not development activity.</p></div>'
+      + '<div class="detail"><div class="panel">'
+      + '<div class="kicker">Interpreted status</div>'
+      + statusHtml
+      + '<div class="divider"></div><div class="kicker">Permit history</div><div class="specs">' + permitsHtml + '</div>'
+      + '<div class="divider"></div><div class="kicker">Enforcement & compliance</div><div class="specs">' + enfHtml + '</div>'
+      + '<p style="font-size:11px;color:var(--ink-3);margin:12px 0 0">Environmental records are geo-matched to this facility, not to a specific parcel. A factual public-record summary — not a verdict on any operator.</p>'
+      + '</div>'
+      + '<div class="panel side"><div class="kicker">Identity</div><div class="specs">'
+      + specRow('Facility', f.name) + specRow('Type', f.type)
+      + specRow('FRS Registry ID', f.registry_id)
+      + specRow('Statutes', statutes.join(', '))
+      + specRow('TCEQ RN', fenv && fenv.tceq_rn)
+      + specRow('Registry', f.developer) + specRow('Distance', f.dist)
+      + '</div>'
+      + '<div class="divider"></div><div class="kicker">Source — official records</div><div class="doact">' + linksHtml + '</div>'
+      + '</div></div>';
   }
   function specRow(k,v){ return '<div class="row"><span>' + HS.esc(k) + '</span><b>' + HS.esc(v||'—') + '</b></div>'; }
 });
