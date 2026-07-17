@@ -42,7 +42,11 @@ HS.onReady(async function () {
     + HS.tpl.statTile(avg, 'Avg property score', 'g');
 
   var tone = { 'Your home':'var(--green)', 'Rental':'var(--amber)', 'Family':'var(--blue)' };
-  document.getElementById('propGrid').innerHTML = S.properties.map(function (p) {
+  var sampleBanner = HS.isSample()
+    ? '<div class="propcard" style="grid-column:1/-1;justify-content:center;background:var(--amber-tint);border:1px solid #f0dcbd">'
+      + '<div style="text-align:center;font-size:13px;color:var(--amber)"><b>Sample homes</b> — sign in to add your own.</div></div>'
+    : '';
+  document.getElementById('propGrid').innerHTML = sampleBanner + S.properties.map(function (p) {
     // per-property computed: nearest N projects, open windows
     var near = HS.withDistance(projects, p).filter(function(x){return (x.distance_mi||9e9) <= 5;});
     var needs = HS.withDistance(changes, p).filter(function(x){return HS.daysUntil(x.window_closes_at)>=0 && (x.distance_mi||9e9)<=5;}).length;

@@ -112,7 +112,7 @@ HS.onReady(async function () {
   // For everyone else the ZIP centroid (app_community_meta.lat/lng, pinned to the
   // USPS dataset) centers the viewport; first mapped record is the last resort.
   // No hardcoded fallback coordinates — a wrong-state anchor is worse than none.
-  var hasRealHome = !!(home && !home.sample && home.zip === S.zip);
+  var hasRealHome = !!HS.realHome();
   var cCentroid = (c && c.lat != null && c.lng != null) ? { lat: c.lat, lng: c.lng } : null;
   var center = (hasRealHome ? home : null) || cCentroid || all[0] || facs[0] || null;
 

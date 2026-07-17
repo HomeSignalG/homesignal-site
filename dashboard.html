@@ -69,7 +69,9 @@ HS.onReady(async function () {
 
   var name = (S.session && S.session.name || 'there').split(' ')[0];
   document.getElementById('dashHi').textContent = 'Welcome back, ' + name;
-  document.getElementById('dashSub').textContent = S.properties.length + ' home' + (S.properties.length===1?'':'s') + ' followed — here\'s what needs you across them.';
+  document.getElementById('dashSub').textContent = HS.isSample()
+    ? 'Sample homes — sign in to add your own.'
+    : (S.properties.length + ' home' + (S.properties.length===1?'':'s') + ' followed — here\'s what needs you across them.');
 
   var openCount = changes.filter(function(x){var d=HS.daysUntil(x.window_closes_at);return d!=null&&d>=0;}).length;
   document.getElementById('dashStrip').innerHTML =
@@ -86,7 +88,7 @@ HS.onReady(async function () {
   var items = changes.filter(function(x){return !x.quiet;}).concat(projects)
     .filter(function(x){return x.lat && x.lng;}).slice(0, 6);
   var dashMap = document.getElementById('dashMap');
-  var hasRealHome = !!(home && !home.sample && home.zip === S.zip);
+  var hasRealHome = !!HS.realHome();
   var center = (hasRealHome ? {lat:home.lat,lng:home.lng} : null)
     || (c && c.lat != null && c.lng != null ? {lat:c.lat,lng:c.lng} : null)
     || (items[0] ? {lat:items[0].lat,lng:items[0].lng} : null);

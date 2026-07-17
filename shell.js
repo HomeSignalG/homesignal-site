@@ -29,7 +29,7 @@
 
   // Has the visitor set their own area yet (a saved property OR a saved ZIP)?
   // When false, the app is showing the Del Valle sample and labels say so.
-  HS.hasArea = function () { return !!(state.activeProperty || LS.get('myZip', null)); };
+  HS.hasArea = function () { var p = state.activeProperty; return !!((p && !p.sample) || LS.get('myZip', null)); };
   HS.isSample = function () { return !HS.hasArea(); };
 
   // The ONE formatter for a property's logged address ("13313 Coomes Dr, Del
@@ -46,6 +46,15 @@
   // sample:true and are never presented as the visitor's own home.
   HS.isRealHome = function (p) {
     return !!(p && !p.sample && (p.label === 'home' || p.tag === 'home' || p.tag === 'Your home'));
+  };
+  // The active property IFF it's a real (non-sample) home located in the ZIP being
+  // viewed — the ONE test for "may I anchor the map / pin 'Your home' here". Returns
+  // null for a sample home, a home in a different ZIP, or none. Single source: maps /
+  // dashboard + the shared where-line all call this (no per-page copies — guarded by
+  // test/realhome.test.mjs).
+  HS.realHome = function () {
+    var p = state.activeProperty;
+    return (p && !p.sample && p.zip === state.zip) ? p : null;
   };
 
   // ---------------------------------------------- referral (first-touch) ------
@@ -294,8 +303,8 @@
         const h1 = ph.querySelector('h1');
         if (h1) h1.insertAdjacentElement('afterend', el); else ph.appendChild(el);
       }
-      const p = state.activeProperty;
-      if (p && !p.sample && p.zip === state.zip) {
+      const p = HS.realHome();
+      if (p) {
         const tag = HS.isRealHome(p) ? 'Your home' : (p.tag || p.label || 'Your property');
         el.textContent = '⌂ ' + tag + ' · ' + HS.homeAddressLine(p);
       } else {
