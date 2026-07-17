@@ -269,6 +269,11 @@
   .inlinebtn:hover{background:var(--green-tint)}
   .overlay{position:fixed;inset:0;background:rgba(16,33,28,.5);z-index:100;display:none;align-items:center;justify-content:center;padding:24px}
   .overlay.show{display:flex}
+  /* Live map engines use big internal z-indexes (Leaflet panes 400, controls/
+     attribution 1000) that outrank the modal overlay above. Isolate every map
+     box so those stack INSIDE the map and can never paint over an open modal
+     (seen live: the dashboard map covered the Switch-property list). */
+  .leaflet-container,.maplibregl-map{isolation:isolate}
   .modal{background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.32);width:100%;max-width:448px;overflow:hidden;animation:pop .18s ease}
   @keyframes pop{from{transform:translateY(10px) scale(.98);opacity:0}to{transform:none;opacity:1}}
   .modal .mhead{padding:24px 26px 0;position:relative}
