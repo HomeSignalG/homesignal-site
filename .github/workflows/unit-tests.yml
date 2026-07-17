@@ -3,18 +3,23 @@ name: unit-tests
 on:
   push:
     paths:
-      - 'lib/landing.js'
+      - '**/*.js'
+      - '**/*.html'
       - 'test/**'
       - '.github/workflows/unit-tests.yml'
   workflow_dispatch: {}
 
 jobs:
-  landing:
+  unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Run landing decision test
+      - name: Landing decision test
         run: node test/landing.test.mjs
+      - name: Sample-view test
+        run: node test/sample-view.test.mjs
+      - name: realHome single-source test
+        run: node test/realhome.test.mjs
