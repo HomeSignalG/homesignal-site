@@ -32,6 +32,22 @@
   HS.hasArea = function () { return !!(state.activeProperty || LS.get('myZip', null)); };
   HS.isSample = function () { return !HS.hasArea(); };
 
+  // The ONE formatter for a property's logged address ("13313 Coomes Dr, Del
+  // Valle, TX 78617"). Built only from fields actually saved on the row —
+  // absent parts stay absent, never guessed.
+  HS.homeAddressLine = function (p) {
+    if (!p) return '';
+    const tail = [p.city, [p.state, p.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    return [p.address, tail].filter(Boolean).join(', ');
+  };
+  // Is this row the resident's OWN home (never a demo/sample property)?
+  // app_properties rows are written with label:'home'; the seed's designated
+  // home is tagged 'Your home' (pure-seed preview only). Live-demo rows carry
+  // sample:true and are never presented as the visitor's own home.
+  HS.isRealHome = function (p) {
+    return !!(p && !p.sample && (p.label === 'home' || p.tag === 'home' || p.tag === 'Your home'));
+  };
+
   // ---------------------------------------------- referral (first-touch) ------
   // FIRST-TOUCH-WINS marketing attribution. When a visitor arrives with utm_*
   // params (e.g. from a Bluesky post link) OR an external referrer, remember it
@@ -217,15 +233,35 @@
     paintTopbar();
     document.dispatchEvent(new CustomEvent('hs:property', { detail: { id } }));
   };
+  // Switcher-modal path: pages compute their home-anchored data (pin, header
+  // address, distances) once at load, so switching focus reloads the current
+  // page to rebuild everything for the newly active home (same pattern as
+  // saveHome). Only on an actual change — re-picking the active home just
+  // closes the modal. Other selectProperty callers must NOT reload: property
+  // cards navigate right after selecting, and property.html syncs the active
+  // home during page load (a reload there would loop).
+  HS.switchProperty = function (id) {
+    const changed = id !== state.activePropId;
+    HS.selectProperty(id);
+    HS.closeModal('switcherModal');
+    if (changed) location.reload();
+  };
   function paintTopbar() {
     const p = state.activeProperty;
     if ($('locLabel')) {
-      // A saved home shows its address; a saved ZIP shows "ZIP <zip>"; otherwise
-      // the visitor is on the default Del Valle sample, so flag it clearly.
+      // A saved home is labeled AS the home ("Your home · <street>") — a bare
+      // street line never said which address the app had on file. The full
+      // logged address (street, city, state ZIP) rides in the hover tooltip.
+      // A saved ZIP shows "ZIP <zip>"; otherwise the visitor is on the default
+      // Del Valle sample, so flag it clearly.
       const myZip = LS.get('myZip', null);
-      $('locLabel').textContent = p ? p.address
+      $('locLabel').textContent = p ? ((HS.isRealHome(p) ? 'Your home · ' : '') + p.address)
         : (myZip ? ('ZIP ' + myZip)
         : ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample Zip Code)'));
+      const locWrap = $('locLabel').closest('.loc');
+      if (locWrap) locWrap.title = p
+        ? ((HS.isRealHome(p) ? 'Your home: ' : '') + HS.homeAddressLine(p) + ' — tap to switch')
+        : 'Tap to set your area';
     }
     const av = $('hs-avatar');
     if (av) {
@@ -244,10 +280,10 @@
     $('switcherSub').textContent = "You're following " + state.properties.length + " home" +
       (state.properties.length === 1 ? '' : 's') + '. Pick one to focus the app on it.';
     list.innerHTML = state.properties.map(p => `
-      <div class="swrow ${p.id === state.activePropId ? 'active' : ''}" onclick="HS.selectProperty('${p.id}');HS.closeModal('switcherModal')">
+      <div class="swrow ${p.id === state.activePropId ? 'active' : ''}" onclick="HS.switchProperty('${p.id}')">
         <div class="miniscore">${p.score || ''}</div>
         <div class="pinfo"><div class="pt">${HS.esc(p.address)}</div>
-          <div class="pa">${HS.esc(p.tag || p.label)} · ${HS.esc(p.city)}, ${HS.esc(p.state)} ${HS.esc(p.zip)}</div></div>
+          <div class="pa">${HS.esc(HS.isRealHome(p) ? 'Your home' : (p.tag || p.label))} · ${HS.esc(p.city)}, ${HS.esc(p.state)} ${HS.esc(p.zip)}</div></div>
         ${p.id === state.activePropId ? '<span class="chk">✓</span>' : ''}
       </div>`).join('');
     HS.openModal('switcherModal');
