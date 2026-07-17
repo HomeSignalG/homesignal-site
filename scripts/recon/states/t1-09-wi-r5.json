@@ -1,0 +1,5 @@
+[
+ {"id":"wi-mad-cpp-fields","url":"https://maps.cityofmadison.com/arcgis/rest/services/Planning/Current_Planning_Projects/MapServer/0?f=json"},
+ {"id":"wi-mad-cpp-count","url":"https://maps.cityofmadison.com/arcgis/rest/services/Planning/Current_Planning_Projects/MapServer/0/query?where=1%3D1&returnCountOnly=true&f=json"},
+ {"id":"wi-mad-cpp-sample","url":"https://maps.cityofmadison.com/arcgis/rest/services/Planning/Current_Planning_Projects/MapServer/0/query?where=1%3D1&outFields=*&resultRecordCount=3&returnGeometry=true&outSR=4326&f=json"}
+]
