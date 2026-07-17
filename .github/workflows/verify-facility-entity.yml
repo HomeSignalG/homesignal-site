@@ -1,0 +1,29 @@
+name: verify-facility-entity
+
+# On-demand, read-only live check of the regulated-facilities-entity build (PR #265)
+# on the deployed site — the four §10 acceptance behaviors, observed in a real browser
+# on a runner (the build sandbox has no egress; CI is the live check, repo standing answer).
+
+on:
+  workflow_dispatch:
+    inputs:
+      zip:
+        description: 'Pilot ZIP to verify (default 78617)'
+        required: false
+        default: '78617'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Verify facility entity behaviors live
+        env:
+          SITE_BASE: https://homesignal.net
+          ZIP: ${{ github.event.inputs.zip || '78617' }}
+        run: node scripts/verify-facility-entity.mjs
