@@ -44,11 +44,24 @@ async function rest(path) {
   return res.json();
 }
 
+// A single transient Playwright nav timeout among thousands of materialized pages must
+// not fail the whole run — retry once at a longer budget before giving up (mirrors the
+// same guard in verify-development.mjs).
+async function gotoWithRetry(page, target) {
+  try {
+    await page.goto(target, { waitUntil: 'networkidle', timeout: 30000 });
+  } catch (e) {
+    if (!String(e && e.message).includes('Timeout')) throw e;
+    console.log(`  ~ nav timeout, retrying once: ${target}`);
+    await page.goto(target, { waitUntil: 'networkidle', timeout: 45000 });
+  }
+}
+
 // Read the rendered community page state: which gate branch rendered, whether it's
 // indexable, the H1, and the record links (for the anti-fabrication check).
 async function readPage(page, zip) {
   const target = `${SITE_BASE}/community.html?zip=${zip}`;
-  await page.goto(target, { waitUntil: 'networkidle', timeout: 30000 });
+  await gotoWithRetry(page, target);
   // The loader renders into #commPage after the async data reads resolve. Wait for content.
   await page.waitForFunction(() => {
     const p = document.getElementById('commPage');
