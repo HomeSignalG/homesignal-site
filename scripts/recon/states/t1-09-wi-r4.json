@@ -1,0 +1,5 @@
+[
+ {"id":"wi-mad-current-planning-proj","url":"https://maps.cityofmadison.com/arcgis/rest/services/Planning/Current_Planning_Projects/MapServer?f=json"},
+ {"id":"wi-mad-development-layers","url":"https://maps.cityofmadison.com/arcgis/rest/services/Planning/Development_Layers/MapServer?f=json"},
+ {"id":"wi-mad-opendata-planning","url":"https://maps.cityofmadison.com/arcgis/rest/services/Public/OPEN_DATA_PLANNING/MapServer?f=json"}
+]
