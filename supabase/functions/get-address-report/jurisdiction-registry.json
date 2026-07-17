@@ -2958,6 +2958,98 @@
     "native_zip_and_coords": "ZIP + Lat/Lon columns",
     "record_url": "dataset-precision (no per-row URL column)"
    }
+  },
+  {
+   "registry_id": "portland-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://www.portlandmaps.com/od/rest/services/COP_OpenData_PlanningDevelopment/MapServer/89",
+   "dataset_url": "https://gis-pdx.opendata.arcgis.com/datasets/PDX::residential-building-permits",
+   "jurisdiction": "City of Portland",
+   "coverage": [
+    {
+     "state": "OR",
+     "county": "Multnomah"
+    },
+    {
+     "state": "OR",
+     "county": "Washington"
+    },
+    {
+     "state": "OR",
+     "county": "Clackamas"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "NEWTYPE",
+     "WORKDESC"
+    ],
+    "status_raw": "STATUS",
+    "type_source": "NEWCLASS",
+    "file_date": "ISSUEDATE",
+    "address": "PROP_ADDRE",
+    "case_number": "FOLDERNUMB"
+   },
+   "include_types": [
+    "New Construction",
+    "Addition",
+    "Replacement",
+    "First",
+    "Move"
+   ],
+   "type_map": {
+    "New Construction": "Development",
+    "Addition": "Development",
+    "Replacement": "Development",
+    "First": "Development",
+    "Move": "Development"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Issued",
+     "Approved to Issue"
+    ],
+    "operating": [
+     "Final",
+     "Under Inspection"
+    ],
+    "proposed": [
+     "Application",
+     "Fees Due"
+    ],
+    "exclude": [
+     "Expired"
+    ]
+   },
+   "recency_days": 365,
+   "spatial_zip_radius_mi": 3,
+   "out_fields": [
+    "NEWTYPE",
+    "WORKDESC",
+    "STATUS",
+    "NEWCLASS",
+    "ISSUEDATE",
+    "PROP_ADDRE",
+    "FOLDERNUMB"
+   ],
+   "_receipts": {
+    "probed": "2026-07-17 pg_net (ids 3806-3813)",
+    "fresh": "max ISSUEDATE 2026-06-10; 36,263 rows; item on portlandmaps.com/od (custom AGS host, PDX open data)",
+    "found_via": "PDX Hub search (gis-pdx.opendata.arcgis.com); the recon portlandmaps root has empty top-level services[] \u2014 the /od/rest tree is the real one",
+    "no_zip_col": "X_COORD/Y_COORD state-plane + Shape point geometry, no ZIP field -> spatial_zip_radius_mi (envelope on geometry)",
+    "statuses_verbatim": [
+     "Approved to Issue",
+     "Issued",
+     "Expired",
+     "Final",
+     "Under Inspection",
+     "Application",
+     "Fees Due"
+    ],
+    "types": "NEWCLASS 6-value construction axis; New Construction/Addition/Replacement/First/Move kept, Alteration + null dropped; NEWTYPE (occupancy) rides in the title",
+    "coverage_note": "Portland spans Multnomah/Washington/Clackamas; spatial envelope self-limits to the city footprint regardless",
+    "record_url": "dataset-precision (no per-row URL column)"
+   }
   }
  ],
  "ckan": [

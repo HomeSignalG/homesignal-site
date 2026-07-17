@@ -1906,3 +1906,32 @@ consolidated per-record permit ledgers anywhere we could find.
   PRIVATE; **Knox County KGIS**: 401 Unauthorized at the REST root.
 - **Shelby / Rutherford hub guesses**: domain-not-found 404s.
 → all on the nightly reprobe list. Memphis/Knoxville ZIPs ship facilities-floor.
+
+## 2026-07-17 — OREGON WIRE PASS (Tier 1 state 8 of 17, founder wire order)
+
+**One metro wired (Portland) on the existing arcgis connector — zero new code**
+(receipts: recon run 29557291700 + pg_net 3806-3813).
+
+### WIRED — portland-building-permits (ArcGIS, City of Portland)
+- **FRESH**: max ISSUEDATE **2026-06-10**; 36,263 rows. Layer lives on the custom
+  **portlandmaps.com/od/rest** AGS host (the recon `portlandmaps.com/arcgis/rest`
+  root has an empty top-level `services[]` — the `/od/rest/services/
+  COP_OpenData_PlanningDevelopment/MapServer/89` tree is the real one, found via
+  the PDX Hub search on gis-pdx.opendata.arcgis.com). Standing answer: when a
+  city's AGS root looks empty, search its Hub for the dataset's GeoService URL.
+- **No ZIP column** (X_COORD/Y_COORD state-plane + Shape point geometry) →
+  `spatial_zip_radius_mi: 3` (envelope on geometry, records keep own points),
+  with `out_fields` projection (7 mapped cols).
+- 7 STATUS values VERBATIM: Issued + Approved to Issue→approved, Final + Under
+  Inspection→operating, Application + Fees Due→proposed, Expired→exclude.
+- NEWCLASS (construction axis, 6 values): New Construction / Addition /
+  Replacement / First / Move kept; Alteration + null dropped at source. NEWTYPE
+  (occupancy: Business/Rowhouse/Duplex/Hotel/Mercantile/…) rides in the title.
+- Coverage gated to Multnomah/Washington/Clackamas; the spatial envelope
+  self-limits to the city footprint regardless.
+
+### Rejections / not wired (receipts)
+- **Eugene / Bend / Medford-Jackson / Washington Co / Clackamas Co hub guesses**:
+  domain-not-found 404s. **Salem hub**: GWM_0003 permission error (private).
+  No first-party per-record permit source located for those → facilities floor.
+→ nightly reprobe list.
