@@ -72,6 +72,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="lib/data.js"></script>
 <script src="lib/templates.js"></script>
+<script src="lib/landing.js"></script>
 <script src="shell.js"></script>
 <script>
   async function homeFind() {
@@ -82,6 +83,11 @@
     else { HS.openLoc(); document.getElementById('locZip').value = z; HS.findCommunity(); }
   }
   HS.onReady(async function () {
+    // Signed-in resident with a home set belongs on their dashboard, not the acquisition
+    // hero. boot() has awaited bootSession() + properties (shell.js:816-819), so session
+    // and activeProperty are settled here. Decision centralized in lib/landing.js.
+    var dest = HS.landingFor(HS.state.session, HS.state.activeProperty);
+    if (dest) { location.replace(dest); return; }
     var home = HS.state.activeProperty;
     var changes = await HS.data.changes(HS.state.zip, home);
     var flagship = changes.find(function (c) { return c.related_project_id; }) || changes[0];
