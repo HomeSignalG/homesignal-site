@@ -48,7 +48,7 @@ HS.onReady(async function () {
       var a = sorted();
       var body = state2.dataView ? dataTable(a) : ('<div class="devgrid">' + a.map(HS.tpl.devCard).join('') + '</div>');
       page.innerHTML =
-        '<div class="ph"><div class="eyebrow">Development</div><h1>What\'s being built — and how it lands on you</h1>'
+        '<div class="ph"><div class="eyebrow">Development</div><h1>What\'s being built — and how it impacts you</h1>'
         + '<p>Every active and proposed project near you, led by its effect on your daily life rather than its stage or unit count.</p></div>'
         + '<div class="lensnav">'
         + lens(0,'How could it affect me?','Impact-first · the default view')
