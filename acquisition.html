@@ -112,6 +112,18 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
 .auth-close{position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;line-height:1;color:var(--muted);cursor:pointer}
 .auth-toggle{font-size:13px;color:var(--muted);margin-top:14px;text-align:center}
 .auth-toggle a{color:var(--accent);cursor:pointer;font-weight:600}
+
+/* ===== Bluesky post edit modal — full text, real textarea, no native prompt() ===== */
+.bsky-edit-overlay{display:none;position:fixed;inset:0;background:rgba(16,33,28,.45);z-index:2000;align-items:center;justify-content:center}
+.bsky-edit-modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px;width:100%;max-width:520px;margin:16px;position:relative}
+.bsky-edit-modal h3{margin:0 0 4px;font-size:17px}
+.bsky-edit-sub{color:var(--muted);font-size:13px;margin-bottom:14px;line-height:1.5}
+.bsky-edit-textarea{width:100%;min-height:180px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 13px;font-size:14px;line-height:1.5;color:var(--ink);font-family:inherit;resize:vertical;box-sizing:border-box}
+.bsky-edit-textarea:focus{outline:none;border-color:var(--accent)}
+.bsky-edit-count{font-size:12px;margin:8px 0 16px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.bsky-edit-count.over{color:var(--persist);font-weight:700}
+.bsky-edit-actions{display:flex;gap:8px;justify-content:flex-end}
+.bsky-edit-close{position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;line-height:1;color:var(--muted);cursor:pointer}
 </style>
 </head>
 <body>
@@ -158,6 +170,21 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
     <button id="auth-submit" class="auth-submit">Send me a code</button>
     <div id="auth-msg" class="auth-msg"></div>
     <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><a id="auth-back-link">Use a different email</a></div>
+  </div>
+</div>
+
+<!-- BLUESKY EDIT MODAL (full text, real textarea — replaces window.prompt()) -->
+<div id="bsky-edit-overlay" class="bsky-edit-overlay">
+  <div class="bsky-edit-modal">
+    <button class="bsky-edit-close" id="bsky-edit-close">&times;</button>
+    <h3>Edit post text</h3>
+    <p class="bsky-edit-sub">Max 300 graphemes. Facts must stay verbatim from the source — this is phrasing/hashtag edits only.</p>
+    <textarea id="bsky-edit-textarea" class="bsky-edit-textarea"></textarea>
+    <div id="bsky-edit-count" class="bsky-edit-count">0/300</div>
+    <div class="bsky-edit-actions">
+      <button class="bsky-btn" id="bsky-edit-cancel" style="background:#e4e8e4;color:#16211c">Cancel</button>
+      <button class="bsky-btn" id="bsky-edit-save" style="background:var(--accent);color:#fff">Save</button>
+    </div>
   </div>
 </div>
 
@@ -569,17 +596,52 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
         var r2=await window.hsClient.from('social_posts').update({status:'skipped'}).eq('id',id);
         if(r2.error){ alert('Skip failed: '+(r2.error.message||'')); return; }
       } else if(act==='edit'){
-        var cur=document.querySelector('[data-post="'+id+'"] div[style*="pre-wrap"]');
-        var next=prompt('Edit post text (max 300 graphemes). Facts must stay verbatim from the source.', cur?cur.textContent:'');
-        if(next==null) return;
-        if(graphemeLen(next)>300){ alert('Too long: '+graphemeLen(next)+'/300 graphemes.'); return; }
-        var r3=await window.hsClient.from('social_posts').update({post_text:next}).eq('id',id);
-        if(r3.error){ alert('Edit failed: '+(r3.error.message||'')); return; }
+        openBskyEdit(id);
+        return; // modal handles its own save/refresh — no DB write yet
       }
       refreshBluesky();
     }catch(e){ alert('Action error.'); }
   }
+  // ---- Bluesky edit modal (real textarea — a native prompt() box is too small
+  // to show a multi-line, near-300-char post with its \n\n hashtag block) -------
+  var bskyEditId=null;
+  function bskyEditCountUpdate(){
+    var ta=$('bsky-edit-textarea'); var n=graphemeLen(ta.value);
+    var c=$('bsky-edit-count'); c.textContent=n+'/300'; c.className='bsky-edit-count'+(n>300?' over':'');
+  }
+  function openBskyEdit(id){
+    var cur=document.querySelector('[data-post="'+id+'"] div[style*="pre-wrap"]');
+    bskyEditId=id;
+    var ta=$('bsky-edit-textarea'); ta.value=cur?cur.textContent:'';
+    bskyEditCountUpdate();
+    $('bsky-edit-overlay').style.display='flex';
+    ta.focus();
+  }
+  function closeBskyEdit(){ $('bsky-edit-overlay').style.display='none'; bskyEditId=null; }
+  async function saveBskyEdit(){
+    if(!bskyEditId) return;
+    var next=$('bsky-edit-textarea').value;
+    var n=graphemeLen(next);
+    if(n>300){ alert('Too long: '+n+'/300 graphemes.'); return; }
+    try{
+      var r=await window.hsClient.from('social_posts').update({post_text:next}).eq('id',bskyEditId);
+      if(r.error){ alert('Edit failed: '+(r.error.message||'')); return; }
+      closeBskyEdit();
+      refreshBluesky();
+    }catch(e){ alert('Edit error.'); }
+  }
+  function wireBskyEditModal(){
+    if(document.getElementById('bsky-edit-wired')) return;
+    var marker=document.createElement('span'); marker.id='bsky-edit-wired'; marker.style.display='none';
+    document.body.appendChild(marker);
+    $('bsky-edit-textarea').addEventListener('input', bskyEditCountUpdate);
+    $('bsky-edit-cancel').addEventListener('click', closeBskyEdit);
+    $('bsky-edit-close').addEventListener('click', closeBskyEdit);
+    $('bsky-edit-save').addEventListener('click', saveBskyEdit);
+    $('bsky-edit-overlay').addEventListener('click', function(e){ if(e.target===$('bsky-edit-overlay')) closeBskyEdit(); });
+  }
   function wireBluesky(){
+    wireBskyEditModal();
     var host=$('tab-bluesky'); if(!host) return;
     if(!document.getElementById('bsky-card')){
       var card=document.createElement('div'); card.className='card'; card.id='bsky-card';
