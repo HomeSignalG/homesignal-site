@@ -96,9 +96,11 @@ ok(true, '2. sidebar facility row navigates to development.html?id=', page.url()
 await page.goto(`${SITE}/development.html?id=${encodeURIComponent(dalfen.id)}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForSelector('#devPage .detail', { timeout: 60000 });
 const body = await page.$eval('#devPage', el => el.innerText);
-ok(/Regulated facility/.test(body) && !/How this affects you/.test(body),
+// Case-insensitive: .ph .eyebrow is CSS-uppercased (app.css text-transform:uppercase),
+// and Chromium's innerText reflects the transform — the header renders REGULATED FACILITY.
+ok(/regulated facility/i.test(body) && !/How this affects you/.test(body),
   '3. dossier header reads "Regulated facility" (facility branch, not the project template)',
-  `eyebrow/body contains "Regulated facility": ${/Regulated facility/.test(body)}`);
+  `header line: "${(body.match(/^.*regulated facility.*$/mi) || [])[0]}"`);
 ok(/Clean Water Act permit terminated — past its end date, no longer active/.test(body),
   '3. DALFEN shows the §5 Terminated interpreted line',
   `"${(body.match(/.*permit terminated.*$/mi) || [])[0]}"`);
