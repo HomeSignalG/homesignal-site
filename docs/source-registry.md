@@ -1674,3 +1674,13 @@ engine's egress path changes. Hillsborough/Tampa ships on the facilities floor.
   data-sarasotacounty, hub-colliercountyfl — all re-run against their REAL portals
   above where one exists; Palm Beach/Pinellas/Lee/Sarasota/Collier/St. Johns have no
   first-party per-record permit source found this pass → facilities floor.
+
+### FL go-live results (2026-07-16, DB-verified)
+- **441/441 modeled FL ZIPs cached** (zipcodes v3.0.0 centroids, 0 quarantined) across
+  10 county roots — **the facilities floor**: 0 permit sources survived smoke.
+- **425 pass + 16 coverage_coming honest empties; 0 unsourced, 0 count mismatches, 0
+  point sites missing coords; 8,807 EPA facilities.**
+- **398 pages auto-indexable** under the substance gate (facilities >= 3); nationwide
+  indexable after FL: 5,327.
+- All four metro rejections (FTL stalled / Orlando ungeolocatable / Tampa WAF /
+  Miami slow-host) + hub no-dataset verdicts are on the nightly reprobe list.

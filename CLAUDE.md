@@ -964,6 +964,27 @@ legal/framing change not covered by the one-time sign-off.
   reprobe list; their ZIPs ship on the EPA facilities floor). Receipts:
   docs/source-registry.md "PENNSYLVANIA WIRE PASS". Reproducible seed:
   docs/pennsylvania-development-reports-seed.sql.
+- 🟢 **FLORIDA IS LIVE ON THE FACILITIES FLOOR — 441/441 modeled FL ZIPs cached, 0 permit
+  sources (all four metro candidates REJECTED with receipts), 398 pages auto-indexable**
+  (DB-verified 2026-07-16). Fourteenth development state, Tier 1 state 2 of 17. The first
+  state where recon found real candidates but **live smoke rejected every one** — the honest
+  outcome the anti-fabrication rules exist for: **Fort Lauderdale** perfect schema but
+  STALLED at 2021-01-05; **Orlando** fresh same-day but UNGEOLOCATABLE at source
+  (geocoded_column populated on 6% of 1.1M rows / 6 rows in the last year, street-only
+  addresses, no ZIP column — Somerville precedent); **Tampa** live + fresh on the city's own
+  server but the WAF 403s Supabase edge-runtime egress (identical URL 200 from pg_net —
+  IP-range block, UA-invariant); **Miami** live + fresh but the host answers edge requests
+  ~30-60s each size-invariant, so the report can't fit the worker budget (546/546/546/504
+  across five smoke rounds; a Detroit control ran 200 mid-investigation proving the arcgis
+  path healthy). Broward/Hillsborough/Miami-Dade county hubs carry no permit datasets; St.
+  Pete has no catalog. Two ADDITIVE arcgis connector options shipped from the investigation
+  and stay (default-off): **`out_fields`** (project mapped columns — outFields=* on wide
+  dense-metro rows is a CPU hazard) and **`page_size`** (fewer, larger pages for slow
+  hosts). Every modeled FL ZIP has a cached row (zipcodes v3.0.0, 0 quarantined) and a
+  materialized page — **425 pass + 16 coverage_coming honest empties; 0 unsourced, 0 count
+  mismatches, 0 point sites missing coords; 8,807 EPA facilities**. All rejected sources →
+  the nightly reprobe list. Receipts: docs/source-registry.md "FLORIDA WIRE PASS".
+  Reproducible seed: docs/florida-development-reports-seed.sql.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:
