@@ -1935,3 +1935,48 @@ consolidated per-record permit ledgers anywhere we could find.
   domain-not-found 404s. **Salem hub**: GWM_0003 permission error (private).
   No first-party per-record permit source located for those → facilities floor.
 → nightly reprobe list.
+
+### GO-LIVE (2026-07-17, DB-verified) + Portland residual
+- 200/200 OR ZIPs cached, 0 unsourced, 0 coordless. 171 pass / 141 indexable / 29
+  coverage_coming. **9 ZIPs dev-backed (1,229 permit records)** across Portland
+  metro (Multnomah/Washington/Clackamas). Nationwide indexable 6,599 → 6,740.
+- **PORTLAND HOST IS FLAKY UNDER BATCH LOAD (standing answer).** portlandmaps.com/od
+  is a slow custom AGS host (~5-10s/query; a 2-record `returnGeometry` probe times
+  out at 5s, succeeds at 15s). Under batch it returns **HTTP-200 with empty
+  `features[]`** intermittently — NOT a 5xx/error, so `getWithBackoff` doesn't retry
+  and no quarantine is logged. Verified the layer really has 142–378 recent permits
+  per central-Portland envelope (count-only probes 11392–11395), yet ~90% of batch
+  fetches came back empty. Only 9 of 83 Portland-covered ZIPs filled after 2 passes;
+  the rest ship EPA-facilities-floor (honest). Do NOT read a 200-empty from a known-
+  dense envelope as "no permits" — it's the host throttling.
+- **FIX 1 — parcel-precise placement.** portlandmaps returns feature geometry as real
+  WGS84 (outSR=4326, wkid 4326 confirmed, e.g. {x:-122.65,y:45.54}); the connector
+  already flattens it to `__lat/__lng`, so Portland's `column_map` now maps
+  `lat:"__lat", lng:"__lng"` (was area-scope centroid — all permits stacked on one
+  point). Freshly-cached ZIPs now show 43–92 distinct parcel points; source geometry
+  is never geofenced. (3 pre-deploy ZIPs — 97232/97258/97034 — stayed area-scope
+  because their re-fires hit the flaky-0 and the dev-guard protected them; they
+  upgrade on the next successful nightly refresh.)
+- **FIX 2 — nightly refresh won't regress dev-backed pages.** `dev_refresh_collect`
+  hardened with a **per-dimension drop-to-zero guard**: a night where Portland flakes
+  (facilities>0, development=0) no longer overwrites a dev-backed page's real permits
+  with 0. New dev>0 always applies, so covered-but-0 ZIPs self-heal UPWARD over
+  nights. Migration `dev_refresh_collect_dev_regression_guard`; docs
+  `development-reports-refresh-cron.sql`.
+
+## 2026-07-17 — WISCONSIN RECON (Tier 1 state 9 of 17) — findings so far
+Two recon rounds (runs 29570330076, 29571402002). **No per-ZIP-scopable permit
+source found yet:**
+- **Milwaukee** `buildingpermits` (CKAN, resource 828e9630-…, datastore_active,
+  metadata_modified 2026-07-17): columns Address (street-only, no city/ZIP), Date
+  Issued, Permit Type, Status, Use of Building, Construction Total Cost — **NO ZIP,
+  NO lat/lng**. CKAN SQL can't spatially scope it and the addresses are street-only
+  → ungeolocatable/unscopable REJECT class (Orlando/Somerville precedent).
+- **Milwaukee** `mapservices.milwaukee.gov` / `gis.milwaukee.gov` AGS roots: DNS
+  fetch-failed (no resolve).
+- **Madison** Hub `q=permit`: only *Residential Parking Permit* polygons (parking
+  areas, not building permits). **Madison AGS root** (maps.cityofmadison.com) lists a
+  `Planning` folder — LEAD: enumerate it for a building-permits/development-apps layer
+  with geometry (pending). **Dane/Waukesha DCAT**: parcel/GIS layers only.
+- **Green Bay / Appleton / Eau Claire** opendata DCAT domains: 404 (dead).
+→ If the Madison Planning folder yields nothing geometried, WI = facilities-floor.

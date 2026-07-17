@@ -1010,6 +1010,25 @@ legal/framing change not covered by the one-time sign-off.
   ledger, Knoxville private hub, Chattanooga dead Pantheon shell). Receipts:
   docs/source-registry.md "TENNESSEE WIRE PASS". Seed:
   docs/tennessee-development-reports-seed.sql.
+- 🟢 **OREGON IS LIVE — 200/200 modeled OR ZIPs cached, 1 permit source (Portland),
+  141 pages auto-indexable** (DB-verified 2026-07-17). Tier 1 state 8. **Portland**
+  (ArcGIS, portlandmaps.com/od custom AGS host) wired on the existing connector,
+  spatial ZIP scope over Multnomah/Washington/Clackamas. 171 pass + 29
+  coverage_coming; **0 unsourced, 0 coordless; 9 ZIPs dev-backed, 1,229 permit
+  records** (Portland metro, parcel-precise). Nationwide indexable 6,599 → 6,740.
+  **STANDING ANSWER — portlandmaps.com is a slow/flaky AGS host**: ~5-10s/query, and
+  under batch load it returns HTTP-200 with an EMPTY `features[]` intermittently (not
+  a 5xx → no retry, no quarantine). The layer genuinely has 142–378 recent permits
+  per central-Portland envelope (probe-verified), but ~90% of batch fetches came back
+  empty, so only 9 of 83 covered ZIPs filled — the rest ship the EPA facilities floor
+  (honest). Never read a 200-empty from a known-dense envelope as "no permits." Two
+  fixes landed: (1) Portland `column_map` maps the real WGS84 feature geometry to
+  per-parcel points (`lat:"__lat"/lng:"__lng"`; was area-scope centroid — source
+  geometry is never geofenced); (2) `dev_refresh_collect` gained a **per-dimension
+  drop-to-zero guard** so a flaky night never wipes a dev-backed page AND covered-
+  but-0 ZIPs self-heal UPWARD over nightly refreshes (dev 0→N applies; N→0 held).
+  Eugene/Bend/Medford/Salem/county hubs rejected (404/private). Receipts:
+  docs/source-registry.md "OREGON WIRE PASS". Seed: docs/oregon-development-reports-seed.sql.
 - 🟢 **NEW JERSEY / CONNECTICUT / MISSOURI ARE LIVE ON THE EPA FACILITIES FLOOR**
   (DB-verified 2026-07-17). Tier 1 states 4/5/6 — no wireable per-record permit
   source survived recon (full receipts in the respective WIRE PASS sections):

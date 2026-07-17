@@ -6,6 +6,24 @@
 -- WIRED: portland-building-permits (Multnomah/Washington/Clackamas, spatial ZIP
 -- scope; registry doc "OREGON WIRE PASS"). Eugene/Bend/Medford/Salem rejected.
 -- Batch mechanics identical to the FL seed with _or_zips. Fail-loud engine.
+--
+-- GO-LIVE RESULT (2026-07-17, DB-verified): 200/200 ZIPs cached, 0 uncached,
+--   0 unsourced, 0 point-sites-missing-coords. 171 pass / 141 indexable / 29
+--   coverage_coming. 9 ZIPs dev-backed (1,229 dev records) — Portland-metro
+--   parcel-precise permits (Multnomah/Washington/Clackamas). Nationwide
+--   indexable 6,599 -> 6,740.
+-- PORTLAND RESIDUAL (logged, non-blocking): portlandmaps.com/od (custom ArcGIS
+--   host) is SLOW (~5-10s/query) and returns HTTP-200-EMPTY intermittently under
+--   batch load — individual queries succeed (the layer really has 142-378 recent
+--   permits per central-Portland envelope, verified) but ~90% of batch fetches
+--   come back empty with no error (so no quarantine). 9 of the 83 Portland-
+--   covered ZIPs filled after 2 passes; the rest ship on the EPA facilities floor
+--   (honest, indexable where >=3 facilities). Two mitigations landed: (1) Portland
+--   column_map now maps the real WGS84 feature geometry to per-parcel points
+--   (was area-scope centroid); (2) dev_refresh_collect hardened with a per-
+--   dimension drop-to-zero guard so the nightly cron never wipes a dev-backed
+--   Portland page on a flaky night AND opportunistically fills covered-but-0 ZIPs
+--   over subsequent nights (dev 0->N applies; N->0 held). Coverage self-heals up.
 -- ============================================================================
 create table if not exists public._or_zips (
   zip text primary key, lat double precision, lng double precision,

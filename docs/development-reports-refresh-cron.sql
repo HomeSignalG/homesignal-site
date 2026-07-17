@@ -41,14 +41,25 @@ begin
     counts        = j->'counts',
     sites         = j->'sites',
     paywall       = coalesce((j->>'paywall')::boolean, false),
-    source_vintage= 'get-address-report v14 ZIP mode; pg_cron daily auto-refresh',
+    source_vintage= 'get-address-report ZIP mode; pg_cron daily auto-refresh',
     refreshed_at  = now()
   from resp
   where d.zip = (j->>'zip')
+    -- TRANSIENT-SAFE, per-dimension: never let a flaky night drop a populated dimension to 0.
+    -- (a) all-empty response over a row that had content (FRS gave up / total flake), and
+    -- (b) development regression: new dev=0 while the cached row had dev>0. A flaky permit
+    --     source (e.g. Portland's slow ArcGIS host returning HTTP-200-empty under batch load)
+    --     must not wipe a dev-backed page. Facilities still update normally; only a
+    --     drop-to-exactly-0 of a previously-populated dimension is held. New dev>0 always applies,
+    --     so coverage self-heals UPWARD over nights. Migration: dev_refresh_collect_dev_regression_guard.
     and not (
       coalesce((j->'counts'->>'facilities')::int, 0) = 0
       and coalesce((j->'counts'->>'development')::int, 0) = 0
       and coalesce((d.counts->>'facilities')::int, 0) + coalesce((d.counts->>'development')::int, 0) > 0
+    )
+    and not (
+      coalesce((j->'counts'->>'development')::int, 0) = 0
+      and coalesce((d.counts->>'development')::int, 0) > 0
     );
   get diagnostics n = row_count;
   return n;
