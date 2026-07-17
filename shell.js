@@ -513,7 +513,7 @@
       HS.esc(c.name || ('ZIP ' + c.zip)) + '</a>').join('');
     const empty = list.length ? '' : '<span class="quiet" style="font-size:12.5px;margin-right:8px">No communities yet.</span>';
     return '<div class="chips">' + empty + chips +
-      '<button class="wchip" type="button" onclick="HS.openLoc()" style="cursor:pointer;border-style:dashed">＋ Add a community</button></div>';
+      '<button class="wchip" type="button" onclick="HS.openLoc()" style="cursor:pointer;border-style:dashed">＋ Add a zip code</button></div>';
   };
 
   // -------------------------------------------------- topic picker ------------
