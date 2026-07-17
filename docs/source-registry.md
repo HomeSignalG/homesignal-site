@@ -1964,9 +1964,41 @@ consolidated per-record permit ledgers anywhere we could find.
   nights. Migration `dev_refresh_collect_dev_regression_guard`; docs
   `development-reports-refresh-cron.sql`.
 
-## 2026-07-17 — WISCONSIN RECON (Tier 1 state 9 of 17) — findings so far
-Two recon rounds (runs 29570330076, 29571402002). **No per-ZIP-scopable permit
-source found yet:**
+## 2026-07-17 — WISCONSIN WIRE PASS (Tier 1 state 9 of 17, founder wire order)
+
+**One source wired (Madison) on the existing arcgis connector — zero new code.**
+GO-LIVE (DB-verified): 211/211 WI ZIPs cached, 0 unsourced, 0 coordless. 208 pass /
+180 indexable / 3 coverage_coming. **20 ZIPs dev-backed (Dane County)**, 1,800+
+Madison planning records. Nationwide indexable 6,740 → 6,920.
+
+### WIRED — madison-planning-projects (ArcGIS, City of Madison / Dane County)
+- Layer `Planning/Current_Planning_Projects/MapServer/0` = **"Current Planning
+  Project Points"** (esriGeometryPoint), **599 active projects** (the city's own
+  curated live set — no recency filter).
+- **Per-record `ProjectURL`** (`cityofmadison.com/dpced/planning/development.cfm?record=LNDUSE-<id>`)
+  → record-precision anti-fabrication link. Real title (`Project_Description`),
+  address (`APO_ADDRESS_PARTIAL_LINE`), case (`RECORD_RecordID`), date
+  (`DATES_SubmittedDate`).
+- **Native geometry is WI state-plane (wkid 103412/8193) but the layer reprojects
+  to WGS84 on `outSR=4326`** (verified {x:-89.29,y:43.14}), and it's a FAST host
+  (~90ms, unlike Portland). `column_map` maps `__lat/__lng` → per-parcel points
+  (source geometry, never geofenced). `spatial_zip_radius_mi: 3`.
+- **16 `RECORD_Status` values (returnDistinctValues) all mapped VERBATIM**:
+  proposed (Additional Info Required / Application Under Review / In Process /
+  Waiting for Fees), approved (Approved and Recorded / Approved Preliminary Plat /
+  Approved, Final Review Pending / Approved, Under Final Review / Final Approval
+  Granted / Recorded), operating (Approval Granted, Completed / Approved,
+  Constructed / Approved, Demolished), exclude (Approval(s) expired / Inactive /
+  Placed on File or Denied). Smoke: 53703 → 231 Madison dev records (202 approved,
+  23 proposed, 6 operating) + 26 facilities; sample sites carry real LNDUSE URLs +
+  parcel-precise Madison coords.
+- **Found via 5 recon rounds** — the Madison AGS root's `Planning` folder →
+  `Current_Planning_Projects` (Milwaukee CKAN had no ZIP/coords; Madison Hub
+  `q=permit` returned only parking-permit polygons; Development_Layers is
+  polygon-only). Standing answer: a city AGS `Planning` folder often hides the
+  real per-project point layer behind polygon land-use services.
+
+### Rejections / not wired (receipts)
 - **Milwaukee** `buildingpermits` (CKAN, resource 828e9630-…, datastore_active,
   metadata_modified 2026-07-17): columns Address (street-only, no city/ZIP), Date
   Issued, Permit Type, Status, Use of Building, Construction Total Cost — **NO ZIP,
@@ -1975,8 +2007,11 @@ source found yet:**
 - **Milwaukee** `mapservices.milwaukee.gov` / `gis.milwaukee.gov` AGS roots: DNS
   fetch-failed (no resolve).
 - **Madison** Hub `q=permit`: only *Residential Parking Permit* polygons (parking
-  areas, not building permits). **Madison AGS root** (maps.cityofmadison.com) lists a
-  `Planning` folder — LEAD: enumerate it for a building-permits/development-apps layer
-  with geometry (pending). **Dane/Waukesha DCAT**: parcel/GIS layers only.
+  areas, not building permits). The `Planning/Development_Layers` service is
+  polygon-only (Parcels/Zoning/TIF/etc.). The winning layer was
+  `Planning/Current_Planning_Projects/0` (WIRED above). **Dane/Waukesha DCAT**:
+  parcel/GIS layers only.
 - **Green Bay / Appleton / Eau Claire** opendata DCAT domains: 404 (dead).
-→ If the Madison Planning folder yields nothing geometried, WI = facilities-floor.
+→ Milwaukee (largest WI city) ships EPA-facilities-floor — no geolocatable permit
+  source; its `buildingpermits` CKAN is the top reprobe candidate if the city ever
+  adds a ZIP or coordinate column.

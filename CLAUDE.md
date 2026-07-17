@@ -1010,6 +1010,20 @@ legal/framing change not covered by the one-time sign-off.
   ledger, Knoxville private hub, Chattanooga dead Pantheon shell). Receipts:
   docs/source-registry.md "TENNESSEE WIRE PASS". Seed:
   docs/tennessee-development-reports-seed.sql.
+- 🟢 **WISCONSIN IS LIVE — 211/211 modeled WI ZIPs cached, 1 dev source (Madison),
+  180 pages auto-indexable** (DB-verified 2026-07-17). Tier 1 state 9. **Madison**
+  (ArcGIS, City of Madison / Dane County) wired on the existing connector: the
+  `Planning/Current_Planning_Projects/0` "Current Planning Project Points" layer —
+  599 active planning projects, **per-record ProjectURL** (LNDUSE record links),
+  parcel-precise WGS84 geometry (fast host, ~90ms), 16 verbatim RECORD_Status values
+  mapped to 4 buckets, spatial ZIP scope. 208 pass + 3 coverage_coming; **0 unsourced,
+  0 coordless; 20 ZIPs dev-backed (Dane County), 1,800+ Madison records** (smoke:
+  53703 → 231 dev + 26 facilities). Nationwide indexable 6,740 → 6,920. Found via 5
+  recon rounds; **Milwaukee ships facilities-floor** (its `buildingpermits` CKAN has
+  no ZIP/coords — ungeolocatable; top reprobe candidate). Standing answer: a city AGS
+  `Planning` folder often hides the real per-project point layer behind polygon
+  land-use services. Receipts: docs/source-registry.md "WISCONSIN WIRE PASS". Seed:
+  docs/wisconsin-development-reports-seed.sql.
 - 🟢 **OREGON IS LIVE — 200/200 modeled OR ZIPs cached, 1 permit source (Portland),
   141 pages auto-indexable** (DB-verified 2026-07-17). Tier 1 state 8. **Portland**
   (ArcGIS, portlandmaps.com/od custom AGS host) wired on the existing connector,
