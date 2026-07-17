@@ -1,0 +1,4 @@
+[
+ {"id": "stl-rdx-ckan-permits", "url": "https://rdx.stldata.org/api/3/action/datastore_search?resource_id=58d19f77-a4e6-43ac-8de3-ce65f14dbeb1&limit=2"},
+ {"id": "stl-rdx-site", "url": "https://rdx.stldata.org/api/3/action/site_read"}
+]

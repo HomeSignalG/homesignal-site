@@ -1562,3 +1562,347 @@ gate proof (Allegheny + Utah ZIPs → 0 fetches) and the SQL-error quarantine.
   dev 243; ckan emitted 243/246; Revoked 3 excluded).
 - **522 pages auto-indexable** under the substance gate (no manual flip);
   nationwide indexable after PA: 4,929.
+
+## 2026-07-16 — FLORIDA WIRE PASS (Tier 1 state 2 of 17, founder wire order)
+
+**Three metros wired (Miami, Orlando, Tampa), all on EXISTING connectors — zero new
+code.** All receipts are live pg_net probes from 2026-07-16 (response ids 1413-1447);
+nothing wired on training knowledge.
+
+### REJECTED AT SMOKE — miami-building-permits (ArcGIS, City of Miami)
+**Wired provisionally, then REJECTED on live-smoke evidence — ENGINE-UNREACHABLE
+WITHIN THE WORKER BUDGET (slow host, not a block).** Five smoke rounds with
+receipts: the layer's host answers Supabase edge-runtime requests ~30-60s per
+request REGARDLESS of size (the identical scoped query returns in seconds from
+pg_net), so the report burns its wall/CPU budget on fetch alone — 546 at 3mi
+(141s), 546 after the out_fields projection (111s), 546 at 1.5mi (~1,400 rows,
+115s), 504 at the gateway wall limit with a single page_size=2000 request. A
+**Detroit control report ran 200 with 734 arcgis records mid-investigation**, so
+the arcgis path itself is healthy — this is host-specific latency toward edge
+egress. Two ADDITIVE connector options shipped from the investigation and stay
+(both default-off, existing entries byte-identical): **`out_fields`** (project
+mapped columns — dense-metro wide rows at outFields=* are a CPU hazard) and
+**`page_size`** (fewer, larger pages for slow hosts). Miami-Dade ships on the
+facilities floor; → nightly reprobe list (revisit if host latency or the engine
+budget changes).
+
+#### (recon detail, kept for the record)
+- **FRESH**: max `IssuedDate` = **2026-07-15** (epoch 1784153820000, live statistics
+  probe). Hub-catalog `modified` 2026-07-16.
+- `Building_Permits_Since_2014/FeatureServer/0` (services1.arcgis.com/CvuPhqcTQpZPT9qY)
+  — point features, one row per permit, Latitude/Longitude + real geometry.
+- 5 statuses VERBATIM (returnDistinctValues): Active→approved, Final→operating,
+  Hold→proposed (Scottsdale ON HOLD precedent), Expired/Revoked→exclude.
+- 22 `ScopeofWork` values enumerated; kept: NEW CONSTRUCTION / DEMOLITION / ADDITION
+  AND REMODELING / PHASED PERMIT. Dropped at source: ELECTRICAL/PLUMBING/MECHANICAL/
+  FIRE/ELEVATOR/BOILER trades, SIGN, LANDSCAPING, TREE PERMIT, BUILDING ROOFING
+  (re-roofs), SPECIAL/TEMPORARY EVENTS, ANNUAL FACILITY, BUILDING RECERTIFICATION,
+  SHOP DRAWINGS, COOKIE CUTTER (ambiguous city jargon — dropped, not guessed),
+  REMODELING/REPAIRS (minor-repair mix — Boston Short-Form precedent).
+- No ZIP column → `spatial_zip_radius_mi: 3` (Denver pattern; records keep their OWN
+  parcel points). record_url dataset-precision (no per-row URL column).
+- **Smoke fix**: the first smoke on 33127 timed out at 120s — the envelope query
+  without a source-side type filter fetched every scope in dense Miami. Added
+  `extra_where` with the 4-type ScopeofWork IN filter (noise dropped AT SOURCE, the
+  standing rule); scoped citywide count = 11,453 rows/365d, fast.
+- **Smoke fix 2 — NEW additive arcgis `out_fields` option (Miami is its first
+  consumer)**: even scoped, the report hit the edge worker CPU limit (HTTP 546 —
+  the CA WORKER_RESOURCE_LIMIT class). Cause: `outFields=*` on 44-column permit
+  rows over a dense central-Miami envelope (~1.3 MB per 1,000-row page). The
+  connector now accepts an optional `out_fields: [...]` projection (absent ⇒ `*`,
+  every existing entry byte-identical); Miami projects its 6 mapped columns.
+  **Standing answer: on dense-metro ArcGIS layers, project the mapped columns —
+  never ship outFields=* wide rows through the worker.**
+
+### REJECTED AT SMOKE — orlando-permit-applications (Socrata, City of Orlando)
+**Wired provisionally, then REJECTED on live-smoke evidence — ungeolocatable at
+source (Somerville precedent).** The dataset is fresh same-day and rich, but:
+`geocoded_column` is populated on only **67,257 of 1,104,026 rows (6%)** and just
+**6 rows in the last 365 days** — a stale one-time geocode, so `within_circle`
+scoping returns ~nothing (smoke on 32801: 3 rows, all geocode-quarantined);
+`permit_address` is street-only (no ZIP embedded, receipts: "10084 TIDAL WAVE ST",
+"240 S SEMORAN BLVD"); there is no ZIP column. No source-side ZIP scope exists →
+per-ZIP pages cannot be honestly filled. Orange County ships on the facilities
+floor. Entry removed before go-live; the recon detail below is kept for the
+nightly-reprobe record (if the city revives its geocode pipeline, wire it).
+
+#### (recon detail, kept for the record)
+- **FRESH same-day**: max `processed_date` AND max `issue_permit_date` = **2026-07-16**
+  (live SoQL probe). Dataset ryhf-m453 on data.cityoforlando.net, updated daily.
+- 66 `worktype` values enumerated; 19 construction/land-use types kept verbatim (New
+  167,170 / Alteration 108,474 / Comm 54,124 / Addition 35,841 / Townhomes / MF / MFHR /
+  Duplex / MixedUse / HotelMotel / ADU / Foundation / Construct / ChangeUse / ChangeOccu /
+  Conversion / Demo / DEM / SFSubd). Dropped at source: Repair 137,791, Roof 87,196,
+  LowVoltage 52,284, Fence, Pool, Irrigation, Solar, FireSupp, ELE/MEC/FIR/GAS trades,
+  Dumpster, AlrmStickr; blank worktype (60,150) fails the whitelist closed.
+- Statuses VERBATIM: Open→proposed, Finaled/Completed→operating; Void/Stop Work/Hold/
+  Hardhold/HardHold→exclude. **`Closed` (385,290 rows) left UNMAPPED ON PURPOSE** — it
+  spans completed AND dead applications with no disambiguating column; fail-closed, it
+  surfaces in `unmapped_statuses`, never guessed. Note: 25,273 `Open` rows carry an
+  issue date (the city keeps status Open post-issuance) — mapped verbatim to proposed
+  per the city's own label.
+- No zip column → Socrata point col `geocoded_column` + `within_circle` spatial scoping
+  (the Chicago pattern, zero new code).
+
+### REJECTED AT SMOKE — tampa-single-family-permits (ArcGIS, City of Tampa)
+**Wired provisionally, then REJECTED on live-smoke evidence — ENGINE-UNREACHABLE.**
+The city server's WAF returns **HTTP 403 to Supabase edge-runtime egress** while the
+IDENTICAL URL returns 200 from pg_net (DB-host egress) — verified byte-for-byte, and
+UA variation makes no difference (Deno UA and browser UA both 200 from pg_net), so
+it is an IP-range block, not a header rule. The engine runs on the edge runtime, so
+the source cannot be fetched at report time; wiring it would cache permanent
+quarantines. Layer stays verified live/fresh (receipts below) — revisit only if the
+engine's egress path changes. Hillsborough/Tampa ships on the facilities floor.
+
+#### (recon detail, kept for the record)
+- **FRESH**: max `LASTUPDATE` = **2026-07-15**; 1,020 rows — a live snapshot of current
+  single-family permits on the CITY'S OWN ArcGIS Server
+  (arcgis.tampagov.net OpenData/Planning/MapServer/32, Accela-backed).
+- **Granularity verified**: one row per `RECORD_ID` (groupBy count = 1 across sample) —
+  per-permit, not a task log.
+- Native `ZIP` column + per-row geometry. Statuses VERBATIM (the snapshot carries only
+  two): Issued→approved, Revision→proposed. APPLICATION_TYPE verbatim include:
+  "Residential New Construction and Additions (1 and 2 Family)" + "Residential New
+  Construction and Additions".
+- Found via the Hub domains API (`orgId IbNXlmt2RVVRCZ6M`) → org-scoped AGO search →
+  the item's `url` pointed at the city server (the Hub DCAT only exposed Experience
+  Builder apps).
+
+### Rejections / not wired (receipts)
+- **Fort Lauderdale Building/Land Use Permits (gis.fortlauderdale.gov MapServer/27)** —
+  perfect schema (PERMITTYPE/PERMITSTAT/APPROVEDT/FULLADDR) but **STALLED: max
+  LASTUPDATEDATE = 2021-01-05**. → nightly reprobe list. Broward ships facilities-floor.
+- **Broward County GeoHub** (corrected URL geohub-bcgis.opendata.arcgis.com, live 200):
+  0 permit/construction/demolition datasets in the DCAT — GIS layers only.
+- **Hillsborough County GeoHub** (corrected URL gis2017-…-hillsborough, live 200):
+  0 permit datasets; the county's permit reports live behind HillsGovHub (Accela app,
+  no public dataset). Tampa city covers the metro core.
+- **Miami-Dade County hub** (gis-mdc, 200 after a transient 500): 0 permit datasets —
+  county GIS only; the CITY ledger above carries the metro.
+- **Tampa "Active Residential / Commercial Permits"**: exists only as an Experience
+  Builder app; no public Feature Service in the org (org-scoped search receipt) — the
+  SF layer is the city's public permits dataset.
+- **St. Petersburg**: stat.stpete.org redirects to the city CMS (no Socrata catalog);
+  no first-party permit API found. Facilities-floor.
+- First-pass 404s (domain-not-found): hub-hillsboroughcounty, open-broward,
+  data-fortlauderdale, data-pbcgov, data-ocfl, data-pinellas-egis, data-capegis,
+  data-sarasotacounty, hub-colliercountyfl — all re-run against their REAL portals
+  above where one exists; Palm Beach/Pinellas/Lee/Sarasota/Collier/St. Johns have no
+  first-party per-record permit source found this pass → facilities floor.
+
+### FL go-live results (2026-07-16, DB-verified)
+- **441/441 modeled FL ZIPs cached** (zipcodes v3.0.0 centroids, 0 quarantined) across
+  10 county roots — **the facilities floor**: 0 permit sources survived smoke.
+- **425 pass + 16 coverage_coming honest empties; 0 unsourced, 0 count mismatches, 0
+  point sites missing coords; 8,807 EPA facilities.**
+- **398 pages auto-indexable** under the substance gate (facilities >= 3); nationwide
+  indexable after FL: 5,327.
+- All four metro rejections (FTL stalled / Orlando ungeolocatable / Tampa WAF /
+  Miami slow-host) + hub no-dataset verdicts are on the nightly reprobe list.
+
+## 2026-07-17 — OHIO WIRE PASS (Tier 1 state 3 of 17, founder wire order)
+
+**Three metros wired (Cincinnati, Columbus, Cleveland), all on EXISTING connectors —
+zero new code.** All receipts are live pg_net probes 2026-07-16/17 (ids 1942-1969);
+nothing wired on training knowledge.
+
+### WIRED — cincinnati-building-permits (Socrata BLDS, Hamilton County)
+- **FRESH same-day**: rowsUpdatedAt 2026-07-16; max issueddate/applieddate 2026-07-14.
+- Dataset uhjb-xac9 — a **BLDS-standard ledger** (the Boulder class): native
+  `originalzip`, `latitude`/`longitude`, per-record **`link`** column (record
+  precision), `statuscurrentmapped` normalized statuses.
+- Statuses VERBATIM from statuscurrentmapped: Permit Issued (21,999)→approved,
+  Permit Finaled (139,840)→operating, Application Accepted/In Review/Approved→
+  proposed; Withdrawn/EXPIRED/DENIED/HOLD/VOIDED/REVOKED/APP_EXP/W-REFUND/XCLOSED→
+  exclude; raw-code oddballs surface in unmapped_statuses (fail-closed).
+- permittypemapped: **Building 44,298 + Wrecking 5,703 kept**; HVAC (48k)/Plumbing
+  (44k)/Signs/Elevator/Fire/Excavation-Fill/Repair/Fences/Parking/Misc/Temp dropped
+  at source.
+
+### WIRED — columbus-building-permits (ArcGIS, Franklin County)
+- **FRESH**: max ISSUED_DT 2026-07-15; the dataset self-describes nightly updates;
+  hub modified 2026-07-16. Found via the Hub domains API (orgId 9yy6msODkIBzkUXU) →
+  the DCAT GeoService distribution (org-scoped item search only surfaced the two
+  archival "Historic Building Permits" services — the DCAT is the reliable path).
+- 4 statuses VERBATIM: Permit Issued→approved, Final Inspection Approved +
+  Certificate of Occupancy Issued→operating, Expired Permit→exclude.
+- GENERAL_TYPE (12 values): all **New Structure** + **Demolition** classes kept
+  (1,2,3 Family / Multi Family / Commercial / Unspecified); "- Other" catch-alls,
+  Graphics Permit (signs), Other, null dropped/fail-closed.
+- Native `B1_SITUS_ZIP` + per-record **ACA_URL** (Accela) — record precision.
+
+### WIRED — cleveland-issued-building-permits (ArcGIS, Cuyahoga County)
+- **FRESH**: max ISSUE_DATE 2026-07-11 — consistent with the dataset's stated
+  weekly-Sunday cadence. 197,652 rows, 2015-present. Found via corrected-URL retry:
+  the recon guess data-clevelandgis 404'd; the real portal is
+  **data.clevelandohio.gov** (ClevelandGIS org, launched 2024).
+- An **issuance ledger** (no permit-level status column; CURRENT_TASK_STATUS is
+  task-level) → the Detroit **status_const** pattern, guarded by
+  `ISSUE_DATE IS NOT NULL` in extra_where.
+- PERMIT_TYPE: Building Permit + Construction Project kept (Code Enforcement /
+  Historical / Velocity Hall dropped); PERMIT_SUBTYPE: Building / Building Permits /
+  Commercial / Residential kept (Elevator, Escalator, Mechanical, Install,
+  Amusement Device trades dropped at source).
+- Per-record **ACCELA_CITIZEN_ACCESS_URL** + LAT/LON columns; no ZIP column →
+  spatial ZIP scoping (3 mi).
+
+### Rejections / not wired (receipts)
+- **Cuyahoga County hub** (data-cuyahoga, 200): no permit datasets in the DCAT —
+  the CITY ledger above carries the metro (consistent with the meetings-side note
+  that Cuyahoga runs bespoke systems).
+- **Akron/Summit hub** (data-summitgis, 200): no permit datasets in the DCAT.
+- **Hamilton County CAGIS root** (cagis.hamilton-co.org/arcgis): 404 — service root
+  not public at that path; Cincinnati's BLDS dataset carries the metro.
+- **Franklin/Dayton/Toledo hub URL guesses**: 404 (domain-not-found) — no first-party
+  per-record permit source found for Dayton/Toledo this pass → facilities floor;
+  nightly reprobe list.
+
+
+## 2026-07-17 — ENGINE HARDENING: fail-loud communities lookup (founder directive)
+**Bug (observed live during the FL verifier walk):** the two communities reads that
+GATE content — `resolveCommunityIds` (civic-notices layer) and the `commRows`
+state/county read (EVERY connector's coverage gate) — discarded the PostgREST
+`error`, so a read that failed under load silently resolved to "no communities" and
+closed every gate. Receipts: OH smoke 44114/43215 returned 200 with
+`arcgis_reports: []` and dev 0 while the identical ZIPs returned thousands of
+records minutes earlier (Cleveland 44113 → 4,566), coinciding with both nationwide
+verifier walks hammering PostgREST. A page cached in that window would be wrongly
+downgraded to facilities-floor/empty — the exact "plausible but wrong" failure the
+anti-fabrication rules exist to prevent.
+**Fix (engine, additive):** `mustReadCommunities()` — 3 attempts with backoff, then
+THROW; a new top-level handler wrapper converts the throw into an explicit JSON 500.
+**A 500 is never collected** (the batch collect requires 200 + a `sites` key) and the
+refresh cron's transient-safe upsert never sees it — so no report can ever again be
+cached with silently-closed gates. **Standing answer: a gate-critical read NEVER
+fails soft — wrong data is worse than no data.**
+
+### Fail-loud fix — LOAD-TEST RECEIPTS (2026-07-17, fix deployed mid-verifier-walk)
+Re-ran the exact ZIPs under the same nationwide verifier load that reproduced the bug:
+- Cleveland 44113 → 200, dev **4,566** (exact match to pre-load run)
+- Cleveland 44114 → 200, dev **3,450** (was WRONGLY 0 under the old code)
+- Columbus 43215 → 200, dev **1,706** (was WRONGLY 0 / 504 — the entry fires and
+  completes; the earlier Columbus 504 was load contention, NOT the Miami slow-host class)
+- Cincinnati 45202 → 1,561 / Philadelphia 19143 → 400 / Pittsburgh 15213 → 243 —
+  regression-exact
+- Columbus-suburb 43230 → explicit **504 IDLE_TIMEOUT** — the fail-LOUD outcome:
+  visible, retryable, never collected. No silent empty anywhere.
+**Cache-integrity audit of already-live pages:** the only covered-city zeros are
+HONEST — Philadelphia 19110: source-side scoped count = 0 (verified against
+phl.carto.com); the 8 Pittsburgh dev-zero 152xx ZIPs: zero rows in the PLI feed at
+all (suburb/campus ZIPs outside city jurisdiction; verified against WPRDC SQL).
+No cached page was wrongly downgraded.
+**Follow-up logged (non-blocking):** the Miami slow-host rejection was measured
+while verifier walks were running — the evidence (pg_net fast vs edge slow,
+Detroit control passing) still points at the host, but re-test Miami in an idle
+window before Florida's next reprobe pass.
+
+## 2026-07-17 — NEW JERSEY WIRE PASS (Tier 1 state 4 of 17, founder wire order)
+
+**Facilities-floor state — no wireable per-record source survived recon** (all
+receipts live pg_net/recon-fetch 2026-07-17). NJ is unusual: the STATE mandates
+permit reporting, but the mandated dataset is aggregate-by-design.
+
+### Rejections / not wired (receipts)
+- **NJ Construction Permit Data (data.nj.gov w9se-dmra, NJ DCA)** — the one
+  statewide mandated dataset (N.J.A.C. 5:23-4.5(d)), fresh monthly (data through
+  2026-07-07, updated 07-08), 60-month rolling window. **Rejected: no honest ZIP
+  scope exists.** The DCA's own description states: "We do not get property
+  address, geocoding, owner names, type of work… What we have here is all we get."
+  Columns are municipality code + tax block/lot + fees/status/use-group. Mapping
+  municipality→ZIP would be guessed geography (USPS city ≠ NJ municipality;
+  townships/boroughs overlap ZIPs) — the Orlando/Somerville class. Logged as a
+  possible FUTURE muni-level area enrichment if an authoritative muni→ZIP
+  crosswalk is ever adopted (founder decision, non-blocking).
+- **Jersey City (data.jerseycitynj.gov — real portal found, Opendatasoft not
+  Socrata)**: the 36 permit-tagged assets are a planning-application DOCUMENT
+  library (per-case PDFs: staff reports, affidavits, notice packages) — no
+  structured per-record ledger to map verbatim. Reject on schema.
+- **Newark (data.ci.newark.nj.us)**: 503 Cloudflare bot-challenge to non-browser
+  clients on repeated probes — engine-unreachable class (the Tampa precedent).
+  Newark's **NewGIN** AGO hub (found via corrected-URL retry) carries only
+  environmental/zoning layers (TRI/NJDEP facilities, permitted-use zones) — no
+  permit ledger.
+- **NJ DCA hub (njdca-data-hub-njdca.hub.arcgis.com)**: "Building Permit Data" /
+  "Demolition Permit Data" / "Raw Permit Data" are hub DOCUMENTS whose GeoService
+  links point back at the same muni-level DCA reporter page — not feature services.
+- **NJGIN state catalog** (6.8 MB DCAT): permit-ish titles are NJDEP air-quality
+  facility layers (environmental registries, already covered by the EPA floor),
+  a 2018 archive, and DOT status layers — no construction-permit ledger.
+- **County hub guesses** (Bergen/Morris/Monmouth/Middlesex/Hudson): domain-not-found
+  404s; no first-party county hubs located. → nightly reprobe list.
+
+## 2026-07-17 — CONNECTICUT WIRE PASS (Tier 1 state 5 of 17, founder wire order)
+
+**Facilities-floor state** (receipts: recon-fetch run 29547920571 + pg_net
+1995-1997). CT's 169-town home rule means no county governments and no
+consolidated per-record permit ledgers anywhere we could find.
+
+### Rejections / not wired (receipts)
+- **data.ct.gov (state Socrata, live + fresh)**: every permit hit is an AGGREGATE —
+  "Monthly Building Permits Issued by Units in Structure", "Annual Housing Permit
+  Data By Town, 1990-2024" (DECD survey, town-level annual counts), CAMA/parcel
+  assessor extracts, liquor-license availability by town. No per-record source.
+- **Hartford (data.hartford.gov)**: the city's Socrata portal is DECOMMISSIONED —
+  the domain now returns "Cannot GET /api/catalog/v1" and the central Socrata
+  discovery API returns "Domain not found: data.hartford.gov". Third-party guides
+  still cite it (stale).
+- **Stamford**: recon domain DNS-dead (fetch failed).
+- **New Haven**: city site offers PDF permit applications + a city-plan GIS page —
+  no structured ledger.
+- **Bridgeport / Norwalk / New Haven hub guesses**: domain-not-found 404s.
+→ all on the nightly reprobe list.
+
+## 2026-07-17 — MISSOURI WIRE PASS (Tier 1 state 6 of 17, founder wire order)
+
+**Facilities-floor state** (receipts: recon runs 29548344593/29548658065 + pg_net
+1998-2004).
+
+### Rejections / not wired (receipts)
+- **Kansas City "Permits - CPD Dataset" (data.kcmo.org ntw8-aacc)** — a perfect
+  BLDS-class ledger (native originalzip, lat/lng, per-record CompassKC link,
+  permittypemapped) but **STALLED: max :updated_at = 2025-05-09** (14 months;
+  confirmed in-data, not just catalog metadata). The companion status-change
+  dataset stalled 2024-10. **Top of the nightly reprobe list** — if KCMO revives
+  the feed it wires in minutes.
+- **St. Louis Regional Data Exchange (rdx.stldata.org, CKAN)** — hosts the city's
+  building-permits database (updated ~monthly per the city site) but the host is
+  **UNREACHABLE from BOTH egress paths** (pg_net 30s+60s timeouts AND GitHub-runner
+  fetch failed ×2) — engine could never fetch it. → nightly reprobe list.
+- **St. Louis city's own portal (stlouis-mo.gov/data)**: building permits ship as
+  a ~monthly 30 MB Microsoft Access ZIP download — no API, not wireable as data.
+- **Springfield (gisdata-cosmo hub, live)**: 0 permit/construction datasets in the
+  DCAT (GIS base layers only).
+- **St. Charles hub**: CONT_0001 item-inaccessible; **Columbia/Boone + both St.
+  Louis hub guesses**: domain-not-found 404s.
+
+## 2026-07-17 — TENNESSEE WIRE PASS (Tier 1 state 7 of 17, founder wire order)
+
+**One metro wired (Nashville) on the existing arcgis connector — zero new code**
+(receipts: recon run 29551286796 + pg_net 2005-2010).
+
+### WIRED — nashville-building-permits-issued (ArcGIS, Metro Nashville-Davidson)
+- **FRESH**: max Date_Issued **2026-07-15**; hub modified 2026-07-16; 28,790 rows.
+- **Platform migration found by corrected-URL retry**: Nashville moved Socrata →
+  **ArcGIS Hub** (the old data.nashville.gov catalog path now 404s "Cannot GET",
+  and the central Socrata discovery API says Domain not found). The Hub DCAT
+  exposes `Building_Permits_Issued_2/FeatureServer/0` on services2.arcgis.com —
+  the healthy host class. **Standing answer: a "Cannot GET /api/catalog/v1" from
+  a former Socrata domain means PLATFORM MIGRATION, not a dead portal — pull the
+  domain's Hub DCAT before rejecting.**
+- Issuance ledger (no status column) → Detroit **status_const** pattern, guarded
+  `Date_Issued IS NOT NULL`. Native **ZIP** + **Lat/Lon** columns.
+- 34-value verbatim Permit_Type_Description domain; **12 construction/land-use
+  classes kept** (Residential/Commercial New, Addition, Foundation, Shell,
+  Structural Frame, Tenant Finish Out + Demolition); Rehab/storm/fire repairs,
+  Roofing-Siding, Signs, Tree Removal, U&O, Change-Contractor, Amend, Moving,
+  Temporary dropped at source.
+
+### Rejections / not wired (receipts)
+- **Memphis (data.memphistn.gov)**: same "Cannot GET /api/catalog/v1" AND the Hub
+  retry finds no permit ledger — the central discovery API has no such domain and
+  no Hub DCAT answers. No first-party per-record source found.
+- **Chattanooga**: recon domain is a dead Pantheon shell ("No Site Detected").
+- **Knoxville hub**: GWM_0003 permission error — the AGO org exists but its hub is
+  PRIVATE; **Knox County KGIS**: 401 Unauthorized at the REST root.
+- **Shelby / Rutherford hub guesses**: domain-not-found 404s.
+→ all on the nightly reprobe list. Memphis/Knoxville ZIPs ship facilities-floor.
