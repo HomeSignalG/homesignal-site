@@ -1815,3 +1815,24 @@ permit reporting, but the mandated dataset is aggregate-by-design.
   a 2018 archive, and DOT status layers — no construction-permit ledger.
 - **County hub guesses** (Bergen/Morris/Monmouth/Middlesex/Hudson): domain-not-found
   404s; no first-party county hubs located. → nightly reprobe list.
+
+## 2026-07-17 — CONNECTICUT WIRE PASS (Tier 1 state 5 of 17, founder wire order)
+
+**Facilities-floor state** (receipts: recon-fetch run 29547920571 + pg_net
+1995-1997). CT's 169-town home rule means no county governments and no
+consolidated per-record permit ledgers anywhere we could find.
+
+### Rejections / not wired (receipts)
+- **data.ct.gov (state Socrata, live + fresh)**: every permit hit is an AGGREGATE —
+  "Monthly Building Permits Issued by Units in Structure", "Annual Housing Permit
+  Data By Town, 1990-2024" (DECD survey, town-level annual counts), CAMA/parcel
+  assessor extracts, liquor-license availability by town. No per-record source.
+- **Hartford (data.hartford.gov)**: the city's Socrata portal is DECOMMISSIONED —
+  the domain now returns "Cannot GET /api/catalog/v1" and the central Socrata
+  discovery API returns "Domain not found: data.hartford.gov". Third-party guides
+  still cite it (stale).
+- **Stamford**: recon domain DNS-dead (fetch failed).
+- **New Haven**: city site offers PDF permit applications + a city-plan GIS page —
+  no structured ledger.
+- **Bridgeport / Norwalk / New Haven hub guesses**: domain-not-found 404s.
+→ all on the nightly reprobe list.
