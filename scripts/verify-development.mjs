@@ -121,6 +121,19 @@ async function loadPropertyReports() {
   return res.json();
 }
 
+// Navigation with ONE retry on timeout. At full-walk scale (5,900+ page loads) a
+// single transient goto timeout is statistically guaranteed eventually and must not
+// fail the whole run; a page that times out TWICE in a row is a real failure.
+async function gotoWithRetry(page, target) {
+  try {
+    await page.goto(target, { waitUntil: 'networkidle', timeout: 30000 });
+  } catch (e) {
+    if (!String(e && e.message).includes('Timeout')) throw e;
+    console.log(`  ~ nav timeout, retrying once: ${target}`);
+    await page.goto(target, { waitUntil: 'networkidle', timeout: 45000 });
+  }
+}
+
 async function main() {
   let reports = await loadReports();
   reports.sort((a, b) => a.zip.localeCompare(b.zip));
