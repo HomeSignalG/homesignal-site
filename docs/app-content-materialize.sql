@@ -115,3 +115,28 @@
 -- REVERT: re-apply the pre-2026-07-14 app_refresh_zip body (this file's history)
 -- and git-revert the nationwide-substance-gate PR; the column is additive and
 -- may remain (ignored by state-scoped readers).
+
+-- ---------------------------------------------------------------------------
+-- Applied 2026-07-17 via migrations `app_projects_facility_entity_columns` +
+-- `app_refresh_zip_facility_entity` (the regulated-facilities-as-entities build,
+-- docs/regulated-facilities-entity-spec):
+--   * app_projects gains `registry_id text` (the FRS business key) and
+--     `facility_env jsonb` — the engine's geo-matched environmental record carried
+--     verbatim from development_reports.sites onto each record_kind='facility' row:
+--       { link_type, epa?: { in_violation[], snc?, quarters_nc?, inspections?,
+--         action_year?, penalty_count?, current_as_of,
+--         permits?[{npdes_id,statute,status,type}],        -- engine v21
+--         permit_status?, compliance_tracking_on? },        -- engine v21
+--         tceq?: { name, status, programs[] }, tceq_rn?, tceq_url? }
+--     Built with jsonb_strip_nulls so absent stays absent; NULL when the cached site
+--     carries no env at all (pre-v19 rows) and on every record_kind='development' row.
+--   * The facility insert in app_refresh_zip is the ONLY changed statement; everything
+--     else is byte-identical to the app_meta_indexable_substance_gate body.
+--   * Readers: lib/data.js facilities() passes the columns through untouched;
+--     lib/templates.js HS.fac.interpret/signals/links renders the §5 interpretation
+--     (dossier = development.html?id=<uuid> branching on record_kind='facility';
+--     sidebar = maps.html "Regulated facilities · nearby"). permit_status is absent
+--     until the v21 engine deploy + re-cache reaches a ZIP — the UI renders the
+--     honest "permit status not yet confirmed" state, never a guess (spec §8).
+-- REVERT: drop the two columns (additive; readers null-check) and re-apply the
+-- prior function body from this file's history.

@@ -98,6 +98,21 @@ every ZIP ships at least a facilities view even with zero enrichment sources.
   Also keeps the legacy `viol` (= # open violations) for back-compat. Interpreted into
   one plain-language line client-side (the shared env render helper). Never creates rows.
   Absent stays absent (a violation year appears ONLY from a real ECHO action date).
+- **Schema mapping (v21 — ICIS-NPDES permit status, STEP-0 verified 2026-07-17 via pg_net):**
+  a second, CWA-service `get_facilities → get_qid` pair per report (same lat/lng/radius key)
+  `https://echodata.epa.gov/echo/cwa_rest_services.get_facilities?output=JSON&p_lat=&p_long=&p_radius=`
+  `https://echodata.epa.gov/echo/cwa_rest_services.get_qid?output=JSON&qid=&qcolumns=1,2,9,11,51,54&responseset=500`
+  (qcolumns pinned against `cwa_rest_services.metadata`: CWPName, SourceID, RegistryID,
+  Statute, CWPPermitStatusDesc, CWPPermitTypeDesc). Joins on RegistryID and adds, onto
+  `env.epa`: `permits:[{npdes_id, statute, status, type}]` (every NPDES permit on the FRS id,
+  verbatim), `permit_status` (the most-active status by precedence Effective → Admin
+  Continued → Expired → Pending → Not Needed → Retired → Terminated; ECHO's verbatim string
+  is "Admin Continued") and `compliance_tracking_on` (true only for Effective / Admin
+  Continued / Expired — ECHO still counts Expired as active). An unknown/blank status stamps
+  NOTHING. Receipt: DALFEN INDUSTRIAL FRS 110071346495 → CWPPermitStatusDesc "Terminated"
+  (NPDES TXR1538KZ). This is the honest core of the regulated-facilities-entity build: a
+  Terminated/Retired/Pending permit's zero-violation counts reflect an UNTRACKED permit and
+  are never rendered as a verified clean history (the page shows the tracking-off caveat).
 - **Coverage scope:** `{national: true}`
 - **counts bucket:** enrichment only (no new count)
 - **Legal framing (§10, standing answer):** Render the interpreted fact ("N open

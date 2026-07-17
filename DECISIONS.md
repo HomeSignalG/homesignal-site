@@ -165,3 +165,47 @@ dashboard.html via the ONE backbone in lib/map.js):
   `docs/app-maps-backbone-migration.sql` (applied live as
   `app_maps_backbone_centroids_and_date_sanity`; function body pulled verbatim
   via pg_get_functiondef, additive edits only).
+
+## Regulated facilities as first-class entities (2026-07-17)
+- **Facilities got the entity → UI pipeline, not a new table.** The spec's original
+  `resolved_facilities` idea was dropped after the repo read: `resolved_projects` is the
+  dormant Stratos entity, and facilities are ALREADY `app_projects` rows
+  (`record_kind='facility'`). The build enriches that row (`registry_id` + `facility_env`
+  jsonb, additive) and renders it — no parallel pipeline, no Stratos work.
+- **The dossier reuses `development.html?id=` branching on `record_kind`** (founder call):
+  one detail surface, one code path; header/labels read "Regulated facility," never
+  development — a facility is an existing condition, not activity. A record-kind-neutral
+  rename of development.html is flagged as a possible later cleanup (logged, non-blocking).
+- **ICIS-NPDES permit status is fetched (engine v21) because it is the honest core:**
+  ECHO's compliance fields alone can't say WHY zeros are meaningful. Statuses are verbatim
+  ("Admin Continued", live-verified); tracking_on = {Effective, Admin Continued, Expired}.
+  **Enforcement zeros render as a positive signal ONLY while tracking is on** — a
+  Terminated/Retired/Pending permit shows the tracking-off caveat instead (the DALFEN
+  FRS 110071346495 example). Unknown status → explicit "permit status not yet confirmed",
+  never a guess; the UI does not block on backfill.
+- **Facilities keep the same coverage gating as projects for free** (rows are ZIP-keyed by
+  the same materializer from the same coverage-gated engine cache; no parallel gate added).
+
+## Staging _*_zips RLS cleanup (2026-07-17)
+- **Dead scratch is DROPPED, not secured** (13 tables): every completed state's
+  `_<st>_zips` worklist is recreated verbatim by its committed seed script (which itself
+  starts `drop table if exists`), and `_dfw_zips`/`_den_zips`/`_den_res_dbg` were
+  comment-only or unreferenced debug scratch. 0 references in pg_proc / pg_views /
+  cron.job for all of them — verified before dropping.
+- **`_fl_zips` is KEPT — it's an in-flight Florida batch** (441 ZIPs all cached,
+  refreshed 2026-07-17 00:05 UTC, live request_id/status worklist columns; a concurrent
+  session owns it). Secured instead: RLS on + anon/authenticated grants revoked + an
+  explicit service_role policy. Zero impact on the batch (service-role bypasses RLS).
+  The owning session drops it at build end.
+- **`spatial_ref_sys` stays RLS-off on purpose** (PostGIS system table — founder call);
+  it is the ONE remaining `rls_disabled_in_public` advisory line, expected.
+- DDL of record: `docs/staging-zips-cleanup.sql` (applied as migration
+  `staging_zips_cleanup_rls`).
+- ⏳ **Drop-by note:** `_fl_zips` must be dropped by the owning session when the
+  Florida build completes. **If found after 2026-07-24, treat it as orphaned:
+  verify the FL build is done (FL ZIPs cached in `development_reports`) and drop it.**
+- 📋 **Pre-existing advisor findings logged as a separate backlog** —
+  `docs/security-advisor-backlog.md`. The ERROR (`feed_inventory_live` is a
+  SECURITY DEFINER view) should get a look soon; the 14 SECDEF-function WARNs and
+  the outreach-schema RLS INFOs are a deliberate later pass. None of it belongs
+  to the regulated-facilities PR.
