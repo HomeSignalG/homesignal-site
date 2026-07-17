@@ -350,6 +350,14 @@
     HS.openModal('homeModal');
     setTimeout(() => { if (a) a.focus(); }, 50);
   };
+  // "Add a home / area" entry points: a signed-in resident gets the Census-confirmed
+  // home flow (private, owner-only rows); a signed-out visitor gets the no-login ZIP
+  // box so the sample experience never dead-ends at a sign-in wall. Restores the
+  // pre-#262 nudge behavior without weakening the privacy model (saving still needs auth).
+  HS.addHome = function () {
+    if (state.session && !state.session.demo) HS.openHome();
+    else if (HS.openLoc) HS.openLoc();
+  };
   HS.findHome = async function () {
     const el = $('homeAddr'), q = el.value.trim();
     if (q.length < 8 || q.indexOf(' ') < 0) { el.style.borderColor = '#c23b34'; el.focus(); return; }

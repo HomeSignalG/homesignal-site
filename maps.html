@@ -234,7 +234,7 @@ HS.onReady(async function () {
         + 'background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 15px;'
         + 'font:600 12.5px/1 var(--font);color:var(--ink);box-shadow:var(--shadow);cursor:pointer';
       el.textContent = '◎ Add your home to see what’s near you';
-      el.onclick = function(){ if (HS.openHome) HS.openHome(); else if (HS.openLoc) HS.openLoc(); };
+      el.onclick = function(){ if (HS.addHome) HS.addHome(); else if (HS.openLoc) HS.openLoc(); };
       if (wrap) wrap.appendChild(el);
     }
   }
