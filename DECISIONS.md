@@ -201,3 +201,11 @@ dashboard.html via the ONE backbone in lib/map.js):
   it is the ONE remaining `rls_disabled_in_public` advisory line, expected.
 - DDL of record: `docs/staging-zips-cleanup.sql` (applied as migration
   `staging_zips_cleanup_rls`).
+- ⏳ **Drop-by note:** `_fl_zips` must be dropped by the owning session when the
+  Florida build completes. **If found after 2026-07-24, treat it as orphaned:
+  verify the FL build is done (FL ZIPs cached in `development_reports`) and drop it.**
+- 📋 **Pre-existing advisor findings logged as a separate backlog** —
+  `docs/security-advisor-backlog.md`. The ERROR (`feed_inventory_live` is a
+  SECURITY DEFINER view) should get a look soon; the 14 SECDEF-function WARNs and
+  the outreach-schema RLS INFOs are a deliberate later pass. None of it belongs
+  to the regulated-facilities PR.

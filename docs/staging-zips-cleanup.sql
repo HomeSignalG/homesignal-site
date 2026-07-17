@@ -52,3 +52,9 @@ create policy "service role only (batch worklist)" on public._fl_zips
 -- Post-apply receipt (2026-07-17): rls_disabled_in_public advisory reduced to
 -- exactly `spatial_ref_sys` (left as-is on purpose); _fl_zips absent from all
 -- lints; _fl_zips rows intact (441) with RLS on + 1 policy.
+
+-- ⏳ _fl_zips DROP-BY NOTE: this table is the Florida batch's worklist and must be
+-- dropped BY THE OWNING SESSION when that build completes (like every prior state's).
+-- If you find public._fl_zips still present AFTER 2026-07-24: it has been orphaned —
+-- verify the FL build is done (its ZIPs cached in development_reports / the FL
+-- go-live status note exists in CLAUDE.md) and `drop table public._fl_zips;`.
