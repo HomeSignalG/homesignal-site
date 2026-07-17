@@ -22,12 +22,8 @@ jobs:
           node-version: '20'
       - name: Install Playwright (chromium)
         run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
-      # BRANCH-LOCAL DISPATCH SHIM (claude/regulated-facilities-entity-n28u3w only — main's
-      # copy is untouched): verify-facility-entity.yml can't be dispatched until it exists on
-      # the default branch, so this registered workflow runs the facility-entity live verifier
-      # from this ref instead. Read-only. Delete with the branch.
-      - name: Verify facility-entity behaviors live (branch shim)
+      - name: Spot-check pages
         env:
           SITE_BASE: https://homesignal.net
-          ZIP: ${{ github.event.inputs.zips }}
-        run: node scripts/verify-facility-entity.mjs
+          ZIPS: ${{ github.event.inputs.zips }}
+        run: node scripts/spot-check-shell.mjs
