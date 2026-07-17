@@ -30,4 +30,15 @@ const pipeKeys = (HS.pipelines || []).map(p => p.key);
 ok(pipeKeys.every(k => canon.pipeline_types.includes(k)),
    'every topics.js pipeline key is a canonical pipeline_type');
 
+// Government-topics gap inventory (vendored, inert). These arrays mirror the
+// ingest canon so the delivery gap is visible + CI-tracked in the site repo.
+// They are NOT consumed by any site runtime; this only guards the vendored JSON.
+const active = canon.government_topics_active || [];
+const pending = canon.government_topics_pending || [];
+ok(active.length > 0, 'canon has active government_topics');
+ok(pending.length > 0, 'canon has pending government_topics (tracked delivery gap)');
+const overlap = active.filter(x => pending.includes(x));
+ok(overlap.length === 0,
+   'active and pending government_topics are disjoint (no topic both delivered and pending): ' + JSON.stringify(overlap));
+
 process.exit(fails ? 1 : 0);
