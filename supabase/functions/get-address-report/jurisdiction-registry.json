@@ -2819,8 +2819,20 @@
      "Permit Issued"
     ],
     "types": "GENERAL_TYPE 12 values; New Structure + Demolition kept, '- Other' catch-alls + Graphics Permit (signs) + Other + null dropped/fail-closed",
-    "record_precision": "native B1_SITUS_ZIP + per-record ACA_URL (Accela)"
-   }
+    "record_precision": "native B1_SITUS_ZIP + per-record ACA_URL (Accela)",
+    "dense_zip_projection": "dense Columbus ZIPs (e.g. 43214 = 2,413 construction rows/365d) at outFields=* on the 44-col schema timed the report out (Miami class); project the 8 mapped columns + page_size=2000"
+   },
+   "out_fields": [
+    "GENERAL_TYPE",
+    "B1_PER_SUB_TYPE",
+    "PERMIT_STATUS",
+    "ISSUED_DT",
+    "SITE_ADDRESS",
+    "B1_SITUS_ZIP",
+    "B1_ALT_ID",
+    "ACA_URL"
+   ],
+   "page_size": 2000
   },
   {
    "registry_id": "cleveland-issued-building-permits",
