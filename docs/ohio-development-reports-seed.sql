@@ -366,3 +366,9 @@ on conflict (zip) do update set lat = excluded.lat, lng = excluded.lng;
 -- FIRE / COLLECT / RE-FIRE / MATERIALIZE: identical statements to the FL seed
 -- (docs/florida-development-reports-seed.sql) with _oh_zips and vintage
 -- 'zipcodes PyPI v3.0.0 centroid; get-address-report ZIP mode; Ohio batch 2026-07-17'.
+
+-- GO-LIVE RESULTS (2026-07-17, DB-verified): 335/335 cached; 323 pass + 12
+-- coverage_coming; 0 unsourced, 0 coordless, 0 count mismatches; 114 dev-backed
+-- (34%), 142,502 dev records (Cincinnati BLDS + Cleveland spatial-3mi + Columbus
+-- native-ZIP); 305 auto-indexable. Dense Columbus cores needed the out_fields+
+-- page_size projection (2,413 wide rows/ZIP) — same Miami CPU-hazard fix.

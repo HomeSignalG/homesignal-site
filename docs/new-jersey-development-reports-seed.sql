@@ -382,3 +382,6 @@ insert into public._nj_zips (zip, lat, lng) values
  ('08902', 40.4538, -74.4823),
  ('08904', 40.4991, -74.4266)
 on conflict (zip) do update set lat = excluded.lat, lng = excluded.lng;
+
+-- GO-LIVE RESULTS (2026-07-17, DB-verified): 359/359 cached on the facilities
+-- floor; 355 pass + 4 coverage_coming; 0 unsourced, 0 coordless; 354 indexable.

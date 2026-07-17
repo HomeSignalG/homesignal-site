@@ -217,3 +217,7 @@ insert into public._tn_zips (zip, lat, lng) values
  ('38487', 35.6494, -87.2257),
  ('42223', 36.6543, -87.4606)
 on conflict (zip) do update set lat = excluded.lat, lng = excluded.lng;
+
+-- GO-LIVE RESULTS (2026-07-17, DB-verified): 201/201 cached; 182 pass + 19
+-- coverage_coming; 0 unsourced, 0 coordless; 31 dev-backed (Nashville/Davidson,
+-- 8,902 records); 159 auto-indexable.
