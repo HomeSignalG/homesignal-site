@@ -17,7 +17,7 @@
       <p>Follow as many homes as you like — yours, a rental, or a family member's. Each is watched independently, and you're alerted when something changes near any of them.</p>
     </div>
     <div class="strip" id="propStrip"></div>
-    <div class="bt-row"><h2 style="font-size:15px;margin:0">Homes you follow</h2><button class="addbtn" onclick="HS.openHome()">+ Add a home</button></div>
+    <div class="bt-row"><h2 style="font-size:15px;margin:0">Homes you follow</h2><button class="addbtn" onclick="HS.addHome()">+ Add a home</button></div>
     <div class="propgrid" id="propGrid"></div>
   </div>
 </template>
@@ -53,7 +53,7 @@ HS.onReady(async function () {
       + '<div class="pmeta">' + (needs ? '<span class="needs">◔ ' + needs + ' need' + (needs===1?'s':'') + ' you</span>' : '<span style="color:var(--ink-3)">Nothing needs you</span>')
       + '<span>' + near.length + ' nearby projects</span><span style="color:var(--green);font-weight:600">+' + p.value_outlook + '%</span></div></div></div>';
   }).join('')
-  + '<div class="propcard" onclick="HS.openHome()" style="border-style:dashed;justify-content:center">'
+  + '<div class="propcard" onclick="HS.addHome()" style="border-style:dashed;justify-content:center">'
   + '<div style="text-align:center"><div style="font-size:22px;color:var(--green);line-height:1">＋</div>'
   + '<div style="font-weight:600;color:var(--ink-2);font-size:13.5px;margin-top:4px">Add another property</div>'
   + '<div style="font-size:11.5px;color:var(--ink-3)">Free — follow as many as you like</div></div></div>';
