@@ -1,0 +1,24 @@
+{
+  "_comment": "GENERATED / VENDORED from homesignal-ingest/topics/canon.yaml (the authored source of record). Phase 1A: descriptive + inert — used ONLY by test/topic-canon.test.mjs to detect drift against topics.js. Nothing in the runtime imports this. Do not hand-edit; regenerate from the ingest artifact. Copied 2026-07-17.",
+  "version": 1,
+  "news_subtopics": [
+    "Water Quality",
+    "Air Quality",
+    "Soil Quality",
+    "Data Centers",
+    "EMF",
+    "Radiation",
+    "Infrastructure",
+    "Noise Pollution",
+    "Light Pollution",
+    "Weather & Climate Hazards",
+    "Animal & Human Viruses / Diseases",
+    "Livestock, Crops, Pets & Wildlife Health"
+  ],
+  "pipeline_types": [
+    "government_notice",
+    "news_alert",
+    "emerging_technology",
+    "global_best_practices"
+  ]
+}
