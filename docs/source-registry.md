@@ -1684,3 +1684,60 @@ engine's egress path changes. Hillsborough/Tampa ships on the facilities floor.
   indexable after FL: 5,327.
 - All four metro rejections (FTL stalled / Orlando ungeolocatable / Tampa WAF /
   Miami slow-host) + hub no-dataset verdicts are on the nightly reprobe list.
+
+## 2026-07-17 — OHIO WIRE PASS (Tier 1 state 3 of 17, founder wire order)
+
+**Three metros wired (Cincinnati, Columbus, Cleveland), all on EXISTING connectors —
+zero new code.** All receipts are live pg_net probes 2026-07-16/17 (ids 1942-1969);
+nothing wired on training knowledge.
+
+### WIRED — cincinnati-building-permits (Socrata BLDS, Hamilton County)
+- **FRESH same-day**: rowsUpdatedAt 2026-07-16; max issueddate/applieddate 2026-07-14.
+- Dataset uhjb-xac9 — a **BLDS-standard ledger** (the Boulder class): native
+  `originalzip`, `latitude`/`longitude`, per-record **`link`** column (record
+  precision), `statuscurrentmapped` normalized statuses.
+- Statuses VERBATIM from statuscurrentmapped: Permit Issued (21,999)→approved,
+  Permit Finaled (139,840)→operating, Application Accepted/In Review/Approved→
+  proposed; Withdrawn/EXPIRED/DENIED/HOLD/VOIDED/REVOKED/APP_EXP/W-REFUND/XCLOSED→
+  exclude; raw-code oddballs surface in unmapped_statuses (fail-closed).
+- permittypemapped: **Building 44,298 + Wrecking 5,703 kept**; HVAC (48k)/Plumbing
+  (44k)/Signs/Elevator/Fire/Excavation-Fill/Repair/Fences/Parking/Misc/Temp dropped
+  at source.
+
+### WIRED — columbus-building-permits (ArcGIS, Franklin County)
+- **FRESH**: max ISSUED_DT 2026-07-15; the dataset self-describes nightly updates;
+  hub modified 2026-07-16. Found via the Hub domains API (orgId 9yy6msODkIBzkUXU) →
+  the DCAT GeoService distribution (org-scoped item search only surfaced the two
+  archival "Historic Building Permits" services — the DCAT is the reliable path).
+- 4 statuses VERBATIM: Permit Issued→approved, Final Inspection Approved +
+  Certificate of Occupancy Issued→operating, Expired Permit→exclude.
+- GENERAL_TYPE (12 values): all **New Structure** + **Demolition** classes kept
+  (1,2,3 Family / Multi Family / Commercial / Unspecified); "- Other" catch-alls,
+  Graphics Permit (signs), Other, null dropped/fail-closed.
+- Native `B1_SITUS_ZIP` + per-record **ACA_URL** (Accela) — record precision.
+
+### WIRED — cleveland-issued-building-permits (ArcGIS, Cuyahoga County)
+- **FRESH**: max ISSUE_DATE 2026-07-11 — consistent with the dataset's stated
+  weekly-Sunday cadence. 197,652 rows, 2015-present. Found via corrected-URL retry:
+  the recon guess data-clevelandgis 404'd; the real portal is
+  **data.clevelandohio.gov** (ClevelandGIS org, launched 2024).
+- An **issuance ledger** (no permit-level status column; CURRENT_TASK_STATUS is
+  task-level) → the Detroit **status_const** pattern, guarded by
+  `ISSUE_DATE IS NOT NULL` in extra_where.
+- PERMIT_TYPE: Building Permit + Construction Project kept (Code Enforcement /
+  Historical / Velocity Hall dropped); PERMIT_SUBTYPE: Building / Building Permits /
+  Commercial / Residential kept (Elevator, Escalator, Mechanical, Install,
+  Amusement Device trades dropped at source).
+- Per-record **ACCELA_CITIZEN_ACCESS_URL** + LAT/LON columns; no ZIP column →
+  spatial ZIP scoping (3 mi).
+
+### Rejections / not wired (receipts)
+- **Cuyahoga County hub** (data-cuyahoga, 200): no permit datasets in the DCAT —
+  the CITY ledger above carries the metro (consistent with the meetings-side note
+  that Cuyahoga runs bespoke systems).
+- **Akron/Summit hub** (data-summitgis, 200): no permit datasets in the DCAT.
+- **Hamilton County CAGIS root** (cagis.hamilton-co.org/arcgis): 404 — service root
+  not public at that path; Cincinnati's BLDS dataset carries the metro.
+- **Franklin/Dayton/Toledo hub URL guesses**: 404 (domain-not-found) — no first-party
+  per-record permit source found for Dayton/Toledo this pass → facilities floor;
+  nightly reprobe list.
