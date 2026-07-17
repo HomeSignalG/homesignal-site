@@ -3112,6 +3112,70 @@
     "statuses_verbatim": "16 RECORD_Status values (returnDistinctValues) all mapped: proposed(4)/approved(6)/operating(3)/exclude(3)",
     "found_via": "Madison AGS root -> Planning folder -> Current_Planning_Projects (5 recon rounds; Milwaukee CKAN had no ZIP/coords, Madison Hub only parking-permit polygons)"
    }
+  },
+  {
+   "registry_id": "wake-county-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://maps.wake.gov/arcgis/rest/services/Inspections/Building_Permits/MapServer/0",
+   "dataset_url": "https://energovcitizenaccess.tylertech.com/WakeCountyNC",
+   "jurisdiction": "Wake County",
+   "coverage": [
+    {
+     "state": "NC",
+     "county": "Wake"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "DESCRIPTION",
+     "PERMIT_TYPE"
+    ],
+    "status_raw": "PERMIT_STATUS",
+    "file_date": "ISSUE_DATE",
+    "address": "MAILING_ADDRESS",
+    "case_number": "PERMIT_NUMBER",
+    "lat": "__lat",
+    "lng": "__lng"
+   },
+   "status_to_bucket": {
+    "proposed": [
+     "In Review",
+     "Application Incomplete",
+     "On Hold",
+     "On Hold - Customer Action Required",
+     "Submitted - Online",
+     "Submitted"
+    ],
+    "approved": [
+     "Issued",
+     "Approved"
+    ],
+    "operating": [
+     "Complete"
+    ],
+    "exclude": [
+     "Disapproved",
+     "Void",
+     "Expired",
+     "Stop Work Order",
+     "Inactive",
+     "Revoked",
+     "Withdrawn",
+     "Under Violation",
+     "Denied"
+    ]
+   },
+   "recency_days": 365,
+   "spatial_zip_radius_mi": 3,
+   "record_url_precision": "dataset",
+   "_receipts": {
+    "probed": "2026-07-17 pg_net 11822-11827 (NC recon run 29578077331 -> Wake DCAT)",
+    "layer": "Inspections/Building_Permits/MapServer/0 = 'Building Permits' \u2014 195,894 total, 5,867 issued in last 365 days",
+    "geometry": "SHAPE point reprojects to WGS84 on outSR=4326 (verified {x:-78.53,y:35.80}); column_map maps __lat/__lng -> per-parcel points (source geometry, never geofenced). spatial_zip_radius_mi=3",
+    "record_url": "LINK = energovcitizenaccess.tylertech.com/WakeCountyNC (EnerGov citizen-access portal \u2014 dataset-precision, the county's official permit record system; not per-record deep-linked, so record_url_precision=dataset via dataset_url)",
+    "statuses_verbatim": "18 PERMIT_STATUS values all mapped: proposed(6)/approved(2 Issued+Approved)/operating(1 Complete)/exclude(9 incl. Stop Work Order+Under Violation as non-lifecycle)",
+    "note": "MAILING_ADDRESS used as display address; pin placement is the real SHAPE geometry (site). Covers all Wake County (Raleigh/Cary/Apex/etc.) \u2014 chosen over the Raleigh-city-only hosted layer for county-wide reach."
+   }
   }
  ],
  "ckan": [
