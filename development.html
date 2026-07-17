@@ -63,6 +63,9 @@ HS.onReady(async function () {
         + body
         + facSection();   // regulated facilities are appended in their OWN labeled section, never the dev list
       wire();
+      // This page rebuilds its .ph dynamically, so re-run the shared header
+      // context line (shell.js::HS.paintWhereLine) after each paint.
+      if (HS.paintWhereLine) HS.paintWhereLine();
     }
     // Regulated facilities (EPA/ECHO) — environmental context, kept out of every
     // development / "what's being built" list above. Renders nothing when empty.

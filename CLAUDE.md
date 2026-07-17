@@ -964,6 +964,62 @@ legal/framing change not covered by the one-time sign-off.
   reprobe list; their ZIPs ship on the EPA facilities floor). Receipts:
   docs/source-registry.md "PENNSYLVANIA WIRE PASS". Reproducible seed:
   docs/pennsylvania-development-reports-seed.sql.
+- 🟢 **FLORIDA IS LIVE ON THE FACILITIES FLOOR — 441/441 modeled FL ZIPs cached, 0 permit
+  sources (all four metro candidates REJECTED with receipts), 398 pages auto-indexable**
+  (DB-verified 2026-07-16). Fourteenth development state, Tier 1 state 2 of 17. The first
+  state where recon found real candidates but **live smoke rejected every one** — the honest
+  outcome the anti-fabrication rules exist for: **Fort Lauderdale** perfect schema but
+  STALLED at 2021-01-05; **Orlando** fresh same-day but UNGEOLOCATABLE at source
+  (geocoded_column populated on 6% of 1.1M rows / 6 rows in the last year, street-only
+  addresses, no ZIP column — Somerville precedent); **Tampa** live + fresh on the city's own
+  server but the WAF 403s Supabase edge-runtime egress (identical URL 200 from pg_net —
+  IP-range block, UA-invariant); **Miami** live + fresh but the host answers edge requests
+  ~30-60s each size-invariant, so the report can't fit the worker budget (546/546/546/504
+  across five smoke rounds; a Detroit control ran 200 mid-investigation proving the arcgis
+  path healthy). Broward/Hillsborough/Miami-Dade county hubs carry no permit datasets; St.
+  Pete has no catalog. Two ADDITIVE arcgis connector options shipped from the investigation
+  and stay (default-off): **`out_fields`** (project mapped columns — outFields=* on wide
+  dense-metro rows is a CPU hazard) and **`page_size`** (fewer, larger pages for slow
+  hosts). Every modeled FL ZIP has a cached row (zipcodes v3.0.0, 0 quarantined) and a
+  materialized page — **425 pass + 16 coverage_coming honest empties; 0 unsourced, 0 count
+  mismatches, 0 point sites missing coords; 8,807 EPA facilities**. All rejected sources →
+  the nightly reprobe list. Receipts: docs/source-registry.md "FLORIDA WIRE PASS".
+  Reproducible seed: docs/florida-development-reports-seed.sql.
+- 🟢 **OHIO IS LIVE UNDER THE SUBSTANCE GATE — 335/335 modeled OH ZIPs cached, 3
+  first-party permit sources, 305 pages auto-indexable** (DB-verified 2026-07-17).
+  Fifteenth development state, Tier 1 state 3. Three metros on existing connectors,
+  zero-to-minimal new code: **Cincinnati** (Socrata BLDS ledger uhjb-xac9, fresh
+  same-day, native zip + per-record link), **Columbus** (ArcGIS, nightly, native
+  ZIP + ACA_URL — dense cores needed the additive `out_fields`+`page_size`
+  projection, 2,413 wide rows/ZIP = the Miami CPU-hazard class), **Cleveland**
+  (ArcGIS status_const issuance ledger via corrected-URL retry to
+  data.clevelandohio.gov; per-record Accela URLs; spatial 3-mi). **323 pass + 12
+  coverage_coming; 0 unsourced, 0 coordless, 0 count mismatches; 114 dev-backed
+  (34%), 142,502 dev records.** Receipts: docs/source-registry.md "OHIO WIRE PASS".
+  Reproducible seed: docs/ohio-development-reports-seed.sql.
+- 🟢 **TENNESSEE IS LIVE UNDER THE SUBSTANCE GATE — 201/201 modeled TN ZIPs cached,
+  1 first-party permit source, 159 pages auto-indexable** (DB-verified 2026-07-17).
+  Sixteenth development state, Tier 1 state 7. **Nashville** (ArcGIS, Metro
+  Nashville-Davidson) wired on the existing connector — found via corrected-URL
+  retry: Nashville MIGRATED Socrata→ArcGIS Hub (the old catalog path 404s "Cannot
+  GET"; standing answer: that means platform migration, pull the Hub DCAT before
+  rejecting). Fresh 2026-07-15, native ZIP + Lat/Lon, status_const issuance ledger,
+  12-value construction whitelist of the 34-value domain. **182 pass + 19
+  coverage_coming; 0 unsourced, 0 coordless; 31 dev-backed (Davidson), 8,902 dev
+  records.** Memphis/Knoxville/Chattanooga rejected with receipts (Memphis no Hub
+  ledger, Knoxville private hub, Chattanooga dead Pantheon shell). Receipts:
+  docs/source-registry.md "TENNESSEE WIRE PASS". Seed:
+  docs/tennessee-development-reports-seed.sql.
+- 🟢 **NEW JERSEY / CONNECTICUT / MISSOURI ARE LIVE ON THE EPA FACILITIES FLOOR**
+  (DB-verified 2026-07-17). Tier 1 states 4/5/6 — no wireable per-record permit
+  source survived recon (full receipts in the respective WIRE PASS sections):
+  **NJ** 359/359 cached (355 pass + 4 empty; 354 indexable) — the mandated DCA
+  dataset is aggregate-by-design (no address/ZIP), Jersey City is a planning-PDF
+  library, Newark Cloudflare-walled; **CT** 288/288 (282 pass + 6 empty; 254
+  indexable) — state publishes only aggregates, Hartford's Socrata decommissioned;
+  **MO** 264/264 (241 pass + 23 empty; 200 indexable) — KCMO's BLDS ledger STALLED
+  2025-05-09 (top reprobe candidate), STL RDX host unreachable dual-egress. All
+  three: 0 unsourced, 0 coordless. Seeds: docs/{new-jersey,connecticut,missouri}-development-reports-seed.sql.
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:

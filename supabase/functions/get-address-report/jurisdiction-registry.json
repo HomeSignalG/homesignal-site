@@ -1106,6 +1106,75 @@
    },
    "recency_days": 365,
    "_receipts": "2026-07-16 MD wire pass (demolition). FRESH: max issueddate 2026-07-15 (res+com live receipts; demolition newest row 2026-02-27 added-date sample). Statuses VERBATIM via SoQL group-by: Open->proposed, Issued->approved, Finaled(+Completed on demolition)->operating, Stop Work->exclude. worktype vocab VERBATIM (res: ADD 43,607/ALTER 52,593/CONSTRUCT 84,198/BUILD FOUNDATION/...; com adds COMMERCIAL CHANGE OF USE 1,019 + DEMOLISH); noise dropped at source per the recon keep list (RESTORE AND / OR REPAIR re-roofs, INSTALL, REPLACE, blanks fail closed). Native `zip` column; coordinates ride the nested Socrata location column -> the NEW additive dot-path readCol (location.latitude/location.longitude; exact-column-name always wins; offline-tested). Recency on addeddate keeps Open applications visible (issueddate is null pre-issuance). No per-row URL column -> dataset-precision record_url. Mechanical/Electrical/Fence/Sign companion datasets DROPPED as trades/noise (WA/MN/IL precedent)."
+  },
+  {
+   "registry_id": "cincinnati-building-permits",
+   "platform": "socrata",
+   "domain": "data.cincinnati-oh.gov",
+   "dataset_id": "uhjb-xac9",
+   "dataset_url": "https://data.cincinnati-oh.gov/d/uhjb-xac9",
+   "jurisdiction": "City of Cincinnati",
+   "coverage": [
+    {
+     "state": "OH",
+     "county": "Hamilton"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "permittypemapped",
+     "description"
+    ],
+    "status_raw": "statuscurrentmapped",
+    "type_source": "permittypemapped",
+    "file_date": "applieddate",
+    "address": "originaladdress1",
+    "zip": "originalzip",
+    "lat": "latitude",
+    "lng": "longitude",
+    "case_number": "permitnum",
+    "record_url": "link"
+   },
+   "include_types": [
+    "Building",
+    "Wrecking"
+   ],
+   "type_map": {
+    "Building": "Development",
+    "Wrecking": "Development"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Permit Issued"
+    ],
+    "proposed": [
+     "Application Accepted",
+     "In Review",
+     "Approved"
+    ],
+    "operating": [
+     "Permit Finaled"
+    ],
+    "exclude": [
+     "Permit Withdrawn",
+     "EXPIRED",
+     "DENIED",
+     "HOLD",
+     "VOIDED",
+     "REVOKED",
+     "APP_EXP",
+     "W/REFUND",
+     "XCLOSED"
+    ]
+   },
+   "recency_days": 365,
+   "_receipts": {
+    "probed": "2026-07-16 pg_net (ids 1942/1945-1947/1949)",
+    "fresh": "rowsUpdatedAt 2026-07-16 (same-day); max issueddate/applieddate 2026-07-14",
+    "blds_standard": "statuscurrentmapped used over raw codes (Permit Issued 21,999 / Permit Finaled 139,840 / Application Accepted 3,206 / In Review 5,596 / Approved 519); raw-code oddballs (ADD INS, APRV_NR, BILLED, CAGIS, PAID, ROUTE...) surface in unmapped_statuses, never guessed",
+    "types": "permittypemapped Building 44,298 + Wrecking 5,703 kept; HVAC/Plumbing/Signs/Elevator/Fire/Excavation-Fill/Repair/Fences/Parking/Misc/Temp/CoO dropped at source",
+    "record_precision": "native per-record link column + native originalzip + latitude/longitude"
+   }
   }
  ],
  "arcgis": [
@@ -2683,6 +2752,304 @@
    },
    "recency_days": 365,
    "_receipts": "2026-07-16 MD wire pass. The county's own ArcGIS Server (bcgisdata, DevelopmentManagement/ActiveDevelopment layer 4 - the Hub distribution host, NOT the hub domain). FRESH: newest ISSDATE 2026-07-15 (epoch 1784073600000; R24-07845/R26-03840 live receipt; esriFieldTypeDate -> recency_days valid). 6 STATUS values VERBATIM (returnDistinctValues): ISSUE->approved, OPEN->proposed, CLOSED->operating, EXPIRED/CANCELLED/BL-EXPIRED->exclude. DESCRIPTION_TYPE vocab VERBATIM ('Comm. Permit - X'/'Res. Permit - X' format - the recon note paraphrased; the IN-list here is byte-exact from the live enumeration): kept 11 construction/land-use classes; DROPPED at source: Sign, Swimming Pool, Deck, Fence, Solar, Tanks, Fireplace, COO, Sprinkler, Towers/Antennas, Temporary*, Retaining Wall, Bulkhead, Piers, Moving, Storm Water, Cranes, Private Bridge, Access Point + Env Health variants (restaurant-scoped). Native ZIP + per-record LATITUDE/LONGITUDE columns; recency on APPL_DATE keeps OPEN applications (ISSDATE null pre-issuance) - wait, file_date is APPL_DATE for exactly that reason. No per-row URL column -> dataset-precision record_url. Hub layers /5 Electrical /8 U&O dropped (trades/occupancy)."
+  },
+  {
+   "registry_id": "columbus-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://services1.arcgis.com/9yy6msODkIBzkUXU/arcgis/rest/services/Building_Permits/FeatureServer/0",
+   "dataset_url": "https://opendata.columbus.gov/datasets/columbus::building-permits-3",
+   "jurisdiction": "City of Columbus",
+   "coverage": [
+    {
+     "state": "OH",
+     "county": "Franklin"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "GENERAL_TYPE",
+     "B1_PER_SUB_TYPE"
+    ],
+    "status_raw": "PERMIT_STATUS",
+    "type_source": "GENERAL_TYPE",
+    "file_date": "ISSUED_DT",
+    "address": "SITE_ADDRESS",
+    "zip": "B1_SITUS_ZIP",
+    "case_number": "B1_ALT_ID",
+    "record_url": "ACA_URL"
+   },
+   "include_types": [
+    "1,2,3 Family - New Structure",
+    "Multi Family - New Structure",
+    "Commercial - New Structure",
+    "1,2,3 Family - Demolition",
+    "Multi Family - Demolition",
+    "Commercial - Demolition",
+    "Unspecified - Demolition"
+   ],
+   "type_map": {
+    "1,2,3 Family - New Structure": "Development",
+    "Multi Family - New Structure": "Development",
+    "Commercial - New Structure": "Development",
+    "1,2,3 Family - Demolition": "Development",
+    "Multi Family - Demolition": "Development",
+    "Commercial - Demolition": "Development",
+    "Unspecified - Demolition": "Development"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Permit Issued"
+    ],
+    "operating": [
+     "Final Inspection Approved",
+     "Certificate of Occupancy Issued"
+    ],
+    "exclude": [
+     "Expired Permit"
+    ]
+   },
+   "recency_days": 365,
+   "_receipts": {
+    "probed": "2026-07-16 pg_net (ids 1952-1958)",
+    "fresh": "max ISSUED_DT 2026-07-15 (nightly per the dataset description); hub modified 2026-07-16",
+    "statuses_verbatim": [
+     "Certificate of Occupancy Issued",
+     "Expired Permit",
+     "Final Inspection Approved",
+     "Permit Issued"
+    ],
+    "types": "GENERAL_TYPE 12 values; New Structure + Demolition kept, '- Other' catch-alls + Graphics Permit (signs) + Other + null dropped/fail-closed",
+    "record_precision": "native B1_SITUS_ZIP + per-record ACA_URL (Accela)",
+    "dense_zip_projection": "dense Columbus ZIPs (e.g. 43214 = 2,413 construction rows/365d) at outFields=* on the 44-col schema timed the report out (Miami class); project the 8 mapped columns + page_size=2000"
+   },
+   "out_fields": [
+    "GENERAL_TYPE",
+    "B1_PER_SUB_TYPE",
+    "PERMIT_STATUS",
+    "ISSUED_DT",
+    "SITE_ADDRESS",
+    "B1_SITUS_ZIP",
+    "B1_ALT_ID",
+    "ACA_URL"
+   ],
+   "page_size": 2000
+  },
+  {
+   "registry_id": "cleveland-issued-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://services3.arcgis.com/dty2kHktVXHrqO8i/arcgis/rest/services/Building_Permits/FeatureServer/0",
+   "dataset_url": "https://data.clevelandohio.gov/datasets/ClevelandGIS::issued-building-permits",
+   "jurisdiction": "City of Cleveland",
+   "coverage": [
+    {
+     "state": "OH",
+     "county": "Cuyahoga"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "PERMIT_SUBTYPE",
+     "JOB_DESCRIPTION"
+    ],
+    "type_source": "PERMIT_SUBTYPE",
+    "file_date": "ISSUE_DATE",
+    "address": "PRIMARY_ADDRESS",
+    "lat": "LAT",
+    "lng": "LON",
+    "case_number": "PERMIT_ID",
+    "record_url": "ACCELA_CITIZEN_ACCESS_URL"
+   },
+   "include_types": [
+    "Building",
+    "Building Permits",
+    "Commercial",
+    "Residential"
+   ],
+   "type_map": {
+    "Building": "Development",
+    "Building Permits": "Development",
+    "Commercial": "Development",
+    "Residential": "Development"
+   },
+   "status_const": "Issued",
+   "extra_where": "PERMIT_TYPE IN ('Building Permit','Construction Project') AND ISSUE_DATE IS NOT NULL",
+   "recency_days": 365,
+   "spatial_zip_radius_mi": 3,
+   "_receipts": {
+    "probed": "2026-07-16 pg_net (ids 1960/1964-1969)",
+    "fresh": "max ISSUE_DATE 2026-07-11 \u2014 consistent with the dataset's stated weekly-Sunday update cadence; 197,652 rows (2015-present)",
+    "issuance_ledger": "no permit-level status column (CURRENT_TASK_STATUS is task-level) -> Detroit status_const pattern, guarded by ISSUE_DATE IS NOT NULL in extra_where",
+    "types": "PERMIT_TYPE Building Permit + Construction Project kept (Code Enforcement/Historical/Velocity Hall dropped); PERMIT_SUBTYPE Building/Building Permits/Commercial/Residential kept (Elevator/Escalator/Mechanical/Install/Amusement trades dropped)",
+    "record_precision": "per-record ACCELA_CITIZEN_ACCESS_URL + LAT/LON columns; no ZIP column -> spatial ZIP scoping"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Issued"
+    ]
+   }
+  },
+  {
+   "registry_id": "nashville-building-permits-issued",
+   "platform": "arcgis",
+   "service_url": "https://services2.arcgis.com/HdTo6HJqh92wn4D8/arcgis/rest/services/Building_Permits_Issued_2/FeatureServer/0",
+   "dataset_url": "https://data.nashville.gov/datasets/Nashville::building-permits-issued/about",
+   "jurisdiction": "Metro Nashville-Davidson County",
+   "coverage": [
+    {
+     "state": "TN",
+     "county": "Davidson"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "Permit_Type_Description",
+     "Purpose"
+    ],
+    "type_source": "Permit_Type_Description",
+    "file_date": "Date_Issued",
+    "address": "Address",
+    "zip": "ZIP",
+    "lat": "Lat",
+    "lng": "Lon",
+    "case_number": "Permit__"
+   },
+   "include_types": [
+    "Building Residential - New",
+    "Building Residential - Addition",
+    "Building Residential - Foundation",
+    "Building Residential - Shell",
+    "Building Residential - Tenant Finish Out",
+    "Building Commercial - New",
+    "Building Commercial - Addition",
+    "Building Commercial - Foundation",
+    "Building Commercial - Shell",
+    "Building Commercial - Structural Frame",
+    "Building Commercial - Tenant Finish Out",
+    "Building Demolition Permit"
+   ],
+   "type_map": {
+    "Building Residential - New": "Development",
+    "Building Residential - Addition": "Development",
+    "Building Residential - Foundation": "Development",
+    "Building Residential - Shell": "Development",
+    "Building Residential - Tenant Finish Out": "Development",
+    "Building Commercial - New": "Development",
+    "Building Commercial - Addition": "Development",
+    "Building Commercial - Foundation": "Development",
+    "Building Commercial - Shell": "Development",
+    "Building Commercial - Structural Frame": "Development",
+    "Building Commercial - Tenant Finish Out": "Development",
+    "Building Demolition Permit": "Development"
+   },
+   "status_const": "Issued",
+   "status_to_bucket": {
+    "approved": [
+     "Issued"
+    ]
+   },
+   "extra_where": "Date_Issued IS NOT NULL",
+   "recency_days": 365,
+   "_receipts": {
+    "probed": "2026-07-17 pg_net (ids 2007-2010)",
+    "fresh": "max Date_Issued 2026-07-15; hub modified 2026-07-16; 28,790 rows",
+    "platform_note": "Nashville MIGRATED Socrata -> ArcGIS Hub (data.nashville.gov is a Hub site now; the old catalog path 404s). services2.arcgis.com \u2014 the healthy host class.",
+    "issuance_ledger": "no status column -> Detroit status_const pattern, guarded Date_Issued IS NOT NULL",
+    "types": "34-value verbatim domain; 12 construction/land-use classes kept; Rehab/storm/fire repairs, Roofing-Siding, Signs, Tree Removal, U&O, Change-Contractor, Amend, Moving, Temporary dropped at source",
+    "native_zip_and_coords": "ZIP + Lat/Lon columns",
+    "record_url": "dataset-precision (no per-row URL column)"
+   }
+  },
+  {
+   "registry_id": "portland-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://www.portlandmaps.com/od/rest/services/COP_OpenData_PlanningDevelopment/MapServer/89",
+   "dataset_url": "https://gis-pdx.opendata.arcgis.com/datasets/PDX::residential-building-permits",
+   "jurisdiction": "City of Portland",
+   "coverage": [
+    {
+     "state": "OR",
+     "county": "Multnomah"
+    },
+    {
+     "state": "OR",
+     "county": "Washington"
+    },
+    {
+     "state": "OR",
+     "county": "Clackamas"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "NEWTYPE",
+     "WORKDESC"
+    ],
+    "status_raw": "STATUS",
+    "type_source": "NEWCLASS",
+    "file_date": "ISSUEDATE",
+    "address": "PROP_ADDRE",
+    "case_number": "FOLDERNUMB"
+   },
+   "include_types": [
+    "New Construction",
+    "Addition",
+    "Replacement",
+    "First",
+    "Move"
+   ],
+   "type_map": {
+    "New Construction": "Development",
+    "Addition": "Development",
+    "Replacement": "Development",
+    "First": "Development",
+    "Move": "Development"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Issued",
+     "Approved to Issue"
+    ],
+    "operating": [
+     "Final",
+     "Under Inspection"
+    ],
+    "proposed": [
+     "Application",
+     "Fees Due"
+    ],
+    "exclude": [
+     "Expired"
+    ]
+   },
+   "recency_days": 365,
+   "spatial_zip_radius_mi": 3,
+   "out_fields": [
+    "NEWTYPE",
+    "WORKDESC",
+    "STATUS",
+    "NEWCLASS",
+    "ISSUEDATE",
+    "PROP_ADDRE",
+    "FOLDERNUMB"
+   ],
+   "_receipts": {
+    "probed": "2026-07-17 pg_net (ids 3806-3813)",
+    "fresh": "max ISSUEDATE 2026-06-10; 36,263 rows; item on portlandmaps.com/od (custom AGS host, PDX open data)",
+    "found_via": "PDX Hub search (gis-pdx.opendata.arcgis.com); the recon portlandmaps root has empty top-level services[] \u2014 the /od/rest tree is the real one",
+    "no_zip_col": "X_COORD/Y_COORD state-plane + Shape point geometry, no ZIP field -> spatial_zip_radius_mi (envelope on geometry)",
+    "statuses_verbatim": [
+     "Approved to Issue",
+     "Issued",
+     "Expired",
+     "Final",
+     "Under Inspection",
+     "Application",
+     "Fees Due"
+    ],
+    "types": "NEWCLASS 6-value construction axis; New Construction/Addition/Replacement/First/Move kept, Alteration + null dropped; NEWTYPE (occupancy) rides in the title",
+    "coverage_note": "Portland spans Multnomah/Washington/Clackamas; spatial envelope self-limits to the city footprint regardless",
+    "record_url": "dataset-precision (no per-row URL column)"
+   }
   }
  ],
  "ckan": [

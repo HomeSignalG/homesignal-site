@@ -523,11 +523,37 @@ async function writePropertyReports(
     } catch (_e) { /* the dossier cache must never break the page response */ }
   }
 }
+// FAIL-LOUD communities read (founder directive 2026-07-17): these two lookups GATE
+// content — resolveCommunityIds feeds the civic-notices layer and the state/county rows
+// feed every connector's coverage gate. A silently-failed read (observed under heavy
+// PostgREST load during verifier walks) used to resolve to "no communities", closing
+// every gate and letting a real dev-backed page cache as facilities-floor/empty. That
+// must never happen: retry the read, and if it still fails THROW — the request 500s,
+// a 500 is never collected into development_reports, and the refresh cron's
+// transient-safe upsert never sees it. Wrong data is worse than no data.
+async function mustReadCommunities<T>(
+  read: () => PromiseLike<{ data: T[] | null; error: { message?: string } | null }>,
+  what: string,
+): Promise<T[]> {
+  let lastErr = "";
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const { data, error } = await read();
+      if (!error && data !== null) return data;
+      lastErr = error?.message || "null data with no error";
+    } catch (e) { lastErr = (e as Error).message; }
+    if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 500));
+  }
+  throw new Error(`communities read failed (${what}) after 3 attempts: ${lastErr} — refusing to emit a report with coverage gates closed`);
+}
 // Resolve a ZIP to the community rows whose jurisdiction covers it (city + county chain).
 async function resolveCommunityIds(supabase: ReturnType<typeof createClient>, zip: string | null): Promise<string[]> {
   if (!zip || !/^\d{5}$/.test(zip)) return [];
-  const { data } = await supabase.from("communities").select("id").contains("zip_codes", [zip]);
-  return (data ?? []).map((r) => r.id as string);
+  const rows = await mustReadCommunities<{ id: string }>(
+    () => supabase.from("communities").select("id").contains("zip_codes", [zip]),
+    `ids for ${zip}`,
+  );
+  return rows.map((r) => r.id as string);
 }
 async function accessLevel(req: Request, supabase: ReturnType<typeof createClient>): Promise<"full" | "teaser"> {
   if (!PAYWALL_ENABLED) return "full";
@@ -541,7 +567,17 @@ async function accessLevel(req: Request, supabase: ReturnType<typeof createClien
     return (data && data.length) ? "full" : "teaser";
   } catch (_e) { return "teaser"; }
 }
+// Top-level fail-loud wrapper: a thrown gate-critical error (e.g. mustReadCommunities
+// exhausting retries) becomes an explicit JSON 500 — never a 200 with silently-empty
+// gated content, so it can never be collected into development_reports.
 Deno.serve(async (req: Request) => {
+  try {
+    return await handleRequest(req);
+  } catch (e) {
+    return json({ error: "engine error: " + String(e instanceof Error ? e.message : e) }, 500, corsHeaders());
+  }
+});
+async function handleRequest(req: Request): Promise<Response> {
   const cors = corsHeaders();
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST only" }, 405, cors);
@@ -594,7 +630,12 @@ Deno.serve(async (req: Request) => {
     // TX TDLR/TABS enrichment (v16, additive — runbook §1). Coverage-gated inside
     // tabsForZip(): the source never runs for a non-TX ZIP. Separate query keeps
     // resolveCommunityIds() untouched (additive-only rule, source-registry #4).
-    const { data: commRows } = await supabase.from("communities").select("state,county").contains("zip_codes", [zip]);
+    // FAIL-LOUD (founder directive): a failed read here used to silently close every
+    // connector's coverage gate — see mustReadCommunities. Throws after 3 attempts.
+    const commRows = await mustReadCommunities<{ state: string | null; county: string | null }>(
+      () => supabase.from("communities").select("state,county").contains("zip_codes", [zip]),
+      `state/county for ${zip}`,
+    );
     // v19: TCEQ Central Registry (Texas state) — coverage-gated inside tceqForZip(). Dedupes each
     // RN onto the FRS facility at the same physical site and stamps env.tceq (state programs).
     const tceq = await tceqForZip(zip, (commRows ?? []) as TceqCommunityRow[], { fetch });
@@ -812,4 +853,4 @@ Deno.serve(async (req: Request) => {
   const sites = access === "full" ? allSites : allSites.slice(0, TEASER_LIMIT);
   const locked = access === "full" ? 0 : Math.max(0, allSites.length - sites.length);
   return json({ address: matched, home: { lat, lng }, radius_mi: radiusMi, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, proposed: proposedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, note: "Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
-});
+}

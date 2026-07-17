@@ -53,6 +53,16 @@ export interface ArcgisRegistryEntry {
   recency_days?: number;
   /** hard cap on rows pulled per dataset. Default 20000. */
   max_rows?: number;
+  /** Optional outFields PROJECTION (additive): fetch ONLY these attribute columns
+   *  instead of "*". Dense-metro layers with wide rows (Miami: 44 columns/permit)
+   *  blow the edge worker's CPU budget at outFields=* — project the mapped columns.
+   *  Absent ⇒ "*" (every existing entry behaves byte-identically). */
+  out_fields?: string[];
+  /** Optional page size for the query loop (additive). Some hosted layers respond
+   *  slowly to edge-runtime egress (~30s/request regardless of size — Miami), so
+   *  fewer, larger pages keep the report inside the worker budget. Cap at the
+   *  layer's maxRecordCount. Absent ⇒ 1000 (existing behavior). */
+  page_size?: number;
   /** output spatial reference for geometry; default 4326 (WGS84 lat/lng). */
   out_sr?: number;
   /** Optional VERBATIM SQL clause AND'd into every query (entry-driven scoping — e.g. drop
@@ -316,7 +326,7 @@ async function fetchRows(
   zipCol: string,
   deps: ArcgisDeps,
 ): Promise<Record<string, unknown>[]> {
-  const pageSize = deps.pageSize ?? 1000;
+  const pageSize = entry.page_size ?? deps.pageSize ?? 1000;
   const maxRows = entry.max_rows ?? 20000;
   const outSr = entry.out_sr ?? 4326;
   const where = buildWhere(entry, zip, zipCol);
@@ -346,7 +356,7 @@ async function fetchRows(
       url.searchParams.set("inSR", "4326");
       url.searchParams.set("spatialRel", "esriSpatialRelIntersects");
     }
-    url.searchParams.set("outFields", "*");
+    url.searchParams.set("outFields", entry.out_fields?.length ? entry.out_fields.join(",") : "*");
     url.searchParams.set("returnGeometry", "true");
     url.searchParams.set("outSR", String(outSr));
     url.searchParams.set("resultOffset", String(offset));

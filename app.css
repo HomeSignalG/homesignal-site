@@ -56,6 +56,7 @@
   .ph .eyebrow{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green)}
   .ph h1{font-size:27px;letter-spacing:-.02em;margin:6px 0 6px}
   .ph p{font-size:15px;color:var(--ink-2);margin:0;max-width:640px}
+  .ph .ph-where{margin:2px 0 8px;font-size:13.5px;font-weight:600;color:var(--ink)}
 
   /* summary strip */
   .strip{display:flex;gap:14px;margin:20px 0 26px;flex-wrap:wrap}
@@ -269,6 +270,11 @@
   .inlinebtn:hover{background:var(--green-tint)}
   .overlay{position:fixed;inset:0;background:rgba(16,33,28,.5);z-index:100;display:none;align-items:center;justify-content:center;padding:24px}
   .overlay.show{display:flex}
+  /* Live map engines use big internal z-indexes (Leaflet panes 400, controls/
+     attribution 1000) that outrank the modal overlay above. Isolate every map
+     box so those stack INSIDE the map and can never paint over an open modal
+     (seen live: the dashboard map covered the Switch-property list). */
+  .leaflet-container,.maplibregl-map{isolation:isolate}
   .modal{background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.32);width:100%;max-width:448px;overflow:hidden;animation:pop .18s ease}
   @keyframes pop{from{transform:translateY(10px) scale(.98);opacity:0}to{transform:none;opacity:1}}
   .modal .mhead{padding:24px 26px 0;position:relative}
