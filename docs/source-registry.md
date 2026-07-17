@@ -1859,3 +1859,35 @@ consolidated per-record permit ledgers anywhere we could find.
   DCAT (GIS base layers only).
 - **St. Charles hub**: CONT_0001 item-inaccessible; **Columbia/Boone + both St.
   Louis hub guesses**: domain-not-found 404s.
+
+## 2026-07-17 — TENNESSEE WIRE PASS (Tier 1 state 7 of 17, founder wire order)
+
+**One metro wired (Nashville) on the existing arcgis connector — zero new code**
+(receipts: recon run 29551286796 + pg_net 2005-2010).
+
+### WIRED — nashville-building-permits-issued (ArcGIS, Metro Nashville-Davidson)
+- **FRESH**: max Date_Issued **2026-07-15**; hub modified 2026-07-16; 28,790 rows.
+- **Platform migration found by corrected-URL retry**: Nashville moved Socrata →
+  **ArcGIS Hub** (the old data.nashville.gov catalog path now 404s "Cannot GET",
+  and the central Socrata discovery API says Domain not found). The Hub DCAT
+  exposes `Building_Permits_Issued_2/FeatureServer/0` on services2.arcgis.com —
+  the healthy host class. **Standing answer: a "Cannot GET /api/catalog/v1" from
+  a former Socrata domain means PLATFORM MIGRATION, not a dead portal — pull the
+  domain's Hub DCAT before rejecting.**
+- Issuance ledger (no status column) → Detroit **status_const** pattern, guarded
+  `Date_Issued IS NOT NULL`. Native **ZIP** + **Lat/Lon** columns.
+- 34-value verbatim Permit_Type_Description domain; **12 construction/land-use
+  classes kept** (Residential/Commercial New, Addition, Foundation, Shell,
+  Structural Frame, Tenant Finish Out + Demolition); Rehab/storm/fire repairs,
+  Roofing-Siding, Signs, Tree Removal, U&O, Change-Contractor, Amend, Moving,
+  Temporary dropped at source.
+
+### Rejections / not wired (receipts)
+- **Memphis (data.memphistn.gov)**: same "Cannot GET /api/catalog/v1" AND the Hub
+  retry finds no permit ledger — the central discovery API has no such domain and
+  no Hub DCAT answers. No first-party per-record source found.
+- **Chattanooga**: recon domain is a dead Pantheon shell ("No Site Detected").
+- **Knoxville hub**: GWM_0003 permission error — the AGO org exists but its hub is
+  PRIVATE; **Knox County KGIS**: 401 Unauthorized at the REST root.
+- **Shelby / Rutherford hub guesses**: domain-not-found 404s.
+→ all on the nightly reprobe list. Memphis/Knoxville ZIPs ship facilities-floor.
