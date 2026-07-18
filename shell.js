@@ -8,15 +8,56 @@
   const CFG = window.HS_CONFIG;
   const $ = (id) => document.getElementById(id);
 
+  // view-zip helpers (canonical copy: lib/view-zip.js — keep in sync)
+  if (!HS.resolveViewedZip) {
+    HS.parseZipParam = function (search) {
+      if (search == null || search === '') return null;
+      try {
+        const z = new URLSearchParams(String(search)).get('zip');
+        return (z && /^\d{5}$/.test(z)) ? z : null;
+      } catch (e) { return null; }
+    };
+    HS.resolveViewedZip = function (opts) {
+      opts = opts || {};
+      const def = opts.defaultZip || '78617';
+      const urlZ = opts.urlZip;
+      if (urlZ && /^\d{5}$/.test(String(urlZ))) return String(urlZ);
+      const myZ = opts.myZip;
+      if (myZ && /^\d{5}$/.test(String(myZ))) return String(myZ);
+      const sesZ = opts.sessionViewZip;
+      if (sesZ && /^\d{5}$/.test(String(sesZ))) return String(sesZ);
+      return def;
+    };
+    HS.navHref = function (page, zip) {
+      if (!page) return page;
+      if (!zip || !/^\d{5}$/.test(String(zip))) return page;
+      return page + '?zip=' + encodeURIComponent(String(zip));
+    };
+    HS.ZIP_NAV_PAGES = ['today.html', 'dashboard.html', 'alerts.html', 'development.html', 'maps.html', 'community.html'];
+  }
+
   // ------------------------------------------------------------------ state --
   const LS = {
     get(k, d) { try { return JSON.parse(localStorage.getItem('hs:' + k)) ?? d; } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('hs:' + k, JSON.stringify(v)); } catch (e) {} }
   };
+  const SS = {
+    get(k) { try { return sessionStorage.getItem('hs:' + k); } catch (e) { return null; } },
+    set(k, v) { try { if (v == null) sessionStorage.removeItem('hs:' + k); else sessionStorage.setItem('hs:' + k, String(v)); } catch (e) {} }
+  };
+  function captureUrlViewZip() {
+    const z = HS.parseZipParam(location.search);
+    if (z) SS.set('viewZip', z);
+    return z;
+  }
+  let _zip = HS.resolveViewedZip({
+    urlZip: captureUrlViewZip(),
+    myZip: LS.get('myZip', null),
+    sessionViewZip: SS.get('viewZip'),
+    defaultZip: CFG.DEFAULT_ZIP
+  });
   const state = HS.state = {
     session: null,           // {user:{id,email}} or null
-    // The visitor's saved ZIP (their chosen area) wins over the Del Valle sample.
-    zip: LS.get('myZip', null) || CFG.DEFAULT_ZIP,
     properties: [],
     activePropId: LS.get('activeProp', null),
     follows: new Set(LS.get('follows', [])),
@@ -27,11 +68,29 @@
       return HS.pickActiveProperty(this.properties, this.activePropId);
     }
   };
+  Object.defineProperty(state, 'zip', {
+    get() { return _zip; },
+    set(z) {
+      if (z == null) return;
+      z = String(z).trim();
+      if (!/^\d{5}$/.test(z) || z === _zip) return;
+      _zip = z;
+      SS.set('viewZip', z);
+      paintTopbar();
+    },
+    enumerable: true,
+    configurable: true
+  });
 
   // Has the visitor set their own area yet (a saved property OR a saved ZIP)?
-  // When false, the app is showing the Del Valle sample and labels say so.
   HS.hasArea = function () { return !!(state.activeProperty || LS.get('myZip', null)); };
-  HS.isSample = function () { return !HS.hasArea(); };
+  // "Sample ZIP Code" labels appear only on the designated demo ZIP (DEFAULT_ZIP),
+  // never because the visitor is signed out or has not saved an area yet.
+  HS.isSampleZip = function (zip) {
+    const z = (zip != null ? String(zip) : String(state.zip)).trim();
+    return z === String(CFG.DEFAULT_ZIP);
+  };
+  HS.isSample = function () { return HS.isSampleZip(state.zip); };
 
   // The ONE formatter for a property's logged address ("13313 Coomes Dr, Del
   // Valle, TX 78617"). Built only from fields actually saved on the row —
@@ -256,6 +315,15 @@
     HS.closeModal('switcherModal');
     if (changed) location.reload();
   };
+  function paintNavHrefs() {
+    const nav = document.getElementById('hs-nav');
+    if (!nav || !HS.ZIP_NAV_PAGES) return;
+    const zip = state.zip;
+    nav.querySelectorAll('a[href]').forEach(a => {
+      const base = (a.getAttribute('href') || '').split('?')[0];
+      if (HS.ZIP_NAV_PAGES.indexOf(base) >= 0) a.setAttribute('href', HS.navHref(base, zip));
+    });
+  }
   function paintTopbar() {
     const p = state.activeProperty;
     if ($('locLabel')) {
@@ -267,7 +335,9 @@
       const myZip = LS.get('myZip', null);
       $('locLabel').textContent = p ? ((HS.isRealHome(p) ? 'Your home · ' : '') + p.address)
         : (myZip ? ('ZIP ' + myZip)
-        : ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample Zip Code)'));
+        : (HS.isSample()
+          ? ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample Zip Code)')
+          : ('ZIP ' + state.zip)));
       const locWrap = $('locLabel').closest('.loc');
       if (locWrap) locWrap.title = p
         ? ((HS.isRealHome(p) ? 'Your home: ' : '') + HS.homeAddressLine(p) + ' — tap to switch')
@@ -282,8 +352,7 @@
     }
     const signinBtn = $('hs-signin');
     if (signinBtn) signinBtn.style.display = state.session ? 'none' : '';
-    const commNav = $('hs-nav-comm');
-    if (commNav) commNav.setAttribute('href', 'community.html?zip=' + encodeURIComponent(state.zip));
+    paintNavHrefs();
   }
   // -------------------------------------------- page-header context line ------
   // Say up front WHICH address (or area) the page is about, on every app page
