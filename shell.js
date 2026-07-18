@@ -519,8 +519,7 @@
     } else {
       HS.followCommunity({ zip: zip, name: btn.dataset.name, state: btn.dataset.state });
       btn.textContent = '✓ Following'; btn.classList.add('following');
-      if (HS.toast) HS.toast('Saved to your communities');   // base confirm (fallback)
-      HS.ensureAreaSubscribed(zip, false);   // register the digest floor; its success toast supersedes
+      HS.ensureAreaSubscribed(zip, false);   // follow (no consent) + show the inline email opt-in card
     }
     paintTopbar();
     const strip = document.getElementById('dashCommunities') || document.getElementById('commStrip');
@@ -538,6 +537,9 @@
   // user already chose (unlike signup_complete, which reconciles-to-exact). No silent
   // subscription: on success the resident sees a confirmation naming what they'll get.
   const AREA_DEFAULT_TOPICS = ['Planning, zoning & development', 'County Commission & county business'];
+  // The exact wording the resident affirms when they tap "Email me these alerts" — stored
+  // on the users row (marketing_consent_copy) as the audit trail of what they agreed to.
+  const AREA_CONSENT_COPY = 'Email me new development & hearing alerts for this ZIP. No spam · unsubscribe anytime.';
   HS.ensureAreaSubscribed = async function (zip, willNavigate) {
     if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) return;
     zip = String(zip || '').trim();
@@ -546,20 +548,63 @@
     try { ct = await HS.data.communityGovTopics(zip); } catch (e) { return; }
     if (!ct || !ct.rootId || !ct.labels) return;
     const has = new Set(ct.labels);
-    const subs = AREA_DEFAULT_TOPICS.filter(t => has.has(t))
-      .map(t => ({ pipeline_type: 'government_notice', topic: t }));
+    const labels = AREA_DEFAULT_TOPICS.filter(t => has.has(t));
+    const subs = labels.map(t => ({ pipeline_type: 'government_notice', topic: t }));
     if (!subs.length) return;   // community carries neither floor topic -> never a zero-sub row
+    // FOLLOW ONLY. subscribe_area_defaults writes user_subscriptions + the identity row and
+    // leaves marketing_consent FALSE / topics null (HS.followRpcArgs carries NO consent
+    // field). Following an area is NOT email consent — that is the separate opt-in below.
     try {
-      const r = await HS.sb().rpc('subscribe_area_defaults', {
-        p_email: state.session.user.email, p_community_id: ct.rootId, p_zip_code: zip, p_subscriptions: subs
-      });
+      const r = await HS.sb().rpc('subscribe_area_defaults',
+        HS.followRpcArgs(state.session.user.email, ct.rootId, zip, subs));
       if (r && r.error) { console.warn('area-subscribe', r.error); return; }
     } catch (e) { console.warn('area-subscribe', e); return; }
-    const msg = 'You’ll get alerts about development & hearings in ' + zip + ' — open Topics to customize';
-    // Callers that reload/redirect can't show a toast that survives the nav, so stash a
-    // one-shot flag boot() surfaces on the next page; in-place callers toast immediately.
-    if (willNavigate) { try { sessionStorage.setItem('hs:areaSubMsg', msg); } catch (e) {} }
-    else if (HS.toast) HS.toast(msg);
+    // Surface the inline email opt-in card. Reload/redirect callers stash a one-shot flag
+    // boot() renders on the destination page; in-place callers render immediately.
+    const info = { zip: zip, communityId: ct.rootId, topics: labels };
+    if (willNavigate) { try { sessionStorage.setItem('hs:areaOptin', JSON.stringify(info)); } catch (e) {} }
+    else HS.showAreaOptin(info);
+  };
+  // The inline EMAIL OPT-IN card — a persistent, deliberately-tapped affirmative (never a
+  // disappearing toast, per the founder consent decision). Shown after a covered follow.
+  // Tapping "Email me these alerts" is the ONLY action that sets marketing_consent.
+  HS.showAreaOptin = function (info) {
+    if (!info || !info.zip) return;
+    let box = $('hsOptin');
+    if (!box) { box = document.createElement('div'); box.id = 'hsOptin'; document.body.appendChild(box); }
+    box.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;'
+      + 'max-width:440px;width:calc(100% - 32px);background:#fff;border:1px solid #d9e2dc;border-radius:14px;'
+      + 'box-shadow:0 8px 28px rgba(0,0,0,.18);padding:14px 16px;font:400 13.5px/1.4 var(--font,system-ui)';
+    box.innerHTML =
+      '<div style="font-weight:700;color:var(--ink,#12261d)">✓ Now following development &amp; hearings in ' + HS.esc(info.zip) + '</div>'
+      + '<div id="optinSub" style="color:var(--ink-3,#5a6b63);margin:4px 0 10px">' + HS.esc(AREA_CONSENT_COPY) + '</div>'
+      + '<div style="display:flex;gap:10px;align-items:center">'
+      +   '<button type="button" id="optinYes" style="background:var(--green,#157a49);color:#fff;border:0;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer">✉ Email me these alerts</button>'
+      +   '<button type="button" id="optinNo" style="background:none;border:0;color:var(--ink-3,#5a6b63);cursor:pointer;font-size:12.5px">Not now</button>'
+      + '</div>';
+    $('optinYes').onclick = function () { HS.enableAreaEmail(info); };
+    $('optinNo').onclick = function () { box.style.display = 'none'; box.innerHTML = ''; };
+  };
+  // The affirmative: the ONLY caller of enable_area_email_alerts, the ONLY writer of
+  // marketing_consent. Sends the floor labels under the 'notices' key + the consent copy
+  // + version for the audit trail. Additive server-side (never clobbers other topics).
+  HS.enableAreaEmail = async function (info) {
+    if (!info || !state.session || !HS.sb) return;
+    const btn = $('optinYes'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    const topics = { notices: (info.topics || []).slice() };   // floor labels are government_notice -> 'notices'
+    try {
+      const r = await HS.sb().rpc('enable_area_email_alerts',
+        HS.optinRpcArgs(state.session.user.email, info.communityId, info.zip, topics, CONSENT_VERSION, AREA_CONSENT_COPY));
+      if (r && r.error) throw new Error(r.error.message || 'consent save failed');
+    } catch (e) {
+      console.warn('area-optin', e);
+      if (btn) { btn.disabled = false; btn.textContent = '✉ Email me these alerts'; }
+      const sub = $('optinSub'); if (sub) sub.textContent = "Couldn't save — please try again.";
+      return;
+    }
+    const box = $('hsOptin');
+    if (box) box.innerHTML = '<div style="font-weight:700;color:var(--ink,#12261d)">✓ Emailing you development &amp; hearings for '
+      + HS.esc(info.zip) + '.</div><div style="color:var(--ink-3,#5a6b63);margin-top:4px">Unsubscribe anytime.</div>';
   };
   // Chip row of followed communities (+ an add button), reused across pages.
   HS.communitiesStripHTML = function () {
@@ -872,11 +917,11 @@
     paintBell();
     // legacy deep link: /index.html?signin=1 (or any page) opens the sign-in modal
     if (!state.session && new URLSearchParams(location.search).get('signin') === '1') HS.openAuth();
-    // One-shot: a covered save-home / ZIP lookup that navigated here left a digest
-    // subscription confirmation to show once the new page settled (no silent subscribe).
+    // One-shot: a covered save-home / ZIP lookup that navigated here left the email
+    // opt-in card to render once the new page settled (follow ≠ consent — explicit tap).
     try {
-      const subMsg = sessionStorage.getItem('hs:areaSubMsg');
-      if (subMsg) { sessionStorage.removeItem('hs:areaSubMsg'); if (HS.toast) setTimeout(() => HS.toast(subMsg), 400); }
+      const optin = sessionStorage.getItem('hs:areaOptin');
+      if (optin) { sessionStorage.removeItem('hs:areaOptin'); setTimeout(() => { try { HS.showAreaOptin(JSON.parse(optin)); } catch (e) {} }, 400); }
     } catch (e) {}
     _resolveReady(HS);
   }

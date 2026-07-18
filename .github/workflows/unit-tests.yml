@@ -26,5 +26,7 @@ jobs:
         run: node test/realhome.test.mjs
       - name: Topic-canon drift test
         run: node test/topic-canon.test.mjs
+      - name: Email opt-in consent-contract test
+        run: node test/email-optin.test.mjs
       - name: Facility-slot reservation test
         run: node test/facility-slots.test.mjs
