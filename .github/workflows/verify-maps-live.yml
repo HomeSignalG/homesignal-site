@@ -1,0 +1,39 @@
+name: verify-maps-live
+
+# On-demand PRODUCTION walk of the map-first Maps page (homesignal.net) —
+# the full launch checklist (view toggle, slide-over/one-panel invariant,
+# official-record link liveness, honest empty state, console errors) plus
+# real desktop + mobile screenshots. Screenshots are force-pushed to the
+# ci-live-shots branch so the no-egress build sandbox can retrieve them.
+# VERIFICATION ONLY — touches no product code.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  walk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Walk the live Maps page
+        run: node scripts/verify-maps-live.mjs
+      - name: Publish screenshots to ci-live-shots branch
+        if: always()
+        run: |
+          cd shots
+          git init -q -b ci-live-shots
+          git config user.email "ci@users.noreply.github.com"
+          git config user.name "verify-maps-live"
+          git add -A
+          git commit -q -m "live verification screenshots (run ${GITHUB_RUN_ID})"
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-live-shots
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
