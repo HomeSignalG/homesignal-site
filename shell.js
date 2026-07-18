@@ -418,6 +418,7 @@
       if (await HS.data.isCovered(m.zip)) {
         let meta = null; try { meta = await HS.data.community(m.zip); } catch (e) {}
         HS.followCommunity({ zip: m.zip, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
+        await HS.ensureAreaSubscribed(m.zip, true);   // register the digest floor (page reloads below)
       }
     } catch (e) {}
     $('homeConfirm').classList.add('hidden');
@@ -450,6 +451,7 @@
       // it the primary area, so the Del Valle sample stops showing everywhere.
       let meta = null; try { meta = await HS.data.community(z); } catch (e) {}
       HS.followCommunity({ zip: z, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
+      await HS.ensureAreaSubscribed(z, true);   // register the digest floor (redirect below)
       location.href = 'community.html?zip=' + z;
     } else {
       $('reqZipLabel').textContent = z;
@@ -517,11 +519,47 @@
     } else {
       HS.followCommunity({ zip: zip, name: btn.dataset.name, state: btn.dataset.state });
       btn.textContent = '✓ Following'; btn.classList.add('following');
-      if (HS.toast) HS.toast('Saved to your communities');
+      if (HS.toast) HS.toast('Saved to your communities');   // base confirm (fallback)
+      HS.ensureAreaSubscribed(zip, false);   // register the digest floor; its success toast supersedes
     }
     paintTopbar();
     const strip = document.getElementById('dashCommunities') || document.getElementById('commStrip');
     if (strip) strip.innerHTML = HS.communitiesStripHTML();
+  };
+
+  // Bridge the app -> digest system. Following an area (save-home, ZIP lookup, or the
+  // community Follow button) registers the resident in public.users/user_subscriptions
+  // — the tables digest.py actually emails from — so "following your community" delivers
+  // alerts instead of only updating app state (the CH-class gap: app rows but 0 digest
+  // rows -> no email). The NARROW floor: development/land-use + hearings, but ONLY the
+  // labels this community really carries (word-for-word from its cascaded
+  // government_topics), so we never subscribe to a topic with no feed. Purely ADDITIVE
+  // (subscribe_area_defaults, ON CONFLICT DO NOTHING) — it can never delete a topic the
+  // user already chose (unlike signup_complete, which reconciles-to-exact). No silent
+  // subscription: on success the resident sees a confirmation naming what they'll get.
+  const AREA_DEFAULT_TOPICS = ['Planning, zoning & development', 'County Commission & county business'];
+  HS.ensureAreaSubscribed = async function (zip, willNavigate) {
+    if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) return;
+    zip = String(zip || '').trim();
+    if (!/^\d{5}$/.test(zip)) return;
+    let ct = null;
+    try { ct = await HS.data.communityGovTopics(zip); } catch (e) { return; }
+    if (!ct || !ct.rootId || !ct.labels) return;
+    const has = new Set(ct.labels);
+    const subs = AREA_DEFAULT_TOPICS.filter(t => has.has(t))
+      .map(t => ({ pipeline_type: 'government_notice', topic: t }));
+    if (!subs.length) return;   // community carries neither floor topic -> never a zero-sub row
+    try {
+      const r = await HS.sb().rpc('subscribe_area_defaults', {
+        p_email: state.session.user.email, p_community_id: ct.rootId, p_zip_code: zip, p_subscriptions: subs
+      });
+      if (r && r.error) { console.warn('area-subscribe', r.error); return; }
+    } catch (e) { console.warn('area-subscribe', e); return; }
+    const msg = 'You’ll get alerts about development & hearings in ' + zip + ' — open Topics to customize';
+    // Callers that reload/redirect can't show a toast that survives the nav, so stash a
+    // one-shot flag boot() surfaces on the next page; in-place callers toast immediately.
+    if (willNavigate) { try { sessionStorage.setItem('hs:areaSubMsg', msg); } catch (e) {} }
+    else if (HS.toast) HS.toast(msg);
   };
   // Chip row of followed communities (+ an add button), reused across pages.
   HS.communitiesStripHTML = function () {
@@ -834,6 +872,12 @@
     paintBell();
     // legacy deep link: /index.html?signin=1 (or any page) opens the sign-in modal
     if (!state.session && new URLSearchParams(location.search).get('signin') === '1') HS.openAuth();
+    // One-shot: a covered save-home / ZIP lookup that navigated here left a digest
+    // subscription confirmation to show once the new page settled (no silent subscribe).
+    try {
+      const subMsg = sessionStorage.getItem('hs:areaSubMsg');
+      if (subMsg) { sessionStorage.removeItem('hs:areaSubMsg'); if (HS.toast) setTimeout(() => HS.toast(subMsg), 400); }
+    } catch (e) {}
     _resolveReady(HS);
   }
 
