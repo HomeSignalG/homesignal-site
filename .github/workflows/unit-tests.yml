@@ -8,6 +8,7 @@ on:
       - 'test/**'
       - 'scripts/run-unit-tests.mjs'
       - 'topics.canon.json'
+      - '.github/workflows/**'
       - '.github/workflows/unit-tests.yml'
   pull_request:
     paths:
@@ -16,6 +17,7 @@ on:
       - 'test/**'
       - 'scripts/run-unit-tests.mjs'
       - 'topics.canon.json'
+      - '.github/workflows/**'
       - '.github/workflows/unit-tests.yml'
   workflow_dispatch: {}
 
