@@ -110,6 +110,14 @@ HS.onReady(async function () {
     var facPins = opts.showFacilities ? facs : [];
     return HS.reserveFacilitySlots(a, facPins, { cap: 16, floor: 4, letters: LET });
   }
+  // A facility lettered into shownItems must NOT also render as its own purple overlay
+  // square — that double-plots the same facility (letter pin + square). Every map path
+  // (schematic / GL / Leaflet) overlays only the facilities that did NOT earn a letter.
+  function unletteredFacs(items) {
+    var lettered = {};
+    (items || []).forEach(function (it) { if (it._facility && it.id != null) lettered[it.id] = 1; });
+    return facs.filter(function (f) { return !(f.id != null && lettered[f.id]); });
+  }
   // NEVER-FAKED rule: only a real signed-in resident home (in THIS ZIP, not the
   // Del Valle sample) may be pinned as "Your home" or used as the viewport anchor.
   // For everyone else the ZIP centroid (app_community_meta.lat/lng, pinned to the
@@ -266,7 +274,7 @@ HS.onReady(async function () {
       home: center, items: items, radiusMi: opts.radiusMi, showRadius: opts.showRadius,
       showHome: hasRealHome, homeLabel: hasRealHome ? home.address : '', w: 780, h: 520
     });
-    overlayFacilities(document.getElementById('mapSch'));
+    overlayFacilities(document.getElementById('mapSch'), items);
     setGps(items); renderPins(items);
     wirePanel(function(){ if (opts.mode==='impact') drawSchematic(); else drawTiles(); });
   }
@@ -274,8 +282,9 @@ HS.onReady(async function () {
   // Overlay regulated facilities onto the schematic SVG as distinct purple squares
   // (labeled "Regulated facility" in the legend). Same projection the MapProvider uses,
   // so they sit correctly relative to home. Kept separate from the impact pins above.
-  function overlayFacilities(el){
-    if (!opts.showFacilities || !facs.length) return;
+  function overlayFacilities(el, items){
+    var oFacs = unletteredFacs(items);   // skip facilities already drawn as lettered pins
+    if (!opts.showFacilities || !oFacs.length) return;
     var svg = el && el.querySelector('svg'); if (!svg) return;
     // Facilities slot in UNDER the home mark (drawn last by MapProvider) so the
     // resident's own home is never buried by a nearby facility square.
@@ -283,7 +292,7 @@ HS.onReady(async function () {
     var put = function(node){ if (homeG) svg.insertBefore(node, homeG); else svg.appendChild(node); };
     var w=780, h=520, cx=w/2, cy=h/2, radiusPx=Math.min(w,h)*0.29, pxPerMile=radiusPx/opts.radiusMi;
     var hLat=center.lat, hLng=center.lng, NS='http://www.w3.org/2000/svg';
-    facs.forEach(function(f){
+    oFacs.forEach(function(f){
       var north=(f.lat-hLat)*69, east=(f.lng-hLng)*69*Math.cos(hLat*Math.PI/180);
       var x=Math.max(20,Math.min(w-20, cx+east*pxPerMile)), y=Math.max(20,Math.min(h-20, cy-north*pxPerMile));
       var rect=document.createElementNS(NS,'rect');
@@ -337,7 +346,8 @@ HS.onReady(async function () {
         .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(itemPopupHTML(it))).addTo(glMap));
     });
     // Regulated facilities — a DISTINCT layer (purple squares), env context, not development.
-    if (opts.showFacilities) facs.forEach(function(f){
+    // Only the un-lettered ones (reserved facilities already show as lettered pins above).
+    if (opts.showFacilities) unletteredFacs(items).forEach(function(f){
       var el=document.createElement('div');
       el.style.cssText='width:20px;height:20px;border-radius:3px;background:'+FACILITY_HEX+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer';
       glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([f.lng,f.lat])
@@ -476,7 +486,7 @@ HS.onReady(async function () {
       lfMarkers.push(L.marker([it.lat,it.lng],{icon:lfDivIcon('<div style="width:26px;height:26px;border-radius:50%;background:'+col+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font:700 12px/1 sans-serif;cursor:pointer">'+it._letter+'</div>',26)})
         .bindPopup(itemPopupHTML(it),{maxWidth:260}).addTo(lfMap));
     });
-    if (opts.showFacilities) facs.forEach(function(f){
+    if (opts.showFacilities) unletteredFacs(items).forEach(function(f){
       lfMarkers.push(L.marker([f.lat,f.lng],{icon:lfDivIcon('<div style="width:20px;height:20px;border-radius:3px;background:'+FACILITY_HEX+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer"></div>',20)})
         .bindPopup(facPopupHTML(f),{maxWidth:260}).addTo(lfMap));
     });
