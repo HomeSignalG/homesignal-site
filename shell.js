@@ -30,7 +30,7 @@
 
   // Has the visitor set their own area yet (a saved property OR a saved ZIP)?
   // When false, the app is showing the Del Valle sample and labels say so.
-  HS.hasArea = function () { return !!(state.activeProperty || LS.get('myZip', null)); };
+  HS.hasArea = function () { return HS.hasAreaFrom(state.activeProperty, LS.get('myZip', null)); };
   HS.isSample = function () { return !HS.hasArea(); };
 
   // The ONE formatter for a property's logged address ("13313 Coomes Dr, Del
@@ -163,9 +163,28 @@
     HS.openAuth();
     return false;
   };
+  // Sign-out must leave NO trace of the account that just left. Clearing only the
+  // Supabase session would keep this browser's personalized localStorage (saved ZIP,
+  // active property, follows, topic picks, …), so the next visitor inherits the
+  // previous account's signed-out chrome — a cross-account privacy leak. So we clear
+  // the account-scoped LS keys AND reset the in-memory state to the sample defaults
+  // BEFORE signOut()+reload, so even the pre-reload frame shows the sample view.
+  HS.clearSession = function () {
+    HS.clearAccountLocal(localStorage);
+    state.session = null;
+    state.zip = CFG.DEFAULT_ZIP;
+    state.properties = [];
+    state.activePropId = null;
+    state.follows = new Set();
+    state.dismissed = new Set();
+    state.topicPrefs = {};
+  };
   HS.onAvatar = function () {
     if (state.session && !state.session.demo) {
-      if (confirm('Sign out?')) HS.sb().auth.signOut().then(() => location.reload());
+      if (confirm('Sign out?')) {
+        HS.clearSession();
+        HS.sb().auth.signOut().then(() => location.reload());
+      }
     } else { HS.openAuth(); }
   };
 

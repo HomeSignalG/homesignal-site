@@ -26,3 +26,5 @@ jobs:
         run: node test/realhome.test.mjs
       - name: Topic-canon drift test
         run: node test/topic-canon.test.mjs
+      - name: Sign-out clears account-scoped local state test
+        run: node test/signout.test.mjs
