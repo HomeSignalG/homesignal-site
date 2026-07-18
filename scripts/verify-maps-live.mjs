@@ -44,15 +44,17 @@ await p.click('#viewSeg [data-view="changed"]'); await p.waitForTimeout(900);
 const chg = await p.evaluate(() => ({
   open: document.getElementById('infoSlide').classList.contains('open'),
   entries: document.querySelectorAll('#infoPanel [data-chg]').length,
+  areaEntries: document.querySelectorAll('#infoPanel [data-chgarea]').length,
   empty: !!document.querySelector('#infoPanel .emptycard'),
   badges: [...new Set([...document.querySelectorAll('#infoPanel .cbadge')].map(e => e.textContent))],
   stageW: document.getElementById('mapWrap').getBoundingClientRect().width,
   openCount: document.querySelectorAll('.sidepanel.open').length
 }));
 ok('What\'s Changed opens the Recent Changes slide-over', chg.open && chg.openCount === 1,
-   `entries=${chg.entries} empty=${chg.empty} badges=${chg.badges.join('/')}`);
-ok('honest content: entries with legal badges OR the honest empty state',
-   (chg.entries > 0 && chg.badges.every(x => ['NEW', 'UPDATE', 'HEARING'].includes(x))) || (chg.entries === 0 && chg.empty));
+   `entries=${chg.entries} area=${chg.areaEntries} empty=${chg.empty} badges=${chg.badges.join('/')}`);
+ok('honest content: mapped/area-wide entries with legal badges OR the empty state',
+   ((chg.entries > 0 || chg.areaEntries > 0) && chg.badges.every(x => ['NEW', 'UPDATE', 'HEARING'].includes(x)))
+   || (chg.entries === 0 && chg.areaEntries === 0 && chg.empty));
 ok('panel overlays — map width unchanged', Math.abs(chg.stageW - lay.w) < 2);
 await p.screenshot({ path: 'shots/live-desktop-changed.png', fullPage: true });
 
