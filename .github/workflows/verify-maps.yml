@@ -1,0 +1,36 @@
+name: verify-maps
+
+# Live end-to-end check of the APP MAP page (maps.html) — dedicated to the facility-slot
+# reservation. Runs where network egress works (GitHub-hosted runner), the piece the build
+# sandbox cannot do. Separate from verify-development (which drives homesignalmap.html).
+# Hard check: the reserve floor min(4, #facilities) holds on the real 78617 default view.
+# Soft check: DALFEN present (logged, never fails the run).
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: '41 13 * * *'   # daily 13:41 UTC — catches regressions after any deploy
+  push:
+    branches: [main]
+    paths:
+      - 'maps.html'
+      - 'lib/map.js'
+      - 'config.js'
+      - 'shell.js'
+      - 'partials/shell.html'
+      - 'lib/data.js'
+      - 'scripts/verify-maps.mjs'
+      - '.github/workflows/verify-maps.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Verify app-map facility-slot floor
+        run: node scripts/verify-maps.mjs

@@ -108,7 +108,12 @@ HS.onReady(async function () {
     // Facilities reserve a FLOOR of lettered slots (min(4,#facs)) so the closest
     // regulated facilities are always surfaced alongside development — de-duped, cap 16.
     var facPins = opts.showFacilities ? facs : [];
-    return HS.reserveFacilitySlots(a, facPins, { cap: 16, floor: 4, letters: LET });
+    var out = HS.reserveFacilitySlots(a, facPins, { cap: 16, floor: 4, letters: LET });
+    // Live-verification hook (scripts/verify-maps.mjs, runs on a real runner with egress):
+    // the lettered pin set + how many mappable facilities exist, so CI can assert the
+    // reserve-slot floor holds on the real 78617 data. Mirrors homesignalmap's __HS_SITES.
+    window.__HS_MAP = { items: out, facCount: facs.length };
+    return out;
   }
   // A facility lettered into shownItems must NOT also render as its own purple overlay
   // square — that double-plots the same facility (letter pin + square). Every map path
