@@ -36,18 +36,18 @@
           </div>
           <div id="tdVitals"></div>
           <div class="scorebars" id="tdBars"></div>
-          <p style="font-size:11px;color:var(--ink-3);margin:8px 0 0">Component scores derived from feeds already ingested.</p>
+          <p style="font-size:11px;color:var(--ink-3);margin:8px 0 0">Based on the public data sources we track for this area.</p>
         </div>
         <div class="block">
           <div class="bt-row"><h2>Action windows</h2><a href="maps.html">Map →</a></div>
           <div id="tdWindows"></div>
         </div>
         <div class="p2">
-          <div class="p2h"><span>🔒</span> Phase 2 — unlocked by new feeds</div>
-          <div class="p2sub">Designed into the layout now; lights up when these sources are added.</div>
-          <div class="p2i"><div style="flex:1"><div class="t">Opportunity Center</div><div class="d">Tax exemptions, rebates, grants, insurance savings</div></div><span class="feed">+ tax / incentive / insurance</span></div>
-          <div class="p2i"><div style="flex:1"><div class="t">Financial Intelligence</div><div class="d">Total cost of ownership, equity timeline</div></div><span class="feed">+ assessor / tax records</span></div>
-          <div class="p2i"><div style="flex:1"><div class="t">Home Document Vault</div><div class="d">Deeds, permits, warranties, policies</div></div><span class="feed">+ user uploads</span></div>
+          <div class="p2h"><span>🔒</span> Coming soon</div>
+          <div class="p2sub">More ways HomeSignal will look out for your home.</div>
+          <div class="p2i"><div style="flex:1"><div class="t">Opportunity Center</div><div class="d">Tax exemptions, rebates, grants, insurance savings</div></div></div>
+          <div class="p2i"><div style="flex:1"><div class="t">Financial Intelligence</div><div class="d">Total cost of ownership, equity timeline</div></div></div>
+          <div class="p2i"><div style="flex:1"><div class="t">Home Document Vault</div><div class="d">Deeds, permits, warranties, policies</div></div></div>
         </div>
       </div>
     </div>
@@ -68,9 +68,11 @@ HS.onReady(async function () {
   var meetings = await HS.data.meetings(S.zip, home);
 
   // greeting
-  var name = (S.session && S.session.name || 'there').split(' ')[0];
+  var name = S.session && S.session.name ? S.session.name.split(' ')[0] : '';
   var today = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
-  document.getElementById('tdGreeting').textContent = 'Good morning, ' + name + ' — here’s what needs you';
+  var hr = new Date().getHours();
+  var daypart = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('tdGreeting').textContent = daypart + (name ? ', ' + name : '') + ' — here’s what needs you';
   // When the visitor has not chosen their own area we are showing the default
   // prototype community as an example, so flag it as a sample zip in the dateline.
   var sampleTag = (HS.isSample && HS.isSample()) ? ' — (Sample Zip Code)' : '';
@@ -103,13 +105,13 @@ HS.onReady(async function () {
   document.getElementById('tdBrief').innerHTML =
     'There are <b>' + changes.filter(function(c){return !c.quiet;}).length + ' changes</b> near you this week. '
     + (top ? 'The biggest is the <span class="hl">' + HS.esc(top.title) + '</span> — ' + HS.esc(top.plain_language) + ' ' : '')
-    + 'Your <span class="hl">value outlook · </span>' + '<span class="hl">' + HS.trend(c.value_trend) + ' over the next 12 months.</span>';
+    + (c.value_trend != null ? 'Your <span class="hl">value outlook · ' + HS.trend(c.value_trend) + ' over the next 12 months.</span>' : '');
 
   // vitals + bars
   document.getElementById('tdRing').innerHTML = HS.tpl.scoreRing(c.community_score);
-  document.getElementById('tdScoreTrend').textContent = 'Strong · growth pressure ' + c.growth_pressure;
+  document.getElementById('tdScoreTrend').textContent = c.growth_pressure ? 'Growth pressure: ' + c.growth_pressure : '';
   document.getElementById('tdVitals').innerHTML =
-    '<div class="vital"><span class="vl">Value outlook · 12 mo</span><span class="vv" style="color:var(--green)">' + HS.trend(c.value_trend) + '</span></div>'
+    (c.value_trend != null ? '<div class="vital"><span class="vl">Value outlook · 12 mo</span><span class="vv" style="color:var(--green)">' + HS.trend(c.value_trend) + '</span></div>' : '')
     + '<div class="vital"><span class="vl">Projects tracked</span><span class="vv">' + (await HS.data.projects(S.zip, home)).length + '</span></div>'
     + '<div class="vital"><span class="vl">Active alerts</span><span class="vv">' + changes.filter(function(c){return HS.daysUntil(c.window_closes_at)>=0 || !c.quiet;}).length + '</span></div>'
     + '<div class="vital"><span class="vl">Growth pressure</span><span class="vv" style="color:var(--amber)">' + HS.esc(c.growth_pressure) + '</span></div>';

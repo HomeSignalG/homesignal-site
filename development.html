@@ -25,11 +25,22 @@
 <script>
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
-  var community = await HS.data.community(S.zip);
-  var projects = await HS.data.projects(S.zip, home);      // DEVELOPMENT only (permits / planning)
-  var facilities = await HS.data.facilities(S.zip, home);  // EPA/ECHO regulated facilities — env context, own section
   var id = new URLSearchParams(location.search).get('id');
   var page = document.getElementById('devPage');
+  // Never hang on the loading skeleton: a failed read renders an honest
+  // "couldn't load" state with a retry (same contract as maps.html).
+  var community = null, projects = [], facilities = [];
+  try {
+    community = await HS.data.community(S.zip);
+    projects = await HS.data.projects(S.zip, home);        // DEVELOPMENT only (permits / planning)
+    facilities = await HS.data.facilities(S.zip, home);    // EPA/ECHO regulated facilities — env context, own section
+  } catch (e) {
+    console.warn('[development] data load failed', e);
+    page.innerHTML = '<div class="ph"><h1>We couldn\'t load this page</h1>'
+      + '<p>Your connection may have dropped, or our data service is briefly unavailable. Nothing is wrong with your account.</p></div>'
+      + '<button class="btn primary" onclick="location.reload()">Try again</button>';
+    return;
+  }
 
   if (id) { renderDetail(id); } else { renderList(); }
 
@@ -167,6 +178,7 @@ HS.onReady(async function () {
         + '<button class="btn primary" onclick="window.open(\'' + HS.esc(p.source_ref) + '\',\'_blank\',\'noopener\')">Submit a public comment</button>'
         + '<button class="btn" onclick="HS.addToCalendar(\'' + p.id + '\')">Add hearing to calendar</button>'
         + '<button class="btn" onclick="window.open(\'' + HS.esc(p.source_ref) + '\',\'_blank\',\'noopener\')">Read the impact analysis</button>'
+        + '<button class="btn" onclick="location.href=\'maps.html\'">See it on the map</button>'
         + '<button class="btn ghost" onclick="HS.toggleFollow(this,\'project\',\'' + p.id + '\')">Follow this project</button></div>'
         + '<div class="divider"></div><div class="kicker">The specs</div><div class="specs">'
         + specRow('Developer', p.developer) + specRow('Size', p.size) + specRow('Investment', p.investment)

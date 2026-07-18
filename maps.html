@@ -778,7 +778,7 @@ HS.onReady(async function () {
   }
 
   // ---------- MapLibre (real tiles: Esri World Imagery + OSM) ----------
-  var glMap = null, glMarkers = [], glReady = false, glFailed = false, glTileErrs = 0, glTilesOK = 0;
+  var glMap = null, glMarkers = [], glReady = false, glFailed = false, glTileErrs = 0, glTilesOK = 0, glLastView = null;
   window.__HS_GL = { get tilesOK(){return glTilesOK;}, get errs(){return glTileErrs;},
                      get ready(){return glReady;}, get failed(){return glFailed;},
                      get lfTilesOK(){return lfTilesOK;}, get lfErrs(){return lfTileErrs;},
@@ -899,7 +899,11 @@ HS.onReady(async function () {
     glMap.getSource('radius').setData(opts.showRadius ? circle(center.lat,center.lng,opts.radiusMi) : {type:'FeatureCollection',features:[]});
     glMap.setLayoutProperty('radius-fill','visibility', opts.showRadius?'visible':'none');
     glMap.setLayoutProperty('radius-line','visibility', opts.showRadius?'visible':'none');
-    glMap.easeTo({ center:[center.lng,center.lat], zoom: zoomFor(opts.radiusMi), duration:300 });
+    var wantZoom = zoomFor(opts.radiusMi);
+    if (glLastView !== center.lat + ',' + center.lng + '@' + wantZoom) {
+      glLastView = center.lat + ',' + center.lng + '@' + wantZoom;
+      glMap.easeTo({ center:[center.lng,center.lat], zoom: wantZoom, duration:300 });
+    }
     addMarkers(items);
     setGps(items); renderInfo(items);
     wirePanel(drawGL);
@@ -907,7 +911,7 @@ HS.onReady(async function () {
 
   // ---------- Leaflet raster fallback (real tiles WITHOUT WebGL) ----------
   var lfMap=null, lfSat=null, lfOsm=null, lfBase=null, lfRadius=null, lfMarkers=[],
-      lfFailed=false, lfTilesOK=0, lfTileErrs=0, lfWatchdogArmed=false;
+      lfFailed=false, lfTilesOK=0, lfTileErrs=0, lfWatchdogArmed=false, lfLastView=null;
   var loadLeaflet = HS.loadLeaflet;
   function lfDivIcon(html,size){ return L.divIcon({html:html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2]}); }
   function clearLfMarkers(){ lfMarkers.forEach(function(m){ try{ lfMap.removeLayer(m); }catch(e){} }); lfMarkers=[]; }
@@ -964,7 +968,8 @@ HS.onReady(async function () {
     }
     var want = (opts.mode === 'street') ? lfOsm : lfSat;
     if (lfBase !== want){ if (lfBase) lfMap.removeLayer(lfBase); want.addTo(lfMap); lfBase = want; }
-    lfMap.setView([center.lat, center.lng], zoomFor(opts.radiusMi));
+    var lfWantView = center.lat + ',' + center.lng + '@' + zoomFor(opts.radiusMi);
+    if (lfLastView !== lfWantView) { lfLastView = lfWantView; lfMap.setView([center.lat, center.lng], zoomFor(opts.radiusMi)); }
     if (lfRadius){ lfMap.removeLayer(lfRadius); lfRadius = null; }
     if (opts.showRadius) lfRadius = L.circle([center.lat,center.lng], { radius: opts.radiusMi*1609.34,
       color:'#157a49', weight:2, dashArray:'4 4', fillColor:'#157a49', fillOpacity:0.08 }).addTo(lfMap);

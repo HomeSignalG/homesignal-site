@@ -25,7 +25,7 @@
           <div class="bt-row"><h2>What's changing around you</h2><a href="maps.html">Open full map →</a></div>
           <div class="mapwrap" id="dashMap" style="box-shadow:none"></div>
         </div>
-        <div class="bt-row"><h2 style="font-size:15px;margin:0">Recent — ranked by impact on you</h2><a href="alerts.html" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">All alerts →</a></div>
+        <div class="bt-row"><h2 style="font-size:15px;margin:0">Recent activity near you</h2><a href="alerts.html" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">All alerts →</a></div>
         <div id="dashRecent"></div>
       </div>
       <div>
@@ -38,8 +38,8 @@
           <div class="bt-row"><h2>Your communities</h2><a href="community.html">Open →</a></div>
           <div id="dashCommunities"></div>
         </div>
-        <div class="block">
-          <div class="bt-row"><h2>Your watchlist</h2><a href="#" onclick="alert('Watchlist edit — persists to watchlist_items');return false">Edit</a></div>
+        <div class="block" id="dashWatchBlock">
+          <div class="bt-row"><h2>Worth watching nearby</h2><a href="maps.html">See on map →</a></div>
           <div class="chips" id="dashWatch"></div>
         </div>
         <div class="block">
@@ -67,16 +67,16 @@ HS.onReady(async function () {
   var changes = await HS.data.changes(S.zip, home);
   var meetings = await HS.data.meetings(S.zip, home);
 
-  var name = (S.session && S.session.name || 'there').split(' ')[0];
-  document.getElementById('dashHi').textContent = 'Welcome back, ' + name;
+  var name = S.session && S.session.name ? S.session.name.split(' ')[0] : '';
+  document.getElementById('dashHi').textContent = name ? 'Welcome back, ' + name : 'Welcome back';
   document.getElementById('dashSub').textContent = S.properties.length + ' home' + (S.properties.length===1?'':'s') + ' followed — here\'s what needs you across them.';
 
   var openCount = changes.filter(function(x){var d=HS.daysUntil(x.window_closes_at);return d!=null&&d>=0;}).length;
   document.getElementById('dashStrip').innerHTML =
     HS.tpl.statTile(projects.length, 'Projects near you', '')
     + HS.tpl.statTile(openCount, 'Action windows open', 'accent')
-    + HS.tpl.statTile('<span style="font-size:19px">' + HS.esc(c.growth_pressure) + '</span>', 'Growth pressure · trending up', '')
-    + HS.tpl.statTile(c.community_score, 'Community score', 'g');
+    + (c && c.growth_pressure ? HS.tpl.statTile('<span style="font-size:19px">' + HS.esc(c.growth_pressure) + '</span>', 'Growth pressure', '') : '')
+    + (c && c.community_score != null ? HS.tpl.statTile(c.community_score, 'Community score', 'g') : '');
 
   // map preview — HS.buildLive is the guarded backbone chain (GL -> Leaflet raster
   // -> schematic; never throws into this init). NEVER-FAKED rule: the home dot and
@@ -92,6 +92,14 @@ HS.onReady(async function () {
     || (items[0] ? {lat:items[0].lat,lng:items[0].lng} : null);
   HS.buildLive(dashMap, { center: center, items: items, home: hasRealHome ? home : null,
     interactive: false, zoom: 12.4, radiusMi: 1.5, w: 640, h: 300 });
+  // The preview is a doorway, not a dead end: the whole surface opens the full
+  // map (its markers are non-interactive by design at this size).
+  dashMap.style.cursor = 'pointer';
+  dashMap.setAttribute('role', 'link');
+  dashMap.setAttribute('aria-label', 'Open the full map of what\'s changing around you');
+  dashMap.tabIndex = 0;
+  dashMap.addEventListener('click', function () { location.href = 'maps.html'; });
+  dashMap.addEventListener('keydown', function (e) { if (e.key === 'Enter') location.href = 'maps.html'; });
 
   // recent — ranked by impact
   var recent = changes.filter(function(x){return !x.quiet;})
@@ -109,9 +117,18 @@ HS.onReady(async function () {
   // your followed communities
   document.getElementById('dashCommunities').innerHTML = HS.communitiesStripHTML();
 
-  // watchlist (seeded from real entities near this home)
-  var watch = [c.zip, 'SH-130 Data Center', 'SH-71', 'Your street', 'Colorado River'];
-  document.getElementById('dashWatch').innerHTML = watch.map(function(w){return '<span class="wchip">' + HS.esc(w) + '</span>';}).join('');
+  // Worth watching nearby — the closest REAL project records (never a canned
+  // list): each chip opens that project's page. No records -> the block hides.
+  var watch = projects.slice()
+    .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);}).slice(0,4);
+  if (watch.length) {
+    document.getElementById('dashWatch').innerHTML = watch.map(function(p){
+      return '<a class="wchip" style="cursor:pointer;text-decoration:none;color:inherit" href="development.html?id=' + encodeURIComponent(p.id) + '">'
+        + HS.esc(p.name) + (p.dist ? ' · ' + HS.esc(p.dist) : '') + '</a>';
+    }).join('');
+  } else {
+    var wb = document.getElementById('dashWatchBlock'); if (wb) wb.style.display = 'none';
+  }
 
   document.getElementById('dashMeetings').innerHTML = meetings.map(HS.tpl.meetingRow).join('');
 });
