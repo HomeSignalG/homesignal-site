@@ -77,9 +77,18 @@ HS.onReady(async function () {
     return;
   }
 
+  // FIRST-TIME vs RETURNING: a signed-out visitor has never been here — never
+  // greet them "Welcome back"; lead with what HomeSignal does. With no homes
+  // followed, the subline is an invitation (plus honest sample-community
+  // disclosure), never "0 homes followed".
   var name = S.session && S.session.name ? S.session.name.split(' ')[0] : '';
-  document.getElementById('dashHi').textContent = name ? 'Welcome back, ' + name : 'Welcome back';
-  document.getElementById('dashSub').textContent = S.properties.length + ' home' + (S.properties.length===1?'':'s') + ' followed — here\'s what needs you across them.';
+  document.getElementById('dashHi').textContent = S.session
+    ? (name ? 'Welcome back, ' + name : 'Welcome back')
+    : 'See what\'s changing around your home';
+  document.getElementById('dashSub').textContent = S.properties.length
+    ? S.properties.length + ' home' + (S.properties.length===1?'':'s') + ' followed — here\'s what needs you across them.'
+    : 'Add your home and we\'ll watch official county and permit records around it'
+      + ((HS.isSample && HS.isSample()) ? ' — right now you\'re viewing our sample community, Del Valle, TX.' : '.');
 
   var openCount = changes.filter(function(x){var d=HS.daysUntil(x.window_closes_at);return d!=null&&d>=0;}).length;
   document.getElementById('dashStrip').innerHTML =
