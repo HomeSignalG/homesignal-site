@@ -6,6 +6,8 @@ on:
       - '**/*.js'
       - '**/*.html'
       - 'test/**'
+      - 'scripts/verify-communities.mjs'
+      - 'scripts/verify-communities-sampling.mjs'
       - 'topics.canon.json'
       - '.github/workflows/unit-tests.yml'
   workflow_dispatch: {}
@@ -28,3 +30,5 @@ jobs:
         run: node test/topic-canon.test.mjs
       - name: Facility-slot reservation test
         run: node test/facility-slots.test.mjs
+      - name: verify-communities sampling test
+        run: node test/verify-communities-sampling.test.mjs

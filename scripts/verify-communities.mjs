@@ -21,6 +21,7 @@
 
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { sampleUnmaterializedZips } from './verify-communities-sampling.mjs';
 
 // ── Single source of truth for the anon key + URL: read them out of config.js (the ONE
 //    place the app config lives now). Format: `SUPABASE_URL: 'https://…'`. ──
@@ -119,17 +120,7 @@ async function main() {
       mlast = page[page.length - 1].zip;
     }
   }
-  const nonUt = [];
-  {
-    // One page of modeled ZIP rows is plenty to find a handful with no meta row.
-    const rows = await rest(`communities?select=zip_codes&level=eq.zip&order=id.asc&limit=4000`);
-    for (const row of rows) {
-      for (const z of (row.zip_codes || [])) {
-        if (/^\d{5}$/.test(z) && !materializedZips.has(z) && !nonUt.includes(z)) { nonUt.push(z); break; }
-      }
-      if (nonUt.length >= 4) break;
-    }
-  }
+  const nonUt = await sampleUnmaterializedZips(materializedZips, rest);
   if (!nonUt.length) console.log('  (no unmaterialized modeled ZIP found to sample — every modeled ZIP is materialized)');
 
   console.log(`Verifying ${walked.length} materialized page(s) + ${nonUt.length} unmaterialized page(s) against ${SITE_BASE}`);
@@ -213,4 +204,7 @@ async function main() {
   if (fails.length) process.exit(1);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+import { fileURLToPath } from 'node:url';
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((e) => { console.error(e); process.exit(1); });
+}

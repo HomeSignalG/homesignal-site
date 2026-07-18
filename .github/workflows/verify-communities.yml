@@ -24,6 +24,7 @@ on:
       - 'lib/data.js'
       - 'docs/*-communities-seed.sql'
       - 'scripts/verify-communities.mjs'
+      - 'scripts/verify-communities-sampling.mjs'
       - '.github/workflows/verify-communities.yml'
 
 jobs:
