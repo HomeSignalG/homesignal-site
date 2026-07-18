@@ -138,15 +138,43 @@ HS.onReady(async function () {
     if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button><div class="ph"><h1>We couldn\'t find that record</h1><p>It may have been removed from the county feed, or the link is out of date. Everything currently on record is on the development page.</p></div>'; return; }
     HS.data.meetings(S.zip, home).then(function (meetings) {
       var mtg = HS.bestMeeting(meetings, p.id);   // soonest UPCOMING first, else latest held
-      var thread = [
-        { date: HS.fmtDate(p.submitted_at, {year:'numeric',month:'long',day:'numeric'}), title: 'Filed with the county', link: 'this filing is what put it on your map' }
-      ];
-      if (p.stage) thread.push({ date: p.status || 'Current', title: p.stage });
-      if (mtg) {
-        var mtgDays = HS.daysUntil(mtg.starts_at);
-        if (mtgDays != null && mtgDays >= 0) thread.push({ date: HS.fmtDate(mtg.starts_at,{year:'numeric',month:'long',day:'numeric'}) + ' · in ' + mtgDays + ' day' + (mtgDays === 1 ? '' : 's'), title: 'Public hearing — comment window open', link: 'you can act here', future: true });
-        else thread.push({ date: HS.fmtDate(mtg.starts_at,{year:'numeric',month:'long',day:'numeric'}), title: 'Public hearing — held', link: '' });
+      // Timeline: only sourced milestones — filing date, record stage/status, or a
+      // linked meeting. Never invent a future vote or expected date from status alone.
+      var thread = [];
+      if (p.submitted_at) {
+        thread.push({
+          date: HS.fmtDate(p.submitted_at, { year: 'numeric', month: 'long', day: 'numeric' }),
+          title: 'Filed with the county',
+          link: p.source_ref ? 'see the official record' : ''
+        });
       }
+      if (p.stage) {
+        thread.push({
+          date: p.status || (p.submitted_at ? HS.fmtDate(p.submitted_at, { month: 'long', day: 'numeric' }) : ''),
+          title: p.stage
+        });
+      }
+      if (mtg && mtg.starts_at) {
+        var mtgDays = HS.daysUntil(mtg.starts_at);
+        if (mtgDays != null && mtgDays >= 0) {
+          thread.push({
+            date: HS.fmtDate(mtg.starts_at, { year: 'numeric', month: 'long', day: 'numeric' }) + ' · in ' + mtgDays + ' day' + (mtgDays === 1 ? '' : 's'),
+            title: 'Public hearing — comment window open',
+            link: mtg.source_ref ? 'see the agenda' : '',
+            future: true
+          });
+        } else {
+          thread.push({
+            date: HS.fmtDate(mtg.starts_at, { year: 'numeric', month: 'long', day: 'numeric' }),
+            title: 'Public hearing — held',
+            link: mtg.source_ref ? 'see the agenda' : ''
+          });
+        }
+      }
+      var threadBlock = thread.length
+        ? '<div class="divider"></div><div class="kicker">The story so far — and what\'s next</div>'
+          + '<div class="thread">' + HS.tpl.thread(thread) + '</div>'
+        : '';
 
       var statusClass = p.status==='Active'?'active':p.status==='Approved'?'appr':'prop';
       // "Why this matters" (Sprint-3): four evidence-based answers + what the
@@ -157,8 +185,12 @@ HS.onReady(async function () {
         place: community ? community.name : null,
         meeting: mtg
       });
-      var hiDims = p.impact_dimensions.filter(function(i){return i.bad;}).slice(0,2).map(function(i){return i.label.toLowerCase();});
-      var goodDim = p.impact_dimensions.find(function(i){return !i.bad;});
+      var dims = p.impact_dimensions || [];
+      var hiDims = dims.filter(function(i){return i.bad;}).slice(0,2).map(function(i){return i.label.toLowerCase();});
+      var goodDim = dims.find(function(i){return !i.bad;});
+      var impactsBlock = dims.length
+        ? '<div class="impacts">' + HS.tpl.impactChips(dims) + '</div>'
+        : '';
       page.innerHTML =
         '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button>'
         + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">' + HS.esc(p.name) + ' <span class="status ' + statusClass + '">' + HS.esc(p.status) + '</span></div><h1 style="margin-bottom:2px">How this affects you</h1></div>'
@@ -167,13 +199,12 @@ HS.onReady(async function () {
         + (hiDims.length
             ? '<div class="verdict">Likely to <span class="hl">affect ' + HS.esc(hiDims.join(' and ')) + '</span> near you'
               + (goodDim ? ' — with a <span class="hlg">lift to ' + HS.esc(goodDim.label.toLowerCase()) + '</span>' : '') + '.</div>'
-            : '<div class="verdict">On the county\'s public record near you — the record below has the specifics.</div>')
-        + '<div class="impacts">' + HS.tpl.impactChips(p.impact_dimensions) + '</div>'
+            : '<div class="verdict">' + HS.esc(p.sowhat || 'On the county\'s public record near you — the record below has the specifics.') + '</div>')
+        + impactsBlock
         + '<div class="divider"></div><div class="kicker">Why this matters</div>' + HS.whyQaHTML(wd)
         + '<div class="divider"></div><div class="kicker">What we know</div>' + HS.whyKnowHTML(wd)
         + '<div class="divider"></div><div class="kicker">What we don\'t know yet</div>' + HS.whyUnknownHTML(wd)
-        + '<div class="divider"></div><div class="kicker">The story so far — and what\'s next</div>'
-        + '<div class="thread">' + HS.tpl.thread(thread) + '</div></div>'
+        + threadBlock + '</div>'
         + '<div class="panel side"><div class="kicker">What you can do</div><div class="doact">'
         + '<button class="btn primary" onclick="window.open(\'' + HS.esc(p.source_ref) + '\',\'_blank\',\'noopener\')">Submit a public comment</button>'
         + '<button class="btn" onclick="HS.addToCalendar(\'' + p.id + '\')">Add hearing to calendar</button>'
