@@ -27,8 +27,8 @@
 <template id="hs-content">
   <div class="page">
     <div class="hero">
-      <h1>See what's changing around your home — what it means, and what you can do about it.</h1>
-      <p class="sub">HomeSignal shows you the projects that impact your quality of life and home value. We track development and monitor civic meetings so you can participate in the trajectory of projects.</p>
+      <h1>See what's changing around your home — from public records you can verify.</h1>
+      <p class="sub">HomeSignal maps development, hearings, and regulated facilities near your ZIP — each item linked to its official source. Coverage depth varies by area; we show what the record says and what it doesn't.</p>
       <div class="ziprow">
         <div class="zwrap"><span class="zpin">◉</span><input id="homeZip" inputmode="numeric" maxlength="5" placeholder="Enter your ZIP code" onkeydown="if(event.key==='Enter')homeFind()"></div>
         <button class="find" onclick="homeFind()">Find my community</button>
@@ -38,15 +38,15 @@
 
     <div class="homesec">
       <div class="trio">
-        <div class="twin"><div class="ic">◉</div><div class="k">See it</div><h3>What's changing</h3><p>Every project, permit, and hearing near your home — mapped, with the ones that actually affect you.</p><div class="tchips"><span class="tc">Development</span><span class="tc">Hearings</span><span class="tc">Water quality</span><span class="tc">Zoning</span></div></div>
-        <div class="twin"><div class="ic">◈</div><div class="k">Understand it</div><h3>What it means</h3><p>Each change put in plain language and scored — how it impacts your traffic, water, safety, and home value.</p><div class="tchips"><span class="tc">Traffic</span><span class="tc">Water</span><span class="tc">Home value</span><span class="tc">Safety</span></div></div>
+        <div class="twin"><div class="ic">◉</div><div class="k">See it</div><h3>What's changing</h3><p>Every project, permit, and hearing near your home — mapped, with official record links on every item.</p><div class="tchips"><span class="tc">Development</span><span class="tc">Hearings</span><span class="tc">Water quality</span><span class="tc">Zoning</span></div></div>
+        <div class="twin"><div class="ic">◈</div><div class="k">Understand it</div><h3>What it means</h3><p>Each change put in plain language from the public record — what is known, what isn't published yet, and where you can still weigh in.</p><div class="tchips"><span class="tc">Traffic</span><span class="tc">Water</span><span class="tc">Home value</span><span class="tc">Safety</span></div></div>
         <div class="twin"><div class="ic">◔</div><div class="k">Act on it</div><h3>What you can do</h3><p>A clear next step on every item, and a heads-up before comment windows and votes close — while you can still weigh in.</p><div class="tchips"><span class="tc">Comment</span><span class="tc">Attend</span><span class="tc">Follow</span><span class="tc">Noted</span></div></div>
       </div>
     </div>
 
     <div class="homesec">
       <h2>This is what you'll see.</h2>
-      <p class="s2">Every change, translated into what it means for you — and what you can do about it.</p>
+      <p class="s2">Every change traced to a public record — and what you can do about it while the window is open.</p>
       <div class="previewwrap">
         <div id="homePreview"><!-- a real Del Valle card, rendered from data --></div>
         <div class="previewcap" id="homePreviewCap">A real card from the Del Valle, TX community. Enter your ZIP to see your own.</div>
@@ -61,7 +61,7 @@
 
     <div class="homecta">
       <h2>Know what's changing around your home.</h2>
-      <p>Open your community in a few seconds — no account needed to start.</p>
+      <p>Enter your ZIP to open the map — no account needed to start. Record depth varies by county.</p>
       <button class="big" onclick="HS.openLoc()">Find my community</button>
     </div>
   </div>
