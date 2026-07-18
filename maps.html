@@ -35,7 +35,7 @@
         <button data-mode="street">Street</button>
       </div>
       <div class="sp"></div>
-      <button class="fpill" id="radiusPill">◉ Radius: 1.5 mi ▾</button>
+      <button class="fpill" id="radiusPill">◉ Map view: 1.5 mi ▾</button>
       <button class="fpill">All dimensions ▾</button>
     </div>
     <div class="mapcols">
@@ -105,7 +105,10 @@ HS.onReady(async function () {
 
   function shownItems() {
     var a = opts.showProjects ? all : all.filter(function(x){return !x.type;});
-    return a.slice(0, 16).map(function(it,i){ return Object.assign({}, it, {_letter: LET[i]}); });
+    // Facilities reserve a FLOOR of lettered slots (min(4,#facs)) so the closest
+    // regulated facilities are always surfaced alongside development — de-duped, cap 16.
+    var facPins = opts.showFacilities ? facs : [];
+    return HS.reserveFacilitySlots(a, facPins, { cap: 16, floor: 4, letters: LET });
   }
   // NEVER-FAKED rule: only a real signed-in resident home (in THIS ZIP, not the
   // Del Valle sample) may be pinned as "Your home" or used as the viewport anchor.
@@ -164,9 +167,14 @@ HS.onReady(async function () {
     // A–P development list: a facility is an existing condition, not activity — spec §6).
     // Closest-first; each row routes into the facility DOSSIER (development.html?id=),
     // never straight to ECHO. Empty state is said out loud, not left blank.
+    // Facilities that earned a letter in the list above are not repeated here (no
+    // double-listing); the section lists only the remaining on-record facilities.
+    var letteredFacIds = {};
+    items.forEach(function (it) { if (it._facility && it.id != null) letteredFacIds[it.id] = 1; });
+    var sectionFacs = facRows.filter(function (f) { return !(f.id != null && letteredFacIds[f.id]); });
     html += '<div class="groupHead">Regulated facilities · nearby</div>';
-    if (facRows.length) {
-      html += facRows.map(function (f, i) {
+    if (sectionFacs.length) {
+      html += sectionFacs.map(function (f, i) {
         var interp = HS.fac.interpret(f.facility_env || null);
         return '<div class="card mini clickable" data-fac="' + i + '" style="border-left-color:' + FACILITY_HEX + '">'
           + '<span class="lens">' + HS.esc(f.type || 'Regulated facility') + (f.dist ? ' · ' + HS.esc(f.dist) : '') + '</span>'
@@ -180,7 +188,7 @@ HS.onReady(async function () {
     document.getElementById('pinList').innerHTML = html;
     document.querySelectorAll('#pinList [data-fac]').forEach(function (el) {
       el.addEventListener('click', function () {
-        var f = facRows[parseInt(el.getAttribute('data-fac'), 10)];
+        var f = sectionFacs[parseInt(el.getAttribute('data-fac'), 10)];
         if (f) location.href = 'development.html?id=' + encodeURIComponent(f.id);
       });
     });
@@ -600,7 +608,7 @@ HS.onReady(async function () {
   var radii = [0.5,1,1.5,2,3,5], ri = 2;
   document.getElementById('radiusPill').onclick = function () {
     ri = (ri + 1) % radii.length; opts.radiusMi = radii[ri];
-    this.textContent = '◉ Radius: ' + opts.radiusMi + ' mi ▾';
+    this.textContent = '◉ Map view: ' + opts.radiusMi + ' mi ▾';
     if (opts.mode === 'impact') showSchematic(); else drawTiles();
   };
 });
