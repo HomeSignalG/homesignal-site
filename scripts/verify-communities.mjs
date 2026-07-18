@@ -20,6 +20,7 @@
 // a quick smoke run), CONCURRENCY (default 8).
 
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { sampleUnmaterializedZips } from './verify-communities-sampling.mjs';
 
