@@ -87,15 +87,33 @@ HS.onReady(async function () {
   var LET = 'ABCDEFGHIJKLMNOP';
   var FACILITY_HEX = '#6f42c1';   // regulated facilities — distinct from the status pin colors
   var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact' };
+  var hasRealHome = !!HS.realHome();
+  var cCentroid = (c && c.lat != null && c.lng != null) ? { lat: c.lat, lng: c.lng } : null;
+  // Order the near-you list / lettered pins by PROXIMITY. With a real home we use the
+  // per-item home distance (distance_mi); with no home we fall back to distance from the
+  // ZIP CENTER (the map's own anchor) so "closest first" is still meaningful AND facilities
+  // interleave with projects by real geography instead of being buried by insertion order
+  // (the bug: 48 projects concat'd before facilities pushed every facility past the A–P
+  // cap for a no-home visitor). This orders only — the displayed distance chip still
+  // renders solely from a real home (the never-faked rule is unchanged).
+  var sortAnchor = (hasRealHome ? home : null) || cCentroid;
+  function proximity(it){
+    if (it.distance_mi != null) return it.distance_mi;
+    if (!sortAnchor || it.lat == null || it.lng == null) return 9e9;
+    var R = 3958.76, toR = function(d){ return d * Math.PI / 180; };
+    var dLat = toR(it.lat - sortAnchor.lat), dLng = toR(it.lng - sortAnchor.lng);
+    var s = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(toR(sortAnchor.lat))*Math.cos(toR(it.lat))*Math.sin(dLng/2)*Math.sin(dLng/2);
+    return R * 2 * Math.asin(Math.min(1, Math.sqrt(s)));
+  }
   // Facilities now flow through the SAME lettered-pin + near-you-card workflow as projects
   // (navigation consistency — no longer a separate purple-square overlay). They join `all`,
-  // interleaved by distance, and are colored purple by the shared statusTier (lib/map.js)
+  // interleaved by proximity, and are colored purple by the shared statusTier (lib/map.js)
   // keyed on record_kind. A facility with no coordinate falls out of the mapped/lettered
   // set exactly like a project without one — honest, no fabricated point.
   var facMapped = (facilities || []).filter(function(x){return x.lat && x.lng;});
   var all = changes.filter(function(x){return !x.quiet;}).concat(projects).concat(facMapped)
     .filter(function(x){return x.lat && x.lng;})
-    .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
+    .sort(function(a,b){return proximity(a) - proximity(b);});
   if (facMapped.length) {   // reveal the facilities color key + layer toggle only when there are any
     var _lf = document.getElementById('legFacility'); if (_lf) _lf.style.display = '';
     var _lyf = document.getElementById('lyrFacilities'); if (_lyf) _lyf.style.display = '';
@@ -114,8 +132,7 @@ HS.onReady(async function () {
   // For everyone else the ZIP centroid (app_community_meta.lat/lng, pinned to the
   // USPS dataset) centers the viewport; first mapped record is the last resort.
   // No hardcoded fallback coordinates — a wrong-state anchor is worse than none.
-  var hasRealHome = !!HS.realHome();
-  var cCentroid = (c && c.lat != null && c.lng != null) ? { lat: c.lat, lng: c.lng } : null;
+  // (hasRealHome / cCentroid / sortAnchor computed above, before the proximity sort.)
   var center = (hasRealHome ? home : null) || cCentroid || all[0] || facMapped[0] || null;
 
   // Area-wide notices: REAL records with no parcel point (jurisdiction-level
