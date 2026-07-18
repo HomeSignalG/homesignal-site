@@ -95,6 +95,44 @@
   .emptycard .ed{font-size:12.5px;color:var(--ink-2);line-height:1.5;margin:0 0 12px}
   .emptycard .btn{display:inline-flex}
 
+  /* ── MAP-FIRST LAYOUT (Sprint 7.5) — page-scoped; app.css untouched ──
+     The map is the dominant surface: the old permanent right column becomes a
+     slide-over panel INSIDE the map stage (bottom sheet on mobile). Closing it
+     restores the full map. Exactly one panel; its content swaps between the
+     nearby list, Recent Changes, and the project detail. */
+  .page.mapsfull{max-width:none;display:flex;flex-direction:column}
+  .mapsfull .ph{margin:2px 0 10px}
+  .mapsfull .ph h1{font-size:21px}
+  .mapsfull .ph > p{display:none}   /* the intro line yields to the map; legend + panel carry its content */
+  .mapsfull .toolbar{margin-bottom:10px}
+  .mapsfull .mapcols{display:block}                 /* kill the old two-column grid */
+  .mapsfull .mapwrap{position:relative;width:100%;overflow:hidden}  /* height set by JS to fill the viewport */
+  .mapsfull #mapgl,.mapsfull #maplf{height:100%}
+  .mapsfull #mapSch{height:100%;display:grid;place-items:center;background:#e4eadd}
+  .mapsfull #mapSch svg{max-height:100%}
+
+  .sidepanel{position:absolute;top:0;right:0;bottom:0;width:min(400px,92%);z-index:9;
+    background:#f6f8f5;border-left:1px solid var(--line);box-shadow:-14px 0 34px rgba(22,33,28,.16);
+    transform:translateX(105%);transition:transform .25s ease;visibility:hidden;
+    display:flex;flex-direction:column}
+  .sidepanel.open{transform:translateX(0);visibility:visible}
+  .sidepanel .pclose{position:absolute;top:10px;right:12px;z-index:3;width:30px;height:30px;border-radius:50%;
+    border:1px solid var(--line);background:#fff;color:var(--ink-2);font:600 13px/1 var(--font);cursor:pointer}
+  .sidepanel .pclose:hover{color:var(--ink)}
+  .sidepanel .pinlist{flex:1;overflow:auto;padding:16px 16px 18px;padding-top:46px;width:auto;max-height:none;margin:0}
+  @media(max-width:900px){
+    .sidepanel{top:auto;left:0;right:0;width:auto;max-height:74%;border-left:none;border-top:1px solid var(--line);
+      border-radius:16px 16px 0 0;box-shadow:0 -12px 30px rgba(22,33,28,.18);transform:translateY(105%)}
+    .sidepanel.open{transform:translateY(0)}
+  }
+  @media(prefers-reduced-motion:reduce){ .sidepanel{transition:none} }
+
+  /* ── "What's Changed" view (Sprint 7) ── */
+  .cbadge{display:inline-block;font:800 9.5px/1 var(--font);letter-spacing:.07em;padding:3px 7px;border-radius:5px;color:#fff;margin-right:5px}
+  .cbadge.b-new{background:#1f9d5c} .cbadge.b-hearing{background:#c47a1a} .cbadge.b-update{background:#3f7fb0}
+  .chgnote{font-size:11.5px;color:var(--ink-2);line-height:1.5;margin:2px 0 12px}
+  .chgline{font-size:12px;color:var(--ink-2);margin-top:3px}
+
   /* ── marker clarity: hover/focus emphasis on tile-map pins ── */
   .hspin{transition:transform .1s ease}
   .hspin:hover,.hspin:focus-visible{transform:scale(1.18);z-index:6;position:relative}
@@ -124,7 +162,7 @@
 </head>
 <body data-nav="maps">
 <template id="hs-content">
-  <div class="page">
+  <div class="page mapsfull">
     <div class="ph">
       <div class="eyebrow">Maps</div>
       <h1>What's changing around you</h1>
@@ -133,6 +171,10 @@
       <p>Every project near your home, placed on the map — <b>shape shows the project type, color shows its permit status</b>. Pick any project for the full picture: why it's here, its quality-of-life impacts, timeline, evidence, and how to weigh in.</p>
     </div>
     <div class="toolbar">
+      <div class="seg" id="viewSeg" role="group" aria-label="Which projects to show">
+        <button class="on" data-view="all" aria-pressed="true">All Projects</button>
+        <button data-view="changed" aria-pressed="false">✦ What's Changed</button>
+      </div>
       <div class="seg" id="mapMode">
         <button class="on" data-mode="impact">Impact</button>
         <button data-mode="satellite">Satellite</button>
@@ -148,6 +190,7 @@
         <div class="fmenu" id="qolMenu" hidden></div>
       </div>
       <button class="fpill" id="radiusPill">◉ Map view: 1.5 mi ▾</button>
+      <button class="fpill" id="listPill" aria-expanded="false" aria-controls="infoSlide">☰ List</button>
     </div>
     <div class="mapcols">
       <div class="mapwrap" id="mapWrap">
@@ -176,13 +219,16 @@
           </div>
         </div>
         <div class="mgps" id="mapGps" role="status"></div>
-      </div>
-      <div class="pinlist" id="infoPanel" aria-live="polite">
-        <!-- loading skeleton — replaced by the first real render -->
-        <div class="skl hd"></div>
-        <div class="card mini"><div class="skl w40"></div><div class="skl w90"></div><div class="skl w70"></div></div>
-        <div class="card mini"><div class="skl w40"></div><div class="skl w90"></div><div class="skl w70"></div></div>
-        <div class="card mini"><div class="skl w40"></div><div class="skl w70"></div><div class="skl w90"></div></div>
+      <aside class="sidepanel" id="infoSlide" role="complementary" aria-label="Project details" aria-hidden="true">
+        <button class="pclose" id="panelClose" type="button" aria-label="Close panel">✕</button>
+        <div class="pinlist" id="infoPanel" aria-live="polite">
+          <!-- loading skeleton — replaced by the first real render -->
+          <div class="skl hd"></div>
+          <div class="card mini"><div class="skl w40"></div><div class="skl w90"></div><div class="skl w70"></div></div>
+          <div class="card mini"><div class="skl w40"></div><div class="skl w90"></div><div class="skl w70"></div></div>
+          <div class="card mini"><div class="skl w40"></div><div class="skl w70"></div><div class="skl w90"></div></div>
+        </div>
+      </aside>
       </div>
     </div>
   </div>
@@ -213,6 +259,8 @@ HS.onReady(async function () {
     console.warn('[maps] data load failed', e);
     var ml0 = document.getElementById('mapLoading');
     if (ml0) ml0.textContent = 'The map can’t load right now.';
+    var sl0 = document.getElementById('infoSlide');
+    if (sl0) { sl0.classList.add('open'); sl0.setAttribute('aria-hidden', 'false'); }
     document.getElementById('infoPanel').innerHTML =
       '<div class="emptycard"><div class="et">We couldn’t load what’s near you</div>'
       + '<p class="ed">Your connection may have dropped, or our data service is briefly unavailable. Nothing is wrong with your account.</p>'
@@ -224,7 +272,7 @@ HS.onReady(async function () {
   var FACILITY_HEX = '#6f42c1';   // regulated facilities — distinct from the status pin colors
   // opts.types / opts.qol are the top-of-page filters (null/empty = show everything,
   // so a signed-out default load is byte-identical to the pre-Sprint page the verifier checks).
-  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact', types: null, qol: null };
+  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact', types: null, qol: null, view: 'all' };
   var selected = null;   // the project currently expanded in the right info panel (null = list view)
   var lastItems = [];    // most recent lettered set, so panel re-renders without a map redraw
 
@@ -249,6 +297,15 @@ HS.onReady(async function () {
     var _lf = document.getElementById('legFacility'); if (_lf) _lf.style.display = '';
     var _lyf = document.getElementById('lyrFacilities'); if (_lyf) _lyf.style.display = '';
   }
+  // "What's Changed" (Sprint 7): entries derived ONLY from dates the records
+  // carry (filings / upcoming hearings / recorded notices) — HS.recentChanges
+  // is the pure, unit-pinned backbone (lib/map.js). No change-history store
+  // exists, so this is the honest fallback, and the panel says so.
+  var CHANGE_DAYS = 30;
+  var changeEntries = HS.recentChanges(projects, changes, meetings, { days: CHANGE_DAYS });
+  var changedIds = {};
+  changeEntries.forEach(function (e) { changedIds[e.id] = e; });
+
   buildShapeLegend();
   buildFilters();
 
@@ -259,6 +316,40 @@ HS.onReady(async function () {
     var open = legPanel.classList.toggle('open');
     legBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
   };
+
+  // ── MAP-FIRST STAGE + SLIDE-OVER PANEL (Sprint 7.5) ─────────────────────────
+  // The map stage fills the viewport below the compact header/toolbar; the ONE
+  // side panel (nearby list / Recent Changes / project detail) slides over it
+  // and closing it always restores the full map. Content swaps in place, so
+  // only one primary panel can ever be open.
+  function sizeStage() {
+    var st = document.getElementById('mapWrap'); if (!st) return;
+    var top = st.getBoundingClientRect().top;
+    st.style.height = Math.max(420, window.innerHeight - top - 16) + 'px';
+    try { if (glMap) glMap.resize(); } catch (e) {}
+    try { if (lfMap) lfMap.invalidateSize(); } catch (e) {}
+  }
+  window.addEventListener('resize', sizeStage);
+  sizeStage();
+
+  var slideEl = document.getElementById('infoSlide'), listPill = document.getElementById('listPill');
+  function panelOpen() { return slideEl.classList.contains('open'); }
+  function openPanel() {
+    slideEl.classList.add('open');
+    slideEl.setAttribute('aria-hidden', 'false');
+    if (listPill) listPill.setAttribute('aria-expanded', 'true');
+  }
+  function closePanel() {
+    slideEl.classList.remove('open');
+    slideEl.setAttribute('aria-hidden', 'true');
+    selected = null;
+    if (listPill) listPill.setAttribute('aria-expanded', 'false');
+  }
+  document.getElementById('panelClose').onclick = closePanel;
+  if (listPill) listPill.onclick = function () {
+    if (panelOpen() && !selected) { closePanel(); return; }
+    selected = null; renderInfo(lastItems); openPanel();
+  };
   // Keyboard: Escape closes an open filter menu first; a second Escape (or the first,
   // with no menu open) backs out of the project detail to the list.
   document.addEventListener('keydown', function (e) {
@@ -267,7 +358,8 @@ HS.onReady(async function () {
       var m = document.getElementById(id); return m && !m.hasAttribute('hidden');
     });
     if (menuOpen) { closeAllMenus(); return; }
-    if (selected) { var bk = document.getElementById('infoBack'); if (bk) bk.click(); }
+    if (selected) { var bk = document.getElementById('infoBack'); if (bk) bk.click(); return; }
+    if (panelOpen()) closePanel();
   });
   // The first real render replaces the loading states (skeleton panel + map veil).
   function clearLoading() {
@@ -290,10 +382,13 @@ HS.onReady(async function () {
 
   function shownItems() {
     var a = opts.showProjects ? all : all.filter(function(x){return !x.type;});
+    // "What's Changed" narrows the map to records with a real in-window change
+    // entry. Facilities carry no change data, so they don't reserve slots here.
+    if (opts.view === 'changed') a = a.filter(function (x) { return changedIds[x.id]; });
     a = a.filter(function (x) { return passType(x) && passQol(x); });
     // Facilities reserve a FLOOR of lettered slots (min(4,#facs)) so the closest
     // regulated facilities are always surfaced alongside development — de-duped, cap 16.
-    var facPins = opts.showFacilities ? facs : [];
+    var facPins = (opts.view === 'changed') ? [] : (opts.showFacilities ? facs : []);
     var out = HS.reserveFacilitySlots(a, facPins, { cap: 16, floor: 4, letters: LET });
     // Live-verification hook (scripts/verify-maps.mjs, runs on a real runner with egress):
     // the lettered pin set + how many mappable facilities exist, so CI can assert the
@@ -420,13 +515,8 @@ HS.onReady(async function () {
   function renderInfo(items) { clearLoading(); lastItems = items; if (selected) renderDetail(selected); else renderList(items); }
   function selectItem(it) {
     if (!it) return; selected = it; renderDetail(it);
-    var p = document.getElementById('infoPanel'); if (!p) return;
-    p.scrollTop = 0;
-    // On a phone the panel sits BELOW the map — bring it into view so a pin tap
-    // visibly responds instead of updating content off-screen.
-    if (window.matchMedia && window.matchMedia('(max-width: 900px)').matches) {
-      p.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    openPanel();                      // the ONE panel — detail replaces whatever was showing
+    var p = document.getElementById('infoPanel'); if (p) p.scrollTop = 0;
   }
   // A lettered REGULATED FACILITY routes to its dossier (an existing condition, not a
   // development "project"), so it never opens the project-framed 6-section panel.
@@ -447,11 +537,13 @@ HS.onReady(async function () {
     var filtersOn = (opts.types && opts.types.size) || (opts.qol && opts.qol.size);
     var panel = document.getElementById('infoPanel');
     panel.classList.remove('idetail');
+    if (opts.view === 'changed') { renderChangedList(items, panel, place); return; }
 
     // Honest, friendly EMPTY STATES (never a blank column):
     //  a) nothing on record at all for this area;
     //  b) the resident's filters match nothing — offer a one-tap way back.
     if (!items.length && !filtersOn && !all.length && !facRows.length && !area.length) {
+      openPanel();   // an empty area must SAY so, not hide behind a closed panel
       panel.innerHTML = '<div class="emptycard"><div class="et">Nothing on the public record near here yet</div>'
         + '<p class="ed">We check official county and permit records for ' + HS.esc(place)
         + ' continuously. When a project, hearing, or permit appears, it shows up here and on the map.</p>'
@@ -460,6 +552,7 @@ HS.onReady(async function () {
       return;
     }
     if (!items.length && filtersOn) {
+      openPanel();   // filter feedback must be visible
       panel.innerHTML = '<div class="emptycard"><div class="et">No projects match your filters</div>'
         + '<p class="ed">Nothing near ' + HS.esc(place) + ' matches that combination right now. '
         + 'Clear the filters to see everything on the map again.</p>'
@@ -539,6 +632,82 @@ HS.onReady(async function () {
     });
   }
 
+  // ── "Recent Changes" panel (Sprint 7) — the What's-Changed list view. ──────
+  // Entries are the pre-derived changeEntries (real dates only). Clicking one
+  // centers the live map on its pin and opens the EXISTING project panel —
+  // no new page. Area-wide records (no honest point) list below, labeled.
+  function renderChangedList(items, panel, place) {
+    var byId = {};
+    items.forEach(function (it) { byId[it.id] = it; });
+    var mapped = changeEntries.filter(function (e) { return byId[e.id]; });
+    // real recent records with no map point (jurisdiction-wide) — listed, never plotted
+    var areaChg = changeEntries.filter(function (e) { return !byId[e.id] && !(e.item.lat && e.item.lng); });
+
+    function badgeHTML(e) {
+      return e.badges.map(function (b) {
+        return '<span class="cbadge b-' + b.toLowerCase() + '">' + b + '</span>';
+      }).join('');
+    }
+    function entryCard(e, i, attr) {
+      var it = byId[e.id] || e.item;
+      var name = it.name || it.title || '';
+      var letter = it._letter ? '<span class="letter" style="background:' + markerColor(it) + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px" aria-hidden="true">' + it._letter + '</span>&nbsp; ' : '';
+      return '<div class="card mini clickable" ' + attr + '="' + i + '" role="button" tabindex="0" aria-label="' + HS.esc(e.badges.join(', ') + '. ' + name) + '">'
+        + '<span class="lens">' + letter + badgeHTML(e) + '</span>'
+        + '<h3>' + HS.esc(name) + '</h3>'
+        + e.lines.map(function (l) { return '<div class="chgline">' + HS.esc(l) + '</div>'; }).join('')
+        + '</div>';
+    }
+
+    if (!mapped.length && !areaChg.length) {
+      panel.innerHTML = '<div class="emptycard"><div class="et">Nothing has changed near ' + HS.esc(place) + ' in the last ' + CHANGE_DAYS + ' days</div>'
+        + '<p class="ed">No new filings, hearings, or official notices in that window — that\'s worth knowing too. We keep watching the record daily.</p>'
+        + '<button class="btn primary" id="chgShowAll">Show all projects</button></div>';
+      var sa = panel.querySelector('#chgShowAll');
+      if (sa) sa.onclick = function () { setView('all'); };
+      return;
+    }
+
+    var html = '<div class="listhead"><b>' + (mapped.length + areaChg.length) + '</b> change'
+      + (mapped.length + areaChg.length === 1 ? '' : 's') + ' near ' + HS.esc(place) + ' · last ' + CHANGE_DAYS + ' days</div>'
+      + '<p class="chgnote">Drawn from dates on the public record — new filings, scheduled hearings, and official notices. We only show changes the record itself supports.</p>'
+      + '<div class="groupHead" style="margin-top:0">Recent changes</div>'
+      + mapped.map(function (e, i) { return entryCard(e, i, 'data-chg'); }).join('');
+    if (areaChg.length) {
+      html += '<div class="groupHead">Area-wide · affect the whole area</div>'
+        + areaChg.map(function (e, i) { return entryCard(e, i, 'data-chgarea'); }).join('');
+    }
+    panel.innerHTML = html;
+
+    function wire(sel, act) {
+      panel.querySelectorAll(sel).forEach(function (el) {
+        el.addEventListener('click', function () { act(el); });
+        el.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); act(el); } });
+      });
+    }
+    wire('[data-chg]', function (el) {
+      var e = mapped[parseInt(el.getAttribute('data-chg'), 10)]; if (!e) return;
+      var it = byId[e.id];
+      centerOn(it);
+      openItem(it);            // the EXISTING Project Intelligence panel
+    });
+    wire('[data-chgarea]', function (el) {
+      var e = areaChg[parseInt(el.getAttribute('data-chgarea'), 10)];
+      if (e && e.item.source_ref) window.open(e.item.source_ref, '_blank', 'noopener');
+    });
+  }
+
+  // Center the live map on one record's pin (What's-Changed click-through).
+  // The schematic is a fixed home/centroid-anchored projection, so it doesn't
+  // re-anchor — the detail panel still opens there.
+  function centerOn(it) {
+    if (!it || it.lat == null || it.lng == null || opts.mode === 'impact') return;
+    try {
+      if (glMap && glReady && !glFailed) glMap.easeTo({ center: [it.lng, it.lat], duration: 400 });
+      else if (lfMap && !lfFailed) lfMap.panTo([it.lat, it.lng]);
+    } catch (e) { /* centering is best-effort — the panel is the payload */ }
+  }
+
   // The 6-section project information panel (Sprint-1 spec). Every field renders only
   // from the real record; anything the record doesn't state is said to be absent, never guessed.
   function renderDetail(it) {
@@ -565,7 +734,7 @@ HS.onReady(async function () {
     // ── 2) Why this matters (Sprint-3): the four questions, answered ONLY from
     // fields on the record + its matched hearing — derived by the shared
     // evidence-gated backbone (lib/why.js), never from the project type.
-    var wMtg = meetings.find(function (m) { return m.related_project_id === it.id; });
+    var wMtg = HS.bestMeeting(meetings, it.id);   // soonest UPCOMING first, else latest held
     var wd = HS.whyDerive(it, {
       hasHome: hasRealHome,
       homeAddress: hasRealHome ? home.address : null,
@@ -635,7 +804,8 @@ HS.onReady(async function () {
 
     var panel = document.getElementById('infoPanel');
     panel.classList.add('idetail');
-    panel.innerHTML = '<button class="backbtn" id="infoBack" aria-label="Back to all nearby projects">← All nearby projects</button>'
+    var backLabel = opts.view === 'changed' ? '← Recent changes' : '← All nearby projects';
+    panel.innerHTML = '<button class="backbtn" id="infoBack" aria-label="Back to the list">' + backLabel + '</button>'
       + summaryHTML + whyHTML + qolHTML + knowHTML + unknownHTML + timelineHTML + evHTML + partHTML;
     var back = panel.querySelector('#infoBack');
     back.onclick = function () {
@@ -652,7 +822,7 @@ HS.onReady(async function () {
     if (it.submitted_at) out.push({ date: HS.fmtDate(it.submitted_at, { year: 'numeric', month: 'long', day: 'numeric' }), title: 'Filed with the county', link: 'this filing is what put it on your map' });
     else if (it.occurred_at) out.push({ date: HS.fmtDate(it.occurred_at, { year: 'numeric', month: 'long', day: 'numeric' }), title: 'Recorded', link: '' });
     if (it.stage) out.push({ date: it.status ? it.status : 'Current', title: it.stage, link: '' });
-    var mtg = meetings.find(function (m) { return m.related_project_id === it.id; });
+    var mtg = HS.bestMeeting(meetings, it.id);   // soonest UPCOMING first, else latest held
     if (mtg) {
       var d = HS.daysUntil(mtg.starts_at);
       if (d != null && d >= 0) {
@@ -671,6 +841,12 @@ HS.onReady(async function () {
 
   function setGps(items){
     var place = c ? ((HS.isSample && HS.isSample()) ? c.name + ' — (Sample Zip Code)' : c.name + ', ' + c.state) : 'Your area';
+    if (opts.view === 'changed') {
+      gpsEl.textContent = place + ' · ' + items.length + ' recent change' + (items.length === 1 ? '' : 's')
+        + ' on the map · last ' + CHANGE_DAYS + ' days';
+      updateHomePrompt();
+      return;
+    }
     var total = opts.showProjects ? all.length : all.filter(function(x){return !x.type;}).length;
     var txt;
     if (hasRealHome) {
@@ -1022,6 +1198,28 @@ HS.onReady(async function () {
     setActiveMode('impact');
     showSchematic();
   }
+
+  // View toggle: All Projects <-> What's Changed. Switching lands on the new
+  // view's LIST (any open detail closes), and the CI-checked default stays 'all'.
+  function setView(v) {
+    if (opts.view === v) return;
+    opts.view = v;
+    selected = null;
+    var seg = document.getElementById('viewSeg');
+    [].forEach.call(seg.querySelectorAll('button'), function (b) {
+      var on = b.dataset.view === v;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    redraw();
+    // What's Changed opens the Recent Changes slide-over; All Projects returns
+    // to the full, unobstructed map (the whole point of map-first).
+    if (v === 'changed') openPanel(); else closePanel();
+  }
+  document.getElementById('viewSeg').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-view]'); if (!btn) return;
+    setView(btn.dataset.view);
+  });
 
   document.getElementById('mapMode').addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-mode]'); if (!btn) return;

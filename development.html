@@ -137,7 +137,7 @@ HS.onReady(async function () {
     }
     if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button><div class="ph"><h1>We couldn\'t find that record</h1><p>It may have been removed from the county feed, or the link is out of date. Everything currently on record is on the development page.</p></div>'; return; }
     HS.data.meetings(S.zip, home).then(function (meetings) {
-      var mtg = meetings.find(function(m){return m.related_project_id===p.id;});
+      var mtg = HS.bestMeeting(meetings, p.id);   // soonest UPCOMING first, else latest held
       var thread = [
         { date: HS.fmtDate(p.submitted_at, {year:'numeric',month:'long',day:'numeric'}), title: 'Filed with the county', link: 'this filing is what put it on your map' }
       ];

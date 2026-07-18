@@ -93,5 +93,15 @@ test('why-this-matters derivation is evidence-gated', () => {
   const xss = HS.whyDerive({ id: 'x', type: 'T', developer: '<img onerror=1>' }, {});
   assert.doesNotMatch(HS.whyKnowHTML(xss), /<img/, 'record values are escaped');
 
+  // ── bestMeeting: an upcoming hearing is never hidden behind an earlier held one ──
+  const mts = [
+    { related_project_id: 'p', starts_at: past },
+    { related_project_id: 'p', starts_at: future },
+    { related_project_id: 'other', starts_at: future }
+  ];
+  assert.strictEqual(HS.bestMeeting(mts, 'p').starts_at, future, 'upcoming beats earlier held meeting');
+  assert.strictEqual(HS.bestMeeting([mts[0]], 'p').starts_at, past, 'no upcoming -> latest held (history)');
+  assert.strictEqual(HS.bestMeeting(mts, 'zzz'), null, 'no match -> null, never borrowed');
+
   console.log('All why-this-matters gates hold.');
 });
