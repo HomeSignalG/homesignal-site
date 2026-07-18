@@ -35,7 +35,7 @@
         <button data-mode="street">Street</button>
       </div>
       <div class="sp"></div>
-      <button class="fpill" id="radiusPill">◉ Radius: 1.5 mi ▾</button>
+      <button class="fpill" id="radiusPill">◉ Map view: 1.5 mi ▾</button>
       <button class="fpill">All dimensions ▾</button>
     </div>
     <div class="mapcols">
@@ -125,6 +125,11 @@ HS.onReady(async function () {
       if (x.record_kind === 'development') return opts.showProjects;
       return true;   // area / change notices
     });
+    // Reserve up to 4 of the 16 A–P slots for regulated facilities (deduping co-located
+    // same-name registrations into one card first), so a nearby existing condition — e.g.
+    // DALFEN at ~1.5 mi — is never pushed off the default view by closer development
+    // items. Not a filter: it only reorders the first-16 membership (lib/map.js).
+    a = HS.reserveFacilitySlots(a, 16, 4);
     return a.slice(0, 16).map(function(it,i){ return Object.assign({}, it, {_letter: LET[i]}); });
   }
   // NEVER-FAKED rule: only a real signed-in resident home (in THIS ZIP, not the
@@ -165,7 +170,7 @@ HS.onReady(async function () {
         // Facilities share the lettered mini-card, but their eyebrow is program + distance
         // (never a dev status) and their body is the interpreted compliance line (Step 2).
         var eyebrow = isFac
-          ? HS.esc(HS.fac.program(it)) + (it.dist ? ' · ' + HS.esc(it.dist) : '')
+          ? HS.esc(HS.fac.program(it)) + (it.dist ? ' · ' + HS.esc(it.dist) : '') + HS.fac.mergeNote(it)
           : (HS.esc(it.type || it.category || '') + (it.status ? ' · ' + HS.esc(it.status) : '') + (it.dist ? ' · ' + HS.esc(it.dist) : ''));
         var body = isFac ? HS.esc(HS.fac.compliance(it)) : HS.esc(it.sowhat || it.plain_language || '');
         return '<div class="card mini' + (to ? ' clickable" data-pin="' + i : '') + '" style="border-left-color:' + col + '">'
@@ -560,10 +565,15 @@ HS.onReady(async function () {
     drawTiles();
   });
 
+  // "Map view" (not "Radius"): this pill sizes the map's ring + zoom only — it is
+  // DELIBERATELY not a filter on the near-you list or lettered pins (those stay
+  // proximity-ranked + facility-slot-reserved, so a facility at 1.53 mi keeps its slot
+  // at any setting). Do NOT wire this to filter shownItems(): a real radius cut would
+  // drop that reserved facility and undo the slot guarantee. The honest label is why.
   var radii = [0.5,1,1.5,2,3,5], ri = 2;
   document.getElementById('radiusPill').onclick = function () {
     ri = (ri + 1) % radii.length; opts.radiusMi = radii[ri];
-    this.textContent = '◉ Radius: ' + opts.radiusMi + ' mi ▾';
+    this.textContent = '◉ Map view: ' + opts.radiusMi + ' mi ▾';
     if (opts.mode === 'impact') showSchematic(); else drawTiles();
   };
 });

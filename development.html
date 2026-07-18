@@ -71,10 +71,13 @@ HS.onReady(async function () {
     // development / "what's being built" list above. Renders nothing when empty.
     function facSection() {
       if (!facilities || !facilities.length) return '';
+      // Collapse co-located same-name registrations to one card (each keeps a secondary
+      // "N EPA registrations" marker; the merged card's detail lists both records).
+      var facCards = HS.fac.dedupe(facilities);
       return '<div class="ph" style="margin-top:40px"><div class="eyebrow">Regulated facilities nearby</div>'
         + '<h2 style="margin-bottom:2px">EPA/ECHO-registered facilities near this ZIP</h2>'
         + '<p>EPA/ECHO-registered facilities near this ZIP — a factual public-record count, not development and not a verdict on any operator.</p></div>'
-        + '<div class="devgrid">' + facilities.map(HS.tpl.facCard).join('') + '</div>';
+        + '<div class="devgrid">' + facCards.map(HS.tpl.facCard).join('') + '</div>';
     }
     function lens(i,q,d){ return '<button class="lenscard' + (state2.lens===i?' on':'') + '" data-lens="' + i + '"><span class="q">' + q + '</span><span class="d">' + d + '</span></button>'; }
     function seg(k,label){ return '<button class="' + ((state2.sort===k && !state2.dataView)?'on':'') + '" data-sort="' + k + '">' + label + '</button>'; }
@@ -148,20 +151,42 @@ HS.onReady(async function () {
   // Every rendered fact traces to the materialized ECHO/TCEQ record; empty spec rows are
   // omitted, not shown as a dash, and no "clean" standing is ever fabricated.
   function renderFacility(f) {
-    var fenv = f.facility_env || null;
+    // A single physical site can carry more than one EPA (FRS) registration — co-located,
+    // same name, sometimes with DIFFERENT permit statuses. They collapse to ONE dossier,
+    // but BOTH public records stay fully reachable. Rules this encodes:
+    //   • The MOST-ACTIVE registration drives the interpreted bottom line — the dossier
+    //     never implies the whole site is Terminated when one registration is still active.
+    //   • The merge is never hidden: an explicit note + a per-registration list (each with
+    //     its own status and its own ECHO source link) render below, and every registry_id
+    //     is in the specs. A reader can reach EITHER record — neither is dropped.
+    var group = HS.fac.coLocated(f, facilities);
+    if (!group.length) group = [f];
+    var primary = HS.fac.mostActive(group) || f;   // most-active registration = the bottom line
+    var merged = group.length > 1;
+    var fenv = primary.facility_env || null;
     var interp = HS.fac.interpret(fenv);
     var sigs = HS.fac.signals(fenv);
-    var links = HS.fac.links(f);
-    var statutes = ((fenv && fenv.epa && fenv.epa.permits) || [])
-      .map(function(pm){ return pm.statute; }).filter(Boolean)
-      .filter(function(s, i, a){ return a.indexOf(s) === i; });
+    // Permits/statutes: union across every registration at the site (honest completeness).
+    var statutes = [];
+    group.forEach(function(g){
+      (((g.facility_env||{}).epa||{}).permits || []).forEach(function(pm){
+        if (pm.statute && statutes.indexOf(pm.statute) < 0) statutes.push(pm.statute);
+      });
+    });
 
     // Bottom line = what it's permitted to do + current compliance standing (honest
-    // absence for the identity-only majority; never a fabricated clean record).
+    // absence for the identity-only majority; never a fabricated clean record). It reflects
+    // the MOST-ACTIVE registration when the site is a merge.
     var bottom = interp ? HS.esc(interp.line)
       : 'An EPA-registered facility on the public record — compliance status not on record.';
     var caveat = (interp && interp.caveat)
       ? '<p class="sowhat" style="font-style:italic">' + HS.esc(interp.caveat) + '</p>' : '';
+    // Explicit merge note — tells the reader the bottom line is the most-active of several
+    // registrations at this site, and points to the full list below. Never hidden.
+    var mergeLine = merged
+      ? '<p class="sowhat" style="margin-top:6px">This location holds <b>' + group.length
+        + ' EPA registrations</b> — the line above reflects the most active. Each is listed below with its own status and source record.</p>'
+      : '';
     // Current compliance standing detail — the facility analog of a project's impact chips.
     // Rendered ONLY from stored facts; empty when nothing is on record (the bottom line
     // already states that). This is NOT a dated timeline — it is the current snapshot.
@@ -170,20 +195,56 @@ HS.onReady(async function () {
           return '<div class="row"><span>' + (g.tone==='alert'?'⚠':g.tone==='watch'?'◔':'·') + '</span><b>' + HS.esc(g.text) + '</b></div>';
         }).join('') + '</div>'
       : '';
+    // Per-registration list (merge only): each registration's own interpreted status line,
+    // keyed by its registry_id — so BOTH statuses are visible, not just the most-active one.
+    var regsHtml = merged
+      ? '<div class="divider"></div><div class="kicker">EPA registrations at this site</div>'
+        + '<div class="specs" style="margin-top:6px">' + group.map(function(g){
+            var gi = HS.fac.interpret(g.facility_env || null);
+            var line = gi ? gi.line : 'compliance status not on record';
+            return '<div class="row"><span>' + HS.esc(g.registry_id || '—') + '</span><b>' + HS.esc(line) + '</b></div>';
+          }).join('') + '</div>'
+      : '';
 
     // The ECHO DFR / TCEQ record links — the one EPA-link path. "Follow this facility"
-    // mirrors "Follow this project"; project-only actions are omitted (Step 4).
+    // mirrors "Follow this project"; project-only actions are omitted (Step 4). When the
+    // site is a merge, EVERY registration's ECHO record link is offered (labeled with its
+    // status so the two are distinguishable) — a user can reach EITHER record.
+    var links;
+    if (merged) {
+      links = []; var seenUrl = {};
+      group.forEach(function(g){
+        var st = (((g.facility_env||{}).epa||{}).permit_status) || null;
+        HS.fac.links(g).forEach(function(l){
+          if (seenUrl[l.url]) return; seenUrl[l.url] = 1;
+          var label = (/^View EPA source record/.test(l.label) && st)
+            ? 'View EPA source record — ' + st + ' →' : l.label;
+          links.push({ label: label, url: l.url });
+        });
+      });
+    } else {
+      links = HS.fac.links(f);
+    }
     var linksHtml = links.map(function(l){
       return '<button class="btn' + (links[0] === l ? ' primary' : '') + '" onclick="window.open(\'' + HS.esc(l.url) + '\',\'_blank\',\'noopener\')">' + HS.esc(l.label) + '</button>';
     }).join('');
 
-    // Specs — omit any row with no value (honest absence, never a dash — Step 4).
+    // Specs — omit any row with no value (honest absence, never a dash — Step 4). On a
+    // merge, EVERY registry_id is listed (both records stay in the record), and the
+    // compliance-status row shows each registration's status.
+    var ridSpec = merged
+      ? group.map(function(g){ return g.registry_id; }).filter(Boolean).join(', ')
+      : f.registry_id;
+    var statusSpec = merged
+      ? group.map(function(g){ return ((g.facility_env||{}).epa||{}).permit_status; }).filter(Boolean).join(', ')
+      : (interp ? interp.status : '');
+    var tceqRn = (group.map(function(g){ return (g.facility_env||{}).tceq_rn; }).filter(Boolean))[0] || '';
     var specs = specRowOpt('Program', HS.fac.program(f))
-      + specRowOpt('EPA registry (FRS ID)', f.registry_id)
+      + specRowOpt(merged ? 'EPA registries (FRS IDs)' : 'EPA registry (FRS ID)', ridSpec)
       + specRowOpt('Permits on record', statutes.join(', '))
-      + specRowOpt('TCEQ registry (RN)', fenv && fenv.tceq_rn)
+      + specRowOpt('TCEQ registry (RN)', tceqRn)
       + specRowOpt('Distance', f.dist)
-      + specRowOpt('Compliance status', interp ? interp.status : '');
+      + specRowOpt(merged ? 'Compliance statuses' : 'Compliance status', statusSpec);
 
     page.innerHTML =
       '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button>'
@@ -192,7 +253,9 @@ HS.onReady(async function () {
       + '<div class="kicker">The bottom line</div>'
       + '<div class="verdict">' + bottom + '</div>'
       + caveat
+      + mergeLine
       + factsHtml
+      + regsHtml
       + '<p style="font-size:11px;color:var(--ink-3);margin:14px 0 0">Environmental records are geo-matched to this facility, not to a specific parcel. A factual public-record summary — not a verdict on any operator.</p>'
       + '</div>'
       + '<div class="panel side"><div class="kicker">What you can do</div><div class="doact">'

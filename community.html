@@ -96,7 +96,7 @@ HS.onReady(async function () {
   var facHtml = facilities.length
     ? '<div class="groupHead"><span class="gd" style="background:#6f42c1"></span> Regulated facilities nearby <span class="gc">— ' + facTotal + ' on record' + (facTotal > facilities.length ? ' · ' + facilities.length + ' shown' : '') + ' · environmental context</span></div>'
       + '<div class="quiet" style="margin:-2px 0 10px;font-size:12.5px">EPA/ECHO-registered facilities near this ZIP — a factual public-record count, not development and not a verdict on any operator.</div>'
-      + '<div class="devgrid">' + facilities.slice(0,6).map(HS.tpl.facCard).join('') + '</div>'
+      + '<div class="devgrid">' + HS.fac.dedupe(facilities).slice(0,6).map(HS.tpl.facCard).join('') + '</div>'
     : '';
 
   page.innerHTML =
