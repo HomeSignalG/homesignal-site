@@ -6,9 +6,22 @@ on:
       - '**/*.js'
       - '**/*.html'
       - 'test/**'
+      - 'scripts/run-unit-tests.mjs'
+      - 'topics.canon.json'
+      - '.github/workflows/unit-tests.yml'
+  pull_request:
+    paths:
+      - '**/*.js'
+      - '**/*.html'
+      - 'test/**'
+      - 'scripts/run-unit-tests.mjs'
       - 'topics.canon.json'
       - '.github/workflows/unit-tests.yml'
   workflow_dispatch: {}
+
+# Read-only checkout — no elevated permissions required.
+permissions:
+  contents: read
 
 jobs:
   unit:
@@ -18,15 +31,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Landing decision test
-        run: node test/landing.test.mjs
-      - name: Signed-out persona guard test
-        run: node test/signed-out-guard.test.mjs
-      - name: realHome single-source test
-        run: node test/realhome.test.mjs
-      - name: Topic-canon drift test
-        run: node test/topic-canon.test.mjs
-      - name: Email opt-in consent-contract test
-        run: node test/email-optin.test.mjs
-      - name: Facility-slot reservation test
-        run: node test/facility-slots.test.mjs
+      - name: Run all unit regression tests
+        run: node scripts/run-unit-tests.mjs

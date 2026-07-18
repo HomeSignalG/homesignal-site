@@ -74,7 +74,7 @@ first-time confusion.*
 
 | Date | Source | Item | Notes |
 |---|---|---|---|
-| 2026-07-18 | audit | **Sample-community disclosure is subtle on deep links.** Signed-out users who land directly on Alerts/Development see Del Valle sample content; the disclosure lives on the dashboard subline + map chip only. Candidate fix: persistent dismissible sample banner. | The #3 pick from the final pre-launch review. Watch for "why am I seeing Texas?" reports. |
+| 2026-07-18 | audit | **Sample-community disclosure is subtle on deep links.** Signed-out users who land directly on Alerts/Development see Del Valle sample content; the disclosure lives on the dashboard subline + map chip only. Candidate fix: persistent dismissible sample banner. | Phase 2 fixes the "Sample Zip Code" **label** on real ZIP pages (in this changeset). Phase 4 implements NAV-01 session-scoped `?zip=` propagation across shell nav (in this changeset). Watch for "why am I seeing Texas?" reports. |
 | 2026-07-18 | audit | **"0 topics followed" reads stark for new users** on Alerts (strict opt-in is correct behavior; the wording may read as broken). | Watch for confusion reports before rewording. |
 | 2026-07-18 | audit | **Project stage appears in up to four panel sections** (specs, Q3, What-we-know, Timeline). Judged reinforcement, not noise, at launch. | Only act if homeowners call it repetitive. |
 | 2026-07-18 | audit | **Q4 "Can I still participate?" vs the Public Participation section** could read as duplicated on records with no hearing. | Watch. |
@@ -112,6 +112,9 @@ improvements. Requires ≥2 independent homeowner requests to schedule.*
 ---
 
 ## Change log
+- **2026-07-18** — Phases 1–6 launch-readiness batch prepared (trust copy, sample-ZIP labeling,
+  NAV-01 ZIP propagation, homepage copy, CI auto-discovery). Phase 3 analysis:
+  `docs/phase3-navigation-analysis.md`. NAV-01 fixed in Phase 4 (`lib/view-zip.js` + `shell.js`).
 - **2026-07-18** — Document created at beta start. Zero homeowner reports;
   all seeded entries are audit-observed launch leftovers, labeled as such.
 - **2026-07-18** — Sprint 7 ("What's Changed?" map view) built as a
