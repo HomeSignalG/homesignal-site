@@ -42,13 +42,6 @@
           <div class="bt-row"><h2>Action windows</h2><a href="maps.html">Map →</a></div>
           <div id="tdWindows"></div>
         </div>
-        <div class="p2">
-          <div class="p2h"><span>🔒</span> Coming soon</div>
-          <div class="p2sub">More ways HomeSignal will look out for your home.</div>
-          <div class="p2i"><div style="flex:1"><div class="t">Opportunity Center</div><div class="d">Tax exemptions, rebates, grants, insurance savings</div></div></div>
-          <div class="p2i"><div style="flex:1"><div class="t">Financial Intelligence</div><div class="d">Total cost of ownership, equity timeline</div></div></div>
-          <div class="p2i"><div style="flex:1"><div class="t">Home Document Vault</div><div class="d">Deeds, permits, warranties, policies</div></div></div>
-        </div>
       </div>
     </div>
   </div>
@@ -63,9 +56,20 @@
 <script>
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
-  var c = await HS.data.community(S.zip);
-  var changes = await HS.data.changes(S.zip, home);
-  var meetings = await HS.data.meetings(S.zip, home);
+  // Never hang silently: a failed read renders an honest retry state.
+  var c, changes, meetings;
+  try {
+    c = await HS.data.community(S.zip);
+    changes = await HS.data.changes(S.zip, home);
+    meetings = await HS.data.meetings(S.zip, home);
+    if (!c) throw new Error('no community meta for ' + S.zip);
+  } catch (e) {
+    console.warn('[today] data load failed', e);
+    document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load today\'s view</h1>'
+      + '<p>Your connection may have dropped, or our data service is briefly unavailable.</p></div>'
+      + '<button class="btn primary" onclick="location.reload()">Try again</button>';
+    return;
+  }
 
   // greeting
   var name = S.session && S.session.name ? S.session.name.split(' ')[0] : '';

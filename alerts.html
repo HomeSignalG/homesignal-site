@@ -48,8 +48,18 @@
 <script>
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
-  var c = await HS.data.community(S.zip);
-  var all = await HS.data.changes(S.zip, home);
+  // Never hang silently: a failed read renders an honest retry state.
+  var c, all;
+  try {
+    c = await HS.data.community(S.zip);
+    all = await HS.data.changes(S.zip, home);
+  } catch (e) {
+    console.warn('[alerts] data load failed', e);
+    document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load your alerts</h1>'
+      + '<p>Your connection may have dropped, or our data service is briefly unavailable.</p></div>'
+      + '<button class="btn primary" onclick="location.reload()">Try again</button>';
+    return;
+  }
 
   // topic counts
   var cats = HS.data.topicCategories();

@@ -62,10 +62,20 @@
 <script>
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
-  var c = await HS.data.community(S.zip);
-  var projects = await HS.data.projects(S.zip, home);
-  var changes = await HS.data.changes(S.zip, home);
-  var meetings = await HS.data.meetings(S.zip, home);
+  // Never hang silently: a failed read renders an honest retry state.
+  var c, projects, changes, meetings;
+  try {
+    c = await HS.data.community(S.zip);
+    projects = await HS.data.projects(S.zip, home);
+    changes = await HS.data.changes(S.zip, home);
+    meetings = await HS.data.meetings(S.zip, home);
+  } catch (e) {
+    console.warn('[dashboard] data load failed', e);
+    document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load your dashboard</h1>'
+      + '<p>Your connection may have dropped, or our data service is briefly unavailable.</p></div>'
+      + '<button class="btn primary" onclick="location.reload()">Try again</button>';
+    return;
+  }
 
   var name = S.session && S.session.name ? S.session.name.split(' ')[0] : '';
   document.getElementById('dashHi').textContent = name ? 'Welcome back, ' + name : 'Welcome back';

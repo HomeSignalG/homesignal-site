@@ -31,15 +31,26 @@
 <script>
 HS.onReady(async function () {
   var S = HS.state;
-  var changes = await HS.data.changes(S.zip, null);
-  var projects = await HS.data.projects(S.zip, null);
-  var avg = Math.round(S.properties.reduce(function(s,p){return s+(p.score||0);},0) / (S.properties.length||1));
+  // Never hang silently: a failed read renders an honest retry state.
+  var changes, projects;
+  try {
+    changes = await HS.data.changes(S.zip, null);
+    projects = await HS.data.projects(S.zip, null);
+  } catch (e) {
+    console.warn('[properties] data load failed', e);
+    document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load your properties</h1>'
+      + '<p>Your connection may have dropped, or our data service is briefly unavailable.</p></div>'
+      + '<button class="btn primary" onclick="location.reload()">Try again</button>';
+    return;
+  }
+  var avg = S.properties.length
+    ? Math.round(S.properties.reduce(function(s,p){return s+(p.score||0);},0) / S.properties.length) : null;
 
   document.getElementById('propStrip').innerHTML =
     HS.tpl.statTile(S.properties.length, 'Homes followed', '')
     + HS.tpl.statTile(changes.filter(function(x){return HS.daysUntil(x.window_closes_at)>=0;}).length, 'Need you across all homes', 'accent')
     + HS.tpl.statTile(projects.length, 'Nearby projects total', '')
-    + HS.tpl.statTile(avg, 'Avg property score', 'g');
+    + (avg != null ? HS.tpl.statTile(avg, 'Avg property score', 'g') : '');
 
   var tone = { 'Your home':'var(--green)', 'Rental':'var(--amber)', 'Family':'var(--blue)' };
   document.getElementById('propGrid').innerHTML = S.properties.map(function (p) {
