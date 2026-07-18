@@ -87,24 +87,26 @@ HS.onReady(async function () {
   var LET = 'ABCDEFGHIJKLMNOP';
   var FACILITY_HEX = '#6f42c1';   // regulated facilities — distinct from the status pin colors
   var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact' };
-  // Development pins (colored by permit STATUS — HS.mapStatus). Facilities are deliberately NOT concatenated here —
-  // they render in their own labeled layer (facs) so they read as environmental context, never development.
-  var all = changes.filter(function(x){return !x.quiet;}).concat(projects)
+  // Facilities now flow through the SAME lettered-pin + near-you-card workflow as projects
+  // (navigation consistency — no longer a separate purple-square overlay). They join `all`,
+  // interleaved by distance, and are colored purple by the shared statusTier (lib/map.js)
+  // keyed on record_kind. A facility with no coordinate falls out of the mapped/lettered
+  // set exactly like a project without one — honest, no fabricated point.
+  var facMapped = (facilities || []).filter(function(x){return x.lat && x.lng;});
+  var all = changes.filter(function(x){return !x.quiet;}).concat(projects).concat(facMapped)
     .filter(function(x){return x.lat && x.lng;})
     .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
-  var facs = (facilities || []).filter(function(x){return x.lat && x.lng;})
-    .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);}).slice(0, 24);
-  // Sidebar rows list EVERY facility on record (closest-first), not just the mappable
-  // ones — a facility with no stored coordinate still exists and still gets its dossier row.
-  var facRows = (facilities || []).slice()
-    .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
-  if (facs.length) {   // reveal the facilities legend + layer toggle only when there are any
+  if (facMapped.length) {   // reveal the facilities color key + layer toggle only when there are any
     var _lf = document.getElementById('legFacility'); if (_lf) _lf.style.display = '';
     var _lyf = document.getElementById('lyrFacilities'); if (_lyf) _lyf.style.display = '';
   }
 
   function shownItems() {
-    var a = opts.showProjects ? all : all.filter(function(x){return !x.type;});
+    var a = all.filter(function(x){
+      if (x.record_kind === 'facility') return opts.showFacilities;
+      if (x.record_kind === 'development') return opts.showProjects;
+      return true;   // area / change notices
+    });
     return a.slice(0, 16).map(function(it,i){ return Object.assign({}, it, {_letter: LET[i]}); });
   }
   // NEVER-FAKED rule: only a real signed-in resident home (in THIS ZIP, not the
@@ -114,7 +116,7 @@ HS.onReady(async function () {
   // No hardcoded fallback coordinates — a wrong-state anchor is worse than none.
   var hasRealHome = !!HS.realHome();
   var cCentroid = (c && c.lat != null && c.lng != null) ? { lat: c.lat, lng: c.lng } : null;
-  var center = (hasRealHome ? home : null) || cCentroid || all[0] || facs[0] || null;
+  var center = (hasRealHome ? home : null) || cCentroid || all[0] || facMapped[0] || null;
 
   // Area-wide notices: REAL records with no parcel point (jurisdiction-level
   // planning/civic items). They have no honest map position, so they are LISTED,
@@ -132,6 +134,7 @@ HS.onReady(async function () {
   // projects -> their detail page; changes -> the related project's detail, else the
   // official record. Items with no destination stay non-clickable (honest, not dead).
   function pinHref(it) {
+    if (it.record_kind === 'facility') return { url: 'development.html?id=' + encodeURIComponent(it.id), ext: false };
     if (it.type) return { url: 'development.html?id=' + encodeURIComponent(it.id), ext: false };
     if (it.related_project_id) return { url: 'development.html?id=' + encodeURIComponent(it.related_project_id), ext: false };
     if (it.source_ref) return { url: it.source_ref, ext: true };
@@ -141,12 +144,18 @@ HS.onReady(async function () {
     var html =
       '<div class="groupHead" style="margin-top:0">Near you · closest first</div>'
       + items.map(function (it, i) {
-        var col = tierHex(it), to = pinHref(it), st = it.status ? HS.esc(it.status) : '';
+        var col = tierHex(it), to = pinHref(it), isFac = it.record_kind === 'facility';
+        // Facilities share the lettered mini-card, but their eyebrow is program + distance
+        // (never a dev status) and their body is the interpreted compliance line (Step 2).
+        var eyebrow = isFac
+          ? HS.esc(HS.fac.program(it)) + (it.dist ? ' · ' + HS.esc(it.dist) : '')
+          : (HS.esc(it.type || it.category || '') + (it.status ? ' · ' + HS.esc(it.status) : '') + (it.dist ? ' · ' + HS.esc(it.dist) : ''));
+        var body = isFac ? HS.esc(HS.fac.compliance(it)) : HS.esc(it.sowhat || it.plain_language || '');
         return '<div class="card mini' + (to ? ' clickable" data-pin="' + i : '') + '" style="border-left-color:' + col + '">'
           + '<span class="lens"><span class="letter" style="background:' + col + '">' + it._letter + '</span>&nbsp; '
-          + HS.esc(it.type || it.category || '') + (st ? ' · ' + st : '') + (it.dist ? ' · ' + HS.esc(it.dist) : '') + '</span>'
+          + eyebrow + '</span>'
           + '<h3>' + HS.esc(it.name || it.title) + '</h3>'
-          + '<p class="sowhat">' + HS.esc(it.sowhat || it.plain_language || '') + '</p></div>';
+          + '<p class="sowhat">' + body + '</p></div>';
       }).join('');
     // Area-wide notices ride BELOW the lettered pins: real records, no map letter,
     // clearly labeled as applying to the whole area (never plotted at a fake point).
@@ -160,30 +169,10 @@ HS.onReady(async function () {
             + '<p class="sowhat">' + HS.esc(it.plain_language || '') + '</p></div>';
         }).join('');
     }
-    // Regulated facilities — the THIRD entity type, own section (never folded into the
-    // A–P development list: a facility is an existing condition, not activity — spec §6).
-    // Closest-first; each row routes into the facility DOSSIER (development.html?id=),
-    // never straight to ECHO. Empty state is said out loud, not left blank.
-    html += '<div class="groupHead">Regulated facilities · nearby</div>';
-    if (facRows.length) {
-      html += facRows.map(function (f, i) {
-        var interp = HS.fac.interpret(f.facility_env || null);
-        return '<div class="card mini clickable" data-fac="' + i + '" style="border-left-color:' + FACILITY_HEX + '">'
-          + '<span class="lens">' + HS.esc(f.type || 'Regulated facility') + (f.dist ? ' · ' + HS.esc(f.dist) : '') + '</span>'
-          + '<h3>' + HS.esc(f.name) + '</h3>'
-          + '<p class="sowhat">' + HS.esc(interp ? interp.line : 'Permit status not yet confirmed — open the facility record.') + '</p></div>';
-      }).join('');
-    } else {
-      html += '<div class="card mini" style="border-left-color:' + FACILITY_HEX + '">'
-        + '<p class="sowhat">No regulated facilities on record near this ZIP.</p></div>';
-    }
+    // Facilities are no longer a separate section — they ride in the lettered "Near you"
+    // list above, interleaved by distance with projects (navigation consistency). Their
+    // purple pin/letter keys to their card, which opens the same detail page.
     document.getElementById('pinList').innerHTML = html;
-    document.querySelectorAll('#pinList [data-fac]').forEach(function (el) {
-      el.addEventListener('click', function () {
-        var f = facRows[parseInt(el.getAttribute('data-fac'), 10)];
-        if (f) location.href = 'development.html?id=' + encodeURIComponent(f.id);
-      });
-    });
     document.querySelectorAll('#pinList [data-pin]').forEach(function (el) {
       el.addEventListener('click', function () {
         var to = pinHref(items[parseInt(el.getAttribute('data-pin'), 10)]); if (!to) return;
@@ -199,14 +188,14 @@ HS.onReady(async function () {
   }
   function setGps(items){
     var place = c ? ((HS.isSample && HS.isSample()) ? c.name + ' — (Sample Zip Code)' : c.name + ', ' + c.state) : 'Your area';
-    var total = opts.showProjects ? all.length : all.filter(function(x){return !x.type;}).length;
+    var total = opts.showProjects ? all.length : all.filter(function(x){return x.record_kind!=='development';}).length;
     var txt;
     if (hasRealHome) {
       // Distances exist only from a real home in this ZIP — count against ALL
       // mapped records, not just the 16 shown (the old chip undercounted).
       // Name the logged address the radius is measured from, so "within N mi"
       // is anchored to a stated home, not an unexplained symbol.
-      var pool = opts.showProjects ? all : all.filter(function(x){return !x.type;});
+      var pool = opts.showProjects ? all : all.filter(function(x){return x.record_kind!=='development';});
       var within = pool.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;
       txt = within + ' within ' + opts.radiusMi + ' mi of ' + home.address;
     } else {
@@ -244,7 +233,7 @@ HS.onReady(async function () {
     document.getElementById('lyrProjects').onclick = function(){ opts.showProjects=!opts.showProjects; redraw(); };
     document.getElementById('lyrRadius').onclick = function(){ opts.showRadius=!opts.showRadius; redraw(); };
     var lyf = document.getElementById('lyrFacilities');
-    if (lyf && facs.length) {
+    if (lyf && facMapped.length) {
       lyf.classList.toggle('off', !opts.showFacilities);
       lyf.onclick = function(){ opts.showFacilities=!opts.showFacilities; redraw(); };
     }
@@ -258,40 +247,8 @@ HS.onReady(async function () {
       home: center, items: items, radiusMi: opts.radiusMi, showRadius: opts.showRadius,
       showHome: hasRealHome, homeLabel: hasRealHome ? home.address : '', w: 780, h: 520
     });
-    overlayFacilities(document.getElementById('mapSch'));
     setGps(items); renderPins(items);
     wirePanel(function(){ if (opts.mode==='impact') drawSchematic(); else drawTiles(); });
-  }
-
-  // Overlay regulated facilities onto the schematic SVG as distinct purple squares
-  // (labeled "Regulated facility" in the legend). Same projection the MapProvider uses,
-  // so they sit correctly relative to home. Kept separate from the impact pins above.
-  function overlayFacilities(el){
-    if (!opts.showFacilities || !facs.length) return;
-    var svg = el && el.querySelector('svg'); if (!svg) return;
-    // Facilities slot in UNDER the home mark (drawn last by MapProvider) so the
-    // resident's own home is never buried by a nearby facility square.
-    var homeG = svg.querySelector('.hs-home');
-    var put = function(node){ if (homeG) svg.insertBefore(node, homeG); else svg.appendChild(node); };
-    var w=780, h=520, cx=w/2, cy=h/2, radiusPx=Math.min(w,h)*0.29, pxPerMile=radiusPx/opts.radiusMi;
-    var hLat=center.lat, hLng=center.lng, NS='http://www.w3.org/2000/svg';
-    facs.forEach(function(f){
-      var north=(f.lat-hLat)*69, east=(f.lng-hLng)*69*Math.cos(hLat*Math.PI/180);
-      var x=Math.max(20,Math.min(w-20, cx+east*pxPerMile)), y=Math.max(20,Math.min(h-20, cy-north*pxPerMile));
-      var rect=document.createElementNS(NS,'rect');
-      rect.setAttribute('x',x-7); rect.setAttribute('y',y-7); rect.setAttribute('width',14); rect.setAttribute('height',14);
-      rect.setAttribute('rx',3); rect.setAttribute('fill',FACILITY_HEX); rect.setAttribute('stroke','#fff'); rect.setAttribute('stroke-width',3);
-      var t=document.createElementNS(NS,'title');
-      t.textContent = f.name + ' · Regulated facility' + (f.dist?' · '+f.dist:'');
-      rect.appendChild(t);
-      // The marker opens the HomeSignal facility dossier (the interpreted panel); the
-      // official ECHO/TCEQ record links live inside the dossier, never on the pin itself.
-      var a=document.createElementNS(NS,'a');
-      var dossier='development.html?id='+encodeURIComponent(f.id);
-      a.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href',dossier);
-      a.setAttribute('href',dossier);
-      a.appendChild(rect); put(a);
-    });
   }
 
   // ---------- MapLibre (real tiles: Esri World Imagery + OSM) ----------
@@ -326,14 +283,7 @@ HS.onReady(async function () {
       el.style.cssText='width:26px;height:26px;border-radius:50%;background:'+col+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font:700 12px/1 sans-serif;cursor:pointer';
       el.textContent=it._letter;
       glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([it.lng,it.lat])
-        .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(itemPopupHTML(it))).addTo(glMap));
-    });
-    // Regulated facilities — a DISTINCT layer (purple squares), env context, not development.
-    if (opts.showFacilities) facs.forEach(function(f){
-      var el=document.createElement('div');
-      el.style.cssText='width:20px;height:20px;border-radius:3px;background:'+FACILITY_HEX+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer';
-      glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([f.lng,f.lat])
-        .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(facPopupHTML(f))).addTo(glMap));
+        .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(it.record_kind==='facility'?facPopupHTML(it):itemPopupHTML(it))).addTo(glMap));
     });
   }
   // Shared popup bodies — used by BOTH tile engines (MapLibre + the Leaflet fallback).
@@ -466,11 +416,7 @@ HS.onReady(async function () {
     items.forEach(function(it){
       var col=tierHex(it);
       lfMarkers.push(L.marker([it.lat,it.lng],{icon:lfDivIcon('<div style="width:26px;height:26px;border-radius:50%;background:'+col+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font:700 12px/1 sans-serif;cursor:pointer">'+it._letter+'</div>',26)})
-        .bindPopup(itemPopupHTML(it),{maxWidth:260}).addTo(lfMap));
-    });
-    if (opts.showFacilities) facs.forEach(function(f){
-      lfMarkers.push(L.marker([f.lat,f.lng],{icon:lfDivIcon('<div style="width:20px;height:20px;border-radius:3px;background:'+FACILITY_HEX+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer"></div>',20)})
-        .bindPopup(facPopupHTML(f),{maxWidth:260}).addTo(lfMap));
+        .bindPopup(it.record_kind==='facility'?facPopupHTML(it):itemPopupHTML(it),{maxWidth:260}).addTo(lfMap));
     });
   }
   function lfFail(){
@@ -575,7 +521,7 @@ HS.onReady(async function () {
   // initial view: REAL tiles for covered ZIPs that have something to plot (Del Valle
   // 78617 / state pass ZIPs) — MapLibre when WebGL works, Leaflet rasters otherwise.
   // The impact diagram is the empty-page default and the final fallback.
-  if (all.length || facs.length) {
+  if (all.length || facMapped.length) {
     setActiveMode('satellite');
     drawTiles();
   } else {

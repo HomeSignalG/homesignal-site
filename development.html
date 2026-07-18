@@ -74,17 +74,7 @@ HS.onReady(async function () {
       return '<div class="ph" style="margin-top:40px"><div class="eyebrow">Regulated facilities nearby</div>'
         + '<h2 style="margin-bottom:2px">EPA/ECHO-registered facilities near this ZIP</h2>'
         + '<p>EPA/ECHO-registered facilities near this ZIP — a factual public-record count, not development and not a verdict on any operator.</p></div>'
-        + '<div class="devgrid">' + facilities.map(facCard).join('') + '</div>';
-    }
-    function facCard(f) {
-      // Routes into the facility dossier (the interpreted panel) — the official ECHO/TCEQ
-      // record links live THERE, so the dossier is the one EPA-link path (spec §3/§7).
-      var interp = HS.fac.interpret(f.facility_env || null);
-      return '<div class="card clickable" style="border-left-color:var(--ink-3)" onclick="location.href=\'development.html?id=' + encodeURIComponent(f.id) + '\'">'
-        + '<span class="lens">' + HS.esc(f.type || 'Regulated facility') + (f.dist ? ' · ' + HS.esc(f.dist) : '') + '</span>'
-        + '<h3>' + HS.esc(f.name) + '</h3>'
-        + '<p class="sowhat">' + HS.esc(interp ? interp.line : 'Permit status not yet confirmed — open the facility record.') + '</p>'
-        + '</div>';
+        + '<div class="devgrid">' + facilities.map(HS.tpl.facCard).join('') + '</div>';
     }
     function lens(i,q,d){ return '<button class="lenscard' + (state2.lens===i?' on':'') + '" data-lens="' + i + '"><span class="q">' + q + '</span><span class="d">' + d + '</span></button>'; }
     function seg(k,label){ return '<button class="' + ((state2.sort===k && !state2.dataView)?'on':'') + '" data-sort="' + k + '">' + label + '</button>'; }
@@ -145,66 +135,75 @@ HS.onReady(async function () {
         + '</div>' + (p.approx ? '<p style="font-size:11px;color:var(--ink-3);margin:12px 0 0">Some specifics are prototype placeholders pending the live feed — see the source record.</p>' : '') + '</div></div>';
     });
   }
-  // Facility dossier (spec §7) — Identity / Interpreted status / Permit history /
-  // Enforcement & compliance / Source. Every rendered field traces to the materialized
-  // ECHO/TCEQ record (app_projects.registry_id + facility_env); absent stays absent and
-  // is SAID to be absent, never guessed. Enforcement zeros render as a positive signal
-  // ONLY while compliance tracking is on (§5) — otherwise the tracking-off caveat shows.
+  // Facility detail — the SAME page/layout as a project detail (renderDetail), branched
+  // on record_kind='facility'. It reuses the identical section scaffold — header "How
+  // this affects you", THE BOTTOM LINE, WHAT YOU CAN DO, THE SPECS — so a facility
+  // navigates and reads exactly like a project. Two deliberate differences, both honest:
+  //   • THE STORY SO FAR timeline is OMITTED — the ingest stores NO dated facility events
+  //     (only a single action_year on ~5% of rows), so there is no dated history to show.
+  //     A follow-up ingest (ECHO get_dfr) is tracked to fill it; until then the slot is
+  //     omitted, never faked. (Data-depth report, this build.)
+  //   • Project-only actions (Submit a public comment / Add hearing to calendar) are NOT
+  //     rendered — there is no hearing for an operating facility (Step 4).
+  // Every rendered fact traces to the materialized ECHO/TCEQ record; empty spec rows are
+  // omitted, not shown as a dash, and no "clean" standing is ever fabricated.
   function renderFacility(f) {
     var fenv = f.facility_env || null;
     var interp = HS.fac.interpret(fenv);
     var sigs = HS.fac.signals(fenv);
     var links = HS.fac.links(f);
-    var permits = (fenv && fenv.epa && fenv.epa.permits) || [];
-    var statutes = permits.map(function(pm){ return pm.statute; }).filter(Boolean)
+    var statutes = ((fenv && fenv.epa && fenv.epa.permits) || [])
+      .map(function(pm){ return pm.statute; }).filter(Boolean)
       .filter(function(s, i, a){ return a.indexOf(s) === i; });
 
-    var statusHtml = interp
-      ? '<div class="verdict">' + HS.esc(interp.line) + '</div>'
-        + (interp.caveat ? '<p class="sowhat" style="font-style:italic">' + HS.esc(interp.caveat) + '</p>' : '')
-      : '<div class="verdict">Permit status not yet confirmed for this facility.</div>'
-        + '<p class="sowhat">EPA lists this facility in its registry, but its permit status isn\'t in our archived record yet — see the official source below.</p>';
+    // Bottom line = what it's permitted to do + current compliance standing (honest
+    // absence for the identity-only majority; never a fabricated clean record).
+    var bottom = interp ? HS.esc(interp.line)
+      : 'An EPA-registered facility on the public record — compliance status not on record.';
+    var caveat = (interp && interp.caveat)
+      ? '<p class="sowhat" style="font-style:italic">' + HS.esc(interp.caveat) + '</p>' : '';
+    // Current compliance standing detail — the facility analog of a project's impact chips.
+    // Rendered ONLY from stored facts; empty when nothing is on record (the bottom line
+    // already states that). This is NOT a dated timeline — it is the current snapshot.
+    var factsHtml = sigs.length
+      ? '<div class="specs" style="margin-top:10px">' + sigs.map(function(g){
+          return '<div class="row"><span>' + (g.tone==='alert'?'⚠':g.tone==='watch'?'◔':'·') + '</span><b>' + HS.esc(g.text) + '</b></div>';
+        }).join('') + '</div>'
+      : '';
 
-    var permitsHtml = permits.length
-      ? permits.map(function(pm){
-          var bits = [pm.npdes_id, pm.type, pm.status].filter(Boolean).map(HS.esc);
-          return '<div class="row"><span>' + HS.esc(pm.statute || 'Permit') + '</span><b>' + bits.join(' · ') + '</b></div>';
-        }).join('')
-      : '<p class="sowhat">No individual permit records in the archived report.</p>';
-
-    var enfHtml = sigs.length
-      ? sigs.map(function(g){ return '<div class="row"><span>' + (g.tone === 'alert' ? '⚠' : g.tone === 'watch' ? '◔' : '·') + '</span><b>' + HS.esc(g.text) + '</b></div>'; }).join('')
-      : (interp && interp.tracking === false
-          ? '<p class="sowhat">' + HS.esc(interp.caveat) + '</p>'
-          : '<p class="sowhat">No enforcement or compliance entries in the archived record.</p>');
-
+    // The ECHO DFR / TCEQ record links — the one EPA-link path. "Follow this facility"
+    // mirrors "Follow this project"; project-only actions are omitted (Step 4).
     var linksHtml = links.map(function(l){
       return '<button class="btn' + (links[0] === l ? ' primary' : '') + '" onclick="window.open(\'' + HS.esc(l.url) + '\',\'_blank\',\'noopener\')">' + HS.esc(l.label) + '</button>';
     }).join('');
 
+    // Specs — omit any row with no value (honest absence, never a dash — Step 4).
+    var specs = specRowOpt('Program', HS.fac.program(f))
+      + specRowOpt('EPA registry (FRS ID)', f.registry_id)
+      + specRowOpt('Permits on record', statutes.join(', '))
+      + specRowOpt('TCEQ registry (RN)', fenv && fenv.tceq_rn)
+      + specRowOpt('Distance', f.dist)
+      + specRowOpt('Compliance status', interp ? interp.status : '');
+
     page.innerHTML =
       '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button>'
-      + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">Regulated facility <span class="status active">Operating</span></div>'
-      + '<h1 style="margin-bottom:2px">' + HS.esc(f.name) + '</h1>'
-      + '<p style="margin:6px 0 0">An existing regulated facility on the public record — environmental context, not development activity.</p></div>'
+      + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">' + HS.esc(f.name) + ' <span class="status active">Regulated facility</span></div><h1 style="margin-bottom:2px">How this affects you</h1></div>'
       + '<div class="detail"><div class="panel">'
-      + '<div class="kicker">Interpreted status</div>'
-      + statusHtml
-      + '<div class="divider"></div><div class="kicker">Permit history</div><div class="specs">' + permitsHtml + '</div>'
-      + '<div class="divider"></div><div class="kicker">Enforcement & compliance</div><div class="specs">' + enfHtml + '</div>'
-      + '<p style="font-size:11px;color:var(--ink-3);margin:12px 0 0">Environmental records are geo-matched to this facility, not to a specific parcel. A factual public-record summary — not a verdict on any operator.</p>'
+      + '<div class="kicker">The bottom line</div>'
+      + '<div class="verdict">' + bottom + '</div>'
+      + caveat
+      + factsHtml
+      + '<p style="font-size:11px;color:var(--ink-3);margin:14px 0 0">Environmental records are geo-matched to this facility, not to a specific parcel. A factual public-record summary — not a verdict on any operator.</p>'
       + '</div>'
-      + '<div class="panel side"><div class="kicker">Identity</div><div class="specs">'
-      + specRow('Facility', f.name) + specRow('Type', f.type)
-      + specRow('FRS Registry ID', f.registry_id)
-      + specRow('Statutes', statutes.join(', '))
-      + specRow('TCEQ RN', fenv && fenv.tceq_rn)
-      + specRow('Registry', f.developer) + specRow('Distance', f.dist)
-      + '</div>'
-      + '<div class="divider"></div><div class="kicker">Source — official records</div><div class="doact">' + linksHtml + '</div>'
+      + '<div class="panel side"><div class="kicker">What you can do</div><div class="doact">'
+      + linksHtml
+      + '<button class="btn ghost" onclick="HS.toggleFollow(this,\'facility\',\'' + f.id + '\')">Follow this facility</button></div>'
+      + '<div class="divider"></div><div class="kicker">The specs</div><div class="specs">' + specs + '</div>'
       + '</div></div>';
   }
   function specRow(k,v){ return '<div class="row"><span>' + HS.esc(k) + '</span><b>' + HS.esc(v||'—') + '</b></div>'; }
+  // Facility spec rows omit entirely when empty (no dead dash) — Step 4 honest absence.
+  function specRowOpt(k,v){ v = (v==null?'':String(v)).trim(); return v ? ('<div class="row"><span>' + HS.esc(k) + '</span><b>' + HS.esc(v) + '</b></div>') : ''; }
 });
 
 // simple .ics generator for "Add hearing to calendar"

@@ -88,15 +88,15 @@ HS.onReady(async function () {
 
   // Guardrail #3: EPA/ECHO regulated facilities render in their OWN clearly-labeled section —
   // never under Development / what's changing. Factual public-record count, not a verdict.
+  // Facilities render via the SHARED facility card (HS.tpl.facCard) — same interpreted
+  // compliance line + same internal dossier route (development.html?id=) as every other
+  // surface, so a facility navigates identically everywhere. (Previously this hand-rolled
+  // a card with a raw "Operating" label + an external record link — the one divergent
+  // facility surface; consolidated here.) Purple key comes from the shared card.
   var facHtml = facilities.length
-    ? '<div class="groupHead"><span class="gd" style="background:#3f7fb0"></span> Regulated facilities nearby <span class="gc">— ' + facTotal + ' on record' + (facTotal > facilities.length ? ' · ' + facilities.length + ' shown' : '') + ' · environmental context</span></div>'
+    ? '<div class="groupHead"><span class="gd" style="background:#6f42c1"></span> Regulated facilities nearby <span class="gc">— ' + facTotal + ' on record' + (facTotal > facilities.length ? ' · ' + facilities.length + ' shown' : '') + ' · environmental context</span></div>'
       + '<div class="quiet" style="margin:-2px 0 10px;font-size:12.5px">EPA/ECHO-registered facilities near this ZIP — a factual public-record count, not development and not a verdict on any operator.</div>'
-      + facilities.slice(0,6).map(function(f){
-          return '<div class="card mini" style="border-left-color:#3f7fb0;margin-bottom:10px">'
-            + '<span class="lens">Operating' + (f.dist? ' · ' + HS.esc(f.dist):'') + '</span><h3>' + HS.esc(f.name) + '</h3>'
-            + '<p class="sowhat">' + HS.esc(f.type||'Regulated facility') + (f.developer? ' · ' + HS.esc(f.developer):'') + '</p>'
-            + (f.source_ref? '<a href="' + HS.esc(f.source_ref) + '" target="_blank" rel="noopener" style="font-size:12.5px;font-weight:600">View public record →</a>':'') + '</div>';
-        }).join('')
+      + '<div class="devgrid">' + facilities.slice(0,6).map(HS.tpl.facCard).join('') + '</div>'
     : '';
 
   page.innerHTML =
