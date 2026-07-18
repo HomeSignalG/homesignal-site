@@ -16,6 +16,110 @@
   @media(max-width:900px){ #mapgl,#maplf{height:60vw;min-height:320px} }
   .maplibregl-popup-content{font-family:var(--font);font-size:13px;border-radius:10px;padding:9px 12px}
   .leaflet-popup-content{font-family:var(--font);font-size:13px}
+
+  /* ── Sprint-1 map MVP: top filters (Projects / Quality of Life) ── */
+  .fwrap{position:relative}
+  .fpill.act{border-color:var(--green);color:var(--green);background:var(--green-tint)}
+  .fpill .fct{display:inline-flex;min-width:16px;height:16px;padding:0 4px;margin-left:5px;border-radius:999px;
+    background:var(--green);color:#fff;font-size:10.5px;font-weight:700;align-items:center;justify-content:center}
+  .fmenu{position:absolute;top:calc(100% + 7px);right:0;z-index:20;min-width:230px;background:#fff;border:1px solid var(--line);
+    border-radius:12px;box-shadow:var(--shadow);padding:9px;max-height:340px;overflow:auto}
+  .fmenu[hidden]{display:none}
+  .fmenu .fh{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);padding:4px 8px 7px}
+  .fmenu label{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink);padding:7px 8px;border-radius:8px;cursor:pointer}
+  .fmenu label:hover{background:var(--line-2)}
+  .fmenu label input{accent-color:var(--green);width:15px;height:15px}
+  .fmenu label .sg{margin-left:auto;opacity:.85}
+  .fmenu .fnote{font-size:11px;color:var(--ink-3);padding:6px 8px 2px;line-height:1.4}
+  .fmenu .fclear{width:100%;margin-top:6px;font-size:12px;font-weight:600;color:var(--green);background:var(--green-tint);
+    border:1px solid #cbe7d5;border-radius:8px;padding:8px}
+
+  /* ── type-shape legend row (shape = project type) ── */
+  .shapeleg{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-2)}
+  .shrow{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--ink);margin-bottom:7px}
+  /* app.css has `.mapwrap svg{width:100%}` for the schematic map; the small inline glyph
+     SVGs in the legend/filter menus live inside .mapwrap too, so pin them to intrinsic size. */
+  #shapeLegend svg,.fmenu svg{width:auto;height:auto;flex:none}
+
+  /* ── right INFORMATION panel (list ⇄ 6-section detail), stays on the map ── */
+  .pinlist{max-height:none}
+  .listhead{font-size:12.5px;color:var(--ink-3);margin:0 4px 12px}
+  .listhead b{color:var(--ink)}
+  .card.mini.clickable{transition:transform .08s ease,box-shadow .12s ease}
+  .card.mini.sel{box-shadow:0 0 0 2px var(--green);transform:none}
+  .idetail .backbtn{margin-bottom:14px}
+  .idetail .isum{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow-sm)}
+  .idetail .isum h2{font-size:19px;margin:6px 0 6px;letter-spacing:-.01em}
+  .idetail .isum .lead{font-size:13.5px;line-height:1.5;color:var(--ink-2);margin:0}
+  .isec{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow-sm);margin-top:12px}
+  .isec > h4{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin:0 0 11px}
+  .qolgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .qcell{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:#fbfcfb}
+  .qcell.on{border-color:#cbe7d5;background:var(--green-tint)}
+  .qcell .qn{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--ink)}
+  .qcell .qn .qd{width:9px;height:9px;border-radius:50%;background:var(--line);flex:none}
+  .qcell.on .qn .qd{background:var(--green-2)}
+  .qcell .qs{font-size:11px;color:var(--ink-3);margin-top:3px}
+  .qcell.on .qs{color:var(--green)}
+  .ihint{font-size:11px;color:var(--ink-3);margin:11px 0 0;line-height:1.45}
+  .specs.tight .row{padding:6px 0;font-size:12.5px}
+  .partcard{border:1px solid #f0dcbd;background:var(--amber-tint);border-radius:11px;padding:13px 14px;margin-bottom:11px}
+  .partcard .pt{font-size:13.5px;font-weight:700;color:var(--ink)}
+  .partcard .pd{font-size:12px;color:var(--ink-2);margin-top:3px}
+  .idetail .doact{margin-top:2px}
+  @media(max-width:900px){ .fmenu{right:auto;left:0} }
+
+  /* ── Sprint-2 polish: readability & rhythm ── */
+  .ph p{line-height:1.55;max-width:640px}
+  .listhead{color:var(--ink-2);line-height:1.5}
+  .card.mini .sowhat{line-height:1.5}
+  .idetail .isum .lead{line-height:1.55}
+  .ihint,.fmenu .fnote{color:var(--ink-2);font-size:11.5px}
+  .isec{padding:17px 18px 15px}
+  .isec + .isec,.isum + .isec{margin-top:13px}
+  .qcell .qs{font-size:11.5px}
+  .mgps{max-width:min(72%,460px);line-height:1.4}
+
+  /* ── loading skeletons (shown until the first real render replaces them) ── */
+  .skl{height:11px;border-radius:6px;background:linear-gradient(90deg,var(--line-2) 25%,#f7f9f7 45%,var(--line-2) 65%);
+    background-size:200% 100%;animation:hsShimmer 1.3s linear infinite;margin-bottom:9px}
+  .skl.w40{width:40%} .skl.w70{width:70%} .skl.w90{width:90%}
+  .skl.hd{height:14px;width:55%;margin:2px 0 14px}
+  @keyframes hsShimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+  .maploading{position:absolute;inset:0;display:grid;place-items:center;z-index:4;
+    font-size:13px;font-weight:600;color:var(--ink-2);background:rgba(244,246,244,.6)}
+
+  /* ── empty / notice cards in the info panel ── */
+  .emptycard{background:#fff;border:1px dashed var(--line);border-radius:14px;padding:22px 18px;text-align:center}
+  .emptycard .et{font-size:14.5px;font-weight:700;margin-bottom:6px}
+  .emptycard .ed{font-size:12.5px;color:var(--ink-2);line-height:1.5;margin:0 0 12px}
+  .emptycard .btn{display:inline-flex}
+
+  /* ── marker clarity: hover/focus emphasis on tile-map pins ── */
+  .hspin{transition:transform .1s ease}
+  .hspin:hover,.hspin:focus-visible{transform:scale(1.18);z-index:6;position:relative}
+
+  /* ── mobile: legend collapses to a pill so it doesn't bury the map ── */
+  .legbtn{display:none}
+  @media(max-width:700px){
+    .legbtn{display:inline-flex;position:absolute;top:12px;left:12px;z-index:7;align-items:center;gap:6px;
+      background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 13px;
+      font:600 12px/1 var(--font);color:var(--ink);box-shadow:var(--shadow-sm);cursor:pointer}
+    .mpanel{display:none}
+    .mpanel.open{display:block;max-height:70%;overflow:auto;top:48px}
+    #mapHomePrompt{top:auto !important;bottom:52px}
+    .toolbar{gap:7px}
+    .idetail .isum h2{font-size:17.5px}
+  }
+
+  /* ── accessibility: visible focus + calmer motion when asked ── */
+  .fpill:focus-visible,.legbtn:focus-visible,.card.mini[tabindex]:focus-visible,.lyr:focus-visible,
+  .backbtn:focus-visible,.fmenu .fclear:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:9px}
+  @media(prefers-reduced-motion:reduce){
+    .card.mini.clickable,.card.clickable,.hspin{transition:none}
+    .hspin:hover,.hspin:focus-visible{transform:none}
+    .skl{animation:none}
+  }
 </style>
 </head>
 <body data-nav="maps">
@@ -26,7 +130,7 @@
       <h1>What's changing around you</h1>
       <!-- The "which address is this about" line (#phWhere) is injected here by
            the SHARED shell.js::HS.paintWhereLine — one component for every page. -->
-      <p>Every project near your home, placed on the map and colored by its permit status. Area-wide notices — which apply to the whole area, not one address — are listed beside the map.</p>
+      <p>Every project near your home, placed on the map — <b>shape shows the project type, color shows its permit status</b>. Pick any project for the full picture: why it's here, its quality-of-life impacts, timeline, evidence, and how to weigh in.</p>
     </div>
     <div class="toolbar">
       <div class="seg" id="mapMode">
@@ -35,35 +139,51 @@
         <button data-mode="street">Street</button>
       </div>
       <div class="sp"></div>
+      <div class="fwrap">
+        <button class="fpill" id="projFilterPill" aria-haspopup="true" aria-expanded="false">◈ Projects ▾</button>
+        <div class="fmenu" id="projMenu" hidden></div>
+      </div>
+      <div class="fwrap">
+        <button class="fpill" id="qolFilterPill" aria-haspopup="true" aria-expanded="false">❋ Quality of Life ▾</button>
+        <div class="fmenu" id="qolMenu" hidden></div>
+      </div>
       <button class="fpill" id="radiusPill">◉ Map view: 1.5 mi ▾</button>
-      <button class="fpill">All dimensions ▾</button>
     </div>
     <div class="mapcols">
       <div class="mapwrap" id="mapWrap">
         <div id="mapSch"></div>
         <div id="mapgl" style="display:none"></div>
         <div id="maplf" style="display:none"></div>
-        <div class="mpanel">
+        <div class="maploading" id="mapLoading">Finding what’s near you…</div>
+        <button class="legbtn" id="legToggle" type="button" aria-expanded="false" aria-controls="mapLegend">◧ Legend</button>
+        <div class="mpanel" id="mapLegend">
           <!-- HONEST LEGEND (2026-07-16 audit): colors encode PERMIT STATUS — the only
-               per-record fact the data carries. The old "impact" tiers were a
-               status->constant lookup; the red "High impact" row could never appear. -->
-          <div class="mt">Pins colored by permit status</div>
+               per-record fact the data carries. Shapes encode project TYPE (Sprint-1). -->
+          <div class="mt">Status — pin color</div>
           <div class="legrow"><span class="ld" style="background:#c47a1a"></span> Proposed</div>
           <div class="legrow"><span class="ld" style="background:#3f7fb0"></span> Approved</div>
           <div class="legrow"><span class="ld" style="background:#1f9d5c"></span> Operating / built</div>
           <div class="legrow" id="legFacility" style="display:none"><span class="ld" style="background:#6f42c1;border-radius:2px"></span> Regulated facility</div>
+          <div class="shapeleg" id="shapeLegWrap" style="display:none">
+            <div class="mt">Type — pin shape</div>
+            <div id="shapeLegend"></div>
+          </div>
           <div class="layers">
-            <div class="mt">Layers</div>
+            <div class="mt">Show on Map</div>
             <div class="lyr" id="lyrProjects"><span>Projects</span><span class="tg"></span></div>
             <div class="lyr" id="lyrFacilities" style="display:none"><span>Regulated facilities</span><span class="tg"></span></div>
             <div class="lyr" id="lyrRadius"><span>Radius ring</span><span class="tg"></span></div>
-            <div class="lyr off" title="Available when flood data is ingested for this community"><span>Flood zones</span><span class="tg"></span></div>
-            <div class="lyr off" title="Available when school data is ingested for this community"><span>Schools</span><span class="tg"></span></div>
           </div>
         </div>
-        <div class="mgps" id="mapGps"></div>
+        <div class="mgps" id="mapGps" role="status"></div>
       </div>
-      <div class="pinlist" id="pinList"></div>
+      <div class="pinlist" id="infoPanel" aria-live="polite">
+        <!-- loading skeleton — replaced by the first real render -->
+        <div class="skl hd"></div>
+        <div class="card mini"><div class="skl w40"></div><div class="skl w90"></div><div class="skl w70"></div></div>
+        <div class="card mini"><div class="skl w40"></div><div class="skl w90"></div><div class="skl w70"></div></div>
+        <div class="card mini"><div class="skl w40"></div><div class="skl w70"></div><div class="skl w90"></div></div>
+      </div>
     </div>
   </div>
 </template>
@@ -74,19 +194,46 @@
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="lib/data.js"></script>
 <script src="lib/templates.js"></script>
+<script src="lib/why.js"></script>
 <script src="lib/map.js"></script>
 <script src="shell.js"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
-  var c = await HS.data.community(S.zip);
-  var projects = await HS.data.projects(S.zip, home);       // DEVELOPMENT only (permits / planning)
-  var changes = await HS.data.changes(S.zip, home);
-  var facilities = await HS.data.facilities(S.zip, home);   // EPA/ECHO regulated facilities — own layer, env context
+  // Load everything the page needs up front, but NEVER hang on the skeleton: a failed
+  // read renders an honest "couldn't load" state with a retry, not a frozen shimmer.
+  var c = null, projects = [], changes = [], facilities = [], meetings = [];
+  try {
+    c = await HS.data.community(S.zip);
+    projects = await HS.data.projects(S.zip, home);         // DEVELOPMENT only (permits / planning)
+    changes = await HS.data.changes(S.zip, home);
+    facilities = await HS.data.facilities(S.zip, home);     // EPA/ECHO regulated facilities — own layer, env context
+    meetings = await HS.data.meetings(S.zip, home);         // for a project's Timeline + Public Participation
+  } catch (e) {
+    console.warn('[maps] data load failed', e);
+    var ml0 = document.getElementById('mapLoading');
+    if (ml0) ml0.textContent = 'The map can’t load right now.';
+    document.getElementById('infoPanel').innerHTML =
+      '<div class="emptycard"><div class="et">We couldn’t load what’s near you</div>'
+      + '<p class="ed">Your connection may have dropped, or our data service is briefly unavailable. Nothing is wrong with your account.</p>'
+      + '<button class="btn primary" onclick="location.reload()">Try again</button></div>';
+    return;
+  }
 
   var LET = 'ABCDEFGHIJKLMNOP';
   var FACILITY_HEX = '#6f42c1';   // regulated facilities — distinct from the status pin colors
-  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact' };
+  // opts.types / opts.qol are the top-of-page filters (null/empty = show everything,
+  // so a signed-out default load is byte-identical to the pre-Sprint page the verifier checks).
+  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact', types: null, qol: null };
+  var selected = null;   // the project currently expanded in the right info panel (null = list view)
+  var lastItems = [];    // most recent lettered set, so panel re-renders without a map redraw
+
+  // Distinct real project types + which pin-shapes appear, for the Projects filter + shape legend.
+  var PROJECT_TYPES = projects.map(function (p) { return p.type; })
+    .filter(function (t, i, a) { return t && a.indexOf(t) === i; }).sort();
+  var shapesPresent = {};
+  projects.forEach(function (p) { shapesPresent[HS.projectShape(p)] = 1; });
+
   // Development pins (colored by permit STATUS — HS.mapStatus). Facilities are deliberately NOT concatenated here —
   // they render in their own labeled layer (facs) so they read as environmental context, never development.
   var all = changes.filter(function(x){return !x.quiet;}).concat(projects)
@@ -102,9 +249,48 @@ HS.onReady(async function () {
     var _lf = document.getElementById('legFacility'); if (_lf) _lf.style.display = '';
     var _lyf = document.getElementById('lyrFacilities'); if (_lyf) _lyf.style.display = '';
   }
+  buildShapeLegend();
+  buildFilters();
+
+  // Mobile: the legend/layers panel collapses behind a "Legend" pill so it never
+  // buries the map on a small screen (desktop shows it inline as before).
+  var legBtn = document.getElementById('legToggle'), legPanel = document.getElementById('mapLegend');
+  if (legBtn && legPanel) legBtn.onclick = function () {
+    var open = legPanel.classList.toggle('open');
+    legBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+  // Keyboard: Escape closes an open filter menu first; a second Escape (or the first,
+  // with no menu open) backs out of the project detail to the list.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var menuOpen = ['projMenu', 'qolMenu'].some(function (id) {
+      var m = document.getElementById(id); return m && !m.hasAttribute('hidden');
+    });
+    if (menuOpen) { closeAllMenus(); return; }
+    if (selected) { var bk = document.getElementById('infoBack'); if (bk) bk.click(); }
+  });
+  // The first real render replaces the loading states (skeleton panel + map veil).
+  function clearLoading() {
+    var ml = document.getElementById('mapLoading'); if (ml) ml.remove();
+  }
+
+  // Top-of-page filters. Empty/absent = pass everything (default), so nothing narrows
+  // until the resident opts in — and a QoL/Type dimension a record doesn't flag stays
+  // absent (never inferred from the project type). anti-fabrication.
+  function passType(it) {
+    if (!opts.types || !opts.types.size) return true;
+    return !!(it.type && opts.types.has(it.type));
+  }
+  function passQol(it) {
+    if (!opts.qol || !opts.qol.size) return true;
+    var q = HS.qolOf(it);
+    var hit = false; opts.qol.forEach(function (cat) { if (q[cat]) hit = true; });
+    return hit;
+  }
 
   function shownItems() {
     var a = opts.showProjects ? all : all.filter(function(x){return !x.type;});
+    a = a.filter(function (x) { return passType(x) && passQol(x); });
     // Facilities reserve a FLOOR of lettered slots (min(4,#facs)) so the closest
     // regulated facilities are always surfaced alongside development — de-duped, cap 16.
     var facPins = opts.showFacilities ? facs : [];
@@ -125,51 +311,189 @@ HS.onReady(async function () {
   }
   // NEVER-FAKED rule: only a real signed-in resident home (in THIS ZIP, not the
   // Del Valle sample) may be pinned as "Your home" or used as the viewport anchor.
-  // For everyone else the ZIP centroid (app_community_meta.lat/lng, pinned to the
-  // USPS dataset) centers the viewport; first mapped record is the last resort.
-  // No hardcoded fallback coordinates — a wrong-state anchor is worse than none.
   var hasRealHome = !!HS.realHome();
   var cCentroid = (c && c.lat != null && c.lng != null) ? { lat: c.lat, lng: c.lng } : null;
   var center = (hasRealHome ? home : null) || cCentroid || all[0] || facs[0] || null;
 
   // Area-wide notices: REAL records with no parcel point (jurisdiction-level
-  // planning/civic items). They have no honest map position, so they are LISTED,
-  // never plotted — inventing a point would fabricate a location.
+  // planning/civic items). They have no honest map position, so they are LISTED, never plotted.
   var area = changes.filter(function(x){ return !x.quiet && !(x.lat && x.lng); })
     .sort(function(a,b){ return String(b.occurred_at||'').localeCompare(String(a.occurred_at||'')); })
     .slice(0, 8);
 
   function tierHex(it){ return HS.mapStatus(it).hex; }
+  function itemShape(it){ return it._facility ? 'square' : HS.projectShape(it); }
+  function markerColor(it){ return it._facility ? FACILITY_HEX : tierHex(it); }
 
-  var panelHTML = document.querySelector('.mpanel').outerHTML;
   var gpsEl = document.getElementById('mapGps');
 
-  // Route a pin-list card the same way cards navigate everywhere else (no dead clicks):
-  // projects -> their detail page; changes -> the related project's detail, else the
-  // official record. Items with no destination stay non-clickable (honest, not dead).
+  // ---------------- shape legend + filters (built once after data load) ------
+  function buildShapeLegend() {
+    var present = Object.keys(shapesPresent);
+    if (!present.length) return;
+    var wrap = document.getElementById('shapeLegWrap');
+    var box = document.getElementById('shapeLegend');
+    box.innerHTML = HS.SHAPE_LEGEND.filter(function (s) { return shapesPresent[s.shape]; })
+      .map(function (s) {
+        return '<div class="shrow">' + HS.markerSVG(s.shape, '#6b7f76', '', 16) + '<span>' + HS.esc(s.label) + '</span></div>';
+      }).join('');
+    wrap.style.display = '';
+  }
+
+  function buildFilters() {
+    // Projects (by type) — real types present in this ZIP's data.
+    var projMenu = document.getElementById('projMenu');
+    var projPill = document.getElementById('projFilterPill');
+    if (!PROJECT_TYPES.length) {
+      projPill.style.opacity = '.5'; projPill.title = 'No project records to filter for this area yet';
+    } else {
+      projMenu.innerHTML = '<div class="fh">Show project types</div>'
+        + PROJECT_TYPES.map(function (t) {
+            return '<label><input type="checkbox" data-type="' + HS.esc(t) + '">'
+              + HS.markerSVG(HS.projectShape({ type: t }), '#6b7f76', '', 15)
+              + '<span>' + HS.esc(t) + '</span></label>';
+          }).join('')
+        + '<button class="fclear" id="projClear" type="button">Show all types</button>';
+    }
+    // Quality of Life (Air/Water/Soil/Noise/Light) — narrows to records that FLAG the
+    // dimension; Soil/Noise/Light rarely carry data yet, so those act as UI-only today.
+    var qolMenu = document.getElementById('qolMenu');
+    qolMenu.innerHTML = '<div class="fh">Quality-of-life lens</div>'
+      + HS.QOL.map(function (q) {
+          return '<label><input type="checkbox" data-qol="' + q + '"><span>' + q + '</span>'
+            + '<span class="sg" style="color:var(--ink-3);font-size:11px">' + qolCount(q) + '</span></label>';
+        }).join('')
+      + '<div class="fnote">Shows only projects whose public record notes that impact. If it\'s not on record, we don\'t guess.</div>'
+      + '<button class="fclear" id="qolClear" type="button">Clear lens</button>';
+
+    // popover open/close (one at a time; outside-click closes)
+    wireMenu(projPill, projMenu);
+    wireMenu(qolPillWire(), qolMenu);
+
+    projMenu.addEventListener('change', function (e) {
+      var cb = e.target.closest('input[data-type]'); if (!cb) return;
+      opts.types = opts.types || new Set();
+      if (cb.checked) opts.types.add(cb.getAttribute('data-type')); else opts.types.delete(cb.getAttribute('data-type'));
+      refreshFilterPills(); redraw();
+    });
+    qolMenu.addEventListener('change', function (e) {
+      var cb = e.target.closest('input[data-qol]'); if (!cb) return;
+      opts.qol = opts.qol || new Set();
+      if (cb.checked) opts.qol.add(cb.getAttribute('data-qol')); else opts.qol.delete(cb.getAttribute('data-qol'));
+      refreshFilterPills(); redraw();
+    });
+    var pc = document.getElementById('projClear');
+    if (pc) pc.onclick = function () { opts.types = null; [].forEach.call(projMenu.querySelectorAll('input'), function(i){i.checked=false;}); refreshFilterPills(); redraw(); };
+    document.getElementById('qolClear').onclick = function () { opts.qol = null; [].forEach.call(qolMenu.querySelectorAll('input'), function(i){i.checked=false;}); refreshFilterPills(); redraw(); };
+  }
+  function qolPillWire(){ return document.getElementById('qolFilterPill'); }
+  function qolCount(cat) {
+    var n = all.filter(function (x) { return HS.qolOf(x)[cat]; }).length;
+    return n ? n + '' : '—';
+  }
+  function wireMenu(pill, menu) {
+    pill.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = menu.hasAttribute('hidden');
+      closeAllMenus();
+      if (open) { menu.removeAttribute('hidden'); pill.setAttribute('aria-expanded', 'true'); }
+    });
+    menu.addEventListener('click', function (e) { e.stopPropagation(); });
+  }
+  function closeAllMenus() {
+    ['projMenu', 'qolMenu'].forEach(function (id) { var m = document.getElementById(id); if (m) m.setAttribute('hidden', ''); });
+    ['projFilterPill', 'qolFilterPill'].forEach(function (id) { var p = document.getElementById(id); if (p) p.setAttribute('aria-expanded', 'false'); });
+  }
+  document.addEventListener('click', closeAllMenus);
+  function refreshFilterPills() {
+    var pn = opts.types ? opts.types.size : 0, qn = opts.qol ? opts.qol.size : 0;
+    var pp = document.getElementById('projFilterPill'), qp = document.getElementById('qolFilterPill');
+    pp.classList.toggle('act', !!pn);
+    pp.innerHTML = '◈ Projects' + (pn ? ' <span class="fct">' + pn + '</span>' : '') + ' ▾';
+    qp.classList.toggle('act', !!qn);
+    qp.innerHTML = '❋ Quality of Life' + (qn ? ' <span class="fct">' + qn + '</span>' : '') + ' ▾';
+  }
+  // Redraw the map in whatever mode is active (filters/toggles changed).
+  function redraw() { if (opts.mode === 'impact') drawSchematic(); else drawTiles(); }
+
+  // ---------------- RIGHT INFO PANEL: list ⇄ 6-section project detail --------
+  function renderInfo(items) { clearLoading(); lastItems = items; if (selected) renderDetail(selected); else renderList(items); }
+  function selectItem(it) {
+    if (!it) return; selected = it; renderDetail(it);
+    var p = document.getElementById('infoPanel'); if (!p) return;
+    p.scrollTop = 0;
+    // On a phone the panel sits BELOW the map — bring it into view so a pin tap
+    // visibly responds instead of updating content off-screen.
+    if (window.matchMedia && window.matchMedia('(max-width: 900px)').matches) {
+      p.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+  // A lettered REGULATED FACILITY routes to its dossier (an existing condition, not a
+  // development "project"), so it never opens the project-framed 6-section panel.
+  function openItem(it) { if (!it) return; if (it._facility) { location.href = 'development.html?id=' + encodeURIComponent(it.id); return; } selectItem(it); }
+  function clearSelection() { selected = null; renderInfo(lastItems); }
+
   function pinHref(it) {
     if (it.type) return { url: 'development.html?id=' + encodeURIComponent(it.id), ext: false };
     if (it.related_project_id) return { url: 'development.html?id=' + encodeURIComponent(it.related_project_id), ext: false };
     if (it.source_ref) return { url: it.source_ref, ext: true };
     return null;
   }
-  function renderPins(items) {
-    var html =
-      '<div class="groupHead" style="margin-top:0">Near you · closest first</div>'
+
+  // Default state: the nearby-projects list. Selecting a card (or a pin) opens the
+  // 6-section detail IN THIS PANEL — the resident never leaves the map.
+  function renderList(items) {
+    var place = c ? c.name : 'your area';
+    var filtersOn = (opts.types && opts.types.size) || (opts.qol && opts.qol.size);
+    var panel = document.getElementById('infoPanel');
+    panel.classList.remove('idetail');
+
+    // Honest, friendly EMPTY STATES (never a blank column):
+    //  a) nothing on record at all for this area;
+    //  b) the resident's filters match nothing — offer a one-tap way back.
+    if (!items.length && !filtersOn && !all.length && !facRows.length && !area.length) {
+      panel.innerHTML = '<div class="emptycard"><div class="et">Nothing on the public record near here yet</div>'
+        + '<p class="ed">We check official county and permit records for ' + HS.esc(place)
+        + ' continuously. When a project, hearing, or permit appears, it shows up here and on the map.</p>'
+        + '<button class="btn primary" onclick="HS.addHome ? HS.addHome() : HS.openLoc()">'
+        + (hasRealHome ? 'Check a different area' : 'Add your home to watch this area') + '</button></div>';
+      return;
+    }
+    if (!items.length && filtersOn) {
+      panel.innerHTML = '<div class="emptycard"><div class="et">No projects match your filters</div>'
+        + '<p class="ed">Nothing near ' + HS.esc(place) + ' matches that combination right now. '
+        + 'Clear the filters to see everything on the map again.</p>'
+        + '<button class="btn primary" id="emptyClear">Show everything</button></div>';
+      var ec = panel.querySelector('#emptyClear');
+      if (ec) ec.onclick = function () {
+        opts.types = null; opts.qol = null;
+        ['projMenu', 'qolMenu'].forEach(function (id) {
+          var m = document.getElementById(id); if (m) [].forEach.call(m.querySelectorAll('input'), function (i) { i.checked = false; });
+        });
+        refreshFilterPills(); redraw();
+      };
+      return;
+    }
+
+    var html = '<div class="listhead">'
+      + (filtersOn ? '<b>' + items.length + '</b> of ' + all.length + ' nearby projects match your filters.'
+                   : 'Showing <b>' + items.length + '</b> project' + (items.length === 1 ? '' : 's') + ' near ' + HS.esc(place) + '.')
+      + ' Select one for the full picture.</div>'
+      + '<div class="groupHead" style="margin-top:0">Near you · closest first</div>'
       + items.map(function (it, i) {
-        var col = tierHex(it), to = pinHref(it), st = it.status ? HS.esc(it.status) : '';
-        return '<div class="card mini' + (to ? ' clickable" data-pin="' + i : '') + '" style="border-left-color:' + col + '">'
-          + '<span class="lens"><span class="letter" style="background:' + col + '">' + it._letter + '</span>&nbsp; '
+        var col = markerColor(it), st = it.status ? HS.esc(it.status) : '';
+        var aria = HS.esc((it.name || it.title || '') + '. ' + (it.type || it.category || '') + (st ? ', ' + st : '') + (it.dist ? ', ' + it.dist + ' away' : ''));
+        return '<div class="card mini clickable" data-pin="' + i + '" role="button" tabindex="0" aria-label="' + aria + '" style="border-left-color:' + col + '">'
+          + '<span class="lens"><span class="letter" style="background:' + col + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px" aria-hidden="true">' + it._letter + '</span>&nbsp; '
           + HS.esc(it.type || it.category || '') + (st ? ' · ' + st : '') + (it.dist ? ' · ' + HS.esc(it.dist) : '') + '</span>'
           + '<h3>' + HS.esc(it.name || it.title) + '</h3>'
           + '<p class="sowhat">' + HS.esc(it.sowhat || it.plain_language || '') + '</p></div>';
       }).join('');
-    // Area-wide notices ride BELOW the lettered pins: real records, no map letter,
-    // clearly labeled as applying to the whole area (never plotted at a fake point).
+    // Area-wide notices — real records, no map letter, whole-area (never plotted at a fake point).
     if (area.length) {
-      html += '<div class="groupHead">Area-wide notices · whole area, not one address</div>'
+      html += '<div class="groupHead">Area-wide notices · affect the whole area</div>'
         + area.map(function (it, i) {
-          return '<div class="card mini' + (it.source_ref ? ' clickable" data-area="' + i : '') + '" style="border-left-color:#6b7f76">'
+          return '<div class="card mini' + (it.source_ref ? ' clickable" role="button" tabindex="0" data-area="' + i : '') + '" style="border-left-color:#6b7f76">'
             + '<span class="lens">' + HS.esc(it.category || 'Notice')
             + (it.occurred_at ? ' · ' + HS.esc(String(it.occurred_at).slice(0, 10)) : '') + '</span>'
             + '<h3>' + HS.esc(it.title || '') + '</h3>'
@@ -177,11 +501,7 @@ HS.onReady(async function () {
         }).join('');
     }
     // Regulated facilities — the THIRD entity type, own section (never folded into the
-    // A–P development list: a facility is an existing condition, not activity — spec §6).
-    // Closest-first; each row routes into the facility DOSSIER (development.html?id=),
-    // never straight to ECHO. Empty state is said out loud, not left blank.
-    // Facilities that earned a letter in the list above are not repeated here (no
-    // double-listing); the section lists only the remaining on-record facilities.
+    // A–P development list). Facilities that earned a letter above are not repeated here.
     var letteredFacIds = {};
     items.forEach(function (it) { if (it._facility && it.id != null) letteredFacIds[it.id] = 1; });
     var sectionFacs = facRows.filter(function (f) { return !(f.id != null && letteredFacIds[f.id]); });
@@ -189,61 +509,182 @@ HS.onReady(async function () {
     if (sectionFacs.length) {
       html += sectionFacs.map(function (f, i) {
         var interp = HS.fac.interpret(f.facility_env || null);
-        return '<div class="card mini clickable" data-fac="' + i + '" style="border-left-color:' + FACILITY_HEX + '">'
+        return '<div class="card mini clickable" data-fac="' + i + '" role="button" tabindex="0" aria-label="' + HS.esc(f.name + '. Regulated facility' + (f.dist ? ', ' + f.dist + ' away' : '')) + '" style="border-left-color:' + FACILITY_HEX + '">'
           + '<span class="lens">' + HS.esc(f.type || 'Regulated facility') + (f.dist ? ' · ' + HS.esc(f.dist) : '') + '</span>'
           + '<h3>' + HS.esc(f.name) + '</h3>'
           + '<p class="sowhat">' + HS.esc(interp ? interp.line : 'Permit status not yet confirmed — open the facility record.') + '</p></div>';
       }).join('');
     } else {
       html += '<div class="card mini" style="border-left-color:' + FACILITY_HEX + '">'
-        + '<p class="sowhat">No regulated facilities on record near this ZIP.</p></div>';
+        + '<p class="sowhat">Good news for this lens: no regulated industrial facilities are on the public record near this area.</p></div>';
     }
-    document.getElementById('pinList').innerHTML = html;
-    document.querySelectorAll('#pinList [data-fac]').forEach(function (el) {
-      el.addEventListener('click', function () {
-        var f = sectionFacs[parseInt(el.getAttribute('data-fac'), 10)];
-        if (f) location.href = 'development.html?id=' + encodeURIComponent(f.id);
+    panel.innerHTML = html;
+    // Click + keyboard (Enter/Space) — every card is reachable and operable without a mouse.
+    function actAll(sel, act) {
+      panel.querySelectorAll(sel).forEach(function (el) {
+        el.addEventListener('click', function () { act(el); });
+        el.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(el); }
+        });
       });
+    }
+    actAll('[data-pin]', function (el) { openItem(items[parseInt(el.getAttribute('data-pin'), 10)]); });
+    actAll('[data-fac]', function (el) {
+      var f = sectionFacs[parseInt(el.getAttribute('data-fac'), 10)];
+      if (f) location.href = 'development.html?id=' + encodeURIComponent(f.id);
     });
-    document.querySelectorAll('#pinList [data-pin]').forEach(function (el) {
-      el.addEventListener('click', function () {
-        var to = pinHref(items[parseInt(el.getAttribute('data-pin'), 10)]); if (!to) return;
-        if (to.ext) window.open(to.url, '_blank', 'noopener'); else location.href = to.url;
-      });
-    });
-    document.querySelectorAll('#pinList [data-area]').forEach(function (el) {
-      el.addEventListener('click', function () {
-        var it = area[parseInt(el.getAttribute('data-area'), 10)];
-        if (it && it.source_ref) window.open(it.source_ref, '_blank', 'noopener');
-      });
+    actAll('[data-area]', function (el) {
+      var it = area[parseInt(el.getAttribute('data-area'), 10)];
+      if (it && it.source_ref) window.open(it.source_ref, '_blank', 'noopener');
     });
   }
+
+  // The 6-section project information panel (Sprint-1 spec). Every field renders only
+  // from the real record; anything the record doesn't state is said to be absent, never guessed.
+  function renderDetail(it) {
+    var title = it.name || it.title || 'Project';
+    var typeLabel = it.type || it.category || 'Record';
+    var status = it.status || '';
+    var statusClass = status === 'Active' || status === 'Operating' || status === 'Built' ? 'active'
+      : status === 'Approved' ? 'appr' : status === 'Proposed' ? 'prop' : '';
+    var summary = it.sowhat || it.plain_language || 'On file with the county — see the official record below.';
+
+    // ── 1) Project Summary
+    var specs = [['Developer / applicant', it.developer], ['Size', it.size], ['Investment', it.investment],
+      ['Jobs', it.jobs], ['Stage', it.stage], ['Distance', it.dist]]
+      .filter(function (r) { return r[1]; })
+      .map(function (r) { return '<div class="row"><span>' + HS.esc(r[0]) + '</span><b>' + HS.esc(r[1]) + '</b></div>'; }).join('');
+    var summaryHTML = '<div class="isum">'
+      + '<span class="lens"><span class="letter" style="background:' + markerColor(it) + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px">' + (it._letter || '•') + '</span>&nbsp; '
+      + HS.esc(typeLabel) + (it.dist ? ' · ' + HS.esc(it.dist) : '') + (status ? ' <span class="status ' + statusClass + '">' + HS.esc(status) + '</span>' : '') + '</span>'
+      + '<h2>' + HS.esc(title) + '</h2>'
+      + '<p class="lead">' + HS.esc(summary) + '</p>'
+      + (specs ? '<div class="specs tight" style="margin-top:12px">' + specs + '</div>' : '')
+      + '</div>';
+
+    // ── 2) Why this matters (Sprint-3): the four questions, answered ONLY from
+    // fields on the record + its matched hearing — derived by the shared
+    // evidence-gated backbone (lib/why.js), never from the project type.
+    var wMtg = meetings.find(function (m) { return m.related_project_id === it.id; });
+    var wd = HS.whyDerive(it, {
+      hasHome: hasRealHome,
+      homeAddress: hasRealHome ? home.address : null,
+      place: c ? c.name : null,
+      radiusMi: opts.radiusMi,
+      meeting: wMtg
+    });
+    var whyHTML = '<div class="isec"><h4>Why this matters</h4>' + HS.whyQaHTML(wd) + '</div>';
+    var knowHTML = '<div class="isec"><h4>What we know</h4>' + HS.whyKnowHTML(wd) + '</div>';
+    var unknownHTML = '<div class="isec"><h4>What we don\'t know yet</h4>' + HS.whyUnknownHTML(wd) + '</div>';
+
+    // ── 3) Potential Quality of Life Impacts (Air / Water / Soil / Noise / Light)
+    var q = HS.qolOf(it);
+    var qolHTML = '<div class="isec"><h4>Potential quality-of-life impacts</h4><div class="qolgrid">'
+      + HS.QOL.map(function (cat) {
+          var dim = q[cat], on = !!dim;
+          var sub = on ? (HS.esc(dim.label || cat) + (dim.dir === 'down' ? ' ↓' : ' ↑')) : 'Not noted in the public record';
+          return '<div class="qcell' + (on ? ' on' : '') + '"><div class="qn"><span class="qd"></span>' + cat + '</div><div class="qs">' + sub + '</div></div>';
+        }).join('')
+      + '</div>';
+    // Other recorded effects that aren't one of the five QoL lenses (traffic, tax base, value…)
+    var others = (it.impact_dimensions || it.impacts || []).filter(function (d) { return !anyQol(d); });
+    if (others.length) qolHTML += '<div style="margin-top:11px">' + HS.tpl.impactChips(others) + '</div>';
+    var anyFlagged = Object.keys(q).length;
+    qolHTML += '<p class="ihint">' + (anyFlagged
+      ? 'These are the impacts this project\'s own public record calls out — a quick read, not the fine print. The official record has the specifics.'
+      : 'This project\'s public record doesn\'t call out quality-of-life impacts yet. We only show what\'s actually on file — we never guess from the project type.') + '</p></div>';
+
+    // ── 4) Timeline
+    var thread = buildTimeline(it);
+    var timelineHTML = '<div class="isec"><h4>Timeline</h4>'
+      + (thread.length ? '<div class="thread">' + HS.tpl.thread(thread) + '</div>' : '<p class="ihint">No dated steps on the public record yet — the timeline fills in as the county publishes them.</p>') + '</div>';
+
+    // ── 5) Evidence
+    var evParts = '';
+    if (it.source_ref) evParts += '<button class="btn primary" onclick="window.open(\'' + HS.esc(it.source_ref) + '\',\'_blank\',\'noopener\')">View the official record ▸</button>';
+    var full = pinHref(it);
+    if (full && !full.ext) evParts += '<button class="btn" onclick="location.href=\'' + HS.esc(full.url) + '\'">See the full project page →</button>';
+    if (!evParts) evParts = '<p class="ihint">This item doesn\'t link to an online record yet — it was reported through an official feed that doesn\'t publish a web page for it.</p>';
+    var evHTML = '<div class="isec"><h4>Evidence</h4><div class="doact">' + evParts + '</div>'
+      + '<p class="ihint">Every item on this map traces to a public record — HomeSignal reports the fact and the link, never a verdict.'
+      + (it.approx ? ' Some details are still preliminary while county records sync — the official record is the source of truth.' : '') + '</p></div>';
+
+    // ── 6) Public Participation (actions for the same matched hearing that
+    // answered "Can I still participate?" above — one source, no drift).
+    // A hearing whose date has PASSED is history, not an opportunity: it never
+    // renders as an actionable card (it stays visible in the Timeline instead).
+    var mtg = (wMtg && new Date(wMtg.starts_at) > new Date()) ? wMtg : null;
+    var partHTML = '<div class="isec"><h4>Public participation</h4>';
+    if (mtg) {
+      var d = HS.daysUntil(mtg.starts_at);
+      partHTML += '<div class="partcard"><div class="pt">' + HS.esc(mtg.title || 'Public hearing')
+        + (d != null && d >= 0 ? ' · ' + (d === 0 ? 'today' : 'in ' + d + ' day' + (d === 1 ? '' : 's')) : '') + '</div>'
+        + '<div class="pd">' + HS.esc(HS.fmtDate(mtg.starts_at, { year: 'numeric', month: 'long', day: 'numeric' }))
+        + (mtg.location ? ' · ' + HS.esc(mtg.location) : '') + '</div></div>'
+        + '<div class="doact">'
+        + (it.source_ref ? '<button class="btn primary" onclick="window.open(\'' + HS.esc(it.source_ref) + '\',\'_blank\',\'noopener\')">Submit a public comment</button>' : '')
+        + '<button class="btn" onclick="mapAddToCalendar(\'' + HS.esc(it.id) + '\')">Add hearing to calendar</button>'
+        + '<button class="btn ghost" onclick="HS.toggleFollow(this,\'project\',\'' + HS.esc(it.id) + '\')">Follow this project</button></div>';
+    } else {
+      partHTML += '<p class="ihint" style="margin-top:0">No hearing is scheduled yet. Follow this project and we\'ll tell you the moment a public comment window opens.</p>'
+        + '<div class="doact">'
+        + (it.source_ref ? '<button class="btn" onclick="window.open(\'' + HS.esc(it.source_ref) + '\',\'_blank\',\'noopener\')">Contact the agency / read the record</button>' : '')
+        + '<button class="btn ghost" onclick="HS.toggleFollow(this,\'' + (it.type ? 'project' : 'change') + '\',\'' + HS.esc(it.id) + '\')">Follow this project</button></div>';
+    }
+    partHTML += '</div>';
+
+    var panel = document.getElementById('infoPanel');
+    panel.classList.add('idetail');
+    panel.innerHTML = '<button class="backbtn" id="infoBack" aria-label="Back to all nearby projects">← All nearby projects</button>'
+      + summaryHTML + whyHTML + qolHTML + knowHTML + unknownHTML + timelineHTML + evHTML + partHTML;
+    var back = panel.querySelector('#infoBack');
+    back.onclick = function () {
+      panel.classList.remove('idetail'); clearSelection();
+      // hand focus back to the card that was open, so keyboard users don't lose their place
+      var again = panel.querySelector('[data-pin]'); if (again) again.focus({ preventScroll: true });
+    };
+    back.focus({ preventScroll: true });   // detail opened: focus starts at the way back
+  }
+
+  // Timeline milestones derived ONLY from real dates on the record + a matched hearing.
+  function buildTimeline(it) {
+    var out = [];
+    if (it.submitted_at) out.push({ date: HS.fmtDate(it.submitted_at, { year: 'numeric', month: 'long', day: 'numeric' }), title: 'Filed with the county', link: 'this filing is what put it on your map' });
+    else if (it.occurred_at) out.push({ date: HS.fmtDate(it.occurred_at, { year: 'numeric', month: 'long', day: 'numeric' }), title: 'Recorded', link: '' });
+    if (it.stage) out.push({ date: it.status ? it.status : 'Current', title: it.stage, link: '' });
+    var mtg = meetings.find(function (m) { return m.related_project_id === it.id; });
+    if (mtg) {
+      var d = HS.daysUntil(mtg.starts_at);
+      if (d != null && d >= 0) {
+        out.push({ date: HS.fmtDate(mtg.starts_at, { year: 'numeric', month: 'long', day: 'numeric' }) + ' · in ' + d + ' day' + (d === 1 ? '' : 's'), title: (mtg.title || 'Public hearing') + ' — comment window', link: 'you can act here', future: true });
+      } else {
+        // already happened -> a factual historical step, not an invitation
+        out.push({ date: HS.fmtDate(mtg.starts_at, { year: 'numeric', month: 'long', day: 'numeric' }), title: (mtg.title || 'Public hearing') + ' — held', link: '' });
+      }
+    }
+    return out;
+  }
+
+  // True when an impact dimension maps to one of the five QoL lenses (so the rest
+  // can be shown separately as "other recorded effects").
+  function anyQol(d) { return Object.keys(HS.qolOf({ impact_dimensions: [d] })).length > 0; }
+
   function setGps(items){
     var place = c ? ((HS.isSample && HS.isSample()) ? c.name + ' — (Sample Zip Code)' : c.name + ', ' + c.state) : 'Your area';
     var total = opts.showProjects ? all.length : all.filter(function(x){return !x.type;}).length;
     var txt;
     if (hasRealHome) {
-      // Distances exist only from a real home in this ZIP — count against ALL
-      // mapped records, not just the 16 shown (the old chip undercounted).
-      // Name the logged address the radius is measured from, so "within N mi"
-      // is anchored to a stated home, not an unexplained symbol.
       var pool = opts.showProjects ? all : all.filter(function(x){return !x.type;});
       var within = pool.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;
       txt = within + ' within ' + opts.radiusMi + ' mi of ' + home.address;
     } else {
-      // No home -> no distances (by design, never fabricated). Say what IS shown.
-      txt = items.length + (total > items.length ? ' of ' + total : '') + ' items mapped';
+      txt = items.length + (total > items.length ? ' of ' + total : '') + ' on the map';
     }
-    if (hasRealHome && total > items.length) txt += ' · latest ' + items.length + ' of ' + total + ' shown';
-    if (area.length) txt += ' · ' + area.length + ' area-wide listed';
+    if (hasRealHome && total > items.length) txt += ' · closest ' + items.length + ' shown';
+    if (area.length) txt += ' · ' + area.length + ' area-wide notice' + (area.length === 1 ? '' : 's') + ' listed';
     gpsEl.textContent = place + ' · ' + txt;
     updateHomePrompt();
   }
-  // Add-your-home nudge — shown ONLY when there's no real resident home to pin.
-  // Opens the add-home flow (shell.js::HS.openHome — Census-confirmed address ->
-  // app_properties); for signed-out visitors that flow shows the sign-in modal,
-  // so the nudge doubles as the signup prompt. Removed once a real home exists
-  // (then the home marker renders instead).
   function updateHomePrompt(){
     var wrap = document.getElementById('mapWrap'), el = document.getElementById('mapHomePrompt');
     if (hasRealHome) { if (el) el.remove(); return; }
@@ -259,40 +700,55 @@ HS.onReady(async function () {
       if (wrap) wrap.appendChild(el);
     }
   }
-  function wirePanel(redraw){
-    document.getElementById('lyrProjects').classList.toggle('off', !opts.showProjects);
-    document.getElementById('lyrRadius').classList.toggle('off', !opts.showRadius);
-    document.getElementById('lyrProjects').onclick = function(){ opts.showProjects=!opts.showProjects; redraw(); };
-    document.getElementById('lyrRadius').onclick = function(){ opts.showRadius=!opts.showRadius; redraw(); };
+  function wirePanel(redrawFn){
+    // Each row is a real switch: role/aria-checked reflect state, and Enter/Space
+    // toggle it — the map legend is fully keyboard-operable.
+    function asSwitch(el, on, toggle){
+      el.classList.toggle('off', !on);
+      el.setAttribute('role', 'switch');
+      el.setAttribute('aria-checked', on ? 'true' : 'false');
+      el.tabIndex = 0;
+      el.style.cursor = 'pointer';
+      el.onclick = toggle;
+      el.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
+    }
+    asSwitch(document.getElementById('lyrProjects'), opts.showProjects, function(){ opts.showProjects=!opts.showProjects; redrawFn(); });
+    asSwitch(document.getElementById('lyrRadius'), opts.showRadius, function(){ opts.showRadius=!opts.showRadius; redrawFn(); });
     var lyf = document.getElementById('lyrFacilities');
     if (lyf && facs.length) {
-      lyf.classList.toggle('off', !opts.showFacilities);
-      lyf.onclick = function(){ opts.showFacilities=!opts.showFacilities; redraw(); };
+      asSwitch(lyf, opts.showFacilities, function(){ opts.showFacilities=!opts.showFacilities; redrawFn(); });
     }
   }
 
   // ---------- impact diagram (schematic SVG — the fallback view) ----------
   function drawSchematic() {
     var items = shownItems();
-    // render into #mapSch only; the overlay panel + gps chip are static siblings in #mapWrap
     HS.MapProvider.render(document.getElementById('mapSch'), {
       home: center, items: items, radiusMi: opts.radiusMi, showRadius: opts.showRadius,
       showHome: hasRealHome, homeLabel: hasRealHome ? home.address : '', w: 780, h: 520
     });
+    overlaySchematicClicks(document.getElementById('mapSch'), items);
     overlayFacilities(document.getElementById('mapSch'), items);
-    setGps(items); renderPins(items);
+    setGps(items); renderInfo(items);
     wirePanel(function(){ if (opts.mode==='impact') drawSchematic(); else drawTiles(); });
   }
+  // Make the schematic pins clickable → open the info panel (same as the tile markers).
+  function overlaySchematicClicks(el, items) {
+    var svg = el && el.querySelector('svg'); if (!svg) return;
+    var gs = svg.querySelectorAll('g');
+    // MapProvider draws one <g> per lettered pin, in order, before the .hs-home group.
+    var pinGroups = [].filter.call(gs, function (g) { return !g.classList.contains('hs-home'); });
+    pinGroups.forEach(function (g, i) {
+      if (i >= items.length) return;
+      g.style.cursor = 'pointer';
+      g.addEventListener('click', function () { var it = items[i]; if (it._facility) location.href = 'development.html?id=' + encodeURIComponent(it.id); else selectItem(it); });
+    });
+  }
 
-  // Overlay regulated facilities onto the schematic SVG as distinct purple squares
-  // (labeled "Regulated facility" in the legend). Same projection the MapProvider uses,
-  // so they sit correctly relative to home. Kept separate from the impact pins above.
   function overlayFacilities(el, items){
-    var oFacs = unletteredFacs(items);   // skip facilities already drawn as lettered pins
+    var oFacs = unletteredFacs(items);
     if (!opts.showFacilities || !oFacs.length) return;
     var svg = el && el.querySelector('svg'); if (!svg) return;
-    // Facilities slot in UNDER the home mark (drawn last by MapProvider) so the
-    // resident's own home is never buried by a nearby facility square.
     var homeG = svg.querySelector('.hs-home');
     var put = function(node){ if (homeG) svg.insertBefore(node, homeG); else svg.appendChild(node); };
     var w=780, h=520, cx=w/2, cy=h/2, radiusPx=Math.min(w,h)*0.29, pxPerMile=radiusPx/opts.radiusMi;
@@ -306,8 +762,6 @@ HS.onReady(async function () {
       var t=document.createElementNS(NS,'title');
       t.textContent = f.name + ' · Regulated facility' + (f.dist?' · '+f.dist:'');
       rect.appendChild(t);
-      // The marker opens the HomeSignal facility dossier (the interpreted panel); the
-      // official ECHO/TCEQ record links live inside the dossier, never on the pin itself.
       var a=document.createElementNS(NS,'a');
       var dossier='development.html?id='+encodeURIComponent(f.id);
       a.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href',dossier);
@@ -317,8 +771,7 @@ HS.onReady(async function () {
   }
 
   // ---------- MapLibre (real tiles: Esri World Imagery + OSM) ----------
-  var glMap = null, glMarkers = [], glReady = false, glFailed = false, glTileErrs = 0, glTilesOK = 0;
-  // Console triage handle (read-only): window.__HS_GL.tilesOK / errs / ready / failed.
+  var glMap = null, glMarkers = [], glReady = false, glFailed = false, glTileErrs = 0, glTilesOK = 0, glLastView = null;
   window.__HS_GL = { get tilesOK(){return glTilesOK;}, get errs(){return glTileErrs;},
                      get ready(){return glReady;}, get failed(){return glFailed;},
                      get lfTilesOK(){return lfTilesOK;}, get lfErrs(){return lfTileErrs;},
@@ -330,44 +783,46 @@ HS.onReady(async function () {
   }
   function zoomFor(r){ return ({'0.5':14,'1':13,'1.5':12.4,'2':12,'3':11.4,'5':10.7})[String(r)] || 12; }
   function clearMarkers(){ glMarkers.forEach(function(m){m.remove();}); glMarkers=[]; }
+  // Build a clickable pin element (shape = type, color = status). Project pins open the
+  // right info panel on click; facility pins keep their dossier popup.
+  function pinEl(it, size){
+    var el=document.createElement('div');
+    el.className='hspin';
+    el.style.cssText='width:'+size+'px;height:'+size+'px;cursor:pointer;line-height:0';
+    el.innerHTML=HS.markerSVG(itemShape(it), markerColor(it), it._letter||'', size);
+    el.setAttribute('role','button');
+    el.tabIndex=0;
+    el.setAttribute('aria-label',(it.name||it.title||'Project')+', '+(it.type||it.category||'record')
+      +(it.status?', '+it.status:'')+(it.dist?', '+it.dist+' away':''));
+    el.addEventListener('keydown', function(e){ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); openItem(it); } });
+    return el;
+  }
   function addMarkers(items){
     clearMarkers();
-    // Only pin a REAL resident home — never a centroid stand-in (never-faked rule).
     if (hasRealHome) {
-      // The home marker is the HomeSignal LOGO tile (shared builder in lib/map.js).
       var hw=document.createElement('div'); hw.innerHTML=HS.homeMarkerHTML(26);
       var h=hw.firstChild; h.style.zIndex='5';
       h.title='Your home · '+HS.homeAddressLine(home);
-      // The popup names the LOGGED address (HS.homePopupHTML) — a bare "Your
-      // home" label never said which address the app had on file.
       glMarkers.push(new maplibregl.Marker({element:h}).setLngLat([center.lng,center.lat])
         .setPopup(new maplibregl.Popup({offset:16,maxWidth:'260px'}).setHTML(HS.homePopupHTML(home))).addTo(glMap));
     }
     items.forEach(function(it){
-      var col=tierHex(it), el=document.createElement('div');
-      el.style.cssText='width:26px;height:26px;border-radius:50%;background:'+col+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font:700 12px/1 sans-serif;cursor:pointer';
-      el.textContent=it._letter;
-      glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([it.lng,it.lat])
-        .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(itemPopupHTML(it))).addTo(glMap));
+      var el=pinEl(it, 26);
+      el.title=(it.name||it.title||'')+' · '+(it.type||it.category||'')+(it.status?' · '+it.status:'');
+      el.addEventListener('click', function(e){ e.stopPropagation(); openItem(it); });
+      glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([it.lng,it.lat]).addTo(glMap));
     });
-    // Regulated facilities — a DISTINCT layer (purple squares), env context, not development.
-    // Only the un-lettered ones (reserved facilities already show as lettered pins above).
     if (opts.showFacilities) unletteredFacs(items).forEach(function(f){
       var el=document.createElement('div');
+      el.className='hspin';
       el.style.cssText='width:20px;height:20px;border-radius:3px;background:'+FACILITY_HEX+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer';
+      el.setAttribute('role','button');
+      el.setAttribute('aria-label',f.name+', regulated facility'+(f.dist?', '+f.dist+' away':''));
       glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([f.lng,f.lat])
         .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(facPopupHTML(f))).addTo(glMap));
     });
   }
-  // Shared popup bodies — used by BOTH tile engines (MapLibre + the Leaflet fallback).
-  function itemPopupHTML(it){
-    return '<div style="font:600 13px/1.3 var(--font)">'+HS.esc(it.name||it.title)+'</div>'
-      +'<div style="font-size:11px;color:#5a6b63">'+HS.esc(it.type||it.category||'')+(it.dist?' · '+HS.esc(it.dist):'')+'</div>'
-      +(it.source_ref?'<a href="'+HS.esc(it.source_ref)+'" target="_blank" rel="noopener" style="font-size:11.5px;color:#157a49;font-weight:600">official record ▸</a>':'');
-  }
   function facPopupHTML(f){
-    // Routes into the HomeSignal facility DOSSIER, not an external ECHO tab — the official
-    // ECHO/TCEQ record links live inside the dossier's Source section (spec §7 / §10).
     var interp = HS.fac.interpret(f.facility_env || null);
     return '<div style="font:600 13px/1.3 var(--font)">'+HS.esc(f.name)+'</div>'
       +'<div style="font-size:11px;color:#5a6b63">Regulated facility'+(f.dist?' · '+HS.esc(f.dist):'')+'</div>'
@@ -376,10 +831,6 @@ HS.onReady(async function () {
   }
   function ensureGL(){
     if (glMap) return;
-    // WebGL can be unavailable entirely (hardened browsers disable it for
-    // fingerprint protection — seen live in Brave: "Failed to initialize WebGL"
-    // thrown from the constructor). Unguarded, that throw killed the rest of
-    // init (no degrade, dead mode buttons). Catch -> impact diagram.
     try {
       glMap = new maplibregl.Map({
       container:'mapgl',
@@ -399,34 +850,19 @@ HS.onReady(async function () {
       return;
     }
     glMap.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
-    // GUARDRAIL (required companion to the Satellite default): Esri World Imagery / OSM
-    // are free, keyless and NOT production-contracted, so a traffic spike can be
-    // rate-limited (429) or a tile host can fail. Rather than a broken map, degrade to
-    // the impact diagram. Trip on repeated tile/source errors (not one edge-tile 404),
-    // or if the map never finishes loading (stalled provider).
     glMap.on('error', function(ev){
       if (!ev) return;
       var src = ev.sourceId, msg = ev.error && String(ev.error.message || ev.error);
-      console.warn('[maps] gl error', src || '(no source)', msg || ev);   // triage: always visible
-      // WebGL failure can surface ASYNC (live Brave console: "Uncaught (in promise)
-      // ... webglcontextcreationerror ... Failed to initialize WebGL") — the ctor
-      // try/catch misses that path. Any WebGL error = no GL map possible: degrade NOW.
+      console.warn('[maps] gl error', src || '(no source)', msg || ev);
       if (msg && /webgl/i.test(msg)) { degradeToSchematic(); return; }
       if (src==='sat' || src==='osm' || (msg && /429|rate|tile|failed to fetch|network/i.test(msg))) {
         if (++glTileErrs >= 4) degradeToSchematic();
       }
     });
-    // Count SUCCESSFUL raster tile loads — the third guard keys on this.
     glMap.on('data', function(ev){
       if (ev && ev.tile && (ev.sourceId==='sat' || ev.sourceId==='osm')) glTilesOK++;
     });
-    // Guard 1: stalled load (style never finishes) -> diagram.
     setTimeout(function(){ if (!glReady) degradeToSchematic(); }, 9000);
-    // Guard 3 (SILENT-BLANK): the map "loads", vector layers paint (radius/pins),
-    // but ZERO raster tiles ever arrive and no error events fire — seen live on
-    // deployed #253 (blank green canvas; e.g. a privacy shield or middlebox that
-    // swallows tile requests without a network error). If no tile has loaded a
-    // while after style-load while a tile mode is active, degrade to the diagram.
     glMap.on('load', function(){
       setTimeout(function(){
         if (!glFailed && glTilesOK === 0 && opts.mode !== 'impact') {
@@ -448,48 +884,43 @@ HS.onReady(async function () {
     document.getElementById('maplf').style.display='none';
     document.getElementById('mapgl').style.display='block';
     ensureGL();
-    if (glFailed || !glMap) return;      // WebGL init failed -> already degraded
-    if (!glReady){ setGps(items); renderPins(items); return; }
+    if (glFailed || !glMap) return;
+    if (!glReady){ setGps(items); renderInfo(items); return; }
     glMap.resize();
-    // base layer per mode
     glMap.setLayoutProperty('sat','visibility', opts.mode==='satellite'?'visible':'none');
     glMap.setLayoutProperty('osm','visibility', opts.mode==='street'?'visible':'none');
-    // radius + markers
     glMap.getSource('radius').setData(opts.showRadius ? circle(center.lat,center.lng,opts.radiusMi) : {type:'FeatureCollection',features:[]});
     glMap.setLayoutProperty('radius-fill','visibility', opts.showRadius?'visible':'none');
     glMap.setLayoutProperty('radius-line','visibility', opts.showRadius?'visible':'none');
-    glMap.easeTo({ center:[center.lng,center.lat], zoom: zoomFor(opts.radiusMi), duration:300 });
+    var wantZoom = zoomFor(opts.radiusMi);
+    if (glLastView !== center.lat + ',' + center.lng + '@' + wantZoom) {
+      glLastView = center.lat + ',' + center.lng + '@' + wantZoom;
+      glMap.easeTo({ center:[center.lng,center.lat], zoom: wantZoom, duration:300 });
+    }
     addMarkers(items);
-    setGps(items); renderPins(items);
-    wirePanel(drawGL);   // panel + gps are static siblings in #mapWrap, over both maps
+    setGps(items); renderInfo(items);
+    wirePanel(drawGL);
   }
 
   // ---------- Leaflet raster fallback (real tiles WITHOUT WebGL) ----------
-  // MapLibre requires WebGL, which hardened browsers disable (seen live: Brave with
-  // fingerprint protection = "Failed to initialize WebGL"). Leaflet paints the SAME
-  // Esri/OSM rasters as plain <img> tiles — already allowed by this page's img-src
-  // CSP — so Satellite/Street keep working there. Loaded lazily from jsDelivr only
-  // when the GL map can't run; healthy-WebGL visitors never fetch it. The impact
-  // diagram stays the FINAL fallback when tiles truly can't load (offline, 429s).
   var lfMap=null, lfSat=null, lfOsm=null, lfBase=null, lfRadius=null, lfMarkers=[],
-      lfFailed=false, lfTilesOK=0, lfTileErrs=0, lfWatchdogArmed=false;
-  var loadLeaflet = HS.loadLeaflet;   // shared backbone loader (lib/map.js)
+      lfFailed=false, lfTilesOK=0, lfTileErrs=0, lfWatchdogArmed=false, lfLastView=null;
+  var loadLeaflet = HS.loadLeaflet;
   function lfDivIcon(html,size){ return L.divIcon({html:html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2]}); }
   function clearLfMarkers(){ lfMarkers.forEach(function(m){ try{ lfMap.removeLayer(m); }catch(e){} }); lfMarkers=[]; }
   function addLfMarkers(items){
     clearLfMarkers();
-    // Only pin a REAL resident home — never a centroid stand-in (never-faked rule).
     if (hasRealHome) {
-      // The home marker is the HomeSignal LOGO tile (shared builder in lib/map.js);
-      // the popup names the LOGGED address (HS.homePopupHTML), same as the GL engine.
       lfMarkers.push(L.marker([center.lat,center.lng],{zIndexOffset:1000,icon:lfDivIcon(HS.homeMarkerHTML(26),26),
           title:'Your home · '+HS.homeAddressLine(home)})
         .bindPopup(HS.homePopupHTML(home),{maxWidth:260}).addTo(lfMap));
     }
     items.forEach(function(it){
-      var col=tierHex(it);
-      lfMarkers.push(L.marker([it.lat,it.lng],{icon:lfDivIcon('<div style="width:26px;height:26px;border-radius:50%;background:'+col+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font:700 12px/1 sans-serif;cursor:pointer">'+it._letter+'</div>',26)})
-        .bindPopup(itemPopupHTML(it),{maxWidth:260}).addTo(lfMap));
+      var m = L.marker([it.lat,it.lng],{icon:lfDivIcon('<div class="hspin" style="line-height:0">'+HS.markerSVG(itemShape(it), markerColor(it), it._letter||'', 26)+'</div>',26),
+          title:(it.name||it.title||'')+' · '+(it.type||it.category||'')})
+        .addTo(lfMap);
+      m.on('click', function(){ openItem(it); });
+      lfMarkers.push(m);
     });
     if (opts.showFacilities) unletteredFacs(items).forEach(function(f){
       lfMarkers.push(L.marker([f.lat,f.lng],{icon:lfDivIcon('<div style="width:20px;height:20px;border-radius:3px;background:'+FACILITY_HEX+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer"></div>',20)})
@@ -510,20 +941,17 @@ HS.onReady(async function () {
     document.getElementById('maplf').style.display='block';
     if (!lfMap){
       lfMap = L.map('maplf', { zoomSnap: 0.2 });
-      // Plain-text attribution prefix: Leaflet's default prepends an inline flag SVG
-      // that reads as a broken blue/yellow image box on this page — text link only.
       if (lfMap.attributionControl) lfMap.attributionControl.setPrefix(
         '<a href="https://leafletjs.com" title="A JavaScript library for interactive maps">Leaflet</a>');
       lfSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {attribution:'© Esri, Maxar', maxZoom:19});
       lfOsm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OpenStreetMap', maxZoom:19, subdomains:'abc'});
       [lfSat,lfOsm].forEach(function(t){
         t.on('tileload',  function(){ lfTilesOK++; });
-        // Same spirit as the GL guardrail: repeated failures with NOTHING painted -> diagram.
         t.on('tileerror', function(){ if (++lfTileErrs >= 4 && lfTilesOK === 0) lfFail(); });
       });
     }
     if (!lfWatchdogArmed){
-      lfWatchdogArmed = true;   // silent-blank watchdog, Leaflet edition
+      lfWatchdogArmed = true;
       setTimeout(function(){
         if (!lfFailed && lfMap && lfTilesOK === 0 && opts.mode !== 'impact') {
           console.warn('[maps] no raster tiles painted on the fallback map — showing the impact diagram.');
@@ -533,23 +961,21 @@ HS.onReady(async function () {
     }
     var want = (opts.mode === 'street') ? lfOsm : lfSat;
     if (lfBase !== want){ if (lfBase) lfMap.removeLayer(lfBase); want.addTo(lfMap); lfBase = want; }
-    lfMap.setView([center.lat, center.lng], zoomFor(opts.radiusMi));
+    var lfWantView = center.lat + ',' + center.lng + '@' + zoomFor(opts.radiusMi);
+    if (lfLastView !== lfWantView) { lfLastView = lfWantView; lfMap.setView([center.lat, center.lng], zoomFor(opts.radiusMi)); }
     if (lfRadius){ lfMap.removeLayer(lfRadius); lfRadius = null; }
     if (opts.showRadius) lfRadius = L.circle([center.lat,center.lng], { radius: opts.radiusMi*1609.34,
       color:'#157a49', weight:2, dashArray:'4 4', fillColor:'#157a49', fillOpacity:0.08 }).addTo(lfMap);
     addLfMarkers(items);
-    setGps(items); renderPins(items);
+    setGps(items); renderInfo(items);
     wirePanel(drawLF);
   }
-  // Route a tile-mode request (Satellite/Street) to whichever live engine can run:
-  // healthy WebGL -> MapLibre; WebGL failed or lib absent -> Leaflet rasters;
-  // both failed -> the impact diagram (final, always available).
   function drawTiles(){
-    if (!center) { setActiveMode('impact'); showSchematic(); return; }   // nothing to anchor a live map on
+    if (!center) { setActiveMode('impact'); showSchematic(); return; }
     if (!glFailed && window.maplibregl) { drawGL(); return; }
     if (lfFailed) { schematicFinal(); return; }
     loadLeaflet(function(ok){
-      if (opts.mode === 'impact') return;   // user switched away while the lib loaded
+      if (opts.mode === 'impact') return;
       if (ok && !lfFailed) drawLF(); else lfFail();
     });
   }
@@ -560,25 +986,19 @@ HS.onReady(async function () {
     document.getElementById('mapSch').style.display='block';
     drawSchematic();
   }
-  // Move the active-mode highlight in the toolbar segment.
   function setActiveMode(mode){
     opts.mode = mode;
     var seg = document.getElementById('mapMode');
     [].forEach.call(seg.querySelectorAll('button'), function(b){ b.classList.toggle('on', b.dataset.mode === mode); });
   }
-  // The GL map failed (WebGL unavailable, tile-provider errors, or a stalled/blank
-  // load). Don't give up on real tiles yet — drawTiles() tries the Leaflet raster
-  // fallback next (no WebGL needed); the impact diagram is the final stop.
   function degradeToSchematic(){
     if (glFailed) return;
     glFailed = true;
     try { if (glMap) glMap.remove(); } catch (e) {}
     glMap = null; glReady = false;
-    if (opts.mode === 'impact') { showSchematic(); return; }   // user already left tiles
+    if (opts.mode === 'impact') { showSchematic(); return; }
     drawTiles();
   }
-  // BOTH tile engines are gone this session: land on the diagram, grey the tile
-  // modes (so they read as unavailable, not broken), and say so once.
   var tilesDead = false;
   function schematicFinal(){
     if (!tilesDead){
@@ -587,17 +1007,14 @@ HS.onReady(async function () {
       ['satellite','street'].forEach(function(m){
         var b = seg.querySelector('[data-mode="'+m+'"]'); if (!b) return;
         b.style.opacity = '.45'; b.setAttribute('aria-disabled','true');
-        b.title = "Live map tiles aren't available in this browser or network right now";
+        b.title = "Live map imagery isn't available in this browser or network right now";
       });
-      if (HS.toast) HS.toast("Live map tiles aren't loading right now — showing the impact diagram.");
+      if (HS.toast) HS.toast("Live map imagery isn't loading right now — showing a simplified view of the same projects.");
     }
     setActiveMode('impact');
     showSchematic();
   }
 
-  // initial view: REAL tiles for covered ZIPs that have something to plot (Del Valle
-  // 78617 / state pass ZIPs) — MapLibre when WebGL works, Leaflet rasters otherwise.
-  // The impact diagram is the empty-page default and the final fallback.
   if (all.length || facs.length) {
     setActiveMode('satellite');
     drawTiles();
@@ -606,11 +1023,10 @@ HS.onReady(async function () {
     showSchematic();
   }
 
-  // mode toggle
   document.getElementById('mapMode').addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-mode]'); if (!btn) return;
-    if (btn.getAttribute('aria-disabled') === 'true') {   // both tile engines failed this session
-      if (HS.toast) HS.toast("Live map tiles aren't available right now — the impact diagram shows the same items.");
+    if (btn.getAttribute('aria-disabled') === 'true') {
+      if (HS.toast) HS.toast("Live map imagery isn't available right now — this simplified view shows the same projects.");
       return;
     }
     [].forEach.call(this.querySelectorAll('button'), function(b){ b.classList.remove('on'); });
@@ -627,6 +1043,20 @@ HS.onReady(async function () {
     if (opts.mode === 'impact') showSchematic(); else drawTiles();
   };
 });
+
+// A small .ics generator for the Public Participation "Add hearing to calendar" button.
+HS.mapAddToCalendar = window.mapAddToCalendar = async function (projectId) {
+  var meetings = await HS.data.meetings(HS.state.zip, HS.state.activeProperty);
+  var m = meetings.find(function(x){return x.related_project_id===projectId;}) || meetings[0];
+  if (!m) return;
+  function z(d){ return new Date(d).toISOString().replace(/[-:]/g,'').replace(/\.\d+/,''); }
+  var ics = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//HomeSignal//EN','BEGIN:VEVENT',
+    'UID:' + m.id + '@homesignal','DTSTART:' + z(m.starts_at),'SUMMARY:' + m.title,
+    'LOCATION:' + (m.location||''),'DESCRIPTION:' + (m.source_ref||''),'END:VEVENT','END:VCALENDAR'].join('\r\n');
+  var a = document.createElement('a');
+  a.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+  a.download = (m.title||'hearing').replace(/\W+/g,'-') + '.ics'; a.click();
+};
 </script>
 </body>
 </html>

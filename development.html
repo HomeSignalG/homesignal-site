@@ -9,21 +9,38 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body data-nav="dev">
-<template id="hs-content"><div class="page" id="devPage"></div></template>
+<template id="hs-content"><div class="page" id="devPage">
+  <div style="height:14px;width:36%;border-radius:6px;background:var(--line-2);margin:4px 0 16px"></div>
+  <div class="card"><div style="height:11px;width:42%;border-radius:6px;background:var(--line-2);margin-bottom:9px"></div><div style="height:11px;width:88%;border-radius:6px;background:var(--line-2);margin-bottom:9px"></div><div style="height:11px;width:66%;border-radius:6px;background:var(--line-2)"></div></div>
+  <div class="card"><div style="height:11px;width:42%;border-radius:6px;background:var(--line-2);margin-bottom:9px"></div><div style="height:11px;width:80%;border-radius:6px;background:var(--line-2)"></div></div>
+</div></template>
 
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="lib/data.js"></script>
 <script src="lib/templates.js"></script>
+<script src="lib/why.js"></script>
 <script src="shell.js"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
-  var projects = await HS.data.projects(S.zip, home);      // DEVELOPMENT only (permits / planning)
-  var facilities = await HS.data.facilities(S.zip, home);  // EPA/ECHO regulated facilities — env context, own section
   var id = new URLSearchParams(location.search).get('id');
   var page = document.getElementById('devPage');
+  // Never hang on the loading skeleton: a failed read renders an honest
+  // "couldn't load" state with a retry (same contract as maps.html).
+  var community = null, projects = [], facilities = [];
+  try {
+    community = await HS.data.community(S.zip);
+    projects = await HS.data.projects(S.zip, home);        // DEVELOPMENT only (permits / planning)
+    facilities = await HS.data.facilities(S.zip, home);    // EPA/ECHO regulated facilities — env context, own section
+  } catch (e) {
+    console.warn('[development] data load failed', e);
+    page.innerHTML = '<div class="ph"><h1>We couldn\'t load this page</h1>'
+      + '<p>Your connection may have dropped, or our data service is briefly unavailable. Nothing is wrong with your account.</p></div>'
+      + '<button class="btn primary" onclick="location.reload()">Try again</button>';
+    return;
+  }
 
   if (id) { renderDetail(id); } else { renderList(); }
 
@@ -46,7 +63,14 @@ HS.onReady(async function () {
     }
     function paint() {
       var a = sorted();
-      var body = state2.dataView ? dataTable(a) : ('<div class="devgrid">' + a.map(HS.tpl.devCard).join('') + '</div>');
+      var body;
+      if (!a.length) {
+        body = '<div class="card" style="text-align:center;padding:26px 18px">'
+          + '<h3 style="margin-bottom:6px">Nothing on the public record near here yet</h3>'
+          + '<p class="sowhat" style="margin:0">We check county and permit records for this area continuously — new projects appear here the moment they\'re filed.</p></div>';
+      } else {
+        body = state2.dataView ? dataTable(a) : ('<div class="devgrid">' + a.map(HS.tpl.devCard).join('') + '</div>');
+      }
       page.innerHTML =
         '<div class="ph"><div class="eyebrow">Development</div><h1>What\'s being built — and how it impacts you</h1>'
         + '<p>Every active and proposed project near you, led by its effect on your daily life rather than its stage or unit count.</p></div>'
@@ -58,8 +82,7 @@ HS.onReady(async function () {
         + '<div class="toolbar"><div class="seg" id="devSort">'
         + seg('impact','Impact on me') + seg('distance','Distance') + seg('newest','Newest')
         + '</div><div class="sp"></div>'
-        + '<button class="fpill">All types ▾</button><button class="fpill">Any status ▾</button>'
-        + '<button class="fpill" id="devDataBtn">⊞ Data view</button></div>'
+        + '<button class="fpill" id="devDataBtn">⊞ Table view</button></div>'
         + body
         + facSection();   // regulated facilities are appended in their OWN labeled section, never the dev list
       wire();
@@ -90,7 +113,7 @@ HS.onReady(async function () {
     function seg(k,label){ return '<button class="' + ((state2.sort===k && !state2.dataView)?'on':'') + '" data-sort="' + k + '">' + label + '</button>'; }
     function dataTable(a){
       return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th><th>Distance</th><th>Impact</th></tr></thead><tbody>'
-        + a.map(function(p){ return '<tr onclick="location.href=\'development.html?id=' + p.id + '\'" style="cursor:pointer">'
+        + a.map(function(p){ return '<tr onclick="location.href=\'development.html?id=' + p.id + '\'" onkeydown="if(event.key===\'Enter\')location.href=\'development.html?id=' + p.id + '\'" tabindex="0" style="cursor:pointer">'
           + '<td><b>' + HS.esc(p.name) + '</b></td><td>' + HS.esc(p.type) + '</td><td>' + HS.esc(p.status) + '</td>'
           + '<td>' + HS.esc(p.stage||'') + '</td><td>' + HS.esc(p.dist||'') + '</td><td>' + (p.impact_score||'') + '</td></tr>'; }).join('')
         + '</tbody></table>';
@@ -112,37 +135,55 @@ HS.onReady(async function () {
       var f = facilities.find(function(x){return x.id===pid;});
       if (f) { renderFacility(f); return; }
     }
-    if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button><div class="ph"><h1>Not found</h1></div>'; return; }
+    if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button><div class="ph"><h1>We couldn\'t find that record</h1><p>It may have been removed from the county feed, or the link is out of date. Everything currently on record is on the development page.</p></div>'; return; }
     HS.data.meetings(S.zip, home).then(function (meetings) {
       var mtg = meetings.find(function(m){return m.related_project_id===p.id;});
       var thread = [
-        { date: HS.fmtDate(p.submitted_at, {year:'numeric',month:'long',day:'numeric'}), title: 'Application submitted', link: 'generated your alert' },
-        { date: HS.fmtDate(p.submitted_at, {month:'long',day:'numeric'}) , title: 'Impact analysis published', link: 'report available now' }
+        { date: HS.fmtDate(p.submitted_at, {year:'numeric',month:'long',day:'numeric'}), title: 'Filed with the county', link: 'this filing is what put it on your map' }
       ];
-      if (mtg) thread.push({ date: HS.fmtDate(mtg.starts_at,{year:'numeric',month:'long',day:'numeric'}) + ' · in ' + HS.daysUntil(mtg.starts_at) + ' days', title: 'Public hearing — comment window open', link: 'you can act here', future: true });
-      thread.push({ date: 'Expected next quarter', title: 'Commission vote', future: true });
+      if (p.stage) thread.push({ date: p.status || 'Current', title: p.stage });
+      if (mtg) {
+        var mtgDays = HS.daysUntil(mtg.starts_at);
+        if (mtgDays != null && mtgDays >= 0) thread.push({ date: HS.fmtDate(mtg.starts_at,{year:'numeric',month:'long',day:'numeric'}) + ' · in ' + mtgDays + ' day' + (mtgDays === 1 ? '' : 's'), title: 'Public hearing — comment window open', link: 'you can act here', future: true });
+        else thread.push({ date: HS.fmtDate(mtg.starts_at,{year:'numeric',month:'long',day:'numeric'}), title: 'Public hearing — held', link: '' });
+      }
 
       var statusClass = p.status==='Active'?'active':p.status==='Approved'?'appr':'prop';
-      var verdictHi = p.impact_dimensions.filter(function(i){return i.bad;}).slice(0,2).map(function(i){return i.label.toLowerCase();}).join(' and ') || 'change';
-      var verdictGood = (p.impact_dimensions.find(function(i){return !i.bad;})||{label:'the tax base'}).label.toLowerCase();
+      // "Why this matters" (Sprint-3): four evidence-based answers + what the
+      // record does and doesn't establish — shared backbone lib/why.js.
+      var wd = HS.whyDerive(p, {
+        hasHome: !!HS.realHome(),
+        homeAddress: HS.realHome() ? home.address : null,
+        place: community ? community.name : null,
+        meeting: mtg
+      });
+      var hiDims = p.impact_dimensions.filter(function(i){return i.bad;}).slice(0,2).map(function(i){return i.label.toLowerCase();});
+      var goodDim = p.impact_dimensions.find(function(i){return !i.bad;});
       page.innerHTML =
         '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button>'
         + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">' + HS.esc(p.name) + ' <span class="status ' + statusClass + '">' + HS.esc(p.status) + '</span></div><h1 style="margin-bottom:2px">How this affects you</h1></div>'
         + '<div class="detail"><div class="panel">'
         + '<div class="kicker">The bottom line</div>'
-        + '<div class="verdict">Likely to <span class="hl">affect ' + HS.esc(verdictHi) + '</span> near you — with a <span class="hlg">lift to ' + HS.esc(verdictGood) + '</span>.</div>'
+        + (hiDims.length
+            ? '<div class="verdict">Likely to <span class="hl">affect ' + HS.esc(hiDims.join(' and ')) + '</span> near you'
+              + (goodDim ? ' — with a <span class="hlg">lift to ' + HS.esc(goodDim.label.toLowerCase()) + '</span>' : '') + '.</div>'
+            : '<div class="verdict">On the county\'s public record near you — the record below has the specifics.</div>')
         + '<div class="impacts">' + HS.tpl.impactChips(p.impact_dimensions) + '</div>'
+        + '<div class="divider"></div><div class="kicker">Why this matters</div>' + HS.whyQaHTML(wd)
+        + '<div class="divider"></div><div class="kicker">What we know</div>' + HS.whyKnowHTML(wd)
+        + '<div class="divider"></div><div class="kicker">What we don\'t know yet</div>' + HS.whyUnknownHTML(wd)
         + '<div class="divider"></div><div class="kicker">The story so far — and what\'s next</div>'
         + '<div class="thread">' + HS.tpl.thread(thread) + '</div></div>'
         + '<div class="panel side"><div class="kicker">What you can do</div><div class="doact">'
         + '<button class="btn primary" onclick="window.open(\'' + HS.esc(p.source_ref) + '\',\'_blank\',\'noopener\')">Submit a public comment</button>'
         + '<button class="btn" onclick="HS.addToCalendar(\'' + p.id + '\')">Add hearing to calendar</button>'
-        + '<button class="btn" onclick="window.open(\'' + HS.esc(p.source_ref) + '\',\'_blank\',\'noopener\')">Read the impact analysis</button>'
+        + '<button class="btn" onclick="window.open(\'' + HS.esc(p.source_ref) + '\',\'_blank\',\'noopener\')">Read the official record</button>'
+        + '<button class="btn" onclick="location.href=\'maps.html\'">See it on the map</button>'
         + '<button class="btn ghost" onclick="HS.toggleFollow(this,\'project\',\'' + p.id + '\')">Follow this project</button></div>'
         + '<div class="divider"></div><div class="kicker">The specs</div><div class="specs">'
         + specRow('Developer', p.developer) + specRow('Size', p.size) + specRow('Investment', p.investment)
         + specRow('Jobs created', p.jobs) + specRow('Distance', p.dist) + specRow('Status', p.stage)
-        + '</div>' + (p.approx ? '<p style="font-size:11px;color:var(--ink-3);margin:12px 0 0">Some specifics are prototype placeholders pending the live feed — see the source record.</p>' : '') + '</div></div>';
+        + '</div>' + (p.approx ? '<p style="font-size:11.5px;color:var(--ink-2);margin:12px 0 0">Some details are still preliminary while county records sync — the official record is the source of truth.</p>' : '') + '</div></div>';
     });
   }
   // Facility dossier (spec §7) — Identity / Interpreted status / Permit history /

@@ -31,8 +31,6 @@
     <div class="toolbar">
       <div class="seg" id="alSort"><button class="on" data-sort="impact">By life impact</button><button data-sort="distance">By distance</button><button data-sort="newest">Newest</button></div>
       <div class="sp"></div>
-      <button class="fpill">All dimensions ▾</button>
-      <button class="fpill">Any distance ▾</button>
     </div>
 
     <div id="alBand"></div>
@@ -50,8 +48,18 @@
 <script>
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
-  var c = await HS.data.community(S.zip);
-  var all = await HS.data.changes(S.zip, home);
+  // Never hang silently: a failed read renders an honest retry state.
+  var c, all;
+  try {
+    c = await HS.data.community(S.zip);
+    all = await HS.data.changes(S.zip, home);
+  } catch (e) {
+    console.warn('[alerts] data load failed', e);
+    document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load your alerts</h1>'
+      + '<p>Your connection may have dropped, or our data service is briefly unavailable.</p></div>'
+      + '<button class="btn primary" onclick="location.reload()">Try again</button>';
+    return;
+  }
 
   // topic counts
   var cats = HS.data.topicCategories();
@@ -73,7 +81,7 @@ HS.onReady(async function () {
   document.getElementById('alStrip').innerHTML =
     HS.tpl.statTile(open.length, 'Need you soon — windows closing', 'accent')
     + HS.tpl.statTile(rest.length + open.length, 'Changes worth knowing this week', '')
-    + HS.tpl.statTile(HS.trend(c.value_trend), 'Your value outlook, next 12 mo', 'g')
+    + (c && c.value_trend != null ? HS.tpl.statTile(HS.trend(c.value_trend), 'Your value outlook, next 12 mo', 'g') : '')
     + HS.tpl.statTile((nearest && nearest.dist ? nearest.dist.replace(' mi','') : '—') + '<span style="font-size:14px;font-weight:600;color:var(--ink-3)">mi</span>', 'Nearest active change', '');
 
   function sortItems(items, mode) {
@@ -107,7 +115,7 @@ HS.onReady(async function () {
     document.getElementById('alQuiet').innerHTML = quiet.length ? (
       '<div class="groupHead" style="color:var(--ink-3)"><span class="gd" style="background:var(--line)"></span> Good to know · lower relevance to you</div>'
       + '<div class="quiet">' + quiet.map(function(q){return '<b>' + HS.esc(q.title) + '</b>';}).join(' · ')
-      + '. &nbsp;Collapsed because they\'re unlikely to affect your home — expand any time.</div>') : '';
+      + '. &nbsp;Kept out of the main list because they\'re unlikely to affect your home.</div>') : '';
   }
 
   render('impact');

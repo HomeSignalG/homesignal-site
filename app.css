@@ -159,6 +159,20 @@
   .specs .row span{color:var(--ink-3)}
   .specs .row b{color:var(--ink)}
 
+  /* ---------- "Why this matters" + What we know / don't know (lib/why.js) ---------- */
+  .wtm{margin:0}
+  .wtm .wq{padding:9px 0;border-bottom:1px dashed var(--line)}
+  .wtm .wq:first-child{padding-top:2px}
+  .wtm .wq:last-child{border-bottom:none;padding-bottom:2px}
+  .wtm dt{font-size:12.5px;font-weight:700;color:var(--ink);margin:0 0 3px}
+  .wtm dd{font-size:13px;line-height:1.5;color:var(--ink-2);margin:0}
+  .known,.unknown{list-style:none;margin:0;padding:0}
+  .known li,.unknown li{display:flex;gap:9px;align-items:flex-start;font-size:13px;line-height:1.5;color:var(--ink);padding:4px 0}
+  .kmark{color:var(--green-2);font-weight:800;flex:none}
+  .umark{color:var(--amber);font-weight:800;flex:none}
+  .unknown li{color:var(--ink-2)}
+  .wnote{font-size:11.5px;color:var(--ink-2);line-height:1.45;margin:10px 0 0}
+
   /* ---------- SHARED LAYOUT (mission / dashboard) ---------- */
   .cols{display:grid;grid-template-columns:1.55fr .95fr;gap:18px;align-items:start}
   .block{background:#fff;border:1px solid var(--line);border-radius:15px;padding:20px;box-shadow:var(--shadow-sm);margin-bottom:18px}
