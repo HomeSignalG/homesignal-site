@@ -10,6 +10,13 @@ name: Regenerate sitemap.xml from communities (daily)
 # publishes it (it only goes live when some later normal commit rebuilds Pages). The
 # verify-* workflows are path-scoped to source files (not sitemap.xml), so a plain
 # commit here rebuilds Pages without triggering them.
+#
+# PUSH AUTH: the "Protect Main" ruleset blocks direct pushes from the workflow
+# GITHUB_TOKEN (github-actions[bot] cannot be a ruleset bypass actor), so the push
+# rides the DEPLOY_KEY repo secret — an SSH deploy key covered by the ruleset's
+# "Deploy keys" bypass. The guard step fails the run up front if the secret is
+# missing, because checkout would otherwise silently fall back to the (blocked)
+# GITHUB_TOKEN and the failure would surface only at push time.
 on:
   schedule:
     - cron: "17 6 * * *"   # daily, 06:17 UTC
@@ -26,7 +33,17 @@ jobs:
   sitemap:
     runs-on: ubuntu-latest
     steps:
+      - name: Require DEPLOY_KEY (ruleset-bypass push credential)
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          if [ -z "$DEPLOY_KEY" ]; then
+            echo "::error::DEPLOY_KEY secret is not set. This workflow pushes to main, which the ruleset blocks for GITHUB_TOKEN — add the SSH deploy key as the DEPLOY_KEY Actions secret (Settings → Secrets and variables → Actions) and enable the Deploy keys bypass on the Protect Main ruleset."
+            exit 1
+          fi
       - uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
