@@ -200,6 +200,7 @@
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="lib/data.js"></script>
 <script src="lib/templates.js"></script>
+<script src="lib/why.js"></script>
 <script src="lib/map.js"></script>
 <script src="shell.js"></script>
 <script>
@@ -568,15 +569,20 @@ HS.onReady(async function () {
       + (specs ? '<div class="specs tight" style="margin-top:12px">' + specs + '</div>' : '')
       + '</div>';
 
-    // ── 2) Why you're seeing this
-    var why = [];
-    if (hasRealHome && it.dist) why.push(['Near you', 'About ' + HS.esc(it.dist) + ' from your home at ' + HS.esc(home.address) + '.']);
-    else why.push(['In your area', 'A record in ' + HS.esc(c ? c.name : 'the area you\'re viewing') + (it.dist ? ', about ' + HS.esc(it.dist) + ' from the map center.' : '.')]);
-    if (status) why.push(['Still shapeable', 'Currently ' + HS.esc(status.toLowerCase()) + ' — ' + (status === 'Proposed' ? 'in review, so public input can still change the outcome.' : status === 'Approved' ? 'approved, but conditions and construction are still on the public agenda.' : 'active on the public record.')]);
-    why.push(['On the public record', it.developer ? 'Filed by ' + HS.esc(it.developer) + '.' : 'Sourced from an official public-record feed for this area.']);
-    var whyHTML = '<div class="isec"><h4>Why you\'re seeing this</h4><ul class="whylist">'
-      + why.map(function (w) { return '<li><span class="wk">•</span><span><b>' + w[0] + '.</b> ' + w[1] + '</span></li>'; }).join('')
-      + '</ul></div>';
+    // ── 2) Why this matters (Sprint-3): the four questions, answered ONLY from
+    // fields on the record + its matched hearing — derived by the shared
+    // evidence-gated backbone (lib/why.js), never from the project type.
+    var wMtg = meetings.find(function (m) { return m.related_project_id === it.id; });
+    var wd = HS.whyDerive(it, {
+      hasHome: hasRealHome,
+      homeAddress: hasRealHome ? home.address : null,
+      place: c ? c.name : null,
+      radiusMi: opts.radiusMi,
+      meeting: wMtg
+    });
+    var whyHTML = '<div class="isec"><h4>Why this matters</h4>' + HS.whyQaHTML(wd) + '</div>';
+    var knowHTML = '<div class="isec"><h4>What we know</h4>' + HS.whyKnowHTML(wd) + '</div>';
+    var unknownHTML = '<div class="isec"><h4>What we don\'t know yet</h4>' + HS.whyUnknownHTML(wd) + '</div>';
 
     // ── 3) Potential Quality of Life Impacts (Air / Water / Soil / Noise / Light)
     var q = HS.qolOf(it);
@@ -610,8 +616,11 @@ HS.onReady(async function () {
       + '<p class="ihint">Every item on this map traces to a public record — HomeSignal reports the fact and the link, never a verdict.'
       + (it.approx ? ' Some details are still preliminary while county records sync — the official record is the source of truth.' : '') + '</p></div>';
 
-    // ── 6) Public Participation
-    var mtg = meetings.find(function (m) { return m.related_project_id === it.id; });
+    // ── 6) Public Participation (actions for the same matched hearing that
+    // answered "Can I still participate?" above — one source, no drift).
+    // A hearing whose date has PASSED is history, not an opportunity: it never
+    // renders as an actionable card (it stays visible in the Timeline instead).
+    var mtg = (wMtg && new Date(wMtg.starts_at) > new Date()) ? wMtg : null;
     var partHTML = '<div class="isec"><h4>Public participation</h4>';
     if (mtg) {
       var d = HS.daysUntil(mtg.starts_at);
@@ -634,7 +643,7 @@ HS.onReady(async function () {
     var panel = document.getElementById('infoPanel');
     panel.classList.add('idetail');
     panel.innerHTML = '<button class="backbtn" id="infoBack" aria-label="Back to all nearby projects">← All nearby projects</button>'
-      + summaryHTML + whyHTML + qolHTML + timelineHTML + evHTML + partHTML;
+      + summaryHTML + whyHTML + qolHTML + knowHTML + unknownHTML + timelineHTML + evHTML + partHTML;
     var back = panel.querySelector('#infoBack');
     back.onclick = function () {
       panel.classList.remove('idetail'); clearSelection();
@@ -653,7 +662,12 @@ HS.onReady(async function () {
     var mtg = meetings.find(function (m) { return m.related_project_id === it.id; });
     if (mtg) {
       var d = HS.daysUntil(mtg.starts_at);
-      out.push({ date: HS.fmtDate(mtg.starts_at, { year: 'numeric', month: 'long', day: 'numeric' }) + (d != null && d >= 0 ? ' · in ' + d + ' days' : ''), title: (mtg.title || 'Public hearing') + ' — comment window', link: 'you can act here', future: true });
+      if (d != null && d >= 0) {
+        out.push({ date: HS.fmtDate(mtg.starts_at, { year: 'numeric', month: 'long', day: 'numeric' }) + ' · in ' + d + ' day' + (d === 1 ? '' : 's'), title: (mtg.title || 'Public hearing') + ' — comment window', link: 'you can act here', future: true });
+      } else {
+        // already happened -> a factual historical step, not an invitation
+        out.push({ date: HS.fmtDate(mtg.starts_at, { year: 'numeric', month: 'long', day: 'numeric' }), title: (mtg.title || 'Public hearing') + ' — held', link: '' });
+      }
     }
     return out;
   }

@@ -20,10 +20,12 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="lib/data.js"></script>
 <script src="lib/templates.js"></script>
+<script src="lib/why.js"></script>
 <script src="shell.js"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
+  var community = await HS.data.community(S.zip);
   var projects = await HS.data.projects(S.zip, home);      // DEVELOPMENT only (permits / planning)
   var facilities = await HS.data.facilities(S.zip, home);  // EPA/ECHO regulated facilities — env context, own section
   var id = new URLSearchParams(location.search).get('id');
@@ -129,9 +131,21 @@ HS.onReady(async function () {
         { date: HS.fmtDate(p.submitted_at, {year:'numeric',month:'long',day:'numeric'}), title: 'Filed with the county', link: 'this filing is what put it on your map' }
       ];
       if (p.stage) thread.push({ date: p.status || 'Current', title: p.stage });
-      if (mtg) thread.push({ date: HS.fmtDate(mtg.starts_at,{year:'numeric',month:'long',day:'numeric'}) + ' · in ' + HS.daysUntil(mtg.starts_at) + ' days', title: 'Public hearing — comment window open', link: 'you can act here', future: true });
+      if (mtg) {
+        var mtgDays = HS.daysUntil(mtg.starts_at);
+        if (mtgDays != null && mtgDays >= 0) thread.push({ date: HS.fmtDate(mtg.starts_at,{year:'numeric',month:'long',day:'numeric'}) + ' · in ' + mtgDays + ' day' + (mtgDays === 1 ? '' : 's'), title: 'Public hearing — comment window open', link: 'you can act here', future: true });
+        else thread.push({ date: HS.fmtDate(mtg.starts_at,{year:'numeric',month:'long',day:'numeric'}), title: 'Public hearing — held', link: '' });
+      }
 
       var statusClass = p.status==='Active'?'active':p.status==='Approved'?'appr':'prop';
+      // "Why this matters" (Sprint-3): four evidence-based answers + what the
+      // record does and doesn't establish — shared backbone lib/why.js.
+      var wd = HS.whyDerive(p, {
+        hasHome: !!HS.realHome(),
+        homeAddress: HS.realHome() ? home.address : null,
+        place: community ? community.name : null,
+        meeting: mtg
+      });
       var hiDims = p.impact_dimensions.filter(function(i){return i.bad;}).slice(0,2).map(function(i){return i.label.toLowerCase();});
       var goodDim = p.impact_dimensions.find(function(i){return !i.bad;});
       page.innerHTML =
@@ -144,6 +158,9 @@ HS.onReady(async function () {
               + (goodDim ? ' — with a <span class="hlg">lift to ' + HS.esc(goodDim.label.toLowerCase()) + '</span>' : '') + '.</div>'
             : '<div class="verdict">On the county\'s public record near you — the record below has the specifics.</div>')
         + '<div class="impacts">' + HS.tpl.impactChips(p.impact_dimensions) + '</div>'
+        + '<div class="divider"></div><div class="kicker">Why this matters</div>' + HS.whyQaHTML(wd)
+        + '<div class="divider"></div><div class="kicker">What we know</div>' + HS.whyKnowHTML(wd)
+        + '<div class="divider"></div><div class="kicker">What we don\'t know yet</div>' + HS.whyUnknownHTML(wd)
         + '<div class="divider"></div><div class="kicker">The story so far — and what\'s next</div>'
         + '<div class="thread">' + HS.tpl.thread(thread) + '</div></div>'
         + '<div class="panel side"><div class="kicker">What you can do</div><div class="doact">'
