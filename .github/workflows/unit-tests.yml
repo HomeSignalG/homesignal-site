@@ -26,3 +26,5 @@ jobs:
         run: node test/realhome.test.mjs
       - name: Topic-canon drift test
         run: node test/topic-canon.test.mjs
+      - name: Facility-slot reservation test
+        run: node test/facility-slots.test.mjs
