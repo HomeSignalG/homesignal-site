@@ -95,6 +95,12 @@
   .emptycard .ed{font-size:12.5px;color:var(--ink-2);line-height:1.5;margin:0 0 12px}
   .emptycard .btn{display:inline-flex}
 
+  /* ── "What's Changed" view (Sprint 7) ── */
+  .cbadge{display:inline-block;font:800 9.5px/1 var(--font);letter-spacing:.07em;padding:3px 7px;border-radius:5px;color:#fff;margin-right:5px}
+  .cbadge.b-new{background:#1f9d5c} .cbadge.b-hearing{background:#c47a1a} .cbadge.b-update{background:#3f7fb0}
+  .chgnote{font-size:11.5px;color:var(--ink-2);line-height:1.5;margin:2px 0 12px}
+  .chgline{font-size:12px;color:var(--ink-2);margin-top:3px}
+
   /* ── marker clarity: hover/focus emphasis on tile-map pins ── */
   .hspin{transition:transform .1s ease}
   .hspin:hover,.hspin:focus-visible{transform:scale(1.18);z-index:6;position:relative}
@@ -133,6 +139,10 @@
       <p>Every project near your home, placed on the map — <b>shape shows the project type, color shows its permit status</b>. Pick any project for the full picture: why it's here, its quality-of-life impacts, timeline, evidence, and how to weigh in.</p>
     </div>
     <div class="toolbar">
+      <div class="seg" id="viewSeg" role="group" aria-label="Which projects to show">
+        <button class="on" data-view="all" aria-pressed="true">All Projects</button>
+        <button data-view="changed" aria-pressed="false">✦ What's Changed</button>
+      </div>
       <div class="seg" id="mapMode">
         <button class="on" data-mode="impact">Impact</button>
         <button data-mode="satellite">Satellite</button>
@@ -224,7 +234,7 @@ HS.onReady(async function () {
   var FACILITY_HEX = '#6f42c1';   // regulated facilities — distinct from the status pin colors
   // opts.types / opts.qol are the top-of-page filters (null/empty = show everything,
   // so a signed-out default load is byte-identical to the pre-Sprint page the verifier checks).
-  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact', types: null, qol: null };
+  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact', types: null, qol: null, view: 'all' };
   var selected = null;   // the project currently expanded in the right info panel (null = list view)
   var lastItems = [];    // most recent lettered set, so panel re-renders without a map redraw
 
@@ -249,6 +259,15 @@ HS.onReady(async function () {
     var _lf = document.getElementById('legFacility'); if (_lf) _lf.style.display = '';
     var _lyf = document.getElementById('lyrFacilities'); if (_lyf) _lyf.style.display = '';
   }
+  // "What's Changed" (Sprint 7): entries derived ONLY from dates the records
+  // carry (filings / upcoming hearings / recorded notices) — HS.recentChanges
+  // is the pure, unit-pinned backbone (lib/map.js). No change-history store
+  // exists, so this is the honest fallback, and the panel says so.
+  var CHANGE_DAYS = 30;
+  var changeEntries = HS.recentChanges(projects, changes, meetings, { days: CHANGE_DAYS });
+  var changedIds = {};
+  changeEntries.forEach(function (e) { changedIds[e.id] = e; });
+
   buildShapeLegend();
   buildFilters();
 
@@ -290,10 +309,13 @@ HS.onReady(async function () {
 
   function shownItems() {
     var a = opts.showProjects ? all : all.filter(function(x){return !x.type;});
+    // "What's Changed" narrows the map to records with a real in-window change
+    // entry. Facilities carry no change data, so they don't reserve slots here.
+    if (opts.view === 'changed') a = a.filter(function (x) { return changedIds[x.id]; });
     a = a.filter(function (x) { return passType(x) && passQol(x); });
     // Facilities reserve a FLOOR of lettered slots (min(4,#facs)) so the closest
     // regulated facilities are always surfaced alongside development — de-duped, cap 16.
-    var facPins = opts.showFacilities ? facs : [];
+    var facPins = (opts.view === 'changed') ? [] : (opts.showFacilities ? facs : []);
     var out = HS.reserveFacilitySlots(a, facPins, { cap: 16, floor: 4, letters: LET });
     // Live-verification hook (scripts/verify-maps.mjs, runs on a real runner with egress):
     // the lettered pin set + how many mappable facilities exist, so CI can assert the
@@ -447,6 +469,7 @@ HS.onReady(async function () {
     var filtersOn = (opts.types && opts.types.size) || (opts.qol && opts.qol.size);
     var panel = document.getElementById('infoPanel');
     panel.classList.remove('idetail');
+    if (opts.view === 'changed') { renderChangedList(items, panel, place); return; }
 
     // Honest, friendly EMPTY STATES (never a blank column):
     //  a) nothing on record at all for this area;
@@ -539,6 +562,82 @@ HS.onReady(async function () {
     });
   }
 
+  // ── "Recent Changes" panel (Sprint 7) — the What's-Changed list view. ──────
+  // Entries are the pre-derived changeEntries (real dates only). Clicking one
+  // centers the live map on its pin and opens the EXISTING project panel —
+  // no new page. Area-wide records (no honest point) list below, labeled.
+  function renderChangedList(items, panel, place) {
+    var byId = {};
+    items.forEach(function (it) { byId[it.id] = it; });
+    var mapped = changeEntries.filter(function (e) { return byId[e.id]; });
+    // real recent records with no map point (jurisdiction-wide) — listed, never plotted
+    var areaChg = changeEntries.filter(function (e) { return !byId[e.id] && !(e.item.lat && e.item.lng); });
+
+    function badgeHTML(e) {
+      return e.badges.map(function (b) {
+        return '<span class="cbadge b-' + b.toLowerCase() + '">' + b + '</span>';
+      }).join('');
+    }
+    function entryCard(e, i, attr) {
+      var it = byId[e.id] || e.item;
+      var name = it.name || it.title || '';
+      var letter = it._letter ? '<span class="letter" style="background:' + markerColor(it) + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px" aria-hidden="true">' + it._letter + '</span>&nbsp; ' : '';
+      return '<div class="card mini clickable" ' + attr + '="' + i + '" role="button" tabindex="0" aria-label="' + HS.esc(e.badges.join(', ') + '. ' + name) + '">'
+        + '<span class="lens">' + letter + badgeHTML(e) + '</span>'
+        + '<h3>' + HS.esc(name) + '</h3>'
+        + e.lines.map(function (l) { return '<div class="chgline">' + HS.esc(l) + '</div>'; }).join('')
+        + '</div>';
+    }
+
+    if (!mapped.length && !areaChg.length) {
+      panel.innerHTML = '<div class="emptycard"><div class="et">Nothing has changed near ' + HS.esc(place) + ' in the last ' + CHANGE_DAYS + ' days</div>'
+        + '<p class="ed">No new filings, hearings, or official notices in that window — that\'s worth knowing too. We keep watching the record daily.</p>'
+        + '<button class="btn primary" id="chgShowAll">Show all projects</button></div>';
+      var sa = panel.querySelector('#chgShowAll');
+      if (sa) sa.onclick = function () { setView('all'); };
+      return;
+    }
+
+    var html = '<div class="listhead"><b>' + (mapped.length + areaChg.length) + '</b> change'
+      + (mapped.length + areaChg.length === 1 ? '' : 's') + ' near ' + HS.esc(place) + ' · last ' + CHANGE_DAYS + ' days</div>'
+      + '<p class="chgnote">Drawn from dates on the public record — new filings, scheduled hearings, and official notices. We only show changes the record itself supports.</p>'
+      + '<div class="groupHead" style="margin-top:0">Recent changes</div>'
+      + mapped.map(function (e, i) { return entryCard(e, i, 'data-chg'); }).join('');
+    if (areaChg.length) {
+      html += '<div class="groupHead">Area-wide · affect the whole area</div>'
+        + areaChg.map(function (e, i) { return entryCard(e, i, 'data-chgarea'); }).join('');
+    }
+    panel.innerHTML = html;
+
+    function wire(sel, act) {
+      panel.querySelectorAll(sel).forEach(function (el) {
+        el.addEventListener('click', function () { act(el); });
+        el.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); act(el); } });
+      });
+    }
+    wire('[data-chg]', function (el) {
+      var e = mapped[parseInt(el.getAttribute('data-chg'), 10)]; if (!e) return;
+      var it = byId[e.id];
+      centerOn(it);
+      openItem(it);            // the EXISTING Project Intelligence panel
+    });
+    wire('[data-chgarea]', function (el) {
+      var e = areaChg[parseInt(el.getAttribute('data-chgarea'), 10)];
+      if (e && e.item.source_ref) window.open(e.item.source_ref, '_blank', 'noopener');
+    });
+  }
+
+  // Center the live map on one record's pin (What's-Changed click-through).
+  // The schematic is a fixed home/centroid-anchored projection, so it doesn't
+  // re-anchor — the detail panel still opens there.
+  function centerOn(it) {
+    if (!it || it.lat == null || it.lng == null || opts.mode === 'impact') return;
+    try {
+      if (glMap && glReady && !glFailed) glMap.easeTo({ center: [it.lng, it.lat], duration: 400 });
+      else if (lfMap && !lfFailed) lfMap.panTo([it.lat, it.lng]);
+    } catch (e) { /* centering is best-effort — the panel is the payload */ }
+  }
+
   // The 6-section project information panel (Sprint-1 spec). Every field renders only
   // from the real record; anything the record doesn't state is said to be absent, never guessed.
   function renderDetail(it) {
@@ -565,7 +664,7 @@ HS.onReady(async function () {
     // ── 2) Why this matters (Sprint-3): the four questions, answered ONLY from
     // fields on the record + its matched hearing — derived by the shared
     // evidence-gated backbone (lib/why.js), never from the project type.
-    var wMtg = meetings.find(function (m) { return m.related_project_id === it.id; });
+    var wMtg = HS.bestMeeting(meetings, it.id);   // soonest UPCOMING first, else latest held
     var wd = HS.whyDerive(it, {
       hasHome: hasRealHome,
       homeAddress: hasRealHome ? home.address : null,
@@ -652,7 +751,7 @@ HS.onReady(async function () {
     if (it.submitted_at) out.push({ date: HS.fmtDate(it.submitted_at, { year: 'numeric', month: 'long', day: 'numeric' }), title: 'Filed with the county', link: 'this filing is what put it on your map' });
     else if (it.occurred_at) out.push({ date: HS.fmtDate(it.occurred_at, { year: 'numeric', month: 'long', day: 'numeric' }), title: 'Recorded', link: '' });
     if (it.stage) out.push({ date: it.status ? it.status : 'Current', title: it.stage, link: '' });
-    var mtg = meetings.find(function (m) { return m.related_project_id === it.id; });
+    var mtg = HS.bestMeeting(meetings, it.id);   // soonest UPCOMING first, else latest held
     if (mtg) {
       var d = HS.daysUntil(mtg.starts_at);
       if (d != null && d >= 0) {
@@ -671,6 +770,12 @@ HS.onReady(async function () {
 
   function setGps(items){
     var place = c ? ((HS.isSample && HS.isSample()) ? c.name + ' — (Sample Zip Code)' : c.name + ', ' + c.state) : 'Your area';
+    if (opts.view === 'changed') {
+      gpsEl.textContent = place + ' · ' + items.length + ' recent change' + (items.length === 1 ? '' : 's')
+        + ' on the map · last ' + CHANGE_DAYS + ' days';
+      updateHomePrompt();
+      return;
+    }
     var total = opts.showProjects ? all.length : all.filter(function(x){return !x.type;}).length;
     var txt;
     if (hasRealHome) {
@@ -1022,6 +1127,25 @@ HS.onReady(async function () {
     setActiveMode('impact');
     showSchematic();
   }
+
+  // View toggle: All Projects <-> What's Changed. Switching lands on the new
+  // view's LIST (any open detail closes), and the CI-checked default stays 'all'.
+  function setView(v) {
+    if (opts.view === v) return;
+    opts.view = v;
+    selected = null;
+    var seg = document.getElementById('viewSeg');
+    [].forEach.call(seg.querySelectorAll('button'), function (b) {
+      var on = b.dataset.view === v;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    redraw();
+  }
+  document.getElementById('viewSeg').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-view]'); if (!btn) return;
+    setView(btn.dataset.view);
+  });
 
   document.getElementById('mapMode').addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-mode]'); if (!btn) return;

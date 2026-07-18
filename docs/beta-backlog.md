@@ -114,3 +114,8 @@ improvements. Requires ≥2 independent homeowner requests to schedule.*
 ## Change log
 - **2026-07-18** — Document created at beta start. Zero homeowner reports;
   all seeded entries are audit-observed launch leftovers, labeled as such.
+- **2026-07-18** — Sprint 7 ("What's Changed?" map view) built as a
+  founder-directed request (source: founder, not backlog-derived). Side
+  finding fixed in the same build: the panels' first-match meeting lookup hid
+  a real upcoming hearing behind an earlier held one (`HS.bestMeeting` now
+  prefers the soonest upcoming hearing everywhere).
