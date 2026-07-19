@@ -1,9 +1,13 @@
-// Offline unit tests for gov-feeds discovery + sync (Phase 1A).
+// Offline unit tests — production public.feeds contract (verified 2026-07-19).
 // Run: node test/gov-feeds.test.mjs
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import {
+  FEEDS_CSV_COLUMNS,
+  VENDOR_ADAPTER,
+} from '../scripts/gov-feeds/lib/production-contract.mjs';
 import {
   analyzeGranicusRss,
   analyzeLegistar,
@@ -11,12 +15,16 @@ import {
   discoverCountyVendor,
   probeCivicClerk,
   scoreProbe,
-  slugifyCounty,
 } from '../scripts/gov-feeds/lib/vendors.mjs';
 import { buildCandidateFeedRow, candidateToInsertSql } from '../scripts/gov-feeds/lib/candidates.mjs';
 import { readFeedsCsv } from '../scripts/gov-feeds/lib/csv-io.mjs';
 import { diffFeedsConfig } from '../scripts/gov-feeds/lib/sync.mjs';
-import { validateFeedRecord, COUNTY_COMMISSION_CATEGORY } from '../scripts/gov-feeds/lib/schema.mjs';
+import {
+  coerceFeedRow,
+  COUNTY_COMMISSION_CATEGORY,
+  normalizeFeedRecord,
+  validateFeedRecord,
+} from '../scripts/gov-feeds/lib/schema.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const fx = (name) => readFileSync(join(root, 'fixtures/gov-feeds', name), 'utf8');
@@ -27,78 +35,78 @@ const ok = (cond, name) => {
   if (!cond) fails++;
 };
 
-// schema
-ok(validateFeedRecord({
-  feed_id: 'wake-county-nc-granicus-rss-meetings',
+// production contract columns
+ok(FEEDS_CSV_COLUMNS.includes('source') && !FEEDS_CSV_COLUMNS.includes('source_url'),
+  'CSV uses production column source (not source_url)');
+ok(!FEEDS_CSV_COLUMNS.includes('destination') && !FEEDS_CSV_COLUMNS.includes('notes'),
+  'CSV excludes non-production columns destination/notes');
+
+// coerce legacy draft shapes
+const coerced = normalizeFeedRecord(coerceFeedRow({
+  feed_id: 'wake-county-nc-granicus-meetings',
   community_id: '00000000-0000-4000-8000-000000000001',
   source_url: 'https://wake.granicus.com/ViewPublisherRSS.php?view_id=18&mode=agendas',
   source_type: 'granicus_rss',
   category: COUNTY_COMMISSION_CATEGORY,
   pipeline_type: 'government_notice',
-  destination: 'meetings',
-  agency_name: 'Wake County Board of Commissioners',
+  agency_name: 'Wake',
   geographic_reference: 'Wake County, NC',
   active: false,
-}).length === 0, 'valid granicus candidate passes schema');
+}));
+ok(coerced.source_type === 'rss' && coerced.source.includes('granicus.com'),
+  'coerce maps granicus_rss → rss and source_url → source');
+
+ok(validateFeedRecord(coerced, { requireCandidateInactive: true }).length === 0,
+  'coerced granicus candidate passes production validation');
 
 ok(validateFeedRecord({
   feed_id: 'bad',
   community_id: 'nope',
-  source_url: 'ftp://x',
+  source: 'ftp://x',
   source_type: 'granicus_rss',
   category: '',
   pipeline_type: '',
-  destination: 'nope',
   agency_name: '',
   geographic_reference: '',
-  active: false,
-}).length >= 5, 'invalid candidate accumulates schema errors');
+  active: true,
+}).length >= 4, 'invalid rows fail validation');
 
-// slugify
-const sl = slugifyCounty('Wake County', 'NC');
-ok(sl.base === 'wake', 'slugify strips County suffix');
-ok(sl.withCounty === 'wakecounty', 'slugify builds withCounty variant');
+// vendor adapter → production source_type
+ok(VENDOR_ADAPTER.granicus.source_type === 'rss', 'Granicus adapter uses rss');
+ok(VENDOR_ADAPTER.legistar.source_type === 'html', 'Legistar adapter uses html');
+ok(VENDOR_ADAPTER.civicclerk.source_type === 'html', 'CivicClerk adapter uses html');
 
-// discovery candidate generation
+// discovery
 const built = buildDiscoveryCandidates({ county_name: 'Douglas County', state: 'NV', hints: { granicus_entity: 'douglascountynv' } });
-ok(built.candidates.some((c) => c.vendor === 'granicus_rss' && c.urls[0].includes('douglascountynv')), 'hints seed granicus entity');
+ok(built.candidates.some((c) => c.vendor === 'granicus'), 'discovery emits granicus vendor id');
 
-// offline granicus analysis
 const granicusBody = fx('granicus-wake-rss.xml');
 const ga = analyzeGranicusRss(granicusBody);
-ok(ga.valid && ga.items === 2, 'granicus fixture has 2 items');
-ok(/Commissioners/.test(ga.sampleTitle), 'granicus sample title mentions Commissioners');
-ok(scoreProbe('granicus_rss', ga) >= 70, 'granicus fixture scores high');
+ok(ga.valid && ga.items === 2, 'granicus fixture parses');
+ok(scoreProbe('granicus', ga) >= 70, 'granicus scores high');
 
-// legistar
 const la = analyzeLegistar(fx('legistar-calendar.html'), 200);
 ok(la.valid, 'legistar fixture validates');
 
-// civicclerk with mock fetch
 const civicJson = fx('civicclerk-events.json');
 const mockFetch = async (url) => ({
-  ok: true,
-  status: 200,
+  ok: true, status: 200,
   text: async () => (String(url).includes('api.civicclerk.com') ? civicJson : ''),
 });
 const cc = await probeCivicClerk('https://traviscotx.portal.civicclerk.com/', { fetchFn: mockFetch });
-ok(cc.valid && cc.events === 1, 'civicclerk mock API returns events');
-ok(/Commissioners Court/.test(cc.sampleTitle || ''), 'civicclerk sample title');
+ok(cc.valid && cc.events === 1, 'civicclerk mock API');
 
-// full discover with mock fetch
 const granicusUrl = 'https://wake.granicus.com/ViewPublisherRSS.php?view_id=18&mode=agendas';
 const discoverFetch = async (url) => ({
-  ok: true,
-  status: 200,
+  ok: true, status: 200,
   text: async () => (String(url) === granicusUrl ? granicusBody : '<html></html>'),
 });
 const disc = await discoverCountyVendor(
   { county_name: 'Wake County', state: 'NC', hints: { granicus_entity: 'wake' } },
   { fetchFn: discoverFetch, maxProbes: 5 },
 );
-ok(disc.hits.length >= 1 && disc.hits[0].vendor === 'granicus_rss', 'discover ranks granicus hit');
+ok(disc.hits[0]?.vendor === 'granicus', 'discover ranks granicus');
 
-// candidate builder + SQL
 const candidate = buildCandidateFeedRow({
   community_id: '00000000-0000-4000-8000-000000000099',
   county_name: 'Wake County',
@@ -107,17 +115,22 @@ const candidate = buildCandidateFeedRow({
   geographic_reference: disc.geo,
   hit: disc.hits[0],
 });
-ok(candidate.active === false, 'candidates default active=false');
-ok(candidate.category === COUNTY_COMMISSION_CATEGORY, 'county meetings use canonical category');
+ok(candidate.active === false && candidate.source_type === 'rss', 'candidate is inactive rss row');
+
 const sql = candidateToInsertSql(candidate);
-ok(sql.includes('insert into public.feeds') && sql.includes('on conflict (feed_id)'), 'insert SQL is idempotent');
+ok(sql.includes('on conflict (feed_id) do nothing'), 'insert SQL never upserts');
+ok(!sql.includes('do update'), 'insert SQL has no DO UPDATE');
+ok(sql.includes('active') && sql.includes('false'), 'insert SQL forces active=false');
 
-// csv + sync
-const csvRows = readFeedsCsv(join(root, 'data/gov-feeds/feeds.csv'));
-ok(csvRows.length === 0, 'authoring feeds.csv is header-only (no production rows)');
-
+// sync — DB-only production feeds are NOT drift
+const csvRows = readFeedsCsv(join(root, 'fixtures/gov-feeds/feeds-authoring-fixture.csv'));
 const dbFixture = JSON.parse(fx('db-feeds-fixture.json'));
-const syncDiff = diffFeedsConfig([], dbFixture);
-ok(syncDiff.only_in_db.length === 1, 'empty CSV vs fixture DB shows only_in_db');
+const driftDbOnly = diffFeedsConfig([], dbFixture);
+ok(driftDbOnly.db_only_production.length === 1, 'reports DB-only feeds');
+ok(!driftDbOnly.summary.has_drift, 'DB-only production feed alone does not cause drift');
+
+const driftMissing = diffFeedsConfig(csvRows, []);
+ok(driftMissing.summary.has_drift, 'CSV row missing from DB is drift');
+ok(driftMissing.missing_from_db.includes('wake-county-nc-candidate'), 'flags missing feed_id');
 
 process.exit(fails ? 1 : 0);

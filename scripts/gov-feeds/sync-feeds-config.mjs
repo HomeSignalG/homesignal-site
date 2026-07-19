@@ -1,19 +1,20 @@
 #!/usr/bin/env node
 // sync-feeds-config.mjs — close the feeds.csv → public.feeds operational gap.
 //
-// Compares the versioned CSV authoring surface against live public.feeds and emits
-// a human-readable report + optional SQL for missing rows (candidates only).
+// Compares homesignal-ingest feeds.csv (NOT duplicated in this repo) against
+// live public.feeds. Fails only on meaningful drift: CSV rows missing from DB,
+// or field mismatches for rows present in both.
 //
 // Usage:
-//   node scripts/gov-feeds/sync-feeds-config.mjs \
-//     --csv data/gov-feeds/feeds.csv \
-//     [--db-json path/to/feeds-export.json]   # offline diff
-//     [--live]                                 # fetch DB via service role (CI)
+//   FEEDS_CSV=/path/to/homesignal-ingest/feeds.csv \
+//     node scripts/gov-feeds/sync-feeds-config.mjs --live
 //
-// SAFETY: never mutates production. --emit-insert-sql writes candidate SQL only
-// for rows present in CSV but absent from DB (typically active=false).
+// Offline:
+//   node scripts/gov-feeds/sync-feeds-config.mjs \
+//     --csv fixtures/gov-feeds/feeds-authoring-fixture.csv \
+//     --db-json fixtures/gov-feeds/db-feeds-fixture.json
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFeedsCsv } from './lib/csv-io.mjs';
 import { candidateToInsertSql } from './lib/candidates.mjs';
 import { diffFeedsConfig, fetchDbFeeds, formatSyncReport } from './lib/sync.mjs';
@@ -24,14 +25,19 @@ function arg(name) {
 }
 const has = (name) => process.argv.includes(name);
 
-const csvPath = arg('--csv') || 'data/gov-feeds/feeds.csv';
+const csvPath = arg('--csv') || process.env.FEEDS_CSV;
 const dbJsonPath = arg('--db-json');
 const outReport = arg('--out-report') || 'results/feeds-sync-report.txt';
 const outSql = arg('--emit-insert-sql');
 const live = has('--live');
 
+if (!csvPath) {
+  console.error('Provide --csv or set FEEDS_CSV to homesignal-ingest/feeds.csv');
+  process.exit(2);
+}
+
 const csvRows = readFeedsCsv(csvPath);
-/** @type {import('./lib/schema.mjs').FeedRecord[]} */
+/** @type {import('./schema.mjs').FeedRecord[]} */
 let dbRows = [];
 
 if (live) {
@@ -56,11 +62,11 @@ mkdirSync('results', { recursive: true });
 writeFileSync(outReport, report + '\n');
 console.log(report);
 
-if (outSql && diff.only_in_csv.length) {
+if (outSql && diff.missing_from_db.length) {
   const csvMap = new Map(csvRows.map((r) => [r.feed_id, r]));
-  const sql = diff.only_in_csv.map((id) => candidateToInsertSql(csvMap.get(id))).join('\n');
+  const sql = diff.missing_from_db.map((id) => candidateToInsertSql(csvMap.get(id))).join('\n');
   writeFileSync(outSql, sql);
-  console.log(`\nWrote insert SQL for ${diff.only_in_csv.length} CSV-only row(s) → ${outSql}`);
+  console.log(`\nWrote insert SQL for ${diff.missing_from_db.length} missing row(s) → ${outSql}`);
 }
 
-process.exit(diff.summary.in_sync ? 0 : 1);
+process.exit(diff.summary.has_drift ? 1 : 0);

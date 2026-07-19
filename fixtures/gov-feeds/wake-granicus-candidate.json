@@ -1,14 +1,14 @@
 {
-  "feed_id": "wake-county-nc-granicus-rss-meetings",
+  "feed_id": "wake-county-nc-granicus-meetings",
   "community_id": "00000000-0000-4000-8000-000000000099",
-  "source_url": "https://wake.granicus.com/ViewPublisherRSS.php?view_id=18&mode=agendas",
-  "source_type": "granicus_rss",
+  "source": "https://wake.granicus.com/ViewPublisherRSS.php?view_id=18&mode=agendas",
+  "source_type": "rss",
   "category": "County Commission & county business",
   "pipeline_type": "government_notice",
-  "destination": "meetings",
   "agency_name": "Wake County Board of Commissioners",
   "geographic_reference": "Wake County, NC",
   "impact_level": "medium",
   "active": false,
-  "notes": "fixture candidate — not for production"
+  "sort_order": 0,
+  "vendor": "granicus"
 }

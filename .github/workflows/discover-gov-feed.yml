@@ -1,6 +1,6 @@
 name: discover-gov-feed
 
-# Phase 1A — county vendor discovery (Granicus RSS / Legistar / CivicClerk).
+# Phase 1A — county vendor discovery (Granicus / Legistar / CivicClerk).
 # READ-ONLY: probes vendor hosts, writes JSON artifact. Does not touch public.feeds.
 
 on:
@@ -16,7 +16,7 @@ on:
         description: 'County root community UUID'
         required: true
       hints_file:
-        description: 'Optional repo path to hints JSON (granicus_entity, legistar_client, civicclerk_sub)'
+        description: 'Optional repo path to hints JSON'
         required: false
         default: ''
       max_probes:
@@ -36,12 +36,25 @@ jobs:
         with:
           node-version: '20'
       - name: Discover vendor
+        env:
+          DISCOVER_COUNTY: ${{ github.event.inputs.county }}
+          DISCOVER_STATE: ${{ github.event.inputs.state }}
+          DISCOVER_COMMUNITY_ID: ${{ github.event.inputs.community_id }}
+          DISCOVER_HINTS: ${{ github.event.inputs.hints_file }}
+          DISCOVER_MAX_PROBES: ${{ github.event.inputs.max_probes }}
         run: |
-          ARGS="--county '${{ github.event.inputs.county }}' --state '${{ github.event.inputs.state }}' --community-id '${{ github.event.inputs.community_id }}' --max-probes ${{ github.event.inputs.max_probes }} --out results/gov-feed-discovery.json"
-          if [ -n "${{ github.event.inputs.hints_file }}" ]; then
-            ARGS="$ARGS --hints '${{ github.event.inputs.hints_file }}'"
+          set -euo pipefail
+          args=(
+            --county "$DISCOVER_COUNTY"
+            --state "$DISCOVER_STATE"
+            --community-id "$DISCOVER_COMMUNITY_ID"
+            --max-probes "$DISCOVER_MAX_PROBES"
+            --out results/gov-feed-discovery.json
+          )
+          if [ -n "$DISCOVER_HINTS" ]; then
+            args+=(--hints "$DISCOVER_HINTS")
           fi
-          node scripts/gov-feeds/discover-county-vendor.mjs $ARGS
+          node scripts/gov-feeds/discover-county-vendor.mjs "${args[@]}"
       - name: Upload discovery artifact
         uses: actions/upload-artifact@v4
         with:

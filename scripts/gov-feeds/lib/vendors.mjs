@@ -13,8 +13,12 @@
  */
 
 /**
+ * @typedef {'granicus' | 'legistar' | 'civicclerk'} VendorId
+ */
+
+/**
  * @typedef {Object} DiscoveryHit
- * @property {'granicus_rss' | 'legistar' | 'civicclerk'} vendor
+ * @property {VendorId} vendor
  * @property {string} source_url
  * @property {number} confidence
  * @property {string} reason
@@ -54,7 +58,7 @@ export function buildDiscoveryCandidates(input) {
   for (const entity of granicusEntities) {
   for (const viewId of [1, 2, 3, 18, 28]) {
       out.push({
-        vendor: 'granicus_rss',
+        vendor: 'granicus',
         urls: [`https://${entity}.granicus.com/ViewPublisherRSS.php?view_id=${viewId}&mode=agendas`],
         reason: `granicus entity=${entity} view_id=${viewId}`,
       });
@@ -174,7 +178,7 @@ export async function probeCivicClerk(portalUrl, opts = {}) {
  * @param {Awaitable<Record<string, unknown>>} probeResult
  */
 export function scoreProbe(vendor, probeResult) {
-  if (vendor === 'granicus_rss') {
+  if (vendor === 'granicus') {
     const { valid, items, sampleTitle } = probeResult;
     if (!valid) return 0;
     let score = 50 + Math.min(items, 50);
@@ -211,13 +215,13 @@ export async function discoverCountyVendor(input, opts = {}) {
     for (const url of cand.urls) {
       if (probed >= maxProbes) break;
       probed++;
-      if (cand.vendor === 'granicus_rss') {
+      if (cand.vendor === 'granicus') {
         const res = await probeUrl(url, opts);
         const analysis = analyzeGranicusRss(res.body);
-        const confidence = scoreProbe('granicus_rss', analysis);
+        const confidence = scoreProbe('granicus', analysis);
         if (confidence > 0) {
           hits.push({
-            vendor: 'granicus_rss',
+            vendor: 'granicus',
             source_url: url,
             confidence,
             reason: `${cand.reason}; items=${analysis.items}`,
