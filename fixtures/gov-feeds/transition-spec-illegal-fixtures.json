@@ -1,0 +1,8 @@
+[
+  { "from": "discovered", "to": "active", "event": "activate", "reason": "skips all gates" },
+  { "from": "queued", "to": "inserted", "event": "insert", "reason": "queued is not a P0 state" },
+  { "from": "superseded", "to": "active", "event": "activate", "reason": "terminal state" },
+  { "from": "abandoned", "to": "discovered", "event": "discriminate", "reason": "terminal state" },
+  { "from": "title_verified", "to": "active", "event": "activate", "reason": "must pass through activating" },
+  { "from": "goliving", "to": "active", "event": "activate", "reason": "skips title_verified" }
+]

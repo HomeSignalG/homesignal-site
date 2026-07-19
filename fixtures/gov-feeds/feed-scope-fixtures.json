@@ -1,0 +1,32 @@
+[
+  {
+    "source": "https://wake.granicus.com/ViewPublisherRSS.php?view_id=18&mode=agendas",
+    "vendor": "granicus",
+    "meeting_url": "https://wake.granicus.com/MediaPlayer.php?view_id=18&clip_id=123",
+    "matches": true
+  },
+  {
+    "source": "https://wake.granicus.com/ViewPublisherRSS.php?view_id=18&mode=agendas",
+    "vendor": "granicus",
+    "meeting_url": "https://wake.granicus.com/MediaPlayer.php?view_id=99&clip_id=456",
+    "matches": false
+  },
+  {
+    "source": "https://wake.legistar.com/Calendar.aspx",
+    "vendor": "legistar",
+    "meeting_url": "https://wake.legistar.com/MeetingDetail.aspx?ID=1",
+    "matches": true
+  },
+  {
+    "source": "https://wake.legistar.com/Calendar.aspx",
+    "vendor": "legistar",
+    "meeting_url": "https://other.legistar.com/MeetingDetail.aspx?ID=1",
+    "matches": false
+  },
+  {
+    "source": "https://wakecounty.portal.civicclerk.com/",
+    "vendor": "civicclerk",
+    "meeting_url": "https://wakecounty.api.civicclerk.com/v1/Events/1",
+    "matches": true
+  }
+]

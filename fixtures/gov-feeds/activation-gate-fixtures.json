@@ -1,0 +1,42 @@
+[
+  {
+    "name": "all gates pass",
+    "candidate": { "title_verified_at": "2026-07-19T00:00:00Z", "claimed_by": "op1", "claim_expires_at": "2026-12-31T00:00:00Z" },
+    "feed": { "feed_id": "wake-county-nc-granicus-meetings", "active": false },
+    "syncDiff": { "has_drift": false },
+    "expect_pass": true
+  },
+  {
+    "name": "missing title_verified_at",
+    "candidate": { "title_verified_at": null },
+    "feed": { "feed_id": "wake-county-nc-granicus-meetings", "active": false },
+    "syncDiff": { "has_drift": false },
+    "expect_pass": false,
+    "expect_failures": ["title_verified_at"]
+  },
+  {
+    "name": "feed already active",
+    "candidate": { "title_verified_at": "2026-07-19T00:00:00Z" },
+    "feed": { "feed_id": "wake-county-nc-granicus-meetings", "active": true },
+    "syncDiff": { "has_drift": false },
+    "expect_pass": false,
+    "expect_failures": ["feed_active_false"]
+  },
+  {
+    "name": "sync drift",
+    "candidate": { "title_verified_at": "2026-07-19T00:00:00Z" },
+    "feed": { "feed_id": "wake-county-nc-granicus-meetings", "active": false },
+    "syncDiff": { "has_drift": true },
+    "expect_pass": false,
+    "expect_failures": ["sync_pass"]
+  },
+  {
+    "name": "circuit halted",
+    "candidate": { "title_verified_at": "2026-07-19T00:00:00Z" },
+    "feed": { "feed_id": "wake-county-nc-granicus-meetings", "active": false },
+    "syncDiff": { "has_drift": false },
+    "circuit": { "circuit_status": "halted" },
+    "expect_pass": false,
+    "expect_failures": ["circuit_closed"]
+  }
+]

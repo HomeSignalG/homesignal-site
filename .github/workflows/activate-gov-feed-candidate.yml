@@ -1,0 +1,46 @@
+name: activate-gov-feed-candidate
+
+# Phase 1B P0 — activation pre-flight (gates only; separate from insert-gov-feed-candidate).
+# Does NOT set active=true — operator runs activation SQL after gates pass.
+
+on:
+  workflow_dispatch:
+    inputs:
+      feed_id:
+        description: 'Canonical feed_id e.g. wake-county-nc-granicus-meetings'
+        required: true
+      candidate_json:
+        description: 'Repo path to feed_candidates row JSON fixture'
+        required: true
+      feed_json:
+        description: 'Repo path to public.feeds row JSON fixture'
+        required: true
+      sync_json:
+        description: 'Optional repo path to sync diff JSON'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  activate-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Activation gate pre-flight
+        env:
+          FEED_ID: ${{ github.event.inputs.feed_id }}
+          CANDIDATE_JSON: ${{ github.event.inputs.candidate_json }}
+          FEED_JSON: ${{ github.event.inputs.feed_json }}
+          SYNC_JSON: ${{ github.event.inputs.sync_json }}
+        run: |
+          set -euo pipefail
+          args=(--feed-id "$FEED_ID" --candidate-json "$CANDIDATE_JSON" --feed-json "$FEED_JSON")
+          if [ -n "$SYNC_JSON" ]; then
+            args+=(--sync-json "$SYNC_JSON")
+          fi
+          node scripts/gov-feeds/activate-feed-candidate.mjs "${args[@]}"

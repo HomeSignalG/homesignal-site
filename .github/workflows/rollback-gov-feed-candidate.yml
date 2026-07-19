@@ -1,0 +1,34 @@
+name: rollback-gov-feed-candidate
+
+# Phase 1B P0 — validate rollback state-machine path (no production mutations).
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_state:
+        description: 'Starting state (default: active)'
+        required: false
+        default: 'active'
+      event:
+        description: 'Transition event (default: open_circuit)'
+        required: false
+        default: 'open_circuit'
+
+permissions:
+  contents: read
+
+jobs:
+  rollback-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate rollback transition chain
+        env:
+          FROM_STATE: ${{ github.event.inputs.from_state }}
+          EVENT: ${{ github.event.inputs.event }}
+        run: |
+          set -euo pipefail
+          node scripts/gov-feeds/rollback-feed-candidate.mjs --from "$FROM_STATE" --event "$EVENT"

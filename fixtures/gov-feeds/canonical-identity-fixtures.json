@@ -1,0 +1,20 @@
+[
+  {
+    "community_slug": "wake-county-nc",
+    "vendor": "granicus",
+    "target_table": "meetings",
+    "feed_id": "wake-county-nc-granicus-meetings"
+  },
+  {
+    "community_slug": "hennepin-county-mn",
+    "vendor": "legistar",
+    "target_table": "meetings",
+    "feed_id": "hennepin-county-mn-legistar-meetings"
+  },
+  {
+    "county_name": "Wake County",
+    "state": "NC",
+    "vendor": "granicus",
+    "legacy_slug": "wake-county-nc"
+  }
+]
