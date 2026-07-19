@@ -21,7 +21,7 @@ import {
 } from '../scripts/gov-feeds/lib/vendors.mjs';
 import { buildCandidateFeedRow, candidateToInsertSql } from '../scripts/gov-feeds/lib/candidates.mjs';
 import { readFeedsCsv } from '../scripts/gov-feeds/lib/csv-io.mjs';
-import { diffFeedsConfig } from '../scripts/gov-feeds/lib/sync.mjs';
+import { diffFeedsConfig, diffFeedForId } from '../scripts/gov-feeds/lib/sync.mjs';
 import {
   coerceFeedRow,
   COUNTY_COMMISSION_CATEGORY,
@@ -104,6 +104,18 @@ const candidate = buildCandidateFeedRow({
   hit: disc.hits[0],
 });
 ok(candidate.county === 'Wake County', 'candidate carries county from discovery');
+ok(candidate.feed_id === 'wake-county-nc-granicus-meetings', 'canonical feed_id from county_name legacy shim');
+
+const slugCandidate = buildCandidateFeedRow({
+  community_id: '00000000-0000-4000-8000-000000000099',
+  community_slug: 'wake-county-nc',
+  county_name: 'Wake County',
+  state: 'NC',
+  agency_name: disc.agency,
+  geographic_reference: disc.geo,
+  hit: disc.hits[0],
+});
+ok(slugCandidate.feed_id === 'wake-county-nc-granicus-meetings', 'canonical feed_id from community_slug');
 
 const sql = candidateToInsertSql(candidate);
 ok(sql.includes('on conflict (feed_id) do nothing'), 'insert SQL never upserts');
@@ -148,6 +160,11 @@ ok(!driftDbOnly.summary.has_drift, 'DB-only production feed alone does not cause
 
 const driftMissing = diffFeedsConfig(csvRows, []);
 ok(driftMissing.summary.has_drift, 'CSV row missing from DB is drift');
+
+const perFeedCsv = diffFeedForId('wake-county-nc-candidate', csvRows, []);
+ok(perFeedCsv.in_csv === true && perFeedCsv.in_db === false, 'diffFeedForId finds CSV-only feed');
+const perFeedDb = diffFeedForId('clark-county-nv-granicus-meetings', [], dbFixture);
+ok(perFeedDb.in_db === true && perFeedDb.in_csv === false, 'diffFeedForId finds DB-only feed');
 
 // legacy filter column alias on ingest-shaped header
 const filterAlias = readFeedsCsv(join(root, 'fixtures/gov-feeds/feeds-filter-alias-fixture.csv'));

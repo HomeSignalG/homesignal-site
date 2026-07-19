@@ -1,5 +1,8 @@
 import { FEEDS_TABLE_COLUMNS, VENDOR_ADAPTER } from './production-contract.mjs';
 import { COUNTY_COMMISSION_CATEGORY, normalizeFeedRecord, validateFeedRecord } from './schema.mjs';
+import { resolveFeedIdInput } from './canonical-identity.mjs';
+
+export { buildCanonicalFeedId, resolveFeedIdInput } from './canonical-identity.mjs';
 
 /**
  * @param {{ vendor: keyof typeof VENDOR_ADAPTER, source_url: string, confidence?: number, reason?: string }} hit
@@ -16,18 +19,40 @@ export function vendorHitToSourceType(hit) {
  */
 export function buildCandidateFeedRow(args) {
   const st = args.state.length === 2 ? args.state.toUpperCase() : args.state;
-  const slugBase = `${args.county_name}-${st}`
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
   const vendor = args.hit.vendor;
-  const feed_id = `${args.feed_id_prefix || slugBase}-${vendor}-meetings`.replace(/--+/g, '-');
+
+  let feed_id;
+  if (args.community_slug) {
+    ({ feed_id } = resolveFeedIdInput({
+      community_slug: args.community_slug,
+      vendor,
+      target_table: args.target_table || 'meetings',
+    }));
+  } else if (args.county_name) {
+    const resolved = resolveFeedIdInput({
+      county_name: args.county_name,
+      state: st,
+      vendor,
+      target_table: args.target_table || 'meetings',
+    });
+    feed_id = args.feed_id_prefix
+      ? `${args.feed_id_prefix}-${vendor}-meetings`.replace(/--+/g, '-')
+      : resolved.feed_id;
+    if (resolved.legacy && typeof console !== 'undefined' && console.warn) {
+      console.warn(
+        'buildCandidateFeedRow: county_name feed_id shim is deprecated; pass community_slug from communities.slug',
+      );
+    }
+  } else {
+    throw new Error('buildCandidateFeedRow requires community_slug or county_name + state');
+  }
+
   const source_type = vendorHitToSourceType(args.hit);
 
   const row = normalizeFeedRecord({
     feed_id,
     community_id: args.community_id,
-    county: args.county_name || '',
+    county: args.county_name || args.county || '',
     source: args.hit.source_url,
     source_type,
     category: COUNTY_COMMISSION_CATEGORY,

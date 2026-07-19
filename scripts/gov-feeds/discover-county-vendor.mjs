@@ -20,6 +20,7 @@ function arg(name) {
 const county = arg('--county');
 const state = arg('--state');
 const communityId = arg('--community-id');
+const communitySlug = arg('--community-slug');
 const hintsPath = arg('--hints');
 const outPath = arg('--out') || 'results/gov-feed-discovery.json';
 const maxProbes = arg('--max-probes') ? parseInt(arg('--max-probes'), 10) : 40;
@@ -46,14 +47,16 @@ const payload = {
 
 if (communityId && result.hits.length) {
   const best = result.hits[0];
-  payload.candidates.push(buildCandidateFeedRow({
+  const rowArgs = {
     community_id: communityId,
     county_name: county,
     state,
     agency_name: result.agency,
     geographic_reference: result.geo,
     hit: best,
-  }));
+  };
+  if (communitySlug) rowArgs.community_slug = communitySlug;
+  payload.candidates.push(buildCandidateFeedRow(rowArgs));
 }
 
 mkdirSync('results', { recursive: true });

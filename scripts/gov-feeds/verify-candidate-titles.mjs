@@ -9,7 +9,10 @@
 //     --community-id <uuid> \
 //     --feed-id <feed_id> \
 //     --pattern "Commission|Council|Court" \
-//     [--min-match 0.8]
+//     [--min-match 0.8] \
+//     [--legacy-host-scope]
+
+import { buildMeetingsScopeFilter, meetingMatchesScope } from './lib/feed-scope.mjs';
 
 function arg(name) {
   const i = process.argv.indexOf(name);
@@ -21,9 +24,10 @@ const feedId = arg('--feed-id');
 const sourceHint = arg('--source');
 const pattern = arg('--pattern') || 'Commission|Council|Court|Board of Commissioners|County Council';
 const minMatch = arg('--min-match') ? parseFloat(arg('--min-match')) : 0.8;
+const legacyHostScope = process.argv.includes('--legacy-host-scope');
 
 if (!communityId) {
-  console.error('usage: verify-candidate-titles.mjs --community-id UUID [--feed-id ID | --source URL] [--pattern REGEX] [--min-match 0.8]');
+  console.error('usage: verify-candidate-titles.mjs --community-id UUID [--feed-id ID | --source URL] [--pattern REGEX] [--min-match 0.8] [--legacy-host-scope]');
   process.exit(2);
 }
 
@@ -37,22 +41,13 @@ if (!url || !key) {
 const base = url.replace(/\/$/, '');
 const headers = { apikey: key, Authorization: `Bearer ${key}` };
 
-/** @param {string} feedSource */
-function sourceHostPattern(feedSource) {
-  try {
-    const u = new URL(feedSource);
-    return u.hostname.replace(/\./g, '\\.');
-  } catch {
-    return feedSource.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-}
-
 let feedSource = sourceHint || '';
 let feedCategory = '';
+let feedVendor = '';
 
 if (feedId) {
   const feedRes = await fetch(
-    `${base}/rest/v1/feeds?feed_id=eq.${encodeURIComponent(feedId)}&select=source,category,community_id&limit=1`,
+    `${base}/rest/v1/feeds?feed_id=eq.${encodeURIComponent(feedId)}&select=source,category,community_id,source_type&limit=1`,
     { headers },
   );
   if (!feedRes.ok) {
@@ -70,19 +65,19 @@ if (feedId) {
   }
   feedSource = feeds[0].source;
   feedCategory = feeds[0].category || '';
+  if (feedSource.includes('granicus.com')) feedVendor = 'granicus';
+  else if (feedSource.includes('legistar.com')) feedVendor = 'legistar';
+  else if (feedSource.includes('civicclerk.com')) feedVendor = 'civicclerk';
 }
 
 const params = new URLSearchParams({
   community_id: `eq.${communityId}`,
   select: 'title,meeting_date,source_url,category',
   order: 'meeting_date.desc',
-  limit: '50',
+  limit: '100',
 });
 
-if (feedSource) {
-  const hostPat = sourceHostPattern(feedSource);
-  params.set('source_url', `ilike.*${hostPat}*`);
-} else if (feedCategory) {
+if (!feedSource && feedCategory) {
   params.set('category', `eq.${feedCategory}`);
 }
 
@@ -93,9 +88,21 @@ if (!res.ok) {
   process.exit(2);
 }
 
-const meetings = await res.json();
+let meetings = await res.json();
 if (!meetings.length) {
   console.error('no meetings found for scoped query — run golive ingest first');
+  process.exit(1);
+}
+
+/** @type {{ type: string, pattern: string, scope: object } | null} */
+let scopeFilter = null;
+if (feedSource) {
+  scopeFilter = buildMeetingsScopeFilter(feedSource, feedVendor, { legacyHostScope });
+  meetings = meetings.filter((m) => meetingMatchesScope(m.source_url, scopeFilter));
+}
+
+if (!meetings.length) {
+  console.error('no meetings matched feed scope — check feed source or use --legacy-host-scope');
   process.exit(1);
 }
 
@@ -107,6 +114,8 @@ const report = {
   community_id: communityId,
   feed_id: feedId || null,
   source_scope: feedSource || null,
+  scope_mode: scopeFilter?.type || (feedCategory ? 'category' : 'community_only'),
+  legacy_host_scope: legacyHostScope,
   total: meetings.length,
   matched: matched.length,
   ratio,

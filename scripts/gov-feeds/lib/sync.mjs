@@ -87,6 +87,27 @@ export async function fetchDbFeeds(creds) {
   return rows;
 }
 
+/**
+ * Per-feed sync diff — subset of diffFeedsConfig for one feed_id.
+ * @param {string} feedId
+ * @param {import('./schema.mjs').FeedRecord[]} csvRows
+ * @param {import('./schema.mjs').FeedRecord[]} dbRows
+ */
+export function diffFeedForId(feedId, csvRows, dbRows) {
+  const csvRow = csvRows.find((r) => feedRecordKey(r) === feedId);
+  const dbRow = dbRows.find((r) => feedRecordKey(r) === feedId);
+  const full = diffFeedsConfig(csvRow ? [csvRow] : [], dbRow ? [dbRow] : []);
+  return {
+    feed_id: feedId,
+    in_csv: Boolean(csvRow),
+    in_db: Boolean(dbRow),
+    ...full.summary,
+    missing_from_db: full.missing_from_db,
+    mismatched: full.mismatched,
+    active_reconcile: full.active_reconcile,
+  };
+}
+
 /** @param {ReturnType<typeof diffFeedsConfig>} diff @param {{ quarantined?: Array<{ row: number, feed_id: string, errors: string[] }>, warnings?: string[] }} [opts] */
 export function formatSyncReport(diff, { quarantined = [], warnings = [] } = {}) {
   const lines = [
