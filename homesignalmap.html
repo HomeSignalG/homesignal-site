@@ -313,10 +313,13 @@
         <div class="card mapcard">
           <div class="map-bar">
             <div class="map-cap">Development around this home</div>
-            <div class="viewseg" id="viewSeg">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <a href="maps.html" id="hs-map-cross" data-znav="maps.html" class="linklike" style="margin:0;font-size:12.5px">App map →</a>
+              <div class="viewseg" id="viewSeg">
               <button data-v="2d" class="on">2D map</button>
               <button data-v="3d">3D aerial</button>
               <button data-v="gl">3D satellite</button>
+            </div>
             </div>
           </div>
           <div class="maprow">
@@ -944,6 +947,7 @@ HS.onReady(function(){
 
   function loadZip(zip){
     ZIP_MODE = true; ZIP_CODE = zip; HOME_ANCHOR = true;
+    if(window.HS && HS.state) HS.state.zip = zip;
     FACILITIES_ONLY = false; ZIP_COUNTY = null;
     ZIP_STATE = null; ZIP_INDEXABLE = false; HAS_CONTENT = false; setIndexable(false);   // start noindex; flip on only via the stamped substance flag
     // NATIONWIDE SUBSTANCE GATE: read the materializer-stamped flag for this ZIP.
@@ -1044,6 +1048,9 @@ HS.onReady(function(){
     } else {
       $("rAddr").textContent = data.address || "";
       $("withinLbl").textContent = "Within " + radiusLabel(CUR_RADIUS) + " of";
+      // Address search: scope the App-map cross-link to this address's ZIP (same parse as the engine).
+      var addrZip = (window.HS && HS.parseZipFromAddress) ? HS.parseZipFromAddress(data.address) : null;
+      if(addrZip && window.HS && HS.state) HS.state.zip = addrZip;
     }
 
     // Anti-fabrication gate + expose the rendered set for scripts/verify-development.mjs.
@@ -2461,7 +2468,14 @@ HS.onReady(function(){
     if(a && a.trim()){ loadProperty(a.trim()); return; }
     var z = u.searchParams.get("zip");
     if(!z){ var m = u.pathname.match(/\/development\/(\d{5})\b/); if(m) z = m[1]; }
-    if(z && /^\d{5}$/.test(z)){ loadZip(z); loadDevTracker(z); }
+    // Reuse shell ZIP context when the URL has no ?zip= — never auto-load the sample default.
+    if(!z && window.HS && HS.hasViewedZipContext && HS.hasViewedZipContext() && HS.state && /^\d{5}$/.test(String(HS.state.zip))){
+      z = String(HS.state.zip);
+    }
+    if(z && /^\d{5}$/.test(z)){
+      if(window.HS && HS.state) HS.state.zip = z;
+      loadZip(z); loadDevTracker(z);
+    }
   })();
 });  // end HS.onReady — the page runtime above ran after the shell injected #hs-content
 </script>

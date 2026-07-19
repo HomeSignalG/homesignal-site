@@ -22,7 +22,7 @@
     <div class="cols">
       <div>
         <div class="block" style="padding:16px 18px">
-          <div class="bt-row"><h2>What's changing around you</h2><a href="maps.html">Open full map →</a></div>
+          <div class="bt-row"><h2>What's changing around you</h2><a href="maps.html" data-znav="maps.html">Open full map →</a></div>
           <div class="mapwrap" id="dashMap" style="box-shadow:none"></div>
         </div>
         <div class="bt-row"><h2 style="font-size:15px;margin:0">Recent activity near you</h2><a href="alerts.html" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">All alerts →</a></div>
@@ -39,7 +39,7 @@
           <div id="dashCommunities"></div>
         </div>
         <div class="block" id="dashWatchBlock">
-          <div class="bt-row"><h2>Worth watching nearby</h2><a href="maps.html">See on map →</a></div>
+          <div class="bt-row"><h2>Worth watching nearby</h2><a href="maps.html" data-znav="maps.html">See on map →</a></div>
           <div class="chips" id="dashWatch"></div>
         </div>
         <div class="block">
@@ -117,8 +117,8 @@ HS.onReady(async function () {
   dashMap.setAttribute('role', 'link');
   dashMap.setAttribute('aria-label', 'Open the full map of what\'s changing around you');
   dashMap.tabIndex = 0;
-  dashMap.addEventListener('click', function () { location.href = 'maps.html'; });
-  dashMap.addEventListener('keydown', function (e) { if (e.key === 'Enter') location.href = 'maps.html'; });
+  dashMap.addEventListener('click', function () { location.href = HS.navHref('maps.html', S.zip); });
+  dashMap.addEventListener('keydown', function (e) { if (e.key === 'Enter') location.href = HS.navHref('maps.html', S.zip); });
 
   // recent — ranked by impact
   var recent = changes.filter(function(x){return !x.quiet;})
