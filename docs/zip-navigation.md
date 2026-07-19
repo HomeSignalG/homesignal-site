@@ -54,8 +54,10 @@ them when the module is not loaded directly.
 |------|------|------------|
 | `maps.html` | App map (`app_*` data) | → `homesignalmap.html` (development tracker) |
 | `homesignalmap.html` | SEO / EPA tracker (`development_reports`) | → `maps.html` |
+| `community.html` | ZIP community hub (`app_*` data) | → `homesignalmap.html` (development tracker) |
 
-Both use `data-znav` on a single in-page link (not a second sidebar item).
+Both map pages use `data-znav` on a single in-page cross-link (not a second sidebar item).
+`community.html` adds **View Development Map →** in the page header action row (`HS.navHref` + `data-znav`).
 
 **Address search on the tracker:** after a live address fetch, `render()` parses the ZIP
 from the geocoded `data.address` (same regex as `get-address-report`) and sets

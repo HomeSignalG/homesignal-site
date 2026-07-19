@@ -49,7 +49,10 @@ HS.onReady(async function () {
       + 'The government meeting and permit feeds for this area are on the way.</p></div>'
       + '<div class="quiet" style="margin-top:6px"><b>Coverage coming.</b> We never show made-up activity. When ' + county0 + ' meeting and permit feeds are wired for '
       + HS.esc(zip) + ', this page fills with real records — each linked to its official source.'
-      + '<div style="margin-top:12px"><button class="inlinebtn" onclick="HS.openLoc()">◉ Notify me when it\'s live →</button></div></div>';
+      + '<div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">'
+      + '<button class="inlinebtn" onclick="HS.openLoc()">◉ Notify me when it\'s live →</button>'
+      + '<a class="inlinebtn" href="' + HS.esc(HS.navHref('homesignalmap.html', zip)) + '" data-znav="homesignalmap.html" style="text-decoration:none">View Development Map →</a>'
+      + '</div></div>';
     return;
   }
 
@@ -104,6 +107,7 @@ HS.onReady(async function () {
     + '<p>What\'s changing across your community — aggregated from the same feeds that power your alerts.</p>'
     + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'
     + '<button class="inlinebtn' + (following ? ' following' : '') + '" id="commFollowBtn" data-zip="' + HS.esc(zip) + '" data-name="' + HS.esc(c.name||'') + '" data-state="' + HS.esc(c.state||'') + '" onclick="HS.toggleFollowCommunityBtn(this)">' + (following ? '✓ Following' : '＋ Follow this community') + '</button>'
+    + '<a class="inlinebtn" href="' + HS.esc(HS.navHref('homesignalmap.html', zip)) + '" data-znav="homesignalmap.html" style="text-decoration:none">View Development Map →</a>'
     + '<button class="inlinebtn" onclick="HS.openModal(\'shareModal\')">◍ Invite your neighbors</button>'
     + '</div>'
     + '<div style="margin-top:14px"><div class="bt" style="font-size:13px;color:var(--ink-2);margin-bottom:6px">Your communities</div><div id="commStrip">' + HS.communitiesStripHTML() + '</div></div></div>'
