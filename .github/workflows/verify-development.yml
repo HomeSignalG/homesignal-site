@@ -26,6 +26,8 @@ on:
       - 'docs/*-development-reports-seed.sql'
       - 'docs/development-reports-cache.sql'
       - 'scripts/verify-development.mjs'
+      - 'scripts/verify-representative-zips.mjs'
+      - 'scripts/lib/verify-dev-helpers.mjs'
       - '.github/workflows/verify-development.yml'
 
 jobs:
