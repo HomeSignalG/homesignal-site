@@ -322,11 +322,19 @@ and will not overwrite an existing row.
 
 ---
 
-## Phase 1B P0 (stub — full runbook after Pilot A)
+## Phase 1B P0 + Pilot A staging
 
 Phase 1B adds a `feed_candidates` registry, state machine, and activation gates.
 **P0 artifacts are in-repo only** — SQL in `docs/gov-feeds-phase1b-p0-*.sql` is
 **not auto-applied**. See `docs/gov-feeds-phase1b-p0-README.md`.
+
+**Pilot A staging execution (operator):**
+
+- `docs/government-feed-phase1b-pilot-a-staging-execution-plan.md`
+- `docs/government-feed-phase1b-pilot-a-operator-runbook.md`
+- `docs/government-feed-phase1b-pilot-a-go-no-go-checklist.md`
+- `docs/government-feed-phase1b-pilot-a-rollback-checklist.md`
+- `docs/government-feed-phase1b-pilot-a-completion-checklist.md`
 
 | P0 script | Path |
 |-----------|------|
