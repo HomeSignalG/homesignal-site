@@ -50,8 +50,15 @@ Pilot A is **not complete** until ALL of the following are true:
 | Rollback drill witnessed | Founder sign-off | Ticket / email | ☐ |
 | 48h soak incidents | 0 SEV-1 | Soak log | ☐ |
 | Post-drill feed state | `active=false`, `superseded` | SQL | ☐ |
+| Post-drill legacy feed state (Plan §8) | `wake-nc-granicus-agendas` still `active=true` | SQL | ☐ |
 
 **Operational pass:** All rows checked.
+
+> **Evidence note (coexistence exception, Plan §8):** metrics that touch
+> meeting data ("Meetings ingested for Wake", wrong-board audit, soak) are
+> evidenced by **workflow logs (`golive-feed` `ONLY_FEED`), L2 title
+> verification, and feed-specific execution** — not total meeting counts, which
+> the concurrently-active legacy feed makes unattributable.
 
 ---
 
@@ -65,6 +72,14 @@ Pilot A is **not complete** until ALL of the following are true:
 | `docs/state-notice-portals.md` | Wake receipt if new evidence | ☐ |
 | `CLAUDE.md` scaling gaps | Government feed Pilot A status | ☐ |
 | Hints registry | Confirm `wake-hints.json` still accurate | ☐ |
+
+---
+
+## 3a. Post-Pilot cleanup (logged, non-blocking)
+
+| Item | Owner | Trigger | Done |
+|------|-------|---------|------|
+| **Supersede the legacy feed `wake-nc-granicus-agendas`** (deactivate in `public.feeds` + `feeds.csv`, sync exit 0) | **Founder decision** | **Only after** a governed Wake feed is **permanently adopted** for production — the same change that permanently activates the governed feed retires the legacy row, so Wake coverage is never interrupted. Not a Pilot A step; Pilot A ends with the pilot feed `superseded` and the legacy feed still active (Plan §8). | ☐ |
 
 ---
 

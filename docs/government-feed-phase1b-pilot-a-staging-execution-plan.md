@@ -120,6 +120,18 @@ where feed_id = 'wake-county-nc-granicus-meetings';
 | 1 row, `active = false` | Proceed; registry must reflect existing row at `inserted` |
 | 1 row, `active = true` | **Stop** — founder approval required before Pilot A re-run (supersede or alternate staging feed) |
 
+> **Known same-source legacy feed (approved coexistence — do not stop):** the
+> pre-flight query above returns **0 rows** for the canonical `feed_id`, but a
+> separate row `wake-nc-granicus-agendas` (`active=true`) exists on the **same**
+> Granicus source URL. It is an **intentional pre-Phase-1B legacy production
+> feed** (2026-07-05 granicus vendor batch), and **Pilot A is an approved
+> coexistence exception**: the legacy feed stays active for the whole pilot,
+> rollback must verify it remains active, and pilot evidence comes from workflow
+> logs / title verification / feed-specific execution — never total meeting
+> counts. Full terms: Pilot A Plan §8. Supersession of the legacy feed is a
+> **post-Pilot founder decision**, taken only after the governed feed is
+> permanently adopted.
+
 ---
 
 ### 1.5 Required secrets

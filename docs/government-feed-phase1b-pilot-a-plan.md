@@ -129,3 +129,43 @@ checklist):
 | Activation (G18) | **Founder — written approval required** |
 | Rollback drill acceptance | Founder |
 | Pilot B authorization | Founder (completion checklist) |
+| Legacy feed supersession (post-Pilot) | Founder (§8 — only after governed feed permanently adopted) |
+
+## 8. Legacy feed coexistence (approved exception)
+
+**`wake-nc-granicus-agendas` is an intentional pre-Phase-1B legacy production
+feed** — added in the 2026-07-05 "granicus vendor batch" (ingest commit
+`15682bb`), documented live in `docs/state-notice-portals.md` (Wake 102
+meetings), on the same Granicus source URL
+(`https://wake.granicus.com/ViewPublisherRSS.php?view_id=18&mode=agendas`) and
+the same Wake county-root `community_id` the pilot will use. It predates the
+Phase 1B canonical naming and the governed onboarding path; it is **not** an
+anomaly or an unauthorized feed.
+
+**Pilot A is an approved coexistence exception:** the pilot's canonical feed
+(`wake-county-nc-granicus-meetings`) runs **alongside** the legacy feed. This
+is safe by construction — `meetings_dedupe_key` is
+`community_id | date | normalized title` (no source_url, no feed identity), and
+`meetings` upserts on `UNIQUE(dedupe_key)`, so both feeds write the **same**
+rows and can never duplicate content; the sync gate (G10) compares by
+`feed_id`, so coexistence causes no drift.
+
+**Operator notes (binding for Pilot A):**
+
+1. **The legacy feed remains `active=true` for the entire pilot** — including
+   through and after the rollback drill. Do not deactivate, rename, or migrate
+   it as part of Pilot A. It is what keeps Wake County coverage continuous when
+   the pilot feed reaches its designed `superseded` end state.
+2. **Rollback (and the drill) must verify the legacy feed is still active**
+   after the pilot feed is deactivated — see the Rollback Checklist drill items.
+3. **Pilot evidence must come from workflow logs (`golive-feed` with
+   `ONLY_FEED`), L2 title verification, and feed-specific execution — not from
+   total meeting counts.** Wake already has ~102 meetings from the legacy feed,
+   and both feeds write identical rows, so absolute row counts cannot attribute
+   anything to the pilot feed.
+
+**Post-Pilot cleanup (logged, non-blocking — founder decision):** supersede
+`wake-nc-granicus-agendas` **only after** the governed Wake feed is permanently
+adopted for production (i.e., the same change that permanently activates a
+governed Wake feed deactivates the legacy row, so Wake is never uncovered).
+This is not a Pilot A step — see the Completion Checklist.
