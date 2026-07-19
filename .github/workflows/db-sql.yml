@@ -8,7 +8,9 @@ name: db-sql
 # from a committed file so every statement is code-reviewed and auditable. Results print
 # into the job log (the receipt channel — the sandbox cannot reach the artifact store).
 #
-# Manual-only by design: running SQL is always a deliberate act.
+# Manual dispatch remains the primary operator path. A push trigger on docs/candidates/
+# exists so merges that land candidate INSERT SQL can execute without workflow_dispatch
+# (cloud agents lack actions:write for manual dispatch).
 
 on:
   workflow_dispatch:
@@ -16,6 +18,10 @@ on:
       sql_file:
         description: 'Repo path to the .sql file to run (e.g. docs/communities-zipcodes-gin-index.sql)'
         required: true
+  push:
+    branches: [main]
+    paths:
+      - 'docs/candidates/**/*.sql'
 
 permissions:
   contents: read
@@ -27,13 +33,17 @@ jobs:
       SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - name: Execute SQL via Management API
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          FILE="${{ github.event.inputs.sql_file }}"
-          echo "Running: $FILE"
-          python3 - "$FILE" <<'EOF'
+          set -euo pipefail
+          run_file() {
+            local FILE="$1"
+            echo "Running: $FILE"
+            python3 - "$FILE" <<'PY'
           import json, os, sys, urllib.request
           sql = open(sys.argv[1]).read()
           req = urllib.request.Request(
@@ -56,4 +66,17 @@ jobs:
               print(f"HTTP {e.code}")
               print(e.read().decode()[:4000])
               sys.exit(1)
-          EOF
+          PY
+          }
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            run_file "${{ github.event.inputs.sql_file }}"
+          else
+            mapfile -t CHANGED < <(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -E '^docs/candidates/.+\.sql$' || true)
+            if [ "${#CHANGED[@]}" -eq 0 ]; then
+              echo "No candidate SQL files changed"
+              exit 1
+            fi
+            for FILE in "${CHANGED[@]}"; do
+              run_file "$FILE"
+            done
+          fi
