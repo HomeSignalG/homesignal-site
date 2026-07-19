@@ -2,10 +2,46 @@
 
 Operator runbook for county **Meetings** feeds via Granicus, Legistar, and CivicClerk.
 
+**Full operator runbook:** `docs/government-feed-onboarding-operator.md` (step-by-step,
+Go/No-Go, rollback, secrets, and ingest checkout).
+
 **Repo ownership:** automation belongs in **`homesignal-ingest`** (see
 `docs/gov-feeds-migration-to-ingest.md`). This site repo hosts the scripts
 interim until migration; **`feeds.csv` is NOT duplicated here** — point
 `FEEDS_CSV` at `homesignal-ingest/feeds.csv`.
+
+---
+
+## Prerequisites
+
+### Checkout homesignal-ingest
+
+Sync and authoring require the ingest repo. Clone it beside this repo (or into
+`homesignal-ingest/` for CI) so `FEEDS_CSV` resolves to a real `feeds.csv`.
+The **`sync-feeds-config`** workflow defaults to `homesignal-ingest/feeds.csv`
+and fails if that path is missing — see `docs/gov-feeds-migration-to-ingest.md`
+for the two-repo checkout pattern (`INGEST_REPO_TOKEN` optional).
+
+### Secrets
+
+| Secret | Workflow / script |
+|--------|-------------------|
+| `SUPABASE_ACCESS_TOKEN` | `insert-gov-feed-candidate` |
+| `SUPABASE_SERVICE_ROLE_KEY` | `sync-feeds-config`, `verify-gov-feed-candidate` |
+| `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | Local `sync-feeds-config.mjs --live`, `verify-candidate-titles.mjs` |
+
+### feed_id naming
+
+`feed_id` is derived from the `--county` string at discovery time. Use the
+**same** label everywhere (discovery, `feeds.csv`, SQL, golive, verify).
+
+| `--county` | Example `feed_id` (Granicus) |
+|------------|------------------------------|
+| `"Wake"` | `wake-nc-granicus-meetings` |
+| `"Wake County"` | `wake-county-nc-granicus-meetings` |
+
+Discovery prints the candidate `feed_id` when `--community-id` is set. Record
+it before editing `feeds.csv`.
 
 ---
 
@@ -65,16 +101,32 @@ DDL (illustrative, not extracted from production): `docs/gov-feeds-schema.sql`
 
 ---
 
+## GitHub Actions workflows (homesignal-site)
+
+| Workflow | Purpose |
+|----------|---------|
+| `discover-gov-feed` | Vendor discovery |
+| `dryrun-gov-feed` | Read-only candidate probe |
+| `insert-gov-feed-candidate` | Apply INSERT SQL (`active=false` only) |
+| `sync-feeds-config` | Diff `feeds.csv` vs `public.feeds` |
+| `verify-gov-feed-candidate` | Post-ingest title verification |
+
+Go-live ingest: **`golive-feed`** in **`homesignal-ingest`** (not this repo).
+
+---
+
 ## Workflow: discover → dry run → verify → candidate → go live
 
 ### 1. Discover
 
 ```bash
 node scripts/gov-feeds/discover-county-vendor.mjs \
-  --county "Wake" --state NC \
+  --county "Wake County" --state NC \
   --community-id <county-root-uuid> \
   --hints scripts/gov-feeds/examples/wake-hints.json
 ```
+
+Workflow: **`discover-gov-feed`**
 
 ### 2. Dry run
 
@@ -82,19 +134,27 @@ node scripts/gov-feeds/discover-county-vendor.mjs \
 node scripts/gov-feeds/probe-candidate.mjs --candidate results/gov-feed-discovery.json
 ```
 
+Workflow: **`dryrun-gov-feed`**
+
 ### 3. Verify (human)
 
 Confirm sample titles are the county commission/council, not a sub-committee.
 
 ### 4. Candidate insert
 
-Add row to **`homesignal-ingest/feeds.csv`** (`active=false`) and generate SQL:
+Generate INSERT SQL **without** `--activate` (the insert workflow rejects files
+that contain activate SQL):
 
 ```bash
 node scripts/gov-feeds/build-candidate-sql.mjs \
   --in results/gov-feed-discovery.json \
-  --out docs/candidates/wake-insert.sql
+  --out docs/candidates/wake-county-nc-insert.sql
 ```
+
+Apply via workflow **`insert-gov-feed-candidate`** (`sql_file` under
+`docs/candidates/*.sql`).
+
+Add a matching row to **`homesignal-ingest/feeds.csv`** (`active=false`).
 
 Candidate SQL uses `ON CONFLICT (feed_id) DO NOTHING` — **never overwrites or
 deactivates** an existing production row.
@@ -103,17 +163,41 @@ Sync check:
 
 ```bash
 FEEDS_CSV=../homesignal-ingest/feeds.csv \
-  node scripts/gov-feeds/sync-feeds-config.mjs --live
+SUPABASE_URL=https://qwnnmljucajnexpxdgxr.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+node scripts/gov-feeds/sync-feeds-config.mjs --live
 ```
+
+Workflow: **`sync-feeds-config`** (requires `homesignal-ingest/feeds.csv` on the runner).
 
 Drift = CSV rows **missing from DB** or **field mismatch** for shared `feed_id`s.
 DB-only production feeds are informational, not failures.
 
 ### 5. Go live
 
-1. `build-candidate-sql.mjs --activate` → committed SQL
-2. `golive-feed` in ingest with `ONLY_FEED=<feed_id>`
-3. `verify-candidate-titles.mjs --community-id <uuid>`
+1. **`golive-feed`** in **`homesignal-ingest`** with `ONLY_FEED=<feed_id>`
+2. Title verify:
+
+   ```bash
+   node scripts/gov-feeds/verify-candidate-titles.mjs \
+     --community-id <county-root-uuid> \
+     --feed-id <feed_id>
+   ```
+
+   Workflow: **`verify-gov-feed-candidate`**
+
+3. **Activate separately** (manual — only after title verify passes):
+
+   ```sql
+   UPDATE public.feeds
+   SET active = true, updated_at = now()
+   WHERE feed_id = '<feed_id>' AND active = false;
+   ```
+
+   Then set `active=true` in `feeds.csv` and re-run sync.
+
+Do **not** use `build-candidate-sql.mjs --activate` for files submitted to
+**`insert-gov-feed-candidate`** — activation must stay in a separate step.
 
 ---
 
@@ -121,7 +205,7 @@ DB-only production feeds are informational, not failures.
 
 - Candidates: `active=false` only
 - Insert SQL: `ON CONFLICT DO NOTHING` (no upsert that clobbers `active`)
-- Activate SQL: separate `UPDATE … WHERE active=false`
+- Activate SQL: separate `UPDATE … WHERE active=false` (not in insert files)
 - Sync: does not flag DB-only production feeds as drift
 
 ---
@@ -129,3 +213,5 @@ DB-only production feeds are informational, not failures.
 ## Estimated time per county
 
 **~30–60 minutes** after automation (discover 5–15m, verify 5–10m, insert 10–15m, golive 10–20m).
+
+See **`docs/government-feed-onboarding-operator.md`** for the full checklist and rollback steps.

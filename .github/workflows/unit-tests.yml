@@ -23,6 +23,7 @@ on:
       - 'fixtures/gov-feeds/**'
       - 'scripts/run-unit-tests.mjs'
       - 'topics.canon.json'
+      - 'docs/government-feed-onboarding*.md'
       - '.github/workflows/**'
       - '.github/workflows/unit-tests.yml'
   workflow_dispatch: {}
