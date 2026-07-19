@@ -13,6 +13,19 @@
 - Phase 1A workflow summary: `docs/government-feed-onboarding.md`
 - Ingest migration map: `docs/gov-feeds-migration-to-ingest.md`
 - Vendor / portal registry: `docs/state-notice-portals.md`
+- **Pilot A documentation set (execution authority):** `docs/government-feed-phase1b-pilot-a-plan.md`
+
+> **⚠️ Supersession notice (2026-07-19).** This document is the Phase 1B
+> **design as reviewed**, kept for historical context. The **implemented**
+> state machine is `scripts/gov-feeds/spec/transition-spec.v1.json`
+> (23 states, 41 transitions, 5 gates), generated into
+> `lib/generated/transitions.{mjs,sql}` — see Appendix C and
+> `docs/gov-feeds-phase1b-p0-README.md`. The state names used throughout §§2–6
+> here (`queued`, `pending_review`, `insert_synced`, `activation_queued`,
+> `inactive`, …) **do not match the implemented spec**; where they disagree,
+> the spec and the Pilot A documentation set
+> (`docs/government-feed-phase1b-pilot-a-plan.md`) win. Do not implement or
+> operate from this document's state machine.
 
 ---
 
@@ -69,7 +82,7 @@ Phase 1B is **done** when:
 - [ ] SLOs in §5 measured for 7 consecutive days post–Pilot C
 - [ ] Batch circuit breaker exercised in Pilot B or C
 - [ ] L2 title verification scoped to feed-specific URL signature (not hostname alone)
-- [ ] `activate-feed` workflow enforces sync + title-verify gates
+- [ ] `activate-gov-feed-candidate` workflow enforces sync + title-verify gates
 - [ ] Runbook updated for queue mode (`docs/government-feed-onboarding-operator.md` appendix or successor)
 
 > **Phase 1C begins after successful completion of Pilot C.**
@@ -163,6 +176,14 @@ Minimum columns (implementation detail deferred; schema is a Phase 1B deliverabl
 - `title_verified_at` MUST be non-null before `activation_queued` → `active`
 
 ### 2.3 Candidate state machine
+
+> **⚠️ Superseded — historical.** The states, diagram, and transition tables in
+> §2.3 are the design as written; they were superseded at implementation by
+> **`scripts/gov-feeds/spec/transition-spec.v1.json`** (23 states, 41
+> transitions, 5 gates) and by the Pilot A documentation set. This section is
+> preserved unedited as design history — do not use it as a wiring reference.
+> Workflow names inside it are likewise historical (the implemented activation
+> workflow is `activate-gov-feed-candidate`, not `activate-feed`).
 
 #### 2.3.1 States
 
@@ -417,7 +438,7 @@ approved → inserted → [awaiting_feeds_csv →] insert_synced → golive_queu
 | Sync | Per-feed sync pass → `insert_synced` |
 | Golive | `golive-feed` `ONLY_FEED=<feed_id>` via queue |
 | L2 | `title_verified_at` set; ratio ≥ 0.80 |
-| Activate | `activate-feed` workflow; requires sync + L2 |
+| Activate | `activate-gov-feed-candidate` workflow (gate validation); requires sync + L2 |
 | CSV `active=true` | Ingest PR; re-sync |
 
 **DB-first note:** Ingest reads `public.feeds` via `load_config`. Golive may run when DB row exists. **Activation is blocked** until `insert_synced` and L2 pass.
@@ -767,7 +788,7 @@ Retention: indefinite (compliance / postmortem).
 |------|------------|
 | Operator bottleneck (25 counties) | Claim model; funnel dashboard |
 | Two-repo coordination | Defer full ingest migration until after Pilot B |
-| Manual activation skipped | `activate-feed` workflow gates |
+| Manual activation skipped | `activate-gov-feed-candidate` workflow gates |
 
 ### 9.2 Technical
 
@@ -805,7 +826,7 @@ Retention: indefinite (compliance / postmortem).
 | 1 | `feed_candidates` schema + transition enforcement |
 | 2 | Canonical `feed_id` from `communities.slug` |
 | 3 | Minimal metrics views (funnel, stuck, active count) |
-| 4 | `activate-feed` workflow (sync + L2 gates) |
+| 4 | `activate-gov-feed-candidate` workflow (sync + L2 gates) |
 | 5 | L2 feed-scoped verification spec + implementation |
 
 ### P1 — Pilot A → Pilot B
@@ -851,7 +872,14 @@ Retention: indefinite (compliance / postmortem).
 | **Audit** | 100% post-activation |
 | **Duration** | 1–2 days |
 
-**Exit:** All states exercised including `inactive` → re-queue; rollback drill; 0 wrong-board; SLOs green 48h.
+**Exit (updated to the implemented state machine):** Happy path executed
+end-to-end (10/10 transitions to `active`); 48h soak green with 0 wrong-board
+findings; rollback drill executes the implemented chain
+`active → open_circuit → circuit_halting → circuit_halted → rollback_running →
+rolled_back → superseded` (6/6); 0 `legacy_verify` transitions.
+*(The original criterion "`inactive` → re-queue" referenced a design-only state
+that does not exist in `transition-spec.v1.json`.)* Full criteria:
+`docs/government-feed-phase1b-pilot-a-completion-checklist.md`.
 
 ### Pilot B — 5 counties
 

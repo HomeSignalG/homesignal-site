@@ -5,6 +5,16 @@ Operator runbook for county **Meetings** feeds via Granicus, Legistar, and Civic
 **Full operator runbook:** `docs/government-feed-onboarding-operator.md` (step-by-step,
 Go/No-Go, rollback, secrets, and ingest checkout).
 
+> **Pilot A supersession notice.** This document describes the **Phase 1A**
+> manual workflow. For **Phase 1B** county onboarding (registry-tracked state
+> machine, activation gates — Wake County Pilot A onward), the execution
+> authority is the **Pilot A documentation set**: start at
+> `docs/government-feed-phase1b-pilot-a-plan.md` (plan + canonical execution
+> order), alongside the staging execution plan, operator runbook, Go/No-Go,
+> rollback, and completion checklists
+> (`docs/government-feed-phase1b-pilot-a-*.md`). Phase 1A remains the
+> reference for the underlying tools.
+
 **Repo ownership:** automation belongs in **`homesignal-ingest`** (see
 `docs/gov-feeds-migration-to-ingest.md`). This site repo hosts the scripts
 interim until migration; **`feeds.csv` is NOT duplicated here** — point
