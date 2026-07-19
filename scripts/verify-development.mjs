@@ -21,6 +21,12 @@
 
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
+import {
+  validRecordUrl,
+  validateTabsSite,
+  LIFECYCLE_BUCKETS,
+  summarizeSourceReports,
+} from './lib/verify-dev-helpers.mjs';
 
 // ── Read the Supabase URL + anon key out of the shipped page so nothing is forked. ──
 const html = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
@@ -44,12 +50,7 @@ const RUN_REPORT_SAMPLE = process.env.RUN_REPORT_SAMPLE ? parseInt(process.env.R
 // Task 6: a record_url must POINT SOMEWHERE OFFICIAL — validated by URL PATTERN + DOMAIN, not by
 // an HTTP 200 body (many official portals, e.g. Austin's abc.austintexas.gov, sit behind a bot
 // challenge that 200s with a non-record page). We require an absolute http(s) URL with a real host.
-function validRecordUrl(u) {
-  if (!u || typeof u !== 'string') return false;
-  try { const p = new URL(u.trim()); return (p.protocol === 'https:' || p.protocol === 'http:') && /\./.test(p.hostname); }
-  catch { return false; }
-}
-const LIFECYCLE = new Set(['built', 'approved', 'proposed']);
+const LIFECYCLE = LIFECYCLE_BUCKETS;
 
 async function loadReports() {
   // KEYSET-paginated: one unbounded select of every row's `sites` jsonb started timing out
@@ -262,6 +263,17 @@ async function main() {
         fails.push(`ZIP ${zip}: counts.operating ${c.operating} !== rendered operating rail ${operatingN} (Task 5)`);
       if (c.comment_open != null && c.comment_open !== commentN)
         fails.push(`ZIP ${zip}: counts.comment_open ${c.comment_open} !== commentable set ${commentN} (Task 5)`);
+
+      // TABS invariant (docs/tdlr-tabs-adapter-runbook.md §3): TX permit filings must carry
+      // a canonical record_url whose suffix matches project_no.
+      const tabsBad = check.filter((s) => {
+        const v = validateTabsSite(s);
+        return !v.ok && !v.skip;
+      });
+      if (tabsBad.length) {
+        fails.push(`ZIP ${zip}: ${tabsBad.length} TABS site(s) with project_no/url mismatch ` +
+          `[${tabsBad.slice(0, 2).map((s) => s.project_no || s.label).join(', ')}]`);
+      }
     } catch (e) {
       fails.push(`ZIP ${zip}: ${e.message.split('\n')[0]}`);
     }
@@ -284,9 +296,13 @@ async function main() {
       });
       if (!res.ok) { fails.push(`RUN-REPORT ${r.zip}: engine HTTP ${res.status}`); continue; }
       const j = await res.json();
-      for (const rep of (j.socrata_reports || [])) {
+      const quarantined = j.tabs_quarantined || j.quarantined || [];
+      if (quarantined.length) {
+        console.log(`  · ${r.zip} quarantined: ${quarantined.length} record(s) [${quarantined.slice(0, 2).map((q) => q.project_no || q.reason || '?').join(', ')}]`);
+      }
+      for (const rep of summarizeSourceReports(j)) {
         const excl = (rep.excluded_by_status || []).reduce((n, e) => n + (e.count || 0), 0);
-        console.log(`  · ${r.zip} ${rep.registry_id}: fetched ${rep.fetched}, emitted ${rep.emitted}, ` +
+        console.log(`  · ${r.zip} ${rep.registry_id} (${rep.family}): fetched ${rep.fetched}, emitted ${rep.emitted}, ` +
           `excluded ${excl}, unmapped ${(rep.unmapped_statuses || []).length}, ` +
           `geocode-fail ${rep.geocode_failures || 0}, no-url ${rep.no_record_url || 0}`);
         if ((rep.unmapped_statuses || []).length)
