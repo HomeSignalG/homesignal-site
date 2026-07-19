@@ -15,6 +15,22 @@ Capture `<WAKE_COUNTY_ROOT_UUID>` once:
 select id from public.communities where slug = 'wake-county-nc' and level = 'county';
 ```
 
+> **Coexistence exception (Plan §8) — operator note.** The legacy production
+> feed **`wake-nc-granicus-agendas`** (same Granicus source URL, same county
+> root) is an **intentional pre-Phase-1B feed** and **remains `active=true`
+> throughout Pilot A** — do not deactivate, rename, or migrate it in any phase.
+> Consequences for this runbook:
+>
+> 1. Both feeds write identical `meetings` rows (dedupe key carries no feed
+>    identity), so **total meeting counts cannot attribute anything to the
+>    pilot feed**. Evidence for Phases 6 and 9 comes from **workflow logs
+>    (`golive-feed` with `ONLY_FEED`), L2 title verification (Phase 7), and
+>    feed-specific execution** — use count queries only as deltas/spot-checks.
+> 2. **Rollback (Phase 10) must verify the legacy feed is still active** after
+>    the pilot feed is deactivated.
+> 3. Superseding the legacy feed is a **post-Pilot founder decision** (only
+>    after the governed feed is permanently adopted) — not a Pilot A step.
+
 ---
 
 ## Phase 0 — Registry bootstrap
@@ -286,6 +302,13 @@ set golive_attempts = golive_attempts + 1, updated_at = now()
 where feed_id = 'wake-county-nc-granicus-meetings';
 ```
 
+> **Evidence note (coexistence exception, Plan §8):** Wake already has ~102
+> meetings from the legacy feed `wake-nc-granicus-agendas`, and both feeds
+> write identical rows — so the count query above passes trivially and proves
+> nothing by itself. The authoritative Phase 6 evidence is the **`golive-feed`
+> workflow log** (scoped `ONLY_FEED` run: items fetched/parsed/upserted) plus a
+> title spot-check; treat the SQL count as a delta/spot-check only.
+
 **No-Go:** 0 meetings after golive; ingest workflow failure.
 
 ---
@@ -436,6 +459,11 @@ where community_id = '<WAKE_COUNTY_ROOT_UUID>';
 
 **Page check:** `https://homesignal.net/community.html?zip=27601` — Meetings tile shows Wake county commission items.
 
+> **Evidence note (coexistence exception, Plan §8):** the legacy feed
+> `wake-nc-granicus-agendas` is writing the same rows concurrently, so soak
+> evidence is **title audits + registry/feed state + workflow logs**, not
+> meeting-count growth.
+
 **No-Go for Pilot B authorization:** Wrong-board content; feed silently inactive; registry state ≠ `active`.
 
 ---
@@ -474,6 +502,17 @@ update public.feeds
 set active = false, updated_at = now()
 where feed_id = 'wake-county-nc-granicus-meetings';
 ```
+
+**Verify the legacy feed was NOT touched** (coexistence exception, Plan §8 —
+the `WHERE feed_id` above must only ever hit the canonical pilot feed):
+
+```sql
+select feed_id, active from public.feeds
+where feed_id = 'wake-nc-granicus-agendas';
+```
+
+**Expected:** `active = true`. If `false`, restore it immediately and document
+the deviation.
 
 **Set `active=false` in `feeds.csv`**; sync pass.
 

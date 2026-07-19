@@ -10,6 +10,14 @@
 > state machine dry-runs **after** insert (`inserted → dry_running` in
 > `transition-spec.v1.json`).
 
+> **Coexistence exception (Plan §8):** the legacy production feed
+> `wake-nc-granicus-agendas` (same Granicus source) is intentional and remains
+> `active=true` throughout Pilot A. Because both feeds write identical
+> `meetings` rows, gate evidence that involves meeting data (G11, soak) must be
+> read from **workflow logs (`golive-feed` `ONLY_FEED`), L2 title
+> verification, and feed-specific execution** — never from total meeting
+> counts.
+
 ---
 
 ## Approval table (all gates before activation)
@@ -19,7 +27,7 @@
 | G0 | P0 on `main` | `git log` + unit tests `21/21` | Operator | PR #305 merged; tests green | **BLOCK** |
 | G1 | Staging DDL applied | Section 2 verification queries | Operator | 41 transitions; 3 views; RPC live | **BLOCK** |
 | G2 | Community root exists | SQL: `wake-county-nc` county row | Operator | 1 county row; UUID captured | **BLOCK** |
-| G3 | No unauthorized active feed | SQL: `public.feeds` preflight | Operator / Founder | 0 rows OR `active=false` only | **BLOCK** |
+| G3 | No unauthorized active feed | SQL: `public.feeds` preflight | Operator / Founder | 0 rows OR `active=false` only for the **canonical** `feed_id`. The same-source legacy feed `wake-nc-granicus-agendas` (`active=true`) is **authorized** — an intentional pre-Phase-1B feed under the approved coexistence exception (Plan §8); it does not fail this gate and stays active | **BLOCK** |
 | G4 | Discovery complete | `gov-feed-discovery.json` artifact | Operator | `feed_id` = canonical; exit 0 | **BLOCK** |
 | G5 | Scope discriminator | Granicus `view_id=18` in source URL | Operator | `title_gate_verified` state | **BLOCK** |
 | G6 | Human title review (L1) | Operator sign-off note | Operator | County commission board, not sub-committee | **BLOCK** |
@@ -46,7 +54,7 @@
 - [ ] **G0** — `main` at P0 merge; `node scripts/run-unit-tests.mjs` exit 0
 - [ ] **G1** — P0 schema, transitions (41), RPC, views applied and verified
 - [ ] **G2** — `<WAKE_COUNTY_ROOT_UUID>` recorded
-- [ ] **G3** — Preflight `public.feeds` check documented
+- [ ] **G3** — Preflight `public.feeds` check documented; legacy feed `wake-nc-granicus-agendas` recorded as authorized coexistence (Plan §8), left `active=true`
 
 ### Discovery → insert → dry run
 

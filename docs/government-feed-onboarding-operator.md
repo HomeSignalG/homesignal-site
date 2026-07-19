@@ -345,6 +345,15 @@ Phase 1B adds a `feed_candidates` registry, state machine, and activation gates.
 - `docs/government-feed-phase1b-pilot-a-rollback-checklist.md`
 - `docs/government-feed-phase1b-pilot-a-completion-checklist.md`
 
+> **Pilot A coexistence exception (Plan §8).** The Wake County pilot runs
+> **alongside** the intentional pre-Phase-1B legacy feed
+> `wake-nc-granicus-agendas` (same Granicus source URL, 2026-07-05 vendor
+> batch). The legacy feed stays `active=true` for the whole pilot, rollback
+> verifies it was not touched, and pilot evidence comes from workflow logs /
+> L2 title verification / feed-specific execution — never total meeting
+> counts. Superseding the legacy feed is a post-Pilot **founder** decision,
+> taken only after the governed feed is permanently adopted.
+
 | P0 script | Path |
 |-----------|------|
 | Transition validate | `scripts/gov-feeds/transition-candidate.mjs` |

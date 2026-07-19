@@ -6,6 +6,12 @@
 
 ---
 
+> **Coexistence exception (Plan §8):** every "feed `active` target" below refers
+> to the **canonical pilot feed** `wake-county-nc-granicus-meetings` only. The
+> intentional pre-Phase-1B legacy feed **`wake-nc-granicus-agendas` must remain
+> `active = true`** through every scenario and the drill — each rollback ends
+> with a verification that it was not touched.
+
 ## Scenario index
 
 | Scenario | Registry end state (target) | Feed `active` target |
@@ -314,7 +320,8 @@ node scripts/gov-feeds/rollback-feed-candidate.mjs --from active --event open_ci
 
 - [ ] Chain validator `rollback_chain_ok: true`
 - [ ] Each RPC transition applied in order
-- [ ] `public.feeds.active = false` after drill
+- [ ] `public.feeds.active = false` after drill (**canonical pilot feed only**)
+- [ ] **Legacy feed `wake-nc-granicus-agendas` still `active = true`** (coexistence exception, Plan §8 — it carries Wake coverage after the drill; if found `false`, restore immediately and document)
 - [ ] `feeds.csv` `active=false`; sync exit 0
 - [ ] Final state `superseded`
 - [ ] Founder witnessed drill
