@@ -18,24 +18,35 @@ homesignal-ingest/feeds.csv  ──sync──►  public.feeds  ──load_confi
        └──────────────────────────────────────┘
 ```
 
-### Production contract (verified 2026-07-19)
+### Production contract
+
+Column **presence** on `public.feeds` was verified 2026-07-19 via PostgREST
+(`select=<col>&limit=1` → 200). Types, defaults, nullability, and constraints
+are **not** verified here — see `docs/gov-feeds-schema.sql` (illustrative DDL,
+not an extracted production schema).
+
+**feeds.csv:** canonical header (parsed by column name; order-independent).
+Known columns: `feed_id`, `county`, `community_id`, `source`, `source_type`,
+`category`, `pipeline_type`, `agency_name`, `geographic_reference`,
+`impact_level`, `active`, `sort_order`, `target_table`, `filter`, `dedupe_on`,
+`status / notes`. Authoritative file: `homesignal-ingest/feeds.csv`.
 
 | Column | Notes |
 |--------|-------|
 | `feed_id` | Primary key (text slug) |
-| `county` | Denormalized county label (operator metadata; ingest routes by `community_id`) |
+| `county` | Denormalized county label (operator metadata; ingest routes by `community_id`; DB nullability/default unverified) |
 | `community_id` | County root UUID |
 | `source` | Feed URL (**not** `source_url`) |
 | `source_type` | `rss` \| `keyword` \| `html` \| `email` |
-| `category` | `County Commission & county business` (verbatim) |
+| `category` | `County Commission & county business` (canonical topic label — must match ingest/topics word-for-word) |
 | `pipeline_type` | `government_notice` |
 | `agency_name` | Board display name |
 | `geographic_reference` | e.g. `Wake County, NC` |
-| `impact_level` | Default `medium` |
-| `active` | `false` until go-live |
-| `sort_order` | Default `0` |
-| `target_table` | `alerts` or `meetings` (engine routing) |
-| `filter_expr` | Optional vendor/body filter |
+| `impact_level` | Typical value `medium` (script default; DB default unverified) |
+| `active` | Candidates use `false` until go-live (script default; DB default unverified) |
+| `sort_order` | Typical value `0` (script default; DB default unverified) |
+| `target_table` | `alerts` or `meetings` (engine routing; script default for candidates: `meetings`; DB default unverified) |
+| `filter_expr` | Optional vendor/body filter (`filter` in CSV) |
 | `dedupe_on` | Optional dedupe key (e.g. `guid\|link`) |
 | `status / notes` | Operator notes in feeds.csv (maps to `status_notes` in DB) |
 | `updated_at` | DB-managed (read-only) |
@@ -50,7 +61,7 @@ homesignal-ingest/feeds.csv  ──sync──►  public.feeds  ──load_confi
 | Legistar | `html` | `*.legistar.com/Calendar.aspx` |
 | CivicClerk | `html` | `*.portal.civicclerk.com/` |
 
-DDL: `docs/gov-feeds-schema.sql`
+DDL (illustrative, not extracted from production): `docs/gov-feeds-schema.sql`
 
 ---
 

@@ -31,7 +31,7 @@ The site repo should **not** own feed authoring or scheduled ingest sync. It may
 
 **Stay in homesignal-site after migration:**
 
-- `docs/gov-feeds-schema.sql` — DDL reference (or link to ingest copy)
+- `docs/gov-feeds-schema.sql` — illustrative DDL reference (column presence verified via PostgREST; types/defaults/constraints unverified — see file header)
 - This migration doc (historical)
 
 ## Interim (current PR)
