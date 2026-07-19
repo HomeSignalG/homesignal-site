@@ -1,4 +1,4 @@
-import { VENDOR_ADAPTER } from './production-contract.mjs';
+import { FEEDS_TABLE_COLUMNS, VENDOR_ADAPTER } from './production-contract.mjs';
 import { COUNTY_COMMISSION_CATEGORY, normalizeFeedRecord, validateFeedRecord } from './schema.mjs';
 
 /**
@@ -36,6 +36,10 @@ export function buildCandidateFeedRow(args) {
     impact_level: 'medium',
     active: false,
     sort_order: 0,
+    target_table: 'meetings',
+    filter_expr: '',
+    dedupe_on: '',
+    status_notes: '',
   });
 
   const errors = validateFeedRecord(row, { requireCandidateInactive: true });
@@ -43,11 +47,7 @@ export function buildCandidateFeedRow(args) {
   return row;
 }
 
-const INSERT_COLS = [
-  'feed_id', 'community_id', 'source', 'source_type', 'category',
-  'pipeline_type', 'agency_name', 'geographic_reference',
-  'impact_level', 'active', 'sort_order',
-];
+const INSERT_COLS = [...FEEDS_TABLE_COLUMNS];
 
 /** @param {import('./schema.mjs').FeedRecord} row */
 export function candidateToInsertSql(row, { schema = 'public', table = 'feeds' } = {}) {
@@ -77,9 +77,29 @@ export function candidateToActivateSql(feed_id, { schema = 'public', table = 'fe
     `-- go-live: activate ${feed_id} (run ONLY after dry-run + title verification)`,
     `update ${schema}.${table}`,
     'set active = true,',
-    `    updated_at = now()`,
+    '    updated_at = now()',
     `where feed_id = '${esc(feed_id)}'`,
     '  and active = false;',
+    '',
+  ].join('\n');
+}
+
+/** @param {import('./schema.mjs').FeedRecord} row */
+export function feedRowToInsertSql(row, { schema = 'public', table = 'feeds' } = {}) {
+  const errors = validateFeedRecord(row);
+  if (errors.length) throw new Error(`invalid feed row: ${errors.join('; ')}`);
+
+  const esc = (v) => String(v ?? '').replace(/'/g, "''");
+  const values = INSERT_COLS.map((c) => {
+    if (c === 'active') return row.active ? 'true' : 'false';
+    if (c === 'sort_order') return String(row.sort_order ?? 0);
+    return `'${esc(row[c])}'`;
+  });
+
+  return [
+    `insert into ${schema}.${table} (${INSERT_COLS.join(', ')})`,
+    `values (${values.join(', ')})`,
+    'on conflict (feed_id) do nothing;',
     '',
   ].join('\n');
 }

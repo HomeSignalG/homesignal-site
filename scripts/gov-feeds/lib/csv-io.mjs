@@ -1,4 +1,9 @@
 import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  FEEDS_CSV_COLUMN_ALIASES,
+  FEEDS_CSV_COLUMNS,
+  FEEDS_CSV_REQUIRED_COLUMNS,
+} from './production-contract.mjs';
 import { CSV_COLUMNS, normalizeFeedRecord, validateFeedRecord } from './schema.mjs';
 
 /** Minimal RFC-4180 CSV parser (no external deps). */
@@ -33,43 +38,92 @@ function escapeCsvCell(v) {
   return s;
 }
 
-/** @param {import('./schema.mjs').FeedRecord[]} records */
-export function recordsToCsv(records) {
-  const lines = [CSV_COLUMNS.join(',')];
+/** @param {string} headerCell */
+function canonicalHeaderName(headerCell) {
+  const trimmed = headerCell.trim();
+  return FEEDS_CSV_COLUMN_ALIASES[trimmed] || trimmed;
+}
+
+/** @param {import('./schema.mjs').FeedRecord[]} records @param {string[]} [columns] */
+export function recordsToCsv(records, columns = CSV_COLUMNS) {
+  const lines = [columns.join(',')];
   for (const r of records) {
-    const row = CSV_COLUMNS.map((col) => escapeCsvCell(r[col]));
+    const row = columns.map((col) => escapeCsvCell(r[col]));
     lines.push(row.join(','));
   }
   return lines.join('\n') + '\n';
 }
 
-/** @param {string} path */
+/**
+ * Read feeds.csv with quarantine-by-row validation.
+ * @param {string} path
+ * @returns {{ rows: import('./schema.mjs').FeedRecord[], quarantined: Array<{ row: number, feed_id: string, errors: string[] }>, header: string[] }}
+ */
 export function readFeedsCsv(path) {
   const text = readFileSync(path, 'utf8');
   const table = parseCsv(text.trimEnd() + '\n');
-  if (!table.length) return [];
-  const header = table[0].map((h) => h.trim());
-  const missing = CSV_COLUMNS.filter((c) => !header.includes(c));
-  if (missing.length) throw new Error(`feeds.csv missing columns: ${missing.join(', ')}`);
+  if (!table.length) return { rows: [], quarantined: [], header: [] };
+
+  const header = table[0].map((h) => canonicalHeaderName(h));
+  const missing = FEEDS_CSV_REQUIRED_COLUMNS.filter((c) => !header.includes(c));
+  if (missing.length) {
+    throw new Error(`feeds.csv missing required columns: ${missing.join(', ')}`);
+  }
+
+  const known = new Set(FEEDS_CSV_COLUMNS);
+  const extra = header.filter((h) => h && !known.has(h));
+  if (extra.length) {
+    throw new Error(`feeds.csv has unknown columns: ${extra.join(', ')}`);
+  }
 
   const records = [];
+  /** @type {Array<{ row: number, feed_id: string, errors: string[] }>} */
+  const quarantined = [];
+
   for (let r = 1; r < table.length; r++) {
     const cells = table[r];
     if (!cells.length || cells.every((c) => !String(c).trim())) continue;
+
     /** @type {Record<string, string>} */
     const obj = {};
-    for (const col of CSV_COLUMNS) {
-      obj[col] = cells[header.indexOf(col)] ?? '';
+    const presentColumns = [];
+    for (let c = 0; c < header.length; c++) {
+      const col = header[c];
+      if (!col || !known.has(col)) continue;
+      const val = cells[c] ?? '';
+      if (String(val).trim() !== '') presentColumns.push(col);
+      obj[col] = val;
     }
-    const normalized = normalizeFeedRecord(obj);
-    const errors = validateFeedRecord(normalized);
-    if (errors.length) throw new Error(`row ${r + 1} (${normalized.feed_id}): ${errors.join('; ')}`);
-    records.push(normalized);
+
+    const feed_id = String(obj.feed_id || '').trim() || `(row ${r + 1})`;
+
+    try {
+      const normalized = normalizeFeedRecord(obj, { presentColumns });
+      const errors = validateFeedRecord(normalized, { columnsPresent: presentColumns });
+      if (errors.length) {
+        quarantined.push({ row: r + 1, feed_id, errors });
+        continue;
+      }
+      records.push(normalized);
+    } catch (err) {
+      quarantined.push({ row: r + 1, feed_id, errors: [err instanceof Error ? err.message : String(err)] });
+    }
   }
-  return records;
+
+  return { rows: records, quarantined, header };
 }
 
 /** @param {string} path @param {import('./schema.mjs').FeedRecord[]} records */
 export function writeFeedsCsv(path, records) {
   writeFileSync(path, recordsToCsv(records), 'utf8');
+}
+
+/** @param {Array<{ row: number, feed_id: string, errors: string[] }>} quarantined */
+export function formatQuarantineReport(quarantined) {
+  if (!quarantined.length) return 'Quarantined rows: 0';
+  const lines = [`Quarantined rows: ${quarantined.length}`, ''];
+  for (const q of quarantined) {
+    lines.push(`  row ${q.row} (${q.feed_id}): ${q.errors.join('; ')}`);
+  }
+  return lines.join('\n');
 }

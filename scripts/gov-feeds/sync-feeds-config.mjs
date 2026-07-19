@@ -3,7 +3,8 @@
 //
 // Compares homesignal-ingest feeds.csv (NOT duplicated in this repo) against
 // live public.feeds. Fails only on meaningful drift: CSV rows missing from DB,
-// or field mismatches for rows present in both.
+// field mismatches for rows present in both, or active-flag ownership conflicts.
+// Invalid CSV rows are quarantined and reported without aborting the run.
 //
 // Usage:
 //   FEEDS_CSV=/path/to/homesignal-ingest/feeds.csv \
@@ -11,11 +12,11 @@
 //
 // Offline:
 //   node scripts/gov-feeds/sync-feeds-config.mjs \
-//     --csv fixtures/gov-feeds/feeds-authoring-fixture.csv \
+//     --csv fixtures/gov-feeds/feeds-ingest-contract.csv \
 //     --db-json fixtures/gov-feeds/db-feeds-fixture.json
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { readFeedsCsv } from './lib/csv-io.mjs';
+import { formatQuarantineReport, readFeedsCsv } from './lib/csv-io.mjs';
 import { candidateToInsertSql } from './lib/candidates.mjs';
 import { diffFeedsConfig, fetchDbFeeds, formatSyncReport } from './lib/sync.mjs';
 
@@ -36,8 +37,8 @@ if (!csvPath) {
   process.exit(2);
 }
 
-const csvRows = readFeedsCsv(csvPath);
-/** @type {import('./schema.mjs').FeedRecord[]} */
+const { rows: csvRows, quarantined } = readFeedsCsv(csvPath);
+/** @type {import('./lib/schema.mjs').FeedRecord[]} */
 let dbRows = [];
 
 if (live) {
@@ -57,10 +58,13 @@ if (live) {
 }
 
 const diff = diffFeedsConfig(csvRows, dbRows);
-const report = formatSyncReport(diff);
+const report = formatSyncReport(diff, { quarantined });
 mkdirSync('results', { recursive: true });
 writeFileSync(outReport, report + '\n');
 console.log(report);
+if (quarantined.length) {
+  console.log('\n' + formatQuarantineReport(quarantined));
+}
 
 if (outSql && diff.missing_from_db.length) {
   const csvMap = new Map(csvRows.map((r) => [r.feed_id, r]));

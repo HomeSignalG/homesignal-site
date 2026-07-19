@@ -1,5 +1,5 @@
 import { FEEDS_DB_READONLY, FEEDS_TABLE_COLUMNS } from './production-contract.mjs';
-import { diffFeedRecords, feedRecordKey, normalizeFeedRecord } from './schema.mjs';
+import { diffFeedRecords, feedRecordKey, normalizeFeedRecord, parseBool } from './schema.mjs';
 
 /**
  * Compare feeds.csv rows (authoring intent) against live public.feeds.
@@ -10,7 +10,7 @@ import { diffFeedRecords, feedRecordKey, normalizeFeedRecord } from './schema.mj
  * @param {import('./schema.mjs').FeedRecord[]} dbRows
  */
 export function diffFeedsConfig(csvRows, dbRows) {
-  const csvMap = new Map(csvRows.map((r) => [feedRecordKey(r), normalizeFeedRecord(r)]));
+  const csvMap = new Map(csvRows.map((r) => [feedRecordKey(r), normalizeFeedRecord(r, { presentColumns: r.presentColumns })]));
   const dbMap = new Map(dbRows.map((r) => [feedRecordKey(r), normalizeFeedRecord(r)]));
 
   /** @type {string[]} */
@@ -19,19 +19,29 @@ export function diffFeedsConfig(csvRows, dbRows) {
   const dbOnlyProduction = [];
   /** @type {Array<{ feed_id: string, mismatches: ReturnType<typeof diffFeedRecords> }>} */
   const mismatched = [];
+  /** @type {Array<{ feed_id: string, csv: boolean, db: boolean }>} */
+  const activeReconcile = [];
 
   for (const id of csvMap.keys()) {
-    if (!dbMap.has(id)) missingFromDb.push(id);
-    else {
-      const mm = diffFeedRecords(csvMap.get(id), dbMap.get(id));
-      if (mm.length) mismatched.push({ feed_id: id, mismatches: mm });
+    const csvRow = csvMap.get(id);
+    if (!dbMap.has(id)) {
+      missingFromDb.push(id);
+      continue;
+    }
+    const dbRow = dbMap.get(id);
+    const mm = diffFeedRecords(csvRow, dbRow);
+    if (mm.length) mismatched.push({ feed_id: id, mismatches: mm });
+
+    const csvHasActive = !csvRow.presentColumns?.length || csvRow.presentColumns.includes('active');
+    if (csvHasActive && parseBool(csvRow.active) !== parseBool(dbRow.active)) {
+      activeReconcile.push({ feed_id: id, csv: parseBool(csvRow.active), db: parseBool(dbRow.active) });
     }
   }
   for (const id of dbMap.keys()) {
     if (!csvMap.has(id)) dbOnlyProduction.push(id);
   }
 
-  const hasDrift = missingFromDb.length > 0 || mismatched.length > 0;
+  const hasDrift = missingFromDb.length > 0 || mismatched.length > 0 || activeReconcile.length > 0;
 
   return {
     summary: {
@@ -40,11 +50,13 @@ export function diffFeedsConfig(csvRows, dbRows) {
       missing_from_db: missingFromDb.length,
       db_only_production: dbOnlyProduction.length,
       mismatched: mismatched.length,
+      active_reconcile: activeReconcile.length,
       has_drift: hasDrift,
     },
     missing_from_db: missingFromDb.sort(),
     db_only_production: dbOnlyProduction.sort(),
     mismatched,
+    active_reconcile: activeReconcile,
   };
 }
 
@@ -75,20 +87,34 @@ export async function fetchDbFeeds(creds) {
   return rows;
 }
 
-/** @param {ReturnType<typeof diffFeedsConfig>} diff */
-export function formatSyncReport(diff) {
+/** @param {ReturnType<typeof diffFeedsConfig>} diff @param {{ quarantined?: Array<{ row: number, feed_id: string, errors: string[] }> }} [opts] */
+export function formatSyncReport(diff, { quarantined = [] } = {}) {
   const lines = [
     'feeds.csv → public.feeds sync report',
     '===================================',
-    `CSV rows (authoring): ${diff.summary.csv_count}`,
+    `CSV rows (valid):     ${diff.summary.csv_count}`,
+    `CSV rows (quarantined): ${quarantined.length}`,
     `DB rows (all):        ${diff.summary.db_count}`,
     `CSV rows missing from DB: ${diff.summary.missing_from_db}`,
     `DB-only production feeds (informational): ${diff.summary.db_only_production}`,
     `Mismatched fields (CSV vs DB): ${diff.summary.mismatched}`,
+    `Active flag reconcile needed: ${diff.summary.active_reconcile}`,
     `Drift detected: ${diff.summary.has_drift ? 'YES' : 'NO'}`,
   ];
+  if (quarantined.length) {
+    lines.push('', '--- quarantined CSV rows (skipped; sync continued) ---');
+    for (const q of quarantined) {
+      lines.push(`  row ${q.row} (${q.feed_id}): ${q.errors.join('; ')}`);
+    }
+  }
   if (diff.missing_from_db.length) {
     lines.push('', '--- missing from DB (action required) ---', ...diff.missing_from_db.map((id) => `  ${id}`));
+  }
+  if (diff.active_reconcile.length) {
+    lines.push('', '--- active ownership (CSV vs DB) ---');
+    for (const a of diff.active_reconcile) {
+      lines.push(`  ${a.feed_id}: csv=${a.csv} db=${a.db}`);
+    }
   }
   if (diff.mismatched.length) {
     lines.push('', '--- mismatched ---');

@@ -10,6 +10,10 @@
     "geographic_reference": "Clark County, NV",
     "impact_level": "medium",
     "active": true,
-    "sort_order": 0
+    "sort_order": 0,
+    "target_table": "meetings",
+    "filter_expr": "",
+    "dedupe_on": "guid|link",
+    "status_notes": ""
   }
 ]

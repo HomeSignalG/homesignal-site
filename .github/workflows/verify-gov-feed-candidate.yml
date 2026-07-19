@@ -9,6 +9,10 @@ on:
       community_id:
         description: 'County root community UUID'
         required: true
+      feed_id:
+        description: 'Feed being verified (scopes meetings to this feed source)'
+        required: false
+        default: ''
       title_pattern:
         description: 'Regex for acceptable board titles'
         required: false
@@ -26,6 +30,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SUPABASE_URL: https://qwnnmljucajnexpxdgxr.supabase.co
+      VERIFY_COMMUNITY_ID: ${{ github.event.inputs.community_id }}
+      VERIFY_FEED_ID: ${{ github.event.inputs.feed_id }}
+      VERIFY_TITLE_PATTERN: ${{ github.event.inputs.title_pattern }}
+      VERIFY_MIN_MATCH: ${{ github.event.inputs.min_match_ratio }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,7 +43,9 @@ jobs:
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          node scripts/gov-feeds/verify-candidate-titles.mjs \
-            --community-id '${{ github.event.inputs.community_id }}' \
-            --pattern '${{ github.event.inputs.title_pattern }}' \
-            --min-match '${{ github.event.inputs.min_match_ratio }}'
+          set -euo pipefail
+          args=(--community-id "$VERIFY_COMMUNITY_ID" --pattern "$VERIFY_TITLE_PATTERN" --min-match "$VERIFY_MIN_MATCH")
+          if [ -n "$VERIFY_FEED_ID" ]; then
+            args+=(--feed-id "$VERIFY_FEED_ID")
+          fi
+          node scripts/gov-feeds/verify-candidate-titles.mjs "${args[@]}"

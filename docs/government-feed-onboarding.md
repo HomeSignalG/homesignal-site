@@ -33,6 +33,10 @@ homesignal-ingest/feeds.csv  ──sync──►  public.feeds  ──load_confi
 | `impact_level` | Default `medium` |
 | `active` | `false` until go-live |
 | `sort_order` | Default `0` |
+| `target_table` | `alerts` or `meetings` (engine routing) |
+| `filter_expr` | Optional vendor/body filter |
+| `dedupe_on` | Optional dedupe key (e.g. `guid\|link`) |
+| `status_notes` | Operator notes (not used by ingest matching) |
 | `updated_at` | DB-managed (read-only) |
 
 **Vendor → production `source_type`:**

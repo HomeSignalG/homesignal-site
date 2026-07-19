@@ -7,6 +7,7 @@
 // Usage:
 //   node scripts/gov-feeds/verify-candidate-titles.mjs \
 //     --community-id <uuid> \
+//     --feed-id <feed_id> \
 //     --pattern "Commission|Council|Court" \
 //     [--min-match 0.8]
 
@@ -16,11 +17,13 @@ function arg(name) {
 }
 
 const communityId = arg('--community-id');
+const feedId = arg('--feed-id');
+const sourceHint = arg('--source');
 const pattern = arg('--pattern') || 'Commission|Council|Court|Board of Commissioners|County Council';
 const minMatch = arg('--min-match') ? parseFloat(arg('--min-match')) : 0.8;
 
 if (!communityId) {
-  console.error('usage: verify-candidate-titles.mjs --community-id UUID [--pattern REGEX] [--min-match 0.8]');
+  console.error('usage: verify-candidate-titles.mjs --community-id UUID [--feed-id ID | --source URL] [--pattern REGEX] [--min-match 0.8]');
   process.exit(2);
 }
 
@@ -32,10 +35,59 @@ if (!url || !key) {
 }
 
 const base = url.replace(/\/$/, '');
-const q = `${base}/rest/v1/meetings?community_id=eq.${communityId}&select=title,meeting_date,source_url&order=meeting_date.desc&limit=50`;
-const res = await fetch(q, {
-  headers: { apikey: key, Authorization: `Bearer ${key}` },
+const headers = { apikey: key, Authorization: `Bearer ${key}` };
+
+/** @param {string} feedSource */
+function sourceHostPattern(feedSource) {
+  try {
+    const u = new URL(feedSource);
+    return u.hostname.replace(/\./g, '\\.');
+  } catch {
+    return feedSource.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+}
+
+let feedSource = sourceHint || '';
+let feedCategory = '';
+
+if (feedId) {
+  const feedRes = await fetch(
+    `${base}/rest/v1/feeds?feed_id=eq.${encodeURIComponent(feedId)}&select=source,category,community_id&limit=1`,
+    { headers },
+  );
+  if (!feedRes.ok) {
+    console.error(`feeds read failed: ${feedRes.status} ${await feedRes.text()}`);
+    process.exit(2);
+  }
+  const feeds = await feedRes.json();
+  if (!feeds.length) {
+    console.error(`feed_id not found: ${feedId}`);
+    process.exit(2);
+  }
+  if (feeds[0].community_id !== communityId) {
+    console.error(`feed ${feedId} belongs to community ${feeds[0].community_id}, not ${communityId}`);
+    process.exit(2);
+  }
+  feedSource = feeds[0].source;
+  feedCategory = feeds[0].category || '';
+}
+
+const params = new URLSearchParams({
+  community_id: `eq.${communityId}`,
+  select: 'title,meeting_date,source_url,category',
+  order: 'meeting_date.desc',
+  limit: '50',
 });
+
+if (feedSource) {
+  const hostPat = sourceHostPattern(feedSource);
+  params.set('source_url', `ilike.*${hostPat}*`);
+} else if (feedCategory) {
+  params.set('category', `eq.${feedCategory}`);
+}
+
+const q = `${base}/rest/v1/meetings?${params.toString()}`;
+const res = await fetch(q, { headers });
 if (!res.ok) {
   console.error(`meetings read failed: ${res.status} ${await res.text()}`);
   process.exit(2);
@@ -43,7 +95,7 @@ if (!res.ok) {
 
 const meetings = await res.json();
 if (!meetings.length) {
-  console.error('no meetings found for community — run golive ingest first');
+  console.error('no meetings found for scoped query — run golive ingest first');
   process.exit(1);
 }
 
@@ -53,6 +105,8 @@ const ratio = matched.length / meetings.length;
 
 const report = {
   community_id: communityId,
+  feed_id: feedId || null,
+  source_scope: feedSource || null,
   total: meetings.length,
   matched: matched.length,
   ratio,
