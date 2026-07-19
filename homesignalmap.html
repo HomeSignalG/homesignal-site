@@ -1253,6 +1253,21 @@ HS.onReady(function(){
     // If the resolved-project parcels have already loaded, draw them onto this same map (and let
     // their footprint re-frame the view — the parcel geometry is the point of the ZIP-precise page).
     drawParcels();
+    publishVerifyState();
+  }
+
+  // Expose map/filter state for verify-development + verify-representative-zips (closure-safe).
+  function publishVerifyState(){
+    var vis = 0;
+    siteMarkers.forEach(function(x){ if(x && x.m && layerGroup && layerGroup.hasLayer(x.m)) vis++; });
+    var covEl = $("covNote");
+    window.__HS_VERIFY = {
+      mapMarkers: siteMarkers.length,
+      visibleMarkers: vis,
+      facilitiesOnly: FACILITIES_ONLY,
+      covNote: (covEl && covEl.style.display !== "none") ? (covEl.textContent || "").trim() : "",
+      leafletPaths: document.querySelectorAll("#map .leaflet-interactive").length
+    };
   }
 
   // Show only the buckets whose legend chip is on.
@@ -1263,6 +1278,7 @@ HS.onReady(function(){
     });
     if(V3.active){ build3DFacilities(); }   // legend toggles apply to the 3D views too
     if(GL.active){ buildGLMarkers(); }
+    publishVerifyState();
   }
 
   // Legend doubles as three toggle buttons (operating / approved / proposed).
