@@ -101,7 +101,7 @@ window.HS_SEED = (function () {
         {k:'cost', dir:'up', label:'Jobs', bad:false},
         {k:'traffic', dir:'up', label:'Traffic', bad:true},
         {k:'air', dir:'up', label:'Noise', bad:true}],
-      source_ref:'https://www.austintexas.gov/airport',
+      source_ref:'https://www.flyaustin.com/',
       sowhat:"the airport 3.5 mi away is in a multi-year build-out — more jobs and access, more corridor traffic and flight noise on some days.",
       approx:true, note:'The AUS "Journey With AUS" expansion is real; figures here are prototype placeholders pending the City of Austin feed.' },
 
@@ -112,7 +112,7 @@ window.HS_SEED = (function () {
       impact_score:46, impact_dimensions:[
         {k:'value', dir:'up', label:'Area value', bad:false},
         {k:'traffic', dir:'up', label:'Traffic', bad:true}],
-      source_ref:'https://www.austintexas.gov/department/planning',
+      source_ref:'https://www.austintexas.gov/planning',
       sowhat:"a large master-planned community continues building out nearby — more neighbors and amenities, more local traffic; broadly supportive of area values.",
       approx:true, note:'Easton Park is a real Del Valle master-planned community; scale/date here are prototype placeholders.' },
 

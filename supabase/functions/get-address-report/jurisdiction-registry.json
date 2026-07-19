@@ -1818,7 +1818,7 @@
    "registry_id": "colorado-springs-planning-applications",
    "platform": "arcgis",
    "service_url": "https://gis.coloradosprings.gov/arcgis/rest/services/Planning/PlanDevTracker_PRO/MapServer/0",
-   "dataset_url": "https://gis.coloradosprings.gov/arcgis/rest/services/Planning/PlanDevTracker_PRO/MapServer/0",
+   "dataset_url": "https://cos-gis.hub.arcgis.com/datasets/colorado-springs::plan-dev-tracker",
    "jurisdiction": "City of Colorado Springs",
    "coverage": [
     {
@@ -1877,7 +1877,7 @@
    "registry_id": "bellevue-permits",
    "platform": "arcgis",
    "service_url": "https://services1.arcgis.com/EYzEZbDhXZjURPbP/arcgis/rest/services/Bellevue_Permits/FeatureServer/0",
-   "dataset_url": "https://data.bellevuewa.gov/datasets/7d938bb5f7a34458baec15fe395e46ce",
+   "dataset_url": "https://data.bellevuewa.gov/datasets/bellevue::bellevue-permits",
    "jurisdiction": "City of Bellevue",
    "coverage": [
     {
@@ -1976,7 +1976,7 @@
    "registry_id": "tacoma-accela-permits",
    "platform": "arcgis",
    "service_url": "https://services3.arcgis.com/SCwJH1pD8WSn5T5y/arcgis/rest/services/accela_permit_data/FeatureServer/0",
-   "dataset_url": "https://geohub.cityoftacoma.org/datasets/a12d6fbf58e4434b8ff5070c09646f19",
+   "dataset_url": "https://data.tacoma.gov/datasets/tacoma::accela-permit-data-tacoma",
    "jurisdiction": "City of Tacoma",
    "coverage": [
     {
@@ -2104,7 +2104,7 @@
    "registry_id": "pierce-county-pals-permits",
    "platform": "arcgis",
    "service_url": "https://services2.arcgis.com/1UvBaQ5y1ubjUPmd/arcgis/rest/services/Permits_Pierce_County/FeatureServer/0",
-   "dataset_url": "https://gisdata-piercecowa.opendata.arcgis.com/datasets/7a2af86e0b64463b9caeb08c374a24ac",
+   "dataset_url": "https://gisdata-piercecowa.hub.arcgis.com/datasets/7a2af86e0b64463b9caeb08c374a24ac",
    "jurisdiction": "Pierce County (PALS)",
    "coverage": [
     {
@@ -2265,7 +2265,7 @@
    "registry_id": "minneapolis-ccs-permits",
    "platform": "arcgis",
    "service_url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/CCS_Permits/FeatureServer/0",
-   "dataset_url": "https://opendata.minneapolismn.gov/datasets/91d7cc54f31a45b0982fca5117f16a0f",
+   "dataset_url": "https://opendata.minneapolismn.gov/datasets/minneapolis::ccs-permits",
    "jurisdiction": "City of Minneapolis (CCS)",
    "coverage": [
     {
@@ -2326,7 +2326,7 @@
     }
    ],
    "service_url": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/bseed_building_permits/FeatureServer/0",
-   "dataset_url": "https://data.detroitmi.gov/datasets/86d47e86062e4beeb19344eb125b75d2",
+   "dataset_url": "https://data.detroitmi.gov/datasets/detroit::bseed-building-permits",
    "column_map": {
     "title": [
      "permit_type",
@@ -2376,7 +2376,7 @@
     }
    ],
    "service_url": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/bseed_trades_permits/FeatureServer/0",
-   "dataset_url": "https://data.detroitmi.gov/datasets/f77e9fd44b7e44089b41d3f8161631fa",
+   "dataset_url": "https://data.detroitmi.gov/datasets/detroit::bseed-trades-permits",
    "column_map": {
     "title": [
      "permit_type",
@@ -2421,7 +2421,7 @@
     }
    ],
    "service_url": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/bseed_demolition_permits/FeatureServer/0",
-   "dataset_url": "https://data.detroitmi.gov/datasets/56b20af695134bd1b4ab65e1876ae79b",
+   "dataset_url": "https://data.detroitmi.gov/datasets/detroit::bseed-demolition-permits",
    "column_map": {
     "title": [
      "work_description",
@@ -2603,7 +2603,7 @@
    "registry_id": "scottsdale-building-permits",
    "platform": "arcgis",
    "service_url": "https://maps.scottsdaleaz.gov/arcgis/rest/services/OpenData_Tabular/MapServer/12",
-   "dataset_url": "https://maps.scottsdaleaz.gov/arcgis/rest/services/OpenData_Tabular/MapServer/12",
+   "dataset_url": "https://maps-scottsdaleaz.hub.arcgis.com/datasets/scottsdale::building-permits",
    "jurisdiction": "City of Scottsdale",
    "coverage": [
     {
