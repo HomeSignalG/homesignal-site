@@ -6,12 +6,20 @@ passes; activation is a **separate** manual step.
 
 **Suggested first county:** Wake County, NC (`slug = wake-county-nc`).
 
+> **Pilot A supersession notice.** For **Phase 1B** county onboarding (the
+> governed `feed_candidates` state machine — Wake County Pilot A onward), this
+> Phase 1A runbook is superseded as the execution authority by the **Pilot A
+> documentation set** — start at `docs/government-feed-phase1b-pilot-a-plan.md`.
+> The steps below remain the reference for the underlying tools
+> (discover / probe / insert / sync / verify), which Pilot A reuses.
+
 **Companion docs:**
 
 - Workflow summary: `docs/government-feed-onboarding.md`
 - Schema reference: `docs/gov-feeds-schema.sql`
 - Ingest migration: `docs/gov-feeds-migration-to-ingest.md`
 - Candidate SQL rules: `docs/candidates/README.md`
+- **Phase 1B Pilot A (supersedes this doc for Phase 1B execution):** `docs/government-feed-phase1b-pilot-a-plan.md`
 
 ---
 
@@ -322,11 +330,20 @@ and will not overwrite an existing row.
 
 ---
 
-## Phase 1B P0 (stub — full runbook after Pilot A)
+## Phase 1B P0 + Pilot A staging
 
 Phase 1B adds a `feed_candidates` registry, state machine, and activation gates.
 **P0 artifacts are in-repo only** — SQL in `docs/gov-feeds-phase1b-p0-*.sql` is
 **not auto-applied**. See `docs/gov-feeds-phase1b-p0-README.md`.
+
+**Pilot A documentation set (execution authority for Phase 1B onboarding):**
+
+- `docs/government-feed-phase1b-pilot-a-plan.md` — plan + canonical execution order (start here)
+- `docs/government-feed-phase1b-pilot-a-staging-execution-plan.md`
+- `docs/government-feed-phase1b-pilot-a-operator-runbook.md`
+- `docs/government-feed-phase1b-pilot-a-go-no-go-checklist.md`
+- `docs/government-feed-phase1b-pilot-a-rollback-checklist.md`
+- `docs/government-feed-phase1b-pilot-a-completion-checklist.md`
 
 | P0 script | Path |
 |-----------|------|
