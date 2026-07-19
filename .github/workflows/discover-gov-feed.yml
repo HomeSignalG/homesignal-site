@@ -1,0 +1,50 @@
+name: discover-gov-feed
+
+# Phase 1A — county vendor discovery (Granicus RSS / Legistar / CivicClerk).
+# READ-ONLY: probes vendor hosts, writes JSON artifact. Does not touch public.feeds.
+
+on:
+  workflow_dispatch:
+    inputs:
+      county:
+        description: 'County name (e.g. Wake)'
+        required: true
+      state:
+        description: 'State abbreviation (e.g. NC)'
+        required: true
+      community_id:
+        description: 'County root community UUID'
+        required: true
+      hints_file:
+        description: 'Optional repo path to hints JSON (granicus_entity, legistar_client, civicclerk_sub)'
+        required: false
+        default: ''
+      max_probes:
+        description: 'Max HTTP probes (default 40)'
+        required: false
+        default: '40'
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Discover vendor
+        run: |
+          ARGS="--county '${{ github.event.inputs.county }}' --state '${{ github.event.inputs.state }}' --community-id '${{ github.event.inputs.community_id }}' --max-probes ${{ github.event.inputs.max_probes }} --out results/gov-feed-discovery.json"
+          if [ -n "${{ github.event.inputs.hints_file }}" ]; then
+            ARGS="$ARGS --hints '${{ github.event.inputs.hints_file }}'"
+          fi
+          node scripts/gov-feeds/discover-county-vendor.mjs $ARGS
+      - name: Upload discovery artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gov-feed-discovery
+          path: results/gov-feed-discovery.json
+          retention-days: 14

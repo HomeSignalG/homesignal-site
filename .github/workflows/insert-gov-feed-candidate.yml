@@ -1,0 +1,54 @@
+name: insert-gov-feed-candidate
+
+# Phase 1A — apply committed candidate INSERT SQL via Supabase Management API.
+# Manual-only. SQL must be committed under docs/candidates/*.sql.
+# Candidates insert with active=false — go-live is a separate deliberate step.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sql_file:
+        description: 'Repo path to committed candidate SQL (e.g. docs/candidates/example-insert.sql)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  insert:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr
+    steps:
+      - uses: actions/checkout@v4
+      - name: Safety check — candidate SQL only
+        run: |
+          FILE="${{ github.event.inputs.sql_file }}"
+          if [[ ! "$FILE" =~ ^docs/candidates/ ]]; then
+            echo "Refusing: sql_file must live under docs/candidates/"
+            exit 1
+          fi
+          if grep -qiE 'update\s+public\.feeds\s+set\s+active\s*=\s*true' "$FILE"; then
+            echo "Refusing: activate SQL belongs in golive workflow, not insert"
+            exit 1
+          fi
+      - name: Execute candidate SQL
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          FILE="${{ github.event.inputs.sql_file }}"
+          python3 - "$FILE" <<'EOF'
+          import json, os, sys, urllib.request
+          sql = open(sys.argv[1]).read()
+          req = urllib.request.Request(
+              f"https://api.supabase.com/v1/projects/{os.environ['SUPABASE_PROJECT_REF']}/database/query",
+              data=json.dumps({"query": sql}).encode(),
+              headers={
+                  "Authorization": f"Bearer {os.environ['SUPABASE_ACCESS_TOKEN']}",
+                  "Content-Type": "application/json",
+              },
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=120) as r:
+              print(r.read().decode()[:8000])
+          EOF

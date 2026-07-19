@@ -1,0 +1,46 @@
+name: sync-feeds-config
+
+# Phase 1A — detect feeds.csv ↔ public.feeds drift (the operational gap).
+# Fails when the versioned CSV and live DB are out of sync.
+# Does NOT insert rows — reports only. Use db-sql + committed candidate SQL to insert.
+
+on:
+  schedule:
+    - cron: '0 11 * * *'   # daily 11:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: https://qwnnmljucajnexpxdgxr.supabase.co
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Diff CSV vs public.feeds
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node scripts/gov-feeds/sync-feeds-config.mjs \
+            --csv data/gov-feeds/feeds.csv \
+            --live \
+            --out-report results/feeds-sync-report.txt \
+            --emit-insert-sql results/feeds-sync-insert.sql || true
+          cat results/feeds-sync-report.txt
+      - name: Upload sync report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feeds-sync-report
+          path: results/
+          retention-days: 7
+      - name: Fail on drift
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node scripts/gov-feeds/sync-feeds-config.mjs --csv data/gov-feeds/feeds.csv --live

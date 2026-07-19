@@ -1,0 +1,41 @@
+name: verify-gov-feed-candidate
+
+# Phase 1A — post-go-live title verification for a county meetings feed.
+# Confirms public.meetings titles match the expected governing board.
+
+on:
+  workflow_dispatch:
+    inputs:
+      community_id:
+        description: 'County root community UUID'
+        required: true
+      title_pattern:
+        description: 'Regex for acceptable board titles'
+        required: false
+        default: 'Commission|Council|Court|Board of Commissioners|County Council'
+      min_match_ratio:
+        description: 'Minimum fraction of titles that must match (0-1)'
+        required: false
+        default: '0.8'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: https://qwnnmljucajnexpxdgxr.supabase.co
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Verify meeting titles
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node scripts/gov-feeds/verify-candidate-titles.mjs \
+            --community-id '${{ github.event.inputs.community_id }}' \
+            --pattern '${{ github.event.inputs.title_pattern }}' \
+            --min-match '${{ github.event.inputs.min_match_ratio }}'
