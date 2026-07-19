@@ -16,7 +16,7 @@
 //     --db-json fixtures/gov-feeds/db-feeds-fixture.json
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { formatQuarantineReport, readFeedsCsv } from './lib/csv-io.mjs';
+import { formatCsvWarnings, formatQuarantineReport, readFeedsCsv } from './lib/csv-io.mjs';
 import { candidateToInsertSql } from './lib/candidates.mjs';
 import { diffFeedsConfig, fetchDbFeeds, formatSyncReport } from './lib/sync.mjs';
 
@@ -37,7 +37,7 @@ if (!csvPath) {
   process.exit(2);
 }
 
-const { rows: csvRows, quarantined } = readFeedsCsv(csvPath);
+const { rows: csvRows, quarantined, warnings } = readFeedsCsv(csvPath);
 /** @type {import('./lib/schema.mjs').FeedRecord[]} */
 let dbRows = [];
 
@@ -58,10 +58,13 @@ if (live) {
 }
 
 const diff = diffFeedsConfig(csvRows, dbRows);
-const report = formatSyncReport(diff, { quarantined });
+const report = formatSyncReport(diff, { quarantined, warnings });
 mkdirSync('results', { recursive: true });
 writeFileSync(outReport, report + '\n');
 console.log(report);
+if (warnings.length) {
+  console.log('\n' + formatCsvWarnings(warnings));
+}
 if (quarantined.length) {
   console.log('\n' + formatQuarantineReport(quarantined));
 }

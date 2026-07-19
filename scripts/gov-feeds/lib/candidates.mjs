@@ -27,6 +27,7 @@ export function buildCandidateFeedRow(args) {
   const row = normalizeFeedRecord({
     feed_id,
     community_id: args.community_id,
+    county: args.county_name || '',
     source: args.hit.source_url,
     source_type,
     category: COUNTY_COMMISSION_CATEGORY,

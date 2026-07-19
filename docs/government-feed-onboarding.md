@@ -23,6 +23,7 @@ homesignal-ingest/feeds.csv  ──sync──►  public.feeds  ──load_confi
 | Column | Notes |
 |--------|-------|
 | `feed_id` | Primary key (text slug) |
+| `county` | Denormalized county label (operator metadata; ingest routes by `community_id`) |
 | `community_id` | County root UUID |
 | `source` | Feed URL (**not** `source_url`) |
 | `source_type` | `rss` \| `keyword` \| `html` \| `email` |
@@ -36,8 +37,10 @@ homesignal-ingest/feeds.csv  ──sync──►  public.feeds  ──load_confi
 | `target_table` | `alerts` or `meetings` (engine routing) |
 | `filter_expr` | Optional vendor/body filter |
 | `dedupe_on` | Optional dedupe key (e.g. `guid\|link`) |
-| `status_notes` | Operator notes (not used by ingest matching) |
+| `status / notes` | Operator notes in feeds.csv (maps to `status_notes` in DB) |
 | `updated_at` | DB-managed (read-only) |
+
+**feeds.csv column aliases:** `filter` → `filter_expr`; `status / notes` → `status_notes`. Unknown spreadsheet columns are warned and ignored.
 
 **Vendor → production `source_type`:**
 

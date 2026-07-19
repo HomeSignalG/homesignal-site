@@ -13,6 +13,7 @@ export { COUNTY_COMMISSION_CATEGORY, FEEDS_CSV_COLUMNS as CSV_COLUMNS };
  * @typedef {Object} FeedRecord
  * @property {string} feed_id
  * @property {string} community_id
+ * @property {string} county
  * @property {string} source
  * @property {string} source_type
  * @property {string} category
@@ -146,6 +147,7 @@ export function normalizeFeedRecord(row, { presentColumns } = {}) {
   return {
     feed_id: String(coerced.feed_id).trim(),
     community_id: String(coerced.community_id).trim(),
+    county: opt('county'),
     source: String(coerced.source).trim(),
     source_type: String(coerced.source_type).trim(),
     category: String(coerced.category).trim(),

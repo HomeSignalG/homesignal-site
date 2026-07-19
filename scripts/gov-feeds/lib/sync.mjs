@@ -87,13 +87,14 @@ export async function fetchDbFeeds(creds) {
   return rows;
 }
 
-/** @param {ReturnType<typeof diffFeedsConfig>} diff @param {{ quarantined?: Array<{ row: number, feed_id: string, errors: string[] }> }} [opts] */
-export function formatSyncReport(diff, { quarantined = [] } = {}) {
+/** @param {ReturnType<typeof diffFeedsConfig>} diff @param {{ quarantined?: Array<{ row: number, feed_id: string, errors: string[] }>, warnings?: string[] }} [opts] */
+export function formatSyncReport(diff, { quarantined = [], warnings = [] } = {}) {
   const lines = [
     'feeds.csv → public.feeds sync report',
     '===================================',
     `CSV rows (valid):     ${diff.summary.csv_count}`,
     `CSV rows (quarantined): ${quarantined.length}`,
+    `CSV warnings:         ${warnings.length}`,
     `DB rows (all):        ${diff.summary.db_count}`,
     `CSV rows missing from DB: ${diff.summary.missing_from_db}`,
     `DB-only production feeds (informational): ${diff.summary.db_only_production}`,
@@ -101,6 +102,9 @@ export function formatSyncReport(diff, { quarantined = [] } = {}) {
     `Active flag reconcile needed: ${diff.summary.active_reconcile}`,
     `Drift detected: ${diff.summary.has_drift ? 'YES' : 'NO'}`,
   ];
+  if (warnings.length) {
+    lines.push('', '--- CSV warnings (columns ignored; sync continued) ---', ...warnings.map((w) => `  ${w}`));
+  }
   if (quarantined.length) {
     lines.push('', '--- quarantined CSV rows (skipped; sync continued) ---');
     for (const q of quarantined) {

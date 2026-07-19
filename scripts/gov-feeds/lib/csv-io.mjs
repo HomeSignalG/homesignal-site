@@ -1,8 +1,10 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import {
-  FEEDS_CSV_COLUMN_ALIASES,
   FEEDS_CSV_COLUMNS,
+  FEEDS_CSV_KNOWN_COLUMNS,
   FEEDS_CSV_REQUIRED_COLUMNS,
+  canonicalCsvColumn,
+  isKnownFeedsCsvColumn,
 } from './production-contract.mjs';
 import { CSV_COLUMNS, normalizeFeedRecord, validateFeedRecord } from './schema.mjs';
 
@@ -38,12 +40,6 @@ function escapeCsvCell(v) {
   return s;
 }
 
-/** @param {string} headerCell */
-function canonicalHeaderName(headerCell) {
-  const trimmed = headerCell.trim();
-  return FEEDS_CSV_COLUMN_ALIASES[trimmed] || trimmed;
-}
-
 /** @param {import('./schema.mjs').FeedRecord[]} records @param {string[]} [columns] */
 export function recordsToCsv(records, columns = CSV_COLUMNS) {
   const lines = [columns.join(',')];
@@ -56,24 +52,39 @@ export function recordsToCsv(records, columns = CSV_COLUMNS) {
 
 /**
  * Read feeds.csv with quarantine-by-row validation.
+ * Unknown header columns produce warnings and are ignored (sync continues).
+ *
  * @param {string} path
- * @returns {{ rows: import('./schema.mjs').FeedRecord[], quarantined: Array<{ row: number, feed_id: string, errors: string[] }>, header: string[] }}
+ * @returns {{
+ *   rows: import('./schema.mjs').FeedRecord[],
+ *   quarantined: Array<{ row: number, feed_id: string, errors: string[] }>,
+ *   warnings: string[],
+ *   header: string[],
+ *   rawHeader: string[],
+ * }}
  */
 export function readFeedsCsv(path) {
   const text = readFileSync(path, 'utf8');
   const table = parseCsv(text.trimEnd() + '\n');
-  if (!table.length) return { rows: [], quarantined: [], header: [] };
+  if (!table.length) return { rows: [], quarantined: [], warnings: [], header: [], rawHeader: [] };
 
-  const header = table[0].map((h) => canonicalHeaderName(h));
+  const rawHeader = table[0].map((h) => String(h ?? '').trim());
+  const header = rawHeader.map((h) => canonicalCsvColumn(h));
+  const warnings = [];
+
   const missing = FEEDS_CSV_REQUIRED_COLUMNS.filter((c) => !header.includes(c));
   if (missing.length) {
     throw new Error(`feeds.csv missing required columns: ${missing.join(', ')}`);
   }
 
-  const known = new Set(FEEDS_CSV_COLUMNS);
-  const extra = header.filter((h) => h && !known.has(h));
-  if (extra.length) {
-    throw new Error(`feeds.csv has unknown columns: ${extra.join(', ')}`);
+  const known = new Set(FEEDS_CSV_KNOWN_COLUMNS);
+  for (let i = 0; i < rawHeader.length; i++) {
+    const raw = rawHeader[i];
+    if (!raw) continue;
+    const canonical = header[i];
+    if (!isKnownFeedsCsvColumn(canonical)) {
+      warnings.push(`unknown CSV column ignored: ${JSON.stringify(raw)}`);
+    }
   }
 
   const records = [];
@@ -110,7 +121,7 @@ export function readFeedsCsv(path) {
     }
   }
 
-  return { rows: records, quarantined, header };
+  return { rows: records, quarantined, warnings, header, rawHeader };
 }
 
 /** @param {string} path @param {import('./schema.mjs').FeedRecord[]} records */
@@ -126,4 +137,10 @@ export function formatQuarantineReport(quarantined) {
     lines.push(`  row ${q.row} (${q.feed_id}): ${q.errors.join('; ')}`);
   }
   return lines.join('\n');
+}
+
+/** @param {string[]} warnings */
+export function formatCsvWarnings(warnings) {
+  if (!warnings.length) return 'CSV warnings: 0';
+  return ['CSV warnings:', ...warnings.map((w) => `  ${w}`)].join('\n');
 }
