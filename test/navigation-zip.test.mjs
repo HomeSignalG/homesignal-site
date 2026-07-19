@@ -23,6 +23,10 @@ ok(parseZipParam('?zip=84101') === '84101', 'parseZipParam reads ?zip=84101');
 ok(parseZipParam('?zip=abc') === null, 'parseZipParam rejects non-5-digit');
 ok(parseZipFromAddress('2200 CALDWELL LN, DEL VALLE, TX 78617') === '78617',
   'parseZipFromAddress reads ZIP from geocoded address');
+ok(parseZipFromAddress('10600 RESEARCH BLVD, AUSTIN, TX, 78759') === '78759',
+  'parseZipFromAddress reads trailing ZIP, not a 5-digit house number');
+ok(parseZipFromAddress('10600 RESEARCH BLVD, AUSTIN, TX, 78759') !== '10600',
+  'parseZipFromAddress does not return house number as ZIP');
 ok(parseZipFromAddress('no zip here') === null,
   'parseZipFromAddress returns null when address has no ZIP');
 ok(resolveViewedZip({ urlZip: '84101', sessionViewZip: '60601', defaultZip: DEF }) === '84101',
@@ -43,8 +47,10 @@ ok(navHref('maps.html', null) === 'maps.html',
   'missing ZIP → bare maps.html (graceful fallback, no invented zip)');
 ok(navHref('maps.html', 'abc') === 'maps.html',
   'invalid ZIP → bare maps.html');
-ok(!navHref('maps.html', DEF).includes('78617') || navHref('maps.html', DEF) === 'maps.html?zip=78617',
-  'navHref uses passed zip dynamically, never a hardcoded sample string in source');
+ok(navHref('maps.html', '84101').indexOf('78617') === -1,
+  'navHref does not substitute the sample ZIP when a different ZIP is passed');
+ok(navHref('maps.html', DEF) === 'maps.html?zip=78617',
+  'navHref encodes an explicitly passed default ZIP');
 
 // --- map cross-navigation (maps.html ↔ homesignalmap.html) ---
 ok(navHref('homesignalmap.html', '90210') === 'homesignalmap.html?zip=90210',

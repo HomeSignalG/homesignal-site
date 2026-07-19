@@ -19,7 +19,7 @@
     };
     HS.parseZipFromAddress = function (str) {
       if (str == null || str === '') return null;
-      const m = String(str).match(/\b(\d{5})\b/);
+      const m = String(str).match(/(\d{5})(?:-\d{4})?\s*$/);
       return (m && /^\d{5}$/.test(m[1])) ? m[1] : null;
     };
     HS.resolveViewedZip = function (opts) {
