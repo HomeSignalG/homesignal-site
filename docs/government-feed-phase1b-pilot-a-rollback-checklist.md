@@ -74,11 +74,18 @@ limit 20;
 
 ### Recovery
 
+> **Transition note:** `title_verify_failed` has exactly one legal outbound
+> transition — `abandon` (`transition-spec.v1.json`). Any retry below therefore
+> proceeds via a **new candidate row** (new `batch_id` or fresh bootstrap) or a
+> **founder-approved manual registry reset** to the last good state (see § 5
+> Registry corruption, Option A) — never a direct registry transition back to
+> `goliving`.
+
 | Root cause | Action |
 |------------|--------|
-| Golive stale / empty | Re-run `golive-feed`; return to `goliving` |
-| Wrong `view_id` | Re-discover; abandon current candidate |
-| Pattern too strict | Adjust `title_pattern` with founder approval; re-verify |
+| Golive stale / empty | Re-run `golive-feed`; re-enter the pipeline via a new candidate row or founder-approved manual reset to `dry_run_pass`/`goliving` |
+| Wrong `view_id` | Abandon current candidate; re-discover on a new candidate row |
+| Pattern too strict | Re-run `verify-candidate-titles.mjs` with an adjusted `--pattern REGEX` (founder approval); there is no stored pattern field to edit |
 
 ### Exit criteria
 
@@ -113,7 +120,17 @@ limit 20;
 | `circuit_closed` | Reset batch circuit to `closed` |
 | `valid_claim` | Set `claimed_by` / extend `claim_expires_at` |
 
-Re-run activation gate CLI until `ok: true`; obtain founder re-approval.
+**Retry path depends on the registry state:**
+
+- Registry still at **`title_verified`** (gate pre-flight failed before any
+  transition was applied): fix the failed gate(s), re-run the activation gate
+  CLI until `ok: true`, and obtain founder re-approval — `title_verified →
+  activating` remains legal.
+- Registry reached **`activation_failed`**: its only legal outbound transition
+  is `abandon` (`transition-spec.v1.json`). Continue via a **new candidate
+  row** or a **founder-approved manual registry reset** to `title_verified`
+  (see § 5 Registry corruption, Option A) — do not attempt a direct transition
+  back from `activation_failed`.
 
 ### Exit criteria
 
@@ -140,11 +157,20 @@ Re-run activation gate CLI until `ok: true`; obtain founder re-approval.
 
 ### Recovery
 
+> **Transition note:** once the registry enters `open_circuit`, the only legal
+> path is **forward through the rollback chain** (`open_circuit →
+> circuit_halting → circuit_halted → rollback_running → rolled_back →
+> superseded`, per `transition-spec.v1.json`) — there is no transition back to
+> `active`. Re-onboarding after the outage proceeds on a **new candidate row**
+> (or, in staging, a founder-approved manual registry reset — see § 5 Registry
+> corruption, Option A).
+
 1. Wait for vendor restoration; confirm RSS returns 200
-2. Re-probe (`dryrun-gov-feed`)
-3. Re-golive if needed
-4. Re-verify titles before re-activation
-5. Complete rollback drill path if testing circuit breaker
+2. Complete the rollback chain on the current row to `rolled_back` →
+   `superseded` (this doubles as the circuit-breaker test if applicable)
+3. Bootstrap a new candidate row and re-probe (`dryrun-gov-feed`)
+4. Re-golive on the new row if needed
+5. Re-verify titles before re-activation on the new row
 
 ### Exit criteria
 

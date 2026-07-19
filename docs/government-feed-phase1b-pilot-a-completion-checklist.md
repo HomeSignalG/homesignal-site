@@ -59,7 +59,7 @@ Pilot A is **not complete** until ALL of the following are true:
 
 | Document | Update needed | Done |
 |----------|---------------|------|
-| `docs/government-feed-onboarding-operator.md` | Replace Phase 1B P0 stub with Pilot A learnings | ☐ |
+| `docs/government-feed-onboarding-operator.md` | Append Pilot A learnings to the existing "Phase 1B P0 + Pilot A staging" section | ☐ |
 | `docs/government-feed-phase1b-design.md` §11 | Mark Pilot A exit criteria met | ☐ |
 | `docs/gov-feeds-phase1b-p0-README.md` | Note staging apply date + environment | ☐ |
 | `docs/state-notice-portals.md` | Wake receipt if new evidence | ☐ |
