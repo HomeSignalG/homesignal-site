@@ -1,0 +1,66 @@
+name: insert-gov-feed-candidate
+
+# Apply committed candidate INSERT SQL (active=false, ON CONFLICT DO NOTHING only).
+
+on:
+  workflow_dispatch:
+    inputs:
+      sql_file:
+        description: 'Repo path under docs/candidates/*.sql'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  insert:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr
+    steps:
+      - uses: actions/checkout@v4
+      - name: Safety check — candidate INSERT only
+        env:
+          SQL_FILE: ${{ github.event.inputs.sql_file }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$SQL_FILE" =~ ^docs/candidates/.+\.sql$ ]]; then
+            echo "Refusing: sql_file must match docs/candidates/*.sql"
+            exit 1
+          fi
+          if [ ! -f "$SQL_FILE" ]; then
+            echo "File not found: $SQL_FILE"
+            exit 1
+          fi
+          if grep -qiE 'update\s+public\.feeds\s+set\s+active\s*=\s*true' "$SQL_FILE"; then
+            echo "Refusing: activate SQL must be a separate go-live step"
+            exit 1
+          fi
+          if grep -qiE 'on\s+conflict\s*\([^)]+\)\s+do\s+update' "$SQL_FILE"; then
+            echo "Refusing: candidate insert must use ON CONFLICT DO NOTHING"
+            exit 1
+          fi
+          if grep -qiE "active\s*,\s*'true'|active\s*,\s*true|active\s*=\s*true" "$SQL_FILE"; then
+            echo "Refusing: candidate insert must keep active=false"
+            exit 1
+          fi
+      - name: Execute candidate SQL
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SQL_FILE: ${{ github.event.inputs.sql_file }}
+        run: |
+          python3 - "$SQL_FILE" <<'EOF'
+          import json, os, sys, urllib.request
+          sql = open(sys.argv[1]).read()
+          req = urllib.request.Request(
+              f"https://api.supabase.com/v1/projects/{os.environ['SUPABASE_PROJECT_REF']}/database/query",
+              data=json.dumps({"query": sql}).encode(),
+              headers={
+                  "Authorization": f"Bearer {os.environ['SUPABASE_ACCESS_TOKEN']}",
+                  "Content-Type": "application/json",
+              },
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=120) as r:
+              print(r.read().decode()[:8000])
+          EOF

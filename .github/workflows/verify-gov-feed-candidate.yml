@@ -1,0 +1,51 @@
+name: verify-gov-feed-candidate
+
+# Phase 1A — post-go-live title verification for a county meetings feed.
+# Confirms public.meetings titles match the expected governing board.
+
+on:
+  workflow_dispatch:
+    inputs:
+      community_id:
+        description: 'County root community UUID'
+        required: true
+      feed_id:
+        description: 'Feed being verified (scopes meetings to this feed source)'
+        required: false
+        default: ''
+      title_pattern:
+        description: 'Regex for acceptable board titles'
+        required: false
+        default: 'Commission|Council|Court|Board of Commissioners|County Council'
+      min_match_ratio:
+        description: 'Minimum fraction of titles that must match (0-1)'
+        required: false
+        default: '0.8'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: https://qwnnmljucajnexpxdgxr.supabase.co
+      VERIFY_COMMUNITY_ID: ${{ github.event.inputs.community_id }}
+      VERIFY_FEED_ID: ${{ github.event.inputs.feed_id }}
+      VERIFY_TITLE_PATTERN: ${{ github.event.inputs.title_pattern }}
+      VERIFY_MIN_MATCH: ${{ github.event.inputs.min_match_ratio }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Verify meeting titles
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          args=(--community-id "$VERIFY_COMMUNITY_ID" --pattern "$VERIFY_TITLE_PATTERN" --min-match "$VERIFY_MIN_MATCH")
+          if [ -n "$VERIFY_FEED_ID" ]; then
+            args+=(--feed-id "$VERIFY_FEED_ID")
+          fi
+          node scripts/gov-feeds/verify-candidate-titles.mjs "${args[@]}"

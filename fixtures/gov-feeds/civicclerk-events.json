@@ -1,0 +1,10 @@
+{
+  "@odata.context": "https://traviscotx.api.civicclerk.com/v1/$metadata#Events",
+  "value": [
+    {
+      "id": 101,
+      "eventName": "Commissioners Court",
+      "startDateTime": "2026-07-22T09:00:00Z"
+    }
+  ]
+}

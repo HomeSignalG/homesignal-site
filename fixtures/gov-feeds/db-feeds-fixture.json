@@ -1,0 +1,20 @@
+[
+  {
+    "feed_id": "clark-county-nv-granicus-meetings",
+    "community_id": "11111111-1111-4111-8111-111111111111",
+    "county": "Clark",
+    "source": "https://clark.granicus.com/ViewPublisherRSS.php?view_id=28&mode=agendas",
+    "source_type": "rss",
+    "category": "County Commission & county business",
+    "pipeline_type": "government_notice",
+    "agency_name": "Clark County Commission",
+    "geographic_reference": "Clark County, NV",
+    "impact_level": "medium",
+    "active": true,
+    "sort_order": 0,
+    "target_table": "meetings",
+    "filter_expr": "",
+    "dedupe_on": "guid|link",
+    "status_notes": ""
+  }
+]

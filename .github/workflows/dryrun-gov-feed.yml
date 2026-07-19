@@ -1,0 +1,30 @@
+name: dryrun-gov-feed
+
+# Phase 1A — read-only dry-run probe for a candidate feed row.
+# Pass = vendor responds with parseable meeting content.
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_json:
+        description: 'Repo path to candidate JSON (or discovery output)'
+        required: true
+        default: 'fixtures/gov-feeds/wake-granicus-candidate.json'
+
+permissions:
+  contents: read
+
+jobs:
+  dryrun:
+    runs-on: ubuntu-latest
+    env:
+      CANDIDATE_JSON: ${{ github.event.inputs.candidate_json }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Probe candidate (dry run)
+        run: |
+          set -euo pipefail
+          node scripts/gov-feeds/probe-candidate.mjs --candidate "$CANDIDATE_JSON"

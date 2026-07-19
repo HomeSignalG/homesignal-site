@@ -1,0 +1,2 @@
+feed_id,county,community_id,source,source_type,category,pipeline_type,agency_name,geographic_reference,impact_level,active,sort_order,target_table,filter,dedupe_on,status / notes
+wake-county-nc-candidate,Wake,00000000-0000-4000-8000-000000000099,https://wake.granicus.com/ViewPublisherRSS.php?view_id=18&mode=agendas,rss,County Commission & county business,government_notice,Wake County Board of Commissioners,"Wake County, NC",medium,false,0,meetings,,,

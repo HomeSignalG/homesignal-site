@@ -1,0 +1,2 @@
+feed_id,county,community_id,source,source_type,category,pipeline_type,agency_name,geographic_reference,active,filter
+be-filter-alias,Box Elder,d67c558f-1f04-4811-a565-873ae2afd6f3,https://www.utah.gov/pmn/sitemap/publicbody/2637.html,html,County Commission & county business,government_notice,Box Elder County Commission,"Box Elder County, UT",false,publicbody/2637

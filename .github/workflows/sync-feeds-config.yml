@@ -1,0 +1,51 @@
+name: sync-feeds-config
+
+# Phase 1A — detect feeds.csv → public.feeds drift.
+# Requires homesignal-ingest/feeds.csv via FEEDS_CSV (see docs/gov-feeds-migration-to-ingest.md).
+# Manual-only until ingest repo checkout is wired.
+
+on:
+  workflow_dispatch:
+    inputs:
+      feeds_csv:
+        description: 'Path to feeds.csv (default: homesignal-ingest/feeds.csv after ingest checkout)'
+        required: false
+        default: 'homesignal-ingest/feeds.csv'
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: https://qwnnmljucajnexpxdgxr.supabase.co
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Diff feeds.csv vs public.feeds
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FEEDS_CSV: ${{ github.event.inputs.feeds_csv }}
+        run: |
+          set -euo pipefail
+          if [ ! -f "$FEEDS_CSV" ]; then
+            echo "feeds.csv not found at $FEEDS_CSV"
+            echo "Checkout homesignal-ingest or pass a valid --csv path. See docs/gov-feeds-migration-to-ingest.md"
+            exit 1
+          fi
+          node scripts/gov-feeds/sync-feeds-config.mjs \
+            --csv "$FEEDS_CSV" \
+            --live \
+            --out-report results/feeds-sync-report.txt \
+            --emit-insert-sql results/feeds-sync-insert.sql
+          cat results/feeds-sync-report.txt
+      - name: Upload sync report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feeds-sync-report
+          path: results/
+          retention-days: 7

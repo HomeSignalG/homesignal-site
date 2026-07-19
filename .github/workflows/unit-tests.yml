@@ -4,8 +4,11 @@ on:
   push:
     paths:
       - '**/*.js'
+      - '**/*.mjs'
       - '**/*.html'
       - 'test/**'
+      - 'scripts/**'
+      - 'fixtures/gov-feeds/**'
       - 'scripts/run-unit-tests.mjs'
       - 'topics.canon.json'
       - '.github/workflows/**'
@@ -13,8 +16,11 @@ on:
   pull_request:
     paths:
       - '**/*.js'
+      - '**/*.mjs'
       - '**/*.html'
       - 'test/**'
+      - 'scripts/**'
+      - 'fixtures/gov-feeds/**'
       - 'scripts/run-unit-tests.mjs'
       - 'topics.canon.json'
       - '.github/workflows/**'

@@ -1,0 +1,5 @@
+feed_id,county,community_id,source,source_type,category,pipeline_type,agency_name,geographic_reference,impact_level,active,sort_order,target_table
+good-rss,Wake,00000000-0000-4000-8000-000000000001,https://wake.granicus.com/ViewPublisherRSS.php?view_id=1&mode=agendas,rss,County Commission & county business,government_notice,Wake,"Wake County, NC",medium,false,0,meetings
+bad-source-type,Wake,00000000-0000-4000-8000-000000000002,https://example.com/feed,bogus,County Commission & county business,government_notice,Wake,"Wake County, NC",medium,false,0,meetings
+bad-email,Box Elder,00000000-0000-4000-8000-000000000003,not-an-email,email,News,news,Box Elder,"Box Elder County, UT",low,false,0,alerts
+bad-rss-url,Wake,00000000-0000-4000-8000-000000000004,ftp://example.com/feed,rss,County Commission & county business,government_notice,Wake,"Wake County, NC",medium,false,0,meetings
