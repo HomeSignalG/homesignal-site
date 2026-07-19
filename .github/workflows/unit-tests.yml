@@ -26,6 +26,7 @@ on:
       - 'scripts/run-unit-tests.mjs'
       - 'topics.canon.json'
       - 'docs/government-feed-onboarding*.md'
+      - 'docs/candidates/**'
       - '.github/workflows/**'
       - '.github/workflows/unit-tests.yml'
   workflow_dispatch: {}
