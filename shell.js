@@ -17,6 +17,11 @@
         return (z && /^\d{5}$/.test(z)) ? z : null;
       } catch (e) { return null; }
     };
+    HS.parseZipFromAddress = function (str) {
+      if (str == null || str === '') return null;
+      const m = String(str).match(/(\d{5})(?:-\d{4})?\s*$/);
+      return (m && /^\d{5}$/.test(m[1])) ? m[1] : null;
+    };
     HS.resolveViewedZip = function (opts) {
       opts = opts || {};
       const def = opts.defaultZip || '78617';
@@ -33,7 +38,21 @@
       if (!zip || !/^\d{5}$/.test(String(zip))) return page;
       return page + '?zip=' + encodeURIComponent(String(zip));
     };
-    HS.ZIP_NAV_PAGES = ['today.html', 'dashboard.html', 'alerts.html', 'development.html', 'maps.html', 'community.html'];
+    HS.ZIP_NAV_PAGES = ['today.html', 'dashboard.html', 'alerts.html', 'development.html', 'maps.html', 'homesignalmap.html', 'community.html'];
+    HS.MAP_PAGES = ['maps.html', 'homesignalmap.html'];
+    HS.hasViewedZipContext = function (opts) {
+      opts = opts || {};
+      if (!opts.urlZip) opts.urlZip = HS.parseZipParam(location.search);
+      if (opts.myZip == null) opts.myZip = LS.get('myZip', null);
+      if (opts.sessionViewZip == null) opts.sessionViewZip = SS.get('viewZip');
+      const urlZ = opts.urlZip;
+      if (urlZ && /^\d{5}$/.test(String(urlZ))) return true;
+      const myZ = opts.myZip;
+      if (myZ && /^\d{5}$/.test(String(myZ))) return true;
+      const sesZ = opts.sessionViewZip;
+      if (sesZ && /^\d{5}$/.test(String(sesZ))) return true;
+      return false;
+    };
   }
 
   // ------------------------------------------------------------------ state --
@@ -316,12 +335,21 @@
     if (changed) location.reload();
   };
   function paintNavHrefs() {
-    const nav = document.getElementById('hs-nav');
-    if (!nav || !HS.ZIP_NAV_PAGES) return;
+    if (!HS.ZIP_NAV_PAGES || !HS.navHref) return;
     const zip = state.zip;
-    nav.querySelectorAll('a[href]').forEach(a => {
-      const base = (a.getAttribute('href') || '').split('?')[0];
-      if (HS.ZIP_NAV_PAGES.indexOf(base) >= 0) a.setAttribute('href', HS.navHref(base, zip));
+    const stamp = (a, base) => {
+      if (!base || HS.ZIP_NAV_PAGES.indexOf(base) < 0) return;
+      a.setAttribute('href', HS.navHref(base, zip));
+    };
+    const nav = document.getElementById('hs-nav');
+    if (nav) {
+      nav.querySelectorAll('a[href]').forEach(a => {
+        stamp(a, (a.getAttribute('href') || '').split('?')[0]);
+      });
+    }
+    // In-page map links (dashboard, today, cross-map switcher) reuse the same ZIP stamp.
+    document.querySelectorAll('#hs-slot a[data-znav]').forEach(a => {
+      stamp(a, a.getAttribute('data-znav'));
     });
   }
   function paintTopbar() {

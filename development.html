@@ -209,7 +209,7 @@ HS.onReady(async function () {
         + '<button class="btn primary" onclick="window.open(\'' + HS.esc(p.source_ref) + '\',\'_blank\',\'noopener\')">Submit a public comment</button>'
         + '<button class="btn" onclick="HS.addToCalendar(\'' + p.id + '\')">Add hearing to calendar</button>'
         + '<button class="btn" onclick="window.open(\'' + HS.esc(p.source_ref) + '\',\'_blank\',\'noopener\')">Read the official record</button>'
-        + '<button class="btn" onclick="location.href=\'maps.html\'">See it on the map</button>'
+        + '<button class="btn" onclick="location.href=\'' + HS.esc(HS.navHref('maps.html', S.zip)) + '\'">See it on the map</button>'
         + '<button class="btn ghost" onclick="HS.toggleFollow(this,\'project\',\'' + p.id + '\')">Follow this project</button></div>'
         + '<div class="divider"></div><div class="kicker">The specs</div><div class="specs">'
         + specRow('Developer', p.developer) + specRow('Size', p.size) + specRow('Investment', p.investment)
