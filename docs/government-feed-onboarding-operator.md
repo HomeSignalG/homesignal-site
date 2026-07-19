@@ -322,6 +322,24 @@ and will not overwrite an existing row.
 
 ---
 
+## Phase 1B P0 (stub — full runbook after Pilot A)
+
+Phase 1B adds a `feed_candidates` registry, state machine, and activation gates.
+**P0 artifacts are in-repo only** — SQL in `docs/gov-feeds-phase1b-p0-*.sql` is
+**not auto-applied**. See `docs/gov-feeds-phase1b-p0-README.md`.
+
+| P0 script | Path |
+|-----------|------|
+| Transition validate | `scripts/gov-feeds/transition-candidate.mjs` |
+| Activation gates | `scripts/gov-feeds/activate-feed-candidate.mjs` |
+| Rollback validate | `scripts/gov-feeds/rollback-feed-candidate.mjs` |
+| Spec generator | `scripts/gov-feeds/gen/generate-transition-artifacts.mjs` |
+
+Title verification now defaults to **feed-scoped** L2 (`view_id` / Legistar client /
+CivicClerk sub). Use `--legacy-host-scope` only for Phase 1A comparison.
+
+---
+
 ## Estimated time per county
 
 **~30–60 minutes** after automation (discover 5–15m, human verify 5–10m,
