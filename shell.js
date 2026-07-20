@@ -155,7 +155,18 @@
   });
 
   // Has the visitor set their own area yet (a saved property OR a saved ZIP)?
-  HS.hasArea = function () { return !!(state.activeProperty || LS.get('myZip', null)); };
+  // Signed-in residents: server-backed only (hydrated properties + app_follows).
+  // Anonymous visitors: localStorage myZip (unchanged).
+  let _accountHydrated = false;
+  let _serverFollowZips = [];
+  HS.hasArea = function () {
+    if (state.session && !state.session.demo && _accountHydrated) {
+      const O = window.HSOnboarding;
+      if (O) return O.hasServerLocation({ activeProperty: state.activeProperty, serverFollowZips: _serverFollowZips });
+    }
+    return !!(state.activeProperty || LS.get('myZip', null));
+  };
+  HS.serverFollowZips = function () { return _serverFollowZips.slice(); };
   // "Sample ZIP Code" labels appear only on the designated demo ZIP (DEFAULT_ZIP),
   // never because the visitor is signed out or has not saved an area yet.
   HS.isSampleZip = function (zip) {
@@ -264,9 +275,416 @@
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') ['topicsModal', 'premiumModal', 'shareModal', 'locModal', 'switcherModal', 'authModal', 'homeModal']
       .forEach(HS.closeModal);
+    // First-time onboarding is non-dismissible — no Escape close.
   });
 
-  // ------------------------------------------------------------- mobile nav --
+  // -------------------------------------------------- first-time onboarding -----------
+  // Full-screen flow for signed-in residents with no server-saved home AND no
+  // server-saved community follow. Completion is implicit once server location exists.
+  let _onbSavedZip = null;
+  let _onbOptin = null;
+  let _onbSaving = false;
+  let _onbTrap = null;
+
+  function onboardingCtx() {
+    return {
+      hydrated: _accountHydrated,
+      activeProperty: state.activeProperty,
+      serverFollowZips: _serverFollowZips
+    };
+  }
+
+  function clearAccountLocalState() {
+    LS.set('myZip', null);
+    LS.set('myCommunities', []);
+    LS.set('activeProp', null);
+    LS.set('accountUid', null);
+    state.activePropId = null;
+    _serverFollowZips = [];
+  }
+
+  function ensureAccountScope() {
+    if (!state.session || state.session.demo) return;
+    const uid = state.session.user.id;
+    const cached = LS.get('accountUid', null);
+    if (cached === uid) return;
+    clearAccountLocalState();
+    LS.set('accountUid', uid);
+  }
+
+  async function refreshServerFollowZips() {
+    _serverFollowZips = [];
+    if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) return;
+    try {
+      const res = await HS.sb().from('app_follows').select('target_id').eq('target_type', 'community');
+      if (!res.error) _serverFollowZips = (res.data || []).map(r => String(r.target_id)).filter(z => /^\d{5}$/.test(z));
+    } catch (e) { /* leave empty; onboarding may still proceed on next hydrate */ }
+  }
+
+  async function hydrateAccountLocation() {
+    _accountHydrated = false;
+    if (!state.session || state.session.demo) {
+      state.properties = await HS.data.properties();
+      _accountHydrated = true;
+      return;
+    }
+    ensureAccountScope();
+    await syncFollowsFromAccount();
+    state.properties = await HS.data.properties();
+    const validIds = new Set(state.properties.map(p => p.id));
+    if (state.activePropId && !validIds.has(state.activePropId)) {
+      state.activePropId = null;
+      LS.set('activeProp', null);
+    }
+    if (!state.activePropId && state.properties[0]) {
+      state.activePropId = state.properties[0].id;
+      LS.set('activeProp', state.activePropId);
+    }
+    await refreshServerFollowZips();
+    _accountHydrated = true;
+  }
+
+  function loadOnboardingLib() {
+    if (window.HSOnboarding) return Promise.resolve();
+    return new Promise(function (resolve, reject) {
+      if (document.querySelector('script[data-hs-onboarding]')) {
+        if (window.HSOnboarding) resolve(); else reject(new Error('onboarding script pending'));
+        return;
+      }
+      const s = document.createElement('script');
+      s.src = 'lib/onboarding.js';
+      s.dataset.hsOnboarding = '1';
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error('onboarding script failed')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  HS.needsOnboarding = function () {
+    const O = window.HSOnboarding;
+    if (!O) return false;
+    return O.needsOnboarding(state.session, onboardingCtx());
+  };
+
+  function setOnboardingBusy(busy) {
+    const overlay = onbEl('onboardingOverlay');
+    if (overlay) overlay.setAttribute('aria-busy', busy ? 'true' : 'false');
+  }
+
+  function showOnbRecovery(show) {
+    const el = onbEl('onbRecovery');
+    if (el) el.classList.toggle('hidden', !show);
+  }
+
+  function trapOnboardingFocus(e) {
+    if (e.key !== 'Tab') return;
+    const overlay = onbEl('onboardingOverlay');
+    if (!overlay || overlay.hidden) return;
+    const f = overlay.querySelectorAll('a[href],button:not([disabled]),input,[tabindex]:not([tabindex="-1"])');
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+
+  function lockOnboardingUi(lock) {
+    document.body.classList.toggle('onboarding-lock', !!lock);
+    if (lock) {
+      _onbTrap = trapOnboardingFocus;
+      document.addEventListener('keydown', _onbTrap);
+    } else if (_onbTrap) {
+      document.removeEventListener('keydown', _onbTrap);
+      _onbTrap = null;
+    }
+  }
+
+  function onbEl(id) { return document.getElementById(id); }
+  function onbMsg(text, err) {
+    const m = onbEl('onbMsg'); if (!m) return;
+    m.textContent = text || '';
+    m.classList.toggle('err', !!err);
+  }
+
+  function showOnbStep(step) {
+    const steps = ['onbStepWelcome', 'onbStepLocation', 'onbStepDest'];
+    steps.forEach(function (id) {
+      const el = onbEl(id); if (!el) return;
+      const active = id === step;
+      el.hidden = !active;
+      el.classList.toggle('onb-active', active);
+      el.classList.remove('onb-exit');
+    });
+    const overlay = onbEl('onboardingOverlay');
+    if (overlay) {
+      const titles = { onbStepWelcome: 'onbWelcomeTitle', onbStepLocation: 'onbLocTitle', onbStepDest: 'onbDestTitle' };
+      overlay.setAttribute('aria-labelledby', titles[step] || 'onbWelcomeTitle');
+    }
+    if (step === 'onbStepLocation') {
+      setTimeout(function () {
+        const a = onbEl('onbAddr'); if (a) a.focus();
+      }, 320);
+    } else {
+      const titleId = { onbStepWelcome: 'onbWelcomeTitle', onbStepLocation: 'onbLocTitle', onbStepDest: 'onbDestTitle' }[step];
+      const title = titleId ? onbEl(titleId) : null;
+      if (title) setTimeout(function () { title.focus(); }, 320);
+    }
+  }
+
+  function transitionOnbStep(fromId, toId) {
+    const from = onbEl(fromId);
+    if (from) from.classList.add('onb-exit');
+    setTimeout(function () { showOnbStep(toId); }, 220);
+  }
+
+  function refreshOnbContinue() {
+    const O = window.HSOnboarding; if (!O) return;
+    const addr = (onbEl('onbAddr') && onbEl('onbAddr').value) || '';
+    const zip = (onbEl('onbZip') && onbEl('onbZip').value) || '';
+    const btn = onbEl('onbContinueBtn');
+    if (btn) btn.disabled = _onbSaving || !O.canContinue(addr, zip);
+    if (!_onbSaving) {
+      onbMsg('');
+      showOnbRecovery(false);
+    }
+    const unc = onbEl('onbUncovered'); if (unc) unc.classList.add('hidden');
+  }
+
+  async function persistCommunityFollow(zip) {
+    const O = window.HSOnboarding;
+    zip = String(zip || '').trim();
+    if (!/^\d{5}$/.test(zip)) throw new Error('Enter a valid 5-digit ZIP code.');
+    let meta = null;
+    try { meta = await HS.data.community(zip); } catch (e) {}
+    HS.followCommunity({ zip: zip, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
+    if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) {
+      _serverFollowZips = [...new Set(_serverFollowZips.concat([zip]))];
+      return;
+    }
+    const res = await HS.sb().from('app_follows').insert({
+      user_id: state.session.user.id, target_type: 'community', target_id: zip
+    }).select();
+    if (res.error && !(O && O.isDuplicateDbError(res.error))) {
+      throw new Error('Could not save your community — please try again.');
+    }
+    await refreshServerFollowZips();
+    if (!_serverFollowZips.includes(zip)) {
+      throw new Error('Your community did not save — please try again.');
+    }
+    if (String(LS.get('myZip', null)) !== zip) {
+      throw new Error('Your default ZIP did not update — please try again.');
+    }
+  }
+
+  async function saveOnboardingAddress(addr) {
+    const O = window.HSOnboarding;
+    let m = null, unavailable = false;
+    try {
+      const r = await HS.sb().functions.invoke('geocode-address', { body: { address: addr } });
+      if (r.error) unavailable = true;
+      else m = (r.data && r.data.match) || null;
+    } catch (e) { unavailable = true; }
+    if (unavailable) throw new Error("The address service couldn't be reached — please try again in a minute.");
+    if (!m || !m.zip) {
+      throw new Error("We couldn't confirm that address against U.S. Census records — check the street, city and state, then try again.");
+    }
+    if (!O.validCoords(m.lat, m.lng)) {
+      throw new Error("We couldn't confirm a valid location for that address — try again or enter your ZIP code instead.");
+    }
+    const row = {
+      user_id: state.session.user.id,
+      address: String(m.matchedAddress || '').split(',')[0],
+      city: m.city || null, state: m.state || null, zip: m.zip,
+      lat: m.lat, lng: m.lng, label: 'home'
+    };
+    const existing = (state.properties || []).find(p => HS.isRealHome(p));
+    let saved = null;
+    if (existing) {
+      const upd = await HS.sb().from('app_properties').update(row)
+        .eq('id', existing.id).eq('user_id', state.session.user.id).select().single();
+      if (upd.error || !upd.data) throw new Error("Couldn't save your home — please try again.");
+      saved = upd.data;
+    } else {
+      const ins = await HS.sb().from('app_properties').insert(row).select().single();
+      if (ins.error || !ins.data) throw new Error("Couldn't save your home — please try again.");
+      saved = ins.data;
+    }
+    LS.set('activeProp', saved.id);
+    state.activePropId = saved.id;
+    state.properties = await HS.data.properties();
+    if (!state.properties.find(p => p.id === saved.id)) {
+      throw new Error("Your home saved but could not be verified — please try again.");
+    }
+    if (await HS.data.isCovered(m.zip)) {
+      await persistCommunityFollow(m.zip);
+      _onbOptin = await HS.ensureAreaSubscribed(m.zip, false, true, true);
+    }
+    state.zip = m.zip;
+    paintTopbar();
+    return m.zip;
+  }
+
+  async function saveOnboardingZip(zip) {
+    const covered = await HS.data.isCovered(zip);
+    if (!covered) return { covered: false, zip: zip };
+    await persistCommunityFollow(zip);
+    _onbOptin = await HS.ensureAreaSubscribed(zip, false, true, true);
+    paintTopbar();
+    return { covered: true, zip: zip };
+  }
+
+  function paintOnbDestinations(zip) {
+    const O = window.HSOnboarding; if (!O) return;
+    const grid = onbEl('onbDestGrid'); if (!grid) return;
+    const saved = onbEl('onbSavedZip'); if (saved) saved.textContent = zip;
+    grid.innerHTML = '';
+    Object.keys(O.DESTINATIONS).forEach(function (key) {
+      const d = O.DESTINATIONS[key];
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'onb-dest';
+      btn.setAttribute('role', 'listitem');
+      btn.setAttribute('aria-label', d.title + '. ' + d.desc);
+      btn.innerHTML = '<span class="icon" aria-hidden="true">' + d.icon + '</span>'
+        + '<span class="copy"><strong>' + HS.esc(d.title) + '</strong><span>' + HS.esc(d.desc) + '</span></span>';
+      btn.onclick = function () { HS.finishOnboarding(key); };
+      grid.appendChild(btn);
+    });
+  }
+
+  HS.startOnboarding = function () {
+    if (!HS.needsOnboarding()) return;
+    const overlay = onbEl('onboardingOverlay'); if (!overlay) return;
+    _onbSavedZip = null;
+    _onbOptin = null;
+    if (onbEl('onbAddr')) onbEl('onbAddr').value = '';
+    if (onbEl('onbZip')) onbEl('onbZip').value = '';
+    onbMsg('');
+    const unc = onbEl('onbUncovered'); if (unc) unc.classList.add('hidden');
+    showOnbRecovery(false);
+    refreshOnbContinue();
+    overlay.hidden = false;
+    lockOnboardingUi(true);
+    requestAnimationFrame(function () { overlay.classList.add('show'); });
+    showOnbStep('onbStepWelcome');
+  };
+
+  HS.finishOnboarding = function (destKey) {
+    const O = window.HSOnboarding;
+    const zip = _onbSavedZip;
+    if (!O || !zip) return;
+    const href = O.destinationHref(destKey, zip, HS.navHref);
+    if (!href) return;
+    const overlay = onbEl('onboardingOverlay');
+    if (overlay) {
+      overlay.classList.remove('show');
+      setTimeout(function () {
+        overlay.hidden = true;
+        lockOnboardingUi(false);
+      }, 280);
+    }
+    if (_onbOptin) {
+      try { sessionStorage.setItem('hs:areaOptin', JSON.stringify(_onbOptin)); } catch (e) {}
+    }
+    location.href = href;
+  };
+
+  HS.continueOnboarding = async function () {
+    const O = window.HSOnboarding; if (!O) return;
+    if (_onbSaving) return;
+    const addr = (onbEl('onbAddr') && onbEl('onbAddr').value) || '';
+    const zipInput = (onbEl('onbZip') && onbEl('onbZip').value) || '';
+    const mode = O.inputMode(addr, zipInput);
+    if (!mode) return;
+    _onbSaving = true;
+    const btn = onbEl('onbContinueBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    setOnboardingBusy(true);
+    showOnbRecovery(false);
+    onbMsg('');
+    try {
+      let savedZip = null;
+      if (mode === 'address') {
+        onbMsg('Confirming your address…');
+        savedZip = await saveOnboardingAddress(addr.trim());
+      } else {
+        const z = zipInput.trim();
+        onbMsg('Saving your ZIP…');
+        const res = await saveOnboardingZip(z);
+        if (!res.covered) {
+          if (onbEl('onbUncoveredZip')) onbEl('onbUncoveredZip').textContent = z;
+          onbEl('onbUncovered').classList.remove('hidden');
+          onbMsg('This ZIP is not live yet — request it below or try another.', true);
+          return;
+        }
+        savedZip = res.zip;
+      }
+      if (!O.hasServerLocation({ activeProperty: state.activeProperty, serverFollowZips: _serverFollowZips })) {
+        throw new Error('Your location did not save completely — please try again.');
+      }
+      _onbSavedZip = savedZip;
+      paintOnbDestinations(savedZip);
+      transitionOnbStep('onbStepLocation', 'onbStepDest');
+    } catch (e) {
+      onbMsg((e && e.message) || 'Something went wrong — please try again.', true);
+      showOnbRecovery(true);
+    } finally {
+      _onbSaving = false;
+      setOnboardingBusy(false);
+      if (btn) { btn.textContent = 'Continue'; }
+      refreshOnbContinue();
+    }
+  };
+
+  HS.submitOnboardingRequest = async function () {
+    const el = onbEl('onbReqEmail'), e = el && el.value.trim();
+    if (!e || e.indexOf('@') < 1) { if (el) { el.style.borderColor = '#c23b34'; el.focus(); } return; }
+    if (el) el.style.borderColor = '';
+    const row = { email: e, zip: (onbEl('onbUncoveredZip') && onbEl('onbUncoveredZip').textContent) || '' };
+    const ref = HS.referralToken(); if (ref) row.source = ref;
+    await persistEmail('community_requests', row);
+    onbMsg('Request received — we will email you when your area goes live.');
+    if (onbEl('onbUncovered')) onbEl('onbUncovered').classList.add('hidden');
+  };
+
+  function wireOnboarding() {
+    const O = window.HSOnboarding;
+    const welcomeBtn = onbEl('onbWelcomeBtn');
+    if (welcomeBtn) welcomeBtn.onclick = function () { transitionOnbStep('onbStepWelcome', 'onbStepLocation'); };
+    const cont = onbEl('onbContinueBtn');
+    if (cont) cont.onclick = function () { HS.continueOnboarding(); };
+    const addr = onbEl('onbAddr'), zip = onbEl('onbZip');
+    if (addr) {
+      addr.addEventListener('input', refreshOnbContinue);
+      addr.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && O && O.canContinue(addr.value, (onbEl('onbZip') && onbEl('onbZip').value) || '') && !_onbSaving) {
+          e.preventDefault(); HS.continueOnboarding();
+        }
+      });
+    }
+    if (zip) {
+      zip.addEventListener('input', refreshOnbContinue);
+      zip.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && O && O.canContinue((onbEl('onbAddr') && onbEl('onbAddr').value) || '', zip.value) && !_onbSaving) {
+          e.preventDefault(); HS.continueOnboarding();
+        }
+      });
+    }
+    const retry = onbEl('onbRetryBtn');
+    if (retry) retry.onclick = function () { showOnbRecovery(false); HS.continueOnboarding(); };
+    const zipInstead = onbEl('onbZipInsteadBtn');
+    if (zipInstead) zipInstead.onclick = function () {
+      if (onbEl('onbAddr')) onbEl('onbAddr').value = '';
+      showOnbRecovery(false);
+      onbMsg('Enter your ZIP code below, then press Continue.');
+      if (onbEl('onbZip')) onbEl('onbZip').focus();
+      refreshOnbContinue();
+    };
+    const req = onbEl('onbReqBtn');
+    if (req) req.onclick = function () { HS.submitOnboardingRequest(); };
+    const reqEmail = onbEl('onbReqEmail');
+    if (reqEmail) reqEmail.addEventListener('keydown', function (e) { if (e.key === 'Enter') HS.submitOnboardingRequest(); });
+  }
+
   HS.toggleMenu = function () {
     document.querySelector('.side').classList.toggle('open');
     $('sidebackdrop').classList.toggle('show');
@@ -297,7 +715,10 @@
   };
   HS.onAvatar = function () {
     if (state.session && !state.session.demo) {
-      if (confirm('Sign out?')) HS.sb().auth.signOut().then(() => location.reload());
+      if (confirm('Sign out?')) {
+        clearAccountLocalState();
+        HS.sb().auth.signOut().then(() => location.reload());
+      }
     } else { HS.openAuth(); }
   };
 
@@ -340,14 +761,14 @@
         // reflect the new session in the top bar without a full reload
         try { const s = await HS.sb().auth.getSession(); if (s && s.data && s.data.session) state.session = s.data.session; } catch (e) {}
         await hydrateTopicPrefs();
+        await hydrateAccountLocation();
         HS.paintTopicCounts();
         paintTopbar();
         setTimeout(() => {
           HS.closeModal('authModal');
           const back = new URLSearchParams(location.search).get('return');
-          if (!LS.get('myZip', null)) {
-            // brand-new account with no saved area -> onboard: ask for their ZIP
-            HS.openLoc(true);
+          if (HS.needsOnboarding && HS.needsOnboarding()) {
+            HS.startOnboarding();
           } else {
             location.href = back ? decodeURIComponent(back) : location.pathname;
           }
@@ -693,30 +1114,44 @@
   // The exact wording the resident affirms when they tap "Email me these alerts" — stored
   // on the users row (marketing_consent_copy) as the audit trail of what they agreed to.
   const AREA_CONSENT_COPY = 'Email me new development & hearing alerts for this ZIP. No spam · unsubscribe anytime.';
-  HS.ensureAreaSubscribed = async function (zip, willNavigate) {
-    if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) return;
+  HS.ensureAreaSubscribed = async function (zip, willNavigate, suppressUi, throwOnError) {
+    if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) return null;
     zip = String(zip || '').trim();
-    if (!/^\d{5}$/.test(zip)) return;
+    if (!/^\d{5}$/.test(zip)) {
+      if (throwOnError) throw new Error('Enter a valid 5-digit ZIP code.');
+      return null;
+    }
     let ct = null;
-    try { ct = await HS.data.communityGovTopics(zip); } catch (e) { return; }
-    if (!ct || !ct.rootId || !ct.labels) return;
+    try { ct = await HS.data.communityGovTopics(zip); } catch (e) {
+      if (throwOnError) throw new Error('Could not load community topics — please try again.');
+      return null;
+    }
+    if (!ct || !ct.rootId || !ct.labels) return null;
     const has = new Set(ct.labels);
     const labels = AREA_DEFAULT_TOPICS.filter(t => has.has(t));
     const subs = labels.map(t => ({ pipeline_type: 'government_notice', topic: t }));
-    if (!subs.length) return;   // community carries neither floor topic -> never a zero-sub row
-    // FOLLOW ONLY. subscribe_area_defaults writes user_subscriptions + the identity row and
-    // leaves marketing_consent FALSE / topics null (HS.followRpcArgs carries NO consent
-    // field). Following an area is NOT email consent — that is the separate opt-in below.
+    if (!subs.length) return null;   // community carries neither floor topic -> never a zero-sub row
     try {
       const r = await HS.sb().rpc('subscribe_area_defaults',
         HS.followRpcArgs(state.session.user.email, ct.rootId, zip, subs));
-      if (r && r.error) { console.warn('area-subscribe', r.error); return; }
-    } catch (e) { console.warn('area-subscribe', e); return; }
+      if (r && r.error) {
+        if (throwOnError) throw new Error(r.error.message || 'Could not save your alerts — please try again.');
+        console.warn('area-subscribe', r.error);
+        return null;
+      }
+    } catch (e) {
+      if (throwOnError) throw new Error((e && e.message) || 'Could not save your alerts — please try again.');
+      console.warn('area-subscribe', e);
+      return null;
+    }
     // Surface the inline email opt-in card. Reload/redirect callers stash a one-shot flag
     // boot() renders on the destination page; in-place callers render immediately.
     const info = { zip: zip, communityId: ct.rootId, topics: labels };
-    if (willNavigate) { try { sessionStorage.setItem('hs:areaOptin', JSON.stringify(info)); } catch (e) {} }
-    else HS.showAreaOptin(info);
+    if (!suppressUi) {
+      if (willNavigate) { try { sessionStorage.setItem('hs:areaOptin', JSON.stringify(info)); } catch (e) {} }
+      else HS.showAreaOptin(info);
+    }
+    return info;
   };
   // The inline EMAIL OPT-IN card — a persistent, deliberately-tapped affirmative (never a
   // disappearing toast, per the founder consent decision). Shown after a covered follow.
@@ -1078,9 +1513,10 @@
       const res = await HS.sb().from('app_follows').select('target_id').eq('target_type', 'community');
       if (res.error) return; rows = res.data || [];
     } catch (e) { return; }
+    _serverFollowZips = rows.map(r => String(r.target_id)).filter(z => /^\d{5}$/.test(z));
     const local = HS.followedCommunities();
     const localZips = new Set(local.map(c => String(c.zip)));
-    const acctZips = new Set(rows.map(r => String(r.target_id)));
+    const acctZips = new Set(_serverFollowZips);
     // pull: account -> local (resolve the display name for ones we don't have)
     for (const r of rows) {
       const zip = String(r.target_id);
@@ -1091,23 +1527,29 @@
       }
     }
     LS.set('myCommunities', local);
-    if (!LS.get('myZip', null) && local[0]) { LS.set('myZip', String(local[0].zip)); state.zip = String(local[0].zip); }
+    if (_serverFollowZips.length) {
+      LS.set('myZip', _serverFollowZips[0]);
+      state.zip = _serverFollowZips[0];
+    } else if (!LS.get('myZip', null) && local[0]) {
+      LS.set('myZip', String(local[0].zip));
+      state.zip = String(local[0].zip);
+    }
     // push: local-only follows -> account
     for (const c of local) {
       if (!acctZips.has(String(c.zip))) {
         try { await HS.sb().from('app_follows').insert({ user_id: state.session.user.id, target_type: 'community', target_id: String(c.zip) }); } catch (e) {}
       }
     }
+    await refreshServerFollowZips();
   }
 
   async function boot() {
     captureReferral();          // first-touch attribution, before anything can fail
     await injectShell();
+    try { await loadOnboardingLib(); wireOnboarding(); } catch (e) { console.warn('onboarding', e); }
     await bootSession();
     await hydrateTopicPrefs();
-    await syncFollowsFromAccount();
-    state.properties = await HS.data.properties();
-    if (!state.activePropId && state.properties[0]) state.activePropId = state.properties[0].id;
+    await hydrateAccountLocation();
     paintTopbar();
     HS.paintWhereLine();   // shared header context line (async, never blocks boot)
     buildShare();
@@ -1121,6 +1563,7 @@
       const optin = sessionStorage.getItem('hs:areaOptin');
       if (optin) { sessionStorage.removeItem('hs:areaOptin'); setTimeout(() => { try { HS.showAreaOptin(JSON.parse(optin)); } catch (e) {} }, 400); }
     } catch (e) {}
+    if (HS.needsOnboarding && HS.needsOnboarding()) HS.startOnboarding();
     _resolveReady(HS);
   }
 
