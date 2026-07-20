@@ -241,6 +241,11 @@
   .mapkey span.off .t{text-decoration:line-through}
   .mapkey i{width:11px;height:11px;border-radius:50%;flex:0 0 auto;
     border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+  .maplegend-wrap{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+  .mapkey-hd{font-size:11px;font-weight:600;color:var(--mute);letter-spacing:.02em}
+  .mapkey-shapes span.sh{border-style:dashed}
+  .mapkey-shapes .ic{display:flex;align-items:center;line-height:0}
+  .mapkey-note{font-size:11px;color:var(--mute);line-height:1.35;max-width:42em}
 
   /* ===== Development-tracker: resolved-project anchor (a) + ZIP/county notices (b/c) =====
      The resolved-project data is a verified public-record anchor. Every honesty label the
@@ -323,7 +328,13 @@
             </div>
           </div>
           <div class="maprow">
-            <div class="mapkey" id="mapkey"></div>
+            <div class="maplegend-wrap">
+              <div class="mapkey-hd">Stage — pin color</div>
+              <div class="mapkey" id="mapkey"></div>
+              <div class="mapkey-hd" id="shapeLegHd">Type — pin shape</div>
+              <div class="mapkey mapkey-shapes" id="mapkeyShapes"></div>
+              <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
+            </div>
             <div class="radsel" id="radSel">
               <span class="rlbl">Radius</span>
               <button data-r="0.5">½ mi</button>
@@ -456,7 +467,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js"></script>
-<script src="lib/map.js?v=20260720"></script>
+<script src="lib/map.js?v=20260720b"></script>
 <script src="shell.js"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
@@ -473,7 +484,7 @@ HS.onReady(function(){
   var ENDPOINT = "https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/get-address-report";
   var APIKEY   = "sb_publishable_ZLf937bYRsWOVeTDVaHI7Q_LKfDmsE-"; // public key, safe in the browser
   var SUPABASE_URL = ENDPOINT.replace(/\/functions\/v1\/.*$/, "");  // REST base for the ZIP-mode cache read
-  var COLORS = { built:"#1f5130", approved:"#2563EB", proposed:"#E2772F", permit:"#E2772F" };
+  var COLORS = HS.LIFECYCLE_HEX;
   // Development lifecycle buckets (Brockovich model): operating -> approved -> proposed.
   var LEGEND = [
     { b:"built",    c:COLORS.built,    t:"Operating now" },
@@ -1065,6 +1076,7 @@ HS.onReady(function(){
     // Expose the label backbone so the verifier can assert, live, that the resident-facing label
     // agrees with the dot's colour (both derive from the lifecycle stage — see kindLabel/stageOf).
     window.__HS_KIND = kindLabel; window.__HS_STAGE = stageOf; window.__HS_COLORS = COLORS;
+    window.__HS_RESOLVE_TRACKER = function(site){ return HS.resolveTrackerMarker(site, frsRid); };
 
     // Point-scope DEVELOPMENT records (state permit filings, e.g. TX TDLR/TABS — they carry
     // a project_no) are not EPA facilities: they bucket into the Operating/Approved/Proposed
@@ -1233,15 +1245,16 @@ HS.onReady(function(){
       var ll = siteLL(s);
       if(typeof ll[0]!=="number" || typeof ll[1]!=="number") return;
       if(!mappable(s)) return;
-      var col = COLORS[s.type] || "#5d6f72";
+      var mk = HS.resolveTrackerMarker(s, frsRid);
       // A dot is solid+full-size ONLY when it's a precise point: an exact-location facility, or
       // a point geocode at rooftop/parcel quality. Area dots (jurisdiction-wide) and
       // approximate points (interpolated, once precise points exist to contrast — isApproxPoint)
       // render dashed + slightly smaller: the visual cue that the spot is representative.
       var solidPoint = s.scope==="point" && !isApproxPoint(s);
-      var m = L.circleMarker(ll, solidPoint
-        ? { radius:7, color:"#fff", weight:2, fillColor:col, fillOpacity:1 }
-        : { radius:5.5, color:"#fff", weight:1.5, dashArray:"2,3", fillColor:col, fillOpacity:.85 });
+      var size = solidPoint ? 14 : 12;
+      var svg = HS.markerSVG(mk.shape, mk.color, '', size);
+      var html = solidPoint ? svg : '<div style="opacity:0.85">' + svg + '</div>';
+      var m = L.marker(ll, { icon: L.divIcon({ html: html, className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2] }) });
       m.bindPopup(popupHTML(s));
       m.on("mouseover", function(){ this.openPopup(); });
       siteMarkers.push({ m:m, bucket:bucketOf(s.type), s:s });
@@ -1270,6 +1283,55 @@ HS.onReady(function(){
       leafletPaths: document.querySelectorAll("#map .leaflet-interactive").length
     };
   }
+  // Marker-backbone verification (scripts/verify-map-markers.mjs): tracker pins + legend.
+  window.__HS_TRACKER_MARKER_VERIFY = function () {
+    var fails = [];
+    var FIXTURES = [
+      { label: "Permit", use_type: "Industrial", type: "proposed", layer: "industrial" },
+      { label: "DC", use_type: "Data Center", type: "approved", layer: "datacenter" },
+      { label: "Homes", use_type: "Residential", type: "built", layer: "residential" },
+      { label: "EPA", use_type: "Industrial", type: "built", layer: "industrial", registry_id: "TX-VERIFY" }
+    ];
+    function geomFromSvg(svg) {
+      if (!svg) return null;
+      if (svg.indexOf("<rect") !== -1) return "square";
+      if (svg.indexOf("<circle") !== -1) return "circle";
+      var m = svg.match(/points="([^"]+)"/);
+      if (!m) return null;
+      var n = m[1].trim().split(/\s+/).filter(Boolean).length;
+      if (n === 3) return "triangle";
+      if (n === 4) return "diamond";
+      if (n === 5) return "pentagon";
+      if (n === 6) return "hexagon";
+      return "polygon";
+    }
+    FIXTURES.forEach(function (s) {
+      var mk = HS.resolveTrackerMarker(s, function (x) { return x.registry_id; });
+      var svg = HS.markerSVG(mk.shape, mk.color, "", 14);
+      var geom = geomFromSvg(svg);
+      if (geom !== mk.shape) fails.push({ label: s.label, err: "tracker-fixture-geometry", want: mk.shape, got: geom });
+      if (s.registry_id && (mk.shape !== "square" || mk.color !== HS.markerRegistry.facilityHex)) {
+        fails.push({ label: s.label, err: "tracker-facility-not-purple-square" });
+      }
+      if (!s.registry_id && s.use_type === "Industrial" && mk.shape !== "triangle") {
+        fails.push({ label: s.label, err: "tracker-industrial-not-triangle" });
+      }
+    });
+    var shapes = document.getElementById("mapkeyShapes");
+    if (!shapes || !shapes.querySelector("svg")) fails.push({ err: "tracker-missing-shape-legend" });
+    var lifecycle = document.getElementById("mapkey");
+    if (lifecycle && lifecycle.querySelectorAll("svg").length < 3) fails.push({ err: "tracker-lifecycle-legend-not-shaped" });
+    var markers = document.querySelectorAll("#map .leaflet-marker-icon svg, #mapgl .maplibregl-marker svg");
+    if (markers.length) {
+      markers.forEach(function (svg, i) {
+        var html = svg.outerHTML || "";
+        if (html.indexOf("<polygon") === -1 && html.indexOf("<rect") === -1) {
+          fails.push({ err: "tracker-onmap-not-shaped", idx: i });
+        }
+      });
+    }
+    return fails;
+  };
 
   // Show only the buckets whose legend chip is on.
   function applyFilter(){
@@ -1295,7 +1357,7 @@ HS.onReady(function(){
       row.setAttribute("aria-label", it.t + " markers");
       if(!FILTER[it.b]) row.className = "off";
       row.setAttribute("aria-pressed", FILTER[it.b] ? "true" : "false");  // pressed = layer shown
-      row.innerHTML = "<i style='background:"+it.c+"'></i><span class='t'>"+it.t+"</span>";
+      row.innerHTML = "<span class='ic'>" + HS.markerSVG("triangle", it.c, "", 14) + "</span><span class='t'>" + it.t + "</span>";
       function toggle(){
         FILTER[it.b] = !FILTER[it.b];
         row.classList.toggle("off", !FILTER[it.b]);
@@ -1308,6 +1370,15 @@ HS.onReady(function(){
       });
       d.appendChild(row);
     });
+    var shapes = document.getElementById("mapkeyShapes");
+    if(shapes && HS.SHAPE_LEGEND){
+      var neutral = HS.markerRegistry.neutralHex;
+      var rows = HS.SHAPE_LEGEND.map(function(s){
+        return "<span class='sh'><span class='ic'>" + HS.markerSVG(s.shape, neutral, "", 14) + "</span><span class='t'>" + esc(s.label) + "</span></span>";
+      });
+      rows.push("<span class='sh'><span class='ic'>" + HS.markerSVG("square", HS.markerRegistry.facilityHex, "", 14) + "</span><span class='t'>Regulated facility</span></span>");
+      shapes.innerHTML = rows.join("");
+    }
   }
 
   // The class of official document the record link opens, so the label states it up
@@ -1648,14 +1719,15 @@ HS.onReady(function(){
     var feats = ZIP_MODE ? [] : [circlePoly(GL.home.lat,GL.home.lng,CUR_RADIUS,96)];  // no 1-mi ring in ZIP mode
     src.setData({ type:"FeatureCollection", features:feats });
   }
-  function glDot(color,size,ring,approx){
+  function glMarkerEl(s, approxPt){
+    var mk = HS.resolveTrackerMarker(s, frsRid);
+    var size = (s.scope==="point"&&!approxPt) ? 15 : 13;
     var el=document.createElement("div");
-    el.style.width=el.style.height=size+"px";el.style.background=color;
-    // approx = interpolated point shown alongside precise ones: dashed ring + slight fade,
-    // the 3D echo of the 2D dashed dot. Dormant until a precise source exists (see isApproxPoint).
-    el.style.border=ring+"px "+(approx?"dashed":"solid")+" #fff";el.style.borderRadius="50%";el.style.boxSizing="border-box";
-    if(approx)el.style.opacity="0.85";
-    el.style.boxShadow="0 0 0 1px rgba(0,0,0,.35)";el.style.cursor="pointer";return el;
+    el.style.width=el.style.height=size+"px"; el.style.lineHeight="0";
+    if(approxPt) el.style.opacity="0.85";
+    el.style.cursor="pointer";
+    el.innerHTML = HS.markerSVG(mk.shape, mk.color, '', size);
+    return el;
   }
   function initGL(home){
     GL.home=home;
@@ -1694,9 +1766,8 @@ HS.onReady(function(){
       if(typeof ll[0]!=="number"||typeof ll[1]!=="number")return;
       if(!mappable(s))return;
       var bkt=bucketOf(s.type); if(!FILTER[bkt])return;
-      var col=COLORS[s.type]||"#5d6f72";
       var approxPt=isApproxPoint(s);
-      var el=glDot(col,(s.scope==="point"&&!approxPt)?15:13,2,approxPt);
+      var el=glMarkerEl(s, approxPt);
       var popup=new maplibregl.Popup({offset:12,maxWidth:"260px"}).setHTML(popupHTML(s));
       var marker=new maplibregl.Marker({element:el}).setLngLat([ll[1],ll[0]]).setPopup(popup).addTo(GL.map);
       el.addEventListener("mouseenter",function(){ if(GL.cur&&GL.cur!==popup)GL.cur.remove(); if(!popup.isOpen())marker.togglePopup(); GL.cur=popup; });
