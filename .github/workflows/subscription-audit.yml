@@ -1,0 +1,46 @@
+name: subscription-audit
+
+# Read-only subscription database audit. Uses the service-role key on a GitHub
+# runner (bypasses RLS). Outputs JSON to the job log. No mutations.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'docs/subscription-audit.sql'
+      - 'scripts/subscription-audit.mjs'
+      - '.github/workflows/subscription-audit.yml'
+  push:
+    branches:
+      - 'cursor/**'
+    paths:
+      - 'docs/subscription-audit.sql'
+      - 'scripts/subscription-audit.mjs'
+      - '.github/workflows/subscription-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: https://qwnnmljucajnexpxdgxr.supabase.co
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run subscription audit (read-only)
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          node scripts/subscription-audit.mjs | tee subscription-audit.json
+          echo "----- AUDIT COMPLETE -----"
+          node -e "
+            const d=require('./subscription-audit.json');
+            console.log('Users:', d.table_counts.public_users, 'distinct emails:', d.table_counts.public_users_distinct_emails);
+            console.log('Subscriptions:', d.table_counts.user_subscriptions);
+            console.log('Report rows:', d.main_report.length);
+          "
