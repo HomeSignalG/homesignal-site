@@ -64,3 +64,26 @@ test('recent-changes derivation is evidence-gated', () => {
 
   console.log('All what’s-changed gates hold.');
 });
+
+test('recent-changes groups duplicate meeting notices and folds related changes', () => {
+  const meetings = [
+    { id: 'm1', title: 'Public meeting — Commissioners Court Voting Session', occurred_at: d(0), window_closes_at: d(-1) },
+    { id: 'm2', title: 'Public meeting — Commissioners Court Voting Session', occurred_at: d(0), window_closes_at: d(-3) },
+    { id: 'm3', title: 'Public meeting — Commissioners Court Work Session', occurred_at: d(0), window_closes_at: d(-5) }
+  ].map((m) => ({
+    id: m.id,
+    title: m.title,
+    occurred_at: m.occurred_at,
+    window_closes_at: m.window_closes_at
+  }));
+  const r = run([], meetings);
+  assert.strictEqual(r.length, 2, 'same-title meeting rows collapse to one card each');
+  const voting = r.find((e) => /voting session/i.test(e.item.title));
+  assert.ok(voting.lines.length >= 2, 'merged card carries every distinct comment-window line');
+
+  const folded = run(
+    [{ id: 'p1', submitted_at: d(2) }],
+    [{ id: 'c1', related_project_id: 'p1', occurred_at: d(1), title: 'County notice' }]);
+  assert.strictEqual(folded.length, 1, 'related change folds into its project');
+  assert.ok(folded[0].badges.includes('NEW') && folded[0].badges.includes('UPDATE'));
+});

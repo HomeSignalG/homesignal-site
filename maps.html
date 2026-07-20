@@ -107,6 +107,11 @@
   .mapsfull .toolbar{margin-bottom:10px}
   .mapsfull .mapcols{display:block}                 /* kill the old two-column grid */
   .mapsfull .mapwrap{position:relative;width:100%;overflow:hidden}  /* height set by JS to fill the viewport */
+  /* Stack map engines absolutely so the tile canvas always fills the stage — in-flow
+     block layout left the MapLibre canvas at a stale size (tiles only in the upper-left). */
+  .mapsfull .mapwrap > #mapSch,
+  .mapsfull .mapwrap > #mapgl,
+  .mapsfull .mapwrap > #maplf{position:absolute;inset:0;width:100%;height:100%}
   .mapsfull #mapgl,.mapsfull #maplf{height:100%}
   .mapsfull #mapSch{height:100%;display:grid;place-items:center;background:#e4eadd}
   .mapsfull #mapSch svg{max-height:100%}
@@ -281,6 +286,8 @@ HS.onReady(async function () {
   var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact', types: null, qol: null, view: 'all' };
   var selected = null;   // the project currently expanded in the right info panel (null = list view)
   var lastItems = [];    // most recent lettered set, so panel re-renders without a map redraw
+  var highlightedId = null; // sidebar card + marker sync
+  var glMarkerById = {}, lfMarkerById = {};
   var deepApplied = false;
 
   // Distinct real project types + which pin-shapes appear, for the Projects filter + shape legend.
@@ -333,11 +340,19 @@ HS.onReady(async function () {
     var st = document.getElementById('mapWrap'); if (!st) return;
     var top = st.getBoundingClientRect().top;
     st.style.height = Math.max(420, window.innerHeight - top - 16) + 'px';
-    try { if (glMap) glMap.resize(); } catch (e) {}
-    try { if (lfMap) lfMap.invalidateSize(); } catch (e) {}
+    function bumpMap() {
+      try { if (glMap) glMap.resize(); } catch (e) {}
+      try { if (lfMap) lfMap.invalidateSize(); } catch (e) {}
+    }
+    bumpMap();
+    requestAnimationFrame(bumpMap);
   }
   window.addEventListener('resize', sizeStage);
   sizeStage();
+  var mapWrapEl = document.getElementById('mapWrap');
+  if (mapWrapEl && typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(function () { sizeStage(); }).observe(mapWrapEl);
+  }
 
   var slideEl = document.getElementById('infoSlide'), listPill = document.getElementById('listPill');
   function panelOpen() { return slideEl.classList.contains('open'); }
@@ -598,7 +613,7 @@ HS.onReady(async function () {
       + items.map(function (it, i) {
         var col = markerColor(it), st = it.status ? HS.esc(it.status) : '';
         var aria = HS.esc((it.name || it.title || '') + '. ' + (it.type || it.category || '') + (st ? ', ' + st : '') + (it.dist ? ', ' + it.dist + ' away' : ''));
-        return '<div class="card mini clickable" data-pin="' + i + '" role="button" tabindex="0" aria-label="' + aria + '" style="border-left-color:' + col + '">'
+        return '<div class="card mini clickable" data-pin="' + i + '" data-id="' + HS.esc(it.id) + '" role="button" tabindex="0" aria-label="' + aria + '" style="border-left-color:' + col + '">'
           + '<span class="lens"><span class="letter" style="background:' + col + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px" aria-hidden="true">' + it._letter + '</span>&nbsp; '
           + HS.esc(it.type || it.category || '') + (st ? ' · ' + st : '') + (it.dist ? ' · ' + HS.esc(it.dist) : '') + '</span>'
           + '<h3>' + HS.esc(it.name || it.title) + '</h3>'
@@ -634,6 +649,7 @@ HS.onReady(async function () {
         + '<p class="sowhat">Good news for this lens: no regulated industrial facilities are on the public record near this area.</p></div>';
     }
     panel.innerHTML = html;
+    if (highlightedId) highlightSidebar(highlightedId);
     // Click + keyboard (Enter/Space) — every card is reachable and operable without a mouse.
     function actAll(sel, act) {
       panel.querySelectorAll(sel).forEach(function (el) {
@@ -643,7 +659,11 @@ HS.onReady(async function () {
         });
       });
     }
-    actAll('[data-pin]', function (el) { openItem(items[parseInt(el.getAttribute('data-pin'), 10)]); });
+    actAll('[data-pin]', function (el) {
+      var it = items[parseInt(el.getAttribute('data-pin'), 10)];
+      focusMapItem(it);
+      openItem(it);
+    });
     actAll('[data-fac]', function (el) {
       var f = sectionFacs[parseInt(el.getAttribute('data-fac'), 10)];
       if (f) location.href = 'development.html?id=' + encodeURIComponent(f.id);
@@ -674,7 +694,7 @@ HS.onReady(async function () {
       var it = byId[e.id] || e.item;
       var name = it.name || it.title || '';
       var letter = it._letter ? '<span class="letter" style="background:' + markerColor(it) + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px" aria-hidden="true">' + it._letter + '</span>&nbsp; ' : '';
-      return '<div class="card mini clickable" ' + attr + '="' + i + '" role="button" tabindex="0" aria-label="' + HS.esc(e.badges.join(', ') + '. ' + name) + '">'
+      return '<div class="card mini clickable" ' + attr + '="' + i + '" data-id="' + HS.esc(e.id) + '" role="button" tabindex="0" aria-label="' + HS.esc(e.badges.join(', ') + '. ' + name) + '">'
         + '<span class="lens">' + letter + badgeHTML(e) + '</span>'
         + '<h3>' + HS.esc(name) + '</h3>'
         + e.lines.map(function (l) { return '<div class="chgline">' + HS.esc(l) + '</div>'; }).join('')
@@ -700,6 +720,7 @@ HS.onReady(async function () {
         + areaChg.map(function (e, i) { return entryCard(e, i, 'data-chgarea'); }).join('');
     }
     panel.innerHTML = html;
+    if (highlightedId) highlightSidebar(highlightedId);
 
     function wire(sel, act) {
       panel.querySelectorAll(sel).forEach(function (el) {
@@ -710,7 +731,7 @@ HS.onReady(async function () {
     wire('[data-chg]', function (el) {
       var e = mapped[parseInt(el.getAttribute('data-chg'), 10)]; if (!e) return;
       var it = byId[e.id];
-      centerOn(it);
+      focusMapItem(it);
       openItem(it);            // the EXISTING Project Intelligence panel
     });
     wire('[data-chgarea]', function (el) {
@@ -728,6 +749,41 @@ HS.onReady(async function () {
       if (glMap && glReady && !glFailed) glMap.easeTo({ center: [it.lng, it.lat], duration: 400 });
       else if (lfMap && !lfFailed) lfMap.panTo([it.lat, it.lng]);
     } catch (e) { /* centering is best-effort — the panel is the payload */ }
+  }
+
+  function projectPopupHTML(it) {
+    var st = it.status ? ' · ' + HS.esc(it.status) : '';
+    return '<div style="font:600 13px/1.3 var(--font)">' + HS.esc(it.name || it.title || '') + '</div>'
+      + '<div style="font-size:11px;color:#5a6b63">' + HS.esc(it.type || it.category || 'Record') + st
+      + (it.dist ? ' · ' + HS.esc(it.dist) : '') + '</div>';
+  }
+
+  function highlightSidebar(id) {
+    highlightedId = id || null;
+    var panel = document.getElementById('infoPanel');
+    if (!panel || selected) return;
+    panel.querySelectorAll('.card.mini.sel').forEach(function (el) { el.classList.remove('sel'); });
+    if (!id) return;
+    var esc = (window.CSS && CSS.escape) ? CSS.escape(String(id)) : String(id).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    var card = panel.querySelector('[data-id="' + esc + '"]');
+    if (card) card.classList.add('sel');
+  }
+
+  function openMarkerPopup(it) {
+    if (!it || opts.mode === 'impact') return;
+    try {
+      var mk = glMarkerById[it.id] || lfMarkerById[it.id];
+      if (!mk) return;
+      if (mk.togglePopup) mk.togglePopup();
+      else if (mk.openPopup) mk.openPopup();
+    } catch (e) { /* popup is best-effort */ }
+  }
+
+  function focusMapItem(it) {
+    if (!it) return;
+    highlightSidebar(it.id);
+    centerOn(it);
+    openMarkerPopup(it);
   }
 
   // The 6-section project information panel (Sprint-1 spec). Every field renders only
@@ -832,8 +888,11 @@ HS.onReady(async function () {
     var back = panel.querySelector('#infoBack');
     back.onclick = function () {
       panel.classList.remove('idetail'); clearSelection();
+      if (highlightedId) highlightSidebar(highlightedId);
       // hand focus back to the card that was open, so keyboard users don't lose their place
-      var again = panel.querySelector('[data-pin]'); if (again) again.focus({ preventScroll: true });
+      var again = panel.querySelector('[data-id="' + ((highlightedId && window.CSS && CSS.escape) ? CSS.escape(String(highlightedId)) : highlightedId) + '"]')
+        || panel.querySelector('[data-pin]');
+      if (again) again.focus({ preventScroll: true });
     };
     back.focus({ preventScroll: true });   // detail opened: focus starts at the way back
   }
@@ -980,7 +1039,7 @@ HS.onReady(async function () {
     return {type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'Polygon',coordinates:[pts]}}]};
   }
   function zoomFor(r){ return ({'0.5':14,'1':13,'1.5':12.4,'2':12,'3':11.4,'5':10.7})[String(r)] || 12; }
-  function clearMarkers(){ glMarkers.forEach(function(m){m.remove();}); glMarkers=[]; }
+  function clearMarkers(){ glMarkers.forEach(function(m){m.remove();}); glMarkers=[]; glMarkerById={}; }
   // Build a clickable pin element (shape = type, color = status). Project pins open the
   // right info panel on click; facility pins keep their dossier popup.
   function pinEl(it, size){
@@ -1007,8 +1066,15 @@ HS.onReady(async function () {
     items.forEach(function(it){
       var el=pinEl(it, 26);
       el.title=(it.name||it.title||'')+' · '+(it.type||it.category||'')+(it.status?' · '+it.status:'');
-      el.addEventListener('click', function(e){ e.stopPropagation(); openItem(it); });
-      glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([it.lng,it.lat]).addTo(glMap));
+      el.addEventListener('click', function(e){
+        e.stopPropagation();
+        focusMapItem(it);
+        openItem(it);
+      });
+      var mk=new maplibregl.Marker({element:el}).setLngLat([it.lng,it.lat])
+        .setPopup(new maplibregl.Popup({offset:16,maxWidth:'260px'}).setHTML(projectPopupHTML(it))).addTo(glMap);
+      glMarkers.push(mk);
+      if (it.id != null) glMarkerById[it.id] = mk;
     });
     if (opts.showFacilities) unletteredFacs(items).forEach(function(f){
       var el=document.createElement('div');
@@ -1073,7 +1139,8 @@ HS.onReady(async function () {
       glMap.addSource('radius',{type:'geojson',data:circle(center.lat,center.lng,opts.radiusMi)});
       glMap.addLayer({id:'radius-fill',type:'fill',source:'radius',paint:{'fill-color':'#157a49','fill-opacity':0.08}});
       glMap.addLayer({id:'radius-line',type:'line',source:'radius',paint:{'line-color':'#157a49','line-width':2,'line-opacity':0.7,'line-dasharray':[2,2]}});
-      glReady=true; drawGL();
+      glReady=true;
+      requestAnimationFrame(function(){ try { glMap.resize(); } catch (e) {} drawGL(); });
     });
   }
   function drawGL(){
@@ -1084,7 +1151,13 @@ HS.onReady(async function () {
     ensureGL();
     if (glFailed || !glMap) return;
     if (!glReady){ setGps(items); renderInfo(items); return; }
-    glMap.resize();
+    requestAnimationFrame(function(){
+      if (!glMap) return;
+      glMap.resize();
+      drawGLBody(items);
+    });
+  }
+  function drawGLBody(items){
     glMap.setLayoutProperty('sat','visibility', opts.mode==='satellite'?'visible':'none');
     glMap.setLayoutProperty('osm','visibility', opts.mode==='street'?'visible':'none');
     glMap.getSource('radius').setData(opts.showRadius ? circle(center.lat,center.lng,opts.radiusMi) : {type:'FeatureCollection',features:[]});
@@ -1105,7 +1178,7 @@ HS.onReady(async function () {
       lfFailed=false, lfTilesOK=0, lfTileErrs=0, lfWatchdogArmed=false, lfLastView=null;
   var loadLeaflet = HS.loadLeaflet;
   function lfDivIcon(html,size){ return L.divIcon({html:html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2]}); }
-  function clearLfMarkers(){ lfMarkers.forEach(function(m){ try{ lfMap.removeLayer(m); }catch(e){} }); lfMarkers=[]; }
+  function clearLfMarkers(){ lfMarkers.forEach(function(m){ try{ lfMap.removeLayer(m); }catch(e){} }); lfMarkers=[]; lfMarkerById={}; }
   function addLfMarkers(items){
     clearLfMarkers();
     if (hasRealHome) {
@@ -1116,9 +1189,11 @@ HS.onReady(async function () {
     items.forEach(function(it){
       var m = L.marker([it.lat,it.lng],{icon:lfDivIcon('<div class="hspin" style="line-height:0">'+HS.markerSVG(itemShape(it), markerColor(it), it._letter||'', 26)+'</div>',26),
           title:(it.name||it.title||'')+' · '+(it.type||it.category||'')})
+        .bindPopup(projectPopupHTML(it),{maxWidth:260})
         .addTo(lfMap);
-      m.on('click', function(){ openItem(it); });
+      m.on('click', function(){ focusMapItem(it); openItem(it); });
       lfMarkers.push(m);
+      if (it.id != null) lfMarkerById[it.id] = m;
     });
     if (opts.showFacilities) unletteredFacs(items).forEach(function(f){
       lfMarkers.push(L.marker([f.lat,f.lng],{icon:lfDivIcon('<div style="width:20px;height:20px;border-radius:3px;background:'+FACILITY_HEX+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer"></div>',20)})
@@ -1165,6 +1240,7 @@ HS.onReady(async function () {
     if (opts.showRadius) lfRadius = L.circle([center.lat,center.lng], { radius: opts.radiusMi*1609.34,
       color:'#157a49', weight:2, dashArray:'4 4', fillColor:'#157a49', fillOpacity:0.08 }).addTo(lfMap);
     addLfMarkers(items);
+    requestAnimationFrame(function(){ try { lfMap.invalidateSize(); } catch (e) {} });
     setGps(items); renderInfo(items);
     wirePanel(drawLF);
   }
