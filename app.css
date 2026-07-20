@@ -67,6 +67,23 @@
   .stat.accent .n{color:var(--red)}
   .stat.g{background:var(--green-tint);border-color:#cbe7d5}
   .stat.g .n{color:var(--green)}
+  a.stat-link{text-decoration:none;color:inherit;cursor:pointer;transition:transform .08s ease,box-shadow .12s ease}
+  a.stat-link:hover,a.stat-link:focus-visible{transform:translateY(-2px);box-shadow:var(--shadow)}
+  a.stat-link:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+  a.card-link:hover,a.card-link:focus-visible{transform:translateY(-2px);box-shadow:var(--shadow)}
+  a.card-link:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+  a.wchip-link{text-decoration:none;color:inherit;transition:background .12s ease,border-color .12s ease}
+  a.wchip-link:hover,a.wchip-link:focus-visible{background:var(--green-tint);border-color:#cbe7d5}
+  a.wchip-link:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+  a.swrow-link{text-decoration:none;color:inherit;display:flex}
+  a.swrow-link:hover,a.swrow-link:focus-visible{background:#f7f9f7}
+  a.swrow-link:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+  a.aw-link{text-decoration:none;color:inherit;display:flex;cursor:pointer;border-radius:8px;margin:0 -6px;padding:11px 6px;transition:background .12s ease}
+  a.aw-link:hover,a.aw-link:focus-visible{background:#f7f9f7}
+  a.aw-link:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+  a.section-link{text-decoration:none;color:inherit}
+  a.section-link:hover,a.section-link:focus-visible{color:var(--green)}
+  .dash-mapwrap:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:15px}
 
   /* filter row */
   .toolbar{display:flex;align-items:center;gap:9px;margin-bottom:18px;flex-wrap:wrap}

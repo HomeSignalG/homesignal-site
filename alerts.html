@@ -48,6 +48,10 @@
 <script>
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
+  var qs = new URLSearchParams(location.search);
+  var focusBand = qs.get('band');
+  var focusCategory = qs.get('category');
+  var focusId = qs.get('id');
   // Never hang silently: a failed read renders an honest retry state.
   var c, all;
   try {
@@ -98,7 +102,7 @@ HS.onReady(async function () {
     var dotColor = { 'Traffic & getting around':'traffic','Home value & cost of living':'value','Environment & utilities':'water','Government & civic':'safety','Development':'traffic' };
     document.getElementById('alGroups').innerHTML = Object.keys(groups).map(function (g) {
       var col = dotColor[g] || 'traffic';
-      return '<div class="groupHead"><span class="gd ' + col + '"></span> ' + HS.esc(g)
+      return '<div class="groupHead" data-category="' + HS.esc(g) + '"><span class="gd ' + col + '"></span> ' + HS.esc(g)
         + ' <span class="gc">— ' + groups[g].length + ' change' + (groups[g].length===1?'':'s') + '</span></div>'
         + groups[g].map(function(ch){ return HS.tpl.storyCard(ch); }).join('');
     }).join('');
@@ -111,11 +115,39 @@ HS.onReady(async function () {
   }
 
   render('impact');
+  applyFocus();
   document.getElementById('alSort').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-sort]'); if (!b) return;
     [].forEach.call(this.querySelectorAll('button'), function(x){x.classList.remove('on');});
     b.classList.add('on'); render(b.dataset.sort);
   });
+
+  // Deep-link focus from Dashboard (band=open, category=..., id=...).
+  function applyFocus() {
+    var target = null;
+    if (focusId) {
+      var cards = document.querySelectorAll('[data-alert-id]');
+      for (var j = 0; j < cards.length; j++) {
+        if (cards[j].getAttribute('data-alert-id') === focusId) { target = cards[j]; break; }
+      }
+    }
+    if (!target && focusBand === 'open') {
+      target = document.getElementById('alBand');
+    }
+    if (!target && focusCategory) {
+      var heads = document.querySelectorAll('.groupHead[data-category]');
+      for (var i = 0; i < heads.length; i++) {
+        if (heads[i].getAttribute('data-category') === focusCategory) { target = heads[i]; break; }
+      }
+    }
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (focusId && target.classList && target.classList.contains('card')) {
+        target.style.boxShadow = '0 0 0 2px var(--green)';
+        setTimeout(function () { target.style.boxShadow = ''; }, 2400);
+      }
+    }
+  }
 });
 </script>
 </body>

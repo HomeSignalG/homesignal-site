@@ -27,6 +27,9 @@
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
   var id = new URLSearchParams(location.search).get('id');
+  var qs = new URLSearchParams(location.search);
+  var initLens = qs.get('lens');
+  var initSort = qs.get('sort');
   var page = document.getElementById('devPage');
   // Never hang on the loading skeleton: a failed read renders an honest
   // "couldn't load" state with a retry (same contract as maps.html).
@@ -48,7 +51,11 @@ HS.onReady(async function () {
   function statusRank(s){ return s==='Proposed'?0:s==='Active'?1:2; }
 
   function renderList() {
-    var state2 = { lens: 0, sort: 'impact', dataView: false };
+    var state2 = {
+      lens: HS.sanitizeLens ? HS.sanitizeLens(initLens) : 0,
+      sort: HS.sanitizeSort ? HS.sanitizeSort(initSort) : 'impact',
+      dataView: false
+    };
     function sorted() {
       var a = projects.slice();
       if (state2.lens === 1) { // what's being built — group by type & stage
@@ -111,7 +118,10 @@ HS.onReady(async function () {
         + '</div>';
     }
     function lens(i,q,d){ return '<button class="lenscard' + (state2.lens===i?' on':'') + '" data-lens="' + i + '"><span class="q">' + q + '</span><span class="d">' + d + '</span></button>'; }
-    function seg(k,label){ return '<button class="' + ((state2.sort===k && !state2.dataView)?'on':'') + '" data-sort="' + k + '">' + label + '</button>'; }
+    function seg(k,label){
+      var on = !state2.dataView && (state2.lens === 2 ? (k === 'distance') : (state2.sort === k));
+      return '<button class="' + (on ? 'on' : '') + '" data-sort="' + k + '">' + label + '</button>';
+    }
     function dataTable(a){
       return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th><th>Distance</th><th>Impact</th></tr></thead><tbody>'
         + a.map(function(p){ return '<tr onclick="location.href=\'development.html?id=' + p.id + '\'" onkeydown="if(event.key===\'Enter\')location.href=\'development.html?id=' + p.id + '\'" tabindex="0" style="cursor:pointer">'
