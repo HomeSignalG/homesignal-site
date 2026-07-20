@@ -41,9 +41,10 @@ jobs:
         run: |
           set -euo pipefail
           run_file() {
-            local FILE="$1"
-            echo "Running: $FILE"
-            python3 - "$FILE" <<'PY'
+            local SQL_FILE="$1"
+            SQL_FILE="${SQL_FILE#Running: }"
+            echo "Running: ${SQL_FILE}"
+            python3 - "${SQL_FILE}" <<'PY'
           import json, os, sys, urllib.request
           sql = open(sys.argv[1]).read()
           req = urllib.request.Request(
