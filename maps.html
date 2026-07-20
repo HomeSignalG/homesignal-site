@@ -17,7 +17,7 @@
   .maplibregl-popup-content{font-family:var(--font);font-size:13px;border-radius:10px;padding:9px 12px}
   .leaflet-popup-content{font-family:var(--font);font-size:13px}
 
-  /* ── Sprint-1 map MVP: top filters (Projects / Quality of Life) ── */
+  /* ── Sprint-1 map MVP: top filters (Quality of Life) ── */
   .fwrap{position:relative}
   .fpill.act{border-color:var(--green);color:var(--green);background:var(--green-tint)}
   .fpill .fct{display:inline-flex;min-width:16px;height:16px;padding:0 4px;margin-left:5px;border-radius:999px;
@@ -203,10 +203,6 @@
       </div>
       <div class="sp"></div>
       <div class="fwrap">
-        <button class="fpill" id="projFilterPill" aria-haspopup="true" aria-expanded="false">◈ Projects ▾</button>
-        <div class="fmenu" id="projMenu" hidden></div>
-      </div>
-      <div class="fwrap">
         <button class="fpill" id="qolFilterPill" aria-haspopup="true" aria-expanded="false">❋ Quality of Life ▾</button>
         <div class="fmenu" id="qolMenu" hidden></div>
       </div>
@@ -303,16 +299,14 @@ HS.onReady(async function () {
   }
 
   var LET = 'ABCDEFGHIJKLMNOP';
-  // opts.types / opts.qol are the top-of-page filters (null/empty = show everything,
+  // opts.qol is the top-of-page filter (null/empty = show everything,
   // so a signed-out default load is byte-identical to the pre-Sprint page the verifier checks).
-  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact', types: null, qol: null, view: 'all' };
+  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact', qol: null, view: 'all' };
   var selected = null;   // the project currently expanded in the right info panel (null = list view)
   var lastItems = [];    // most recent lettered set, so panel re-renders without a map redraw
   var deepApplied = false;
 
-  // Distinct real project types + which pin-shapes appear, for the Projects filter + shape legend.
-  var PROJECT_TYPES = projects.map(function (p) { return p.type; })
-    .filter(function (t, i, a) { return t && a.indexOf(t) === i; }).sort();
+  // Which pin-shapes appear in this ZIP's data (for the shape legend).
   var shapesPresent = {};
   projects.forEach(function (p) { shapesPresent[HS.resolveMarker(p).shape] = 1; });
 
@@ -401,13 +395,9 @@ HS.onReady(async function () {
     var ml = document.getElementById('mapLoading'); if (ml) ml.remove();
   }
 
-  // Top-of-page filters. Empty/absent = pass everything (default), so nothing narrows
-  // until the resident opts in — and a QoL/Type dimension a record doesn't flag stays
+  // Top-of-page filter. Empty/absent = pass everything (default), so nothing narrows
+  // until the resident opts in — and a QoL dimension a record doesn't flag stays
   // absent (never inferred from the project type). anti-fabrication.
-  function passType(it) {
-    if (!opts.types || !opts.types.size) return true;
-    return !!(it.type && opts.types.has(it.type));
-  }
   function passQol(it) {
     if (!opts.qol || !opts.qol.size) return true;
     var q = HS.qolOf(it);
@@ -425,7 +415,7 @@ HS.onReady(async function () {
     // "What's Changed" narrows the map to records with a real in-window change
     // entry. Facilities carry no change data, so they don't reserve slots here.
     if (opts.view === 'changed') a = a.filter(function (x) { return changedIds[x.id]; });
-    a = a.filter(function (x) { return passType(x) && passQol(x) && HS.statusVisible(x); });
+    a = a.filter(function (x) { return passQol(x) && HS.statusVisible(x); });
     // Facilities reserve a FLOOR of lettered slots (min(4,#facs)) so the closest
     // regulated facilities are always surfaced alongside development — de-duped, cap 16.
     var facPins = (opts.view === 'changed' || !opts.showFacilities) ? [] : facs;
@@ -473,22 +463,6 @@ HS.onReady(async function () {
   }
 
   function buildFilters() {
-    // Projects (by type) — real types present in this ZIP's data.
-    var projMenu = document.getElementById('projMenu');
-    var projPill = document.getElementById('projFilterPill');
-    var neutral = HS.markerRegistry.neutralHex;
-    if (!PROJECT_TYPES.length) {
-      projPill.style.opacity = '.5'; projPill.title = 'No project records to filter for this area yet';
-    } else {
-      projMenu.innerHTML = '<div class="fh">Show project types</div>'
-        + PROJECT_TYPES.map(function (t) {
-            var mk = HS.resolveMarker({ type: t });
-            return '<label><input type="checkbox" data-type="' + HS.esc(t) + '">'
-              + HS.markerSVG(mk.shape, neutral, '', 15)
-              + '<span>' + HS.esc(t) + '</span></label>';
-          }).join('')
-        + '<button class="fclear" id="projClear" type="button">Show all types</button>';
-    }
     // Quality of Life (Air/Water/Soil/Noise/Light) — narrows to records that FLAG the
     // dimension; Soil/Noise/Light rarely carry data yet, so those act as UI-only today.
     var qolMenu = document.getElementById('qolMenu');
@@ -501,23 +475,14 @@ HS.onReady(async function () {
       + '<button class="fclear" id="qolClear" type="button">Clear lens</button>';
 
     // popover open/close (one at a time; outside-click closes)
-    wireMenu(projPill, projMenu);
     wireMenu(qolPillWire(), qolMenu);
 
-    projMenu.addEventListener('change', function (e) {
-      var cb = e.target.closest('input[data-type]'); if (!cb) return;
-      opts.types = opts.types || new Set();
-      if (cb.checked) opts.types.add(cb.getAttribute('data-type')); else opts.types.delete(cb.getAttribute('data-type'));
-      refreshFilterPills(); redraw();
-    });
     qolMenu.addEventListener('change', function (e) {
       var cb = e.target.closest('input[data-qol]'); if (!cb) return;
       opts.qol = opts.qol || new Set();
       if (cb.checked) opts.qol.add(cb.getAttribute('data-qol')); else opts.qol.delete(cb.getAttribute('data-qol'));
       refreshFilterPills(); redraw();
     });
-    var pc = document.getElementById('projClear');
-    if (pc) pc.onclick = function () { opts.types = null; [].forEach.call(projMenu.querySelectorAll('input'), function(i){i.checked=false;}); refreshFilterPills(); redraw(); };
     document.getElementById('qolClear').onclick = function () { opts.qol = null; [].forEach.call(qolMenu.querySelectorAll('input'), function(i){i.checked=false;}); refreshFilterPills(); redraw(); };
   }
   function qolPillWire(){ return document.getElementById('qolFilterPill'); }
@@ -540,10 +505,8 @@ HS.onReady(async function () {
   }
   document.addEventListener('click', closeAllMenus);
   function refreshFilterPills() {
-    var pn = opts.types ? opts.types.size : 0, qn = opts.qol ? opts.qol.size : 0;
-    var pp = document.getElementById('projFilterPill'), qp = document.getElementById('qolFilterPill');
-    pp.classList.toggle('act', !!pn);
-    pp.innerHTML = '◈ Projects' + (pn ? ' <span class="fct">' + pn + '</span>' : '') + ' ▾';
+    var qn = opts.qol ? opts.qol.size : 0;
+    var qp = document.getElementById('qolFilterPill');
     qp.classList.toggle('act', !!qn);
     qp.innerHTML = '❋ Quality of Life' + (qn ? ' <span class="fct">' + qn + '</span>' : '') + ' ▾';
   }
@@ -588,7 +551,7 @@ HS.onReady(async function () {
   // 6-section detail IN THIS PANEL — the resident never leaves the map.
   function renderList(items) {
     var place = c ? c.name : 'your area';
-    var filtersOn = (opts.types && opts.types.size) || (opts.qol && opts.qol.size);
+    var filtersOn = opts.qol && opts.qol.size;
     var panel = document.getElementById('infoPanel');
     panel.classList.remove('idetail');
     if (opts.view === 'changed') { renderChangedList(items, panel, place); return; }
@@ -613,10 +576,8 @@ HS.onReady(async function () {
         + '<button class="btn primary" id="emptyClear">Show everything</button></div>';
       var ec = panel.querySelector('#emptyClear');
       if (ec) ec.onclick = function () {
-        opts.types = null; opts.qol = null;
-        ['projMenu', 'qolMenu'].forEach(function (id) {
-          var m = document.getElementById(id); if (m) [].forEach.call(m.querySelectorAll('input'), function (i) { i.checked = false; });
-        });
+        opts.qol = null;
+        var m = document.getElementById('qolMenu'); if (m) [].forEach.call(m.querySelectorAll('input'), function (i) { i.checked = false; });
         refreshFilterPills(); redraw();
       };
       return;
@@ -1435,7 +1396,7 @@ HS.onReady(async function () {
     drawTiles();
   });
 
-  // Map-view radius: a dropdown menu (matches the Projects / Quality of Life pills),
+  // Map-view radius: a dropdown menu (matches the Quality of Life pill),
   // not a click-to-cycle — the ▾ opens a real list so every radius is one click away.
   var radii = [0.5,1,1.5,2,3,5], ri = 2;
   (function setupRadiusMenu() {
