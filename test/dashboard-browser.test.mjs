@@ -65,6 +65,7 @@ function startServer() {
 
 // ---- unit-level helpers (same file for one browser run) ----
 ok(sanitizeSort('bogus') === 'impact', 'sanitizeSort rejects invalid');
+ok(sanitizeSort('status') === 'status', 'sanitizeSort accepts status');
 ok(sanitizeLens('9') === 0, 'sanitizeLens rejects out of range');
 ok(sanitizeLens('2') === 2, 'sanitizeLens accepts 2');
 ok(meetingNavHref({ related_project_id: 'chg-dvisd' }, '78617').indexOf('alerts.html') === 0,
@@ -176,6 +177,14 @@ try {
   // Destination: development invalid lens/sort
   await page.goto(base + '/development.html?data=seed&zip=78617&lens=99&sort=bogus', { waitUntil: 'networkidle' });
   ok(await page.locator('#devSort button.on').getAttribute('data-sort') === 'impact', 'invalid sort falls back to impact');
+
+  // Destination: development status sort deep link
+  await page.goto(base + '/development.html?data=seed&zip=78617&sort=status', { waitUntil: 'networkidle' });
+  await page.waitForSelector('#devSort button.on[data-sort="status"]', { timeout: 15000 });
+  ok(await page.locator('#devSort button.on').getAttribute('data-sort') === 'status', 'sort=status highlights Status');
+  ok(await page.locator('#devSort button[data-sort="status"]').textContent() === 'Status', 'Status label renders');
+  const sortButtons = await page.locator('#devSort button[data-sort]').allTextContents();
+  ok(sortButtons.join('|') === 'Impact on me|Status|Distance|Newest', 'sort controls appear in expected order');
 
   // Destination: community invalid focus
   await page.goto(base + '/community.html?data=seed&zip=78617&focus=bogus', { waitUntil: 'networkidle' });

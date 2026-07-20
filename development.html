@@ -49,8 +49,6 @@ HS.onReady(async function () {
 
   if (id) { renderDetail(id); } else { renderList(); }
 
-  function statusRank(s){ return s==='Proposed'?0:s==='Active'?1:2; }
-
   function renderList() {
     var state2 = {
       lens: HS.sanitizeLens ? HS.sanitizeLens(initLens) : 0,
@@ -60,9 +58,11 @@ HS.onReady(async function () {
     function sorted() {
       var a = projects.slice();
       if (state2.lens === 1) { // what's being built — group by type & stage
-        a.sort(function(x,y){ return (x.type>y.type?1:x.type<y.type?-1:0) || (statusRank(x.status)-statusRank(y.status)); });
+        a.sort(function(x,y){ return (x.type>y.type?1:x.type<y.type?-1:0) || (HS.devStatusSortRank(x)-HS.devStatusSortRank(y)); });
       } else if (state2.lens === 2 || state2.sort === 'distance') {
         a.sort(function(x,y){return (x.distance_mi||9e9)-(y.distance_mi||9e9);});
+      } else if (state2.sort === 'status') {
+        a.sort(function(x,y){return HS.devStatusSortRank(x)-HS.devStatusSortRank(y);});
       } else if (state2.sort === 'newest') {
         a.sort(function(x,y){return new Date(y.submitted_at)-new Date(x.submitted_at);});
       } else {
@@ -84,7 +84,7 @@ HS.onReady(async function () {
         '<div class="ph"><div class="eyebrow">Development</div><h1>What\'s being built — and how it impacts you</h1>'
         + '<p>Every active and proposed project near you, led by its effect on your daily life rather than its stage or unit count.</p></div>'
         + '<div class="toolbar toolbar--lead"><div class="seg" id="devSort">'
-        + seg('impact','Impact on me') + seg('distance','Distance') + seg('newest','Newest')
+        + seg('impact','Impact on me') + seg('status','Status') + seg('distance','Distance') + seg('newest','Newest')
         + '</div><div class="sp"></div>'
         + '<button class="fpill" id="devDataBtn">⊞ Table view</button></div>'
         + body
