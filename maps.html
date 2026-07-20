@@ -134,7 +134,15 @@
   .chgline{font-size:12px;color:var(--ink-2);margin-top:3px}
 
   /* ── marker clarity: hover/focus emphasis on tile-map pins ── */
-  .hspin{transition:transform .1s ease}
+  /* transform-box/origin pin the scale to the marker's OWN centre. The schematic
+     (Impact-view) pins are SVG <g> whose children sit at absolute view-box coords;
+     without this, transform-box defaults to `view-box` + origin `0 0`, so scale()
+     grows the pin about the SVG origin — sliding it out from under the cursor and
+     firing a mouseleave→mouseenter loop (the hover flutter). Scaling about the pin
+     centre keeps the hit area under the cursor. Inert on the GL markers (MapLibre's
+     inline positioning transform wins) and a no-op for the HTML markers (already
+     centre-origin), so it only corrects the SVG case. */
+  .hspin{transition:transform .1s ease;transform-box:fill-box;transform-origin:center}
   .hspin:hover,.hspin:focus-visible{transform:scale(1.18);z-index:6;position:relative}
 
   /* ── mobile: legend collapses to a pill so it doesn't bury the map ── */
