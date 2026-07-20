@@ -720,25 +720,17 @@
   // Signed-in: app_topic_prefs is source of truth; localStorage is a write-through
   // cache stamped with topicPrefsUid so a second account never inherits the first.
   // Anonymous: localStorage only until login, then server wins on hydrate.
-  const TOPIC_PREF_CATS = ['gov', 'meetings', 'news', 'dev'];
-  function topicPrefsFromRows(rows) {
-    const prefs = {};
-    (rows || []).forEach(row => {
-      prefs[row.category] = {
-        topics: Array.isArray(row.topics) ? row.topics.slice() : [],
-        share_consent: !!row.share_consent
-      };
-    });
-    return prefs;
-  }
+  const util = HS.topicPrefsUtil;
+  const TOPIC_PREF_CATS = util.TOPIC_PREF_CATS;
   function cacheTopicPrefs(prefs, userId) {
     LS.set('topicPrefs', prefs);
     if (userId) LS.set('topicPrefsUid', userId);
     else { try { localStorage.removeItem('hs:topicPrefsUid'); } catch (e) {} }
   }
   async function hydrateTopicPrefs() {
-    if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) {
-      state.topicPrefs = LS.get('topicPrefs', {});
+    const authenticated = CFG.DATA_SOURCE === 'supabase' && state.session && !state.session.demo && HS.sb;
+    if (!authenticated) {
+      state.topicPrefs = util.hydrateAnonymousPrefs(LS.get('topicPrefs', {}));
       return;
     }
     const uid = state.session.user.id;
@@ -747,18 +739,17 @@
         .select('category, topics, share_consent')
         .eq('user_id', uid);
       if (res.error) throw res.error;
-      state.topicPrefs = topicPrefsFromRows(res.data);
+      state.topicPrefs = util.hydrateSignedInPrefs(res.data);
       cacheTopicPrefs(state.topicPrefs, uid);
     } catch (e) {
       console.warn('topic-prefs hydrate', e);
-      state.topicPrefs = {};
+      state.topicPrefs = util.hydrateSignedInFailure();
       cacheTopicPrefs({}, uid);
     }
   }
   HS.paintTopicCounts = function () {
     TOPIC_PREF_CATS.forEach(k => {
-      const pref = state.topicPrefs[k];
-      const n = pref && pref.topics ? pref.topics.length : 0;
+      const n = util.topicCount(state.topicPrefs, k);
       const el = $('cc-' + k);
       if (el) el.textContent = n + ' topic' + (n === 1 ? '' : 's') + ' followed';
     });
