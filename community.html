@@ -27,8 +27,12 @@ HS.onReady(async function () {
   var robots = document.getElementById('robots-meta');
   function setIndexable(ok){ if(robots) robots.setAttribute('content', ok ? 'index, follow' : 'noindex, nofollow'); }
 
-  // DATA-QUALITY GATE: only render the full page when the ZIP has real, sourced data.
-  var status = await HS.data.coverageStatus(zip);   // 'pass' | 'coverage_coming' | null
+  // DATA-QUALITY GATE (feed-coverage truth): data_quality now derives from the
+  // daily feed_coverage_check snapshot. 'pass' = a wired feed is producing;
+  // 'wired_silent' = feeds are wired but nothing published in the window — the
+  // full page still renders (honest empty sections beat a false interstitial);
+  // 'coverage_coming' = no wired feed anywhere on the chain.
+  var status = await HS.data.coverageStatus(zip);   // 'pass' | 'wired_silent' | 'coverage_coming' | null
   var meta = status ? await HS.data.community(zip) : null;
 
   // NATIONWIDE SUBSTANCE GATE (founder-approved 2026-07-14, PLAN.md §11 threshold c):
@@ -44,7 +48,7 @@ HS.onReady(async function () {
       + '<button class="inlinebtn" style="margin-top:12px" onclick="HS.openLoc()">Request this community →</button></div>';
     return;
   }
-  if (status !== 'pass') {
+  if (status !== 'pass' && status !== 'wired_silent') {
     var county0 = meta && meta.county ? HS.esc(meta.county) + ' County' : 'the county';
     page.innerHTML = '<div class="ph"><div class="eyebrow">Communities</div><h1>' + HS.esc(zip) + (meta && meta.name ? ' · ' + HS.esc(meta.name) : '') + (meta && meta.state ? ', ' + HS.esc(meta.state) : '') + '</h1>'
       + '<p>Coverage for this ZIP is being wired. We show a community only when it has real, sourced records — no placeholder cards. '

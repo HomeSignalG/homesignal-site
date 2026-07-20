@@ -12,8 +12,14 @@ create table if not exists public.app_community_meta (
   name text, county text, state text,
   community_score int, growth_pressure text, value_trend numeric,
   component_scores jsonb, civic_activity text, blurb text,
-  covered boolean not null default true,
+  covered boolean not null default true,   -- PROPOSED 2026-07-20 (parked, ingest migration
+                                        -- 20260720101000): default false + DERIVED from
+                                        -- feed_coverage_check — never a constant again
   data_quality text,                    -- 'pass' | 'coverage_coming' (the quality gate)
+                                        -- PROPOSED 2026-07-20: + 'wired_silent', derived
+                                        -- from feed_coverage_check (see ingest
+                                        -- docs/feed-coverage-truth.md); meta also gains
+                                        -- feed_coverage jsonb (per-tab bucket map)
   updated_at timestamptz default now()
 );
 create table if not exists public.app_projects (
