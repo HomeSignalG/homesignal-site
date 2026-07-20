@@ -241,6 +241,11 @@
   .mapkey span.off .t{text-decoration:line-through}
   .mapkey i{width:11px;height:11px;border-radius:50%;flex:0 0 auto;
     border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+  .maplegend-wrap{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+  .mapkey-hd{font-size:11px;font-weight:600;color:var(--mute);letter-spacing:.02em}
+  .mapkey-shapes span.sh{border-style:dashed}
+  .mapkey-shapes .ic{display:flex;align-items:center;line-height:0}
+  .mapkey-note{font-size:11px;color:var(--mute);line-height:1.35;max-width:42em}
 
   /* ===== Development-tracker: resolved-project anchor (a) + ZIP/county notices (b/c) =====
      The resolved-project data is a verified public-record anchor. Every honesty label the
@@ -323,7 +328,13 @@
             </div>
           </div>
           <div class="maprow">
-            <div class="mapkey" id="mapkey"></div>
+            <div class="maplegend-wrap">
+              <div class="mapkey-hd">Stage — pin color</div>
+              <div class="mapkey" id="mapkey"></div>
+              <div class="mapkey-hd" id="shapeLegHd">Type — pin shape</div>
+              <div class="mapkey mapkey-shapes" id="mapkeyShapes"></div>
+              <div class="mapkey-note" id="mapkeyNote">Pin shape shows project type; color shows lifecycle stage. 3D aerial uses simplified building blocks (lifecycle color only) — use 2D or satellite for type shapes.</div>
+            </div>
             <div class="radsel" id="radSel">
               <span class="rlbl">Radius</span>
               <button data-r="0.5">½ mi</button>
@@ -1272,6 +1283,55 @@ HS.onReady(function(){
       leafletPaths: document.querySelectorAll("#map .leaflet-interactive").length
     };
   }
+  // Marker-backbone verification (scripts/verify-map-markers.mjs): tracker pins + legend.
+  window.__HS_TRACKER_MARKER_VERIFY = function () {
+    var fails = [];
+    var FIXTURES = [
+      { label: "Permit", use_type: "Industrial", type: "proposed", layer: "industrial" },
+      { label: "DC", use_type: "Data Center", type: "approved", layer: "datacenter" },
+      { label: "Homes", use_type: "Residential", type: "built", layer: "residential" },
+      { label: "EPA", use_type: "Industrial", type: "built", layer: "industrial", registry_id: "TX-VERIFY" }
+    ];
+    function geomFromSvg(svg) {
+      if (!svg) return null;
+      if (svg.indexOf("<rect") !== -1) return "square";
+      if (svg.indexOf("<circle") !== -1) return "circle";
+      var m = svg.match(/points="([^"]+)"/);
+      if (!m) return null;
+      var n = m[1].trim().split(/\s+/).filter(Boolean).length;
+      if (n === 3) return "triangle";
+      if (n === 4) return "diamond";
+      if (n === 5) return "pentagon";
+      if (n === 6) return "hexagon";
+      return "polygon";
+    }
+    FIXTURES.forEach(function (s) {
+      var mk = HS.resolveTrackerMarker(s, function (x) { return x.registry_id; });
+      var svg = HS.markerSVG(mk.shape, mk.color, "", 14);
+      var geom = geomFromSvg(svg);
+      if (geom !== mk.shape) fails.push({ label: s.label, err: "tracker-fixture-geometry", want: mk.shape, got: geom });
+      if (s.registry_id && (mk.shape !== "square" || mk.color !== HS.markerRegistry.facilityHex)) {
+        fails.push({ label: s.label, err: "tracker-facility-not-purple-square" });
+      }
+      if (!s.registry_id && s.use_type === "Industrial" && mk.shape !== "triangle") {
+        fails.push({ label: s.label, err: "tracker-industrial-not-triangle" });
+      }
+    });
+    var shapes = document.getElementById("mapkeyShapes");
+    if (!shapes || !shapes.querySelector("svg")) fails.push({ err: "tracker-missing-shape-legend" });
+    var lifecycle = document.getElementById("mapkey");
+    if (lifecycle && lifecycle.querySelectorAll("svg").length < 3) fails.push({ err: "tracker-lifecycle-legend-not-shaped" });
+    var markers = document.querySelectorAll("#map .leaflet-marker-icon svg, #mapgl .maplibregl-marker svg");
+    if (markers.length) {
+      markers.forEach(function (svg, i) {
+        var html = svg.outerHTML || "";
+        if (html.indexOf("<polygon") === -1 && html.indexOf("<rect") === -1) {
+          fails.push({ err: "tracker-onmap-not-shaped", idx: i });
+        }
+      });
+    }
+    return fails;
+  };
 
   // Show only the buckets whose legend chip is on.
   function applyFilter(){
@@ -1297,7 +1357,7 @@ HS.onReady(function(){
       row.setAttribute("aria-label", it.t + " markers");
       if(!FILTER[it.b]) row.className = "off";
       row.setAttribute("aria-pressed", FILTER[it.b] ? "true" : "false");  // pressed = layer shown
-      row.innerHTML = "<i style='background:"+it.c+"'></i><span class='t'>"+it.t+"</span>";
+      row.innerHTML = "<span class='ic'>" + HS.markerSVG("triangle", it.c, "", 14) + "</span><span class='t'>" + it.t + "</span>";
       function toggle(){
         FILTER[it.b] = !FILTER[it.b];
         row.classList.toggle("off", !FILTER[it.b]);
@@ -1310,6 +1370,15 @@ HS.onReady(function(){
       });
       d.appendChild(row);
     });
+    var shapes = document.getElementById("mapkeyShapes");
+    if(shapes && HS.SHAPE_LEGEND){
+      var neutral = HS.markerRegistry.neutralHex;
+      var rows = HS.SHAPE_LEGEND.map(function(s){
+        return "<span class='sh'><span class='ic'>" + HS.markerSVG(s.shape, neutral, "", 14) + "</span><span class='t'>" + esc(s.label) + "</span></span>";
+      });
+      rows.push("<span class='sh'><span class='ic'>" + HS.markerSVG("square", HS.markerRegistry.facilityHex, "", 14) + "</span><span class='t'>Regulated facility</span></span>");
+      shapes.innerHTML = rows.join("");
+    }
   }
 
   // The class of official document the record link opens, so the label states it up

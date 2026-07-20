@@ -1065,6 +1065,92 @@ HS.onReady(async function () {
     });
     return fails;
   };
+  function geomFromNode(node) {
+    if (!node) return null;
+    if (node.tagName === 'rect' || node.querySelector('rect')) return 'square';
+    if (node.tagName === 'circle' || node.querySelector('circle')) return 'circle';
+    var poly = node.tagName === 'polygon' ? node : node.querySelector('polygon');
+    if (poly) {
+      var pts = (poly.getAttribute('points') || '').trim().split(/\s+/).filter(Boolean).length;
+      if (pts === 3) return 'triangle';
+      if (pts === 4) return 'diamond';
+      if (pts === 5) return 'pentagon';
+      if (pts === 6) return 'hexagon';
+      return 'polygon';
+    }
+    return null;
+  }
+  function fillFromNode(node) {
+    if (!node) return '';
+    var el = node.tagName === 'svg' || node.tagName === 'g' ? node.querySelector('polygon,rect,circle') : node;
+    if (!el || (el.tagName !== 'polygon' && el.tagName !== 'rect' && el.tagName !== 'circle')) {
+      el = node.querySelector('polygon,rect,circle');
+    }
+    return el ? String(el.getAttribute('fill') || '').toLowerCase() : '';
+  }
+  // Fixture + on-map DOM verification — asserts rendered SVG geometry/color, not resolver alone.
+  window.__HS_MARKER_DOM_VERIFY = function (rootSelector) {
+    var fails = [];
+    var FIXTURES = [
+      { id: 'fx-ind', type: 'Industrial', status: 'Proposed', lat: 30.18, lng: -97.60 },
+      { id: 'fx-dc', type: 'Data Center', status: 'Approved', lat: 30.181, lng: -97.601 },
+      { id: 'fx-res', type: 'Residential', status: 'Active', lat: 30.182, lng: -97.602 },
+      { id: 'fx-fac', type: 'Industrial', status: 'Operating', _facility: true, lat: 30.183, lng: -97.603 }
+    ];
+    FIXTURES.forEach(function (it) {
+      var m = HS.resolveMarker(it);
+      var pin = pinEl(it, 26);
+      var geom = geomFromNode(pin);
+      var fill = fillFromNode(pin);
+      if (geom !== m.shape) fails.push({ id: it.id, err: 'fixture-pin-geometry', want: m.shape, got: geom });
+      if (fill && m.color && fill !== String(m.color).toLowerCase()) {
+        fails.push({ id: it.id, err: 'fixture-pin-color', want: m.color, got: fill });
+      }
+    });
+    var root = rootSelector ? document.querySelector(rootSelector) : document;
+    if (root) {
+      var items = (window.__HS_MAP && window.__HS_MAP.items) || [];
+      if (rootSelector === '#mapSch') {
+        items.forEach(function (it, idx) {
+          var g = root.querySelector('g[data-pin-idx="' + idx + '"]');
+          if (!g) return;
+          var m = HS.resolveMarker(it);
+          var geom = geomFromNode(g);
+          var fill = fillFromNode(g);
+          if (geom && geom !== m.shape) fails.push({ id: it.id, err: 'dom-geometry', want: m.shape, got: geom, root: rootSelector });
+          if (fill && m.color && fill !== String(m.color).toLowerCase()) {
+            fails.push({ id: it.id, err: 'dom-color', want: m.color, got: fill, root: rootSelector });
+          }
+        });
+      } else {
+        var pins = root.querySelectorAll('.hspin');
+        var n = Math.min(pins.length, items.length);
+        for (var i = 0; i < n; i++) {
+          var it2 = items[i], m2 = HS.resolveMarker(it2);
+          var geom2 = geomFromNode(pins[i]);
+          var fill2 = fillFromNode(pins[i]);
+          if (geom2 && geom2 !== m2.shape) fails.push({ id: it2.id, err: 'dom-geometry', want: m2.shape, got: geom2, root: rootSelector || 'document' });
+          if (fill2 && m2.color && fill2 !== String(m2.color).toLowerCase()) {
+            fails.push({ id: it2.id, err: 'dom-color', want: m2.color, got: fill2, root: rootSelector || 'document' });
+          }
+        }
+      }
+    }
+    var sch = document.getElementById('mapSch');
+    if (sch && sch.querySelector('svg')) {
+      var el = { innerHTML: '' };
+      HS.MapProvider.render(el, {
+        home: center, items: FIXTURES, radiusMi: opts.radiusMi, showRadius: false, showHome: false, w: 400, h: 300
+      });
+      FIXTURES.forEach(function (it, idx) {
+        var m = HS.resolveMarker(it);
+        var g = el.querySelector('g[data-pin-idx="' + idx + '"]') || el.querySelectorAll('g.hspin')[idx];
+        var geom = geomFromNode(g);
+        if (geom !== m.shape) fails.push({ id: it.id, err: 'schematic-render-geometry', want: m.shape, got: geom });
+      });
+    }
+    return fails;
+  };
   function addMarkers(items){
     clearMarkers();
     if (hasRealHome) {
