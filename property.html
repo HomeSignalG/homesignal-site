@@ -24,7 +24,7 @@ HS.onReady(async function () {
   var p = S.properties.find(function(x){return x.id===id;}) || S.activeProperty;
   if (p) HS.selectProperty(p.id);
   var page = document.getElementById('propPage');
-  if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'properties.html\'">← All saved places</button><div class="ph"><h1>No saved place</h1></div>'; return; }
+  if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'properties.html\'">← All Saved Places</button><div class="ph"><h1>No Saved Place</h1></div>'; return; }
 
   var projects = HS.withDistance(await HS.data.projects(S.zip, p), p)
     .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
@@ -46,7 +46,7 @@ HS.onReady(async function () {
   var openAlerts = changes.filter(function(x){return HS.daysUntil(x.window_closes_at)>=0 && (x.distance_mi||9e9)<=5;}).length;
 
   page.innerHTML =
-    '<button class="backbtn" onclick="location.href=\'properties.html\'">← All saved places</button>'
+    '<button class="backbtn" onclick="location.href=\'properties.html\'">← All Saved Places</button>'
     + '<div class="ph"><div class="eyebrow">' + HS.esc(p.tag||p.label) + '</div><h1>' + HS.esc(p.address) + '</h1>'
     + '<p>' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + ' — everything changing around this specific address, and what it means for its value.</p></div>'
     + '<div class="cols"><div>'

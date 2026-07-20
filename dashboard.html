@@ -32,7 +32,7 @@
         <div class="block">
           <div class="bt-row"><h2>Your Saved Places</h2><a href="properties.html">Manage →</a></div>
           <div id="dashProps"></div>
-          <button class="addbtn" style="width:100%;justify-content:center;margin-top:10px" onclick="HS.addHome()">+ Add a home</button>
+          <button class="addbtn" style="width:100%;justify-content:center;margin-top:10px" onclick="HS.addHome()">+ Add a Saved Place</button>
         </div>
         <div class="block">
           <div class="bt-row"><h2>Your communities</h2><a href="community.html">Open →</a></div>
@@ -86,7 +86,7 @@ HS.onReady(async function () {
     ? (name ? 'Welcome back, ' + name : 'Welcome back')
     : 'See what\'s changing around your home';
   document.getElementById('dashSub').textContent = S.properties.length
-    ? S.properties.length + ' home' + (S.properties.length===1?'':'s') + ' followed — here\'s what needs you across them.'
+    ? S.properties.length + ' saved place' + (S.properties.length===1?'':'s') + ' — here\'s what needs you across them.'
     : 'Add your home and we\'ll watch official county and permit records around it'
       + ((HS.isSample && HS.isSample()) ? ' — right now you\'re viewing our sample community, Del Valle, TX.' : '.');
 
