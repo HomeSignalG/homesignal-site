@@ -1,6 +1,7 @@
-// Regression: the redundant "Projects" show-on-map toggle must stay removed.
-// maps.html is the ONE shared template for every ZIP's app map (?zip=), so this
-// pins the legend for all current and future ZIP pages.
+// Regression: redundant project-type controls must stay removed from maps.html.
+// Type shapes belong in the legend's "Type — pin shape" row only — not a toolbar
+// filter or a show-on-map layer toggle. maps.html is the ONE shared template for
+// every ZIP's app map (?zip=).
 // Run: node test/map-legend-layers.test.mjs
 import { readFileSync } from 'node:fs';
 
@@ -20,10 +21,13 @@ ok(!/<div class="lyr"[^>]*>\s*<span>Projects<\/span>/.test(block),
   'no Projects row under "Show on Map"');
 ok(/id="lyrRadius"/.test(html) && /Radius ring/.test(html),
   'Radius ring toggle remains under "Show on Map"');
-ok(/id="projFilterPill"/.test(html) && /Project types/.test(html),
-  'toolbar type filter is labelled "Project types" (not "Projects")');
-ok(!/<button[^>]*id="projFilterPill"[^>]*>[^<]*Projects[^<]*<\/button>/.test(html),
-  'toolbar filter pill does not say "Projects"');
+
+ok(!/id="projFilterPill"/.test(html), 'no toolbar project-types filter pill');
+ok(!/id="projMenu"/.test(html), 'no toolbar project-types filter menu');
+ok(!/opts\.types/.test(html), 'no opts.types filter state');
+ok(!/data-type=/.test(html), 'no project-type checkbox filter markup');
+ok(/id="shapeLegWrap"/.test(html) && /id="shapeLegend"/.test(html),
+  'shape legend section remains in map legend');
 
 if (fails) { console.error('\n' + fails + ' assertion(s) failed'); process.exit(1); }
 console.log('\nAll map-legend-layers assertions passed.');
