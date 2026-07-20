@@ -83,12 +83,7 @@ HS.onReady(async function () {
       page.innerHTML =
         '<div class="ph"><div class="eyebrow">Development</div><h1>What\'s being built — and how it impacts you</h1>'
         + '<p>Every active and proposed project near you, led by its effect on your daily life rather than its stage or unit count.</p></div>'
-        + '<div class="lensnav">'
-        + lens(0,'How could it affect me?','Impact-first · the default view')
-        + lens(1,'What\'s being built?','The projects themselves')
-        + lens(2,'Where are we growing?','The trajectory of the area')
-        + '</div>'
-        + '<div class="toolbar"><div class="seg" id="devSort">'
+        + '<div class="toolbar toolbar--lead"><div class="seg" id="devSort">'
         + seg('impact','Impact on me') + seg('distance','Distance') + seg('newest','Newest')
         + '</div><div class="sp"></div>'
         + '<button class="fpill" id="devDataBtn">⊞ Table view</button></div>'
@@ -118,7 +113,6 @@ HS.onReady(async function () {
         + '<p class="sowhat">' + HS.esc(interp ? interp.line : 'Permit status not yet confirmed — open the facility record.') + '</p>'
         + '</div>';
     }
-    function lens(i,q,d){ return '<button class="lenscard' + (state2.lens===i?' on':'') + '" data-lens="' + i + '"><span class="q">' + q + '</span><span class="d">' + d + '</span></button>'; }
     function seg(k,label){
       var on = !state2.dataView && (state2.lens === 2 ? (k === 'distance') : (state2.sort === k));
       return '<button class="' + (on ? 'on' : '') + '" data-sort="' + k + '">' + label + '</button>';
@@ -131,7 +125,6 @@ HS.onReady(async function () {
         + '</tbody></table>';
     }
     function wire() {
-      [].forEach.call(page.querySelectorAll('.lenscard'), function(b){ b.onclick=function(){ state2.lens=+b.dataset.lens; state2.dataView=false; paint(); }; });
       var ds = page.querySelector('#devSort'); if (ds) ds.onclick=function(e){ var b=e.target.closest('button[data-sort]'); if(!b)return; state2.sort=b.dataset.sort; state2.dataView=false; paint(); };
       var db = page.querySelector('#devDataBtn'); if (db) db.onclick=function(){ state2.dataView=!state2.dataView; paint(); };
     }
