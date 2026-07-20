@@ -200,13 +200,13 @@
 </div>
 
 <!-- ======= FIRST-TIME ONBOARDING (signed-in users with no saved location) ======= -->
-<div class="onboarding" id="onboardingOverlay" role="dialog" aria-modal="true" aria-labelledby="onbWelcomeTitle" hidden>
+<div class="onboarding" id="onboardingOverlay" role="dialog" aria-modal="true" aria-labelledby="onbWelcomeTitle" aria-busy="false" hidden>
   <div class="onboarding-card">
     <div class="onb-steps">
       <!-- Step 1: Welcome -->
       <section class="onb-step onb-active" id="onbStepWelcome" data-step="welcome" aria-labelledby="onbWelcomeTitle">
         <span class="onb-badge">◉ Welcome</span>
-        <h2 class="onb-title" id="onbWelcomeTitle">Welcome to HomeSignal</h2>
+        <h2 class="onb-title" id="onbWelcomeTitle" tabindex="-1">Welcome to HomeSignal</h2>
         <p class="onb-sub">Let's personalize your experience.</p>
         <p class="onb-body">HomeSignal monitors development, government activity, local news, and quality-of-life changes that may affect your property.</p>
         <button type="button" class="onb-btn" id="onbWelcomeBtn">Get started</button>
@@ -215,19 +215,19 @@
       <!-- Step 2: Location + benefits -->
       <section class="onb-step" id="onbStepLocation" data-step="location" aria-labelledby="onbLocTitle" hidden>
         <span class="onb-badge">◉ Your location</span>
-        <h2 class="onb-title" id="onbLocTitle">Choose your location</h2>
+        <h2 class="onb-title" id="onbLocTitle" tabindex="-1">Choose your location</h2>
         <p class="onb-sub">Address is preferred but not required — enter either one below.</p>
 
         <div class="onb-field">
           <label class="onb-label" for="onbAddr">Search by Address</label>
-          <input id="onbAddr" type="text" autocomplete="street-address" placeholder="123 Main St, Austin, TX" aria-describedby="onbMsg">
+          <input id="onbAddr" type="text" autocomplete="street-address" placeholder="123 Main St, Austin, TX" aria-describedby="onbMsg onbRecovery">
         </div>
 
         <div class="onb-or" aria-hidden="true">OR</div>
 
         <div class="onb-field">
           <label class="onb-label" for="onbZip">Search by ZIP Code</label>
-          <input id="onbZip" type="text" inputmode="numeric" maxlength="5" placeholder="78617" aria-describedby="onbMsg">
+          <input id="onbZip" type="text" inputmode="numeric" maxlength="5" placeholder="78617" aria-describedby="onbMsg onbRecovery">
         </div>
 
         <div class="onb-benefits" aria-label="Why we ask for your location">
@@ -244,6 +244,11 @@
         <p class="onb-msg" id="onbMsg" role="status" aria-live="polite"></p>
         <button type="button" class="onb-btn" id="onbContinueBtn" disabled>Continue</button>
 
+        <div id="onbRecovery" class="onb-recovery hidden" role="group" aria-label="Recovery options">
+          <button type="button" class="onb-btn onb-btn-secondary" id="onbRetryBtn">Retry save</button>
+          <button type="button" class="onb-btn onb-btn-secondary" id="onbZipInsteadBtn">Use ZIP code instead</button>
+        </div>
+
         <div id="onbUncovered" class="onb-uncovered hidden">
           <div class="onb-uncovered-box">
             <b>We're not in <span id="onbUncoveredZip">—</span> yet</b> — add your email and we'll notify you when your area goes live.
@@ -256,7 +261,7 @@
       <!-- Step 3: Destination picker -->
       <section class="onb-step" id="onbStepDest" data-step="dest" aria-labelledby="onbDestTitle" hidden>
         <span class="onb-badge">◉ You're set</span>
-        <h2 class="onb-title" id="onbDestTitle">Welcome to ZIP <span id="onbSavedZip">—</span></h2>
+        <h2 class="onb-title" id="onbDestTitle" tabindex="-1">Welcome to ZIP <span id="onbSavedZip">—</span></h2>
         <p class="onb-sub">What would you like to explore first?</p>
         <div class="onb-dest-grid" id="onbDestGrid" role="list"></div>
       </section>

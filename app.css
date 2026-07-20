@@ -534,9 +534,17 @@
 .onb-dest .copy{flex:1;min-width:0}
 .onb-dest .copy strong{display:block;font-size:15px;color:var(--ink);margin-bottom:3px}
 .onb-dest .copy span{font-size:13px;color:var(--ink-2);line-height:1.45}
+.onb-recovery{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.onb-recovery.hidden{display:none}
+body.onboarding-lock #hs-app-root{pointer-events:none;user-select:none}
+body.onboarding-lock{overflow:hidden}
+@media (prefers-reduced-motion:reduce){
+  .onboarding,.onb-step{transition:none}
+}
 @media(max-width:640px){
   .onb-step{padding:24px 20px 22px}
   .onb-title{font-size:22px}
+  .onboarding-card{max-height:calc(100dvh - 24px);overflow:auto}
 }
 
 /* app-only: transient toast for honest "not built yet" feedback (no dead clicks) */
