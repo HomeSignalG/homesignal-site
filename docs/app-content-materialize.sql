@@ -173,3 +173,33 @@
 --     both paths — none involve the new statement's rows). Flagged to founder.
 -- REVERT: re-apply the app_refresh_zip_facility_entity body from this file's
 -- history (drops the added statement; no schema change to revert).
+
+-- ---------------------------------------------------------------------------
+-- PROPOSED 2026-07-20 (PARKED FOR FOUNDER REVIEW — NOT applied): the
+-- FEED-COVERAGE-TRUTH build. Full migrations live in homesignal-ingest
+-- (supabase/migrations/20260720100000..102000) + docs/feed-coverage-truth.md:
+--   * NEW public.feed_coverage_check — daily (snapshot_date, zip, tab) snapshot
+--     of wired (active feed on the ZIP's community chain, community_id join
+--     only) vs producing (recent alerts/meetings on the chain), with a
+--     generated bucket 'no_feed'|'wired_silent'|'producing' (wired takes
+--     precedence — inactive-feed residue can't keep a tab alive). History
+--     kept; pg_cron 'feed-coverage-check' at 09:12 UTC, before the 09:20
+--     app-content-refresh. Views: feed_coverage_summary,
+--     feed_coverage_regressions (producing→wired_silent day-over-day).
+--   * app_refresh_zip DERIVES covered/data_quality/feed_coverage from the
+--     latest snapshot (any tab producing → 'pass'; wired only →
+--     'wired_silent'; none wired → 'coverage_coming'; no snapshot → fail
+--     closed). The hardcoded covered=true literal + default are deleted;
+--     app_community_meta gains feed_coverage jsonb (the per-tab map the
+--     honest tab states on alerts.html read).
+--   * indexable now ALSO requires derived data_quality='pass' — the
+--     substance-only gate would index pages that render a coverage state.
+--   * NEW 'Local news' insert into app_changes: news alerts (pipeline_type
+--     'news' — NOT 'news_alert') materialize ONLY when the alert's community
+--     has an ACTIVE news feed (Part 4 — kills the Cache County stale-news
+--     leak: 52 orphaned alerts / 2 inactive feeds / 19 ZIP pages). 14-day
+--     window, cap 24, sourced-only, after the _nc count (never inflates the
+--     civic component score).
+-- REVERT: re-apply this file's 2026-07-17 body; drop the cron job, the table,
+-- the views, and the two meta columns (additive; readers null-check).
+-- ---------------------------------------------------------------------------

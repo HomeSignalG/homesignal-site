@@ -148,7 +148,14 @@ async function main() {
       try {
         const st = await readPage(page, row.zip);
         const tag = `${row.state} ${row.zip} (${row.name})`;
-        if (row.data_quality !== 'pass') {
+        if (row.data_quality === 'wired_silent') {
+          // wired_silent (feed-coverage truth): feeds are wired but nothing produced
+          // in the window — the full page renders with honest per-tab empty states,
+          // and it is NEVER indexed (only derived 'pass' pages can be).
+          if (row.indexable) fails.push(`${tag}: wired_silent row has indexable=true (materializer bug)`);
+          else if (indexable(st.robots)) fails.push(`${tag}: wired_silent page is INDEXABLE (robots="${st.robots}")`);
+          else console.log(`  ✓ ${tag} · wired_silent · noindex`);
+        } else if (row.data_quality !== 'pass') {
           // coverage_coming: honest coverage page, never indexed (flag must be false too).
           if (st.isPass) fails.push(`${tag}: meta says coverage_coming but the page rendered a PASS state`);
           else if (row.indexable) fails.push(`${tag}: coverage_coming row has indexable=true (materializer bug)`);

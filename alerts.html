@@ -135,6 +135,22 @@ HS.onReady(async function () {
     meetings: buildMeetingsPool()
   };
 
+  // FEED-COVERAGE TRUTH (per-tab honest states): the materializer stamps
+  // app_community_meta.feed_coverage = { gov_notices|meetings|local_news:
+  // 'no_feed' | 'wired_silent' | 'producing' } from the daily
+  // feed_coverage_check snapshot. A tab we have NO active feed for renders no
+  // zero-count tab — a bare "0" would imply we checked a source we don't
+  // have. A missing map (pre-migration meta, seed mode) falls back to the
+  // legacy behavior: every tab shown, current empty copy.
+  var TAB_COV_KEY = { gov: 'gov_notices', meetings: 'meetings', news: 'local_news' };
+  var TAB_LABEL = { gov: 'government notices', meetings: 'public meetings', news: 'local news' };
+  var countyLabel = (c && c.county) ? c.county + ' County' : 'this area';
+  function tabCoverage(tab) {
+    var fc = c && c.feed_coverage;
+    if (!fc || !fc[TAB_COV_KEY[tab]]) return 'producing';   // no signal -> legacy behavior
+    return fc[TAB_COV_KEY[tab]];
+  }
+
   function resolveTab(cat) {
     if (!cat) return 'gov';
     var key = String(cat).toLowerCase();
@@ -148,12 +164,22 @@ HS.onReady(async function () {
 
   var state = { tab: resolveTab(focusCategory), sort: 'urgency' };
   // When the default tab is empty but another feed has records, land on the first
-  // non-empty tab (unless a category deep link explicitly chose the tab).
-  if (!focusCategory && !pools[state.tab].length) {
-    ['gov', 'meetings', 'news'].some(function (k) {
-      if (pools[k].length) { state.tab = k; return true; }
-    });
+  // non-empty tab (unless a category deep link explicitly chose the tab) — kept
+  // from #321, now restricted to MONITORED tabs: an unmonitored (no_feed) default
+  // never sticks, and an unmonitored tab is never auto-selected.
+  if (!focusCategory && (tabCoverage(state.tab) === 'no_feed' || !pools[state.tab].length)) {
+    var monitored = ['gov', 'meetings', 'news'].filter(function (k) { return tabCoverage(k) !== 'no_feed'; });
+    var firstWithItems = null;
+    monitored.some(function (k) { if (pools[k].length) { firstWithItems = k; return true; } });
+    state.tab = firstWithItems || monitored[0] || state.tab;
   }
+
+  // No zero-count tab for a source we don't monitor: hide those tab buttons
+  // entirely (deep links can still land on the state — render() shows the
+  // honest "we don't monitor this yet" line instead of counts).
+  [].forEach.call(document.getElementById('alFilter').querySelectorAll('button'), function (b) {
+    if (tabCoverage(b.dataset.tab) === 'no_feed') b.style.display = 'none';
+  });
 
   function itemsForTab(tab) { return pools[tab] || pools.gov; }
 
@@ -189,7 +215,38 @@ HS.onReady(async function () {
     return a;
   }
 
+  // Honest per-tab empty copy: wired-but-silent says "checked, nothing found";
+  // producing tabs keep the legacy copy (an item can age out of the 14-day
+  // display window while the 90-day coverage window still counts it produced).
+  function emptyStateHtml(tab) {
+    if (tabCoverage(tab) === 'wired_silent') {
+      return '<div class="quiet" style="margin-top:4px"><b>No ' + TAB_LABEL[tab] + ' found from ' + HS.esc(countyLabel)
+        + ' sources in the last 90 days.</b> The feed is connected and checked daily — new items will appear here as soon as they\'re published.</div>';
+    }
+    return '<div class="quiet" style="margin-top:4px"><b>Nothing in this category right now.</b> ' + HS.esc(TAB_EMPTY[tab] || '') + '</div>';
+  }
+
+  function syncControls() {
+    [].forEach.call(document.getElementById('alFilter').querySelectorAll('button'), function (b) {
+      b.classList.toggle('on', b.dataset.tab === state.tab);
+    });
+    document.getElementById('alSortSelect').value = state.sort;
+  }
+
   function render() {
+    if (tabCoverage(state.tab) === 'no_feed') {
+      // Unmonitored source (deep link only — the tab button is hidden): never a
+      // bare 0 implying we checked a source we don't have. No stat tiles, no
+      // groups — one honest line.
+      document.getElementById('alStrip').innerHTML = '';
+      document.getElementById('alBand').innerHTML = '';
+      document.getElementById('alQuiet').innerHTML = '';
+      document.getElementById('alGroups').innerHTML =
+        '<div class="quiet" style="margin-top:4px"><b>We don\'t monitor ' + TAB_LABEL[state.tab] + ' for ' + HS.esc(countyLabel)
+        + ' yet.</b> When a first-party source is wired for this area, this section will appear with real records.</div>';
+      syncControls();
+      return;
+    }
     var items = itemsForTab(state.tab);
     var buckets = paintStrip(items);
     var open = buckets.open, rest = buckets.rest, quiet = buckets.quiet;
@@ -210,19 +267,14 @@ HS.onReady(async function () {
       return '<div class="groupHead" data-category="' + HS.esc(g) + '"><span class="gd ' + col + '"></span> ' + HS.esc(g)
         + ' <span class="gc">— ' + groups[g].length + ' change' + (groups[g].length===1?'':'s') + '</span></div>'
         + groups[g].map(function(ch){ return HS.tpl.storyCard(ch); }).join('');
-    }).join('') : (!open.length && !quiet.length
-      ? '<div class="quiet" style="margin-top:4px"><b>Nothing in this category right now.</b> ' + HS.esc(TAB_EMPTY[tab] || '') + '</div>'
-      : '');
+    }).join('') : (!open.length && !quiet.length ? emptyStateHtml(tab) : '');
 
     document.getElementById('alQuiet').innerHTML = quiet.length ? (
       '<div class="groupHead" style="color:var(--ink-3)"><span class="gd" style="background:var(--line)"></span> Good to know · lower relevance to you</div>'
       + '<div class="quiet">' + quiet.map(function(q){return '<b>' + HS.esc(q.title) + '</b>';}).join(' · ')
       + '. &nbsp;Kept out of the main list because they\'re unlikely to affect your home.</div>') : '';
 
-    [].forEach.call(document.getElementById('alFilter').querySelectorAll('button'), function (b) {
-      b.classList.toggle('on', b.dataset.tab === state.tab);
-    });
-    document.getElementById('alSortSelect').value = state.sort;
+    syncControls();
   }
 
   render();
