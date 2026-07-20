@@ -17,6 +17,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js"></script>
+<script src="lib/impact.js"></script>
 <script src="shell.js"></script>
 <script>
 HS.onReady(async function () {
@@ -55,7 +56,9 @@ HS.onReady(async function () {
     + near.map(function (pr) {
         return '<div class="card mini" style="border-left-color:' + HS.barColor(pr) + ';margin-bottom:10px">'
           + '<span class="lens"><span class="sw ' + HS.esc(pr.lens||'value') + '"></span>' + HS.esc(pr.dist||'') + ' · ' + HS.esc(pr.status.toLowerCase()) + '</span>'
-          + '<h3>' + HS.esc(pr.name) + '</h3><p class="sowhat"><b>Effect on this home:</b> ' + HS.esc(pr.sowhat||'') + '</p>'
+          + '<h3>' + HS.esc(pr.name) + '</h3>'
+          + HS.tpl.devImpactBlock(pr)
+          + '<p class="sowhat"><b>Effect on this home:</b> ' + HS.esc(pr.sowhat||'') + '</p>'
           + '<div class="impacts">' + HS.tpl.impactChips(pr.impact_dimensions) + '</div></div>';
       }).join('')
     + '</div>'

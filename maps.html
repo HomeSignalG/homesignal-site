@@ -265,6 +265,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js"></script>
+<script src="lib/impact.js"></script>
 <script src="lib/why.js"></script>
 <script src="lib/map.js?v=20260720b"></script>
 <script src="shell.js"></script>
@@ -590,6 +591,7 @@ HS.onReady(async function () {
           + '<span class="lens"><span class="letter" style="background:' + col + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px" aria-hidden="true">' + it._letter + '</span>&nbsp; '
           + HS.esc(mk.typeLabel || it.type || it.category || '') + (st ? ' · ' + st : '') + (it.dist ? ' · ' + HS.esc(it.dist) : '') + '</span>'
           + '<h3>' + HS.esc(it.name || it.title) + '</h3>'
+          + HS.tpl.devImpactBlock(it)
           + '<p class="sowhat">' + HS.esc(it.sowhat || it.plain_language || '') + '</p></div>';
       }).join('');
     // Area-wide notices — real records, no map letter, whole-area (never plotted at a fake point).

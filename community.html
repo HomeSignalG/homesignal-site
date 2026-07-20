@@ -17,6 +17,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js"></script>
+<script src="lib/impact.js"></script>
 <script src="shell.js"></script>
 <script>
 HS.onReady(async function () {
@@ -129,7 +130,8 @@ HS.onReady(async function () {
     + (projects.length ? topProjects.slice(0,3).map(function(p){
         return '<div class="card mini" style="border-left-color:' + HS.barColor(p) + ';margin-bottom:10px">'
           + '<span class="lens">' + HS.esc(p.status) + ' · ' + HS.esc(p.dist||'') + '</span><h3>' + HS.esc(p.name) + '</h3>'
-          + '<p class="sowhat">' + HS.esc(p.sowhat||'') + '</p></div>';
+          + HS.tpl.devImpactBlock(p)
+          + '<p class="sowhat"><b>' + (p.sowhat_factual ? 'On the record:' : 'How it impacts you:') + '</b> ' + HS.esc(p.sowhat||'') + '</p></div>';
       }).join('') : '<div class="quiet" style="margin-bottom:10px;font-size:12.5px">No permit or planning records on file for this ZIP yet — the regulated-facility record below is the current public-record floor.</div>')
     + facHtml
     + '<div class="groupHead"><span class="gd water"></span> Environment &amp; utilities <span class="gc">— ' + envChanges.length + ' change' + (envChanges.length===1?'':'s') + '</span></div>'
