@@ -33,9 +33,8 @@ update public.users
        unsubscribed = false,
        unsubscribed_at = null;
 
--- 5) Optional: remove digest identity rows entirely (stricter clean slate).
---    Uncomment ONLY if you also want zero public.users rows.
--- delete from public.users;
+-- 5) Remove digest identity rows (stricter clean slate — approved 2026-07-20).
+delete from public.users;
 
 -- 6) NOT TOUCHED (per operator contract):
 --    auth.users, alerts, meetings, feeds, email_events, communities,

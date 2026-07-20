@@ -1,0 +1,37 @@
+name: subscription-reset
+
+# Founder-approved one-time reset (2026-07-20). Exports backup artifact,
+# deletes subscription state, verifies zero rows. auth.users preserved.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - 'cursor/subscription-database-audit-f8ba'
+    paths:
+      - 'scripts/subscription-reset.mjs'
+      - '.github/workflows/subscription-reset.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: https://qwnnmljucajnexpxdgxr.supabase.co
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Export backup and reset subscriptions
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/subscription-reset.mjs
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: subscription-backup-${{ github.run_id }}
+          path: subscription-backup.json
+          retention-days: 90
