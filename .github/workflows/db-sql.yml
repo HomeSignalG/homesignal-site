@@ -67,6 +67,7 @@ jobs:
               headers={
                   "Authorization": f"Bearer {os.environ['SUPABASE_ACCESS_TOKEN']}",
                   "Content-Type": "application/json",
+                  "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) HomeSignal-CI",
               },
               method="POST",
           )
