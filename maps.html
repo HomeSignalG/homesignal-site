@@ -17,7 +17,7 @@
   .maplibregl-popup-content{font-family:var(--font);font-size:13px;border-radius:10px;padding:9px 12px}
   .leaflet-popup-content{font-family:var(--font);font-size:13px}
 
-  /* ── Sprint-1 map MVP: top filters (Projects / Quality of Life) ── */
+  /* ── Sprint-1 map MVP: top filters (Project types / Quality of Life) ── */
   .fwrap{position:relative}
   .fpill.act{border-color:var(--green);color:var(--green);background:var(--green-tint)}
   .fpill .fct{display:inline-flex;min-width:16px;height:16px;padding:0 4px;margin-left:5px;border-radius:999px;
@@ -203,7 +203,7 @@
       </div>
       <div class="sp"></div>
       <div class="fwrap">
-        <button class="fpill" id="projFilterPill" aria-haspopup="true" aria-expanded="false">◈ Projects ▾</button>
+        <button class="fpill" id="projFilterPill" aria-haspopup="true" aria-expanded="false">◈ Project types ▾</button>
         <div class="fmenu" id="projMenu" hidden></div>
       </div>
       <div class="fwrap">
@@ -309,7 +309,7 @@ HS.onReady(async function () {
   var lastItems = [];    // most recent lettered set, so panel re-renders without a map redraw
   var deepApplied = false;
 
-  // Distinct real project types + which pin-shapes appear, for the Projects filter + shape legend.
+  // Distinct real project types + which pin-shapes appear, for the Project types filter + shape legend.
   var PROJECT_TYPES = projects.map(function (p) { return p.type; })
     .filter(function (t, i, a) { return t && a.indexOf(t) === i; }).sort();
   var shapesPresent = {};
@@ -472,14 +472,16 @@ HS.onReady(async function () {
   }
 
   function buildFilters() {
-    // Projects (by type) — real types present in this ZIP's data.
+    // Projects (by type) — real types present in this ZIP's data. Toolbar label is
+    // "Project types" (not "Projects") so it is never confused with the retired
+    // show-on-map layer toggle.
     var projMenu = document.getElementById('projMenu');
     var projPill = document.getElementById('projFilterPill');
     var neutral = HS.markerRegistry.neutralHex;
     if (!PROJECT_TYPES.length) {
       projPill.style.opacity = '.5'; projPill.title = 'No project records to filter for this area yet';
     } else {
-      projMenu.innerHTML = '<div class="fh">Show project types</div>'
+      projMenu.innerHTML = '<div class="fh">Project types</div>'
         + PROJECT_TYPES.map(function (t) {
             var mk = HS.resolveMarker({ type: t });
             return '<label><input type="checkbox" data-type="' + HS.esc(t) + '">'
@@ -542,7 +544,7 @@ HS.onReady(async function () {
     var pn = opts.types ? opts.types.size : 0, qn = opts.qol ? opts.qol.size : 0;
     var pp = document.getElementById('projFilterPill'), qp = document.getElementById('qolFilterPill');
     pp.classList.toggle('act', !!pn);
-    pp.innerHTML = '◈ Projects' + (pn ? ' <span class="fct">' + pn + '</span>' : '') + ' ▾';
+    pp.innerHTML = '◈ Project types' + (pn ? ' <span class="fct">' + pn + '</span>' : '') + ' ▾';
     qp.classList.toggle('act', !!qn);
     qp.innerHTML = '❋ Quality of Life' + (qn ? ' <span class="fct">' + qn + '</span>' : '') + ' ▾';
   }
@@ -1433,7 +1435,7 @@ HS.onReady(async function () {
     drawTiles();
   });
 
-  // Map-view radius: a dropdown menu (matches the Projects / Quality of Life pills),
+  // Map-view radius: a dropdown menu (matches the Project types / Quality of Life pills),
   // not a click-to-cycle — the ▾ opens a real list so every radius is one click away.
   var radii = [0.5,1,1.5,2,3,5], ri = 2;
   (function setupRadiusMenu() {
