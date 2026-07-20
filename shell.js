@@ -81,7 +81,7 @@
     activePropId: LS.get('activeProp', null),
     follows: new Set(LS.get('follows', [])),
     dismissed: new Set(LS.get('dismissed', [])),
-    topicPrefs: LS.get('topicPrefs', {}),
+    topicPrefs: {},   // hydrated in boot() — server for signed-in, localStorage for anonymous
     get activeProperty() {
       // Never a demo/sample home — see lib/data.js::pickActiveProperty (config.js:14-20).
       return HS.pickActiveProperty(this.properties, this.activePropId);
@@ -285,6 +285,8 @@
         $('authForm').classList.add('hidden'); $('authDone').classList.remove('hidden');
         // reflect the new session in the top bar without a full reload
         try { const s = await HS.sb().auth.getSession(); if (s && s.data && s.data.session) state.session = s.data.session; } catch (e) {}
+        await hydrateTopicPrefs();
+        HS.paintTopicCounts();
         paintTopbar();
         setTimeout(() => {
           HS.closeModal('authModal');
@@ -714,6 +716,54 @@
       '<button class="wchip" type="button" onclick="HS.openLoc()" style="cursor:pointer;border-style:dashed">＋ Add a zip code</button></div>';
   };
 
+  // -------------------------------------------------- topic prefs (hydrate) -----
+  // Signed-in: app_topic_prefs is source of truth; localStorage is a write-through
+  // cache stamped with topicPrefsUid so a second account never inherits the first.
+  // Anonymous: localStorage only until login, then server wins on hydrate.
+  const TOPIC_PREF_CATS = ['gov', 'meetings', 'news', 'dev'];
+  function topicPrefsFromRows(rows) {
+    const prefs = {};
+    (rows || []).forEach(row => {
+      prefs[row.category] = {
+        topics: Array.isArray(row.topics) ? row.topics.slice() : [],
+        share_consent: !!row.share_consent
+      };
+    });
+    return prefs;
+  }
+  function cacheTopicPrefs(prefs, userId) {
+    LS.set('topicPrefs', prefs);
+    if (userId) LS.set('topicPrefsUid', userId);
+    else { try { localStorage.removeItem('hs:topicPrefsUid'); } catch (e) {} }
+  }
+  async function hydrateTopicPrefs() {
+    if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) {
+      state.topicPrefs = LS.get('topicPrefs', {});
+      return;
+    }
+    const uid = state.session.user.id;
+    try {
+      const res = await HS.sb().from('app_topic_prefs')
+        .select('category, topics, share_consent')
+        .eq('user_id', uid);
+      if (res.error) throw res.error;
+      state.topicPrefs = topicPrefsFromRows(res.data);
+      cacheTopicPrefs(state.topicPrefs, uid);
+    } catch (e) {
+      console.warn('topic-prefs hydrate', e);
+      state.topicPrefs = {};
+      cacheTopicPrefs({}, uid);
+    }
+  }
+  HS.paintTopicCounts = function () {
+    TOPIC_PREF_CATS.forEach(k => {
+      const pref = state.topicPrefs[k];
+      const n = pref && pref.topics ? pref.topics.length : 0;
+      const el = $('cc-' + k);
+      if (el) el.textContent = n + ' topic' + (n === 1 ? '' : 's') + ' followed';
+    });
+  };
+
   // -------------------------------------------------- topic picker ------------
   // Category -> delivery pipeline (VERBATIM from the pre-promotion community.html /
   // topics.js — the word-for-word matching rule). `dev` has NO delivery pipeline:
@@ -766,7 +816,7 @@
     const chips = [...document.querySelectorAll('#tmGrid .tchip.on span:last-child')].map(s => s.textContent);
     const cats = HS.data.topicCategories();
     state.topicPrefs[TCUR] = { topics: chips, share_consent: $('tmConsent').checked };
-    LS.set('topicPrefs', state.topicPrefs);
+    cacheTopicPrefs(state.topicPrefs, state.session && state.session.user && state.session.user.id);
     await persistTopics(TCUR, chips, $('tmConsent').checked);
     // THE signup write: users row + user_subscriptions via signup_complete — the
     // thing that makes digest emails actually deliver. FAIL LOUD: if it errors,
@@ -779,7 +829,7 @@
       if (m) m.textContent = "Couldn't save your alerts — please try again. (" + ((e && e.message) || 'save error') + ')';
       return;
     }
-    const cc = $('cc-' + TCUR); if (cc) cc.textContent = chips.length + ' topic' + (chips.length === 1 ? '' : 's') + ' followed';
+    HS.paintTopicCounts();
     $('tmForm').classList.add('hidden');
     $('tmDoneMsg').textContent = "You'll be alerted about " + chips.length + ' ' + cats[TCUR].title.toLowerCase() + ' topic' + (chips.length === 1 ? '' : 's') + '.';
     $('tmDone').classList.remove('hidden');
@@ -1004,6 +1054,7 @@
     captureReferral();          // first-touch attribution, before anything can fail
     await injectShell();
     await bootSession();
+    await hydrateTopicPrefs();
     await syncFollowsFromAccount();
     state.properties = await HS.data.properties();
     if (!state.activePropId && state.properties[0]) state.activePropId = state.properties[0].id;
