@@ -321,7 +321,7 @@
   .topicsec{background:#fff;border:1px solid var(--line);border-radius:15px;padding:18px 20px;box-shadow:var(--shadow-sm);margin-bottom:22px}
   .topicsec .th{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap}
   .topicsec .th h2{font-size:15px;margin:0}
-  .tcats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .tcats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
   .tcat{border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left;background:#fff;cursor:pointer}
   .tcat:hover{border-color:var(--green);background:var(--green-tint)}
   .tcat .ci{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:15px;margin-bottom:10px;color:#fff}
