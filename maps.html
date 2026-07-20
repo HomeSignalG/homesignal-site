@@ -1082,8 +1082,12 @@ HS.onReady(async function () {
     });
     glMap.on('load', function(){
       glMap.addSource('radius',{type:'geojson',data:circle(center.lat,center.lng,opts.radiusMi)});
-      glMap.addLayer({id:'radius-fill',type:'fill',source:'radius',paint:{'fill-color':'#157a49','fill-opacity':0.08}});
-      glMap.addLayer({id:'radius-line',type:'line',source:'radius',paint:{'line-color':'#157a49','line-width':2,'line-opacity':0.7,'line-dasharray':[2,2]}});
+      // A white casing UNDER the green dashed line so the ring reads on any basemap —
+      // satellite imagery and street tiles are busy, and a bare thin green line
+      // vanishes into them (why the ring looked "missing" outside the Impact view).
+      glMap.addLayer({id:'radius-fill',type:'fill',source:'radius',paint:{'fill-color':'#157a49','fill-opacity':0.10}});
+      glMap.addLayer({id:'radius-casing',type:'line',source:'radius',paint:{'line-color':'#ffffff','line-width':5,'line-opacity':0.85}});
+      glMap.addLayer({id:'radius-line',type:'line',source:'radius',paint:{'line-color':'#157a49','line-width':2.5,'line-opacity':1,'line-dasharray':[2,2]}});
       glReady=true; drawGL();
     });
   }
@@ -1099,8 +1103,9 @@ HS.onReady(async function () {
     glMap.setLayoutProperty('sat','visibility', opts.mode==='satellite'?'visible':'none');
     glMap.setLayoutProperty('osm','visibility', opts.mode==='street'?'visible':'none');
     glMap.getSource('radius').setData(opts.showRadius ? circle(center.lat,center.lng,opts.radiusMi) : {type:'FeatureCollection',features:[]});
-    glMap.setLayoutProperty('radius-fill','visibility', opts.showRadius?'visible':'none');
-    glMap.setLayoutProperty('radius-line','visibility', opts.showRadius?'visible':'none');
+    ['radius-fill','radius-casing','radius-line'].forEach(function(id){
+      glMap.setLayoutProperty(id,'visibility', opts.showRadius?'visible':'none');
+    });
     var wantZoom = zoomFor(opts.radiusMi);
     if (glLastView !== center.lat + ',' + center.lng + '@' + wantZoom) {
       glLastView = center.lat + ',' + center.lng + '@' + wantZoom;
@@ -1173,8 +1178,15 @@ HS.onReady(async function () {
     var lfWantView = center.lat + ',' + center.lng + '@' + zoomFor(opts.radiusMi);
     if (lfLastView !== lfWantView) { lfLastView = lfWantView; lfMap.setView([center.lat, center.lng], zoomFor(opts.radiusMi)); }
     if (lfRadius){ lfMap.removeLayer(lfRadius); lfRadius = null; }
-    if (opts.showRadius) lfRadius = L.circle([center.lat,center.lng], { radius: opts.radiusMi*1609.34,
-      color:'#157a49', weight:2, dashArray:'4 4', fillColor:'#157a49', fillOpacity:0.08 }).addTo(lfMap);
+    if (opts.showRadius) {
+      var rM = opts.radiusMi*1609.34;
+      // White casing under the green dashed ring — same reason as the GL map: a bare
+      // thin green line disappears into satellite imagery / street tiles.
+      lfRadius = L.layerGroup([
+        L.circle([center.lat,center.lng], { radius: rM, color:'#ffffff', weight:5, opacity:0.85, fill:false }),
+        L.circle([center.lat,center.lng], { radius: rM, color:'#157a49', weight:2.5, opacity:1, dashArray:'4 4', fillColor:'#157a49', fillOpacity:0.10 })
+      ]).addTo(lfMap);
+    }
     addLfMarkers(items);
     setGps(items); renderInfo(items);
     wirePanel(drawLF);
