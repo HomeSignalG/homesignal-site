@@ -16,6 +16,7 @@ on:
       - 'maps.html'
       - 'dashboard.html'
       - 'homesignalmap.html'
+      - 'app.css'
       - 'lib/map.js'
       - 'lib/templates.js'
       - 'config.js'

@@ -79,6 +79,45 @@ async function verifyMaps(page, fails) {
   console.log('Fixture resolver summary:', JSON.stringify(fixtureSummary, null, 2));
 }
 
+async function verifyLeafletRing(browser, fails) {
+  // Regression guard for the radius ring on the tile maps. The ring is a Leaflet
+  // VECTOR OVERLAY (an <svg> in a map pane); a broad `.mapwrap svg{width:100%}` rule
+  // once collapsed that overlay to 0x0 with overflow:hidden, silently CLIPPING the ring
+  // (it existed in the DOM but never painted, while HTML marker pins were unaffected).
+  // Headless Chromium uses WebGL -> the MapLibre canvas path, which can't regress this;
+  // block MapLibre so the page falls back to Leaflet and we actually exercise it.
+  const page = await browser.newPage();
+  await page.route(/maplibre-gl@.*\.js/i, (r) => r.abort());
+  try {
+    await gotoWithRetry(page, target);
+    // The overlay <svg> only exists once Leaflet draws a vector layer (the ring).
+    await page.waitForSelector('#maplf .leaflet-overlay-pane svg', { timeout: 30000 });
+    await page.waitForTimeout(1500);
+    const res = await page.evaluate(() => {
+      const glShown = (() => { const g = document.getElementById('mapgl'); return !!(g && getComputedStyle(g).display !== 'none'); })();
+      const svg = document.querySelector('#maplf .leaflet-overlay-pane svg');
+      if (!svg) return { err: 'no-overlay-svg', glShown };
+      const r = svg.getBoundingClientRect();
+      return { glShown, svgW: Math.round(r.width), svgH: Math.round(r.height),
+        ringPaths: document.querySelectorAll('#maplf .leaflet-overlay-pane path').length };
+    });
+    if (res.glShown) {
+      fails.push('Leaflet ring check did not reach the Leaflet fallback (WebGL still active): ' + JSON.stringify(res));
+    } else if (res.err) {
+      fails.push('Leaflet ring: ' + res.err);
+    } else if (!(res.svgW > 0 && res.svgH > 0)) {
+      fails.push('Leaflet overlay SVG collapsed to ' + res.svgW + 'x' + res.svgH +
+        ' — the radius ring is clipped and will not paint (see app.css .mapwrap svg rule).');
+    } else if (res.ringPaths < 1) {
+      fails.push('Leaflet radius-ring path missing: ' + JSON.stringify(res));
+    } else {
+      console.log('Leaflet ring OK: overlay svg ' + res.svgW + 'x' + res.svgH + ', ' + res.ringPaths + ' overlay path(s).');
+    }
+  } finally {
+    await page.close();
+  }
+}
+
 async function verifyDashboard(page, fails) {
   await gotoWithRetry(page, SITE_BASE + DASH_PATH);
   await page.waitForFunction(() => typeof window.HS !== 'undefined' && !!document.getElementById('dashMap'), { timeout: 25000 });
@@ -131,6 +170,7 @@ async function main() {
 
   try {
     await verifyMaps(page, fails);
+    await verifyLeafletRing(browser, fails);
     await verifyDashboard(page, fails);
     await verifyTracker(page, fails);
   } finally {
@@ -142,7 +182,7 @@ async function main() {
     console.error('\nVERIFY FAILED:\n' + fails.join('\n'));
     process.exit(1);
   }
-  console.log('\nmap-markers browser verification passed (Focus, Street, Satellite, Dashboard, Tracker legend).');
+  console.log('\nmap-markers browser verification passed (Focus, Street, Satellite, Leaflet radius ring, Dashboard, Tracker legend).');
 }
 
 main().catch(function (e) {
