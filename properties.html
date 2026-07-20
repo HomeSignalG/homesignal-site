@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>HomeSignal — Properties</title>
+<title>HomeSignal — Saved Places</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
 <link rel="stylesheet" href="app.css">
 </head>
@@ -12,12 +12,12 @@
 <template id="hs-content">
   <div class="page">
     <div class="ph">
-      <div class="eyebrow">Properties</div>
-      <h1>Your properties</h1>
+      <div class="eyebrow">Saved Places</div>
+      <h1>Your Saved Places</h1>
       <p>Follow as many homes as you like — yours, a rental, or a family member's. Each is watched independently, and you're alerted when something changes near any of them.</p>
     </div>
     <div class="strip" id="propStrip"></div>
-    <div class="bt-row"><h2 style="font-size:15px;margin:0">Homes you follow</h2><button class="addbtn" onclick="HS.addHome()">+ Add a home</button></div>
+    <div class="bt-row"><h2 style="font-size:15px;margin:0">Places you follow</h2><button class="addbtn" onclick="HS.addHome()">+ Add a Saved Place</button></div>
     <div class="propgrid" id="propGrid"></div>
   </div>
 </template>
@@ -38,7 +38,7 @@ HS.onReady(async function () {
     projects = await HS.data.projects(S.zip, null);
   } catch (e) {
     console.warn('[properties] data load failed', e);
-    document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load your properties</h1>'
+    document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load your Saved Places</h1>'
       + '<p>Your connection may have dropped, or our data service is briefly unavailable.</p></div>'
       + '<button class="btn primary" onclick="location.reload()">Try again</button>';
     return;
@@ -47,8 +47,8 @@ HS.onReady(async function () {
     ? Math.round(S.properties.reduce(function(s,p){return s+(p.score||0);},0) / S.properties.length) : null;
 
   document.getElementById('propStrip').innerHTML =
-    HS.tpl.statTile(S.properties.length, 'Homes followed', '')
-    + HS.tpl.statTile(changes.filter(function(x){return HS.daysUntil(x.window_closes_at)>=0;}).length, 'Need you across all homes', 'accent')
+    HS.tpl.statTile(S.properties.length, 'Saved Places', '')
+    + HS.tpl.statTile(changes.filter(function(x){return HS.daysUntil(x.window_closes_at)>=0;}).length, 'Need you across all places', 'accent')
     + HS.tpl.statTile(projects.length, 'Nearby projects total', '')
     + (avg != null ? HS.tpl.statTile(avg, 'Avg property score', 'g') : '');
 
@@ -66,7 +66,7 @@ HS.onReady(async function () {
   }).join('')
   + '<div class="propcard" onclick="HS.addHome()" style="border-style:dashed;justify-content:center">'
   + '<div style="text-align:center"><div style="font-size:22px;color:var(--green);line-height:1">＋</div>'
-  + '<div style="font-weight:600;color:var(--ink-2);font-size:13.5px;margin-top:4px">Add another property</div>'
+  + '<div style="font-weight:600;color:var(--ink-2);font-size:13.5px;margin-top:4px">Add another Saved Place</div>'
   + '<div style="font-size:11.5px;color:var(--ink-3)">Free — follow as many as you like</div></div></div>';
 });
 </script>

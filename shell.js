@@ -403,7 +403,7 @@
       }
       const p = HS.realHome();
       if (p) {
-        const tag = HS.isRealHome(p) ? 'Your home' : (p.tag || p.label || 'Your property');
+        const tag = HS.isRealHome(p) ? 'Your home' : (p.tag || p.label || 'Saved place');
         el.textContent = '⌂ ' + tag + ' · ' + HS.homeAddressLine(p);
       } else {
         let c = null;
@@ -417,7 +417,7 @@
 
   HS.openSwitcher = function () {
     const list = $('switcherList'); if (!list) return;
-    $('switcherSub').textContent = "You're following " + state.properties.length + " home" +
+    $('switcherSub').textContent = "You're following " + state.properties.length + " saved place" +
       (state.properties.length === 1 ? '' : 's') + '. Pick one to focus the app on it.';
     list.innerHTML = state.properties.map(p => `
       <div class="swrow ${p.id === state.activePropId ? 'active' : ''}" onclick="HS.switchProperty('${p.id}')">
