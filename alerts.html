@@ -14,7 +14,7 @@
     <div class="ph">
       <div class="eyebrow">Alerts</div>
       <h1>What needs your attention near home</h1>
-      <p>Sorted by how much each change affects your daily life — not by when it arrived.</p>
+      <p id="alSub">Government notices, meetings, and local news for your area.</p>
     </div>
     <div class="strip" id="alStrip"></div>
 
@@ -28,8 +28,19 @@
     </div>
 
     <div class="toolbar">
-      <div class="seg" id="alSort"><button class="on" data-sort="impact">By life impact</button><button data-sort="distance">By distance</button><button data-sort="newest">Newest</button></div>
+      <div class="seg" id="alFilter">
+        <button class="on" data-tab="gov">Government Notices</button>
+        <button data-tab="meetings">Upcoming Meetings</button>
+        <button data-tab="news">Local News</button>
+      </div>
       <div class="sp"></div>
+      <label class="sortctl" for="alSortSelect">Sort:
+        <select id="alSortSelect" aria-label="Sort alerts">
+          <option value="urgency" selected>By urgency</option>
+          <option value="date">By date</option>
+          <option value="distance">By distance</option>
+        </select>
+      </label>
     </div>
 
     <div id="alBand"></div>
@@ -53,10 +64,11 @@ HS.onReady(async function () {
   var focusCategory = qs.get('category');
   var focusId = qs.get('id');
   // Never hang silently: a failed read renders an honest retry state.
-  var c, all;
+  var c, all, meetings;
   try {
     c = await HS.data.community(S.zip);
     all = await HS.data.changes(S.zip, home);
+    meetings = await HS.data.meetings(S.zip, home);
   } catch (e) {
     console.warn('[alerts] data load failed', e);
     document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load your alerts</h1>'
@@ -68,58 +80,130 @@ HS.onReady(async function () {
   // topic counts — state.topicPrefs was hydrated from server (signed-in) or LS (anonymous) in boot()
   HS.paintTopicCounts();
 
-  var open = all.filter(function (x) { var d = HS.daysUntil(x.window_closes_at); return d != null && d >= 0; });
-  var rest = all.filter(function (x) { return open.indexOf(x) < 0 && !x.quiet; });
-  var quiet = all.filter(function (x) { return x.quiet; });
+  var newsTopics = (HS.data.topicCategories().news && HS.data.topicCategories().news.items) || [];
 
-  // strip
-  var nearest = all.slice().sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);})[0];
-  document.getElementById('alStrip').innerHTML =
-    HS.tpl.statTile(open.length, 'Need you soon — windows closing', 'accent')
-    + HS.tpl.statTile(rest.length + open.length, 'Changes worth knowing this week', '')
-    + (c && c.value_trend != null ? HS.tpl.statTile(HS.trend(c.value_trend), 'Your value outlook, next 12 mo', 'g') : '')
-    + HS.tpl.statTile((nearest && nearest.dist ? nearest.dist.replace(' mi','') : '—') + '<span style="font-size:14px;font-weight:600;color:var(--ink-3)">mi</span>', 'Nearest active change', '');
+  function isMeetingMirror(ch) {
+    return /^Public meeting\s*[—–-]/i.test(ch.title || '');
+  }
+  function isNewsItem(ch) {
+    var cat = ch.category || '';
+    return newsTopics.indexOf(cat) !== -1 || /news/i.test(cat);
+  }
+  function isGovNotice(ch) {
+    if (isMeetingMirror(ch) || isNewsItem(ch)) return false;
+    return /planning|government|civic/i.test(ch.category || '')
+      || /^Government notice/i.test(ch.plain_language || '');
+  }
+  function meetingAsChange(m) {
+    var when = m.starts_at ? HS.fmtDate(m.starts_at) : '';
+    return {
+      id: m.id,
+      category: m.category || 'Upcoming Meetings',
+      title: m.title || m.body,
+      plain_language: 'Public meeting' + (when ? ' on ' + when : '') + (m.location ? ' at ' + m.location : '') + '.',
+      occurred_at: m.starts_at,
+      window_closes_at: m.window_closes_at || m.starts_at,
+      source_ref: m.source_ref,
+      related_project_id: m.related_project_id,
+      lens: 'safety',
+      impacts: [],
+      distance_mi: m.distance_mi,
+      dist: m.dist
+    };
+  }
 
-  function sortItems(items, mode) {
+  var pools = {
+    gov: all.filter(isGovNotice),
+    news: all.filter(isNewsItem),
+    meetings: meetings.map(meetingAsChange)
+  };
+
+  function resolveTab(cat) {
+    if (!cat) return 'gov';
+    var key = String(cat).toLowerCase();
+    if (key === 'gov' || key === 'government notices' || key === 'notices') return 'gov';
+    if (key === 'meetings' || key === 'upcoming meetings') return 'meetings';
+    if (key === 'news' || key === 'local news') return 'news';
+  // Legacy deep links used QoL group names (e.g. Government & civic) — route to gov tab.
+    if (/planning|government|civic/i.test(cat)) return 'gov';
+    return 'gov';
+  }
+
+  var state = { tab: resolveTab(focusCategory), sort: 'urgency' };
+
+  function itemsForTab(tab) { return pools[tab] || pools.gov; }
+
+  function paintStrip(items) {
+    var open = items.filter(function (x) { var d = HS.daysUntil(x.window_closes_at); return d != null && d >= 0; });
+    var rest = items.filter(function (x) { return open.indexOf(x) < 0 && !x.quiet; });
+    var nearest = items.slice().sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);})[0];
+    document.getElementById('alStrip').innerHTML =
+      HS.tpl.statTile(open.length, 'Need you soon — windows closing', 'accent')
+      + HS.tpl.statTile(rest.length + open.length, 'In this category', '')
+      + (c && c.value_trend != null ? HS.tpl.statTile(HS.trend(c.value_trend), 'Your value outlook, next 12 mo', 'g') : '')
+      + HS.tpl.statTile((nearest && nearest.dist ? nearest.dist.replace(' mi','') : '—') + '<span style="font-size:14px;font-weight:600;color:var(--ink-3)">mi</span>', 'Nearest in category', '');
+    return { open: open, rest: rest, quiet: items.filter(function (x) { return x.quiet; }) };
+  }
+
+  function sortItems(items, mode, tab) {
     var a = items.slice();
-    if (mode === 'distance') a.sort(function(x,y){return (x.distance_mi||9e9)-(y.distance_mi||9e9);});
-    else if (mode === 'newest') a.sort(function(x,y){return new Date(y.occurred_at)-new Date(x.occurred_at);});
-    else a.sort(function(x,y){return (y.impacts?y.impacts.length:0)-(x.impacts?x.impacts.length:0);});
+    if (mode === 'distance') {
+      a.sort(function(x,y){return (x.distance_mi||9e9)-(y.distance_mi||9e9);});
+    } else if (mode === 'date') {
+      a.sort(function(x,y){return new Date(y.occurred_at||0)-new Date(x.occurred_at||0);});
+    } else if (tab === 'meetings') {
+      a.sort(function(x,y){return new Date(x.occurred_at||0)-new Date(y.occurred_at||0);});
+    } else {
+      a.sort(function(x,y){return (y.impacts?y.impacts.length:0)-(x.impacts?x.impacts.length:0);});
+    }
     return a;
   }
 
-  function render(mode) {
-    // needs-you band
+  function render() {
+    var items = itemsForTab(state.tab);
+    var buckets = paintStrip(items);
+    var open = buckets.open, rest = buckets.rest, quiet = buckets.quiet;
+    var mode = state.sort, tab = state.tab;
+
     document.getElementById('alBand').innerHTML = open.length ? (
       '<div class="band"><div class="band-h"><span class="lab"><span class="dotb"></span>Needs you soon</span>'
       + '<span class="cnt">Action still changes the outcome</span></div>'
-      + sortItems(open, mode).map(function(ch){ return HS.tpl.storyCard(ch).replace('class="card"','class="card inband"'); }).join('')
+      + sortItems(open, mode, tab).map(function(ch){ return HS.tpl.storyCard(ch).replace('class="card"','class="card inband"'); }).join('')
       + '</div>') : '';
 
-    // groups by category
     var groups = {};
-    sortItems(rest, mode).forEach(function (ch) { (groups[ch.category] = groups[ch.category] || []).push(ch); });
-    var dotColor = { 'Traffic & getting around':'traffic','Home value & cost of living':'value','Environment & utilities':'water','Government & civic':'safety','Development':'traffic' };
-    document.getElementById('alGroups').innerHTML = Object.keys(groups).map(function (g) {
+    sortItems(rest, mode, tab).forEach(function (ch) { (groups[ch.category] = groups[ch.category] || []).push(ch); });
+    var dotColor = { 'Traffic & getting around':'traffic','Home value & cost of living':'value','Environment & utilities':'water','Government & civic':'safety','Development':'traffic','Planning & zoning':'traffic','Upcoming Meetings':'safety' };
+    var groupKeys = Object.keys(groups);
+    document.getElementById('alGroups').innerHTML = groupKeys.length ? groupKeys.map(function (g) {
       var col = dotColor[g] || 'traffic';
       return '<div class="groupHead" data-category="' + HS.esc(g) + '"><span class="gd ' + col + '"></span> ' + HS.esc(g)
         + ' <span class="gc">— ' + groups[g].length + ' change' + (groups[g].length===1?'':'s') + '</span></div>'
         + groups[g].map(function(ch){ return HS.tpl.storyCard(ch); }).join('');
-    }).join('');
+    }).join('') : '';
 
-    // quiet
     document.getElementById('alQuiet').innerHTML = quiet.length ? (
       '<div class="groupHead" style="color:var(--ink-3)"><span class="gd" style="background:var(--line)"></span> Good to know · lower relevance to you</div>'
       + '<div class="quiet">' + quiet.map(function(q){return '<b>' + HS.esc(q.title) + '</b>';}).join(' · ')
       + '. &nbsp;Kept out of the main list because they\'re unlikely to affect your home.</div>') : '';
+
+    [].forEach.call(document.getElementById('alFilter').querySelectorAll('button'), function (b) {
+      b.classList.toggle('on', b.dataset.tab === state.tab);
+    });
+    document.getElementById('alSortSelect').value = state.sort;
   }
 
-  render('impact');
+  render();
   applyFocus();
-  document.getElementById('alSort').addEventListener('click', function (e) {
-    var b = e.target.closest('button[data-sort]'); if (!b) return;
-    [].forEach.call(this.querySelectorAll('button'), function(x){x.classList.remove('on');});
-    b.classList.add('on'); render(b.dataset.sort);
+
+  document.getElementById('alFilter').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-tab]'); if (!b) return;
+    state.tab = b.dataset.tab;
+    render();
+  });
+  document.getElementById('alSortSelect').addEventListener('change', function () {
+    state.sort = this.value;
+    render();
   });
 
   // Deep-link focus from Dashboard (band=open, category=..., id=...).
