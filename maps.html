@@ -41,6 +41,16 @@
      SVGs in the legend/filter menus live inside .mapwrap too, so pin them to intrinsic size. */
   #shapeLegend svg,.fmenu svg{width:auto;height:auto;flex:none}
 
+  /* ── Status rows double as show/hide toggles (reuse the .lyr switch) ── */
+  .lyr .lbl{display:flex;align-items:center;gap:9px;color:var(--ink)}
+  .lyr .lbl .ld{width:11px;height:11px;border-radius:50%;flex:none}
+  /* ── empty state: shown when every status toggle is off (never a blank map) ── */
+  #mapEmpty{position:absolute;inset:0;display:grid;place-items:center;z-index:3;pointer-events:none}
+  #mapEmpty[hidden]{display:none}
+  #mapEmpty .msg{pointer-events:auto;max-width:290px;text-align:center;background:rgba(255,255,255,.95);
+    border:1px solid var(--line);border-radius:14px;padding:16px 20px;box-shadow:var(--shadow);
+    font:600 13px/1.5 var(--font);color:var(--ink-2)}
+
   /* ── right INFORMATION panel (list ⇄ 6-section detail), stays on the map ── */
   .pinlist{max-height:none}
   .listhead{font-size:12.5px;color:var(--ink-3);margin:0 4px 12px}
@@ -207,15 +217,20 @@
         <div id="mapgl" style="display:none"></div>
         <div id="maplf" style="display:none"></div>
         <div class="maploading" id="mapLoading">Finding what’s near you…</div>
+        <div id="mapEmpty" hidden><div class="msg">No pin types are selected. Use the legend’s status toggles — Proposed, Approved, Operating, or Regulated facility — to show pins on the map.</div></div>
         <button class="legbtn" id="legToggle" type="button" aria-expanded="false" aria-controls="mapLegend">◧ Legend</button>
         <div class="mpanel" id="mapLegend">
           <!-- HONEST LEGEND (2026-07-16 audit): colors encode PERMIT STATUS — the only
                per-record fact the data carries. Shapes encode project TYPE (Sprint-1). -->
+          <!-- Each status row is also a show/hide switch (same .tg toggle as "Show on
+               Map"). State lives on the shared backbone (HS.*StatusFilter*, persisted),
+               so a resident's choice applies on every ZIP page and survives radius
+               changes / navigation. -->
           <div class="mt">Status — pin color</div>
-          <div class="legrow"><span class="ld" style="background:#c47a1a"></span> Proposed</div>
-          <div class="legrow"><span class="ld" style="background:#3f7fb0"></span> Approved</div>
-          <div class="legrow"><span class="ld" style="background:#1f9d5c"></span> Operating / built</div>
-          <div class="legrow" id="legFacility" style="display:none"><span class="ld" style="background:#6f42c1;border-radius:2px"></span> Regulated facility</div>
+          <div class="lyr" id="sttProposed"><span class="lbl"><span class="ld" style="background:#c47a1a"></span> Proposed</span><span class="tg"></span></div>
+          <div class="lyr" id="sttApproved"><span class="lbl"><span class="ld" style="background:#3f7fb0"></span> Approved</span><span class="tg"></span></div>
+          <div class="lyr" id="sttOperating"><span class="lbl"><span class="ld" style="background:#1f9d5c"></span> Operating / built</span><span class="tg"></span></div>
+          <div class="lyr" id="legFacility" style="display:none"><span class="lbl"><span class="ld" style="background:#6f42c1;border-radius:2px"></span> Regulated facility</span><span class="tg"></span></div>
           <div class="shapeleg" id="shapeLegWrap" style="display:none">
             <div class="mt">Type — pin shape</div>
             <div id="shapeLegend"></div>
@@ -223,7 +238,6 @@
           <div class="layers">
             <div class="mt">Show on Map</div>
             <div class="lyr" id="lyrProjects"><span>Projects</span><span class="tg"></span></div>
-            <div class="lyr" id="lyrFacilities" style="display:none"><span>Regulated facilities</span><span class="tg"></span></div>
             <div class="lyr" id="lyrRadius"><span>Radius ring</span><span class="tg"></span></div>
           </div>
         </div>
@@ -308,9 +322,8 @@ HS.onReady(async function () {
   // ones — a facility with no stored coordinate still exists and still gets its dossier row.
   var facRows = (facilities || []).slice()
     .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
-  if (facs.length) {   // reveal the facilities legend + layer toggle only when there are any
+  if (facs.length) {   // reveal the "Regulated facility" status toggle only when there are any
     var _lf = document.getElementById('legFacility'); if (_lf) _lf.style.display = '';
-    var _lyf = document.getElementById('lyrFacilities'); if (_lyf) _lyf.style.display = '';
   }
   // "What's Changed" (Sprint 7): entries derived ONLY from dates the records
   // carry (filings / upcoming hearings / recorded notices) — HS.recentChanges
@@ -396,14 +409,19 @@ HS.onReady(async function () {
   }
 
   function shownItems() {
+    // The legend's per-status toggles gate which pins appear; state lives on the
+    // shared backbone (HS.*StatusFilter*, persisted) so the choice survives radius
+    // changes / navigation. The "Regulated facility" status toggle now stands in for
+    // the retired "Regulated facilities" layer toggle.
+    opts.showFacilities = HS.getStatusFilters().facility;
     var a = opts.showProjects ? all : all.filter(function(x){return !x.type;});
     // "What's Changed" narrows the map to records with a real in-window change
     // entry. Facilities carry no change data, so they don't reserve slots here.
     if (opts.view === 'changed') a = a.filter(function (x) { return changedIds[x.id]; });
-    a = a.filter(function (x) { return passType(x) && passQol(x); });
+    a = a.filter(function (x) { return passType(x) && passQol(x) && HS.statusVisible(x); });
     // Facilities reserve a FLOOR of lettered slots (min(4,#facs)) so the closest
     // regulated facilities are always surfaced alongside development — de-duped, cap 16.
-    var facPins = (opts.view === 'changed') ? [] : (opts.showFacilities ? facs : []);
+    var facPins = (opts.view === 'changed' || !opts.showFacilities) ? [] : facs;
     var out = HS.reserveFacilitySlots(a, facPins, { cap: 16, floor: 4, letters: LET });
     // Live-verification hook (scripts/verify-maps.mjs, runs on a real runner with egress):
     // the lettered pin set + how many mappable facilities exist, so CI can assert the
@@ -869,7 +887,14 @@ HS.onReady(async function () {
   // can be shown separately as "other recorded effects").
   function anyQol(d) { return Object.keys(HS.qolOf({ impact_dimensions: [d] })).length > 0; }
 
+  // When every status toggle is off the map is intentionally empty — say so, rather
+  // than showing a blank map with no explanation.
+  function updateEmptyState(){
+    var el = document.getElementById('mapEmpty');
+    if (el) el.hidden = !HS.allStatusesOff();
+  }
   function setGps(items){
+    updateEmptyState();
     var place = c ? ((HS.isSample && HS.isSample()) ? c.name + ' — (Sample Zip Code)' : c.name + ', ' + c.state) : 'Your area';
     if (opts.view === 'changed') {
       gpsEl.textContent = place + ' · ' + items.length + ' recent change' + (items.length === 1 ? '' : 's')
@@ -877,10 +902,13 @@ HS.onReady(async function () {
       updateHomePrompt();
       return;
     }
-    var total = opts.showProjects ? all.length : all.filter(function(x){return !x.type;}).length;
+    // Count only pins whose status toggle is currently ON, so the caption tracks
+    // exactly what's visible on the map.
+    var vis = all.filter(function(x){ return HS.statusVisible(x); });
+    var total = opts.showProjects ? vis.length : vis.filter(function(x){return !x.type;}).length;
     var txt;
     if (hasRealHome) {
-      var pool = opts.showProjects ? all : all.filter(function(x){return !x.type;});
+      var pool = opts.showProjects ? vis : vis.filter(function(x){return !x.type;});
       var within = pool.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;
       txt = within + ' within ' + opts.radiusMi + ' mi of ' + home.address;
     } else {
@@ -920,10 +948,15 @@ HS.onReady(async function () {
     }
     asSwitch(document.getElementById('lyrProjects'), opts.showProjects, function(){ opts.showProjects=!opts.showProjects; redrawFn(); });
     asSwitch(document.getElementById('lyrRadius'), opts.showRadius, function(){ opts.showRadius=!opts.showRadius; redrawFn(); });
-    var lyf = document.getElementById('lyrFacilities');
-    if (lyf && facs.length) {
-      asSwitch(lyf, opts.showFacilities, function(){ opts.showFacilities=!opts.showFacilities; redrawFn(); });
-    }
+    // Status rows reuse the SAME switch component. Their on/off state is the shared,
+    // persisted backbone state (HS.*StatusFilter*) — the "Regulated facility" row
+    // replaces the old "Regulated facilities" layer toggle.
+    var sf = HS.getStatusFilters();
+    [['sttProposed','proposed'],['sttApproved','approved'],['sttOperating','operating'],['legFacility','facility']]
+      .forEach(function(pair){
+        var el = document.getElementById(pair[0]); if (!el) return;
+        asSwitch(el, sf[pair[1]], function(){ HS.setStatusFilter(pair[1], !HS.getStatusFilters()[pair[1]]); redrawFn(); });
+      });
   }
 
   // ---------- impact diagram (schematic SVG — the fallback view) ----------
