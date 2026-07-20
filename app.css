@@ -228,6 +228,12 @@
   .mapcols{display:grid;grid-template-columns:1fr 350px;gap:16px;align-items:start}
   .mapwrap{position:relative;border:1px solid var(--line);border-radius:15px;overflow:hidden;box-shadow:var(--shadow-sm);background:#e4eadd}
   .mapwrap svg{display:block;width:100%;height:auto}
+  /* ...but Leaflet draws its vector overlay (the radius ring, polylines, etc.) as an
+     <svg> inside its own map panes. The rule above would size that overlay to width:100%
+     of a 0-width pane -> a 0x0 svg with overflow:hidden, which CLIPS everything Leaflet
+     draws (the radius ring existed in the DOM but never painted on the tile maps). Let
+     Leaflet size its own overlay SVG via its width/height attributes. */
+  .mapwrap .leaflet-pane svg{width:auto;height:auto}
   .mpanel{position:absolute;top:14px;left:14px;background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:12px;padding:13px 15px;box-shadow:var(--shadow);width:196px}
   .mpanel .mt{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin:0 0 9px}
   .legrow{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink);margin-bottom:8px}
