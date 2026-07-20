@@ -42,6 +42,7 @@
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="lib/data.js"></script>
+<script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js"></script>
 <script src="shell.js"></script>
 <script>
@@ -60,16 +61,8 @@ HS.onReady(async function () {
     return;
   }
 
-  // topic counts
-  var cats = HS.data.topicCategories();
-  ['gov','meetings','news'].forEach(function (k) {
-    var pref = S.topicPrefs[k];
-    // STRICT OPT-IN: no saved picks = 0 followed. Never display the old seed
-    // defaults as "followed" — that claims subscriptions the user never chose.
-    var n = pref ? pref.topics.length : 0;
-    var el = document.getElementById('cc-' + k);
-    if (el) el.textContent = n + ' topic' + (n===1?'':'s') + ' followed';
-  });
+  // topic counts — state.topicPrefs was hydrated from server (signed-in) or LS (anonymous) in boot()
+  HS.paintTopicCounts();
 
   var open = all.filter(function (x) { var d = HS.daysUntil(x.window_closes_at); return d != null && d >= 0; });
   var rest = all.filter(function (x) { return open.indexOf(x) < 0 && !x.quiet; });
