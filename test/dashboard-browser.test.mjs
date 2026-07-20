@@ -132,9 +132,9 @@ try {
   // Projects near you navigation + back (context H)
   await page.locator('#dashStrip a.stat-link').first().click();
   await page.waitForURL(/development\.html/, { timeout: 15000 });
-  await page.waitForSelector('.lenscard.on', { timeout: 15000 });
+  await page.waitForSelector('#devSort button.on', { timeout: 15000 });
   ok(page.url().includes('zip=78617') && page.url().includes('sort=distance'), 'Projects click lands on development with sort');
-  ok(await page.locator('.lenscard.on').count() === 1, 'development shows one active lens');
+  ok(await page.locator('#devSort button.on').getAttribute('data-sort') === 'distance', 'development shows Distance sort active');
   await page.goBack();
   await page.waitForURL(/dashboard\.html/, { timeout: 15000 });
 
@@ -144,12 +144,12 @@ try {
   ok(await page.locator('#alBand').count() >= 0, 'alerts page loaded with band=open');
   await page.goBack();
 
-  // Growth pressure → lens=2
+  // Growth pressure → lens=2 (distance sort via deep link)
   const growth = page.locator('#dashStrip a.stat-link').filter({ hasText: 'Growth pressure' });
   if (await growth.count()) {
     await growth.click();
     await page.waitForURL(/development\.html.*lens=2/, { timeout: 15000 });
-    ok(await page.locator('.lenscard.on').getAttribute('data-lens') === '2', 'lens=2 activates third lens');
+    await page.waitForSelector('#devSort button.on[data-sort="distance"]', { timeout: 15000 });
     ok(await page.locator('#devSort button.on').count() === 1, 'lens=2 shows exactly one active sort button');
     ok(await page.locator('#devSort button.on').getAttribute('data-sort') === 'distance',
       'lens=2 highlights Distance sort only');
@@ -175,7 +175,6 @@ try {
 
   // Destination: development invalid lens/sort
   await page.goto(base + '/development.html?data=seed&zip=78617&lens=99&sort=bogus', { waitUntil: 'networkidle' });
-  ok(await page.locator('.lenscard.on').getAttribute('data-lens') === '0', 'invalid lens falls back to 0');
   ok(await page.locator('#devSort button.on').getAttribute('data-sort') === 'impact', 'invalid sort falls back to impact');
 
   // Destination: community invalid focus
