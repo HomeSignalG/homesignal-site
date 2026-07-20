@@ -197,7 +197,10 @@
         <button class="fpill" id="qolFilterPill" aria-haspopup="true" aria-expanded="false">❋ Quality of Life ▾</button>
         <div class="fmenu" id="qolMenu" hidden></div>
       </div>
-      <button class="fpill" id="radiusPill">◉ Map view: 1.5 mi ▾</button>
+      <div class="fwrap">
+        <button class="fpill" id="radiusPill" aria-haspopup="true" aria-expanded="false">◉ Map view: 1.5 mi ▾</button>
+        <div class="fmenu" id="radiusMenu" hidden></div>
+      </div>
       <button class="fpill" id="listPill" aria-expanded="false" aria-controls="infoSlide">☰ List</button>
       <a class="fpill" id="hs-map-cross" data-znav="homesignalmap.html" href="homesignalmap.html" style="text-decoration:none;display:inline-flex;align-items:center">◈ Development tracker</a>
     </div>
@@ -369,8 +372,8 @@ HS.onReady(async function () {
   // with no menu open) backs out of the project detail to the list.
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
-    var menuOpen = ['projMenu', 'qolMenu'].some(function (id) {
-      var m = document.getElementById(id); return m && !m.hasAttribute('hidden');
+    var menuOpen = [].some.call(document.querySelectorAll('.fmenu'), function (m) {
+      return !m.hasAttribute('hidden');
     });
     if (menuOpen) { closeAllMenus(); return; }
     if (selected) { var bk = document.getElementById('infoBack'); if (bk) bk.click(); return; }
@@ -511,8 +514,8 @@ HS.onReady(async function () {
     menu.addEventListener('click', function (e) { e.stopPropagation(); });
   }
   function closeAllMenus() {
-    ['projMenu', 'qolMenu'].forEach(function (id) { var m = document.getElementById(id); if (m) m.setAttribute('hidden', ''); });
-    ['projFilterPill', 'qolFilterPill'].forEach(function (id) { var p = document.getElementById(id); if (p) p.setAttribute('aria-expanded', 'false'); });
+    [].forEach.call(document.querySelectorAll('.fmenu'), function (m) { m.setAttribute('hidden', ''); });
+    [].forEach.call(document.querySelectorAll('.fpill[aria-haspopup]'), function (p) { p.setAttribute('aria-expanded', 'false'); });
   }
   document.addEventListener('click', closeAllMenus);
   function refreshFilterPills() {
@@ -1264,12 +1267,27 @@ HS.onReady(async function () {
     drawTiles();
   });
 
+  // Map-view radius: a dropdown menu (matches the Projects / Quality of Life pills),
+  // not a click-to-cycle — the ▾ opens a real list so every radius is one click away.
   var radii = [0.5,1,1.5,2,3,5], ri = 2;
-  document.getElementById('radiusPill').onclick = function () {
-    ri = (ri + 1) % radii.length; opts.radiusMi = radii[ri];
-    this.textContent = '◉ Map view: ' + opts.radiusMi + ' mi ▾';
-    if (opts.mode === 'impact') showSchematic(); else drawTiles();
-  };
+  (function setupRadiusMenu() {
+    var pill = document.getElementById('radiusPill');
+    var menu = document.getElementById('radiusMenu');
+    function renderPill() { pill.innerHTML = '◉ Map view: ' + opts.radiusMi + ' mi ▾'; }
+    menu.innerHTML = '<div class="fh">Map view radius</div>'
+      + radii.map(function (r, i) {
+          return '<label><input type="radio" name="hsradius" data-i="' + i + '"'
+            + (i === ri ? ' checked' : '') + '><span>' + r + ' mi</span></label>';
+        }).join('');
+    wireMenu(pill, menu);
+    menu.addEventListener('change', function (e) {
+      var cb = e.target.closest('input[data-i]'); if (!cb) return;
+      ri = +cb.getAttribute('data-i'); opts.radiusMi = radii[ri];
+      renderPill();
+      closeAllMenus();
+      if (opts.mode === 'impact') showSchematic(); else drawTiles();
+    });
+  })();
 });
 
 // A small .ics generator for the Public Participation "Add hearing to calendar" button.
