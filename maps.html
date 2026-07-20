@@ -1022,6 +1022,13 @@ HS.onReady(async function () {
                      get lfTilesOK(){return lfTilesOK;}, get lfErrs(){return lfTileErrs;},
                      get lfFailed(){return lfFailed;} };
   function circle(lat, lng, rMi){
+    // Coerce to numbers FIRST: a home loaded from the DB (app_properties) can arrive
+    // with lat/lng as STRINGS. The `lng + …` / `lat + …` below is numeric addition —
+    // with a string it becomes concatenation ("-97.60" + 0.02 = "-97.600.02"), which
+    // produces invalid GeoJSON and MapLibre silently draws no ring (markers still show
+    // because MapLibre's setLngLat coerces internally). This was the "ring missing on
+    // Satellite/Street" bug.
+    lat = +lat; lng = +lng; rMi = +rMi;
     var pts=[], R=rMi/69.0, cs=Math.cos(lat*Math.PI/180);
     for(var i=0;i<=64;i++){var a=i/64*2*Math.PI; pts.push([lng + (R*Math.sin(a))/cs, lat + R*Math.cos(a)]);}
     return {type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'Polygon',coordinates:[pts]}}]};
@@ -1215,12 +1222,12 @@ HS.onReady(async function () {
     if (lfLastView !== lfWantView) { lfLastView = lfWantView; lfMap.setView([center.lat, center.lng], zoomFor(opts.radiusMi)); }
     if (lfRadius){ lfMap.removeLayer(lfRadius); lfRadius = null; }
     if (opts.showRadius) {
-      var rM = opts.radiusMi*1609.34;
+      var rM = opts.radiusMi*1609.34, clat=+center.lat, clng=+center.lng;   // coerce: DB home coords may be strings
       // White casing under the green dashed ring — same reason as the GL map: a bare
       // thin green line disappears into satellite imagery / street tiles.
       lfRadius = L.layerGroup([
-        L.circle([center.lat,center.lng], { radius: rM, color:'#ffffff', weight:5, opacity:0.85, fill:false }),
-        L.circle([center.lat,center.lng], { radius: rM, color:'#157a49', weight:2.5, opacity:1, dashArray:'4 4', fillColor:'#157a49', fillOpacity:0.10 })
+        L.circle([clat,clng], { radius: rM, color:'#ffffff', weight:5, opacity:0.85, fill:false }),
+        L.circle([clat,clng], { radius: rM, color:'#157a49', weight:2.5, opacity:1, dashArray:'4 4', fillColor:'#157a49', fillOpacity:0.10 })
       ]).addTo(lfMap);
     }
     addLfMarkers(items);
