@@ -24,7 +24,6 @@
         <button class="tcat" onclick="HS.openTopics('gov')"><div class="ci" style="background:var(--red)">▤</div><h4>Government Notices</h4><div class="cc" id="cc-gov">—</div><div class="cd">click to change</div></button>
         <button class="tcat" onclick="HS.openTopics('meetings')"><div class="ci" style="background:var(--amber)">▦</div><h4>Upcoming Meetings</h4><div class="cc" id="cc-meetings">—</div><div class="cd">click to change</div></button>
         <button class="tcat" onclick="HS.openTopics('news')"><div class="ci" style="background:var(--blue)">✉</div><h4>Local News</h4><div class="cc" id="cc-news">—</div><div class="cd">click to change</div></button>
-        <button class="tcat" onclick="HS.openTopics('dev')"><div class="ci" style="background:var(--green-2)">◈</div><h4>Development</h4><div class="cc" id="cc-dev">—</div><div class="cd">click to change</div></button>
       </div>
     </div>
 
@@ -63,7 +62,7 @@ HS.onReady(async function () {
 
   // topic counts
   var cats = HS.data.topicCategories();
-  ['gov','meetings','news','dev'].forEach(function (k) {
+  ['gov','meetings','news'].forEach(function (k) {
     var pref = S.topicPrefs[k];
     // STRICT OPT-IN: no saved picks = 0 followed. Never display the old seed
     // defaults as "followed" — that claims subscriptions the user never chose.

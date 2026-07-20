@@ -25,7 +25,7 @@
         'Planning, zoning & development',
         'Elections & voting',
         'Public safety & emergencies',
-        'Water companies',
+        'Water districts & utilities',
         'Stratos data center project',
         'Property taxes & assessments',
         'City government (Brigham City)',
@@ -47,7 +47,7 @@
         'Planning, zoning & development',
         'Property taxes & assessments',
         'Public safety & emergencies',
-        'Water companies',
+        'Water districts & utilities',
         'Elections & voting',
         'Eagle Mountain data center project'
       ]

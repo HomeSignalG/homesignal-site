@@ -37,7 +37,7 @@ insert into public.communities (name, county, state, level, slug, zip_codes, gov
        '84109','84111','84112','84113','84115','84116','84117','84118','84119','84120',
        '84121','84123','84124','84128','84129'],
  array['County Commission & county business','Planning, zoning & development',
-       'Property taxes & assessments','Public safety & emergencies','Water companies',
+       'Property taxes & assessments','Public safety & emergencies','Water districts & utilities',
        'Elections & voting'])
 on conflict do nothing;
 

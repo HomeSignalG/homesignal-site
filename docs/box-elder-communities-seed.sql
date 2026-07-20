@@ -23,7 +23,7 @@ insert into public.communities (name, county, state, level, slug, zip_codes, gov
  array['84301','84302','84306','84307','84309','84311','84312','84313','84314',
        '84316','84324','84329','84330','84331','84334','84336','84337','84340'],
  array['County Commission & county business','Planning, zoning & development',
-       'Property taxes & assessments','Public safety & emergencies','Water companies',
+       'Property taxes & assessments','Public safety & emergencies','Water districts & utilities',
        'Elections & voting','Stratos data center project'])
 on conflict do nothing;
 -- NOTE: neither 84315 (Hooper, Weber County) nor 84308 (Cornish, Cache County) is in
