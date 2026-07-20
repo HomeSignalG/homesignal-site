@@ -117,7 +117,7 @@ async function main() {
     paginate('users', '*'),
     paginate('user_subscriptions', '*'),
     paginate('communities', 'id,name,state,zip_codes,government_topics'),
-    paginate('email_events', 'user_email,status,event_type,created_at'),
+    paginate('email_events', '*').catch(() => []),
     paginate('app_follows', 'user_id,target_type,target_id,created_at'),
     paginate('app_topic_prefs', 'user_id,category,topics,updated_at'),
     listAuthUsers(),
@@ -139,7 +139,7 @@ async function main() {
 
   const lastEmail = new Map();
   for (const ev of emailEvents) {
-    const e = (ev.user_email || '').toLowerCase();
+    const e = (ev.user_email || ev.email || '').toLowerCase();
     if (!e) continue;
     const kind = ev.status || ev.event_type;
     if (!['sent', 'delivered'].includes(kind)) continue;
