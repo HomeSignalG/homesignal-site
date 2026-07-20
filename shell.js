@@ -85,7 +85,18 @@
       return HS.pageHref('alerts.html', { zip, category: 'Government & civic' });
     };
     HS.sanitizeSort = function (s) {
-      return ({ impact: 1, distance: 1, newest: 1 })[s] ? s : 'impact';
+      return ({ impact: 1, status: 1, distance: 1, newest: 1 })[s] ? s : 'impact';
+    };
+    var DEV_STATUS_RANK = { 'Proposed': 0, 'On file': 0, 'Decided': 1, 'Approved': 2, 'Active': 3, 'Operating': 4, 'Built': 4 };
+    var DEV_REVIEW_STAGE = /\breview\b|in review|under review|hearing|submitt|pending/;
+    HS.devStatusSortRank = function (item) {
+      var status = String((item && item.status) || (typeof item === 'string' ? item : ''));
+      var base = DEV_STATUS_RANK[status];
+      if (base != null) {
+        if (status === 'Proposed' && item && item.stage && DEV_REVIEW_STAGE.test(String(item.stage).toLowerCase())) return 1;
+        return base;
+      }
+      return 5;
     };
     HS.sanitizeLens = function (n) {
       n = parseInt(n, 10);
