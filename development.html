@@ -22,6 +22,7 @@
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js"></script>
 <script src="lib/impact.js"></script>
+<script src="lib/impact-resolver.js"></script>
 <script src="lib/why.js"></script>
 <script src="shell.js"></script>
 <script>
@@ -47,6 +48,18 @@ HS.onReady(async function () {
     return;
   }
 
+  // Phase-2 impact: join the per-document analyses (by source_ref) and resolve
+  // every project through the ONE shared resolver. A failed analysis read still
+  // resolves everything via the conservative metadata fallback — cards are
+  // never blocked on impact analysis.
+  try {
+    var analyses = await HS.data.impactAnalyses(projects.map(function (p) { return p.source_ref; }));
+    projects = HS.attachResolvedImpact(projects, analyses);
+  } catch (e) {
+    console.warn('[development] impact analyses load failed', e);
+    projects = HS.attachResolvedImpact(projects, {});
+  }
+
   if (id) { renderDetail(id); } else { renderList(); }
 
   function statusRank(s){ return s==='Proposed'?0:s==='Active'?1:2; }
@@ -66,7 +79,10 @@ HS.onReady(async function () {
       } else if (state2.sort === 'newest') {
         a.sort(function(x,y){return new Date(y.submitted_at)-new Date(x.submitted_at);});
       } else {
-        a.sort(function(x,y){return (y.impact_score||0)-(x.impact_score||0);});
+        // "Impact on me" — shared comparator: resolved score desc, confidence
+        // desc, distance asc, newest; document-grounded results outrank
+        // similar-scoring metadata fallbacks (lib/impact-resolver.js).
+        a.sort(HS.impactSortCompare);
       }
       return a;
     }
@@ -127,7 +143,7 @@ HS.onReady(async function () {
       return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th><th>Distance</th><th>Impact</th></tr></thead><tbody>'
         + a.map(function(p){ return '<tr onclick="location.href=\'development.html?id=' + p.id + '\'" onkeydown="if(event.key===\'Enter\')location.href=\'development.html?id=' + p.id + '\'" tabindex="0" style="cursor:pointer">'
           + '<td><b>' + HS.esc(p.name) + '</b></td><td>' + HS.esc(p.type) + '</td><td>' + HS.esc(p.status) + '</td>'
-          + '<td>' + HS.esc(p.stage||'') + '</td><td>' + HS.esc(p.dist||'') + '</td><td>' + (p.impact_score||'') + '</td></tr>'; }).join('')
+          + '<td>' + HS.esc(p.stage||'') + '</td><td>' + HS.esc(p.dist||'') + '</td><td>' + (p.impact_resolved ? (p.impact_resolved.score + '/100') : (p.impact_score||'')) + '</td></tr>'; }).join('')
         + '</tbody></table>';
     }
     function wire() {
@@ -203,6 +219,45 @@ HS.onReady(async function () {
       var impactsBlock = dims.length
         ? '<div class="impacts">' + HS.tpl.impactChips(dims) + '</div>'
         : '';
+      // Phase-2 impact analysis detail — category impacts, evidence (with page
+      // refs), confidence, and how the score was computed. Document-grounded
+      // when a Stage-1 extraction exists; otherwise the honest fallback note.
+      var impactDetailBlock = '';
+      var ir = p.impact_resolved;
+      if (ir) {
+        var lvl = ir.level.charAt(0).toUpperCase() + ir.level.slice(1);
+        var dirW = ir.direction.charAt(0).toUpperCase() + ir.direction.slice(1);
+        var catRows = (ir.categoryScores || []).map(function (c) {
+          var tone = c.direction === 'positive' ? 'var(--green-2)' : c.direction === 'negative' ? 'var(--red)' : 'var(--amber)';
+          return '<div class="sb"><div class="sl"><span>' + HS.esc(c.category) + '</span><b>' + c.magnitude + ' · ' + HS.esc(c.direction) + '</b></div>'
+            + '<div class="track"><div class="fill" style="width:' + c.magnitude + '%;background:' + tone + '"></div></div></div>';
+        }).join('');
+        var quoteEv = (ir.evidence || []).filter(function (e) { return e.fact === 'quote'; });
+        var factEv = (ir.evidence || []).filter(function (e) { return e.fact !== 'quote'; }).slice(0, 10);
+        var evRows = factEv.map(function (e) {
+          return '<div class="row"><span>' + HS.esc(e.category) + '</span><b>' + HS.esc(e.fact + ': ' + e.value) + '</b></div>';
+        }).join('');
+        var quoteRows = quoteEv.slice(0, 6).map(function (q) {
+          return '<p class="sowhat" style="font-style:italic;margin-bottom:6px">“' + HS.esc(q.value) + '”'
+            + (q.page != null ? ' <span style="color:var(--ink-3)">(p. ' + HS.esc(q.page) + ')</span>' : '') + '</p>';
+        }).join('');
+        var basisNote = ir.basis === 'document'
+          ? 'Derived from the official filing linked below.'
+          : 'The filing hasn\'t been analyzed yet — this is a conservative estimate from the record\'s own metadata only.';
+        impactDetailBlock =
+          '<div class="divider"></div><div class="kicker">Impact analysis</div>'
+          + '<p class="sowhat" style="margin-bottom:8px"><span class="ibadge ' + HS.esc(ir.level) + '">' + HS.esc(lvl) + ' · ' + ir.score + '/100</span>'
+          + '<span class="idir ' + HS.esc(ir.direction) + '">' + HS.esc(dirW) + '</span>'
+          + ' <span style="color:var(--ink-3)">· confidence ' + Math.round((ir.confidence || 0) * 100) + '%</span></p>'
+          + '<p class="impactsentence">' + HS.esc(ir.sentence) + '</p>'
+          + (catRows ? '<div style="margin:10px 0 4px">' + catRows + '</div>' : '')
+          + (evRows ? '<div class="kicker" style="margin-top:12px">Evidence from the record</div><div class="specs">' + evRows + '</div>' : '')
+          + quoteRows
+          + '<p style="font-size:11px;color:var(--ink-3);margin:10px 0 0">' + basisNote
+          + ' Score = strongest documented effects × distance (base ' + (ir.factors && ir.factors.base) + ', distance weight '
+          + (ir.factors && ir.factors.distanceWeight) + ') · ' + HS.esc(ir.version)
+          + '. The score measures how much daily life nearby could change — direction says which way.</p>';
+      }
       page.innerHTML =
         '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button>'
         + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">' + HS.esc(p.name) + ' <span class="status ' + statusClass + '">' + HS.esc(p.status) + '</span></div><h1 style="margin-bottom:2px">How this affects you</h1></div>'
@@ -213,6 +268,7 @@ HS.onReady(async function () {
               + (goodDim ? ' — with a <span class="hlg">lift to ' + HS.esc(goodDim.label.toLowerCase()) + '</span>' : '') + '.</div>'
             : '<div class="verdict">' + HS.esc(p.sowhat || 'On the county\'s public record near you — the record below has the specifics.') + '</div>')
         + impactsBlock
+        + impactDetailBlock
         + '<div class="divider"></div><div class="kicker">Why this matters</div>' + HS.whyQaHTML(wd)
         + '<div class="divider"></div><div class="kicker">What we know</div>' + HS.whyKnowHTML(wd)
         + '<div class="divider"></div><div class="kicker">What we don\'t know yet</div>' + HS.whyUnknownHTML(wd)

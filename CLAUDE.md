@@ -1020,6 +1020,24 @@ legal/framing change not covered by the one-time sign-off.
   **MO** 264/264 (241 pass + 23 empty; 200 indexable) — KCMO's BLDS ledger STALLED
   2025-05-09 (top reprobe candidate), STL RDX host unreachable dual-egress. All
   three: 0 unsourced, 0 coordless. Seeds: docs/{new-jersey,connecticut,missouri}-development-reports-seed.sql.
+- 🟡 **DEVELOPMENT IMPACT SYSTEM PHASE 2 — document-grounded impact scores (PILOT).**
+  Two-stage pipeline: Stage 1 (ingest repo `analyze_project_documents.py` + `impact-extract.yml`,
+  manual, dry-run default) LLM-extracts ONLY document-supported facts from each project's
+  official record into `public.development_impact_analyses` (public-read RLS, keyed by
+  `source_ref` — a separate durable table because `app_refresh_zip()` deletes/reinserts
+  `app_projects` every refresh). Stage 2 is **deterministic shared code, not AI judgment**:
+  `lib/impact-resolver.js` (`impact-score-v1`) computes category scores / base score /
+  level / direction / confidence / sentence; `scripts/impact-score.mjs` (+`impact-score.yml`)
+  stores the BASE results; `development.html` joins by source_ref and applies the documented
+  distance-decay bands per selected home at render. Score = magnitude, direction = sign
+  (flood control high+positive; industrial high+negative). Quote GROUNDING GATE: an
+  extracted quote not verbatim in the document is dropped in code (prompt-injection
+  defense, tested). Cards are never blocked — no analysis → conservative metadata
+  fallback (marked `metadata_fallback`, confidence ≤0.3, never outranks a similar
+  document-grounded score in "Impact on me"). Full design:
+  `docs/development-impact-system.md`; DDL `docs/development-impact-analyses.sql`.
+  **Manual-only, pilot-gated: no schedule / bulk processing until the founder reviews
+  the pilot output.**
 - 🟢 **84302 (Brigham City) prototype detail** (DB-verified): facilities 23 · development 41 ·
   proposed 41 · approved 0 · 64 sites · 0 unsourced; the page surfaces upcoming hearings as
   "comment windows open" (a live, date-derived count from each notice's `meeting_date`). Route:

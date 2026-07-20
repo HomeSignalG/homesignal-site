@@ -1,0 +1,32 @@
+name: Development impact — Stage 2 scoring (manual)
+
+# Applies the ONE canonical deterministic resolver (lib/impact-resolver.js) to
+# development_impact_analyses rows whose extraction is done but whose scoring
+# is stale/absent (plus fetch-failed rows, scored as honest metadata fallback).
+# Manual-only during the pilot; no schedule until the pilot output is reviewed.
+# Stage 1 (LLM document extraction) runs in homesignal-ingest
+# (impact-extract.yml) — this job never calls a model, it only computes.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Max rows to score"
+        type: string
+        default: "50"
+
+permissions:
+  contents: read
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Score pending analyses
+        env:
+          SUPABASE_URL: https://qwnnmljucajnexpxdgxr.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/impact-score.mjs --supabase --limit "${{ inputs.limit }}"
