@@ -51,11 +51,10 @@ HS.onReady(async function () {
 
   function renderList() {
     var state2 = {
-      lens: initLens != null && initLens !== '' ? parseInt(initLens, 10) : 0,
-      sort: initSort || 'impact',
+      lens: HS.sanitizeLens ? HS.sanitizeLens(initLens) : 0,
+      sort: HS.sanitizeSort ? HS.sanitizeSort(initSort) : 'impact',
       dataView: false
     };
-    if (isNaN(state2.lens) || state2.lens < 0 || state2.lens > 2) state2.lens = 0;
     function sorted() {
       var a = projects.slice();
       if (state2.lens === 1) { // what's being built — group by type & stage
@@ -118,7 +117,10 @@ HS.onReady(async function () {
         + '</div>';
     }
     function lens(i,q,d){ return '<button class="lenscard' + (state2.lens===i?' on':'') + '" data-lens="' + i + '"><span class="q">' + q + '</span><span class="d">' + d + '</span></button>'; }
-    function seg(k,label){ return '<button class="' + ((state2.sort===k && !state2.dataView)?'on':'') + '" data-sort="' + k + '">' + label + '</button>'; }
+    function seg(k,label){
+      var on = !state2.dataView && (state2.lens === 2 ? (k === 'distance') : (state2.sort === k));
+      return '<button class="' + (on ? 'on' : '') + '" data-sort="' + k + '">' + label + '</button>';
+    }
     function dataTable(a){
       return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th><th>Distance</th><th>Impact</th></tr></thead><tbody>'
         + a.map(function(p){ return '<tr onclick="location.href=\'development.html?id=' + p.id + '\'" onkeydown="if(event.key===\'Enter\')location.href=\'development.html?id=' + p.id + '\'" tabindex="0" style="cursor:pointer">'

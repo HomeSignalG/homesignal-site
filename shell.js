@@ -71,13 +71,25 @@
       if (it.id) return HS.pageHref('alerts.html', { zip, id: it.id });
       return null;
     };
-    HS.meetingNavHref = function (m, zip) {
+    HS.meetingNavHref = function (m, zip, projectIds) {
       if (!m) return null;
       zip = zip && /^\d{5}$/.test(String(zip)) ? String(zip) : null;
-      if (m.related_project_id) {
-        return HS.pageHref('development.html', { zip, id: m.related_project_id });
+      const rid = m.related_project_id;
+      if (rid) {
+        const isProject = projectIds
+          ? projectIds.has(rid)
+          : /^proj-/i.test(String(rid));
+        if (isProject) return HS.pageHref('development.html', { zip, id: rid });
+        return HS.pageHref('alerts.html', { zip, id: rid });
       }
-      return HS.pageHref('alerts.html', { zip, category: 'Government & civic', id: m.id });
+      return HS.pageHref('alerts.html', { zip, category: 'Government & civic' });
+    };
+    HS.sanitizeSort = function (s) {
+      return ({ impact: 1, distance: 1, newest: 1 })[s] ? s : 'impact';
+    };
+    HS.sanitizeLens = function (n) {
+      n = parseInt(n, 10);
+      return (n >= 0 && n <= 2 && !isNaN(n)) ? n : 0;
     };
     HS.ZIP_NAV_PAGES = ['today.html', 'dashboard.html', 'alerts.html', 'development.html', 'maps.html', 'homesignalmap.html', 'community.html'];
     HS.MAP_PAGES = ['maps.html', 'homesignalmap.html'];
@@ -165,7 +177,8 @@
   // home is tagged 'Your home' (pure-seed preview only). Live-demo rows carry
   // sample:true and are never presented as the visitor's own home.
   HS.isRealHome = function (p) {
-    return !!(p && !p.sample && (p.label === 'home' || p.tag === 'home' || p.tag === 'Your home'));
+    return !!(p && !p.sample && !p.demo
+      && (p.label === 'home' || p.tag === 'home' || p.tag === 'Your home'));
   };
   // The active property IFF it's a real (non-sample) home located in the ZIP being
   // viewed — the ONE test for "may I anchor the map / pin 'Your home' here". Returns
@@ -174,7 +187,7 @@
   // test/realhome.test.mjs).
   HS.realHome = function () {
     var p = state.activeProperty;
-    return (p && !p.sample && p.zip === state.zip) ? p : null;
+    return (p && HS.isRealHome(p) && p.zip === state.zip) ? p : null;
   };
 
   // ---------------------------------------------- referral (first-touch) ------

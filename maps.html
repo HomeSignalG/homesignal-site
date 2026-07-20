@@ -280,6 +280,7 @@ HS.onReady(async function () {
   var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact', types: null, qol: null, view: 'all' };
   var selected = null;   // the project currently expanded in the right info panel (null = list view)
   var lastItems = [];    // most recent lettered set, so panel re-renders without a map redraw
+  var deepApplied = false;
 
   // Distinct real project types + which pin-shapes appear, for the Projects filter + shape legend.
   var PROJECT_TYPES = projects.map(function (p) { return p.type; })
@@ -517,7 +518,7 @@ HS.onReady(async function () {
   function redraw() { if (opts.mode === 'impact') drawSchematic(); else drawTiles(); }
 
   // ---------------- RIGHT INFO PANEL: list ⇄ 6-section project detail --------
-  function renderInfo(items) { clearLoading(); lastItems = items; if (selected) renderDetail(selected); else renderList(items); }
+  function renderInfo(items) { clearLoading(); lastItems = items; if (selected) renderDetail(selected); else renderList(items); applyDeepId(items); }
   function selectItem(it) {
     if (!it) return; selected = it; renderDetail(it);
     openPanel();                      // the ONE panel — detail replaces whatever was showing
@@ -527,6 +528,21 @@ HS.onReady(async function () {
   // development "project"), so it never opens the project-framed 6-section panel.
   function openItem(it) { if (!it) return; if (it._facility) { location.href = 'development.html?id=' + encodeURIComponent(it.id); return; } selectItem(it); }
   function clearSelection() { selected = null; renderInfo(lastItems); }
+
+  function applyDeepId(items) {
+    if (!deepId || deepApplied) return;
+    var pick = (items || []).find(function (x) { return x.id === deepId; })
+      || all.find(function (x) { return x.id === deepId; })
+      || projects.find(function (x) { return x.id === deepId; })
+      || facs.find(function (x) { return x.id === deepId; });
+    if (!pick) return;
+    deepApplied = true;
+    if (pick._facility || (facilities || []).some(function (f) { return f.id === pick.id; })) {
+      location.href = HS.pageHref('development.html', { zip: S.zip, id: pick.id });
+      return;
+    }
+    selectItem(pick);
+  }
 
   function pinHref(it) {
     if (it.type) return { url: 'development.html?id=' + encodeURIComponent(it.id), ext: false };
@@ -1202,21 +1218,6 @@ HS.onReady(async function () {
   } else {
     setActiveMode('impact');
     showSchematic();
-  }
-
-  if (deepId) {
-    setTimeout(function () {
-      var pick = all.find(function (x) { return x.id === deepId; })
-        || projects.find(function (x) { return x.id === deepId; })
-        || facs.find(function (x) { return x.id === deepId; });
-      if (pick) {
-        if (pick._facility || (facilities || []).some(function (f) { return f.id === pick.id; })) {
-          location.href = HS.pageHref('development.html', { zip: S.zip, id: pick.id });
-        } else {
-          selectItem(pick);
-        }
-      }
-    }, 400);
   }
 
   // View toggle: All Projects <-> What's Changed. Switching lands on the new

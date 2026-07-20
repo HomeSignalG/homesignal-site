@@ -151,10 +151,8 @@ HS.onReady(async function () {
     + '</div></div>';
 
   if (focusScore) {
-    setTimeout(function () {
-      var el = document.getElementById('zip-score-strip');
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 80);
+    var el = document.getElementById('zip-score-strip');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 });
 </script>

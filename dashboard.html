@@ -138,18 +138,26 @@ HS.onReady(async function () {
   HS.buildLive(dashMap, {
     center: center, items: items, home: hasRealHome ? home : null,
     interactive: true, zoom: 12.4, radiusMi: 1.5, w: 640, h: 300,
-    itemClick: onMarkerClick
+    itemClick: onMarkerClick,
+    onReady: function (map) {
+      if (map && map.on) {
+        map.on('dragstart', function () { dashMap._hsDragged = true; });
+        map.on('dragend', function () { setTimeout(function () { dashMap._hsDragged = false; }, 0); });
+      }
+    }
   });
 
   // The preview surface opens the full map; marker clicks route to the record.
   dashMap.style.cursor = 'pointer';
   dashMap.addEventListener('click', function (e) {
-    if (e.target.closest('[data-hs-map-item]')) return;
+    if (dashMap._hsDragged || e.target.closest('[data-hs-map-item]')) return;
     goMapPreview();
   });
   dashMap.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.target.closest('[data-hs-map-item]')) goMapPreview();
   });
+
+  var projectIds = new Set(projects.map(function (p) { return p.id; }));
 
   // recent — ranked by impact; each card opens its alert or project detail.
   var recent = changes.filter(function (x) { return !x.quiet; })
@@ -190,7 +198,7 @@ HS.onReady(async function () {
 
   document.getElementById('dashMeetings').innerHTML = meetings.length
     ? meetings.map(function (m) {
-        var href = HS.meetingNavHref ? HS.meetingNavHref(m, zip) : null;
+        var href = HS.meetingNavHref ? HS.meetingNavHref(m, zip, projectIds) : null;
         return HS.tpl.meetingRowLink(m, href);
       }).join('')
     : '<p class="quiet" style="font-size:12.5px;margin:0">No upcoming public meetings on file for this ZIP yet.</p>';

@@ -29,8 +29,16 @@ ok(itemNavHref(alert, '78617').indexOf('band=open') > 0,
   'itemNavHref routes open-window alerts with band=open');
 
 const mtg = { id: 'mtg-commissioners', related_project_id: 'proj-datacenter' };
-ok(meetingNavHref(mtg, '78617') === 'development.html?zip=78617&id=proj-datacenter',
-  'meetingNavHref routes linked meetings to project detail');
+ok(meetingNavHref(mtg, '78617', new Set(['proj-datacenter'])) === 'development.html?zip=78617&id=proj-datacenter',
+  'meetingNavHref routes linked project meetings to development detail');
+
+const mtgChg = { id: 'mtg-dvisd', related_project_id: 'chg-dvisd' };
+ok(meetingNavHref(mtgChg, '78617').indexOf('alerts.html?zip=78617&id=chg-dvisd') === 0,
+  'meetingNavHref routes change-linked meetings to alerts id');
+
+const mtgBare = { id: 'mtg-x' };
+ok(meetingNavHref(mtgBare, '78617') === 'alerts.html?zip=78617&category=Government+%26+civic',
+  'meetingNavHref without related id uses civic category only');
 
 const dash = fs.readFileSync(new URL('../dashboard.html', import.meta.url), 'utf8');
 ok(/ZIP Score/.test(dash) && !/Community score/.test(dash),
@@ -47,6 +55,10 @@ ok(!/onclick="HS\.addHome\(\)"/.test(dash), 'dashboard add-place uses listener n
 
 const shell = fs.readFileSync(new URL('../shell.js', import.meta.url), 'utf8');
 ok(/HS\.pageHref/.test(shell), 'shell.js exposes pageHref');
+ok(!/setTimeout\s*\(\s*applyFocus/.test(fs.readFileSync(new URL('../alerts.html', import.meta.url), 'utf8')),
+  'alerts applyFocus runs synchronously after render');
+ok(!/setTimeout\s*\(\s*function\s*\(\)\s*\{[^}]*zip-score-strip/s.test(fs.readFileSync(new URL('../community.html', import.meta.url), 'utf8')),
+  'community focus=score scroll is immediate');
 
 if (fails) { console.error('\n' + fails + ' assertion(s) failed'); process.exit(1); }
 console.log('\nAll dashboard-nav assertions passed.');
