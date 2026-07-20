@@ -243,7 +243,6 @@
           </div>
           <div class="layers">
             <div class="mt">Show on Map</div>
-            <div class="lyr" id="lyrProjects"><span>Projects</span><span class="tg"></span></div>
             <div class="lyr" id="lyrRadius"><span>Radius ring</span><span class="tg"></span></div>
           </div>
         </div>
@@ -305,7 +304,7 @@ HS.onReady(async function () {
   var LET = 'ABCDEFGHIJKLMNOP';
   // opts.types / opts.qol are the top-of-page filters (null/empty = show everything,
   // so a signed-out default load is byte-identical to the pre-Sprint page the verifier checks).
-  var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact', types: null, qol: null, view: 'all' };
+  var opts = { radiusMi: 1.5, showRadius: true, showFacilities: true, mode: 'impact', types: null, qol: null, view: 'all' };
   var selected = null;   // the project currently expanded in the right info panel (null = list view)
   var lastItems = [];    // most recent lettered set, so panel re-renders without a map redraw
   var deepApplied = false;
@@ -421,7 +420,7 @@ HS.onReady(async function () {
     // changes / navigation. The "Regulated facility" status toggle now stands in for
     // the retired "Regulated facilities" layer toggle.
     opts.showFacilities = HS.getStatusFilters().facility;
-    var a = opts.showProjects ? all : all.filter(function(x){return !x.type;});
+    var a = all;
     // "What's Changed" narrows the map to records with a real in-window change
     // entry. Facilities carry no change data, so they don't reserve slots here.
     if (opts.view === 'changed') a = a.filter(function (x) { return changedIds[x.id]; });
@@ -913,10 +912,10 @@ HS.onReady(async function () {
     // Count only pins whose status toggle is currently ON, so the caption tracks
     // exactly what's visible on the map.
     var vis = all.filter(function(x){ return HS.statusVisible(x); });
-    var total = opts.showProjects ? vis.length : vis.filter(function(x){return !x.type;}).length;
+    var total = vis.length;
     var txt;
     if (hasRealHome) {
-      var pool = opts.showProjects ? vis : vis.filter(function(x){return !x.type;});
+      var pool = vis;
       var within = pool.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;
       txt = within + ' within ' + opts.radiusMi + ' mi of ' + home.address;
     } else {
@@ -954,7 +953,6 @@ HS.onReady(async function () {
       el.onclick = toggle;
       el.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
     }
-    asSwitch(document.getElementById('lyrProjects'), opts.showProjects, function(){ opts.showProjects=!opts.showProjects; redrawFn(); });
     asSwitch(document.getElementById('lyrRadius'), opts.showRadius, function(){ opts.showRadius=!opts.showRadius; redrawFn(); });
     // Status rows reuse the SAME switch component. Their on/off state is the shared,
     // persisted backbone state (HS.*StatusFilter*) — the "Regulated facility" row
