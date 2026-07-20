@@ -20,6 +20,10 @@ ok(!/<div class="lyr"[^>]*>\s*<span>Projects<\/span>/.test(block),
   'no Projects row under "Show on Map"');
 ok(/id="lyrRadius"/.test(html) && /Radius ring/.test(html),
   'Radius ring toggle remains under "Show on Map"');
+ok(/id="projFilterPill"/.test(html) && /Project types/.test(html),
+  'toolbar type filter is labelled "Project types" (not "Projects")');
+ok(!/<button[^>]*id="projFilterPill"[^>]*>[^<]*Projects[^<]*<\/button>/.test(html),
+  'toolbar filter pill does not say "Projects"');
 
 if (fails) { console.error('\n' + fails + ' assertion(s) failed'); process.exit(1); }
 console.log('\nAll map-legend-layers assertions passed.');
