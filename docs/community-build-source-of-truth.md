@@ -316,7 +316,7 @@ asking.** (Only §10 warrants a pause.)
 | Recurring question | STANDING ANSWER |
 |---|---|
 | Clone a page or use the dynamic one? | **Dynamic `community.html`.** Never clone. (§4) |
-| For a **city**, rename topic #1 to "City Council"? "Water & utilities"? | **NO.** Verbatim canonical strings: `County Commission & county business`, `Water companies`, etc. The engine matches exact strings. |
+| For a **city**, rename topic #1 to "City Council"? "Water & utilities"? | **NO.** Verbatim canonical strings: `County Commission & county business`, `Water districts & utilities`, etc. The engine matches exact strings. |
 | How to create the `communities.government_topics` value? | **Canonical strings only** — never city-friendly variants (they get dropped by the digest). |
 | Is a new row immediately live? | **Yes**, at `?id=`/`?zip=` — no repo change, no deploy. (§5) |
 | Empty government tile on a fresh community? | **Expected** until ingest feeds exist (Step 3). `government_topics` may start `[]`. |

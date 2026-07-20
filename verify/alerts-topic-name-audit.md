@@ -4,7 +4,9 @@
 **Scope:** Production Alerts page (`alerts.html`) topic tiles, popups, and cross-ZIP topic inventory.  
 **Method:** Live Supabase reads (anon key, same as production pages) + static code review. Representative ZIPs tested in browser-equivalent resolution (`communityGovTopics` cascade logic from `lib/data.js`).
 
-**Out of scope (not changed in this pass):** topic renames, merges, feed config, subscriptions, email delivery, schemas, RLS, production data.
+**Follow-up (same branch):** canonical rename `Water companies` → `Water districts & utilities` (site seeds + `topics.canon.json` + migration SQL). Ingest canon/feeds must be updated in `homesignal-ingest` before the next ingest run.
+
+**Still out of scope:** other topic renames, merges, feed config changes beyond the label, email delivery behavior, schemas, RLS.
 
 ---
 
@@ -59,7 +61,7 @@ These two popups render the **same labels** per ZIP. In supabase mode, labels co
 2. Planning, zoning & development
 3. Property taxes & assessments
 4. Public safety & emergencies
-5. Water companies
+5. Water districts & utilities
 6. Elections & voting
 
 **Additional labels found in production** (community-specific, appended via cascade):
@@ -120,9 +122,9 @@ Was `topicCategories.dev` with 8 UI-only topics (never in canonical ingest):
 
 ---
 
-## 4. Why "Water companies" exists
+## 4. Why "Water districts & utilities" exists (formerly "Water companies")
 
-"Water companies" is a **canonical government topic** in the ingest taxonomy (`topics.canon.json::government_topics_active`, position 5 of 6 backbone topics). It was seeded on every county root during the national community build (six standard topics copied from the original Utah/Box Elder model).
+"Water districts & utilities" is a **canonical government topic** in the ingest taxonomy (`topics.canon.json::government_topics_active`, position 5 of 6 backbone topics). It was seeded on every county root during the national community build (six standard topics copied from the original Utah/Box Elder model).
 
 **Original intent (inferred from production records, not from a separate product spec):** capture **water-district and special-district government notices** published through the **Utah Public Notice Marketplace (PMN)** — board meetings, public hearings, rate/property-related hearings, and meeting schedules for entities like water conservancy districts.
 
@@ -134,11 +136,11 @@ It is **not** meant to cover:
 
 ---
 
-## 5. Evidence — records and feeds for "Water companies"
+## 5. Evidence — records and feeds for "Water districts & utilities"
 
 ### 5.1 Production alert records
 
-Query: `alerts WHERE category = 'Water companies'`  
+Query: `alerts WHERE category = 'Water districts & utilities'`  
 **Count: 11** (all `pipeline_type = government_notice`)
 
 | agency_name | community | count | source |
@@ -150,7 +152,7 @@ Sample titles: "Public Meeting", "PUBLIC HEARING", "Annual Public Meeting", "Pub
 
 ### 5.2 Production meeting records
 
-Query: `meetings WHERE category = 'Water companies'`  
+Query: `meetings WHERE category = 'Water districts & utilities'`  
 **Count: 0** — no meeting rows use this category, despite the topic appearing in the **Upcoming Meetings** popup.
 
 ### 5.3 Feeds
@@ -159,7 +161,7 @@ The public `feeds` table is **not readable** via the anon key (0 rows returned).
 
 ### 5.4 Geographic coverage
 
-| ZIP tested | Water companies in popup? | Alerts at county root | Meetings at county root |
+| ZIP tested | Water districts & utilities in popup? | Alerts at county root | Meetings at county root |
 |------------|----------------------------|----------------------|--------------------------|
 | 84302 (UT) | Yes | 9 | 0 |
 | 84336 (UT) | Yes | 9 | 0 |
@@ -174,34 +176,33 @@ The public `feeds` table is **not readable** via the anon key (0 rows returned).
 
 ### 5.5 Subscriptions
 
-`user_subscriptions WHERE topic = 'Water companies'` → **0 rows** (anon-visible).
+`user_subscriptions WHERE topic = 'Water districts & utilities'` → **0 rows** (anon-visible).
 
 ### 5.6 Canonical mapping
 
-- **Internal key = display label** (word-for-word): `Water companies`
+- **Internal key = display label** (word-for-word): `Water districts & utilities`
 - Listed in `topics.canon.json::government_topics_active`
 - `pipeline_type` on matching alerts: `government_notice`
 
 ---
 
-## 6. Recommendation for "Water companies"
+## 6. Recommendation — implemented
 
-**Recommend: RENAME** (pending approval — do not implement in this pass)
+**Status: RENAMED** `Water companies` → **`Water districts & utilities`** (founder-approved 2026-07-20)
 
-**Proposed name:** `Water districts & utilities`
+| Where updated | Files |
+|---------------|-------|
+| Site runtime / seeds | `seed/delvalle.js`, `communities.js`, `topics.canon.json`, all `docs/*-communities-seed.sql` |
+| Production DB | `docs/water-districts-utilities-rename-migration.sql` (run in Supabase SQL Editor) |
+| Ingest (required before next run) | `homesignal-ingest` `topics/canon.yaml` + feed/Zap category stamps |
 
-| Criterion | Assessment |
-|-----------|------------|
-| Homeowner clarity | "Water companies" is vague; most residents think of a **district**, **authority**, or **city utility** — not a "company." |
-| Actual content | Bear River **Water Conservancy District** board notices — not corporate "company news." |
-| Geographic validity | "Company" excludes municipal utilities, cooperatives, authorities, and special districts — the entities PMN actually posts. |
-| Overlap | Partial overlap with **Water Quality** (news) and **Utilities** (removed Development tile); government hearings are distinct from quality news. |
-| Meetings popup | Topic appears under Meetings but **0 meeting rows** — misleading split. |
-| National display | Shown in 8/8 test ZIPs but **delivers only in Utah** — empty subscription elsewhere. |
+Original rationale for the rename:
 
-**Not recommend REMOVE:** Utah has real, sourced notices today.  
-**Not recommend MERGE** with Planning or Public safety: content is water-governance-specific.  
-**Not recommend KEEP as-is:** label is inaccurate for the entities delivered and for non-corporate utilities nationwide.
+| Criterion | Assessment (old label "Water companies") |
+|-----------|------------------------------------------|
+| Homeowner clarity | "Companies" mislabels districts, authorities, and city utilities |
+| Actual content | Bear River **Water Conservancy District** board notices |
+| Geographic validity | "Company" excludes municipal utilities, cooperatives, and special districts |
 
 ---
 
@@ -236,12 +237,12 @@ The public `feeds` table is **not readable** via the anon key (0 rows returned).
 |-----|-------------|-----------------|--------------|----------------|-------------|-------------------|--------------------------|-------|
 | 84302 | Gov Notices / Meetings | County Commission & county business | same | UT+13 counties | Yes (alerts+meetings) | Yes* | Yes | *Meetings/notices not independent streams yet |
 | 84302 | Gov Notices / Meetings | Planning, zoning & development | same | UT+some | Yes | Yes* | Yes | |
-| 84302 | Gov Notices / Meetings | Water companies | same | UT PMN only | Yes (9 alerts) | Yes* | Yes | 0 meetings; 2 EM miscategorized alerts in canon |
+| 84302 | Gov Notices / Meetings | Water districts & utilities | same | UT PMN only | Yes (9 alerts) | Yes* | Yes | 0 meetings; 2 EM miscategorized alerts in canon |
 | 84302 | Gov Notices / Meetings | Stratos data center project | same | Box Elder only | Yes | Yes* | **No** | UT-specific project label on popup |
 | 84302 | Gov Notices / Meetings | City government (Brigham City) | same | UT | Yes (meetings) | Yes* | **No** | City-specific |
-| 78617 | Gov Notices / Meetings | Water companies | same | **No** | **No** | No content | Yes | Empty topic nationally displayed |
+| 78617 | Gov Notices / Meetings | Water districts & utilities | same | **No** | **No** | No content | Yes | Empty topic nationally displayed |
 | 78617 | Gov Notices / Meetings | County Commission & county business | same | Yes (Granicus) | Yes (meetings) | Yes* | Yes | |
-| 98101 | Gov Notices / Meetings | Water companies | same | **No** | **No** | No content | Yes | Empty |
+| 98101 | Gov Notices / Meetings | Water districts & utilities | same | **No** | **No** | No content | Yes | Empty |
 | ALL | Local News | Water Quality … Data Centers (×12) | same | Zap/news ingest | **No** (`news_alert` count=0) | **No** | Yes | Entire tile has no production content |
 | ALL | ~~Development~~ | ~~Residential … Parks~~ (×8) | N/A | **Never wired** | **No** | **No** | N/A | **Removed** — UI-only stub |
 
@@ -251,7 +252,7 @@ The public `feeds` table is **not readable** via the anon key (0 rows returned).
 
 | Topic | Shown where | Feed reality |
 |-------|-------------|--------------|
-| Water companies | All county-backbone ZIPs | Records only in Utah (PMN water districts) |
+| Water districts & utilities | All county-backbone ZIPs | Records only in Utah (PMN water districts) |
 | Property taxes & assessments | Standard backbone | 0 records in all 8 test ZIPs |
 | Public safety & emergencies | Standard backbone | 0 records in 6/8 test ZIPs; sparse in UT |
 | Elections & voting | Standard backbone | 0 records in 6/8 test ZIPs |
@@ -268,7 +269,7 @@ The public `feeds` table is **not readable** via the anon key (0 rows returned).
 |----------|-----|
 | **Development tile subtopics** (removed) | Never in `CAT_TO_PIPELINE`; `persistSignup` skips `dev`. |
 | **Local News (all 12)** | `news_alert` subscriptions can be saved, but **0 `alerts` rows** with `pipeline_type=news_alert` in production — nothing to match. |
-| **Government topics with 0 content** | Subscription row can exist, but digest has nothing to send (e.g. Water companies in TX/IL/MA/CO/MI/WA). |
+| **Government topics with 0 content** | Subscription row can exist, but digest has nothing to send (e.g. Water districts & utilities in TX/IL/MA/CO/MI/WA). |
 | **Meetings selections (partial)** | Even when meetings exist, `meetings` and `notices` popups both write `government_notice` today — independent meeting-only email not implemented (`docs/notices-vs-meetings-delivery-handoff.md`). |
 
 ---
@@ -281,11 +282,11 @@ The public `feeds` table is **not readable** via the anon key (0 rows returned).
 | **Planning, zoning & development** (gov) ↔ **Infrastructure** (news) | Gov = hearings/notices; News = quality/environment news | **Intentional but confusing** — similar words, different pipelines |
 | **Planning, zoning & development** ↔ Development tile subtopics | Tile was UI-only; real permits live on Development & Impact | **Accidental duplication (resolved)** — tile removed |
 | **Data Centers** | In Local News AND was in Development tile | **Same label, different dead ends** — news has no content; dev tile was non-deliverable |
-| **Water Quality** ↔ **Water companies** | News environmental quality vs government water-district hearings | **Intentional but poorly labeled** — "water" appears twice; companies ≠ quality |
+| **Water Quality** ↔ **Water districts & utilities** | News environmental quality vs government water-district hearings | **Intentional but poorly labeled** — "water" appears twice; companies ≠ quality |
 | **Infrastructure** (news) ↔ **Roads & Infrastructure** (removed dev) | News vs dev permit types | **Accidental** — dev removed |
 | **Public safety & emergencies** ↔ **Weather & Climate Hazards** | Gov emergencies vs news hazards | **Partial overlap** — storms could fit both; boundaries unclear |
 | **Animal & Human Viruses / Diseases** ↔ **Livestock, Crops, Pets & Wildlife Health** | Human/public health vs agricultural health | **Intentional split but awkward** — long labels, unclear boundary |
-| **Utilities** (removed dev) ↔ **Water companies** | Dev tile utility permits vs gov water districts | **Different concepts, similar user mental model** |
+| **Utilities** (removed dev) ↔ **Water districts & utilities** | Dev tile utility permits vs gov water districts | **Different concepts, similar user mental model** |
 
 ---
 
@@ -293,7 +294,7 @@ The public `feeds` table is **not readable** via the anon key (0 rows returned).
 
 | Current name | Proposed name | Rationale |
 |--------------|---------------|-----------|
-| Water companies | Water districts & utilities | Matches conservancy districts, authorities, co-ops |
+| Water districts & utilities | Water districts & utilities | Matches conservancy districts, authorities, co-ops |
 | County Commission & county business | County government | Clearer for non-commission states (boroughs, parishes) — **high impact, needs ingest sync** |
 | Planning, zoning & development | Planning & land use | Shorter; "development" overload |
 | Animal & Human Viruses / Diseases | Illness & disease outbreaks | Homeowner language |
@@ -311,7 +312,7 @@ The public `feeds` table is **not readable** via the anon key (0 rows returned).
 | Planning, zoning & development | same | Planning hearings, zoning notices, PMN planning | UT + wired counties | Overlaps "development" colloquially | P2 | Planning & land use |
 | Property taxes & assessments | same | Tax assessor notices | Canon only; sparse records | Empty in most test ZIPs | P1 — no feed in most places | (keep or rename to Property taxes) |
 | Public safety & emergencies | same | Emergency gov notices | Sparse | Vague vs news hazards | P2 | Public safety alerts |
-| Water companies | same | Water **district** board notices (PMN) | **Utah only** (9 real + 2 miscategorized) | Wrong entity type; 0 meetings; national empty label | **P1 rename** | Water districts & utilities |
+| Water districts & utilities | same | Water **district** board notices (PMN) | **Utah only** (9 real + 2 miscategorized) | Wrong entity type; 0 meetings; national empty label | **P1 rename** | Water districts & utilities |
 | Elections & voting | same | Election notices | Sparse | | P2 | (keep) |
 | City government (X) | same | City council meetings | UT wired cities | Pending cities in canon not delivered | P1 for pending | (keep pattern) |
 | Stratos data center project | same | Project-specific notices | Box Elder | State-specific on national popup pattern | P2 | (keep until project ends) |
@@ -335,16 +336,16 @@ The public `feeds` table is **not readable** via the anon key (0 rows returned).
 
 ### P1 — Topic has no working feed or maps incorrectly
 
-1. **Water companies** outside Utah — shown on every county-backbone ZIP, **0 records** in 6/8 test ZIPs.
-2. **Water companies** — 2 Eagle Mountain City Council notices miscategorized as `Water companies` (agency_name contradicts category).
+1. **Water districts & utilities** outside Utah — shown on every county-backbone ZIP, **0 records** in 6/8 test ZIPs.
+2. **Water districts & utilities** — 2 Eagle Mountain City Council notices miscategorized as `Water districts & utilities` (agency_name contradicts category).
 3. **Property taxes, Public safety, Elections** — in popup for all test ZIPs, **0 records** in most.
 4. **Utah County backbone** — county row missing 5 of 6 standard topics; Provo ZIP shows 2 topics instead of 7+.
 5. **City government (X)** — 17 cities in `government_topics_pending` in canon; not delivered as alerts yet.
 
 ### P2 — Misleading, duplicated, or inconsistent
 
-1. **Water companies** label — inaccurate for conservancy districts and municipal utilities.
-2. **Water companies under Upcoming Meetings** — 0 meeting rows; hearings appear as **notices** only.
+1. **Water districts & utilities** label — inaccurate for conservancy districts and municipal utilities.
+2. **Water districts & utilities under Upcoming Meetings** — 0 meeting rows; hearings appear as **notices** only.
 3. **Data Centers** — appears under Local News; was also on removed Development tile.
 4. **Stratos data center project** — UT-specific label on Box Elder ZIPs only; pattern doesn't generalize.
 5. **County Commission & county business** — commission-centric wording on Denver/Detroit/Seattle pages.

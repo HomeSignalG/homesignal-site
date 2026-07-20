@@ -18,7 +18,7 @@ set government_topics = array[
   'Planning, zoning & development',
   'Property taxes & assessments',
   'Public safety & emergencies',
-  'Water companies',
+  'Water districts & utilities',
   'Elections & voting',
   'Stratos data center project'
 ]
