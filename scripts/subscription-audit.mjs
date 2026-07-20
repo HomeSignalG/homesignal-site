@@ -3,6 +3,7 @@
  * Read-only subscription database audit.
  * Requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (bypasses RLS).
  * Outputs JSON sections to stdout for operator review.
+ * Post-reset verify: 2026-07-20 — expect all subscription counts zero.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
