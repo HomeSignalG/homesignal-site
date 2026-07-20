@@ -14,12 +14,17 @@ on:
     branches: [main]
     paths:
       - 'maps.html'
+      - 'dashboard.html'
+      - 'homesignalmap.html'
       - 'lib/map.js'
+      - 'lib/templates.js'
       - 'config.js'
       - 'shell.js'
       - 'partials/shell.html'
       - 'lib/data.js'
       - 'scripts/verify-maps.mjs'
+      - 'scripts/verify-map-markers.mjs'
+      - 'test/map-markers.test.mjs'
       - '.github/workflows/verify-maps.yml'
 
 jobs:
@@ -34,3 +39,5 @@ jobs:
         run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
       - name: Verify app-map facility-slot floor
         run: node scripts/verify-maps.mjs
+      - name: Verify canonical marker registry
+        run: node scripts/verify-map-markers.mjs

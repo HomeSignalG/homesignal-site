@@ -233,10 +233,10 @@
                so a resident's choice applies on every ZIP page and survives radius
                changes / navigation. -->
           <div class="mt">Status — pin color</div>
-          <div class="lyr" id="sttProposed"><span class="lbl"><span class="ld" style="background:#c47a1a"></span> Proposed</span><span class="tg"></span></div>
-          <div class="lyr" id="sttApproved"><span class="lbl"><span class="ld" style="background:#3f7fb0"></span> Approved</span><span class="tg"></span></div>
-          <div class="lyr" id="sttOperating"><span class="lbl"><span class="ld" style="background:#1f9d5c"></span> Operating / built</span><span class="tg"></span></div>
-          <div class="lyr" id="legFacility" style="display:none"><span class="lbl"><span class="ld" style="background:#6f42c1;border-radius:2px"></span> Regulated facility</span><span class="tg"></span></div>
+          <div class="lyr" id="sttProposed"><span class="lbl"><span class="ld"></span> Proposed</span><span class="tg"></span></div>
+          <div class="lyr" id="sttApproved"><span class="lbl"><span class="ld"></span> Approved</span><span class="tg"></span></div>
+          <div class="lyr" id="sttOperating"><span class="lbl"><span class="ld"></span> Operating / built</span><span class="tg"></span></div>
+          <div class="lyr" id="legFacility" style="display:none"><span class="lbl"><span class="ld"></span> Regulated facility</span><span class="tg"></span></div>
           <div class="shapeleg" id="shapeLegWrap" style="display:none">
             <div class="mt">Type — pin shape</div>
             <div id="shapeLegend"></div>
@@ -271,7 +271,7 @@
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js"></script>
 <script src="lib/why.js"></script>
-<script src="lib/map.js?v=20260720"></script>
+<script src="lib/map.js?v=20260720b"></script>
 <script src="shell.js"></script>
 <script>
 HS.onReady(async function () {
@@ -303,7 +303,6 @@ HS.onReady(async function () {
   }
 
   var LET = 'ABCDEFGHIJKLMNOP';
-  var FACILITY_HEX = '#6f42c1';   // regulated facilities — distinct from the status pin colors
   // opts.types / opts.qol are the top-of-page filters (null/empty = show everything,
   // so a signed-out default load is byte-identical to the pre-Sprint page the verifier checks).
   var opts = { radiusMi: 1.5, showRadius: true, showProjects: true, showFacilities: true, mode: 'impact', types: null, qol: null, view: 'all' };
@@ -315,7 +314,9 @@ HS.onReady(async function () {
   var PROJECT_TYPES = projects.map(function (p) { return p.type; })
     .filter(function (t, i, a) { return t && a.indexOf(t) === i; }).sort();
   var shapesPresent = {};
-  projects.forEach(function (p) { shapesPresent[HS.projectShape(p)] = 1; });
+  projects.forEach(function (p) { shapesPresent[HS.resolveMarker(p).shape] = 1; });
+
+  HS.paintStatusLegend();
 
   // Development pins (colored by permit STATUS — HS.mapStatus). Facilities are deliberately NOT concatenated here —
   // they render in their own labeled layer (facs) so they read as environmental context, never development.
@@ -433,6 +434,7 @@ HS.onReady(async function () {
     // the lettered pin set + how many mappable facilities exist, so CI can assert the
     // reserve-slot floor holds on the real 78617 data. Mirrors homesignalmap's __HS_SITES.
     window.__HS_MAP = { items: out, facCount: facs.length };
+    window.__HS_RESOLVE = HS.resolveMarker;
     return out;
   }
   // A facility lettered into shownItems must NOT also render as its own purple overlay
@@ -455,21 +457,17 @@ HS.onReady(async function () {
     .sort(function(a,b){ return String(b.occurred_at||'').localeCompare(String(a.occurred_at||'')); })
     .slice(0, 8);
 
-  function tierHex(it){ return HS.mapStatus(it).hex; }
-  function itemShape(it){ return it._facility ? 'square' : HS.projectShape(it); }
-  function markerColor(it){ return it._facility ? FACILITY_HEX : tierHex(it); }
-
   var gpsEl = document.getElementById('mapGps');
 
-  // ---------------- shape legend + filters (built once after data load) ------
   function buildShapeLegend() {
     var present = Object.keys(shapesPresent);
     if (!present.length) return;
     var wrap = document.getElementById('shapeLegWrap');
     var box = document.getElementById('shapeLegend');
+    var neutral = HS.markerRegistry.neutralHex;
     box.innerHTML = HS.SHAPE_LEGEND.filter(function (s) { return shapesPresent[s.shape]; })
       .map(function (s) {
-        return '<div class="shrow">' + HS.markerSVG(s.shape, '#6b7f76', '', 16) + '<span>' + HS.esc(s.label) + '</span></div>';
+        return '<div class="shrow">' + HS.markerSVG(s.shape, neutral, '', 16) + '<span>' + HS.esc(s.label) + '</span></div>';
       }).join('');
     wrap.style.display = '';
   }
@@ -478,13 +476,15 @@ HS.onReady(async function () {
     // Projects (by type) — real types present in this ZIP's data.
     var projMenu = document.getElementById('projMenu');
     var projPill = document.getElementById('projFilterPill');
+    var neutral = HS.markerRegistry.neutralHex;
     if (!PROJECT_TYPES.length) {
       projPill.style.opacity = '.5'; projPill.title = 'No project records to filter for this area yet';
     } else {
       projMenu.innerHTML = '<div class="fh">Show project types</div>'
         + PROJECT_TYPES.map(function (t) {
+            var mk = HS.resolveMarker({ type: t });
             return '<label><input type="checkbox" data-type="' + HS.esc(t) + '">'
-              + HS.markerSVG(HS.projectShape({ type: t }), '#6b7f76', '', 15)
+              + HS.markerSVG(mk.shape, neutral, '', 15)
               + '<span>' + HS.esc(t) + '</span></label>';
           }).join('')
         + '<button class="fclear" id="projClear" type="button">Show all types</button>';
@@ -628,11 +628,11 @@ HS.onReady(async function () {
       + ' Select one for the full picture.</div>'
       + '<div class="groupHead" style="margin-top:0">Near you · closest first</div>'
       + items.map(function (it, i) {
-        var col = markerColor(it), st = it.status ? HS.esc(it.status) : '';
-        var aria = HS.esc((it.name || it.title || '') + '. ' + (it.type || it.category || '') + (st ? ', ' + st : '') + (it.dist ? ', ' + it.dist + ' away' : ''));
+        var mk = HS.resolveMarker(it), col = mk.color, st = it.status ? HS.esc(it.status) : '';
+        var aria = HS.esc(mk.popupLabel);
         return '<div class="card mini clickable" data-pin="' + i + '" role="button" tabindex="0" aria-label="' + aria + '" style="border-left-color:' + col + '">'
           + '<span class="lens"><span class="letter" style="background:' + col + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px" aria-hidden="true">' + it._letter + '</span>&nbsp; '
-          + HS.esc(it.type || it.category || '') + (st ? ' · ' + st : '') + (it.dist ? ' · ' + HS.esc(it.dist) : '') + '</span>'
+          + HS.esc(mk.typeLabel || it.type || it.category || '') + (st ? ' · ' + st : '') + (it.dist ? ' · ' + HS.esc(it.dist) : '') + '</span>'
           + '<h3>' + HS.esc(it.name || it.title) + '</h3>'
           + '<p class="sowhat">' + HS.esc(it.sowhat || it.plain_language || '') + '</p></div>';
       }).join('');
@@ -640,7 +640,7 @@ HS.onReady(async function () {
     if (area.length) {
       html += '<div class="groupHead">Area-wide notices · affect the whole area</div>'
         + area.map(function (it, i) {
-          return '<div class="card mini' + (it.source_ref ? ' clickable" role="button" tabindex="0" data-area="' + i : '') + '" style="border-left-color:#6b7f76">'
+          return '<div class="card mini' + (it.source_ref ? ' clickable" role="button" tabindex="0" data-area="' + i : '') + '" style="border-left-color:' + HS.markerRegistry.neutralHex + '">'
             + '<span class="lens">' + HS.esc(it.category || 'Notice')
             + (it.occurred_at ? ' · ' + HS.esc(String(it.occurred_at).slice(0, 10)) : '') + '</span>'
             + '<h3>' + HS.esc(it.title || '') + '</h3>'
@@ -656,13 +656,13 @@ HS.onReady(async function () {
     if (sectionFacs.length) {
       html += sectionFacs.map(function (f, i) {
         var interp = HS.fac.interpret(f.facility_env || null);
-        return '<div class="card mini clickable" data-fac="' + i + '" role="button" tabindex="0" aria-label="' + HS.esc(f.name + '. Regulated facility' + (f.dist ? ', ' + f.dist + ' away' : '')) + '" style="border-left-color:' + FACILITY_HEX + '">'
+        return '<div class="card mini clickable" data-fac="' + i + '" role="button" tabindex="0" aria-label="' + HS.esc(f.name + '. Regulated facility' + (f.dist ? ', ' + f.dist + ' away' : '')) + '" style="border-left-color:' + HS.markerRegistry.facilityHex + '">'
           + '<span class="lens">' + HS.esc(f.type || 'Regulated facility') + (f.dist ? ' · ' + HS.esc(f.dist) : '') + '</span>'
           + '<h3>' + HS.esc(f.name) + '</h3>'
           + '<p class="sowhat">' + HS.esc(interp ? interp.line : 'Permit status not yet confirmed — open the facility record.') + '</p></div>';
       }).join('');
     } else {
-      html += '<div class="card mini" style="border-left-color:' + FACILITY_HEX + '">'
+      html += '<div class="card mini" style="border-left-color:' + HS.markerRegistry.facilityHex + '">'
         + '<p class="sowhat">Good news for this lens: no regulated industrial facilities are on the public record near this area.</p></div>';
     }
     panel.innerHTML = html;
@@ -705,7 +705,8 @@ HS.onReady(async function () {
     function entryCard(e, i, attr) {
       var it = byId[e.id] || e.item;
       var name = it.name || it.title || '';
-      var letter = it._letter ? '<span class="letter" style="background:' + markerColor(it) + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px" aria-hidden="true">' + it._letter + '</span>&nbsp; ' : '';
+      var mk = HS.resolveMarker(it);
+      var letter = it._letter ? '<span class="letter" style="background:' + mk.color + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px" aria-hidden="true">' + it._letter + '</span>&nbsp; ' : '';
       return '<div class="card mini clickable" ' + attr + '="' + i + '" role="button" tabindex="0" aria-label="' + HS.esc(e.badges.join(', ') + '. ' + name) + '">'
         + '<span class="lens">' + letter + badgeHTML(e) + '</span>'
         + '<h3>' + HS.esc(name) + '</h3>'
@@ -765,8 +766,9 @@ HS.onReady(async function () {
   // The 6-section project information panel (Sprint-1 spec). Every field renders only
   // from the real record; anything the record doesn't state is said to be absent, never guessed.
   function renderDetail(it) {
+    var mk = HS.resolveMarker(it);
     var title = it.name || it.title || 'Project';
-    var typeLabel = it.type || it.category || 'Record';
+    var typeLabel = mk.typeLabel || it.type || it.category || 'Record';
     var status = it.status || '';
     var statusClass = status === 'Active' || status === 'Operating' || status === 'Built' ? 'active'
       : status === 'Approved' ? 'appr' : status === 'Proposed' ? 'prop' : '';
@@ -778,7 +780,7 @@ HS.onReady(async function () {
       .filter(function (r) { return r[1]; })
       .map(function (r) { return '<div class="row"><span>' + HS.esc(r[0]) + '</span><b>' + HS.esc(r[1]) + '</b></div>'; }).join('');
     var summaryHTML = '<div class="isum">'
-      + '<span class="lens"><span class="letter" style="background:' + markerColor(it) + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px">' + (it._letter || '•') + '</span>&nbsp; '
+      + '<span class="lens"><span class="letter" style="background:' + mk.color + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px">' + (it._letter || '•') + '</span>&nbsp; '
       + HS.esc(typeLabel) + (it.dist ? ' · ' + HS.esc(it.dist) : '') + (status ? ' <span class="status ' + statusClass + '">' + HS.esc(status) + '</span>' : '') + '</span>'
       + '<h2>' + HS.esc(title) + '</h2>'
       + '<p class="lead">' + HS.esc(summary) + '</p>'
@@ -1003,7 +1005,7 @@ HS.onReady(async function () {
       var x=Math.max(20,Math.min(w-20, cx+east*pxPerMile)), y=Math.max(20,Math.min(h-20, cy-north*pxPerMile));
       var rect=document.createElementNS(NS,'rect');
       rect.setAttribute('x',x-7); rect.setAttribute('y',y-7); rect.setAttribute('width',14); rect.setAttribute('height',14);
-      rect.setAttribute('rx',3); rect.setAttribute('fill',FACILITY_HEX); rect.setAttribute('stroke','#fff'); rect.setAttribute('stroke-width',3);
+      rect.setAttribute('rx',3); rect.setAttribute('fill',HS.markerRegistry.facilityHex); rect.setAttribute('stroke','#fff'); rect.setAttribute('stroke-width',3);
       var t=document.createElementNS(NS,'title');
       t.textContent = f.name + ' · Regulated facility' + (f.dist?' · '+f.dist:'');
       rect.appendChild(t);
@@ -1031,17 +1033,38 @@ HS.onReady(async function () {
   // Build a clickable pin element (shape = type, color = status). Project pins open the
   // right info panel on click; facility pins keep their dossier popup.
   function pinEl(it, size){
+    var mk = HS.resolveMarker(it);
     var el=document.createElement('div');
     el.className='hspin';
     el.style.cssText='width:'+size+'px;height:'+size+'px;cursor:pointer;line-height:0';
-    el.innerHTML=HS.markerSVG(itemShape(it), markerColor(it), it._letter||'', size);
+    el.innerHTML=HS.markerSVG(mk.shape, mk.color, it._letter||'', size);
     el.setAttribute('role','button');
     el.tabIndex=0;
-    el.setAttribute('aria-label',(it.name||it.title||'Project')+', '+(it.type||it.category||'record')
-      +(it.status?', '+it.status:'')+(it.dist?', '+it.dist+' away':''));
+    el.setAttribute('aria-label', mk.popupLabel);
     el.addEventListener('keydown', function(e){ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); openItem(it); } });
     return el;
   }
+  // Live-verification hook (scripts/verify-map-markers.mjs): pin DOM must match resolveMarker.
+  window.__HS_MARKER_VERIFY = function () {
+    var fails = [];
+    var items = (window.__HS_MAP && window.__HS_MAP.items) || [];
+    items.forEach(function (it) {
+      var m = HS.resolveMarker(it);
+      var pin = pinEl(it, 26);
+      var svg = pin.innerHTML || '';
+      var geomOk = (m.shape === 'square' && svg.indexOf('<rect') !== -1)
+        || (m.shape === 'circle' && svg.indexOf('<circle') !== -1)
+        || (m.shape !== 'square' && m.shape !== 'circle' && svg.indexOf('<polygon') !== -1);
+      if (!geomOk) fails.push({ id: it.id, type: it.type, shape: m.shape, err: 'pin-geometry-mismatch' });
+      if (!it._facility && /industrial/i.test(String(it.type || '')) && m.shape === 'square') {
+        fails.push({ id: it.id, type: it.type, err: 'industrial-resolved-as-square' });
+      }
+      if (it._facility && (m.shape !== 'square' || m.color !== HS.markerRegistry.facilityHex)) {
+        fails.push({ id: it.id, type: it.type, shape: m.shape, color: m.color, err: 'facility-not-purple-square' });
+      }
+    });
+    return fails;
+  };
   function addMarkers(items){
     clearMarkers();
     if (hasRealHome) {
@@ -1058,11 +1081,13 @@ HS.onReady(async function () {
       glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([it.lng,it.lat]).addTo(glMap));
     });
     if (opts.showFacilities) unletteredFacs(items).forEach(function(f){
+      var fmk = HS.resolveMarker(Object.assign({}, f, { _facility: true, record_kind: 'facility' }));
       var el=document.createElement('div');
       el.className='hspin';
-      el.style.cssText='width:20px;height:20px;border-radius:3px;background:'+FACILITY_HEX+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer';
+      el.style.cssText='width:20px;height:20px;line-height:0;cursor:pointer';
+      el.innerHTML=HS.markerSVG(fmk.shape, fmk.color, '', 20);
       el.setAttribute('role','button');
-      el.setAttribute('aria-label',f.name+', regulated facility'+(f.dist?', '+f.dist+' away':''));
+      el.setAttribute('aria-label', fmk.popupLabel);
       glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([f.lng,f.lat])
         .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(facPopupHTML(f))).addTo(glMap));
     });
@@ -1166,14 +1191,16 @@ HS.onReady(async function () {
         .bindPopup(HS.homePopupHTML(home),{maxWidth:260}).addTo(lfMap));
     }
     items.forEach(function(it){
-      var m = L.marker([it.lat,it.lng],{icon:lfDivIcon('<div class="hspin" style="line-height:0">'+HS.markerSVG(itemShape(it), markerColor(it), it._letter||'', 26)+'</div>',26),
+      var mk = HS.resolveMarker(it);
+      var m = L.marker([it.lat,it.lng],{icon:lfDivIcon('<div class="hspin" style="line-height:0">'+HS.markerSVG(mk.shape, mk.color, it._letter||'', 26)+'</div>',26),
           title:(it.name||it.title||'')+' · '+(it.type||it.category||'')})
         .addTo(lfMap);
       m.on('click', function(){ openItem(it); });
       lfMarkers.push(m);
     });
     if (opts.showFacilities) unletteredFacs(items).forEach(function(f){
-      lfMarkers.push(L.marker([f.lat,f.lng],{icon:lfDivIcon('<div style="width:20px;height:20px;border-radius:3px;background:'+FACILITY_HEX+';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer"></div>',20)})
+      var fmk = HS.resolveMarker(Object.assign({}, f, { _facility: true, record_kind: 'facility' }));
+      lfMarkers.push(L.marker([f.lat,f.lng],{icon:lfDivIcon('<div style="line-height:0">'+HS.markerSVG(fmk.shape, fmk.color, '', 20)+'</div>',20)})
         .bindPopup(facPopupHTML(f),{maxWidth:260}).addTo(lfMap));
     });
   }
