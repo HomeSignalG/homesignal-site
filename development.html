@@ -118,10 +118,10 @@ HS.onReady(async function () {
       return '<button class="' + (on ? 'on' : '') + '" data-sort="' + k + '">' + label + '</button>';
     }
     function dataTable(a){
-      return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th><th>Distance</th><th>Impact</th></tr></thead><tbody>'
+      return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th><th>Distance</th><th>Quality of Life Score</th></tr></thead><tbody>'
         + a.map(function(p){ return '<tr onclick="location.href=\'development.html?id=' + p.id + '\'" onkeydown="if(event.key===\'Enter\')location.href=\'development.html?id=' + p.id + '\'" tabindex="0" style="cursor:pointer">'
           + '<td><b>' + HS.esc(p.name) + '</b></td><td>' + HS.esc(p.type) + '</td><td>' + HS.esc(p.status) + '</td>'
-          + '<td>' + HS.esc(p.stage||'') + '</td><td>' + HS.esc(p.dist||'') + '</td><td>' + (p.impact_score||'') + '</td></tr>'; }).join('')
+          + '<td>' + HS.esc(p.stage||'') + '</td><td>' + HS.esc(p.dist||'') + '</td><td>' + HS.esc((HS.impactScoreValue && HS.impactScoreValue(p.impact_score)) || '') + '</td></tr>'; }).join('')
         + '</tbody></table>';
     }
     function wire() {

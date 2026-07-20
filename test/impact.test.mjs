@@ -23,9 +23,33 @@ function lenOk(s) {
 test('devCard renders Impact line below title', () => {
   const html = readFileSync(new URL('../lib/templates.js', import.meta.url), 'utf8');
   assert.match(html, /class="impactline"/, 'devCard includes impactline');
-  assert.match(html, /<h3>\$\{esc\(p\.name\)\}<\/h3>\s*<p class="impactline">/, 'impact line sits under title');
+  assert.match(html, /<h3>\$\{esc\(p\.name\)\}<\/h3>\s*\$\{tpl\.devImpactBlock\(p\)\}/, 'impact block sits under title');
+  assert.match(html, /Quality of Life Impact Score:/, 'devCard includes QoL impact score line');
   const page = readFileSync(new URL('../development.html', import.meta.url), 'utf8');
   assert.match(page, /lib\/impact\.js/, 'development.html loads impact.js');
+  assert.match(page, /Quality of Life Score/, 'development table column renamed');
+});
+
+test('impactRating and impactScoreValue use stored impact_score', () => {
+  assert.strictEqual(HS.impactRating(72), 'High');
+  assert.strictEqual(HS.impactRating(55), 'Medium');
+  assert.strictEqual(HS.impactRating(34), 'Low');
+  assert.strictEqual(HS.impactRating(null), null);
+  assert.strictEqual(HS.impactScoreValue(72), '72 | High');
+  assert.strictEqual(HS.impactScoreValue(null), '');
+});
+
+test('devCard renders QoL score line between impact and sowhat', () => {
+  const p = projects[0];
+  const html = HS.tpl.devCard(p);
+  const impactIdx = html.indexOf('Impact:');
+  const scoreIdx = html.indexOf('Quality of Life Impact Score:');
+  const sowhatIdx = html.indexOf('On the record:');
+  const altSowhatIdx = html.indexOf('How it impacts you:');
+  const recordIdx = sowhatIdx >= 0 ? sowhatIdx : altSowhatIdx;
+  assert.ok(impactIdx >= 0 && scoreIdx > impactIdx, 'score line follows impact line');
+  assert.ok(recordIdx > scoreIdx, 'score line precedes on-the-record section');
+  assert.match(html, /Quality of Life Impact Score:<\/b> 88 \| High/, 'seed flagship shows score and rating on one line');
 });
 
 test('projectImpact is deterministic and length-bounded for seed projects', () => {
