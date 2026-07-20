@@ -2361,9 +2361,11 @@
     "Change of Use": "Development",
     "Residential Rehab": "Residential"
    },
+   "record_url_template": "https://aca-prod.accela.com/DETROIT/Cap/CapHome.aspx?module=Permits&TabName=Permits&RecordNumber={record_id}",
+   "record_url_precision": "record",
    "extra_where": "issued_date IS NOT NULL AND permit_type IN ('Accessory/Utility Structure','Add Addition Use','Add Additional Occupancy/Use','Addition','Alter Revision','Alteration','Change of Occupancy/Use','Change of Use','Foundation Only','New','New Revision','Residential Rehab')",
    "recency_days": 365,
-   "_receipts": "2026-07-15: FRESH \u2014 max issued_date 2026-07-14 (pg_net stat). esriGeometryPoint, native zip_code + latitude/longitude columns; 16 permit_type values VERBATIM (returnDistinctValues) \u2014 Correct Violation / Fire Insurance Escrow / Fire Repair / Other dropped at source; NO status column (issuance ledger; field description: 'The permit is issued when the permit application is approved') -> dataset-level status via NEW status_const 'Issued', guarded by issued_date IS NOT NULL. issued_date is esriFieldTypeDateOnly (string dates; DATE literal filter live-verified: 522 rows since 2026-06-15). Receipt row 48226: BLD2026-00771 'Alteration' issued 2026-05-26. record_id is an Accela id but no per-row URL column and no verified portal URL pattern -> dataset-precision record_url (Denver/Minneapolis precedent). submitted_date exists but is unmapped (recency keys on issuance \u2014 the event this ledger records)."
+   "_receipts": "2026-07-15: FRESH \u2014 max issued_date 2026-07-14 (pg_net stat). esriGeometryPoint, native zip_code + latitude/longitude columns; 16 permit_type values VERBATIM (returnDistinctValues) \u2014 Correct Violation / Fire Insurance Escrow / Fire Repair / Other dropped at source; NO status column (issuance ledger; field description: 'The permit is issued when the permit application is approved') -> dataset-level status via NEW status_const 'Issued', guarded by issued_date IS NOT NULL. issued_date is esriFieldTypeDateOnly (string dates; DATE literal filter live-verified: 522 rows since 2026-06-15). Receipt row 48226: BLD2026-00771 'Alteration' issued 2026-05-26. CORRECTION 2026-07-20: record-precision record_url via verified Detroit eLAPS Accela search URL (RecordNumber={record_id}); dataset landing page was colliding 5:1 in app_changes (48226 audit FAIL)."
   },
   {
    "registry_id": "detroit-trades-permits",
@@ -2406,9 +2408,11 @@
     "Mechanical Permit": "Trades",
     "Plumbing Permit": "Trades"
    },
+   "record_url_template": "https://aca-prod.accela.com/DETROIT/Cap/CapHome.aspx?module=Permits&TabName=Permits&RecordNumber={record_id}",
+   "record_url_precision": "record",
    "extra_where": "issued_date IS NOT NULL AND permit_type IN ('Boiler PV Permit','Electrical Permit','Elevator Permit','Fire Alarm Permit','Generator Permit','Mechanical Permit','Plumbing Permit')",
    "recency_days": 365,
-   "_receipts": "2026-07-15: FRESH \u2014 max issued_date 2026-07-14. Point layer, native zip_code + lat/lng; 7 permit_type values VERBATIM (all kept \u2014 FOUNDER-SPECIFIED: the Detroit trio explicitly includes Trades, unlike the trades-noise drop in WA/MN/IL; single-entry revert restores comparability). No status column -> status_const 'Issued' + issued_date IS NOT NULL guard."
+   "_receipts": "2026-07-15: FRESH \u2014 max issued_date 2026-07-14. Point layer, native zip_code + lat/lng; 7 permit_type values VERBATIM (all kept \u2014 FOUNDER-SPECIFIED: the Detroit trio explicitly includes Trades, unlike the trades-noise drop in WA/MN/IL; single-entry revert restores comparability). No status column -> status_const 'Issued' + issued_date IS NOT NULL guard. CORRECTION 2026-07-20: record-precision Accela eLAPS URL per record_id (48226 had 5 elevator/trades rows sharing one Hub landing page)."
   },
   {
    "registry_id": "detroit-demolition-permits",
@@ -2441,9 +2445,11 @@
      "Issued"
     ]
    },
+   "record_url_template": "https://aca-prod.accela.com/DETROIT/Cap/CapHome.aspx?module=Permits&TabName=Permits&RecordNumber={record_id}",
+   "record_url_precision": "record",
    "extra_where": "issued_date IS NOT NULL",
    "recency_days": 365,
-   "_receipts": "2026-07-15: FRESH \u2014 max issued_date 2026-07-10. Point layer, native zip_code + lat/lng; NO permit_type column (single-purpose demolition ledger \u2014 use_type stays unclassified, absent stays absent) and NO status column -> status_const 'Issued' + issued_date IS NOT NULL guard. Title falls back work_description -> address."
+   "_receipts": "2026-07-15: FRESH \u2014 max issued_date 2026-07-10. Point layer, native zip_code + lat/lng; NO permit_type column (single-purpose demolition ledger \u2014 use_type stays unclassified, absent stays absent) and NO status column -> status_const 'Issued' + issued_date IS NOT NULL guard. Title falls back work_description -> address. CORRECTION 2026-07-20: record-precision Accela eLAPS URL per record_id."
   },
   {
    "registry_id": "ann-arbor-energov-permits",
