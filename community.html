@@ -20,6 +20,7 @@
 <script>
 HS.onReady(async function () {
   var zip = new URLSearchParams(location.search).get('zip') || HS.state.zip;
+  var focusScore = new URLSearchParams(location.search).get('focus') === 'score';
   HS.state.zip = zip;
   var page = document.getElementById('commPage');
   var robots = document.getElementById('robots-meta');
@@ -111,7 +112,7 @@ HS.onReady(async function () {
     + '<button class="inlinebtn" onclick="HS.openModal(\'shareModal\')">◍ Invite your neighbors</button>'
     + '</div>'
     + '<div style="margin-top:14px"><div class="bt" style="font-size:13px;color:var(--ink-2);margin-bottom:6px">Your communities</div><div id="commStrip">' + HS.communitiesStripHTML() + '</div></div></div>'
-    + '<div class="strip">'
+    + '<div class="strip" id="zip-score-strip">'
     + HS.tpl.statTile(c.community_score, 'Community score', 'g')
     + HS.tpl.statTile(devTotal, 'Development projects', '')
     + HS.tpl.statTile(meetings.length, 'Public meetings', 'accent')
@@ -148,6 +149,13 @@ HS.onReady(async function () {
     + '<div class="p2i"><div style="flex:1"><div class="t">Population &amp; demographics</div><div class="d">Community DNA radar, household mix</div></div><span class="feed">+ Census (free)</span></div>'
     + '<div class="p2i"><div style="flex:1"><div class="t">Median home value &amp; market</div><div class="d">Prices, growth outlook</div></div><span class="feed">+ market data</span></div></div>'
     + '</div></div>';
+
+  if (focusScore) {
+    setTimeout(function () {
+      var el = document.getElementById('zip-score-strip');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  }
 });
 </script>
 </body>

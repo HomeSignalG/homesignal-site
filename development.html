@@ -26,6 +26,9 @@
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
   var id = new URLSearchParams(location.search).get('id');
+  var qs = new URLSearchParams(location.search);
+  var initLens = qs.get('lens');
+  var initSort = qs.get('sort');
   var page = document.getElementById('devPage');
   // Never hang on the loading skeleton: a failed read renders an honest
   // "couldn't load" state with a retry (same contract as maps.html).
@@ -47,7 +50,12 @@ HS.onReady(async function () {
   function statusRank(s){ return s==='Proposed'?0:s==='Active'?1:2; }
 
   function renderList() {
-    var state2 = { lens: 0, sort: 'impact', dataView: false };
+    var state2 = {
+      lens: initLens != null && initLens !== '' ? parseInt(initLens, 10) : 0,
+      sort: initSort || 'impact',
+      dataView: false
+    };
+    if (isNaN(state2.lens) || state2.lens < 0 || state2.lens > 2) state2.lens = 0;
     function sorted() {
       var a = projects.slice();
       if (state2.lens === 1) { // what's being built — group by type & stage

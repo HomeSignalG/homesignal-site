@@ -22,28 +22,28 @@
     <div class="cols">
       <div>
         <div class="block" style="padding:16px 18px">
-          <div class="bt-row"><h2>What's changing around you</h2><a href="maps.html" data-znav="maps.html">Open full map →</a></div>
-          <div class="mapwrap" id="dashMap" style="box-shadow:none"></div>
+          <div class="bt-row"><h2>What's changing around you</h2><a href="maps.html" data-znav="maps.html" id="dashMapLink">Open full map →</a></div>
+          <div class="mapwrap dash-mapwrap" id="dashMap" style="box-shadow:none" tabindex="0" role="region" aria-label="Map preview — open the full map"></div>
         </div>
-        <div class="bt-row"><h2 style="font-size:15px;margin:0">Recent activity near you</h2><a href="alerts.html" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">All alerts →</a></div>
+        <div class="bt-row"><h2 style="font-size:15px;margin:0">Recent activity near you</h2><a href="alerts.html" data-znav="alerts.html" id="dashAllAlerts" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">All alerts →</a></div>
         <div id="dashRecent"></div>
       </div>
       <div>
         <div class="block">
           <div class="bt-row"><h2>Your Saved Places</h2><a href="properties.html">Manage →</a></div>
           <div id="dashProps"></div>
-          <button class="addbtn" style="width:100%;justify-content:center;margin-top:10px" onclick="HS.addHome()">+ Add a Saved Place</button>
+          <button class="addbtn" type="button" style="width:100%;justify-content:center;margin-top:10px" id="dashAddPlace">+ Add a Saved Place</button>
         </div>
         <div class="block">
-          <div class="bt-row"><h2>Your communities</h2><a href="community.html">Open →</a></div>
+          <div class="bt-row"><h2>Your ZIP Codes</h2><a href="community.html" data-znav="community.html" id="dashZipOpen">Open →</a></div>
           <div id="dashCommunities"></div>
         </div>
         <div class="block" id="dashWatchBlock">
-          <div class="bt-row"><h2>Worth watching nearby</h2><a href="maps.html" data-znav="maps.html">See on map →</a></div>
+          <div class="bt-row"><h2>Worth watching nearby</h2><a href="maps.html" data-znav="maps.html" id="dashWatchMap">See on map →</a></div>
           <div class="chips" id="dashWatch"></div>
         </div>
         <div class="block">
-          <h2 class="bt">Upcoming meetings</h2>
+          <div class="bt-row"><h2 class="bt" style="margin:0"><a href="alerts.html" data-znav="alerts.html" id="dashMeetingsHead" class="section-link">Upcoming meetings</a></h2></div>
           <div id="dashMeetings"></div>
         </div>
       </div>
@@ -61,7 +61,10 @@
 <script src="shell.js"></script>
 <script>
 HS.onReady(async function () {
-  var S = HS.state, home = S.activeProperty;
+  var S = HS.state, home = S.activeProperty, zip = S.zip;
+  var realHome = HS.realHome();
+  var nav = HS.pageHref ? HS.pageHref.bind(HS) : function (p, o) { return HS.navHref(p, (o && o.zip) || zip); };
+
   // Never hang silently: a failed read renders an honest retry state.
   var c, projects, changes, meetings;
   try {
@@ -77,79 +80,120 @@ HS.onReady(async function () {
     return;
   }
 
+  function mapCtx() {
+    var o = { zip: zip };
+    if (realHome && realHome.id) o.place = realHome.id;
+    return o;
+  }
+
   // FIRST-TIME vs RETURNING: a signed-out visitor has never been here — never
   // greet them "Welcome back"; lead with what HomeSignal does. With no homes
-  // followed, the subline is an invitation (plus honest sample-community
-  // disclosure), never "0 homes followed".
+  // followed, the subline is an invitation (plus honest sample-ZIP disclosure),
+  // never "0 homes followed".
   var name = S.session && S.session.name ? S.session.name.split(' ')[0] : '';
   document.getElementById('dashHi').textContent = S.session
     ? (name ? 'Welcome back, ' + name : 'Welcome back')
     : 'See what\'s changing around your home';
   document.getElementById('dashSub').textContent = S.properties.length
-    ? S.properties.length + ' saved place' + (S.properties.length===1?'':'s') + ' — here\'s what needs you across them.'
+    ? S.properties.length + ' saved place' + (S.properties.length === 1 ? '' : 's') + ' — here\'s what needs you across them.'
     : 'Add your home and we\'ll watch official county and permit records around it'
-      + ((HS.isSample && HS.isSample()) ? ' — right now you\'re viewing our sample community, Del Valle, TX.' : '.');
+      + ((HS.isSample && HS.isSample()) ? ' — right now you\'re viewing our sample ZIP code, Del Valle, TX.' : '.');
 
-  var openCount = changes.filter(function(x){var d=HS.daysUntil(x.window_closes_at);return d!=null&&d>=0;}).length;
+  var openCount = changes.filter(function (x) { var d = HS.daysUntil(x.window_closes_at); return d != null && d >= 0; }).length;
   document.getElementById('dashStrip').innerHTML =
-    HS.tpl.statTile(projects.length, 'Projects near you', '')
-    + HS.tpl.statTile(openCount, 'Action windows open', 'accent')
-    + (c && c.growth_pressure ? HS.tpl.statTile('<span style="font-size:19px">' + HS.esc(c.growth_pressure) + '</span>', 'Growth pressure', '') : '')
-    + (c && c.community_score != null ? HS.tpl.statTile(c.community_score, 'Community score', 'g') : '');
+    HS.tpl.statTileLink(projects.length, 'Projects near you', '', nav('development.html', Object.assign({ sort: 'distance' }, mapCtx())))
+    + HS.tpl.statTileLink(openCount, 'Action windows open', 'accent', nav('alerts.html', Object.assign({ band: 'open' }, mapCtx())))
+    + (c && c.growth_pressure ? HS.tpl.statTileLink('<span style="font-size:19px">' + HS.esc(c.growth_pressure) + '</span>', 'Growth pressure', '', nav('development.html', Object.assign({ lens: 2 }, mapCtx()))) : '')
+    + (c && c.community_score != null ? HS.tpl.statTileLink(c.community_score, 'ZIP Score', 'g', nav('community.html', Object.assign({ focus: 'score' }, mapCtx()))) : '');
+
+  // Stamp ZIP-aware header links (paintNavHrefs runs at boot; re-stamp after we know data).
+  var mapHref = nav('maps.html', mapCtx());
+  ['dashMapLink', 'dashWatchMap', 'dashAllAlerts', 'dashZipOpen', 'dashMeetingsHead'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (id === 'dashMeetingsHead') el.href = nav('alerts.html', Object.assign({ category: 'Government & civic' }, mapCtx()));
+    else if (id === 'dashAllAlerts') el.href = nav('alerts.html', mapCtx());
+    else if (id === 'dashZipOpen') el.href = nav('community.html', mapCtx());
+    else el.href = mapHref;
+  });
 
   // map preview — HS.buildLive is the guarded backbone chain (GL -> Leaflet raster
   // -> schematic; never throws into this init). NEVER-FAKED rule: the home dot and
   // home-anchored center exist ONLY for a real resident home in this ZIP — otherwise
   // the ZIP centroid (app_community_meta.lat/lng) anchors, else the first record.
-  // No hardcoded fallback coordinates.
-  var items = changes.filter(function(x){return !x.quiet;}).concat(projects)
-    .filter(function(x){return x.lat && x.lng;}).slice(0, 6);
+  var items = changes.filter(function (x) { return !x.quiet; }).concat(projects)
+    .filter(function (x) { return x.lat && x.lng; }).slice(0, 6);
   var dashMap = document.getElementById('dashMap');
-  var hasRealHome = !!HS.realHome();
-  var center = (hasRealHome ? {lat:home.lat,lng:home.lng} : null)
-    || (c && c.lat != null && c.lng != null ? {lat:c.lat,lng:c.lng} : null)
-    || (items[0] ? {lat:items[0].lat,lng:items[0].lng} : null);
-  HS.buildLive(dashMap, { center: center, items: items, home: hasRealHome ? home : null,
-    interactive: false, zoom: 12.4, radiusMi: 1.5, w: 640, h: 300 });
-  // The preview is a doorway, not a dead end: the whole surface opens the full
-  // map (its markers are non-interactive by design at this size).
+  var hasRealHome = !!realHome;
+  var center = (hasRealHome ? { lat: home.lat, lng: home.lng } : null)
+    || (c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : null)
+    || (items[0] ? { lat: items[0].lat, lng: items[0].lng } : null);
+
+  function goMapPreview() { location.href = mapHref; }
+  function onMarkerClick(it) {
+    var href = HS.itemNavHref ? HS.itemNavHref(it, zip) : null;
+    if (href) location.href = href;
+  }
+
+  HS.buildLive(dashMap, {
+    center: center, items: items, home: hasRealHome ? home : null,
+    interactive: true, zoom: 12.4, radiusMi: 1.5, w: 640, h: 300,
+    itemClick: onMarkerClick
+  });
+
+  // The preview surface opens the full map; marker clicks route to the record.
   dashMap.style.cursor = 'pointer';
-  dashMap.setAttribute('role', 'link');
-  dashMap.setAttribute('aria-label', 'Open the full map of what\'s changing around you');
-  dashMap.tabIndex = 0;
-  dashMap.addEventListener('click', function () { location.href = HS.navHref('maps.html', S.zip); });
-  dashMap.addEventListener('keydown', function (e) { if (e.key === 'Enter') location.href = HS.navHref('maps.html', S.zip); });
+  dashMap.addEventListener('click', function (e) {
+    if (e.target.closest('[data-hs-map-item]')) return;
+    goMapPreview();
+  });
+  dashMap.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.target.closest('[data-hs-map-item]')) goMapPreview();
+  });
 
-  // recent — ranked by impact
-  var recent = changes.filter(function(x){return !x.quiet;})
-    .sort(function(a,b){return (b.impacts?b.impacts.length:0)-(a.impacts?a.impacts.length:0);}).slice(0,2);
-  document.getElementById('dashRecent').innerHTML = recent.map(function(ch){ return HS.tpl.miniCard(ch, ch.category); }).join('');
-
-  // properties
-  document.getElementById('dashProps').innerHTML = S.properties.map(function(p){
-    return '<div class="swrow" onclick="HS.selectProperty(\'' + p.id + '\');location.href=\'property.html?id=' + p.id + '\'">'
-      + '<div class="miniscore">' + (p.score||'') + '</div>'
-      + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + ' <span style="font-size:10px;color:var(--green);font-weight:700">· ' + HS.esc(String(p.tag || p.label || 'home').toUpperCase()) + '</span></div>'
-      + '<div class="pa">' + HS.esc(p.city) + '</div></div></div>';
+  // recent — ranked by impact; each card opens its alert or project detail.
+  var recent = changes.filter(function (x) { return !x.quiet; })
+    .sort(function (a, b) { return (b.impacts ? b.impacts.length : 0) - (a.impacts ? a.impacts.length : 0); }).slice(0, 2);
+  document.getElementById('dashRecent').innerHTML = recent.map(function (ch) {
+    var href = HS.itemNavHref ? HS.itemNavHref(ch, zip) : null;
+    return HS.tpl.miniCardLink(ch, ch.category, href);
   }).join('');
 
-  // your followed communities
-  document.getElementById('dashCommunities').innerHTML = HS.communitiesStripHTML();
+  // properties — each row selects that place and opens its property page.
+  document.getElementById('dashProps').innerHTML = S.properties.map(function (p) {
+    return '<a class="swrow swrow-link" href="property.html?id=' + encodeURIComponent(p.id) + '" data-place-id="' + HS.esc(p.id) + '">'
+      + '<div class="miniscore">' + (p.score || '') + '</div>'
+      + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + ' <span style="font-size:10px;color:var(--green);font-weight:700">· ' + HS.esc(String(p.tag || p.label || 'home').toUpperCase()) + '</span></div>'
+      + '<div class="pa">' + HS.esc(p.city) + '</div></div></a>';
+  }).join('');
+  document.getElementById('dashProps').addEventListener('click', function (e) {
+    var row = e.target.closest('[data-place-id]');
+    if (row) HS.selectProperty(row.getAttribute('data-place-id'));
+  });
 
-  // Worth watching nearby — the closest REAL project records (never a canned
-  // list): each chip opens that project's page. No records -> the block hides.
+  document.getElementById('dashAddPlace').addEventListener('click', function () { HS.addHome(); });
+
+  // followed ZIP codes
+  document.getElementById('dashCommunities').innerHTML = HS.communitiesStripHTML({ zipLabels: true });
+
+  // Worth watching nearby — closest REAL project records; each chip opens detail.
   var watch = projects.slice()
-    .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);}).slice(0,4);
+    .sort(function (a, b) { return (a.distance_mi || 9e9) - (b.distance_mi || 9e9); }).slice(0, 4);
   if (watch.length) {
-    document.getElementById('dashWatch').innerHTML = watch.map(function(p){
-      return '<a class="wchip" style="cursor:pointer;text-decoration:none;color:inherit" href="development.html?id=' + encodeURIComponent(p.id) + '">'
+    document.getElementById('dashWatch').innerHTML = watch.map(function (p) {
+      return '<a class="wchip wchip-link" href="' + HS.esc(nav('development.html', { zip: zip, id: p.id })) + '">'
         + HS.esc(p.name) + (p.dist ? ' · ' + HS.esc(p.dist) : '') + '</a>';
     }).join('');
   } else {
     var wb = document.getElementById('dashWatchBlock'); if (wb) wb.style.display = 'none';
   }
 
-  document.getElementById('dashMeetings').innerHTML = meetings.map(HS.tpl.meetingRow).join('');
+  document.getElementById('dashMeetings').innerHTML = meetings.length
+    ? meetings.map(function (m) {
+        var href = HS.meetingNavHref ? HS.meetingNavHref(m, zip) : null;
+        return HS.tpl.meetingRowLink(m, href);
+      }).join('')
+    : '<p class="quiet" style="font-size:12.5px;margin:0">No upcoming public meetings on file for this ZIP yet.</p>';
 });
 </script>
 </body>

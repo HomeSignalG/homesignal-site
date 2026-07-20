@@ -246,6 +246,10 @@
 <script src="shell.js"></script>
 <script>
 HS.onReady(async function () {
+  var qs = new URLSearchParams(location.search);
+  var deepId = qs.get('id');
+  var deepPlace = qs.get('place');
+  if (deepPlace) HS.selectProperty(deepPlace);
   var S = HS.state, home = S.activeProperty;
   // Load everything the page needs up front, but NEVER hang on the skeleton: a failed
   // read renders an honest "couldn't load" state with a retry, not a frozen shimmer.
@@ -1198,6 +1202,21 @@ HS.onReady(async function () {
   } else {
     setActiveMode('impact');
     showSchematic();
+  }
+
+  if (deepId) {
+    setTimeout(function () {
+      var pick = all.find(function (x) { return x.id === deepId; })
+        || projects.find(function (x) { return x.id === deepId; })
+        || facs.find(function (x) { return x.id === deepId; });
+      if (pick) {
+        if (pick._facility || (facilities || []).some(function (f) { return f.id === pick.id; })) {
+          location.href = HS.pageHref('development.html', { zip: S.zip, id: pick.id });
+        } else {
+          selectItem(pick);
+        }
+      }
+    }, 400);
   }
 
   // View toggle: All Projects <-> What's Changed. Switching lands on the new

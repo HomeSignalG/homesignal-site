@@ -8,6 +8,7 @@ const {
   parseZipFromAddress,
   resolveViewedZip,
   navHref,
+  pageHref,
   hasViewedZipContext,
   ZIP_NAV_PAGES,
   MAP_PAGES
@@ -51,6 +52,8 @@ ok(navHref('maps.html', '84101').indexOf('78617') === -1,
   'navHref does not substitute the sample ZIP when a different ZIP is passed');
 ok(navHref('maps.html', DEF) === 'maps.html?zip=78617',
   'navHref encodes an explicitly passed default ZIP');
+ok(pageHref('alerts.html', { zip: '84101', band: 'open' }) === 'alerts.html?zip=84101&band=open',
+  'pageHref preserves zip + deep-link params');
 
 // --- map cross-navigation (maps.html ↔ homesignalmap.html) ---
 ok(navHref('homesignalmap.html', '90210') === 'homesignalmap.html?zip=90210',
@@ -86,6 +89,7 @@ ok(/SS\.set\('viewZip'/.test(shell), 'viewZip stored in sessionStorage (not myZi
 ok(!/LS\.set\('myZip'/.test(shell.match(/function captureUrlViewZip[\s\S]*?return z;\s*}/)?.[0] || 'x'),
   'captureUrlViewZip does not write myZip');
 ok(/hasViewedZipContext/.test(shell), 'shell.js exposes hasViewedZipContext');
+ok(/HS\.pageHref/.test(shell), 'shell.js exposes pageHref');
 ok(/parseZipFromAddress/.test(shell), 'shell.js exposes parseZipFromAddress');
 
 // --- page contracts: cross-links + "See it on the map" ---
@@ -109,8 +113,8 @@ ok(!/location\.href='maps\.html'/.test(devPage),
   'development.html does not hardcode bare maps.html');
 ok(/data-znav="maps\.html"/.test(dash),
   'dashboard map links use data-znav');
-ok(/HS\.navHref\('maps\.html',\s*S\.zip\)/.test(dash),
-  'dashboard map click uses HS.navHref with active ZIP');
+ok(/nav\('maps\.html',\s*mapCtx\(\)\)/.test(dash) || /HS\.navHref\('maps\.html',\s*S\.zip\)/.test(dash),
+  'dashboard map click preserves ZIP via pageHref/navHref');
 ok(/data-znav="maps\.html"/.test(today),
   'today.html Map link uses data-znav');
 ok(/parseZipFromAddress/.test(devMapHtml) && /HS\.state\.zip\s*=\s*addrZip/.test(devMapHtml),

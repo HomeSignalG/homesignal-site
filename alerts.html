@@ -47,6 +47,10 @@
 <script>
 HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
+  var qs = new URLSearchParams(location.search);
+  var focusBand = qs.get('band');
+  var focusCategory = qs.get('category');
+  var focusId = qs.get('id');
   // Never hang silently: a failed read renders an honest retry state.
   var c, all;
   try {
@@ -123,6 +127,34 @@ HS.onReady(async function () {
     [].forEach.call(this.querySelectorAll('button'), function(x){x.classList.remove('on');});
     b.classList.add('on'); render(b.dataset.sort);
   });
+
+  // Deep-link focus from Dashboard (band=open, category=..., id=...).
+  function applyFocus() {
+    var target = null;
+    if (focusId) {
+      var cards = document.querySelectorAll('[data-alert-id]');
+      for (var j = 0; j < cards.length; j++) {
+        if (cards[j].getAttribute('data-alert-id') === focusId) { target = cards[j]; break; }
+      }
+    }
+    if (!target && focusBand === 'open') {
+      target = document.getElementById('alBand');
+    }
+    if (!target && focusCategory) {
+      var heads = document.querySelectorAll('.groupHead');
+      for (var i = 0; i < heads.length; i++) {
+        if (heads[i].textContent.indexOf(focusCategory) >= 0) { target = heads[i]; break; }
+      }
+    }
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (focusId && target.classList && target.classList.contains('card')) {
+        target.style.boxShadow = '0 0 0 2px var(--green)';
+        setTimeout(function () { target.style.boxShadow = ''; }, 2400);
+      }
+    }
+  }
+  setTimeout(applyFocus, 80);
 });
 </script>
 </body>

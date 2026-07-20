@@ -38,6 +38,47 @@
       if (!zip || !/^\d{5}$/.test(String(zip))) return page;
       return page + '?zip=' + encodeURIComponent(String(zip));
     };
+    HS.pageHref = function (page, opts) {
+      if (!page) return page;
+      opts = opts || {};
+      const params = new URLSearchParams();
+      const zip = opts.zip;
+      if (zip && /^\d{5}$/.test(String(zip))) params.set('zip', String(zip));
+      Object.keys(opts).forEach(k => {
+        if (k === 'zip') return;
+        const v = opts[k];
+        if (v == null || v === '') return;
+        params.set(k, String(v));
+      });
+      const qs = params.toString();
+      return page + (qs ? '?' + qs : '');
+    };
+    HS.itemNavHref = function (it, zip) {
+      if (!it) return null;
+      zip = zip && /^\d{5}$/.test(String(zip)) ? String(zip) : null;
+      if (it.type || it.record_kind === 'facility' || it._facility) {
+        return HS.pageHref('development.html', { zip, id: it.id });
+      }
+      if (it.related_project_id) {
+        return HS.pageHref('development.html', { zip, id: it.related_project_id });
+      }
+      if (it.window_closes_at != null) {
+        try {
+          const d = Math.ceil((new Date(it.window_closes_at) - new Date()) / 86400000);
+          if (d >= 0) return HS.pageHref('alerts.html', { zip, band: 'open', id: it.id });
+        } catch (e) { /* fall through */ }
+      }
+      if (it.id) return HS.pageHref('alerts.html', { zip, id: it.id });
+      return null;
+    };
+    HS.meetingNavHref = function (m, zip) {
+      if (!m) return null;
+      zip = zip && /^\d{5}$/.test(String(zip)) ? String(zip) : null;
+      if (m.related_project_id) {
+        return HS.pageHref('development.html', { zip, id: m.related_project_id });
+      }
+      return HS.pageHref('alerts.html', { zip, category: 'Government & civic', id: m.id });
+    };
     HS.ZIP_NAV_PAGES = ['today.html', 'dashboard.html', 'alerts.html', 'development.html', 'maps.html', 'homesignalmap.html', 'community.html'];
     HS.MAP_PAGES = ['maps.html', 'homesignalmap.html'];
     HS.hasViewedZipContext = function (opts) {
@@ -703,15 +744,20 @@
     if (box) box.innerHTML = '<div style="font-weight:700;color:var(--ink,#12261d)">✓ Emailing you development &amp; hearings for '
       + HS.esc(info.zip) + '.</div><div style="color:var(--ink-3,#5a6b63);margin-top:4px">Unsubscribe anytime.</div>';
   };
-  // Chip row of followed communities (+ an add button), reused across pages.
-  HS.communitiesStripHTML = function () {
+  // Chip row of followed ZIP codes (+ an add button), reused across pages.
+  HS.communitiesStripHTML = function (opts) {
+    opts = opts || {};
     const list = HS.followedCommunities();
     const chips = list.map(c =>
-      '<a class="wchip" href="community.html?zip=' + encodeURIComponent(c.zip) + '" style="text-decoration:none">◍ ' +
+      '<a class="wchip" href="' + HS.esc(HS.pageHref('community.html', { zip: c.zip })) + '" style="text-decoration:none">◍ ' +
       HS.esc(c.name || ('ZIP ' + c.zip)) + '</a>').join('');
-    const empty = list.length ? '' : '<span class="quiet" style="font-size:12.5px;margin-right:8px">No communities yet.</span>';
+    const emptyLabel = opts.zipLabels
+      ? 'No ZIP codes yet.'
+      : 'No communities yet.';
+    const addLabel = opts.zipLabels ? '＋ Add a ZIP Code' : '＋ Add a zip code';
+    const empty = list.length ? '' : '<span class="quiet" style="font-size:12.5px;margin-right:8px">' + emptyLabel + '</span>';
     return '<div class="chips">' + empty + chips +
-      '<button class="wchip" type="button" onclick="HS.openLoc()" style="cursor:pointer;border-style:dashed">＋ Add a zip code</button></div>';
+      '<button class="wchip" type="button" onclick="HS.openLoc()" style="cursor:pointer;border-style:dashed">' + addLabel + '</button></div>';
   };
 
   // -------------------------------------------------- topic picker ------------
