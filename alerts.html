@@ -111,11 +111,28 @@ HS.onReady(async function () {
       dist: m.dist
     };
   }
+  function dedupeMeetings(items) {
+    var seen = {}, out = [];
+    items.forEach(function (it) {
+      var key = (it.source_ref || '') + '|' + (it.title || '') + '|' + String(it.occurred_at || it.window_closes_at || '');
+      if (seen[key]) return;
+      seen[key] = 1;
+      out.push(it);
+    });
+    return out;
+  }
+  function buildMeetingsPool() {
+    var fromApi = meetings.map(meetingAsChange);
+    var fromChanges = all.filter(isMeetingMirror).map(function (ch) {
+      return Object.assign({}, ch, { category: ch.category || 'Upcoming Meetings' });
+    });
+    return dedupeMeetings(fromApi.concat(fromChanges));
+  }
 
   var pools = {
     gov: all.filter(isGovNotice),
     news: all.filter(isNewsItem),
-    meetings: meetings.map(meetingAsChange)
+    meetings: buildMeetingsPool()
   };
 
   function resolveTab(cat) {
@@ -130,8 +147,21 @@ HS.onReady(async function () {
   }
 
   var state = { tab: resolveTab(focusCategory), sort: 'urgency' };
+  // When the default tab is empty but another feed has records, land on the first
+  // non-empty tab (unless a category deep link explicitly chose the tab).
+  if (!focusCategory && !pools[state.tab].length) {
+    ['gov', 'meetings', 'news'].some(function (k) {
+      if (pools[k].length) { state.tab = k; return true; }
+    });
+  }
 
   function itemsForTab(tab) { return pools[tab] || pools.gov; }
+
+  var TAB_EMPTY = {
+    gov: 'No government notices on file for this ZIP yet — check Upcoming Meetings for public hearings and agendas.',
+    meetings: 'No upcoming public meetings on file for this ZIP yet.',
+    news: 'No local news items on file for this ZIP yet.'
+  };
 
   function paintStrip(items) {
     var open = items.filter(function (x) { var d = HS.daysUntil(x.window_closes_at); return d != null && d >= 0; });
@@ -180,7 +210,9 @@ HS.onReady(async function () {
       return '<div class="groupHead" data-category="' + HS.esc(g) + '"><span class="gd ' + col + '"></span> ' + HS.esc(g)
         + ' <span class="gc">— ' + groups[g].length + ' change' + (groups[g].length===1?'':'s') + '</span></div>'
         + groups[g].map(function(ch){ return HS.tpl.storyCard(ch); }).join('');
-    }).join('') : '';
+    }).join('') : (!open.length && !quiet.length
+      ? '<div class="quiet" style="margin-top:4px"><b>Nothing in this category right now.</b> ' + HS.esc(TAB_EMPTY[tab] || '') + '</div>'
+      : '');
 
     document.getElementById('alQuiet').innerHTML = quiet.length ? (
       '<div class="groupHead" style="color:var(--ink-3)"><span class="gd" style="background:var(--line)"></span> Good to know · lower relevance to you</div>'

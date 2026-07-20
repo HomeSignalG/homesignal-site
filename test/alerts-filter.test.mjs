@@ -24,6 +24,7 @@ ok(/id="alSortSelect"/.test(alerts) && /By urgency/.test(alerts) && /By date/.te
 ok(/resolveTab/.test(alerts) && /applyFocus/.test(alerts),
   'alerts preserves category deep-link helpers');
 ok(/HS\.data\.meetings/.test(alerts), 'alerts loads meetings for meetings tab');
-ok(/isGovNotice/.test(alerts) && /isNewsItem/.test(alerts), 'alerts classifies change rows by feed');
+ok(/buildMeetingsPool|dedupeMeetings/.test(alerts), 'alerts merges meeting mirrors into meetings pool');
+ok(/TAB_EMPTY/.test(alerts), 'alerts has per-tab empty state copy');
 
 process.exit(fails ? 1 : 0);
