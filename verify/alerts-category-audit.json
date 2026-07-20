@@ -1,0 +1,246 @@
+{
+  "at": "2026-07-20T13:55:05.033Z",
+  "materializedZips": 7910,
+  "categoriesMandatory": [
+    "Government Notices",
+    "Upcoming Meetings",
+    "Local News"
+  ],
+  "uiThreeTiles": "PASS — hardcoded in alerts.html (static for all ZIPs)",
+  "newsTopicsPerZip": 12,
+  "production": {
+    "totalAlerts": 967,
+    "totalMeetings": 1380,
+    "government_noticeAlerts": 260,
+    "news_alertAlerts": 0,
+    "rootsWithGovContent": 43
+  },
+  "govTopicCountDistribution": {
+    "1": 3,
+    "2": 25,
+    "6": 7863,
+    "7": 17,
+    "8": 2
+  },
+  "stdBackboneCountDistribution": {
+    "1": 28,
+    "6": 7882
+  },
+  "zipsNoCommunity": 0,
+  "utahPartialCountyBackbone": 28,
+  "representative": [
+    {
+      "zip": "02138",
+      "state": "MA",
+      "data_quality": "pass",
+      "resolved": "Cambridge (02138)",
+      "govTopicCount": 6,
+      "stdBackbone": 6,
+      "govTopics": [
+        "County Commission & county business",
+        "Planning, zoning & development",
+        "Property taxes & assessments",
+        "Public safety & emergencies",
+        "Water companies",
+        "Elections & voting"
+      ],
+      "rootId": "de259186-579c-4a59-9416-aba0ed29b9a3",
+      "topicsWithAlerts": 0,
+      "topicsWithMeetings": 0,
+      "anyGovContent": false
+    },
+    {
+      "zip": "48226",
+      "state": "MI",
+      "data_quality": "pass",
+      "resolved": "Detroit (48226)",
+      "govTopicCount": 6,
+      "stdBackbone": 6,
+      "govTopics": [
+        "County Commission & county business",
+        "Planning, zoning & development",
+        "Property taxes & assessments",
+        "Public safety & emergencies",
+        "Water companies",
+        "Elections & voting"
+      ],
+      "rootId": "84e0d885-aaa0-4ec1-b9c0-9d1183e879c0",
+      "topicsWithAlerts": 0,
+      "topicsWithMeetings": 0,
+      "anyGovContent": false
+    },
+    {
+      "zip": "60601",
+      "state": "IL",
+      "data_quality": "pass",
+      "resolved": "Chicago (60601)",
+      "govTopicCount": 6,
+      "stdBackbone": 6,
+      "govTopics": [
+        "County Commission & county business",
+        "Planning, zoning & development",
+        "Property taxes & assessments",
+        "Public safety & emergencies",
+        "Water companies",
+        "Elections & voting"
+      ],
+      "rootId": "67329d70-9e88-4bc9-bc11-5c1869fb0850",
+      "topicsWithAlerts": 0,
+      "topicsWithMeetings": 0,
+      "anyGovContent": false
+    },
+    {
+      "zip": "78617",
+      "state": "TX",
+      "data_quality": "pass",
+      "resolved": "Del Valle (78617)",
+      "govTopicCount": 6,
+      "stdBackbone": 6,
+      "govTopics": [
+        "County Commission & county business",
+        "Planning, zoning & development",
+        "Property taxes & assessments",
+        "Public safety & emergencies",
+        "Water companies",
+        "Elections & voting"
+      ],
+      "rootId": "b0d7b834-4fcf-49bf-a018-0cb611de065c",
+      "topicsWithAlerts": 0,
+      "topicsWithMeetings": 1,
+      "anyGovContent": true
+    },
+    {
+      "zip": "80202",
+      "state": "CO",
+      "data_quality": "pass",
+      "resolved": "Denver (80202)",
+      "govTopicCount": 6,
+      "stdBackbone": 6,
+      "govTopics": [
+        "County Commission & county business",
+        "Planning, zoning & development",
+        "Property taxes & assessments",
+        "Public safety & emergencies",
+        "Water companies",
+        "Elections & voting"
+      ],
+      "rootId": "57ebc736-e42e-4ce9-b35d-2ae5c01585a1",
+      "topicsWithAlerts": 0,
+      "topicsWithMeetings": 0,
+      "anyGovContent": false
+    },
+    {
+      "zip": "84101",
+      "state": "UT",
+      "data_quality": "pass",
+      "resolved": "Salt Lake City (84101)",
+      "govTopicCount": 6,
+      "stdBackbone": 6,
+      "govTopics": [
+        "County Commission & county business",
+        "Planning, zoning & development",
+        "Property taxes & assessments",
+        "Public safety & emergencies",
+        "Water companies",
+        "Elections & voting"
+      ],
+      "rootId": "d4de538f-6475-4f1a-96b8-bf72c8412416",
+      "topicsWithAlerts": 2,
+      "topicsWithMeetings": 1,
+      "anyGovContent": true
+    },
+    {
+      "zip": "84302",
+      "state": "UT",
+      "data_quality": "pass",
+      "resolved": "Brigham City",
+      "govTopicCount": 8,
+      "stdBackbone": 6,
+      "govTopics": [
+        "City government (Brigham City)",
+        "County Commission & county business",
+        "Planning, zoning & development",
+        "Property taxes & assessments",
+        "Public safety & emergencies",
+        "Water companies",
+        "Elections & voting",
+        "Stratos data center project"
+      ],
+      "rootId": "d67c558f-1f04-4811-a565-873ae2afd6f3",
+      "topicsWithAlerts": 6,
+      "topicsWithMeetings": 4,
+      "anyGovContent": true
+    },
+    {
+      "zip": "84336",
+      "state": "UT",
+      "data_quality": "pass",
+      "resolved": "Snowville",
+      "govTopicCount": 7,
+      "stdBackbone": 6,
+      "govTopics": [
+        "County Commission & county business",
+        "Planning, zoning & development",
+        "Property taxes & assessments",
+        "Public safety & emergencies",
+        "Water companies",
+        "Elections & voting",
+        "Stratos data center project"
+      ],
+      "rootId": "d67c558f-1f04-4811-a565-873ae2afd6f3",
+      "topicsWithAlerts": 6,
+      "topicsWithMeetings": 3,
+      "anyGovContent": true
+    },
+    {
+      "zip": "84604",
+      "state": "UT",
+      "data_quality": "pass",
+      "resolved": "Provo (84604)",
+      "govTopicCount": 2,
+      "stdBackbone": 1,
+      "govTopics": [
+        "City government (Provo)",
+        "County Commission & county business"
+      ],
+      "rootId": "625a808d-74f0-491a-95a7-0d7ebd1e3761",
+      "topicsWithAlerts": 2,
+      "topicsWithMeetings": 2,
+      "anyGovContent": true
+    },
+    {
+      "zip": "98101",
+      "state": "WA",
+      "data_quality": "pass",
+      "resolved": "Seattle (98101)",
+      "govTopicCount": 6,
+      "stdBackbone": 6,
+      "govTopics": [
+        "County Commission & county business",
+        "Planning, zoning & development",
+        "Property taxes & assessments",
+        "Public safety & emergencies",
+        "Water companies",
+        "Elections & voting"
+      ],
+      "rootId": "c64b08fe-1c3e-4134-93a4-885c4c9f8a05",
+      "topicsWithAlerts": 0,
+      "topicsWithMeetings": 1,
+      "anyGovContent": true
+    }
+  ],
+  "findings": {
+    "p0": [
+      "Local News: 0 production alerts with pipeline_type=news_alert — subscriptions cannot deliver email content.",
+      "Gov Notices vs Upcoming Meetings: both write pipeline_type=government_notice; independent meeting-only subscription not implemented."
+    ],
+    "p1": [
+      "7158/7910 materialized ZIPs (90.5%) have zero gov-topic alerts AND meetings at chain root — topics shown but no feed-backed records.",
+      "28 Utah ZIP(s) inherit a county row with <6 backbone government_topics (e.g. Utah County = 1 topic). Popup topic list inconsistent with national standard."
+    ],
+    "p2": [
+      "alerts.html has no per-category empty-state copy distinguishing \"no records yet\" vs \"no source coverage\" on topic tiles.",
+      "Topic tile counts show \"N topics followed\" only — no signal when a followed topic has zero feed coverage."
+    ]
+  }
+}
