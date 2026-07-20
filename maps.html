@@ -184,9 +184,12 @@
         <button data-view="changed" aria-pressed="false">✦ What's Changed</button>
       </div>
       <div class="seg" id="mapMode">
-        <button class="on" data-mode="impact">Impact</button>
-        <button data-mode="satellite">Satellite</button>
+        <!-- Order: Street | Satellite | Focus. "Focus" is the simplified HomeSignal
+             schematic view; its data-mode key stays "impact" so all view logic,
+             deep links, and active-button wiring below are unchanged. -->
         <button data-mode="street">Street</button>
+        <button data-mode="satellite">Satellite</button>
+        <button class="on" data-mode="impact">Focus</button>
       </div>
       <div class="sp"></div>
       <div class="fwrap">
