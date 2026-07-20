@@ -264,9 +264,243 @@
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') ['topicsModal', 'premiumModal', 'shareModal', 'locModal', 'switcherModal', 'authModal', 'homeModal']
       .forEach(HS.closeModal);
+    // First-time onboarding is non-dismissible — no Escape close.
   });
 
-  // ------------------------------------------------------------- mobile nav --
+  // -------------------------------------------------- first-time onboarding -----------
+  // Full-screen flow for signed-in residents with no saved home AND no saved ZIP.
+  // Completion is implicit: once a location is saved, needsOnboarding() is false.
+  // Clearing the saved location re-opens onboarding on next sign-in / page load.
+  let _onbSavedZip = null;
+  let _onbOptin = null;
+
+  function loadOnboardingLib() {
+    if (window.HSOnboarding) return Promise.resolve();
+    return new Promise(function (resolve, reject) {
+      if (document.querySelector('script[data-hs-onboarding]')) {
+        if (window.HSOnboarding) resolve(); else reject(new Error('onboarding script pending'));
+        return;
+      }
+      const s = document.createElement('script');
+      s.src = 'lib/onboarding.js';
+      s.dataset.hsOnboarding = '1';
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error('onboarding script failed')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  HS.needsOnboarding = function () {
+    const O = window.HSOnboarding;
+    if (!O) return false;
+    return O.needsOnboarding(state.session, LS.get('myZip', null), state.activeProperty);
+  };
+
+  function onbEl(id) { return document.getElementById(id); }
+  function onbMsg(text, err) {
+    const m = onbEl('onbMsg'); if (!m) return;
+    m.textContent = text || '';
+    m.classList.toggle('err', !!err);
+  }
+
+  function showOnbStep(step) {
+    const steps = ['onbStepWelcome', 'onbStepLocation', 'onbStepDest'];
+    steps.forEach(function (id) {
+      const el = onbEl(id); if (!el) return;
+      const active = id === step;
+      el.hidden = !active;
+      el.classList.toggle('onb-active', active);
+      el.classList.remove('onb-exit');
+    });
+    const overlay = onbEl('onboardingOverlay');
+    if (overlay) {
+      const titles = { onbStepWelcome: 'onbWelcomeTitle', onbStepLocation: 'onbLocTitle', onbStepDest: 'onbDestTitle' };
+      overlay.setAttribute('aria-labelledby', titles[step] || 'onbWelcomeTitle');
+    }
+    if (step === 'onbStepLocation') {
+      setTimeout(function () {
+        const a = onbEl('onbAddr'); if (a) a.focus();
+      }, 320);
+    }
+  }
+
+  function transitionOnbStep(fromId, toId) {
+    const from = onbEl(fromId);
+    if (from) from.classList.add('onb-exit');
+    setTimeout(function () { showOnbStep(toId); }, 220);
+  }
+
+  function refreshOnbContinue() {
+    const O = window.HSOnboarding; if (!O) return;
+    const addr = (onbEl('onbAddr') && onbEl('onbAddr').value) || '';
+    const zip = (onbEl('onbZip') && onbEl('onbZip').value) || '';
+    const btn = onbEl('onbContinueBtn');
+    if (btn) btn.disabled = !O.canContinue(addr, zip);
+    onbMsg('');
+    const unc = onbEl('onbUncovered'); if (unc) unc.classList.add('hidden');
+  }
+
+  function paintOnbDestinations(zip) {
+    const O = window.HSOnboarding; if (!O) return;
+    const grid = onbEl('onbDestGrid'); if (!grid) return;
+    const saved = onbEl('onbSavedZip'); if (saved) saved.textContent = zip;
+    grid.innerHTML = '';
+    Object.keys(O.DESTINATIONS).forEach(function (key) {
+      const d = O.DESTINATIONS[key];
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'onb-dest';
+      btn.setAttribute('role', 'listitem');
+      btn.innerHTML = '<span class="icon" aria-hidden="true">' + d.icon + '</span>'
+        + '<span class="copy"><strong>' + HS.esc(d.title) + '</strong><span>' + HS.esc(d.desc) + '</span></span>';
+      btn.onclick = function () { HS.finishOnboarding(key); };
+      grid.appendChild(btn);
+    });
+  }
+
+  async function saveOnboardingAddress(addr) {
+    let m = null, unavailable = false;
+    try {
+      const r = await HS.sb().functions.invoke('geocode-address', { body: { address: addr } });
+      if (r.error) unavailable = true;
+      else m = (r.data && r.data.match) || null;
+    } catch (e) { unavailable = true; }
+    if (unavailable) throw new Error("The address service couldn't be reached — please try again in a minute.");
+    if (!m || m.lat == null || m.lng == null || !m.zip) {
+      throw new Error("We couldn't confirm that address against U.S. Census records — check the street, city and state, then try again.");
+    }
+    const row = {
+      user_id: state.session.user.id,
+      address: String(m.matchedAddress || '').split(',')[0],
+      city: m.city || null, state: m.state || null, zip: m.zip,
+      lat: m.lat, lng: m.lng, label: 'home'
+    };
+    let r = null;
+    try { r = await HS.sb().from('app_properties').insert(row).select().single(); } catch (e) { r = { error: e }; }
+    if (!r || r.error || !r.data) throw new Error("Couldn't save your home — please try again.");
+    LS.set('activeProp', r.data.id);
+    state.activePropId = r.data.id;
+    state.properties = await HS.data.properties();
+    if (await HS.data.isCovered(m.zip)) {
+      let meta = null; try { meta = await HS.data.community(m.zip); } catch (e) {}
+      HS.followCommunity({ zip: m.zip, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
+      _onbOptin = await HS.ensureAreaSubscribed(m.zip, false, true);
+    }
+    state.zip = m.zip;
+    paintTopbar();
+    return m.zip;
+  }
+
+  async function saveOnboardingZip(zip) {
+    const covered = await HS.data.isCovered(zip);
+    if (!covered) return { covered: false, zip: zip };
+    let meta = null; try { meta = await HS.data.community(zip); } catch (e) {}
+    HS.followCommunity({ zip: zip, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
+    _onbOptin = await HS.ensureAreaSubscribed(zip, false, true);
+    paintTopbar();
+    return { covered: true, zip: zip };
+  }
+
+  HS.startOnboarding = function () {
+    if (!HS.needsOnboarding()) return;
+    const overlay = onbEl('onboardingOverlay'); if (!overlay) return;
+    _onbSavedZip = null;
+    _onbOptin = null;
+    if (onbEl('onbAddr')) onbEl('onbAddr').value = '';
+    if (onbEl('onbZip')) onbEl('onbZip').value = '';
+    onbMsg('');
+    const unc = onbEl('onbUncovered'); if (unc) unc.classList.add('hidden');
+    refreshOnbContinue();
+    overlay.hidden = false;
+    requestAnimationFrame(function () { overlay.classList.add('show'); });
+    showOnbStep('onbStepWelcome');
+    document.body.style.overflow = 'hidden';
+  };
+
+  HS.finishOnboarding = function (destKey) {
+    const O = window.HSOnboarding;
+    const zip = _onbSavedZip || state.zip;
+    if (!O || !zip) return;
+    const href = O.destinationHref(destKey, zip, HS.navHref);
+    if (!href) return;
+    const overlay = onbEl('onboardingOverlay');
+    if (overlay) {
+      overlay.classList.remove('show');
+      setTimeout(function () { overlay.hidden = true; document.body.style.overflow = ''; }, 280);
+    }
+    if (_onbOptin) {
+      try { sessionStorage.setItem('hs:areaOptin', JSON.stringify(_onbOptin)); } catch (e) {}
+    }
+    location.href = href;
+  };
+
+  HS.continueOnboarding = async function () {
+    const O = window.HSOnboarding; if (!O) return;
+    const addr = (onbEl('onbAddr') && onbEl('onbAddr').value) || '';
+    const zipInput = (onbEl('onbZip') && onbEl('onbZip').value) || '';
+    const mode = O.inputMode(addr, zipInput);
+    if (!mode) return;
+    const btn = onbEl('onbContinueBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    onbMsg('');
+    try {
+      let savedZip = null;
+      if (mode === 'address') {
+        onbMsg('Confirming your address…');
+        savedZip = await saveOnboardingAddress(addr.trim());
+      } else {
+        const z = zipInput.trim();
+        onbMsg('Saving your ZIP…');
+        const res = await saveOnboardingZip(z);
+        if (!res.covered) {
+          if (onbEl('onbUncoveredZip')) onbEl('onbUncoveredZip').textContent = z;
+          onbEl('onbUncovered').classList.remove('hidden');
+          onbMsg('This ZIP is not live yet — request it below or try another.', true);
+          if (btn) { btn.disabled = false; btn.textContent = 'Continue'; }
+          return;
+        }
+        savedZip = res.zip;
+      }
+      _onbSavedZip = savedZip;
+      paintOnbDestinations(savedZip);
+      transitionOnbStep('onbStepLocation', 'onbStepDest');
+    } catch (e) {
+      onbMsg((e && e.message) || 'Something went wrong — please try again.', true);
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Continue'; refreshOnbContinue(); }
+  };
+
+  HS.submitOnboardingRequest = async function () {
+    const el = onbEl('onbReqEmail'), e = el && el.value.trim();
+    if (!e || e.indexOf('@') < 1) { if (el) { el.style.borderColor = '#c23b34'; el.focus(); } return; }
+    if (el) el.style.borderColor = '';
+    const row = { email: e, zip: (onbEl('onbUncoveredZip') && onbEl('onbUncoveredZip').textContent) || '' };
+    const ref = HS.referralToken(); if (ref) row.source = ref;
+    await persistEmail('community_requests', row);
+    onbMsg('Request received — we will email you when your area goes live.');
+    if (onbEl('onbUncovered')) onbEl('onbUncovered').classList.add('hidden');
+  };
+
+  function wireOnboarding() {
+    const welcomeBtn = onbEl('onbWelcomeBtn');
+    if (welcomeBtn) welcomeBtn.onclick = function () { transitionOnbStep('onbStepWelcome', 'onbStepLocation'); };
+    const cont = onbEl('onbContinueBtn');
+    if (cont) cont.onclick = function () { HS.continueOnboarding(); };
+    const addr = onbEl('onbAddr'), zip = onbEl('onbZip');
+    if (addr) {
+      addr.addEventListener('input', refreshOnbContinue);
+      addr.addEventListener('keydown', function (e) { if (e.key === 'Enter') HS.continueOnboarding(); });
+    }
+    if (zip) {
+      zip.addEventListener('input', refreshOnbContinue);
+      zip.addEventListener('keydown', function (e) { if (e.key === 'Enter') HS.continueOnboarding(); });
+    }
+    const req = onbEl('onbReqBtn');
+    if (req) req.onclick = function () { HS.submitOnboardingRequest(); };
+    const reqEmail = onbEl('onbReqEmail');
+    if (reqEmail) reqEmail.addEventListener('keydown', function (e) { if (e.key === 'Enter') HS.submitOnboardingRequest(); });
+  }
+
   HS.toggleMenu = function () {
     document.querySelector('.side').classList.toggle('open');
     $('sidebackdrop').classList.toggle('show');
@@ -340,14 +574,17 @@
         // reflect the new session in the top bar without a full reload
         try { const s = await HS.sb().auth.getSession(); if (s && s.data && s.data.session) state.session = s.data.session; } catch (e) {}
         await hydrateTopicPrefs();
+        try {
+          state.properties = await HS.data.properties();
+          if (!state.activePropId && state.properties[0]) state.activePropId = state.properties[0].id;
+        } catch (e) {}
         HS.paintTopicCounts();
         paintTopbar();
         setTimeout(() => {
           HS.closeModal('authModal');
           const back = new URLSearchParams(location.search).get('return');
-          if (!LS.get('myZip', null)) {
-            // brand-new account with no saved area -> onboard: ask for their ZIP
-            HS.openLoc(true);
+          if (HS.needsOnboarding && HS.needsOnboarding()) {
+            HS.startOnboarding();
           } else {
             location.href = back ? decodeURIComponent(back) : location.pathname;
           }
@@ -693,7 +930,7 @@
   // The exact wording the resident affirms when they tap "Email me these alerts" — stored
   // on the users row (marketing_consent_copy) as the audit trail of what they agreed to.
   const AREA_CONSENT_COPY = 'Email me new development & hearing alerts for this ZIP. No spam · unsubscribe anytime.';
-  HS.ensureAreaSubscribed = async function (zip, willNavigate) {
+  HS.ensureAreaSubscribed = async function (zip, willNavigate, suppressUi) {
     if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) return;
     zip = String(zip || '').trim();
     if (!/^\d{5}$/.test(zip)) return;
@@ -715,8 +952,11 @@
     // Surface the inline email opt-in card. Reload/redirect callers stash a one-shot flag
     // boot() renders on the destination page; in-place callers render immediately.
     const info = { zip: zip, communityId: ct.rootId, topics: labels };
-    if (willNavigate) { try { sessionStorage.setItem('hs:areaOptin', JSON.stringify(info)); } catch (e) {} }
-    else HS.showAreaOptin(info);
+    if (!suppressUi) {
+      if (willNavigate) { try { sessionStorage.setItem('hs:areaOptin', JSON.stringify(info)); } catch (e) {} }
+      else HS.showAreaOptin(info);
+    }
+    return info;
   };
   // The inline EMAIL OPT-IN card — a persistent, deliberately-tapped affirmative (never a
   // disappearing toast, per the founder consent decision). Shown after a covered follow.
@@ -1103,6 +1343,7 @@
   async function boot() {
     captureReferral();          // first-touch attribution, before anything can fail
     await injectShell();
+    try { await loadOnboardingLib(); wireOnboarding(); } catch (e) { console.warn('onboarding', e); }
     await bootSession();
     await hydrateTopicPrefs();
     await syncFollowsFromAccount();
@@ -1121,6 +1362,7 @@
       const optin = sessionStorage.getItem('hs:areaOptin');
       if (optin) { sessionStorage.removeItem('hs:areaOptin'); setTimeout(() => { try { HS.showAreaOptin(JSON.parse(optin)); } catch (e) {} }, 400); }
     } catch (e) {}
+    if (HS.needsOnboarding && HS.needsOnboarding()) HS.startOnboarding();
     _resolveReady(HS);
   }
 
