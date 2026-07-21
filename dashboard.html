@@ -8,7 +8,19 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://*.tile.openstreetmap.org; form-action 'self'">
 <link rel="stylesheet" href="app.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<style>#dashMap{height:300px}#dashMap .maplibregl-canvas{border-radius:15px}</style>
+<style>
+#dashMap{height:300px}
+#dashMap .maplibregl-canvas{border-radius:15px}
+.dash-mapwrap{position:relative}
+.dash-sidepanel{position:absolute;top:0;right:0;bottom:0;width:min(320px,92%);z-index:5;
+  background:#fff;border-left:1px solid var(--line);box-shadow:-6px 0 18px rgba(0,0,0,.1);
+  transform:translateX(100%);visibility:hidden;transition:transform .2s ease,visibility .2s;
+  display:flex;flex-direction:column;border-radius:0 15px 15px 0;overflow:hidden}
+.dash-sidepanel.open{transform:translateX(0);visibility:visible}
+.dash-sidepanel .dash-pclose{position:absolute;top:8px;right:10px;z-index:2;width:28px;height:28px;border-radius:50%;
+  border:1px solid var(--line);background:#fff;color:var(--ink-3);font-size:16px;cursor:pointer}
+.dash-sidepanel .dash-pinlist{flex:1;overflow:auto;padding:14px 14px 16px;padding-top:40px;font-size:13px}
+</style>
 </head>
 <body data-nav="dash">
 <template id="hs-content">
@@ -23,7 +35,13 @@
       <div>
         <div class="block" style="padding:16px 18px">
           <div class="bt-row"><h2>What's changing around you</h2><a href="maps.html" data-znav="maps.html" id="dashMapLink">Open full map →</a></div>
-          <div class="mapwrap dash-mapwrap" id="dashMap" style="box-shadow:none" tabindex="0" role="region" aria-label="Map preview — open the full map"></div>
+          <div class="mapwrap dash-mapwrap" id="dashMapWrap" style="box-shadow:none">
+            <div id="dashMap" tabindex="0" role="region" aria-label="Map preview — open the full map"></div>
+            <aside class="dash-sidepanel" id="dashInfoSlide" role="complementary" aria-label="Record details" aria-hidden="true">
+              <button class="dash-pclose" id="dashPanelClose" type="button" aria-label="Close panel">×</button>
+              <div class="dash-pinlist" id="dashInfoPanel"></div>
+            </aside>
+          </div>
         </div>
         <div class="bt-row"><h2 style="font-size:15px;margin:0">Recent activity near you</h2><a href="alerts.html" data-znav="alerts.html" id="dashAllAlerts" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">All alerts →</a></div>
         <div id="dashRecent"></div>
@@ -125,15 +143,35 @@ HS.onReady(async function () {
   var items = changes.filter(function (x) { return !x.quiet; }).concat(projects)
     .filter(function (x) { return x.lat && x.lng; }).slice(0, 6);
   var dashMap = document.getElementById('dashMap');
+  var dashMapWrap = document.getElementById('dashMapWrap');
   var hasRealHome = !!realHome;
   var center = (hasRealHome ? { lat: home.lat, lng: home.lng } : null)
     || (c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : null)
     || (items[0] ? { lat: items[0].lat, lng: items[0].lng } : null);
 
+  function renderDashDetail(it) {
+    var mk = HS.resolveMarker(it);
+    var panel = document.getElementById('dashInfoPanel');
+    var name = it.name || it.title || 'Record';
+    var typeLabel = mk.typeLabel || it.type || it.category || 'Project';
+    var summary = it.sowhat || it.plain_language || it.stage || 'On the public record near you.';
+    panel.innerHTML = '<div style="font-size:12px;color:var(--ink-3)">' + HS.esc(typeLabel)
+      + (it.status ? ' · ' + HS.esc(it.status) : '') + (it.dist ? ' · ' + HS.esc(it.dist) : '') + '</div>'
+      + '<h3 style="margin:6px 0 8px;font-size:16px">' + HS.esc(name) + '</h3>'
+      + '<p style="margin:0;line-height:1.5;color:var(--ink-2)">' + HS.esc(summary) + '</p>'
+      + (it.source_ref ? '<button class="btn primary" style="margin-top:12px" onclick="window.open(\'' + HS.esc(it.source_ref) + '\',\'_blank\',\'noopener\')">View official record ▸</button>' : '');
+  }
+  var dashSidebar = HS.createMapSidebar({
+    panel: 'dashInfoPanel',
+    slide: 'dashInfoSlide',
+    onSelect: function (it) { renderDashDetail(it); }
+  });
+  document.getElementById('dashPanelClose').addEventListener('click', function () { dashSidebar.close(); });
+
   function goMapPreview() { location.href = mapHref; }
   function onMarkerClick(it) {
-    var href = HS.itemNavHref ? HS.itemNavHref(it, zip) : null;
-    if (href) location.href = href;
+    if (!it) return;
+    dashSidebar.select(it);
   }
 
   HS.buildLive(dashMap, {
@@ -148,14 +186,14 @@ HS.onReady(async function () {
     }
   });
 
-  // The preview surface opens the full map; marker clicks route to the record.
-  dashMap.style.cursor = 'pointer';
-  dashMap.addEventListener('click', function (e) {
-    if (dashMap._hsDragged || e.target.closest('[data-hs-map-item]')) return;
+  // The preview surface opens the full map on background click; marker clicks open the sidebar.
+  dashMapWrap.style.cursor = 'pointer';
+  dashMapWrap.addEventListener('click', function (e) {
+    if (dashMap._hsDragged || e.target.closest('[data-hs-map-item]') || e.target.closest('.dash-sidepanel')) return;
     goMapPreview();
   });
-  dashMap.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.target.closest('[data-hs-map-item]')) goMapPreview();
+  dashMapWrap.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.target.closest('[data-hs-map-item]') && e.target.id === 'dashMap') goMapPreview();
   });
 
   var projectIds = new Set(projects.map(function (p) { return p.id; }));

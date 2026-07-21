@@ -100,21 +100,29 @@
   .homepin{width:30px;height:30px;border-radius:9px;background:var(--green);border:2px solid #fff;
     display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 7px rgba(0,0,0,.4)}
   .leaflet-marker-icon.homepin{margin-left:-15px;margin-top:-15px}
-  .mk3tip{position:absolute;z-index:6;display:none;pointer-events:none;max-width:230px;
-    background:rgba(10,18,20,.93);color:#eaf5f1;border:1px solid rgba(255,255,255,.15);
-    border-radius:10px;padding:8px 11px;font-size:12px;line-height:1.45;box-shadow:0 6px 18px rgba(0,0,0,.45)}
-  .mk3tip .n{font-weight:700;font-size:12.5px}
-  .mk3tip .ty{opacity:.85}
-  .mk3info{position:absolute;right:12px;top:12px;z-index:7;display:none;width:238px;
-    background:rgba(10,18,20,.96);color:#eaf5f1;border:1px solid rgba(255,255,255,.16);
-    border-radius:12px;padding:12px 13px 12px;box-shadow:0 10px 28px rgba(0,0,0,.55);font-size:12.5px}
-  .mk3info .cl{position:absolute;right:8px;top:6px;background:none;border:0;color:#9fb6b0;
-    font-size:17px;cursor:pointer;line-height:1;padding:2px}
-  .mk3info .ci-n{font-weight:700;font-size:13.5px;padding-right:16px;line-height:1.3}
-  .mk3info .ci-t{opacity:.85;margin-top:2px}
-  .mk3info .ci-v{margin-top:7px;font-weight:600}
-  .mk3info .ci-l{margin-top:9px;display:flex;flex-wrap:wrap;gap:4px 10px}
-  .mk3info .ci-l a{color:#8fd8c8;text-decoration:none;font-weight:600}
+  .mk3tip{position:absolute;z-index:6;display:none;pointer-events:none;max-width:200px;
+    background:rgba(255,255,255,.97);color:#16211c;border:1px solid #d5ddd8;
+    border-radius:8px;padding:6px 10px;font-size:12px;line-height:1.35;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+  .mk3tip .hs-mtip-ty{font-size:11px;color:#5a6b63}
+  .mk3tip .hs-mtip-nm{font-weight:700;font-size:12.5px;margin-top:1px}
+  .dev-sidepanel{position:absolute;top:0;right:0;bottom:0;width:min(360px,92%);z-index:8;
+    background:#fff;border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(0,0,0,.12);
+    transform:translateX(100%);visibility:hidden;transition:transform .22s ease,visibility .22s;
+    display:flex;flex-direction:column}
+  .dev-sidepanel.open{transform:translateX(0);visibility:visible}
+  .dev-sidepanel .dev-pclose{position:absolute;top:10px;right:12px;z-index:3;width:30px;height:30px;border-radius:50%;
+    border:1px solid var(--line);background:#fff;color:var(--ink-3);font-size:18px;cursor:pointer;line-height:1}
+  .dev-sidepanel .dev-pinlist{flex:1;overflow:auto;padding:16px 16px 18px;padding-top:46px}
+  .dev-idetail .dev-isum{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px}
+  .dev-idetail .dev-isum h2{font-size:17px;margin:6px 0}
+  .dev-idetail .dev-isec{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:10px}
+  .dev-idetail .dev-isec h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);margin:0 0 8px}
+  @media(max-width:900px){
+    .dev-sidepanel{top:auto;left:0;right:0;width:auto;max-height:74%;border-left:none;border-top:1px solid var(--line);
+      transform:translateY(100%)}
+    .dev-sidepanel.open{transform:translateY(0)}
+  }
+  .mk3info{display:none !important}
   .hud3d{position:absolute;inset:0;pointer-events:none}
   .h3-hint{position:absolute;left:12px;top:11px;font-size:10.5px;color:#9fb6b0;letter-spacing:.02em}
   .ctrl3d{position:absolute;right:12px;bottom:11px;display:flex;align-items:center;gap:8px;pointer-events:auto}
@@ -348,7 +356,10 @@
           </div>
           <div class="map-frame">
             <div class="mk3tip" id="mk3tip"></div>
-            <div class="mk3info" id="mk3info"></div>
+            <aside class="dev-sidepanel" id="devInfoSlide" role="complementary" aria-label="Record details" aria-hidden="true">
+              <button class="dev-pclose" id="devPanelClose" type="button" aria-label="Close panel">×</button>
+              <div class="dev-pinlist dev-idetail" id="devInfoPanel"></div>
+            </aside>
             <div id="map"><div id="mapInner"></div></div>
             <div class="mapgl" id="mapgl"></div>
             <div class="map3d" id="map3d">
@@ -782,49 +793,65 @@ HS.onReady(function(){
   // Clean hover-tooltip content for a 3D building. The env layer rides in via kind3 (the type
   // line) — envTag() folds the headline env signal into it — and the type line is toned by
   // severity when a facility carries an environmental record.
-  function tip3(s){
-    // Distance only for precise (point) sites: area items' raw e/n come from the engine's
-    // untrusted jurisdiction coordinate, and their display spot is representative anyway.
-    var d = (s.scope==="point" && typeof s.e==="number"&&typeof s.n==="number") ? Math.hypot(s.e,s.n) : null;
-    var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from home");
-    var h = envHeadline(s);
-    var tyStyle = h ? " style='color:"+envColor(h.tone,true)+"'" : "";
-    return "<div class='n'>"+esc(s.label||"")+"</div>"+
-           "<div class='ty'"+tyStyle+">"+esc(kind3(s))+(dist?" · "+dist:"")+"</div>";
+  function siteAsItem(s) {
+    var it = HS.trackerSiteItem(s, frsRid);
+    it.name = s.label;
+    it.title = s.label;
+    it.label = s.label;
+    it.address = s.location_addr || s.canonical_addr || '';
+    it.dist = (s.scope === 'point' && typeof s.e === 'number' && typeof s.n === 'number' && !ZIP_MODE)
+      ? ((Math.hypot(s.e, s.n) < 0.1) ? 'at this address' : (Math.round(Math.hypot(s.e, s.n) * 10) / 10) + ' mi away') : '';
+    it.status = stageWord(s);
+    return it;
   }
-  // Type line for the 3D views: facility type + the headline env signal for precise sites (via the
-  // shared envTag helper), honest lifecycle + jurisdiction-wide framing for area notices.
-  function kind3(s){
-    return s.scope==="point" ? (facilityType(s) + envTag(s))
-      : (stageWord(s) + " · jurisdiction-wide");
-  }
-  // Detailed, persistent info card shown when a 3D building is CLICKED (links are clickable).
-  // Environmental records render through the shared helpers: every interpreted signal (colored by
-  // severity), the geo_matched honesty note, and the official ECHO + TCEQ drill-down links.
-  function infoCard3(s){
-    var d = (s.scope==="point" && typeof s.e==="number"&&typeof s.n==="number") ? Math.hypot(s.e,s.n) : null;
-    var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from home");
-    var link = s.url || s.record_url || "";
-    // Type line: bare facility type for points (env shows in its own block below, not duplicated);
-    // jurisdiction framing for area notices.
-    var typeLine = s.scope==="point" ? facilityType(s) : kind3(s);
+  var devSidebar = HS.createMapSidebar({
+    panel: 'devInfoPanel',
+    slide: 'devInfoSlide',
+    onSelect: function (s) { renderSiteDetail(s); }
+  });
+  document.getElementById('devPanelClose').addEventListener('click', function () { devSidebar.close(); });
+  function selectSite(s) { if (s) devSidebar.select(s); }
+  function renderSiteDetail(s) {
+    var it = siteAsItem(s);
+    var mk = HS.resolveTrackerMarker(s, frsRid);
+    var typeLabel = mk.typeLabel || facilityType(s) || 'Development';
+    var dist = it.dist || '';
+    var link = s.url || s.record_url || '';
     var sigs = envSignals(s);
-    var envBlock = sigs.map(function(g){ return "<div class='ci-v' style='color:"+envColor(g.tone,true)+"'>"+esc(g.text)+"</div>"; }).join("");
-    if(sigs.length) envBlock += "<div class='ci-v' style='color:#9fb0ad;font-size:11px'>"+esc(ENV_MATCH_NOTE)+"</div>";
-    // A facility's record_url IS its ECHO report, so for env sites show the shared env links (ECHO +
-    // TCEQ); a non-env point (e.g. a TABS permit) keeps its labeled record link.
-    var links = hasEnvRecord(s) ? envLinks(s).join("") : (link ? recordLink(s, link) : "");
-    return "<button class='cl' id='mk3close' aria-label='Close'>×</button>"+
-      "<div class='ci-n'>"+esc(s.label||"")+"</div>"+
-      "<div class='ci-t'>"+esc(typeLine)+(dist?" · "+dist:"")+"</div>"+
-      envBlock+
-      "<div class='ci-l'>"+links+"</div>";
+    var envBlock = sigs.map(function (g) {
+      return '<div style="color:' + envColor(g.tone, false) + ';font-weight:600;margin-top:4px">' + esc(g.text) + '</div>';
+    }).join('');
+    if (sigs.length) envBlock += '<div style="margin-top:4px;font-size:11px;color:#5d6f72">' + esc(ENV_MATCH_NOTE) + '</div>';
+    var links = hasEnvRecord(s) ? envLinks(s).join(' ') : (link ? recordLink(s, link) : '');
+    var pkey = s.canonical_addr || s.location_addr;
+    var addrLine = pkey || (s.scope === 'area' ? 'Jurisdiction-wide notice' : '');
+    var timeline = '';
+    if (s.meeting_date) {
+      var mdate = s.meeting_date.slice(0, 10);
+      timeline = '<div class="dev-isec"><h4>Timeline</h4><div class="rec" style="border-top:none;padding-top:0">'
+        + esc(fmtDate(mdate)) + (s.decided ? ' · decided' : '') + '</div></div>';
+    }
+    var panel = document.getElementById('devInfoPanel');
+    panel.innerHTML = '<div class="dev-isum">'
+      + '<div style="font-size:12px;color:var(--mute)">' + esc(typeLabel) + (dist ? ' · ' + esc(dist) : '') + ' · ' + esc(stageWord(s)) + '</div>'
+      + '<h2>' + esc(s.label || '') + '</h2>'
+      + (addrLine ? '<div style="font-size:13px;color:var(--soft);margin-top:4px">' + esc(addrLine) + '</div>' : '')
+      + '<p style="font-size:13px;line-height:1.5;color:var(--soft);margin:8px 0 0">' + esc(envHeadline(s) ? envHeadline(s).text : kindLabel(s)) + '</p>'
+      + '</div>'
+      + (envBlock ? '<div class="dev-isec"><h4>Environmental context</h4>' + envBlock + '</div>' : '')
+      + timeline
+      + '<div class="dev-isec"><h4>Development or facility details</h4>'
+      + '<div style="font-size:13px;color:var(--soft)">' + esc(srcLabel(s)) + (s.project_no ? ' · ' + esc(s.project_no) : '') + '</div></div>'
+      + '<div class="dev-isec"><h4>Documents and sources</h4><div style="display:flex;flex-wrap:wrap;gap:6px 10px">'
+      + (links || '<span style="color:var(--mute);font-size:13px">No online record link on file.</span>')
+      + (pkey ? " <a href='" + esc(propertyHref(pkey)) + "'>View address page →</a>" : '')
+      + '</div></div>';
+    panel.scrollTop = 0;
   }
-  function showInfoCard(s){
-    var c=document.getElementById("mk3info"); if(!c)return;
-    c.innerHTML=infoCard3(s); c.style.display="block";
-    var x=document.getElementById("mk3close"); if(x)x.addEventListener("click",function(){ c.style.display="none"; });
+  function tip3(s){
+    return HS.markerHoverHTML(siteAsItem(s));
   }
+  function showInfoCard(s){ selectSite(s); }
   var LAYER_LABEL = { datacenter:"Data center", industrial:"Industrial", energy:"Energy",
                       logistics:"Logistics", residential:"Residential" };
 
@@ -1255,8 +1282,9 @@ HS.onReady(function(){
       var svg = HS.markerSVG(mk.shape, mk.color, '', size);
       var html = solidPoint ? svg : '<div style="opacity:0.85">' + svg + '</div>';
       var m = L.marker(ll, { icon: L.divIcon({ html: html, className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2] }) });
-      m.bindPopup(popupHTML(s));
-      m.on("mouseover", function(){ this.openPopup(); });
+      m.on('click', function(e){ if(e && e.originalEvent) e.originalEvent.stopPropagation(); selectSite(s); });
+      var mel = m.getElement();
+      if (mel) HS.attachMarkerHover(mel, siteAsItem(s));
       siteMarkers.push({ m:m, bucket:bucketOf(s.type), s:s });
       bounds.push(ll);
     });
@@ -1580,7 +1608,7 @@ HS.onReady(function(){
     dom.addEventListener("click",function(ev){
       if(V3.dragMoved)return;
       var s=pickAt(ev.clientX,ev.clientY);
-      if(s){ showInfoCard(s); } else { var c=document.getElementById("mk3info"); if(c)c.style.display="none"; }
+      if(s){ showInfoCard(s); } else { devSidebar.close(); }
     });
     build3DFacilities();setTimeOfDay(document.getElementById("todSlider").value/100);animate3D();
   }
@@ -1768,9 +1796,10 @@ HS.onReady(function(){
       var bkt=bucketOf(s.type); if(!FILTER[bkt])return;
       var approxPt=isApproxPoint(s);
       var el=glMarkerEl(s, approxPt);
-      var popup=new maplibregl.Popup({offset:12,maxWidth:"260px"}).setHTML(popupHTML(s));
-      var marker=new maplibregl.Marker({element:el}).setLngLat([ll[1],ll[0]]).setPopup(popup).addTo(GL.map);
-      el.addEventListener("mouseenter",function(){ if(GL.cur&&GL.cur!==popup)GL.cur.remove(); if(!popup.isOpen())marker.togglePopup(); GL.cur=popup; });
+      var marker=new maplibregl.Marker({element:el}).setLngLat([ll[1],ll[0]]).addTo(GL.map);
+      HS.attachMarkerHover(el, siteAsItem(s));
+      el.addEventListener('click', function(e){ e.stopPropagation(); selectSite(s); });
+      el.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); selectSite(s); } });
       GL.markers.push({marker:marker,bucket:bkt});
     });
   }
@@ -1782,7 +1811,7 @@ HS.onReady(function(){
     document.getElementById("map").style.display   = (mode==="2d") ? "block" : "none";
     document.getElementById("map3d").classList.toggle("on", mode==="3d");
     document.getElementById("mapgl").classList.toggle("on", mode==="gl");
-    if(mode!=="3d"){ ["mk3tip","mk3info"].forEach(function(id){ var t=document.getElementById(id); if(t)t.style.display="none"; }); }
+    if(mode!=="3d"){ var t=document.getElementById("mk3tip"); if(t)t.style.display="none"; }
     if(mode==="2d" && map){ setTimeout(function(){ map.invalidateSize(); },20); }
     if(mode==="3d"){
       // Lazy-load three.js on first use, then proceed automatically (no second click).

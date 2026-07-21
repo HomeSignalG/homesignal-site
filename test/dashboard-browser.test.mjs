@@ -223,13 +223,17 @@ try {
   if (await marker.count()) {
     const before = page.url();
     await marker.click({ force: true });
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(500);
     const after = page.url();
-    ok(after !== before && after.indexOf('dashboard') < 0, 'marker click navigates away from dashboard');
-    ok(after.indexOf('maps.html') < 0 || after.indexOf('id=') > 0 || after.indexOf('development') > 0 || after.indexOf('alerts') > 0,
-      'marker click does not open bare maps background');
-    await page.goBack();
-    await page.waitForURL(/dashboard\.html/);
+    const panel = await page.evaluate(() => ({
+      open: document.getElementById('dashInfoSlide').classList.contains('open'),
+      detail: ((document.getElementById('dashInfoPanel') || {}).textContent || '').length > 0,
+      popup: !!document.querySelector('.maplibregl-popup, .leaflet-popup')
+    }));
+    ok(after === before && panel.open && panel.detail && !panel.popup,
+      'marker click opens dashboard sidebar without navigation', JSON.stringify(panel));
+    await page.click('#dashPanelClose').catch(function () {});
+    await page.waitForTimeout(200);
 
     // Keyboard Enter on map region opens full map
     await page.locator('#dashMap').focus();
@@ -240,7 +244,7 @@ try {
     await page.waitForURL(/dashboard\.html/);
 
     // Background click opens maps (not after drag — simulated by direct click corner)
-    await page.locator('#dashMap').click({ position: { x: 12, y: 12 }, force: true });
+    await page.locator('#dashMapWrap').click({ position: { x: 12, y: 12 }, force: true });
     await page.waitForURL(/maps\.html/, { timeout: 15000 });
     assertHref('map background click', 'maps.html' + page.url().substring(page.url().indexOf('?')), { zip: '78617', noPlace: true });
   } else {

@@ -51,6 +51,7 @@ ok(/statTileLink/.test(dash), 'dashboard stat tiles use statTileLink');
 ok(/miniCardLink/.test(dash), 'dashboard recent cards use miniCardLink');
 ok(/meetingRowLink/.test(dash), 'dashboard meetings use meetingRowLink');
 ok(/itemClick:\s*onMarkerClick/.test(dash), 'dashboard map markers are clickable');
+ok(/dashSidebar\.select/.test(dash), 'dashboard marker click opens sidebar');
 ok(!/onclick="HS\.addHome\(\)"/.test(dash), 'dashboard add-place uses listener not inline onclick');
 
 const shell = fs.readFileSync(new URL('../shell.js', import.meta.url), 'utf8');

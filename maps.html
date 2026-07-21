@@ -512,13 +512,15 @@ HS.onReady(async function () {
   // ---------------- RIGHT INFO PANEL: list ⇄ 6-section project detail --------
   function renderInfo(items) { clearLoading(); lastItems = items; if (selected) renderDetail(selected); else renderList(items); applyDeepId(items); }
   function selectItem(it) {
-    if (!it) return; selected = it; renderDetail(it);
+    if (!it) return;
+    selected = it;
+    if (it._facility || it.record_kind === 'facility') renderFacilityDetail(it);
+    else renderDetail(it);
     openPanel();                      // the ONE panel — detail replaces whatever was showing
     var p = document.getElementById('infoPanel'); if (p) p.scrollTop = 0;
   }
-  // A lettered REGULATED FACILITY routes to its dossier (an existing condition, not a
-  // development "project"), so it never opens the project-framed 6-section panel.
-  function openItem(it) { if (!it) return; if (it._facility) { location.href = 'development.html?id=' + encodeURIComponent(it.id); return; } selectItem(it); }
+  // Canonical marker click — always opens/updates the right sidebar, never navigates.
+  function openItem(it) { if (!it) return; selectItem(it); }
   function clearSelection() { selected = null; renderInfo(lastItems); }
 
   function applyDeepId(items) {
@@ -529,10 +531,6 @@ HS.onReady(async function () {
       || facs.find(function (x) { return x.id === deepId; });
     if (!pick) return;
     deepApplied = true;
-    if (pick._facility || (facilities || []).some(function (f) { return f.id === pick.id; })) {
-      location.href = HS.pageHref('development.html', { zip: S.zip, id: pick.id });
-      return;
-    }
     selectItem(pick);
   }
 
@@ -636,7 +634,7 @@ HS.onReady(async function () {
     actAll('[data-pin]', function (el) { openItem(items[parseInt(el.getAttribute('data-pin'), 10)]); });
     actAll('[data-fac]', function (el) {
       var f = sectionFacs[parseInt(el.getAttribute('data-fac'), 10)];
-      if (f) location.href = 'development.html?id=' + encodeURIComponent(f.id);
+      if (f) selectItem(Object.assign({}, f, { _facility: true, record_kind: 'facility' }));
     });
     actAll('[data-area]', function (el) {
       var it = area[parseInt(el.getAttribute('data-area'), 10)];
@@ -830,6 +828,59 @@ HS.onReady(async function () {
     back.focus({ preventScroll: true });   // detail opened: focus starts at the way back
   }
 
+  // Regulated-facility detail in the same right sidebar (never a page redirect).
+  function renderFacilityDetail(f) {
+    var mk = HS.resolveMarker(Object.assign({}, f, { _facility: true, record_kind: 'facility' }));
+    var fenv = f.facility_env || null;
+    var interp = HS.fac.interpret(fenv);
+    var sigs = HS.fac.signals(fenv);
+    var links = HS.fac.links(f);
+    var permits = (fenv && fenv.epa && fenv.epa.permits) || [];
+    var typeLabel = mk.typeLabel || f.type || 'Regulated facility';
+    var summary = interp ? interp.line : 'Permit status not yet confirmed for this facility.';
+    var specs = [['Facility type', f.type || typeLabel], ['Registry', f.developer], ['FRS Registry ID', f.registry_id],
+      ['Distance', f.dist], ['Address', f.address || f.location]]
+      .filter(function (r) { return r[1]; })
+      .map(function (r) { return '<div class="row"><span>' + HS.esc(r[0]) + '</span><b>' + HS.esc(r[1]) + '</b></div>'; }).join('');
+    var summaryHTML = '<div class="isum">'
+      + '<span class="lens"><span class="letter" style="background:' + mk.color + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px">■</span>&nbsp; '
+      + HS.esc(typeLabel) + (f.dist ? ' · ' + HS.esc(f.dist) : '') + ' <span class="status active">Operating</span></span>'
+      + '<h2>' + HS.esc(f.name) + '</h2>'
+      + '<p class="lead">' + HS.esc(summary) + '</p>'
+      + (interp && interp.caveat ? '<p class="ihint" style="margin-top:8px">' + HS.esc(interp.caveat) + '</p>' : '')
+      + (specs ? '<div class="specs tight" style="margin-top:12px">' + specs + '</div>' : '')
+      + '</div>';
+    var envHTML = '<div class="isec"><h4>Environmental context</h4>'
+      + (sigs.length ? sigs.map(function (g) {
+          return '<div class="row"><span>' + (g.tone === 'alert' ? '⚠' : g.tone === 'watch' ? '◔' : '·') + '</span><b>' + HS.esc(g.text) + '</b></div>';
+        }).join('') : '<p class="ihint">No enforcement or compliance entries in the archived record.</p>')
+      + '<p class="ihint">Environmental records are geo-matched to this facility, not to a specific parcel. A factual public-record summary — not a verdict on any operator.</p></div>';
+    var permitsHTML = '<div class="isec"><h4>Permit history</h4><div class="specs">'
+      + (permits.length ? permits.map(function (pm) {
+          var bits = [pm.npdes_id, pm.type, pm.status].filter(Boolean).map(HS.esc);
+          return '<div class="row"><span>' + HS.esc(pm.statute || 'Permit') + '</span><b>' + bits.join(' · ') + '</b></div>';
+        }).join('') : '<p class="ihint">No individual permit records in the archived report.</p>')
+      + '</div></div>';
+    var evParts = links.map(function (l) {
+      return '<button class="btn' + (links[0] === l ? ' primary' : '') + '" onclick="window.open(\'' + HS.esc(l.url) + '\',\'_blank\',\'noopener\')">' + HS.esc(l.label) + '</button>';
+    }).join('');
+    if (!evParts) evParts = '<p class="ihint">Official source links are not available for this facility yet.</p>';
+    var evHTML = '<div class="isec"><h4>Documents and sources</h4><div class="doact">' + evParts + '</div></div>';
+    var partHTML = '<div class="isec"><h4>Related actions</h4><div class="doact">'
+      + '<button class="btn ghost" onclick="HS.toggleFollow(this,\'project\',\'' + HS.esc(f.id) + '\')">Follow this facility</button></div></div>';
+    var panel = document.getElementById('infoPanel');
+    panel.classList.add('idetail');
+    var backLabel = opts.view === 'changed' ? '← Recent changes' : '← All nearby projects';
+    panel.innerHTML = '<button class="backbtn" id="infoBack" aria-label="Back to the list">' + backLabel + '</button>'
+      + summaryHTML + envHTML + permitsHTML + evHTML + partHTML;
+    var back = panel.querySelector('#infoBack');
+    back.onclick = function () {
+      panel.classList.remove('idetail'); clearSelection();
+      var again = panel.querySelector('[data-pin], [data-fac]'); if (again) again.focus({ preventScroll: true });
+    };
+    back.focus({ preventScroll: true });
+  }
+
   // Timeline milestones derived ONLY from real dates on the record + a matched hearing.
   function buildTimeline(it) {
     var out = [];
@@ -945,7 +996,16 @@ HS.onReady(async function () {
     pinGroups.forEach(function (g, i) {
       if (i >= items.length) return;
       g.style.cursor = 'pointer';
-      g.addEventListener('click', function () { var it = items[i]; if (it._facility) location.href = 'development.html?id=' + encodeURIComponent(it.id); else selectItem(it); });
+      g.setAttribute('role', 'button');
+      g.tabIndex = 0;
+      var it = items[i];
+      var hp = HS.markerHoverParts(it);
+      g.setAttribute('aria-label', hp.type + '. ' + hp.name);
+      var t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+      t.textContent = hp.type + '\n' + hp.name;
+      g.appendChild(t);
+      g.addEventListener('click', function (e) { e.stopPropagation(); openItem(it); });
+      g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openItem(it); } });
     });
   }
 
@@ -963,14 +1023,18 @@ HS.onReady(async function () {
       var rect=document.createElementNS(NS,'rect');
       rect.setAttribute('x',x-7); rect.setAttribute('y',y-7); rect.setAttribute('width',14); rect.setAttribute('height',14);
       rect.setAttribute('rx',3); rect.setAttribute('fill',HS.markerRegistry.facilityHex); rect.setAttribute('stroke','#fff'); rect.setAttribute('stroke-width',3);
+      rect.style.cursor = 'pointer';
+      var facItem = Object.assign({}, f, { _facility: true, record_kind: 'facility' });
+      var hp = HS.markerHoverParts(facItem);
       var t=document.createElementNS(NS,'title');
-      t.textContent = f.name + ' · Regulated facility' + (f.dist?' · '+f.dist:'');
+      t.textContent = hp.type + '\n' + hp.name;
       rect.appendChild(t);
-      var a=document.createElementNS(NS,'a');
-      var dossier='development.html?id='+encodeURIComponent(f.id);
-      a.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href',dossier);
-      a.setAttribute('href',dossier);
-      a.appendChild(rect); put(a);
+      rect.setAttribute('role','button');
+      rect.setAttribute('tabindex','0');
+      rect.setAttribute('aria-label', hp.type + '. ' + hp.name);
+      rect.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); openItem(facItem); });
+      rect.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openItem(facItem); } });
+      put(rect);
     });
   }
 
@@ -1004,7 +1068,7 @@ HS.onReady(async function () {
     el.innerHTML=HS.markerSVG(mk.shape, mk.color, it._letter||'', size);
     el.setAttribute('role','button');
     el.tabIndex=0;
-    el.setAttribute('aria-label', mk.popupLabel);
+    HS.attachMarkerHover(el, it);
     el.addEventListener('keydown', function(e){ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); openItem(it); } });
     return el;
   }
@@ -1126,28 +1190,23 @@ HS.onReady(async function () {
     }
     items.forEach(function(it){
       var el=pinEl(it, 26);
-      el.title=(it.name||it.title||'')+' · '+(it.type||it.category||'')+(it.status?' · '+it.status:'');
       el.addEventListener('click', function(e){ e.stopPropagation(); openItem(it); });
       glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([it.lng,it.lat]).addTo(glMap));
     });
     if (opts.showFacilities) unletteredFacs(items).forEach(function(f){
-      var fmk = HS.resolveMarker(Object.assign({}, f, { _facility: true, record_kind: 'facility' }));
+      var facItem = Object.assign({}, f, { _facility: true, record_kind: 'facility' });
+      var fmk = HS.resolveMarker(facItem);
       var el=document.createElement('div');
       el.className='hspin';
       el.style.cssText='width:20px;height:20px;line-height:0;cursor:pointer';
       el.innerHTML=HS.markerSVG(fmk.shape, fmk.color, '', 20);
+      HS.attachMarkerHover(el, facItem);
       el.setAttribute('role','button');
-      el.setAttribute('aria-label', fmk.popupLabel);
-      glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([f.lng,f.lat])
-        .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(facPopupHTML(f))).addTo(glMap));
+      el.tabIndex=0;
+      el.addEventListener('click', function(e){ e.stopPropagation(); openItem(facItem); });
+      el.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openItem(facItem); } });
+      glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([f.lng,f.lat]).addTo(glMap));
     });
-  }
-  function facPopupHTML(f){
-    var interp = HS.fac.interpret(f.facility_env || null);
-    return '<div style="font:600 13px/1.3 var(--font)">'+HS.esc(f.name)+'</div>'
-      +'<div style="font-size:11px;color:#5a6b63">Regulated facility'+(f.dist?' · '+HS.esc(f.dist):'')+'</div>'
-      +(interp?'<div style="font-size:11px;color:#5a6b63">'+HS.esc(interp.line)+'</div>':'')
-      +'<a href="development.html?id='+encodeURIComponent(f.id)+'" style="font-size:11.5px;color:#157a49;font-weight:600">Facility record ▸</a>';
   }
   function ensureGL(){
     if (glMap) return;
@@ -1242,16 +1301,25 @@ HS.onReady(async function () {
     }
     items.forEach(function(it){
       var mk = HS.resolveMarker(it);
-      var m = L.marker([it.lat,it.lng],{icon:lfDivIcon('<div class="hspin" style="line-height:0">'+HS.markerSVG(mk.shape, mk.color, it._letter||'', 26)+'</div>',26),
-          title:(it.name||it.title||'')+' · '+(it.type||it.category||'')})
+      var m = L.marker([it.lat,it.lng],{icon:lfDivIcon('<div class="hspin" style="line-height:0">'+HS.markerSVG(mk.shape, mk.color, it._letter||'', 26)+'</div>',26)})
         .addTo(lfMap);
       m.on('click', function(){ openItem(it); });
+      var mel = m.getElement();
+      if (mel) {
+        var pin = mel.querySelector('.hspin') || mel;
+        HS.attachMarkerHover(pin, it);
+      }
       lfMarkers.push(m);
     });
     if (opts.showFacilities) unletteredFacs(items).forEach(function(f){
-      var fmk = HS.resolveMarker(Object.assign({}, f, { _facility: true, record_kind: 'facility' }));
-      lfMarkers.push(L.marker([f.lat,f.lng],{icon:lfDivIcon('<div style="line-height:0">'+HS.markerSVG(fmk.shape, fmk.color, '', 20)+'</div>',20)})
-        .bindPopup(facPopupHTML(f),{maxWidth:260}).addTo(lfMap));
+      var facItem = Object.assign({}, f, { _facility: true, record_kind: 'facility' });
+      var fmk = HS.resolveMarker(facItem);
+      var m = L.marker([f.lat,f.lng],{icon:lfDivIcon('<div class="hspin" style="line-height:0">'+HS.markerSVG(fmk.shape, fmk.color, '', 20)+'</div>',20)})
+        .addTo(lfMap);
+      m.on('click', function(){ openItem(facItem); });
+      var mel = m.getElement();
+      if (mel) HS.attachMarkerHover(mel.querySelector('.hspin') || mel, facItem);
+      lfMarkers.push(m);
     });
   }
   function lfFail(){
