@@ -115,6 +115,7 @@
   .card h3+.impactline{margin-top:-3px}
   .impactline{font-size:13px;line-height:1.35;color:var(--ink-2);margin:0 0 8px}
   .impactline b{color:var(--ink);font-weight:600}
+  .impactline sup,.data-table th sup{font-size:.72em;line-height:0;vertical-align:super}
   .card:has(.impactline) .sowhat{margin-bottom:11px}
   .sowhat{font-size:14px;color:var(--ink-2);margin:0 0 13px}
   .sowhat b{color:var(--ink)}

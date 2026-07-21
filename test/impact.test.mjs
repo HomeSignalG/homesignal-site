@@ -24,10 +24,11 @@ test('devCard renders Impact line below title', () => {
   const html = readFileSync(new URL('../lib/templates.js', import.meta.url), 'utf8');
   assert.match(html, /class="impactline"/, 'devCard includes impactline');
   assert.match(html, /<h3>\$\{esc\(p\.name\)\}<\/h3>\s*\$\{tpl\.devImpactBlock\(p\)\}/, 'impact block sits under title');
-  assert.match(html, /Quality of Life Impact Score:/, 'devCard includes QoL impact score line');
+  assert.match(html, /QOL_IMPACT_SCORE_BRAND = 'Quality of Life Impact Score<sup>™<\/sup>'/, 'templates define branded QoL impact score label');
+  assert.match(html, /QOL_IMPACT_SCORE_BRAND\}:/, 'impactScoreLine uses branded QoL impact score label');
   const page = readFileSync(new URL('../development.html', import.meta.url), 'utf8');
   assert.match(page, /lib\/impact\.js/, 'development.html loads impact.js');
-  assert.match(page, /Quality of Life Score/, 'development table column renamed');
+  assert.match(page, /qolImpactScoreBrand/, 'development table column uses shared branded label');
 });
 
 test('impactRating and impactScoreValue use stored impact_score', () => {
@@ -43,13 +44,13 @@ test('devCard renders QoL score line between impact and sowhat', () => {
   const p = projects[0];
   const html = HS.tpl.devCard(p);
   const impactIdx = html.indexOf('Impact:');
-  const scoreIdx = html.indexOf('Quality of Life Impact Score:');
+  const scoreIdx = html.indexOf('Quality of Life Impact Score<sup>™</sup>:');
   const sowhatIdx = html.indexOf('On the record:');
   const altSowhatIdx = html.indexOf('How it impacts you:');
   const recordIdx = sowhatIdx >= 0 ? sowhatIdx : altSowhatIdx;
   assert.ok(impactIdx >= 0 && scoreIdx > impactIdx, 'score line follows impact line');
   assert.ok(recordIdx > scoreIdx, 'score line precedes on-the-record section');
-  assert.match(html, /Quality of Life Impact Score:<\/b> 88 \| High/, 'seed flagship shows score and rating on one line');
+  assert.match(html, /Quality of Life Impact Score<sup>™<\/sup>:<\/b> 88 \| High/, 'seed flagship shows score and rating on one line');
 });
 
 test('projectImpact is deterministic and length-bounded for seed projects', () => {
