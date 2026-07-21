@@ -84,6 +84,41 @@ version, timestamps, `analysis_basis`.
   `tests/test_impact_extractor.py` (ingest). Phase-1 pins (`test/impact.test.mjs`)
   still pass — the Phase-1 sentence remains the no-analysis fallback.
 
+## Pilot receipts (2026-07-20, session run — review before any bulk processing)
+
+10 pilot rows live in `development_impact_analyses` (anon-read verified: 10 rows,
+RLS on). **5 document-grounded** — the real captured TDLR TABS official records
+(`fixtures/tabs/`, all at 2200 Caldwell Ln, Del Valle TX 78617; extraction
+validated by `analyze_project_documents.validate_extraction` with 0 quotes
+dropped by the grounding gate; extraction_model labeled `claude-fable-5/
+session-pilot` because GitHub Actions was down account-wide — see blocker):
+
+| Project (official record) | Facts | Base score | Level · Direction · Conf | Sentence |
+|---|---|---|---|---|
+| River Bottoms Ranch Barn 2 (14,200 sq ft barn, built) | 5 | 40 | Medium · Negative · 0.9 | Likely to increase construction disruption near the home. |
+| Histology Lab (7,500 sq ft, built) | 5 | 40 | Medium · Negative · 0.9 | Likely to increase construction disruption near the home. |
+| Barn 2 ACT Office (3,410 sq ft fit-out) | 5 | 40 | Medium · Negative · 0.9 | Likely to increase construction disruption near the home. |
+| ATX1 New Construction (112,000 sq ft, 3-story manufacturing) | 7 | 50 | Medium · Negative · 0.9 | Likely to increase noise and neighborhood activity near the home. |
+| ATX1 Third Floor TI (37,607 sq ft, upcoming) | 5 | 37 | Low · Negative · 0.9 | Likely to increase construction disruption and neighborhood activity near the home. |
+
+**5 metadata-fallback** (docs unreachable from the sandbox — Austin is behind an
+Incapsula wall, Madison serves an antibot 404 to non-JS clients, Accela hosts
+reject pg_net; rows seeded `pending` so the CI lane re-tries them from a real
+runner): Sun Chase Regional Detention (drainage, 18 low), Tannehill Creek Trail
+(recreation, 32 low), Johnny Morris Road CIP (transportation/civic, 23 low
+neutral), Colony Park Phase 1 (utility, 35 low neutral), Fort Collins 100 sq ft
+patio (residential small/far, 26 low) — all confidence 0.3, cautious "The
+available filing suggests…" wording, none blocked from rendering.
+
+**⚠️ Blocker found during the pilot (founder action needed): GitHub Actions is
+down account-wide since 2026-07-19 ~23:00 UTC** — every run in
+`homesignal-ingest` fails in ~4 s before a runner is assigned (last success:
+`ingest.yml` 22:56 UTC). This has the production 2-hour ingest cron down too,
+unrelated to this build. Likely spent Actions minutes / billing block. Once
+restored: dispatch `impact-extract.yml` (branch `claude/dev-impact-system-
+phase-2-htzgp0`, dry-run off) to run the real Stage-1 pass over the 5 pending
+pilot documents + re-verify the TABS pages live, then `impact-score.yml`.
+
 ## Known limits (logged, non-blocking)
 
 - Many permit `record_url`s are dataset-precision (Boston/Philly/Chicago…) —
