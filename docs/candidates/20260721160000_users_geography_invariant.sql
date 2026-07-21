@@ -1,6 +1,7 @@
 -- Geography invariant for public.users (digest identity).
 -- Ensures users.zip_code is covered by users.community_id and retires stale
 -- multi-community rows when a subscriber moves to a new area.
+-- Applied via docs/candidates + db-sql workflow.
 
 -- 1) Does this community row cover the ZIP?
 create or replace function public.community_covers_zip(p_community_id uuid, p_zip_code text)
