@@ -1,0 +1,45 @@
+name: verify-alerts-page
+
+# Live browser verification of the customer-facing Alerts page (alerts.html) against
+# the same DB truth the page reads — the subscriber-journey counterpart to
+# verify-representative-zips (which covers the map/development pages).
+
+on:
+  workflow_dispatch:
+    inputs:
+      zips:
+        description: 'Comma-separated ZIPs (default: launch panel)'
+        required: false
+        default: ''
+  schedule:
+    - cron: '55 13 * * *'   # daily, right after verify-representative-zips
+  push:
+    branches: [main]
+    paths:
+      - 'alerts.html'
+      - 'lib/data.js'
+      - 'lib/templates.js'
+      - 'scripts/verify-alerts-page.mjs'
+      - '.github/workflows/verify-alerts-page.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Verify Alerts page against DB truth
+        env:
+          SITE_BASE: https://homesignal.net
+          ZIPS: ${{ github.event.inputs.zips }}
+        run: node scripts/verify-alerts-page.mjs
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alerts-page-report
+          path: verify/alerts-page-report.json
