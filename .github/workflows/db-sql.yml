@@ -19,7 +19,7 @@ on:
         description: 'Repo path to the .sql file to run (e.g. docs/communities-zipcodes-gin-index.sql)'
         required: true
   push:
-    branches: [main]
+    branches: [main, cursor/sync-geography-rpc-docs-1740]
     paths:
       - 'docs/candidates/**/*.sql'
 
