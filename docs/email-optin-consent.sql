@@ -47,6 +47,7 @@ declare
   v_existing  jsonb;
   v_merged    jsonb;
   v_key       text;
+  v_community uuid;
 begin
   -- identity guards (mirror subscribe_area_defaults / signup_complete)
   if v_jwt_email = '' then
@@ -61,12 +62,11 @@ begin
   if p_zip_code is null or trim(p_zip_code) = '' then
     raise exception 'zip_code is required';
   end if;
-  if p_community_id is null then
-    raise exception 'community_id is required';
-  end if;
+
+  v_community := public.resolve_digest_community_id(p_zip_code);
 
   select id, topics into v_id, v_existing
-  from public.users where email = v_email and community_id = p_community_id;
+  from public.users where email = v_email and community_id = v_community;
 
   -- ADDITIVE topic merge: for each key in p_topics, UNION its labels into the existing
   -- array (distinct) — never replace or remove. Other existing keys are left untouched.
@@ -92,13 +92,14 @@ begin
            marketing_consent_at   = coalesce(marketing_consent_at, now()),  -- first opt-in wins
            marketing_consent_copy = p_marketing_consent_copy,
            consent_version        = p_consent_version,
-           zip_code               = trim(p_zip_code)
+           zip_code               = trim(p_zip_code),
+           community_id           = v_community
      where id = v_id;
   else
     -- Defensive: opt-in before the follow row exists — create it, consented.
     insert into public.users (email, zip_code, community_id, topics,
                               marketing_consent, marketing_consent_at, marketing_consent_copy, consent_version)
-    values (v_email, trim(p_zip_code), p_community_id, v_merged,
+    values (v_email, trim(p_zip_code), v_community, v_merged,
             true, now(), p_marketing_consent_copy, p_consent_version)
     on conflict (email, community_id) do update
       set topics                 = excluded.topics,
@@ -109,6 +110,8 @@ begin
           zip_code               = excluded.zip_code
     returning id into v_id;
   end if;
+
+  perform public.retire_stale_digest_identities(v_email, v_community);
 
   return v_id;
 end;

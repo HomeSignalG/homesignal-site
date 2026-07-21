@@ -73,6 +73,7 @@ DECLARE
   v_email     text := lower(trim(p_email));
   v_user_id   uuid;
   v_now       timestamptz := now();
+  v_community uuid;
   v_opted_in  boolean := (
     SELECT count(*) > 0
     FROM jsonb_array_elements(coalesce(p_subscriptions, '[]'::jsonb)) AS e
@@ -91,9 +92,8 @@ BEGIN
   IF p_zip_code IS NULL OR trim(p_zip_code) = '' THEN
     RAISE EXCEPTION 'zip_code is required';
   END IF;
-  IF p_community_id IS NULL THEN
-    RAISE EXCEPTION 'community_id is required';
-  END IF;
+
+  v_community := public.resolve_digest_community_id(p_zip_code);
 
   INSERT INTO public.users (
     email, zip_code, community_id, topics, consent_version, data_licensing_agreed,
@@ -101,7 +101,7 @@ BEGIN
     referral_source, referral_campaign
   )
   VALUES (
-    v_email, trim(p_zip_code), p_community_id, coalesce(p_topics, '[]'::jsonb),
+    v_email, trim(p_zip_code), v_community, coalesce(p_topics, '[]'::jsonb),
     p_consent_version, coalesce(p_data_licensing_agreed, false),
     v_opted_in,
     CASE WHEN v_opted_in THEN v_now END,
@@ -132,7 +132,7 @@ BEGIN
   removed AS (
     DELETE FROM public.user_subscriptions s
     WHERE s.user_id = v_user_id
-      AND s.community_id = p_community_id
+      AND s.community_id = v_community
       AND NOT EXISTS (
         SELECT 1 FROM desired d
         WHERE d.pipeline_type = s.pipeline_type AND d.topic = s.topic
@@ -140,9 +140,11 @@ BEGIN
     RETURNING 1
   )
   INSERT INTO public.user_subscriptions (user_id, community_id, pipeline_type, topic)
-  SELECT v_user_id, p_community_id, d.pipeline_type, d.topic
+  SELECT v_user_id, v_community, d.pipeline_type, d.topic
   FROM desired d
   ON CONFLICT (user_id, community_id, pipeline_type, topic) DO NOTHING;
+
+  PERFORM public.retire_stale_digest_identities(v_email, v_community);
 
   RETURN v_user_id;
 END;

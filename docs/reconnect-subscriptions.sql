@@ -54,6 +54,7 @@ declare
   v_jwt_email text := lower(coalesce(auth.jwt() ->> 'email', ''));
   v_email     text := lower(trim(p_email));
   v_user_id   uuid;
+  v_community uuid;
 begin
   -- identity guards (mirror signup_complete)
   if v_jwt_email = '' then
@@ -68,26 +69,22 @@ begin
   if p_zip_code is null or trim(p_zip_code) = '' then
     raise exception 'zip_code is required';
   end if;
-  if p_community_id is null then
-    raise exception 'community_id is required';
-  end if;
 
-  -- ADDITIVE identity: create the digest row if absent; if present, only refresh
-  -- the ZIP.  NEVER touch topics / consent / marketing / unsubscribed — following
-  -- an area is not consent and must not downgrade an existing subscriber.
+  v_community := public.resolve_digest_community_id(p_zip_code);
+
   insert into public.users (email, zip_code, community_id)
-  values (v_email, trim(p_zip_code), p_community_id)
+  values (v_email, trim(p_zip_code), v_community)
   on conflict (email, community_id) do update
     set zip_code = excluded.zip_code
   returning id into v_user_id;
 
-  -- ADDITIVE subscriptions: add the floor, never delete.  Idempotent — the live
-  -- bridge and the §2 backfill can both hit this repeatedly and it converges.
   insert into public.user_subscriptions (user_id, community_id, pipeline_type, topic)
-  select v_user_id, p_community_id, e->>'pipeline_type', e->>'topic'
+  select v_user_id, v_community, e->>'pipeline_type', e->>'topic'
   from jsonb_array_elements(coalesce(p_subscriptions, '[]'::jsonb)) as e
   where coalesce(e->>'pipeline_type','') <> '' and coalesce(e->>'topic','') <> ''
   on conflict (user_id, community_id, pipeline_type, topic) do nothing;
+
+  perform public.retire_stale_digest_identities(v_email, v_community);
 
   return v_user_id;
 end;
