@@ -173,3 +173,31 @@
 --     both paths — none involve the new statement's rows). Flagged to founder.
 -- REVERT: re-apply the app_refresh_zip_facility_entity body from this file's
 -- history (drops the added statement; no schema change to revert).
+
+-- ---------------------------------------------------------------------------
+-- Applied 2026-07-22 via migration `app_refresh_zip_local_news`
+-- (full reproducible body: docs/app-refresh-zip-local-news-migration.sql —
+-- the Local News materialization fix):
+--   * WHY: Local News is ingested into public.alerts (pipeline_type='news',
+--     category='local_news', tagged to the chain-root community_id) but the
+--     materializer only read development_reports + meetings + government_notice
+--     alerts, so news never reached app_changes. The site's Local News tab reads
+--     app_changes, so it rendered empty (an architecture gap, not a parser miss).
+--   * ONE added statement (AFTER the app_community_meta upsert): recent sourced
+--     local_news for the chain root -> app_changes as category 'Local News'
+--     (occurred_at = published_at/created_at, confidence 'Medium', lens 'value',
+--     no window). source_ref REQUIRED (anti-fabrication); 14-day window; newest
+--     48; deduped by source_ref against rows the same run wrote. Mirrors the
+--     gov-notice statement exactly, one canonical pipeline.
+--   * GATES UNCHANGED ON PURPOSE: placed after the meta upsert, so news does NOT
+--     feed _nc / data_quality / indexable. No coverage_coming -> pass flip and no
+--     new page indexed — launch/index policy and every non-news surface are
+--     byte-identical. (A `_nn` news count is added to the return log only.)
+--   * SITE READERS (same PR): lib/data.js gains news() (reads app_changes where
+--     category='Local News') and changes() now EXCLUDES 'Local News' so the
+--     general "what's changing" feed (today/dashboard/maps/community/property/
+--     index) is unchanged; alerts.html's Local News tab reads HS.data.news().
+--   * DEPLOY ORDER: merge the site PR (ships the changes() guard) BEFORE applying
+--     this migration; then run select public.app_refresh_all(); to backfill.
+-- REVERT: re-apply the app_refresh_zip_gov_notices_window14_cap48 body from this
+-- file's history (drops the added statement; no schema change to revert).
