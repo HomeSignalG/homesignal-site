@@ -906,7 +906,7 @@
   HS.openSwitcher = function () {
     const list = $('switcherList'); if (!list) return;
     $('switcherSub').textContent = "You're following " + state.properties.length + " saved place" +
-      (state.properties.length === 1 ? '' : 's') + '. Pick one to focus the app on it.';
+      (state.properties.length === 1 ? '' : 's') + '.';
     list.innerHTML = state.properties.map(p => `
       <div class="swrow ${p.id === state.activePropId ? 'active' : ''}" onclick="HS.switchProperty('${p.id}')">
         <div class="miniscore">${p.score || ''}</div>
