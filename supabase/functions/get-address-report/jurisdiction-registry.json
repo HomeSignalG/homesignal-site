@@ -1110,6 +1110,7 @@
   },
   {
    "registry_id": "cincinnati-building-permits",
+   "geocode_assemble": true,
    "platform": "socrata",
    "domain": "data.cincinnati-oh.gov",
    "dataset_id": "uhjb-xac9",
@@ -1498,6 +1499,7 @@
   },
   {
    "registry_id": "fort-worth-development-permits",
+   "geocode_assemble": true,
    "platform": "arcgis",
    "service_url": "https://mapit.fortworthtexas.gov/ags/rest/services/CIVIC/Permits/MapServer/0",
    "dataset_url": "https://mapit.fortworthtexas.gov/ags/rest/services/CIVIC/Permits/MapServer/0",
@@ -1876,6 +1878,7 @@
   },
   {
    "registry_id": "bellevue-permits",
+   "geocode_assemble": true,
    "platform": "arcgis",
    "service_url": "https://services1.arcgis.com/EYzEZbDhXZjURPbP/arcgis/rest/services/Bellevue_Permits/FeatureServer/0",
    "dataset_url": "https://data.bellevuewa.gov/datasets/bellevue::bellevue-permits",
@@ -2103,6 +2106,7 @@
   },
   {
    "registry_id": "pierce-county-pals-permits",
+   "geocode_assemble": true,
    "platform": "arcgis",
    "service_url": "https://services2.arcgis.com/1UvBaQ5y1ubjUPmd/arcgis/rest/services/Permits_Pierce_County/FeatureServer/0",
    "dataset_url": "https://gisdata-piercecowa.hub.arcgis.com/datasets/7a2af86e0b64463b9caeb08c374a24ac",
@@ -2216,6 +2220,7 @@
   },
   {
    "registry_id": "clark-county-active-dev-permits",
+   "geocode_assemble": true,
    "platform": "arcgis",
    "service_url": "https://gis.clark.wa.gov/arcgisfed/rest/services/DevelopmentPermits/ActiveDevelopmentPermits/FeatureServer/0",
    "dataset_url": "https://gis.clark.wa.gov/gishome/",
@@ -2756,6 +2761,7 @@
   },
   {
    "registry_id": "columbus-building-permits",
+   "geocode_assemble": true,
    "platform": "arcgis",
    "service_url": "https://services1.arcgis.com/9yy6msODkIBzkUXU/arcgis/rest/services/Building_Permits/FeatureServer/0",
    "dataset_url": "https://opendata.columbus.gov/datasets/columbus::building-permits-3",
