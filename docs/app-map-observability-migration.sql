@@ -1,56 +1,42 @@
 -- ============================================================================
--- MAP PIPELINE REMEDIATION — geocode carry-through for markers (PARKED DDL).
+-- MAP PIPELINE — observability + Government-Notice geometry carry-through (PARKED DDL).
 -- Design + decision table: docs/map-pipeline-remediation.md.
 --
--- ADDITIVE ONLY. Applied MANUALLY in the Supabase SQL editor (this file is the
--- DDL-of-record) — NOT auto-deployed by any workflow. Rollback = re-apply the
--- prior app_refresh_zip body from docs/app-content-materialize.sql history and
--- (optionally) drop the two additive objects below.
+-- SCOPE (deliberately small, zero new geocoding infra): this migration ONLY
+--   P4  adds app_changes.geo_exclusion_reason (why a row is sidebar-only), and
+--   P1  carries a Government Notice's EXISTING geocoded point (alerts.geo_lat/
+--       geo_lng, populated by the ingest notice_geo/backfill_notice_geo path) into
+--       app_changes when geo_scope='address' — so an address-bearing notice becomes
+--       a marker with NO frontend change; jurisdiction-wide notices stay sidebar,
+--       labeled, and
+--   P4  adds app_materialization_summary() reporting.
 --
--- What it changes (nothing else in app_refresh_zip is touched):
---   P4  app_changes gains `geo_exclusion_reason text` (why a row is sidebar-only).
---   P2  new `app_geocodes` resolution store (source_url -> genuine geocoded point).
---   P1  gov-notice insert carries alerts.geo_lat/geo_lng when geo_scope='address'.
---   P2  area-scope development that RESOLVED to a genuine geofenced point is
---       promoted into app_projects(record_kind='development'); the rest stay in
---       app_changes with a geo_exclusion_reason (never a synthetic-centroid marker).
---   P4  app_materialization_summary() reports processed/materialized/displayed/
---       excluded + reason_counts per layer.
+-- Development geometry is NOT resolved here. It is resolved EXACTLY ONCE in the
+-- engine (get-address-report: resolveGeocode() + the geocodes cache + the 25-mi
+-- geofence). Address-bearing development records the engine resolves arrive as
+-- scope='point' with real coords and flow through the UNCHANGED point-dev insert
+-- below. This migration adds NO app_geocodes table and NO promotion branch.
+--
+-- ADDITIVE ONLY. Applied MANUALLY (this file is the DDL-of-record) — NOT auto-
+-- deployed. Rollback = re-apply the prior app_refresh_zip body from
+-- docs/app-content-materialize.sql history; the column and summary fn are additive
+-- and may remain (readers null-check).
 -- ============================================================================
 
 -- ---------------------------------------------------------------- P4: reason column
 alter table public.app_changes add column if not exists geo_exclusion_reason text;
 
--- ---------------------------------------------------------------- P2: resolution store
--- ONE row per (ZIP, street address). Written by the ingest geocoders
--- (adapters/development_geo.py via scripts/backfill_development_geo.py).
--- KEY = '<zip>|<UPPER(TRIM(address))>'.  NOTE: record_url is dataset-level for many
--- sources (e.g. a Fort Worth ArcGIS MapServer URL is shared by every permit), so it
--- is NOT a per-record key — the geocode is keyed by the address it actually resolves,
--- and identical addresses (same parcel) correctly share one point.
--- geo_scope='address' => a genuine, geofenced street-address point (mappable).
--- Any other geo_scope (or absence) => NOT mappable; `reason` says why.
--- RLS ON, no policies (service-role / pg_cron only) — matches resolved_projects.
-create table if not exists public.app_geocodes (
-  source_key   text primary key,            -- '<zip>|<UPPER(TRIM(address))>'
-  lat          double precision,
-  lng          double precision,
-  geo_scope    text,                         -- 'address' (mappable) | 'countywide' | 'unresolved'
-  matched_zip  text,                         -- ZIP the geocoder returned (fence check)
-  expected_zip text,                         -- ZIP the record was filed under
-  reason       text,                         -- exclusion reason when geo_scope<>'address'
-  geocoder     text default 'census',
-  resolved_at  timestamptz not null default now()
-);
-alter table public.app_geocodes enable row level security;
-
--- ---------------------------------------------------------------- P1+P2: materializer
+-- ---------------------------------------------------------------- P1: materializer
+-- Byte-identical to the production app_refresh_zip EXCEPT: (a) each app_changes insert
+-- stamps geo_exclusion_reason, and (b) the gov-notice insert carries alerts.geo_lat/
+-- geo_lng when geo_scope='address'. The development (point) + facility inserts are
+-- UNCHANGED — the engine feeds resolved points into the point insert.
 create or replace function public.app_refresh_zip(_zip text)
  returns text
  language plpgsql
 as $function$
 declare _cid uuid; _root uuid; _county text; _nd int; _ndp int; _nf int; _nfc int; _nc int; _nm int; _has_report boolean;
-        _lat double precision; _lng double precision; _nap int;
+        _lat double precision; _lng double precision;
 begin
   select id, county into _cid, _county from public.communities
     where _zip = any(zip_codes) order by (level='zip') desc, (level='city') desc limit 1;
@@ -61,10 +47,12 @@ begin
 
   delete from public.app_projects where zip=_zip;
   delete from public.app_changes  where zip=_zip;
-  _nd := 0; _ndp := 0; _nf := 0; _nfc := 0; _nc := 0; _nm := 0; _nap := 0;
+  _nd := 0; _ndp := 0; _nf := 0; _nfc := 0; _nc := 0; _nm := 0;
 
   if _has_report then
-    -- (1) parcel-precise DEVELOPMENT permits (scope='point') — UNCHANGED.
+    -- DEVELOPMENT permits (scope='point') — UNCHANGED. Engine-resolved address-bearing
+    -- records arrive here as scope='point' with real coords (get-address-report
+    -- resolveGeocode + geofence); nothing to do on this side but copy them.
     insert into public.app_projects (community_id, zip, name, type, status, stage, developer, size, investment, submitted_at, lat, lng, impact_score, source_ref, record_kind)
     select _cid, _zip, el->>'label',
       coalesce(nullif(el->>'use_type',''), el->>'layer'),
@@ -90,58 +78,18 @@ begin
     order by
       case when coalesce(el->>'file_date',el->>'decision_date') ~ '^\d{4}-\d{2}-\d{2}' then left(coalesce(el->>'file_date',el->>'decision_date'),10)::date end desc nulls last
     limit 48;
-
-    -- (1b) NEW (P2): area-scope DEVELOPMENT that RESOLVED to a genuine, geofenced
-    -- street-address point (app_geocodes.geo_scope='address') is promoted to a
-    -- real development marker. The engine stamped these with the ZIP CENTROID
-    -- (synthetic) — we DELIBERATELY ignore el->'lat'/'lng' here and use ONLY the
-    -- geocoder's fenced point. Records not resolved to 'address' are NOT promoted
-    -- (they fall through to the sidebar insert below with a reason). Keyed by
-    -- (zip,address); point vs area are disjoint by scope, so no cross-dedup needed.
-    insert into public.app_projects (community_id, zip, name, type, status, developer, submitted_at, lat, lng, impact_score, source_ref, record_kind)
-    select _cid, _zip, el->>'label',
-      coalesce(nullif(el->>'use_type',''), nullif(el->>'layer',''), 'Development'),
-      case lower(coalesce(nullif(el->>'bucket',''), ''))
-        when 'built' then 'Active' when 'approved' then 'Approved'
-        when 'proposed' then 'Proposed' when 'operating' then 'Operating' else 'On file' end,
-      coalesce(nullif(el->>'owner',''), nullif(el->>'src',''), nullif(el->>'jurisdiction','')),
-      case when coalesce(el->>'file_date',el->>'decision_date') ~ '^\d{4}-\d{2}-\d{2}' then left(coalesce(el->>'file_date',el->>'decision_date'),10)::date end,
-      g.lat, g.lng,
-      case lower(coalesce(el->>'bucket','')) when 'proposed' then 72 when 'approved' then 55 when 'built' then 55 else 45 end,
-      coalesce(el->>'record_url', el->>'url'), 'development'
-    from public.development_reports dr, jsonb_array_elements(dr.sites) el
-    join public.app_geocodes g
-      on g.source_key = _zip||'|'||upper(btrim(el->>'address'))
-     and g.geo_scope = 'address' and g.lat is not null and g.lng is not null
-    where dr.zip=_zip and coalesce(el->>'relevance','')='development'
-      and coalesce(el->>'scope','')<>'point'
-      and coalesce(el->>'record_url', el->>'url','')<>''
-      and coalesce(el->>'address','')<>''
-    order by
-      case when coalesce(el->>'file_date',el->>'decision_date') ~ '^\d{4}-\d{2}-\d{2}' then left(coalesce(el->>'file_date',el->>'decision_date'),10)::date end desc nulls last
-    limit 48;
-
     select count(*) into _nd from public.app_projects where zip=_zip and record_kind='development';
-    -- promoted (area records that resolved to a genuine geofenced point), uncapped
-    select count(*) into _nap
-      from public.development_reports dr, jsonb_array_elements(dr.sites) el
-      join public.app_geocodes g on g.source_key=_zip||'|'||upper(btrim(el->>'address')) and g.geo_scope='address'
-      where dr.zip=_zip and coalesce(el->>'relevance','')='development'
-        and coalesce(el->>'scope','')<>'point' and coalesce(el->>'record_url', el->>'url','')<>'';
 
-    -- TRUE totals (uncapped) — parcel-precise point dev + resolved-area dev.
-    select
-      (select count(*) from public.development_reports dr, jsonb_array_elements(dr.sites) el
-        where dr.zip=_zip and coalesce(el->>'relevance','')='development'
-          and coalesce(el->>'scope','')='point' and coalesce(el->>'record_url', el->>'url','')<>'')
-      + _nap
-      into _ndp;
+    select count(*) into _ndp
+    from public.development_reports dr, jsonb_array_elements(dr.sites) el
+    where dr.zip=_zip and coalesce(el->>'relevance','')='development'
+      and coalesce(el->>'scope','')='point' and coalesce(el->>'record_url', el->>'url','')<>'';
     select count(*) into _nfc
     from public.development_reports dr, jsonb_array_elements(dr.sites) el
     where dr.zip=_zip and coalesce(el->>'relevance','') not in ('development','civic')
       and coalesce(el->>'record_url', el->>'url','')<>'' and coalesce(nullif(el->>'label',''),'')<>'';
 
-    -- (2) EPA/ECHO regulated FACILITIES — UNCHANGED (record_kind='facility').
+    -- EPA/ECHO regulated FACILITIES — UNCHANGED.
     insert into public.app_projects (community_id, zip, name, type, status, developer, lat, lng, impact_score, source_ref, record_kind, registry_id, facility_env)
     select _cid, _zip, el->>'label',
       coalesce(nullif(el->>'use_type',''), nullif(el->>'layer',''), 'Regulated facility'),
@@ -164,10 +112,9 @@ begin
     limit 16;
     select count(*) into _nf from public.app_projects where zip=_zip and record_kind='facility';
 
-    -- (3) area-scope DEVELOPMENT that did NOT resolve to a genuine point ->
-    -- app_changes 'Planning & zoning', NULL coords, with the exclusion reason
-    -- (from app_geocodes if we tried, else 'not_point_materialized'). NEVER the
-    -- ZIP-centroid coordinate. (Was: unconditional insert of 6 rows, no coords.)
+    -- area-scope DEVELOPMENT (jurisdiction-wide planning notices/agendas) -> app_changes,
+    -- sidebar, NULL coords. UNCHANGED behavior; now stamped with an honest reason.
+    -- (Engine-resolved address records left this population as scope='point' above.)
     insert into public.app_changes (community_id, zip, category, title, plain_language, occurred_at, source_ref, confidence, lens, geo_exclusion_reason)
     select _cid, _zip, 'Planning & zoning',
       el->>'label',
@@ -175,20 +122,14 @@ begin
       case when el->>'file_date' ~ '^\d{4}-\d{2}-\d{2}'
                 and left(el->>'file_date',10)::date between date '2000-01-01' and (current_date + interval '2 years')
            then left(el->>'file_date',10)::date else current_date end,
-      coalesce(el->>'record_url', el->>'url'), 'Medium', 'value',
-      coalesce(g.reason, 'not_point_materialized')
+      coalesce(el->>'record_url', el->>'url'), 'Medium', 'value', 'not_point_materialized'
     from public.development_reports dr, jsonb_array_elements(dr.sites) el
-    left join public.app_geocodes g on g.source_key = _zip||'|'||upper(btrim(el->>'address'))
     where dr.zip=_zip and coalesce(el->>'relevance','')='development'
       and coalesce(el->>'scope','')<>'point'
       and coalesce(el->>'record_url', el->>'url','')<>''
-      and coalesce(g.geo_scope,'') <> 'address'   -- resolved ones were promoted above
-    order by
-      case when el->>'file_date' ~ '^\d{4}-\d{2}-\d{2}' then left(el->>'file_date',10)::date end desc nulls last
-    limit 12;
+    limit 6;
 
-    -- (4) PMN civic notices (jurisdiction-wide) -> app_changes, sidebar. UNCHANGED
-    -- behavior; now stamped with an honest reason.
+    -- PMN civic notices (jurisdiction-wide) -> app_changes, sidebar. UNCHANGED; reason added.
     insert into public.app_changes (community_id, zip, category, title, plain_language, occurred_at, source_ref, confidence, lens, geo_exclusion_reason)
     select _cid, _zip, 'Government & civic',
       el->>'label',
@@ -199,8 +140,8 @@ begin
     limit 6;
   end if;
 
-  -- (5) MEETINGS -> app_changes, ALWAYS timeline (Finding 7: never a map marker).
-  -- Coords intentionally NULL; reason 'meeting_timeline_by_design'. UNCHANGED behavior.
+  -- MEETINGS -> app_changes, ALWAYS timeline (Finding 7: never a map marker). Coords NULL;
+  -- reason 'meeting_timeline_by_design'. UNCHANGED behavior.
   insert into public.app_changes (community_id, zip, category, title, plain_language, occurred_at, source_ref, confidence, window_closes_at, lens, geo_exclusion_reason)
   select coalesce(_root,_cid), _zip, 'Government & civic',
     'Public meeting — '||m.title,
@@ -210,11 +151,10 @@ begin
   where m.community_id = coalesce(_root,_cid) and m.meeting_date >= now() and coalesce(m.source_url,'')<>''
   order by m.meeting_date asc limit 8;
 
-  -- (6) GOV NOTICES from public.alerts (the civic-alerts source of truth).
-  -- P1 CHANGE: carry the geocoded point (geo_lat/geo_lng) ONLY when geo_scope=
-  -- 'address' (a genuine street-address geocode). Everything else stays NULL ->
-  -- sidebar, with an honest reason. A row with real coords is plotted by the
-  -- UNCHANGED frontend automatically.
+  -- GOV NOTICES from public.alerts. P1 CHANGE: carry the EXISTING geocoded point
+  -- (alerts.geo_lat/geo_lng) ONLY when geo_scope='address' (a genuine street-address
+  -- geocode from the ingest notice_geo path). Everything else stays NULL -> sidebar,
+  -- with an honest reason. A row with real coords is plotted by the UNCHANGED frontend.
   insert into public.app_changes (community_id, zip, category, title, plain_language, occurred_at, source_ref, confidence, window_closes_at, lens, lat, lng, geo_exclusion_reason)
   select coalesce(_root,_cid), _zip, 'Government & civic',
     a.title,
@@ -257,13 +197,11 @@ begin
     name=excluded.name, county=excluded.county, state=excluded.state, indexable=excluded.indexable, updated_at=now(),
     lat=coalesce(excluded.lat, app_community_meta.lat), lng=coalesce(excluded.lng, app_community_meta.lng);
 
-  return _zip||': development='||_nd||'/'||_ndp||' (area-geocoded='||_nap||') facilities='||_nf||'/'||_nfc||' notices='||_nc||' quality='||(case when (_nd+_nf+_nc)>0 then 'pass' else 'coverage_coming' end);
+  return _zip||': development='||_nd||'/'||_ndp||' facilities='||_nf||'/'||_nfc||' notices='||_nc||' quality='||(case when (_nd+_nf+_nc)>0 then 'pass' else 'coverage_coming' end);
 end $function$;
 
 -- ---------------------------------------------------------------- P4: summary fn
 -- Per-layer processed / materialized / displayed(mappable) / excluded + reasons.
--- Read-only; safe to call any time. 'displayed' = rows that will render as a MAP
--- MARKER (valid coords); meetings are timeline-only so displayed is always 0.
 create or replace function public.app_materialization_summary()
  returns table(layer text, records_processed bigint, records_materialized bigint,
                records_displayed bigint, records_excluded bigint, reason_counts jsonb)
@@ -276,7 +214,6 @@ as $function$
       count(*) filter (where lat is null or lng is null) excluded
     from public.app_projects group by record_kind
   ),
-  -- app_changes, split: meetings (timeline by design) vs notices/planning
   chg as (
     select
       case when geo_exclusion_reason = 'meeting_timeline_by_design' then 'meeting'

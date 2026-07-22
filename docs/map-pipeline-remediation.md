@@ -1,175 +1,138 @@
 # Map Pipeline Remediation — design decision & architecture
 
-> Implementation of the approved production architecture for making truthful,
-> defensible map markers out of Government Notices and area-scope Development.
-> Companion migration: `docs/app-map-geocode-migration.sql` (parked DDL, applied
-> manually — NOT auto-deployed). Ingest-side geocoding mechanism lives in
-> `homesignal-ingest` (`adapters/development_geo.py`, `scripts/backfill_*_geo.py`).
+> Making truthful, defensible map markers out of Government Notices and area-scope
+> Development — with **geometry resolved exactly once, in the engine's existing
+> geocode infrastructure** (no new/duplicate geocoding).
+>
+> Site migration (this repo, parked, applied manually): `docs/app-map-observability-migration.sql`.
+> Engine geometry resolution: `supabase/functions/get-address-report` (`resolveGeocode()`
+> + the `geocodes` cache + the 25-mi geofence) — separate engine PR.
 
 ---
 
 ## 0. The one-line summary
 
-The frontend is correct and stays untouched. Markers are missing because
-**real geographic coordinates never reach the materialized rows** — the
-materializer (`app_refresh_zip`) writes Government Notices and area-scope
-Development into `app_changes`/`app_projects` with **NULL** (or **synthetic
-ZIP-centroid**) coordinates. The fix carries **genuine, geocoded, geofenced**
-coordinates into those rows — and *only* those with a defensible location —
-so the existing frontend plots them automatically.
+The frontend is correct and stays untouched. Markers were missing because real
+coordinates never reached the materialized rows. The fix has two decoupled halves,
+each on the target architecture:
+
+1. **Development** — resolved **once, in the engine** (`resolveGeocode()` + the
+   `geocodes` cache + geofence). Address-bearing records the engine resolves arrive
+   as `scope='point'` with real coords and flow through the **unchanged** point-dev
+   insert. **No new table, no second geocoder.**
+2. **Government Notices** — the materializer carries the notice's **existing**
+   geocoded point (`alerts.geo_lat/geo_lng`, from the ingest `notice_geo` path) into
+   `app_changes` **only** when `geo_scope='address'`. Everything else stays
+   sidebar/timeline with a machine-readable exclusion reason.
+
+The original draft introduced a parallel `app_geocodes` table + a second Python
+geocoder (`development_geo.py`). **Both were removed** — the engine already owns a
+production-quality, write-once, quality-aware geocode cache; duplicating it was the
+architecture we agreed not to ship.
 
 ---
 
-## 1. Verified facts (evidence attached — the audit was right)
+## 1. Verified facts (evidence attached)
 
-All counts are live from project `qwnnmljucajnexpxdgxr`, 2026-07-22.
+Live from project `qwnnmljucajnexpxdgxr`, 2026-07-22.
 
-| Fact | Query result |
+| Fact | Result |
 |---|---|
-| `app_changes` `Government & civic` rows | **6,737**, `with_coords = 0` |
-| `app_changes` `Planning & zoning` rows | **1,941**, `with_coords = 0` |
-| `app_projects` (development / facility) | 46,016 / 88,432 — **all** with coords |
-| `alerts` `government_notice` rows | 314 (`geo_scope='address'` = 0; countywide 50; NULL 264) |
-| area-scope development in `development_reports.sites` | **52,262** — all sourced, **all carry lat/lng equal to the ZIP centroid** (373 distinct points = 1 per ZIP) |
-| … of those, with a real street address (house# + street token) | **46,518** (empty/`"0"` = 1,269; non-numeric = 154) |
+| `app_changes` `Government & civic` / `Planning & zoning` | 6,737 / 1,941 rows — **0 with coords** |
+| `app_projects` development / facility | 46,016 / 88,432 — **all** with coords |
+| `alerts` `government_notice` | 314 rows; `geo_scope='address'` = **0** (all `geographic_reference` are jurisdiction names — "Box Elder County, UT", "Pima County, AZ") |
+| area-scope development in `development_reports.sites` | 52,262 records, **all carrying the ZIP centroid** (synthetic); 46,518 have a street address |
 
-**The frontend coordinate gate is load-bearing and correct** (`maps.html`):
+**The frontend coordinate gate is load-bearing and correct** (`maps.html:316-318` plots
+`changes+projects` with coords; `:443` lists coordinate-less changes in the sidebar).
+A row **with** real coords becomes a marker with **zero** frontend change. Do not weaken it (Finding 1).
 
-```js
-// line 316-318 — markers = changes(non-quiet) + projects, WITH coords only
-var all = changes.filter(x => !x.quiet).concat(projects)
-  .filter(x => x.lat && x.lng);
-// line 443 — changes WITHOUT coords are LISTED (sidebar), never plotted
-var area = changes.filter(x => !x.quiet && !(x.lat && x.lng));
-```
-
-So a `app_changes` row **with** valid coords becomes a map marker with **zero
-frontend change**; one without coords becomes a sidebar/timeline item. This is
-exactly the behavior we build on. **Do not weaken this filter** (Finding 1).
+**The engine already geocodes.** Source connectors (`socrata`/`arcgis`/`ckan`/`csv`/
+`carto`/`tabs`) call `resolveGeocode()` + apply the geofence (`index.ts:657-724`). The
+`geocodes` table + the rooftop→parcel→interpolated ladder + never-downgrade guard +
+`needs_review` flagging already exist (`geocode-cache.ts`, `docs/geocodes-setup.sql`).
 
 ---
 
-## 2. THE REQUIRED DESIGN DECISION — when a notice/record may become a marker
+## 2. THE REQUIRED DESIGN DECISION — when a record may become a marker
 
-Before materializing, every Government Notice and every area-scope Development
-record is classified by the *strongest geographic reference it actually carries*:
-
-| Geographic reference present | Becomes a marker? | Where it lands |
+| Geographic reference present | Marker? | Where it lands |
 |---|---|---|
-| **Source point geometry** (per-parcel lat/lng from the publisher) | ✅ yes | already a `point` record → `app_projects` (unchanged) |
-| **Street address** (house number + street-type token) that **geocodes** and passes the **geofence** | ✅ yes | geocoded → genuine point → marker |
-| **Parcel / APN** resolvable to a parcel polygon (`resolved_project_parcels`) | ✅ yes (future) | parcel centroid → marker |
-| **Jurisdiction / county / city name only** | ❌ no | `app_changes`, NULL coords → **sidebar / timeline** |
-| **ZIP only** (or the synthetic ZIP centroid the engine stamped) | ❌ no | `app_changes`, NULL coords → **sidebar / timeline** |
-| **No geographic reference** | ❌ no | `app_changes`, NULL coords → **sidebar / timeline** |
+| **Source point geometry** | ✅ | `app_projects` (unchanged) |
+| **Street address** that geocodes + clears the geofence | ✅ | engine resolves → `scope='point'` → `app_projects` |
+| **Parcel / APN** (future: `resolved_project_parcels`) | ✅ | parcel centroid/polygon |
+| **Jurisdiction / county / city / ZIP only** | ❌ | `app_changes`, NULL coords → sidebar/timeline |
+| **No geographic reference** | ❌ | `app_changes`, NULL coords → sidebar/timeline |
 
-**The geofence (reused from engine v20 — `GEOCODE_FENCE_MI = 25`).** A geocoded
-point is trusted only when **(a)** the geocoder's matched-address ZIP equals the
-record's own filed ZIP **and (b)** the point is within `GEOCODE_FENCE_MI` of the
-report's ZIP centroid. A miss NULLs the coordinate (the record still lists in the
-sidebar) — never a fabricated marker. Source-supplied point geometry is **never**
-fenced.
+**The geofence (engine, `GEOCODE_FENCE_MI = 25`)**: a geocoded point is trusted only
+when the matched-address ZIP equals the filed ZIP **and** it sits within 25 mi of the
+report centroid; a miss NULLs the coordinate (record still lists). Source geometry is
+never fenced. **We never plot a ZIP/county/city centroid to make a marker appear**, and
+never invent, infer, default, or interpolate a coordinate.
 
-**What we explicitly refuse** (Engineering Principles / Phase 2/3):
-- We never plot the **ZIP / county / city centroid** to "make a marker appear."
-  The 52,262 area-dev records already carry the ZIP centroid; we treat that
-  coordinate as *absent*, because it is synthetic.
-- We never invent, infer, default, or interpolate a coordinate.
-- If uncertainty exceeds tolerance (geocode miss, out-of-fence, ZIP mismatch,
-  garbage address), we **exclude the marker** and record the reason.
+**Meetings are never markers** (Finding 7): the meetings insert leaves coords NULL and
+stamps `meeting_timeline_by_design`.
 
-**Meetings are never converted to markers** (Finding 7). The meetings insert in
-`app_refresh_zip` deliberately leaves coords NULL and stamps
-`geo_exclusion_reason = 'meeting_timeline_by_design'`.
-
-### 2.1 What the data actually says (verified 2026-07-22) — do not over-plot
-
-- **Government Notices are jurisdiction-wide.** All 314 `alerts.government_notice`
-  rows carry a `geographic_reference` that is a **jurisdiction name** ("Box Elder
-  County, UT", "Tremonton, UT", "Pima County, AZ") — **0 are street addresses.**
-  Their honest classification is *jurisdiction boundary → no marker*; they stay
-  timeline/sidebar with reason `countywide`. The "6,737 not displayed" figure is
-  therefore **correct behavior made observable**, not a marker backlog to force
-  onto the map. The P1 carry-through still ships because it is the correct
-  mechanism the moment an address-bearing notice arrives — and it labels every
-  excluded one.
-- **Development is the real, defensible marker gain.** Of 52,262 area-scope
-  development records, **46,518 carry a genuine street address** (house# + street
-  token). These geocode to real per-parcel points and become honest development
-  markers — subject to the geofence. The synthetic ZIP-centroid coordinate the
-  engine stamped on them is treated as absent and never plotted.
+### 2.1 What the data says today (do not over-plot)
+- **Government Notices are jurisdiction-wide** — all 314 carry a jurisdiction name, 0
+  street addresses. They correctly stay timeline/sidebar; the P1 carry-through is the
+  correct *mechanism* the moment an address-bearing notice arrives, and it labels every
+  excluded one (`countywide` / `no_geographic_reference`).
+- **Development is the real marker gain**, and it is delivered by the **engine** — an
+  address-bearing development record that clears the geofence renders as a point through
+  the unchanged materializer. Records the engine cannot place stay sidebar (`not_point_materialized`).
 
 ---
 
-## 3. Architecture — where each piece runs
+## 3. Architecture — geometry resolved exactly once
 
 ```
- ingest (GitHub Actions, has egress + service key)         DB (Supabase)                     frontend (static, UNCHANGED)
- ─────────────────────────────────────────────           ──────────────                    ────────────────────────────
- backfill_notice_geo.py   ── geocode + geofence ──▶  alerts.geo_lat/geo_lng/geo_scope
- backfill_development_geo.py ─ geocode + geofence ─▶  app_geocodes(source_key → lat/lng)
+ engine (get-address-report edge fn)                DB (Supabase)                 frontend (static, UNCHANGED)
+ ──────────────────────────────────                ──────────────                ────────────────────────────
+ source record has an address ─▶ resolveGeocode()  development_reports.sites
+   + geocodes cache + 25-mi geofence  ──────────▶    scope='point' + real lat/lng
                                                         │
-                                            app_refresh_zip(_zip)  ── carries genuine coords ──▶  app_changes.lat/lng
-                                            (materializer, nightly    (+ geo_exclusion_reason)      app_projects.lat/lng
-                                             pg_cron 'app-content-refresh')                                │
-                                                                                        maps.html plots rows WITH coords,
-                                                                                        lists rows WITHOUT coords (sidebar)
+ ingest notice_geo ─▶ alerts.geo_lat/geo_lng (address) │
+                                                        ▼
+                                          app_refresh_zip(_zip)  ── COPIES geometry ──▶ app_projects.lat/lng
+                                          (materializer; never geocodes)                app_changes.lat/lng
+                                             + geo_exclusion_reason                          │
+                                                                             maps.html plots rows WITH coords,
+                                                                             lists rows WITHOUT coords (sidebar)
 ```
 
-- **Geocoding is business logic → lives in the ingest/materialization pipeline**
-  (Python, Actions egress). The DB materializer stays pure SQL and only *carries*
-  coordinates that a geocoder already resolved and fenced.
-- **`app_geocodes`** is the resolution store keyed by **`'<zip>|<UPPER(TRIM(address))>'`**.
-  `record_url` is dataset-level for many sources (a Fort Worth ArcGIS MapServer URL
-  is shared by every permit), so it is **not** a per-record key — the geocode is
-  keyed by the address it actually resolves, and identical addresses (same parcel)
-  correctly share one point. Idempotent upsert; RLS on, service-role only. Survives
-  the materializer's nightly delete+reinsert because the materializer re-joins it
-  every run. `source_ref` on the promoted `app_projects` row stays the official
-  `record_url` (dataset-precision link) — anti-fabrication is preserved.
-- **Notices** read their resolved point from `alerts.geo_lat/geo_lng`
-  (`geo_scope='address'`); **development** reads it from `app_geocodes`. Two
-  natural homes, one identical carry-through rule.
+- **One geocoder** (the engine's `resolveGeocode()` + `geocodes` cache). Notices reuse
+  the ingest `notice_geo` path that already populates `alerts.geo_lat`. The materializer
+  **only copies** geometry — it never resolves.
+- **No `app_geocodes`, no `development_geo.py`, no duplicate cache.**
 
 ---
 
 ## 4. Observability (Phase 4)
-
-- `app_changes.geo_exclusion_reason text` — a machine-readable reason on every
-  row that stayed in the sidebar rather than the map. Reason vocabulary:
-  `missing_coordinates`, `missing_address`, `no_geographic_reference`,
-  `countywide`, `civic_jurisdiction_wide`, `meeting_timeline_by_design`,
-  `not_point_materialized`, `geocode_no_match`, `geocode_zip_mismatch`,
-  `geocode_out_of_fence`, `invalid_geometry`.
-- `app_materialization_summary()` — returns, per layer
-  (`government_notice` / `development` / `facility` / `meeting`):
-  `records_processed`, `records_materialized`, `records_displayed` (mappable),
-  `records_excluded`, and a `reason_counts` jsonb. The ingest backfill scripts
-  print the same shape per run.
+- `app_changes.geo_exclusion_reason` on every sidebar row: `countywide`,
+  `no_geographic_reference`, `civic_jurisdiction_wide`, `meeting_timeline_by_design`,
+  `not_point_materialized`.
+- `app_materialization_summary()` — per layer: processed / materialized / displayed
+  (mappable) / excluded + reason counts.
 
 ---
 
 ## 5. Rollout & rollback
-
-**Rollout** (operator, after PR review — NOT part of this PR):
-1. Apply `docs/app-map-geocode-migration.sql` (adds column + `app_geocodes` +
-   new `app_refresh_zip` body + summary fn). Additive; readers null-check.
-2. Run `backfill_notice_geo.py` (DRY_RUN=false) and
-   `backfill_development_geo.py` (DRY_RUN=false) in Actions to populate coords.
-3. `select public.app_refresh_all();` (or let the nightly pg_cron run) to
-   re-materialize. New markers appear on the live site with no site deploy.
+**Rollout** (operator, after review):
+1. Apply `docs/app-map-observability-migration.sql` (adds the column, the reason-stamped
+   `app_refresh_zip`, and the summary fn). No `app_geocodes`.
+2. Deploy the engine geometry-resolution change (separate PR) via the deploy workflow;
+   re-cache a representative ZIP set (the nightly `dev_refresh` also does this).
+3. `select public.app_refresh_all();` — engine-resolved points flow into `app_projects`.
 
 **Rollback**: re-apply the prior `app_refresh_zip` body from
-`docs/app-content-materialize.sql` history. The added column and `app_geocodes`
-table are additive and can remain (ignored). No frontend revert — the frontend
-never changed.
+`docs/app-content-materialize.sql` history; the added column + summary fn are additive.
+No frontend revert; the engine change is guarded by `verify-geocodes` CI and reverts by
+redeploying the prior bundle.
 
 ---
 
 ## 6. Non-goals / preserved behavior (P0)
-
-- Frontend map, coordinate filter, marker categories: **unchanged**.
-- EPA FRS/ECHO facilities pipeline: **unchanged** (Finding 6).
-- Meetings as timeline content: **unchanged** (Finding 7).
-- Anti-fabrication invariants (`source_ref` required, no invented coords):
-  **strengthened**, never relaxed.
+Frontend map, coordinate filter, marker categories, EPA facilities (Finding 6), and
+meetings-as-timeline (Finding 7) are **unchanged**. Anti-fabrication invariants are
+strengthened, never relaxed. No second geocoding system is introduced.
