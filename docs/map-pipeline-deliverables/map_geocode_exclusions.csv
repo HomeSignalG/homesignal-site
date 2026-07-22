@@ -1,0 +1,11 @@
+record_id,source,category,reason,recommended_action
+b094809d-f029-431d-81b6-721b84d72ab5,alerts.government_notice,Government & civic,countywide,keep_timeline_sidebar
+8afe462d-9e31-482c-87e4-3944ea44d0be,alerts.government_notice,Government & civic,countywide,keep_timeline_sidebar
+ab4e902c-29fc-4495-9a16-115f70c1be8a,alerts.government_notice,Government & civic,countywide,keep_timeline_sidebar
+https://www.utah.gov/pmn/sitemap/notice/1085733.html,development_reports.area,Planning & zoning,no_geographic_reference,keep_sidebar
+https://www.utah.gov/pmn/sitemap/notice/1077121.html,development_reports.area,Planning & zoning,no_geographic_reference,keep_sidebar
+https://www.utah.gov/pmn/sitemap/notice/1094345.html,development_reports.area,Planning & zoning,no_geographic_reference,keep_sidebar
+76132|0,development_reports.area,Planning & zoning,missing_address,keep_sidebar_or_fix_source
+43235|6013 WINSTEAD RD,development_reports.area,development,promotable_street_address,geocode_to_point_marker
+43235|825 GREENRIDGE RD,development_reports.area,development,promotable_street_address,geocode_to_point_marker
+43235|945 STONEY CREEK RD,development_reports.area,development,promotable_street_address,geocode_to_point_marker
