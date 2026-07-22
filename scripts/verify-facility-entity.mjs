@@ -61,36 +61,39 @@ ok(notYet.length === unconfirmed.length && blankRows.length === 0,
 const echoLinks = await page.$$eval('a', as => as.filter(a => (a.href || '').includes('echo.epa.gov')).length);
 ok(echoLinks === 0, '2. no echo.epa.gov link anywhere in the maps.html DOM', `${echoLinks} echo links`);
 
-// Purple pin → popup → dossier link (GL and Leaflet markers are DOM divs with the
-// facility hex; the schematic fallback wraps SVG rects in <a href="development.html?id=…">).
+// Purple pin click opens the in-map sidebar (never a popup or dossier redirect).
 const pin = await page.evaluateHandle(() => {
   const divs = [...document.querySelectorAll('#mapgl div, #maplf div')]
-    .filter(d => (d.style.background || '').includes('rgb(111, 66, 193)'));
-  return divs[0] || document.querySelector('#mapSch svg a rect') || null;
+    .filter(d => (d.style.background || '').includes('rgb(111, 66, 193)') || d.querySelector('svg rect'));
+  return divs[0] || document.querySelector('#mapSch svg rect') || null;
 });
 let pinObserved = 'no purple marker element found';
 let pinOk = false;
 if (await pin.evaluate(el => !!el)) {
-  const isRect = await pin.evaluate(el => el.tagName === 'rect');
-  if (isRect) {
-    const href = await pin.evaluate(el => el.closest('a')?.getAttribute('href'));
-    pinOk = /^development\.html\?id=/.test(href || '');
-    pinObserved = `schematic SVG marker; anchor href="${href}"`;
-  } else {
-    await pin.asElement().click();
-    await page.waitForTimeout(1500);
-    const popup = await page.$eval('.maplibregl-popup-content, .leaflet-popup-content',
-      el => el.innerHTML).catch(() => null);
-    pinOk = !!popup && popup.includes('development.html?id=') && !popup.includes('echo.epa.gov');
-    pinObserved = popup ? `popup HTML: ${popup.replace(/\s+/g, ' ').slice(0, 300)}` : 'popup did not open';
-  }
+  await pin.asElement().click();
+  await page.waitForTimeout(1500);
+  const panel = await page.evaluate(() => ({
+    open: document.getElementById('infoSlide').classList.contains('open'),
+    detail: !!document.querySelector('#infoPanel.idetail'),
+    popup: !!document.querySelector('.maplibregl-popup, .leaflet-popup'),
+    body: (document.getElementById('infoPanel') || {}).textContent || ''
+  }));
+  pinOk = panel.open && panel.detail && !panel.popup;
+  pinObserved = JSON.stringify(panel);
 }
-ok(pinOk, '2. purple pin opens the dossier route, not ECHO', pinObserved);
+ok(pinOk, '2. purple pin opens facility detail in the sidebar (no popup/redirect)', pinObserved);
 
-// Sidebar row click navigates to the dossier route.
+// Sidebar row click opens the same panel (no page navigation).
+const beforeUrl = page.url();
 await page.click('#pinList [data-fac]');
-await page.waitForURL(/development\.html\?id=/, { timeout: 15000 });
-ok(true, '2. sidebar facility row navigates to development.html?id=', page.url());
+await page.waitForTimeout(800);
+const facPanel = await page.evaluate(() => ({
+  open: document.getElementById('infoSlide').classList.contains('open'),
+  detail: !!document.querySelector('#infoPanel.idetail'),
+  name: (document.querySelector('#infoPanel h2') || {}).textContent || ''
+}));
+ok(page.url() === beforeUrl && facPanel.open && facPanel.detail,
+  '2. sidebar facility row opens in-map detail without navigation', JSON.stringify(facPanel));
 
 // ── 3. DALFEN dossier ──
 await page.goto(`${SITE}/development.html?id=${encodeURIComponent(dalfen.id)}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
