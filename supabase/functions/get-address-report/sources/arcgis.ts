@@ -27,6 +27,7 @@ import type {
   Bucket, ColumnMap, ColumnRef, NormalizedRecord, StatusToBucket,
   ExcludedStatus, UnmappedStatus,
 } from "./socrata.ts";
+import { buildGeocodeInput } from "./geo-input.ts";
 
 // ───────────────────────────── registry entry + types ─────────────────────────────
 
@@ -39,6 +40,11 @@ export interface ArcgisRegistryEntry {
   /** Human landing page; the record_url fallback when no per-row URL is derivable. */
   dataset_url: string;
   jurisdiction: string;
+  /** OPT-IN: assemble a COMPLETE one-line address (street + city-from-jurisdiction + state +
+   *  ZIP) before geocoding, instead of sending the bare address column. Set true ONLY for
+   *  connectors whose address column is a bare street line the Census geocoder can't match
+   *  (verified 2026-07-22). Absent/false ⇒ prior behavior. See sources/geo-input.ts. */
+  geocode_assemble?: boolean;
   coverage: { state: string; county?: string }[];
   column_map: ColumnMap;
   type_map?: Record<string, string>;
@@ -256,15 +262,26 @@ async function normalizeRow(
   if (lat != null && lng != null) {
     geoPrecision = "point"; scope = "point";
   } else if (address && deps.geocode) {
-    const g = await deps.geocode(address);
-    if (!g) { report.geocode_failures++; report.quarantined.push({ reason: "geocode failed", sample: address }); lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area"; }
+    // OPT-IN per registry entry (`geocode_assemble`). OFF ⇒ byte-identical to the prior
+    // behavior (bare address to the geocoder; filedZip = zip column / reportZip). ON ⇒ build a
+    // COMPLETE one-line address first (city from jurisdiction, state from coverage, ZIP from
+    // the mapped column / embedded / reportZip) — a bare street line does not match the Census
+    // geocoder (measured). resolveGeocode()/cache/fence are unchanged either way.
+    const gi = entry.geocode_assemble
+      ? buildGeocodeInput({ rawAddress: address, jurisdiction: entry.jurisdiction, state: entry.coverage[0]?.state, zipColValue: valOrNull(readCol(row, cm.zip)), reportZip })
+      : { input: address, filedZip: (String(readCol(row, cm.zip) ?? "").match(/\b\d{5}\b/)?.[0]) || reportZip || null };
+    const g = await deps.geocode(gi.input);
+    if (!g) { report.geocode_failures++; report.quarantined.push({ reason: "geocode failed", sample: gi.input }); lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area"; }
     else {
       // GEOFENCE (anti-fabrication): a geocoded point is trusted only when the geocoder's
       // own output agrees with where the record is filed. Census range-interpolation can
       // match the same street name in another city/state (live example: a Fort Worth permit
       // rendered in Michigan). Two local checks, no extra lookups; a miss NULLS the coords —
       // the record stays listed as an area item, the untrusted marker is never rendered.
-      const filedZip = (String(readCol(row, cm.zip) ?? "").match(/\b\d{5}\b/)?.[0]) || reportZip || null;
+      // filedZip from the complete-address builder: mapped ZIP column → ZIP embedded in the
+      // address (the Clark County fix: fence against the address's OWN ZIP, not the report
+      // ZIP) → reportZip. Same fence comparison as before, just a more accurate filed ZIP.
+      const filedZip = gi.filedZip;
       const matchedZip = ((g.matched_address || "").match(/\b(\d{5})(?:-\d{4})?\s*$/)?.[1]) ?? null;
       const zipMismatch = !!(filedZip && matchedZip && filedZip !== matchedZip);
       const c = deps.zipCentroid;
