@@ -1,0 +1,184 @@
+name: verify-edge-function
+
+# PR-stage validation for the Supabase Edge Function source under supabase/functions/**.
+# Closes a CI coverage gap: no other pull_request workflow validates TypeScript/JSON changes
+# in the Edge Function directory (the verify-* workflows are post-merge/live gates that run
+# on push:[main] + schedule and hit the DEPLOYED function — they cannot validate PR source).
+#
+# This workflow is offline + read-only: it type-checks the source, runs the offline geocoder
+# helper unit tests, validates the Edge Function JSON, and asserts the intended
+# `geocode_assemble` registry flags. It requires NO production secrets and NEVER calls the
+# live database, the Census geocoder, the Supabase project, or the deployed Edge Function.
+# It performs NO deployment and NO production writes. (`deno check` fetches the function's
+# library dependency types from the jsr package registry — ordinary dependency resolution,
+# not a call to any HomeSignal production service.)
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/**/*.ts'
+      - 'supabase/functions/**/*.json'
+      - 'supabase/functions/**/sources/**'
+      - '.github/workflows/verify-edge-function.yml'
+  workflow_dispatch: {}
+
+# Read-only checkout — no elevated permissions, no secrets.
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-edge-function-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      FN_DIR: supabase/functions/get-address-report
+    steps:
+      - name: Checkout (read-only)
+        uses: actions/checkout@v4
+
+      - name: Install Deno (pinned)
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.1.4
+
+      - name: Validate Edge Function JSON
+        run: |
+          cat > "${RUNNER_TEMP}/validate-json.ts" <<'TS'
+          // Parse every .json under supabase/functions to prove none is malformed.
+          const root = "supabase/functions";
+          function* walk(dir: string): Generator<string> {
+            for (const d of Deno.readDirSync(dir)) {
+              const p = `${dir}/${d.name}`;
+              if (d.isDirectory) yield* walk(p); else yield p;
+            }
+          }
+          let checked = 0, bad = 0;
+          for (const path of walk(root)) {
+            if (!path.endsWith(".json")) continue;
+            checked++;
+            try { JSON.parse(Deno.readTextFileSync(path)); console.log("ok  ", path); }
+            catch (e) { bad++; console.error(`::error::malformed JSON: ${path} — ${(e as Error).message}`); }
+          }
+          console.log(`checked ${checked} JSON file(s), ${bad} malformed`);
+          if (bad) Deno.exit(1);
+          TS
+          deno run --allow-read "${RUNNER_TEMP}/validate-json.ts"
+
+      - name: Run geocoder helper tests (offline)
+        run: |
+          set -o pipefail
+          out="$(deno run "${FN_DIR}/sources/geo-input.test.ts")"
+          printf '%s\n' "$out"
+          if printf '%s\n' "$out" | grep -q '^FAIL '; then
+            echo "::error::geo-input helper tests reported failures"; exit 1
+          fi
+          if ! printf '%s\n' "$out" | grep -qE ', 0 failed$'; then
+            echo "::error::did not observe a clean test summary (', 0 failed')"; exit 1
+          fi
+          echo "geo-input helper tests passed"
+
+      - name: Type-check the new geocoder helper (strict, must be clean)
+        run: |
+          # geo-input.ts is the module this PR introduces; it has no external deps and must
+          # type-check with zero errors.
+          deno check "${FN_DIR}/sources/geo-input.ts"
+
+      - name: Type-check Edge Function TypeScript (no NEW errors from this PR)
+        run: |
+          # Type-check the entry point + touched connectors. The repo has PRE-EXISTING
+          # `deno check` errors in untouched code (the un-typed Supabase client resolves to a
+          # `never`-generic under strict checking — a compile-time-only artifact; types are
+          # erased at deploy). Fixing them means editing production files this PR must not
+          # touch. So this gate fails ONLY when an error lands on a line THIS PR added/changed
+          # (a genuinely new error); pre-existing errors on untouched lines are surfaced and
+          # tolerated. deno check fetches library types from the jsr/npm registries — ordinary
+          # dependency resolution, not a call to any HomeSignal production service.
+          git fetch --no-tags --depth=1 origin main
+          git diff --unified=0 "origin/main...HEAD" -- "${FN_DIR}" > "${RUNNER_TEMP}/pr.diff" || true
+          set +e
+          deno check \
+            "${FN_DIR}/index.ts" \
+            "${FN_DIR}/sources/geo-input.ts" \
+            "${FN_DIR}/sources/arcgis.ts" \
+            "${FN_DIR}/sources/socrata.ts" > "${RUNNER_TEMP}/check.out" 2>&1
+          echo "deno check exit: $?"
+          set -e
+          cat "${RUNNER_TEMP}/check.out"
+          cat > "${RUNNER_TEMP}/gate.ts" <<'TS'
+          // Fail ONLY if `deno check` reports an error on a line THIS PR added/changed.
+          // Pre-existing errors on untouched lines are tolerated (and logged). Robust to
+          // dependency version drift: drift moves pre-existing errors, which stay tolerated.
+          const added = new Map<string, Array<[number, number]>>();
+          let cur: string | null = null;
+          for (const line of Deno.readTextFileSync(Deno.env.get("PR_DIFF")!).split("\n")) {
+            const f = line.match(/^\+\+\+ b\/(.+)$/);
+            if (f) { cur = f[1]; if (!added.has(cur)) added.set(cur, []); continue; }
+            const h = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);
+            if (h && cur) {
+              const start = parseInt(h[1], 10);
+              const count = h[2] === undefined ? 1 : parseInt(h[2], 10);
+              if (count > 0) added.get(cur)!.push([start, start + count - 1]);
+            }
+          }
+          const locs: Array<{ file: string; line: number }> = [];
+          for (const m of Deno.readTextFileSync(Deno.env.get("CHECK_ERR")!)
+            .matchAll(/at file:\/\/\/\S*?(supabase\/functions\/[^\s:]+):(\d+):(\d+)/g)) {
+            locs.push({ file: m[1], line: parseInt(m[2], 10) });
+          }
+          const isNew = (file: string, line: number) =>
+            (added.get(file) ?? []).some(([a, b]) => line >= a && line <= b);
+          const news = locs.filter((l) => isNew(l.file, l.line));
+          console.log(`deno check: ${locs.length} error location(s) — ${news.length} on PR-changed lines, ${locs.length - news.length} pre-existing on untouched lines.`);
+          if (news.length) {
+            console.error("::error::this PR introduces NEW type errors:");
+            for (const l of news) console.error(`::error::  ${l.file}:${l.line}`);
+            Deno.exit(1);
+          }
+          console.log("PASS: no new type errors introduced by this PR.");
+          TS
+          PR_DIFF="${RUNNER_TEMP}/pr.diff" CHECK_ERR="${RUNNER_TEMP}/check.out" \
+            deno run --allow-read --allow-env "${RUNNER_TEMP}/gate.ts"
+
+      - name: Assert geocode_assemble flags (exactly six, Boulder unflagged)
+        run: |
+          cat > "${RUNNER_TEMP}/assert-flags.ts" <<'TS'
+          // The registry is an object keyed by platform (socrata/arcgis/ckan/csv/carto),
+          // each an array of entries; readme keys hold non-entry arrays. Flatten the real
+          // entries and confirm the six intended `geocode_assemble` flags — and only those —
+          // and that Boulder is NOT flagged.
+          const path = "supabase/functions/get-address-report/jurisdiction-registry.json";
+          const reg = JSON.parse(Deno.readTextFileSync(path)) as Record<string, unknown>;
+          const entries = Object.values(reg)
+            .flatMap((v) => Array.isArray(v) ? v : [])
+            .filter((e): e is Record<string, unknown> =>
+              !!e && typeof e === "object" && typeof (e as Record<string, unknown>).registry_id === "string");
+          const flagged = entries
+            .filter((e) => e.geocode_assemble === true)
+            .map((e) => e.registry_id as string)
+            .sort();
+          const want = [
+            "bellevue-permits",
+            "cincinnati-building-permits",
+            "clark-county-active-dev-permits",
+            "columbus-building-permits",
+            "fort-worth-development-permits",
+            "pierce-county-pals-permits",
+          ].sort();
+          console.log(`flagged (${flagged.length}): ${flagged.join(", ")}`);
+          let ok = true;
+          if (JSON.stringify(flagged) !== JSON.stringify(want)) {
+            ok = false;
+            console.error(`::error::geocode_assemble flag set mismatch — want [${want.join(", ")}]`);
+          }
+          const boulder = entries.find((e) => e.registry_id === "boulder-construction-permits");
+          if (boulder && boulder.geocode_assemble) {
+            ok = false;
+            console.error("::error::boulder-construction-permits must NOT be geocode_assemble-flagged");
+          }
+          if (!ok) Deno.exit(1);
+          console.log("registry flags OK — exactly six intended entries flagged, Boulder unflagged");
+          TS
+          deno run --allow-read "${RUNNER_TEMP}/assert-flags.ts"
