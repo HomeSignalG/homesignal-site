@@ -64,11 +64,12 @@ HS.onReady(async function () {
   var focusCategory = qs.get('category');
   var focusId = qs.get('id');
   // Never hang silently: a failed read renders an honest retry state.
-  var c, all, meetings;
+  var c, all, meetings, news;
   try {
     c = await HS.data.community(S.zip);
     all = await HS.data.changes(S.zip, home);
     meetings = await HS.data.meetings(S.zip, home);
+    news = await HS.data.news(S.zip, home);
   } catch (e) {
     console.warn('[alerts] data load failed', e);
     document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load your alerts</h1>'
@@ -129,9 +130,12 @@ HS.onReady(async function () {
     return dedupeMeetings(fromApi.concat(fromChanges));
   }
 
+  // Local News is served by its own materialized read (HS.data.news → app_changes rows
+  // tagged 'Local News'); changes() deliberately excludes them so the gov/meetings feeds
+  // and every other page are untouched. isNewsItem still guards isGovNotice above.
   var pools = {
     gov: all.filter(isGovNotice),
-    news: all.filter(isNewsItem),
+    news: news,
     meetings: buildMeetingsPool()
   };
 
