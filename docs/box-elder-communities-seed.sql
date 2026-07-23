@@ -11,8 +11,15 @@
 --   whatever government cascades down from its parents (city council, county, state).
 --
 --   county  Box Elder County ............ county government (commission, planning, tax, …)
---     ├─ city  Brigham City / Tremonton ... their own city council (for 84302 / 84337)
---     └─ zip   Bear River City … Willard, Hooper ... inherit the county's government
+--     ├─ city  Brigham City / Tremonton ... GOVERNMENT LAYERS (their own city council);
+--     │         │                           NOT resident pages — the ZIP page below is.
+--     │         └─ zip  Brigham City (84302) / Tremonton (84337) ... resident pages that
+--     │                 inherit the city council AND the county via cascade.
+--     └─ zip   Bear River City … Willard ... resident pages that inherit the county.
+--
+-- Every user-facing Box Elder ZIP therefore resolves through a level=zip community — an
+-- identical backbone across all 18 ZIP pages (§4). The two incorporated-city ZIPs simply
+-- have one extra government layer (their council) to cascade through.
 --
 -- Town councils for the small ZIP towns are layered on LATER, once each town's meeting
 -- source is wired on the ingest side (many small Utah towns may not publish meetings).
@@ -59,6 +66,21 @@ from (values
   ('Snowville','snowville','84336'),
   ('Willard','willard','84340')
 ) as v(name, slug, zip)
+on conflict do nothing;
+
+-- ── 4) Incorporated-city ZIP pages — the resident page for 84302 / 84337; parent → its
+--        CITY row (§2). Named "<place> (<ZIP>)" like every other state's ZIP pages, with
+--        government_topics=[] (the council label lives on the city government LAYER and
+--        cascades down). This makes EVERY user-facing Box Elder ZIP resolve through a
+--        level=zip community; resolution ranks zip > city > county, so these outrank the
+--        Brigham City / Tremonton city rows, which remain purely as cascaded gov layers.
+insert into public.communities (name, county, state, level, slug, zip_codes, government_topics, parent_id)
+select v.name, 'Box Elder', 'UT', 'zip', v.slug, array[v.zip], array[]::text[],
+       (select id from public.communities where slug = v.parent_slug)
+from (values
+  ('Brigham City (84302)','brigham-city-84302','84302','brigham-city'),
+  ('Tremonton (84337)','tremonton-84337','84337','tremonton')
+) as v(name, slug, zip, parent_slug)
 on conflict do nothing;
 
 -- Verify:
