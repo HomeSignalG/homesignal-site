@@ -25,6 +25,8 @@ jobs:
         run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
       - name: Walk the live Maps page
         run: node scripts/verify-maps-live.mjs
+      - name: Walk the rollout ZIP classes (Street/Satellite/Focus across representative ZIPs)
+        run: node scripts/verify-maps-rollout.mjs
       - name: Publish screenshots to ci-live-shots branch
         if: always()
         run: |
