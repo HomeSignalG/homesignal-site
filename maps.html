@@ -516,10 +516,48 @@ HS.onReady(async function () {
     openPanel();                      // the ONE panel — detail replaces whatever was showing
     var p = document.getElementById('infoPanel'); if (p) p.scrollTop = 0;
   }
-  // A lettered REGULATED FACILITY routes to its dossier (an existing condition, not a
-  // development "project"), so it never opens the project-framed 6-section panel.
-  function openItem(it) { if (!it) return; if (it._facility) { location.href = 'development.html?id=' + encodeURIComponent(it.id); return; } selectItem(it); }
+  // A REGULATED FACILITY is an existing condition, not a development "project", so it
+  // never opens the project-framed 6-section panel — but a marker/row CLICK must open
+  // the SAME right panel and never navigate away (founder launch spec). The facility
+  // gets its own facility-framed panel; the full dossier stays one explicit click away.
+  function openItem(it) { if (!it) return; if (it._facility) { selectFacility(it); return; } selectItem(it); }
   function clearSelection() { selected = null; renderInfo(lastItems); }
+
+  function facilityRowOf(x) {
+    if (!x || x.id == null) return x || null;
+    var pool = facRows.concat(facs);
+    for (var i = 0; i < pool.length; i++) if (pool[i].id === x.id) return pool[i];
+    return x;
+  }
+  function selectFacility(x) {
+    var f = facilityRowOf(x);
+    if (!f) return;
+    selected = null;                      // facility detail is its own transient view
+    renderFacilityDetail(f, x && x._letter);
+    openPanel();
+    var p = document.getElementById('infoPanel'); if (p) p.scrollTop = 0;
+  }
+  function renderFacilityDetail(f, letter) {
+    var panel = document.getElementById('infoPanel');
+    panel.classList.add('idetail');
+    var interp = HS.fac.interpret(f.facility_env || null);
+    var line = interp ? interp.line : 'Permit status not yet confirmed — open the facility record.';
+    var specs = [['EPA registry ID', f.registry_id], ['Distance', f.dist]]
+      .filter(function (r) { return r[1]; })
+      .map(function (r) { return '<div class="row"><span>' + HS.esc(r[0]) + '</span><b>' + HS.esc(r[1]) + '</b></div>'; }).join('');
+    panel.innerHTML = '<button class="backbtn" id="infoBack" aria-label="Back to the list">← All nearby projects</button>'
+      + '<div class="isum">'
+      + '<span class="lens"><span class="letter" style="background:' + HS.markerRegistry.facilityHex + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px">' + HS.esc(letter || f._letter || '■') + '</span>&nbsp; Regulated facility' + (f.dist ? ' · ' + HS.esc(f.dist) : '') + '</span>'
+      + '<h2>' + HS.esc(f.name || 'Regulated facility') + '</h2>'
+      + '<p class="lead">' + HS.esc(line) + '</p>'
+      + (interp && interp.caveat ? '<p class="sowhat">' + HS.esc(interp.caveat) + '</p>' : '')
+      + (specs ? '<div class="specs tight" style="margin-top:12px">' + specs + '</div>' : '')
+      + '</div>'
+      + '<div class="isec"><button class="btn primary" onclick="location.href=\'development.html?id=' + encodeURIComponent(f.id) + '\'">Open the full facility record ▸</button></div>';
+    var back = panel.querySelector('#infoBack');
+    back.onclick = function () { panel.classList.remove('idetail'); clearSelection(); };
+    back.focus({ preventScroll: true });
+  }
 
   function applyDeepId(items) {
     if (!deepId || deepApplied) return;
@@ -636,7 +674,7 @@ HS.onReady(async function () {
     actAll('[data-pin]', function (el) { openItem(items[parseInt(el.getAttribute('data-pin'), 10)]); });
     actAll('[data-fac]', function (el) {
       var f = sectionFacs[parseInt(el.getAttribute('data-fac'), 10)];
-      if (f) location.href = 'development.html?id=' + encodeURIComponent(f.id);
+      if (f) selectFacility(f);          // same panel — a row click never navigates
     });
     actAll('[data-area]', function (el) {
       var it = area[parseInt(el.getAttribute('data-area'), 10)];
@@ -945,7 +983,7 @@ HS.onReady(async function () {
     pinGroups.forEach(function (g, i) {
       if (i >= items.length) return;
       g.style.cursor = 'pointer';
-      g.addEventListener('click', function () { var it = items[i]; if (it._facility) location.href = 'development.html?id=' + encodeURIComponent(it.id); else selectItem(it); });
+      g.addEventListener('click', function () { openItem(items[i]); });   // facility → same-panel detail, never navigates
     });
   }
 
@@ -964,13 +1002,14 @@ HS.onReady(async function () {
       rect.setAttribute('x',x-7); rect.setAttribute('y',y-7); rect.setAttribute('width',14); rect.setAttribute('height',14);
       rect.setAttribute('rx',3); rect.setAttribute('fill',HS.markerRegistry.facilityHex); rect.setAttribute('stroke','#fff'); rect.setAttribute('stroke-width',3);
       var t=document.createElementNS(NS,'title');
-      t.textContent = f.name + ' · Regulated facility' + (f.dist?' · '+f.dist:'');
+      t.textContent = 'Regulated facility · ' + f.name;          // hover: type + name
       rect.appendChild(t);
-      var a=document.createElementNS(NS,'a');
-      var dossier='development.html?id='+encodeURIComponent(f.id);
-      a.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href',dossier);
-      a.setAttribute('href',dossier);
-      a.appendChild(rect); put(a);
+      rect.setAttribute('role','button'); rect.setAttribute('tabindex','0');
+      rect.setAttribute('aria-label', 'Regulated facility. ' + f.name);
+      rect.style.cursor='pointer';
+      rect.addEventListener('click', function(){ selectFacility(f); });   // same panel, never navigates
+      rect.addEventListener('keydown', function(e){ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); selectFacility(f); } });
+      put(rect);
     });
   }
 
@@ -1126,7 +1165,9 @@ HS.onReady(async function () {
     }
     items.forEach(function(it){
       var el=pinEl(it, 26);
-      el.title=(it.name||it.title||'')+' · '+(it.type||it.category||'')+(it.status?' · '+it.status:'');
+      var mkt = HS.resolveMarker(it);
+      // hover = type + name (founder launch spec)
+      el.title=(mkt.typeLabel||it.type||it.category||(it._facility?'Regulated facility':'Record'))+' · '+(it.name||it.title||'');
       el.addEventListener('click', function(e){ e.stopPropagation(); openItem(it); });
       glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([it.lng,it.lat]).addTo(glMap));
     });
@@ -1138,17 +1179,13 @@ HS.onReady(async function () {
       el.innerHTML=HS.markerSVG(fmk.shape, fmk.color, '', 20);
       el.setAttribute('role','button');
       el.setAttribute('aria-label', fmk.popupLabel);
-      glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([f.lng,f.lat])
-        .setPopup(new maplibregl.Popup({offset:12,maxWidth:'260px'}).setHTML(facPopupHTML(f))).addTo(glMap));
+      el.title='Regulated facility · '+(f.name||'');               // hover = type + name
+      el.addEventListener('click', function(e){ e.stopPropagation(); selectFacility(f); });  // same panel
+      glMarkers.push(new maplibregl.Marker({element:el}).setLngLat([f.lng,f.lat]).addTo(glMap));
     });
   }
-  function facPopupHTML(f){
-    var interp = HS.fac.interpret(f.facility_env || null);
-    return '<div style="font:600 13px/1.3 var(--font)">'+HS.esc(f.name)+'</div>'
-      +'<div style="font-size:11px;color:#5a6b63">Regulated facility'+(f.dist?' · '+HS.esc(f.dist):'')+'</div>'
-      +(interp?'<div style="font-size:11px;color:#5a6b63">'+HS.esc(interp.line)+'</div>':'')
-      +'<a href="development.html?id='+encodeURIComponent(f.id)+'" style="font-size:11.5px;color:#157a49;font-weight:600">Facility record ▸</a>';
-  }
+  // (facility popups removed — a facility marker click opens the SAME right panel via
+  //  selectFacility(); the dossier stays one explicit button click away. Founder launch spec.)
   function ensureGL(){
     if (glMap) return;
     try {
@@ -1243,15 +1280,18 @@ HS.onReady(async function () {
     items.forEach(function(it){
       var mk = HS.resolveMarker(it);
       var m = L.marker([it.lat,it.lng],{icon:lfDivIcon('<div class="hspin" style="line-height:0">'+HS.markerSVG(mk.shape, mk.color, it._letter||'', 26)+'</div>',26),
-          title:(it.name||it.title||'')+' · '+(it.type||it.category||'')})
+          title:(mk.typeLabel||it.type||it.category||(it._facility?'Regulated facility':'Record'))+' · '+(it.name||it.title||'')})
         .addTo(lfMap);
       m.on('click', function(){ openItem(it); });
       lfMarkers.push(m);
     });
     if (opts.showFacilities) unletteredFacs(items).forEach(function(f){
       var fmk = HS.resolveMarker(Object.assign({}, f, { _facility: true, record_kind: 'facility' }));
-      lfMarkers.push(L.marker([f.lat,f.lng],{icon:lfDivIcon('<div style="line-height:0">'+HS.markerSVG(fmk.shape, fmk.color, '', 20)+'</div>',20)})
-        .bindPopup(facPopupHTML(f),{maxWidth:260}).addTo(lfMap));
+      var fm = L.marker([f.lat,f.lng],{icon:lfDivIcon('<div style="line-height:0">'+HS.markerSVG(fmk.shape, fmk.color, '', 20)+'</div>',20),
+          title:'Regulated facility · '+(f.name||'')})
+        .addTo(lfMap);
+      fm.on('click', function(){ selectFacility(f); });            // same panel, never navigates
+      lfMarkers.push(fm);
     });
   }
   function lfFail(){
