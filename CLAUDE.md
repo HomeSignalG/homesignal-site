@@ -590,6 +590,22 @@ legal/framing change not covered by the one-time sign-off.
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 
 ### Status
+- 🟢 **DUPLICATE DEVELOPMENT RECORDS ELIMINATED — engine v22 + materializer safeguard + one-time
+  cleanup** (DB-verified 2026-07-23). The arcgis/socrata connectors page with resultOffset/$offset but
+  no guaranteed-unique total order, so one source row could be emitted on several pages of a single
+  fetch — 4,759 exact-identity duplicate groups / 9,631 excess copies across 273 cached
+  `development_reports` rows (worst: one Minneapolis permit cached 510×), inherited verbatim by the
+  Maps materializer. **Standing answer (so no session re-derives): the dedup identity is
+  title|label|case_number|record_url|url|file_date|decision_date|lat|lng|bucket|scope|relevance|
+  registry_id|source_registry_id|source_id — file_date and case_number MUST stay in the key** (same
+  case re-issued on a new date = a distinct real filing, e.g. NYC DOB renewals; same-title per-unit
+  permits, e.g. Mesa 85234's 27 distinct cases, are separate real records — never collapse either).
+  Fix: engine v22 `dedupeExactPermits` at report assembly (counts computed downstream, so they stay
+  accurate); production migration `dev_sites_exact_identity_dedup` (`dev_sites_deduped()` +
+  `app_refresh_zip` reads every cached site through it); one-time order-preserving cleanup of exactly
+  the 273 rows (696,500 → 686,869 elements = −9,631 exactly, nothing else lost) + re-materialization
+  of exactly those ZIPs. After: 0 duplicate groups cache-wide. SQL of record:
+  `docs/maps-dedup-migration.sql`.
 - 🟢 **ALL 136 modeled Utah ZIPs are LIVE** (DB-verified) — statewide across Box Elder, Utah,
   Salt Lake, Davis, Weber, Tooele, and Cache counties, on the **multi-county engine (v11)**.
   Every modeled UT ZIP has a cached `development_reports` row: **local EPA facilities** (national

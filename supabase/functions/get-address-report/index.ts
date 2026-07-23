@@ -1,4 +1,16 @@
 // get-address-report — Supabase edge function (project qwnnmljucajnexpxdgxr).
+// v22 = PERMIT EXACT-IDENTITY DEDUP (dedupeExactPermits): the arcgis/socrata connectors page with
+// resultOffset/$offset but without a guaranteed-unique total order (ArcGIS sends no orderByFields
+// unless the entry has an incremental_field; Socrata orders by the incremental date column, whose
+// ties straddle page boundaries), so the same source row can be emitted on several pages. DB-verified
+// 2026-07-23: 9,631 excess copies across 273 cached ZIP reports, 100% from arcgis+socrata (worst: one
+// Minneapolis permit cached 510×). Fix: the combined permit-connector output is deduped ONCE at
+// assembly on the exact identity (title|label|case_number|record_url|url|file_date|decision_date|
+// lat|lng|bucket|scope|relevance|registry_id|source_registry_id|source_id) — first-seen wins. The key
+// deliberately includes file_date (same case number re-issued on a new date = a distinct real filing,
+// e.g. NYC DOB renewals — MUST survive) and case_number (same-title per-unit permits, e.g. Mesa's 27
+// distinct cases for one townhome project — MUST survive). Removes only true identical records; no
+// fetch behavior changes. Counts are computed downstream of the dedup, so they stay accurate too.
 // v21 = ICIS-NPDES PERMIT STATUS (cwaPermitEnrich): one cwa_rest_services get_facilities→get_qid
 // pair per report stamps env.epa.permits[] (npdes_id/statute/status/type, verbatim) plus the
 // most-active env.epa.permit_status and derived env.epa.compliance_tracking_on onto each FRS
@@ -802,12 +814,25 @@ async function handleRequest(req: Request): Promise<Response> {
       // Structured permit rows (TABS/Socrata) carry no comment window → comment_open stays false.
       if (s.scope === "area" && !s.decided && s.comment_deadline && String(s.comment_deadline).slice(0, 10) >= today) s.comment_open = true;
     }
-    const devRecords = [...devReal, ...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...csvSites, ...cartoSites];
+    // v22: exact-identity dedup over the combined permit-connector output (see header). First-seen
+    // wins; identity includes case_number + file_date so re-issues and per-unit permits survive.
+    const dedupeExactPermits = (rows: Record<string, unknown>[]): Record<string, unknown>[] => {
+      const seen = new Set<string>(); const out: Record<string, unknown>[] = [];
+      for (const s of rows) {
+        const k = [s.title, s.label, s.case_number, s.record_url, s.url, s.file_date, s.decision_date,
+                   s.lat, s.lng, s.bucket, s.scope, s.relevance, s.registry_id, s.source_registry_id, s.source_id]
+          .map((v) => (v == null ? "" : String(v))).join("|");
+        if (!seen.has(k)) { seen.add(k); out.push(s); }
+      }
+      return out;
+    };
+    const permitSites = dedupeExactPermits([...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...csvSites, ...cartoSites]);
+    const devRecords = [...devReal, ...permitSites];
     const proposedRecords = devRecords.filter((s) => s.type === "proposed");
     const approvedRecords = devRecords.filter((s) => s.type === "approved");
     const operatingRecords = devRecords.filter((s) => s.type === "built");
     const commentOpenRecords = devRecords.filter((s) => s.comment_open === true);
-    const allSites = [...dev, ...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...csvSites, ...cartoSites, ...fac];
+    const allSites = [...dev, ...permitSites, ...fac];
     const access = await accessLevel(req, supabase);
     const sites = access === "full" ? allSites : allSites.slice(0, TEASER_LIMIT);
     const locked = access === "full" ? 0 : Math.max(0, allSites.length - sites.length);
