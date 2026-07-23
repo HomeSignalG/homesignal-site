@@ -1,0 +1,28 @@
+name: verify-maps-rollout
+
+# On-demand PRODUCTION walk of the Maps page (Street | Satellite | Focus) across
+# representative ZIP classes for the full 12,704-ZIP rollout: marker-rich,
+# facility-rich, newly-materialized civic, coverage_coming honest empty, and the
+# hardest-centroid ZIP — desktop + mobile. VERIFICATION ONLY.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  walk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Walk the live Maps page across rollout ZIP classes
+        run: node scripts/verify-maps-rollout.mjs
+      - name: Upload screenshots + report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maps-rollout-shots
+          path: shots/
