@@ -1,0 +1,102 @@
+[
+ {
+  "check": "map boots on live data (__HS_MAP)",
+  "pass": true,
+  "extra": "items=16"
+ },
+ {
+  "check": "sidebar + header present",
+  "pass": true,
+  "extra": ""
+ },
+ {
+  "check": "map fills content area (>=60% vh, full width)",
+  "pass": true,
+  "extra": "{\"hFrac\":0.7494444444444445,\"wFrac\":1,\"w\":1136,\"closed\":true}"
+ },
+ {
+  "check": "panel closed by default (All Projects)",
+  "pass": true,
+  "extra": ""
+ },
+ {
+  "check": "What's Changed opens the Recent Changes slide-over",
+  "pass": true,
+  "extra": "entries=0 area=5 empty=false badges=UPDATE"
+ },
+ {
+  "check": "honest content: mapped/area-wide entries with legal badges OR the empty state",
+  "pass": true,
+  "extra": ""
+ },
+ {
+  "check": "panel overlays — map width unchanged",
+  "pass": true,
+  "extra": ""
+ },
+ {
+  "check": "closing restores the full map",
+  "pass": true,
+  "extra": ""
+ },
+ {
+  "check": "nearby list opens with entries",
+  "pass": true,
+  "extra": ""
+ },
+ {
+  "check": "marker/entry opens Project Intelligence in the same slide-over",
+  "pass": true,
+  "extra": ""
+ },
+ {
+  "check": "Why-this-matters evidence panel renders (4 questions)",
+  "pass": true,
+  "extra": "Q4: No comment window is currently listed — review the official record for options."
+ },
+ {
+  "check": "full project page link present",
+  "pass": true,
+  "extra": ""
+ },
+ {
+  "check": "full project page URL serves 200",
+  "pass": true,
+  "extra": "https://homesignal.net/development.html?id=2fae7c97-5efe-42d3-bd05-13b3f7d46536 -> 200"
+ },
+ {
+  "check": "official record link reachable (2xx/3xx)",
+  "pass": true,
+  "extra": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=13720102 -> 200"
+ },
+ {
+  "check": "official-record button matches record",
+  "pass": true,
+  "extra": "source_ref=true"
+ },
+ {
+  "check": "Recent Changes entry click-through",
+  "pass": true,
+  "extra": "skipped — live window has 0 changes (honest empty state verified instead)"
+ },
+ {
+  "check": "honest empty state (filter matching nothing)",
+  "pass": true,
+  "extra": "{\"cards\":0,\"empty\":false,\"txt\":\"\"}"
+ },
+ {
+  "check": "mobile: no horizontal scroll",
+  "pass": true,
+  "extra": ""
+ },
+ {
+  "check": "mobile: bottom sheet over the map, no horizontal scroll",
+  "pass": true,
+  "extra": "{\"open\":true,\"sheet\":true,\"noH\":true}"
+ },
+ {
+  "check": "zero page errors (desktop + mobile)",
+  "pass": true,
+  "extra": "{\"desktop\":[],\"mobile\":[],\"consoleErrors\":[]}"
+ }
+]
