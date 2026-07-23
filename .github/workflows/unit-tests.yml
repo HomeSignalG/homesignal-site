@@ -13,6 +13,7 @@ on:
       - 'scripts/run-unit-tests.mjs'
       - 'topics.canon.json'
       - 'supabase/functions/**'
+      - 'docs/**'
       - '.github/workflows/**'
       - '.github/workflows/unit-tests.yml'
   pull_request:
@@ -27,6 +28,7 @@ on:
       - 'scripts/run-unit-tests.mjs'
       - 'topics.canon.json'
       - 'supabase/functions/**'
+      - 'docs/**'
       - 'docs/government-feed-onboarding*.md'
       - 'docs/candidates/**'
       - '.github/workflows/**'
