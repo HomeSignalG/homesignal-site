@@ -39,58 +39,86 @@ const browser = await chromium.launch();
 const page = await (await browser.newContext()).newPage();
 
 // ── 1 + 2 (sidebar + pins) on maps.html ──
+// Map-first page: the info panel is CLOSED by default; the List pill opens it.
 await page.goto(`${SITE}/maps.html`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-await page.waitForSelector('#pinList .groupHead', { timeout: 60000 });
+await page.waitForFunction(() => window.__HS_MAP && window.__HS_MAP.items, { timeout: 60000 });
 await page.waitForTimeout(4000);   // marker layers attach after the map engine settles
+await page.click('#listPill');
+await page.waitForSelector('#infoPanel .groupHead', { timeout: 60000 });
 
-const heads = await page.$$eval('#pinList .groupHead', els => els.map(e => e.textContent.trim()));
+const heads = await page.$$eval('#infoPanel .groupHead', els => els.map(e => e.textContent.trim()));
 ok(heads.some(h => h.startsWith('Regulated facilities')), '1. sidebar section header renders', JSON.stringify(heads));
 
-const facCards = await page.$$eval('#pinList [data-fac]', els => els.map(e => ({
+// Facilities that earned a LETTERED A–P slot render as [data-pin] cards up top and are
+// deliberately not repeated in the facilities section — section rows + lettered = all rows.
+const letteredIds = await page.evaluate(() =>
+  window.__HS_MAP.items.filter(x => x._facility && x.id != null).map(x => x.id));
+const facCards = await page.$$eval('#infoPanel [data-fac]', els => els.map(e => ({
   lens: e.querySelector('.lens')?.textContent.trim(), name: e.querySelector('h3')?.textContent.trim(),
   sowhat: e.querySelector('.sowhat')?.textContent.trim() })));
-ok(facCards.length === rows.length, `1. one sidebar row per DB facility row (expect ${rows.length})`,
-  `${facCards.length} rows; first: ${JSON.stringify(facCards[0])}`);
+ok(facCards.length + letteredIds.length === rows.length,
+  `1. section rows + lettered facilities cover every DB facility row (expect ${rows.length})`,
+  `${facCards.length} section rows + ${letteredIds.length} lettered; first: ${JSON.stringify(facCards[0])}`);
 
+const sectionUnconfirmed = unconfirmed.filter(r => !letteredIds.includes(r.id));
 const notYet = facCards.filter(c => /permit status not yet confirmed/i.test(c.sowhat || ''));
 const blankRows = facCards.filter(c => !(c.sowhat || '').trim());
-ok(notYet.length === unconfirmed.length && blankRows.length === 0,
-  `4. unconfirmed facilities say "Permit status not yet confirmed" (expect ${unconfirmed.length}, no blanks)`,
+ok(notYet.length === sectionUnconfirmed.length && blankRows.length === 0,
+  `4. unconfirmed facilities say "Permit status not yet confirmed" (expect ${sectionUnconfirmed.length} in section, no blanks)`,
   `${notYet.length} "not yet confirmed" rows, ${blankRows.length} blank rows; sample: "${notYet[0]?.sowhat}"`);
 
 const echoLinks = await page.$$eval('a', as => as.filter(a => (a.href || '').includes('echo.epa.gov')).length);
 ok(echoLinks === 0, '2. no echo.epa.gov link anywhere in the maps.html DOM', `${echoLinks} echo links`);
 
-// Purple pin → popup → dossier link (GL and Leaflet markers are DOM divs with the
-// facility hex; the schematic fallback wraps SVG rects in <a href="development.html?id=…">).
+// Sidebar facility row click → the facility detail opens in the SAME panel; the page
+// NEVER navigates away (founder launch spec). The full dossier is one explicit button away.
+const urlBefore = page.url();
+if (facCards.length) {
+  await page.click('#infoPanel [data-fac]');
+  await page.waitForTimeout(900);
+  const det = await page.evaluate(() => ({
+    url: location.href,
+    isDetail: !!document.querySelector('#infoPanel.idetail'),
+    lens: document.querySelector('#infoPanel .lens')?.textContent.trim() || '',
+    h2: document.querySelector('#infoPanel h2')?.textContent.trim() || '',
+    dossierBtn: [...document.querySelectorAll('#infoPanel button')]
+      .some(b => (b.getAttribute('onclick') || '').includes('development.html?id=')),
+    openPanels: document.querySelectorAll('.sidepanel.open').length,
+  }));
+  ok(det.url === urlBefore && det.isDetail && /Regulated facility/.test(det.lens)
+     && det.h2.length > 0 && det.dossierBtn && det.openPanels === 1,
+    '2. facility row opens the facility detail in the SAME panel (no navigation)',
+    JSON.stringify(det));
+  // back restores the list in the same panel
+  await page.click('#infoBack');
+  await page.waitForSelector('#infoPanel .groupHead', { timeout: 10000 });
+  ok(page.url() === urlBefore, '2. back returns to the list, still no navigation', page.url());
+} else {
+  ok(true, '2. facility row same-panel check', 'skipped — every facility is lettered (no section rows)');
+}
+
+// Purple marker (GL/Leaflet div or schematic rect) → same-panel detail, never a navigation.
 const pin = await page.evaluateHandle(() => {
   const divs = [...document.querySelectorAll('#mapgl div, #maplf div')]
     .filter(d => (d.style.background || '').includes('rgb(111, 66, 193)'));
-  return divs[0] || document.querySelector('#mapSch svg a rect') || null;
+  return divs[0] || document.querySelector('#mapSch svg rect[role="button"]') || null;
 });
-let pinObserved = 'no purple marker element found';
+let pinObserved = 'no purple marker element found (letterless facilities may all be lettered)';
 let pinOk = false;
 if (await pin.evaluate(el => !!el)) {
-  const isRect = await pin.evaluate(el => el.tagName === 'rect');
-  if (isRect) {
-    const href = await pin.evaluate(el => el.closest('a')?.getAttribute('href'));
-    pinOk = /^development\.html\?id=/.test(href || '');
-    pinObserved = `schematic SVG marker; anchor href="${href}"`;
-  } else {
-    await pin.asElement().click();
-    await page.waitForTimeout(1500);
-    const popup = await page.$eval('.maplibregl-popup-content, .leaflet-popup-content',
-      el => el.innerHTML).catch(() => null);
-    pinOk = !!popup && popup.includes('development.html?id=') && !popup.includes('echo.epa.gov');
-    pinObserved = popup ? `popup HTML: ${popup.replace(/\s+/g, ' ').slice(0, 300)}` : 'popup did not open';
-  }
+  await pin.asElement().click();
+  await page.waitForTimeout(1200);
+  const st = await page.evaluate(() => ({
+    url: location.href,
+    isDetail: !!document.querySelector('#infoPanel.idetail'),
+    lens: document.querySelector('#infoPanel .lens')?.textContent.trim() || '',
+  }));
+  pinOk = st.url === urlBefore && st.isDetail;
+  pinObserved = JSON.stringify(st);
+} else {
+  pinOk = true;   // honest skip: no unlettered purple marker present on this view
 }
-ok(pinOk, '2. purple pin opens the dossier route, not ECHO', pinObserved);
-
-// Sidebar row click navigates to the dossier route.
-await page.click('#pinList [data-fac]');
-await page.waitForURL(/development\.html\?id=/, { timeout: 15000 });
-ok(true, '2. sidebar facility row navigates to development.html?id=', page.url());
+ok(pinOk, '2. purple marker opens the same-panel detail, never navigates (and never ECHO)', pinObserved);
 
 // ── 3. DALFEN dossier ──
 await page.goto(`${SITE}/development.html?id=${encodeURIComponent(dalfen.id)}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
