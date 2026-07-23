@@ -28,6 +28,8 @@ const ZIPS = [
   { zip: '89501', markers: false, note: 'newly materialized civic (was chicken-and-egg-blocked)' },
   { zip: '35801', markers: false, note: 'newly materialized coverage_coming honest empty' },
   { zip: '84684', markers: false, note: 'hardest centroid (Census place point)' },
+  { zip: '84302', markers: true,  note: 'normalized pilot ZIP (was city-row-resolved; now level=zip)' },
+  { zip: '84005', markers: true,  note: 'normalized pilot ZIP under a root city (Eagle Mountain)' },
 ];
 const R = []; const ok = (n, c, extra) => R.push({ check: n, pass: !!c, extra: extra || '' });
 mkdirSync('shots', { recursive: true });
