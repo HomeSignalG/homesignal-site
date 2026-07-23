@@ -109,3 +109,23 @@ CI receipts (both at deployed `f5131d2`):
   (3) keep distinct-case-number rows (they are real separate filings).
 - **Blocks launch?** No — it fails none of the 11 gates and violates no
   anti-fabrication rule. Recommended as the next engine-side fix.
+
+### RESOLVED — same day (2026-07-23), fix applied end to end
+
+Root cause pinned to **cache generation**: the engine's arcgis/socrata
+connectors page with resultOffset/$offset but no guaranteed-unique total order,
+so one source row can be emitted on several pages of a single fetch; 100% of the
+excess traced to those two connectors. **Corrected identity numbers** (the
+audit key above omitted `file_date`, so its 21,839 figure over-counted by
+including legitimate re-issues of the same case number — verified in
+production): true duplication was **4,759 groups / 9,631 excess copies / 273
+cached rows** (worst 560×). Fix shipped in three layers — engine v22
+`dedupeExactPermits` at report assembly (identity includes case_number AND
+file_date so per-unit permits and re-issued filings survive), materializer
+`dev_sites_deduped()` defensive dedup (production migration
+`dev_sites_exact_identity_dedup`), and a one-time order-preserving cleanup of
+exactly the 273 rows (counts recomputed with the engine's own formulas)
+followed by re-materializing exactly those 273 ZIPs. After: **0 duplicate
+groups cache-wide**; cache total 696,500 → 686,869 (= −9,631 exactly, nothing
+else lost); Mesa 85234's 27 distinct-case permits all retained; Minneapolis
+55405's 510× remodel → 1. SQL of record: `docs/maps-dedup-migration.sql`.
