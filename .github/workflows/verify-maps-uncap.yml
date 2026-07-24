@@ -16,6 +16,13 @@ on:
         description: 'Comma-separated ZIPs (typical,dense,densest)'
         required: false
         default: '85234,55407,44127'
+  # Cloud agents lack actions:write for manual dispatch (db-sql.yml precedent) —
+  # a push touching the verifier or its trigger file runs the check on that branch.
+  push:
+    paths:
+      - 'scripts/verify-maps-uncap.mjs'
+      - '.github/workflows/verify-maps-uncap.yml'
+      - 'verify/uncap-run.txt'
 
 jobs:
   verify:
