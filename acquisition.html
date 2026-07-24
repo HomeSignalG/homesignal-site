@@ -136,7 +136,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
 .bsky-edit-actions{display:flex;gap:8px;justify-content:flex-end}
 .bsky-edit-close{position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;line-height:1;color:var(--muted);cursor:pointer}
 
-/* ===== Video Producer tab (Tab 11 — client script from payload.tab_scripts) ===== */
+/* ===== Video Producer tab (Tab 11 — trusted static asset + snapshot HTML) ===== */
 .vp-wrap{max-width:1100px}
 .vp-steps{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px}
 .vp-step{background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px}
@@ -262,6 +262,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   </div>
 </div>
 
+<script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ============================================================
@@ -357,6 +358,24 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   function emptyState(){ gate('<h2>No snapshot yet</h2><p>The dashboard data hasn’t been published to the server yet.</p>'); }
   function loading(){ gate('<div class="gate-loading">Loading dashboard…</div>'); }
 
+  // Trusted tab initializers — only version-controlled assets; never execute
+  // JavaScript from hs_acquisition_dashboard / dashboard_snapshots (tab_scripts).
+  var tabInitDone = { videoproducer: false };
+  var TAB_TRUSTED_INIT = {
+    videoproducer: function () {
+      if (tabInitDone.videoproducer) return;
+      var container = document.getElementById('tab-videoproducer');
+      if (
+        container &&
+        window.HomeSignalVideoProducer &&
+        typeof window.HomeSignalVideoProducer.init === 'function'
+      ) {
+        window.HomeSignalVideoProducer.init(container, {});
+        tabInitDone.videoproducer = true;
+      }
+    }
+  };
+
   // ---- growth slider (adapted from the artifact; reads S from the payload) ----
   function initGrowth(S){
     if(!S || !S.length) return;
@@ -398,13 +417,15 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 
   // ---- tab nav wiring (from the artifact) ----
   function wireTabs(){
+    if (window.__acqTabsWired) return;
+    window.__acqTabsWired = true;
     document.querySelectorAll('nav.tabs button').forEach(function(b){
       b.addEventListener('click', function(){
         document.querySelectorAll('nav.tabs button').forEach(function(x){ x.classList.remove('active'); });
         document.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('active'); });
         b.classList.add('active');
         var t=document.getElementById('tab-'+b.dataset.tab); if(t) t.classList.add('active');
-        if(b.dataset.tab==='videoproducer' && window.initVideoProducer) window.initVideoProducer();
+        if (TAB_TRUSTED_INIT[b.dataset.tab]) TAB_TRUSTED_INIT[b.dataset.tab]();
         window.scrollTo({top:0,behavior:'instant'});
       });
     });
@@ -413,11 +434,6 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   function render(p){
     var tabs=p.tabs||{};
     Object.keys(tabs).forEach(function(id){ var el=$('tab-'+id); if(el) el.innerHTML=tabs[id]; });
-    var tabScripts=p.tab_scripts||{};
-    if(tabScripts.videoproducer && !window.__vpScriptLoaded){
-      try{ (0,eval)(tabScripts.videoproducer); window.__vpScriptLoaded=true; }
-      catch(e){ console.error('Video Producer script failed', e); }
-    }
     if(p.meta){
       var m=$('dash-meta');
       if(m) m.textContent='One engine: data ingestion · project detection · public-records intelligence · homeowner-behavior intelligence · distribution & acquisition.  Data snapshot '+(p.meta.snapshot||'')+' · project '+(p.meta.project||'');
