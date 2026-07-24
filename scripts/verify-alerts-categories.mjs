@@ -119,7 +119,10 @@ async function main() {
     mm.set(m.category, (mm.get(m.category) || 0) + 1);
   }
 
-  const newsAlertCount = alerts.filter((a) => a.pipeline_type === 'news_alert').length;
+  // Live vocabulary (verified 2026-07-24): local news rows are
+  // pipeline_type='news' + category='local_news'. The earlier 'news_alert'
+  // probe matched a value the pipeline never writes, so this P0 always fired.
+  const localNewsCount = alerts.filter((a) => a.pipeline_type === 'news' && a.category === 'local_news').length;
   const govAlertCount = alerts.filter((a) => a.pipeline_type === 'government_notice').length;
 
   const govTopicDist = {};
@@ -174,7 +177,7 @@ async function main() {
       totalAlerts: alerts.length,
       totalMeetings: meetings.length,
       government_noticeAlerts: govAlertCount,
-      news_alertAlerts: newsAlertCount,
+      local_news_alerts: localNewsCount,
       rootsWithGovContent: rootsWithContent.size,
     },
     govTopicCountDistribution: govTopicDist,
@@ -190,8 +193,8 @@ async function main() {
   };
 
   // Findings
-  if (newsAlertCount === 0) {
-    report.findings.p0.push('Local News: 0 production alerts with pipeline_type=news_alert — subscriptions cannot deliver email content.');
+  if (localNewsCount === 0) {
+    report.findings.p0.push("Local News: 0 production alerts with pipeline_type='news' + category='local_news' — the Local News tab and email tier have no content.");
   }
   report.findings.p0.push('Gov Notices vs Upcoming Meetings: both write pipeline_type=government_notice; independent meeting-only subscription not implemented.');
   if (noCommunity.length) {
@@ -215,7 +218,7 @@ async function main() {
   console.log(`Standard backbone (of 6) distribution:`, stdBackboneDist);
   console.log(`ZIPs with no community: ${noCommunity.length}`);
   console.log(`Utah partial county backbone: ${partialUtah.length}`);
-  console.log(`news_alert rows: ${newsAlertCount}`);
+  console.log(`local_news rows: ${localNewsCount}`);
   console.log(`Roots with gov content: ${rootsWithContent.size}`);
   console.log(`ZIPs with zero gov content at root: ${emptyGov}`);
   console.log('\nRepresentative ZIPs:');
