@@ -1,0 +1,25 @@
+name: verify-coverage-state
+
+# Phase 2 coverage-state model verification: full-population invariants on the
+# live app_coverage_states view (exactly one valid state per ZIP, no impossible
+# combinations, legacy data_quality consistency, determinism) + desktop/mobile
+# renders of exemplar pages asserting the data-coverage-state attribute.
+# VERIFICATION ONLY — touches no product data.
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: '30 10 * * *'   # daily, after the 09:20 UTC materialization
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Verify coverage-state model against production
+        run: node scripts/verify-coverage-state.mjs
