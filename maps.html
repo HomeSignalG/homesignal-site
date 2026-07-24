@@ -285,6 +285,12 @@ HS.onReady(async function () {
     changes = await HS.data.changes(S.zip, home);
     facilities = await HS.data.facilities(S.zip, home);     // EPA/ECHO regulated facilities — own layer, env context
     meetings = await HS.data.meetings(S.zip, home);         // for a project's Timeline + Public Participation
+    // Maps uncap: projects()/facilities() are range-windowed full reads. A read
+    // that failed partway is marked complete=false — NEVER render that prefix as
+    // if it were the full record set; fall through to the honest error state.
+    if (projects.complete === false || facilities.complete === false) {
+      throw new Error('incomplete app_projects read');
+    }
   } catch (e) {
     console.warn('[maps] data load failed', e);
     var ml0 = document.getElementById('mapLoading');
@@ -336,8 +342,14 @@ HS.onReady(async function () {
   var all = changes.filter(function(x){return !x.quiet;}).concat(projects)
     .filter(function(x){return x.lat && x.lng;})
     .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
-  var facs = (facilities || []).filter(function(x){return x.lat && x.lng;})
-    .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);}).slice(0, 24);
+  // ALL mappable facilities (Maps uncap): the nearest 24 keep their individual DOM
+  // squares exactly as before; the remainder ride the clustered rest layer so no
+  // facility is ever unreachable on the map. facRows below already lists every
+  // facility, mappable or not.
+  var facsAllMappable = (facilities || []).filter(function(x){return x.lat && x.lng;})
+    .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
+  var facs = facsAllMappable.slice(0, 24);
+  var restFacs = facsAllMappable.slice(24).map(function(f){ return Object.assign({}, f, { _restFacility: true }); });
   // Sidebar rows list EVERY facility on record (closest-first), not just the mappable
   // ones — a facility with no stored coordinate still exists and still gets its dossier row.
   var facRows = (facilities || []).slice()
@@ -428,21 +440,38 @@ HS.onReady(async function () {
     // changes / navigation. The "Regulated facility" status toggle now stands in for
     // the retired "Regulated facilities" layer toggle.
     opts.showFacilities = HS.getStatusFilters().facility;
-    var a = all;
-    // "What's Changed" narrows the map to records with a real in-window change
-    // entry. Facilities carry no change data, so they don't reserve slots here.
-    if (opts.view === 'changed') a = a.filter(function (x) { return changedIds[x.id]; });
-    a = a.filter(function (x) { return passQol(x) && HS.statusVisible(x); });
+    var a = visibleItems();
     // Facilities reserve a FLOOR of lettered slots (min(4,#facs)) so the closest
     // regulated facilities are always surfaced alongside development — de-duped, cap 16.
     var facPins = (opts.view === 'changed' || !opts.showFacilities) ? [] : facs;
     var out = HS.reserveFacilitySlots(a, facPins, { cap: 16, floor: 4, letters: LET });
     // Live-verification hook (scripts/verify-maps.mjs, runs on a real runner with egress):
-    // the lettered pin set + how many mappable facilities exist, so CI can assert the
-    // reserve-slot floor holds on the real 78617 data. Mirrors homesignalmap's __HS_SITES.
-    window.__HS_MAP = { items: out, facCount: facs.length };
+    // the lettered pin set + how many mappable facilities exist, PLUS (Maps uncap) the
+    // true totals so CI can assert completeness: devTotal/facTotal must equal the DB's
+    // app_projects counts for the ZIP, and `complete` must be true on a clean load.
+    window.__HS_MAP = { items: out, facCount: facs.length,
+      devTotal: projects.length, facTotal: facilities.length,
+      visibleTotal: a.length, restFacTotal: restFacs.length,
+      complete: projects.complete !== false && facilities.complete !== false };
     window.__HS_RESOLVE = HS.resolveMarker;
     return out;
+  }
+  // The filtered VISIBLE set (dev projects + coordinate-bearing changes) before the
+  // lettered cap — the completeness backbone every surface derives from.
+  function visibleItems() {
+    var a = all;
+    // "What's Changed" narrows the map to records with a real in-window change
+    // entry. Facilities carry no change data, so they don't reserve slots here.
+    if (opts.view === 'changed') a = a.filter(function (x) { return changedIds[x.id]; });
+    return a.filter(function (x) { return passQol(x) && HS.statusVisible(x); });
+  }
+  // Everything visible that did NOT earn a letter (plus mappable facilities beyond
+  // the nearest-24 DOM squares) — rendered as the clustered/canvas rest layer, so
+  // the A-P letters stay a presentation aid, never an accessibility cap.
+  function restItems(lettered) {
+    var rest = HS.restAfterLetters(visibleItems(), lettered);
+    if (opts.view !== 'changed' && opts.showFacilities) rest = rest.concat(restFacs);
+    return rest;
   }
   // A facility lettered into shownItems must NOT also render as its own purple overlay
   // square — that double-plots the same facility (letter pin + square). Every map path
@@ -584,7 +613,7 @@ HS.onReady(async function () {
     var pick = (items || []).find(function (x) { return x.id === deepId; })
       || all.find(function (x) { return x.id === deepId; })
       || projects.find(function (x) { return x.id === deepId; })
-      || facs.find(function (x) { return x.id === deepId; });
+      || facRows.find(function (x) { return x.id === deepId; });   // ALL facilities, not just the mapped nearest-24
     if (!pick) return;
     deepApplied = true;
     if (pick._facility || (facilities || []).some(function (f) { return f.id === pick.id; })) {
@@ -644,9 +673,14 @@ HS.onReady(async function () {
       return;
     }
 
+    // Maps uncap: the header states the TRUE visible total; the lettered cards are
+    // the nearest subset and the "All records on file" section below enumerates
+    // every visible record (chunk-rendered so a dense ZIP never floods the DOM).
+    var fullRecs = visibleItems();
     var html = '<div class="listhead">'
-      + (filtersOn ? '<b>' + items.length + '</b> of ' + all.length + ' nearby projects match your filters.'
-                   : 'Showing <b>' + items.length + '</b> project' + (items.length === 1 ? '' : 's') + ' near ' + HS.esc(place) + '.')
+      + (filtersOn ? '<b>' + fullRecs.length + '</b> of ' + all.length + ' nearby records match your filters.'
+                   : 'Showing <b>' + fullRecs.length + '</b> record' + (fullRecs.length === 1 ? '' : 's') + ' near ' + HS.esc(place)
+                     + (fullRecs.length > items.length ? ' — nearest ' + items.length + ' lettered below, all listed under “All records on file”' : '') + '.')
       + ' Select one for the full picture.</div>'
       + '<div class="groupHead" style="margin-top:0">Near you · closest first</div>'
       + items.map(function (it, i) {
@@ -669,6 +703,15 @@ HS.onReady(async function () {
             + '<h3>' + HS.esc(it.title || '') + '</h3>'
             + '<p class="sowhat">' + HS.esc(it.plain_language || '') + '</p></div>';
         }).join('');
+    }
+    // ── All records on file (Maps uncap) — the COMPLETE enumeration. Every visible
+    // development/notice record, including the thousands past the lettered set, is
+    // reachable here; rows append in chunks so the DOM stays light. Facilities have
+    // their own complete section below (facRows).
+    if (fullRecs.length > items.length) {
+      html += '<div class="groupHead">All records on file · ' + fullRecs.length + '</div>'
+        + '<div id="allRecList"></div>'
+        + '<button class="btn" id="allRecMore" type="button">Show all ' + fullRecs.length + ' records</button>';
     }
     // Regulated facilities — the THIRD entity type, own section (never folded into the
     // A–P development list). Facilities that earned a letter above are not repeated here.
@@ -707,6 +750,42 @@ HS.onReady(async function () {
       var it = area[parseInt(el.getAttribute('data-area'), 10)];
       if (it && it.source_ref) window.open(it.source_ref, '_blank', 'noopener');
     });
+    // "All records on file" chunk appender — 200 rows per click, delegated click +
+    // keyboard handlers on the container (rows are appended after wiring).
+    var moreBtn = panel.querySelector('#allRecMore'), allList = panel.querySelector('#allRecList');
+    if (moreBtn && allList) {
+      var CHUNK = 200, next = 0;
+      var rowHTML = function (it, i) {
+        var mk = HS.resolveMarker(it), st = it.status ? HS.esc(it.status) : '';
+        var when = it.submitted_at ? String(it.submitted_at).slice(0, 10)
+                 : (it.occurred_at ? String(it.occurred_at).slice(0, 10) : '');
+        return '<div class="card mini clickable" data-all="' + i + '" role="button" tabindex="0"'
+          + ' aria-label="' + HS.esc(mk.popupLabel || (it.name || it.title || 'Record')) + '"'
+          + ' style="border-left-color:' + mk.color + '">'
+          + '<span class="lens">' + HS.esc(mk.typeLabel || it.type || it.category || '')
+          + (st ? ' · ' + st : '') + (when ? ' · ' + HS.esc(when) : '') + '</span>'
+          + '<h3>' + HS.esc(it.name || it.title || '') + '</h3></div>';
+      };
+      var appendChunk = function () {
+        var end = Math.min(next + CHUNK, fullRecs.length), buf = [];
+        for (var i = next; i < end; i++) buf.push(rowHTML(fullRecs[i], i));
+        allList.insertAdjacentHTML('beforeend', buf.join(''));
+        next = end;
+        if (next >= fullRecs.length) { moreBtn.style.display = 'none'; }
+        else { moreBtn.textContent = 'Show ' + Math.min(CHUNK, fullRecs.length - next) + ' more (' + (fullRecs.length - next) + ' remaining)'; }
+      };
+      moreBtn.addEventListener('click', appendChunk);
+      var actRow = function (el) { var it = fullRecs[parseInt(el.getAttribute('data-all'), 10)]; if (it) openItem(it); };
+      allList.addEventListener('click', function (e) {
+        var el = e.target && e.target.closest ? e.target.closest('[data-all]') : null;
+        if (el) actRow(el);
+      });
+      allList.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        var el = e.target && e.target.closest ? e.target.closest('[data-all]') : null;
+        if (el) { e.preventDefault(); actRow(el); }
+      });
+    }
   }
 
   // ── "Recent Changes" panel (Sprint 7) — the What's-Changed list view. ──────
@@ -942,10 +1021,18 @@ HS.onReady(async function () {
       var pool = vis;
       var within = pool.filter(function(x){return (x.distance_mi||9e9) <= opts.radiusMi;}).length;
       txt = within + ' within ' + opts.radiusMi + ' mi of ' + home.address;
+    } else if (opts.mode === 'impact') {
+      // The schematic diagram draws only the lettered nearest set — say so.
+      txt = items.length + (total > items.length ? ' of ' + total : '') + ' on the diagram';
     } else {
-      txt = items.length + (total > items.length ? ' of ' + total : '') + ' on the map';
+      // GL/Leaflet modes plot EVERY visible record (lettered pins + the clustered
+      // rest layer) — the caption reports the true total (Maps uncap).
+      txt = total + ' on the map' + (total > items.length ? ' · nearest ' + items.length + ' lettered' : '');
     }
-    if (hasRealHome && total > items.length) txt += ' · closest ' + items.length + ' shown';
+    if (hasRealHome && total > items.length) {
+      txt += (opts.mode === 'impact') ? ' · closest ' + items.length + ' shown'
+                                      : ' · nearest ' + items.length + ' lettered';
+    }
     if (area.length) txt += ' · ' + area.length + ' area-wide notice' + (area.length === 1 ? '' : 's') + ' listed';
     gpsEl.textContent = place + ' · ' + txt;
     updateHomePrompt();
@@ -1042,6 +1129,7 @@ HS.onReady(async function () {
 
   // ---------- MapLibre (real tiles: Esri World Imagery + OSM) ----------
   var glMap = null, glMarkers = [], glReady = false, glFailed = false, glTileErrs = 0, glTilesOK = 0, glLastView = null;
+  var restById = {};   // id -> rest-layer item, for the cluster layer's click -> panel dispatch
   window.__HS_GL = { get tilesOK(){return glTilesOK;}, get errs(){return glTileErrs;},
                      get ready(){return glReady;}, get failed(){return glFailed;},
                      get lfTilesOK(){return lfTilesOK;}, get lfErrs(){return lfTileErrs;},
@@ -1263,6 +1351,42 @@ HS.onReady(async function () {
       glMap.addLayer({id:'radius-fill',type:'fill',source:'radius',paint:{'fill-color':'#157a49','fill-opacity':0.10}});
       glMap.addLayer({id:'radius-casing',type:'line',source:'radius',paint:{'line-color':'#ffffff','line-width':5,'line-opacity':0.85}});
       glMap.addLayer({id:'radius-line',type:'line',source:'radius',paint:{'line-color':'#157a49','line-width':2.5,'line-opacity':1,'line-dasharray':[2,2]}});
+      // Maps uncap: the clustered REST layer — every visible record beyond the
+      // lettered A-P set (and mappable facilities beyond the nearest-24 squares).
+      // Clusters are neutral circles sized by count and zoom-expand on click;
+      // unclustered points carry their own status color and open the same info
+      // panel as a lettered pin. Deliberately no text labels: this raster style
+      // declares no glyph host, and adding one would be a new external dependency —
+      // counts live in the side panel ("Showing N of M") instead.
+      glMap.addSource('hs-rest', { type:'geojson', cluster:true, clusterMaxZoom:15, clusterRadius:44,
+        data:{ type:'FeatureCollection', features:[] } });
+      glMap.addLayer({ id:'hs-rest-cluster', type:'circle', source:'hs-rest',
+        filter:['has','point_count'],
+        paint:{ 'circle-color':'#157a49', 'circle-opacity':0.75,
+          'circle-radius':['step',['get','point_count'],12,10,16,50,22,250,28],
+          'circle-stroke-color':'#ffffff','circle-stroke-width':2 } });
+      glMap.addLayer({ id:'hs-rest-pt', type:'circle', source:'hs-rest',
+        filter:['!',['has','point_count']],
+        paint:{ 'circle-color':['get','col'], 'circle-radius':5.5,
+          'circle-stroke-color':'#ffffff','circle-stroke-width':1.5 } });
+      glMap.on('click','hs-rest-cluster', function(e){
+        var f = e.features && e.features[0]; if (!f) return;
+        var src = glMap.getSource('hs-rest'), fin = function(z){
+          if (z != null) glMap.easeTo({ center:f.geometry.coordinates, zoom:z });
+        };
+        // maplibre v3 returns a Promise; v2 takes a node-style callback — support both.
+        var maybe = src.getClusterExpansionZoom(f.properties.cluster_id, function(err,z){ if(!err) fin(z); });
+        if (maybe && maybe.then) maybe.then(fin).catch(function(){});
+      });
+      glMap.on('click','hs-rest-pt', function(e){
+        var f = e.features && e.features[0]; if (!f) return;
+        var it = restById[f.properties.id]; if (!it) return;
+        if (it._restFacility) selectFacility(it); else openItem(it);
+      });
+      ['hs-rest-cluster','hs-rest-pt'].forEach(function(id){
+        glMap.on('mouseenter', id, function(){ glMap.getCanvas().style.cursor='pointer'; });
+        glMap.on('mouseleave', id, function(){ glMap.getCanvas().style.cursor=''; });
+      });
       glReady=true; drawGL();
     });
   }
@@ -1287,13 +1411,20 @@ HS.onReady(async function () {
       glMap.easeTo({ center:[center.lng,center.lat], zoom: wantZoom, duration:300 });
     }
     addMarkers(items);
+    // Maps uncap: feed the clustered rest layer everything visible beyond the letters.
+    var rest = restItems(items);
+    restById = {};
+    rest.forEach(function(it){ if (it.id != null) restById[it.id] = it; });
+    var restSrc = glMap.getSource('hs-rest');
+    if (restSrc) restSrc.setData(HS.restFeatureCollection(rest));
     setGps(items); renderInfo(items);
     wirePanel(drawGL);
   }
 
   // ---------- Leaflet raster fallback (real tiles WITHOUT WebGL) ----------
   var lfMap=null, lfSat=null, lfOsm=null, lfBase=null, lfRadius=null, lfMarkers=[],
-      lfFailed=false, lfTilesOK=0, lfTileErrs=0, lfWatchdogArmed=false, lfLastView=null;
+      lfFailed=false, lfTilesOK=0, lfTileErrs=0, lfWatchdogArmed=false, lfLastView=null,
+      lfRestRenderer=null;   // ONE shared canvas renderer for the rest layer (cheap at 1,000s of points)
   var loadLeaflet = HS.loadLeaflet;
   function lfDivIcon(html,size){ return L.divIcon({html:html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2]}); }
   function clearLfMarkers(){ lfMarkers.forEach(function(m){ try{ lfMap.removeLayer(m); }catch(e){} }); lfMarkers=[]; }
@@ -1320,6 +1451,21 @@ HS.onReady(async function () {
       fm.on('click', function(){ selectFacility(f); });            // same panel, never navigates
       lfMarkers.push(fm);
     });
+    // Maps uncap: the rest layer on the fallback map — canvas circleMarkers, because
+    // thousands of canvas circles are cheap where thousands of DOM divIcons are not.
+    // Same click dispatch as a lettered pin (facility rest points -> facility detail).
+    var rest = restItems(items);
+    if (rest.length) {
+      if (!lfRestRenderer) lfRestRenderer = L.canvas({ padding: 0.4 });
+      rest.forEach(function(it){
+        var mk = HS.resolveMarker(it);
+        var m = L.circleMarker([it.lat, it.lng], { renderer: lfRestRenderer, radius: 5,
+          color:'#ffffff', weight:1.5, fillColor: mk.color, fillOpacity:0.95 }).addTo(lfMap);
+        m.on('click', function(){ if (it._restFacility) selectFacility(it); else openItem(it); });
+        m.bindTooltip((mk.typeLabel||it.type||it.category||'Record')+' · '+(it.name||it.title||''));
+        lfMarkers.push(m);
+      });
+    }
   }
   function lfFail(){
     if (lfFailed) { schematicFinal(); return; }
