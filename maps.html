@@ -1417,6 +1417,7 @@ HS.onReady(async function () {
     rest.forEach(function(it){ if (it.id != null) restById[it.id] = it; });
     var restSrc = glMap.getSource('hs-rest');
     if (restSrc) restSrc.setData(HS.restFeatureCollection(rest));
+    if (window.__HS_MAP) window.__HS_MAP.restCount = rest.length;   // CI hook (verify-maps-uncap)
     setGps(items); renderInfo(items);
     wirePanel(drawGL);
   }
@@ -1455,6 +1456,7 @@ HS.onReady(async function () {
     // thousands of canvas circles are cheap where thousands of DOM divIcons are not.
     // Same click dispatch as a lettered pin (facility rest points -> facility detail).
     var rest = restItems(items);
+    if (window.__HS_MAP) window.__HS_MAP.restCount = rest.length;   // CI hook (verify-maps-uncap)
     if (rest.length) {
       if (!lfRestRenderer) lfRestRenderer = L.canvas({ padding: 0.4 });
       rest.forEach(function(it){
