@@ -305,6 +305,26 @@ HS.onReady(async function () {
   var lastItems = [];    // most recent lettered set, so panel re-renders without a map redraw
   var deepApplied = false;
 
+  // ── P1 (ZIP preservation): a visitor on maps.html?zip=<zip> who taps an
+  // "Add your home / watch this area" prompt should not have to re-type the ZIP
+  // they are already viewing. Open the SHARED location/signup flow unchanged, then
+  // prefill its ZIP box with the viewed ?zip — but ONLY when it is a valid 5-digit
+  // code AND the field is still empty (never clobbers text the user typed; no ?zip
+  // leaves the existing blank/default behavior intact; the value stays editable).
+  // maps.html-scoped: shell.js / openLoc are untouched, so every other page's flow
+  // is byte-identical. The signed-in address flow (openHome) has no #locZip, so the
+  // prefill is a harmless no-op there.
+  function mapsAddHome() {
+    if (HS.addHome) HS.addHome(); else if (HS.openLoc) HS.openLoc();
+    try {
+      var zipField = document.getElementById('locZip');
+      var viewedZip = qs.get('zip');
+      if (zipField && !zipField.value && /^\d{5}$/.test(String(viewedZip || ''))) {
+        zipField.value = viewedZip;
+      }
+    } catch (e) { /* prefill is best-effort — the flow itself already opened */ }
+  }
+
   // Which pin-shapes appear in the legend's "Type — pin shape" row.
   var shapesPresent = {};
   projects.forEach(function (p) { shapesPresent[HS.resolveMarker(p).shape] = 1; });
@@ -598,8 +618,15 @@ HS.onReady(async function () {
       panel.innerHTML = '<div class="emptycard"><div class="et">Nothing on the public record near here yet</div>'
         + '<p class="ed">We check official county and permit records for ' + HS.esc(place)
         + ' continuously. When a project, hearing, or permit appears, it shows up here and on the map.</p>'
-        + '<button class="btn primary" onclick="HS.addHome ? HS.addHome() : HS.openLoc()">'
+        + '<button class="btn primary" id="emptyAddHome">'
         + (hasRealHome ? 'Check a different area' : 'Add your home to watch this area') + '</button></div>';
+      var eah = panel.querySelector('#emptyAddHome');
+      // "Add your home to watch this area" preserves the viewed ZIP (mapsAddHome);
+      // "Check a different area" (a resident who already has a home) intentionally
+      // opens a BLANK lookup so they can enter a different ZIP — unchanged behavior.
+      if (eah) eah.onclick = hasRealHome
+        ? function () { if (HS.addHome) HS.addHome(); else if (HS.openLoc) HS.openLoc(); }
+        : mapsAddHome;
       return;
     }
     if (!items.length && filtersOn) {
@@ -934,7 +961,7 @@ HS.onReady(async function () {
         + 'background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 15px;'
         + 'font:600 12.5px/1 var(--font);color:var(--ink);box-shadow:var(--shadow);cursor:pointer';
       el.textContent = '◎ Add your home to see what’s near you';
-      el.onclick = function(){ if (HS.addHome) HS.addHome(); else if (HS.openLoc) HS.openLoc(); };
+      el.onclick = function(){ mapsAddHome(); };   // preserves the viewed ZIP into the signup box
       if (wrap) wrap.appendChild(el);
     }
   }
