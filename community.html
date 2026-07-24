@@ -31,6 +31,19 @@ HS.onReady(async function () {
   // DATA-QUALITY GATE: only render the full page when the ZIP has real, sourced data.
   var status = await HS.data.coverageStatus(zip);   // 'pass' | 'coverage_coming' | null
   var meta = status ? await HS.data.community(zip) : null;
+  // Phase 2 coverage-state (ADDITIVE, fail-soft): truthful state copy only — the
+  // layout gate above stays keyed on data_quality, so rendering behavior is unchanged.
+  var cov = status ? await HS.data.coverageState(zip) : null;
+  if (cov && cov.coverage_state) page.setAttribute('data-coverage-state', cov.coverage_state);
+  var covBanner = '';
+  if (cov) {
+    if (cov.coverage_state === 'facilities_only') {
+      covBanner = '<div class="quiet" style="margin:10px 0 2px">Local government meeting and permit feeds for this area are still being wired — the EPA-registered facility records below are live public data.</div>';
+    } else if (cov.coverage_state === 'stale_data' || cov.coverage_state === 'temporarily_unavailable' || cov.coverage_state === 'failed_ingest') {
+      var covDays = cov.refreshed_at ? Math.max(1, Math.round((Date.now() - new Date(cov.refreshed_at).getTime()) / 86400000)) : null;
+      covBanner = '<div class="quiet" style="margin:10px 0 2px">' + (covDays ? 'Records on this page were last verified ' + covDays + ' day' + (covDays > 1 ? 's' : '') + ' ago. ' : '') + 'An automatic refresh is scheduled — nothing shown here is ever fabricated.</div>';
+    }
+  }
 
   // NATIONWIDE SUBSTANCE GATE (founder-approved 2026-07-14, PLAN.md §11 threshold c):
   // the materializer stamps app_community_meta.indexable = pass AND (>=1 development
@@ -48,8 +61,10 @@ HS.onReady(async function () {
   if (status !== 'pass') {
     var county0 = meta && meta.county ? HS.esc(meta.county) + ' County' : 'the county';
     page.innerHTML = '<div class="ph"><div class="eyebrow">Communities</div><h1>' + HS.esc(zip) + (meta && meta.name ? ' · ' + HS.esc(meta.name) : '') + (meta && meta.state ? ', ' + HS.esc(meta.state) : '') + '</h1>'
-      + '<p>Coverage for this ZIP is being wired. We show a community only when it has real, sourced records — no placeholder cards. '
-      + 'The government meeting and permit feeds for this area are on the way.</p></div>'
+      + (cov && cov.coverage_state === 'honestly_empty'
+          ? '<p>We checked every supported public source for this area — government registries, permit feeds, and the EPA facility registry — and found no qualifying records yet. That check is real and repeats automatically; the moment a record appears it will show here, linked to its official source.</p></div>'
+          : '<p>Coverage for this ZIP is being wired. We show a community only when it has real, sourced records — no placeholder cards. '
+            + 'The government meeting and permit feeds for this area are on the way.</p></div>')
       + '<div class="quiet" style="margin-top:6px"><b>Coverage coming.</b> We never show made-up activity. When ' + county0 + ' meeting and permit feeds are wired for '
       + HS.esc(zip) + ', this page fills with real records — each linked to its official source.'
       + '<div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">'
@@ -108,6 +123,7 @@ HS.onReady(async function () {
   page.innerHTML =
     '<div class="ph"><div class="eyebrow">Communities</div><h1>' + HS.esc(zip) + ' · ' + HS.esc(c.name) + ', ' + HS.esc(c.state) + '</h1>'
     + '<p>What\'s changing across your community — aggregated from the same feeds that power your alerts.</p>'
+    + covBanner
     + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'
     + '<button class="inlinebtn' + (following ? ' following' : '') + '" id="commFollowBtn" data-zip="' + HS.esc(zip) + '" data-name="' + HS.esc(c.name||'') + '" data-state="' + HS.esc(c.state||'') + '" onclick="HS.toggleFollowCommunityBtn(this)">' + (following ? '✓ Following' : '＋ Follow this community') + '</button>'
     + '<a class="inlinebtn" href="' + HS.esc(HS.navHref('homesignalmap.html', zip)) + '" data-znav="homesignalmap.html" style="text-decoration:none">View Development Map →</a>'
