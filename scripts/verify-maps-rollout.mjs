@@ -108,14 +108,23 @@ async function walk(zip, expectMarkers, note) {
          panel.open && panel.openCount === 1 && page.url() === before, JSON.stringify(panel));
     }
     if (zip === '78666') {
-      // Fence proof: the La Cima record is in the dataset (listed) but carries
-      // no coordinates, so it must never be a plotted pin.
-      const fence = await page.evaluate(() => {
+      // Fence proof: a specific record that the page lists WITHOUT coordinates must
+      // never become a plotted pin. Keyed to that record's STABLE, UNIQUE identity —
+      // its exact full title — NOT a "La Cima Phase 3C" prefix, which also matches
+      // sibling San Marcos planning cases (e.g. "…Phase 3C & 7E SF-4.5 Zoning") that
+      // carry first-party source geometry and are LEGITIMATELY plotted. Matching the
+      // prefix conflated those distinct records; the exact title identifies only the
+      // intended coordless one.
+      const FENCED_TITLE = 'La Cima Phase 3C & 7E Annexation';
+      const fence = await page.evaluate((title) => {
         const items = window.__HS_MAP.items || [];
-        const laCima = items.find((x) => /La Cima Phase 3C/i.test(x.name || ''));
-        return { letteredLaCima: !!laCima, anyPinNamedLaCima: !!document.querySelector('[title*="La Cima Phase 3C"]') };
-      });
-      ok('78666 fenced record is never plotted', !fence.anyPinNamedLaCima, JSON.stringify(fence));
+        return {
+          fencedTitle: title,
+          letteredRecord: items.some((x) => (x.name || '') === title),
+          anyPinNamedRecord: !!document.querySelector(`[title*="${title}"]`),
+        };
+      }, FENCED_TITLE);
+      ok('78666 fenced record is never plotted', !fence.anyPinNamedRecord, JSON.stringify(fence));
     }
     await page.screenshot({ path: `shots/rollout-${zip}.png`, fullPage: true });
   } catch (e) {
