@@ -135,6 +135,62 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
 .bsky-prev-note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
 .bsky-edit-actions{display:flex;gap:8px;justify-content:flex-end}
 .bsky-edit-close{position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;line-height:1;color:var(--muted);cursor:pointer}
+
+/* ===== Video Producer tab (Tab 11 — trusted static asset + snapshot HTML) ===== */
+.vp-wrap{max-width:1100px}
+.vp-steps{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px}
+.vp-step{background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px}
+.vp-step.active,.vp-step.done{background:var(--panel);color:var(--ink);border-color:var(--accent)}
+.vp-step.done::before{content:"✓ ";color:var(--real)}
+.vp-panel{display:none}.vp-panel.active{display:block}
+.vp-field{margin:0 0 12px}
+.vp-field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.vp-field input[type=text],.vp-field input[type=url],.vp-field textarea,.vp-field select{
+width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit}
+.vp-field textarea{min-height:120px;resize:vertical}
+.vp-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:820px){.vp-row{grid-template-columns:1fr}}
+.vp-btn{background:var(--accent);border:0;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600}
+.vp-btn:hover{filter:brightness(1.08)}
+.vp-btn.secondary{background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-weight:500}
+.vp-btn:disabled{opacity:.45;cursor:not-allowed}
+.vp-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+.vp-hint{font-size:11.5px;color:var(--muted);margin:6px 0 0}
+.vp-transcript{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;max-height:280px;overflow:auto;font-size:12.5px;line-height:1.6;white-space:pre-wrap}
+.vp-transcript mark{background:rgba(79,156,255,.35);color:var(--ink);padding:0 2px;border-radius:3px}
+.vp-stmt{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0}
+.vp-stmt h4{margin:0 0 8px;font-size:13px}
+.vp-match{display:grid;grid-template-columns:90px 1fr 70px;gap:8px;align-items:start;font-size:12px;padding:6px 0;border-top:1px solid var(--line)}
+.vp-match:first-of-type{border-top:0}
+.vp-conf{font-size:11px;padding:2px 8px;border-radius:12px;display:inline-block}
+.vp-conf.high{background:rgba(47,191,113,.2);color:var(--real)}
+.vp-conf.med{background:rgba(224,164,35,.2);color:var(--persist)}
+.vp-conf.low{background:rgba(91,107,134,.35);color:var(--muted)}
+.vp-comment-block{margin:10px 0}
+.vp-comment-block h5{margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.vp-evidence{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.vp-evidence-item{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:11px;max-width:160px}
+.vp-evidence-item img{max-width:140px;max-height:90px;display:block;border-radius:4px;margin-bottom:4px}
+.vp-storyboard{display:flex;flex-direction:column;gap:8px}
+.vp-sb-item{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:grab}
+.vp-sb-item.drag-over{border-color:var(--accent);background:#152238}
+.vp-sb-type{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--accent);font-weight:700}
+.vp-sb-preview{font-size:12px;color:#cddaf1}
+.vp-sb-handle{color:var(--muted);font-size:16px;user-select:none}
+.vp-card-preview{background:linear-gradient(180deg,#0d1a30,#0a1220);border:1px solid var(--line);border-radius:10px;padding:16px;margin:12px 0;min-height:120px}
+.vp-card-preview .vp-alert-title{color:#ff6b4a;font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase}
+.vp-card-preview .vp-alert-sub{color:var(--muted);font-size:11px;margin-top:2px}
+.vp-card-preview .vp-claim{margin-top:12px;font-size:15px;font-weight:600;line-height:1.4}
+.vp-card-preview .vp-body{margin-top:8px;font-size:13px;line-height:1.55;color:#c6d5ee}
+.vp-progress{background:var(--panel2);border-radius:8px;height:10px;overflow:hidden;border:1px solid var(--line);margin:10px 0}
+.vp-progress>div{height:100%;background:linear-gradient(90deg,#3d6fd6,#4f9cff);width:0;transition:width .25s}
+.vp-projects{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.vp-project-chip{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer}
+.vp-project-chip.active{border-color:var(--accent);color:var(--accent)}
+.vp-video-preview{width:100%;max-height:240px;background:#000;border-radius:8px;margin-top:8px}
+.vp-render-out{margin-top:12px}
+.vp-render-out video{max-width:100%;border-radius:8px;border:1px solid var(--line)}
+.vp-disclaimer{font-size:11.5px;color:var(--muted);border-left:3px solid var(--persist);padding:8px 10px;margin:12px 0;background:var(--panel2);border-radius:0 8px 8px 0}
 </style>
 </head>
 <body>
@@ -153,7 +209,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
       <span><i class="dot pending"></i> instrumentation pending — not collected; never faked</span>
     </div>
   </header>
-  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="bluesky">11 · Bluesky Posts</button></nav>
+  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button></nav>
   <main>
     <div class="tab active" id="tab-exec"></div>
     <div class="tab" id="tab-feed"></div>
@@ -165,6 +221,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
     <div class="tab" id="tab-alertperf"></div>
     <div class="tab" id="tab-homeowners"></div>
     <div class="tab" id="tab-acquisition"></div>
+    <div class="tab" id="tab-videoproducer"></div>
     <div class="tab" id="tab-bluesky"></div>
   </main>
   <footer>Internal · staff &amp; investors. Numbers are a point-in-time snapshot (<span id="dash-foot-date">—</span>), served only to allowlisted accounts through a gated read-only function — no data ships in this page. Regenerated from the HomeSignal ingest pipeline.</footer>
@@ -205,6 +262,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
   </div>
 </div>
 
+<script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ============================================================
@@ -300,6 +358,24 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
   function emptyState(){ gate('<h2>No snapshot yet</h2><p>The dashboard data hasn’t been published to the server yet.</p>'); }
   function loading(){ gate('<div class="gate-loading">Loading dashboard…</div>'); }
 
+  // Trusted tab initializers — only version-controlled assets; never execute
+  // JavaScript from hs_acquisition_dashboard / dashboard_snapshots (tab_scripts).
+  var tabInitDone = { videoproducer: false };
+  var TAB_TRUSTED_INIT = {
+    videoproducer: function () {
+      if (tabInitDone.videoproducer) return;
+      var container = document.getElementById('tab-videoproducer');
+      if (
+        container &&
+        window.HomeSignalVideoProducer &&
+        typeof window.HomeSignalVideoProducer.init === 'function'
+      ) {
+        window.HomeSignalVideoProducer.init(container, {});
+        tabInitDone.videoproducer = true;
+      }
+    }
+  };
+
   // ---- growth slider (adapted from the artifact; reads S from the payload) ----
   function initGrowth(S){
     if(!S || !S.length) return;
@@ -341,12 +417,15 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
 
   // ---- tab nav wiring (from the artifact) ----
   function wireTabs(){
+    if (window.__acqTabsWired) return;
+    window.__acqTabsWired = true;
     document.querySelectorAll('nav.tabs button').forEach(function(b){
       b.addEventListener('click', function(){
         document.querySelectorAll('nav.tabs button').forEach(function(x){ x.classList.remove('active'); });
         document.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('active'); });
         b.classList.add('active');
         var t=document.getElementById('tab-'+b.dataset.tab); if(t) t.classList.add('active');
+        if (TAB_TRUSTED_INIT[b.dataset.tab]) TAB_TRUSTED_INIT[b.dataset.tab]();
         window.scrollTo({top:0,behavior:'instant'});
       });
     });
@@ -557,7 +636,7 @@ footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid 
     }catch(e){}
   }
 
-  // ---- Tab 11: Bluesky Posts (LIVE, owner-only write surface) ----------------
+  // ---- Tab 12: Bluesky Posts (LIVE, owner-only write surface) ----------------
   //   Reads/writes public.social_posts through the OWNER's logged-in session; RLS
   //   (social_posts_owner_all) gates it to the owner only. A non-owner sees an
   //   empty queue and cannot write. The page NEVER holds the Bluesky credential
