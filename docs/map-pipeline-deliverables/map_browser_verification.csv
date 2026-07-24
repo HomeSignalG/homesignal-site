@@ -1,0 +1,9 @@
+zip,page,expected_markers,observed_markers,hover_verified,sidebar_verified,result
+43235,maps.html,dev+facility(promotions+point),ci_pending_post_deploy,harness,harness,projected_ci_pending
+76132,maps.html,dev(point+2 promoted)+facility,ci_pending_post_deploy,harness,harness,projected_ci_pending
+10002,maps.html,dev(point+1 promoted)+facility,ci_pending_post_deploy,harness,harness,projected_ci_pending
+78617,maps.html,dev(point)+facility(16)+area sidebar,48+16 today,harness,harness,no_regression_frontend_unchanged
+84302,maps.html,facility(16); notices+area in sidebar,16 today,harness,harness,no_regression_frontend_unchanged
+84003,maps.html,facility(16); notices+area in sidebar,16 today,harness,harness,no_regression_frontend_unchanged
+85201,maps.html,dev(point48)+facility(16),48+16 today,harness,harness,no_regression_frontend_unchanged
+84083,maps.html,none(rural empty)+area sidebar,0 today,harness,harness,no_regression_frontend_unchanged
