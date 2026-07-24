@@ -69,7 +69,11 @@ HS.onReady(async function () {
     c = await HS.data.community(S.zip);
     all = await HS.data.changes(S.zip, home);
     meetings = await HS.data.meetings(S.zip, home);
-    news = await HS.data.news(S.zip, home);
+    // Local News filtered by the user's saved News-tier topics (Phase B). No saved
+    // selection (anonymous / empty) -> all Local News, unchanged from before.
+    var newsFollows = (HS.topicPrefsUtil && HS.topicPrefsUtil.newsFollows
+      && HS.topicPrefsUtil.newsFollows(S.topicPrefs)) || [];
+    news = await HS.data.news(S.zip, home, newsFollows);
   } catch (e) {
     console.warn('[alerts] data load failed', e);
     document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load your alerts</h1>'
