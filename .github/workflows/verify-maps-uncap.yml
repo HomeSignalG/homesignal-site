@@ -1,0 +1,49 @@
+name: verify-maps-uncap
+
+# Phase 4 of the Maps uncap — live completeness + performance verification.
+# Serves THIS CHECKOUT's maps.html locally (so the branch's page code is what
+# runs) against LIVE Supabase data on a runner with egress, and asserts:
+#   every materialized development record + facility is reachable from Maps
+#   (totals == REST count=exact), the complete sidebar enumeration works down
+#   to the deepest tail record, the GL rest layer carries the full remainder,
+#   and payload/ready budgets hold on the densest cached ZIP (44127, 5,424).
+# VERIFICATION ONLY — touches no product data.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zips:
+        description: 'Comma-separated ZIPs (typical,dense,densest)'
+        required: false
+        default: '85234,55407,44127'
+  # Cloud agents lack actions:write for manual dispatch (db-sql.yml precedent) —
+  # a push touching the verifier or its trigger file runs the check on that branch.
+  push:
+    paths:
+      - 'scripts/verify-maps-uncap.mjs'
+      - '.github/workflows/verify-maps-uncap.yml'
+      - 'verify/uncap-run.txt'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Serve this checkout + verify completeness and performance
+        run: |
+          mkdir -p shots
+          python3 -m http.server 8765 &
+          sleep 2
+          SITE_BASE=http://localhost:8765 ZIPS='${{ github.event.inputs.zips }}' node scripts/verify-maps-uncap.mjs
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uncap-shots
+          path: shots/
+          if-no-files-found: ignore
