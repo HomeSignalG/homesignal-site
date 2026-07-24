@@ -201,3 +201,25 @@
 --     this migration; then run select public.app_refresh_all(); to backfill.
 -- REVERT: re-apply the app_refresh_zip_gov_notices_window14_cap48 body from this
 -- file's history (drops the added statement; no schema change to revert).
+
+-- ---------------------------------------------------------------------------
+-- Applied 2026-07-24 via migrations `app_refresh_zip_determinism_tiebreakers` +
+-- `app_refresh_zip_gin_containment` (Phase A of the Local News routing project;
+-- full current body of record: docs/app-refresh-zip-gin-containment-migration.sql;
+-- pre-Phase-A baseline: docs/app-refresh-zip-live-snapshot-2026-07-24.sql):
+--   * DETERMINISM (FD-1): every capped select gained a stable, immutable unique
+--     tie-breaker as the FINAL ordering term (md5(el::text) for deduped JSONB
+--     site elements; the row uuid id for alerts/meetings; communities.id for the
+--     ZIP resolution). Business ordering unchanged; the two branches that had NO
+--     order by (planning & zoning, civic top-6) now order by the stable key
+--     alone. Fixes Phase A Addendum Obs 1-2 (nondeterministic top-N; 02108
+--     selected 48 of 77 dev rows arbitrarily).
+--   * GIN SHAPE: ZIP->community resolution `_zip = any(zip_codes)` -> the
+--     semantically identical `zip_codes @> array[_zip]` so
+--     idx_communities_zip_codes_gin is used (Addendum Obs 3). Equivalence proven
+--     on all 12,722 candidate ZIPs (0 mismatches); seq scan 3.3 ms -> GIN 0.6 ms.
+--   * NOTE: this file's older inline body ABOVE is historical — since the
+--     2026-07-23 recursive-root-walk change and Phase A, the authoritative
+--     reproducible body is docs/app-refresh-zip-gin-containment-migration.sql.
+-- REVERT: apply docs/app-refresh-zip-determinism-migration.sql (M1 only) or
+-- docs/app-refresh-zip-live-snapshot-2026-07-24.sql (baseline; drill-verified).

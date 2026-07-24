@@ -11,7 +11,11 @@ import { dirname, join } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const data = readFileSync(join(root, 'lib/data.js'), 'utf8');
 const alerts = readFileSync(join(root, 'alerts.html'), 'utf8');
-const migration = readFileSync(join(root, 'docs/app-refresh-zip-local-news-migration.sql'), 'utf8');
+// Phase A (2026-07-24): the SQL of record moved to the gin-containment migration
+// (docs/app-refresh-zip-local-news-migration.sql had drifted from production —
+// one-hop _root vs the live recursive walk). Guards below now track the current
+// full body of record so they keep protecting what actually runs.
+const migration = readFileSync(join(root, 'docs/app-refresh-zip-gin-containment-migration.sql'), 'utf8');
 const ddlPointer = readFileSync(join(root, 'docs/app-content-materialize.sql'), 'utf8');
 
 let fails = 0;
