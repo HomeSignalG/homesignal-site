@@ -1935,3 +1935,82 @@ consolidated per-record permit ledgers anywhere we could find.
   domain-not-found 404s. **Salem hub**: GWM_0003 permission error (private).
   No first-party per-record permit source located for those → facilities floor.
 → nightly reprobe list.
+
+## 2026-07-24 — WISCONSIN / MADISON CONNECTOR RESTORATION WIRE PASS
+
+**One connector RESTORED as committed, reproducible config (registry-only — zero
+adapter/engine code changes): `madison-planning-projects`** (receipts: pg_net
+82715-82721, 82973-82978; golden-set SQL in this section).
+
+### Why a "restoration"
+The connector existed ONLY in an uncommitted deployed engine (never in git — pickaxe
+`--all -S"madison-planning-projects"` = 0 across both repos; not in any PR; not in the
+parked bundle). It produced 2,452 cached records across 20 Dane County ZIPs, then
+vanished on 2026-07-17 when the engine was redeployed from committed source
+(deploy-edge-functions.yml build; classification: accidental regression / build
+omission). The 20 ZIPs froze and aged into `failed_ingest`. This pass reconstructs the
+entry from forensic evidence and commits it so a rebuild can never drop it again.
+
+### RESTORED — madison-planning-projects (ArcGIS, City of Madison)
+- **Upstream ALIVE + schema intact** (re-verified 2026-07-24, HTTP 200): layer 0
+  "Current Planning Project Points" of `maps.cityofmadison.com/arcgis/rest/services/
+  Planning/Current_Planning_Projects/MapServer`, esriGeometryPoint, 598 features; all
+  identified fields present (RECORD_RecordID / RECORD_Status / Project_Description /
+  ProjectURL / DATES_SubmittedDate / APO_ADDRESS_PARTIAL_LINE).
+- **Field map recovered by matching live features to cached output** (e.g.
+  LNDUSE-2015-00037): case_number←RECORD_RecordID, status_raw←RECORD_Status,
+  title←Project_Description, record_url←ProjectURL (100% populated upstream, 0 blank;
+  equals the `development.cfm?record={case_number}` template on ALL 502 golden cases →
+  template kept as insurance, precision "record"), file_date←DATES_SubmittedDate
+  (epoch ms), address←APO_ADDRESS_PARTIAL_LINE, geometry←source point (__lat/__lng).
+- **NO ZIP column** → `spatial_zip_radius_mi: 3`, recovered EXACTLY from the golden
+  set: box-membership fit over 502 projects × 20 centroids gives R ∈ [3.0026, 3.0028)
+  → the engine-standard 3 mi. ArcGIS's own envelope intersect at R=3 reproduces
+  per-ZIP membership EXACTLY (53703: 231/231, 53562: 48/48, 53598: 1/1; 0 diff).
+- **Status policy — every upstream status enumerated, fail closed**: 13 statuses
+  mapped VERBATIM from the golden set (proposed: In Process, Application Under Review,
+  Additional Info Required, Waiting for Fees; approved: Final Approval Granted,
+  Recorded, "Approved, Final Review Pending", "Approved, Under Final Review", Approved
+  and Recorded, Approved Preliminary Plat; operating: "Approval Granted, Completed",
+  "Approved, Demolished", "Approved, Constructed" — commas exact) + 4 explicit
+  exclusions ("Approval(s) expired" AND "Approval(s) Expired" — the source emits BOTH
+  casings and returnDistinctValues showed only one (silently truncated distinct — the
+  Mesa $limit lesson, spatial variant); Inactive; Placed on File or Denied — all
+  lapsed/dead/denied, all 0-in-golden). Any FUTURE status surfaces as unmapped
+  (dropped + reported), never silently bucketed.
+- **No type_map** (golden = 100% use_type "unclassified"), **no recency filter**
+  (planning projects kept regardless of age; golden spans 2015+), Web_Planning_Project
+  omitted ('Y' on all 598 rows — a no-op filter).
+
+### Golden-set comparison (run WITHOUT deploying, via pg_net + SQL)
+Golden = the 2,452 cached records (20 ZIPs, 502 distinct cases, frozen 2026-07-17):
+- **reproduced: 501/502**; **URL mismatches: 0**; **duplicate case rows: 0**;
+  **unmapped: 0**; per-ZIP spot membership identical (3 ZIPs, 0 diff both directions).
+- **cache-only: 1** — LNDCSM-2026-00010 ("Approved, Under Final Review" at freeze) is
+  ABSENT from today's upstream (city-side deletion since 2026-07-17). Explained; kept
+  in cache under last-known-good semantics until the next refresh naturally supersedes.
+- **new-only: 2** — LNDUSE-2017-00052 (Final Approval Granted), LNDUSE-2025-00023
+  ("Approved, Final Review Pending"): real mapped projects, template-true URLs.
+  +0.4% = normal upstream drift over 7 days, not false-positive expansion.
+- Current upstream: 598 features → 503 pass the mapped set, 95 excluded by the dead
+  statuses, 0 unmapped, 0 blank.
+
+### Tests (committed)
+- `test/madison-connector.test.mjs` (CI `unit` job): registry contract, status policy
+  (17 enumerated, no dual-bucket, fail-closed), normalization vs the committed
+  7-real-feature fixture `fixtures/madison/planning-projects-sample.json` (captured
+  live 2026-07-24; stable public records, not a full-payload snapshot), edge shapes.
+- `scripts/arcgis.fixture-test.ts` (esbuild-run, carto/ckan/csv pattern): the ACTUAL
+  `arcgisForZip` with mocked fetch — coverage gate (Dane yes / Milwaukee no / Utah
+  no / 0 fetches out of coverage), spatial envelope params, pagination
+  (exceededTransferLimit + resultOffset), deterministic source_ids, dedup, empty
+  response (honest 0), ArcGIS error object (quarantined fetch failure, never
+  0-success), missing-centroid skip.
+
+### Rollback
+Remove the single `madison-planning-projects` entry from
+`supabase/functions/get-address-report/jurisdiction-registry.json` (and the two test
+files), redeploy via `deploy-edge-functions.yml` — the engine is otherwise byte-
+identical; no other connector is touched. Cached Madison records persist under the
+collector's last-known-good guard (dev>0 rows are never overwritten by an empty
+response), exactly as they persisted after the original regression.

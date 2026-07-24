@@ -3057,6 +3057,60 @@
     "coverage_note": "Portland spans Multnomah/Washington/Clackamas; spatial envelope self-limits to the city footprint regardless",
     "record_url": "dataset-precision (no per-row URL column)"
    }
+  },
+  {
+   "registry_id": "madison-planning-projects",
+   "platform": "arcgis",
+   "service_url": "https://maps.cityofmadison.com/arcgis/rest/services/Planning/Current_Planning_Projects/MapServer/0",
+   "dataset_url": "https://www.cityofmadison.com/dpced/planning/",
+   "jurisdiction": "City of Madison",
+   "coverage": [
+    {
+     "state": "WI",
+     "county": "Dane"
+    }
+   ],
+   "column_map": {
+    "title": "Project_Description",
+    "status_raw": "RECORD_Status",
+    "file_date": "DATES_SubmittedDate",
+    "address": "APO_ADDRESS_PARTIAL_LINE",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "RECORD_RecordID",
+    "record_url": "ProjectURL"
+   },
+   "spatial_zip_radius_mi": 3,
+   "status_to_bucket": {
+    "proposed": [
+     "In Process",
+     "Application Under Review",
+     "Additional Info Required",
+     "Waiting for Fees"
+    ],
+    "approved": [
+     "Final Approval Granted",
+     "Recorded",
+     "Approved, Final Review Pending",
+     "Approved, Under Final Review",
+     "Approved and Recorded",
+     "Approved Preliminary Plat"
+    ],
+    "operating": [
+     "Approval Granted, Completed",
+     "Approved, Demolished",
+     "Approved, Constructed"
+    ],
+    "exclude": [
+     "Approval(s) expired",
+     "Approval(s) Expired",
+     "Inactive",
+     "Placed on File or Denied"
+    ]
+   },
+   "record_url_template": "https://www.cityofmadison.com/dpced/planning/development.cfm?record={case_number}",
+   "record_url_precision": "record",
+   "_receipts": "Restored 2026-07-24 (connector was deployed-but-never-committed; accidentally dropped 2026-07-17 when the engine was rebuilt from committed source, freezing 20 Dane County ZIP pages). Live-reverified 2026-07-24 via pg_net: layer 0 'Current Planning Project Points' HTTP 200, esriGeometryPoint, 598 features; all identified fields present (RECORD_RecordID/RECORD_Status/Project_Description/ProjectURL/DATES_SubmittedDate/APO_ADDRESS_PARTIAL_LINE). NO ZIP attribute anywhere -> spatial_zip_radius_mi=3 (the engine's standard ZIP approximation; records keep their OWN per-parcel point geometry). Radius recovered exactly from the 2,452-record golden set (502 distinct projects x 20 ZIPs): box-membership fit gives R in [3.0026, 3.0028) -> 3 mi. status_to_bucket + buckets recovered verbatim from the golden set (13 statuses, exact commas). The 3 upstream statuses absent from the golden set (Approval(s) expired / Inactive / Placed on File or Denied = lapsed/dead/denied projects) are enumerated in exclude[] so the run report stays clean and any FUTURE new status surfaces as unmapped for triage. Web_Planning_Project is 'Y' on all 598 rows (no-op filter, omitted). ProjectURL populated on 100% of rows (0 blank) and equals the record_url_template of RECORD_RecordID on all 502 golden cases -> template is the observed canonical format (record precision), pure insurance. No recency filter (planning projects kept regardless of age; golden spans 2015+). No type_map (all records use_type 'unclassified', matching the golden set)."
   }
  ],
  "ckan": [

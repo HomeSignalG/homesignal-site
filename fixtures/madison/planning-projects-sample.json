@@ -1,0 +1,93 @@
+{
+  "_provenance": "Captured LIVE 2026-07-24 via pg_net from https://maps.cityofmadison.com/arcgis/rest/services/Planning/Current_Planning_Projects/MapServer/0/query (public planning records; outSR=4326). 7 representative features chosen to cover every status bucket the madison-planning-projects registry entry maps: approved (Final Approval Granted), proposed (In Process, Application Under Review), operating (Approval Granted Completed; Approved Demolished), and the fail-closed exclusions (Approval(s) Expired, Placed on File or Denied). Stable historical cases, not a full-payload snapshot.",
+  "displayFieldName": "AlderName",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": { "wkid": 4326, "latestWkid": 4326 },
+  "fields": [
+    { "name": "RECORD_RecordID", "type": "esriFieldTypeString", "alias": "RECORD_RecordID", "length": 30 },
+    { "name": "RECORD_Status", "type": "esriFieldTypeString", "alias": "RECORD_Status", "length": 30 },
+    { "name": "Project_Description", "type": "esriFieldTypeString", "alias": "Project_Description", "length": 4000 },
+    { "name": "ProjectURL", "type": "esriFieldTypeString", "alias": "ProjectURL", "length": 98 },
+    { "name": "DATES_SubmittedDate", "type": "esriFieldTypeDate", "alias": "DATES_SubmittedDate", "length": 8 },
+    { "name": "APO_ADDRESS_PARTIAL_LINE", "type": "esriFieldTypeString", "alias": "APO_ADDRESS_PARTIAL_LINE", "length": 4000 }
+  ],
+  "features": [
+    {
+      "attributes": {
+        "RECORD_RecordID": "LNDUSE-2015-00037",
+        "RECORD_Status": "Final Approval Granted",
+        "Project_Description": "Demolish 2 commercial/agricultural bldgs to construct & expand a pkg lot for an existing auto body shop (Gates Auto Body). (See LNDSPR-2016-00132 for Agency Verification of Conditions)",
+        "ProjectURL": "https://www.cityofmadison.com/dpced/planning/development.cfm?record=LNDUSE-2015-00037",
+        "DATES_SubmittedDate": 1440115200000,
+        "APO_ADDRESS_PARTIAL_LINE": "5317 Wayne Ter"
+      },
+      "geometry": { "x": -89.291471135905979, "y": 43.138815692663215 }
+    },
+    {
+      "attributes": {
+        "RECORD_RecordID": "LNDUSE-2019-00032",
+        "RECORD_Status": "In Process",
+        "Project_Description": "Construct new single-family residence. Is the continuation of a previously approved Demolition Permit for 4214 Doncaster Drive (Legistar File 52206) which was approved by the PC on July 30, 2018.",
+        "ProjectURL": "https://www.cityofmadison.com/dpced/planning/development.cfm?record=LNDUSE-2019-00032",
+        "DATES_SubmittedDate": 1555286400000,
+        "APO_ADDRESS_PARTIAL_LINE": "4216 Doncaster Dr"
+      },
+      "geometry": { "x": -89.444590917332192, "y": 43.036332481653268 }
+    },
+    {
+      "attributes": {
+        "RECORD_RecordID": "LNDUSE-2021-00012",
+        "RECORD_Status": "Approved, Demolished",
+        "Project_Description": "Demolish auto repair business to construct a six-story, mixed-use building with 750 sq. ft. of commercial space and 79 apartments. ------ STATUS: Demo permit approval CONTINUES but C/U approval, which was approved  by Plan Commission on 4/12/2021, is considered APPROVAL EXPIRED per MGO Section 28.183(9). C/U was replaced by a subsequent submittal (see Legistar File 69314)",
+        "ProjectURL": "https://www.cityofmadison.com/dpced/planning/development.cfm?record=LNDUSE-2021-00012",
+        "DATES_SubmittedDate": 1614124800000,
+        "APO_ADDRESS_PARTIAL_LINE": "2208 University Ave"
+      },
+      "geometry": { "x": -89.424386251996637, "y": 43.072827958706284 }
+    },
+    {
+      "attributes": {
+        "RECORD_RecordID": "LNDUSE-2025-00011",
+        "RECORD_Status": "Approval Granted, Completed",
+        "Project_Description": "Allow nightclub (Jays Bar) in existing commercial building.",
+        "ProjectURL": "https://www.cityofmadison.com/dpced/planning/development.cfm?record=LNDUSE-2025-00011",
+        "DATES_SubmittedDate": 1739145600000,
+        "APO_ADDRESS_PARTIAL_LINE": "406 N Frances St"
+      },
+      "geometry": { "x": -89.396102217753835, "y": 43.073570805609336 }
+    },
+    {
+      "attributes": {
+        "RECORD_RecordID": "LNDCSM-2017-00006",
+        "RECORD_Status": "Approval(s) Expired",
+        "Project_Description": "4-lot CSM to re-divide 3 parcels addressed as 205, 213 & 221 N. Gammon Rd into a total of 4 single-family lots (includes new cul-de-sac configure for Acadia Ct). Proposes one deep residential lot. ------ STATUS: APPROVED by Council on 5/2/2017 but considered APPROVAL EXPIRED per Wis. Stat. § 236.34(2).",
+        "ProjectURL": "https://www.cityofmadison.com/dpced/planning/development.cfm?record=LNDCSM-2017-00006",
+        "DATES_SubmittedDate": 1487116800000,
+        "APO_ADDRESS_PARTIAL_LINE": "205 N Gammon Rd"
+      },
+      "geometry": { "x": -89.501993701398789, "y": 43.070541855770934 }
+    },
+    {
+      "attributes": {
+        "RECORD_RecordID": "LNDCSM-2018-00009",
+        "RECORD_Status": "Placed on File or Denied",
+        "Project_Description": "Create one residential lot. ------ STATUS: Requests PLACED ON FILE W/OUT PREJUDICE by the CC on 5/15/2018.",
+        "ProjectURL": "https://www.cityofmadison.com/dpced/planning/development.cfm?record=LNDCSM-2018-00009",
+        "DATES_SubmittedDate": 1520812800000,
+        "APO_ADDRESS_PARTIAL_LINE": "222 N Charter St"
+      },
+      "geometry": { "x": -89.405985266396485, "y": 43.071810574376734 }
+    },
+    {
+      "attributes": {
+        "RECORD_RecordID": "LNDCSM-2026-00014",
+        "RECORD_Status": "Application Under Review",
+        "Project_Description": "Create two residential lots in A (Agricultural) zoning.",
+        "ProjectURL": "https://www.cityofmadison.com/dpced/planning/development.cfm?record=LNDCSM-2026-00014",
+        "DATES_SubmittedDate": 1775174400000,
+        "APO_ADDRESS_PARTIAL_LINE": "7021 Cottage Grove Rd"
+      },
+      "geometry": { "x": -89.260326279322996, "y": 43.079946981221433 }
+    }
+  ]
+}
