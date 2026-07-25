@@ -388,13 +388,31 @@ export function validateRegistryEntry(e: Record<string, unknown>, sourceClass: s
   if (!hasStatusCol && (e.status_const == null || String(e.status_const).trim() === "")) {
     errs.push(`${id}: needs column_map.status_raw or status_const (fail-closed status)`);
   }
-  // Any status the entry declares must be bucketed, or it is silently dropped.
   const s2b = (e.status_to_bucket ?? {}) as Record<string, unknown>;
   if (typeof s2b !== "object") errs.push(`${id}: status_to_bucket must be an object`);
-  if (e.status_const != null && String(e.status_const).trim() !== "") {
-    const all = Object.values(s2b).flatMap((v) => (Array.isArray(v) ? v.map(String) : []));
-    if (!all.map((s) => s.trim()).includes(String(e.status_const).trim())) {
-      errs.push(`${id}: status_const "${String(e.status_const)}" is not present in status_to_bucket`);
+
+  // status_const has TWO DIFFERENT SEMANTICS across platforms — verified in source, and
+  // exactly the kind of divergence this validator exists to police:
+  //   • socrata.ts:68  status_const?: "proposed" | "approved" | "operating"
+  //                    line 225 assigns it DIRECTLY to `bucket` — status_to_bucket is bypassed,
+  //                    which is why the live socrata entries carry `status_to_bucket: {}`.
+  //   • arcgis.ts:86   status_const?: string
+  //                    line 207 feeds it into statusRaw, which is then bucketed THROUGH
+  //                    status_to_bucket (Detroit/Cleveland/Nashville: const "Issued" →
+  //                    status_to_bucket.approved ["Issued"]).
+  // Validating one rule for both is wrong in one direction or the other, so the rule is
+  // selected by section. ckan/csv/carto declare no status_const at all today.
+  const konst = e.status_const == null ? "" : String(e.status_const).trim();
+  if (konst !== "") {
+    if (sourceClass === "socrata") {
+      if (!["proposed", "approved", "operating"].includes(konst)) {
+        errs.push(`${id}: socrata status_const must be a bucket name (proposed|approved|operating), got "${konst}"`);
+      }
+    } else {
+      const all = Object.values(s2b).flatMap((v) => (Array.isArray(v) ? v.map(String) : []));
+      if (!all.map((s) => s.trim()).includes(konst)) {
+        errs.push(`${id}: status_const "${konst}" is not present in status_to_bucket`);
+      }
     }
   }
   // include_types without a type_map leaves every record unclassified.
