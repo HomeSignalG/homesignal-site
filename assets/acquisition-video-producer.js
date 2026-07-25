@@ -234,6 +234,66 @@
     state.transcriptRaw = ($("vp-transcript-paste") && $("vp-transcript-paste").value) || "";
   }
 
+  function ensureFetchTranscriptButton() {
+    if ($("vp-fetch-transcript")) return $("vp-fetch-transcript");
+    var analyze = $("vp-analyze-transcript");
+    if (!analyze || !analyze.parentElement) return null;
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "vp-btn secondary";
+    btn.id = "vp-fetch-transcript";
+    btn.textContent = "Fetch transcript from YouTube";
+    analyze.parentElement.insertBefore(btn, analyze);
+    return btn;
+  }
+
+  function fetchYoutubeTranscript() {
+    syncFromForm();
+    var url = state.youtube || "";
+    if (!url.trim()) {
+      alert("Enter a YouTube URL first.");
+      return;
+    }
+    if (!window.hsClient || typeof window.hsClient.functions.invoke !== "function") {
+      alert("Transcript fetch is unavailable on this page.");
+      return;
+    }
+    var btn = $("vp-fetch-transcript");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Fetching…";
+    }
+    window.hsClient.functions.invoke("fetch-youtube-transcript", {
+      body: { video_url: url.trim() }
+    }).then(function (r) {
+      if (r.error) throw new Error(r.error.message || "fetch failed");
+      var data = r.data || {};
+      if (data.error) throw new Error(data.error);
+      state.youtube = url.trim();
+      state.transcriptRaw = data.transcript_raw || "";
+      state.parsed = parseTranscript(state.transcriptRaw);
+      if ($("vp-youtube")) $("vp-youtube").value = state.youtube;
+      if ($("vp-transcript-paste")) $("vp-transcript-paste").value = state.transcriptRaw;
+      if (data.title && !state.name && $("vp-project-name")) {
+        $("vp-project-name").value = data.title;
+        state.name = data.title;
+      }
+      renderTranscript();
+      persist();
+      document.querySelectorAll(".vp-step").forEach(function (b) {
+        if (b.dataset.vpStep === "source") b.classList.add("done");
+      });
+      alert("Transcript fetched from YouTube.");
+    }).catch(function (e) {
+      alert("Could not fetch transcript: " + (e && e.message ? e.message : e));
+    }).finally(function () {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Fetch transcript from YouTube";
+      }
+    });
+  }
+
   function persist() {
     syncFromForm();
     if (!state.id) state.id = uid();
@@ -686,6 +746,9 @@
         if (b.dataset.vpStep === "source") b.classList.add("done");
       });
     });
+
+    var fetchBtn = ensureFetchTranscriptButton();
+    if (fetchBtn) fetchBtn.addEventListener("click", fetchYoutubeTranscript);
 
     var saveBtn = $("vp-save-project");
     if (saveBtn) saveBtn.addEventListener("click", function () { persist(); alert("Project saved locally."); });
