@@ -86,6 +86,19 @@ jobs:
           # type-check with zero errors.
           deno check "${FN_DIR}/sources/geo-input.ts"
 
+      - name: Type-check the backbone contract (strict, must be clean)
+        run: |
+          # contract.ts is the neutral backbone module every adapter imports. It has no
+          # external deps, so it must type-check with ZERO errors — no tolerance window.
+          deno check "${FN_DIR}/sources/contract.ts"
+
+      - name: Validate jurisdiction-registry entries (backbone Phase 2)
+        run: |
+          # Single-implementation gate: imports validateRegistryEntry from contract.ts.
+          # A malformed entry otherwise fails silently in production (closed coverage gate
+          # or all-unclassified rows look identical to "this place has no permits").
+          deno run --allow-read scripts/validate-registry.ts
+
       - name: Type-check Edge Function TypeScript (no NEW errors from this PR)
         run: |
           # Type-check the entry point + touched connectors. The repo has PRE-EXISTING

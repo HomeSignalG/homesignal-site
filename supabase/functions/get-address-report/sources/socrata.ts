@@ -31,34 +31,15 @@ import { buildGeocodeInput } from "./geo-input.ts";
 
 // ───────────────────────────── types ─────────────────────────────
 
-export type Bucket = "proposed" | "approved" | "operating" | "exclude";
-
-/** One field's source column. A single column name, an array of columns to join with a
- *  space (composite street address), or null/absent when the dataset has no such field. */
-export type ColumnRef = string | string[] | null;
-
-export interface ColumnMap {
-  title: ColumnRef;
-  /** Optional: omit for issuance ledgers with no status column (see entry.status_const). */
-  status_raw?: ColumnRef;
-  type_source?: ColumnRef;
-  file_date?: ColumnRef;
-  decision_date?: ColumnRef;
-  address?: ColumnRef;
-  lat?: ColumnRef;
-  lng?: ColumnRef;
-  case_number?: ColumnRef;
-  zip?: ColumnRef;
-  /** A column carrying a per-row official URL (string, or an object with a `.url`). */
-  record_url?: ColumnRef;
-}
-
-export interface StatusToBucket {
-  proposed?: string[];
-  approved?: string[];
-  operating?: string[];
-  exclude?: string[];
-}
+// The record/column contract now lives in the NEUTRAL backbone module. Re-exported here
+// so existing `from "./socrata.ts"` imports keep resolving during the migration; new code
+// must import from ./contract.ts directly.
+export type { Bucket, ColumnRef, ColumnMap, StatusToBucket, NormalizedRecord, UnmappedStatus, ExcludedStatus } from "./contract.ts";
+import type { Bucket, ColumnRef, ColumnMap, StatusToBucket, NormalizedRecord } from "./contract.ts";
+import {
+  readCol, firstCol, valOrNull, buildBucketLookup, layerFor, BUCKET_TO_TYPE,
+  coverageMatches as coverageMatchesShared, milesBetween, GEOCODE_FENCE_MI,
+} from "./contract.ts";
 
 export interface SocrataRegistryEntry {
   registry_id: string;
@@ -119,42 +100,7 @@ export interface SocrataRegistryEntry {
 /** Normalized internal record — the brief's shape, carried through to development_reports.sites.
  *  `type` is the LIFECYCLE bucket the page renders (built|approved|proposed); the mapped source
  *  classification is `use_type` (kept separate so the two never collide). */
-export interface NormalizedRecord {
-  source_id: string;                 // socrata:{domain}:{dataset_id}:{case_number|:id}
-  source_class: string;              // "socrata"
-  // NOT `registry_id` — the page reserves that field for the EPA FRS RegistryId (frsRid) and
-  // would render any record carrying it with the "Facility · operating now" ECHO popup.
-  source_registry_id: string;        // which jurisdiction-registry entry produced this record
-  jurisdiction: string;
-  label: string;
-  title: string;
-  use_type: string;                  // Industrial|Development|Residential|Utility|unclassified
-  bucket: Exclude<Bucket, "exclude">;
-  type: "built" | "approved" | "proposed";   // lifecycle for the page (bucket→type)
-  relevance: "development";          // permit/case filings are development by construction
-  rel_rule: string;                  // "source:socrata:{registry_id}"
-  layer: string;                     // map layer, derived from use_type (never from the title)
-  status_raw: string;
-  file_date: string | null;
-  decision_date: string | null;
-  address: string | null;
-  lat: number | null;
-  lng: number | null;
-  scope: "point" | "area";
-  geo_precision: "point" | "address" | "jurisdiction";
-  zip: string | null;
-  case_number: string | null;
-  record_url: string;
-  record_url_precision: "record" | "dataset";
-  // geocode-quality passthrough (present only when this record was geocoded)
-  match_type?: string;
-  matched_address?: string;
-  geocode_source?: string;
-  needs_review?: boolean;
-}
 
-export interface UnmappedStatus { status: string; count: number; }
-export interface ExcludedStatus { status: string; count: number; }
 
 export interface SocrataRunReport {
   registry_id: string;
@@ -222,13 +168,7 @@ export function coverageMatches(
   coverage: { state: string; county?: string }[],
   communities: SocrataCommunityRow[],
 ): boolean {
-  const norm = (s?: string | null) => (s || "").trim().toLowerCase();
-  return coverage.some((cov) =>
-    communities.some((c) =>
-      norm(c.state) === norm(cov.state) &&
-      (!cov.county || norm(c.county) === norm(cov.county))
-    )
-  );
+  return coverageMatchesShared(coverage, communities);
 }
 
 // ───────────────────────────── per-entry run ─────────────────────────────
@@ -311,12 +251,6 @@ async function runEntry(
 // GEOCODE geofence constant + distance — kept in lockstep with sources/arcgis.ts
 // (GEOCODE_FENCE_MI / milesBetween). A geocoded point farther than this from the report
 // ZIP centroid is an untrusted cross-city/state match and is nulled (area scope).
-const GEOCODE_FENCE_MI_GEO = 25;
-function milesBetweenGeo(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const dLat = (lat2 - lat1) * 69;
-  const dLng = (lng2 - lng1) * 69 * Math.cos(((lat1 + lat2) / 2) * Math.PI / 180);
-  return Math.sqrt(dLat * dLat + dLng * dLng);
-}
 
 async function normalizeRow(
   row: Record<string, unknown>,
@@ -371,14 +305,14 @@ async function normalizeRow(
       const matchedZip = ((g.matched_address || "").match(/\b(\d{5})(?:-\d{4})?\s*$/)?.[1]) ?? null;
       const zipMismatch = !!(filedZip && matchedZip && filedZip !== matchedZip);
       const c = deps.zipCentroid;
-      const fenceMiles = c ? milesBetweenGeo(c.lat, c.lng, g.lat, g.lng) : null;
-      const outOfFence = fenceMiles != null && fenceMiles > GEOCODE_FENCE_MI_GEO;
+      const fenceMiles = c ? milesBetween(c.lat, c.lng, g.lat, g.lng) : null;
+      const outOfFence = fenceMiles != null && fenceMiles > GEOCODE_FENCE_MI;
       if (zipMismatch || outOfFence) {
         report.geocode_failures++;
         report.quarantined.push({
           reason: zipMismatch
             ? `geocode geofence: matched ZIP ${matchedZip} != filed ${filedZip} — coords nulled`
-            : `geocode geofence: point ${Math.round(fenceMiles!)} mi from ZIP centroid (> ${GEOCODE_FENCE_MI_GEO}) — coords nulled`,
+            : `geocode geofence: point ${Math.round(fenceMiles!)} mi from ZIP centroid (> ${GEOCODE_FENCE_MI}) — coords nulled`,
           sample: address,
         });
         lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area";
@@ -530,59 +464,10 @@ export async function discoverDatasets(
 
 // ───────────────────────────── helpers ─────────────────────────────
 
-const BUCKET_TO_TYPE: Record<Exclude<Bucket, "exclude">, "built" | "approved" | "proposed"> = {
-  operating: "built", approved: "approved", proposed: "proposed",
-};
 
-/** Map layer from the (already source-derived) classification — never from the title.
- *  Use-types: Industrial | Development | Residential | Utility | Commercial | Civic/Public. */
-function layerFor(useType: string): string {
-  switch (useType.toLowerCase()) {
-    case "industrial": return "industrial";
-    case "utility": return "energy";
-    case "residential": return "residential";
-    case "commercial": return "commercial";
-    case "civic/public": return "civic";
-    default: return "development";     // Development / unclassified → neutral
-  }
-}
 
-/** status → bucket, exact after trim. Later buckets don't override earlier ones (a status
- *  should appear in exactly one; if duplicated, first wins and the map should be fixed). */
-function buildBucketLookup(s2b: StatusToBucket): Map<string, Bucket> {
-  const m = new Map<string, Bucket>();
-  (["proposed", "approved", "operating", "exclude"] as Bucket[]).forEach((b) => {
-    for (const status of s2b[b] ?? []) { const k = status.trim(); if (!m.has(k)) m.set(k, b); }
-  });
-  return m;
-}
 
-function firstCol(ref?: ColumnRef): string | null {
-  if (!ref) return null;
-  return Array.isArray(ref) ? (ref[0] ?? null) : ref;
-}
 
-/** Read a mapped column: a single value, or an array of columns joined by spaces. */
-function readCol(row: Record<string, unknown>, ref?: ColumnRef): unknown {
-  if (!ref) return undefined;
-  if (Array.isArray(ref)) {
-    const parts = ref.map((c) => row[c]).filter((v) => v != null && String(v).trim() !== "").map((v) => String(v).trim());
-    return parts.length ? parts.join(" ") : undefined;
-  }
-  // Dot-path support for Socrata `location`-type columns (e.g. Montgomery County MD's
-  // nested location.latitude/location.longitude). An exact column of that name always
-  // wins; the path walk only runs when no such column exists. Additive — flat refs and
-  // every existing entry behave byte-identically.
-  if (row[ref] === undefined && ref.includes(".")) {
-    let v: unknown = row;
-    for (const seg of ref.split(".")) {
-      if (v == null || typeof v !== "object") return undefined;
-      v = (v as Record<string, unknown>)[seg];
-    }
-    return v;
-  }
-  return row[ref];
-}
 
 /** record_url column may be a bare string or a Socrata URL object {url:"…"}. */
 function extractUrl(v: unknown): string {
@@ -605,11 +490,6 @@ function rowId(row: Record<string, unknown>): string | null {
   return id == null ? null : String(id);
 }
 
-function valOrNull(v: unknown): string | null {
-  if (v == null) return null;
-  const s = String(v).trim();
-  return s === "" ? null : s;
-}
 
 function numOrNull(v: unknown): number | null {
   if (v == null || v === "") return null;

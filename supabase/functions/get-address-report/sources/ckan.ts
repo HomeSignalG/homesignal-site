@@ -22,7 +22,10 @@
 import {
   Bucket, ColumnMap, ColumnRef, ExcludedStatus, NormalizedRecord, StatusToBucket,
   UnmappedStatus, coverageMatches,
-} from "./socrata.ts";
+} from "./contract.ts";
+import {
+  readCol, firstCol, valOrNull, buildBucketLookup, layerFor, BUCKET_TO_TYPE,
+} from "./contract.ts";
 
 // ───────────────────────────── registry entry + types ─────────────────────────────
 
@@ -148,9 +151,6 @@ async function runEntry(
   return { records, report };
 }
 
-const BUCKET_TO_TYPE: Record<string, NormalizedRecord["type"]> = {
-  proposed: "proposed", approved: "approved", operating: "built",
-};
 
 async function normalizeRow(
   row: Record<string, unknown>,
@@ -282,32 +282,9 @@ async function getWithBackoff(url: string, deps: CkanDeps): Promise<unknown> {
 
 // ───────────────────────────── small helpers (socrata.ts siblings) ─────────────────────────────
 
-function buildBucketLookup(s2b: StatusToBucket): Map<string, Bucket> {
-  const m = new Map<string, Bucket>();
-  for (const b of ["proposed", "approved", "operating", "exclude"] as Bucket[]) {
-    for (const status of s2b[b] ?? []) { const k = status.trim(); if (!m.has(k)) m.set(k, b); }
-  }
-  return m;
-}
 
-function readCol(row: Record<string, unknown>, ref?: ColumnRef): unknown {
-  if (!ref) return undefined;
-  if (Array.isArray(ref)) {
-    const parts = ref.map((c) => row[c]).filter((v) => v != null && String(v).trim() !== "").map((v) => String(v).trim());
-    return parts.length ? parts.join(" ") : undefined;
-  }
-  return row[ref];
-}
 
-function firstCol(ref?: ColumnRef): string | null {
-  if (!ref) return null;
-  return Array.isArray(ref) ? (ref[0] ?? null) : ref;
-}
 
-function valOrNull(v: unknown): string | null {
-  const s = v == null ? "" : String(v).trim();
-  return s === "" ? null : s;
-}
 
 function numOrNull(v: unknown): number | null {
   if (v == null || String(v).trim() === "") return null;
@@ -349,17 +326,5 @@ function hostOf(baseUrl: string): string {
   try { return new URL(baseUrl).host; } catch { return baseUrl; }
 }
 
-/** Map layer from the (already source-derived) classification — byte-for-byte the
- *  socrata.ts mapping so the same use_type renders on the same layer everywhere. */
-function layerFor(useType: string): string {
-  switch (useType.toLowerCase()) {
-    case "industrial": return "industrial";
-    case "utility": return "energy";
-    case "residential": return "residential";
-    case "commercial": return "commercial";
-    case "civic/public": return "civic";
-    default: return "development";     // Development / unclassified → neutral
-  }
-}
 
 function sleep(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)); }
