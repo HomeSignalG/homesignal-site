@@ -3215,6 +3215,139 @@
    "record_url_precision": "record",
    "_receipts": "Restored 2026-07-24 (connector was deployed-but-never-committed; accidentally dropped 2026-07-17 when the engine was rebuilt from committed source, freezing 20 Dane County ZIP pages). Live-reverified 2026-07-24 via pg_net: layer 0 'Current Planning Project Points' HTTP 200, esriGeometryPoint, 598 features; all identified fields present (RECORD_RecordID/RECORD_Status/Project_Description/ProjectURL/DATES_SubmittedDate/APO_ADDRESS_PARTIAL_LINE). NO ZIP attribute anywhere -> spatial_zip_radius_mi=3 (the engine's standard ZIP approximation; records keep their OWN per-parcel point geometry). Radius recovered exactly from the 2,452-record golden set (502 distinct projects x 20 ZIPs): box-membership fit gives R in [3.0026, 3.0028) -> 3 mi. status_to_bucket + buckets recovered verbatim from the golden set (13 statuses, exact commas). The 3 upstream statuses absent from the golden set (Approval(s) expired / Inactive / Placed on File or Denied = lapsed/dead/denied projects) are enumerated in exclude[] so the run report stays clean and any FUTURE new status surfaces as unmapped for triage. Web_Planning_Project is 'Y' on all 598 rows (no-op filter, omitted). ProjectURL populated on 100% of rows (0 blank) and equals the record_url_template of RECORD_RecordID on all 502 golden cases -> template is the observed canonical format (record precision), pure insurance. No recency filter (planning projects kept regardless of age; golden spans 2015+). No type_map (all records use_type 'unclassified', matching the golden set)."
   }
+,
+  {
+   "registry_id": "raleigh-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://services.arcgis.com/v400IkDOw1ad7Yad/arcgis/rest/services/Building_Permits/FeatureServer/0",
+   "dataset_url": "https://www.arcgis.com/home/item.html?id=bdfad82b15344d37beb28d7f90b6c4be&sublayer=0",
+   "jurisdiction": "City of Raleigh",
+   "coverage": [
+    {
+     "state": "NC",
+     "county": "Wake"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "permittypemapped",
+     "proposedworkdescription"
+    ],
+    "status_raw": "statuscurrent",
+    "type_source": "permittypemapped",
+    "file_date": "applieddate",
+    "decision_date": "issueddate",
+    "address": [
+     "originaladdress1",
+     "originalcity"
+    ],
+    "zip": "originalzip",
+    "lat": "latitude_perm",
+    "lng": "longitude_perm",
+    "case_number": "permitnum"
+   },
+   "type_map": {
+    "Building": "Development",
+    "Demolition": "Development"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Issued",
+     "ACTIVE  (ISSUED)",
+     "Active"
+    ],
+    "operating": [
+     "Complete",
+     "INACTIVE (INSPECTIONS COMPLETED)"
+    ],
+    "proposed": [
+     "In Review",
+     "REVIEW IN PROGRESS",
+     "Submitted",
+     "Submitted - Online",
+     "On Hold",
+     "Delayed Issuance",
+     "DETAIL REVIEW COMPLETED",
+     "PENDING PICKUP (FINAL REVIEW DONE)",
+     "Ready for Issuance"
+    ],
+    "exclude": [
+     "Expired-Closed",
+     "Review Expired",
+     "Stop Work Order"
+    ]
+   },
+   "recency_days": 365,
+   "record_url_precision": "dataset",
+   "_receipts": "2026-07-25 pg_net recon (ids 106379-106400): Raleigh open-data Hub 'Building Permits' AGO FeatureServer; FRESH max issueddate 2026-07-24 (epoch 1784854453000). permittypemapped = ONLY Building/Demolition (no trades noise -> no whitelist; both map Development). statuscurrent 17 values VERBATIM via returnDistinctValues, incl. the double-space 'ACTIVE  (ISSUED)'. Native site-address originalzip + latitude_perm/longitude_perm columns. file_date=applieddate so pre-issuance applications stay visible (Montgomery precedent); decision_date=issueddate. No per-record link column -> dataset(item)-precision. Coverage NC/Wake (39 modeled ZIP pages)."
+  },
+  {
+   "registry_id": "wake-county-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://maps.wake.gov/arcgis/rest/services/Inspections/Building_Permits/MapServer/0",
+   "dataset_url": "https://www.arcgis.com/home/item.html?id=6a9651b339b7413d8dc264f9ae1b3f6f&sublayer=0",
+   "jurisdiction": "Wake County",
+   "coverage": [
+    {
+     "state": "NC",
+     "county": "Wake"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "PERMIT_TYPE",
+     "DESCRIPTION"
+    ],
+    "status_raw": "PERMIT_STATUS",
+    "type_source": "PERMIT_TYPE",
+    "file_date": "APPLICATION_DATE",
+    "decision_date": "ISSUE_DATE",
+    "address": "MAILING_ADDRESS",
+    "record_url": "LINK",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "PERMIT_NUMBER"
+   },
+   "type_map": {
+    "Residential Building": "Residential",
+    "Residential Accessory Building Structure": "Residential",
+    "Manufactured Home Permit": "Residential",
+    "Commercial Building": "Development",
+    "Demolition Permit": "Development"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Issued",
+     "Approved"
+    ],
+    "operating": [
+     "Complete"
+    ],
+    "proposed": [
+     "In Review",
+     "Submitted",
+     "Submitted - Online",
+     "Application Incomplete",
+     "On Hold",
+     "On Hold - Customer Action Required"
+    ],
+    "exclude": [
+     "Void",
+     "Withdrawn",
+     "Expired",
+     "Disapproved",
+     "Revoked",
+     "Denied",
+     "Stop Work Order",
+     "Inactive",
+     "Under Violation"
+    ]
+   },
+   "recency_days": 365,
+   "spatial_zip_radius_mi": 3,
+   "record_url_precision": "record",
+   "_receipts": "2026-07-25 pg_net recon (ids 106384-106398): Wake County's own AGS (maps.wake.gov Inspections/Building_Permits); FRESH max ISSUE_DATE 2026-07-23 (epoch 1784764800000), 196,060 rows. PERMIT_STATUS 18 values VERBATIM via groupBy counts (Complete 158,292 / Void 11,844 / Withdrawn 9,573 / Expired 7,246 / Issued 7,072 / In Review 1,410 / ...). PERMIT_TYPE 5 values, all real construction (no trades) - all kept. PER-RECORD LINK column -> Tyler EnerGov citizen-access URL (record precision, live sample verified). Geometry NC state-plane reprojected by the connector's outSR=4326 -> __lat/__lng. MAILING_* is the only address block (site-vs-mailing ambiguity) -> spatial_zip_radius_mi scoping on geometry, zip column NOT mapped (never guess). file_date=APPLICATION_DATE keeps pre-issuance applications visible. Coverage NC/Wake (39 modeled ZIP pages)."
+  }
  ],
  "ckan": [
   {
