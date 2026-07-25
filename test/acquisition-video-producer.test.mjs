@@ -60,6 +60,8 @@ ok(/vp-build-storyboard/.test(vp), 'static asset handles build storyboard clicks
 ok(/fetch-youtube-transcript/.test(vp), 'static asset invokes fetch-youtube-transcript edge function');
 ok(/hasSourceVideo/.test(vp), 'static asset does not persist source video blobs in localStorage');
 ok(/function safePersist\(\)/.test(vp) && /return true/.test(vp), 'safePersist reports save success');
+ok(/ensureActionButtons/.test(vp), 'static asset wires action buttons directly');
+ok(/sanitizeProjectRecord/.test(vp), 'static asset strips legacy video blobs from storage');
 
 // Gate remains for unauthorized users
 ok(/id="gate"/.test(acq) && /function loginState/.test(acq) && /function noAccess/.test(acq),

@@ -5,8 +5,16 @@
 
   var STORAGE_KEY = "hs_video_projects_v1";
   var WPM = 150;
+  var vpContainer = null;
+  var vpRoot = null;
 
-  function $(id) { return document.getElementById(id); }
+  function $(id) {
+    if (vpRoot) {
+      var scoped = vpRoot.querySelector("#" + id);
+      if (scoped) return scoped;
+    }
+    return document.getElementById(id);
+  }
   function esc(s) {
     return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
@@ -143,8 +151,47 @@
   }
 
   function loadProjects() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY) || "[]";
+      var list = JSON.parse(raw);
+      return sanitizeProjectList(list);
+    }
     catch (e) { return []; }
+  }
+
+  function sanitizeProjectRecord(rec) {
+    if (!rec || typeof rec !== "object") return null;
+    var clean = {
+      id: rec.id || uid(),
+      name: rec.name || "",
+      youtube: rec.youtube || "",
+      speaker: rec.speaker || "",
+      transcriptRaw: rec.transcriptRaw || "",
+      parsed: rec.parsed || parseTranscript(rec.transcriptRaw || ""),
+      hasSourceVideo: !!(rec.hasSourceVideo || rec.videoDataUrl),
+      statements: Array.isArray(rec.statements) ? rec.statements : [],
+      storyboard: Array.isArray(rec.storyboard) ? rec.storyboard : [],
+      updatedAt: rec.updatedAt || new Date().toISOString(),
+    };
+    // Drop legacy base64 video blobs — they exceed localStorage quota and break all saves.
+    delete clean.videoDataUrl;
+    return clean;
+  }
+
+  function sanitizeProjectList(list) {
+    if (!Array.isArray(list)) return [];
+    return list.map(sanitizeProjectRecord).filter(Boolean);
+  }
+
+  function compactStoredProjects() {
+    try {
+      var list = sanitizeProjectList(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"));
+      saveProjects(list);
+      return true;
+    } catch (e) {
+      console.error("Video Producer: could not compact stored projects", e);
+      return false;
+    }
   }
 
   function saveProjects(list) {
@@ -476,8 +523,23 @@
     }
   }
 
+  function setStoryboardStatus(msg, isError) {
+    var el = $("vp-storyboard-status");
+    if (!el) {
+      var list = $("vp-storyboard-list");
+      if (!list || !list.parentElement) return;
+      el = document.createElement("p");
+      el.id = "vp-storyboard-status";
+      el.className = "vp-hint";
+      list.parentElement.insertBefore(el, list);
+    }
+    el.textContent = msg || "";
+    el.style.color = isError ? "var(--persist)" : "var(--muted)";
+  }
+
   function buildStoryboard() {
-    var board = [];
+    try {
+      var board = [];
     var vidStart = { type: "source_clip", label: "Source clip (intro)", start: 0, duration: 3 };
     board.push(vidStart);
     board.push({ type: "freeze", label: "Freeze frame", duration: 1.5 });
@@ -503,6 +565,11 @@
     if (first) previewCard(first);
     var list = $("vp-storyboard-list");
     if (list) list.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    setStoryboardStatus("Storyboard built — " + state.storyboard.length + " items. Drag to reorder or click Preview.", false);
+    } catch (err) {
+      console.error("Video Producer: buildStoryboard failed", err);
+      setStoryboardStatus("Could not build storyboard: " + (err && err.message ? err.message : err), true);
+    }
   }
 
   function renderStoryboard() {
@@ -816,6 +883,114 @@
     out.appendChild(hint);
   }
 
+  function bindVpDom(container) {
+    vpContainer = container || document.getElementById("tab-videoproducer");
+    vpRoot = vpContainer ? vpContainer.querySelector("#video-producer-root") : null;
+  }
+
+  function wireButton(id, handler) {
+    var btn = $(id);
+    if (!btn) return;
+    var marker = "data-vp-btn-" + id;
+    if (btn.getAttribute(marker) === "1") return;
+    btn.setAttribute(marker, "1");
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      handler(e);
+    });
+  }
+
+  function ensureActionButtons() {
+    wireButton("vp-analyze-transcript", function () {
+      syncFromForm();
+      if (!state.transcriptRaw.trim()) {
+        alert("Paste or fetch a transcript first.");
+        return;
+      }
+      state.parsed = parseTranscript(state.transcriptRaw);
+      renderTranscript();
+      safePersist();
+      setStep("statements");
+      markStepDone("source");
+    });
+    wireButton("vp-fetch-transcript", fetchYoutubeTranscript);
+    wireButton("vp-save-project", function () {
+      if (safePersist()) alert("Project saved locally.");
+      else alert("Could not save project. Browser storage may be full — export JSON or remove old projects.");
+    });
+    wireButton("vp-new-project", startNewProject);
+    wireButton("vp-locate-statements", function () {
+      syncFromForm();
+      state.parsed = parseTranscript(state.transcriptRaw);
+      var lines = ($("vp-statement-input") && $("vp-statement-input").value || "").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+      lines.forEach(function (line) {
+        var matches = findMatches(line, state.parsed);
+        state.statements.push({
+          id: uid(),
+          text: line,
+          matches: matches.length ? matches : [{ text: line, start: 0, end: 4, confidence: 0.3 }],
+          commentary: { said: line, evidence: "", community: "" },
+          evidence: [],
+        });
+      });
+      if ($("vp-statement-input")) $("vp-statement-input").value = "";
+      invalidateStoryboard();
+      safePersist();
+      renderStatements();
+      renderCommentary();
+      markStepDone("statements");
+    });
+    wireButton("vp-add-statement", function () {
+      var line = prompt("Statement to locate:");
+      if (!line) return;
+      syncFromForm();
+      state.parsed = parseTranscript(state.transcriptRaw);
+      var matches = findMatches(line, state.parsed);
+      state.statements.push({
+        id: uid(),
+        text: line,
+        matches: matches.length ? matches : [{ text: line, start: 0, end: 4, confidence: 0.3 }],
+        commentary: { said: line, evidence: "", community: "" },
+        evidence: [],
+      });
+      safePersist();
+      invalidateStoryboard();
+      renderStatements();
+      renderCommentary();
+    });
+    wireButton("vp-build-storyboard", function () {
+      buildStoryboard();
+      markStepDone("storyboard");
+    });
+    wireButton("vp-start-render", function (e) {
+      var el = e.currentTarget;
+      var bar = $("vp-render-bar");
+      var status = $("vp-render-status");
+      if (!state.storyboard.length) buildStoryboard();
+      if (bar) bar.style.width = "0%";
+      el.disabled = true;
+      if (status) status.textContent = "Rendering…";
+      renderVideo(function (p) {
+        if (bar) bar.style.width = Math.round(p * 100) + "%";
+      }, function (blob, err) {
+        el.disabled = false;
+        if (err) { if (status) status.textContent = err; return; }
+        if (bar) bar.style.width = "100%";
+        if (status) status.textContent = "Render complete. Download or preview below.";
+        showRenderOutput(blob);
+        markStepDone("render");
+      });
+    });
+    wireButton("vp-export-project", function () {
+      syncFromForm();
+      var blob = new Blob([JSON.stringify(projectRecordFromState(), null, 2)], { type: "application/json" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = (state.name || "homesignal-video-project") + ".json";
+      a.click();
+    });
+  }
+
   function wireEvents(container) {
     if (!container || container.getAttribute("data-vp-delegate-wired") === "1") return;
     container.setAttribute("data-vp-delegate-wired", "1");
@@ -860,109 +1035,6 @@
         renderStatements();
         renderCommentary();
         return;
-      }
-
-      var el = e.target.closest && e.target.closest("[id]");
-      if (!el || !container.contains(el)) return;
-
-      if (el.id === "vp-analyze-transcript") {
-        syncFromForm();
-        if (!state.transcriptRaw.trim()) {
-          alert("Paste or fetch a transcript first.");
-          return;
-        }
-        state.parsed = parseTranscript(state.transcriptRaw);
-        renderTranscript();
-        safePersist();
-        setStep("statements");
-        markStepDone("source");
-        return;
-      }
-      if (el.id === "vp-fetch-transcript") {
-        fetchYoutubeTranscript();
-        return;
-      }
-      if (el.id === "vp-save-project") {
-        if (safePersist()) alert("Project saved locally.");
-        else alert("Could not save project. Browser storage may be full — export JSON or remove old projects.");
-        return;
-      }
-      if (el.id === "vp-new-project") {
-        startNewProject();
-        return;
-      }
-      if (el.id === "vp-locate-statements") {
-        syncFromForm();
-        state.parsed = parseTranscript(state.transcriptRaw);
-        var lines = ($("vp-statement-input") && $("vp-statement-input").value || "").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
-        lines.forEach(function (line) {
-          var matches = findMatches(line, state.parsed);
-          state.statements.push({
-            id: uid(),
-            text: line,
-            matches: matches.length ? matches : [{ text: line, start: 0, end: 4, confidence: 0.3 }],
-            commentary: { said: line, evidence: "", community: "" },
-            evidence: [],
-          });
-        });
-        if ($("vp-statement-input")) $("vp-statement-input").value = "";
-        invalidateStoryboard();
-        safePersist();
-        renderStatements();
-        renderCommentary();
-        markStepDone("statements");
-        return;
-      }
-      if (el.id === "vp-add-statement") {
-        var line = prompt("Statement to locate:");
-        if (!line) return;
-        syncFromForm();
-        state.parsed = parseTranscript(state.transcriptRaw);
-        var matches = findMatches(line, state.parsed);
-        state.statements.push({
-          id: uid(),
-          text: line,
-          matches: matches.length ? matches : [{ text: line, start: 0, end: 4, confidence: 0.3 }],
-          commentary: { said: line, evidence: "", community: "" },
-          evidence: [],
-        });
-        safePersist();
-        invalidateStoryboard();
-        renderStatements();
-        renderCommentary();
-        return;
-      }
-      if (el.id === "vp-build-storyboard") {
-        buildStoryboard();
-        markStepDone("storyboard");
-        return;
-      }
-      if (el.id === "vp-start-render") {
-        var bar = $("vp-render-bar");
-        var status = $("vp-render-status");
-        if (!state.storyboard.length) buildStoryboard();
-        if (bar) bar.style.width = "0%";
-        el.disabled = true;
-        if (status) status.textContent = "Rendering…";
-        renderVideo(function (p) {
-          if (bar) bar.style.width = Math.round(p * 100) + "%";
-        }, function (blob, err) {
-          el.disabled = false;
-          if (err) { if (status) status.textContent = err; return; }
-          if (bar) bar.style.width = "100%";
-          if (status) status.textContent = "Render complete. Download or preview below.";
-          showRenderOutput(blob);
-          markStepDone("render");
-        });
-        return;
-      }
-      if (el.id === "vp-export-project") {
-        syncFromForm();
-        var blob = new Blob([JSON.stringify(projectRecordFromState(), null, 2)], { type: "application/json" });
-        var a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = (state.name || "homesignal-video-project") + ".json";
-        a.click();
       }
     });
 
@@ -1048,7 +1120,9 @@
   }
 
   function bootVideoProducer(container) {
-    if (!$("video-producer-root")) return;
+    bindVpDom(container);
+    if (!vpRoot) return;
+    compactStoredProjects();
     ensureRenderLabel();
     ensureFetchTranscriptButton();
     var activeStep = "source";
@@ -1060,13 +1134,16 @@
     else if (list.length) loadProject(list[0]);
     else startNewDraft();
     if (container) wireEvents(container);
+    ensureActionButtons();
     setStep(activeStep);
   }
 
   function refreshVideoProducer() {
-    if (!$("video-producer-root")) return;
+    bindVpDom(vpContainer);
+    if (!vpRoot) return;
     ensureRenderLabel();
     ensureFetchTranscriptButton();
+    ensureActionButtons();
     syncStateToForm();
     renderProjectChips();
     renderTranscript();
@@ -1082,10 +1159,13 @@
   window.HomeSignalVideoProducer = {
     init: function (container, payload) {
       if (!container) return;
-      if (!container.querySelector("#video-producer-root")) return;
+      bindVpDom(container);
+      if (!vpRoot) return;
+      compactStoredProjects();
       ensureRenderLabel();
       ensureFetchTranscriptButton();
       wireEvents(container);
+      ensureActionButtons();
       if (container.getAttribute("data-vp-initialized") === "1") {
         refreshVideoProducer();
         return;
