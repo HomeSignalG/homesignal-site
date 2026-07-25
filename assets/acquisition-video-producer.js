@@ -247,6 +247,18 @@
     return btn;
   }
 
+  function invokeErrorMessage(err) {
+    if (!err) return "fetch failed";
+    var ctx = err.context;
+    if (ctx && ctx.body) {
+      try {
+        var body = typeof ctx.body === "string" ? JSON.parse(ctx.body) : ctx.body;
+        if (body && body.error) return body.error;
+      } catch (ignore) {}
+    }
+    return err.message || "fetch failed";
+  }
+
   function fetchYoutubeTranscript() {
     syncFromForm();
     var url = state.youtube || "";
@@ -266,7 +278,7 @@
     window.hsClient.functions.invoke("fetch-youtube-transcript", {
       body: { video_url: url.trim() }
     }).then(function (r) {
-      if (r.error) throw new Error(r.error.message || "fetch failed");
+      if (r.error) throw new Error(invokeErrorMessage(r.error));
       var data = r.data || {};
       if (data.error) throw new Error(data.error);
       state.youtube = url.trim();
