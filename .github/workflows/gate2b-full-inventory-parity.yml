@@ -6,8 +6,19 @@ name: gate2b-full-inventory-parity
 # key the site already ships, renders the real maps.html in real Chromium, and writes no
 # production data. Manual trigger only.
 
+# NOTE ON TRIGGERS: workflow_dispatch cannot be used yet — the GitHub API only dispatches
+# workflows already registered on the DEFAULT branch, and this file exists only on the
+# feature branch (merging first is not permitted). So the gate also runs on pull_request,
+# which fires on the already-open PR for this branch without merging anything.
 on:
   workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'scripts/gate2/**'
+      - 'lib/map.js'
+      - 'lib/data.js'
+      - 'maps.html'
+      - '.github/workflows/gate2b-full-inventory-parity.yml'
 
 permissions:
   contents: read
