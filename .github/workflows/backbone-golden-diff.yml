@@ -1,0 +1,87 @@
+name: backbone-golden-diff
+
+# EMPIRICAL zero-diff gate for the backbone refactor (Gate 2).
+#
+# Runs scripts/backbone-golden-diff.ts against the BASE commit's connector code and against
+# this PR's connector code, using the SAME frozen inputs, then diffs the two outputs.
+# Byte-identical stdout ⇒ the refactor changed no connector behaviour.
+#
+# NO NETWORK, NO DATABASE, NO PRODUCTION: fetch and geocode are stubbed inside the harness.
+# The harness itself is always taken from the PR branch (the base commit does not have it);
+# only the connector modules and jurisdiction-registry.json differ between the two runs.
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/get-address-report/**'
+      - 'scripts/backbone-golden-diff.ts'
+      - '.github/workflows/backbone-golden-diff.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  golden-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Resolve base SHA
+        id: base
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="$(git rev-parse origin/main)"; fi
+          echo "sha=$BASE" >> "$GITHUB_OUTPUT"
+          echo "base commit: $BASE"
+
+      - name: Run harness on BRANCH code
+        run: |
+          deno run --allow-read scripts/backbone-golden-diff.ts > /tmp/branch.json
+          echo "branch output: $(wc -c < /tmp/branch.json) bytes"
+
+      - name: Build a BASE tree with the same harness
+        run: |
+          # Worktree at the base commit, then copy ONLY the harness in (the base commit
+          # predates it). Connector code + registry come from the base commit unchanged.
+          git worktree add /tmp/base "${{ steps.base.outputs.sha }}"
+          mkdir -p /tmp/base/scripts
+          cp scripts/backbone-golden-diff.ts /tmp/base/scripts/backbone-golden-diff.ts
+          echo "base connector files:"
+          ls -1 /tmp/base/supabase/functions/get-address-report/sources/
+
+      - name: Run harness on BASE code
+        working-directory: /tmp/base
+        run: |
+          deno run --allow-read scripts/backbone-golden-diff.ts > /tmp/base.json
+          echo "base output: $(wc -c < /tmp/base.json) bytes"
+
+      - name: Diff base vs branch (must be byte-identical)
+        run: |
+          echo "base   sha256: $(sha256sum /tmp/base.json   | cut -d' ' -f1)"
+          echo "branch sha256: $(sha256sum /tmp/branch.json | cut -d' ' -f1)"
+          if diff -u /tmp/base.json /tmp/branch.json > /tmp/golden.diff; then
+            echo "✅ ZERO DIFF — connector output is byte-identical across the refactor."
+          else
+            echo "❌ OUTPUT DIFFERS — refactor is NOT behaviour-preserving:"
+            head -200 /tmp/golden.diff
+            exit 1
+          fi
+
+      - name: Upload golden-diff artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backbone-golden-diff
+          path: |
+            /tmp/base.json
+            /tmp/branch.json
+            /tmp/golden.diff
+          if-no-files-found: warn
