@@ -2014,3 +2014,25 @@ files), redeploy via `deploy-edge-functions.yml` — the engine is otherwise byt
 identical; no other connector is touched. Cached Madison records persist under the
 collector's last-known-good guard (dev>0 rows are never overwritten by an empty
 response), exactly as they persisted after the original regression.
+
+## 2026-07-25 — BATCH 4 (corrected-URL discovery: El Paso TX, Fairfax VA, + 9 counties)
+
+**WIRED — `fairfax-active-site-construction`** (VA / Fairfax). `www.fairfaxcounty.gov/mercator/rest/services/LDS/DevelopmentTracker/FeatureServer/1` ("Active Site Construction - Centroid Point", 2,183 rows, point geometry). Corrected-URL find: Fairfax's server is under `/mercator/`, not a `data.`/`opendata.` host. Freshness gate passed BEFORE wiring — max `last_edited_date` 2026-07-25 (same day), `RECORD_STATUS_DATE` 2026-07-22. `LINK_URL` populated on every row (`IS NULL` count = 0) giving **record-precision** Accela ACA deep links. `RECORD_STATUS` verbatim: Approved 1,170 + Revised 871 → approved; Closed 133 → operating; Denied/Expired/Voided/Withdrawn/Revised-Pending Customer → exclude. 9 of 11 `APPTYPEALIAS` plan types kept (Bond Reduction/Bond Extension dropped at source). Spatial ZIP scoping — `ZIP_CODE` NULL on 457/2,183 (21%) and mixes 5-digit with unpunctuated ZIP+4. No `recency_days` on purpose: the county already scopes the layer to active construction; a 365d cut on `SUBMITTED_DATE` would keep only 371 of 2,183. **Production result: 46 of 47 modeled Fairfax ZIP pages, 8,112 records, 0 missing record_url, 0 missing coords, 100% record-precision URLs.**
+
+**REJECTED — El Paso TX `gis.elpasotexas.gov` (WAF blocks the Supabase edge runtime).** Wired and deployed, then **retired the same day** on measured production evidence. The city's own ArcGIS Server (v11.3, `Planning/NewResidential` FeatureServer layer 1, 42,677 rows, 605 in the trailing 365d) answers **pg_net with 200** but returns **HTTP 403 to the edge-function runtime** on the identical query — recorded verbatim in the run report for all 143 El Paso ZIPs: `"fetch failed: HTTP 403 for https://gis.elpasotexas.gov/arcgis/rest/services/Planning/NewResidential/FeatureServer/1/query?..."`. Result was `fetched: 0, emitted: 0` on every ZIP. **This is the Tampa precedent** (FLORIDA WIRE PASS: live + fresh on the city's own server, identical URL 200 from pg_net, WAF 403s edge egress by IP range). The entry was removed so the daily refresh does not fire 143 doomed requests; El Paso goes on the **nightly reprobe list**. Not a schema or config problem — the source is well-shaped and would be wireable if egress were allowed.
+
+**REJECTED — El Paso `Planning/NewCommercial`** (11,322 rows / 524 in 365d): a groupBy over the 365d window returns a **single blank `Record_Typ` group** (n=524) and non-blank `Descriptio` count = **0**. No title source and nothing to classify or whitelist — every record would render as a bare permit number with `use_type: unclassified`. Failed the gate independently of the 403.
+
+**Counties investigated this batch with firm verdicts (9):**
+- **Dallas TX** — `gis.dallascityhall.com` + `egis.dallascityhall.com` live (v10.91/10.61). All public folders evaluated: `Pbw_public/ROWMSPermits` is right-of-way work by its own service description ("construction in public right-of-way, including the street, median and parkway") — street cuts, not building development; `sdc_public` carries CityProperty/Zoning/PD_SUP_Search (zoning polygons, no permit ledger); `Crm_public` is geocoders only. **No building-permit layer exposed.**
+- **Dallas County TX** — `gis.dallascounty.org` fails TLS ("SSL peer certificate or SSH remote key was not OK").
+- **Worcester MA**, **Allegheny PA**, **Orange CA** (`gis.ocgov.com`) — DNS failure on the `gis.` host; `gis.santa-ana.org` 404.
+- **Oklahoma City OK** — Incapsula WAF shell.
+- **Sedgwick KS (Wichita)** — HTML app shell, no REST root.
+- **El Paso TX**, **Fairfax VA** — as above.
+
+**Deferred, not counted as evaluated (2):** Suffolk County NY (`gis.suffolkcountyny.gov` returned 403 "Suffolk County Server Maintenance" — retry later), Westchester NY (GeoHub v2 live; the DCAT feed probe returned no response).
+
+**Leads discovered but not evaluated (next batch):** Fairfax `LDS/PLUSApprovedSiteRecords`, Fairfax `DevelopmentTracker` layer 0 "Data Center Development" (polygon; directly relevant to the data-center tier), layers 3-5 (Recent Building Permits / Certificate of Occupancy).
+
+**Standing answer added: a source that passes every schema gate can still fail on EGRESS.** pg_net reachability does NOT prove edge-runtime reachability — the two use different IP ranges and municipal WAFs block them differently. The recon path (pg_net) and the production path (edge function) must both be proven before a source counts as wireable. El Paso and Tampa are the two known instances.
