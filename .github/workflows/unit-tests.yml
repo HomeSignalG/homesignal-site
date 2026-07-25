@@ -47,5 +47,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      # The Video Producer / dashboard suites drive a real browser. Without
+      # playwright on the runner they take their "playwright not installed"
+      # skip path, so every runtime assertion silently passed without running.
+      # Installed into a scratch directory outside the repo so the no-bundler,
+      # no-package.json rule for the site itself still holds.
+      - name: Install playwright (browser-backed regression suites)
+        # Installed in the PARENT of the checkout: node resolves imports by
+        # walking up from the repo, so the suites find it without a
+        # package.json or node_modules ever appearing inside the site repo.
+        working-directory: ${{ github.workspace }}/..
+        run: |
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.56.0
+          npx playwright install --with-deps chromium
+      - name: Verify playwright is actually available to the suites
+        run: node -e "import('playwright').then(()=>console.log('playwright resolves')).catch(e=>{console.error('playwright MISSING — browser assertions would silently skip');process.exit(1)})"
       - name: Run all unit regression tests
         run: node scripts/run-unit-tests.mjs
