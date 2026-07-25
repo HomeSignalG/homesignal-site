@@ -1279,6 +1279,40 @@
    "recency_days": 365,
    "record_url_precision": "dataset",
    "_receipts": "2026-07-25 pg_net recon (ids 105302-105310): data.brla.gov Socrata 'EBR Building Permits' 7fq7-8j7r; FRESH max issueddate 2026-07-22, 142,347 rows. Native zip (NUMERIC -> zip_numeric) + lat/long columns. NO status column -> socrata status_const='approved' (issuance ledger; guarded by non-empty issueddate). permittype whitelist keeps New Building Permit (R/C) + Existing Bldg Remodel/Addition (R/C), drops Occupancy/Electrical/Gas/Generator/Plumbing/Sign/Fence noise at source (extra_where verified live). dataset_url precision (data.brla.gov/d/7fq7-8j7r). Coverage gated to LA/East Baton Rouge (28 modeled ZIP pages)."
+  },
+  {
+   "registry_id": "marin-county-building-permits",
+   "platform": "socrata",
+   "domain": "data.marincounty.gov",
+   "dataset_id": "mkbn-caye",
+   "dataset_url": "https://data.marincounty.gov/d/mkbn-caye",
+   "jurisdiction": "County of Marin",
+   "coverage": [
+    {
+     "state": "CA",
+     "county": "Marin"
+    }
+   ],
+   "column_map": {
+    "title": "description",
+    "type_source": "type_permit",
+    "file_date": "issued_date",
+    "address": "address",
+    "lat": "latitude",
+    "lng": "longitude",
+    "zip": "zipcode",
+    "case_number": "permit_number"
+   },
+   "status_to_bucket": {},
+   "status_const": "approved",
+   "type_map": {
+    "RESIDENTIAL": "Residential",
+    "COMMERCIAL": "Commercial"
+   },
+   "extra_where": "permit_category='All other Construction'",
+   "recency_days": 365,
+   "record_url_precision": "dataset",
+   "_receipts": "2026-07-25 pg_net recon (response ids 110467-110482): data.marincounty.gov Socrata 'Building Permits' mkbn-caye; FRESH max issued_date 2026-07-24T14:57 over 50,223 rows (min 2002-07-17). Native TEXT zipcode + latitude/longitude columns (sample row zipcode '94949', 38.0612464/-122.5434833) -> no zip_numeric, no spatial scoping needed. NO status column -> socrata status_const='approved' (issuance ledger, guarded by non-empty issued_date). CATEGORY AXIS: permit_work_class is a semicolon-joined multi-select whose values duplicate on trailing whitespace ('Land Develop; OtherLand Develop; Transportation; Health; ' vs the same string untrimmed) with 31,572 blank rows -> UNUSABLE as a verbatim whitelist. permit_category is clean, 4 values: Maintenance 20,961 / All other Construction 13,729 / blank 11,614 / Minor Improvement 3,919. Whitelist keeps ONLY 'All other Construction' (725 rows in the trailing 365d), verified by reading real descriptions: 'Detached A D U; Outdoor Bbq; Retaining Walls', 'Poles With Foundations For Athletic Field Lights At High School', 'Repair Fire Damaged Building', 'Replace Deck & Add Concrete Structural Beams', 'Voluntary Seismic Retrofit In Accordance W/ 2022 Cebc Ch A3'. DROPPED at source: 'Minor Improvement' = solar PV/battery installs, many carrying NO description at all ('PV INSTALL 7KW, 16 MODULES, 1 ESS'), and 'Maintenance' = water-heater/furnace/panel-upgrade/re-roof/window/EV-charger trades ('Remove & replace furnace like for like.', 'REMOVE AND REPLACE CLASS A COMP SHINGLE ROOF.') -- same trades-noise drop policy as the WA/MN/IL sources. Zero blank descriptions in the kept set (title always substantive); 6 of 725 lack coords and fall to the address geocode path. type_permit RESIDENTIAL 670 / COMMERCIAL 55 drives type_map. NO per-record URL column exists in the schema (permit_tracking_id / permit_number / unique_id only, no portal id triplet) -> dataset-precision record_url, the Boston/Philadelphia precedent. Coverage gated to CA/Marin (28 modeled ZIP pages; the dataset's 94952 Petaluma row plus the 94913 / '949' / 'UNKNOWN' junk ZIP values are not modeled Marin pages and are unreachable through the gate)."
   }
  ],
  "arcgis": [
