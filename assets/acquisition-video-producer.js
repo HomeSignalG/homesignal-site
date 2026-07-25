@@ -171,7 +171,8 @@
       speaker: state.speaker,
       transcriptRaw: state.transcriptRaw,
       parsed: state.parsed,
-      videoDataUrl: state.videoDataUrl || null,
+      // Source video is session-only (object URL). Persisting base64 video blows localStorage quota.
+      hasSourceVideo: !!(state.videoObjectUrl || state.videoDataUrl),
       statements: state.statements,
       storyboard: state.storyboard,
       updatedAt: new Date().toISOString(),
@@ -194,9 +195,9 @@
     syncFromForm();
     var list = loadProjects();
     var hasContent = !!(state.name || state.transcriptRaw || state.statements.length ||
-      state.storyboard.length || state.youtube || state.speaker || state.videoDataUrl);
+      state.storyboard.length || state.youtube || state.speaker || state.videoObjectUrl || state.videoDataUrl);
     var existsInList = !!(state.id && list.some(function (p) { return p.id === state.id; }));
-    if (existsInList || (hasContent && state.id)) persist();
+    if (existsInList || (hasContent && state.id)) safePersist();
     startNewDraft();
   }
 
@@ -296,7 +297,7 @@
         state.name = data.title;
       }
       renderTranscript();
-      persist();
+      safePersist();
       setStep("statements");
       document.querySelectorAll(".vp-step").forEach(function (b) {
         if (b.dataset.vpStep === "source") b.classList.add("done");
@@ -324,6 +325,21 @@
     renderProjectChips();
   }
 
+  function syncStateToForm() {
+    if ($("vp-project-name")) $("vp-project-name").value = state.name;
+    if ($("vp-youtube")) $("vp-youtube").value = state.youtube;
+    if ($("vp-speaker")) $("vp-speaker").value = state.speaker;
+    if ($("vp-transcript-paste")) $("vp-transcript-paste").value = state.transcriptRaw;
+    var vid = $("vp-video-preview");
+    if (vid && (state.videoObjectUrl || state.videoDataUrl)) {
+      vid.src = state.videoObjectUrl || state.videoDataUrl;
+      vid.style.display = "block";
+    } else if (vid) {
+      vid.removeAttribute("src");
+      vid.style.display = "none";
+    }
+  }
+
   function loadProject(rec) {
     if (state.videoObjectUrl) URL.revokeObjectURL(state.videoObjectUrl);
     state.id = rec.id;
@@ -337,19 +353,7 @@
     state.videoDataUrl = rec.videoDataUrl || null;
     state.videoObjectUrl = null;
 
-    if ($("vp-project-name")) $("vp-project-name").value = state.name;
-    if ($("vp-youtube")) $("vp-youtube").value = state.youtube;
-    if ($("vp-speaker")) $("vp-speaker").value = state.speaker;
-    if ($("vp-transcript-paste")) $("vp-transcript-paste").value = state.transcriptRaw;
-
-    var vid = $("vp-video-preview");
-    if (vid && state.videoDataUrl) {
-      vid.src = state.videoDataUrl;
-      vid.style.display = "block";
-    } else if (vid) {
-      vid.removeAttribute("src");
-      vid.style.display = "none";
-    }
+    syncStateToForm();
     renderTranscript();
     renderStatements();
     renderCommentary();
@@ -456,11 +460,19 @@
     });
   }
 
+  function invalidateStoryboard() {
+    if (!state.storyboard.length) return;
+    state.storyboard = [];
+    renderStoryboard();
+  }
+
   function safePersist() {
     try {
       persist();
+      return true;
     } catch (e) {
       console.error("Video Producer: could not save project to localStorage", e);
+      return false;
     }
   }
 
@@ -629,6 +641,30 @@
     if (track && typeof track.requestFrame === "function") track.requestFrame();
   }
 
+  function seekVideo(v, time) {
+    return new Promise(function (resolve) {
+      if (!v || !v.src) { resolve(); return; }
+      var target = Math.max(0, time || 0);
+      var onSeeked = function () {
+        v.removeEventListener("seeked", onSeeked);
+        resolve();
+      };
+      v.addEventListener("seeked", onSeeked);
+      v.pause();
+      try {
+        v.currentTime = target;
+      } catch (e) {
+        v.removeEventListener("seeked", onSeeked);
+        resolve();
+        return;
+      }
+      if (Math.abs(v.currentTime - target) < 0.05) {
+        v.removeEventListener("seeked", onSeeked);
+        resolve();
+      }
+    });
+  }
+
   function renderVideo(progressCb, doneCb) {
     var aspect = ($("vp-aspect") && $("vp-aspect").value) || "landscape";
     var w = aspect === "vertical" ? 1080 : 1920;
@@ -707,12 +743,14 @@
         if (f < frames) setTimeout(drawFrame, 1000 / fps);
         else { vi++; next(); }
       }
-      if ((item.type === "source_clip" || item.type === "resume") && $("vp-video-preview")) {
-        var v = $("vp-video-preview");
-        v.currentTime = item.start || 0;
-        v.play().catch(function () {});
+      function startFrames() {
+        drawFrame();
       }
-      drawFrame();
+      if ((item.type === "source_clip" || item.type === "resume") && $("vp-video-preview")) {
+        seekVideo($("vp-video-preview"), item.start || 0).then(startFrames);
+      } else {
+        startFrames();
+      }
     }
     next();
   }
@@ -817,6 +855,7 @@
       var rmStmt = e.target.closest && e.target.closest(".vp-remove-stmt");
       if (rmStmt && container.contains(rmStmt)) {
         state.statements.splice(parseInt(rmStmt.dataset.si, 10), 1);
+        invalidateStoryboard();
         safePersist();
         renderStatements();
         renderCommentary();
@@ -828,6 +867,10 @@
 
       if (el.id === "vp-analyze-transcript") {
         syncFromForm();
+        if (!state.transcriptRaw.trim()) {
+          alert("Paste or fetch a transcript first.");
+          return;
+        }
         state.parsed = parseTranscript(state.transcriptRaw);
         renderTranscript();
         safePersist();
@@ -840,8 +883,8 @@
         return;
       }
       if (el.id === "vp-save-project") {
-        safePersist();
-        alert("Project saved locally.");
+        if (safePersist()) alert("Project saved locally.");
+        else alert("Could not save project. Browser storage may be full — export JSON or remove old projects.");
         return;
       }
       if (el.id === "vp-new-project") {
@@ -863,6 +906,7 @@
           });
         });
         if ($("vp-statement-input")) $("vp-statement-input").value = "";
+        invalidateStoryboard();
         safePersist();
         renderStatements();
         renderCommentary();
@@ -883,6 +927,7 @@
           evidence: [],
         });
         safePersist();
+        invalidateStoryboard();
         renderStatements();
         renderCommentary();
         return;
@@ -896,6 +941,7 @@
         var bar = $("vp-render-bar");
         var status = $("vp-render-status");
         if (!state.storyboard.length) buildStoryboard();
+        if (bar) bar.style.width = "0%";
         el.disabled = true;
         if (status) status.textContent = "Rendering…";
         renderVideo(function (p) {
@@ -912,7 +958,7 @@
       }
       if (el.id === "vp-export-project") {
         syncFromForm();
-        var blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+        var blob = new Blob([JSON.stringify(projectRecordFromState(), null, 2)], { type: "application/json" });
         var a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = (state.name || "homesignal-video-project") + ".json";
@@ -945,12 +991,8 @@
         state.videoObjectUrl = URL.createObjectURL(vfile);
         var vid = $("vp-video-preview");
         if (vid) { vid.src = state.videoObjectUrl; vid.style.display = "block"; }
-        var vreader = new FileReader();
-        vreader.onload = function () {
-          state.videoDataUrl = vreader.result;
-          safePersist();
-        };
-        vreader.readAsDataURL(vfile);
+        state.videoDataUrl = null;
+        safePersist();
         return;
       }
       if (el.matches && el.matches('input[data-field="start"]')) {
@@ -1009,17 +1051,23 @@
     if (!$("video-producer-root")) return;
     ensureRenderLabel();
     ensureFetchTranscriptButton();
+    var activeStep = "source";
+    var activeBtn = document.querySelector(".vp-step.active");
+    if (activeBtn && activeBtn.dataset.vpStep) activeStep = activeBtn.dataset.vpStep;
     var list = loadProjects();
     var current = state.id && list.find(function (p) { return p.id === state.id; });
     if (current) loadProject(current);
     else if (list.length) loadProject(list[0]);
     else startNewDraft();
     if (container) wireEvents(container);
-    setStep("source");
+    setStep(activeStep);
   }
 
   function refreshVideoProducer() {
     if (!$("video-producer-root")) return;
+    ensureRenderLabel();
+    ensureFetchTranscriptButton();
+    syncStateToForm();
     renderProjectChips();
     renderTranscript();
     renderStatements();
@@ -1035,6 +1083,8 @@
     init: function (container, payload) {
       if (!container) return;
       if (!container.querySelector("#video-producer-root")) return;
+      ensureRenderLabel();
+      ensureFetchTranscriptButton();
       wireEvents(container);
       if (container.getAttribute("data-vp-initialized") === "1") {
         refreshVideoProducer();
