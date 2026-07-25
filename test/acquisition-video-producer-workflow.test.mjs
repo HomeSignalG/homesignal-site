@@ -131,8 +131,21 @@ try {
   await attachEvidence('a-proof.png');
   await buildStoryboard();
 
-  const sbCountA = await page.evaluate(() => document.querySelectorAll('#vp-storyboard-list .vp-sb-item').length);
-  ok(sbCountA >= 5, 'workflow A — storyboard has items after build');
+  // One statement builds the four commentary cards (alert / claim / evidence /
+  // commentary). It used to build seven because the builder also fabricated
+  // source_clip + freeze + resume placeholders that referenced no media and
+  // could not render; those are gone, so assert the REAL cards are present
+  // rather than a count that only held while the placeholders existed.
+  const sbA = await page.evaluate(() => ({
+    count: document.querySelectorAll('#vp-storyboard-list .vp-sb-item').length,
+    types: JSON.parse(localStorage.getItem('hs_video_projects_v1'))
+      .find((p) => p.name === 'Workflow A').storyboard.map((i) => i.type)
+  }));
+  ok(sbA.count >= 4, 'workflow A — storyboard has items after build (' + sbA.count + ')');
+  ok(['alert', 'claim', 'evidence', 'commentary'].every((t) => sbA.types.includes(t)),
+    'workflow A — storyboard contains the commentary cards: ' + JSON.stringify(sbA.types));
+  ok(!sbA.types.some((t) => t === 'source_clip' || t === 'resume'),
+    'workflow A — no fabricated source placeholders without media');
 
   await page.click('.vp-step[data-vp-step="source"]');
   await page.waitForFunction(() => document.getElementById('vp-panel-source')?.classList.contains('active'));
@@ -322,7 +335,8 @@ try {
     items: document.querySelectorAll('#vp-storyboard-list .vp-sb-item').length
   }));
   ok(mobile.scrollW <= mobile.clientW + 2, 'mobile — no horizontal overflow');
-  ok(mobile.items >= 5, 'mobile — storyboard builds at 390px width');
+  // 4 commentary cards per statement; see the Workflow A note above.
+  ok(mobile.items >= 4, 'mobile — storyboard builds at 390px width (' + mobile.items + ')');
   await page.setViewportSize({ width: 1280, height: 720 });
 
   // ------------------------------------------------------------------

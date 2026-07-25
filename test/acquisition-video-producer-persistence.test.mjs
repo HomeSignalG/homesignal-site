@@ -173,11 +173,13 @@ try {
     'reopened evidence states honestly that the preview is not stored');
   ok(reopened.statements === 1, 'reopened project restores its statements');
 
+  const storedStoryboardLen = JSON.parse(raw)[0].storyboard.length;
   const reopenedStoryboard = await page.evaluate(() => {
     document.querySelector('.vp-step[data-vp-step="storyboard"]').click();
     return document.querySelectorAll('#vp-storyboard-list .vp-sb-item').length;
   });
-  ok(reopenedStoryboard >= 5, 'reopening a saved project restores its storyboard (' + reopenedStoryboard + ' items)');
+  ok(storedStoryboardLen > 0 && reopenedStoryboard === storedStoryboardLen,
+    'reopening a saved project restores its storyboard exactly (' + reopenedStoryboard + '/' + storedStoryboardLen + ' items)');
 
   // ------------------------------------------------------------------
   // 3. Two projects never overwrite one another — saving B leaves A
@@ -239,7 +241,8 @@ try {
   ok(restoredA.name === 'Project A' && restoredA.speaker === 'Speaker A' &&
     restoredA.transcript === 'alpha bravo charlie',
     'switching back to A restores A');
-  ok(restoredA.storyboard >= 5, 'switching back to A restores A\'s storyboard');
+  ok(restoredA.storyboard === recA.storyboard.length && recA.storyboard.length > 0,
+    'switching back to A restores A\'s storyboard exactly (' + restoredA.storyboard + '/' + recA.storyboard.length + ')');
 
   // The storyboard button still works after a project switch.
   await page.click('#vp-build-storyboard');
