@@ -1178,6 +1178,109 @@
     "record_precision": "native per-record link column + native originalzip + latitude/longitude"
    }
   }
+,
+  {
+   "registry_id": "new-orleans-permits",
+   "platform": "socrata",
+   "domain": "data.nola.gov",
+   "dataset_id": "rcm3-fn58",
+   "dataset_url": "https://data.nola.gov/d/rcm3-fn58",
+   "jurisdiction": "City of New Orleans",
+   "coverage": [
+    {
+     "state": "LA",
+     "county": "Orleans"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "type",
+     "description"
+    ],
+    "status_raw": "currentstatus",
+    "type_source": "type",
+    "file_date": "issuedate",
+    "address": "address",
+    "lat": "location_1.latitude",
+    "lng": "location_1.longitude",
+    "case_number": "numstring"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Permit Issued",
+     "Permit Issuance - Active"
+    ],
+    "operating": [
+     "Certificate of Completion",
+     "Certificate of Occupancy",
+     "Finaled",
+     "Permit Finaled",
+     "Inspections Finaled",
+     "Inspection - Completed",
+     "Meter Release"
+    ],
+    "exclude": [
+     "Permit Expired",
+     "Permit Expired Due to Inactivity",
+     "Closed",
+     "VOIDED - Owner Changed Contractor"
+    ]
+   },
+   "type_map": {
+    "New Construction": "Development",
+    "Renovation (Structural)": "Development",
+    "Demolition": "Development",
+    "Accessory Structure": "Development"
+   },
+   "extra_where": "type in ('New Construction','Renovation (Structural)','Demolition','Accessory Structure')",
+   "recency_days": 365,
+   "spatial_zip_radius_mi": 3,
+   "spatial_point_col": "location_1",
+   "record_url_precision": "dataset",
+   "_receipts": "2026-07-25 pg_net recon (ids 105023-105031): data.nola.gov Socrata 'Permits' rcm3-fn58; FRESH max issuedate 2026-07-24; 345,113 rows. NO zip column -> spatial within_circle on the location_1 Point (records keep own per-parcel lat/lng, read via dot-path location_1.latitude/longitude). type whitelist keeps New Construction/Renovation (Structural)/Demolition/Accessory Structure, drops trades/solar/roofing/HVAC/electrical at source (extra_where verified live). currentstatus buckets verbatim. No per-record link column -> dataset_url precision (data.nola.gov/d/rcm3-fn58 -> 200). Coverage gated to LA/Orleans (20 modeled ZIP pages)."
+  },
+  {
+   "registry_id": "east-baton-rouge-building-permits",
+   "platform": "socrata",
+   "domain": "data.brla.gov",
+   "dataset_id": "7fq7-8j7r",
+   "dataset_url": "https://data.brla.gov/d/7fq7-8j7r",
+   "jurisdiction": "City of Baton Rouge / Parish of East Baton Rouge",
+   "coverage": [
+    {
+     "state": "LA",
+     "county": "East Baton Rouge"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "permittype",
+     "projectdescription"
+    ],
+    "type_source": "permittype",
+    "file_date": "issueddate",
+    "address": "streetaddress",
+    "lat": "lat",
+    "lng": "long",
+    "zip": "zip",
+    "case_number": "permitnumber"
+   },
+   "status_to_bucket": {},
+   "status_const": "approved",
+   "zip_numeric": true,
+   "type_map": {
+    "New Building Permit (R)": "Development",
+    "New Building Permit (C)": "Development",
+    "Existing Bldg - Remodel Only (R)": "Development",
+    "Existing Bldg - Remodel Only (C)": "Development",
+    "Existing Bldg - Addition Only (R)": "Development",
+    "Existing Bldg - Addition Only (C)": "Development"
+   },
+   "extra_where": "permittype in ('New Building Permit (R)','New Building Permit (C)','Existing Bldg - Remodel Only (R)','Existing Bldg - Remodel Only (C)','Existing Bldg - Addition Only (R)','Existing Bldg - Addition Only (C)')",
+   "recency_days": 365,
+   "record_url_precision": "dataset",
+   "_receipts": "2026-07-25 pg_net recon (ids 105302-105310): data.brla.gov Socrata 'EBR Building Permits' 7fq7-8j7r; FRESH max issueddate 2026-07-22, 142,347 rows. Native zip (NUMERIC -> zip_numeric) + lat/long columns. NO status column -> socrata status_const='approved' (issuance ledger; guarded by non-empty issueddate). permittype whitelist keeps New Building Permit (R/C) + Existing Bldg Remodel/Addition (R/C), drops Occupancy/Electrical/Gas/Generator/Plumbing/Sign/Fence noise at source (extra_where verified live). dataset_url precision (data.brla.gov/d/7fq7-8j7r). Coverage gated to LA/East Baton Rouge (28 modeled ZIP pages)."
+  }
  ],
  "arcgis": [
   {

@@ -39,7 +39,8 @@ export type ColumnRef = string | string[] | null;
 
 export interface ColumnMap {
   title: ColumnRef;
-  status_raw: ColumnRef;
+  /** Optional: omit for issuance ledgers with no status column (see entry.status_const). */
+  status_raw?: ColumnRef;
   type_source?: ColumnRef;
   file_date?: ColumnRef;
   decision_date?: ColumnRef;
@@ -79,6 +80,15 @@ export interface SocrataRegistryEntry {
    *  values first — same discipline as status_to_bucket). */
   type_map?: Record<string, string>;
   status_to_bucket: StatusToBucket;
+  /** For issuance ledgers with NO status column: assign this CONSTANT bucket to every row
+   *  that carries a non-empty file_date (evidence it was issued). Mirrors the arcgis
+   *  connector's status_const. column_map.status_raw may be omitted; a row missing its
+   *  file_date is still excluded (never publish a record with no issuance evidence). */
+  status_const?: "proposed" | "approved" | "operating";
+  /** true → the native zip column is a NUMBER, not text: filter with `zip=<digits>` instead of
+   *  `upper(zip)='<zip>'` (upper() on a numeric column is a Socrata type-mismatch 400). Absent/
+   *  false ⇒ prior text behavior. Only affects entries with a native zip column (not spatial). */
+  zip_numeric?: boolean;
   /** e.g. "https://…/{case_number}". Used only when column_map.record_url is absent. */
   record_url_template?: string;
   record_url_precision?: "record" | "dataset";
@@ -260,19 +270,35 @@ async function runEntry(
   report.fetched = rows.length;
 
   for (const row of rows) {
-    const statusRaw = String(readCol(row, entry.column_map.status_raw) ?? "").trim();
-    if (!statusRaw) { report.blank_status++; continue; }               // blank → exclude + count
-    const bucket = lookup.get(statusRaw);
-    if (bucket === undefined) {                                        // unmapped → exclude + FLAG
-      unmappedCount.set(statusRaw, (unmappedCount.get(statusRaw) ?? 0) + 1);
-      continue;
-    }
-    if (bucket === "exclude") {                                        // intended drop
-      excludeCount.set(statusRaw, (excludeCount.get(statusRaw) ?? 0) + 1);
-      continue;
+    const rawStatus = entry.column_map.status_raw
+      ? String(readCol(row, entry.column_map.status_raw) ?? "").trim() : "";
+    let statusRaw = rawStatus;
+    let bucket: Bucket | undefined;
+    if (!rawStatus) {
+      // No status value. status_const (issuance-ledger datasets with no status column)
+      // assigns a CONSTANT bucket, but ONLY when the row carries a file_date — evidence it
+      // was issued. No const, or no file_date → excluded as blank (fail-closed, as before).
+      const fileDate = entry.column_map.file_date
+        ? String(readCol(row, entry.column_map.file_date) ?? "").trim() : "";
+      if (entry.status_const && fileDate) {
+        statusRaw = entry.status_const;                                // surface const as the label
+        bucket = entry.status_const;
+      } else {
+        report.blank_status++; continue;                              // blank → exclude + count
+      }
+    } else {
+      bucket = lookup.get(rawStatus);
+      if (bucket === undefined) {                                      // unmapped → exclude + FLAG
+        unmappedCount.set(rawStatus, (unmappedCount.get(rawStatus) ?? 0) + 1);
+        continue;
+      }
+      if (bucket === "exclude") {                                      // intended drop
+        excludeCount.set(rawStatus, (excludeCount.get(rawStatus) ?? 0) + 1);
+        continue;
+      }
     }
 
-    const rec = await normalizeRow(row, entry, statusRaw, bucket, deps, report, zip);
+    const rec = await normalizeRow(row, entry, statusRaw, bucket as Exclude<Bucket, "exclude">, deps, report, zip);
     if (rec) records.push(rec);
   }
 
@@ -436,7 +462,9 @@ function buildWhere(entry: SocrataRegistryEntry, zip: string, zipCol: string, ce
   const spatial = (entry.spatial_zip_radius_mi ?? 0) > 0 && centroid && entry.spatial_point_col;
   const clauses = [spatial
     ? `within_circle(${entry.spatial_point_col}, ${centroid.lat}, ${centroid.lng}, ${Math.round((entry.spatial_zip_radius_mi as number) * 1609.34)})`
-    : `upper(${zipCol})='${zip.replace(/'/g, "''")}'`];
+    : (entry.zip_numeric
+        ? `${zipCol}=${zip.replace(/[^0-9]/g, "")}`               // numeric zip column: no upper(), no quotes
+        : `upper(${zipCol})='${zip.replace(/'/g, "''")}'`)];
   // extra_where (additive, data-driven — the arcgis connector's twin): a VERBATIM SoQL
   // clause ANDed into every query, used to drop noise types AT SOURCE (e.g. Seattle's
   // ECA/street-exception and roof permits). The connector never inspects it.
