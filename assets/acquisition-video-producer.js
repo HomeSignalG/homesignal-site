@@ -666,6 +666,19 @@
     });
   }
 
+  function pickRecorderMimeType() {
+    var types = ["video/webm;codecs=vp8", "video/webm;codecs=vp9", "video/webm"];
+    for (var i = 0; i < types.length; i++) {
+      if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(types[i])) return types[i];
+    }
+    return "";
+  }
+
+  function pumpCanvasFrame(stream) {
+    var track = stream && stream.getVideoTracks ? stream.getVideoTracks()[0] : null;
+    if (track && typeof track.requestFrame === "function") track.requestFrame();
+  }
+
   function renderVideo(progressCb, doneCb) {
     var aspect = ($("vp-aspect") && $("vp-aspect").value) || "landscape";
     var w = aspect === "vertical" ? 1080 : 1920;
@@ -676,18 +689,21 @@
     var ctx = canvas.getContext("2d");
     var items = state.storyboard.length ? state.storyboard : [{ type: "alert", title: "DEVELOPMENT ALERT", subtitle: "HomeSignal Intelligence" }];
     var total = items.length;
-    var fps = 30;
+    var fps = 24;
     var stream = canvas.captureStream(fps);
     var chunks = [];
     var recorder;
+    var mimeType = pickRecorderMimeType();
     try {
-      recorder = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp9", videoBitsPerSecond: 6000000 });
+      recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType: mimeType, videoBitsPerSecond: 4500000 })
+        : new MediaRecorder(stream);
     } catch (e) {
       try { recorder = new MediaRecorder(stream); } catch (e2) { doneCb(null, "MediaRecorder not supported in this browser."); return; }
     }
     recorder.ondataavailable = function (e) { if (e.data.size) chunks.push(e.data); };
     recorder.onstop = function () {
-      var blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
+      var blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "video/webm" });
       doneCb(blob.size ? blob : null, blob.size ? null : "Render produced an empty file. Try again in Chrome or Brave.");
     };
     recorder.start(250);
@@ -698,7 +714,7 @@
         setTimeout(function () {
           if (typeof recorder.requestData === "function") recorder.requestData();
           recorder.stop();
-        }, 400);
+        }, 800);
         return;
       }
       var item = items[vi];
@@ -736,8 +752,9 @@
           ctx.font = "24px sans-serif";
           wrapText(ctx, item.text, 40, h - 72, w - 80, 28);
         }
+        pumpCanvasFrame(stream);
         f++;
-        if (f < frames) requestAnimationFrame(drawFrame);
+        if (f < frames) setTimeout(drawFrame, 1000 / fps);
         else { vi++; next(); }
       }
       if ((item.type === "source_clip" || item.type === "resume") && $("vp-video-preview")) {
@@ -766,13 +783,32 @@
       return;
     }
     state.renderObjectUrl = URL.createObjectURL(blob);
+    state.renderBlob = blob;
     var url = state.renderObjectUrl;
+    var mime = blob.type || "video/webm";
     out.textContent = "";
     var video = document.createElement("video");
     video.controls = true;
-    video.src = url;
+    video.preload = "auto";
+    video.muted = true;
+    video.playsInline = true;
     video.setAttribute("playsinline", "");
+    var source = document.createElement("source");
+    source.src = url;
+    source.type = mime;
+    video.appendChild(source);
+    video.load();
+    var meta = document.createElement("p");
+    meta.className = "vp-hint";
+    meta.textContent = "Preview ready (" + Math.round(blob.size / 1024) + " KB). Press play if it does not start automatically.";
+    video.addEventListener("loadeddata", function () {
+      video.play().catch(function () {});
+    });
+    video.addEventListener("error", function () {
+      meta.textContent = "Preview could not play in this browser. Use Download WebM and open the file in VLC or QuickTime.";
+    });
     out.appendChild(video);
+    out.appendChild(meta);
     var hint = document.createElement("p");
     hint.className = "vp-hint";
     var dl = document.createElement("button");
