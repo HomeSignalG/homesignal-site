@@ -90,7 +90,7 @@ const POSITIVE = [
   ['Riverside Resort', 'commercial'],
   ['Ross Retail Center', 'commercial'],
   ['BURCH DRIVE BUSINESS PARK', 'commercial'],
-  ['AAA STORAGE HWY 71 EAST', 'commercial'],
+  ['AAA Self-Storage Facility', 'commercial'],
   ['J.P. CAR WASHES', 'commercial'],
   ['BERGSTROM EAST COMMERCIAL SUBDIVISION', 'commercial'],   // commercial beats subdivision
   ['Austin Granite Warehouse', 'industrial'],
@@ -116,6 +116,16 @@ const NEGATIVE = [
   'COTA Land',
   'Velocity Crossing',
   'APAC Texas-Buck',
+  // Cross-state false positives found in the national audit — must NOT classify:
+  '2760 Gattis School Rd - Rezoning',                       // street name, not a school
+  '4001 Smith School Road',                                 // street name
+  'Special Event: Water Safety Day Held By Aqua Ducks Swim School',  // private business
+  'Change of Use of Land to Trade School (Truck Driving) School',    // private business
+  'Acton Business School',                                  // private business
+  'Accessory Structure 10x10 Accessory Storage Shed in backyard',    // residential shed
+  'Attached Garage addition with unconditioned storage above',       // residential
+  '720 sq ft Detached Pole Building for Workshop and Personal Storage',
+  'AAA STORAGE HWY 71 EAST',                                // states no storage NOUN
 ];
 for (const name of NEGATIVE) {
   const m = M({ type: 'unclassified', status: 'Approved', name });
