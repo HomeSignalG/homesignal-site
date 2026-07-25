@@ -688,14 +688,17 @@
     recorder.ondataavailable = function (e) { if (e.data.size) chunks.push(e.data); };
     recorder.onstop = function () {
       var blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
-      doneCb(blob, null);
+      doneCb(blob.size ? blob : null, blob.size ? null : "Render produced an empty file. Try again in Chrome or Brave.");
     };
-    recorder.start();
+    recorder.start(250);
 
     var vi = 0;
     function next() {
       if (vi >= total) {
-        setTimeout(function () { recorder.stop(); }, 400);
+        setTimeout(function () {
+          if (typeof recorder.requestData === "function") recorder.requestData();
+          recorder.stop();
+        }, 400);
         return;
       }
       var item = items[vi];
@@ -745,6 +748,48 @@
       drawFrame();
     }
     next();
+  }
+
+  function clearRenderOutput() {
+    if (state.renderObjectUrl) {
+      URL.revokeObjectURL(state.renderObjectUrl);
+      state.renderObjectUrl = null;
+    }
+  }
+
+  function showRenderOutput(blob) {
+    var out = $("vp-render-out");
+    if (!out) return;
+    clearRenderOutput();
+    if (!blob || !blob.size) {
+      out.innerHTML = '<p class="vp-hint">Render produced an empty file. Try again in Chrome or Brave.</p>';
+      return;
+    }
+    state.renderObjectUrl = URL.createObjectURL(blob);
+    var url = state.renderObjectUrl;
+    out.textContent = "";
+    var video = document.createElement("video");
+    video.controls = true;
+    video.src = url;
+    video.setAttribute("playsinline", "");
+    out.appendChild(video);
+    var hint = document.createElement("p");
+    hint.className = "vp-hint";
+    var dl = document.createElement("button");
+    dl.type = "button";
+    dl.className = "vp-btn secondary";
+    dl.textContent = "Download WebM";
+    dl.addEventListener("click", function () {
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = (state.name || "homesignal-video").replace(/[^\w.-]+/g, "-") + ".webm";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+    hint.appendChild(dl);
+    hint.appendChild(document.createTextNode(" — browser preview export (WebM only)."));
+    out.appendChild(hint);
   }
 
   function wireEvents() {
@@ -875,10 +920,7 @@
         if (err) { if (status) status.textContent = err; return; }
         if (bar) bar.style.width = "100%";
         if (status) status.textContent = "Render complete. Download or preview below.";
-        if (out) {
-          var url = URL.createObjectURL(blob);
-          out.innerHTML = '<video controls src="' + url + '"></video><p class="vp-hint"><a href="' + url + '" download="homesignal-video.webm">Download WebM</a> — browser preview export (WebM only).</p>';
-        }
+        showRenderOutput(blob);
         document.querySelectorAll(".vp-step").forEach(function (b) {
           if (b.dataset.vpStep === "render") b.classList.add("done");
         });
