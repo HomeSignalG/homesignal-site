@@ -1177,8 +1177,7 @@
     "types": "permittypemapped Building 44,298 + Wrecking 5,703 kept; HVAC/Plumbing/Signs/Elevator/Fire/Excavation-Fill/Repair/Fences/Parking/Misc/Temp/CoO dropped at source",
     "record_precision": "native per-record link column + native originalzip + latitude/longitude"
    }
-  }
-,
+  },
   {
    "registry_id": "new-orleans-permits",
    "platform": "socrata",
@@ -2811,7 +2810,7 @@
    "coverage": [
     {
      "state": "MD",
-     "county": "Baltimore County"
+     "county": "Baltimore"
     }
    ],
    "column_map": {
@@ -3214,8 +3213,7 @@
    "record_url_template": "https://www.cityofmadison.com/dpced/planning/development.cfm?record={case_number}",
    "record_url_precision": "record",
    "_receipts": "Restored 2026-07-24 (connector was deployed-but-never-committed; accidentally dropped 2026-07-17 when the engine was rebuilt from committed source, freezing 20 Dane County ZIP pages). Live-reverified 2026-07-24 via pg_net: layer 0 'Current Planning Project Points' HTTP 200, esriGeometryPoint, 598 features; all identified fields present (RECORD_RecordID/RECORD_Status/Project_Description/ProjectURL/DATES_SubmittedDate/APO_ADDRESS_PARTIAL_LINE). NO ZIP attribute anywhere -> spatial_zip_radius_mi=3 (the engine's standard ZIP approximation; records keep their OWN per-parcel point geometry). Radius recovered exactly from the 2,452-record golden set (502 distinct projects x 20 ZIPs): box-membership fit gives R in [3.0026, 3.0028) -> 3 mi. status_to_bucket + buckets recovered verbatim from the golden set (13 statuses, exact commas). The 3 upstream statuses absent from the golden set (Approval(s) expired / Inactive / Placed on File or Denied = lapsed/dead/denied projects) are enumerated in exclude[] so the run report stays clean and any FUTURE new status surfaces as unmapped for triage. Web_Planning_Project is 'Y' on all 598 rows (no-op filter, omitted). ProjectURL populated on 100% of rows (0 blank) and equals the record_url_template of RECORD_RecordID on all 502 golden cases -> template is the observed canonical format (record precision), pure insurance. No recency filter (planning projects kept regardless of age; golden spans 2015+). No type_map (all records use_type 'unclassified', matching the golden set)."
-  }
-,
+  },
   {
    "registry_id": "raleigh-building-permits",
    "platform": "arcgis",
@@ -3347,6 +3345,220 @@
    "spatial_zip_radius_mi": 3,
    "record_url_precision": "record",
    "_receipts": "2026-07-25 pg_net recon (ids 106384-106398): Wake County's own AGS (maps.wake.gov Inspections/Building_Permits); FRESH max ISSUE_DATE 2026-07-23 (epoch 1784764800000), 196,060 rows. PERMIT_STATUS 18 values VERBATIM via groupBy counts (Complete 158,292 / Void 11,844 / Withdrawn 9,573 / Expired 7,246 / Issued 7,072 / In Review 1,410 / ...). PERMIT_TYPE 5 values, all real construction (no trades) - all kept. PER-RECORD LINK column -> Tyler EnerGov citizen-access URL (record precision, live sample verified). Geometry NC state-plane reprojected by the connector's outSR=4326 -> __lat/__lng. MAILING_* is the only address block (site-vs-mailing ambiguity) -> spatial_zip_radius_mi scoping on geometry, zip column NOT mapped (never guess). file_date=APPLICATION_DATE keeps pre-issuance applications visible. Coverage NC/Wake (39 modeled ZIP pages)."
+  },
+  {
+   "registry_id": "miami-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://services1.arcgis.com/CvuPhqcTQpZPT9qY/arcgis/rest/services/Building_Permits_Since_2014/FeatureServer/0",
+   "dataset_url": "https://www.arcgis.com/home/item.html?id=564477f647634c94a6588d1f57597b30",
+   "jurisdiction": "City of Miami",
+   "coverage": [
+    {
+     "state": "FL",
+     "county": "Miami-Dade"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "ScopeofWork",
+     "DeliveryAddress"
+    ],
+    "status_raw": "BuildingPermitStatusDescription",
+    "type_source": "ScopeofWork",
+    "file_date": "IssuedDate",
+    "address": "DeliveryAddress",
+    "lat": "Latitude",
+    "lng": "Longitude",
+    "case_number": "PermitNumber"
+   },
+   "type_map": {
+    "NEW CONSTRUCTION": "Development",
+    "ADDITION AND REMODELING": "Development",
+    "DEMOLITION": "Development",
+    "PHASED PERMIT": "Development"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Active"
+    ],
+    "operating": [
+     "Final"
+    ],
+    "exclude": [
+     "Revoked",
+     "Expired",
+     "Hold"
+    ]
+   },
+   "extra_where": "ScopeofWork in ('NEW CONSTRUCTION','ADDITION AND REMODELING','DEMOLITION','PHASED PERMIT')",
+   "recency_days": 365,
+   "spatial_zip_radius_mi": 1.5,
+   "record_url_precision": "dataset",
+   "_receipts": "2026-07-25 pg_net recon (ids 108007/108017/108024/108025): City of Miami 'Building Permits Since 2014' on Esri-hosted AGO (services1.arcgis.com - NOT the city's slow own-host that the FL wire pass rejected). FRESH max IssuedDate 2026-07-25 (same-day). Per-record Latitude/Longitude + PermitNumber + DeliveryAddress; Miami21Zone field confirms City of Miami. 5 verbatim statuses via groupBy: Final 197,698 / Active 19,253 / Revoked 5,271 / Expired 4,954 / Hold 628. 22 verbatim ScopeofWork values via groupBy; whitelist keeps NEW CONSTRUCTION 50,060 + REMODELING/REPAIRS 87,760 + ADDITION AND REMODELING 12,315 + DEMOLITION 8,520 + PHASED PERMIT 648, drops ELECTRICAL/MECHANICAL/PLUMBING/ROOFING/SIGN/ELEVATOR/TREE/SPECIAL EVENTS at source. NO site-ZIP column (CompanyZip is the contractor's) -> spatial_zip_radius_mi. No per-record link column -> dataset precision. Coverage FL/Miami-Dade (80 dev-empty ZIP pages). VOLUME CORRECTION 2026-07-25: the first live cache of 33130 produced 14,933 dev records / 13 MB in one row - 3.7x the known 3.5 MB dense-metro ceiling (Minneapolis 55407) and not servable to the page. Measured cause: 22,045 whitelisted permits city-wide in the last 365 days, and a 3-mi circle from a small dense downtown ZIP centroid spans most of the City of Miami. Two evidence-backed corrections: (a) spatial_zip_radius_mi 3 -> 1.5 because downtown Miami ZIPs are physically small and a 3-mi circle over-includes, which HURTS ZIP-level relevance; (b) dropped the generic REMODELING/REPAIRS bucket (10,545 of the 22,045/yr) as high-volume minor alteration work - the substantive alteration bucket ADDITION AND REMODELING 1,892 is RETAINED, as are NEW CONSTRUCTION 8,323 / DEMOLITION 1,161 / PHASED PERMIT 124 (Boston Short-Form-drop precedent). Single-entry revert restores it if the founder wants the wider set."
+  },
+  {
+   "registry_id": "tempe-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://services.arcgis.com/lQySeXwbBg53XWDi/arcgis/rest/services/building_permits/FeatureServer/0",
+   "dataset_url": "https://data-tempegov.opendata.arcgis.com/",
+   "jurisdiction": "City of Tempe",
+   "coverage": [
+    {
+     "state": "AZ",
+     "county": "Maricopa"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "PermitTypeDesc",
+     "Description"
+    ],
+    "status_raw": "StatusCurrent",
+    "type_source": "PermitTypeDesc",
+    "file_date": "IssuedDate",
+    "address": "OriginalAddress1",
+    "zip": "OriginalZip",
+    "lat": "Latitude",
+    "lng": "Longitude",
+    "case_number": "PermitNum"
+   },
+   "type_map": {
+    "Building Permit": "Development",
+    "Single Family Residential Permit": "Residential"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Issued",
+     "Ready for Issuance",
+     "Ready to Issue",
+     "Standard"
+    ],
+    "operating": [
+     "Final",
+     "Finaled",
+     "CofO Issued",
+     "TCO Issued",
+     "Closed"
+    ],
+    "proposed": [
+     "Applied"
+    ],
+    "exclude": [
+     "Expired",
+     "Revoked"
+    ]
+   },
+   "extra_where": "PermitTypeDesc in ('Building Permit','Single Family Residential Permit') AND IssuedDate >= '2025-01-01'",
+   "record_url_precision": "dataset",
+   "_receipts": "2026-07-25 pg_net recon (ids 108011/108019/108026/108027): City of Tempe 'Building Permit' AGO service, BLDS-shaped. FRESH max IssuedDate 2026-07-24. Native OriginalZip + per-record Latitude/Longitude (wkid 4326). 12 verbatim StatusCurrent values via groupBy (Final 9,985 / Issued 4,286 / Expired 2,144 / CofO Issued 1,809 / Closed 1,203 / Applied 156 / ...). 11 verbatim PermitTypeDesc values; whitelist keeps Building Permit 16,684 + Single Family Residential Permit 345, drops Water/Sewer/Drainage/Paving/Street Lights/Underground Fire engineering permits at source. IssuedDate is esriFieldTypeSTRING (ISO yyyy-mm-dd) so recency rides in extra_where as a lexical compare, NEVER recency_days' DATE literal (Anaheim precedent). Coverage AZ/Maricopa (99 dev-empty ZIP pages; Mesa+Scottsdale already wired, Tempe is additive)."
+  },
+  {
+   "registry_id": "irving-development-permits",
+   "platform": "arcgis",
+   "service_url": "https://services3.arcgis.com/OfsJXUlu8pSkbl7B/arcgis/rest/services/Pending_Cases_and_Development_Activity/FeatureServer/2",
+   "dataset_url": "https://www.arcgis.com/home/item.html?id=564477f647634c94a6588d1f57597b30",
+   "jurisdiction": "City of Irving",
+   "coverage": [
+    {
+     "state": "TX",
+     "county": "Dallas"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "Project",
+     "StName"
+    ],
+    "status_raw": "Status",
+    "file_date": "Applied",
+    "decision_date": "Issued",
+    "address": [
+     "StNum",
+     "StDir",
+     "StName"
+    ],
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "Permit"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "APPROVED",
+     "UNDER CONSTRUCTION"
+    ],
+    "operating": [
+     "FINALED"
+    ],
+    "proposed": [
+     "APPLICATION"
+    ],
+    "exclude": [
+     "CANCELLED",
+     "EXPIRED",
+     "SEE 2024-12-9925"
+    ]
+   },
+   "spatial_zip_radius_mi": 3,
+   "record_url_precision": "dataset",
+   "_receipts": "2026-07-25 pg_net recon (ids 108016/108023/108031/108032): City of Irving (Dallas County) 'Development Permit Activity' = layer 2 of the Pending_Cases_and_Development_Activity FeatureServer (layer 0 is Municipal Boundary - the corpus hit pointed at the service root, the permit layer is 2). Point geometry. FRESH max Issued 2026-06-15; real project records e.g. Permit 2026-05-3542 'COI FLEET MAINTENACE BLDG ADDN, PH 3' UNDER CONSTRUCTION $3.78M, 'GATEWAY COMMERCE BLDG 1 (SHELL OFC/WHSE)' $8.04M. 7 verbatim Status values via groupBy: UNDER CONSTRUCTION 72 / FINALED 69 / APPLICATION 43 / EXPIRED 15 / CANCELLED 2 / APPROVED 1 / 'SEE 2024-12-9925' 1 (a data-entry artifact, excluded). 203 rows total - this is Irving's MAJOR-development tracker, not an all-permits ledger, so no recency window is applied (all rows are current development activity). No ZIP column -> spatial_zip_radius_mi. No type column -> type_map omitted (records stay use_type unclassified rather than guessed). Coverage TX/Dallas (174 dev-empty ZIP pages; Irving covers its own footprint)."
+  },
+  {
+   "registry_id": "las-vegas-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://services1.arcgis.com/F1v0ufATbBQScMtY/arcgis/rest/services/OpenData_Building_Permits_/FeatureServer/0",
+   "dataset_url": "https://opendataportal-lasvegas.hub.arcgis.com/",
+   "jurisdiction": "City of Las Vegas",
+   "coverage": [
+    {
+     "state": "NV",
+     "county": "Clark"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "WORKTYPE",
+     "ADDR1"
+    ],
+    "status_raw": "BLDGAPPLSTATUS",
+    "type_source": "WORKTYPE",
+    "file_date": "ISSDTTM",
+    "address": [
+     "ADDR1",
+     "CITY",
+     "STATE"
+    ],
+    "case_number": "APNO"
+   },
+   "zip_where_template": "ZIP LIKE '{zip}%'",
+   "type_map": {
+    "Building": "Development",
+    "ProdHome": "Residential",
+    "MultiFam": "Residential",
+    "Model": "Residential",
+    "TI": "Development",
+    "Grading": "Development"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Issued",
+     "Accepted",
+     "Open"
+    ],
+    "operating": [
+     "Closed"
+    ],
+    "exclude": [
+     "Expired",
+     "Cancelled",
+     "Stop Work",
+     "Withdrawn",
+     "Hold"
+    ]
+   },
+   "extra_where": "WORKTYPE in ('Building','ProdHome','MultiFam','Model','TI','Grading')",
+   "recency_days": 365,
+   "record_url_precision": "dataset",
+   "_receipts": "2026-07-25 pg_net recon (ids 108028-108035): City of Las Vegas 'Building Permits' (OpenData_Building_Permits_, Building_Permits_MV) - the CURRENT service; the org's other hits are 'Building Permits Archived'/'Historical Building Permits' (rejected) and CLV_BLDG_OFFSITE_EXP (water-district offsite work orders, rejected). FRESH max ISSDTTM 2026-07-16 over 435,245 rows. 9 verbatim BLDGAPPLSTATUS values via groupBy: Closed 287,872 / Issued 91,308 / Expired 51,381 / Cancelled 2,565 / Stop Work 2,034 / Open 47 / Withdrawn 19 / Hold 14 / Accepted 5. APTYPE|WORKTYPE enumerated via groupBy; whitelist keeps Building (Res 9,106 + Com 8,901), ProdHome 34,341, MultiFam 891, Model 149, TI 13,941, Grading 949 - drops OTC 272,711 over-the-counter minor work plus Electrical/Plumbing/Mechanical/Patio/PoolSpa/WallFence/Sign/Disaster/AVI at source. Layer is a geometry-less TABLE (geom=NONE) with NO lat/lng columns -> records geocode from ADDR1+CITY+STATE through the engine's Census path under GEOCODE_FENCE_MI (a fence miss NULLs coords, never fabricates). Native site ZIP is ZIP+4 in places (e.g. '89145-5247') so scoping uses zip_where_template LIKE '<zip>%' (Philadelphia ZIP+4 precedent), not an exact match. Coverage NV/Clark (76 dev-empty ZIP pages)."
   }
  ],
  "ckan": [
