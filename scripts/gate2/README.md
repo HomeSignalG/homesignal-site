@@ -136,3 +136,30 @@ restFacs)` — lib/map.js's own documented authority for "which records every re
 surface plots and what symbol each gets" — instead of `__HS_MAP.items`. Expose its inputs
 via a harness-owned wrapper on reserveFacilitySlots/restAfterLetters, assert the returned
 set is 39, then re-run Step 6 per-record parity over that set.
+
+## STEPS A–E RESULT — SAMPLE PARITY PASS
+
+### Step A — canonical inventory identified and proven (stepA.mjs)
+
+| candidate | count | relationship |
+|---|---:|---|
+| `__HS_MAP.items` | 16 | the LETTERED cap set only — `reserveFacilitySlots(cap:16)` output. NOT canonical. |
+| `visible` (arg 1 to reserveFacilitySlots) | 33 | every development record after filtering |
+| `facs` (arg 2) | 6 | every facility |
+| `restAfterLetters(visible, lettered)` | 21 | development beyond the letters (canvas layer, no DOM nodes) |
+| `__HS_MAP.restFacTotal` | 0 | no facilities beyond the nearest set |
+| **`visible` ∪ `facs`** | **39** | **CANONICAL** — corroborated by the page's own `__HS_MAP.focusMarkerCount = focusExpected = 39`, `complete: true` |
+
+### Step B — partition, zero unexplained loss
+
+    39 source rows -> 39 canonical plotted
+       16 lettered (12 dev + 4 fac)
+     + 21 rest-layer development
+     +  2 unlettered facilities
+     = 39      unexplained_loss: 0
+
+### Steps C–E — three-mode parity over the canonical inventory
+
+39/39 records compared by stable source identity (`source_ref`). Identical ID set in all
+three modes. **0 mismatches** on kind, category, symbol, lifecycle, evidence URL, filter
+membership, colour and popup title. 0 console errors, 0 page errors.
