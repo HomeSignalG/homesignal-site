@@ -148,7 +148,56 @@
   }
 
   function saveProjects(list) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    } catch (e) {
+      console.error("Video Producer: could not save projects to localStorage", e);
+      throw e;
+    }
+  }
+
+  function resetFileInputs() {
+    ["vp-transcript-file", "vp-source-video"].forEach(function (id) {
+      var el = $(id);
+      if (el) el.value = "";
+    });
+  }
+
+  function projectRecordFromState() {
+    return {
+      id: state.id,
+      name: state.name,
+      youtube: state.youtube,
+      speaker: state.speaker,
+      transcriptRaw: state.transcriptRaw,
+      parsed: state.parsed,
+      videoDataUrl: state.videoDataUrl || null,
+      statements: state.statements,
+      storyboard: state.storyboard,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  function startNewDraft() {
+    var list = loadProjects();
+    var freshId = uid();
+    while (list.some(function (p) { return p.id === freshId; })) freshId = uid();
+    var fresh = blankProject();
+    fresh.id = freshId;
+    loadProject(fresh);
+    resetFileInputs();
+    setStep("source");
+    renderProjectChips();
+  }
+
+  function startNewProject() {
+    syncFromForm();
+    var list = loadProjects();
+    var hasContent = !!(state.name || state.transcriptRaw || state.statements.length ||
+      state.storyboard.length || state.youtube || state.speaker || state.videoDataUrl);
+    var existsInList = !!(state.id && list.some(function (p) { return p.id === state.id; }));
+    if (existsInList || (hasContent && state.id)) persist();
+    startNewDraft();
   }
 
   var state = {
@@ -187,22 +236,12 @@
 
   function persist() {
     syncFromForm();
+    if (!state.id) state.id = uid();
     var list = loadProjects();
-    var rec = {
-      id: state.id || uid(),
-      name: state.name,
-      youtube: state.youtube,
-      speaker: state.speaker,
-      transcriptRaw: state.transcriptRaw,
-      parsed: state.parsed,
-      videoDataUrl: state.videoDataUrl || null,
-      statements: state.statements,
-      storyboard: state.storyboard,
-      updatedAt: new Date().toISOString(),
-    };
-    state.id = rec.id;
+    var rec = projectRecordFromState();
     var ix = list.findIndex(function (p) { return p.id === rec.id; });
-    if (ix >= 0) list[ix] = rec; else list.push(rec);
+    if (ix >= 0) list[ix] = rec;
+    else list.push(rec);
     saveProjects(list);
     renderProjectChips();
   }
@@ -652,10 +691,7 @@
     if (saveBtn) saveBtn.addEventListener("click", function () { persist(); alert("Project saved locally."); });
 
     var newBtn = $("vp-new-project");
-    if (newBtn) newBtn.addEventListener("click", function () {
-      loadProject(blankProject());
-      if ($("vp-transcript-paste")) $("vp-transcript-paste").value = "";
-    });
+    if (newBtn) newBtn.addEventListener("click", startNewProject);
 
     var tFile = $("vp-transcript-file");
     if (tFile) tFile.addEventListener("change", function () {
@@ -790,10 +826,7 @@
     ensureRenderLabel();
     var list = loadProjects();
     if (list.length) loadProject(list[0]);
-    else {
-      state.id = uid();
-      renderProjectChips();
-    }
+    else startNewDraft();
     wireEvents();
     setStep("source");
   }
