@@ -297,6 +297,7 @@
       }
       renderTranscript();
       persist();
+      setStep("statements");
       document.querySelectorAll(".vp-step").forEach(function (b) {
         if (b.dataset.vpStep === "source") b.classList.add("done");
       });
@@ -759,6 +760,7 @@
       state.parsed = parseTranscript(state.transcriptRaw);
       renderTranscript();
       persist();
+      setStep("statements");
       document.querySelectorAll(".vp-step").forEach(function (b) {
         if (b.dataset.vpStep === "source") b.classList.add("done");
       });
