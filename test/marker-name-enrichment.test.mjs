@@ -63,10 +63,12 @@ ok(shape('Development', 'Building Permit General-Express-Building Construction:8
 // ── 3. Precedence invariants ────────────────────────────────────────────────────────
 // A SPECIFIC source type is never reinterpreted by the name.
 ok(shape('Residential', 'Commercial building fit-out') === 'pentagon', 'specific type Residential wins over a commercial-sounding name');
-// Civic/Public is a GENERIC bucket per #373's merged GENERIC_EXACT decision (non-
-// terminal), so a civic record with residential class text may refine — pinned here
-// so the semantics are explicit, not accidental.
-ok(shape('Civic/Public', 'Residential shelter renovation') === 'pentagon', 'Civic/Public is generic (#373 GENERIC_EXACT) — name may refine');
+// Civic/Public is now a FIRST-CLASS category with its own legend row and `cross`
+// symbol (maps-backbone repair), so it is TERMINAL: a source that states "this is a
+// civic/public project" is not reinterpreted by words in the project's name. Before
+// the repair it sat in GENERIC_EXACT and was relabelled "Other project" — a real
+// category the legend never explained.
+ok(shape('Civic/Public', 'Residential shelter renovation') === 'cross', 'Civic/Public is terminal — a stated civic type is never re-read from the name');
 ok(shape('Industrial', 'Residential-adjacent warehouse') === 'triangle', 'specific Industrial type wins');
 // Facilities untouched: explicit flag only, always purple square.
 const fac = HS.resolveMarker({ type: 'industrial', name: 'Residential Water Treatment Co', record_kind: 'facility', status: 'Operating' });
