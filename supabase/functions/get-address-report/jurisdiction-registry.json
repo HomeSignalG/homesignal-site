@@ -3560,6 +3560,141 @@
    "record_url_precision": "dataset",
    "_receipts": "2026-07-25 pg_net recon (ids 108028-108035): City of Las Vegas 'Building Permits' (OpenData_Building_Permits_, Building_Permits_MV) - the CURRENT service; the org's other hits are 'Building Permits Archived'/'Historical Building Permits' (rejected) and CLV_BLDG_OFFSITE_EXP (water-district offsite work orders, rejected). FRESH max ISSDTTM 2026-07-16 over 435,245 rows. 9 verbatim BLDGAPPLSTATUS values via groupBy: Closed 287,872 / Issued 91,308 / Expired 51,381 / Cancelled 2,565 / Stop Work 2,034 / Open 47 / Withdrawn 19 / Hold 14 / Accepted 5. APTYPE|WORKTYPE enumerated via groupBy; whitelist keeps Building (Res 9,106 + Com 8,901), ProdHome 34,341, MultiFam 891, Model 149, TI 13,941, Grading 949 - drops OTC 272,711 over-the-counter minor work plus Electrical/Plumbing/Mechanical/Patio/PoolSpa/WallFence/Sign/Disaster/AVI at source. Layer is a geometry-less TABLE (geom=NONE) with NO lat/lng columns -> records geocode from ADDR1+CITY+STATE through the engine's Census path under GEOCODE_FENCE_MI (a fence miss NULLs coords, never fabricates). Native site ZIP is ZIP+4 in places (e.g. '89145-5247') so scoping uses zip_where_template LIKE '<zip>%' (Philadelphia ZIP+4 precedent), not an exact match. Coverage NV/Clark (76 dev-empty ZIP pages)."
   }
+,
+  {
+   "registry_id": "hartford-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://utility.arcgis.com/usrsvcs/servers/d595ae995fb049d3ac54919ebf24b1ac/rest/services/HartfordOpenDataTables/FeatureServer/0",
+   "dataset_url": "https://data.hartford.gov/",
+   "jurisdiction": "City of Hartford",
+   "coverage": [
+    {
+     "state": "CT",
+     "county": "Hartford"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "RECORD_TYPE_TYPE",
+     "DESCRIPTION"
+    ],
+    "status_raw": "RECORD_STATUS",
+    "type_source": "RECORD_TYPE_TYPE",
+    "file_date": "DateIssued",
+    "address": "PROPERTY_ADDRESS",
+    "zip": "PROPERTY_ZIP",
+    "case_number": "RECORD_ID"
+   },
+   "type_map": {
+    "Commercial": "Development",
+    "Residential": "Residential"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Issued",
+     "Ready to Issue",
+     "Accepted",
+     "TCO Issued"
+    ],
+    "operating": [
+     "Closed - Complete",
+     "Closed",
+     "Final Inspection Complete",
+     "Complete",
+     "Closed - Paid",
+     "Closed - Inspection Complete",
+     "Closed - Approved"
+    ],
+    "proposed": [
+     "In Progress",
+     "In Review",
+     "Pending",
+     "Additional Info Required",
+     "Inspections In Progress",
+     "Inspection Phase",
+     "Inspection in Progress",
+     "Work in Progress",
+     "Pending CO",
+     "Pending FMO Review",
+     "Assigned",
+     "Corrections Required",
+     "Revisions Received",
+     "Revisions Required"
+    ],
+    "exclude": [
+     "Closed - Denied",
+     "Closed - Withdrawn",
+     "Closed - Incomplete",
+     "Closed - Insufficient Info",
+     "Denied",
+     "Denied - Planning",
+     "Hold",
+     "Permit Expired",
+     "Closed - Duplicate",
+     "Incomplete Submission"
+    ]
+   },
+   "extra_where": "RECORD_TYPE_TYPE in ('Commercial','Residential')",
+   "recency_days": 365,
+   "record_url_precision": "dataset",
+   "_receipts": "2026-07-25 pg_net recon (ids 109083/109089/109090/109091/109092): City of Hartford open-data 'Building Permits 20200101 to Current' (owner HartfordData - authoritative first-party). FRESH max DateIssued 2026-06-29 over 35,691 rows - this SUPERSEDES the CT wire pass's rejection, which was based on Hartford's decommissioned SOCRATA portal, not this ArcGIS service. 36 verbatim RECORD_STATUS values via groupBy (Issued 14,547 / Closed-Complete 6,145 / Closed 5,209 / Final Inspection Complete 5,144 / Closed-Denied 1,258 / ...) all mapped explicitly; 7 verbatim RECORD_TYPE_TYPE values, whitelist keeps Commercial 23,369 + Residential 10,438 and drops FMO 1,215 fire-marshal records, Temporary Structure 583, Inspection 52, Miscellaneous Fees 28, Amendment 6. Real per-record DESCRIPTION text and Total_Construction_Cost. Geometry-less TABLE (geom=NONE) with no lat/lng, so records geocode from the already-complete PROPERTY_ADDRESS ('282 WASHINGTON ST, HARTFORD, CT 06106') under GEOCODE_FENCE_MI; native PROPERTY_ZIP for deterministic routing. Coverage CT/Hartford (60 dev-empty ZIP pages)."
+  }
+,
+  {
+   "registry_id": "kcmo-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://services.arcgis.com/4o5uMWTHuOhUVJPd/arcgis/rest/services/All_BuildingPermits_2020_to_2025/FeatureServer/0",
+   "dataset_url": "https://data.kcmo.org/",
+   "jurisdiction": "City of Kansas City, Missouri",
+   "coverage": [
+    {
+     "state": "MO",
+     "county": "Jackson"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "USER_derived_workclass",
+     "USER_Work_Done"
+    ],
+    "status_raw": "USER_per_stat",
+    "type_source": "USER_derived_workclass",
+    "file_date": "USER_Issue_Date",
+    "address": "USER_Address1",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "USER_Permit_Number"
+   },
+   "zip_where_template": "USER_Zip = {zip}",
+   "type_map": {
+    "NEW CONSTRUCTION": "Development",
+    "DEMOLITION": "Development",
+    "ADDITIONS/ALTERATIONS/REPAIRS": "Development",
+    "ADDITIONS/ ALTERATIONS/ REPAIRS": "Development"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Issued",
+     "Issued With Unpaid Fees",
+     "Ready For Issuance",
+     "Open-Active"
+    ],
+    "operating": [
+     "Closed",
+     "Work Completed"
+    ],
+    "exclude": [
+     "Cancelled",
+     "Hold",
+     "Suspended",
+     "Voided-City"
+    ]
+   },
+   "extra_where": "USER_derived_workclass in ('NEW CONSTRUCTION','DEMOLITION','ADDITIONS/ALTERATIONS/REPAIRS','ADDITIONS/ ALTERATIONS/ REPAIRS')",
+   "recency_days": 365,
+   "record_url_precision": "dataset",
+   "_receipts": "2026-07-25 pg_net recon (ids 109077/109078/109093/109094/109095): City of Kansas City MO 'All_Permits_2020_to_2025' (KCMO org 4o5uMWTHuOhUVJPd, authoritative first-party). Point geometry (geocoded by the city, Score/Match_addr present) + numeric native USER_Zip. Real per-record USER_Work_Done text, USER_Permit_Value, USER_Class_Description. 7 verbatim USER_derived_workclass values via returnDistinctValues; whitelist keeps NEW CONSTRUCTION / DEMOLITION / BOTH SPACING VARIANTS of ADDITIONS/ALTERATIONS/REPAIRS (the source carries 'ADDITIONS/ALTERATIONS/REPAIRS' AND 'ADDITIONS/ ALTERATIONS/ REPAIRS' - Mesa en-dash precedent) and drops 'B', 'UNDETERMINED' and null. 11 verbatim USER_per_stat values, all mapped. USER_Zip is NUMERIC so routing uses zip_where_template 'USER_Zip = {zip}' - an exact upper() match would be a Socrata/ArcGIS type-mismatch on a number (East Baton Rouge precedent). STALENESS CAVEAT: max USER_Issue_Date is 2025-12-31 (service modified 2026-03-04) - this is a lagging periodic extract, roughly 7 months behind, so the 365-day window surfaces ~5 months of real records rather than a live feed. Wired because the records are genuine, first-party, dated per-record and honestly labelled, but this source belongs on the reprobe list. Coverage MO/Jackson (57 dev-empty ZIP pages). This SUPERSEDES the MO wire pass's rejection, which was based on KCMO's stalled BLDS/Socrata ledger, not this ArcGIS service."
+  }
  ],
  "ckan": [
   {
