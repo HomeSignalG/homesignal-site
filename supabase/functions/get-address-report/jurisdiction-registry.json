@@ -3097,6 +3097,8 @@
     "type_source": "NEWCLASS",
     "file_date": "ISSUEDATE",
     "address": "PROP_ADDRE",
+    "lat": "__lat",
+    "lng": "__lng",
     "case_number": "FOLDERNUMB"
    },
    "include_types": [
@@ -3157,7 +3159,8 @@
     ],
     "types": "NEWCLASS 6-value construction axis; New Construction/Addition/Replacement/First/Move kept, Alteration + null dropped; NEWTYPE (occupancy) rides in the title",
     "coverage_note": "Portland spans Multnomah/Washington/Clackamas; spatial envelope self-limits to the city footprint regardless",
-    "record_url": "dataset-precision (no per-row URL column)"
+    "record_url": "dataset-precision (no per-row URL column)",
+    "point_scope_fix": "POINT-SCOPE FIX 2026-07-25 (pg_net 109742-109744 + cache audit): the entry emitted 2,166 records that ALL carried a valid record_url but landed scope='area', so app_refresh_zip (which inserts development markers only where scope='point') produced ZERO map markers for the whole Portland metro. Cause was NOT stale fields or projection - every mapped field verified present (NEWTYPE/WORKDESC/STATUS/NEWCLASS/ISSUEDATE/PROP_ADDRE/FOLDERNUMB) and the layer geometry is already esriGeometryPoint wkid 4326. The column_map simply never mapped lat/lng to the connector's geometry-flatten fields, so every record fell through the source-coords branch to area scope. Added lat=__lat / lng=__lng (the Denver + Minneapolis pattern). Config only; no connector change; anti-fabrication untouched - records already carried genuine record_urls."
    }
   },
   {
@@ -3559,8 +3562,7 @@
    "recency_days": 365,
    "record_url_precision": "dataset",
    "_receipts": "2026-07-25 pg_net recon (ids 108028-108035): City of Las Vegas 'Building Permits' (OpenData_Building_Permits_, Building_Permits_MV) - the CURRENT service; the org's other hits are 'Building Permits Archived'/'Historical Building Permits' (rejected) and CLV_BLDG_OFFSITE_EXP (water-district offsite work orders, rejected). FRESH max ISSDTTM 2026-07-16 over 435,245 rows. 9 verbatim BLDGAPPLSTATUS values via groupBy: Closed 287,872 / Issued 91,308 / Expired 51,381 / Cancelled 2,565 / Stop Work 2,034 / Open 47 / Withdrawn 19 / Hold 14 / Accepted 5. APTYPE|WORKTYPE enumerated via groupBy; whitelist keeps Building (Res 9,106 + Com 8,901), ProdHome 34,341, MultiFam 891, Model 149, TI 13,941, Grading 949 - drops OTC 272,711 over-the-counter minor work plus Electrical/Plumbing/Mechanical/Patio/PoolSpa/WallFence/Sign/Disaster/AVI at source. Layer is a geometry-less TABLE (geom=NONE) with NO lat/lng columns -> records geocode from ADDR1+CITY+STATE through the engine's Census path under GEOCODE_FENCE_MI (a fence miss NULLs coords, never fabricates). Native site ZIP is ZIP+4 in places (e.g. '89145-5247') so scoping uses zip_where_template LIKE '<zip>%' (Philadelphia ZIP+4 precedent), not an exact match. Coverage NV/Clark (76 dev-empty ZIP pages)."
-  }
-,
+  },
   {
    "registry_id": "hartford-building-permits",
    "platform": "arcgis",
@@ -3638,8 +3640,7 @@
    "recency_days": 365,
    "record_url_precision": "dataset",
    "_receipts": "2026-07-25 pg_net recon (ids 109083/109089/109090/109091/109092): City of Hartford open-data 'Building Permits 20200101 to Current' (owner HartfordData - authoritative first-party). FRESH max DateIssued 2026-06-29 over 35,691 rows - this SUPERSEDES the CT wire pass's rejection, which was based on Hartford's decommissioned SOCRATA portal, not this ArcGIS service. 36 verbatim RECORD_STATUS values via groupBy (Issued 14,547 / Closed-Complete 6,145 / Closed 5,209 / Final Inspection Complete 5,144 / Closed-Denied 1,258 / ...) all mapped explicitly; 7 verbatim RECORD_TYPE_TYPE values, whitelist keeps Commercial 23,369 + Residential 10,438 and drops FMO 1,215 fire-marshal records, Temporary Structure 583, Inspection 52, Miscellaneous Fees 28, Amendment 6. Real per-record DESCRIPTION text and Total_Construction_Cost. Geometry-less TABLE (geom=NONE) with no lat/lng, so records geocode from the already-complete PROPERTY_ADDRESS ('282 WASHINGTON ST, HARTFORD, CT 06106') under GEOCODE_FENCE_MI; native PROPERTY_ZIP for deterministic routing. Coverage CT/Hartford (60 dev-empty ZIP pages)."
-  }
-,
+  },
   {
    "registry_id": "kcmo-building-permits",
    "platform": "arcgis",
