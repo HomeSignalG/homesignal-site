@@ -25,6 +25,29 @@
     return String(s || "").toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
   }
 
+  function escapeRegExp(s) {
+    return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  // Locate `needle` inside the RAW transcript and return its real character
+  // span, so callers never have to map a normalized-text index back onto raw
+  // text (which silently shifts by however much punctuation was collapsed).
+  // Falls back to a punctuation-tolerant token match. Tokens come from
+  // normalizeText, so they are word characters only — safe to put in a regex.
+  function findRawSpan(text, needle) {
+    var raw = String(needle || "").trim();
+    if (!raw) return null;
+
+    var idx = String(text).toLowerCase().indexOf(raw.toLowerCase());
+    if (idx >= 0) return { start: idx, end: idx + raw.length };
+
+    var words = normalizeText(raw).split(" ").filter(Boolean);
+    if (!words.length) return null;
+    var m = new RegExp(words.map(escapeRegExp).join("[\\W_]+"), "i").exec(text);
+    if (!m) return null;
+    return { start: m.index, end: m.index + m[0].length };
+  }
+
   function parseTimecode(tc) {
     var p = tc.trim().replace(",", ".").split(":");
     if (p.length === 3) return parseFloat(p[0]) * 3600 + parseFloat(p[1]) * 60 + parseFloat(p[2]);
@@ -239,7 +262,10 @@
   }
 
   function compactStoredProjects() {
-    lastStorageProblem = null;
+    // One-shot latch, deliberately NOT cleared here: init() compacts and then
+    // bootVideoProducer() compacts again, and by the second pass the damage has
+    // already been repaired — clearing here would erase the message before the
+    // operator ever sees it. bootVideoProducer consumes and clears it.
     var read = readStoredProjectsRaw();
 
     if (read.parseError) {
@@ -508,12 +534,31 @@
     state.videoDataUrl = rec.videoDataUrl || null;
     state.videoObjectUrl = null;
 
-    syncStateToForm();
-    renderTranscript();
-    renderStatements();
-    renderCommentary();
-    renderStoryboard();
-    renderProjectChips();
+    clearRenderOutput();
+    resetRenderPanel();
+
+    // Each section renders independently: a failure in one must not abort the
+    // rest, and must never take renderProjectChips() with it — the chips are
+    // the only way to switch away from a project that will not render.
+    [syncStateToForm, renderTranscript, renderStatements, renderCommentary,
+      renderStoryboard, renderProjectChips].forEach(function (fn) {
+      try {
+        fn();
+      } catch (e) {
+        console.error("Video Producer: " + fn.name + " failed while loading a project", e);
+      }
+    });
+  }
+
+  // The render output belongs to ONE project. Clear it on load so project A's
+  // finished video is never shown under project B's name.
+  function resetRenderPanel() {
+    var out = $("vp-render-out");
+    if (out) out.textContent = "";
+    var status = $("vp-render-status");
+    if (status) status.textContent = "Ready.";
+    var bar = $("vp-render-bar");
+    if (bar) bar.style.width = "0%";
   }
 
   function renderProjectChips() {
@@ -541,13 +586,15 @@
     if (!view) return;
     var text = state.parsed.plain || "No transcript yet.";
     if (highlight) {
-      var norm = normalizeText(text);
-      var nh = normalizeText(highlight);
-      var idx = norm.indexOf(nh);
-      if (idx >= 0) {
-        var pre = esc(text.slice(0, idx));
-        var mid = esc(text.slice(idx, idx + highlight.length));
-        var post = esc(text.slice(idx + highlight.length));
+      // Match against the RAW text. The old code took an index from the
+      // NORMALIZED text (punctuation collapsed to spaces, whitespace squashed)
+      // and sliced the raw text with it, so the <mark> landed off by however
+      // many characters normalization had removed.
+      var span = findRawSpan(text, highlight);
+      if (span) {
+        var pre = esc(text.slice(0, span.start));
+        var mid = esc(text.slice(span.start, span.end));
+        var post = esc(text.slice(span.end));
         view.innerHTML = pre + "<mark>" + mid + "</mark>" + post;
         return;
       }
@@ -655,6 +702,9 @@
       el.className = "vp-hint";
       list.parentElement.insertBefore(el, list);
     }
+    // Announce build results to screen readers; assertive for real failures.
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", isError ? "assertive" : "polite");
     el.textContent = msg || "";
     el.style.color = isError ? "var(--persist)" : "var(--muted)";
   }
@@ -679,7 +729,7 @@
       }
     });
     state.storyboard = board;
-    safePersist();
+    var saved = safePersist();
     renderStoryboard();
     var first = state.storyboard.find(function (item) {
       return item.type === "alert" || item.type === "claim";
@@ -687,7 +737,14 @@
     if (first) previewCard(first);
     var list = $("vp-storyboard-list");
     if (list) list.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    setStoryboardStatus("Storyboard built — " + state.storyboard.length + " items. Drag to reorder or click Preview.", false);
+    // Never report a build as succeeded when the save failed — the operator
+    // would lose the storyboard on reload believing it was stored.
+    if (saved) {
+      setStoryboardStatus("Storyboard built — " + state.storyboard.length + " items. Drag to reorder or click Preview.", false);
+    } else {
+      setStoryboardStatus("Storyboard built (" + state.storyboard.length + " items) but COULD NOT BE SAVED — " +
+        "browser storage is full. Export the project to JSON or remove old projects, then build again.", true);
+    }
     } catch (err) {
       console.error("Video Producer: buildStoryboard failed", err);
       setStoryboardStatus("Could not build storyboard: " + (err && err.message ? err.message : err), true);
@@ -702,11 +759,17 @@
       return;
     }
     list.innerHTML = state.storyboard.map(function (item, i) {
-      var preview = item.text || item.label || item.type;
-      if (item.type === "alert") preview = item.title + " — " + item.subtitle;
+      // Defensive: a hand-edited or truncated storage record can carry an item
+      // with no `type`. Reading .replace off undefined used to throw out of
+      // renderStoryboard and abort loadProject before renderProjectChips ran —
+      // which removed the project switcher and left the tab unusable.
+      item = item && typeof item === "object" ? item : {};
+      var type = typeof item.type === "string" && item.type ? item.type : "unknown";
+      var preview = item.text || item.label || type;
+      if (type === "alert") preview = (item.title || "") + " — " + (item.subtitle || "");
       return '<div class="vp-sb-item" draggable="true" data-ix="' + i + '">' +
         '<span class="vp-sb-handle">⠿</span>' +
-        '<div><div class="vp-sb-type">' + esc(item.type.replace("_", " ")) + '</div>' +
+        '<div><div class="vp-sb-type">' + esc(type.replace("_", " ")) + '</div>' +
         '<div class="vp-sb-preview">' + esc(String(preview).slice(0, 120)) + "</div></div>" +
         '<button type="button" class="vp-btn secondary vp-sb-preview-btn" data-ix="' + i + '" style="padding:4px 8px;font-size:11px">Preview</button></div>';
     }).join("");
@@ -729,8 +792,10 @@
         if (dragIx === null || dragIx === dropIx) return;
         var item = state.storyboard.splice(dragIx, 1)[0];
         state.storyboard.splice(dropIx, 0, item);
-        safePersist();
+        if (safePersist()) setStoryboardStatus("Order saved — " + state.storyboard.length + " items.", false);
+        else setStoryboardStatus("New order COULD NOT BE SAVED — browser storage is full.", true);
         renderStoryboard();
+        previewCard(state.storyboard[0]);
       });
     });
   }
@@ -1094,24 +1159,41 @@
       if (bar) bar.style.width = "0%";
       el.disabled = true;
       if (status) status.textContent = "Rendering…";
-      renderVideo(function (p) {
-        if (bar) bar.style.width = Math.round(p * 100) + "%";
-      }, function (blob, err) {
+      // renderVideo can throw synchronously (canvas.captureStream or
+      // MediaRecorder unavailable). Without this the button stayed disabled
+      // and the status stuck on "Rendering…" until a full page reload.
+      try {
+        renderVideo(function (p) {
+          if (bar) bar.style.width = Math.round(p * 100) + "%";
+        }, function (blob, err) {
+          el.disabled = false;
+          if (err) { if (status) status.textContent = err; return; }
+          if (bar) bar.style.width = "100%";
+          if (status) status.textContent = "Render complete. Download or preview below.";
+          showRenderOutput(blob);
+          markStepDone("render");
+        });
+      } catch (renderErr) {
+        console.error("Video Producer: render failed to start", renderErr);
         el.disabled = false;
-        if (err) { if (status) status.textContent = err; return; }
-        if (bar) bar.style.width = "100%";
-        if (status) status.textContent = "Render complete. Download or preview below.";
-        showRenderOutput(blob);
-        markStepDone("render");
-      });
+        if (bar) bar.style.width = "0%";
+        if (status) {
+          status.textContent = "Could not start the render: " +
+            (renderErr && renderErr.message ? renderErr.message : renderErr) +
+            " — try Chrome or Brave.";
+        }
+      }
     });
     wireButton("vp-export-project", function () {
       syncFromForm();
       var blob = new Blob([JSON.stringify(projectRecordFromState(), null, 2)], { type: "application/json" });
       var a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
+      var url = URL.createObjectURL(blob);
+      a.href = url;
       a.download = (state.name || "homesignal-video-project") + ".json";
       a.click();
+      // Release the blob; without this every export leaked one object URL.
+      setTimeout(function () { URL.revokeObjectURL(url); }, 0);
     });
   }
 
@@ -1260,6 +1342,11 @@
     if (container) wireEvents(container);
     ensureActionButtons();
     setStep(activeStep);
+    // A storage failure detected during compaction is reported, not swallowed.
+    if (lastStorageProblem) {
+      setStoryboardStatus(lastStorageProblem, true);
+      lastStorageProblem = null;
+    }
   }
 
   function refreshVideoProducer() {
