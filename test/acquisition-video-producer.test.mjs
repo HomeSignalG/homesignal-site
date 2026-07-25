@@ -53,6 +53,8 @@ ok(/Browser Preview Export — WebM/.test(vp),
   'render label says Browser Preview Export — WebM');
 ok(!/Render MP4/i.test(vp), 'static asset does not claim MP4 render support');
 ok(/if \(eventsWired\) return/.test(vp), 'wireEvents guarded against duplicate listeners');
+ok(/fetch-youtube-transcript/.test(vp), 'static asset invokes fetch-youtube-transcript edge function');
+ok(/vp-fetch-transcript/.test(vp), 'static asset wires Fetch transcript from YouTube button');
 
 // Gate remains for unauthorized users
 ok(/id="gate"/.test(acq) && /function loginState/.test(acq) && /function noAccess/.test(acq),
