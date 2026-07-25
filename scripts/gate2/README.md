@@ -54,3 +54,43 @@ claim can be made.
 
 Run: `node scripts/gate2/gate2.mjs` (needs playwright + leaflet + @supabase/supabase-js
 installed in the working directory; browser at /opt/pw-browsers/chromium-1194).
+
+## STEP 1 RESULT — the working seed contract, captured live (probe-seed-contract.mjs)
+
+Run against the page's OWN bundled `seed/delvalle.js`, nothing injected, 0 page errors.
+
+`window.HS_SEED` top-level keys (9):
+    community, demoUser, properties, projects, changes, meetings,
+    environmental_risk, coverage, topicCategories
+
+`HS_SEED.community` (the home/origin object):
+    zip slug name city county state covered lat lng community_score
+    growth_pressure value_trend component_scores civic_activity blurb
+    -> lat 30.1745 / lng -97.6134  (this is the origin `withDistance(rows, home)` uses)
+
+`HS_SEED.projects[0]` contract — 19 keys, all present on the working record:
+    id(string) name(string) type(string) status(string) stage(string) lens(string)
+    developer(string) size(string) investment(string) jobs(string)
+    submitted_at(string) lat(number) lng(number) impact_score(number)
+    impact_dimensions(array) source_ref(string) sowhat(string) approx(boolean)
+    note(string)
+
+NOTE: the working demo project row has NO `record_kind`, NO `registry_id`, NO `zip`.
+`HS_SEED.facilities` does not exist in the bundled seed (facilities_n = 0), so the
+facilities key is optional and facility-ness is carried by `_facility`.
+
+### Field delta vs the harness rows that plotted zero
+
+Missing from `scripts/gate2/seed78617.mjs` output:
+  * HS_SEED top level : demoUser, properties, topicCategories
+  * HS_SEED.community : covered, lat, lng, slug, city (harness supplied only
+                        zip/name/county/state)
+  * HS_SEED.coverage  : name
+  * project rows      : lens, impact_dimensions, sowhat, approx, note
+
+## STEP 2 — NOT DONE
+
+The drop point has NOT been instrumented, so no causal claim is made here. The field
+delta above is an observation, not a proven cause. Step 2 must trace the 39 rows through
+HS_SEED -> lib/data.js seed branch -> withDistance(rows, home) -> pre-plot collection ->
+__HS_MAP.items and report count-in/count-out and the first rejected record at each stage.
