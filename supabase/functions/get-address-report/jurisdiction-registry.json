@@ -3729,6 +3729,119 @@
    "recency_days": 365,
    "record_url_precision": "dataset",
    "_receipts": "2026-07-25 pg_net recon (ids 109077/109078/109093/109094/109095): City of Kansas City MO 'All_Permits_2020_to_2025' (KCMO org 4o5uMWTHuOhUVJPd, authoritative first-party). Point geometry (geocoded by the city, Score/Match_addr present) + numeric native USER_Zip. Real per-record USER_Work_Done text, USER_Permit_Value, USER_Class_Description. 7 verbatim USER_derived_workclass values via returnDistinctValues; whitelist keeps NEW CONSTRUCTION / DEMOLITION / BOTH SPACING VARIANTS of ADDITIONS/ALTERATIONS/REPAIRS (the source carries 'ADDITIONS/ALTERATIONS/REPAIRS' AND 'ADDITIONS/ ALTERATIONS/ REPAIRS' - Mesa en-dash precedent) and drops 'B', 'UNDETERMINED' and null. 11 verbatim USER_per_stat values, all mapped. USER_Zip is NUMERIC so routing uses zip_where_template 'USER_Zip = {zip}' - an exact upper() match would be a Socrata/ArcGIS type-mismatch on a number (East Baton Rouge precedent). STALENESS CAVEAT: max USER_Issue_Date is 2025-12-31 (service modified 2026-03-04) - this is a lagging periodic extract, roughly 7 months behind, so the 365-day window surfaces ~5 months of real records rather than a live feed. Wired because the records are genuine, first-party, dated per-record and honestly labelled, but this source belongs on the reprobe list. Coverage MO/Jackson (57 dev-empty ZIP pages). This SUPERSEDES the MO wire pass's rejection, which was based on KCMO's stalled BLDS/Socrata ledger, not this ArcGIS service."
+  },
+  {
+   "registry_id": "el-paso-new-residential-permits",
+   "platform": "arcgis",
+   "service_url": "https://gis.elpasotexas.gov/arcgis/rest/services/Planning/NewResidential/FeatureServer/1",
+   "dataset_url": "https://gis.elpasotexas.gov/arcgis/rest/services/Planning/NewResidential/FeatureServer/1",
+   "jurisdiction": "City of El Paso",
+   "coverage": [
+    {
+     "state": "TX",
+     "county": "El Paso"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "Record_Typ",
+     "Street_Add"
+    ],
+    "type_source": "Record_Typ",
+    "file_date": "Issued_Dat",
+    "address": "Street_Add",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "B1_ALT_ID"
+   },
+   "include_types": [
+    "New Residential",
+    "3rd/Residential/New",
+    "Residential/New/NA"
+   ],
+   "type_map": {
+    "New Residential": "Residential",
+    "3rd/Residential/New": "Residential",
+    "Residential/New/NA": "Residential"
+   },
+   "status_const": "Issued",
+   "status_to_bucket": {
+    "approved": [
+     "Issued"
+    ]
+   },
+   "extra_where": "Record_Typ IN ('New Residential','3rd/Residential/New','Residential/New/NA') AND Issued_Dat IS NOT NULL",
+   "recency_days": 365,
+   "spatial_zip_radius_mi": 3,
+   "record_url_precision": "dataset",
+   "_receipts": "2026-07-25 pg_net recon (response ids 110865-110894, 111145-111147). CORRECTED-URL RETRY: the prior 'El Paso has no portal' rejection was a wrong-URL guess -- data.elpasotexas.gov and opendata.elpasotexas.gov both fail DNS, but the city's OWN ArcGIS Server is live at gis.elpasotexas.gov/arcgis/rest/services (v11.3, folders incl. Planning/CommunityDev). Planning/NewResidential FeatureServer LAYER 1 (not 0 -- layer 0 does not exist; serviceDescription 'new residential building permits'): 42,677 rows, esriGeometryPoint, max Issued_Dat 2026-06-30, 605 rows in the trailing 365d. The B1_* column prefixes are Accela's own DB names -- this is El Paso's Accela permit data republished to ArcGIS (same pattern as Tacoma/Cleveland/Columbus). Record_Typ is a CLEAN 3-value vocabulary over the 365d window (New Residential 553 / 3rd/Residential/New 28 / Residential/New/NA 24 = 605, zero noise types) -- all new residential construction, so all three are kept and no noise class needs dropping. NO status column (B1_APPL_ST is blank on every recent row) -> status_const 'Issued', guarded by Issued_Dat IS NOT NULL. ZIP SCOPING IS SPATIAL, NOT NATIVE: B1_SITUS_Z is MIS-LOADED -- returnDistinctValues over the whole layer yields exactly 10 values and every one is a YEAR (' ', 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026), no ZIP codes at all -> spatial_zip_radius_mi 3 on the records' own points (Denver/Minneapolis/Chicago pattern). TITLE: Descriptio is blank on ALL 605 recent rows (verified count of non-blank = 0), so the title is built from the two populated verbatim source columns Record_Typ + Street_Add (e.g. 'New Residential 12262 COSTA BRAVA') -- the Portland title:[NEWTYPE,WORKDESC] precedent; nothing is inferred. No per-record URL column exists -> dataset-precision record_url. SIBLING LAYER REJECTED WITH RECEIPTS: Planning/NewCommercial FeatureServer/0 (11,322 rows, 524 in 365d) is NOT wired -- a groupBy over the 365d window returns a SINGLE blank Record_Typ group (n=524) and the non-blank Descriptio count is 0, so it has neither a title source nor any work-type to classify or whitelist; every record would render as a bare permit number with use_type 'unclassified'. Coverage gated to TX/El Paso (143 modeled ZIP pages, 136 of them dev-empty and named 'El Paso')."
+  },
+  {
+   "registry_id": "fairfax-active-site-construction",
+   "platform": "arcgis",
+   "service_url": "https://www.fairfaxcounty.gov/mercator/rest/services/LDS/DevelopmentTracker/FeatureServer/1",
+   "dataset_url": "https://www.fairfaxcounty.gov/mercator/rest/services/LDS/DevelopmentTracker/FeatureServer/1",
+   "jurisdiction": "Fairfax County Land Development Services",
+   "coverage": [
+    {
+     "state": "VA",
+     "county": "Fairfax"
+    }
+   ],
+   "column_map": {
+    "title": "PROJECT_NAME",
+    "type_source": "APPTYPEALIAS",
+    "status_raw": "RECORD_STATUS",
+    "file_date": "SUBMITTED_DATE",
+    "decision_date": "APPROVED_DATE",
+    "address": "ADDRESS_1",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "RECORDID",
+    "record_url": "LINK_URL"
+   },
+   "include_types": [
+    "Infill Lot Grading Plan",
+    "Site Plan",
+    "Minor Site Plan",
+    "Subdivision Grading Plan",
+    "Rough Grading Plan",
+    "DPWES Plan",
+    "Subdivision Plan",
+    "Public Improvement Plan",
+    "Conservation Plan"
+   ],
+   "type_map": {
+    "Infill Lot Grading Plan": "Residential",
+    "Site Plan": "Development",
+    "Minor Site Plan": "Development",
+    "Subdivision Grading Plan": "Residential",
+    "Rough Grading Plan": "Development",
+    "DPWES Plan": "Development",
+    "Subdivision Plan": "Residential",
+    "Public Improvement Plan": "Civic/Public",
+    "Conservation Plan": "Development"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "Approved",
+     "Revised"
+    ],
+    "operating": [
+     "Closed"
+    ],
+    "exclude": [
+     "Denied",
+     "Expired",
+     "Voided",
+     "Withdrawn",
+     "Revised - Pending Customer"
+    ]
+   },
+   "extra_where": "APPTYPEALIAS NOT IN ('Bond Extension','Bond Reduction')",
+   "spatial_zip_radius_mi": 3,
+   "record_url_precision": "record",
+   "_receipts": "2026-07-25 pg_net recon (response ids 111159-111183). CORRECTED-URL RETRY: Fairfax County's ArcGIS Server is at www.fairfaxcounty.gov/mercator/rest/services (v10.91), NOT a data./opendata. host. LDS (Land Development Services) folder -> DevelopmentTracker FeatureServer, LAYER 1 'Active Site Construction - Centroid Point' (esriGeometryPoint, 2,183 rows). FRESHNESS GATE PASSED (Detroit precedent, checked BEFORE wiring): max last_edited_date 2026-07-25 (same day), max RECORD_STATUS_DATE 2026-07-22, max SUBMITTED_DATE 2026-07-21 -- actively maintained. RECORD-PRECISION record_url: LINK_URL is populated on EVERY row (IS NULL count = 0) and is a per-record Accela ACA deep link (plus.fairfaxcounty.gov/CitizenAccess/urlrouting.ashx?...capID1=... &agencyCode=FFX) -- Fairfax's Accela PLUS system republished through ArcGIS. RECORD_STATUS is a clean verbatim 8-value vocabulary mapped exactly: Approved 1,170 + Revised 871 -> approved (both are live approved site-construction records; 'Revised' is an approved plan under revision), Closed 133 -> operating (construction concluded), and Denied 1 / Expired 1 / Voided 3 / Withdrawn 3 / 'Revised - Pending Customer' 1 -> exclude. APPTYPEALIAS is an 11-value vocabulary; the 9 real development plan types are kept (Infill Lot Grading Plan 1,210, Site Plan 283, Minor Site Plan 168, Subdivision Grading Plan 139, Rough Grading Plan 119, DPWES Plan 90, Subdivision Plan 66, Public Improvement Plan 59, Conservation Plan 45) and the 4 financial-administration rows are dropped at source (Bond Reduction 3, Bond Extension 1). ZIP SCOPING IS SPATIAL, NOT NATIVE: ZIP_CODE is NULL on 457 of 2,183 rows (21%) and the populated values mix 5-digit with unpunctuated ZIP+4 ('201212503', '220035505'), so it is not a reliable filter key -> spatial_zip_radius_mi 3 on each record's own point. NO recency_days ON PURPOSE: this layer is the county's ACTIVE-construction tracker, not an issuance ledger -- the county already scopes it to what is currently being built, and a 365d filter on SUBMITTED_DATE would keep only 371 of 2,183 rows, dropping long-running projects that are actively under construction today (exactly what a resident needs to see). Freshness is instead assured by the daily-edited source + the RECORD_STATUS gate. Coverage gated to VA/Fairfax (47 modeled ZIP pages, all 47 dev-empty). NOT WIRED from the same server: Pbw_public/ROWMSPermits on Dallas's server is right-of-way work (its own serviceDescription: 'construction in public right-of-way, including the street, median and parkway') -- street cuts, not building development."
   }
  ],
  "ckan": [
