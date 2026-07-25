@@ -248,15 +248,16 @@
   }
 
   function invokeErrorMessage(err) {
-    if (!err) return "fetch failed";
-    var ctx = err.context;
-    if (ctx && ctx.body) {
-      try {
-        var body = typeof ctx.body === "string" ? JSON.parse(ctx.body) : ctx.body;
+    if (!err) return Promise.resolve("fetch failed");
+    if (err.context && typeof err.context.json === "function") {
+      return err.context.json().then(function (body) {
         if (body && body.error) return body.error;
-      } catch (ignore) {}
+        return err.message || "fetch failed";
+      }).catch(function () {
+        return err.message || "fetch failed";
+      });
     }
-    return err.message || "fetch failed";
+    return Promise.resolve(err.message || "fetch failed");
   }
 
   function fetchYoutubeTranscript() {
@@ -278,7 +279,11 @@
     window.hsClient.functions.invoke("fetch-youtube-transcript", {
       body: { video_url: url.trim() }
     }).then(function (r) {
-      if (r.error) throw new Error(invokeErrorMessage(r.error));
+      return invokeErrorMessage(r.error).then(function (msg) {
+        if (r.error) throw new Error(msg);
+        return r;
+      });
+    }).then(function (r) {
       var data = r.data || {};
       if (data.error) throw new Error(data.error);
       state.youtube = url.trim();
@@ -292,6 +297,7 @@
       }
       renderTranscript();
       persist();
+      setStep("statements");
       document.querySelectorAll(".vp-step").forEach(function (b) {
         if (b.dataset.vpStep === "source") b.classList.add("done");
       });
@@ -754,6 +760,7 @@
       state.parsed = parseTranscript(state.transcriptRaw);
       renderTranscript();
       persist();
+      setStep("statements");
       document.querySelectorAll(".vp-step").forEach(function (b) {
         if (b.dataset.vpStep === "source") b.classList.add("done");
       });
