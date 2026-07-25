@@ -38,6 +38,7 @@ ok(/<script\s+src="assets\/acquisition-video-producer\.js"><\/script>/.test(acq)
 ok(/var\s+TAB_TRUSTED_INIT\s*=\s*\{/.test(acq), 'TAB_TRUSTED_INIT registry is defined');
 ok(/HomeSignalVideoProducer\.init\(container,\s*\{\}\)/.test(acq),
   'trusted initializer calls HomeSignalVideoProducer.init');
+ok(/media-src[^;]*blob:/.test(acq), 'CSP allows blob URLs for rendered video preview');
 ok(/tabInitDone\.videoproducer/.test(acq), 'videoproducer init guarded against duplicate calls');
 ok(!/p\.tab_scripts/.test(acq), 'render does not read tab_scripts from snapshot');
 ok(!/\(0,\s*eval\)/.test(acq), 'acquisition.html does not eval snapshot scripts');
