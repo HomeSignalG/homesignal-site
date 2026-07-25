@@ -54,10 +54,58 @@ export const ROWS = RAW.trim().split('\n').map((line, i) => {
            lat: Number(lat), lng: Number(lng), source_ref,
            submitted_at: '2026-01-15', impact_score: 55, stage: null, developer: 'City of Austin' };
 });
+// ── SEED-CONTRACT ADAPTER (Step 3) ────────────────────────────────────────────
+// Shapes the production-derived rows into the EXACT contract the page's own seed path
+// consumes, captured live from seed/delvalle.js in Step 1. Adds structure only — no
+// semantic value is invented. See FIELD_ORIGIN below for per-field provenance.
+const ORIGIN = { lat: 30.1745, lng: -97.6134 };   // 78617 ZIP centroid (development_reports.home_lat/lng)
+
+function project(r) {
+  return {
+    id: r.id,                       // deterministic: 'dv-<row index>'
+    name: r.name,                   // SOURCE app_projects.name
+    type: r.type,                   // SOURCE app_projects.type
+    status: r.status,               // SOURCE app_projects.status
+    stage: r.stage,                 // SOURCE app_projects.stage (null where the source has none)
+    lens: 'value',                  // STRUCTURAL: contract string; not a category or lifecycle
+    developer: r.developer,         // SOURCE-derived jurisdiction label
+    size: null, investment: null, jobs: null,      // INTENTIONALLY NULL — no source value
+    submitted_at: r.submitted_at,   // SOURCE app_projects.submitted_at
+    lat: r.lat, lng: r.lng,         // SOURCE, unchanged
+    impact_score: r.impact_score,   // SOURCE app_projects.impact_score
+    impact_dimensions: [],          // STRUCTURAL empty array — contract requires an array
+    source_ref: r.source_ref,       // SOURCE evidence URL, unchanged
+    sowhat: '',                     // STRUCTURAL empty string — display copy, no source value
+    approx: false,                  // STRUCTURAL: these are parcel-precise source points
+    note: '',                       // STRUCTURAL empty
+    // carried through for verification (the page ignores unknown keys):
+    record_kind: r.record_kind, registry_id: r.registry_id, zip: r.zip,
+  };
+}
+const DEV = ROWS.filter(r => r.record_kind === 'development').map(project);
+const FAC = ROWS.filter(r => r.record_kind === 'facility').map(r =>
+  Object.assign(project(r), { _facility: true, record_kind: 'facility' }));
+
 export const HS_SEED = {
-  community: { zip: '78617', name: 'Del Valle (78617)', county: 'Travis', state: 'TX' },
-  coverage: [{ zip: '78617', covered: true }],
-  projects: ROWS.filter(r => r.record_kind === 'development'),
-  facilities: ROWS.filter(r => r.record_kind === 'facility').map(f => Object.assign({}, f, { _facility: true })),
+  community: {                       // the ORIGIN object withDistance() measures from
+    zip: '78617', slug: 'del-valle-78617', name: 'Del Valle (78617)', city: 'Del Valle',
+    county: 'Travis', state: 'TX', covered: true, lat: ORIGIN.lat, lng: ORIGIN.lng,
+    community_score: null, growth_pressure: 'High', value_trend: null,
+    component_scores: {}, civic_activity: null, blurb: '',
+  },
+  demoUser: null,                    // STRUCTURAL: present in the working contract
+  properties: [],                    // REQUIRED — lib/data.js:249 does HS_SEED.properties.slice()
+  projects: DEV,
+  facilities: FAC,
   changes: [], meetings: [], environmental_risk: {},
+  coverage: [{ zip: '78617', name: 'Del Valle (78617)', covered: true }],
+  topicCategories: [],               // STRUCTURAL: present in the working contract
 };
+
+// Fail loudly rather than silently plotting zero.
+for (const k of ['community','properties','projects','facilities','changes','meetings','environmental_risk','coverage','topicCategories'])
+  if (HS_SEED[k] === undefined) throw new Error('seed contract violation: missing ' + k);
+for (const r of DEV.concat(FAC)) {
+  if (!r.id || typeof r.lat !== 'number' || typeof r.lng !== 'number' || !r.source_ref)
+    throw new Error('seed row missing a required source value: ' + JSON.stringify(r).slice(0,120));
+}
