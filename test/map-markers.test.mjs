@@ -39,6 +39,15 @@ ok(HS.resolveMarker({ type: 'Mixed-Use Residential' }).shape === 'pentagon', 'Mi
 ok(HS.resolveMarker({ type: 'Water Treatment Plant' }).shape === 'diamond', 'Water Treatment Plant → diamond (not plant/industrial)');
 ok(HS.resolveMarker({ type: 'School' }).shape === 'circle', 'School → circle');
 
+// Generic source types are non-terminal — name/title keywords classify when type_map is coarse.
+ok(HS.resolveMarker({ type: 'Development' }).shape === 'circle', 'bare Development → circle');
+ok(HS.resolveMarker({ type: 'Development', name: 'Warehouse distribution center' }).shape === 'triangle',
+   'Development + warehouse name → triangle via KEYWORD');
+ok(HS.resolveMarker({ type: 'unclassified', title: 'Mixed-Use Residential tower' }).shape === 'pentagon',
+   'unclassified + mixed-use residential title → pentagon');
+ok(HS.resolveMarker({ type: 'animal-facility' }).shape === 'triangle', 'animal-facility layer → industrial triangle');
+ok(HS.resolveMarker({ type: 'research' }).shape === 'triangle', 'research layer → industrial triangle');
+
 // projectShape delegates to resolveMarker.
 ok(HS.projectShape({ type: 'Industrial' }) === 'triangle', 'HS.projectShape delegates to resolveMarker');
 
