@@ -2082,3 +2082,14 @@ BUILD/PILOT/NOT-WORTH recommendation until measured API evidence exists. Executi
 fail on EGRESS.** pg_net reachability does NOT prove edge-runtime reachability. The production gate
 is now five conditions — schema, evidence standards, **edge-runtime connectivity**, production
 materialization, regression survival — and no source counts as wireable until all five hold.
+
+## 2026-07-25 — ACCELA DEFERRED (EXTERNAL ACCESS BLOCKED)
+
+The founder attempted to create an Accela developer account; developers.accela.com returned a
+**server-side entity-save error** during registration, so no App ID could be issued. Founder call:
+**skip Accela** — do not troubleshoot the vendor's registration, contact Accela, wait for
+credentials, or design/build the connector. `ACCELA_APP_ID` is **no longer an active blocker**.
+Accela is **DEFERRED — EXTERNAL ACCESS BLOCKED** until materially new access evidence appears; the
+dormant validation plan stays in `docs/accela-validation-spike-plan.md`. The measured 400-ZIP
+opportunity (upper bound 400-697) remains on the books as deferred. No further Accela work is
+authorized.

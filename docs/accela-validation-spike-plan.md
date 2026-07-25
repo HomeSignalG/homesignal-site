@@ -1,10 +1,31 @@
 # Accela Validation Spike — plan of record
 
-**Status: BLOCKED on `ACCELA_APP_ID`. Engineering frozen. No connector, no config, no deploy.**
+**Status: DEFERRED — EXTERNAL ACCESS BLOCKED (2026-07-25). Accela is no longer part of the
+current execution path. No further Accela work is authorized.**
+
+What happened: the founder attempted to create an Accela developer account at
+developers.accela.com and the registration system returned a **server-side entity-save
+error**, so no `ACCELA_APP_ID` could be issued. The founder chose to skip Accela rather
+than troubleshoot the vendor's registration system. Consequences:
+
+- `ACCELA_APP_ID` is **no longer an active blocker** — nothing is waiting on it.
+- Do **not** troubleshoot Accela registration, contact Accela, wait for credentials, or
+  design/build the connector.
+- Accela is deferred until **materially new access evidence** appears (e.g. a successful
+  registration, or an agency exposing records without the credential). If that happens,
+  the validation plan below is the plan of record — it remains valid and unexecuted.
+- The measured opportunity (400 confirmed dev-empty ZIP pages, upper bound 400-697) stays
+  on the books as deferred, not abandoned; El Paso/Tampa's WAF situation is being pursued
+  through other routes instead (see `docs/source-registry.md`, next-source assessment).
+
+Everything below is retained as the dormant plan, to be executed only if access evidence
+materially changes.
+
+---
 
 This document records the accepted engineering facts at the close of the corrected-URL
-ArcGIS campaign, and the exact validation plan to execute the moment the credential is
-available. It is a plan, not an implementation.
+ArcGIS campaign, and the exact validation plan that WOULD execute if the credential ever
+became available. It is a plan, not an implementation.
 
 ---
 
