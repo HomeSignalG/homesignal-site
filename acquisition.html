@@ -363,7 +363,6 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   var tabInitDone = { videoproducer: false };
   var TAB_TRUSTED_INIT = {
     videoproducer: function () {
-      if (tabInitDone.videoproducer) return;
       var container = document.getElementById('tab-videoproducer');
       if (
         container &&
@@ -433,7 +432,17 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 
   function render(p){
     var tabs=p.tabs||{};
-    Object.keys(tabs).forEach(function(id){ var el=$('tab-'+id); if(el) el.innerHTML=tabs[id]; });
+    Object.keys(tabs).forEach(function(id){
+      var el=$('tab-'+id);
+      if(!el) return;
+      // Keep Video Producer DOM + in-memory state when auth refresh re-fetches the snapshot.
+      if(id==='videoproducer' && el.getAttribute('data-vp-initialized')==='1') return;
+      el.innerHTML=tabs[id];
+    });
+    var vpEl=$('tab-videoproducer');
+    if(vpEl && vpEl.getAttribute('data-vp-initialized')==='1' && window.HomeSignalVideoProducer && typeof window.HomeSignalVideoProducer.init==='function'){
+      window.HomeSignalVideoProducer.init(vpEl, {});
+    }
     if(p.meta){
       var m=$('dash-meta');
       if(m) m.textContent='One engine: data ingestion · project detection · public-records intelligence · homeowner-behavior intelligence · distribution & acquisition.  Data snapshot '+(p.meta.snapshot||'')+' · project '+(p.meta.project||'');

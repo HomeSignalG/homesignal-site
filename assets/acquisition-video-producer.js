@@ -366,12 +366,6 @@
       var active = p.id === state.id ? " active" : "";
       return '<button type="button" class="vp-project-chip' + active + '" data-id="' + esc(p.id) + '">' + esc(p.name || "Untitled") + "</button>";
     }).join("");
-    el.querySelectorAll(".vp-project-chip").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var rec = list.find(function (p) { return p.id === btn.dataset.id; });
-        if (rec) loadProject(rec);
-      });
-    });
   }
 
   function setStep(name) {
@@ -419,27 +413,6 @@
       return '<div class="vp-stmt" data-si="' + si + '"><h4>' + esc(st.text) + '</h4>' + matchesHtml +
         '<div class="vp-toolbar" style="margin-top:8px"><button type="button" class="vp-btn secondary vp-remove-stmt" data-si="' + si + '">Remove</button></div></div>';
     }).join("");
-
-    list.querySelectorAll('input[data-field="start"]').forEach(function (inp) {
-      inp.addEventListener("change", function () {
-        var si = parseInt(inp.dataset.si, 10);
-        var mi = parseInt(inp.dataset.mi, 10);
-        var sec = parseTimecode(inp.value);
-        if (state.statements[si] && state.statements[si].matches[mi]) {
-          state.statements[si].matches[mi].start = sec;
-          state.statements[si].matches[mi].end = sec + 4;
-          persist();
-        }
-      });
-    });
-    list.querySelectorAll(".vp-remove-stmt").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        state.statements.splice(parseInt(btn.dataset.si, 10), 1);
-        persist();
-        renderStatements();
-        renderCommentary();
-      });
-    });
   }
 
   function renderCommentary() {
@@ -459,44 +432,6 @@
         '<input type="file" multiple accept="image/*,.pdf" data-si="' + si + '" class="vp-evidence-upload">' +
         evidenceHtml(st.evidence || [], si) + "</div></div>";
     }).join("");
-
-    list.querySelectorAll("textarea[data-cfield]").forEach(function (ta) {
-      ta.addEventListener("input", function () {
-        var si = parseInt(ta.dataset.si, 10);
-        var field = ta.dataset.cfield;
-        if (!state.statements[si].commentary) state.statements[si].commentary = {};
-        state.statements[si].commentary[field] = ta.value;
-        persist();
-      });
-    });
-    list.querySelectorAll(".vp-evidence-upload").forEach(function (inp) {
-      inp.addEventListener("change", function () {
-        var si = parseInt(inp.dataset.si, 10);
-        Array.from(inp.files || []).forEach(function (file) {
-          var reader = new FileReader();
-          reader.onload = function () {
-            if (!state.statements[si].evidence) state.statements[si].evidence = [];
-            state.statements[si].evidence.push({
-              name: file.name,
-              type: file.type,
-              dataUrl: reader.result,
-            });
-            persist();
-            renderCommentary();
-          };
-          reader.readAsDataURL(file);
-        });
-      });
-    });
-    list.querySelectorAll(".vp-ev-remove").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var si = parseInt(btn.dataset.si, 10);
-        var ei = parseInt(btn.dataset.ei, 10);
-        state.statements[si].evidence.splice(ei, 1);
-        persist();
-        renderCommentary();
-      });
-    });
   }
 
   function blockField(si, field, label, val) {
@@ -513,6 +448,20 @@
       return '<div class="vp-evidence-item">' + thumb +
         '<button type="button" class="vp-btn secondary vp-ev-remove" data-si="' + si + '" data-ei="' + ei + '" style="padding:2px 6px;font-size:10px">Remove</button></div>';
     }).join("") + "</div>";
+  }
+
+  function markStepDone(step) {
+    document.querySelectorAll(".vp-step").forEach(function (b) {
+      if (b.dataset.vpStep === step) b.classList.add("done");
+    });
+  }
+
+  function safePersist() {
+    try {
+      persist();
+    } catch (e) {
+      console.error("Video Producer: could not save project to localStorage", e);
+    }
   }
 
   function buildStoryboard() {
@@ -534,8 +483,14 @@
       }
     });
     state.storyboard = board;
-    persist();
+    safePersist();
     renderStoryboard();
+    var first = state.storyboard.find(function (item) {
+      return item.type === "alert" || item.type === "claim";
+    });
+    if (first) previewCard(first);
+    var list = $("vp-storyboard-list");
+    if (list) list.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   function renderStoryboard() {
@@ -573,13 +528,8 @@
         if (dragIx === null || dragIx === dropIx) return;
         var item = state.storyboard.splice(dragIx, 1)[0];
         state.storyboard.splice(dropIx, 0, item);
-        persist();
+        safePersist();
         renderStoryboard();
-      });
-    });
-    list.querySelectorAll(".vp-sb-preview-btn").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        previewCard(state.storyboard[parseInt(btn.dataset.ix, 10)]);
       });
     });
   }
@@ -828,74 +778,102 @@
     out.appendChild(hint);
   }
 
-  function wireEvents() {
-    if (eventsWired) return;
-    eventsWired = true;
-    document.querySelectorAll(".vp-step").forEach(function (btn) {
-      btn.addEventListener("click", function () { setStep(btn.dataset.vpStep); });
-    });
+  function wireEvents(container) {
+    if (!container || container.getAttribute("data-vp-delegate-wired") === "1") return;
+    container.setAttribute("data-vp-delegate-wired", "1");
 
-    var analyze = $("vp-analyze-transcript");
-    if (analyze) analyze.addEventListener("click", function () {
-      syncFromForm();
-      state.parsed = parseTranscript(state.transcriptRaw);
-      renderTranscript();
-      persist();
-      setStep("statements");
-      document.querySelectorAll(".vp-step").forEach(function (b) {
-        if (b.dataset.vpStep === "source") b.classList.add("done");
-      });
-    });
+    container.addEventListener("click", function (e) {
+      var stepBtn = e.target.closest && e.target.closest(".vp-step");
+      if (stepBtn && container.contains(stepBtn)) {
+        setStep(stepBtn.dataset.vpStep);
+        return;
+      }
 
-    var fetchBtn = ensureFetchTranscriptButton();
-    if (fetchBtn) fetchBtn.addEventListener("click", fetchYoutubeTranscript);
+      var chip = e.target.closest && e.target.closest(".vp-project-chip");
+      if (chip && container.contains(chip)) {
+        var rec = loadProjects().find(function (p) { return p.id === chip.dataset.id; });
+        if (rec) loadProject(rec);
+        return;
+      }
 
-    var saveBtn = $("vp-save-project");
-    if (saveBtn) saveBtn.addEventListener("click", function () { persist(); alert("Project saved locally."); });
+      var previewBtn = e.target.closest && e.target.closest(".vp-sb-preview-btn");
+      if (previewBtn && container.contains(previewBtn)) {
+        previewCard(state.storyboard[parseInt(previewBtn.dataset.ix, 10)]);
+        return;
+      }
 
-    var newBtn = $("vp-new-project");
-    if (newBtn) newBtn.addEventListener("click", startNewProject);
+      var evRemove = e.target.closest && e.target.closest(".vp-ev-remove");
+      if (evRemove && container.contains(evRemove)) {
+        var si = parseInt(evRemove.dataset.si, 10);
+        var ei = parseInt(evRemove.dataset.ei, 10);
+        if (state.statements[si] && state.statements[si].evidence) {
+          state.statements[si].evidence.splice(ei, 1);
+          safePersist();
+          renderCommentary();
+        }
+        return;
+      }
 
-    var tFile = $("vp-transcript-file");
-    if (tFile) tFile.addEventListener("change", function () {
-      var file = tFile.files && tFile.files[0];
-      if (!file) return;
-      var reader = new FileReader();
-      reader.onload = function () {
-        if ($("vp-transcript-paste")) $("vp-transcript-paste").value = reader.result;
-        state.transcriptRaw = reader.result;
+      var rmStmt = e.target.closest && e.target.closest(".vp-remove-stmt");
+      if (rmStmt && container.contains(rmStmt)) {
+        state.statements.splice(parseInt(rmStmt.dataset.si, 10), 1);
+        safePersist();
+        renderStatements();
+        renderCommentary();
+        return;
+      }
+
+      var el = e.target.closest && e.target.closest("[id]");
+      if (!el || !container.contains(el)) return;
+
+      if (el.id === "vp-analyze-transcript") {
+        syncFromForm();
         state.parsed = parseTranscript(state.transcriptRaw);
         renderTranscript();
-        persist();
-      };
-      reader.readAsText(file);
-    });
-
-    var vFile = $("vp-source-video");
-    if (vFile) vFile.addEventListener("change", function () {
-      var file = vFile.files && vFile.files[0];
-      if (!file) return;
-      if (state.videoObjectUrl) URL.revokeObjectURL(state.videoObjectUrl);
-      state.videoObjectUrl = URL.createObjectURL(file);
-      var vid = $("vp-video-preview");
-      if (vid) { vid.src = state.videoObjectUrl; vid.style.display = "block"; }
-      var reader = new FileReader();
-      reader.onload = function () {
-        state.videoDataUrl = reader.result;
-        persist();
-      };
-      reader.readAsDataURL(file);
-    });
-
-    var search = $("vp-transcript-search");
-    if (search) search.addEventListener("input", function () { renderTranscript(search.value); });
-
-    var locate = $("vp-locate-statements");
-    if (locate) locate.addEventListener("click", function () {
-      syncFromForm();
-      state.parsed = parseTranscript(state.transcriptRaw);
-      var lines = ($("vp-statement-input") && $("vp-statement-input").value || "").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
-      lines.forEach(function (line) {
+        safePersist();
+        setStep("statements");
+        markStepDone("source");
+        return;
+      }
+      if (el.id === "vp-fetch-transcript") {
+        fetchYoutubeTranscript();
+        return;
+      }
+      if (el.id === "vp-save-project") {
+        safePersist();
+        alert("Project saved locally.");
+        return;
+      }
+      if (el.id === "vp-new-project") {
+        startNewProject();
+        return;
+      }
+      if (el.id === "vp-locate-statements") {
+        syncFromForm();
+        state.parsed = parseTranscript(state.transcriptRaw);
+        var lines = ($("vp-statement-input") && $("vp-statement-input").value || "").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+        lines.forEach(function (line) {
+          var matches = findMatches(line, state.parsed);
+          state.statements.push({
+            id: uid(),
+            text: line,
+            matches: matches.length ? matches : [{ text: line, start: 0, end: 4, confidence: 0.3 }],
+            commentary: { said: line, evidence: "", community: "" },
+            evidence: [],
+          });
+        });
+        if ($("vp-statement-input")) $("vp-statement-input").value = "";
+        safePersist();
+        renderStatements();
+        renderCommentary();
+        markStepDone("statements");
+        return;
+      }
+      if (el.id === "vp-add-statement") {
+        var line = prompt("Statement to locate:");
+        if (!line) return;
+        syncFromForm();
+        state.parsed = parseTranscript(state.transcriptRaw);
         var matches = findMatches(line, state.parsed);
         state.statements.push({
           id: uid(),
@@ -904,100 +882,174 @@
           commentary: { said: line, evidence: "", community: "" },
           evidence: [],
         });
-      });
-      if ($("vp-statement-input")) $("vp-statement-input").value = "";
-      persist();
-      renderStatements();
-      renderCommentary();
-      document.querySelectorAll(".vp-step").forEach(function (b) {
-        if (b.dataset.vpStep === "statements") b.classList.add("done");
-      });
-    });
-
-    var addStmt = $("vp-add-statement");
-    if (addStmt) addStmt.addEventListener("click", function () {
-      var line = prompt("Statement to locate:");
-      if (!line) return;
-      syncFromForm();
-      state.parsed = parseTranscript(state.transcriptRaw);
-      var matches = findMatches(line, state.parsed);
-      state.statements.push({
-        id: uid(),
-        text: line,
-        matches: matches.length ? matches : [{ text: line, start: 0, end: 4, confidence: 0.3 }],
-        commentary: { said: line, evidence: "", community: "" },
-        evidence: [],
-      });
-      persist();
-      renderStatements();
-      renderCommentary();
-    });
-
-    var buildSb = $("vp-build-storyboard");
-    if (buildSb) buildSb.addEventListener("click", function () {
-      buildStoryboard();
-      document.querySelectorAll(".vp-step").forEach(function (b) {
-        if (b.dataset.vpStep === "storyboard") b.classList.add("done");
-      });
-    });
-
-    var renderBtn = $("vp-start-render");
-    if (renderBtn) renderBtn.addEventListener("click", function () {
-      var bar = $("vp-render-bar");
-      var status = $("vp-render-status");
-      var out = $("vp-render-out");
-      if (!state.storyboard.length) buildStoryboard();
-      renderBtn.disabled = true;
-      if (status) status.textContent = "Rendering…";
-      renderVideo(function (p) {
-        if (bar) bar.style.width = Math.round(p * 100) + "%";
-      }, function (blob, err) {
-        renderBtn.disabled = false;
-        if (err) { if (status) status.textContent = err; return; }
-        if (bar) bar.style.width = "100%";
-        if (status) status.textContent = "Render complete. Download or preview below.";
-        showRenderOutput(blob);
-        document.querySelectorAll(".vp-step").forEach(function (b) {
-          if (b.dataset.vpStep === "render") b.classList.add("done");
+        safePersist();
+        renderStatements();
+        renderCommentary();
+        return;
+      }
+      if (el.id === "vp-build-storyboard") {
+        buildStoryboard();
+        markStepDone("storyboard");
+        return;
+      }
+      if (el.id === "vp-start-render") {
+        var bar = $("vp-render-bar");
+        var status = $("vp-render-status");
+        if (!state.storyboard.length) buildStoryboard();
+        el.disabled = true;
+        if (status) status.textContent = "Rendering…";
+        renderVideo(function (p) {
+          if (bar) bar.style.width = Math.round(p * 100) + "%";
+        }, function (blob, err) {
+          el.disabled = false;
+          if (err) { if (status) status.textContent = err; return; }
+          if (bar) bar.style.width = "100%";
+          if (status) status.textContent = "Render complete. Download or preview below.";
+          showRenderOutput(blob);
+          markStepDone("render");
         });
-      });
+        return;
+      }
+      if (el.id === "vp-export-project") {
+        syncFromForm();
+        var blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = (state.name || "homesignal-video-project") + ".json";
+        a.click();
+      }
     });
 
-    var exportBtn = $("vp-export-project");
-    if (exportBtn) exportBtn.addEventListener("click", function () {
-      syncFromForm();
-      var blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-      var a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = (state.name || "homesignal-video-project") + ".json";
-      a.click();
+    container.addEventListener("change", function (e) {
+      var el = e.target;
+      if (!el || !container.contains(el)) return;
+
+      if (el.id === "vp-transcript-file") {
+        var file = el.files && el.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          if ($("vp-transcript-paste")) $("vp-transcript-paste").value = reader.result;
+          state.transcriptRaw = reader.result;
+          state.parsed = parseTranscript(state.transcriptRaw);
+          renderTranscript();
+          safePersist();
+        };
+        reader.readAsText(file);
+        return;
+      }
+      if (el.id === "vp-source-video") {
+        var vfile = el.files && el.files[0];
+        if (!vfile) return;
+        if (state.videoObjectUrl) URL.revokeObjectURL(state.videoObjectUrl);
+        state.videoObjectUrl = URL.createObjectURL(vfile);
+        var vid = $("vp-video-preview");
+        if (vid) { vid.src = state.videoObjectUrl; vid.style.display = "block"; }
+        var vreader = new FileReader();
+        vreader.onload = function () {
+          state.videoDataUrl = vreader.result;
+          safePersist();
+        };
+        vreader.readAsDataURL(vfile);
+        return;
+      }
+      if (el.matches && el.matches('input[data-field="start"]')) {
+        var si = parseInt(el.dataset.si, 10);
+        var mi = parseInt(el.dataset.mi, 10);
+        var sec = parseTimecode(el.value);
+        if (state.statements[si] && state.statements[si].matches[mi]) {
+          state.statements[si].matches[mi].start = sec;
+          state.statements[si].matches[mi].end = sec + 4;
+          safePersist();
+        }
+        return;
+      }
+      if (el.classList && el.classList.contains("vp-evidence-upload")) {
+        var evSi = parseInt(el.dataset.si, 10);
+        Array.from(el.files || []).forEach(function (file) {
+          var evReader = new FileReader();
+          evReader.onload = function () {
+            if (!state.statements[evSi].evidence) state.statements[evSi].evidence = [];
+            state.statements[evSi].evidence.push({
+              name: file.name,
+              type: file.type,
+              dataUrl: evReader.result,
+            });
+            safePersist();
+            renderCommentary();
+          };
+          evReader.readAsDataURL(file);
+        });
+      }
+    });
+
+    container.addEventListener("input", function (e) {
+      var el = e.target;
+      if (!el || !container.contains(el)) return;
+      if (el.id === "vp-transcript-search") {
+        renderTranscript(el.value);
+        return;
+      }
+      if (el.matches && el.matches("textarea[data-cfield]")) {
+        var si = parseInt(el.dataset.si, 10);
+        var field = el.dataset.cfield;
+        if (!state.statements[si].commentary) state.statements[si].commentary = {};
+        state.statements[si].commentary[field] = el.value;
+        safePersist();
+      }
     });
   }
-
-  var eventsWired = false;
 
   function ensureRenderLabel() {
     var renderBtn = $("vp-start-render");
     if (renderBtn) renderBtn.textContent = "Browser Preview Export — WebM";
   }
 
-  function bootVideoProducer() {
+  function bootVideoProducer(container) {
     if (!$("video-producer-root")) return;
     ensureRenderLabel();
+    ensureFetchTranscriptButton();
     var list = loadProjects();
-    if (list.length) loadProject(list[0]);
+    var current = state.id && list.find(function (p) { return p.id === state.id; });
+    if (current) loadProject(current);
+    else if (list.length) loadProject(list[0]);
     else startNewDraft();
-    wireEvents();
+    if (container) wireEvents(container);
     setStep("source");
+  }
+
+  function refreshVideoProducer() {
+    if (!$("video-producer-root")) return;
+    renderProjectChips();
+    renderTranscript();
+    renderStatements();
+    renderCommentary();
+    renderStoryboard();
+  }
+
+  function rebootVideoProducer(container) {
+    bootVideoProducer(container);
   }
 
   window.HomeSignalVideoProducer = {
     init: function (container, payload) {
       if (!container) return;
-      if (container.getAttribute("data-vp-initialized") === "1") return;
       if (!container.querySelector("#video-producer-root")) return;
+      wireEvents(container);
+      if (container.getAttribute("data-vp-initialized") === "1") {
+        refreshVideoProducer();
+        return;
+      }
       container.setAttribute("data-vp-initialized", "1");
-      bootVideoProducer();
+      bootVideoProducer(container);
+    },
+    refresh: function (container) {
+      if (!container || !container.querySelector("#video-producer-root")) return;
+      refreshVideoProducer();
+    },
+    reboot: function (container) {
+      if (!container || !container.querySelector("#video-producer-root")) return;
+      rebootVideoProducer(container);
     }
   };
 })();
