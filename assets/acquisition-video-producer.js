@@ -825,19 +825,42 @@
     if (!$("video-producer-root")) return;
     ensureRenderLabel();
     var list = loadProjects();
-    if (list.length) loadProject(list[0]);
+    var current = state.id && list.find(function (p) { return p.id === state.id; });
+    if (current) loadProject(current);
+    else if (list.length) loadProject(list[0]);
     else startNewDraft();
     wireEvents();
     setStep("source");
   }
 
+  function refreshVideoProducer() {
+    if (!$("video-producer-root")) return;
+    renderProjectChips();
+  }
+
+  function rebootVideoProducer() {
+    eventsWired = false;
+    bootVideoProducer();
+  }
+
   window.HomeSignalVideoProducer = {
     init: function (container, payload) {
       if (!container) return;
-      if (container.getAttribute("data-vp-initialized") === "1") return;
       if (!container.querySelector("#video-producer-root")) return;
+      if (container.getAttribute("data-vp-initialized") === "1") {
+        refreshVideoProducer();
+        return;
+      }
       container.setAttribute("data-vp-initialized", "1");
       bootVideoProducer();
+    },
+    refresh: function (container) {
+      if (!container || !container.querySelector("#video-producer-root")) return;
+      refreshVideoProducer();
+    },
+    reboot: function (container) {
+      if (!container || !container.querySelector("#video-producer-root")) return;
+      rebootVideoProducer();
     }
   };
 })();

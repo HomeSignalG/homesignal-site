@@ -160,6 +160,28 @@ try {
   }));
   ok(formB.name === 'smoke test 3' && formB.speaker === 'Speaker B edited',
     'switch to B — form restores B state');
+
+  // 7. Simulated auth refresh re-render keeps project chips visible
+  await page.evaluate(function () { window.hsOnAuthChange(); });
+  await page.waitForTimeout(500);
+  chips = await chipLabels();
+  ok(chips.length === 2 && chips.includes('smoke test 2') && chips.includes('smoke test 3'),
+    'auth refresh re-render — both project chips remain visible');
+
+  const activeAfterRefresh = await page.evaluate(() => document.getElementById('vp-project-name')?.value || '');
+  ok(activeAfterRefresh === 'smoke test 3',
+    'auth refresh re-render — active project selection preserved');
+
+  // 8. Forced DOM replace + reboot restores chips from localStorage
+  await page.evaluate(function (html) {
+    var c = document.getElementById('tab-videoproducer');
+    c.innerHTML = html;
+    window.HomeSignalVideoProducer.reboot(c);
+  }, sampleVpHtml);
+  await page.waitForTimeout(300);
+  chips = await chipLabels();
+  ok(chips.length === 2 && chips.includes('smoke test 2') && chips.includes('smoke test 3'),
+    'reboot after DOM replace — project chips restored from localStorage');
 } finally {
   await browser.close();
   srv.close();
