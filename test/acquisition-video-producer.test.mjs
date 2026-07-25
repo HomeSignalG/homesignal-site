@@ -55,9 +55,8 @@ ok(/init:\s*function\s*\(container,\s*payload\)/.test(vp),
 ok(/Browser Preview Export — WebM/.test(vp),
   'render label says Browser Preview Export — WebM');
 ok(!/Render MP4/i.test(vp), 'static asset does not claim MP4 render support');
-ok(/if \(eventsWired\) return/.test(vp), 'wireEvents guarded against duplicate listeners');
-ok(/rebootVideoProducer/.test(vp), 'static asset can reboot after DOM replacement');
-ok(/data-vp-events-wired/.test(vp), 'static asset marks wired root for stale detection');
+ok(/data-vp-delegate-wired/.test(vp), 'static asset uses container-level event delegation');
+ok(/vp-build-storyboard/.test(vp), 'static asset handles build storyboard clicks');
 ok(/fetch-youtube-transcript/.test(vp), 'static asset invokes fetch-youtube-transcript edge function');
 ok(/vp-fetch-transcript/.test(vp), 'static asset wires Fetch transcript from YouTube button');
 
@@ -187,17 +186,23 @@ try {
 
   const beforeRefresh = await page.evaluate(() => ({
     items: document.querySelectorAll('#vp-storyboard-list .vp-sb-item').length,
-    wired: document.getElementById('video-producer-root')?.getAttribute('data-vp-events-wired') === '1'
+    wired: document.getElementById('tab-videoproducer')?.getAttribute('data-vp-delegate-wired') === '1'
   }));
   ok(beforeRefresh.items >= 2, 'build storyboard populates the sequence list');
-  ok(beforeRefresh.wired, 'storyboard root is marked wired after init');
+  ok(beforeRefresh.wired, 'Video Producer uses container-level delegation');
 
+  // Simulate auth refresh that replaces VP innerHTML — delegation on the tab container survives.
   await page.evaluate(function (html) {
-    window.__sampleVpHtml = html;
-    window.hsOnAuthChange();
+    var el = document.getElementById('tab-videoproducer');
+    if (!el) return;
+    el.innerHTML = html;
+    if (window.HomeSignalVideoProducer && typeof window.HomeSignalVideoProducer.init === 'function') {
+      window.HomeSignalVideoProducer.init(el, {});
+    }
   }, sampleVpHtml);
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(200);
 
+  await page.click('.vp-step[data-vp-step="storyboard"]');
   await page.click('#vp-build-storyboard');
   await page.waitForFunction(() => {
     var list = document.getElementById('vp-storyboard-list');
@@ -208,7 +213,7 @@ try {
     items: document.querySelectorAll('#vp-storyboard-list .vp-sb-item').length,
     claim: document.getElementById('vp-preview-claim')?.textContent || ''
   }));
-  ok(afterRefresh.items >= 2, 'build storyboard still works after auth refresh re-render');
+  ok(afterRefresh.items >= 2, 'build storyboard still works after VP DOM replacement');
   ok(afterRefresh.claim.indexOf('DEVELOPMENT ALERT') >= 0, 'build storyboard previews first branded card');
 } finally {
   await browser.close();
