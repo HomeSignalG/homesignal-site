@@ -485,13 +485,26 @@ HS.onReady(function(){
   var APIKEY   = "sb_publishable_ZLf937bYRsWOVeTDVaHI7Q_LKfDmsE-"; // public key, safe in the browser
   var SUPABASE_URL = ENDPOINT.replace(/\/functions\/v1\/.*$/, "");  // REST base for the ZIP-mode cache read
   var COLORS = HS.LIFECYCLE_HEX;
-  // Development lifecycle buckets (Brockovich model): operating -> approved -> proposed.
-  var LEGEND = [
-    { b:"built",    c:COLORS.built,    t:"Operating now" },
-    { b:"approved", c:COLORS.approved, t:"Approved" },
-    { b:"proposed", c:COLORS.proposed, t:"Proposed" }
-  ];
-  var FILTER = { built:true, approved:true, proposed:true };
+  // Development lifecycle buckets (Brockovich model): operating -> approved -> proposed
+  // -> unknown. GENERATED from HS.STATUS_LEGEND_ROWS (lib/map.js) so this page's legend
+  // cannot drift from the resolver's lifecycle vocabulary — the previous hand-listed
+  // array omitted `unknown`, so records the source gives no lifecycle for rendered in a
+  // colour the legend never explained. The facility row is excluded here (facilities get
+  // their own shape-legend row, not a lifecycle chip).
+  var TRACKER_LABELS = { operating:"Operating now", approved:"Approved", proposed:"Proposed",
+                         unknown:"Lifecycle unknown" };
+  var LEGEND = (HS.STATUS_LEGEND_ROWS || []).filter(function(r){ return r.key !== "facility"; })
+    .map(function(r){
+      return { b: r.key, c: (COLORS[r.key] != null ? COLORS[r.key] : r.hex),
+               t: TRACKER_LABELS[r.key] || r.label };
+    })
+    .sort(function(a,b){
+      var ord = { operating:0, approved:1, proposed:2, unknown:3 };
+      return (ord[a.b] == null ? 9 : ord[a.b]) - (ord[b.b] == null ? 9 : ord[b.b]);
+    });
+  var FILTER = {};
+  LEGEND.forEach(function(it){ FILTER[it.b] = true; });
+  FILTER.built = true;                          // legacy alias (cached rows stamp type='built')
   var siteMarkers = [];
   var MAP_SITES = [];              // current sites, shared by the 2D map and both 3D views
   var LAST_DRAW = null;            // {data,sites} of the last render — lets a radius change re-cull/re-frame the ZIP view with no network pull
@@ -520,7 +533,19 @@ HS.onReady(function(){
   // HomeSignal house logo, reused as the "your home" marker across all three maps.
   var HOME_SVG = "<svg width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='#fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z'/><path d='M9.5 20.5v-6h5v6'/></svg>";
   function homePinEl(){ var el=document.createElement("div"); el.className="homepin"; el.innerHTML=HOME_SVG; return el; }
-  function bucketOf(t){ return t==="built" ? "built" : (t==="approved" ? "approved" : "proposed"); }
+  // ONE lifecycle authority. Delegates to the shared resolver (lib/map.js
+  // trackerSiteItem/resolveMarker) so the map filter, the legend, the popup and the app
+  // map cannot disagree. The old form —
+  //     t==="built" ? "built" : t==="approved" ? "approved" : "proposed"
+  // — asserted "proposed" for ANY record with no lifecycle evidence, and there was no
+  // `unknown` bucket to fall into. Returns the CANONICAL key verbatim (operating, not the
+  // legacy "built" spelling) so the legend chip, the filter map and the 3D views key on
+  // one vocabulary.
+  function bucketOf(t, site){
+    var s = site || { type: t };
+    var lc = (HS.resolveTrackerMarker ? HS.resolveTrackerMarker(s, function(){ return ""; }).lifecycle : null);
+    return lc || "unknown";   // operating | approved | proposed | unknown — verbatim
+  }
   // ───────────────────── LIFECYCLE STAGE LABEL — the ONE source of truth for a record's words ──────────
   // A record's resident-facing stage MUST come from the SAME signal that colours its dot, or the two
   // disagree (the 12,000-page bug: an orange "proposed" dot whose popup read "operating now", and a
@@ -1103,7 +1128,7 @@ HS.onReady(function(){
       .concat(dev.filter(function(s){ return bucketOf(s.type)==="approved"; }));
     var prop = permits.filter(function(s){ return bucketOf(s.type)==="proposed"; })
       .concat(dev.filter(function(s){ return bucketOf(s.type)==="proposed"; }));
-    var builtRows = permits.filter(function(s){ return bucketOf(s.type)==="built"; }).concat(fac);
+    var builtRows = permits.filter(function(s){ return bucketOf(s.type, s)==="operating"; }).concat(fac);
     // "Open for public comment" (Task 5) = exactly the records the engine stamped comment_open=true.
     // The page renders these as commentable, so the counter (counts.comment_open) === this set.
     var today = new Date().toISOString().slice(0,10);
@@ -1257,7 +1282,7 @@ HS.onReady(function(){
       var m = L.marker(ll, { icon: L.divIcon({ html: html, className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2] }) });
       m.bindPopup(popupHTML(s));
       m.on("mouseover", function(){ this.openPopup(); });
-      siteMarkers.push({ m:m, bucket:bucketOf(s.type), s:s });
+      siteMarkers.push({ m:m, bucket:bucketOf(s.type, s), s:s });
       bounds.push(ll);
     });
     applyFilter();
@@ -1611,7 +1636,7 @@ HS.onReady(function(){
     // Frame the view to where the buildings actually are (not the empty outer radius),
     // so it reads well at every radius. maxD = farthest visible facility from home.
     var maxD=0, nLabelable=0;
-    MAP_SITES.forEach(function(p){ if(!mappable(p))return; if(!FILTER[bucketOf(p.type)])return;
+    MAP_SITES.forEach(function(p){ if(!mappable(p))return; if(!FILTER[bucketOf(p.type, p)])return;
       var en=siteEN(p); if(typeof en[0]!=="number"||typeof en[1]!=="number")return; var dd=Math.hypot(en[0],en[1]);
       if(dd<=CUR_RADIUS+0.3){ maxD=Math.max(maxD,dd); if(bucketOf(p.type)!=="proposed") nLabelable++; } });
     // Readability: floating type-labels only when few enough not to collide. In a dense
@@ -1629,7 +1654,7 @@ HS.onReady(function(){
       var en=siteEN(p);
       if(typeof en[0]!=="number"||typeof en[1]!=="number")return;
       if(!mappable(p))return;
-      var bkt=bucketOf(p.type);
+      var bkt=bucketOf(p.type, p);
       if(!FILTER[bkt])return;
       if(Math.hypot(en[0],en[1])>CUR_RADIUS+0.3)return;   // keep in sync with the chosen radius
       var d=dims[p.layer]||[16,30],w=d[0],h=bkt==="proposed"?Math.min(d[1],26):d[1],x=mi(en[0]),zc=mi(-en[1]);

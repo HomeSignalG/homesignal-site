@@ -9,7 +9,10 @@ await import('../lib/map.js');
 const HS = global.window.HS;
 
 const CASES = [
-  { label: 'Data Center / Proposed', item: { type: 'Data Center', status: 'Proposed' }, shape: 'square', color: '#c47a1a' },
+  // Data Center moved square → OCTAGON in the maps-backbone repair: `square` is the
+  // Regulated-facility symbol, and one symbol may not carry two semantic categories
+  // (test/maps-category-contract.test.mjs asserts symbol uniqueness).
+  { label: 'Data Center / Proposed', item: { type: 'Data Center', status: 'Proposed' }, shape: 'octagon', color: '#c47a1a' },
   { label: 'Industrial / Active', item: { type: 'Industrial', status: 'Active' }, shape: 'triangle', color: '#1f9d5c' },
   { label: 'Residential / Active', item: { type: 'Residential', status: 'Active' }, shape: 'pentagon', color: '#1f9d5c' },
   { label: 'Infrastructure / Approved', item: { type: 'Infrastructure', status: 'Approved' }, shape: 'diamond', color: '#3f7fb0' },

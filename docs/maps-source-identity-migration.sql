@@ -1,0 +1,64 @@
+-- docs/maps-source-identity-migration.sql
+-- PARKED — NOT APPLIED. Apply in the Supabase SQL editor when the maps-backbone repair
+-- is approved for production (this session was explicitly told: no deployment).
+--
+-- WHY -----------------------------------------------------------------------------
+-- `app_refresh_zip` writes `registry_id` on the FACILITY insert but omits it on the
+-- DEVELOPMENT insert, so every development row in `app_projects` carries registry_id
+-- NULL. Verified on the maps-backbone reference page:
+--
+--   select record_kind, coalesce(registry_id,'(none)') reg, count(*)
+--     from public.app_projects where zip='78617' group by 1,2;
+--   -- development | (none) | 428      <-- source identity lost
+--   -- facility    | 1100…  | 1 each   <-- source identity preserved
+--
+-- Consequence: once a record reaches the app layer you cannot say WHICH source produced
+-- it, so the maps-backbone acceptance test "source identity survives adapter → normalized
+-- record → cache → materializer → API → browser" cannot be enforced there, and a
+-- per-source recall (e.g. "retract everything austin-site-plan-cases emitted") is
+-- impossible without re-deriving from the cache.
+--
+-- WHAT THIS CHANGES ---------------------------------------------------------------
+-- One column in one INSERT. The development insert now carries the cached record's
+-- `source_registry_id` (the engine's canonical source key) into app_projects.registry_id,
+-- exactly as the facility insert already carries the EPA registry id. No other column,
+-- predicate, ordering term, or count changes — the FD-1 ordering contract is untouched.
+--
+-- SAFETY --------------------------------------------------------------------------
+-- * Purely additive: rows that had NULL gain a value; nothing is deleted or re-shaped.
+-- * Idempotent: re-running app_refresh_zip(zip) rebuilds the same rows.
+-- * Takes effect per ZIP on that ZIP's next refresh — no bulk rewrite is triggered.
+-- * `registry_id` already exists on app_projects (used by facilities), so there is NO
+--   schema change and no migration of existing data.
+--
+-- AFTER APPLYING ------------------------------------------------------------------
+--   select public.app_refresh_zip('78617');
+--   select record_kind, coalesce(registry_id,'(none)') reg, count(*)
+--     from public.app_projects where zip='78617' group by 1,2 order by 1,3 desc;
+--   -- expect: development | austin-site-plan-cases | 267
+--   --         development | austin-subdivision-cases | 156
+--   --         development | (none) | 5        <-- TABS, until it is on the registry contract
+--
+-- The full function body is NOT duplicated here: copy the live definition
+--   select pg_get_functiondef(p.oid) from pg_proc p
+--     join pg_namespace n on n.oid = p.pronamespace
+--    where n.nspname='public' and p.proname='app_refresh_zip';
+-- and apply exactly the two edits below inside the DEVELOPMENT insert.
+
+-- EDIT 1 — add the column to the development insert's column list:
+--
+--     insert into public.app_projects (community_id, zip, name, type, status, stage,
+--       developer, size, investment, submitted_at, lat, lng, impact_score, source_ref,
+--       record_kind, registry_id)                       -- <<< add registry_id
+--
+-- EDIT 2 — add the matching select term, immediately after the record_kind literal:
+--
+--       coalesce(el->>'record_url', el->>'url'), 'development',
+--       nullif(el->>'source_registry_id','')            -- <<< add this line
+--
+-- Nothing else in the function changes.
+
+-- VERIFICATION QUERY (run after the next refresh of any dev-backed ZIP):
+--   select count(*) filter (where record_kind='development' and registry_id is null) as dev_without_source
+--     from public.app_projects where zip = '78617';
+--   -- expect 5 (the TABS rows) and 0 once TABS is on the normalized contract.

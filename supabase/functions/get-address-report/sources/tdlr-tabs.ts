@@ -30,7 +30,8 @@ export interface TabsSite {
   // v15 core fields
   label: string;
   scope: "point";                       // TABS records carry real street addresses
-  type: "built" | "approved";           // TABS has no "proposed" phase (see mapStatus)
+  /** null = the filing evidences no lifecycle; renders as the `unknown` state. */
+  type: "built" | "approved" | null;    // TABS has no "proposed" phase (see mapStatus)
   layer: string;                        // classified from scope_text (see classifyLayer)
   lat?: number;
   lng?: number;
@@ -282,6 +283,14 @@ async function normalize(
     record_url: recordUrl(p.project_no),
     project_no: p.project_no,
   };
+  // Absent stays absent: a null lifecycle is REMOVED from the emitted record (not sent
+  // as null) and replaced with an explicit, auditable reason, so every consumer sees
+  // "no lifecycle stated" rather than inventing one.
+  if (site.type === null) {
+    delete (site as { type?: unknown }).type;
+    (site as { lifecycle_unknown_reason?: string }).lifecycle_unknown_reason =
+      "TDLR TABS filing states no project status and no completion date";
+  }
   // Carry the geocode quality through (absent stays absent). Lets the page style markers
   // off match_type and a review queue surface flagged points — no manual coord-checking.
   if (geo.match_type) site.match_type = geo.match_type;
@@ -330,10 +339,17 @@ async function normalize(
  * non-terminal statuses fall back to the FILED completion date with a 90-day
  * grace, so a just-passed estimate doesn't flip a live project to built.
  */
-export function mapStatus(statusText?: string, endDate?: string): "built" | "approved" {
+export function mapStatus(statusText?: string, endDate?: string): "built" | "approved" | null {
   const s = (statusText || "").toLowerCase();
   if (/closed|inspection complete|project complete/.test(s)) return "built";
   if (endDate && daysSince(endDate) > 90) return "built"; // filed completion long passed
+  // EVIDENCE-BOUNDED (maps-backbone repair): a filing that states NO status and has no
+  // filed end date evidences no lifecycle. It previously fell through to "approved",
+  // which the tracker page then rendered as a lifecycle pin and the materializer turned
+  // into "On file" — the same record asserting two different states on two pages, both
+  // unsupported. Returning null lets the record render under the first-class `unknown`
+  // lifecycle instead of a fabricated one.
+  if (s.trim() === "" && !endDate) return null;
   return "approved";
 }
 
