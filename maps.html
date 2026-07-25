@@ -1084,9 +1084,67 @@ HS.onReady(async function () {
       showHome: hasRealHome, homeLabel: hasRealHome ? home.address : '', w: 780, h: 520
     });
     overlaySchematicClicks(document.getElementById('mapSch'), items);
+    // Focus completeness (2026-07-24): the lettered A–P set is only the nearest 16.
+    // Plot the FULL uncapped remainder too (every visible dev record + facilities
+    // beyond the nearest set) with each record's canonical TYPE shape + STATUS color,
+    // so Focus shows the same complete status/type symbology the tile modes' rest
+    // layer carries — never a 16-pin subset dominated by the facility overlay.
+    overlayRestPins(document.getElementById('mapSch'), restItems(items));
     overlayFacilities(document.getElementById('mapSch'), items);
+    // Focus-completeness CI hook (verify-maps): the schematic must plot EVERY visible
+    // record + EVERY mappable facility — the same complete set the tile rest layer
+    // carries — so focusMarkerCount MUST equal visibleTotal + all mappable facilities.
+    if (window.__HS_MAP) {
+      var sch = document.getElementById('mapSch');
+      var lettered = sch ? sch.querySelectorAll('g[data-pin-idx]').length : 0;
+      var restPins = sch ? sch.querySelectorAll('svg g.hspin:not([data-pin-idx])').length : 0;
+      var facPins  = sch ? sch.querySelectorAll('svg rect[role="button"]').length : 0;
+      window.__HS_MAP.focusMarkerCount = lettered + restPins + facPins;
+      window.__HS_MAP.focusExpected = (window.__HS_MAP.visibleTotal || 0) + facs.length + restFacs.length;
+    }
     setGps(items); renderInfo(items);
     wirePanel(function(){ if (opts.mode==='impact') drawSchematic(); else drawTiles(); });
+  }
+  // Plot the uncapped rest set into the schematic SVG as canonical shaped+colored pins
+  // (no letter — the A–P letters stay the nearest-16 emphasis). Uses the SAME resolver
+  // as every other surface (HS.resolveMarker → type shape + status color; facilities →
+  // purple square) so Focus can never diverge from the tile modes' symbology. Built as
+  // ONE string + a single delegated listener (dense ZIPs can carry thousands of records —
+  // per-node DOM creation + per-pin listeners would stall the default view). A facility
+  // rest point opens the facility detail; a development point opens the project panel.
+  function overlayRestPins(el, restSet) {
+    if (!restSet || !restSet.length) return;
+    var svg = el && el.querySelector('svg'); if (!svg) return;
+    var w = 780, h = 520, cx = w / 2, cy = h / 2, radiusPx = Math.min(w, h) * 0.29,
+        pxPerMile = radiusPx / opts.radiusMi, hLat = center.lat, hLng = center.lng;
+    var plotted = [], html = '';
+    restSet.forEach(function (it) {
+      if (it.lat == null || it.lng == null) return;
+      var mk = HS.resolveMarker(it);
+      var north = (it.lat - hLat) * 69, east = (it.lng - hLng) * 69 * Math.cos(hLat * Math.PI / 180);
+      var x = Math.max(14, Math.min(w - 14, cx + east * pxPerMile)),
+          y = Math.max(14, Math.min(h - 14, cy - north * pxPerMile));
+      var i = plotted.length; plotted.push(it);
+      var tip = (mk.typeLabel || it.type || (it._restFacility ? 'Regulated facility' : 'Record')) + ' · ' + (it.name || it.title || '');
+      html += '<g class="hspin" data-rest-idx="' + i + '" role="button" tabindex="0" aria-label="'
+        + HS.esc(mk.popupLabel) + '" style="cursor:pointer">'
+        + HS.shapeEl(mk.shape, x, y, 9, mk.color, 2.2) + '<title>' + HS.esc(tip) + '</title></g>';
+    });
+    if (!html) return;
+    // ONE group, drawn UNDER the lettered pins + home so the nearest-16 stay legible.
+    var group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', 'hs-rest-pins');
+    group.innerHTML = html;
+    var anchor = svg.querySelector('g[data-pin-idx]') || svg.querySelector('.hs-home') || null;
+    if (anchor) svg.insertBefore(group, anchor); else svg.appendChild(group);
+    var open = function (idx) { var it = plotted[idx]; if (!it) return; if (it._restFacility) selectFacility(it); else openItem(it); };
+    group.addEventListener('click', function (e) {
+      var g = e.target.closest && e.target.closest('g[data-rest-idx]'); if (g) open(+g.getAttribute('data-rest-idx'));
+    });
+    group.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var g = e.target.closest && e.target.closest('g[data-rest-idx]'); if (g) { e.preventDefault(); open(+g.getAttribute('data-rest-idx')); }
+    });
   }
   // Make the schematic pins clickable → open the info panel (same as the tile markers).
   function overlaySchematicClicks(el, items) {
