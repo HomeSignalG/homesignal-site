@@ -755,9 +755,11 @@
     var list = $("vp-storyboard-list");
     if (!list) return;
     if (!state.storyboard.length) {
+      list.removeAttribute("role");
       list.innerHTML = '<p class="muted">Click “Build / refresh storyboard” to generate the sequence.</p>';
       return;
     }
+    list.setAttribute("role", "list");
     list.innerHTML = state.storyboard.map(function (item, i) {
       // Defensive: a hand-edited or truncated storage record can carry an item
       // with no `type`. Reading .replace off undefined used to throw out of
@@ -767,8 +769,12 @@
       var type = typeof item.type === "string" && item.type ? item.type : "unknown";
       var preview = item.text || item.label || type;
       if (type === "alert") preview = (item.title || "") + " — " + (item.subtitle || "");
-      return '<div class="vp-sb-item" draggable="true" data-ix="' + i + '">' +
-        '<span class="vp-sb-handle">⠿</span>' +
+      return '<div class="vp-sb-item" draggable="true" data-ix="' + i + '"' +
+        ' tabindex="0" role="listitem"' +
+        ' aria-label="' + esc(type.replace("_", " ")) + " " + (i + 1) + " of " + state.storyboard.length +
+        '. Hold Alt and press arrow up or down to reorder."' +
+        '>' +
+        '<span class="vp-sb-handle" aria-hidden="true">⠿</span>' +
         '<div><div class="vp-sb-type">' + esc(type.replace("_", " ")) + '</div>' +
         '<div class="vp-sb-preview">' + esc(String(preview).slice(0, 120)) + "</div></div>" +
         '<button type="button" class="vp-btn secondary vp-sb-preview-btn" data-ix="' + i + '" style="padding:4px 8px;font-size:11px">Preview</button></div>';
@@ -792,12 +798,37 @@
         if (dragIx === null || dragIx === dropIx) return;
         var item = state.storyboard.splice(dragIx, 1)[0];
         state.storyboard.splice(dropIx, 0, item);
-        if (safePersist()) setStoryboardStatus("Order saved — " + state.storyboard.length + " items.", false);
-        else setStoryboardStatus("New order COULD NOT BE SAVED — browser storage is full.", true);
-        renderStoryboard();
-        previewCard(state.storyboard[0]);
+        moveStoryboardItem(dragIx, dropIx);
+      });
+
+      // Keyboard equivalent of the drag handle — dragging was the ONLY way to
+      // reorder, which left the sequence unusable without a mouse.
+      row.addEventListener("keydown", function (e) {
+        if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+        if (!e.altKey && !e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+        var from = parseInt(row.dataset.ix, 10);
+        var to = e.key === "ArrowUp" ? from - 1 : from + 1;
+        if (to < 0 || to >= state.storyboard.length) return;
+        moveStoryboardItem(from, to);
+        var moved = list.querySelector('.vp-sb-item[data-ix="' + to + '"]');
+        if (moved) moved.focus();
       });
     });
+  }
+
+  function moveStoryboardItem(from, to) {
+    if (from === null || isNaN(from) || isNaN(to) || from === to) return;
+    var item = state.storyboard.splice(from, 1)[0];
+    state.storyboard.splice(to, 0, item);
+    if (safePersist()) {
+      setStoryboardStatus("Moved “" + (item.label || item.type || "item") + "” to position " +
+        (to + 1) + " of " + state.storyboard.length + ". Order saved.", false);
+    } else {
+      setStoryboardStatus("New order COULD NOT BE SAVED — browser storage is full.", true);
+    }
+    renderStoryboard();
+    previewCard(state.storyboard[0]);
   }
 
   function previewCard(item) {
