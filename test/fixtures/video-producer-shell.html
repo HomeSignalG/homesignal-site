@@ -1,0 +1,92 @@
+<div class="vp-wrap" id="video-producer-root">
+  <section class="card">
+    <h3>Video Producer</h3>
+    <p class="sub">Internal ops tool for investigative videos.</p>
+    <div class="vp-projects" id="vp-projects"></div>
+    <div class="vp-steps" id="vp-steps">
+      <button type="button" class="vp-step active" data-vp-step="source">1 · Source</button>
+      <button type="button" class="vp-step" data-vp-step="statements">2 · Statements</button>
+      <button type="button" class="vp-step" data-vp-step="commentary">3 · Commentary</button>
+      <button type="button" class="vp-step" data-vp-step="storyboard">4 · Storyboard</button>
+      <button type="button" class="vp-step" data-vp-step="render">5 · Render</button>
+    </div>
+  </section>
+
+  <div class="vp-panel active" id="vp-panel-source">
+    <section class="card">
+      <h3>Step 1 — Source</h3>
+      <div class="vp-row">
+        <div class="vp-field"><label for="vp-project-name">Project name</label><input id="vp-project-name" type="text"></div>
+        <div class="vp-field"><label for="vp-speaker">Speaker</label><input id="vp-speaker" type="text"></div>
+      </div>
+      <div class="vp-field"><label for="vp-youtube">YouTube URL</label><input id="vp-youtube" type="url"></div>
+      <div class="vp-row">
+        <div class="vp-field"><label for="vp-source-video">Upload source video</label><input id="vp-source-video" type="file" accept="video/*"></div>
+        <div class="vp-field"><label for="vp-transcript-file">Upload transcript</label><input id="vp-transcript-file" type="file" accept=".txt,.vtt,.srt,text/plain"></div>
+      </div>
+      <video id="vp-video-preview" class="vp-video-preview" controls style="display:none"></video>
+      <div class="vp-field"><label for="vp-transcript-paste">Paste transcript</label><textarea id="vp-transcript-paste"></textarea></div>
+      <div class="vp-toolbar">
+        <button type="button" class="vp-btn" id="vp-analyze-transcript">Analyze transcript</button>
+        <button type="button" class="vp-btn secondary" id="vp-save-project">Save project</button>
+        <button type="button" class="vp-btn secondary" id="vp-new-project">New project</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="vp-panel" id="vp-panel-statements">
+    <section class="card">
+      <h3>Step 2 — Statements</h3>
+      <div class="vp-toolbar">
+        <input id="vp-transcript-search" type="text" placeholder="Search transcript…">
+        <button type="button" class="vp-btn secondary" id="vp-add-statement">Add statement</button>
+      </div>
+      <div class="vp-field"><label for="vp-statement-input">Paste statements</label><textarea id="vp-statement-input" rows="3"></textarea></div>
+      <div class="vp-toolbar"><button type="button" class="vp-btn" id="vp-locate-statements">Locate in transcript</button></div>
+      <div class="vp-row">
+        <div><div class="vp-transcript" id="vp-transcript-view">No transcript yet.</div></div>
+        <div id="vp-statements-list"><p class="muted">Statements appear here.</p></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="vp-panel" id="vp-panel-commentary">
+    <section class="card">
+      <h3>Step 3 — Commentary</h3>
+      <div id="vp-commentary-list"><p class="muted">Add statements first.</p></div>
+    </section>
+  </div>
+
+  <div class="vp-panel" id="vp-panel-storyboard">
+    <section class="card">
+      <h3>Step 4 — Storyboard</h3>
+      <div class="vp-toolbar">
+        <button type="button" class="vp-btn" id="vp-build-storyboard">Build / refresh storyboard</button>
+      </div>
+      <div class="vp-card-preview" id="vp-card-preview">
+        <div class="vp-claim" id="vp-preview-claim">Preview</div>
+        <div class="vp-body" id="vp-preview-body"></div>
+      </div>
+      <div class="vp-storyboard" id="vp-storyboard-list"></div>
+    </section>
+  </div>
+
+  <div class="vp-panel" id="vp-panel-render">
+    <section class="card">
+      <h3>Step 5 — Render</h3>
+      <div class="vp-row">
+        <div class="vp-field"><label for="vp-aspect">Aspect ratio</label>
+          <select id="vp-aspect"><option value="landscape">Landscape (16:9)</option></select>
+        </div>
+        <div class="vp-field"><label><input type="checkbox" id="vp-captions" checked> Burn-in captions</label></div>
+      </div>
+      <div class="vp-toolbar">
+        <button type="button" class="vp-btn" id="vp-start-render">Render MP4</button>
+        <button type="button" class="vp-btn secondary" id="vp-export-project">Export project JSON</button>
+      </div>
+      <div class="vp-progress"><div id="vp-render-bar"></div></div>
+      <p class="vp-hint" id="vp-render-status">Ready.</p>
+      <div class="vp-render-out" id="vp-render-out"></div>
+    </section>
+  </div>
+</div>
