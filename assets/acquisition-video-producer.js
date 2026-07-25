@@ -796,8 +796,6 @@
         row.classList.remove("drag-over");
         var dropIx = parseInt(row.dataset.ix, 10);
         if (dragIx === null || dragIx === dropIx) return;
-        var item = state.storyboard.splice(dragIx, 1)[0];
-        state.storyboard.splice(dropIx, 0, item);
         moveStoryboardItem(dragIx, dropIx);
       });
 
