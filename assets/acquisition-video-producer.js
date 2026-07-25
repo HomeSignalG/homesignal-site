@@ -159,6 +159,25 @@
     catch (e) { return []; }
   }
 
+  function sanitizeStatements(stmts) {
+    if (!Array.isArray(stmts)) return [];
+    return stmts.map(function (st) {
+      var out = {
+        id: st.id,
+        text: st.text || "",
+        matches: Array.isArray(st.matches) ? st.matches : [],
+        commentary: st.commentary || {},
+        evidence: [],
+      };
+      if (Array.isArray(st.evidence)) {
+        out.evidence = st.evidence.map(function (ev) {
+          return { name: ev.name || "", type: ev.type || "" };
+        });
+      }
+      return out;
+    });
+  }
+
   function sanitizeProjectRecord(rec) {
     if (!rec || typeof rec !== "object") return null;
     var clean = {
@@ -169,12 +188,10 @@
       transcriptRaw: rec.transcriptRaw || "",
       parsed: rec.parsed || parseTranscript(rec.transcriptRaw || ""),
       hasSourceVideo: !!(rec.hasSourceVideo || rec.videoDataUrl),
-      statements: Array.isArray(rec.statements) ? rec.statements : [],
+      statements: sanitizeStatements(rec.statements),
       storyboard: Array.isArray(rec.storyboard) ? rec.storyboard : [],
       updatedAt: rec.updatedAt || new Date().toISOString(),
     };
-    // Drop legacy base64 video blobs — they exceed localStorage quota and break all saves.
-    delete clean.videoDataUrl;
     return clean;
   }
 
@@ -190,7 +207,28 @@
       return true;
     } catch (e) {
       console.error("Video Producer: could not compact stored projects", e);
-      return false;
+      try {
+        var minimal = sanitizeProjectList(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")).map(function (p) {
+          return {
+            id: p.id,
+            name: p.name,
+            youtube: p.youtube,
+            speaker: p.speaker,
+            transcriptRaw: (p.transcriptRaw || "").slice(0, 50000),
+            parsed: p.parsed,
+            hasSourceVideo: !!p.hasSourceVideo,
+            statements: sanitizeStatements(p.statements),
+            storyboard: p.storyboard || [],
+            updatedAt: p.updatedAt || new Date().toISOString(),
+          };
+        });
+        localStorage.removeItem(STORAGE_KEY);
+        saveProjects(minimal);
+        return true;
+      } catch (e2) {
+        console.error("Video Producer: storage repair failed", e2);
+        return false;
+      }
     }
   }
 
