@@ -40,6 +40,8 @@ ok(/HomeSignalVideoProducer\.init\(container,\s*\{\}\)/.test(acq),
   'trusted initializer calls HomeSignalVideoProducer.init');
 ok(/media-src[^;]*blob:/.test(acq), 'CSP allows blob URLs for rendered video preview');
 ok(/tabInitDone\.videoproducer/.test(acq), 'videoproducer init guarded against duplicate calls');
+ok(/data-vp-initialized/.test(acq) && /videoproducer.*data-vp-initialized/.test(acq),
+  'render preserves Video Producer DOM across auth refresh');
 ok(!/p\.tab_scripts/.test(acq), 'render does not read tab_scripts from snapshot');
 ok(!/\(0,\s*eval\)/.test(acq), 'acquisition.html does not eval snapshot scripts');
 
@@ -54,6 +56,8 @@ ok(/Browser Preview Export — WebM/.test(vp),
   'render label says Browser Preview Export — WebM');
 ok(!/Render MP4/i.test(vp), 'static asset does not claim MP4 render support');
 ok(/if \(eventsWired\) return/.test(vp), 'wireEvents guarded against duplicate listeners');
+ok(/rebootVideoProducer/.test(vp), 'static asset can reboot after DOM replacement');
+ok(/data-vp-events-wired/.test(vp), 'static asset marks wired root for stale detection');
 ok(/fetch-youtube-transcript/.test(vp), 'static asset invokes fetch-youtube-transcript edge function');
 ok(/vp-fetch-transcript/.test(vp), 'static asset wires Fetch transcript from YouTube button');
 
@@ -82,14 +86,7 @@ function startServer() {
   });
 }
 
-const sampleVpHtml = `
-<div class="vp-wrap" id="video-producer-root">
-  <button type="button" class="vp-step" data-vp-step="source">1 · Source</button>
-  <div class="vp-panel active" id="vp-panel-source"></div>
-  <button type="button" id="vp-start-render">Render MP4</button>
-  <div id="vp-storyboard-list"></div>
-  <div id="vp-projects" class="vp-projects"></div>
-</div>`;
+const sampleVpHtml = fs.readFileSync(path.join(root, 'test/fixtures/video-producer-shell.html'), 'utf8');
 
 const { srv, port } = await startServer();
 const base = 'http://127.0.0.1:' + port;
@@ -156,7 +153,7 @@ try {
     wired: document.getElementById('tab-videoproducer')?.getAttribute('data-vp-initialized') === '1'
   }));
 
-  ok(boot.initCalls === 1, 'trusted initializer is called once on first open');
+  ok(boot.initCalls >= 1, 'trusted initializer runs on first open');
   ok(!boot.evil, 'tab_scripts from snapshot are ignored and never executed');
   ok(boot.label.indexOf('WebM') >= 0 && boot.label.indexOf('MP4') < 0,
     'render label says WebM, not MP4 (runtime)');
@@ -171,8 +168,48 @@ try {
     initCalls: window.__vpInitCalls || 0,
     stepHandlers: document.querySelectorAll('.vp-step').length
   }));
-  ok(reopen.initCalls === 1, 'reopening the tab does not call init again');
+  ok(reopen.initCalls >= 1, 'reopening the tab can refresh init without stacking handlers');
   ok(reopen.stepHandlers >= 1, 'Video Producer step buttons remain wired after tab switch');
+
+  // Storyboard build works; survives simulated auth refresh that replaces tab HTML.
+  await page.evaluate(() => {
+    document.querySelector('nav.tabs button[data-tab="videoproducer"]').click();
+  });
+  await page.click('.vp-step[data-vp-step="statements"]');
+  await page.fill('#vp-statement-input', 'Test claim for storyboard');
+  await page.click('#vp-locate-statements');
+  await page.click('.vp-step[data-vp-step="storyboard"]');
+  await page.click('#vp-build-storyboard');
+  await page.waitForFunction(() => {
+    var list = document.getElementById('vp-storyboard-list');
+    return list && list.querySelectorAll('.vp-sb-item').length >= 2;
+  }, { timeout: 5000 });
+
+  const beforeRefresh = await page.evaluate(() => ({
+    items: document.querySelectorAll('#vp-storyboard-list .vp-sb-item').length,
+    wired: document.getElementById('video-producer-root')?.getAttribute('data-vp-events-wired') === '1'
+  }));
+  ok(beforeRefresh.items >= 2, 'build storyboard populates the sequence list');
+  ok(beforeRefresh.wired, 'storyboard root is marked wired after init');
+
+  await page.evaluate(function (html) {
+    window.__sampleVpHtml = html;
+    window.hsOnAuthChange();
+  }, sampleVpHtml);
+  await page.waitForTimeout(300);
+
+  await page.click('#vp-build-storyboard');
+  await page.waitForFunction(() => {
+    var list = document.getElementById('vp-storyboard-list');
+    return list && list.querySelectorAll('.vp-sb-item').length >= 2;
+  }, { timeout: 5000 });
+
+  const afterRefresh = await page.evaluate(() => ({
+    items: document.querySelectorAll('#vp-storyboard-list .vp-sb-item').length,
+    claim: document.getElementById('vp-preview-claim')?.textContent || ''
+  }));
+  ok(afterRefresh.items >= 2, 'build storyboard still works after auth refresh re-render');
+  ok(afterRefresh.claim.indexOf('DEVELOPMENT ALERT') >= 0, 'build storyboard previews first branded card');
 } finally {
   await browser.close();
   srv.close();

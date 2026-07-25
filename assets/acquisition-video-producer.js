@@ -536,6 +536,12 @@
     state.storyboard = board;
     persist();
     renderStoryboard();
+    var first = state.storyboard.find(function (item) {
+      return item.type === "alert" || item.type === "claim";
+    });
+    if (first) previewCard(first);
+    var list = $("vp-storyboard-list");
+    if (list) list.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   function renderStoryboard() {
@@ -972,6 +978,9 @@
       a.download = (state.name || "homesignal-video-project") + ".json";
       a.click();
     });
+
+    var root = $("video-producer-root");
+    if (root) root.setAttribute("data-vp-events-wired", "1");
   }
 
   var eventsWired = false;
@@ -985,19 +994,46 @@
     if (!$("video-producer-root")) return;
     ensureRenderLabel();
     var list = loadProjects();
-    if (list.length) loadProject(list[0]);
+    var current = state.id && list.find(function (p) { return p.id === state.id; });
+    if (current) loadProject(current);
+    else if (list.length) loadProject(list[0]);
     else startNewDraft();
     wireEvents();
     setStep("source");
   }
 
+  function refreshVideoProducer() {
+    if (!$("video-producer-root")) return;
+    renderProjectChips();
+  }
+
+  function rebootVideoProducer() {
+    eventsWired = false;
+    var root = $("video-producer-root");
+    if (root) root.removeAttribute("data-vp-events-wired");
+    bootVideoProducer();
+  }
+
   window.HomeSignalVideoProducer = {
     init: function (container, payload) {
       if (!container) return;
-      if (container.getAttribute("data-vp-initialized") === "1") return;
-      if (!container.querySelector("#video-producer-root")) return;
+      var root = container.querySelector("#video-producer-root");
+      if (!root) return;
+      if (container.getAttribute("data-vp-initialized") === "1") {
+        if (!root.getAttribute("data-vp-events-wired")) rebootVideoProducer();
+        else refreshVideoProducer();
+        return;
+      }
       container.setAttribute("data-vp-initialized", "1");
       bootVideoProducer();
+    },
+    refresh: function (container) {
+      if (!container || !container.querySelector("#video-producer-root")) return;
+      refreshVideoProducer();
+    },
+    reboot: function (container) {
+      if (!container || !container.querySelector("#video-producer-root")) return;
+      rebootVideoProducer();
     }
   };
 })();
