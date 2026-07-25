@@ -53,6 +53,10 @@ ok(/Browser Preview Export — WebM/.test(vp),
   'render label says Browser Preview Export — WebM');
 ok(!/Render MP4/i.test(vp), 'static asset does not claim MP4 render support');
 ok(/if \(eventsWired\) return/.test(vp), 'wireEvents guarded against duplicate listeners');
+ok(/refresh:\s*function/.test(vp), 'static asset exposes refresh(container)');
+ok(/reboot:\s*function/.test(vp), 'static asset exposes reboot(container)');
+ok(/data-vp-initialized/.test(acq) && /HomeSignalVideoProducer\.refresh/.test(acq),
+  'render preserves initialized Video Producer tab across snapshot refresh');
 
 // Gate remains for unauthorized users
 ok(/id="gate"/.test(acq) && /function loginState/.test(acq) && /function noAccess/.test(acq),
