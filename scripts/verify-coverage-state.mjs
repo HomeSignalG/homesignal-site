@@ -60,6 +60,27 @@ ok('impossible: unsupported_source with a report', !rows.some(r => r.coverage_st
 ok('legacy: honestly_empty => coverage_coming', rows.every(r => r.coverage_state !== 'honestly_empty' || r.data_quality === 'coverage_coming'));
 ok('legacy: populated/facilities_only => pass', rows.every(r => !['populated','facilities_only'].includes(r.coverage_state) || r.data_quality === 'pass'));
 
+// ── 3b: PRODUCTION COVERAGE-PASS GATES (2026-07-25 Maps data coverage pass) ──
+// The full-universe audit classified all ZIPs and resolved every FAILED /
+// UNDER_RETURN / STALE case (docs/maps-data-coverage-pass-2026-07-25.md). These
+// gates keep that state: a regression to a failed or chronically-stale
+// materialization anywhere in the universe fails CI. Explained exceptions, if
+// ever needed, go in the allowlist WITH a receipt — never silently.
+const FAILED_ALLOWLIST = new Set([]);   // zip -> must carry a receipt in the coverage-pass doc
+const failedRows = rows.filter(r => ['failed_ingest', 'temporarily_unavailable'].includes(r.coverage_state) && !FAILED_ALLOWLIST.has(r.zip));
+ok('coverage-pass: zero FAILED materializations', failedRows.length === 0,
+   failedRows.slice(0, 5).map(r => r.zip + ':' + r.coverage_state).join(','));
+const staleRows = rows.filter(r => r.coverage_state === 'stale_data');
+ok('coverage-pass: zero unintentionally STALE ZIPs', staleRows.length === 0,
+   staleRows.slice(0, 5).map(r => r.zip).join(','));
+ok('coverage-pass: every ZIP classified (full universe)', rows.length === metaCount && rows.length > 0);
+// Meetings-marker policy: map markers come ONLY from app_projects; a meeting could
+// only become a marker via a coordinate-bearing app_changes row. Assert none exist —
+// general government meetings ride the notices LIST, never the map.
+const coordChanges = await rest('app_changes?select=zip&lat=not.is.null&limit=1');
+ok('coverage-pass: no coordinate-bearing app_changes (no meeting can be a map marker)', coordChanges.length === 0,
+   coordChanges.length ? 'found zip=' + coordChanges[0].zip : '');
+
 // ── 4: determinism — re-read a sample, states agree ──
 const sample = rows.filter(r => ['populated','facilities_only','honestly_empty'].includes(r.coverage_state)).slice(0, 3);
 for (const s of sample) {
