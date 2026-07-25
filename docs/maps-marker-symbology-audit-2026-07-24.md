@@ -112,11 +112,33 @@ and hover/click/sidebar/mobile behavior are untouched.
 - Street/Satellite/Focus resolve an identical symbol histogram (one resolver).
 - Uncap invariance: 600 records → 600 plotted, and per-record shape/color unchanged.
 
-## 6. Tracked follow-up (separate, not combined)
+## 6. Name-enrichment phase (2026-07-25 — the approved follow-up, renderer-side)
 
-The 77.9% generic-`type` development records render honest neutral circles because their
-SOURCE type is generic. Enriching that type in the ingest engine (so those records earn a
-specific shape) is a **data-classification** change and is deliberately **not** bundled
-here. Open a separate ingest task, with per-record receipts, only if evidence shows true
-source-classification errors (the audit above shows the current values are honestly
-generic, not wrong).
+The 77.9% generic-`type` development records render neutral circles because their SOURCE
+`use_type` is generic ("Development"/"unclassified"/"Trades"). The follow-up was approved
+and shipped **renderer-side in the ONE canonical resolver** (no ingest change, no data
+mutation): the record NAME embeds each source's own permit-class text (the materializer
+sets `name = label`, and labels carry strings like "Residential Alteration", "Multi
+Family - Other Structural", "Addition and/or Alteration Commercial Building Permit"), so
+`classifyProjectType` now runs a high-precision `NAME_RULES` phase over the name — **only
+when the type fields resolved to the generic 'other' bucket**. A specific source-stated
+type (incl. Civic/Public) is never reinterpreted; facilities are untouched; a name can
+never produce the regulated purple.
+
+Calibrated on the live `app_projects` vocabulary (top name-prefixes ≥300 records + a
+400-record random sample, 2026-07-25). Deliberate precision choices, each from a real
+observed string:
+- **Trades/sign/demolition/board-up stay circles** — those classes state no building type.
+- **House laterals are not infrastructure** — "Install sewer line" / "gas service
+  connection" are parcel trade jobs; only MAINS + public-way/telecom signals match.
+- **"sidewalk" is not an infra signal** — NYC facade repairs carry "sidewalk shed"
+  (temporary scaffolding); matching it misclassified building work as infrastructure.
+- **"Neighborhood Development Permit Wireless Communication Facility" → infrastructure**,
+  never Residential (no 'neighborhood' keyword — the San Diego permit-class trap).
+
+Production-wide impact (SQL replay of the shipped rules over all 401,675 generic-typed
+dev records, 2026-07-25): **137,550 (34.2%) gain their source-stated shape** —
+Residential 105,358 · Commercial 29,633 · Industrial 1,390 · Roads & infrastructure
+1,137 · Data center 32; **264,125 (65.8%) honestly remain "Other project" circles**.
+Regression tests: `test/marker-name-enrichment.test.mjs` (verbatim production strings +
+adversarial cases + precedence/facility/purple invariants).
