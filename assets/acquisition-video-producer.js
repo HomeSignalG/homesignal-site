@@ -173,6 +173,103 @@
     return "low";
   }
 
+  /* ----------------------------------------------------------------------
+     SOURCE MEDIA — three roles, kept strictly separate:
+
+       1. YOUTUBE REFERENCE  (state.youtube)     — viewable, NEVER renderable.
+          A YouTube URL cannot become export footage without downloading
+          protected media, which we do not do. It is a reference and a
+          transcript source only, and the UI says so.
+       2. TRANSCRIPT SOURCE  (fetch-youtube-transcript edge function).
+       3. LOCAL RENDERABLE MEDIA (state.videoObjectUrl + state.sourceMeta) —
+          an operator-supplied MP4/WebM. This is the ONLY thing clips can be
+          cut from and the ONLY thing the renderer can draw.
+
+     The bytes are never persisted. sourceMeta is a small identity record, so
+     a reopened project knows WHICH file it needs and can relink clips when
+     the operator reselects that same file.
+     ---------------------------------------------------------------------- */
+
+  var YT_ID_RE = /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/;
+
+  function youtubeVideoId(url) {
+    var m = YT_ID_RE.exec(String(url || ""));
+    return m ? m[1] : null;
+  }
+
+  // Identity of a local file: stable across reselecting the SAME file, and
+  // different for a different file — that is what stops one project silently
+  // adopting another project's footage.
+  function sourceIdFor(file) {
+    if (!file) return null;
+    return "vps_" + String(file.name).replace(/[^\w.-]+/g, "_") +
+      "_" + (file.size || 0) + "_" + (file.lastModified || 0);
+  }
+
+  function sanitizeSourceMeta(meta) {
+    if (!meta || typeof meta !== "object" || !meta.id) return null;
+    var d = Number(meta.duration);
+    return {
+      id: String(meta.id),
+      name: String(meta.name || ""),
+      size: Number(meta.size) || 0,
+      type: String(meta.type || ""),
+      lastModified: Number(meta.lastModified) || 0,
+      // Non-finite is legitimate: MediaRecorder-produced WebM files report
+      // Infinity until fully buffered. Store null rather than a fake number.
+      duration: isFinite(d) && d > 0 ? d : null,
+    };
+  }
+
+  // Is renderable footage actually loaded in THIS session?
+  function sourceReady() {
+    return !!(state.videoObjectUrl && state.sourceMeta && state.sourceMeta.id);
+  }
+
+  // A project that has clips or a remembered file, but no loaded media now.
+  function sourceNeedsReselect() {
+    return !!(state.sourceMeta && state.sourceMeta.id) && !state.videoObjectUrl;
+  }
+
+  function clipsInStoryboard() {
+    return (state.storyboard || []).filter(function (i) { return i && i.type === "clip"; });
+  }
+
+  function sanitizeClip(item) {
+    var start = Number(item.start);
+    var end = Number(item.end);
+    if (!isFinite(start) || start < 0) start = 0;
+    if (!isFinite(end) || end <= start) end = start + 1;
+    return {
+      id: item.id || ("vpc_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
+      type: "clip",
+      sourceId: item.sourceId || null,
+      start: start,
+      end: end,
+      duration: end - start,
+      label: item.label || "Source clip",
+    };
+  }
+
+  // Legacy projects carry auto-generated {type:'source_clip'|'resume', start,
+  // duration} placeholders that referenced no real media and could not be
+  // trimmed. Migrate them to real clip items so sequence position and the one
+  // timestamp they had survive, with sourceId null = "not linked to a file".
+  function migrateLegacySourceItems(board) {
+    if (!Array.isArray(board)) return [];
+    return board.map(function (item) {
+      if (!item || (item.type !== "source_clip" && item.type !== "resume")) return item;
+      var start = Number(item.start) || 0;
+      var dur = Number(item.duration) || 3;
+      return sanitizeClip({
+        sourceId: null,
+        start: start,
+        end: start + dur,
+        label: item.label || "Source clip (imported)",
+      });
+    });
+  }
+
   function loadProjects() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY) || "[]";
@@ -214,8 +311,11 @@
   // evidence blobs carried on `files` (see sanitizeEvidenceList).
   function sanitizeStoryboard(board) {
     if (!Array.isArray(board)) return [];
-    return board.map(function (item) {
+    return migrateLegacySourceItems(board).map(function (item) {
       if (!item || typeof item !== "object") return { type: "unknown", label: "Unknown item" };
+      // Clips carry timing that must round-trip exactly; normalize them so a
+      // hand-edited or truncated record can never yield end <= start.
+      if (item.type === "clip") return sanitizeClip(item);
       var out = {};
       Object.keys(item).forEach(function (k) { if (k !== "files") out[k] = item[k]; });
       if (Array.isArray(item.files)) out.files = sanitizeEvidenceList(item.files);
@@ -232,7 +332,10 @@
       speaker: rec.speaker || "",
       transcriptRaw: rec.transcriptRaw || "",
       parsed: rec.parsed || parseTranscript(rec.transcriptRaw || ""),
-      hasSourceVideo: !!(rec.hasSourceVideo || rec.videoDataUrl),
+      hasSourceVideo: !!(rec.hasSourceVideo || rec.videoDataUrl || rec.sourceMeta),
+      // Identity of the local file this project's clips were cut from — never
+      // the bytes. Lets a reopened project ask for the RIGHT file back.
+      sourceMeta: sanitizeSourceMeta(rec.sourceMeta),
       statements: sanitizeStatements(rec.statements),
       storyboard: sanitizeStoryboard(rec.storyboard),
       updatedAt: rec.updatedAt || new Date().toISOString(),
@@ -350,8 +453,10 @@
       speaker: state.speaker,
       transcriptRaw: state.transcriptRaw,
       parsed: state.parsed,
-      // Source video is session-only (object URL). Persisting base64 video blows localStorage quota.
-      hasSourceVideo: !!(state.videoObjectUrl || state.videoDataUrl),
+      // Source video bytes are session-only (object URL). Persisting base64
+      // video blows the localStorage quota; only its identity is stored.
+      hasSourceVideo: !!(state.videoObjectUrl || state.videoDataUrl || state.sourceMeta),
+      sourceMeta: state.sourceMeta || null,
       statements: state.statements,
       storyboard: state.storyboard,
       updatedAt: new Date().toISOString(),
@@ -387,7 +492,8 @@
     speaker: "",
     transcriptRaw: "",
     parsed: { plain: "", cues: [] },
-    videoObjectUrl: null,
+    videoObjectUrl: null,   // session-only blob URL for the loaded local file
+    sourceMeta: null,       // persisted identity of that file
     statements: [],
     storyboard: [],
   };
@@ -401,6 +507,7 @@
       transcriptRaw: "",
       parsed: { plain: "", cues: [] },
       videoDataUrl: null,
+      sourceMeta: null,
       statements: [],
       storyboard: [],
       updatedAt: new Date().toISOString(),
@@ -476,6 +583,7 @@
         state.name = data.title;
       }
       renderTranscript();
+      renderSourceStudio();
       safePersist();
       setStep("statements");
       document.querySelectorAll(".vp-step").forEach(function (b) {
@@ -519,6 +627,250 @@
       vid.removeAttribute("src");
       vid.style.display = "none";
     }
+    renderSourceStudio();
+  }
+
+  /* ----------------------------------------------------------------------
+     SOURCE STUDIO UI.
+
+     Everything here is created programmatically. The Video Producer's markup
+     is served from the gated dashboard snapshot (acquisition.html does
+     `el.innerHTML = tabs[id]`), NOT from this repo, so new controls cannot be
+     added as HTML — they have to be built by this asset, the same way
+     ensureFetchTranscriptButton already does.
+     ---------------------------------------------------------------------- */
+
+  var INPUT_STYLE = "background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 6px;width:96px";
+
+  function mk(tag, props, style) {
+    var el = document.createElement(tag);
+    if (props) Object.keys(props).forEach(function (k) { el[k] = props[k]; });
+    if (style) el.setAttribute("style", style);
+    return el;
+  }
+
+  function panelEl(step) {
+    return $("vp-panel-" + step);
+  }
+
+  // One honest status line per step, so the operator always knows what media
+  // the project actually has — requirement: show source status in every step.
+  function ensureSourceStatusStrips() {
+    ["source", "statements", "commentary", "storyboard", "render"].forEach(function (step) {
+      var panel = panelEl(step);
+      if (!panel) return;
+      if (panel.querySelector(".vp-source-status")) return;
+      var strip = mk("p", { className: "vp-hint vp-source-status" },
+        "margin:0 0 10px 0;padding:8px 10px;border:1px solid var(--line);border-radius:8px");
+      strip.setAttribute("role", "status");
+      strip.setAttribute("aria-live", "polite");
+      var card = panel.querySelector(".card") || panel;
+      card.insertBefore(strip, card.firstChild);
+    });
+  }
+
+  function sourceStatus() {
+    var ytId = youtubeVideoId(state.youtube);
+    if (sourceReady()) {
+      var d = state.sourceMeta.duration;
+      return {
+        text: "Renderable source loaded: " + state.sourceMeta.name +
+          (d ? " (" + formatTime(d) + ")" : "") + ". Clips can be created and exported.",
+        level: "ok",
+      };
+    }
+    if (sourceNeedsReselect()) {
+      return {
+        text: "Source file “" + state.sourceMeta.name + "” must be reselected — browsers cannot " +
+          "restore a local file automatically. Clip timings and order are preserved; reselect the " +
+          "same file in Step 1 to make them renderable again.",
+        level: "warn",
+      };
+    }
+    if (ytId) {
+      return {
+        text: "YouTube reference loaded. Upload an authorized MP4 or WebM copy to create renderable clips.",
+        level: "warn",
+      };
+    }
+    return { text: "No source video loaded. Upload an authorized MP4 or WebM in Step 1 to create clips.", level: "warn" };
+  }
+
+  // The YouTube reference player. Viewable when page policy permits; it is
+  // NEVER a render source and the label says so unconditionally.
+  function ensureYoutubeReference() {
+    var panel = panelEl("source");
+    if (!panel) return;
+    var host = $("vp-yt-reference");
+    if (!host) {
+      var anchor = $("vp-video-preview");
+      if (!anchor || !anchor.parentElement) return;
+      host = mk("div", { id: "vp-yt-reference" }, "margin:10px 0");
+      anchor.parentElement.insertBefore(host, anchor);
+    }
+    var id = youtubeVideoId(state.youtube);
+    if (host.getAttribute("data-yt") === (id || "")) return;  // no needless reloads
+    host.setAttribute("data-yt", id || "");
+    host.textContent = "";
+    if (!id) { host.style.display = "none"; return; }
+    host.style.display = "block";
+
+    var frame = mk("iframe", {
+      id: "vp-yt-frame",
+      src: "https://www.youtube-nocookie.com/embed/" + id,
+      title: "YouTube reference video (not renderable)",
+      allow: "encrypted-media; picture-in-picture",
+    }, "width:100%;max-width:560px;aspect-ratio:16/9;border:1px solid var(--line);border-radius:8px");
+    frame.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+    frame.setAttribute("allowfullscreen", "");
+    host.appendChild(frame);
+
+    var note = mk("p", { className: "vp-hint", id: "vp-yt-note" }, "margin:6px 0 0 0");
+    note.textContent = "Reference only — this YouTube video CANNOT be used in the final render. " +
+      "It is here to watch and to pull the transcript from. To export footage, upload an " +
+      "authorized MP4 or WebM copy below.";
+    host.appendChild(note);
+
+    var link = mk("a", { href: "https://www.youtube.com/watch?v=" + id, target: "_blank", rel: "noopener noreferrer" });
+    link.className = "vp-hint";
+    link.textContent = "Open on YouTube ↗";
+    host.appendChild(link);
+  }
+
+  // Step 4 clip editor: player + in/out marking. Only usable with real media.
+  function ensureClipEditor() {
+    var panel = panelEl("storyboard");
+    if (!panel) return;
+    if ($("vp-clip-editor")) return;
+    var list = $("vp-storyboard-list");
+    if (!list || !list.parentElement) return;
+
+    var box = mk("div", { id: "vp-clip-editor" },
+      "margin:10px 0;padding:10px;border:1px solid var(--line);border-radius:8px");
+
+    box.appendChild(mk("h4", { textContent: "Source clips" }, "margin:0 0 8px 0"));
+
+    var player = mk("video", { id: "vp-clip-player", controls: true, preload: "metadata", muted: true },
+      "width:100%;max-width:560px;display:none;border-radius:8px");
+    player.setAttribute("playsinline", "");
+    box.appendChild(player);
+
+    var row = mk("div", { className: "vp-toolbar" }, "margin-top:8px;flex-wrap:wrap;gap:6px");
+
+    var inLabel = mk("label", { htmlFor: "vp-clip-in", textContent: "In " }, "font-size:12px");
+    var inInput = mk("input", { id: "vp-clip-in", type: "text", value: "0:00" }, INPUT_STYLE);
+    inLabel.appendChild(inInput);
+
+    var outLabel = mk("label", { htmlFor: "vp-clip-out", textContent: "Out " }, "font-size:12px");
+    var outInput = mk("input", { id: "vp-clip-out", type: "text", value: "0:05" }, INPUT_STYLE);
+    outLabel.appendChild(outInput);
+
+    row.appendChild(inLabel);
+    row.appendChild(outLabel);
+    row.appendChild(mk("button", { id: "vp-clip-set-in", type: "button", className: "vp-btn secondary", textContent: "Set In from playhead" }));
+    row.appendChild(mk("button", { id: "vp-clip-set-out", type: "button", className: "vp-btn secondary", textContent: "Set Out from playhead" }));
+    row.appendChild(mk("button", { id: "vp-clip-add", type: "button", className: "vp-btn", textContent: "Add clip to sequence" }));
+    box.appendChild(row);
+
+    var msg = mk("p", { className: "vp-hint", id: "vp-clip-msg" }, "margin:6px 0 0 0");
+    msg.setAttribute("role", "status");
+    msg.setAttribute("aria-live", "polite");
+    box.appendChild(msg);
+
+    list.parentElement.insertBefore(box, list);
+  }
+
+  function ensureSourceStudio() {
+    ensureSourceStatusStrips();
+    ensureYoutubeReference();
+    ensureClipEditor();
+  }
+
+  function setClipMessage(msg, isError) {
+    var el = $("vp-clip-msg");
+    if (!el) return;
+    el.textContent = msg || "";
+    el.style.color = isError ? "var(--persist)" : "var(--muted)";
+    if (el.getAttribute("aria-live") !== (isError ? "assertive" : "polite")) {
+      el.setAttribute("aria-live", isError ? "assertive" : "polite");
+    }
+  }
+
+  // Push current source state into every piece of UI that depends on it.
+  function renderSourceStudio() {
+    ensureSourceStudio();
+    ensureYoutubeReference();
+
+    var st = sourceStatus();
+    var root = vpRoot || document;
+    Array.prototype.forEach.call(root.querySelectorAll(".vp-source-status"), function (el) {
+      el.textContent = st.text;
+      el.style.color = st.level === "ok" ? "var(--muted)" : "var(--persist)";
+    });
+
+    var player = $("vp-clip-player");
+    if (player) {
+      if (state.videoObjectUrl) {
+        if (player.getAttribute("src") !== state.videoObjectUrl) player.src = state.videoObjectUrl;
+        player.style.display = "block";
+      } else {
+        player.removeAttribute("src");
+        player.style.display = "none";
+      }
+    }
+
+    // Clip creation is impossible without renderable media — disable rather
+    // than let the operator mark in/out points against nothing.
+    var ready = sourceReady();
+    ["vp-clip-add", "vp-clip-set-in", "vp-clip-set-out"].forEach(function (id) {
+      var b = $(id);
+      if (!b) return;
+      b.disabled = !ready;
+      b.title = ready ? "" : "Upload an authorized MP4 or WebM source file first.";
+    });
+    ["vp-clip-in", "vp-clip-out"].forEach(function (id) {
+      var i = $(id);
+      if (i) i.disabled = !ready;
+    });
+    if (!ready) setClipMessage(st.text, st.level !== "ok");
+    else if (!clipsInStoryboard().length) setClipMessage("Mark In and Out, then add the clip to the sequence.", false);
+
+    updateRenderAvailability();
+  }
+
+  // The renderer can only draw clips whose media is loaded. If the sequence
+  // needs footage it does not have, say so and block the export rather than
+  // silently producing a video with placeholder cards where footage belongs.
+  function unrenderableClips() {
+    if (sourceReady()) {
+      return clipsInStoryboard().filter(function (c) {
+        return c.sourceId && state.sourceMeta && c.sourceId !== state.sourceMeta.id;
+      });
+    }
+    return clipsInStoryboard();
+  }
+
+  function updateRenderAvailability() {
+    var btn = $("vp-start-render");
+    if (!btn) return;
+    var blocked = unrenderableClips();
+    var status = $("vp-render-status");
+    if (blocked.length) {
+      btn.disabled = true;
+      btn.title = "Load the source file these clips were cut from.";
+      if (status && !/Rendering|complete/i.test(status.textContent || "")) {
+        status.textContent = blocked.length + " clip(s) in the sequence have no loaded source media. " +
+          "Reselect the source file in Step 1 to enable export.";
+        status.style.color = "var(--persist)";
+      }
+    } else {
+      btn.disabled = false;
+      btn.title = "";
+      if (status && status.style.color === "var(--persist)") {
+        status.textContent = "Ready.";
+        status.style.color = "";
+      }
+    }
   }
 
   function loadProject(rec) {
@@ -532,10 +884,15 @@
     state.statements = rec.statements || [];
     state.storyboard = rec.storyboard || [];
     state.videoDataUrl = rec.videoDataUrl || null;
+    // A blob URL belongs to the file the operator picked in THIS session and
+    // to one project only. Dropping it on every load is what guarantees
+    // project B can never inherit project A's footage.
     state.videoObjectUrl = null;
+    state.sourceMeta = sanitizeSourceMeta(rec.sourceMeta);
 
     clearRenderOutput();
     resetRenderPanel();
+    resetFileInputs();
 
     // Each section renders independently: a failure in one must not abort the
     // rest, and must never take renderProjectChips() with it — the chips are
@@ -670,6 +1027,171 @@
     }).join("") + "</div>";
   }
 
+  // Files produced by MediaRecorder (and some streamed MP4s) report
+  // duration === Infinity until the browser has scanned to the end. Seeking
+  // far past the end forces that scan; without this the "clip cannot exceed
+  // the media duration" rule silently never fires.
+  function probeMediaDuration(el, cb) {
+    if (!el) { cb(null); return; }
+    function settle() {
+      var d = el.duration;
+      cb(isFinite(d) && d > 0 ? d : null);
+    }
+    function afterMeta() {
+      if (isFinite(el.duration) && el.duration > 0) { settle(); return; }
+      var done = false;
+      var finish = function () {
+        if (done) return;
+        done = true;
+        el.removeEventListener("durationchange", finish);
+        try { el.currentTime = 0; } catch (e) { /* best effort */ }
+        settle();
+      };
+      el.addEventListener("durationchange", finish);
+      try { el.currentTime = 1e101; } catch (e) { finish(); return; }
+      setTimeout(finish, 3000);   // never hang the UI on a stubborn file
+    }
+    if (el.readyState >= 1) afterMeta();
+    else el.addEventListener("loadedmetadata", function onMeta() {
+      el.removeEventListener("loadedmetadata", onMeta);
+      afterMeta();
+    });
+  }
+
+  // Longest trustworthy media duration we know: the live element wins, then
+  // the stored metadata. Non-finite (MediaRecorder WebM) means "unknown".
+  function sourceDuration() {
+    var player = $("vp-clip-player");
+    if (player && isFinite(player.duration) && player.duration > 0) return player.duration;
+    var prev = $("vp-video-preview");
+    if (prev && isFinite(prev.duration) && prev.duration > 0) return prev.duration;
+    if (state.sourceMeta && state.sourceMeta.duration) return state.sourceMeta.duration;
+    return null;
+  }
+
+  // Returns {ok:true, clip} or {ok:false, error} — validation is visible,
+  // never a silent clamp.
+  function validateClipRange(startRaw, endRaw) {
+    var start = parseTimecode(String(startRaw || ""));
+    var end = parseTimecode(String(endRaw || ""));
+    if (!isFinite(start) || start < 0) return { ok: false, error: "In point is not a valid time." };
+    if (!isFinite(end)) return { ok: false, error: "Out point is not a valid time." };
+    if (end <= start) {
+      return { ok: false, error: "Out point (" + formatTime(end) + ") must be later than In point (" + formatTime(start) + ")." };
+    }
+    var dur = sourceDuration();
+    if (dur && end > dur + 0.05) {
+      return { ok: false, error: "Out point (" + formatTime(end) + ") is past the end of the source video (" + formatTime(dur) + ")." };
+    }
+    return { ok: true, start: start, end: end };
+  }
+
+  function addClipFromEditor() {
+    if (!sourceReady()) {
+      setClipMessage("Upload an authorized MP4 or WebM source file before creating clips.", true);
+      return null;
+    }
+    var v = validateClipRange(($("vp-clip-in") || {}).value, ($("vp-clip-out") || {}).value);
+    if (!v.ok) { setClipMessage(v.error, true); return null; }
+
+    var clip = sanitizeClip({
+      sourceId: state.sourceMeta.id,
+      start: v.start,
+      end: v.end,
+      label: "Clip " + formatTime(v.start) + "–" + formatTime(v.end),
+    });
+    state.storyboard.push(clip);
+    if (safePersist()) {
+      setClipMessage("Clip added — " + formatTime(clip.start) + " to " + formatTime(clip.end) +
+        " (" + clip.duration.toFixed(1) + "s). Position " + state.storyboard.length + " in the sequence.", false);
+    } else {
+      setClipMessage("Clip added but COULD NOT BE SAVED — browser storage is full.", true);
+    }
+    renderStoryboard();
+    previewCard(clip);
+    updateRenderAvailability();
+    return clip;
+  }
+
+  // Play exactly the clip's range in the editor player, then stop.
+  function previewClipRange(clip) {
+    var player = $("vp-clip-player");
+    if (!clip || !player || !state.videoObjectUrl) return false;
+    if (player._vpStop) { player.removeEventListener("timeupdate", player._vpStop); }
+    try { player.currentTime = clip.start; } catch (e) { return false; }
+    var stop = function () {
+      if (player.currentTime >= clip.end) {
+        player.pause();
+        player.removeEventListener("timeupdate", stop);
+        player._vpStop = null;
+      }
+    };
+    player._vpStop = stop;
+    player.addEventListener("timeupdate", stop);
+    var p = player.play();
+    if (p && typeof p.catch === "function") p.catch(function () {});
+    return true;
+  }
+
+  // Take a picked file as this project's renderable source.
+  //
+  // If the project already has clips cut from a DIFFERENT file, that is not a
+  // silent relink: existing clip timings would point into footage they were
+  // never measured against. The operator is asked first, and declining leaves
+  // the project exactly as it was.
+  function adoptSourceFile(file) {
+    var newId = sourceIdFor(file);
+    var existing = clipsInStoryboard().filter(function (c) { return c.sourceId; });
+    var priorId = state.sourceMeta && state.sourceMeta.id;
+    var mismatch = existing.length && priorId && priorId !== newId;
+
+    if (mismatch) {
+      var okToSwap = window.confirm(
+        "This project's " + existing.length + " clip(s) were cut from “" + state.sourceMeta.name + "”.\n\n" +
+        "You picked “" + file.name + "”, which is a different file. Clip timings were measured " +
+        "against the original and may not line up.\n\nUse this file anyway and relink the clips?");
+      if (!okToSwap) {
+        resetFileInputs();
+        setClipMessage("Kept the existing source. Reselect “" + state.sourceMeta.name + "” to restore renderable clips.", true);
+        renderSourceStudio();
+        return false;
+      }
+    }
+
+    if (state.videoObjectUrl) URL.revokeObjectURL(state.videoObjectUrl);
+    state.videoObjectUrl = URL.createObjectURL(file);
+    state.videoDataUrl = null;
+    state.sourceMeta = sanitizeSourceMeta({
+      id: newId, name: file.name, size: file.size,
+      type: file.type, lastModified: file.lastModified, duration: null,
+    });
+
+    var vid = $("vp-video-preview");
+    if (vid) { vid.src = state.videoObjectUrl; vid.style.display = "block"; }
+
+    if (mismatch) {
+      // Relink so the sequence stays renderable, and say so plainly.
+      clipsInStoryboard().forEach(function (c) { c.sourceId = newId; });
+    }
+
+    // Learn the real duration so clip bounds can be validated against it.
+    probeMediaDuration($("vp-clip-player") || vid, function (d) {
+      if (state.sourceMeta && d) {
+        state.sourceMeta.duration = d;
+        safePersist();
+        renderSourceStudio();
+      }
+    });
+
+    safePersist();
+    renderSourceStudio();
+    renderStoryboard();
+    setClipMessage(mismatch
+      ? "Source replaced with “" + file.name + "” and " + existing.length + " clip(s) relinked. Check each clip's range."
+      : "Source loaded: " + file.name + ". Mark In and Out, then add the clip to the sequence.", false);
+    return true;
+  }
+
   function markStepDone(step) {
     document.querySelectorAll(".vp-step").forEach(function (b) {
       if (b.dataset.vpStep === step) b.classList.add("done");
@@ -711,10 +1233,15 @@
 
   function buildStoryboard() {
     try {
-      var board = [];
-    var vidStart = { type: "source_clip", label: "Source clip (intro)", start: 0, duration: 3 };
-    board.push(vidStart);
-    board.push({ type: "freeze", label: "Freeze frame", duration: 1.5 });
+    // Operator-created clips are REAL content and are never regenerated or
+    // thrown away by a rebuild — only the commentary cards are rebuilt from
+    // the statements. The old code instead fabricated {source_clip}/{resume}
+    // placeholders on every build, with invented timings and no source, and
+    // reported success even when no media existed at all.
+    var keptClips = clipsInStoryboard().map(function (c) { return c; });
+    var board = [];
+
+    if (keptClips.length) board.push(keptClips[0]);
 
     state.statements.forEach(function (st, i) {
       var t = (st.matches && st.matches[0]) ? st.matches[0].start : i * 8;
@@ -723,28 +1250,50 @@
       board.push({ type: "claim", label: "Claim", text: st.text, time: t });
       board.push({ type: "evidence", label: "Evidence", text: c.evidence || "", files: st.evidence || [] });
       board.push({ type: "commentary", label: "Commentary", text: c.community || "" });
-      board.push({ type: "resume", label: "Resume video", start: t, duration: 4 });
+      // CLIP → COMMENTARY → CLIP → COMMENTARY: drop the next operator clip
+      // between commentary blocks so the sequence alternates as intended.
+      if (keptClips[i + 1]) board.push(keptClips[i + 1]);
       if (i < state.statements.length - 1) {
         board.push({ type: "freeze", label: "Freeze frame", duration: 1 });
       }
     });
+    // Any clips beyond the number of statements still belong to the operator.
+    keptClips.slice(Math.max(1, state.statements.length + 1)).forEach(function (c) { board.push(c); });
+
     state.storyboard = board;
     var saved = safePersist();
     renderStoryboard();
     var first = state.storyboard.find(function (item) {
-      return item.type === "alert" || item.type === "claim";
+      return item.type === "alert" || item.type === "claim" || item.type === "clip";
     });
     if (first) previewCard(first);
     var list = $("vp-storyboard-list");
     if (list) list.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    // Never report a build as succeeded when the save failed — the operator
-    // would lose the storyboard on reload believing it was stored.
+
+    // The status must describe what was ACTUALLY assembled, including the
+    // absence of source footage — never a bare "Storyboard built".
+    var clipCount = clipsInStoryboard().length;
+    var srcNote;
+    if (clipCount) {
+      srcNote = " " + clipCount + " source clip(s) included.";
+      var blocked = unrenderableClips().length;
+      if (blocked) srcNote += " " + blocked + " of them have no loaded media and will not render until the source file is reselected.";
+    } else if (sourceReady()) {
+      srcNote = " No source-video clips included — mark In/Out above and add clips to the sequence.";
+    } else if (youtubeVideoId(state.youtube)) {
+      srcNote = " No source-video clips included: a YouTube URL is a reference only. " +
+        "Upload an authorized MP4 or WebM copy to create renderable clips.";
+    } else {
+      srcNote = " No source-video clips included: no renderable media has been uploaded.";
+    }
+
     if (saved) {
-      setStoryboardStatus("Storyboard built — " + state.storyboard.length + " items. Drag to reorder or click Preview.", false);
+      setStoryboardStatus("Storyboard built — " + state.storyboard.length + " items." + srcNote, clipCount === 0);
     } else {
       setStoryboardStatus("Storyboard built (" + state.storyboard.length + " items) but COULD NOT BE SAVED — " +
         "browser storage is full. Export the project to JSON or remove old projects, then build again.", true);
     }
+    updateRenderAvailability();
     } catch (err) {
       console.error("Video Producer: buildStoryboard failed", err);
       setStoryboardStatus("Could not build storyboard: " + (err && err.message ? err.message : err), true);
@@ -769,15 +1318,29 @@
       var type = typeof item.type === "string" && item.type ? item.type : "unknown";
       var preview = item.text || item.label || type;
       if (type === "alert") preview = (item.title || "") + " — " + (item.subtitle || "");
+      var extra = "";
+      if (type === "clip") {
+        // Show the real range and duration, plus an explicit warning when the
+        // clip's media is not loaded, so the list never implies it will render.
+        preview = formatTime(item.start) + " → " + formatTime(item.end) +
+          "  (" + (Number(item.duration) || 0).toFixed(1) + "s)";
+        var linked = sourceReady() && state.sourceMeta &&
+          (!item.sourceId || item.sourceId === state.sourceMeta.id);
+        extra = linked
+          ? '<span class="vp-conf high">source loaded</span>'
+          : '<span class="vp-conf low">source not loaded</span>';
+      }
       return '<div class="vp-sb-item" draggable="true" data-ix="' + i + '"' +
         ' tabindex="0" role="listitem"' +
         ' aria-label="' + esc(type.replace("_", " ")) + " " + (i + 1) + " of " + state.storyboard.length +
+        (type === "clip" ? ", " + esc(preview) : "") +
         '. Hold Alt and press arrow up or down to reorder."' +
         '>' +
         '<span class="vp-sb-handle" aria-hidden="true">⠿</span>' +
         '<div><div class="vp-sb-type">' + esc(type.replace("_", " ")) + '</div>' +
-        '<div class="vp-sb-preview">' + esc(String(preview).slice(0, 120)) + "</div></div>" +
-        '<button type="button" class="vp-btn secondary vp-sb-preview-btn" data-ix="' + i + '" style="padding:4px 8px;font-size:11px">Preview</button></div>';
+        '<div class="vp-sb-preview">' + esc(String(preview).slice(0, 120)) + "</div></div>" + extra +
+        '<button type="button" class="vp-btn secondary vp-sb-preview-btn" data-ix="' + i + '" style="padding:4px 8px;font-size:11px">Preview</button>' +
+        '<button type="button" class="vp-btn secondary vp-sb-remove-btn" data-ix="' + i + '" style="padding:4px 8px;font-size:11px">Remove</button></div>';
     }).join("");
 
     var dragIx = null;
@@ -834,6 +1397,14 @@
     var claim = $("vp-preview-claim");
     var body = $("vp-preview-body");
     if (!claim || !body) return;
+    if (item.type === "clip") {
+      claim.textContent = "SOURCE CLIP";
+      var played = previewClipRange(item);
+      body.textContent = formatTime(item.start) + " → " + formatTime(item.end) +
+        " (" + (Number(item.duration) || 0).toFixed(1) + "s)" +
+        (played ? " — playing this range" : " — source media not loaded; reselect the file in Step 1");
+      return;
+    }
     if (item.type === "alert") {
       claim.textContent = item.title || "DEVELOPMENT ALERT";
       body.textContent = item.subtitle || "HomeSignal Intelligence";
@@ -958,6 +1529,17 @@
     var ctx = canvas.getContext("2d");
     var items = state.storyboard.length ? state.storyboard : [{ type: "alert", title: "DEVELOPMENT ALERT", subtitle: "HomeSignal Intelligence" }];
     var total = items.length;
+    // Render off a dedicated element so exporting does not hijack the player
+    // the operator is scrubbing, and so seeking mid-render is never visible.
+    var renderSourceEl = null;
+    if (state.videoObjectUrl) {
+      renderSourceEl = document.createElement("video");
+      renderSourceEl.src = state.videoObjectUrl;
+      renderSourceEl.muted = true;
+      renderSourceEl.playsInline = true;
+      renderSourceEl.setAttribute("playsinline", "");
+      renderSourceEl.preload = "auto";
+    }
     var fps = 24;
     var stream = canvas.captureStream(fps);
     var chunks = [];
@@ -992,23 +1574,22 @@
       var f = 0;
       progressCb((vi + 0.5) / total);
 
+      // A clip must export as MOVING footage trimmed to [start, end). The old
+      // code paused the element and redrew the same frame for the whole item,
+      // so source footage always exported as a still and no end time existed.
+      if (item.type === "clip") {
+        renderClipItem(item, function () { vi++; next(); });
+        return;
+      }
+
       function drawFrame() {
         ctx.fillStyle = "#000";
         ctx.fillRect(0, 0, w, h);
-        if (item.type === "source_clip" || item.type === "resume") {
-          var vid = $("vp-video-preview");
-          if (vid && vid.src && vid.readyState >= 2) {
-            try {
-              ctx.drawImage(vid, 0, 0, w, h);
-            } catch (e) {
-              drawBrandedCard(ctx, w, h, { type: "alert", title: "SOURCE CLIP", subtitle: formatTime(item.start || 0) });
-            }
-          } else {
-            drawBrandedCard(ctx, w, h, { type: "alert", title: "SOURCE VIDEO", subtitle: "Upload a source file in Step 1" });
+        if (item.type === "freeze") {
+          var vid2 = renderSourceEl;
+          if (vid2 && vid2.src && vid2.readyState >= 2) {
+            try { ctx.drawImage(vid2, 0, 0, w, h); } catch (e) { /* keep the black field */ }
           }
-        } else if (item.type === "freeze") {
-          var vid2 = $("vp-video-preview");
-          if (vid2 && vid2.src) ctx.drawImage(vid2, 0, 0, w, h);
           ctx.fillStyle = "rgba(0,0,0,0.25)";
           ctx.fillRect(0, 0, w, h);
         } else {
@@ -1026,15 +1607,59 @@
         if (f < frames) setTimeout(drawFrame, 1000 / fps);
         else { vi++; next(); }
       }
-      function startFrames() {
-        drawFrame();
-      }
-      if ((item.type === "source_clip" || item.type === "resume") && $("vp-video-preview")) {
-        seekVideo($("vp-video-preview"), item.start || 0).then(startFrames);
-      } else {
-        startFrames();
-      }
+      drawFrame();
     }
+
+    // Play [start, end) and capture real frames. Falls back to a labelled card
+    // only when the media genuinely is not loaded — and buildStoryboard /
+    // updateRenderAvailability already stop the operator reaching here in that
+    // state, so this is a backstop, not a silent substitution.
+    function renderClipItem(item, doneItem) {
+      var v = renderSourceEl;
+      var usable = v && v.src && isFinite(item.start) && isFinite(item.end) && item.end > item.start;
+      if (!usable) {
+        var frames2 = Math.ceil((Number(item.duration) || 2) * fps);
+        var f2 = 0;
+        (function placeholder() {
+          ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+          drawBrandedCard(ctx, w, h, {
+            type: "alert", title: "SOURCE CLIP UNAVAILABLE",
+            subtitle: formatTime(item.start) + "–" + formatTime(item.end) + " — source file not loaded",
+          });
+          pumpCanvasFrame(stream);
+          f2++;
+          if (f2 < frames2) setTimeout(placeholder, 1000 / fps); else doneItem();
+        })();
+        return;
+      }
+
+      seekVideo(v, item.start).then(function () {
+        var playing = v.play();
+        if (playing && typeof playing.catch === "function") playing.catch(function () {});
+        (function pump() {
+          // currentTime is the authority, so the clip stops at its OUT point
+          // regardless of decode jitter — this is the trim.
+          if (v.currentTime >= item.end || v.ended) {
+            v.pause();
+            doneItem();
+            return;
+          }
+          ctx.fillStyle = "#000";
+          ctx.fillRect(0, 0, w, h);
+          try { ctx.drawImage(v, 0, 0, w, h); } catch (e) { /* keep the black field */ }
+          if ($("vp-captions") && $("vp-captions").checked && item.text) {
+            ctx.fillStyle = "rgba(0,0,0,0.55)";
+            ctx.fillRect(0, h - 100, w, 100);
+            ctx.fillStyle = "#fff";
+            ctx.font = "24px sans-serif";
+            wrapText(ctx, item.text, 40, h - 72, w - 80, 28);
+          }
+          pumpCanvasFrame(stream);
+          setTimeout(pump, 1000 / fps);
+        })();
+      });
+    }
+
     next();
   }
 
@@ -1180,6 +1805,21 @@
       buildStoryboard();
       markStepDone("storyboard");
     });
+    wireButton("vp-clip-add", function () { addClipFromEditor(); });
+    wireButton("vp-clip-set-in", function () {
+      var p = $("vp-clip-player");
+      if (p && $("vp-clip-in")) {
+        $("vp-clip-in").value = formatTime(p.currentTime);
+        setClipMessage("In point set to " + formatTime(p.currentTime) + ".", false);
+      }
+    });
+    wireButton("vp-clip-set-out", function () {
+      var p = $("vp-clip-player");
+      if (p && $("vp-clip-out")) {
+        $("vp-clip-out").value = formatTime(p.currentTime);
+        setClipMessage("Out point set to " + formatTime(p.currentTime) + ".", false);
+      }
+    });
     wireButton("vp-start-render", function (e) {
       var el = e.currentTarget;
       var bar = $("vp-render-bar");
@@ -1250,6 +1890,25 @@
         return;
       }
 
+      // Removing a clip removes ONE sequence item. It never touches the
+      // underlying source file, its identity, or any other clip.
+      var sbRemove = e.target.closest && e.target.closest(".vp-sb-remove-btn");
+      if (sbRemove && container.contains(sbRemove)) {
+        var rix = parseInt(sbRemove.dataset.ix, 10);
+        var removed = state.storyboard[rix];
+        if (!removed) return;
+        state.storyboard.splice(rix, 1);
+        if (safePersist()) {
+          setStoryboardStatus("Removed “" + (removed.label || removed.type || "item") + "”. " +
+            state.storyboard.length + " items remain; the source video is untouched.", false);
+        } else {
+          setStoryboardStatus("Item removed but COULD NOT BE SAVED — browser storage is full.", true);
+        }
+        renderStoryboard();
+        renderSourceStudio();
+        return;
+      }
+
       var evRemove = e.target.closest && e.target.closest(".vp-ev-remove");
       if (evRemove && container.contains(evRemove)) {
         var si = parseInt(evRemove.dataset.si, 10);
@@ -1294,12 +1953,7 @@
       if (el.id === "vp-source-video") {
         var vfile = el.files && el.files[0];
         if (!vfile) return;
-        if (state.videoObjectUrl) URL.revokeObjectURL(state.videoObjectUrl);
-        state.videoObjectUrl = URL.createObjectURL(vfile);
-        var vid = $("vp-video-preview");
-        if (vid) { vid.src = state.videoObjectUrl; vid.style.display = "block"; }
-        state.videoDataUrl = null;
-        safePersist();
+        adoptSourceFile(vfile);
         return;
       }
       if (el.matches && el.matches('input[data-field="start"]')) {
@@ -1339,6 +1993,15 @@
         renderTranscript(el.value);
         return;
       }
+      // The YouTube reference player has to appear as soon as a URL is typed.
+      // state.youtube was previously only synced on a button click, so the
+      // reference frame and the source-status strips stayed blank until the
+      // operator happened to press something.
+      if (el.id === "vp-youtube") {
+        state.youtube = el.value || "";
+        renderSourceStudio();
+        return;
+      }
       if (el.matches && el.matches("textarea[data-cfield]")) {
         var si = parseInt(el.dataset.si, 10);
         var field = el.dataset.cfield;
@@ -1360,6 +2023,7 @@
     compactStoredProjects();
     ensureRenderLabel();
     ensureFetchTranscriptButton();
+    ensureSourceStudio();
     var activeStep = "source";
     var activeBtn = document.querySelector(".vp-step.active");
     if (activeBtn && activeBtn.dataset.vpStep) activeStep = activeBtn.dataset.vpStep;
@@ -1370,6 +2034,7 @@
     else startNewDraft();
     if (container) wireEvents(container);
     ensureActionButtons();
+    renderSourceStudio();
     setStep(activeStep);
     // A storage failure detected during compaction is reported, not swallowed.
     if (lastStorageProblem) {
@@ -1383,6 +2048,7 @@
     if (!vpRoot) return;
     ensureRenderLabel();
     ensureFetchTranscriptButton();
+    ensureSourceStudio();
     ensureActionButtons();
     syncStateToForm();
     renderProjectChips();
@@ -1390,6 +2056,7 @@
     renderStatements();
     renderCommentary();
     renderStoryboard();
+    renderSourceStudio();
   }
 
   function rebootVideoProducer(container) {
@@ -1404,6 +2071,7 @@
       compactStoredProjects();
       ensureRenderLabel();
       ensureFetchTranscriptButton();
+      ensureSourceStudio();
       wireEvents(container);
       ensureActionButtons();
       if (container.getAttribute("data-vp-initialized") === "1") {
