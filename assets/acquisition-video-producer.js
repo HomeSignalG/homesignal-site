@@ -159,21 +159,43 @@
     catch (e) { return []; }
   }
 
+  // Evidence blobs (base64 dataUrl) are SESSION-ONLY, exactly like the source
+  // video: keeping them would blow the localStorage quota. Only the file
+  // identity (name/type) is persisted, so a reopened project still lists what
+  // was attached. Stripping happens on the WRITE path too — otherwise a build
+  // of the storyboard smuggles the same blobs back into storage inside
+  // storyboard[].files, and saving one project rewrites (and damages) every
+  // other project's evidence on the way through loadProjects().
+  function sanitizeEvidenceList(items) {
+    if (!Array.isArray(items)) return [];
+    return items.map(function (ev) {
+      return { name: (ev && ev.name) || "", type: (ev && ev.type) || "" };
+    });
+  }
+
   function sanitizeStatements(stmts) {
     if (!Array.isArray(stmts)) return [];
     return stmts.map(function (st) {
-      var out = {
+      st = st || {};
+      return {
         id: st.id,
         text: st.text || "",
         matches: Array.isArray(st.matches) ? st.matches : [],
         commentary: st.commentary || {},
-        evidence: [],
+        evidence: sanitizeEvidenceList(st.evidence),
       };
-      if (Array.isArray(st.evidence)) {
-        out.evidence = st.evidence.map(function (ev) {
-          return { name: ev.name || "", type: ev.type || "" };
-        });
-      }
+    });
+  }
+
+  // Storyboard items are operator-shaped data; keep every field EXCEPT the
+  // evidence blobs carried on `files` (see sanitizeEvidenceList).
+  function sanitizeStoryboard(board) {
+    if (!Array.isArray(board)) return [];
+    return board.map(function (item) {
+      if (!item || typeof item !== "object") return { type: "unknown", label: "Unknown item" };
+      var out = {};
+      Object.keys(item).forEach(function (k) { if (k !== "files") out[k] = item[k]; });
+      if (Array.isArray(item.files)) out.files = sanitizeEvidenceList(item.files);
       return out;
     });
   }
@@ -189,7 +211,7 @@
       parsed: rec.parsed || parseTranscript(rec.transcriptRaw || ""),
       hasSourceVideo: !!(rec.hasSourceVideo || rec.videoDataUrl),
       statements: sanitizeStatements(rec.statements),
-      storyboard: Array.isArray(rec.storyboard) ? rec.storyboard : [],
+      storyboard: sanitizeStoryboard(rec.storyboard),
       updatedAt: rec.updatedAt || new Date().toISOString(),
     };
     return clean;
@@ -200,15 +222,58 @@
     return list.map(sanitizeProjectRecord).filter(Boolean);
   }
 
-  function compactStoredProjects() {
+  // Result of the last compaction, surfaced to the operator by bootVideoProducer.
+  // Never swallowed: unreadable or unwritable storage has to be visible.
+  var lastStorageProblem = null;
+
+  function readStoredProjectsRaw() {
+    // Returns {list} on success or {parseError} — the caller must NOT retry the
+    // identical parse, which is what made malformed JSON unrepairable before.
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw === null || raw === "") return { list: [] };
     try {
-      var list = sanitizeProjectList(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"));
-      saveProjects(list);
+      return { list: sanitizeProjectList(JSON.parse(raw)) };
+    } catch (e) {
+      return { parseError: e, raw: raw };
+    }
+  }
+
+  function compactStoredProjects() {
+    lastStorageProblem = null;
+    var read = readStoredProjectsRaw();
+
+    if (read.parseError) {
+      // Unparseable JSON can never be repaired by parsing it again. Move the
+      // damaged blob aside (so nothing is destroyed without a copy) and start
+      // from a clean list, then tell the operator.
+      console.error("Video Producer: stored projects are not valid JSON", read.parseError);
+      try {
+        localStorage.setItem(STORAGE_KEY + "_corrupt_backup", read.raw);
+      } catch (backupErr) {
+        console.error("Video Producer: could not back up corrupt storage", backupErr);
+      }
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        saveProjects([]);
+        lastStorageProblem = "Saved projects were unreadable and could not be recovered. " +
+          "Storage has been reset; the damaged copy is kept under " +
+          STORAGE_KEY + "_corrupt_backup.";
+      } catch (resetErr) {
+        console.error("Video Producer: storage reset failed", resetErr);
+        lastStorageProblem = "Saved projects are unreadable and browser storage cannot be written. " +
+          "Projects will not save in this browser.";
+      }
+      return false;
+    }
+
+    try {
+      saveProjects(read.list);
       return true;
     } catch (e) {
+      // Parsed fine but will not write — quota. Retry with transcripts trimmed.
       console.error("Video Producer: could not compact stored projects", e);
       try {
-        var minimal = sanitizeProjectList(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")).map(function (p) {
+        var minimal = read.list.map(function (p) {
           return {
             id: p.id,
             name: p.name,
@@ -218,15 +283,18 @@
             parsed: p.parsed,
             hasSourceVideo: !!p.hasSourceVideo,
             statements: sanitizeStatements(p.statements),
-            storyboard: p.storyboard || [],
+            storyboard: sanitizeStoryboard(p.storyboard),
             updatedAt: p.updatedAt || new Date().toISOString(),
           };
         });
         localStorage.removeItem(STORAGE_KEY);
         saveProjects(minimal);
+        lastStorageProblem = "Browser storage was full — long transcripts were trimmed to free space.";
         return true;
       } catch (e2) {
         console.error("Video Producer: storage repair failed", e2);
+        lastStorageProblem = "Browser storage is full and could not be repaired. " +
+          "Export projects to JSON, then clear old ones.";
         return false;
       }
     }
@@ -402,7 +470,9 @@
     syncFromForm();
     if (!state.id) state.id = uid();
     var list = loadProjects();
-    var rec = projectRecordFromState();
+    // Sanitize on the way OUT as well as the way in: state keeps evidence blobs
+    // for this session, storage never receives them.
+    var rec = sanitizeProjectRecord(projectRecordFromState());
     var ix = list.findIndex(function (p) { return p.id === rec.id; });
     if (ix >= 0) list[ix] = rec;
     else list.push(rec);
@@ -532,8 +602,22 @@
   function evidenceHtml(items, si) {
     if (!items.length) return '<div class="vp-evidence"></div>';
     return '<div class="vp-evidence">' + items.map(function (ev, ei) {
-      var thumb = ev.type && ev.type.indexOf("image") === 0
-        ? '<img src="' + ev.dataUrl + '" alt="">' : "📄 " + esc(ev.name);
+      // A thumbnail is only shown when the blob is still in memory this
+      // session. Evidence blobs are never persisted (see sanitizeEvidenceList),
+      // so a reopened project shows the file name plus an honest note instead
+      // of a broken <img src="undefined">.
+      var hasBlob = typeof ev.dataUrl === "string" && ev.dataUrl.indexOf("data:") === 0;
+      var isImage = ev.type && ev.type.indexOf("image") === 0;
+      var thumb;
+      if (hasBlob && isImage) {
+        thumb = '<img src="' + esc(ev.dataUrl) + '" alt="' + esc(ev.name) + '">';
+      } else if (hasBlob) {
+        thumb = "📄 " + esc(ev.name);
+      } else {
+        thumb = '<span class="vp-evidence-meta" title="Preview is not stored between sessions">'
+          + (isImage ? "🖼️ " : "📄 ") + esc(ev.name)
+          + ' <em>(preview not stored — re-attach to see it)</em></span>';
+      }
       return '<div class="vp-evidence-item">' + thumb +
         '<button type="button" class="vp-btn secondary vp-ev-remove" data-si="' + si + '" data-ei="' + ei + '" style="padding:2px 6px;font-size:10px">Remove</button></div>';
     }).join("") + "</div>";
@@ -991,8 +1075,10 @@
         commentary: { said: line, evidence: "", community: "" },
         evidence: [],
       });
-      safePersist();
+      // Invalidate BEFORE persisting, or storage keeps a storyboard that no
+      // longer matches the statements and a reload restores the stale one.
       invalidateStoryboard();
+      safePersist();
       renderStatements();
       renderCommentary();
     });
