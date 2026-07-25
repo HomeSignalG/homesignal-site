@@ -94,3 +94,45 @@ The drop point has NOT been instrumented, so no causal claim is made here. The f
 delta above is an observation, not a proven cause. Step 2 must trace the 39 rows through
 HS_SEED -> lib/data.js seed branch -> withDistance(rows, home) -> pre-plot collection ->
 __HS_MAP.items and report count-in/count-out and the first rejected record at each stage.
+
+## STEP 2 RESULT — FIRST DROP POINT PROVEN (trace.mjs)
+
+It is NOT a record filter. 39 never becomes 0 by exclusion — **the render pipeline throws.**
+
+    window.__HS_MAP  ===  null      (not {items:[]} — shownItems() never ran)
+    page error       ===  "TypeError: Cannot read properties of undefined (reading 'slice')"
+
+Code location: **lib/data.js:249**
+
+    if (isSeed()) return window.HS_SEED.properties.slice();
+
+The harness seed had no `properties` key, so `undefined.slice()` threw and aborted the
+page before any marker was created. This is why the legend rendered (lib/map.js is
+independent) while all three modes plotted zero.
+
+ROOT CAUSE: missing REQUIRED top-level seed key `properties`. Defect class: **harness
+seed adapter**. Not production code, not source data.
+
+## STEP 3 RESULT — adapter fixed, page renders
+
+seed78617.mjs now emits the full 10-key contract (community/demoUser/properties/projects/
+facilities/changes/meetings/environmental_risk/coverage/topicCategories), a community
+origin with lat/lng/covered/slug/city, and the 19-key project contract. It throws on a
+missing required source value instead of plotting zero silently.
+
+Result: 0 -> rendering. All three modes report IDENTICAL aggregates.
+
+## STEP 5 — BLOCKED (count is 16, not 39)
+
+`window.__HS_MAP.items` is the page's **lettered cap-16 set** (reserveFacilitySlots
+cap:16), not the full inventory; the remainder rides the uncapped "rest" layer, which in
+Leaflet is a canvas layer with no DOM nodes. So parity measured over `items` covers 16 of
+39 records.
+
+Per the Step 5 rule ("if any count is not 39, stop"), the run stops here.
+
+NEXT ACTION (smallest defensible): compare over `HS.plottedMarkerSet(visible, facs,
+restFacs)` — lib/map.js's own documented authority for "which records every render
+surface plots and what symbol each gets" — instead of `__HS_MAP.items`. Expose its inputs
+via a harness-owned wrapper on reserveFacilitySlots/restAfterLetters, assert the returned
+set is 39, then re-run Step 6 per-record parity over that set.
