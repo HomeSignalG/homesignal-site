@@ -58,7 +58,10 @@ ok(!/Render MP4/i.test(vp), 'static asset does not claim MP4 render support');
 ok(/data-vp-delegate-wired/.test(vp), 'static asset uses container-level event delegation');
 ok(/vp-build-storyboard/.test(vp), 'static asset handles build storyboard clicks');
 ok(/fetch-youtube-transcript/.test(vp), 'static asset invokes fetch-youtube-transcript edge function');
-ok(/vp-fetch-transcript/.test(vp), 'static asset wires Fetch transcript from YouTube button');
+ok(/hasSourceVideo/.test(vp), 'static asset does not persist source video blobs in localStorage');
+ok(/function safePersist\(\)/.test(vp) && /return true/.test(vp), 'safePersist reports save success');
+ok(/ensureActionButtons/.test(vp), 'static asset wires action buttons directly');
+ok(/sanitizeProjectRecord/.test(vp), 'static asset strips legacy video blobs from storage');
 
 // Gate remains for unauthorized users
 ok(/id="gate"/.test(acq) && /function loginState/.test(acq) && /function noAccess/.test(acq),
