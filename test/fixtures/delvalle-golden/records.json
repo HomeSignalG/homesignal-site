@@ -1,0 +1,232 @@
+{
+  "_provenance": {
+    "source": "public.app_projects where zip='78617' (Supabase project qwnnmljucajnexpxdgxr)",
+    "captured": "2026-07-26",
+    "live_census_at_capture": {
+      "total": 457, "development": 428, "facilities": 29,
+      "austin_with_registry": 423, "dev_null_registry": 5,
+      "austin-site-plan-cases": 267, "austin-subdivision-cases": 156,
+      "distinct_identities": 457, "unsourced": 0, "coordless": 0,
+      "content_md5": "649e6ea9e534279502e41511fe4a105a"
+    },
+    "note": "Every row below is a VERBATIM production row. Nothing is synthesised. Rows are selected by stable source identity (the folderrsn / TABS project id / EPA registry id inside source_ref), never by array index, so a re-export in a different order still selects the same records.",
+    "origin": { "lat": 30.1745, "lng": -97.6134, "why": "the 78617 report centroid — the page's distance origin" }
+  },
+
+  "records": [
+    { "why": ["source:austin-site-plan-cases", "cell:Civic/Public|Approved", "category:civic", "lifecycle:approved"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Austin First Church", "type": "Civic/Public", "status": "Approved",
+      "lat": 30.18794242, "lng": -97.60436246, "submitted_at": "2009-04-06", "stage": "Approved and Released", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10256824" },
+
+    { "why": ["source:austin-site-plan-cases", "cell:Civic/Public|Proposed", "lifecycle:proposed"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "TCO - Onion Creek Greenway Improvements III", "type": "Civic/Public", "status": "Proposed",
+      "lat": 30.16821556, "lng": -97.66363866, "submitted_at": "2024-11-14", "stage": "Pending", "developer": null, "impact_score": 72, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=13431232" },
+
+    { "why": ["source:austin-site-plan-cases", "cell:Commercial|Approved", "category:commercial", "name-rule-must-NOT-fire: 'Correctional Complex' is typed Commercial by the source and the TYPE wins"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Travis County Correctional Complex", "type": "Commercial", "status": "Approved",
+      "lat": 30.19658546, "lng": -97.64708578, "submitted_at": "2007-03-29", "stage": "Approved and Released", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10017673" },
+
+    { "why": ["source:austin-site-plan-cases", "cell:Commercial|Proposed"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Buck Truck Stop", "type": "Commercial", "status": "Proposed",
+      "lat": 30.18414858, "lng": -97.54153867, "submitted_at": "2021-10-08", "stage": "Waiting on Legal", "developer": null, "impact_score": 72, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=12797625" },
+
+    { "why": ["source:austin-site-plan-cases", "cell:Industrial|Approved", "category:industrial", "shares a NAME with EPA facility 110071346495 — the two must stay distinct records, one development one facility"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Dalfen Industrial", "type": "Industrial", "status": "Approved",
+      "lat": 30.16787011, "lng": -97.63457491, "submitted_at": "2020-11-24", "stage": "Approved and Released", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=12594668" },
+
+    { "why": ["source:austin-site-plan-cases", "cell:Industrial|Proposed"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Stream Elroy & 130", "type": "Industrial", "status": "Proposed",
+      "lat": 30.16483568, "lng": -97.65815116, "submitted_at": "2025-05-15", "stage": "In Review", "developer": null, "impact_score": 72, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=13519032" },
+
+    { "why": ["source:austin-site-plan-cases", "cell:Residential|Approved", "category:residential"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Ross Road Multifamily", "type": "Residential", "status": "Approved",
+      "lat": 30.16268872, "lng": -97.63785309, "submitted_at": "2020-03-16", "stage": "Approved and Released", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=12437499" },
+
+    { "why": ["source:austin-site-plan-cases", "cell:Residential|Proposed"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Charro Estates", "type": "Residential", "status": "Proposed",
+      "lat": 30.11809529, "lng": -97.56665375, "submitted_at": "2020-09-25", "stage": "Waiting on Legal", "developer": null, "impact_score": 72, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=12555947" },
+
+    { "why": ["source:austin-site-plan-cases", "cell:unclassified|Approved", "name-rule:civic", "the source type is the generic 'unclassified' bucket, so the NAME rule must classify it"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Travis County Correctional Complex - Permit #3", "type": "unclassified", "status": "Approved",
+      "lat": 30.19658546, "lng": -97.64708578, "submitted_at": "2007-05-24", "stage": "Approved and Released", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10036733" },
+
+    { "why": ["source:austin-site-plan-cases", "cell:unclassified|Proposed", "name-rule:commercial", "'Hotels' plural — the regression that a bare \\bhotel\\b missed"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Wingate Hotels", "type": "unclassified", "status": "Proposed",
+      "lat": 30.20387283, "lng": -97.6434739, "submitted_at": "2017-10-03", "stage": "Pending", "developer": null, "impact_score": 72, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=11800825" },
+
+    { "why": ["source:austin-site-plan-cases", "cell:Utility|Approved", "category:infrastructure", "embedded double-quotes in the title — a JSON/round-trip hazard"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Watersedge PUD 16\" & 24\" Water Line Ph I Service Extension Request  #2406", "type": "Utility", "status": "Approved",
+      "lat": 30.18604103, "lng": -97.60546649, "submitted_at": "2008-02-14", "stage": "Approved and Released", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10115325" },
+
+    { "why": ["source:austin-subdivision-cases", "cell:Civic/Public|Approved", "PRECEDENCE: the title says RESUBDIVISION but the source TYPE says Civic/Public — type must win over the name rule, so this must resolve civic, not residential"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "JOSEPH ADDITION, RESUBDIVISION OF LOT 3", "type": "Civic/Public", "status": "Approved",
+      "lat": 30.201955, "lng": -97.6402467, "submitted_at": "1999-07-26", "stage": "Approved", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=100449" },
+
+    { "why": ["source:austin-subdivision-cases", "cell:Commercial|Approved"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "LOS CIELOS SEC 5", "type": "Commercial", "status": "Approved",
+      "lat": 30.16606366, "lng": -97.62003036, "submitted_at": "2007-04-17", "stage": "Approved", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10023600" },
+
+    { "why": ["source:austin-subdivision-cases", "cell:Commercial|Operating", "lifecycle:operating — the ONLY source family in Del Valle that reaches 'operating'"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "Ross Elroy Subdivision", "type": "Commercial", "status": "Operating",
+      "lat": 30.1556224, "lng": -97.64122139, "submitted_at": "2011-01-27", "stage": "Subdivision Recorded", "developer": null, "impact_score": 45, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10540488" },
+
+    { "why": ["source:austin-subdivision-cases", "cell:Commercial|Proposed"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "Austin Airport Hotel Center", "type": "Commercial", "status": "Proposed",
+      "lat": 30.22197615, "lng": -97.667296, "submitted_at": "2008-03-10", "stage": "Awaiting Update", "developer": null, "impact_score": 72, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10123165" },
+
+    { "why": ["source:austin-subdivision-cases", "cell:Industrial|Operating"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "Rio Garfield", "type": "Industrial", "status": "Operating",
+      "lat": 30.19788273, "lng": -97.55639278, "submitted_at": "2013-10-21", "stage": "Subdivision Recorded", "developer": null, "impact_score": 45, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=11035811" },
+
+    { "why": ["source:austin-subdivision-cases", "cell:Residential|Approved"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "Rio Vista Ranch Sec 3", "type": "Residential", "status": "Approved",
+      "lat": 30.09051336, "lng": -97.62715655, "submitted_at": "2007-06-13", "stage": "Approved", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10042505" },
+
+    { "why": ["source:austin-subdivision-cases", "cell:Residential|Operating"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "Soto Subdivision", "type": "Residential", "status": "Operating",
+      "lat": 30.11943207, "lng": -97.62969437, "submitted_at": "2011-05-09", "stage": "Subdivision Recorded", "developer": null, "impact_score": 45, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10586390" },
+
+    { "why": ["source:austin-subdivision-cases", "cell:Residential|Proposed"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "Stoney Ridge Highlands Phase 4", "type": "Residential", "status": "Proposed",
+      "lat": 30.15021998, "lng": -97.63127004, "submitted_at": "2025-02-28", "stage": "Waiting on Fiscal", "developer": null, "impact_score": 72, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=13476517" },
+
+    { "why": ["source:austin-subdivision-cases", "cell:unclassified|Approved"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "Garfield Sec 1", "type": "unclassified", "status": "Approved",
+      "lat": 30.18995108, "lng": -97.53456888, "submitted_at": "2007-09-21", "stage": "Approved", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10074015" },
+
+    { "why": ["source:austin-subdivision-cases", "cell:unclassified|Operating", "name-rule:residential ('Subdivision' wins over the word 'Commercial' later in the title)"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "Berdoll Commercial Subdivision; Amended Plat of Lots 9 & 10 Block A", "type": "unclassified", "status": "Operating",
+      "lat": 30.17942983, "lng": -97.61468172, "submitted_at": "2010-12-29", "stage": "Subdivision Recorded", "developer": null, "impact_score": 45, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10530667" },
+
+    { "why": ["source:austin-subdivision-cases", "cell:unclassified|Proposed"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "Sun Chase Ph1 Sec 1", "type": "unclassified", "status": "Proposed",
+      "lat": 30.14926544, "lng": -97.58041749, "submitted_at": "2010-06-25", "stage": "Awaiting Update", "developer": null, "impact_score": 72, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10457815" },
+
+    { "why": ["source:austin-subdivision-cases", "cell:Utility|Approved"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "Interport Subdivision Construction Plans", "type": "Utility", "status": "Approved",
+      "lat": 30.20491188, "lng": -97.6343284, "submitted_at": "2023-06-30", "stage": "Approved and Released", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=13168246" },
+
+    { "why": ["source:austin-subdivision-cases", "cell:Utility|Proposed", "a title that states NO building class at all — the type must carry it"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "Lot 2, Block B", "type": "Utility", "status": "Proposed",
+      "lat": 30.19694121, "lng": -97.63781881, "submitted_at": "2026-04-22", "stage": "Awaiting Update", "developer": null, "impact_score": 72, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=13691544" },
+
+    { "why": ["source:austin-subdivision-cases", "name-rule:commercial", "unclassified + 'Hotel' in the title"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "Austin Airport Hotel Center (The Amended Plat of Buratti Pecora I)", "type": "unclassified", "status": "Approved",
+      "lat": 30.2194705, "lng": -97.66887898, "submitted_at": "2008-03-10", "stage": "Approved", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10123141" },
+
+    { "why": ["source:austin-site-plan-cases", "name-rule:industrial", "unclassified + 'Warehouse'"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Austin Granite Warehouse", "type": "unclassified", "status": "Approved",
+      "lat": 30.1866843, "lng": -97.55239939, "submitted_at": "2009-02-24", "stage": "Approved and Released", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10239535" },
+
+    { "why": ["source:austin-site-plan-cases", "name-rule:infrastructure", "unclassified + 'Waterline' — the Austin vocabulary the pre-repair NAME_RULES missed entirely"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Giga Texas Offsite Reclaimed Waterline", "type": "unclassified", "status": "Approved",
+      "lat": 30.20905734, "lng": -97.6214384, "submitted_at": "2022-05-20", "stage": "Approved and Released", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=12940306" },
+
+    { "why": ["source:austin-site-plan-cases", "HONEST FALLBACK: unclassified type + a title that states no building class — must land on 'other' WITH an explicit fallback_reason, never a guessed category"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Interport Floodplain Modifications Ph I", "type": "unclassified", "status": "Approved",
+      "lat": 30.19469554, "lng": -97.62342405, "submitted_at": "2007-07-12", "stage": "Approved and Released", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10051523" },
+
+    { "why": ["source:austin-subdivision-cases", "name-rule:residential", "'Resubdivision' inside a longer title"],
+      "record_kind": "development", "registry_id": "austin-subdivision-cases", "name": "Partition of Ida Mae Burch Estate, Resubdivision of Lot 9-B", "type": "unclassified", "status": "Approved",
+      "lat": 30.18805554, "lng": -97.60616945, "submitted_at": "2009-01-13", "stage": "Approved", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=10226556" },
+
+    { "why": ["DEDUPE GUARD 1/3", "same title 'Del Valle High School Addition', DIFFERENT filing date and DIFFERENT case — three real filings that must never collapse into one"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Del Valle High School Addition", "type": "unclassified", "status": "Approved",
+      "lat": 30.18052071, "lng": -97.61269143, "submitted_at": "2016-01-11", "stage": "Approved and Released", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=11469662" },
+
+    { "why": ["DEDUPE GUARD 2/3"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Del Valle High School Addition", "type": "unclassified", "status": "Approved",
+      "lat": 30.17901097, "lng": -97.60985633, "submitted_at": "2020-06-25", "stage": "Approved and Released", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=12495458" },
+
+    { "why": ["DEDUPE GUARD 3/3"],
+      "record_kind": "development", "registry_id": "austin-site-plan-cases", "name": "Del Valle High School Addition", "type": "unclassified", "status": "Approved",
+      "lat": 30.17598933, "lng": -97.61339832, "submitted_at": "2022-01-24", "stage": "Approved and Released", "developer": null, "impact_score": 55, "zip": "78617",
+      "source_ref": "https://abc.austintexas.gov/web/permit/public-search-other?t_detail=1&t_selected_folderrsn=12865350" },
+
+    { "why": ["source:TABS 1/5", "registry_id NULL (known adapter-contract gap)", "status 'On file' -> lifecycle unknown", "NO filing date — absent stays absent"],
+      "record_kind": "development", "registry_id": null, "name": "River Bottoms Ranch Barn 2", "type": "animal-facility", "status": "On file",
+      "lat": 30.21513, "lng": -97.5391859, "submitted_at": null, "stage": null, "developer": "River Bottoms Ranch LLC", "impact_score": 45, "zip": "78617",
+      "source_ref": "https://www.tdlr.texas.gov/TABS/Projects/TABS2023006449" },
+
+    { "why": ["source:TABS 2/5", "type 'research' is not a canonical category — must not invent one"],
+      "record_kind": "development", "registry_id": null, "name": "Histology Lab", "type": "research", "status": "On file",
+      "lat": 30.21513, "lng": -97.5391859, "submitted_at": null, "stage": null, "developer": "River Bottoms Ranch", "impact_score": 45, "zip": "78617",
+      "source_ref": "https://www.tdlr.texas.gov/TABS/Projects/TABS2023006483" },
+
+    { "why": ["source:TABS 3/5"],
+      "record_kind": "development", "registry_id": null, "name": "Barn 2 ACT Office", "type": "commercial", "status": "On file",
+      "lat": 30.21513, "lng": -97.5391859, "submitted_at": null, "stage": null, "developer": "RIVER BOTTOMS RANCH LLC", "impact_score": 45, "zip": "78617",
+      "source_ref": "https://www.tdlr.texas.gov/TABS/Projects/TABS2024016698" },
+
+    { "why": ["source:TABS 4/5", "all five TABS rows share ONE coordinate — identity must come from source_ref, not position"],
+      "record_kind": "development", "registry_id": null, "name": "ATX1 New Construction", "type": "industrial", "status": "On file",
+      "lat": 30.21513, "lng": -97.5391859, "submitted_at": null, "stage": null, "developer": "Neuralink", "impact_score": 45, "zip": "78617",
+      "source_ref": "https://www.tdlr.texas.gov/TABS/Projects/TABS2024022676" },
+
+    { "why": ["source:TABS 5/5"],
+      "record_kind": "development", "registry_id": null, "name": "ATX1 - Third Floor Tenant Improvement", "type": "commercial", "status": "On file",
+      "lat": 30.21513, "lng": -97.5391859, "submitted_at": null, "stage": null, "developer": "Neuralink Corporation", "impact_score": 45, "zip": "78617",
+      "source_ref": "https://www.tdlr.texas.gov/TABS/Projects/TABS2026011928" },
+
+    { "why": ["source:EPA FRS", "facility 1/29"], "record_kind": "facility", "registry_id": "110005052085", "name": "BFI WASTE SYSTEMS OF TEXAS LP", "type": "industrial", "status": "Operating", "lat": 30.201016, "lng": -97.639046, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110005052085", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110005052085" },
+    { "why": ["source:EPA FRS", "facility 2/29"], "record_kind": "facility", "registry_id": "110005079495", "name": "FRANKS WASTE OIL SERVICE", "type": "industrial", "status": "Operating", "lat": 30.16732, "lng": -97.65936, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110005079495", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110005079495" },
+    { "why": ["source:EPA FRS", "facility 3/29", "DEDUPE GUARD: shares its NAME with facility 110039703611 at a different point — distinct EPA registry ids, distinct records"], "record_kind": "facility", "registry_id": "110008975804", "name": "SOUTH AUSTIN REGIONAL WASTEWATER TREATMENT PLANT", "type": "industrial", "status": "Operating", "lat": 30.206452, "lng": -97.632932, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110008975804", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110008975804" },
+    { "why": ["source:EPA FRS", "facility 4/29", "type 'logistics' is not a canonical category — the FACILITY flag outranks it"], "record_kind": "facility", "registry_id": "110012255175", "name": "TORRES TRUCKING SIGNATURE HAULING", "type": "logistics", "status": "Operating", "lat": 30.19259, "lng": -97.60268, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110012255175", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110012255175" },
+    { "why": ["source:EPA FRS", "facility 5/29"], "record_kind": "facility", "registry_id": "110033390104", "name": "BFI RECYCLING CENTER MANOR", "type": "industrial", "status": "Operating", "lat": 30.19965, "lng": -97.640722, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110033390104", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110033390104" },
+    { "why": ["source:EPA FRS", "facility 6/29", "name contains 'INFRASTRUCTURE' — a development name rule must NOT steal a facility"], "record_kind": "facility", "registry_id": "110033793465", "name": "LONE STAR INFRASTRUCTURE CONCRETE BATCH CP-7", "type": "industrial", "status": "Operating", "lat": 30.18087, "lng": -97.64662, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110033793465", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110033793465" },
+    { "why": ["source:EPA FRS", "facility 7/29"], "record_kind": "facility", "registry_id": "110033828918", "name": "JL D MANAGEMENT CONCRETE CRUSHER", "type": "industrial", "status": "Operating", "lat": 30.1677, "lng": -97.6527, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110033828918", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110033828918" },
+    { "why": ["source:EPA FRS", "facility 8/29"], "record_kind": "facility", "registry_id": "110034291059", "name": "DE-ANDA TRUCKING", "type": "logistics", "status": "Operating", "lat": 30.16667, "lng": -97.59301, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110034291059", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110034291059" },
+    { "why": ["source:EPA FRS", "facility 9/29", "DEDUPE GUARD: same name as 110008975804"], "record_kind": "facility", "registry_id": "110039703611", "name": "SOUTH AUSTIN REGIONAL WASTEWATER TREATMENT PLANT", "type": "industrial", "status": "Operating", "lat": 30.21203, "lng": -97.61193, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110039703611", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110039703611" },
+    { "why": ["source:EPA FRS", "facility 10/29"], "record_kind": "facility", "registry_id": "110056361743", "name": "CITY OF AUSTIN WATER UTILITY SOUTH AUSTIN REGIONAL WASTEWATER", "type": "industrial", "status": "Operating", "lat": 30.206509, "lng": -97.632813, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110056361743", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110056361743" },
+    { "why": ["source:EPA FRS", "facility 11/29"], "record_kind": "facility", "registry_id": "110070171250", "name": "AGGREGATE HAULERS DEL VALLE", "type": "industrial", "status": "Operating", "lat": 30.19503, "lng": -97.58191, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110070171250", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110070171250" },
+    { "why": ["source:EPA FRS", "facility 12/29"], "record_kind": "facility", "registry_id": "110070182593", "name": "TXI - GARFIELD SAND & GRAVEL", "type": "industrial", "status": "Operating", "lat": 30.19503, "lng": -97.58191, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110070182593", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110070182593" },
+    { "why": ["source:EPA FRS", "facility 13/29", "type 'energy'"], "record_kind": "facility", "registry_id": "110070191525", "name": "SANDHILL POWER PLANT", "type": "energy", "status": "Operating", "lat": 30.20623, "lng": -97.63328, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110070191525", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110070191525" },
+    { "why": ["source:EPA FRS", "facility 14/29"], "record_kind": "facility", "registry_id": "110070363763", "name": "WALNUT CREEK WASTEWATER TREATMENT FACILITY", "type": "industrial", "status": "Operating", "lat": 30.21203, "lng": -97.61193, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110070363763", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110070363763" },
+    { "why": ["source:EPA FRS", "facility 15/29"], "record_kind": "facility", "registry_id": "110070366263", "name": "PEARCE LANE WASTEWATER TREATMENT PLANT", "type": "industrial", "status": "Operating", "lat": 30.164214, "lng": -97.571565, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110070366263", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110070366263" },
+    { "why": ["source:EPA FRS", "facility 16/29"], "record_kind": "facility", "registry_id": "110070376640", "name": "TXI - GARFIELD SAND & GRAVEL PLANT", "type": "industrial", "status": "Operating", "lat": 30.19503, "lng": -97.58191, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110070376640", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110070376640" },
+    { "why": ["source:EPA FRS", "facility 17/29", "DEDUPE GUARD: same name as 110071161706 at a different point"], "record_kind": "facility", "registry_id": "110070735758", "name": "SAND HILL ENERGY CENTER", "type": "energy", "status": "Operating", "lat": 30.206452, "lng": -97.632932, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110070735758", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110070735758" },
+    { "why": ["source:EPA FRS", "facility 18/29", "DEDUPE GUARD: same name as 110071347034"], "record_kind": "facility", "registry_id": "110071144283", "name": "LONGVIEW OFFSITE UTILITIES PHASE 1", "type": "industrial", "status": "Operating", "lat": 30.16368, "lng": -97.61113, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110071144283", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110071144283" },
+    { "why": ["source:EPA FRS", "facility 19/29"], "record_kind": "facility", "registry_id": "110071161706", "name": "SAND HILL ENERGY CENTER", "type": "energy", "status": "Operating", "lat": 30.208333, "lng": -97.605, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110071161706", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110071161706" },
+    { "why": ["source:EPA FRS", "facility 20/29"], "record_kind": "facility", "registry_id": "110071299543", "name": "MDH INDUSTRIAL", "type": "industrial", "status": "Operating", "lat": 30.188964, "lng": -97.587752, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110071299543", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110071299543" },
+    { "why": ["source:EPA FRS", "facility 21/29", "DEDUPE GUARD: shares its name with the austin-site-plan-cases DEVELOPMENT record folderrsn=12594668 — one is a facility, one is a permit, never merged"], "record_kind": "facility", "registry_id": "110071346495", "name": "DALFEN INDUSTRIAL", "type": "industrial", "status": "Operating", "lat": 30.167466, "lng": -97.637664, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110071346495", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110071346495" },
+    { "why": ["source:EPA FRS", "facility 22/29"], "record_kind": "facility", "registry_id": "110071347034", "name": "LONGVIEW OFFSITE UTILITIES PHASE 1", "type": "industrial", "status": "Operating", "lat": 30.163717, "lng": -97.610917, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110071347034", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110071347034" },
+    { "why": ["source:EPA FRS", "facility 23/29"], "record_kind": "facility", "registry_id": "110071425575", "name": "ATX 130 INDUSTRIAL", "type": "industrial", "status": "Operating", "lat": 30.161264, "lng": -97.648361, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110071425575", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110071425575" },
+    { "why": ["source:EPA FRS", "facility 24/29"], "record_kind": "facility", "registry_id": "110071443381", "name": "D174 MDH HWY 71 LOGISTICS", "type": "logistics", "status": "Operating", "lat": 30.188964, "lng": -97.587752, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110071443381", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110071443381" },
+    { "why": ["source:EPA FRS", "facility 25/29"], "record_kind": "facility", "registry_id": "110071657336", "name": "BIEL INDUSTRIAL", "type": "industrial", "status": "Operating", "lat": 30.168293, "lng": -97.653771, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110071657336", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110071657336" },
+    { "why": ["source:EPA FRS", "facility 26/29"], "record_kind": "facility", "registry_id": "110071708120", "name": "GIGA TEXAS OFFSITE WASTEWATER INTERCEPTOR", "type": "industrial", "status": "Operating", "lat": 30.2032, "lng": -97.6234, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110071708120", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110071708120" },
+    { "why": ["source:EPA FRS", "facility 27/29"], "record_kind": "facility", "registry_id": "110071895462", "name": "TIMBER CREEK SUBSTATION", "type": "energy", "status": "Operating", "lat": 30.187116, "lng": -97.646564, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110071895462", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110071895462" },
+    { "why": ["source:EPA FRS", "facility 28/29"], "record_kind": "facility", "registry_id": "110071945553", "name": "COLORADO BEND INDUSTRIAL", "type": "industrial", "status": "Operating", "lat": 30.199562, "lng": -97.625492, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110071945553", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110071945553" },
+    { "why": ["source:EPA FRS", "facility 29/29", "the 29th facility guarantees 29 > 24, so the restFacs tail is exercised"], "record_kind": "facility", "registry_id": "110072130517", "name": "RECLAIMED WATER AND WASTEWATER INFRASTRUCTURE", "type": "industrial", "status": "Operating", "lat": 30.2153, "lng": -97.6158, "submitted_at": null, "stage": null, "developer": "EPA FRS · registry 110072130517", "impact_score": 30, "zip": "78617", "source_ref": "https://echo.epa.gov/detailed-facility-report?fid=110072130517" }
+  ]
+}
