@@ -34,9 +34,15 @@ ok(shape('Development', 'Commercial Alterations') === 'hexagon', 'Detroit "Comme
 ok(shape('Development', 'Earth Work ALT-1 FILING TO RENOVATION OF EXISTING MIXED USE BUILDING WITH NEW 2ND. FLOOR') === 'hexagon', 'NYC mixed-use → hexagon');
 // Industrial (triangle)
 ok(shape('Development', 'Building Commercial - New To construct 46,250SF warehouse with associated office space.') === 'triangle', 'Nashville warehouse → triangle (industrial)');
-// Data center (square — NOT the facility purple)
+// Data center — the OCTAGON the registry defines, NOT the facility square/purple.
+// Asserted against CATEGORY_REGISTRY rather than a shape literal: this assertion
+// previously hardcoded 'square', which is the symbol `facility` owns, and so kept
+// passing while production rendered data centers indistinguishably from regulated
+// facilities. Binding to the registry makes that drift impossible here.
 const dc = HS.resolveMarker({ type: 'unclassified', name: 'ZYDECO DATA CENTER (WITHDRAWAL & RESUBMITTAL OF SP-06-0332C)', status: 'Proposed' });
-ok(dc.shape === 'square' && dc.color !== FAC && dc.isFacility === false, 'Austin "ZYDECO DATA CENTER" → data-center square, status color, never facility purple');
+ok(dc.shape === HS.CATEGORY_REGISTRY.datacenter.symbol && dc.shape !== HS.CATEGORY_REGISTRY.facility.symbol
+  && dc.color !== FAC && dc.isFacility === false,
+  'Austin "ZYDECO DATA CENTER" → registry data-center octagon, status color, never the facility square/purple');
 // Infrastructure (diamond)
 ok(shape('Development', 'Neighborhood Development Permit Wireless Communication Facility(WCF)-Discretionary Project:9292/Miramar') === 'diamond', 'San Diego wireless facility → diamond (adversarial: NOT pentagon from "Neighborhood")');
 
