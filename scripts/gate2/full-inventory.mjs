@@ -142,6 +142,27 @@ await page.evaluate(() => {
   const pm = HS.plottedMarkerSet;
   if (pm) HS.plottedMarkerSet = function (visible, facs, restFacs) {
     window.__RESTFACS = restFacs || []; return pm.apply(this, arguments); };
+
+  // ONE definition of the canonical plotted set — used by BOTH the parity collector and the
+  // filter collector so the two can never disagree again. (Gate 2B shipped with the parity
+  // half fixed and the filter half still reading `visible ∪ facs`; every filter row therefore
+  // reported a 452 baseline and a constant +5 removed offset. Harness-only, but a baseline
+  // that does not equal the canonical inventory is not evidence of anything.)
+  //
+  // restFacs prefers the array the page itself passed to plottedMarkerSet. The fallback
+  // (seed facilities − facs) fires ONLY when the hook never ran; an explicitly EMPTY
+  // __RESTFACS is honoured verbatim, so a filter that genuinely hides facilities is reported
+  // as hiding them instead of being papered over by the derivation.
+  window.__canonSet = function () {
+    const C = window.__CANON || { visible: [], facs: [] };
+    const facIds = new Set(C.facs.map(x => x.source_ref || x.name));
+    const derived = ((window.HS_SEED || {}).facilities || []).filter(f => !facIds.has(f.source_ref || f.name));
+    const restFacs = window.__RESTFACS ? window.__RESTFACS : derived;
+    return C.visible.concat(C.facs).concat(restFacs);
+  };
+  window.__canonIds = function () {
+    return window.__canonSet().map(x => (x && (x.source_ref || x.name)) || '?');
+  };
 });
 
 const MODES = [['street', 'Street'], ['satellite', 'Satellite'], ['impact', 'Focus']];
@@ -157,8 +178,8 @@ for (const [key, label] of MODES) {
     // own __HS_MAP.restFacTotal so the derivation can never silently invent or lose a record.
     const facIds = new Set(C.facs.map(x => x.source_ref || x.name));
     const derived = ((window.HS_SEED || {}).facilities || []).filter(f => !facIds.has(f.source_ref || f.name));
-    const restFacs = (window.__RESTFACS && window.__RESTFACS.length) ? window.__RESTFACS : derived;
-    const rec = C.visible.concat(C.facs).concat(restFacs).map(it => { const m = HS.resolveMarker(it);
+    const restFacs = window.__RESTFACS ? window.__RESTFACS : derived;
+    const rec = window.__canonSet().map(it => { const m = HS.resolveMarker(it);
       return { id: id(it), name: it.name, kind: m.isFacility ? 'facility' : 'development',
         category: m.categoryKey, symbol: m.shape, lifecycle: m.lifecycle, color: m.color,
         evidence: it.source_ref || '', filterKey: m.filterKey, legendLabel: m.legendLabel,
@@ -212,34 +233,56 @@ for (const id of ids) {
 const sameSet = JSON.stringify(ids) === JSON.stringify(Object.keys(iB).sort()) && JSON.stringify(ids) === JSON.stringify(Object.keys(iC).sort());
 
 // ── STEP 7 — filter parity, per mode ────────────────────────────────────────────────────
+// The baseline here is window.__canonSet() — the SAME canonical set the parity collector
+// uses (visible ∪ facs ∪ restFacs = 457). `before`/`restored` must therefore read 457, and
+// `removed_count` is a real count of hidden records rather than a real count plus the 5
+// restFacs the old 452-row window could never see.
+//
+// EXPECTED (derived from the accepted lifecycle census, not hard-coded guesses):
+//   proposed 36 · approved 323 · operating 93 − 29 facilities = 64 · unknown 5 (the TABS rows)
+// Facilities carry filterKey 'facility', so no lifecycle toggle may remove one.
+const FILTER_EXPECT = { proposed: 36, approved: 323, operating: 64, unknown: 5 };
+const facIdSet = new Set(A.records.filter(r => r.kind === 'facility').map(r => r.id));
 const filters = {};
 for (const key of ['proposed', 'approved', 'operating', 'unknown']) {
   filters[key] = {};
   for (const [mk, ml] of MODES) {
     await page.evaluate(k => { const b = document.querySelector('#mapMode button[data-mode="' + k + '"]'); if (b) b.click(); }, mk);
     await page.waitForTimeout(1200);
-    const before = await page.evaluate(() => { const C = window.__CANON || { visible: [], facs: [] }; return C.visible.length + C.facs.length; });
+    const before = await page.evaluate(() => window.__canonSet().length);
     await page.evaluate(k => window.HS.setStatusFilter(k, false), key);
     await page.evaluate(k => { const b = document.querySelector('#mapMode button[data-mode="' + k + '"]'); if (b) b.click(); }, mk === 'street' ? 'satellite' : 'street');
     await page.waitForTimeout(500);
     await page.evaluate(k => { const b = document.querySelector('#mapMode button[data-mode="' + k + '"]'); if (b) b.click(); }, mk);
     await page.waitForTimeout(1400);
-    const after = await page.evaluate(() => { const C = window.__CANON || { visible: [], facs: [] }; return C.visible.concat(C.facs).map(x => x.source_ref || x.name); });
+    const after = await page.evaluate(() => window.__canonIds());
     if (ml === 'Street') await page.screenshot({ path: join(OUT, `gate2b-filter-${key}-off.png`) });
     await page.evaluate(k => window.HS.setStatusFilter(k, true), key);
     await page.evaluate(k => { const b = document.querySelector('#mapMode button[data-mode="' + k + '"]'); if (b) b.click(); }, mk === 'street' ? 'satellite' : 'street');
     await page.waitForTimeout(400);
     await page.evaluate(k => { const b = document.querySelector('#mapMode button[data-mode="' + k + '"]'); if (b) b.click(); }, mk);
     await page.waitForTimeout(1200);
-    const restored = await page.evaluate(() => { const C = window.__CANON || { visible: [], facs: [] }; return C.visible.length + C.facs.length; });
-    const removed = ids.filter(i => !after.includes(i)).sort();
+    const restored = await page.evaluate(() => window.__canonSet().length);
+    const afterSet = new Set(after);
+    const removed = ids.filter(i => !afterSet.has(i)).sort();
+    const removedFacs = removed.filter(i => facIdSet.has(i)).length;
     filters[key][ml] = { before, after: after.length, restored, removed_count: removed.length,
       removed_tabs: removed.filter(i => i.includes('tdlr.texas.gov')).length,
+      removed_facilities: removedFacs,
       membership_sha: createHash('sha256').update(removed.join('\n')).digest('hex') };
   }
   const shas = MODES.map(([, l]) => filters[key][l].membership_sha);
   filters[key].identical_across_modes = shas.every(s => s === shas[0]);
+  filters[key].expected_removed = FILTER_EXPECT[key];
+  filters[key].baseline_is_canonical = MODES.every(([, l]) =>
+    filters[key][l].before === 457 && filters[key][l].restored === 457);
+  filters[key].removed_matches_expected = MODES.every(([, l]) =>
+    filters[key][l].removed_count === FILTER_EXPECT[key]);
+  filters[key].facilities_never_removed = MODES.every(([, l]) => filters[key][l].removed_facilities === 0);
 }
+// The five TABS rows, and only those, must be what an `unknown` toggle hides.
+filters.unknown.removed_are_exactly_the_tabs =
+  MODES.every(([, l]) => filters.unknown[l].removed_tabs === 5 && filters.unknown[l].removed_count === 5);
 
 const tabs = A.records.filter(r => !r.registry_id && r.kind === 'development');
 const facRows = A.records.filter(r => r.kind === 'facility');
@@ -272,6 +315,9 @@ console.log(JSON.stringify(report, null, 1));
 await browser.close(); srv.close();
 
 const hardFail = mism.length || !sameSet || A.total !== 457 || pageErrors.length
-  || !report.facilities_all_square || Object.values(filters).some(f => !f.identical_across_modes);
+  || !report.facilities_all_square
+  || Object.values(filters).some(f => !f.identical_across_modes || !f.baseline_is_canonical
+       || !f.removed_matches_expected || !f.facilities_never_removed)
+  || !filters.unknown.removed_are_exactly_the_tabs;
 console.log(hardFail ? '\nRESULT: GATE 2 FAIL' : '\nRESULT: GATE 2 FULL-INVENTORY PASS');
 process.exit(hardFail ? 1 : 0);

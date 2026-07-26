@@ -131,5 +131,72 @@ const toAppProject = (el) => ({
   eq(new Set(all).size, 457, '6: the three partitions are disjoint — no double count');
 }
 
+
+// ── 7. The FILTER baseline must be the canonical set, not `visible ∪ facs` ───────────
+// Gate 2B shipped with §6 fixed in the parity collector but NOT in the filter collector, so
+// every filter row reported before/restored = 452 and a removed_count inflated by exactly the
+// 5 restFacs (they sat outside the measurement window, so they read as permanently hidden).
+// This pins the repaired contract: ONE canonical accessor feeds both collectors, facilities
+// are never removed by a LIFECYCLE toggle, and removed_count is the true hidden count.
+{
+  const HS = globalThis.window.HS;
+  const NEAREST_FAC_CAP = 24, FAC_TOTAL = 29;
+  const facility = (i) => ({ record_kind: 'facility', _facility: true, name: 'FAC ' + i,
+    source_ref: 'https://echo.epa.gov/detailed-facility-report?fid=' + (110000000000 + i),
+    lat: 30.1 + i / 1000, lng: -97.6 - i / 1000 });
+  const dev = (i, status) => ({ record_kind: 'development', name: 'DEV ' + i, status,
+    source_ref: 'https://abc.austintexas.gov/web/permit/x' + i, type: 'Industrial' });
+
+  // The accepted Del Valle lifecycle census, reproduced at shape: 36 proposed, 323 approved,
+  // 64 operating development rows, 5 unknown (TABS) — plus 29 facilities that render
+  // 'operating' but live in the FACILITY filter bucket.
+  const LIFE = { proposed: 36, approved: 323, operating: 64, unknown: 5 };
+  const devRows = [];
+  let n = 0;
+  for (const [k, c] of Object.entries(LIFE))
+    for (let i = 0; i < c; i++) devRows.push(dev(n++, k === 'unknown' ? '' : k === 'operating' ? 'Built' : k));
+  eq(devRows.length, 428, '7: the modelled development set is the accepted 428');
+
+  const allFacs = Array.from({ length: FAC_TOTAL }, (_, i) => facility(i));
+  const facs = allFacs.slice(0, NEAREST_FAC_CAP);
+  const restFacs = allFacs.slice(NEAREST_FAC_CAP);
+
+  // The ONE canonical accessor, mirroring scripts/gate2/full-inventory.mjs::__canonSet.
+  const canonSet = (visible, restFacsArg) => visible.concat(facs).concat(restFacsArg);
+  const idOf = x => x.source_ref || x.name;
+
+  eq(canonSet(devRows, restFacs).length, 457, '7: the filter baseline is the canonical 457, not 452');
+  eq(devRows.length + facs.length, 452, '7: 452 is the OLD window — it must no longer be the baseline');
+
+  // A facility's filter key is 'facility' for BOTH the nearest-24 and the restFacs tail, so
+  // no lifecycle toggle may ever select one.
+  const LIFECYCLE_KEYS = ['proposed', 'approved', 'operating', 'unknown'];
+  for (const f of [facs[0], facs[23], restFacs[0], restFacs[4]]) {
+    const m = HS.resolveMarker(f);
+    eq(m.filterKey, 'facility', '7: facility filterKey is facility (incl. the restFacs tail)');
+    ok(!LIFECYCLE_KEYS.includes(m.filterKey), '7: a facility is outside every lifecycle filter');
+  }
+  eq(HS.resolveMarker(restFacs[0]).lifecycle, 'operating',
+     '7: a restFacs facility still RENDERS operating while filtering as facility');
+
+  // Toggling each lifecycle key off hides exactly its development rows — the count must not
+  // pick up the +5 restFacs offset the old 452-row window produced.
+  const ids = canonSet(devRows, restFacs).map(idOf);
+  for (const key of LIFECYCLE_KEYS) {
+    const visibleAfter = devRows.filter(d => HS.resolveMarker(d).filterKey !== key);
+    const after = new Set(canonSet(visibleAfter, restFacs).map(idOf));   // facilities survive
+    const removed = ids.filter(i => !after.has(i));
+    eq(removed.length, LIFE[key], `7: ${key} hides exactly ${LIFE[key]} records — no +5 offset`);
+    eq(removed.filter(i => i.includes('echo.epa.gov')).length, 0,
+       `7: no facility is removed by the ${key} lifecycle filter`);
+    eq(canonSet(visibleAfter, restFacs).length + removed.length, 457,
+       `7: after + removed reconciles to the canonical 457 for ${key}`);
+  }
+
+  // The derivation fallback must not paper over a genuinely empty restFacs array: an explicit
+  // [] is honoured, so a filter that really did hide facilities would be reported, not hidden.
+  eq(canonSet(devRows, []).length, 452, '7: an explicitly EMPTY restFacs is honoured verbatim');
+}
+
 console.log(`maps-source-identity: ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
