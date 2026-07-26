@@ -122,7 +122,16 @@ await page.goto('http://127.0.0.1:8799/maps.html?zip=' + ZIP + '&data=seed', { w
 for (let i = 0; i < 400; i++) { if (await page.evaluate(() => !!(window.__HS_MAP && window.__HS_MAP.items))) break; await page.waitForTimeout(100); }
 await page.waitForTimeout(1500);
 
-// canonical inventory recorder (proven in Gate 2A Step A: visible ∪ facs)
+// CANONICAL INVENTORY RECORDER.
+//
+// Gate 2A recorded `visible ∪ facs` and that was RIGHT AT SAMPLE SCALE ONLY. maps.html:351-352
+// splits the mappable facilities:
+//     var facs     = facsAllMappable.slice(0, 24);
+//     var restFacs = facsAllMappable.slice(24).map(f => ({...f, _restFacility: true}));
+// The 39-row sample had 6 facilities (6 < 24) so restFacs was empty and the omission was
+// invisible. At full scale 29 > 24, so 5 facilities land in restFacs — plotted by the page
+// (HS.plottedMarkerSet(visible, facs, restFacs); focusExpected = visibleTotal + facs +
+// restFacs) but never counted by the collector. Canonical is visible ∪ facs ∪ restFacs.
 await page.evaluate(() => {
   const HS = window.HS;
   const rs = HS.reserveFacilitySlots;
@@ -130,6 +139,9 @@ await page.evaluate(() => {
     const o = rs.apply(this, arguments); window.__LETTERED = o; return o; };
   const ra = HS.restAfterLetters;
   if (ra) HS.restAfterLetters = function () { const o = ra.apply(this, arguments); window.__REST = o; return o; };
+  const pm = HS.plottedMarkerSet;
+  if (pm) HS.plottedMarkerSet = function (visible, facs, restFacs) {
+    window.__RESTFACS = restFacs || []; return pm.apply(this, arguments); };
 });
 
 const MODES = [['street', 'Street'], ['satellite', 'Satellite'], ['impact', 'Focus']];
@@ -140,7 +152,13 @@ for (const [key, label] of MODES) {
   per[label] = await page.evaluate(() => {
     const HS = window.HS, C = window.__CANON || { visible: [], facs: [] };
     const id = x => (x && (x.source_ref || x.name)) || '?';
-    const rec = C.visible.concat(C.facs).map(it => { const m = HS.resolveMarker(it);
+    // restFacs: prefer the set the page itself passed to plottedMarkerSet; otherwise derive
+    // it as (all seed facilities) minus (facs), and cross-check the count against the page's
+    // own __HS_MAP.restFacTotal so the derivation can never silently invent or lose a record.
+    const facIds = new Set(C.facs.map(x => x.source_ref || x.name));
+    const derived = ((window.HS_SEED || {}).facilities || []).filter(f => !facIds.has(f.source_ref || f.name));
+    const restFacs = (window.__RESTFACS && window.__RESTFACS.length) ? window.__RESTFACS : derived;
+    const rec = C.visible.concat(C.facs).concat(restFacs).map(it => { const m = HS.resolveMarker(it);
       return { id: id(it), name: it.name, kind: m.isFacility ? 'facility' : 'development',
         category: m.categoryKey, symbol: m.shape, lifecycle: m.lifecycle, color: m.color,
         evidence: it.source_ref || '', filterKey: m.filterKey, legendLabel: m.legendLabel,
@@ -150,6 +168,9 @@ for (const [key, label] of MODES) {
     return { records: rec, total: rec.length,
       dev: rec.filter(r => r.kind === 'development').length, fac: rec.filter(r => r.kind === 'facility').length,
       lettered: (window.__LETTERED || []).length, rest: (window.__REST || []).length,
+      lettered_facs: C.facs.length, rest_facs: restFacs.length,
+      restFacTotal_page: (window.__HS_MAP || {}).restFacTotal,
+      restfac_count_agrees: restFacs.length === ((window.__HS_MAP || {}).restFacTotal),
       by_category: cnt(r => r.category), by_symbol: cnt(r => r.symbol), by_lifecycle: cnt(r => r.lifecycle),
       by_registry: cnt(r => r.registry_id || '(null)'), by_fallback: cnt(r => r.fallbackReason ? 'has-reason' : 'none'),
       legend_labels: (HS.SHAPE_LEGEND || []).map(x => x.label).concat([HS.CATEGORY_REGISTRY.facility.label]),
