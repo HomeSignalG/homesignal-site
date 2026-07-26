@@ -100,3 +100,35 @@ const toAppProject = (el) => ({
 
 console.log(`maps-source-identity: ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
+
+// ── 6. Gate 2B canonical-inventory partition (regression for the 5-facility loss) ──
+// maps.html:351-352 splits the mappable facilities:
+//     var facs     = facsAllMappable.slice(0, 24);
+//     var restFacs = facsAllMappable.slice(24).map(f => ({...f, _restFacility: true}));
+// Any harness that measures "everything the page plots" as `visible ∪ facs` silently drops
+// every facility at index >= 24. That is invisible below 25 facilities (the 39-row Gate 2A
+// sample had 6) and lost exactly 5 of Del Valle's 29 at full scale. Canonical must be
+// visible ∪ facs ∪ restFacs.
+{
+  const NEAREST_FAC_CAP = 24;
+  const mk = (i) => ({ id: 'f' + i, record_kind: 'facility', _facility: true,
+    source_ref: 'https://echo.epa.gov/detailed-facility-report?fid=' + (110000000000 + i),
+    name: 'FAC ' + i, lat: 30.1 + i / 1000, lng: -97.6 - i / 1000 });
+  const allFacs = Array.from({ length: 29 }, (_, i) => mk(i));
+  const facs = allFacs.slice(0, NEAREST_FAC_CAP);
+  const restFacs = allFacs.slice(NEAREST_FAC_CAP).map(f => Object.assign({}, f, { _restFacility: true }));
+  const visible = Array.from({ length: 428 }, (_, i) => ({ id: 'd' + i, record_kind: 'development' }));
+
+  eq(visible.length + facs.length, 452, '6: visible ∪ facs alone reproduces the 452 undercount');
+  eq(visible.length + facs.length + restFacs.length, 457, '6: visible ∪ facs ∪ restFacs is the full inventory');
+  eq(restFacs.length, 5, '6: exactly 5 facilities land beyond the nearest-24 cap');
+  // the derived fallback (all seed facilities minus facs) must equal the page's restFacs
+  const facIds = new Set(facs.map(f => f.source_ref));
+  const derived = allFacs.filter(f => !facIds.has(f.source_ref));
+  eq(derived.length, restFacs.length, '6: derived restFacs count matches the page partition');
+  eq(derived.map(f => f.source_ref).join(','), restFacs.map(f => f.source_ref).join(','),
+     '6: derived restFacs are the SAME records, not just the same count');
+  // and no record may appear twice across the three partitions
+  const all = visible.concat(facs).concat(restFacs).map(x => x.source_ref || x.id);
+  eq(new Set(all).size, 457, '6: the three partitions are disjoint — no double count');
+}
