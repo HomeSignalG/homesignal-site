@@ -162,7 +162,21 @@ for (const [key, label] of MODES) {
   await page.screenshot({ path: join(OUT, `gate2b-${key}-full.png`) });
 }
 const [A, B, C] = [per.Street, per.Satellite, per.Focus];
-if (A.total !== 457) fail(`canonical inventory ${A.total}, expected 457 (Street)`);
+if (A.total !== 457) {
+  // Do not just report the count — name the records. The adapted set is the source of
+  // truth for what SHOULD be present; whatever it has that the canonical set does not is
+  // the exact loss, with the fields that decide inclusion attached.
+  const seen = new Set(A.records.map(r => r.id));
+  const missing = ADAPTED.filter(r => !seen.has(r.source_ref || r.name)).map(r => ({
+    id: r.source_ref || r.name, name: r.name, record_kind: r.record_kind,
+    registry_id: r.registry_id, type: r.type, status: r.status, lat: r.lat, lng: r.lng,
+  }));
+  const dbg = { canonical: A.total, expected: 457, missing_count: missing.length,
+    visible_len: A.dev, facs_len: A.fac, lettered: A.lettered, rest: A.rest, missing };
+  writeFileSync(join(OUT, 'gate2b-missing.json'), JSON.stringify(dbg, null, 1));
+  console.log('MISSING RECORD DIAGNOSTIC:\n' + JSON.stringify(dbg, null, 1));
+  fail(`canonical inventory ${A.total}, expected 457 (Street) — see gate2b-missing.json`);
+}
 if (!intercepted) fail('seed was not intercepted');
 
 const ix = m => Object.fromEntries(m.records.map(r => [r.id, r]));
