@@ -1241,6 +1241,23 @@ HS.onReady(async function () {
     });
     return fails;
   };
+  // VERIFICATION ONLY — the point-count → symbol-name lookup used by
+  // __HS_MARKER_DOM_VERIFY to NAME a rendered polygon. It draws nothing; the renderer is
+  // HS.shapeEl in lib/map.js and is not touched by this table.
+  //
+  // Every entry mirrors an HS.shapeEl polygon branch:
+  //   3  triangle  polyPts(…,3,…)      6  hexagon  polyPts(…,6,…)
+  //   4  diamond   polyPts(…,4,…)      8  octagon  polyPts(…,8,…)     ← data center
+  //   5  pentagon  polyPts(…,5,…)     12  cross    12-vertex plus     ← civic & public
+  //
+  // 8 and 12 were missing, so the canonical `octagon` (data center) and `cross` (civic)
+  // both fell through to the generic 'polygon' and every fixture assertion comparing the
+  // name to HS.resolveMarker().shape failed — with the markers themselves rendering
+  // correctly the whole time. Anything not listed here still returns 'polygon', which
+  // FAILS the fixture assertion loudly: a new symbol must be classified here (and given a
+  // fixture below) or the verifier goes red rather than silently passing it.
+  var POLY_POINTS_TO_SYMBOL = { 3: 'triangle', 4: 'diamond', 5: 'pentagon', 6: 'hexagon', 8: 'octagon', 12: 'cross' };
+
   function geomFromNode(node) {
     if (!node) return null;
     if (node.tagName === 'rect' || node.querySelector('rect')) return 'square';
@@ -1248,11 +1265,7 @@ HS.onReady(async function () {
     var poly = node.tagName === 'polygon' ? node : node.querySelector('polygon');
     if (poly) {
       var pts = (poly.getAttribute('points') || '').trim().split(/\s+/).filter(Boolean).length;
-      if (pts === 3) return 'triangle';
-      if (pts === 4) return 'diamond';
-      if (pts === 5) return 'pentagon';
-      if (pts === 6) return 'hexagon';
-      return 'polygon';
+      return POLY_POINTS_TO_SYMBOL[pts] || 'polygon';
     }
     return null;
   }
@@ -1267,12 +1280,28 @@ HS.onReady(async function () {
   // Fixture + on-map DOM verification — asserts rendered SVG geometry/color, not resolver alone.
   window.__HS_MARKER_DOM_VERIFY = function (rootSelector) {
     var fails = [];
+    // ONE FIXTURE PER CANONICAL SYMBOL. Each names the category it pins, so a symbol that
+    // the classifier above cannot name shows up here as a hard failure instead of passing
+    // silently. `cat` is checked against HS.CATEGORY_REGISTRY below, so adding a category
+    // without adding a fixture also fails.
     var FIXTURES = [
-      { id: 'fx-ind', type: 'Industrial', status: 'Proposed', lat: 30.18, lng: -97.60 },
-      { id: 'fx-dc', type: 'Data Center', status: 'Approved', lat: 30.181, lng: -97.601 },
-      { id: 'fx-res', type: 'Residential', status: 'Active', lat: 30.182, lng: -97.602 },
-      { id: 'fx-fac', type: 'Industrial', status: 'Operating', _facility: true, lat: 30.183, lng: -97.603 }
+      { id: 'fx-ind', cat: 'industrial', type: 'Industrial', status: 'Proposed', lat: 30.18, lng: -97.60 },
+      { id: 'fx-dc', cat: 'datacenter', type: 'Data Center', status: 'Approved', lat: 30.181, lng: -97.601 },
+      { id: 'fx-res', cat: 'residential', type: 'Residential', status: 'Active', lat: 30.182, lng: -97.602 },
+      { id: 'fx-fac', cat: 'facility', type: 'Industrial', status: 'Operating', _facility: true, lat: 30.183, lng: -97.603 },
+      { id: 'fx-inf', cat: 'infrastructure', type: 'Infrastructure', status: 'Approved', lat: 30.184, lng: -97.604 },
+      { id: 'fx-com', cat: 'commercial', type: 'Commercial', status: 'Proposed', lat: 30.185, lng: -97.605 },
+      { id: 'fx-civ', cat: 'civic', type: 'Civic/Public', status: 'Approved', lat: 30.186, lng: -97.606 },
+      { id: 'fx-oth', cat: 'other', type: 'unclassified', status: 'Approved', lat: 30.187, lng: -97.607 }
     ];
+    // Coverage guard: every legend-bearing category in the canonical registry must have a
+    // fixture. A new category with no fixture fails here rather than shipping unverified.
+    var REG = (HS.CATEGORY_REGISTRY || {});
+    var covered = {};
+    FIXTURES.forEach(function (f) { covered[f.cat] = 1; });
+    Object.keys(REG).forEach(function (k) {
+      if (!covered[k]) fails.push({ id: k, err: 'fixture-missing-for-category', want: REG[k].symbol });
+    });
     FIXTURES.forEach(function (it) {
       var m = HS.resolveMarker(it);
       var pin = pinEl(it, 26);
@@ -1281,6 +1310,14 @@ HS.onReady(async function () {
       if (geom !== m.shape) fails.push({ id: it.id, err: 'fixture-pin-geometry', want: m.shape, got: geom });
       if (fill && m.color && fill !== String(m.color).toLowerCase()) {
         fails.push({ id: it.id, err: 'fixture-pin-color', want: m.color, got: fill });
+      }
+      // The resolved shape must also equal the symbol the canonical registry declares for
+      // this fixture's category — so the geometry name, the resolver and the registry are
+      // pinned to each other, not just to whatever the resolver happens to return.
+      if (it.cat && REG[it.cat]) {
+        if (m.categoryKey !== it.cat) fails.push({ id: it.id, err: 'fixture-category', want: it.cat, got: m.categoryKey });
+        if (m.shape !== REG[it.cat].symbol) fails.push({ id: it.id, err: 'fixture-registry-symbol', want: REG[it.cat].symbol, got: m.shape });
+        if (geom !== REG[it.cat].symbol) fails.push({ id: it.id, err: 'fixture-geometry-vs-registry', want: REG[it.cat].symbol, got: geom });
       }
     });
     var root = rootSelector ? document.querySelector(rootSelector) : document;
@@ -1314,7 +1351,10 @@ HS.onReady(async function () {
     }
     var sch = document.getElementById('mapSch');
     if (sch && sch.querySelector('svg')) {
-      var el = { innerHTML: '' };
+      // A DETACHED ELEMENT, not a bare object literal. This was `{ innerHTML: '' }`, so the
+      // `el.querySelector(...)` two lines below threw TypeError whenever this branch ran —
+      // the schematic-render assertion could never actually execute. Verification-only.
+      var el = document.createElement('div');
       HS.MapProvider.render(el, {
         home: center, items: FIXTURES, radiusMi: opts.radiusMi, showRadius: false, showHome: false, w: 400, h: 300
       });

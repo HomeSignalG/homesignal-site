@@ -1311,12 +1311,26 @@ HS.onReady(function(){
   // Marker-backbone verification (scripts/verify-map-markers.mjs): tracker pins + legend.
   window.__HS_TRACKER_MARKER_VERIFY = function () {
     var fails = [];
+    // ONE FIXTURE PER CANONICAL SYMBOL — the same set maps.html verifies, so the tracker
+    // and the app map cannot drift apart. `cat` is checked against HS.CATEGORY_REGISTRY below.
     var FIXTURES = [
-      { label: "Permit", use_type: "Industrial", type: "proposed", layer: "industrial" },
-      { label: "DC", use_type: "Data Center", type: "approved", layer: "datacenter" },
-      { label: "Homes", use_type: "Residential", type: "built", layer: "residential" },
-      { label: "EPA", use_type: "Industrial", type: "built", layer: "industrial", registry_id: "TX-VERIFY" }
+      { label: "Permit", cat: "industrial", use_type: "Industrial", type: "proposed", layer: "industrial" },
+      { label: "DC", cat: "datacenter", use_type: "Data Center", type: "approved", layer: "datacenter" },
+      { label: "Homes", cat: "residential", use_type: "Residential", type: "built", layer: "residential" },
+      { label: "EPA", cat: "facility", use_type: "Industrial", type: "built", layer: "industrial", registry_id: "TX-VERIFY" },
+      { label: "Infra", cat: "infrastructure", use_type: "Infrastructure", type: "approved", layer: "infrastructure" },
+      { label: "Comm", cat: "commercial", use_type: "Commercial", type: "proposed", layer: "commercial" },
+      { label: "Civic", cat: "civic", use_type: "Civic/Public", type: "approved", layer: "civic" },
+      { label: "Other", cat: "other", use_type: "unclassified", type: "approved", layer: "other" }
     ];
+    // VERIFICATION ONLY — point-count → symbol-name lookup, the twin of the table in
+    // maps.html. It draws nothing; HS.shapeEl in lib/map.js is the renderer.
+    //   3 triangle · 4 diamond · 5 pentagon · 6 hexagon · 8 octagon · 12 cross
+    // 8 (data center) and 12 (civic) were missing here, so both were named the generic
+    // "polygon" and failed the assertion below while rendering correctly the whole time.
+    // An unlisted count still returns "polygon", which FAILS loudly — a new symbol has to
+    // be classified here and given a fixture above, or this verifier goes red.
+    var POLY_POINTS_TO_SYMBOL = { 3: "triangle", 4: "diamond", 5: "pentagon", 6: "hexagon", 8: "octagon", 12: "cross" };
     function geomFromSvg(svg) {
       if (!svg) return null;
       if (svg.indexOf("<rect") !== -1) return "square";
@@ -1324,12 +1338,16 @@ HS.onReady(function(){
       var m = svg.match(/points="([^"]+)"/);
       if (!m) return null;
       var n = m[1].trim().split(/\s+/).filter(Boolean).length;
-      if (n === 3) return "triangle";
-      if (n === 4) return "diamond";
-      if (n === 5) return "pentagon";
-      if (n === 6) return "hexagon";
-      return "polygon";
+      return POLY_POINTS_TO_SYMBOL[n] || "polygon";
     }
+    // Coverage guard: a registry category with no fixture fails here rather than shipping
+    // unverified on the tracker page.
+    var REG = (HS.CATEGORY_REGISTRY || {});
+    var covered = {};
+    FIXTURES.forEach(function (f) { covered[f.cat] = 1; });
+    Object.keys(REG).forEach(function (k) {
+      if (!covered[k]) fails.push({ label: k, err: "tracker-fixture-missing-for-category", want: REG[k].symbol });
+    });
     FIXTURES.forEach(function (s) {
       var mk = HS.resolveTrackerMarker(s, function (x) { return x.registry_id; });
       var svg = HS.markerSVG(mk.shape, mk.color, "", 14);
