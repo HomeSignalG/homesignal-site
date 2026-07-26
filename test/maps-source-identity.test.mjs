@@ -98,8 +98,6 @@ const toAppProject = (el) => ({
      '5: markers group by source for audit/recall');
 }
 
-console.log(`maps-source-identity: ${pass} passed, ${fail} failed`);
-if (fail) process.exit(1);
 
 // ── 6. Gate 2B canonical-inventory partition (regression for the 5-facility loss) ──
 // maps.html:351-352 splits the mappable facilities:
@@ -132,3 +130,6 @@ if (fail) process.exit(1);
   const all = visible.concat(facs).concat(restFacs).map(x => x.source_ref || x.id);
   eq(new Set(all).size, 457, '6: the three partitions are disjoint — no double count');
 }
+
+console.log(`maps-source-identity: ${pass} passed, ${fail} failed`);
+if (fail) process.exit(1);
