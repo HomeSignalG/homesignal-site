@@ -1,0 +1,125 @@
+-- docs/maps-source-identity-migration.sql
+-- STATUS: APPLIED 2026-07-25 (Gate 1). Evidence below. Rollback SQL at the end.
+--
+-- APPLIED HOW — the two edits were made IN THE DATABASE, not transcribed:
+--   a DO block reads pg_get_functiondef(), asserts each anchor appears EXACTLY once,
+--   applies two replace() calls, asserts the length delta equals exactly
+--   length(', registry_id') + length(', nullif(el->>''source_registry_id'','''')'),
+--   then EXECUTEs the result. Every other byte is the server's own rendering of the
+--   live function, so transcription error is impossible.
+--
+-- EVIDENCE ------------------------------------------------------------------------
+--   definition md5 before : ae95a5ab3231bde7b2ef58cc5f44baa9  (12,485 bytes)
+--   definition md5 after  : cbdac3967b9cda5001799da03233da09  (12,536 bytes, +51)
+--   app_refresh_zip('78617') -> "development=428/428 facilities=29/29 notices=5 quality=pass"
+--
+--   NO-DRIFT PROOF — a content hash over (record_kind|name|type|status|lat|lng|
+--   source_ref|zip) for all 457 rows, before vs after the migration AND a full
+--   re-materialization:
+--     before f30b5abdc6437de96b15f8dcd42dea90   457 rows
+--     after  f30b5abdc6437de96b15f8dcd42dea90   457 rows      <-- identical
+--   => marker counts, coordinates, titles, categories, lifecycle, evidence URLs and
+--      ZIP assignment are provably unchanged; only registry_id gained a value.
+--
+--   SOURCE IDENTITY GAINED:
+--     development rows with a source key: 0 -> 423
+--       austin-site-plan-cases, austin-subdivision-cases
+--     development rows still NULL: 5 (the TABS filings — TABS is not yet on the
+--       normalized registry contract; tracked as a known defect, not a regression)
+--
+--   IDEMPOTENCY: re-running the DO block detects 'source_registry_id' already present
+--   and returns without re-patching (verified — raised 'idempotent: no-op').
+--
+--   ROLLBACK ROUND-TRIP VERIFIED: the rollback block below was executed and returned
+--   the definition to md5 ae95a5ab3231bde7b2ef58cc5f44baa9 / 12,485 bytes — bit-exact
+--   — and the forward migration was then re-applied. The rollback is proven, not assumed.
+--
+-- WHY -----------------------------------------------------------------------------
+-- `app_refresh_zip` writes `registry_id` on the FACILITY insert but omits it on the
+-- DEVELOPMENT insert, so every development row in `app_projects` carries registry_id
+-- NULL. Verified on the maps-backbone reference page:
+--
+--   select record_kind, coalesce(registry_id,'(none)') reg, count(*)
+--     from public.app_projects where zip='78617' group by 1,2;
+--   -- development | (none) | 428      <-- source identity lost
+--   -- facility    | 1100…  | 1 each   <-- source identity preserved
+--
+-- Consequence: once a record reaches the app layer you cannot say WHICH source produced
+-- it, so the maps-backbone acceptance test "source identity survives adapter → normalized
+-- record → cache → materializer → API → browser" cannot be enforced there, and a
+-- per-source recall (e.g. "retract everything austin-site-plan-cases emitted") is
+-- impossible without re-deriving from the cache.
+--
+-- WHAT THIS CHANGES ---------------------------------------------------------------
+-- One column in one INSERT. The development insert now carries the cached record's
+-- `source_registry_id` (the engine's canonical source key) into app_projects.registry_id,
+-- exactly as the facility insert already carries the EPA registry id. No other column,
+-- predicate, ordering term, or count changes — the FD-1 ordering contract is untouched.
+--
+-- SAFETY --------------------------------------------------------------------------
+-- * Purely additive: rows that had NULL gain a value; nothing is deleted or re-shaped.
+-- * Idempotent: re-running app_refresh_zip(zip) rebuilds the same rows.
+-- * Takes effect per ZIP on that ZIP's next refresh — no bulk rewrite is triggered.
+-- * `registry_id` already exists on app_projects (used by facilities), so there is NO
+--   schema change and no migration of existing data.
+--
+-- AFTER APPLYING ------------------------------------------------------------------
+--   select public.app_refresh_zip('78617');
+--   select record_kind, coalesce(registry_id,'(none)') reg, count(*)
+--     from public.app_projects where zip='78617' group by 1,2 order by 1,3 desc;
+--   -- expect: development | austin-site-plan-cases | 267
+--   --         development | austin-subdivision-cases | 156
+--   --         development | (none) | 5        <-- TABS, until it is on the registry contract
+--
+-- The full function body is NOT duplicated here: copy the live definition
+--   select pg_get_functiondef(p.oid) from pg_proc p
+--     join pg_namespace n on n.oid = p.pronamespace
+--    where n.nspname='public' and p.proname='app_refresh_zip';
+-- and apply exactly the two edits below inside the DEVELOPMENT insert.
+
+-- EDIT 1 — add the column to the development insert's column list:
+--
+--     insert into public.app_projects (community_id, zip, name, type, status, stage,
+--       developer, size, investment, submitted_at, lat, lng, impact_score, source_ref,
+--       record_kind, registry_id)                       -- <<< add registry_id
+--
+-- EDIT 2 — add the matching select term, immediately after the record_kind literal:
+--
+--       coalesce(el->>'record_url', el->>'url'), 'development',
+--       nullif(el->>'source_registry_id','')            -- <<< add this line
+--
+-- Nothing else in the function changes.
+
+-- VERIFICATION QUERY (run after the next refresh of any dev-backed ZIP):
+--   select count(*) filter (where record_kind='development' and registry_id is null) as dev_without_source
+--     from public.app_projects where zip = '78617';
+--   -- expect 5 (the TABS rows) and 0 once TABS is on the normalized contract.
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════════
+-- ROLLBACK (verified — restores md5 ae95a5ab3231bde7b2ef58cc5f44baa9 exactly)
+-- ═══════════════════════════════════════════════════════════════════════════════════
+-- Reverses the same two edits in the database. Safe to run at any time; the next
+-- app_refresh_zip(zip) for a ZIP simply rewrites its rows with registry_id NULL again.
+-- No data is lost: registry_id is derived from the cache on every refresh.
+--
+-- do $rb$
+-- declare src text; out text;
+-- begin
+--   select pg_get_functiondef(p.oid) into src from pg_proc p
+--     join pg_namespace nm on nm.oid = p.pronamespace
+--    where nm.nspname='public' and p.proname='app_refresh_zip';
+--   if position('source_registry_id' in src) = 0 then raise notice 'not patched'; return; end if;
+--   out := replace(src, 'impact_score, source_ref, record_kind, registry_id)',
+--                       'impact_score, source_ref, record_kind)');
+--   out := replace(out, 'coalesce(el->>''record_url'', el->>''url''), ''development'', nullif(el->>''source_registry_id'','''')',
+--                       'coalesce(el->>''record_url'', el->>''url''), ''development''');
+--   execute out;
+-- end $rb$;
+--
+-- Post-rollback check (expect ae95a5ab3231bde7b2ef58cc5f44baa9 / 12485):
+--   select md5(pg_get_functiondef(p.oid)), length(pg_get_functiondef(p.oid))
+--     from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+--    where n.nspname='public' and p.proname='app_refresh_zip';
+--
+-- Regression test for the JS half of the chain: test/maps-source-identity.test.mjs

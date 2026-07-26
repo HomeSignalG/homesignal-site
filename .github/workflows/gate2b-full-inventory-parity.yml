@@ -1,0 +1,44 @@
+name: gate2b-full-inventory-parity
+
+# GATE 2B — full 457-record Del Valle inventory parity across Street / Satellite / Focus.
+# Runs HERE rather than in the build sandbox because the sandbox has no egress and cannot
+# export the complete live inventory. Read-only: it reads app_projects with the PUBLIC anon
+# key the site already ships, renders the real maps.html in real Chromium, and writes no
+# production data. Manual trigger only.
+
+# NOTE ON TRIGGERS: workflow_dispatch cannot be used yet — the GitHub API only dispatches
+# workflows already registered on the DEFAULT branch, and this file exists only on the
+# feature branch (merging first is not permitted). So the gate also runs on pull_request,
+# which fires on the already-open PR for this branch without merging anything.
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'scripts/gate2/**'
+      - 'lib/map.js'
+      - 'lib/data.js'
+      - 'maps.html'
+      - '.github/workflows/gate2b-full-inventory-parity.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Install Playwright + Chromium
+        run: npm i --no-save playwright@1.49.1 && npx playwright install --with-deps chromium
+      - name: Run full-inventory parity
+        run: node scripts/gate2/full-inventory.mjs
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate2b-evidence
+          path: gate2b-out/
+          if-no-files-found: warn
