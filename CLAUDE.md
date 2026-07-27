@@ -615,12 +615,21 @@ legal/framing change not covered by the one-time sign-off.
   `use_type` drives the pin SHAPE — the added keywords are recorded verbatim in the entry's
   `_receipts`. Henderson is wired **https** (workbook said http); the repo's own
   `official-links` guard caught it and https returns identical counts.
-  ⚠️ **Open follow-up: Henderson rows are now the cache's largest — 89012 = 4.68 MB / 4,910
-  sites**, above the 3.5 MB / 3,160-site Minneapolis high-water mark that drove the adaptive
-  page-size verifier fix. Cause: both layers carry full permit history with **no recency window**
-  (live `ISSUEDATE` 2015–2017). The lever is `recency_days` on `APPLICATIONDATE`; **not applied**
-  because it changes what residents see (founder-visible), logged with numbers. Receipts:
-  docs/source-registry.md "POLYGON WIRE PASS #2".
+  ✅ **Henderson row size RESOLVED — `recency_days: 1095` on both entries** (live-verified
+  2026-07-27): 89012 **4.68 → 1.00 MB**, 89002 4.18 → 1.30, 89011 3.72 → 1.54, all far under
+  3.5 MB, with 0 missing coords / 0 missing `record_url` and control ZIPs (75201, 89101)
+  unchanged. `APPLICATIONDATE` was chosen over `ISSUEDATE` because it is 100% populated
+  (28,391/28,391 and 8,490/8,490 vs ISSUEDATE's 27,280) AND is when the permit process STARTED;
+  it is `esriFieldTypeDate`, so the `DATE '<cutoff>'` literal applies (no Anaheim string-compare
+  workaround). The window is exact — oldest surviving `file_date` is 2023-07-28, the 1,095-day
+  boundary. ⚠️ **New standing correction: the "3.5 MB / 3,160-site Minneapolis 55407"
+  high-water mark quoted across these docs is STALE.** With Henderson trimmed, the real ceiling
+  is **CLEVELAND — 44127 at 5.98 MB / 5,511 sites** (plus 44104/44115/44102/44103/44113 all
+  above 5 MB). Recency is not the lever there: `cleveland-issued-building-permits` is already
+  windowed to 365 days and supplies 5,471 of 44127's 5,511 sites by itself — it is raw permit
+  density in a 3-mile circle, so the levers are `spatial_zip_radius_mi` or an `out_fields`
+  projection. Not touched (out of scope, and radius changes what residents see); logged with
+  numbers. Receipts: docs/source-registry.md "POLYGON WIRE PASS #2".
 - 🟢 **POLYGON / POLYLINE GEOMETRY PASS — the ArcGIS connector can now PIN non-point layers;
   5 sources wired (registry 76 → 81 entries)** (live-probe + unit-verified 2026-07-27). Until
   now `sources/arcgis.ts` flattened **point geometry only**, so every polygon/polyline layer

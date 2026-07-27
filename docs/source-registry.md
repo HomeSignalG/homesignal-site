@@ -2541,19 +2541,59 @@ coords, 0 missing URL.
 **only** NV/Clark; `nvdot-project-boundaries` **only** NV pages (Clark 4 + Washoe 1) — statewide
 as declared, and never outside NV.
 
-### ⚠️ Open follow-up — Henderson ZIP rows exceed the documented row-size ceiling
+### ✅ RESOLVED — Henderson row size, fixed with `recency_days: 1095` (2026-07-27)
 
-The three Henderson pages are the largest rows in the cache: **89012 = 4.68 MB / 4,910 sites**,
-89002 = 4.18 MB / 4,408, 89011 = 3.72 MB / 3,937. That is **above the 3.5 MB / 3,160-site
-Minneapolis 55407 high-water mark** that forced the adaptive page-size fix in
-`verify-development` / `verify-geocodes` (whose floor is a single-row read, so they should still
-cope — but this is now the ceiling, not Minneapolis).
+The three Henderson pages had been the largest rows in the cache — **89012 = 4.68 MB / 4,910
+sites**, 89002 = 4.18 MB / 4,408, 89011 = 3.72 MB / 3,937 — because both layers carried the full
+permit history back to **2002** with no recency window.
 
-The cause is that the two Henderson layers carry the full permit history with **no recency
-window** (live sample `ISSUEDATE` values from 2015–2017), so a 3-mile circle over suburban
-Henderson pulls a decade of completed dwelling permits. The obvious lever is a `recency_days`
-window on `APPLICATIONDATE` (an `esriFieldTypeDate`, so the connector's `DATE '…'` literal
-applies) — it would cut the payload sharply **and** improve relevance, since a completed 2015
-dwelling permit is not "development around your home" today. **Not applied here**: it changes
-what residents see, which is a founder-visible parameter rather than a wiring detail. Logged
-with numbers so the call can be made deliberately.
+**Fix: `recency_days: 1095` (3 years) on both entries.** Nothing else changed —
+`spatial_zip_radius_mi` stays 3, `type_map` and `status_to_bucket` untouched (proven by diffing
+the parsed registry against HEAD: exactly two entries differ, only in `recency_days` +
+`_receipts`; the socrata/ckan/csv/carto lists are byte-identical).
+
+Verified live BEFORE applying, so the value was chosen from data rather than assumed:
+
+| check | residential | commercial |
+|---|---|---|
+| `APPLICATIONDATE` type | `esriFieldTypeDate` | `esriFieldTypeDate` |
+| populated | 28,391 / 28,391 (100 %) | 8,490 / 8,490 (100 %) |
+| `ISSUEDATE` populated (rejected) | 27,280 / 28,391 | 8,490 |
+| data span | 2002-01-04 → 2026-07-24 | 2002-02-07 → 2026-07-26 |
+| `APPLICATIONDATE >= DATE '2023-07-28'` | 9,098 (32 % kept) | 2,033 (24 % kept) |
+
+Because `APPLICATIONDATE` is a true `esriFieldTypeDate`, the connector's `DATE '<cutoff>'`
+literal applies directly — no string-compare workaround (the Anaheim case). `APPLICATIONDATE`
+was chosen over `ISSUEDATE` deliberately: it is when the permit process **started**, which is
+what "what's happening near me" means, it is 100 % populated where ISSUEDATE is not, and it is
+already the column mapped to `file_date`, so `buildWhere()` picks it up with no other change.
+
+**Result after deploy + live re-run + `dev_refresh_collect()`:**
+
+| ZIP | before | after | sites |
+|---|---|---|---|
+| 89002 | 4.18 MB | **1.30 MB** | 4,408 → 1,410 |
+| 89011 | 3.72 MB | **1.54 MB** | 3,937 → 1,677 |
+| 89012 | 4.68 MB | **1.00 MB** | 4,910 → 1,093 |
+
+All three now sit far below the 3.5 MB mark. The window is exact: the oldest Henderson
+`file_date` on the refreshed pages is **2023-07-28** (89002, 89012) and 2023-07-31 (89011) —
+precisely the 1,095-day cutoff — while the newest is 2026-07-23…25, so the pages stay current.
+**0 missing coordinates, 0 missing `record_url`** on every refreshed page. Control ZIPs confirm
+no collateral effect: 75201 Dallas 397 sourced / 0.38 MB and 89101 Las Vegas 420 sourced /
+0.38 MB, both byte-for-byte the same counts as before the change.
+
+### ⚠️ New open follow-up — CLEVELAND is the real row-size ceiling, not Minneapolis
+
+Removing Henderson from the top of the cache surfaced that the **3.5 MB / 3,160-site Minneapolis
+55407 high-water mark quoted throughout these docs was already stale**. The largest rows cache-wide
+are Cleveland: **44127 = 5.98 MB / 5,511 sites**, 44104 5.90 MB, 44115 5.70 MB, 44102 5.61 MB,
+44103 5.09 MB, 44113 5.06 MB.
+
+Recency is **not** the lever there — `cleveland-issued-building-permits` is already windowed to
+365 days (44127's records span 2025-07-27 → 2026-07-25, and it supplies 5,471 of that page's
+5,511 sites on its own). The size is raw permit density inside a 3-mile circle over Cleveland's
+core. The available levers would be a smaller `spatial_zip_radius_mi` or an `out_fields`
+projection (the Miami/Columbus CPU-hazard pattern). **Not touched here** — this pass was scoped to
+the Henderson entries, and changing Cleveland's radius changes what residents see. Logged with
+numbers so the ceiling claim in these docs is no longer wrong.
