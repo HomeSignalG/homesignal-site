@@ -3857,6 +3857,52 @@
    "spatial_zip_radius_mi": 3,
    "record_url_precision": "record",
    "_receipts": "2026-07-25 pg_net recon (response ids 111626-111653), Batch 5. Same DevelopmentTracker service already proven edge-runtime-reachable by fairfax-active-site-construction (8,112 records live in production), so the egress gate that killed El Paso is already satisfied for this host. LAYER 4 'Recent Building Permits - Centroid Point': 11,325 rows, esriGeometryPoint. FRESHNESS GATE PASSED: max last_edited_date 2026-07-25 (same day), max SUBMITTED_DATE 2026-07-21. RECORD-PRECISION record_url: LINK_URL IS NULL count = 0 -- every row carries a per-record Accela ACA Building deep link (plus.fairfaxcounty.gov/CitizenAccess/urlrouting.ashx?type=1000&Module=Building&capID1=...&agencyCode=FFX). RECORD_STATUS is a clean verbatim 7-value vocabulary mapped exactly: Issued 11,055 + Issued - Amendment Pending 219 + Critical Structures Approved 2 + Inspection Phase 1 -> approved; Inspections Completed 1 -> operating; Submitted 1 -> proposed; Refund Request Pending 46 -> exclude (permit being refunded/withdrawn). APPTYPEALIAS is a clean 4-value vocabulary, ALL of it real building construction, so all four are kept: Residential Addition/Alteration 6,604, Commercial Addition/Alteration 2,748, Residential New 1,105, Commercial New 868. TITLE: PROJECT_NAME is blank on 1,921 of 11,325 rows (17%), so the title leads with APPTYPEALIAS and appends PROJECT_NAME when present (Cleveland title:[PERMIT_SUBTYPE,JOB_DESCRIPTION] precedent) -- a record is never titled by its bare permit number. ADDRESS_1 is blank on exactly 1 row. SPATIAL ZIP scoping, not native: ZIP_CODE carries hyphenated ZIP+4 ('20124-1307'), same unreliability as layer 1. recency_days 365 (3,964 of 11,325 rows) -- unlike layer 1 this IS an issuance ledger spanning back to 2021, so the standard 365d permit window applies; showing 5-year-old issued permits as current development would be misleading. SIBLING LAYERS REJECTED WITH RECEIPTS -- all POLYGON, and the arcgis connector flattens POINT geometry only (f.geometry.x/y), so a polygon layer yields no coordinates, no markers, and would degrade every record to area scope: layer 0 'Data Center Development', layer 2 'Active Site Construction - Parcels' (a duplicate of the already-wired layer 1 in parcel form), layer 5 'Recent Building Permits - Parcels' (duplicate of this layer), layer 6 'Certificate of Occupancy', and LDS/PLUSApprovedSiteRecords. Layer index 3 does not exist. NOTE ON YIELD: Fairfax was already 46 of 47 ZIP pages populated by layer 1, so this source adds RECORDS to live pages (charter P3), not newly populated pages (charter P1)."
+  },
+  {
+   "registry_id": "frisco-active-building-permits",
+   "platform": "arcgis",
+   "service_url": "https://maps.friscotexas.gov/gis/rest/services/Public/External_Planning_and_Zoning/MapServer/1",
+   "dataset_url": "https://maps.friscotexas.gov/gis/rest/services/Public/External_Planning_and_Zoning/MapServer/1",
+   "jurisdiction": "City of Frisco",
+   "coverage": [
+    {
+     "state": "TX",
+     "county": "Collin"
+    },
+    {
+     "state": "TX",
+     "county": "Denton"
+    }
+   ],
+   "column_map": {
+    "title": [
+     "Type",
+     "Address"
+    ],
+    "status_raw": "Status",
+    "type_source": "Type",
+    "file_date": "Issued_Date",
+    "address": "Address",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "Permit_No",
+    "record_url": "Hyperlink"
+   },
+   "spatial_zip_radius_mi": 3,
+   "type_map": {
+    "Single Family Residential": "Residential",
+    "Multi-Family Residential": "Residential",
+    "Commercial": "Commercial",
+    "School": "Civic/Public"
+   },
+   "status_to_bucket": {
+    "approved": [
+     "ISSUED"
+    ]
+   },
+   "incremental_field": "Issued_Date",
+   "record_url_precision": "record",
+   "_receipts": "Verified live 2026-07-27 via pg_net (response ids 155581-155589). DISCOVERY: the AGO search hit for 'Active Building Permits' pointed at mapcache.friscotexas.gov, which does NOT resolve (DNS) -- the real live host was found by walking the city's own 'Construction & Development App' item (3e7e17f60f8649d4bab55c4e0c467f77, modified 2026-06-17) to its web map (9f94555a439648bb91cbfc5e83fbaba6) and reading operationalLayers. First-party: the City of Frisco's own ArcGIS Server. LAYER 1 'Active Building Permits': 753 rows, esriGeometryPoint, geometry returned already in wkid 4326. FRESHNESS: newest Issued_Date 12/31/2025; the layer is the city's ACTIVE permit working set (not a historical ledger), so no recency_days is set -- and MUST NOT BE: Issued_Date is esriFieldTypeString in M/D/YYYY, and recency_days emits a `>= DATE 'yyyy-mm-dd'` literal against it (the Anaheim string-date standing answer). isoDay() already normalizes M/D/YYYY (arcgis.ts:541), so file_date parses with no code change. STATUS is a real column with a single VERBATIM value from a live groupBy: ISSUED = 753 of 753 -> bucket approved (every row IS an issued permit; san-antonio/Detroit precedent, but mapped from the live column rather than status_const because the column exists). TYPE is a clean 4-value vocabulary from a live groupBy, ALL of it real construction, so all four are kept and none is unclassified: Single Family Residential 503, Commercial 226, Multi-Family Residential 22, School 2. No trade/electrical/plumbing/sign noise exists in this layer, so no extra_where drop is needed. RECORD-PRECISION record_url: Hyperlink carries a per-record eTRAKiT deep link (https://etrakit.friscotexas.gov/etrakit/Search/permit.aspx?activityNo=B25-04203). SPATIAL ZIP scoping, not native: Address carries street only ('8050 PRESTON RD'), no ZIP anywhere in the schema, so zip_where_template is impossible -> spatial_zip_radius_mi 3 (the Denver/Minneapolis/Chicago pattern; records keep their OWN per-parcel points). COVERAGE is BOTH counties because the City of Frisco straddles the Collin/Denton line -- confirmed against our own rows: Frisco (75034)/(75035) are Collin pages, Frisco (75033)/(75036) are Denton pages. MEASURED ZIP LIFT (all 753 points fetched and run through the connector's own envelopeFor(lat,lng,3) math against zip_centroids): 8 TX ZIP pages, all currently at dev_markers=0 -- 75035 Frisco 278, 75034 Frisco 221, 75036 Frisco 221, 75078 Prosper 147, 75056 The Colony 67, 75024 Plano 43, 75033 Frisco 21, 75025 Plano 13. SIBLING LAYERS REJECTED WITH RECEIPTS: layer 4 'Submittals' (planning cases), layer 5 'Proposed Zoning' and layer 6 'Proposed Annexations' are all esriGeometryPolygon, and the arcgis connector flattens POINT geometry only, so a polygon layer yields no coordinates and would degrade every record to area scope."
   }
  ],
  "ckan": [

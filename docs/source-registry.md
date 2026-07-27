@@ -2050,3 +2050,118 @@ Scope was restricted to leads already discovered in Batch 4 — no broad discove
 **REJECTED — Suffolk County NY (107 dev-empty ZIPs).** `gis.suffolkcountyny.gov` still returns HTTP 403 behind a "Suffolk County Server Maintenance" page (unchanged from Batch 4); `gis2.` and `maps.suffolkcountyny.gov` both fail DNS; the ArcGIS Online group search surfaces only unrelated items (a Peconic Estuary education group). → nightly reprobe list.
 
 **CAMPAIGN CONCLUDED.** Batch 5 produced ~0 newly populated ZIP pages against a 20/day and 40/batch threshold; Batch 4 was below the discovery-efficiency threshold. Two consecutive batches below threshold → the corrected-URL ArcGIS campaign is closed. The known-lead pipeline is empty: both deferred counties are firmly rejected and every Fairfax layer is evaluated.
+
+---
+
+## 2026-07-27 — TEXAS DEV-COVERAGE PASS (Collin / Denton / Montgomery / Fort Bend / El Paso)
+
+Scope: the five Texas counties carrying the most facilities-only ZIP pages (El Paso 145,
+Denton 32, Collin 28, Montgomery 22, Fort Bend 21). Recon by `pg_net` (the sandbox has no
+egress). One source wired; the rest rejected with receipts below.
+
+### WIRED — `frisco-active-building-permits` (Collin + Denton)
+
+City of Frisco's own ArcGIS Server, layer 1 of `Public/External_Planning_and_Zoning`.
+**READY — config only, no code change.** Full evidence lives in the entry's `_receipts` in
+`jurisdiction-registry.json`; the load-bearing facts:
+
+| Gate | Evidence |
+|---|---|
+| First-party | `maps.friscotexas.gov` — the city's own server |
+| Geometry | `esriGeometryPoint`, returned in wkid 4326 |
+| Freshness | newest `Issued_Date` 12/31/2025; layer is the city's **active** working set, 753 rows |
+| Status vocabulary | live groupBy → `ISSUED = 753` of 753 (single verbatim value) |
+| Type vocabulary | live groupBy → Single Family Residential 503, Commercial 226, Multi-Family Residential 22, School 2 — all four kept, **0 unclassified**, no trade noise to drop |
+| `record_url` | per-record eTRAKiT deep link in `Hyperlink` → **record precision** |
+| ZIP scoping | `Address` is street-only, no ZIP in the schema → `spatial_zip_radius_mi: 3` (Denver/Minneapolis/Chicago pattern) |
+
+**Two traps avoided, both on existing standing answers.** (1) `Issued_Date` is
+`esriFieldTypeString` in `M/D/YYYY`, so `recency_days` is **deliberately absent** — it emits a
+`>= DATE 'yyyy-mm-dd'` literal against a string column (the Anaheim standing answer), and
+`M/D/YYYY` does not string-compare chronologically either. `isoDay()` already parses `M/D/YYYY`
+(`arcgis.ts:541`), so `file_date` normalizes with no code change. (2) The AGO search hit pointed
+at `mapcache.friscotexas.gov`, which **does not resolve** — the live host was found by walking
+the city's own app item → web map → `operationalLayers`, not by guessing a URL.
+
+**New standing answer: a dead host in an AGO search result is not a dead source.** AGO item
+`url` fields go stale when a city migrates servers. Walk the owning app/web map to its
+`operationalLayers` before rejecting — that is how Frisco was recovered after its search-result
+host failed DNS.
+
+**Measured ZIP lift** — all 753 points fetched and run through the connector's own
+`envelopeFor(lat, lng, 3)` against `zip_centroids`. 8 pages, every one currently at
+`dev_markers = 0`:
+
+| ZIP | Page | County | Permits in envelope |
+|---|---|---|---|
+| 75035 | Frisco (75035) | Collin | 278 |
+| 75034 | Frisco (75034) | Collin | 221 |
+| 75036 | Frisco (75036) | Denton | 221 |
+| 75078 | Prosper (75078) | Collin | 147 |
+| 75056 | The Colony (75056) | Denton | 67 |
+| 75024 | Plano (75024) | Collin | 43 |
+| 75033 | Frisco (75033) | Denton | 21 |
+| 75025 | Plano (75025) | Collin | 13 |
+
+Coverage declares **both** Collin and Denton because the City of Frisco straddles the county
+line — confirmed against our own rows (75034/75035 are Collin pages, 75033/75036 are Denton).
+
+### REJECTED — Denton County `gis.dentoncounty.gov` `DEV_Permits` (STALLED)
+
+The county's own server is live (ArcGIS 11.5) and the layer is well-shaped — point geometry,
+56,500 rows, `PermitType`/`DateReceiv`/`PermitStat`. It is **frozen**: `max(DateReceiv) =
+1686286800000` = **2023-06-09**, on both the MapServer and FeatureServer copies, matching the
+layer's own title `Development Permits (1/05-7/23)`. Worcester/KCMO precedent. → nightly reprobe
+list. Sibling services (`CityETJPermits_GC`, `ZoningPermits_GC`, `OSSFPermits_GC` septic,
+`Floodplain_PermitApp`, `UTILITY_Permits`) are utility/septic/floodplain paperwork, not
+development records.
+
+### DECISION NEEDED — McKinney `EnergovRecords` (Collin)
+
+`maps.mckinneytexas.org/mckinney/rest/services/MapServices/EnergovRecords` is live, first-party
+Tyler EnerGov (the Ann Arbor precedent), both layers point geometry. Neither layer is wireable
+as-is:
+- **Layer 0 `Energov Records`** — 328,727 rows and **no date column at all** (`MODULE`,
+  `ENT_NUMBER`, `ENT_WORK_CLASS`, `ENT_DESCRIPTION`, `ENT_STATUS`, `ENT_PARCEL`, `ENT_MA1/2`).
+  Undated records cannot be honestly dated or aged out. Baltimore-city precedent — a founder
+  call, not a config gap.
+- **Layer 1 `Active Construction`** — clean vocabulary (`permit_number`, `permit_status`,
+  `permit_type`, `description`, `project`, `main_address`) but its only date is
+  `last_inspection_date`, which is **not** a filing or issuance date. Presenting it as
+  `file_date` would mislabel the record.
+
+Logged, non-blocking. Also carries engineer name/email/phone columns — project them out with
+`out_fields` if it is ever wired.
+
+### REJECTED — Fort Bend County (access-restricted)
+
+Org is real (`fbcgis` / `HfQs2ClqmipKpmFK`, "Fort Bend County GIS"). Its **"Fort Bend County
+Permitting"** app's web map (`310f18d4ac5246199976396c933a977f`) returns
+`{"error":{"code":403,"messageCode":"GWM_0003","message":"You do not have permissions to access
+this resource"}}` — Westchester/Buffalo restricted-item precedent. The org's public services
+carry no permit records: `Subdivisions`, `All_Subdivisions`, `Subdivision_Alias`,
+`Development_Agreement` are boundary/reference layers. The county's own
+`arcgisweb.fortbendcountytx.gov` answers `{"status":"error","messages":["Could not access any
+server machines"]}`. Sugar Land (`gis.sugarlandtx.gov`) fails DNS. → nightly reprobe list.
+
+### REJECTED — Montgomery County (no first-party source found)
+
+No first-party per-record permit source. `gis.cityofconroe.org` → 404;
+`gis-cityofconroe.opendata.arcgis.com` → Hub domain does not exist. The AGO searches surfaced
+only third-party lookalikes — a Lee & Associates broker layer ("New Houston Developments") and,
+for the generic permit query, `comadmin_comgis` "Permits", which is **Midland, Texas**
+(`allowedRedirectUris: https://maps.midlandtexas.gov/portal/`), not Montgomery. Cross-city
+lookalike class — the same trap as the Calgary/WA and Kent DE/RI hits.
+
+### STILL BLOCKED — El Paso (unchanged, re-probed)
+
+`gis.elpasotexas.gov/.../Planning/NewResidential/FeatureServer/1` re-probed 2026-07-27: **200
+from pg_net** (`currentVersion 11.3`), confirming the source is alive and well-shaped. The
+blocker is unchanged and is not ours to fix from config — the WAF 403s the Supabase
+edge-runtime IP range. Stays on the nightly reprobe list; still the single largest TX prize at
+**145 pages**.
+
+### Also rejected on egress/DNS (URL-guess round, no leads lost)
+
+`gis.plano.gov` DNS · `maps.cityofallen.org` TLS handshake timeout · `data.plano.gov` DNS.
+Plano's 43+13 pages are already served by the Frisco entry's envelope.
