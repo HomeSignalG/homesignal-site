@@ -26,8 +26,11 @@
 import type {
   Bucket, ColumnMap, ColumnRef, NormalizedRecord, StatusToBucket,
   ExcludedStatus, UnmappedStatus,
-} from "./socrata.ts";
+} from "./contract.ts";
 import { buildGeocodeInput } from "./geo-input.ts";
+import {
+  readCol, firstCol, valOrNull, buildBucketLookup, layerFor, BUCKET_TO_TYPE, milesBetween, GEOCODE_FENCE_MI, coverageMatches as coverageMatchesShared,
+} from "./contract.ts";
 
 // ───────────────────────────── registry entry + types ─────────────────────────────
 
@@ -152,7 +155,7 @@ export async function arcgisForZip(
   for (const entry of entries) {
     if (entry.platform !== "arcgis") continue;
     if (entry.zip_mode === false) continue;
-    if (!coverageMatches(entry.coverage, communities)) continue;
+    if (!coverageMatchesShared(entry.coverage, communities)) continue;
     const { records, report } = await runEntry(entry, zip, deps);
     sites.push(...records);
     reports.push(report);
@@ -161,18 +164,6 @@ export async function arcgisForZip(
 }
 
 /** True iff some community row satisfies an entry coverage clause (state + optional county). */
-export function coverageMatches(
-  coverage: { state: string; county?: string }[],
-  communities: ArcgisCommunityRow[],
-): boolean {
-  const norm = (s?: string | null) => (s || "").trim().toLowerCase();
-  return coverage.some((cov) =>
-    communities.some((c) =>
-      norm(c.state) === norm(cov.state) &&
-      (!cov.county || norm(c.county) === norm(cov.county))
-    )
-  );
-}
 
 // ───────────────────────────── per-entry run ─────────────────────────────
 
@@ -458,42 +449,10 @@ async function getWithBackoff(url: string, deps: ArcgisDeps): Promise<unknown> {
 
 // ───────────────────────────── helpers (mirror socrata.ts, kept local so that file is untouched) ─────────────────────────────
 
-const BUCKET_TO_TYPE: Record<Exclude<Bucket, "exclude">, "built" | "approved" | "proposed"> = {
-  operating: "built", approved: "approved", proposed: "proposed",
-};
 
-function layerFor(useType: string): string {
-  switch (useType.toLowerCase()) {
-    case "industrial": return "industrial";
-    case "utility": return "energy";
-    case "residential": return "residential";
-    case "commercial": return "commercial";
-    case "civic/public": return "civic";
-    default: return "development";
-  }
-}
 
-function buildBucketLookup(s2b: StatusToBucket): Map<string, Bucket> {
-  const m = new Map<string, Bucket>();
-  (["proposed", "approved", "operating", "exclude"] as Bucket[]).forEach((b) => {
-    for (const status of s2b[b] ?? []) { const k = status.trim(); if (!m.has(k)) m.set(k, b); }
-  });
-  return m;
-}
 
-function firstCol(ref?: ColumnRef): string | null {
-  if (!ref) return null;
-  return Array.isArray(ref) ? (ref[0] ?? null) : ref;
-}
 
-function readCol(row: Record<string, unknown>, ref?: ColumnRef): unknown {
-  if (!ref) return undefined;
-  if (Array.isArray(ref)) {
-    const parts = ref.map((c) => row[c]).filter((v) => v != null && String(v).trim() !== "").map((v) => String(v).trim());
-    return parts.length ? parts.join(" ") : undefined;
-  }
-  return row[ref];
-}
 
 function extractUrl(v: unknown): string {
   if (!v) return "";
@@ -515,11 +474,6 @@ function rowId(row: Record<string, unknown>): string | null {
   return id == null ? null : String(id);
 }
 
-function valOrNull(v: unknown): string | null {
-  if (v == null) return null;
-  const s = String(v).trim();
-  return s === "" ? null : s;
-}
 
 function numOrNull(v: unknown): number | null {
   if (v == null || v === "") return null;
@@ -556,11 +510,4 @@ export function envelopeFor(lat: number, lng: number, radiusMi: number): { xmin:
 /** Geofence for GEOCODED points (source-supplied geometry is never fenced): a Census
  *  interpolation landing farther than this from the report's ZIP centroid cannot be an
  *  address inside that ZIP — the coords are nulled, the record stays listed (area scope). */
-export const GEOCODE_FENCE_MI = 25;
 
-/** Equirectangular distance in miles — plenty at fence scale. */
-export function milesBetween(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const dLat = (lat2 - lat1) * 69;
-  const dLng = (lng2 - lng1) * 69 * Math.cos(((lat1 + lat2) / 2) * Math.PI / 180);
-  return Math.sqrt(dLat * dLat + dLng * dLng);
-}

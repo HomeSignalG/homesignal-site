@@ -72,10 +72,58 @@ import { arcgisForZip, type ArcgisRegistryEntry } from "./sources/arcgis.ts";
 import { ckanForZip, type CkanCommunityRow, type CkanRegistryEntry } from "./sources/ckan.ts";
 import { csvForZip, type CsvCommunityRow, type CsvRegistryEntry } from "./sources/csv.ts";
 import { cartoForZip, type CartoCommunityRow, type CartoRegistryEntry } from "./sources/carto.ts";
+import type { AdapterDeps, CommunityRow, NormalizedRecord, RunReport } from "./sources/contract.ts";
 const ARCGIS_ENTRIES = (jurisdictionRegistry as unknown as { arcgis?: ArcgisRegistryEntry[] }).arcgis ?? [];
 const CKAN_ENTRIES = (jurisdictionRegistry as unknown as { ckan?: CkanRegistryEntry[] }).ckan ?? [];
 const CSV_ENTRIES = (jurisdictionRegistry as unknown as { csv?: CsvRegistryEntry[] }).csv ?? [];
 const CARTO_ENTRIES = (jurisdictionRegistry as unknown as { carto?: CartoRegistryEntry[] }).carto ?? [];
+
+/**
+ * THE ADAPTER TABLE — the ONLY engine-side thing a new platform touches.
+ *
+ * To add EnerGov / OpenGov / Municity / a JSON or XML feed: write sources/<x>.ts exporting
+ * an `<x>ForZip(zip, communities, entries, deps)`, add its section to
+ * jurisdiction-registry.json, and add ONE row here. No other engine edit — no new call
+ * block, no new mapping block, no new response key, no change to dedupe or counts.
+ *
+ * ORDER IS CONTRACTUAL (see the loop): records concatenate in this order and
+ * dedupeExactPermits is first-seen-wins. Appending is safe; reordering is not.
+ */
+interface EngineAdapter {
+  source_class: string;
+  report_key: string;
+  run(zip: string, communities: CommunityRow[], deps: AdapterDeps): Promise<{ sites: NormalizedRecord[]; reports: RunReport[] }>;
+}
+const ADAPTERS: EngineAdapter[] = [
+  { source_class: "socrata", report_key: "socrata_reports",
+    run: (z, c, d) => socrataForZip(z, c as SocrataCommunityRow[], SOCRATA_ENTRIES, d) as unknown as Promise<{ sites: NormalizedRecord[]; reports: RunReport[] }> },
+  { source_class: "arcgis", report_key: "arcgis_reports",
+    run: (z, c, d) => arcgisForZip(z, c, ARCGIS_ENTRIES, d) as unknown as Promise<{ sites: NormalizedRecord[]; reports: RunReport[] }> },
+  { source_class: "ckan", report_key: "ckan_reports",
+    run: (z, c, d) => ckanForZip(z, c as CkanCommunityRow[], CKAN_ENTRIES, d) as unknown as Promise<{ sites: NormalizedRecord[]; reports: RunReport[] }> },
+  { source_class: "csv", report_key: "csv_reports",
+    run: (z, c, d) => csvForZip(z, c as CsvCommunityRow[], CSV_ENTRIES, d) as unknown as Promise<{ sites: NormalizedRecord[]; reports: RunReport[] }> },
+  { source_class: "carto", report_key: "carto_reports",
+    run: (z, c, d) => cartoForZip(z, c as CartoCommunityRow[], CARTO_ENTRIES, d) as unknown as Promise<{ sites: NormalizedRecord[]; reports: RunReport[] }> },
+];
+
+/**
+ * The ONE adapter-record → engine-site mapping. Was copy-pasted five times, byte-identical
+ * (the removed comments literally read "identical mapping to socrataSites above").
+ * A point record sits at its real lat/lng; an area record anchors at the report centroid
+ * like any jurisdiction-level item (its coordinates are never displayed).
+ * record_url is mirrored to `url` so the shared dev gate + page link logic see it.
+ */
+function toEngineSites(rows: Record<string, unknown>[], clat: number, clng: number): Record<string, unknown>[] {
+  return rows
+    .filter((s) => String(s.record_url || "").trim() !== "")
+    .map((s) => {
+      const lat = s.lat as number | null, lng = s.lng as number | null;
+      const pt = lat != null && lng != null;
+      const [e, n] = pt ? toEN(clat, clng, lat as number, lng as number) : [0, 0];
+      return { ...s, url: s.record_url, e, n, lat: pt ? lat : clat, lng: pt ? lng : clng };
+    });
+}
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -671,70 +719,33 @@ async function handleRequest(req: Request): Promise<Response> {
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
     });
-    // TASK 1 — structured open-data permit/case records (Socrata), coverage-gated per registry entry.
-    // Generic connector; adding a city is a jurisdiction-registry.json edit, never code here. Records
-    // are development point records (relevance:"development") bucketed by their status_to_bucket type.
-    const socrata = await socrataForZip(zip, (commRows ?? []) as SocrataCommunityRow[], SOCRATA_ENTRIES, {
+    // ── REGISTRY-DRIVEN ADAPTER LOOP (backbone Phase 3) ────────────────────────────────
+    // Every structured permit/case platform runs through ONE loop over the ADAPTERS table.
+    // Previously this was six hand-written blocks plus five byte-identical mapping blocks;
+    // adding a platform meant editing the engine in four places. Now: one adapter module +
+    // one ADAPTERS row. Adding a JURISDICTION to an existing platform stays a
+    // jurisdiction-registry.json edit with no code at all.
+    //
+    // ORDER IS CONTRACTUAL: the adapters run sequentially in ADAPTERS order and their records
+    // are concatenated in that same order, because dedupeExactPermits() below is first-seen-wins.
+    // Do not parallelise and do not reorder without re-verifying a golden-set diff.
+    const adapterDeps: AdapterDeps = {
       fetch,
       geocode: async (a: string) => {
         const g = await resolveGeocode(geoStore, a, canonicalAddr(a), geoLadder);
-        if (g.lat == null || g.lng == null) return null;   // failed → quarantine (socrata.ts)
+        if (g.lat == null || g.lng == null) return null;   // failed → quarantine (per adapter)
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
       appToken: Deno.env.get("SOCRATA_APP_TOKEN") || undefined,
       zipCentroid: { lat: clat, lng: clng },
-    });
-    // TASK 1 (ArcGIS twin) — same generic, coverage-gated connector for Esri/ArcGIS FeatureServer
-    // permit/case layers (e.g. Salt Lake City building permits). Adding a jurisdiction is a
-    // jurisdiction-registry.json `arcgis` edit, never code here. Same NormalizedRecord shape + gates.
-    const arcgis = await arcgisForZip(zip, (commRows ?? []) as { state?: string | null; county?: string | null }[], ARCGIS_ENTRIES, {
-      fetch,
-      geocode: async (a: string) => {
-        const g = await resolveGeocode(geoStore, a, canonicalAddr(a), geoLadder);
-        if (g.lat == null || g.lng == null) return null;   // failed → quarantine (arcgis.ts)
-        return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
-      },
-      // ZIP centroid for entries using spatial_zip_radius_mi (layers with no ZIP attribute) —
-      // the engine's standard centroid+radius ZIP approximation; records keep their own points.
-      zipCentroid: { lat: clat, lng: clng },
-    });
-    // TASK 1 (CKAN twin) — same generic, coverage-gated connector for CKAN datastore portals
-    // (e.g. Boston's data.boston.gov Approved Building Permits). Adding a jurisdiction is a
-    // jurisdiction-registry.json `ckan` edit, never code here. Same NormalizedRecord shape + gates.
-    const ckan = await ckanForZip(zip, (commRows ?? []) as CkanCommunityRow[], CKAN_ENTRIES, {
-      fetch,
-      geocode: async (a: string) => {
-        const g = await resolveGeocode(geoStore, a, canonicalAddr(a), geoLadder);
-        if (g.lat == null || g.lng == null) return null;   // failed → quarantine (ckan.ts)
-        return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
-      },
-    });
-    // TASK 1 (CSV twin) — same generic, coverage-gated connector for first-party portals whose
-    // interface is a published CSV file (e.g. San Diego's seshat.datasd.org approvals ledger).
-    // Adding a jurisdiction is a jurisdiction-registry.json `csv` edit, never code here. The
-    // file is fetched once per cache window (module memo) and served to every ZIP in the batch.
-    const csv = await csvForZip(zip, (commRows ?? []) as CsvCommunityRow[], CSV_ENTRIES, {
-      fetch,
-      geocode: async (a: string) => {
-        const g = await resolveGeocode(geoStore, a, canonicalAddr(a), geoLadder);
-        if (g.lat == null || g.lng == null) return null;   // failed → quarantine (csv.ts)
-        return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
-      },
-      zipCentroid: { lat: clat, lng: clng },
-    });
-    // TASK 1 (Carto twin) — same generic, coverage-gated connector for Carto SQL-API portals
-    // (e.g. Philadelphia's phl.carto.com permits table). Adding a jurisdiction is a
-    // jurisdiction-registry.json `carto` edit, never code here. ZIP scoping is a LIKE prefix
-    // (Carto portals store ZIP+4); geometry rides PostGIS ST_Y/ST_X of the entry's geom_col.
-    const carto = await cartoForZip(zip, (commRows ?? []) as CartoCommunityRow[], CARTO_ENTRIES, {
-      fetch,
-      geocode: async (a: string) => {
-        const g = await resolveGeocode(geoStore, a, canonicalAddr(a), geoLadder);
-        if (g.lat == null || g.lng == null) return null;   // failed → quarantine (carto.ts)
-        return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
-      },
-    });
-    // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
+    };
+    const adapterSites: Record<string, Record<string, unknown>[]> = {};
+    const adapterReports: Record<string, unknown[]> = {};
+    for (const a of ADAPTERS) {
+      const out = await a.run(zip, (commRows ?? []) as CommunityRow[], adapterDeps);
+      adapterSites[a.source_class] = toEngineSites(out.sites as unknown as Record<string, unknown>[], clat, clng);
+      adapterReports[a.report_key] = out.reports as unknown[];
+    }
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");
     // TABS filings are development records by construction (state permit registry) — stamp
     // relevance/rel_rule so the cache stays queryable alongside the v15 classifier's output,
@@ -746,50 +757,6 @@ async function handleRequest(req: Request): Promise<Response> {
     // `url` so the shared dev gate + page link logic (which read `url`) treat them like other dev items.
     // A point record (source coords or geocoded address) sits at its real lat/lng; a jurisdiction-scope
     // record anchors at the report centroid like any area item (its coordinates are never displayed).
-    const socrataSites: Record<string, unknown>[] = (socrata.sites as unknown as Record<string, unknown>[])
-      .filter((s) => String(s.record_url || "").trim() !== "")
-      .map((s) => {
-        const lat = s.lat as number | null, lng = s.lng as number | null;
-        const pt = lat != null && lng != null;
-        const [e, n] = pt ? toEN(clat, clng, lat as number, lng as number) : [0, 0];
-        return { ...s, url: s.record_url, e, n, lat: pt ? lat : clat, lng: pt ? lng : clng };
-      });
-    // ArcGIS records → engine site shape (identical mapping to socrataSites above).
-    const arcgisSites: Record<string, unknown>[] = (arcgis.sites as unknown as Record<string, unknown>[])
-      .filter((s) => String(s.record_url || "").trim() !== "")
-      .map((s) => {
-        const lat = s.lat as number | null, lng = s.lng as number | null;
-        const pt = lat != null && lng != null;
-        const [e, n] = pt ? toEN(clat, clng, lat as number, lng as number) : [0, 0];
-        return { ...s, url: s.record_url, e, n, lat: pt ? lat : clat, lng: pt ? lng : clng };
-      });
-    // CKAN records → engine site shape (identical mapping to socrataSites above).
-    const ckanSites: Record<string, unknown>[] = (ckan.sites as unknown as Record<string, unknown>[])
-      .filter((s) => String(s.record_url || "").trim() !== "")
-      .map((s) => {
-        const lat = s.lat as number | null, lng = s.lng as number | null;
-        const pt = lat != null && lng != null;
-        const [e, n] = pt ? toEN(clat, clng, lat as number, lng as number) : [0, 0];
-        return { ...s, url: s.record_url, e, n, lat: pt ? lat : clat, lng: pt ? lng : clng };
-      });
-    // CSV records → engine site shape (identical mapping to socrataSites above).
-    const csvSites: Record<string, unknown>[] = (csv.sites as unknown as Record<string, unknown>[])
-      .filter((s) => String(s.record_url || "").trim() !== "")
-      .map((s) => {
-        const lat = s.lat as number | null, lng = s.lng as number | null;
-        const pt = lat != null && lng != null;
-        const [e, n] = pt ? toEN(clat, clng, lat as number, lng as number) : [0, 0];
-        return { ...s, url: s.record_url, e, n, lat: pt ? lat : clat, lng: pt ? lng : clng };
-      });
-    // Carto records → engine site shape (identical mapping to socrataSites above).
-    const cartoSites: Record<string, unknown>[] = (carto.sites as unknown as Record<string, unknown>[])
-      .filter((s) => String(s.record_url || "").trim() !== "")
-      .map((s) => {
-        const lat = s.lat as number | null, lng = s.lng as number | null;
-        const pt = lat != null && lng != null;
-        const [e, n] = pt ? toEN(clat, clng, lat as number, lng as number) : [0, 0];
-        return { ...s, url: s.record_url, e, n, lat: pt ? lat : clat, lng: pt ? lng : clng };
-      });
     const fac = facRaw.filter((s) => (s.record_url as string) && (s.record_url as string).trim() !== "");
     // v17: persist the per-address dossier rows for this ZIP (small N; must never fail the page).
     const isTx = (commRows ?? []).some((c) => /^(tx|texas)$/i.test(String((c as { state?: string }).state || "").trim()));
@@ -826,7 +793,9 @@ async function handleRequest(req: Request): Promise<Response> {
       }
       return out;
     };
-    const permitSites = dedupeExactPermits([...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...csvSites, ...cartoSites]);
+    // Same order as before the Phase 3 refactor: TABS first, then ADAPTERS order
+    // (socrata, arcgis, ckan, csv, carto). dedupeExactPermits is first-seen-wins.
+    const permitSites = dedupeExactPermits([...tabsSites, ...ADAPTERS.flatMap((a) => adapterSites[a.source_class] ?? [])]);
     const devRecords = [...devReal, ...permitSites];
     const proposedRecords = devRecords.filter((s) => s.type === "proposed");
     const approvedRecords = devRecords.filter((s) => s.type === "approved");
@@ -840,7 +809,7 @@ async function handleRequest(req: Request): Promise<Response> {
     const envEpa = fac.filter((s) => (s.env as { epa?: unknown } | undefined)?.epa).length;
     const envTceq = fac.filter((s) => (s.env as { tceq?: unknown } | undefined)?.tceq).length;
     // TABS records are development filings → counts.development, never counts.facilities.
-    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, proposed: proposedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, csv_reports: csv.reports, carto_reports: carto.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
+    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, proposed: proposedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, ...adapterReports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
   }
 
   const address = (body.address || "").trim();

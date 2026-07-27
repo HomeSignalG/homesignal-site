@@ -2050,3 +2050,46 @@ Scope was restricted to leads already discovered in Batch 4 — no broad discove
 **REJECTED — Suffolk County NY (107 dev-empty ZIPs).** `gis.suffolkcountyny.gov` still returns HTTP 403 behind a "Suffolk County Server Maintenance" page (unchanged from Batch 4); `gis2.` and `maps.suffolkcountyny.gov` both fail DNS; the ArcGIS Online group search surfaces only unrelated items (a Peconic Estuary education group). → nightly reprobe list.
 
 **CAMPAIGN CONCLUDED.** Batch 5 produced ~0 newly populated ZIP pages against a 20/day and 40/batch threshold; Batch 4 was below the discovery-efficiency threshold. Two consecutive batches below threshold → the corrected-URL ArcGIS campaign is closed. The known-lead pipeline is empty: both deferred counties are firmly rejected and every Fairfax layer is evaluated.
+
+## 2026-07-25 — ARCGIS CAMPAIGN CLOSED; ACCELA SPIKE BLOCKED ON CREDENTIAL
+
+**The corrected-URL ArcGIS discovery campaign is COMPLETE** (Batches 1-5). Do not resume broad
+ArcGIS discovery unless new evidence materially changes the opportunity. Remaining ArcGIS
+opportunities are exhausted or operationally blocked: WAF (El Paso, Tampa), token-gated
+(Westchester `Municity5` + `DOH_Permit`, 499), extended maintenance (Suffolk, 403). Close-out:
+1,462 / 12,722 dev-backed pages (11.49%), 615,735 markers, 0 missing `record_url`; 256 ZIP pages
+added over 4.7 engineering days (54.5/day blended).
+
+**Measured Accela opportunity: 400 confirmed development-empty existing ZIP pages**, upper bound
+400-697 pending resolution of five ambiguous agency codes (`ALLEGHENYCO`, `LANCASTER`, `ALAMEDA`,
+`DUPAGE`, `ALBANY` — each a live ACA portal whose jurisdiction cannot be resolved without the
+agencies endpoint). Corrected down from the earlier ~438 estimate: Fairfax's 47 ZIPs were in that
+figure and are now **fully populated** by the ArcGIS wiring, and Tacoma is 17 of 26 populated.
+`NASSAU` and `MONTGOMERY` both resolve to "City of Metropolis", Accela's demo tenant — discarded.
+
+**El Paso (136) and Tampa (27) are the strategic case for Accela**: both are well-shaped sources
+whose ArcGIS path is blocked by a municipal WAF that 403s the Supabase edge runtime, while
+`apis.accela.com` is Accela's cloud — a different host that may not be blocked. ~163 ZIPs are
+reachable only via that route, 41% of the confirmed 400.
+
+**BLOCKER: `ACCELA_APP_ID` is not available.** Anonymous access exists but is credential-gated —
+`/v4/agencies` with no header returns 400 naming the required `x-accela-appid`; with a placeholder
+it returns 500. Engineering is FROZEN: no connector, no pilot configs, no production estimates, no
+BUILD/PILOT/NOT-WORTH recommendation until measured API evidence exists. Execution plan of record:
+`docs/accela-validation-spike-plan.md`.
+
+**Standing answer reinforced (the El Paso lesson): a source that passes every schema gate can still
+fail on EGRESS.** pg_net reachability does NOT prove edge-runtime reachability. The production gate
+is now five conditions — schema, evidence standards, **edge-runtime connectivity**, production
+materialization, regression survival — and no source counts as wireable until all five hold.
+
+## 2026-07-25 — ACCELA DEFERRED (EXTERNAL ACCESS BLOCKED)
+
+The founder attempted to create an Accela developer account; developers.accela.com returned a
+**server-side entity-save error** during registration, so no App ID could be issued. Founder call:
+**skip Accela** — do not troubleshoot the vendor's registration, contact Accela, wait for
+credentials, or design/build the connector. `ACCELA_APP_ID` is **no longer an active blocker**.
+Accela is **DEFERRED — EXTERNAL ACCESS BLOCKED** until materially new access evidence appears; the
+dormant validation plan stays in `docs/accela-validation-spike-plan.md`. The measured 400-ZIP
+opportunity (upper bound 400-697) remains on the books as deferred. No further Accela work is
+authorized.
