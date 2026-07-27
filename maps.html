@@ -1657,6 +1657,7 @@ HS.onReady(async function () {
       var mk = HS.resolveMarker(it);
       out.expected.push({ id: it.id, name: it.name || it.title || '', shape: mk.shape,
         col: mk.color, rule: mk.shapeRule, reason: mk.fallbackReason || '',
+        distMi: it.distance_mi == null ? null : +it.distance_mi,
         srcType: it.type || it.use_type || it.layer || it.category || '' });
       out.shapeCounts[mk.shape] = (out.shapeCounts[mk.shape] || 0) + 1;
       if (mk.shape === 'circle') {
