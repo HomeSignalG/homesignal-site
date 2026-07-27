@@ -928,6 +928,44 @@ legal/framing change not covered by the one-time sign-off.
   companion; Sonoma county datasets (no city/ZIP/coords — cannot scope or geocode).
   Receipts: docs/source-registry.md "CALIFORNIA WIRE PASS". Reproducible seed:
   docs/california-development-reports-seed.sql.
+- 🟢 **UTAH + ARIZONA MAPS COVERAGE PASS — 5 first-party sources wired; UT 16→102 and AZ
+  38→74 ZIP pages carrying REAL map records** (DB-verified 2026-07-27). Scope was the
+  `0032Maps.IngestFeedInventory.xlsx` brief. **Config only — no connector, engine or schema
+  change.** **New standing answer (so no session re-derives): the workbook's "Live" column is
+  COVERAGE-GATE based, not record based** — a registry entry declaring `{state,county}` makes
+  every ZIP page in that county count as Live even where no record lands. Measured as the brief
+  actually defines Live ("actual source data populating the satellite, street and focus maps"),
+  the true baseline was **UT 16/310 and AZ 38/364**, not the 65 and 136 the workbook reports.
+  Always count `development_reports` sites with a non-null `source_registry_id`, excluding the
+  EPA facilities floor. Wired: **tucson-commercial-building-permits** + **tucson-residential-building-permits**
+  (AZ/Pima — the city's own PDSD `PermitsCode` MapServer layers 81/85; 4,805 + 19,388 rows;
+  per-record Tyler EnerGov `CSS_URL` → RECORD precision; commercial has native POSTALCODE,
+  residential has NO ZIP column so it rides spatial 3-mi — Pima 0→31 ZIPs, 12,112 records),
+  **gilbert-energov-permits** (AZ/Maricopa — 214,662 rows, native AddressZip + per-record
+  Latitude/Longitude columns), **casa-grande-active-development-sites** (AZ/Pinal — the ONLY
+  wireable first-party per-record source found for Pinal; the county's own Accela FeatureServer
+  fails DNS), and **udot-active-projects** (UT STATEWIDE — the Utah analogue of the workbook's
+  own TxDOT-PIA "Utilities / Infrastructure" row; `coverage:[{state:'UT'}]` with no county, which
+  the registry contract permits for a statewide dataset; 358 active projects lift **102 UT ZIPs
+  across 14 counties**, incl. Weber 14/14 and Davis 10/14 which were fully dark). Anti-fabrication
+  + map-render invariants across all 25,611 UT/AZ records from all 10 sources: **0 missing
+  `record_url`, 0 missing coordinates** — coordinates are what make a record renderable, and all
+  three map views (2D/satellite/focus) read the same `MAP_SITES` dataset, so a point that renders
+  in one renders in all three. Bidirectional gate proof with live receipts: Tucson records ride
+  ONLY Pima pages, Gilbert ONLY Maricopa, Casa Grande ONLY Pinal, UDOT only UT counties.
+  **Two more standing answers:** (a) **ArcGIS Online `search` with a `bbox` does NOT geo-filter** —
+  UT and AZ bboxes returned identical result sets full of Louisville KY / Charlottesville VA /
+  Kisumu Kenya lookalikes, so `bbox` is not a substitute for `orgid:` scoping; discovery must go
+  through per-portal DCAT catalogs. (b) **`column_map` arrays JOIN values, they do NOT fall back**
+  (`readCol`, `sources/arcgis.ts`) — so a multi-field date fallback is unavailable and one date
+  field must be chosen on live non-null counts (UDOT `start_dat` 43/358 was rejected for
+  `created_dt` 358/358 after a smoke refresh emitted 11 of 12 records with no date).
+  **Still dark and documented, not wired:** UT Washington/Iron/Tooele/Cache-city and AZ
+  Navajo/Coconino/Mohave/Cochise/Yuma/Santa Cruz/Apache have no wireable first-party per-record
+  permit source — an unusable source is documented, never wired. Pima County's own
+  `Development Permits`/`Development Plans` are live and fresh but **polygon** geometry, and the
+  arcgis connector flattens point geometry only. Receipts: docs/source-registry.md
+  "UTAH / ARIZONA MAPS COVERAGE PASS".
 - 🟢 **ARIZONA IS LIVE UNDER THE SUBSTANCE GATE — 364/364 modeled AZ ZIPs cached, 2
   first-party permit sources, 230 pages auto-indexable (no manual flip)** (DB-verified
   2026-07-16). Eleventh development state, state 3 of the four-state run. **293 pass +
