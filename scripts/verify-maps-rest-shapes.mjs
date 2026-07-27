@@ -88,8 +88,18 @@ async function openPage(browser, { blockGL = false } = {}) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   page._errs = [];
   page.on('pageerror', (e) => page._errs.push('pageerror: ' + String(e.message).slice(0, 240)));
-  page.on('console', (m) => { if (m.type() === 'error') page._errs.push('console: ' + m.text().slice(0, 240)); });
-  if (blockGL) await page.route(/maplibre-gl@.*\.js/i, (r) => r.abort());
+  page.on('console', (m) => {
+    if (m.type() !== 'error') return;
+    const t = m.text().slice(0, 240);
+    if (page._ignoreErr && page._ignoreErr.test(t)) return;
+    page._errs.push('console: ' + t);
+  });
+  // Blocking maplibre is how we FORCE the Leaflet path, so the abort it causes is our
+  // own noise, not a page defect — the page's real console must still be clean.
+  if (blockGL) {
+    page._ignoreErr = /ERR_FAILED|Failed to load resource|maplibre/i;
+    await page.route(/maplibre-gl@.*\.js/i, (r) => r.abort());
+  }
   await injectHome(page, HOME);
   await page.goto(`${BASE}/maps.html?zip=${ZIP}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForFunction(() => window.__HS_MAP && typeof window.__HS_REST_VERIFY === 'function',
@@ -124,18 +134,9 @@ try {
   ok(view.lettered <= 16, 'the lettered head stays capped at 16', 'lettered=' + view.lettered);
   notes.push(`view: home=${view.homeAddress} radius=${view.radiusMi}mi lettered=${view.lettered} visible=${view.visibleTotal}`);
 
-  // ── Focus (schematic SVG) ───────────────────────────────────────────────────────
-  console.log('\n== Focus (schematic) ==');
-  const focus = await page.evaluate(() => window.__HS_REST_VERIFY());
-  ok(focus.restTotal > 16, 'the view plots well past the 16-letter head (>16 rest records)',
-    'rest=' + focus.restTotal);
-  ok(!!focus.focus && focus.focus.count === focus.restTotal,
-    'Focus draws EVERY rest record', focus.focus ? `${focus.focus.count}/${focus.restTotal}` : 'no rest pins');
-  const expShapes = focus.expected.map((e) => e.shape);
-  if (focus.focus) {
-    const bad = focus.focus.shapes.map((s, i) => (s === expShapes[i] ? null : `#${i} drew ${s}, resolver said ${expShapes[i]}`)).filter(Boolean);
-    ok(bad.length === 0, 'every Focus rest pin draws its resolved shape', bad.slice(0, 5).join('; '));
-  }
+  const boot = await page.evaluate(() => window.__HS_REST_VERIFY());
+  ok(boot.restTotal > 16, 'the view plots well past the 16-letter head (>16 rest records)',
+    'rest=' + boot.restTotal);
 
   // ── Street + Satellite (the MapLibre symbol layer) ──────────────────────────────
   const glReads = {};
@@ -168,6 +169,24 @@ try {
       colourless.length + ' without a status colour');
 
     console.log('  shape distribution: ' + fmt(hist(v.gl.features.map((f) => f.shape))));
+  }
+
+  // ── Focus (schematic SVG — real DOM geometry) ───────────────────────────────────
+  // The page boots straight into the tile map, so the schematic is not in the DOM until
+  // Focus is actually selected; an earlier read here found "no rest pins" and reported a
+  // defect that did not exist. Select the mode, then read it.
+  console.log('\n== Focus (schematic) ==');
+  await page.click('[data-mode="impact"]');
+  await page.waitForSelector('#mapSch .hs-rest-pins g.hspin', { timeout: 30000 }).catch(() => {});
+  await page.waitForTimeout(1200);
+  const focus = await page.evaluate(() => window.__HS_REST_VERIFY());
+  ok(!!focus.focus && focus.focus.count === focus.restTotal,
+    'Focus draws EVERY rest record', focus.focus ? `${focus.focus.count}/${focus.restTotal}` : 'no rest pins');
+  if (focus.focus) {
+    const expShapes = focus.expected.map((e) => e.shape);
+    const bad = focus.focus.shapes.map((s, i) => (s === expShapes[i] ? null : `#${i} drew ${s}, resolver said ${expShapes[i]}`)).filter(Boolean);
+    ok(bad.length === 0, 'every Focus rest pin draws its resolved shape', bad.slice(0, 5).join('; '));
+    console.log('  shape distribution: ' + fmt(hist(focus.focus.shapes)));
   }
 
   // ── the three views must agree, record for record ───────────────────────────────
@@ -215,11 +234,24 @@ try {
   const total = acct.restTotal + view.lettered;
   const circles = acct.shapeCounts.circle || 0;
   const classified = acct.restTotal - circles;
-  console.log(`  plotted (lettered + rest): ${total}`);
+  console.log(`  plotted (lettered + rest, whole ZIP): ${total}`);
   console.log(`  rest records: ${acct.restTotal}`);
   console.log(`  classified to a real category: ${classified}`);
   console.log(`  circles: ${circles}  (honest fallbacks: ${acct.fallbackCounts.honest || 0}, unexplained: ${acct.fallbackCounts.UNEXPLAINED || 0})`);
   console.log(`  full shape distribution: ${fmt(acct.shapeCounts)}`);
+
+  // The founder's baseline counts the records the page reports as "N within 1.5 mi",
+  // NOT the whole plotted set — the radius drives the ring, the zoom and that footer
+  // count, and the map deliberately still plots everything for the ZIP. Report the
+  // in-radius subset separately so the two numbers are actually comparable.
+  const near = acct.expected.filter((e) => e.distMi != null && e.distMi <= RADIUS_MI);
+  const nearHist = hist(near.map((e) => e.shape));
+  const nearCircles = nearHist.circle || 0;
+  console.log(`\n  within ${RADIUS_MI} mi of the home (the founder's baseline slice):`);
+  console.log(`    rest records: ${near.length}`);
+  console.log(`    classified to a real category: ${near.length - nearCircles}`);
+  console.log(`    honest "Other project" circles: ${nearCircles}`);
+  console.log(`    shape distribution: ${fmt(nearHist)}`);
   console.log(`  acceptance baseline (informational, 2026-07-26): plotted ~${BASELINE.plotted}, classified ${BASELINE.classified}, honest circles ${BASELINE.honestCircles}`);
   ok((acct.fallbackCounts.UNEXPLAINED || 0) === 0,
     'every circle is an honest FALLBACK:other with a stated reason — no record loses its shape',
