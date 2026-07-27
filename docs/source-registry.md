@@ -2171,3 +2171,147 @@ edge-runtime IP range. Stays on the nightly reprobe list; still the single large
 
 `gis.plano.gov` DNS · `maps.cityofallen.org` TLS handshake timeout · `data.plano.gov` DNS.
 Plano's 43+13 pages are already served by the Frisco entry's envelope.
+
+---
+
+## 2026-07-27 — UTAH / ARIZONA MAPS COVERAGE PASS (5 sources wired)
+
+Scope: complete UT/AZ Maps Page source coverage per the `0032Maps.IngestFeedInventory.xlsx`
+research brief. Recon and every receipt below via `pg_net` (the sandbox has no egress — a
+`curl` to `arcgis.com` and to `data.mesaaz.gov` both return `000`). Five sources wired, all
+first-party, **config only — no connector, engine or schema change.**
+
+### FINDING FIRST — the workbook's "Live" is coverage-gate based, not record based
+
+The brief opens with Utah 65/310 and Arizona 136/364. Those are **county-coverage** counts:
+`slc-planning-petitions` declares `{AZ→no, UT/Salt Lake}` so all 36 Salt Lake ZIP pages counted
+as Live, and the three Maricopa sources made all 136 Maricopa ZIP pages count. The task defines
+Live as *"the Maps Page has actual source data populating the satellite, street, and focus
+maps."* Measured that way against `development_reports` (all 674 UT/AZ rows refreshed
+2026-07-27, so this is fresh truth, not stale cache):
+
+| | Workbook "Live" | **Actual ZIPs with registry records** |
+|---|---|---|
+| Utah | 65 / 310 | **16 / 310** (slc 12, provo 4) |
+| Arizona | 136 / 364 | **38 / 364** (mesa 25, scottsdale 13, tempe 5; distinct after overlap) |
+
+Query of record: `communities` (level='zip') joined to `development_reports`, counting sites
+whose `source_registry_id`/`source_id` is non-null. EPA-FRS facilities are excluded from that
+count, per the brief's instruction not to let the facilities floor mark a state complete.
+
+### Existing 5 UT/AZ entries — verified present, endpoints live
+
+No duplicates created; all five were already in `jurisdiction-registry.json` and all five
+answer `returnCountOnly` / `$select=count(1)` with HTTP 200:
+
+| registry_id | live record count |
+|---|---|
+| `mesa-building-permits` (socrata) | 155,543 |
+| `scottsdale-building-permits` | 288,061 |
+| `tempe-building-permits` | 19,938 |
+| `slc-planning-petitions` | 3,113 |
+| `provo-planning-applications` | 196 |
+
+### WIRED — the five new sources
+
+Full evidence lives in each entry's `_receipts` in `jurisdiction-registry.json`. Load-bearing facts:
+
+| registry_id | Coverage | Records | ZIP scoping | record_url | Freshness |
+|---|---|---|---|---|---|
+| `tucson-commercial-building-permits` | AZ/Pima | 4,805 | native `POSTALCODE` (29 ZIPs) | **record** (Tyler EnerGov `CSS_URL`) | ISSUEDATE 2026-07-24 |
+| `tucson-residential-building-permits` | AZ/Pima | 19,388 | spatial 3 mi (no ZIP column on this layer) | **record** (`CSS_URL`) | ISSUEDATE 2026-07-24 |
+| `gilbert-energov-permits` | AZ/Maricopa | 214,662 | native `AddressZip` | dataset | 362 issued 07-01..07-27 |
+| `casa-grande-active-development-sites` | AZ/Pinal | 86 | spatial 3 mi | dataset | Submit_Date 2025-12-12 (see note) |
+| `udot-active-projects` | UT statewide | 2,145 (358 active) | spatial 3 mi | dataset | dataLastEditDate 2026-07-27 |
+
+All status and type vocabularies were read from **live groupBy** and copied verbatim; unlisted
+values fail closed. Kept-vs-dropped rationale, per-value counts, and the enumeration method are
+in each `_receipts`.
+
+**Smoke refresh through the live deployed engine** (8 ZIPs, pg_net → `get-address-report`,
+all HTTP 200). Every new source emitted records, and the anti-fabrication + map-render
+invariants held across all 2,070 emitted records:
+
+| Source | records | missing `record_url` | missing coords |
+|---|---|---|---|
+| `tucson-residential-building-permits` | 1,377 | 0 | 0 |
+| `tucson-commercial-building-permits` | 423 | 0 | 0 |
+| `gilbert-energov-permits` | 204 | 0 | 0 |
+| `casa-grande-active-development-sites` | 54 | 0 | 0 |
+| `udot-active-projects` | 12 | 0 | 0 |
+
+`development` counts on those ZIPs: 85719 → 1,097 · 85705 → 741 · 85295 → 204 · 85122 → 54 ·
+84302 → 34 · 84414 → 18. (84341 Logan and 84770 St. George returned 0 — no UDOT project within
+3 mi; honest empties, not failures.) **0 records lack coordinates, which is what makes them
+renderable on the satellite, street and focus map views** — all three read the same
+`MAP_SITES` dataset, so a point that renders in one renders in all three.
+
+Two evidence-driven corrections made during the pass:
+* **UDOT `file_date` `start_dat` → `created_dt`.** `start_dat` is populated on only 43 of the
+  358 active projects; the first smoke refresh emitted 11 of 12 records with no `file_date`.
+  Live non-null counts over the active set: `created_dt` 358/358, `epm_plan_start_date` 65,
+  `start_dat` 43, `advertise_date` 27, `est_compl_dat` 2. `column_map` arrays JOIN values
+  rather than falling back (`readCol`, `sources/arcgis.ts`), so a multi-field date fallback is
+  not available — one field must be chosen.
+* **Tucson `file_date` = `APPLYDATE`, not `ISSUEDATE`.** APPLYDATE is populated pre-issuance,
+  so in-review permits keep a date and stay visible; ISSUEDATE rides as `decision_date`.
+
+**Casa Grande freshness, stated honestly:** this is a curated *active-projects roster*, not an
+issuance ledger. `Submit_Date` is the application date and the newest is 2025-12-12. Multi-year
+site projects legitimately carry older submit dates, so no recency window is applied and no
+freshness claim beyond that date is made. It is wired because it is the only wireable
+first-party per-record source found for Pinal County.
+
+### Rejections / not wired (receipts)
+
+* **ArcGIS Online `search` with a `bbox` does NOT geo-filter.** Scoped attempts for UT
+  (`bbox=-114.1,36.9,-109.0,42.1`) and AZ (`bbox=-115.0,31.3,-109.0,37.0`) returned **identical**
+  result sets containing Louisville KY, Charlottesville VA, Oakville Ontario, Kisumu Kenya and
+  New Zealand fire permits. This confirms the existing standing answer (unscoped AGO search
+  returns cross-org lookalikes) and extends it: **`bbox` is not a substitute for `orgid:` scoping.**
+  Discovery was redone against per-portal DCAT catalogs instead.
+* **Pima County `Development Permits` / `Development Plans`** (`gisdata.pima.gov/arcgis1/…/LandRecords/MapServer/7` and `/8`,
+  1,373 and 5,603 rows, both modified 2026-07-27) — live and first-party, but **`esriGeometryPolygon`**.
+  The arcgis connector flattens **point** geometry only (`f.geometry.x/y` → `__lat/__lng`,
+  `sources/arcgis.ts`), so polygon rows would carry no coordinates and could not render as map
+  markers. Not wired rather than add a `returnCentroid` connector branch; the City of Tucson
+  point layers cover the county's population centre. Logged as the candidate if polygon support
+  is ever added.
+* **Pinal County `Accela` FeatureServer** (`gismaps.pinalcountyaz.gov/webapps/rest/services/Accela/FeatureServer`,
+  the documented recon lead) — **DNS failure** from pg_net and from the sandbox. Casa Grande's own
+  server was used for Pinal instead.
+* **Salt Lake County open data** (`gisdata-slco.opendata.arcgis.com`) — DCAT live; the only
+  development-adjacent dataset is "Salt Lake County Subdivisions", **modified 2019-11-21**, no
+  permits. Rejected on staleness + wrong shape.
+* **UGRC / Utah SGID statewide** (`opendata.gis.utah.gov`, 3.1 MB DCAT) — carries **no** local
+  building-permit or planning-application dataset. Its "permit" datasets are environmental
+  (DAQ air permits, groundwater, MS4 stormwater, uranium mines). Correctly rejected for this
+  capability.
+* **UPlan `Permits` service** (`…/Permits/FeatureServer/0`) — only **179** active records
+  statewide, and a **data defect**: its `latitude` column repeats the LONGITUDE value
+  (observed `latitude: -111.88967`, `longitude: -111.88967` on the same row). Not wired; the
+  sibling `All_Projects` layer (2,145 rows, trustworthy point geometry) was wired instead.
+* **Yavapai County** `gis.yavapaiaz.gov` — server live, but its only Development-Services
+  service (`ServicesDeptDS/DS_OpenGov`) exposes parcels, flood zones, zoning, inspection areas
+  and boundaries. **No permit layer.**
+* **Chandler / Peoria / Glendale (AZ)** — DCAT catalogs live; the only development-adjacent
+  items are boundary/zoning/general-plan polygons and Chandler's "Subdivisions" (2022-05-31).
+  No per-record permit dataset. Gilbert was the one Maricopa portal that carried one.
+* **Rejected on DNS / 404 (URL-guess round, no leads lost):** `gis.washco.utah.gov` DNS ·
+  `gis.ogdencity.com` DNS · `maps.laytoncity.org` DNS · `gis.co.weber.ut.us` DNS ·
+  `maps.daviscountyutah.gov` DNS · `gis.loganutah.org` timeout · `gis.yumaaz.gov` DNS ·
+  `gis.mohave.gov` 403 · `maps.sgcity.org/arcgis/rest/services` 404 (host is an Experience
+  Builder app, `SGCityMaps`, not a REST root) · `gis.flagstaffaz.gov/server/rest/services` 404 ·
+  `map-flagstaff.opendata.arcgis.com` DCAT 500 "Item does not exist". **Lehi** (`maps.lehi-ut.gov`)
+  resolves and is a real ArcGIS root, but its folders are AssetManagement / Hosted / Utilities /
+  Water — no planning or permits. All added to the nightly reprobe list.
+
+### Coverage still open after this pass
+
+Utah remains the harder state: no first-party per-record **building-permit** source was found
+for St. George/Washington, Ogden/Weber, Layton/Davis, Logan/Cache, Park City/Summit or Cedar
+City/Iron. Those counties are served by `udot-active-projects` (transportation infrastructure)
+plus the EPA facilities floor only. Arizona's remaining dark counties — Navajo, Coconino,
+Mohave, Cochise, Yuma, Santa Cruz, Apache — likewise have no wireable first-party per-record
+source found in this pass. No entry was created for any of them: **an unusable source is
+documented, not wired.**
