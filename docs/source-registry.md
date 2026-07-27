@@ -2069,7 +2069,7 @@ City of Frisco's own ArcGIS Server, layer 1 of `Public/External_Planning_and_Zon
 |---|---|
 | First-party | `maps.friscotexas.gov` — the city's own server |
 | Geometry | `esriGeometryPoint`, returned in wkid 4326 |
-| Freshness | newest `Issued_Date` 12/31/2025; layer is the city's **active** working set, 753 rows |
+| Freshness | newest `Issued_Date` **2026-07-24** (3 days before wiring), oldest 2022-05-04, **86 issued in the trailing 30 days**; layer is the city's **active** working set, 753 rows |
 | Status vocabulary | live groupBy → `ISSUED = 753` of 753 (single verbatim value) |
 | Type vocabulary | live groupBy → Single Family Residential 503, Commercial 226, Multi-Family Residential 22, School 2 — all four kept, **0 unclassified**, no trade noise to drop |
 | `record_url` | per-record eTRAKiT deep link in `Hyperlink` → **record precision** |
@@ -2079,7 +2079,13 @@ City of Frisco's own ArcGIS Server, layer 1 of `Public/External_Planning_and_Zon
 `esriFieldTypeString` in `M/D/YYYY`, so `recency_days` is **deliberately absent** — it emits a
 `>= DATE 'yyyy-mm-dd'` literal against a string column (the Anaheim standing answer), and
 `M/D/YYYY` does not string-compare chronologically either. `isoDay()` already parses `M/D/YYYY`
-(`arcgis.ts:541`), so `file_date` normalizes with no code change. (2) The AGO search hit pointed
+(`arcgis.ts:541`), so `file_date` normalizes with no code change.
+
+**Measure freshness on the PARSED date, never on a server-side sort of a string date column.**
+`orderByFields=Issued_Date DESC` on this layer returns `12/31/2025` — a *lexical* max, since
+`"12/…"` sorts above `"7/…"`. The true chronological max is **2026-07-24**, read from the parsed
+`file_date` in the live cache. An earlier draft of this receipt quoted the lexical value and
+understated the source's freshness by seven months. (2) The AGO search hit pointed
 at `mapcache.friscotexas.gov`, which **does not resolve** — the live host was found by walking
 the city's own app item → web map → `operationalLayers`, not by guessing a URL.
 
