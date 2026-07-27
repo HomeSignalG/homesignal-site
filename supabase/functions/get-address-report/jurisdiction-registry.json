@@ -3970,7 +3970,8 @@
       "extra_where": "WORKCLASS IN ('Commercial New Building Permit', 'Commercial Addition/Alteration Permit', 'Commercial Model Permit', 'Commercial Care Facility', 'Commercial Demolition Permit', 'Commercial Interior Only Demolition Permit')",
       "recency_days": 730,
       "record_url_precision": "record",
-      "incremental_field": "APPLYDATE"
+      "incremental_field": "APPLYDATE",
+      "_receipts": "2026-07-27 UT/AZ Maps coverage pass. City of Tucson PDSD commercial building permits — layer 81 of the city's own `PublicMaps/PermitsCode` MapServer (mapdata.tucsonaz.gov, first-party). 4,805 rows (live returnCountOnly). esriGeometryPoint returned wkid 4326 → __lat/__lng (the layer ALSO carries LAT/LON columns; geometry is used because it is guaranteed present). FRESH: max ISSUEDATE 2026-07-24, max APPLYDATE 2026-07-26 (live max-stat receipts). 17 STATUS values VERBATIM via groupBy (Issued 2373 / Inspections 925 / Inspections Complete 363 / Needs Resubmittal 322 / Fees Due 205 / Approved 182 / In Review 175 / Approved - Awaiting Customer Attention 102 / Awaiting Submittal 47 / Submitted 29 / In Revision 26 / Submitted - Online 16 / Fees Paid 14 / Awaiting Customer Attention 12 / Stop Work Order 7 / Revision Fees Due 6 / On Hold 1); 'Inspections' → approved (permit issued, construction being inspected), 'Inspections Complete' → operating, 'Stop Work Order' EXCLUDED (Boston precedent). 10 WORKCLASS values enumerated live (complete domain); kept 6 construction classes verbatim (Commercial New Building 410, Commercial Addition/Alteration 1906, Commercial Demolition 158, Commercial Interior Only Demolition 27, Commercial Model 4, Commercial Care Facility 1 = 2,506 kept); DROPPED at source: Commercial Trade Permit 1989 (trades noise — WA/MN/IL precedent), Commercial Solar 199, Commercial Fence/Wall 94, Commercial Pool/Spa 17. Native 5-digit POSTALCODE over 29 Tucson-area ZIPs (85705 705 / 85719 504 / 85716 399 / 85712 379 / 85711 353 …; 8 null + 8 blank fail closed). file_date = APPLYDATE (populated on every row incl. pre-issuance) so in-review permits stay visible; ISSUEDATE rides as decision_date. recency_days 730 on APPLYDATE — the layer is an OPEN-permit set whose oldest ISSUEDATE is 1998-01-01, so a window is required. record_url = per-record CSS_URL Tyler EnerGov self-service deep link (e.g. .../selfservice#/permit/0000B47A-8464-435B-85C5-2432D2B090CF) → RECORD precision."
     },
     {
       "registry_id": "tucson-residential-building-permits",
@@ -4040,7 +4041,8 @@
       "spatial_zip_radius_mi": 3,
       "recency_days": 730,
       "record_url_precision": "record",
-      "incremental_field": "APPLYDATE"
+      "incremental_field": "APPLYDATE",
+      "_receipts": "2026-07-27 UT/AZ Maps coverage pass. City of Tucson PDSD residential building permits — layer 85, same first-party MapServer as the commercial twin (distinct capability, not a backup). 19,388 rows (live returnCountOnly). esriGeometryPoint wkid 4326 → __lat/__lng. FRESH: max ISSUEDATE 2026-07-24, max APPLYDATE 2026-07-26. 16 STATUS values VERBATIM via groupBy (Issued 11154 / Inspections 4641 / Inspections Complete 1634 / Needs Resubmittal 612 / Fees Due 466 / In Review 304 / Approved 290 / Approved - Awaiting Customer Attention 138 / In Revision 63 / Fees Paid 26 / Submitted 24 / Submitted - Online 19 / Stop Work Order 8 / Revision Fees Due 6 / Awaiting Customer Attention 2 / On Hold 1) — same bucket map as the commercial twin. 14 WORKCLASS values enumerated live (complete domain); kept 8 construction classes verbatim (Residential Addition/Alteration 2470, Residential Model 1429, New Dwelling 957, Manufactured Home 584, Residential Demolition 209, Residential ADU - Casitas 75, Residential Interior Only Demolition 7, Residential Care Facility 3 = 5,734 kept); DROPPED at source: Residential Trade Permit 9417, Residential Solar Permit 2053, Residential Solar App 1349, Residential Pool/Spa 403, Residential Fence/Wall 364, Electrical Reconnect 68. UNLIKE layer 81 this layer has NO POSTALCODE and NO CITY column (verified against the live layer schema) → spatial within-envelope ZIP scoping on the layer's own point geometry (spatial_zip_radius_mi 3, the standard engine ZIP approximation); rows place by their OWN points. file_date = APPLYDATE, recency_days 730 (oldest ISSUEDATE 1997-08-19). record_url = per-record CSS_URL Tyler EnerGov deep link → RECORD precision."
     },
     {
       "registry_id": "gilbert-energov-permits",
@@ -4103,7 +4105,8 @@
       "extra_where": "PermitType IN ('Residential Building', 'Commercial Building', 'Commercial Multi-Family', 'Residential Accessory Structure', 'Demolition Permit')",
       "recency_days": 365,
       "record_url_precision": "dataset",
-      "incremental_field": "IssuedDate"
+      "incremental_field": "IssuedDate",
+      "_receipts": "2026-07-27 UT/AZ Maps coverage pass. Town of Gilbert `EnergovPermitData` — layer 3 of the town's own `OD/Growth_Development_Tables_1` MapServer (maps.gilbertaz.gov, first-party; surfaced via the town's ArcGIS Hub DCAT). 214,662 rows (live returnCountOnly) — the largest AZ source wired. Geometry-less TABLE carrying per-record Latitude/Longitude COLUMNS (Scottsdale/Detroit-tables class) AND a native AddressZip → column ZIP scoping, no spatial option needed. FRESH: 362 permits with IssuedDate in 2026-07-01..2026-07-27 (live count — used instead of max(IssuedDate), which returns a FUTURE 2026-08-04 from source data entry and is therefore not a freshness proof). 14 PermitStatus values VERBATIM via groupBy (Finaled 153518 / Cancelled 18416 / Closed at Conversion 13517 / Issued 12230 / Closed 5908 / Expired 4542 / Under Review 1787 / Approved 1683 / Finaled No Inspection Req'd 1207 / Active 757 / Submitted Online 492 / Application Accepted 386 / Hold 194 / Applied 25); 'Closed at Conversion' EXCLUDED (a system-migration artifact, not a real lifecycle state), Cancelled + Expired excluded. PermitType enumerated live over BOTH groupBy orderings (n DESC and n ASC) to defeat $limit truncation (Mesa precedent); kept 5 construction classes verbatim (Residential Building 57686, Commercial Building 16676, Commercial Multi-Family 3985, Residential Accessory Structure 3406, Demolition Permit 562); DROPPED at source: Residential Trades/Fire/Misc 23689, Swimming Pool/Spa 22238, Commercial Trades/Fire/Misc 16228, Engineering - Util Permit 13331, Traffic - Residential/Commercial 13060, Engineering Construction Permit 10617, Plan Change 10137, Deferred Submittal 6230, Sign Permit 3723, and the long agreement/fireworks/lease tail. AddressZip carries dirt (703 blanks; 6-digit typos '985233', '852233') — exact 5-digit match self-excludes them, never guessed. recency_days 365 on IssuedDate (esriFieldTypeDate → DATE literal valid). No per-row URL column → dataset-precision record_url."
     },
     {
       "registry_id": "casa-grande-active-development-sites",
@@ -4143,7 +4146,8 @@
         ]
       },
       "spatial_zip_radius_mi": 3,
-      "record_url_precision": "dataset"
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-27 UT/AZ Maps coverage pass. City of Casa Grande `Planning/Active_Development_Sites` — the city's own ArcGIS Server (rogue.casagrandeaz.gov, first-party). THE ONLY wireable first-party per-record source found for Pinal County: the county's own `gismaps.pinalcountyaz.gov` Accela FeatureServer (the documented recon lead) FAILS DNS from both pg_net and the sandbox. 86 rows (live returnCountOnly), esriGeometryPoint wkid 4326 → __lat/__lng. 5 Development_Stage values VERBATIM via groupBy, summing exactly to 86 (Permit Issued / Construction Started 27 / In Review 25 / Site Plan Approved 18 / Building / Construction Review 12 / Construction Complete 4). FRESHNESS — stated honestly: this is a curated ACTIVE-PROJECTS roster, not an issuance ledger; Submit_Date is the application date and the newest is 2025-12-12 (live max-stat). Multi-year site projects legitimately carry older submit dates, so no recency window is applied and no freshness claim beyond that date is made. No ZIP column → spatial_zip_radius_mi 3 on the layer's own points. NO type field exists on the layer → type_map is deliberately ABSENT and records surface as use_type 'unclassified' (logged) rather than inferred from the title. No per-row URL column → dataset-precision record_url."
     },
     {
       "registry_id": "udot-active-projects",
@@ -4163,7 +4167,7 @@
         ],
         "status_raw": "pin_stat_nm",
         "type_source": "proj_typ_nm",
-        "file_date": "start_dat",
+        "file_date": "created_dt",
         "decision_date": "est_compl_dat",
         "address": "proj_loc",
         "lat": "__lat",
@@ -4213,7 +4217,8 @@
       },
       "extra_where": "pin_stat_nm NOT IN ('Closed', 'Abandoned')",
       "spatial_zip_radius_mi": 3,
-      "record_url_precision": "dataset"
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-27 UT/AZ Maps coverage pass. Utah Department of Transportation `All_Projects` layer 0 ('UDOT Projects (Points)'), published on UDOT's own UPlan open-data hub (data-uplan.opendata.arcgis.com, first-party state agency). This is the Utah analogue of the workbook's own TxDOT-PIA 'Utilities / Infrastructure' capability row. 2,145 rows total; extra_where keeps the 358 non-Closed/non-Abandoned ACTIVE PIPELINE (live returnCountOnly). esriGeometryPoint wkid 4326 → __lat/__lng; dataLastEditDate 2026-07-27 (edited the day of wiring). 13 pin_stat_nm values VERBATIM via groupBy (Closed 1368 / Abandoned 419 / Scoping 75 / Proposed 71 / STIP 62 / Active 53 / Close Out 47 / Under Construction 21 / Funding 15 / Substantially Compl 7 / Region Review 4 / Physically Complete 2 / Awarded 1); Closed + Abandoned excluded BOTH in status_to_bucket and at source in extra_where. 22 proj_typ_nm values enumerated live; 16 transportation-infrastructure classes map to use_type Utility (Traffic and Safety 849, Roadway 306, Traffic Management 211, Structures 80, Transportation Solutions 73, Safety 52, Maintenance 45, Capacity 32, …); the non-physical classes (Other 152, Contingency 98, Not Applicable 39, Studies 38, Joint Highway Committee 37, Environmental 8) are deliberately UNMAPPED → 'unclassified' (logged), never inferred. STATEWIDE coverage [{state:'UT'}] with no county — permitted by the registry contract for a statewide dataset (coverageMatches: `!cov.county` matches any UT county). Live cnty_name groupBy confirms real spread across the dark counties: SALT LAKE 675 / VARIOUS 570 / WEBER 116 / UTAH 112 / SUMMIT 92 / DAVIS 89 / TOOELE 85 / BOX ELDER 58 / CACHE 50 / SEVIER 32 / UINTAH 24 / WASHINGTON 20 / WASATCH 17 / GRAND 16 / SAN JUAN 15 / CARBON 13 / BEAVER 12 / GARFIELD 12 / MILLARD 12 / MORGAN 12 / DUCHESNE 10 / KANE 9 / IRON 7. No ZIP column → spatial_zip_radius_mi 3 on the layer's own points. file_date = created_dt — chosen on live non-null counts over the 358 active rows: created_dt 358/358 (100%), epm_plan_start_date 65, start_dat 43, advertise_date 27, est_compl_dat 2. start_dat was the first choice and was REJECTED on evidence: a smoke refresh left 11 of 12 emitted records with no file_date. est_compl_dat stays as decision_date and is legitimately absent on almost every row (absent fields stay absent, never interpolated). column_map arrays JOIN values rather than falling back (readCol in sources/arcgis.ts), so a multi-field date fallback is NOT available — one field must be chosen. DEFECT NOTED on the sibling UPlan `Permits` service (NOT wired): its `latitude` column repeats the LONGITUDE value (-111.88967 in both) — geometry, not those columns, is the trustworthy position. No per-row URL column → dataset-precision record_url."
     }
   ],
   "ckan": [
