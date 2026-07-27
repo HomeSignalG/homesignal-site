@@ -590,6 +590,26 @@ legal/framing change not covered by the one-time sign-off.
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 
 ### Status
+- 🟢 **TEXAS DEV-COVERAGE PASS — `frisco-active-building-permits` WIRED; TX development pages
+  110 → 118** (DB-verified 2026-07-27). Recon over the five TX counties with the most
+  facilities-only pages. **Config only — no connector, engine or schema change.** The City of
+  Frisco's own ArcGIS Server (753 active permits, point geometry, per-record eTRAKiT links,
+  single verbatim status `ISSUED`, 4-value Type vocabulary → 0 unclassified) lifts **8 pages**
+  off the facilities floor: 75035 (281 dev), 75034 (232), 75036 (232), 75078 (151), 75056 (69),
+  75024 (45), 75033 (21), 75025 (13). Coverage declares **both Collin and Denton** (Frisco
+  straddles the line); bidirectional gate proof — Frisco records ride ONLY those 5 Collin + 3
+  Denton pages. 0 unsourced, 0 coordless, 0 unclassified. **Two standing answers applied:**
+  `recency_days` is deliberately ABSENT because `Issued_Date` is a STRING (`M/D/YYYY`) and
+  `recency_days` emits a `DATE` literal (Anaheim); `isoDay()` already parses `M/D/YYYY`
+  (`arcgis.ts:541`). **New standing answer: a dead host in an AGO search result is not a dead
+  source** — Frisco's search-result host (`mapcache.friscotexas.gov`) fails DNS; the live server
+  was recovered by walking the city's own app item → web map → `operationalLayers`. Rejections
+  with receipts (docs/source-registry.md "TEXAS DEV-COVERAGE PASS"): Denton County's own permit
+  layer **stalled at 2023-06-09** on both server copies; Fort Bend's permitting web map **403
+  access-restricted**; Montgomery surfaced only a **Midland TX cross-city lookalike**; McKinney's
+  EnerGov layers carry **no usable filing date** (founder call, logged); El Paso re-probed **200
+  from pg_net but its WAF still 403s the edge runtime** — unchanged, still the largest TX prize
+  at 145 pages.
 - 🟢 **DUPLICATE DEVELOPMENT RECORDS ELIMINATED — engine v22 + materializer safeguard + one-time
   cleanup** (DB-verified 2026-07-23). The arcgis/socrata connectors page with resultOffset/$offset but
   no guaranteed-unique total order, so one source row could be emitted on several pages of a single
