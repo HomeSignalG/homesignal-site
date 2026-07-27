@@ -101,6 +101,22 @@ export interface ArcgisRegistryEntry {
    *  as `lat_col BETWEEN ymin AND ymax AND lng_col BETWEEN xmin AND xmax`. Rows still
    *  place by their OWN column coordinates (column_map.lat/lng); nothing is guessed. */
   spatial_latlng_cols?: { lat: string; lng: string };
+  /** POLYGON layers: ask the SERVER for its own polygon centroid (`returnCentroid=true`),
+   *  returned per feature as `{centroid:{x,y}}` alongside the rings. OPT-IN per entry, never
+   *  automatic, because the parameter is not universally supported and failure modes differ:
+   *   • hosted ArcGIS Online / Enterprise ≥10.9.1 FeatureServers honor it (verified live:
+   *     clark-county-active-projects, douglas-county-major-projects);
+   *   • classic ArcGIS Server MapServer layers SILENTLY IGNORE it (verified live: the
+   *     Houston PlatTracker, Harris Plats, Fort Worth zoning, NRH zoning and Washoe Accela
+   *     layers all return rings with no `centroid` key);
+   *   • NON-polygon layers HARD-REJECT it — a polyline layer answers HTTP 200 with
+   *     `{"error":{"code":400,…"Return geometry centroid is only supported on layer with
+   *     polygon geometry type."}}`, which the connector treats as a failed fetch (verified
+   *     live: txdot-projects-info-all). Never set this on a point or polyline entry.
+   *  Absent/false ⇒ the query string is byte-identical to before, so every point entry is
+   *  unaffected. When the param is ignored or absent, featurePoint() still derives the same
+   *  centroid from the feature's own rings — this option only prefers the server's value. */
+  return_centroid?: boolean;
 }
 
 export interface ArcgisRunReport {
@@ -337,6 +353,103 @@ async function normalizeRow(
 
 // ───────────────────────────── fetch / ArcGIS REST ─────────────────────────────
 
+/** An ArcGIS query feature. Geometry is a point ({x,y}), a polygon ({rings}) or a
+ *  polyline ({paths}); `centroid` rides alongside only when return_centroid was honored. */
+export interface ArcgisFeature {
+  attributes?: Record<string, unknown>;
+  geometry?: { x?: number; y?: number; rings?: number[][][]; paths?: number[][][] };
+  centroid?: { x?: number; y?: number };
+}
+
+const finite2 = (x: unknown, y: unknown): { lng: number; lat: number } | null =>
+  typeof x === "number" && typeof y === "number" && Number.isFinite(x) && Number.isFinite(y)
+    ? { lng: x, lat: y }
+    : null;
+
+/**
+ * The map pin for one feature, taken from the feature's OWN geometry — never guessed, never
+ * defaulted to a jurisdiction centre. A feature that yields no point returns null and the
+ * record is placed exactly as before (geocode the address, else area scope).
+ *
+ * Order of preference:
+ *   1. POINT geometry {x,y} — the original and only path before this; unchanged.
+ *   2. The SERVER's polygon centroid (return_centroid, hosted FeatureServers only).
+ *   3. POLYGON rings → the area-weighted (shoelace) centroid, computed here. Signed ring
+ *      areas make holes and multipart polygons subtract/add correctly. Validated against
+ *      the server's own centroid on the two layers that publish both: agreement was
+ *      2.6e-5° (~2.9 m, clark-county-active-projects) and 8.3e-6° (~0.9 m,
+ *      douglas-county-major-projects) — the same quantity at pin precision, the residual
+ *      being planar-degree vs geodesic arithmetic. A degenerate (zero-area) ring set falls
+ *      back to the mean vertex.
+ *   4. POLYLINE paths → the point at half the cumulative length of the LONGEST path, i.e.
+ *      a point that lies ON the line (a road project pins to the middle of its segment).
+ *      A polyline has no centroid endpoint upstream — the server rejects returnCentroid
+ *      outright — so this is the only way such a record can carry a marker.
+ */
+export function featurePoint(f: ArcgisFeature): { lng: number; lat: number } | null {
+  const g = f.geometry;
+  const asPoint = finite2(g?.x, g?.y);
+  if (asPoint) return asPoint;
+
+  const server = finite2(f.centroid?.x, f.centroid?.y);
+  if (server) return server;
+
+  const rings = g?.rings;
+  if (Array.isArray(rings) && rings.length) {
+    let a2 = 0, cx = 0, cy = 0, sx = 0, sy = 0, n = 0;
+    for (const ring of rings) {
+      if (!Array.isArray(ring)) continue;
+      for (let i = 0; i < ring.length; i++) {
+        const p = ring[i];
+        if (!finite2(p?.[0], p?.[1])) continue;
+        sx += p[0]; sy += p[1]; n++;
+        const q = ring[i + 1];
+        if (!finite2(q?.[0], q?.[1])) continue;
+        const cross = p[0] * q[1] - q[0] * p[1];
+        a2 += cross; cx += (p[0] + q[0]) * cross; cy += (p[1] + q[1]) * cross;
+      }
+    }
+    if (a2 !== 0) {
+      const out = finite2(cx / (3 * a2), cy / (3 * a2));
+      if (out) return out;
+    }
+    if (n > 0) return finite2(sx / n, sy / n);  // degenerate ring (zero area) — mean vertex
+    return null;
+  }
+
+  const paths = g?.paths;
+  if (Array.isArray(paths) && paths.length) {
+    let best: number[][] | null = null, bestLen = -1;
+    for (const path of paths) {
+      if (!Array.isArray(path) || path.length < 2) continue;
+      let len = 0;
+      for (let i = 0; i + 1 < path.length; i++) {
+        const p = path[i], q = path[i + 1];
+        if (!finite2(p?.[0], p?.[1]) || !finite2(q?.[0], q?.[1])) continue;
+        len += Math.hypot(q[0] - p[0], q[1] - p[1]);
+      }
+      if (len > bestLen) { bestLen = len; best = path; }
+    }
+    if (!best) return null;
+    if (bestLen <= 0) return finite2(best[0]?.[0], best[0]?.[1]);
+    let walked = 0;
+    for (let i = 0; i + 1 < best.length; i++) {
+      const p = best[i], q = best[i + 1];
+      if (!finite2(p?.[0], p?.[1]) || !finite2(q?.[0], q?.[1])) continue;
+      const seg = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      if (walked + seg >= bestLen / 2) {
+        const t = seg === 0 ? 0 : (bestLen / 2 - walked) / seg;
+        return finite2(p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t);
+      }
+      walked += seg;
+    }
+    const last = best[best.length - 1];
+    return finite2(last?.[0], last?.[1]);
+  }
+
+  return null;
+}
+
 async function fetchRows(
   entry: ArcgisRegistryEntry,
   zip: string,
@@ -375,13 +488,16 @@ async function fetchRows(
     }
     url.searchParams.set("outFields", entry.out_fields?.length ? entry.out_fields.join(",") : "*");
     url.searchParams.set("returnGeometry", "true");
+    // Polygon layers only, opt-in (see return_centroid): ask the server for its own centroid.
+    // Absent ⇒ this param is never sent, so point entries keep their exact prior query string.
+    if (entry.return_centroid) url.searchParams.set("returnCentroid", "true");
     url.searchParams.set("outSR", String(outSr));
     url.searchParams.set("resultOffset", String(offset));
     url.searchParams.set("resultRecordCount", String(pageSize));
     if (orderBy) url.searchParams.set("orderByFields", orderBy);
     url.searchParams.set("f", "json");
     const page = await getWithBackoff(url.toString(), deps) as {
-      features?: { attributes?: Record<string, unknown>; geometry?: { x?: number; y?: number } }[];
+      features?: ArcgisFeature[];
       exceededTransferLimit?: boolean;
       error?: { message?: string };
     };
@@ -390,11 +506,11 @@ async function fetchRows(
     if (feats.length === 0) break;
     for (const f of feats) {
       const row = { ...(f.attributes ?? {}) } as Record<string, unknown>;
-      // flatten point geometry so a column_map can read lat/lng from __lat/__lng (mirrors
-      // the socrata geojson flatten). ArcGIS point geometry with outSR=4326 is {x:lng,y:lat}.
-      if (f.geometry && typeof f.geometry.x === "number" && typeof f.geometry.y === "number") {
-        row.__lng = f.geometry.x; row.__lat = f.geometry.y;
-      }
+      // flatten the feature's OWN geometry so a column_map can read lat/lng from
+      // __lat/__lng (mirrors the socrata geojson flatten). ArcGIS geometry with
+      // outSR=4326 is {x:lng,y:lat}.
+      const pt = featurePoint(f);
+      if (pt) { row.__lng = pt.lng; row.__lat = pt.lat; }
       out.push(row);
     }
     if (feats.length < pageSize || page.exceededTransferLimit === false) break;

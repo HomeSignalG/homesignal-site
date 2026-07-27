@@ -46,7 +46,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 22, not 20: test/arcgis-geometry.test.mjs imports the real TypeScript
+          # connector (sources/arcgis.ts) and asserts against the shipped code rather
+          # than a copy of it. Node strips types on import from 22.18; on 20 that test
+          # fails loudly rather than skipping, so the whole suite needs 22.
+          node-version: '22'
       # The Video Producer / dashboard suites drive a real browser. Without
       # playwright on the runner they take their "playwright not installed"
       # skip path, so every runtime assertion silently passed without running.
