@@ -4327,6 +4327,463 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-27 UT/AZ Maps coverage pass. Utah Department of Transportation `All_Projects` layer 0 ('UDOT Projects (Points)'), published on UDOT's own UPlan open-data hub (data-uplan.opendata.arcgis.com, first-party state agency). This is the Utah analogue of the workbook's own TxDOT-PIA 'Utilities / Infrastructure' capability row. 2,145 rows total; extra_where keeps the 358 non-Closed/non-Abandoned ACTIVE PIPELINE (live returnCountOnly). esriGeometryPoint wkid 4326 → __lat/__lng; dataLastEditDate 2026-07-27 (edited the day of wiring). 13 pin_stat_nm values VERBATIM via groupBy (Closed 1368 / Abandoned 419 / Scoping 75 / Proposed 71 / STIP 62 / Active 53 / Close Out 47 / Under Construction 21 / Funding 15 / Substantially Compl 7 / Region Review 4 / Physically Complete 2 / Awarded 1); Closed + Abandoned excluded BOTH in status_to_bucket and at source in extra_where. 22 proj_typ_nm values enumerated live; 16 transportation-infrastructure classes map to use_type Utility (Traffic and Safety 849, Roadway 306, Traffic Management 211, Structures 80, Transportation Solutions 73, Safety 52, Maintenance 45, Capacity 32, …); the non-physical classes (Other 152, Contingency 98, Not Applicable 39, Studies 38, Joint Highway Committee 37, Environmental 8) are deliberately UNMAPPED → 'unclassified' (logged), never inferred. STATEWIDE coverage [{state:'UT'}] with no county — permitted by the registry contract for a statewide dataset (coverageMatches: `!cov.county` matches any UT county). Live cnty_name groupBy confirms real spread across the dark counties: SALT LAKE 675 / VARIOUS 570 / WEBER 116 / UTAH 112 / SUMMIT 92 / DAVIS 89 / TOOELE 85 / BOX ELDER 58 / CACHE 50 / SEVIER 32 / UINTAH 24 / WASHINGTON 20 / WASATCH 17 / GRAND 16 / SAN JUAN 15 / CARBON 13 / BEAVER 12 / GARFIELD 12 / MILLARD 12 / MORGAN 12 / DUCHESNE 10 / KANE 9 / IRON 7. No ZIP column → spatial_zip_radius_mi 3 on the layer's own points. file_date = created_dt — chosen on live non-null counts over the 358 active rows: created_dt 358/358 (100%), epm_plan_start_date 65, start_dat 43, advertise_date 27, est_compl_dat 2. start_dat was the first choice and was REJECTED on evidence: a smoke refresh left 11 of 12 emitted records with no file_date. est_compl_dat stays as decision_date and is legitimately absent on almost every row (absent fields stay absent, never interpolated). column_map arrays JOIN values rather than falling back (readCol in sources/arcgis.ts), so a multi-field date fallback is NOT available — one field must be chosen. DEFECT NOTED on the sibling UPlan `Permits` service (NOT wired): its `latitude` column repeats the LONGITUDE value (-111.88967 in both) — geometry, not those columns, is the trustworthy position. No per-row URL column → dataset-precision record_url."
+    },
+    {
+      "registry_id": "arlington-planning-cases",
+      "platform": "arcgis",
+      "service_url": "https://gis2.arlingtontx.gov/agsext2/rest/services/OpenData/OD_Property/MapServer/0",
+      "dataset_url": "https://data-arlingtontx.opendata.arcgis.com/",
+      "jurisdiction": "City of Arlington",
+      "coverage": [
+        {
+          "state": "TX",
+          "county": "Tarrant"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "SUBDESC",
+          "FOLDERNAME"
+        ],
+        "status_raw": "STATUSDESC",
+        "type_source": "SUBDESC",
+        "file_date": "INDATE",
+        "decision_date": "FINALDATE",
+        "address": [
+          "PROPHOUSE",
+          "PROPSTREETPREFIX",
+          "PROPSTREET",
+          "STREETTYPEDESC"
+        ],
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "FolderNumber"
+      },
+      "type_map": {
+        "Planned Development": "Development",
+        "Specific Use Permit": "Development",
+        "Zoning Amendment": "Development",
+        "No Zoning Request": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "In Review",
+          "Submittal Review",
+          "Pending Customer Response",
+          "Additional Information Needed",
+          "Awaiting Council",
+          "Awaiting P & Z",
+          "Continued by P&Z"
+        ],
+        "approved": [
+          "Approved"
+        ],
+        "operating": [],
+        "exclude": [
+          "Void",
+          "Denied",
+          "Withdrawn",
+          "Never Completed Application",
+          "Expired"
+        ]
+      },
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-27 TX/NV original-workbook wire pass (ARL-PC-001). City of Arlington's own ArcGIS Server, layer 0 'Zoning Case' of OD_Property ('3-Year view of City of Arlington Zoning Cases'). esriGeometryPoint. 300 rows (live returnCountOnly). STATUS: 13 STATUSDESC values VERBATIM via groupBy summing EXACTLY to 300 (Approved 117 / Void 100 / Pending Customer Response 19 / Denied 12 / In Review 12 / Additional Information Needed 11 / Withdrawn 9 / Never Completed Application 5 / Awaiting Council 5 / Awaiting P & Z 3 / Continued by P&Z 3 / Expired 3 / Submittal Review 1) — complete domain, 0 unmapped. operating:[] because a zoning-case queue has no built/operating end state. TYPE: 4 SUBDESC values VERBATIM summing EXACTLY to 300 (Planned Development 174 / Specific Use Permit 59 / Zoning Amendment 49 / No Zoning Request 18) — all 4 mapped, 0 unclassified. No per-row URL column -> dataset precision. ZIP SCOPING FIX (same session, caught by verification): the entry was first written with no zip column, no zip_where_template and no spatial radius, so the connector correctly QUARANTINED it ('no zip column mapped and no zip_where_template — statewide dataset skipped for ZIP report') and the source emitted 0 records on Arlington's own core ZIPs 76010/76011/76013. The OD_Property layers carry no ZIP attribute (full schema read), so spatial_zip_radius_mi 3 on the layer's own point geometry is the correct scoping — the engine's standard ZIP approximation.",
+      "spatial_zip_radius_mi": 3
+    },
+    {
+      "registry_id": "arlington-permit-applications",
+      "platform": "arcgis",
+      "service_url": "https://gis2.arlingtontx.gov/agsext2/rest/services/OpenData/OD_Property/MapServer/9",
+      "dataset_url": "https://data-arlingtontx.opendata.arcgis.com/",
+      "jurisdiction": "City of Arlington",
+      "coverage": [
+        {
+          "state": "TX",
+          "county": "Tarrant"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "SUBDESC",
+          "FOLDERNAME"
+        ],
+        "status_raw": "STATUSDESC",
+        "type_source": "SUBDESC",
+        "file_date": "InDate",
+        "address": "FOLDERDESCRIPTION",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "FOLDERSEQUENCE"
+      },
+      "type_map": {
+        "Single-Family": "Residential",
+        "Residential": "Residential",
+        "New Tenant": "Commercial",
+        "Business": "Commercial",
+        "Existing Business/New Owner": "Commercial",
+        "Mercantile": "Commercial",
+        "Expanding Lease Space": "Commercial",
+        "Educational": "Civic/Public",
+        "Assembly": "Civic/Public",
+        "Storage": "Industrial",
+        "Utility & Miscellaneous": "Utility"
+      },
+      "extra_where": "SUBDESC IN ('Single-Family', 'Residential', 'New Tenant', 'Business', 'Existing Business/New Owner', 'Mercantile', 'Expanding Lease Space', 'Educational', 'Assembly', 'Storage', 'Utility & Miscellaneous')",
+      "status_to_bucket": {
+        "proposed": [
+          "Pending",
+          "Application Incomplete",
+          "Pre-Application"
+        ],
+        "approved": [
+          "Approved for Issue"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-27 TX/NV original-workbook wire pass (ARL-DEV-001). Layer 9 'Permit Applications' of the same OD_Property service. esriGeometryPoint, 398 rows. STATUS: 4 STATUSDESC values VERBATIM summing EXACTLY to 398 (Pending 149 / Application Incomplete 108 / Approved for Issue 104 / Pre-Application 37) — complete domain. operating:[] and exclude:[] because an in-flight APPLICATION queue publishes neither a completed nor a void state (both verified absent from the live domain, not omitted). TYPE: SUBDESC enumerated live; the construction/land-use classes are kept VERBATIM and the sign/fence/patio noise is DROPPED AT SOURCE via extra_where (Tucson/Mesa/Detroit precedent) — dropped: Wall Sign 53, Residential Privacy 36, Ground 12, Patio Cover/Gazebo 11, Portable Storage/Accy Building 7, Commercial Privacy 6, Commercial Screening 6, Residential Pool Barrier 5, Pole Sign 5, Perimeter Screening Fence 5, Canopy / Fascia Sign 4, Clean and Show 3, Directional 3. ZIP SCOPING FIX (same session, caught by verification): the entry was first written with no zip column, no zip_where_template and no spatial radius, so the connector correctly QUARANTINED it ('no zip column mapped and no zip_where_template — statewide dataset skipped for ZIP report') and the source emitted 0 records on Arlington's own core ZIPs 76010/76011/76013. The OD_Property layers carry no ZIP attribute (full schema read), so spatial_zip_radius_mi 3 on the layer's own point geometry is the correct scoping — the engine's standard ZIP approximation.",
+      "spatial_zip_radius_mi": 3
+    },
+    {
+      "registry_id": "reno-ldc-projects",
+      "platform": "arcgis",
+      "service_url": "https://services5.arcgis.com/RjM4BJrv5ZkqP4XC/arcgis/rest/services/LDC_Projects_view/FeatureServer/0",
+      "dataset_url": "https://www.reno.gov/government/departments/community-development",
+      "jurisdiction": "City of Reno",
+      "coverage": [
+        {
+          "state": "NV",
+          "county": "Washoe"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "project_title",
+          "work_description"
+        ],
+        "status_raw": "b1_appl_status",
+        "type_source": "b1_per_type",
+        "file_date": "b1_file_dd",
+        "address": "work_description",
+        "lat": "Latitude",
+        "lng": "Longitude",
+        "case_number": "case_number",
+        "record_url": "link"
+      },
+      "type_map": {
+        "Parcel Map": "Development",
+        "Final Map": "Development",
+        "Land Development Case": "Development",
+        "Boundary Line Adjustment": "Development",
+        "Site Plan Review": "Development",
+        "Reversion to Acreage": "Development",
+        "Utility Abandonment": "Utility",
+        "Abandonment": "Utility",
+        "Annexation": "Development",
+        "Map Extension Agreements": "Development",
+        "Minor Deviation": "Development",
+        "Subdivision-Site Improvement": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "In Review",
+          "In Progress"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "record_url_precision": "record",
+      "spatial_zip_radius_mi": 3,
+      "_receipts": "2026-07-27 TX/NV original-workbook wire pass (RNO-DP). City of Reno Land Development Case view. esriGeometryPoint (wkid 3857) AND per-record Latitude/Longitude columns — the columns are mapped. 232 rows. STATUS: EXACTLY 2 b1_appl_status values VERBATIM summing to 232 (In Review 145 / In Progress 87). This is an IN-FLIGHT case view, so approved/operating/exclude are all [] BY CONSTRUCTION — verified absent from the live domain, not omitted. TYPE: 12 b1_per_type values VERBATIM summing EXACTLY to 232 (Parcel Map 73 / Final Map 39 / Land Development Case 35 / Boundary Line Adjustment 34 / Site Plan Review 13 / Reversion to Acreage 11 / Utility Abandonment 10 / Abandonment 5 / Map Extension Agreements 5 / Minor Deviation 4 / Annexation 2 / Subdivision-Site Improvement 1) — complete domain, 0 unclassified. record_url from the per-record `link` column -> RECORD precision. No ZIP column -> spatial_zip_radius_mi 3."
+    },
+    {
+      "registry_id": "san-antonio-prelim-plan-review",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/g1fRTDLeMgspWrYp/arcgis/rest/services/Preliminary_Plan_Review_Meetings/FeatureServer/0",
+      "dataset_url": "https://open-crd-cosagis.hub.arcgis.com/",
+      "jurisdiction": "City of San Antonio",
+      "coverage": [
+        {
+          "state": "TX",
+          "county": "Bexar"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Project_Name",
+          "Project_Description"
+        ],
+        "type_source": "Application_Type",
+        "file_date": "Received_Date",
+        "address": [
+          "Street__",
+          "Pre_Direction",
+          "Street_Name",
+          "Street_Type"
+        ],
+        "zip": "Zip_Code",
+        "lat": "DDLat",
+        "lng": "DDLon",
+        "case_number": "Record_ID"
+      },
+      "type_map": {
+        "Preliminary Plan Review - Building": "Development",
+        "Preliminary Plan Review - Land Development": "Development"
+      },
+      "status_const": "proposed",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-27 TX/NV original-workbook wire pass (SA-DP). City of San Antonio Preliminary Plan Review Meetings. esriGeometryPoint (wkid 4326) with native Zip_Code and DDLat/DDLon columns. 50 rows. STATUS: the layer has NO status column (full schema read: Project_Name, Record_ID, Application_Type, Application_Name, Received_Date, Type_of_Review, Project_Description, ... Zip_Code, Lat, Long, DDLat, DDLon) — every row is a scheduled PRE-development review, so status_const='proposed' assigns the bucket directly in the connector and all four status_to_bucket arrays are [] (structurally inapplicable, East-Baton-Rouge/Marin precedent). TYPE: EXACTLY 2 Application_Type values VERBATIM summing to 50 (Preliminary Plan Review - Building 41 / Preliminary Plan Review - Land Development 9) — complete domain, 0 unclassified."
+    },
+    {
+      "registry_id": "denton-county-dev-permits",
+      "platform": "arcgis",
+      "service_url": "https://gis.dentoncounty.gov/arcgis/rest/services/DEV_Permits/FeatureServer/0",
+      "dataset_url": "https://gis.dentoncounty.gov/",
+      "jurisdiction": "Denton County",
+      "coverage": [
+        {
+          "state": "TX",
+          "county": "Denton"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PermitType",
+          "PropertyOw"
+        ],
+        "status_raw": "PermitStat",
+        "type_source": "PermitType",
+        "file_date": "DateReceiv",
+        "decision_date": "DateApprov",
+        "address": "PropertyAc",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "PermitID"
+      },
+      "type_map": {
+        "HOUSE": "Residential",
+        "MOBILE HOME": "Residential",
+        "DUPLEX": "Residential",
+        "GARAGE": "Residential",
+        "ADDITION TO HOUSE": "Residential",
+        "BARN": "Development",
+        "METAL SHOP": "Industrial",
+        "COMMERCIAL BUILDING": "Commercial"
+      },
+      "extra_where": "PermitType IN ('HOUSE', 'MOBILE HOME', 'DUPLEX', 'GARAGE', 'ADDITION TO HOUSE', 'BARN', 'METAL SHOP', 'COMMERCIAL BUILDING')",
+      "status_to_bucket": {
+        "proposed": [
+          "Pending",
+          "Submitted"
+        ],
+        "approved": [
+          "Approved"
+        ],
+        "operating": [],
+        "exclude": [
+          "Withdrawn",
+          "Not Issued",
+          "Not Issussed",
+          "Denied",
+          "Expired",
+          "Annex"
+        ]
+      },
+      "record_url_precision": "dataset",
+      "spatial_zip_radius_mi": 3,
+      "_receipts": "2026-07-27 TX/NV original-workbook wire pass (DC-DP). Denton County's own ArcGIS Server, DEV_Permits layer 0 'Permits'. esriGeometryPoint, 56,500 rows. STATUS: 11 PermitStat values VERBATIM via groupBy (Approved 29,892 / ' ' 26,192 / Withdrawn 235 / Not Issued 95 / Denied 48 / Pending 25 / Annex 6 / 'Not Issussed' 2 (SOURCE TYPO kept verbatim so those rows bucket rather than fail closed) / null 2 / Expired 2 / Submitted 1). The 26,192 blank-status rows fail closed on their own (blank_status). operating:[] — the domain has no completed/finaled state. TYPE: PermitType is an UNCONTROLLED FREE-TEXT field — the n-DESC page looks clean (HOUSE 39,484 / MOBILE HOME 4,229 / OTHER 1,378 / COMMERCIAL BUILDING 1,161 / ...) but an ALPHABETICAL enumeration exposes a long one-off tail ('190\\' LATTICE TOWER' 1, '2ND STORY ADDITION' 1, '97294' 1, '-------------------' 1, 'ADD TO GARAGE-APT' 1, ...). Only the high-frequency VERBATIM construction classes are kept, and they are ALSO the extra_where whitelist so the tail is dropped AT SOURCE rather than guessed. DROPPED deliberately: SWIMMING POOL 1,126, WATER WELL 907, GAS / OIL WELL 796, ADDRESS ONLY 378, OTHER 1,378 (ambiguous 'other', Mesa precedent). No ZIP column -> spatial_zip_radius_mi 3."
+    },
+    {
+      "registry_id": "clv-planning-cases",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/F1v0ufATbBQScMtY/arcgis/rest/services/CLV_Planning_Cases/FeatureServer/2",
+      "dataset_url": "https://opendataportal-lasvegas.opendata.arcgis.com/",
+      "jurisdiction": "City of Las Vegas",
+      "coverage": [
+        {
+          "state": "NV",
+          "county": "Clark"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PROJNAME",
+          "TYPE"
+        ],
+        "status_raw": "MTG_STATUS",
+        "file_date": "MTG_DATE",
+        "address": "PROJNAME",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "CASE_"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Scheduled"
+        ],
+        "approved": [
+          "Approved"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "record_url_precision": "dataset",
+      "spatial_zip_radius_mi": 3,
+      "recency_days": 1825,
+      "_receipts": "2026-07-27 TX/NV original-workbook wire pass (CLV-PC). City of Las Vegas planning cases, layer 2 'APPROVED'. esriGeometryPoint (wkid 3421). 275,595 rows. STATUS: EXACTLY 3 MTG_STATUS values VERBATIM summing to 275,595 (Approved 275,521 / Scheduled 54 / null 20) — complete domain; the 20 nulls fail closed. operating:[] and exclude:[] verified absent from the live domain (this is the APPROVED-cases layer by construction). TYPE: type_map DELIBERATELY ABSENT. The only categorical candidate is USETYPE and it is 94% EMPTY — live groupBy: ' ' (blank) 260,008 of 275,595, null 2,954, then PRIVATE STREETS 2,530 / VAR 1,545 / TAVERNS 867 / ELECTRIC UTILITY SUBSTATIONS 735 / MIXED USE 326 / TEMPORARY REAL ESTATE SALES OFFICE 324 / ... Mapping a field that is blank on 94% of rows would classify almost nothing while implying coverage, so records stay use_type 'unclassified' (logged) — Madison/Casa Grande precedent. recency_days 1825 (5 yr) bounds a 275k-row historical case ledger to the current development picture. No ZIP column -> spatial_zip_radius_mi 3."
+    },
+    {
+      "registry_id": "arlington-issued-permits",
+      "platform": "arcgis",
+      "service_url": "https://gis2.arlingtontx.gov/agsext2/rest/services/OpenData/OD_Property/MapServer/1",
+      "dataset_url": "https://data-arlingtontx.opendata.arcgis.com/",
+      "jurisdiction": "City of Arlington",
+      "coverage": [
+        {
+          "state": "TX",
+          "county": "Tarrant"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "SUBDESC",
+          "FOLDERNAME"
+        ],
+        "status_raw": "STATUSDESC",
+        "type_source": "MainUse",
+        "file_date": "ISSUEDATE",
+        "decision_date": "FINALDATE",
+        "address": "FOLDERNAME",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "FOLDERSEQUENCE"
+      },
+      "type_map": {
+        "Apartments (3+ dwelling units)": "Residential",
+        "Amenity Center": "Residential",
+        "Business Office": "Commercial",
+        "Retail/Wholesale Store": "Commercial",
+        "Restaurant": "Commercial",
+        "Automotive Repair Garage": "Commercial",
+        "Medical Office": "Commercial",
+        "Bank/Credit Union": "Commercial",
+        "Banquet Hall": "Commercial",
+        "Barber/Beauty Shop": "Commercial",
+        "Automobile Sales": "Commercial",
+        "Auto Lube Center": "Commercial",
+        "Car Wash (Auto/Self-service)": "Commercial",
+        "Animal Hospital": "Commercial",
+        "Convenience Store w/ gas pumps": "Commercial",
+        "Amusement Park": "Commercial",
+        "Warehousing/Storage": "Industrial",
+        "Assembly/Disassembly": "Industrial",
+        "School (ISD)": "Civic/Public",
+        "Asst Living Facilities": "Civic/Public",
+        "Towers": "Utility",
+        "Carports": "Development",
+        "Undetermined use (Shell Buildings Only)": "Development",
+        "Barns": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Pending",
+          "Pending Inspection",
+          "Approved for Issue"
+        ],
+        "approved": [
+          "Issued",
+          "TCO Issued"
+        ],
+        "operating": [
+          "Finaled"
+        ],
+        "exclude": [
+          "Expired",
+          "Void",
+          "Denied",
+          "Revoked"
+        ]
+      },
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-27 TX/NV original-workbook wire pass (ARL-BP-001). Layer 1 'Issued Permits' of OD_Property ('3-Year view of City of Arlington permitting'). esriGeometryPoint, 18,942 rows. STATUS: 10 STATUSDESC values VERBATIM via groupBy summing EXACTLY to 18,942 (Finaled 9,352 / Issued 5,560 / Expired 3,905 / Void 113 / TCO Issued 5 / Pending Inspection 3 / Denied 1 / Revoked 1 / Pending 1 / Approved for Issue 1) — complete domain, 0 unmapped, all four buckets populated from real values. TYPE: MainUse is the categorical field but it is NULL on 16,243 of 18,942 rows (86%) — live groupBy receipt. The non-null values were enumerated ALPHABETICALLY over MainUse IS NOT NULL and the construction/occupancy classes are mapped VERBATIM; the ~86% null rows stay use_type 'unclassified' (logged), never inferred from the title. Partial-by-source, documented rather than faked. ZIP SCOPING FIX (same session, caught by verification): the entry was first written with no zip column, no zip_where_template and no spatial radius, so the connector correctly QUARANTINED it ('no zip column mapped and no zip_where_template — statewide dataset skipped for ZIP report') and the source emitted 0 records on Arlington's own core ZIPs 76010/76011/76013. The OD_Property layers carry no ZIP attribute (full schema read), so spatial_zip_radius_mi 3 on the layer's own point geometry is the correct scoping — the engine's standard ZIP approximation.",
+      "spatial_zip_radius_mi": 3
+    },
+    {
+      "registry_id": "harris-county-permits",
+      "platform": "arcgis",
+      "service_url": "https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/ePermits/FeatureServer/1",
+      "dataset_url": "https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/ePermits/FeatureServer",
+      "jurisdiction": "Harris County Permits",
+      "coverage": [
+        {
+          "state": "TX",
+          "county": "Harris"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PERMITNAME",
+          "PROJECTNAME"
+        ],
+        "status_raw": "PROJECTSTATUS",
+        "type_source": "APPTYPE",
+        "file_date": "ISSUEDDATE",
+        "address": "FULLADDRESS",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "PERMITNUMBER"
+      },
+      "type_map": {
+        "Residential Construction & On-site Sewerage System (Septic)": "Residential",
+        "Tract Home Builders": "Residential",
+        "Commercial Building (Fire Code)": "Commercial",
+        "Site Development": "Development",
+        "Legacy - Development Application": "Development",
+        "Flood Recovery - Hurricane Harvey": "Residential",
+        "Fire Protection": "Civic/Public"
+      },
+      "extra_where": "APPTYPE IN ('Residential Construction & On-site Sewerage System (Septic)', 'Tract Home Builders', 'Commercial Building (Fire Code)', 'Site Development', 'Legacy - Development Application', 'Flood Recovery - Hurricane Harvey', 'Fire Protection')",
+      "status_to_bucket": {
+        "proposed": [
+          "Assigned",
+          "Assigned: Pending Inspection",
+          "UnAssigned: Pending Inspection",
+          "Draft",
+          "Submit",
+          "Ready for Payment",
+          "Paid",
+          "Revision",
+          "Return to Customer",
+          "Transfer Department",
+          "Priority Changed",
+          "Physical Plan Pickup",
+          "Customer Dispute",
+          "Dept Approval"
+        ],
+        "approved": [
+          "Issued",
+          "Final Approval"
+        ],
+        "operating": [],
+        "exclude": [
+          "Cancel",
+          "Permit Denied",
+          "Dept Disapproval"
+        ]
+      },
+      "record_url_precision": "dataset",
+      "recency_days": 1095,
+      "_receipts": "2026-07-27 TX/NV original-workbook wire pass (HC-BP-001). Harris County ePermits layer 1 'Permits (Regulation)'. esriGeometryPoint, 1,276,613 rows. STATUS: 19 PROJECTSTATUS values VERBATIM via an ALPHABETICAL groupBy summing EXACTLY to 1,276,613 (Issued 1,199,164 / Cancel 35,045 / Return to Customer 25,051 / Ready for Payment 5,634 / Final Approval 4,418 / Revision 4,167 / Paid 1,658 / Assigned 398 / Transfer Department 273 / Customer Dispute 231 / Dept Approval 140 / Draft 120 / Dept Disapproval 117 / Physical Plan Pickup 69 / Submit 61 / UnAssigned: Pending Inspection 49 / Assigned: Pending Inspection 13 / Permit Denied 4 / Priority Changed 1) — complete domain, 0 unmapped. operating:[] — the ledger has no finaled/completed state. DUPLICATE PROOF — ONLY ONE OF THE THREE HARRIS LAYERS IS WIRED. The workbook lists three, and they are the same records at three grains: HOU-BP (Permits/IssuedPermits/FeatureServer/0) has an IDENTICAL field list and PROJECTSTATUS='Issued' 1,194,947 vs this layer's 1,199,164 — a filtered view of the same ledger; HC-DEV-001 (ePermits/FeatureServer/0 'Projects') is the PARENT application layer for the same PROJECTNUMBERs (STATUS='Issued' 1,182,850). Wiring all three would stack ~3.6M near-identical records on the same Harris addresses, and the engine's dedup key includes source_id so they would NOT collapse. This permit-grain layer is the single best choice; the other two are documented rejects. TYPE: APPTYPE enumerated live; construction/land-use classes kept VERBATIM and used as the extra_where whitelist. DROPPED at source: Signs ETJ, Scenic & Toll Road 30,141; Public Works ROW Notifications 26,798; Renewals & Transfers 16,786. recency_days 1095 (3 yr) bounds a 1.28M-row historical ledger. ZIP SCOPING FIX (same session, caught by live verification alongside the Arlington three): the entry was first written with no zip column, no zip_where_template and no spatial radius, so the connector correctly QUARANTINED it and it emitted 0 records. The ePermits layer carries no ZIP attribute (full schema read: OBJECTID, ID, PROJECTNUMBER, PROJECTNAME, FULLADDRESS, APPTYPE, PROJECTSUBMITDATE, PROJECTSTATUS, REGULATION, PERMITNUMBER, PERMITNAME, STATUS, EVENTID, ISSUEDDATE, STREETNUMBER, STREETNAME, DATECREATED, ISCLOSED, PERMITCLASSCODE), so spatial_zip_radius_mi 3 on its own point geometry is the correct scoping. COVERAGE NOTE: Harris County currently has only ONE modeled level=zip community page (77393), so this source's page lift is capped at 1 regardless of its 1.28M rows — the constraint is the communities table, not the source.",
+      "spatial_zip_radius_mi": 3
     }
   ],
   "ckan": [
