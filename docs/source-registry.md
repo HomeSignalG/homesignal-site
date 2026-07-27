@@ -2465,3 +2465,95 @@ quarantined at 0 everywhere):
 The unlock is a **Harris County ZIP expansion** — the same structural fix already applied for the
 NYC boroughs, Boston/Suffolk and Philadelphia County. Until then both entries sit dormant and
 cost nothing (the coverage gate keeps them off every non-Harris page). Logged, not blocking.
+
+---
+
+## POLYGON WIRE PASS #2 (2026-07-27) — NDOT · Dallas SUPs · Henderson ×2 (registry 81 → 85)
+
+Config only. All four are polygon layers riding the `featurePoint()` centroid path shipped in
+the previous pass — no connector, engine or schema change.
+
+| registry_id | coverage | rows | status vocab | type vocab |
+|---|---|---|---|---|
+| `nvdot-project-boundaries` | statewide NV | 563 | `status_const` (Record_Type is a data-format descriptor) | 26 `Project_Type` → Utility |
+| `dallas-specific-use-permits` | TX/Dallas | 1,338 | 3 verbatim `STATUS` (2 real + case variant) | **525** `SPECIFICUSE` |
+| `henderson-residential-permits` | NV/Clark | 28,391 | 9 verbatim `STATUS` (+null fails closed) | 2 `CASETYPE` → Residential |
+| `henderson-commercial-permits` | NV/Clark | 8,490 | 9 verbatim `STATUS` (+null fails closed) | 14 `CASETYPE` |
+
+Every vocabulary was enumerated live and **each set sums exactly to its layer count**.
+
+### Four corrections to the wiring brief, all live-verified
+
+- **NDOT's "`where=1=1` returns HTTP 500" quirk did NOT reproduce.** `where=1%3D1` returned
+  **200 / count=563**, and so did the *exact* query shape this connector emits (envelope +
+  `outFields=*` + `returnGeometry=true` + `outSR=4326` + `resultOffset`/`resultRecordCount`):
+  **200 with 52 features**. **Standing answer:** `extra_where` could not have worked around such
+  a failure anyway — `buildWhere()` always prefixes the spatial zipClause `1=1` and ANDs
+  `extra_where` after it, so the connector sends `1=1 AND (OBJECTID>0)` either way. The
+  `OBJECTID>0` guard is kept (live-verified identical result) in case the 500 is intermittent.
+- **Henderson `groupBy` works and returns real counts** (the brief expected 0), which surfaced
+  values the brief missed: layer 1 STATUS has **10** values incl. `Awaiting Final Review` (3)
+  and CASETYPE has **2**, not 1 (`BLDG - Multi-Fam Residential`, 157); layer 2 STATUS has **10**
+  incl. `Awaiting Application` (4) and CASETYPE has **14**, adding `BLDG - Retail Sales` (46) and
+  `BLDG - Medical/24HR Care` (14). Layer 2's live name is **"Other Permits"**, not "Commercial".
+- **Dallas STATUS** — the 3 rows the brief calls `"None"` are JSON `null`. Explicit mapping was
+  used rather than `status_const`: STATUS is a real status column (CLAUDE.md forbids overriding
+  one) and explicit mapping correctly fails the 4 null/whitespace rows closed.
+- **Dallas `type_map` deliberately deviates from the brief's keyword list.** Those rules would
+  have defaulted ~100 values to `Commercial` that plainly are not — `Electrical Substation`,
+  `Power Plant`, `Sewage Treatment Plant`, `Quarry`, `Mining Operation`, `Meat Packing`,
+  `Salvage Yard`, `Multifamily`, `Retirement housing`, `College`, `Kindergarten`, `Convent`,
+  `Government Installation`, `Airport`, `Zoo`, `YMCA`, `Nursing Home`. **`use_type` drives the pin
+  SHAPE**, so shipping that would have been a visible misclassification. The added keywords are
+  listed verbatim in the entry's `_receipts`. A small tail of one-off free-text values still
+  lands in the documented `Commercial` default — keyword classification over uncontrolled free
+  text has a tail, and the tail is the default rather than a guess.
+
+Henderson is wired **`https://`** (the workbook says `http://`) — the repo's own
+`test/official-links.test.mjs` guard caught it, and https was live-verified to return the
+identical count from the identical path (28,391 / 8,490). A scheme upgrade, not a new source.
+
+### Live go-live smoke (deployed run 30314664115, green)
+
+Seven ZIPs re-run through the live engine — **all HTTP 200** — then persisted with
+`dev_refresh_collect()`.
+
+| ZIP | sourced (was → now) | new sources present |
+|---|---|---|
+| 75201 Dallas | 0 → 397 | `dallas-specific-use-permits`, `txdot-projects-info-all` |
+| 75202 Dallas | 0 → 419 | `dallas-specific-use-permits`, `txdot-projects-info-all` |
+| 89002 Henderson | 1 → 4,400 | `henderson-residential`, `henderson-commercial`, `nvdot` |
+| 89011 Henderson | 0 → 3,933 | both Henderson, `nvdot`, `clark-county-active-projects` |
+| 89012 Henderson | 0 → 4,888 | both Henderson, `nvdot` |
+| 89101 Las Vegas | 369 → 420 | `nvdot` (+ existing Clark sources) |
+| 89501 Reno | 65 → 137 | `nvdot`, `reno-ldc-projects` |
+
+**Across all 14,028 records emitted by the four new sources: 0 missing `record_url`, 0 missing
+coordinates, 100 % `scope:"point"`.** Unclassified: 0 for Dallas (all 525 values mapped) and 0
+for both Henderson layers; **2** for NDOT — exactly the two rows whose `Project_Type` is null,
+which `type_map` cannot key and which are logged rather than guessed. Coordinate spreads are
+geographically correct: Henderson 35.965–36.130, Dallas 32.734–32.846, NDOT 35.827–39.600 (Las
+Vegas → Reno, i.e. genuinely statewide). Cache-wide on the seven ZIPs: 0 sourced sites missing
+coords, 0 missing URL.
+
+**Bidirectional coverage-gate proof** (cache-wide, live): `dallas-specific-use-permits` rides
+**only** TX/Dallas pages; `henderson-residential-permits` and `henderson-commercial-permits`
+**only** NV/Clark; `nvdot-project-boundaries` **only** NV pages (Clark 4 + Washoe 1) — statewide
+as declared, and never outside NV.
+
+### ⚠️ Open follow-up — Henderson ZIP rows exceed the documented row-size ceiling
+
+The three Henderson pages are the largest rows in the cache: **89012 = 4.68 MB / 4,910 sites**,
+89002 = 4.18 MB / 4,408, 89011 = 3.72 MB / 3,937. That is **above the 3.5 MB / 3,160-site
+Minneapolis 55407 high-water mark** that forced the adaptive page-size fix in
+`verify-development` / `verify-geocodes` (whose floor is a single-row read, so they should still
+cope — but this is now the ceiling, not Minneapolis).
+
+The cause is that the two Henderson layers carry the full permit history with **no recency
+window** (live sample `ISSUEDATE` values from 2015–2017), so a 3-mile circle over suburban
+Henderson pulls a decade of completed dwelling permits. The obvious lever is a `recency_days`
+window on `APPLICATIONDATE` (an `esriFieldTypeDate`, so the connector's `DATE '…'` literal
+applies) — it would cut the payload sharply **and** improve relevance, since a completed 2015
+dwelling permit is not "development around your home" today. **Not applied here**: it changes
+what residents see, which is a founder-visible parameter rather than a wiring detail. Logged
+with numbers so the call can be made deliberately.

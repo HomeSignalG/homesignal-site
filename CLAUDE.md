@@ -590,6 +590,37 @@ legal/framing change not covered by the one-time sign-off.
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 
 ### Status
+- 🟢 **POLYGON WIRE PASS #2 — NDOT · Dallas SUPs · Henderson ×2 wired (registry 81 → 85)**
+  (live-verified 2026-07-27). **Config only** — all four are polygon layers riding the
+  `featurePoint()` centroid path from the pass below. `nvdot-project-boundaries` (STATEWIDE NV,
+  563), `dallas-specific-use-permits` (TX/Dallas, 1,338, **525-value `SPECIFICUSE` type_map**),
+  `henderson-residential-permits` (NV/Clark, 28,391) and `henderson-commercial-permits`
+  (NV/Clark, 8,490). Every vocabulary enumerated live; **each set sums exactly to its layer
+  count**. Smoke (deployed run 30314664115, 7 ZIPs, all 200): 75201 · 75202 Dallas both 0 → ~400
+  sourced; 89002/89011/89012 Henderson 0-1 → 4,400/3,933/4,888; 89101 Las Vegas 369 → 420; 89501
+  Reno 65 → 137. **Across all 14,028 records from the four new sources: 0 missing `record_url`,
+  0 missing coordinates, 100 % `scope:"point"`, 0 unclassified except the 2 NDOT rows whose
+  `Project_Type` is null** (logged, never guessed). Bidirectional gate proof: Dallas rides ONLY
+  TX/Dallas, Henderson ONLY NV/Clark, NDOT ONLY NV (Clark + Washoe).
+  **Four standing answers (so no session re-derives):** (a) **`extra_where` can NEVER work around
+  a `where=1=1` failure** — `buildWhere()` always prefixes the spatial zipClause `1=1` and ANDs
+  `extra_where` after it, so the connector sends `1=1 AND (…)` regardless; the reported NDOT
+  "1=1 → HTTP 500" quirk did not reproduce anyway (200/563, and 200/52 features on the exact
+  connector query shape). (b) A server reported as returning **0 counts from groupBy may simply
+  work** — Henderson's did, and that surfaced 2 STATUS values and 3 CASETYPE values the brief had
+  missed. (c) **A `null` is not the string `"None"`** — Dallas's 3 "None" rows are JSON null and
+  fail closed. (d) **Never let a keyword default swallow self-describing values**: the brief's
+  Dallas rules would have labelled `Electrical Substation`, `Power Plant`, `Quarry`, `Meat
+  Packing`, `Multifamily`, `College`, `Airport` and `Nursing Home` as **Commercial**, and
+  `use_type` drives the pin SHAPE — the added keywords are recorded verbatim in the entry's
+  `_receipts`. Henderson is wired **https** (workbook said http); the repo's own
+  `official-links` guard caught it and https returns identical counts.
+  ⚠️ **Open follow-up: Henderson rows are now the cache's largest — 89012 = 4.68 MB / 4,910
+  sites**, above the 3.5 MB / 3,160-site Minneapolis high-water mark that drove the adaptive
+  page-size verifier fix. Cause: both layers carry full permit history with **no recency window**
+  (live `ISSUEDATE` 2015–2017). The lever is `recency_days` on `APPLICATIONDATE`; **not applied**
+  because it changes what residents see (founder-visible), logged with numbers. Receipts:
+  docs/source-registry.md "POLYGON WIRE PASS #2".
 - 🟢 **POLYGON / POLYLINE GEOMETRY PASS — the ArcGIS connector can now PIN non-point layers;
   5 sources wired (registry 76 → 81 entries)** (live-probe + unit-verified 2026-07-27). Until
   now `sources/arcgis.ts` flattened **point geometry only**, so every polygon/polyline layer
