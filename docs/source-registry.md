@@ -2419,3 +2419,49 @@ a real point on the real published geometry and the record genuinely crosses the
 ### `SA-PC` — out of scope by instruction
 Not probed and not wired: it is an ArcGIS **Table** (no geometry), so it is not part of this
 polygon/polyline pass.
+
+### Live go-live smoke (deployed engine, 2026-07-27)
+
+Deployed via `deploy-edge-functions.yml` (run 30312463714, green), then six cached ZIPs were
+re-run through the live function with `net.http_post` — all **HTTP 200** — and persisted with
+`dev_refresh_collect()`.
+
+| ZIP | county | sourced records | from the new sources | registry_ids present |
+|---|---|---|---|---|
+| 76104 | Tarrant | 528 | 41 | `fort-worth-development-permits`, **`fort-worth-zoning-cases`**, **`txdot-projects-info-all`** |
+| 76110 | Tarrant | 503 | 38 | `fort-worth-development-permits`, **`txdot-projects-info-all`** |
+| 78617 | Travis | 443 | 20 | `austin-site-plan-cases`, `austin-subdivision-cases`, **`txdot-projects-info-all`** |
+| 89101 | Clark NV | 369 | 26 | **`clark-county-active-projects`**, `clv-planning-cases`, `las-vegas-building-permits` |
+| 89106 | Clark NV | 330 | 15 | **`clark-county-active-projects`**, `clv-planning-cases`, `las-vegas-building-permits` |
+| 77393 | Harris | 35 | 35 | **`txdot-projects-info-all`** — page lifted off the facilities floor for the first time |
+
+**The invariant that proves this build did its job: across every record emitted by the three
+new sources — 132 TxDOT (polyline), 41 Clark (polygon), 2 Fort Worth (polygon) — there were
+0 missing `record_url` and 0 missing coordinates, all `scope: "point"`.** Before this change a
+polygon or polyline layer could only ever produce coordinate-less records. Coordinate spreads
+are geographically correct (TxDOT lat 30.128–32.792 spanning Austin→Fort Worth; Clark
+36.072–36.210 over Las Vegas; Fort Worth 32.714–32.765). Cache-wide for the six ZIPs:
+**0 sourced sites missing coords, 0 missing URL.**
+
+`fort-worth-zoning-cases` appears on 76104 and not 76110, as expected — only 5 of its 96 rows
+carry a decided `ACTION_`, the rest fail closed.
+
+### ⚠️ Open follow-up — Harris County has ONE modeled ZIP page, so the two Harris sources have no surface
+
+`houston-plat-applications` and `harris-county-plats` are correctly wired but emitted **0**
+records in the smoke, and the reason is a **communities-model gap, not a wiring bug** (it is
+explicitly *not* the Arlington/`harris-county-permits` missing-ZIP-scoping class, which
+quarantined at 0 everywhere):
+
+- Harris County has exactly **1** `level=zip` community with a cached report — **77393** — whose
+  pinned centroid is **30.329, −95.4635**: Conroe, roughly 50 miles north of Houston and outside
+  Harris County altogether (it is a P.O.-type ZIP). A 3-mile envelope there legitimately contains
+  no Houston plats. For comparison Tarrant has 99, Travis 86, Clark 76.
+- Both entries return real data over real Houston/Harris geography. Live envelope probes:
+  **5,542** plat applications within ±3 mi of downtown Houston (29.7604, −95.3698), and **61**
+  Harris plats in the wider county box — both `esriGeometryPolygon` with rings, and with statuses
+  from the mapped vocabulary (`Action Form Completed`, `Historical Plat`, `Pre-Recordation Plat`).
+
+The unlock is a **Harris County ZIP expansion** — the same structural fix already applied for the
+NYC boroughs, Boston/Suffolk and Philadelphia County. Until then both entries sit dormant and
+cost nothing (the coverage gate keeps them off every non-Harris page). Logged, not blocking.

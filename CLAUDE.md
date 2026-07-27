@@ -622,8 +622,22 @@ legal/framing change not covered by the one-time sign-off.
   **free-text prose statuses** and content frozen ~2020. `SA-PC` is a geometry-less Table, out of
   scope by instruction. Regression: `test/arcgis-geometry.test.mjs` drives the **shipped**
   connector over a real captured feature — which needs Node type stripping, so `unit-tests` CI
-  moved **20 → 22** (full 57-file suite green). Receipts: docs/source-registry.md
-  "POLYGON / POLYLINE GEOMETRY PASS".
+  moved **20 → 22** (full 57-file suite green). **Live go-live smoke** (deployed run
+  30312463714, six ZIPs re-run through the live engine, all 200, persisted via
+  `dev_refresh_collect`): 76104 · 76110 (Tarrant) · 78617 (Travis) · 89101 · 89106 (Clark NV) ·
+  **77393 (Harris — lifted off the facilities floor for the first time, 0 → 35 sourced records,
+  all from TxDOT)**. **The invariant that proves the build: across all 175 records from the three
+  new sources — 132 TxDOT polyline, 41 Clark polygon, 2 Fort Worth polygon — 0 missing
+  `record_url`, 0 missing coordinates, all `scope:"point"`**, with geographically correct spreads
+  (TxDOT lat 30.128–32.792 Austin→Fort Worth; Clark 36.072–36.210 Las Vegas). ⚠️ **Open
+  follow-up: `houston-plat-applications` + `harris-county-plats` are correctly wired but have no
+  surface — Harris County has exactly ONE modeled `level=zip` page (77393), whose centroid
+  30.329/−95.4635 is in Conroe, ~50 mi north of Houston and outside Harris County** (Tarrant has
+  99, Travis 86, Clark 76). Not the Arlington missing-ZIP-scoping bug: live envelope probes
+  return 5,542 plat applications within ±3 mi of downtown Houston and 61 Harris plats county-wide.
+  The unlock is a **Harris County ZIP expansion** (the NYC-borough / Boston-Suffolk /
+  Philadelphia-County precedent); until then both entries sit dormant behind the coverage gate.
+  Receipts: docs/source-registry.md "POLYGON / POLYLINE GEOMETRY PASS".
 - 🟢 **TEXAS DEV-COVERAGE PASS — `frisco-active-building-permits` WIRED; TX development pages
   110 → 118** (DB-verified 2026-07-27). Recon over the five TX counties with the most
   facilities-only pages. **Config only — no connector, engine or schema change.** The City of
