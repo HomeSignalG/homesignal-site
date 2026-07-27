@@ -242,11 +242,13 @@ try {
     } else {
       ok(lv.leaflet.count === lv.restTotal, 'the Leaflet fallback draws EVERY rest record',
         `${lv.leaflet.count}/${lv.restTotal}`);
-      const lfExp = lv.expected.map((e) => e.shape);
-      const lfBad = lv.leaflet.shapes.map((s, i) => (s === lfExp[i] ? null : `#${i} drew ${s}, resolver said ${lfExp[i]}`)).filter(Boolean);
+      const lfWant = {}; lv.expected.forEach((e) => { lfWant[String(e.id)] = e.shape; });
+      const lfBad = lv.leaflet.pins
+        .filter((p) => lfWant[p.id] !== undefined && lfWant[p.id] !== p.shape)
+        .map((p) => `${p.id}: drew ${p.shape}, resolver said ${lfWant[p.id]}`);
       ok(lfBad.length === 0, 'the Leaflet fallback uses the computed shape, not circleMarkers',
         lfBad.slice(0, 5).join('; '));
-      console.log('  shape distribution: ' + fmt(hist(lv.leaflet.shapes)));
+      console.log('  shape distribution: ' + fmt(hist(lv.leaflet.pins.map((p) => p.shape))));
     }
     ok(lf._errs.length === 0, 'Leaflet-fallback console clean', lf._errs.slice(0, 3).join(' | '));
   } finally { await lf.close(); }

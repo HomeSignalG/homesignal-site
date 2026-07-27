@@ -1502,8 +1502,15 @@ HS.onReady(async function () {
   // runtime dependency — the CSP on this page allows neither.
   var restIconsAdded = {};
   var lastRestSet = [];        // the rest set most recently handed to a renderer
-  function registerRestIcons(fc){
+  // Decoding an SVG data URI is ASYNCHRONOUS, so the icons for a freshly-drawn view are
+  // not in the style yet when setData runs. MapLibre would then warn once per missing
+  // image and leave those points unplaced until something else forced a re-place. So the
+  // caller hands us the source and we re-feed it when the batch lands — one extra
+  // setData, only on the first view that needs a new (shape,colour) pair.
+  function registerRestIcons(fc, onReady){
     if (!glMap || !HS.restIconSpecs) return;
+    var pending = 0, fired = false;
+    var settle = function(){ if (--pending === 0 && !fired) { fired = true; if (onReady) onReady(); } };
     HS.restIconSpecs(fc).forEach(function(spec){
       if (restIconsAdded[spec.id]) return;
       restIconsAdded[spec.id] = 1;
@@ -1511,19 +1518,25 @@ HS.onReady(async function () {
       var px = 44;                                     // 2x of the 22px drawn size
       var svg = HS.markerSVG(spec.shape, spec.color, '', px);
       var img = new Image(px, px);
+      pending++;
       img.onload = function(){
         try {
-          if (glMap.hasImage && glMap.hasImage(spec.id)) return;
-          var cv = document.createElement('canvas');
-          cv.width = px; cv.height = px;
-          var ctx = cv.getContext('2d');
-          ctx.drawImage(img, 0, 0, px, px);
-          glMap.addImage(spec.id, ctx.getImageData(0, 0, px, px), { pixelRatio: 2 });
+          if (!(glMap.hasImage && glMap.hasImage(spec.id))) {
+            var cv = document.createElement('canvas');
+            cv.width = px; cv.height = px;
+            var ctx = cv.getContext('2d');
+            ctx.drawImage(img, 0, 0, px, px);
+            // data: URIs are same-origin, so getImageData does not taint the canvas.
+            glMap.addImage(spec.id, ctx.getImageData(0, 0, px, px), { pixelRatio: 2 });
+          }
         } catch (e) { /* a failed icon leaves the point undrawn, never mis-shaped */ }
+        settle();
       };
+      img.onerror = function(){ restIconsAdded[spec.id] = 0; settle(); };
       // Inline SVG data URI — same-origin, no network fetch.
       img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
     });
+    if (pending === 0 && onReady) onReady();          // every icon already in the style
   }
   function drawGL(){
     var items = shownItems();
@@ -1553,7 +1566,9 @@ HS.onReady(async function () {
     rest.forEach(function(it){ if (it.id != null) restById[it.id] = it; });
     var restSrc = glMap.getSource('hs-rest');
     var restFC = HS.restFeatureCollection(rest);
-    registerRestIcons(restFC);                    // shapes must exist before setData
+    // Icons must be in the style before the symbols are placed; the second setData is
+    // the no-op re-place for the pairs that were still decoding on this first draw.
+    registerRestIcons(restFC, function(){ if (restSrc) restSrc.setData(restFC); });
     if (restSrc) restSrc.setData(restFC);
     if (window.__HS_MAP) {
       window.__HS_MAP.restCount = rest.length;    // CI hook (verify-maps-uncap)
@@ -1610,8 +1625,8 @@ HS.onReady(async function () {
         // which could only express colour and therefore drew every record past the
         // lettered head as a circle regardless of its type.
         var m = L.marker([it.lat, it.lng], {
-          icon: lfDivIcon('<div class="hspin hsrest" style="line-height:0">'
-            + HS.markerSVG(mk.shape, mk.color, '', 20) + '</div>', 20),
+          icon: lfDivIcon('<div class="hspin hsrest" data-rid="' + HS.esc(String(it.id == null ? '' : it.id))
+            + '" style="line-height:0">' + HS.markerSVG(mk.shape, mk.color, '', 20) + '</div>', 20),
           title:(mk.typeLabel||it.type||it.category||'Record')+' · '+(it.name||it.title||'')
         }).addTo(lfMap);
         m.on('click', function(){ if (it._restFacility) selectFacility(it); else openItem(it); });
@@ -1675,9 +1690,11 @@ HS.onReady(async function () {
       out.focus = { count: schG.length, shapes: [].map.call(schG, function (g) { return geomFromNode(g); }) };
     }
     // --- Leaflet raster fallback (only present when WebGL is unavailable) ---
-    var lfIcons = document.querySelectorAll('#maplf .leaflet-marker-icon .hspin.hsrest svg');
-    if (lfIcons.length) {
-      out.leaflet = { count: lfIcons.length, shapes: [].map.call(lfIcons, function (s) { return geomFromNode(s); }) };
+    var lfPins = document.querySelectorAll('#maplf .leaflet-marker-icon .hspin.hsrest');
+    if (lfPins.length) {
+      out.leaflet = { count: lfPins.length, pins: [].map.call(lfPins, function (d) {
+        return { id: d.getAttribute('data-rid'), shape: geomFromNode(d.querySelector('svg')) };
+      }) };
     }
     return out;
   };
