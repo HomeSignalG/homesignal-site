@@ -6,6 +6,12 @@ name: verify-communities
 # and is indexable, and that non-Utah pages are noindexed. Zero-touch: it reads the live
 # app_community_meta table (anon key from config.js), so new Utah ZIPs are covered with no
 # code change.
+#
+# It also runs a data-only PHASE 0 first: the cross-state ZIP modeling guard, which
+# asserts every modeled ZIP page against the authoritative USPS state crosswalk
+# (docs/zip-state-v3.csv). That class is invisible to the browser walk — a ZIP page
+# modeled under the wrong state renders perfectly, it just inherits a foreign state's
+# government. See docs/cross-state-zip-root-defect.md.
 
 on:
   workflow_dispatch:
@@ -24,6 +30,8 @@ on:
       - 'lib/data.js'
       - 'docs/*-communities-seed.sql'
       - 'scripts/verify-communities.mjs'
+      - 'scripts/lib/zip-state-crosswalk.mjs'
+      - 'docs/zip-state-v3.csv'
       - '.github/workflows/verify-communities.yml'
 
 jobs:

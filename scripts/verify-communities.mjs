@@ -21,6 +21,12 @@
 
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
+import {
+  loadZipStateCrosswalk,
+  assertQuarantineIsHonest,
+  checkZipStateIntegrity,
+  QUARANTINED_ZCTA_ONLY,
+} from './lib/zip-state-crosswalk.mjs';
 
 // ── Single source of truth for the anon key + URL: read them out of config.js (the ONE
 //    place the app config lives now). Format: `SUPABASE_URL: 'https://…'`. ──
@@ -85,6 +91,41 @@ async function readPage(page, zip) {
 
 const indexable = (r) => /(^|[^n])index/i.test(r) && !/noindex/i.test(r);
 
+// ── PHASE 0: cross-state ZIP modeling guard (data-only, no browser) ────────────
+// Reads every communities row and asserts the geographic model against the
+// authoritative USPS crosswalk. This runs BEFORE the browser walk because it is
+// cheap, deterministic, and catches a class the page walk cannot see: a ZIP page
+// modeled under the wrong state renders perfectly — it just inherits a foreign
+// state's government and anchors that state's content. See
+// scripts/lib/zip-state-crosswalk.mjs for the invariant and the quarantine list.
+async function verifyZipStateModel() {
+  const crosswalk = loadZipStateCrosswalk(new URL('../docs/zip-state-v3.csv', import.meta.url));
+  assertQuarantineIsHonest(crosswalk);
+
+  let rows = [];
+  for (let last = ''; ;) {
+    const page = await rest(
+      `communities?select=id,name,slug,level,state,county,parent_id,zip_codes&order=id.asc&limit=1000` +
+      (last ? `&id=gt.${encodeURIComponent(last)}` : '')
+    );
+    rows.push(...page);
+    if (page.length < 1000) break;
+    last = page[page.length - 1].id;
+  }
+
+  const violations = checkZipStateIntegrity(rows, crosswalk);
+  const zipPages = rows.filter((r) => r.level === 'zip').length;
+  const quarantined = Object.keys(QUARANTINED_ZCTA_ONLY);
+  console.log(
+    `Cross-state ZIP guard: ${zipPages} ZIP page(s) checked against docs/zip-state-v3.csv ` +
+    `(${crosswalk.size} authoritative ZIPs; ${quarantined.length} quarantined: ${quarantined.join(', ')}) ` +
+    `→ ${violations.length} violation(s)`
+  );
+  for (const v of violations) console.log(`  ✗ [${v.rule}] ${v.zip}: ${v.detail}`);
+  if (!violations.length) console.log('  ✓ every modeled ZIP agrees with the authoritative USPS state');
+  return violations.map((v) => `cross-state ZIP model [${v.rule}] ${v.zip}: ${v.detail}`);
+}
+
 async function main() {
   // NATIONWIDE SUBSTANCE GATE (PLAN.md §11, founder-approved threshold c): every
   // materialized page is verified against its materializer-stamped `indexable` flag —
@@ -95,6 +136,11 @@ async function main() {
   // KEYSET-paginated: PostgREST caps un-paginated reads at 1,000 rows — a bare
   // limit=100000 silently truncated the walk once WA pushed the meta table past 1,000
   // (the 99xxx ZIPs were never checked). zip=gt.<last> pages cover every row.
+  //
+  // Phase 0 first: the model check is cheap and browser-free, so a geographic
+  // modeling defect is reported even if the page walk later has trouble.
+  const modelFails = await verifyZipStateModel();
+
   let walked = [];
   for (let last = ''; ;) {
     const page = await rest(`app_community_meta?select=zip,name,state,data_quality,indexable&order=zip.asc&limit=1000` + (last ? `&zip=gt.${encodeURIComponent(last)}` : ''));
@@ -135,7 +181,7 @@ async function main() {
   console.log(`Verifying ${walked.length} materialized page(s) + ${nonUt.length} unmaterialized page(s) against ${SITE_BASE}`);
 
   const browser = await chromium.launch();
-  const fails = [];
+  const fails = [...modelFails];
 
   // --- Materialized pages: substance flag drives BOTH assertions ---
   let cursor = 0;
@@ -202,6 +248,7 @@ async function main() {
     `- Site: ${SITE_BASE}`,
     `- Materialized pages checked: **${walked.length}** (${nIdx} substance-flagged ⇒ must be indexable; rest ⇒ noindex)`,
     `- Unmaterialized pages checked: **${nonUt.length}** (must be noindexed)`,
+    `- Cross-state ZIP model violations: **${modelFails.length}** (every ZIP page vs the authoritative USPS state)`,
     `- Failed: **${fails.length}**`,
     ...(fails.length ? [``, `## Failures`, ...fails.map((f) => `- ${f}`)] : [``, `Every substance-flagged page renders real records and is indexable; every thin/empty/unmaterialized page is noindexed. ✓`]),
   ].join('\n');
