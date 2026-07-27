@@ -1,6 +1,10 @@
 # Cross-state ZIP root defect — investigation, scope, and proposed fix
 
-**Status:** investigated and proven. **Nothing applied.** Awaiting founder go-ahead.
+**Status:** ✅ **RESOLVED AND APPLIED 2026-07-27.** All 19 ZIPs repaired, 15 missing county
+roots seeded, the 73 duplicate rows removed, affected pages re-materialized and verified.
+Reproducible seed of record + full before/after evidence:
+**`docs/cross-state-zip-repair-seed.sql`**. Sections 5a/5b/5c below are superseded by that
+file (the applied version seeds the 15 missing roots, which the original proposal deferred).
 **Date:** 2026-07-27. **Trigger:** ZIP 79922 anchoring El Paso, TX news to Doña Ana County, NM.
 
 ---
