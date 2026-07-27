@@ -1,0 +1,56 @@
+name: verify-maps-rest-shapes
+
+# PRODUCTION check that EVERY plotted record on the Maps page renders the shape
+# HS.resolveMarker gave it — not just the 16 lettered pins. The rest layer is drawn to
+# a MapLibre canvas (no DOM), so the existing DOM verifier could not see it; that blind
+# spot is how a `circle` rest layer shipped and flattened 97 of 113 markers on the
+# founder's home view into circles when only 24 were honestly unclassifiable.
+#
+# Runs against the deployed site (the build sandbox has no egress — CI is the live check,
+# the repo's standing pattern). VERIFICATION ONLY — touches no product code.
+#
+# Home anchor: this repo is PUBLIC, so a resident's precise parcel geocode is not
+# committed. The script defaults to the Del Valle coordinate already in the repo (~0.2 mi
+# from the parcel — the 1.5 mi record set is very nearly the same). Set the optional
+# repository secrets MAPS_HOME_LAT / MAPS_HOME_LNG to reproduce the parcel-exact view;
+# secrets are masked in the run log.
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_base:
+        description: 'Site to verify (default https://homesignal.net)'
+        required: false
+        default: 'https://homesignal.net'
+  push:
+    branches: [main]
+    paths:
+      - 'maps.html'
+      - 'lib/map.js'
+      - 'scripts/verify-maps-rest-shapes.mjs'
+  schedule:
+    - cron: '35 7 * * *'
+
+jobs:
+  rest-shapes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      # A push to main is only live once Pages republishes; give the deploy a moment so
+      # the run reads the new bytes rather than the previous build.
+      - name: Wait for the Pages deploy to land
+        if: github.event_name == 'push'
+        run: sleep 90
+      - name: Verify rest-layer symbology on the exact home view
+        env:
+          SITE_BASE: ${{ github.event.inputs.site_base || 'https://homesignal.net' }}
+          HOME_ZIP: '78617'
+          HOME_ADDRESS: '13313 COOMES DR'
+          HOME_LAT: ${{ secrets.MAPS_HOME_LAT }}
+          HOME_LNG: ${{ secrets.MAPS_HOME_LNG }}
+        run: node scripts/verify-maps-rest-shapes.mjs

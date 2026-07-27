@@ -67,8 +67,13 @@ ok(/hs-rest-cluster/.test(page) && /hs-rest-pt/.test(page),
 ok(/getClusterExpansionZoom/.test(page), 'maps.html: clusters zoom-expand on click');
 ok(/restFeatureCollection\(/.test(page) && /setData\(/.test(page),
    'maps.html: drawGL feeds the rest layer via setData(restFeatureCollection(...))');
-ok(/L\.canvas\(/.test(page) && /circleMarker\(/.test(page),
-   'maps.html: Leaflet fallback renders the rest layer as canvas circleMarkers');
+// The Leaflet fallback used to draw the rest layer as canvas circleMarkers, which can
+// express only COLOUR — so every record past the lettered head became a circle whatever
+// its type. It now draws the same HS.markerSVG a lettered pin uses, so shape survives.
+ok(!/circleMarker\(/.test(page),
+   'maps.html: Leaflet fallback no longer flattens the rest layer to circleMarkers');
+ok(/HS\.markerSVG\(mk\.shape, mk\.color, '', 20\)/.test(page),
+   'maps.html: Leaflet fallback draws each rest record with its resolved shape');
 ok(/All records on file/.test(page) && /allRecMore/.test(page),
    'maps.html: the complete chunk-rendered "All records on file" list exists');
 ok(/complete === false[\s\S]{0,200}incomplete app_projects read/.test(page),

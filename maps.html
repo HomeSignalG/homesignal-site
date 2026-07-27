@@ -1089,7 +1089,8 @@ HS.onReady(async function () {
     // beyond the nearest set) with each record's canonical TYPE shape + STATUS color,
     // so Focus shows the same complete status/type symbology the tile modes' rest
     // layer carries — never a 16-pin subset dominated by the facility overlay.
-    overlayRestPins(document.getElementById('mapSch'), restItems(items));
+    lastRestSet = restItems(items);                                 // verification hook
+    overlayRestPins(document.getElementById('mapSch'), lastRestSet);
     overlayFacilities(document.getElementById('mapSch'), items);
     // Focus-completeness CI hook (verify-maps): the schematic must plot EVERY visible
     // record + EVERY mappable facility — the same complete set the tile rest layer
@@ -1463,10 +1464,16 @@ HS.onReady(async function () {
         paint:{ 'circle-color':'#157a49', 'circle-opacity':0.75,
           'circle-radius':['step',['get','point_count'],12,10,16,50,22,250,28],
           'circle-stroke-color':'#ffffff','circle-stroke-width':2 } });
-      glMap.addLayer({ id:'hs-rest-pt', type:'circle', source:'hs-rest',
+      // SYMBOL layer, not circle: an unclustered rest point draws the SHAPE
+      // resolveMarker() gave it, so "pin shape = project type" holds for every
+      // plotted record and not just the lettered head. Icons are generated
+      // locally from HS.markerSVG (registerRestIcons below) — no sprite sheet,
+      // no external runtime dependency. Colour still comes from the record's
+      // status, so shape=type / colour=lifecycle is preserved.
+      glMap.addLayer({ id:'hs-rest-pt', type:'symbol', source:'hs-rest',
         filter:['!',['has','point_count']],
-        paint:{ 'circle-color':['get','col'], 'circle-radius':5.5,
-          'circle-stroke-color':'#ffffff','circle-stroke-width':1.5 } });
+        layout:{ 'icon-image':['get','icon'], 'icon-size':0.62,
+          'icon-allow-overlap':true, 'icon-ignore-placement':true } });
       glMap.on('click','hs-rest-cluster', function(e){
         var f = e.features && e.features[0]; if (!f) return;
         var src = glMap.getSource('hs-rest'), fin = function(z){
@@ -1487,6 +1494,49 @@ HS.onReady(async function () {
       });
       glReady=true; drawGL();
     });
+  }
+  // Rasterize HS.markerSVG(shape,color) into a MapLibre image, once per distinct
+  // (shape,colour) pair the rest layer needs. Deterministic and fully local: the
+  // SVG is built by the SAME function the lettered pins and the legend use, so a
+  // rest marker cannot drift from a lettered one. No sprite sheet and no external
+  // runtime dependency — the CSP on this page allows neither.
+  var restIconsAdded = {};
+  var lastRestSet = [];        // the rest set most recently handed to a renderer
+  // Decoding an SVG data URI is ASYNCHRONOUS, so the icons for a freshly-drawn view are
+  // not in the style yet when setData runs. MapLibre would then warn once per missing
+  // image and leave those points unplaced until something else forced a re-place. So the
+  // caller hands us the source and we re-feed it when the batch lands — one extra
+  // setData, only on the first view that needs a new (shape,colour) pair.
+  function registerRestIcons(fc, onReady){
+    if (!glMap || !HS.restIconSpecs) return;
+    var pending = 0, fired = false;
+    var settle = function(){ if (--pending === 0 && !fired) { fired = true; if (onReady) onReady(); } };
+    HS.restIconSpecs(fc).forEach(function(spec){
+      if (restIconsAdded[spec.id]) return;
+      restIconsAdded[spec.id] = 1;
+      if (glMap.hasImage && glMap.hasImage(spec.id)) return;
+      var px = 44;                                     // 2x of the 22px drawn size
+      var svg = HS.markerSVG(spec.shape, spec.color, '', px);
+      var img = new Image(px, px);
+      pending++;
+      img.onload = function(){
+        try {
+          if (!(glMap.hasImage && glMap.hasImage(spec.id))) {
+            var cv = document.createElement('canvas');
+            cv.width = px; cv.height = px;
+            var ctx = cv.getContext('2d');
+            ctx.drawImage(img, 0, 0, px, px);
+            // data: URIs are same-origin, so getImageData does not taint the canvas.
+            glMap.addImage(spec.id, ctx.getImageData(0, 0, px, px), { pixelRatio: 2 });
+          }
+        } catch (e) { /* a failed icon leaves the point undrawn, never mis-shaped */ }
+        settle();
+      };
+      img.onerror = function(){ restIconsAdded[spec.id] = 0; settle(); };
+      // Inline SVG data URI — same-origin, no network fetch.
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    });
+    if (pending === 0 && onReady) onReady();          // every icon already in the style
   }
   function drawGL(){
     var items = shownItems();
@@ -1512,18 +1562,28 @@ HS.onReady(async function () {
     // Maps uncap: feed the clustered rest layer everything visible beyond the letters.
     var rest = restItems(items);
     restById = {};
+    lastRestSet = rest;                           // verification hook (__HS_REST_VERIFY)
     rest.forEach(function(it){ if (it.id != null) restById[it.id] = it; });
     var restSrc = glMap.getSource('hs-rest');
-    if (restSrc) restSrc.setData(HS.restFeatureCollection(rest));
-    if (window.__HS_MAP) window.__HS_MAP.restCount = rest.length;   // CI hook (verify-maps-uncap)
+    var restFC = HS.restFeatureCollection(rest);
+    // Icons must be in the style before the symbols are placed; the second setData is
+    // the no-op re-place for the pairs that were still decoding on this first draw.
+    registerRestIcons(restFC, function(){ if (restSrc) restSrc.setData(restFC); });
+    if (restSrc) restSrc.setData(restFC);
+    if (window.__HS_MAP) {
+      window.__HS_MAP.restCount = rest.length;    // CI hook (verify-maps-uncap)
+      // CI hook (verify-maps-rest-shapes): what the REST layer will actually draw.
+      window.__HS_MAP.restShapes = restFC.features.map(function (f) {
+        return { id: f.properties.id, shape: f.properties.shape, col: f.properties.col };
+      });
+    }
     setGps(items); renderInfo(items);
     wirePanel(drawGL);
   }
 
   // ---------- Leaflet raster fallback (real tiles WITHOUT WebGL) ----------
   var lfMap=null, lfSat=null, lfOsm=null, lfBase=null, lfRadius=null, lfMarkers=[],
-      lfFailed=false, lfTilesOK=0, lfTileErrs=0, lfWatchdogArmed=false, lfLastView=null,
-      lfRestRenderer=null;   // ONE shared canvas renderer for the rest layer (cheap at 1,000s of points)
+      lfFailed=false, lfTilesOK=0, lfTileErrs=0, lfWatchdogArmed=false, lfLastView=null;
   var loadLeaflet = HS.loadLeaflet;
   function lfDivIcon(html,size){ return L.divIcon({html:html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2]}); }
   function clearLfMarkers(){ lfMarkers.forEach(function(m){ try{ lfMap.removeLayer(m); }catch(e){} }); lfMarkers=[]; }
@@ -1550,23 +1610,95 @@ HS.onReady(async function () {
       fm.on('click', function(){ selectFacility(f); });            // same panel, never navigates
       lfMarkers.push(fm);
     });
-    // Maps uncap: the rest layer on the fallback map — canvas circleMarkers, because
-    // thousands of canvas circles are cheap where thousands of DOM divIcons are not.
-    // Same click dispatch as a lettered pin (facility rest points -> facility detail).
+    // Maps uncap: the rest layer on the fallback map — shape-bearing divIcons, so a
+    // record past the lettered head shows its real TYPE here exactly as it does on the
+    // GL symbol layer. Same click dispatch as a lettered pin (facility rest points ->
+    // facility detail).
     var rest = restItems(items);
+    lastRestSet = rest;                                             // verification hook
     if (window.__HS_MAP) window.__HS_MAP.restCount = rest.length;   // CI hook (verify-maps-uncap)
     if (rest.length) {
-      if (!lfRestRenderer) lfRestRenderer = L.canvas({ padding: 0.4 });
       rest.forEach(function(it){
         var mk = HS.resolveMarker(it);
-        var m = L.circleMarker([it.lat, it.lng], { renderer: lfRestRenderer, radius: 5,
-          color:'#ffffff', weight:1.5, fillColor: mk.color, fillOpacity:0.95 }).addTo(lfMap);
+        // divIcon carrying the SAME HS.markerSVG a lettered pin uses, so a rest
+        // record shows its real SHAPE here too. This replaced canvas circleMarkers,
+        // which could only express colour and therefore drew every record past the
+        // lettered head as a circle regardless of its type.
+        var m = L.marker([it.lat, it.lng], {
+          icon: lfDivIcon('<div class="hspin hsrest" data-rid="' + HS.esc(String(it.id == null ? '' : it.id))
+            + '" style="line-height:0">' + HS.markerSVG(mk.shape, mk.color, '', 20) + '</div>', 20),
+          title:(mk.typeLabel||it.type||it.category||'Record')+' · '+(it.name||it.title||'')
+        }).addTo(lfMap);
         m.on('click', function(){ if (it._restFacility) selectFacility(it); else openItem(it); });
         m.bindTooltip((mk.typeLabel||it.type||it.category||'Record')+' · '+(it.name||it.title||''));
         lfMarkers.push(m);
       });
     }
   }
+  // ── Rest-layer symbology verification hook (scripts/verify-maps-rest-shapes.mjs) ──
+  // The lettered A–P pins are DOM nodes, so __HS_MARKER_DOM_VERIFY can read their SVG
+  // geometry directly. The REST layer past the letters is not DOM on the tile maps — it
+  // is a MapLibre symbol layer drawn to canvas — so its correctness has to be read out
+  // of live GL state instead. That blind spot is exactly how the defect shipped: the
+  // rest layer was `type:'circle'` and every record past the 16th drew a circle whatever
+  // its type, with no DOM to catch it.
+  //
+  // Returns live, per-record evidence — never a self-report: the layer's real type, the
+  // real `icon-image` expression, whether each icon IMAGE is actually registered in the
+  // GL style, the shape each renderer drew, and every circle that is NOT backed by an
+  // honest FALLBACK:other classification.
+  window.__HS_REST_VERIFY = function () {
+    var out = { mode: opts.mode, radiusMi: opts.radiusMi, hasHome: hasRealHome,
+                homeAddress: hasRealHome ? home.address : null,
+                restTotal: lastRestSet.length, gl: null, focus: null,
+                leaflet: null, expected: [], unexplainedCircles: [], shapeCounts: {},
+                fallbackCounts: {} };
+    lastRestSet.forEach(function (it) {
+      var mk = HS.resolveMarker(it);
+      out.expected.push({ id: it.id, name: it.name || it.title || '', shape: mk.shape,
+        col: mk.color, rule: mk.shapeRule, reason: mk.fallbackReason || '',
+        srcType: it.type || it.use_type || it.layer || it.category || '' });
+      out.shapeCounts[mk.shape] = (out.shapeCounts[mk.shape] || 0) + 1;
+      if (mk.shape === 'circle') {
+        var why = mk.shapeRule === 'FALLBACK:other' && mk.fallbackReason ? 'honest' : 'UNEXPLAINED';
+        out.fallbackCounts[why] = (out.fallbackCounts[why] || 0) + 1;
+        if (why === 'UNEXPLAINED') out.unexplainedCircles.push({ id: it.id,
+          name: it.name || it.title || '', srcType: it.type || it.use_type || '',
+          rule: mk.shapeRule || null });
+      }
+    });
+    // --- MapLibre (Street + Satellite share this layer) ---
+    if (glMap && glReady && glMap.getLayer && glMap.getLayer('hs-rest-pt')) {
+      var lyr = glMap.getLayer('hs-rest-pt');
+      var src = glMap.getSource('hs-rest');
+      var fc = (src && src._data) || { features: [] };
+      out.gl = {
+        layerType: lyr.type,
+        iconImage: JSON.stringify(glMap.getLayoutProperty('hs-rest-pt', 'icon-image')),
+        featureCount: fc.features.length,
+        renderedCount: (glMap.querySourceFeatures ? glMap.querySourceFeatures('hs-rest').length : -1),
+        features: fc.features.map(function (f) {
+          return { id: f.properties.id, shape: f.properties.shape, col: f.properties.col,
+            icon: f.properties.icon,
+            imageRegistered: !!(glMap.hasImage && glMap.hasImage(f.properties.icon)) };
+        })
+      };
+    }
+    // --- Focus (schematic SVG — real DOM geometry, read the same way as a lettered pin) ---
+    var schG = document.querySelectorAll('#mapSch .hs-rest-pins g.hspin');
+    if (schG.length) {
+      out.focus = { count: schG.length, shapes: [].map.call(schG, function (g) { return geomFromNode(g); }) };
+    }
+    // --- Leaflet raster fallback (only present when WebGL is unavailable) ---
+    var lfPins = document.querySelectorAll('#maplf .leaflet-marker-icon .hspin.hsrest');
+    if (lfPins.length) {
+      out.leaflet = { count: lfPins.length, pins: [].map.call(lfPins, function (d) {
+        return { id: d.getAttribute('data-rid'), shape: geomFromNode(d.querySelector('svg')) };
+      }) };
+    }
+    return out;
+  };
+
   function lfFail(){
     if (lfFailed) { schematicFinal(); return; }
     lfFailed = true;
