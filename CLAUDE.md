@@ -590,6 +590,54 @@ legal/framing change not covered by the one-time sign-off.
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 
 ### Status
+- 🟢 **POLYGON / POLYLINE GEOMETRY PASS — the ArcGIS connector can now PIN non-point layers;
+  5 sources wired (registry 76 → 81 entries)** (live-probe + unit-verified 2026-07-27). Until
+  now `sources/arcgis.ts` flattened **point geometry only**, so every polygon/polyline layer
+  produced records with **no coordinates** — listed, never pinned on the 2D / satellite / focus
+  views. New `featurePoint()` resolves a pin from the feature's OWN geometry: point `{x,y}`
+  (unchanged) → the server's centroid → polygon `rings` via a signed (shoelace) area-weighted
+  centroid, holes subtracting and multipart parts combining → polyline `paths` at half the
+  cumulative length of the longest path (a point ON the line). No geometry still yields no
+  coordinates — the record stays area-scoped, never a fabricated pin. **The derivation is not a
+  convenience approximation: it reproduces ArcGIS's own `returnCentroid` to 2.6e-5° (~2.9 m) and
+  8.3e-6° (~0.9 m) on the two layers that publish both.**
+  **New standing answer (so no session re-derives): `returnCentroid` is OPT-IN per registry
+  entry (`return_centroid`), NEVER derived from "geometryType is not `esriGeometryPoint`."**
+  Three live behaviors: a **polyline layer HARD-REJECTS it** (HTTP 200 carrying
+  `{"error":{"code":400,…"Return geometry centroid is only supported on layer with polygon
+  geometry type."}}` — TxDOT), classic ArcGIS Server **MapServer layers silently ignore it**
+  (rings, no `centroid` key — Houston/Harris/Fort Worth/NRH/Washoe), and only hosted AGO
+  FeatureServers honor it (Clark, Douglas). The literal "not a point → add the param" rule would
+  have broken the statewide TxDOT source and still pinned only 2 of 9. Wired: **`txdot-projects-info-all`**
+  (polyline, statewide TX, 85,422 rows, 16 verbatim `PROJ_STG` values — mapped instead of
+  `PROJ_STAT`, whose 'Active' spans Planning→Construction and could not be bucketed without
+  guessing), **`houston-plat-applications`** (36,774), **`harris-county-plats`** (573, statuses
+  right-padded upstream → trimmed both sides by the connector), **`fort-worth-zoning-cases`** (96),
+  **`clark-county-active-projects`** (236, the only `return_centroid: true` entry). **4 rejected
+  with receipts:** Houston layer 0 "Final Plats" is a **proven subset** of layer 1 (same AppIds +
+  AppNos; wiring both would have double-emitted ~25,777 plats per Houston page — the engine-v22
+  duplicate class, uncatchable by exact-identity dedup across two `source_registry_id`s); Washoe
+  Accela **stalled at 2016-10-27**; North Richland Hills "Special Use Permit" has **no status and
+  no date column** (1990s adopted zoning overlays); Douglas County NV Major Projects has
+  **free-text prose statuses** and content frozen ~2020. `SA-PC` is a geometry-less Table, out of
+  scope by instruction. Regression: `test/arcgis-geometry.test.mjs` drives the **shipped**
+  connector over a real captured feature — which needs Node type stripping, so `unit-tests` CI
+  moved **20 → 22** (full 57-file suite green). **Live go-live smoke** (deployed run
+  30312463714, six ZIPs re-run through the live engine, all 200, persisted via
+  `dev_refresh_collect`): 76104 · 76110 (Tarrant) · 78617 (Travis) · 89101 · 89106 (Clark NV) ·
+  **77393 (Harris — lifted off the facilities floor for the first time, 0 → 35 sourced records,
+  all from TxDOT)**. **The invariant that proves the build: across all 175 records from the three
+  new sources — 132 TxDOT polyline, 41 Clark polygon, 2 Fort Worth polygon — 0 missing
+  `record_url`, 0 missing coordinates, all `scope:"point"`**, with geographically correct spreads
+  (TxDOT lat 30.128–32.792 Austin→Fort Worth; Clark 36.072–36.210 Las Vegas). ⚠️ **Open
+  follow-up: `houston-plat-applications` + `harris-county-plats` are correctly wired but have no
+  surface — Harris County has exactly ONE modeled `level=zip` page (77393), whose centroid
+  30.329/−95.4635 is in Conroe, ~50 mi north of Houston and outside Harris County** (Tarrant has
+  99, Travis 86, Clark 76). Not the Arlington missing-ZIP-scoping bug: live envelope probes
+  return 5,542 plat applications within ±3 mi of downtown Houston and 61 Harris plats county-wide.
+  The unlock is a **Harris County ZIP expansion** (the NYC-borough / Boston-Suffolk /
+  Philadelphia-County precedent); until then both entries sit dormant behind the coverage gate.
+  Receipts: docs/source-registry.md "POLYGON / POLYLINE GEOMETRY PASS".
 - 🟢 **TEXAS DEV-COVERAGE PASS — `frisco-active-building-permits` WIRED; TX development pages
   110 → 118** (DB-verified 2026-07-27). Recon over the five TX counties with the most
   facilities-only pages. **Config only — no connector, engine or schema change.** The City of

@@ -2315,3 +2315,153 @@ plus the EPA facilities floor only. Arizona's remaining dark counties — Navajo
 Mohave, Cochise, Yuma, Santa Cruz, Apache — likewise have no wireable first-party per-record
 source found in this pass. No entry was created for any of them: **an unusable source is
 documented, not wired.**
+
+---
+
+## POLYGON / POLYLINE GEOMETRY PASS (2026-07-27) — connector change + 5 sources wired
+
+Scope: the nine polygon/polyline sources in the `0036` workbook, plus the ArcGIS connector
+support they need. Before this pass the connector flattened **point geometry only**
+(`f.geometry.x` / `f.geometry.y`), so a polygon or polyline layer produced records with no
+coordinates — listed, but never pinned on the 2D / satellite / focus views.
+
+### Connector change (`sources/arcgis.ts`) — purely additive
+
+`featurePoint()` resolves a feature's pin from the feature's **own** geometry:
+
+1. point `{x,y}` — the pre-existing path, unchanged (asserted byte-for-byte);
+2. the server's polygon centroid, when `returnCentroid` was honored;
+3. polygon `rings` → the area-weighted (shoelace) centroid, signed so holes subtract and
+   multipart polygons combine;
+4. polyline `paths` → the point at half the cumulative length of the longest path — a point
+   that lies **on** the line.
+
+No geometry still yields no coordinates: the record stays area-scoped rather than acquiring a
+fabricated pin.
+
+**The derived centroid is not an approximation of convenience.** On the two layers that
+publish both, it reproduces ArcGIS's own `returnCentroid` to **2.6e-5°(~2.9 m)** and
+**8.3e-6°(~0.9 m)** — the residual being planar-degree vs geodesic arithmetic. Receipts:
+`clark-county-active-projects` server `{x:-115.15351077017141, y:36.1032081087714}`;
+`douglas-county-major-projects` server `{x:-119.82057133657315, y:39.049196864125506}`.
+
+**Standing answer — `returnCentroid` is OPT-IN per entry (`return_centroid`), never derived
+from "geometryType is not point".** Live probes found three distinct behaviors:
+
+| behavior | layers (live) | receipt |
+|---|---|---|
+| **hard 400** | `txdot-projects-info-all` (polyline) | HTTP 200 body `{"error":{"code":400,…"Return geometry centroid is only supported on layer with polygon geometry type."}}` |
+| **silently ignored** | Houston PlatTracker 0+1, Harris Plats, Fort Worth zoning, NRH zoning, Washoe Accela | rings returned, **no** `centroid` key |
+| **honored** | Clark County Active Projects, Douglas County Major Projects (hosted AGO FeatureServers) | `centroid:{x,y}` alongside the rings |
+
+So the literal rule "if geometryType is not `esriGeometryPoint`, add `returnCentroid=true`"
+would have **broken the statewide TxDOT source outright**, and would have pinned only 2 of the
+9 sources even where it succeeded. The ring/path derivation is what actually carries them.
+
+Regression: `test/arcgis-geometry.test.mjs` drives the **shipped** connector (imported, not
+re-implemented) over `fixtures/arcgis/polygon-centroid-sample.json` — a real captured feature
+with its server centroid — plus hole / multipart / winding / degenerate / polyline cases. It
+needs Node's type stripping, so `unit-tests` CI moved 20 → 22.
+
+### Wired (5)
+
+| registry_id | layer | geom | rows | status vocab | freshness |
+|---|---|---|---|---|---|
+| `txdot-projects-info-all` | TxDOT_Projects_Info_All/0 | polyline | 85,422 | 16 `PROJ_STG` verbatim | `LAST_PROJ_UPDATE_DT` 100%, max 2026-07-25 |
+| `houston-plat-applications` | PT365_PLAT_MAPPING/1 "Plat Applications by Type" | polygon | 36,774 | 6 `AppStatus` (sums exactly) | `AppSubmitDate` 100%, max 2026-07-27 |
+| `harris-county-plats` | Plats_NonHouston_SV/0 | polygon | 573 | 6 `PlatStatus` (padded → trimmed) | 135 received since 2025-01-01 |
+| `fort-worth-zoning-cases` | Zoning_case_service/12 | polygon | 96 | `ACTION_` Approved 4 / Denied 1 | max `ZC_DATE` 2026-08-12 (future hearing) |
+| `clark-county-active-projects` | Active_Projects/0 | polygon | 236 | 5 `PROSTATUS` (sums exactly) | `EditDate` 2026-07-27 |
+
+All five: no ZIP column → `spatial_zip_radius_mi: 3`; no per-record URL column →
+`record_url_precision: "dataset"` on the verified machine endpoint (Boulder/Philadelphia
+precedent) rather than a templated guess. `clark-county-active-projects` is the only entry
+carrying `return_centroid: true`. Full per-entry evidence lives in each entry's `_receipts`.
+
+**`txdot-projects-info-all` known display characteristic** (documented, not a defect): the
+spatial envelope selects any project whose line *intersects* the ZIP, so a long corridor
+project can pin at its own midpoint several miles from the ZIP page it appears on. The pin is
+a real point on the real published geometry and the record genuinely crosses the ZIP.
+`verify-geocodes` does not fence it — source-supplied geometry carries no `match_type`
+(`scripts/verify-geocodes.mjs:208`).
+
+### NOT wired — 4 rejections with receipts
+
+- **`HOU-DP` — PT365_PLAT_MAPPING layer 0 "Final Plats" (25,777): a proven SUBSET of layer 1.**
+  Wiring both would have emitted ~25,777 Houston plats **twice** on every Houston page — the
+  exact duplicate class engine v22 was built to remove, and one its exact-identity dedup would
+  **not** catch, because the two entries carry different `source_registry_id`/`source_id`.
+  Proof: layer 0's five newest AppIds (93355, 93350, 93342, 93340, 93339) all return from layer 1
+  with identical AppNos; both share min AppId 40410; in the window AppId 93000–93500 layer 0 has
+  172 rows to layer 1's 361; and layer 1 equals-or-exceeds layer 0 on every shared AppCode
+  (C2R 10,880 vs 10,826 · C3F 8,369 vs 8,360 · C2 5,782 vs 5,755 · SP 778 vs 775 · C1 51 vs 46 ·
+  VF 15 vs 15) while adding five codes layer 0 lacks.
+- **`WSH-BP` — Washoe County `Accela/AccelaWashoe/23`: STALLED at 2016-10-27.** `DATE_` is the
+  layer's only date field, populated 265,039/265,039, and its live max is **2016-10-27** — nearly
+  ten years stale. Schema was otherwise excellent (51 verbatim `STATUS` values, 139 `TYPE` values,
+  a clean 28-value building/land-use whitelist live-verified at 77,662 rows). Rejected on freshness
+  alone → nightly reprobe list. *(Fort Lauderdale / Worcester / St. Paul precedent.)*
+- **`NRH-PC-001` — North Richland Hills `Zoning/MapServer/0`, live name "Special Use Permit"
+  (196): no status column and no date column.** Fields are `CODE, DL, ORD, NAME, NAME2, ANNO,
+  CASENUM` only (194/196 carry `ORD` + `CASENUM`). The records are *adopted zoning overlays* from
+  the 1990s (live sample: ORD 2244–2621, CASENUM `PZ 97-41` … `PZ 98-30`), not active development
+  filings. There is nothing to map to a bucket, and `status_const` would be inventing a status
+  string the source never publishes.
+- **`DGL-DP` — Douglas County NV Major Projects (39): free-text prose in `Status`, and content
+  frozen ~2020.** `Status` is not a vocabulary — live values include *"Tentative Approval for
+  Phases 3 and 4 granted by Board of Commissioners- May 5, 2016 \r\n30 lots recorded July 2017
+  (Ph 3)"* — ~18 distinct sentences across 33 non-null rows, 6 null. `Type` is null on 20 of 39,
+  `YearApproved` is a STRING whose max is the literal `"Multiple"`, and a column named
+  `LotsBuiltOutThru062020` dates the content. No verbatim status→bucket mapping is possible
+  (San Jose `"30"` precedent). Rejected despite being one of only two layers that honor
+  `returnCentroid`.
+
+### `SA-PC` — out of scope by instruction
+Not probed and not wired: it is an ArcGIS **Table** (no geometry), so it is not part of this
+polygon/polyline pass.
+
+### Live go-live smoke (deployed engine, 2026-07-27)
+
+Deployed via `deploy-edge-functions.yml` (run 30312463714, green), then six cached ZIPs were
+re-run through the live function with `net.http_post` — all **HTTP 200** — and persisted with
+`dev_refresh_collect()`.
+
+| ZIP | county | sourced records | from the new sources | registry_ids present |
+|---|---|---|---|---|
+| 76104 | Tarrant | 528 | 41 | `fort-worth-development-permits`, **`fort-worth-zoning-cases`**, **`txdot-projects-info-all`** |
+| 76110 | Tarrant | 503 | 38 | `fort-worth-development-permits`, **`txdot-projects-info-all`** |
+| 78617 | Travis | 443 | 20 | `austin-site-plan-cases`, `austin-subdivision-cases`, **`txdot-projects-info-all`** |
+| 89101 | Clark NV | 369 | 26 | **`clark-county-active-projects`**, `clv-planning-cases`, `las-vegas-building-permits` |
+| 89106 | Clark NV | 330 | 15 | **`clark-county-active-projects`**, `clv-planning-cases`, `las-vegas-building-permits` |
+| 77393 | Harris | 35 | 35 | **`txdot-projects-info-all`** — page lifted off the facilities floor for the first time |
+
+**The invariant that proves this build did its job: across every record emitted by the three
+new sources — 132 TxDOT (polyline), 41 Clark (polygon), 2 Fort Worth (polygon) — there were
+0 missing `record_url` and 0 missing coordinates, all `scope: "point"`.** Before this change a
+polygon or polyline layer could only ever produce coordinate-less records. Coordinate spreads
+are geographically correct (TxDOT lat 30.128–32.792 spanning Austin→Fort Worth; Clark
+36.072–36.210 over Las Vegas; Fort Worth 32.714–32.765). Cache-wide for the six ZIPs:
+**0 sourced sites missing coords, 0 missing URL.**
+
+`fort-worth-zoning-cases` appears on 76104 and not 76110, as expected — only 5 of its 96 rows
+carry a decided `ACTION_`, the rest fail closed.
+
+### ⚠️ Open follow-up — Harris County has ONE modeled ZIP page, so the two Harris sources have no surface
+
+`houston-plat-applications` and `harris-county-plats` are correctly wired but emitted **0**
+records in the smoke, and the reason is a **communities-model gap, not a wiring bug** (it is
+explicitly *not* the Arlington/`harris-county-permits` missing-ZIP-scoping class, which
+quarantined at 0 everywhere):
+
+- Harris County has exactly **1** `level=zip` community with a cached report — **77393** — whose
+  pinned centroid is **30.329, −95.4635**: Conroe, roughly 50 miles north of Houston and outside
+  Harris County altogether (it is a P.O.-type ZIP). A 3-mile envelope there legitimately contains
+  no Houston plats. For comparison Tarrant has 99, Travis 86, Clark 76.
+- Both entries return real data over real Houston/Harris geography. Live envelope probes:
+  **5,542** plat applications within ±3 mi of downtown Houston (29.7604, −95.3698), and **61**
+  Harris plats in the wider county box — both `esriGeometryPolygon` with rings, and with statuses
+  from the mapped vocabulary (`Action Form Completed`, `Historical Plat`, `Pre-Recordation Plat`).
+
+The unlock is a **Harris County ZIP expansion** — the same structural fix already applied for the
+NYC boroughs, Boston/Suffolk and Philadelphia County. Until then both entries sit dormant and
+cost nothing (the coverage gate keeps them off every non-Harris page). Logged, not blocking.
