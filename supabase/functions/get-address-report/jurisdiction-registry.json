@@ -4784,6 +4784,281 @@
       "recency_days": 1095,
       "_receipts": "2026-07-27 TX/NV original-workbook wire pass (HC-BP-001). Harris County ePermits layer 1 'Permits (Regulation)'. esriGeometryPoint, 1,276,613 rows. STATUS: 19 PROJECTSTATUS values VERBATIM via an ALPHABETICAL groupBy summing EXACTLY to 1,276,613 (Issued 1,199,164 / Cancel 35,045 / Return to Customer 25,051 / Ready for Payment 5,634 / Final Approval 4,418 / Revision 4,167 / Paid 1,658 / Assigned 398 / Transfer Department 273 / Customer Dispute 231 / Dept Approval 140 / Draft 120 / Dept Disapproval 117 / Physical Plan Pickup 69 / Submit 61 / UnAssigned: Pending Inspection 49 / Assigned: Pending Inspection 13 / Permit Denied 4 / Priority Changed 1) — complete domain, 0 unmapped. operating:[] — the ledger has no finaled/completed state. DUPLICATE PROOF — ONLY ONE OF THE THREE HARRIS LAYERS IS WIRED. The workbook lists three, and they are the same records at three grains: HOU-BP (Permits/IssuedPermits/FeatureServer/0) has an IDENTICAL field list and PROJECTSTATUS='Issued' 1,194,947 vs this layer's 1,199,164 — a filtered view of the same ledger; HC-DEV-001 (ePermits/FeatureServer/0 'Projects') is the PARENT application layer for the same PROJECTNUMBERs (STATUS='Issued' 1,182,850). Wiring all three would stack ~3.6M near-identical records on the same Harris addresses, and the engine's dedup key includes source_id so they would NOT collapse. This permit-grain layer is the single best choice; the other two are documented rejects. TYPE: APPTYPE enumerated live; construction/land-use classes kept VERBATIM and used as the extra_where whitelist. DROPPED at source: Signs ETJ, Scenic & Toll Road 30,141; Public Works ROW Notifications 26,798; Renewals & Transfers 16,786. recency_days 1095 (3 yr) bounds a 1.28M-row historical ledger. ZIP SCOPING FIX (same session, caught by live verification alongside the Arlington three): the entry was first written with no zip column, no zip_where_template and no spatial radius, so the connector correctly QUARANTINED it and it emitted 0 records. The ePermits layer carries no ZIP attribute (full schema read: OBJECTID, ID, PROJECTNUMBER, PROJECTNAME, FULLADDRESS, APPTYPE, PROJECTSUBMITDATE, PROJECTSTATUS, REGULATION, PERMITNUMBER, PERMITNAME, STATUS, EVENTID, ISSUEDDATE, STREETNUMBER, STREETNAME, DATECREATED, ISCLOSED, PERMITCLASSCODE), so spatial_zip_radius_mi 3 on its own point geometry is the correct scoping. COVERAGE NOTE: Harris County currently has only ONE modeled level=zip community page (77393), so this source's page lift is capped at 1 regardless of its 1.28M rows — the constraint is the communities table, not the source.",
       "spatial_zip_radius_mi": 3
+    },
+    {
+      "registry_id": "txdot-projects-info-all",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/TxDOT_Projects_Info_All/FeatureServer/0",
+      "dataset_url": "https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/TxDOT_Projects_Info_All/FeatureServer/0",
+      "jurisdiction": "Texas Department of Transportation",
+      "coverage": [
+        {
+          "state": "TX"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "HIGHWAY_NUMBER",
+          "TYPE_OF_WORK"
+        ],
+        "status_raw": "PROJ_STG",
+        "type_source": "PROJ_CLASS",
+        "file_date": "LAST_PROJ_UPDATE_DT",
+        "address": [
+          "LIMITS_FROM",
+          "LIMITS_TO"
+        ],
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "CONTROL_SECT_JOB"
+      },
+      "type_map": {
+        "Bicycle Infrastructure Improvements": "Utility",
+        "Bridge Maintenance": "Utility",
+        "Bridge Preventative Maintenance": "Utility",
+        "Bridge Preventative Maintenance - Sealed": "Utility",
+        "Bridge Replacement": "Utility",
+        "Bridge Widening or Rehabilitation": "Utility",
+        "Convert Non-Freeway To Freeway": "Utility",
+        "Corridor Traffic Management ": "Utility",
+        "Culvert & Storm Drainage Work": "Utility",
+        "Emergency Maintenance Project - Sealed": "Utility",
+        "Emergency Relief Projects": "Utility",
+        "Ferry Boat": "Utility",
+        "Freeway Operational Improvements": "Utility",
+        "Grade Crossing Protection": "Utility",
+        "Hazard Elimination & Safety": "Utility",
+        "Interchange (New or Reconstructed)": "Utility",
+        "Intersection & Operational Imprv": "Utility",
+        "Landscape & Scenic Enhancement": "Utility",
+        "Material Maintenance Project": "Utility",
+        "Material Maintenance Project - Sealed": "Utility",
+        "Miscellaneous Construction": "Utility",
+        "New Location Freeway": "Utility",
+        "New Location Non-Freeway": "Utility",
+        "Overlay": "Utility",
+        "Pedestrian, Sidewalks & Curb Ramps ": "Utility",
+        "Rail Hwy Crossing Signals/Structures": "Utility",
+        "Rail Replanking": "Utility",
+        "Railroad Relocation": "Utility",
+        "Rehabilitation of Existing Road": "Utility",
+        "Remove Hazardous Paint (Bridge)": "Utility",
+        "Restoration": "Utility",
+        "Routine Maintenance Project": "Utility",
+        "Routine Maintenance Project - Sealed": "Utility",
+        "Safety Bond Projects": "Utility",
+        "Safety Improvement Projects": "Utility",
+        "Seal Coat": "Utility",
+        "State Owned Rail Line": "Utility",
+        "Super-2 Highway": "Utility",
+        "Systemic Widening Projects": "Utility",
+        "Traffic Control Devices": "Utility",
+        "Traffic Protection Devices": "Utility",
+        "Traffic Signal": "Utility",
+        "Transportation Enhancement ": "Utility",
+        "Transportation Non-Roadway": "Utility",
+        "Tunnel Construction": "Utility",
+        "Upgrade to Standards Freeway": "Utility",
+        "Upgrade to Standards Non-Freeway ": "Utility",
+        "Utility Adjustments": "Utility",
+        "Widen Freeway": "Utility",
+        "Widen Non-Freeway": "Utility",
+        "Border Crossing Facility": "Civic/Public",
+        "Building Project": "Civic/Public",
+        "Military Bases and Federal Campus": "Civic/Public",
+        "Port Infrastructure": "Civic/Public",
+        "Safety Rest Area": "Civic/Public",
+        "Texas Park and Wildlife ": "Civic/Public"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Initiate",
+          "Planning",
+          "PE",
+          "PS&E",
+          "Procurement",
+          "Pre Procurement",
+          "Ready to Let",
+          "Letting",
+          "Design and Construct",
+          "Dual"
+        ],
+        "approved": [
+          "Construction",
+          "Execute"
+        ],
+        "operating": [
+          "Operations and Maint"
+        ],
+        "exclude": [
+          "Closed",
+          "Cancelled"
+        ]
+      },
+      "extra_where": "PROJ_STG NOT IN ('Closed', 'Cancelled')",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-27 POLYGON/POLYLINE GEOMETRY PASS (workbook 0036 row TxDOT-PIA). TxDOT's own hosted FeatureServer (org KTcxiTD9dsQw4r7Z), layer 'TxDOT_Projects_Info_All'. geometryType esriGeometryPolyline wkid 4326 -> the connector's NEW polyline path pins each project at the point half-way along its longest path (a point ON the road segment). THIS ENTRY MUST NOT SET return_centroid: the server HARD-REJECTS it here, answering HTTP 200 with {\"error\":{\"code\":400,...,\"details\":[\"'returnCentroid' parameter is invalid\",\"Return geometry centroid is only supported on layer with polygon geometry type.\"]}} (live, request 162991) - which is why the param is opt-in per entry and never derived from 'geometryType is not point'. 85,422 rows (returnCountOnly). 16 PROJ_STG values enumerated VERBATIM via groupBy (Closed 52,469 / Cancelled 10,599 / Construction 9,435 / PS&E 4,638 / Planning 3,811 / null 1,736 / PE 1,157 / Initiate 584 / Execute 502 / Letting 261 / Ready to Let 117 / Design and Construct 42 / Operations and Maint 30 / Procurement 20 / Dual 17 / Pre Procurement 4); PROJ_STG is mapped rather than PROJ_STAT because PROJ_STAT's 'Active' (20,488) spans everything from Planning to Construction and could not be bucketed without guessing. Closed + Cancelled excluded BOTH in status_to_bucket and at source in extra_where; the 1,736 nulls fail closed. 68 PROJ_CLASS values enumerated live (complete - no exceededTransferLimit): 50 physical transportation classes -> use_type Utility (Seal Coat 29,791, Safety Improvement Projects 11,799, Overlay 7,657, Rehabilitation of Existing Road 6,124, Bridge Replacement 3,347, Widen Non-Freeway 3,137, ...), 6 building/facility classes -> Civic/Public (Building Project, Safety Rest Area, Border Crossing Facility, Port Infrastructure, Military Bases and Federal Campus, Texas Park and Wildlife); the 12 administrative/non-physical classes (Feasibility Studies, Preliminary Engineering, Right of Way, Environmental Work Activities, Default, the two Legacy classifications, ...) are deliberately UNMAPPED -> 'unclassified' (logged, never inferred) - the UDOT precedent. Field population live: PROJ_CLASS 85,421/85,422, LIMITS_FROM 85,422, CONTROL_SECT_JOB 85,364, HIGHWAY_NUMBER 85,229, TYPE_OF_WORK 82,286, LAST_PROJ_UPDATE_DT 85,422 (100%) max 2026-07-25 - FRESH, and the only fully-populated date, so it is the file_date (the record's own date of record; stated plainly rather than dressed up as a filing date). STATEWIDE coverage [{state:'TX'}] with no county, permitted by the registry contract for a statewide dataset (coverageMatches: !cov.county matches any TX county) - the same shape as udot-active-projects. No ZIP column anywhere -> spatial_zip_radius_mi 3. No per-record URL column -> record_url_precision 'dataset' pointing at the machine endpoint (Boulder/Philadelphia precedent); templating one would be guessing. KNOWN DISPLAY CHARACTERISTIC (documented, not a defect): the spatial envelope selects any project whose line INTERSECTS the ZIP, so a long corridor project can pin at its own midpoint several miles from the ZIP page it appears on. The pin is a real point on the real published geometry and the record genuinely crosses the ZIP; verify-geocodes does not fence it because source-supplied geometry carries no match_type (scripts/verify-geocodes.mjs:208)."
+    },
+    {
+      "registry_id": "houston-plat-applications",
+      "platform": "arcgis",
+      "service_url": "https://mycity2.houstontx.gov/geoplat01/rest/services/PlatTracker/PT365_PLAT_MAPPING/MapServer/1",
+      "dataset_url": "https://mycity2.houstontx.gov/geoplat01/rest/services/PlatTracker/PT365_PLAT_MAPPING/MapServer/1",
+      "jurisdiction": "City of Houston Planning & Development Department",
+      "coverage": [
+        {
+          "state": "TX",
+          "county": "Harris"
+        }
+      ],
+      "column_map": {
+        "title": "SubdivisionName",
+        "status_raw": "AppStatus",
+        "type_source": "AppCode",
+        "file_date": "AppSubmitDate",
+        "decision_date": "PCDate",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "AppNo"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Application Submitted",
+          "Awaiting Completeness",
+          "Being Reviewed",
+          "Awaiting Assignment",
+          "Check-In Complete"
+        ],
+        "approved": [
+          "Action Form Completed"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-27 POLYGON/POLYLINE GEOMETRY PASS (workbook 0036 row HOU-PC). City of Houston PlatTracker, service PT365_PLAT_MAPPING layer 1, live name 'Plat Applications by Type'. geometryType esriGeometryPolygon (rings) -> pinned by the connector's derived shoelace centroid. return_centroid deliberately NOT set: this classic ArcGIS Server MapServer SILENTLY IGNORES the parameter - the live probe returned rings with no 'centroid' key (request 162993) - so the flag would add a query param that buys nothing. 36,774 rows. 6 AppStatus values VERBATIM via groupBy (Action Form Completed 36,603 / Application Submitted 58 / Awaiting Completeness 47 / Being Reviewed 35 / Awaiting Assignment 27 / Check-In Complete 4) - they sum to exactly 36,774, so the vocabulary is complete and nothing fails closed. AppSubmitDate 36,774/36,774 (100%), max 2026-07-27 - FRESH, same-day. SubdivisionName and AppNo also 100%. LAYER 0 ('Final Plats', 25,777 rows) IS DELIBERATELY NOT WIRED - it is a proven SUBSET of this layer, and wiring both would have emitted ~25,777 Houston plats twice per page (the exact duplicate class engine v22 was built to remove, and one its exact-identity dedup would NOT catch because the two entries carry different source_registry_id/source_id). Proof: layer 0's five newest AppIds (93355, 93350, 93342, 93340, 93339) all return from layer 1 with identical AppNos (2026-1168, 2026-1157, 2026-1153, 2026-1150, 2026-1154); both layers share min AppId 40410; in the window AppId 93000-93500 layer 0 has 172 rows and layer 1 has 361; and layer 1's AppCode counts equal or exceed layer 0's on every shared code (C2R 10,880 vs 10,826 / C3F 8,369 vs 8,360 / C2 5,782 vs 5,755 / SP 778 vs 775 / C1 51 vs 46 / VF 15 vs 15) while adding five codes layer 0 lacks (C3P 4,490, C3N 3,109, GP 1,837, C3R 1,446, VP 17). No type_map: AppCode is an 11-value internal application code (C2R/C3F/C2/C3P/...) with no published expansion, so mapping it to a use_type would be invention - left unclassified, logged. No ZIP column -> spatial_zip_radius_mi 3. No per-record URL column -> record_url_precision 'dataset'."
+    },
+    {
+      "registry_id": "harris-county-plats",
+      "platform": "arcgis",
+      "service_url": "https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/Plats_NonHouston_SV/MapServer/0",
+      "dataset_url": "https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/Plats_NonHouston_SV/MapServer/0",
+      "jurisdiction": "Harris County Permits (unincorporated / non-Houston)",
+      "coverage": [
+        {
+          "state": "TX",
+          "county": "Harris"
+        }
+      ],
+      "column_map": {
+        "title": "PlatName",
+        "status_raw": "PlatStatus",
+        "file_date": "DateReceived",
+        "decision_date": "PCDate",
+        "address": "Location",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "PlatNumber"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "New Plat",
+          "Working Plat",
+          "Pre-Recordation Plat"
+        ],
+        "approved": [],
+        "operating": [
+          "Historical Plat"
+        ],
+        "exclude": [
+          "Withdrawn",
+          "Vacating Plat"
+        ]
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-27 POLYGON/POLYLINE GEOMETRY PASS (workbook 0036 row HC-PC-001). Harris County Permits' own ArcGIS Server, service Permits/Plats_NonHouston_SV layer 0 - unincorporated / non-Houston Harris County, complementing houston-plat-applications rather than overlapping it (different service, different jurisdiction, disjoint by construction: 'NonHouston'). geometryType esriGeometryPolygon -> derived shoelace centroid; return_centroid NOT set (classic MapServer, ignores it - live probe 162994 returned rings with no centroid key). 573 rows. 6 PlatStatus values VERBATIM via groupBy (Historical Plat 420 / Pre-Recordation Plat 112 / Withdrawn 23 / Working Plat 10 / New Plat 7 / Vacating Plat 1) - sums to 573, complete. NOTE the upstream values are RIGHT-PADDED to 50 chars ('Historical Plat' + 35 spaces); they are stored here trimmed because the connector trims on both sides of the lookup (buildBucketLookup does status.trim(), and statusRaw is .trim()ed before the lookup - sources/arcgis.ts). PlatName, PlatNumber and Location are each 573/573. DateReceived is 573/573; its max is 2030-01-02, a single upstream data-entry sentinel rather than a real filing - the live activity signal is 135 plats received since 2025-01-01, so the layer is current. No ZIP column -> spatial_zip_radius_mi 3. No type field -> no type_map (documented absence, not an omission). No per-record URL column -> record_url_precision 'dataset'."
+    },
+    {
+      "registry_id": "fort-worth-zoning-cases",
+      "platform": "arcgis",
+      "service_url": "https://mapit.fortworthtexas.gov/ags/rest/services/Planning_Development/Zoning_case_service/MapServer/12",
+      "dataset_url": "https://mapit.fortworthtexas.gov/ags/rest/services/Planning_Development/Zoning_case_service/MapServer/12",
+      "jurisdiction": "City of Fort Worth Development Services",
+      "coverage": [
+        {
+          "state": "TX",
+          "county": "Tarrant"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "CASE_NMBR",
+          "ZONING_TO"
+        ],
+        "status_raw": "ACTION_",
+        "file_date": "ZC_DATE",
+        "decision_date": "DATE_APPRO",
+        "address": "ADDRESS",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "CASE_NMBR"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Approved"
+        ],
+        "operating": [],
+        "exclude": [
+          "Denied"
+        ]
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-27 POLYGON/POLYLINE GEOMETRY PASS (workbook 0036 row FW-PC). City of Fort Worth Planning_Development/Zoning_case_service layer 12 - ZONING CASES, a different dataset from the already-wired fort-worth-development-permits (different service, different records); service_url dedup checked against all 53 pre-existing arcgis entries, no collision. geometryType esriGeometryPolygon -> derived shoelace centroid; return_centroid NOT set (classic MapServer, ignores it - live probe 162995). 96 rows: this is a CURRENT-CASES layer, not an archive. CASE_NMBR, ADDRESS and ZC_DATE are each 96/96; max ZC_DATE 2026-08-12, i.e. a hearing still in the future - FRESH. ACTION_ (the decision column) is enumerated VERBATIM via groupBy and is null on 91 of 96, with only Approved 4 and Denied 1 populated. THOSE 91 ROWS FAIL CLOSED BY DESIGN - a blank status is dropped and counted (sources/arcgis.ts), so this entry publishes 5 records today, not 96. That is deliberate: ACTION_ is a decision, and the alternative columns cannot substitute - CONSISTENC is a Yes/No comprehensive-plan consistency flag (live sample: ZC-26-035 'No', ZC-25-185 'Yes'), not a lifecycle status, and bucketing it would be exactly the 'never guess the bucket' violation. Recorded here so a future session does not re-derive it: the fix is upstream populating ACTION_, not a cleverer mapping. No ZIP column -> spatial_zip_radius_mi 3. No type field -> no type_map. No per-record URL column -> record_url_precision 'dataset'."
+    },
+    {
+      "registry_id": "clark-county-active-projects",
+      "platform": "arcgis",
+      "service_url": "https://services2.arcgis.com/MLoS3Qx4BXmDoTIY/arcgis/rest/services/Active_Projects/FeatureServer/0",
+      "dataset_url": "https://services2.arcgis.com/MLoS3Qx4BXmDoTIY/arcgis/rest/services/Active_Projects/FeatureServer/0",
+      "jurisdiction": "Clark County, Nevada — Public Works",
+      "coverage": [
+        {
+          "state": "NV",
+          "county": "Clark"
+        }
+      ],
+      "column_map": {
+        "title": "PRONAME",
+        "status_raw": "PROSTATUS",
+        "file_date": "BIDOPEN",
+        "decision_date": "EstConstComplete",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "PRONUM"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Design",
+          "On Hold"
+        ],
+        "approved": [
+          "Construction"
+        ],
+        "operating": [],
+        "exclude": [
+          "Archive"
+        ]
+      },
+      "extra_where": "PROSTATUS <> 'Archive'",
+      "spatial_zip_radius_mi": 3,
+      "return_centroid": true,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-27 POLYGON/POLYLINE GEOMETRY PASS (workbook 0036 row CLC-DP). Clark County NV's own hosted FeatureServer (org MLoS3Qx4BXmDoTIY), 'Active_Projects' layer 0 - county capital projects. geometryType esriGeometryPolygon wkid 4326. THIS IS ONE OF ONLY TWO PROBED LAYERS THAT HONOR returnCentroid, so it is the first consumer of the new opt-in return_centroid flag: the live probe (request 162998) returned centroid {\"x\":-115.15351077017141,\"y\":36.1032081087714} alongside the rings. The connector's own shoelace derivation independently reproduces that value to dx 2.6e-5 / dy 8.2e-6 degrees (~2.9 m) - which is what proves the derived centroid used by the six MapServer-backed polygon sources is the same quantity ArcGIS computes, not an approximation of convenience. 236 rows. 5 PROSTATUS values VERBATIM via groupBy (Archive 80 / Design 74 / Construction 55 / On Hold 21 / null 6) - sums to 236, complete; the 6 nulls fail closed and Archive is dropped both in status_to_bucket and at source in extra_where. Field population live: PRONAME 230/236, PRONUM 222/236, BIDOPEN 222/236, EstConstructionStart 178, NTPDate 99, ConstructionStart 1. BIDOPEN is the file_date - the most-populated REAL project milestone; EditDate (max 2026-07-27, which is the freshness receipt) is editor tracking and is deliberately NOT used as a filing date. PROJADD is 0/236 (entirely null), so there is no address to geocode - the polygon centroid is the only geography, which is exactly what this build adds. TempLink is an INTEGER (live sample: 2126), not a URL, so it is NOT mapped to record_url; record_url_precision 'dataset'. No ZIP column -> spatial_zip_radius_mi 3. No usable type field -> no type_map."
     }
   ],
   "ckan": [
