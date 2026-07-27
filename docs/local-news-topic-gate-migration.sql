@@ -1,5 +1,33 @@
 -- ============================================================================
--- Migration: local_news_canonical_topic_gate            (PARKED — NOT APPLIED)
+-- Migration: local_news_canonical_topic_gate     (APPLIED 2026-07-27 02:2x UTC)
+--
+-- APPLIED via mcp__Supabase__apply_migration, name `local_news_canonical_topic_gate`,
+-- project qwnnmljucajnexpxdgxr. Receipts, in order:
+--   §2 dry run   -> reached the sentinel; catalog read-back md5
+--                   36fd470f7781838b57b9e402e2e0df8f len=12859, then rolled back
+--                   (live re-read after rollback: 3f1dde87… len=12419 — untouched).
+--   §3 apply     -> success; live body now md5 36fd470f7781838b57b9e402e2e0df8f
+--                   len=12859, gate present exactly 1×, anchor still 1×.
+--   re-materialized every affected ZIP through the new body.
+--   §4c invariant -> 0 Local News page rows without a canonical topic (whole surface).
+--   §4d retention -> 1,388 non-qualifying local_news alerts retained intact
+--                   (1,388 source_url, 1,388 publisher, 1,388 title, 1,381 geo_evidence
+--                   — the 7 without geo_evidence are pre-existing; this migration
+--                   issued no UPDATE/DELETE against public.alerts).
+--
+-- BEFORE -> AFTER (page surface):
+--   visible qualifying Local News      1,050 -> 3,510
+--   visible NON-qualifying Local News  8,091 ->     0
+--   ZIPs showing Local News              283 ->   983
+--   Government Notices / Meetings / Development Tracker source counts unchanged
+--   (324 / 2,551 / 12,722). app_changes non-Local-News moved 11,470 -> 11,467; the
+--   -3 is exactly the 3 meetings that crossed `m.meeting_date >= now()` in the
+--   preceding 12 h (designed aging), NOT the gate — Local News is inserted LAST in
+--   the function, so it cannot affect the government branches.
+--
+-- DEFERRED ON PURPOSE: 25 NM-rooted ZIPs (Doña Ana County) were NOT re-materialized,
+-- pending the ZIP 79922 cross-state-root root-cause investigation. Nothing was
+-- deleted or moved; they simply were not rebuilt.
 --
 -- FOUNDER DECISION (2026-07-27), verbatim:
 --   "The 12 HomeSignal Local News topics are the product definition. An article
