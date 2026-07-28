@@ -631,7 +631,23 @@ legal/framing change not covered by the one-time sign-off.
   PRE-ACTION SYSTEM F107, PRIVATE FIRE FLOW TEST F810 …) — Civic/Public on the code, never a
   guess; where the fire permit's SUBJECT is industrial (INDUSTRIAL OVEN, WRECKING YARDS, HIGH
   PILE COMBUSTIBLE STORAGE …) the subject wins, and solar PV (5,558 rows) is Utility, not a fire
-  inspection. Receipts: docs/source-registry.md "PHOENIX BUILDING PERMITS".
+  inspection.
+  ⚠️ **CI status, so nobody re-investigates: `verify-development` FAILED (run 30319267075) but
+  NO Phoenix page is in its failure list** — 390 lines over 165 ZIPs, the only Arizona-range
+  entries being 85724 + 85745, **both Tucson/Pima**; **0 of the 136 Maricopa ZIPs failed**. It is
+  pre-existing and *improving* for AZ (the pre-change run 30305825744 had **8** failing 85xxx
+  ZIPs, all Tucson/Pima → now 2), with the 97→390 growth entirely in Dallas 75xxx / NV 89xxx /
+  San Diego 92xxx from PRs #413-415; 385 of the 390 lines are the `counts.* !== rendered rail`
+  class already red on `main` (three consecutive ~3 h failures) that `claude/verify-development-fa…`
+  owns. **`verify-geocodes` was CANCELLED at 6:00:18 — GitHub's hard 6 h job cap, not a failure**
+  — and had nothing to check here regardless: **all 96,352 Phoenix records are
+  `geo_precision:"point"` with 0 geocoded**, and source-supplied geometry is never fenced. The
+  containment check was run directly instead: pins span lat 33.2907–33.8892 / lng −112.3078–−111.7597
+  against the publisher's declared extent 33.2905–33.8929 / −112.3044–−111.7589, and the **2
+  records of 96,352** outside it are real (11580 W INDIAN SCHOOL RD ≈ 115th Ave, ZIP 85392, two
+  TCO cases) — **new standing answer: a declared ArcGIS `extent` is cached metadata, not a
+  containment guarantee; a small overshoot is not a geocoding defect.**
+  Receipts: docs/source-registry.md "PHOENIX BUILDING PERMITS".
 - 🟢 **AUSTIN ZONING CASES wired — `austin-zoning-cases` (socrata, registry 85 → 86)**
   (live-verified 2026-07-28). City of Austin's own portal, dataset `edir-dcnf`, 6,919 rows,
   fresh (`data_portal_update` 2026-07-27). Config only. **New standing answer (so no session
