@@ -1432,6 +1432,105 @@
       "spatial_point_col": "location",
       "record_url_precision": "record",
       "_receipts": "2026-07-28 Austin Zoning Cases (workbook row ATX-ZC). City of Austin's own Socrata portal, dataset edir-dcnf ('Zoning Cases', category Building and Development). 6,919 rows (select count(1)), data_portal_update on the sampled row 2026-07-27 - fresh. **spatial_point_col 'location' IS REQUIRED AND WAS NOT IN THE WIRING BRIEF.** The socrata connector QUARANTINES an entry that sets spatial_zip_radius_mi without spatial_point_col (sources/socrata.ts: `if (spatial && (!deps.zipCentroid || !entry.spatial_point_col))` -> 'spatial_zip_radius_mi set but no zipCentroid/spatial_point_col - skipped'), so radius alone would have emitted ZERO records - the same class as the Arlington/harris-county-permits missing-ZIP-scoping bug. Live probing found the dataset DOES publish a Socrata Point column named `location` alongside the flat latitude/longitude strings, and the exact SoQL the connector emits was verified: `within_circle(location, 30.2672, -97.7431, 4828)` returns 2,201 rows around downtown Austin with real per-record lat/lng and links. Same shape as chicago-building-permits / mesa-building-permits / new-orleans-permits. 22 detailed_status values enumerated VERBATIM via $group (complete - the response carried all 22, and they sum to EXACTLY 6,919): Closed 5,386 / Withdrawn 448 / Approved 275 / Expired 267 / Denied 166 / Scheduled for Hearing 75 / In Review 74 / Pending 69 / Recommended for Approval 50 / Scheduled for Council Hearing 39 / Notice Sent 17 / Case Assigned 9 / Aborted 8 / VOID 7 / Cancelled 6 / Reading Approved 5 / Approved and Released 5 / Awaiting Update 4 / Postponed 4 / Notice/Hearing Determination 2 / Partial Approval 2 / Notice Requested 1. Every one is mapped, none twice: approved 337 + proposed 294 + operating 5,386 + exclude 902 = 6,919. 12 sub_type values, also complete and summing to EXACTLY 6,919: Zoning/Rezoning 5,029 / Amended Neighborhood Plan 559 / Historical 505 / Capital View Corridor Height 281 / PUD 230 / Restrictive Covenant Amendment 106 / Restricted Covenant Termination 77 / PDA 64 / MUD 55 / New Neighborhood Plan 7 / Ordinance Zoning Text Amendment 3 / TND 3 - so 0 unclassified. Field population live: link 6,919/6,919 (100%%) -> record_url_precision 'record', a real per-case abc.austintexas.gov detail URL, never a template; site_address 6,919; status_date 6,919; application_start_date 6,914 (99.9%%) -> file_date; case_name 6,917; approval_date only 1,538 (22%%) -> mapped to decision_date, absent on the rest (absent stays absent). latitude/longitude are populated on 5,900 of 6,919 (85%%); the other 1,019 carry no coordinate and are LISTED but not pinned - accepted per the brief, and honest: no geocoding is attempted and no point is invented. site_address embeds a ZIP ('2701 E 7TH , AUSTIN,TX 78702') but there is no ZIP COLUMN, which is why scoping is spatial rather than zip_where_template. No recency window - 6,919 rows is small and zoning cases stay relevant for years."
+    },
+    {
+      "registry_id": "buffalo-building-permits",
+      "platform": "socrata",
+      "domain": "data.buffalony.gov",
+      "dataset_id": "9p2d-f3yt",
+      "dataset_url": "https://data.buffalony.gov/d/9p2d-f3yt",
+      "jurisdiction": "City of Buffalo",
+      "coverage": [
+        {
+          "state": "NY",
+          "county": "Erie"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "aptype",
+          "stname"
+        ],
+        "type_source": "aptype",
+        "file_date": "issued",
+        "address": [
+          "stname",
+          "city",
+          "state",
+          "zip"
+        ],
+        "lat": "latitude",
+        "lng": "longitude",
+        "zip": "zip",
+        "case_number": "apno"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "status_const": "operating",
+      "type_map": {
+        "NEW RESI": "Residential",
+        "NEW COM": "Commercial",
+        "DEMOLITION": "Development"
+      },
+      "extra_where": "aptype in ('NEW RESI','NEW COM','DEMOLITION','GC','GARSHED','INTBLDOUT','PARKINGLOT','SWIM POOL','FENDRIVE','TOWERSATT','TANK','OUTDORCAFE')",
+      "recency_days": 365,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 Phase 4 recon (recon-fetch runs 30384902474 / 30385163406 / 30385461375): data.buffalony.gov Socrata 'Permits' 9p2d-f3yt. FRESH — max(issued) 2026-07-27, min 2000-01-03, 275,572 rows; issued IS NULL -> 0 rows, so status_const applies to every row (the connector requires a non-empty file_date). NATIVE zip column (text) + per-record latitude/longitude columns (latitude IS NULL -> only 17 of 275,572); location_1 Point also present but the flat lat/lng columns are read directly, so .geojson (geographic) is not needed. NO status column -> socrata status_const='operating' per the Phase 4 packet (note: the registry's other issuance ledgers — east-baton-rouge, detroit-*, cleveland — use 'approved'; the packet's value is kept verbatim). status_to_bucket is [] x4 for schema completeness only: status_const assigns the bucket DIRECTLY (`bucket = entry.status_const`) and bypasses the lookup. TYPE VOCABULARY IS COMPLETE — 27 verbatim aptype values summing to EXACTLY 275,572 (REPAIR 85,852 · ELECTRICAL 76,642 · PLUMBING 42,213 · HEATING 22,154 · DEMOLITION 10,822 · GC 8,655 · FENDRIVE 6,063 · USE 4,233 · ASBESTOS 4,222 · SIGN 3,007 · GARSHED 1,880 · PLUMB-GC 1,594 · ELEVATOR 1,423 · TEAROUT 1,114 · PLAN-COPY 1,068 · TOWERSATT 767 · NEW RESI 723 · SWIM POOL 678 · REP-PLANS 584 · ELEC-GC 574 · PARKINGLOT 406 · NEW COM 338 · TANK 270 · OUTDORCAFE 134 · INTBLDOUT 132 · BILLBOARD 16 · COO-COC 8). extra_where keeps the 12 building/land-use classes (30,868 rows) and drops trades + paperwork + signage at source (REPAIR/ELECTRICAL/PLUMBING/HEATING/ASBESTOS/ELEVATOR/PLAN-COPY/REP-PLANS/USE/SIGN/BILLBOARD/COO-COC/TEAROUT/PLUMB-GC/ELEC-GC) — the WA/MN/IL precedent. type_map maps ONLY the three self-describing values; the other nine kept classes are terse in-house abbreviations (GC, GARSHED, FENDRIVE, TOWERSATT, INTBLDOUT …) with no published legend, so they stay use_type:'unclassified' (logged) rather than being inferred. record_url: the dataset publishes no per-row URL column -> dataset precision (Boulder/Philadelphia precedent). CONNECTOR-SHAPED SMOKE (run 30385461375, the exact upper(zip)='<zip>' AND (extra_where) AND issued > cutoff query the connector builds): 14214 -> 67 rows, 14216 -> 92 rows, sample rows carry apno/aptype/issued/stname/zip and real lat/lng. Coverage gated to NY/Erie."
+    },
+    {
+      "registry_id": "prince-georges-county-permits",
+      "platform": "socrata",
+      "domain": "data.princegeorgescountymd.gov",
+      "dataset_id": "weik-ttee",
+      "dataset_url": "https://data.princegeorgescountymd.gov/d/weik-ttee",
+      "jurisdiction": "Prince George's County",
+      "geocode_assemble": true,
+      "coverage": [
+        {
+          "state": "MD",
+          "county": "Prince George's"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "permit_type",
+          "case_name"
+        ],
+        "type_source": "permit_type",
+        "file_date": "permit_issuance_date",
+        "address": [
+          "street_address",
+          "city"
+        ],
+        "zip": "zip_code",
+        "case_number": "permit_case_id"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "status_const": "operating",
+      "zip_numeric": true,
+      "type_map": {
+        "SGU - (New Single Family)": "Residential",
+        "RGU (RESIDENTIAL ADDITION/GRADING/USE)": "Residential",
+        "RESIDENTIAL DRIVEWAY PERMIT": "Residential",
+        "Residential Driveway": "Residential",
+        "SITE DEVELOPMENT FINE GRADING PERMIT": "Development",
+        "SITE DEVELOPMENT ROUGH GRADING PERMIT": "Development",
+        "SITE DEVELOPMENT CONCEPT PLAN": "Development",
+        "STREET CONSTRUCTION PERMIT": "Civic/Public"
+      },
+      "extra_where": "permit_category in ('Building Permit','Site Road Permit')",
+      "recency_days": 365,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 Phase 4 recon (recon-fetch runs 30384902474 / 30385163406 / 30385625756): data.princegeorgescountymd.gov Socrata 'Permits' weik-ttee. FRESH — max(permit_issuance_date) 2026-07-24, 461,508 rows. NATIVE zip_code column, NO geometry (the 12 columns are permit_category, county_agency, permit_case_id, permit_case_year, permit_type, case_name, street_address, city, zip_code, permit_issuance_date, expected_construction_cost, location) -> records place by GEOCODING the assembled address (geocode_assemble: street_address + city, then the shared geo-input helper appends 'MD <zip>'; the engine's unchanged geofence still applies). zip_code IS A NUMBER: the connector's default upper(zip_code)='20772' returns HTTP 400 query.soql.type-mismatch 'Type mismatch for upper, is number' (verified live, run 30385461375) -> zip_numeric: true, the east-baton-rouge option. NO status column -> status_const='operating' per the packet, guarded by a non-empty permit_issuance_date; status_to_bucket [] x4 for schema completeness only (status_const bypasses the lookup). CATEGORY VOCABULARY IS COMPLETE — 3 verbatim permit_category values summing to EXACTLY 461,508: Building Permit 419,296 + Site Road Permit 10,215 (both kept) + Health Permit 31,997 (DROPPED at source — food-service licences, pool-operator licences, well/septic and scavenger-vehicle permits, not construction). permit_type has 115 verbatim values (also summing to exactly 461,508) but is overwhelmingly opaque in-house codes with no published legend (DPIE ER 120,393 · DPIE EC 56,386 · R 38,090 · RW 34,017 · FIRW 15,931 …), so type_map maps ONLY the 8 values that STATE their own meaning (9,017 rows of the kept 429,511); every other value stays use_type:'unclassified' (logged) rather than being inferred from a guessed legend. No per-row URL column -> dataset precision. CONNECTOR-SHAPED SMOKE (run 30385625756, zip_code=<n> AND (extra_where) AND recency): 20772 -> 33 rows, 20740 -> 13, 20785 -> 7, samples carry street_address/city/zip_code/permit_issuance_date. Coverage gated to MD/Prince George's."
     }
   ],
   "arcgis": [
@@ -8359,6 +8458,50 @@
       "recency_days": 730,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). TYPE uses BPTYPE_Desc, the readable twin of the BPTYPE codes (SF/MH/MF/DEMOB/DESF...): \"Single-family\" 48540 / \"Manufactured Home\" 9349 / \"Demolition\" 3381 / \"Multifamily\" 2978 / \"Accessory Dwelling\" 288. NATIVE ZIP: ZIP5 is a string column and the connector's exact predicate ZIP5='98501' returns 8,387 (run 30380342906) — proven, not assumed. The X/Y columns are STATE-PLANE (wkid 102749), NOT lat/lng, so column_map reads the flattened geometry (__lat/__lng) which the connector reprojects to 4326; mapping X/Y would have placed every marker in the wrong hemisphere."
+    },
+    {
+      "registry_id": "butler-county-ks-permits",
+      "platform": "arcgis",
+      "service_url": "https://services5.arcgis.com/SU4Aj97XUNDcwkDb/arcgis/rest/services/Permits_Premium/FeatureServer/0",
+      "dataset_url": "https://services5.arcgis.com/SU4Aj97XUNDcwkDb/arcgis/rest/services/Permits_Premium/FeatureServer/0",
+      "jurisdiction": "Butler County",
+      "coverage": [
+        {
+          "state": "KS",
+          "county": "Butler"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "permitid",
+          "jobsite_address"
+        ],
+        "status_raw": "open_closed",
+        "file_date": "CreationDate",
+        "address": "jobsite_address",
+        "case_number": "permitid"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Submitted",
+          "In Review",
+          "In Review/Requested Info",
+          "Inspector Review"
+        ],
+        "approved": [
+          "Issued",
+          "Final Inspection"
+        ],
+        "operating": [
+          "Completed (Cert. of Occupancy)",
+          "Completed (Cert. of Completion)",
+          "Closed"
+        ],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 5,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 Phase 4 recon (recon-fetch runs 30384902474 / 30385163406 / 30385461375): Butler County KS 'Permits_Premium' FeatureServer layer 0. FRESH — CreationDate min 2026-01-08, max 2026-07-28 (today), 911 rows, esriGeometryPoint in wkid 4326, so records place by their OWN per-parcel points. STATUS VOCABULARY IS COMPLETE — 9 verbatim open_closed values + 1 null summing to EXACTLY 911: Issued 449 + Final Inspection 235 -> approved · Submitted 99 + Inspector Review 35 + In Review/Requested Info 7 + In Review 1 -> proposed · Closed 51 + Completed (Cert. of Occupancy) 17 + Completed (Cert. of Completion) 16 -> operating; the 1 null fails closed (blank status -> excluded + counted). NO type_map ON PURPOSE — the Phase 4 packet's premise (buildingpermit / solarpermit / buildingsiteonlypermit as boolean type flags) DOES NOT HOLD against live data: a groupBy over all three fields returns exactly ONE combination, {buildingpermit:'No', buildingsiteonlypermit:'No', solarpermit:'No'}, n=911, i.e. 100% of rows. Their field ALIASES read 'Building Permit Complete' / 'Solar Permit Complete' / 'Building Site Only Permit Complete' — they are workflow-completion checkboxes defaulted to 'No', never permit-type flags, so any type_map over them would classify every record identically and carry no information. The only other candidate, `zoning` (16 verbatim values summing to 911 — RURAL RESIDENTIAL DISTRICT 363, AGRICULTURAL DISTRICT 40 192, AGRICULTURAL DISTRICT 80 133, URBAN JURISDICTION 126 …), is the PARCEL's zoning district, not the permit's use, so mapping it would invent a classification the source never states. Every record is therefore use_type:'unclassified' (logged) — the fail-closed outcome, not a guess. NO ZIP SCOPING COLUMN: the only ZIP field is cama_zip, the CAMA landowner's MAILING zip (ZIP+4 and frequently out of state — 01801 MA, 15317 PA, 30068 GA observed), NOT the jobsite -> spatial_zip_radius_mi 5 around the ZIP centroid, the county-wide-entry default. SPATIAL SMOKE (run 30385461375): an envelope query around a sampled jobsite returns features with real Butler County points (lat 37.67-37.76, lng -96.83 to -96.92) and live open_closed values. record_url: `parcel_data` is populated on 911/911 rows but is THE SAME layer-root URL on every record (https://ww1.bucoks.com/bucogis1/rest/services/PublicOutreach/Parcels_Data_BldgLL_Condos/FeatureServer/0/), not a per-record link — mapping it would present a generic URL as the record's own, so it is left unmapped and the entry falls back to dataset precision. Coverage gated to KS/Butler."
     }
   ],
   "ckan": [

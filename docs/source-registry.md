@@ -2970,3 +2970,124 @@ have placed every marker in the wrong hemisphere.
 Same as Phase 1: `jurisdiction-registry.json` is a static import bundled into the edge function
 (`index.ts:69`), so these 12 entries do nothing until `deploy-edge-functions.yml` runs for
 `get-address-report` and the cache refreshes (`dev_refresh_fire`, daily 09:00 UTC).
+
+---
+
+## PHASE 4 SPECIAL-HANDLING WIRE PASS (2026-07-28) — 3 of 6 endpoints wired (registry 125 → 128), 3 rejected with receipts
+
+Source brief: `docs/implementation-packets/claude_code_phase4_prompt.md` +
+`claude_code_implementation.json` → `phase4_special_handling` (6 endpoints, 533 ZIPs).
+**Config only — no connector, engine or schema change.** Branch `claude/phase4-special-handling`.
+Every vocabulary below is VERBATIM live output; four `recon-fetch` rounds — **30384902474**,
+**30385163406**, **30385461375**, **30385625756** (targets under `scripts/recon/p4-*.json`).
+
+### STANDING ANSWER — on **socrata**, `status_const` DOES bypass `status_to_bucket` (the opposite of arcgis)
+
+The Phase 2 standing answer above ("`status_const` does NOT bypass `status_to_bucket`") is an
+**arcgis** fact and does not carry to the socrata connector. `sources/socrata.ts` assigns the
+constant to *both* sides directly — `statusRaw = entry.status_const; bucket = entry.status_const;`
+(l.283-285) — and never consults the lookup, so a socrata `status_const` entry keeps all four
+buckets **empty** (the `east-baton-rouge-building-permits` / `marin-county-building-permits`
+shape), while an arcgis one must echo the constant into its bucket. Wiring either connector with
+the other's shape emits zero records. Both new socrata entries here use the empty-bucket form; the
+one new arcgis entry has a real status column and no constant at all.
+
+### Wired (3)
+
+| registry_id | platform | jurisdiction | special handling | live receipt |
+|---|---|---|---|---|
+| `buffalo-building-permits` | socrata | City of Buffalo (NY/Erie) | no status column → `status_const` | 14214 → **67** rows, 14216 → **92** on the exact query the connector builds |
+| `prince-georges-county-permits` | socrata | Prince George's County (MD) | no geometry → `geocode_assemble`; **numeric ZIP** | 20772 → **33**, 20740 → **13**, 20785 → **7** |
+| `butler-county-ks-permits` | arcgis | Butler County (KS) | no jobsite ZIP → `spatial_zip_radius_mi` | envelope smoke returns real Butler points, lat 37.67–37.76 |
+
+### Coverage strings verified against the live `communities` table
+
+The coverage gate matches `communities.state`/`county` verbatim (trim + lowercase), so a wrong
+county string is a silent no-op — the `harris-county-permits` failure class. Queried live:
+**NY/`Erie` → 72 ZIP pages**, **MD/`Prince George's` → 36**, **KS/`Butler` → 19** — each exactly the
+ZIP count the packet lists for that endpoint, so all three entries have a real surface the moment
+the function is deployed. (The rejected three would have had one too: NJ's ten counties hold 359 ZIP
+pages, VA/Arlington 11, WI/Milwaukee 36 — their blockers are the datasets, not our coverage.)
+
+Every vocabulary is complete — each set sums **exactly** to its row count: Buffalo 27 `aptype`
+values = 275,572; Prince George's 3 `permit_category` = 461,508 (and 115 `permit_type` = 461,508);
+Butler 9 `open_closed` + 1 null = 911.
+
+### Prince George's — `zip_code` is a NUMBER (the connector's default predicate 400s)
+
+The socrata connector's default ZIP clause is `upper(zip_code)='20772'`, which the portal rejects:
+`HTTP 400 query.soql.type-mismatch — "Type mismatch for upper, is number"` (verified live, run
+30385461375). `zip_numeric: true` switches it to `zip_code=20772`, which returns rows. This is the
+`east-baton-rouge-building-permits` option and the second time it has been needed; **check the ZIP
+column's TYPE before wiring any socrata entry** — the failure is a hard 400, not an empty result,
+so it would have surfaced only after deploy.
+
+### Butler KS — the packet's boolean type flags are "No" on 100% of rows
+
+The brief specifies a custom `type_map` over `buildingpermit` / `solarpermit` /
+`buildingsiteonlypermit` ("all Yes/No strings", *"If `buildingpermit = "Yes"` → Residential or
+Commercial … If `solarpermit = "Yes"` → Utility"*). **A groupBy over all three fields returns
+exactly ONE combination:** `{buildingpermit:"No", buildingsiteonlypermit:"No", solarpermit:"No"}`,
+`n=911` — there is no `Yes` anywhere in the layer. Their field *aliases* explain why: "Building
+Permit **Complete**", "Solar Permit **Complete**", "Building Site Only Permit **Complete**" — they
+are workflow-completion checkboxes (`defaultValue: "No"`), not permit-type flags. A `type_map` over
+them would classify every record identically and carry zero information.
+
+The only other candidate, `zoning` (16 verbatim values summing to 911 — RURAL RESIDENTIAL DISTRICT
+363, AGRICULTURAL DISTRICT 40 192, AGRICULTURAL DISTRICT 80 133, URBAN JURISDICTION 126, …), is the
+**parcel's** zoning district, not the permit's use; mapping it would invent a classification the
+source never states. The entry therefore ships with **no `type_map`** and every record is
+`use_type:"unclassified"` (logged) — the fail-closed outcome the registry rules prescribe, not a
+guess. **Standing answer: a boolean-flag "type" field must be proven to vary before a `type_map` is
+built on it — a single groupBy combination means the field is a workflow checkbox, not a classifier.**
+
+Butler's other trap: the layer's only ZIP field is `cama_zip`, the CAMA landowner's **mailing** ZIP
+(ZIP+4, frequently out of state — 01801 MA, 15317 PA, 30068 GA observed), **not** the jobsite. It is
+not mapped; scoping is `spatial_zip_radius_mi: 5` on the layer's own point geometry.
+
+### NOT wired — 3 rejections with receipts
+
+1. **NJ statewide (`data.nj.gov` `w9se-dmra`) — unscopable and unplaceable.** The dataset has **no
+   ZIP column, no street-address column and no geometry**: the 36 columns are comu/treasurycode/
+   muniname/munitype/county/recordid/**block**/**lot**/permitno/status/permitstatusdesc/permitdate/
+   certdate/permittype/permittypedesc/certtype/certtypedesc/certcount/…fees…/usegroup/usegroupdesc/
+   censusnumber/censusdesc/public/source/sourcedesc/version/processdate/pk. The socrata connector
+   needs either a ZIP column or `spatial_point_col` + radius; it has neither, so the entry would be
+   quarantined ("no zip column mapped — statewide dataset skipped") and emit nothing. There is also
+   nothing to geocode — block/lot is not an address, and the packet's fallback ("municipality
+   centroid lookup") would place every permit in a town at one fabricated point, which the
+   anti-fabrication directive forbids. Other findings while confirming: the row count is
+   **2,755,796**, not the packet's 99,808; `permitstatusdesc` has only 2 values (Permit 1,418,735 /
+   Certificate 1,337,061); and `permitdate` ranges **1113-11-11 → 2925-08-15** (unusable dates).
+2. **Arlington VA (`datahub-v2.arlingtonva.us/api/RealEstate/Permit`) — no connector, and no
+   scopable field.** `platform: "json_api"` does not exist: `sources/` holds arcgis, socrata, ckan,
+   csv, carto (+ tceq-cr, tdlr-tabs) only, and `index.ts` calls exactly those. Even with a
+   connector, the response has **no ZIP, no address and no geometry** (permitKey, provalLrsnId,
+   realEstatePropertyCode, permitNbr, permitActivationDate, permitCode, permitCostEstimateAmt,
+   permitCompletedDate, permitCompletedPct, permitNoteText) — records join to parcels by
+   `realEstatePropertyCode`, and no parcel endpoint is in scope for this packet. The packet's own
+   date field, **`permitActivationDate`, is an empty string on every sampled record**.
+3. **Milwaukee WI (`data.milwaukee.gov` CKAN `828e9630-…`) — no ZIP column.** The resource's 10
+   fields are `_id`, Date Opened, **Address**, Record ID, Permit Type, Status, Date Issued,
+   Construction Total Cost, Use of Building, Dwelling units impact (16,685 rows). `sources/ckan.ts`
+   requires a mapped ZIP column and quarantines the resource otherwise ("no zip column mapped —
+   resource skipped for ZIP report"); the CKAN connector has no spatial-radius option and no
+   `geocode_assemble`, and the Address values are street-only ("2033 S 24TH ST"), the same
+   ungeolocatable shape that rejected Somerville MA and Orlando FL.
+
+All three are documented, not wired — an unusable source is documented, never wired.
+
+### ⚠️ Pre-existing defect noticed while confirming this (NOT touched by this PR)
+
+**`cincinnati-building-permits` (socrata) carries `include_types: ["Building","Wrecking"]`, which
+the socrata connector never reads.** `include_types` is a **csv-only** option (`sources/csv.ts:61`,
+applied at `l.316`); `grep -rn include_types sources/ index.ts` matches csv.ts and nothing else. The
+entry's intended noise filter is therefore inert — every Cincinnati permit type is ingested. The fix
+is to move the filter into `extra_where` (the socrata equivalent), but that changes what a live
+state renders, so it is flagged for the owner rather than changed here.
+
+### Not yet live — deploy is the remaining step
+
+Same as Phases 1–3: `jurisdiction-registry.json` is a static import bundled into the edge function
+(`index.ts:69`), so these 3 entries do nothing until `deploy-edge-functions.yml` runs for
+`get-address-report` and the cache refreshes (`dev_refresh_fire`, daily 09:00 UTC).
