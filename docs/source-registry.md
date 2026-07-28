@@ -2994,7 +2994,7 @@ unambiguous codes are mapped and the rest (RAPD 13,115 · ACCE 6,412 · PWP 5,73
 | `savannah-commercial-building-permits` | GA/Chatham | 1 | 1 | 3 | spatial 5 mi | — |
 | `louisville-active-construction-permits` | KY/Jefferson | 23 | 4 | 1 | native `ZIPCODE` | — |
 | `kenton-county-devtracking-permits` | KY/Kenton | 9 | 4 | 2 | spatial 5 mi | — |
-| `saint-paul-approved-building-permits` | MN/Ramsey | 21 | 6 | 6 | spatial 5 mi | 730 |
+| ~~`saint-paul-approved-building-permits`~~ **RETIRED 2026-07-28** | MN/Ramsey | 21 | 6 | 6 | spatial 5 mi | 730 |
 | `sioux-falls-building-permits` | SD/Minnehaha | 2 | 2 | 11 | spatial 5 mi | 730 |
 | `bozeman-building-permits` | MT/Gallatin | 19 | 5 | 4 | spatial 5 mi | — |
 | `missoula-addresses-with-permits` | MT/Missoula | 10 | 4 | 18 | spatial 5 mi | 730 |
@@ -3406,3 +3406,36 @@ Other shape notes for a future wire: no ZIP column and no address column anywher
 so ZIP scoping must be `spatial_zip_radius_mi` on the layer's own points; `a_use_desc`
 ("RESIDENTIAL SINGLE FAMILY", …) is the readable type source; `h_description1`/`h_description2` are
 right-padded 60-char fragments of one description.
+---
+
+## SAINT PAUL RETIRED FROM THE REGISTRY (2026-07-28) — arcgis 129 → 128
+
+`saint-paul-approved-building-permits` (MN/Ramsey), wired in the Phase 1 ArcGIS pass, is
+**removed**. Founder call, on these live receipts from the post-deploy probe of the deployed
+function (`get-address-report` v105):
+
+- **It never served a page.** ZIPs 55101 and 55102 each timed out the WHOLE report —
+  `Timeout of 90000 ms reached`, and again `Timeout of 150000 ms reached` — so those pages
+  returned nothing at all, not even the EPA facilities floor.
+- **The layer is stalled.** `max(ISSUEDATE) = 2025-06-30 21:57:20 UTC` (live `outStatistics`),
+  so every record it could cache is ≥13 months old.
+- **No config combination could rescue it.** `ISSUEDATE > DATE '2025-07-28'` returns **0 rows**
+  at both 5 mi and 3 mi, so a 365-day window would have silently zeroed the entry; and at
+  730 days the volume is 27,639 rows at 5 mi / 14,898 at 3 mi, which at the measured engine
+  ratio (~1,013 bytes of output per record) implies a ~14–19 MB cached row against a ~3.5 MB
+  working ceiling. PR #426 landed the `out_fields` + `page_size` projection that fixes the
+  fetch time; it could not fix the payload, because the payload is the problem.
+- This is the same stall the **MINNESOTA WIRE PASS** recorded before Phase 1 wired it —
+  *"St. Paul's org is live but its permits layer STALLED at 2025-06-30"*.
+
+**Ramsey County's 17 ZIP pages fall back to the EPA facilities floor**, which is what they
+already display (their cached rows carry 0 sourced sites). No page loses content.
+
+**The layer stays on the nightly reprobe list** — `scripts/source-monitor-targets.json` tracks
+it as `stpaul-approved-building-permits`, untouched by this PR, so the monitor will flag it if
+Saint Paul resumes publishing. Re-wiring then is one appended registry entry.
+
+**Standing answer: freshness is a wiring gate, not a post-wire discovery.** Check
+`max(<date column>)` BEFORE adding an entry — a stalled layer that fits the schema perfectly
+still cannot serve a "what's being built near you" page, and a recency window applied to it
+produces a silent zero rather than a visible failure.
