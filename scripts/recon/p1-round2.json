@@ -1,0 +1,157 @@
+[
+ {
+  "id": "00-de-kent-sample2",
+  "url": "https://gis.kentcountyde.gov/server/rest/services/LayersForApps/Permits_Data/MapServer/1/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "01-de-sussex-sample2",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "03-nc-durham-sample2",
+  "url": "https://webgis.durhamnc.gov/server/rest/services/PublicServices/Inspections/MapServer/12/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "05-nc-newhanover-sample2",
+  "url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "06-nc-brunswick-sample2",
+  "url": "https://services1.arcgis.com/W6gamXPYQeLXrdAd/arcgis/rest/services/Permit_Locations/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "07-ga-dekalb-sample2",
+  "url": "https://dcgis.dekalbcountyga.gov/mapping/rest/services/Building_Permit_Applications/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "10-ky-jefferson-sample2",
+  "url": "https://services1.arcgis.com/79kfd2K6fskCAkyg/arcgis/rest/services/active_construction_permits/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "12-mn-ramsey-sample2",
+  "url": "https://services1.arcgis.com/9meaaHE3uiba0zr8/arcgis/rest/services/Approved_Building_Permits/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "14-mt-gallatin-sample2",
+  "url": "https://gisweb.bozeman.net/arcgis/rest/services/Internal/Building_Permits/MapServer/1/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "15-mt-missoula-sample2",
+  "url": "https://services.arcgis.com/HfwHS0BxZBQ1E5DY/arcgis/rest/services/AddressesWithPermits_mso/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "16-mo-boone-sample2",
+  "url": "https://gis.gocolumbiamo.com/arcgis/rest/services/View_Services/City_Projects_Construction_Updated/MapServer/3/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "17-ks-johnson-sample2",
+  "url": "https://services1.arcgis.com/YQsWDBr0DjMtoTQo/arcgis/rest/services/Building_Permits/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "19-ne-lancaster-sample2",
+  "url": "https://gis.lincoln.ne.gov/public/rest/services/Planning/Residential_New_Construction_Permits/MapServer/4/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "20-ar-pulaski-sample2",
+  "url": "https://maps.littlerock.gov/server/rest/services/Permits_All/MapServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "22-co-adams-sample2",
+  "url": "https://services3.arcgis.com/4PNQOtAivErR7nbT/arcgis/rest/services/Building_Permits_Eye_On_Adams/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "23-id-canyon-sample2",
+  "url": "https://maps.canyonco.org/arcgisserver/rest/services/DSD/Building_Permits_NEW_2023/FeatureServer/1/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "25-or-marion-sample2",
+  "url": "https://services.arcgis.com/kIA6yS9KDGqZL7U3/arcgis/rest/services/Structure_Permits/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "05-nc-newhanover-type-retry",
+  "url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0/query?where=1%3D1&outFields=PERMIT_TYPE&returnGeometry=false&groupByFieldsForStatistics=PERMIT_TYPE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22PERMIT_TYPE%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 8000
+ },
+ {
+  "id": "05-nc-newhanover-type-distinct",
+  "url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0/query?where=1%3D1&outFields=PERMIT_TYPE&returnGeometry=false&returnDistinctValues=true&f=json",
+  "print_chars": 8000
+ },
+ {
+  "id": "05-nc-newhanover-status-retry",
+  "url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0/query?where=1%3D1&outFields=PERMIT_STATUS&returnGeometry=false&groupByFieldsForStatistics=PERMIT_STATUS&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22PERMIT_STATUS%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 8000
+ },
+ {
+  "id": "05-nc-newhanover-status-distinct",
+  "url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0/query?where=1%3D1&outFields=PERMIT_STATUS&returnGeometry=false&returnDistinctValues=true&f=json",
+  "print_chars": 8000
+ },
+ {
+  "id": "21-ar-benton-type-retry",
+  "url": "https://gis.bentonvillear.com/arcgis/rest/services/Electric_System/Catalyst_Planning/FeatureServer/1/query?where=1%3D1&outFields=PERMIT_TYPE&returnGeometry=false&groupByFieldsForStatistics=PERMIT_TYPE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22PERMIT_TYPE%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 8000
+ },
+ {
+  "id": "21-ar-benton-type-distinct",
+  "url": "https://gis.bentonvillear.com/arcgis/rest/services/Electric_System/Catalyst_Planning/FeatureServer/1/query?where=1%3D1&outFields=PERMIT_TYPE&returnGeometry=false&returnDistinctValues=true&f=json",
+  "print_chars": 8000
+ },
+ {
+  "id": "21-ar-benton-status-retry",
+  "url": "https://gis.bentonvillear.com/arcgis/rest/services/Electric_System/Catalyst_Planning/FeatureServer/1/query?where=1%3D1&outFields=STATUS&returnGeometry=false&groupByFieldsForStatistics=STATUS&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22STATUS%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 8000
+ },
+ {
+  "id": "21-ar-benton-status-distinct",
+  "url": "https://gis.bentonvillear.com/arcgis/rest/services/Electric_System/Catalyst_Planning/FeatureServer/1/query?where=1%3D1&outFields=STATUS&returnGeometry=false&returnDistinctValues=true&f=json",
+  "print_chars": 8000
+ },
+ {
+  "id": "06-nc-brunswick-type-full",
+  "url": "https://services1.arcgis.com/W6gamXPYQeLXrdAd/arcgis/rest/services/Permit_Locations/FeatureServer/0/query?where=1%3D1&outFields=PermitType&returnGeometry=false&groupByFieldsForStatistics=PermitType&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22PermitType%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 20000
+ },
+ {
+  "id": "01-de-sussex-desc-pt_a_type_desc",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/0/query?where=1%3D1&outFields=pt_a_type_desc&returnGeometry=false&groupByFieldsForStatistics=pt_a_type_desc&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22pt_a_type_desc%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "00-de-kent-desc-StatusDesc",
+  "url": "https://gis.kentcountyde.gov/server/rest/services/LayersForApps/Permits_Data/MapServer/1/query?where=1%3D1&outFields=StatusDesc&returnGeometry=false&groupByFieldsForStatistics=StatusDesc&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22StatusDesc%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "18-ks-shawnee-desc-case_type_desc",
+  "url": "https://maps.topeka.gov/arcgis/rest/services/CityworksViews/BuildingPermits/MapServer/1/query?where=1%3D1&outFields=case_type_desc&returnGeometry=false&groupByFieldsForStatistics=case_type_desc&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22case_type_desc%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "26-wa-spokane-desc-Status_Description",
+  "url": "https://services3.arcgis.com/WlYQgAChrqj0tuQi/arcgis/rest/services/Spokane_County_Building_and_Planning_Permits/FeatureServer/0/query?where=1%3D1&outFields=Status_Description&returnGeometry=false&groupByFieldsForStatistics=Status_Description&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22Status_Description%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "19-ne-lancaster-desc-PermType",
+  "url": "https://gis.lincoln.ne.gov/public/rest/services/Planning/Residential_New_Construction_Permits/MapServer/4/query?where=1%3D1&outFields=PermType&returnGeometry=false&groupByFieldsForStatistics=PermType&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22PermType%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 12000
+ }
+]

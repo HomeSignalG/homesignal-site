@@ -1,0 +1,90 @@
+[
+ {
+  "id": "00-StructureDesc",
+  "url": "https://gis.kentcountyde.gov/server/rest/services/LayersForApps/Permits_Data/MapServer/1/query?where=1%3D1&outFields=StructureDesc&returnGeometry=false&groupByFieldsForStatistics=StructureDesc&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22StructureDesc%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 14000
+ },
+ {
+  "id": "06-ProjectType",
+  "url": "https://services1.arcgis.com/W6gamXPYQeLXrdAd/arcgis/rest/services/Permit_Locations/FeatureServer/0/query?where=1%3D1&outFields=ProjectType&returnGeometry=false&groupByFieldsForStatistics=ProjectType&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22ProjectType%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 14000
+ },
+ {
+  "id": "06-ProjectCategory",
+  "url": "https://services1.arcgis.com/W6gamXPYQeLXrdAd/arcgis/rest/services/Permit_Locations/FeatureServer/0/query?where=1%3D1&outFields=ProjectCategory&returnGeometry=false&groupByFieldsForStatistics=ProjectCategory&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22ProjectCategory%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 14000
+ },
+ {
+  "id": "06-PemitProjectStatus",
+  "url": "https://services1.arcgis.com/W6gamXPYQeLXrdAd/arcgis/rest/services/Permit_Locations/FeatureServer/0/query?where=1%3D1&outFields=PemitProjectStatus&returnGeometry=false&groupByFieldsForStatistics=PemitProjectStatus&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22PemitProjectStatus%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 14000
+ },
+ {
+  "id": "07-WorkTypeDescription",
+  "url": "https://dcgis.dekalbcountyga.gov/mapping/rest/services/Building_Permit_Applications/FeatureServer/0/query?where=1%3D1&outFields=WorkTypeDescription&returnGeometry=false&groupByFieldsForStatistics=WorkTypeDescription&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22WorkTypeDescription%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 14000
+ },
+ {
+  "id": "07-statusDescription",
+  "url": "https://dcgis.dekalbcountyga.gov/mapping/rest/services/Building_Permit_Applications/FeatureServer/0/query?where=1%3D1&outFields=statusDescription&returnGeometry=false&groupByFieldsForStatistics=statusDescription&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22statusDescription%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 14000
+ },
+ {
+  "id": "20-BldUseDesc",
+  "url": "https://maps.littlerock.gov/server/rest/services/Permits_All/MapServer/0/query?where=1%3D1&outFields=BldUseDesc&returnGeometry=false&groupByFieldsForStatistics=BldUseDesc&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22BldUseDesc%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 14000
+ },
+ {
+  "id": "20-WorkClassMapped",
+  "url": "https://maps.littlerock.gov/server/rest/services/Permits_All/MapServer/0/query?where=1%3D1&outFields=WorkClassMapped&returnGeometry=false&groupByFieldsForStatistics=WorkClassMapped&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22WorkClassMapped%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 14000
+ },
+ {
+  "id": "19-UseType",
+  "url": "https://gis.lincoln.ne.gov/public/rest/services/Planning/Residential_New_Construction_Permits/MapServer/4/query?where=1%3D1&outFields=UseType&returnGeometry=false&groupByFieldsForStatistics=UseType&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22UseType%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 14000
+ },
+ {
+  "id": "12-SUB_TYPE",
+  "url": "https://services1.arcgis.com/9meaaHE3uiba0zr8/arcgis/rest/services/Approved_Building_Permits/FeatureServer/0/query?where=1%3D1&outFields=SUB_TYPE&returnGeometry=false&groupByFieldsForStatistics=SUB_TYPE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22SUB_TYPE%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 14000
+ },
+ {
+  "id": "01-domain-a_status",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/0?f=json",
+  "extract": "\"name\"\\s*:\\s*\"a_status\"",
+  "extract_context": 4000,
+  "extract_max": 2
+ },
+ {
+  "id": "00-domain-StructureType",
+  "url": "https://gis.kentcountyde.gov/server/rest/services/LayersForApps/Permits_Data/MapServer/1?f=json",
+  "extract": "\"name\"\\s*:\\s*\"StructureType\"",
+  "extract_context": 4000,
+  "extract_max": 2
+ },
+ {
+  "id": "20-domain-PermitType",
+  "url": "https://maps.littlerock.gov/server/rest/services/Permits_All/MapServer/0?f=json",
+  "extract": "\"name\"\\s*:\\s*\"PermitType\"",
+  "extract_context": 4000,
+  "extract_max": 2
+ },
+ {
+  "id": "05-narrow-PERMIT_TYPE",
+  "url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0/query?where=ISSUE_DATE%20%3E%20DATE%20%272025-01-01%27&outFields=PERMIT_TYPE&returnGeometry=false&groupByFieldsForStatistics=PERMIT_TYPE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22PERMIT_TYPE%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "05-narrow-PERMIT_STATUS",
+  "url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0/query?where=ISSUE_DATE%20%3E%20DATE%20%272025-01-01%27&outFields=PERMIT_STATUS&returnGeometry=false&groupByFieldsForStatistics=PERMIT_STATUS&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22PERMIT_STATUS%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "05-nh-meta",
+  "url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0?f=json",
+  "extract": "\"name\"\\s*:\\s*\"(PERMIT_TYPE|PERMIT_STATUS|ZIP|ISSUE_DATE)",
+  "extract_context": 2500,
+  "extract_max": 4
+ }
+]

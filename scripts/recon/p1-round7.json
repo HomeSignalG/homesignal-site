@@ -1,0 +1,117 @@
+[
+ {
+  "id": "datelit-00-IssueDate",
+  "url": "https://gis.kentcountyde.gov/server/rest/services/LayersForApps/Permits_Data/MapServer/1/query?where=IssueDate%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-03-ISSUE_DATE",
+  "url": "https://webgis.durhamnc.gov/server/rest/services/PublicServices/Inspections/MapServer/12/query?where=ISSUE_DATE%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-04-B1_FILE_DD",
+  "url": "https://location.cabarruscounty.us/arcgisservices/rest/services/Current_Accela_Permits/Plan_Reviews/MapServer/0/query?where=B1_FILE_DD%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-06-DateIssued",
+  "url": "https://services1.arcgis.com/W6gamXPYQeLXrdAd/arcgis/rest/services/Permit_Locations/FeatureServer/0/query?where=DateIssued%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-07-issuedDateTime",
+  "url": "https://dcgis.dekalbcountyga.gov/mapping/rest/services/Building_Permit_Applications/FeatureServer/0/query?where=issuedDateTime%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-08-IssueDate",
+  "url": "https://geo.forsythco.com/gis3/rest/services/Public_EnerGovPlans/Building_Permits/MapServer/0/query?where=IssueDate%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-12-ISSUEDATE",
+  "url": "https://services1.arcgis.com/9meaaHE3uiba0zr8/arcgis/rest/services/Approved_Building_Permits/FeatureServer/0/query?where=ISSUEDATE%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-13-ISSUEDATE",
+  "url": "https://gis.siouxfalls.gov/arcgis/rest/services/Data/Community/MapServer/3/query?where=ISSUEDATE%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-15-ApplicationDate",
+  "url": "https://services.arcgis.com/HfwHS0BxZBQ1E5DY/arcgis/rest/services/AddressesWithPermits_mso/FeatureServer/0/query?where=ApplicationDate%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-21-ISSUED",
+  "url": "https://gis.bentonvillear.com/arcgis/rest/services/Electric_System/Catalyst_Planning/FeatureServer/1/query?where=ISSUED%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-22-ApplicationDate",
+  "url": "https://services3.arcgis.com/4PNQOtAivErR7nbT/arcgis/rest/services/Building_Permits_Eye_On_Adams/FeatureServer/0/query?where=ApplicationDate%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-24-ISSUEDATE",
+  "url": "https://geo.sanjoseca.gov/server/rest/services/PLN/PLN_PermitsAndComplaints/MapServer/8/query?where=ISSUEDATE%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-10-ISSUE_DATE",
+  "url": "https://services1.arcgis.com/79kfd2K6fskCAkyg/arcgis/rest/services/active_construction_permits/FeatureServer/0/query?where=ISSUE_DATE%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-17-IssueDate",
+  "url": "https://services1.arcgis.com/YQsWDBr0DjMtoTQo/arcgis/rest/services/Building_Permits/FeatureServer/0/query?where=IssueDate%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-18-date_issued",
+  "url": "https://maps.topeka.gov/arcgis/rest/services/CityworksViews/BuildingPermits/MapServer/1/query?where=date_issued%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-19-Issued",
+  "url": "https://gis.lincoln.ne.gov/public/rest/services/Planning/Residential_New_Construction_Permits/MapServer/4/query?where=Issued%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-23-PermitIssuedDate",
+  "url": "https://maps.canyonco.org/arcgisserver/rest/services/DSD/Building_Permits_NEW_2023/FeatureServer/1/query?where=PermitIssuedDate%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-25-ISSUEDDATE",
+  "url": "https://services.arcgis.com/kIA6yS9KDGqZL7U3/arcgis/rest/services/Structure_Permits/FeatureServer/0/query?where=ISSUEDDATE%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-26-Issued_Date",
+  "url": "https://services3.arcgis.com/WlYQgAChrqj0tuQi/arcgis/rest/services/Spokane_County_Building_and_Planning_Permits/FeatureServer/0/query?where=Issued_Date%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-09-IssuedDate_DATE",
+  "url": "https://pub.sagis.org/arcgis/rest/services/Savannah/BuildingPermit_FC/FeatureServer/0/query?where=IssuedDate_DATE%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-11-PERMIT_DAT",
+  "url": "https://services2.arcgis.com/90vxQoG8CT8O1MXs/arcgis/rest/services/DevTracking_Permits_KC_Processing/FeatureServer/0/query?where=PERMIT_DAT%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-14-PERMIT_ISSUE_DATE",
+  "url": "https://gisweb.bozeman.net/arcgis/rest/services/Internal/Building_Permits/MapServer/1/query?where=PERMIT_ISSUE_DATE%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "datelit-20-PermitIssueDate",
+  "url": "https://maps.littlerock.gov/server/rest/services/Permits_All/MapServer/0/query?where=PermitIssueDate%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ }
+]

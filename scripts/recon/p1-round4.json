@@ -1,0 +1,17 @@
+[
+ {
+  "id": "00-StructureDesc-full",
+  "url": "https://gis.kentcountyde.gov/server/rest/services/LayersForApps/Permits_Data/MapServer/1/query?where=1%3D1&outFields=StructureDesc&returnGeometry=false&groupByFieldsForStatistics=StructureDesc&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22StructureDesc%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 30000
+ },
+ {
+  "id": "01-sussex-legend",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/legend?f=json",
+  "print_chars": 8000
+ },
+ {
+  "id": "01-sussex-status-x-desc",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/0/query?where=1%3D1&outFields=a_status,a_project_shdesc&returnGeometry=false&groupByFieldsForStatistics=a_status,a_project_shdesc&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22a_status%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 12000
+ }
+]
