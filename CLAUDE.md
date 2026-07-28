@@ -590,6 +590,48 @@ legal/framing change not covered by the one-time sign-off.
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 
 ### Status
+- 🟢 **PHOENIX BUILDING PERMITS wired — `phoenix-building-permits` (arcgis, registry 86 → 87);
+  Maricopa development pages 40 → 97** (DB-verified 2026-07-28). The City of Phoenix Planning &
+  Development Department's **own** MapServer (`maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1`),
+  70,791 rows, point geometry, spatial 3-mi ZIP scoping (no ZIP column). **Config only — no
+  connector, engine or schema change.** ⚠️ **Corrects the ARIZONA WIRE PASS**, which recorded
+  "Phoenix: no first-party per-record permit dataset" — true of the CKAN *catalogue*, false of
+  the city; **standing answer: an empty open-data catalogue is not evidence a city publishes
+  nothing — probe the city's own GIS host before recording a rejection.** Both vocabularies are
+  complete and each sums to EXACTLY 70,791: **4 `PERMIT_STAT`** (DONE 42,488 → operating ·
+  OPEN 28,222 → proposed · EXPR 64 + VOID 17 → excluded) and **238 `PER_TYPE_DESC`** (not the
+  brief's "250+"), enumerated three agreeing ways — groupBy `n DESC`, groupBy `n ASC` (the
+  Mesa/Gilbert `$limit`-truncation defence) and `returnDistinctValues` → **0 unclassified**.
+  Go-live: **78 ZIP pages carry 96,352 Phoenix records**, and across every one of them
+  **0 missing `record_url`, 0 missing coordinates, 0 unclassified, 0 non-`point` scope**.
+  Bidirectional gate proof with live receipts: Phoenix rides **AZ/Maricopa pages ONLY**
+  (78 ZIPs, cache-wide), while 85701 (Pima) and 85122 (Pinal) returned 0 through the deployed
+  engine; `test/phoenix-connector.test.mjs` asserts the stronger unit fact that an
+  out-of-coverage ZIP **never fetches** the layer. Prior sources unchanged (Tucson 24+26 ZIPs,
+  Mesa 25, Scottsdale 13, Gilbert 9, Casa Grande 3, UDOT 104).
+  ⚠️ **`recency_days` is 365, NOT the brief's 1095 — the brief's own 3.5 MB ceiling was
+  measured, not assumed.** Deployed at 1095 first and measured live via `pg_net` with nothing
+  persisted: 85003 **7.16 MB**/9,375 records · 85008 4.74 · 85015 4.65 · 85032 3.62 — every
+  probe ZIP over the ceiling, so the named contingency could not satisfy the constraint it was
+  given for. At 365 the same ZIPs land at 2.84 / 1.80 / 1.79 / 1.51 MB, and the choice is
+  verified against **all 136 modelled Maricopa ZIPs** (not a sample): worst case 85006 at
+  3,954 records → **3.21 MB cached, 0 of 136 rows over 3.5 MB**. The window is exact — oldest
+  surviving `file_date` 2025-07-28. **Two more standing answers:** (a) **`record_url_precision:
+  "none"` does not exist** — the connector's type is `"record" | "dataset"` and the
+  anti-fabrication gate requires every site to carry a URL; both Phoenix per-record URL patterns
+  were probed and neither discriminates (`/pdd/search/permits/<num>` renders
+  `<title>P&D Online - Error</title>`; `?permitNumber=<num>` returns the same search shell as
+  the bare path), so it is `dataset` precision on the city's own permit search. (b) **`use_type`
+  is a CLOSED six-value vocabulary** (`lib/map.js::TYPE_EXACT`), so the brief's "Other" bucket is
+  written as **`Development`** — the generic member that maps to the "Other project" circle;
+  an off-vocabulary `"Other"` would miss `TYPE_EXACT` and fall through to keyword guessing.
+  Self-describing values were resolved against the layer's **own `PER_TYPE` department code**
+  (a live `PER_TYPE × PER_TYPE_DESC × SCOPE_DESC` crosstab): `F####` is the Fire range, and
+  **63 of its 136 values are not `FP `/`FIRE`-prefixed** (DEDICATED FUNCTION MONITORING F175,
+  PRE-ACTION SYSTEM F107, PRIVATE FIRE FLOW TEST F810 …) — Civic/Public on the code, never a
+  guess; where the fire permit's SUBJECT is industrial (INDUSTRIAL OVEN, WRECKING YARDS, HIGH
+  PILE COMBUSTIBLE STORAGE …) the subject wins, and solar PV (5,558 rows) is Utility, not a fire
+  inspection. Receipts: docs/source-registry.md "PHOENIX BUILDING PERMITS".
 - 🟢 **AUSTIN ZONING CASES wired — `austin-zoning-cases` (socrata, registry 85 → 86)**
   (live-verified 2026-07-28). City of Austin's own portal, dataset `edir-dcnf`, 6,919 rows,
   fresh (`data_portal_update` 2026-07-27). Config only. **New standing answer (so no session
