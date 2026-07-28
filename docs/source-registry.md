@@ -2863,6 +2863,38 @@ description — an honest fallback, not a gap.
 `test/phoenix-connector.test.mjs` asserts the stronger unit-level fact — an out-of-coverage ZIP
 **never fetches** the Phoenix layer at all.
 
+### CI verifier status — read this before re-investigating
+
+**`verify-development` (run 30319267075, 3 h 32 m) FAILED — no Phoenix page is in the failure
+list.** 390 failure lines over 165 distinct ZIPs, of which the only Arizona-range entries are
+**85724 and 85745, both `Tucson (…)` / Pima County** (DB-confirmed; served by
+`tucson-*`, untouched here). **0 of the 136 Maricopa ZIPs failed**, including all 78 carrying
+Phoenix records. This is pre-existing: the previous run (30305825744, *before* this change) had
+**8 failing 85xxx ZIPs — 85641, 85704, 85735, 85742, 85746, 85748, 85749, 85750, every one
+Tucson/Pima** — so Arizona failures went **8 → 2**. The 97 → 390 growth is entirely `75xxx`
+(Dallas, 72 ZIPs), `89xxx` (NV, 44) and `92xxx` (San Diego, 18) — the PR #413/#414/#415 sources.
+385 of the 390 lines are the `counts.* !== rendered <band> rail` class already red on `main`
+(last three completed runs: failure at 2:54:54, 3:27:04, 3:12:42); the other 5 are substance-gate
+`robots="index, follow"` lines on AL/OK/ID ZIPs. Neither class is a function of adding a registry
+source, and `claude/verify-development-fa…` is already open against it.
+
+**`verify-geocodes` (run 30319270760) was CANCELLED at 6:00:18 — GitHub's hard 6-hour job cap**,
+not a failure and not a verdict (the workflow declares no concurrency group, so nothing cancelled
+it externally). **It would have had nothing to check here anyway: all 96,352 Phoenix records are
+`geo_precision:"point"` with `geocode_source` null on every one — 0 geocoded.** The geofence
+applies to GEOCODED points only; source-supplied geometry is never fenced.
+
+The equivalent containment check was therefore run directly against the data. Emitted Phoenix
+pins span **lat 33.2907–33.8892, lng −112.3078–−111.7597**, versus the publisher's own declared
+layer extent (metadata `extent`, EPSG:3857 → WGS84) of **lat 33.2905–33.8929, lng −112.3044–−111.7589**
+— i.e. inside on three sides, with **exactly 2 records of 96,352** sitting ~315 m west of the
+declared western edge. Both were inspected and are **real, not bad coordinates**: case 26007590
+"BLDG D - TCO" and 26007591 "BLDG E - TCO", `11580 W INDIAN SCHOOL RD`, ZIP 85392, filed
+2026-05-21. Longitude −112.3078 is ≈115th Ave (Phoenix's origin is Central Ave at −112.074;
+115 blocks ÷ 8 per mile ≈ 14.4 mi ≈ 0.24°), which matches that address. **Standing answer: an
+ArcGIS layer's declared `extent` is cached/rounded metadata, not a containment guarantee — do not
+treat a small overshoot as a geocoding defect.**
+
 ### Regression cover
 
 `test/phoenix-connector.test.mjs` (new, offline) drives the **shipped** connector over a real
