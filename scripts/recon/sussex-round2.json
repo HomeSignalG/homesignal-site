@@ -1,0 +1,66 @@
+[
+ {
+  "id": "sx-status-date-corr",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/0/query?where=1%3D1&groupByFieldsForStatistics=a_status&outStatistics=%5B%7B%22statisticType%22%3A%20%22count%22%2C%20%22onStatisticField%22%3A%20%22OBJECTID%22%2C%20%22outStatisticFieldName%22%3A%20%22n%22%7D%2C%20%7B%22statisticType%22%3A%20%22min%22%2C%20%22onStatisticField%22%3A%20%22pt_p_issue_date%22%2C%20%22outStatisticFieldName%22%3A%20%22mind%22%7D%2C%20%7B%22statisticType%22%3A%20%22max%22%2C%20%22onStatisticField%22%3A%20%22pt_p_issue_date%22%2C%20%22outStatisticFieldName%22%3A%20%22maxd%22%7D%5D&f=json",
+  "print_chars": 6000
+ },
+ {
+  "id": "sx-status-x-munstat",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/0/query?where=1%3D1&groupByFieldsForStatistics=a_status%2Ch_mun_stat&outStatistics=%5B%7B%22statisticType%22%3A%20%22count%22%2C%20%22onStatisticField%22%3A%20%22OBJECTID%22%2C%20%22outStatisticFieldName%22%3A%20%22n%22%7D%5D&f=json",
+  "print_chars": 6000
+ },
+ {
+  "id": "sx-usedesc-vocab",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/0/query?where=1%3D1&groupByFieldsForStatistics=a_use_desc&outStatistics=%5B%7B%22statisticType%22%3A%20%22count%22%2C%20%22onStatisticField%22%3A%20%22OBJECTID%22%2C%20%22outStatisticFieldName%22%3A%20%22n%22%7D%5D&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "sx-dup-check",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/0/query?where=pt_a_permit_no%20%3D%20%27158677%20%20%20%20%20%20%20%20%20%27&outFields=OBJECTID%2Cpt_a_permit_no%2Cpt_f_pifm_key%2Ca_status%2Cpt_p_issue_date&returnGeometry=false&f=json",
+  "print_chars": 4000
+ },
+ {
+  "id": "sx-status-C-recent",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/0/query?where=a_status%20%3D%20%27C%27%20AND%20pt_p_issue_date%20%3E%20DATE%20%272025-01-01%27&returnCountOnly=true&f=json",
+  "print_chars": 600
+ },
+ {
+  "id": "sx-status-O-recent",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/0/query?where=a_status%20%3D%20%27O%27%20AND%20pt_p_issue_date%20%3E%20DATE%20%272025-01-01%27&returnCountOnly=true&f=json",
+  "print_chars": 600
+ },
+ {
+  "id": "sx-querydomains2",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/queryDomains?layers=%5B0%5D&f=json",
+  "print_chars": 4000
+ },
+ {
+  "id": "sx-featureserver-meta",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/FeatureServer/0?f=json",
+  "extract": "a_status|codedValues|domain\":\\{",
+  "extract_context": 700,
+  "extract_max": 8
+ },
+ {
+  "id": "sx-folder-commdev",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Community_Development?f=json",
+  "print_chars": 3000
+ },
+ {
+  "id": "sx-folder-munis",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Munis?f=json",
+  "print_chars": 3000
+ },
+ {
+  "id": "sx-folder-pz",
+  "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Planning_And_Zoning?f=json",
+  "print_chars": 3000
+ },
+ {
+  "id": "sx-bpl-page",
+  "url": "https://sussexcountyde.gov/building-permits-and-licenses",
+  "extract": "status|search|lookup|code",
+  "extract_context": 350,
+  "extract_max": 14
+ }
+]
