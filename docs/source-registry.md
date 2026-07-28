@@ -2851,6 +2851,13 @@ Re-cached all 136 modelled Maricopa ZIPs through the live engine (`pg_net` → `
   garbage-coordinate precedent). Hence 100 % pinned rather than a listed/pinned split.
 * **Heaviest row 85006 at 3.21 MB; 0 rows over 3.5 MB.**
 
+**Known characteristic, recorded not hidden:** `title` is `PERMIT_NAME` exactly as the brief
+specifies, and that column is null on 3.7 % of the layer — **4,063 of the 96,352 cached records
+(4.2 %) carry a blank `title`**. None of them is label-less: `0 of 96,352` have a blank `label`,
+because the connector falls back to the permit number (`label = title || case_number ||
+"Development record"`). So those pins read as their real permit number rather than a
+description — an honest fallback, not a gap.
+
 **Bidirectional coverage-gate proof, live:** `85701` (Tucson, AZ/Pima) and `85122`
 (Casa Grande, AZ/Pinal) both returned **0 Phoenix records** through the deployed engine, and
 `test/phoenix-connector.test.mjs` asserts the stronger unit-level fact — an out-of-coverage ZIP
