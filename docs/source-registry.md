@@ -2902,3 +2902,296 @@ captured query response committed at `fixtures/phoenix/planning-permit-layer1-sa
 It pins the vocabulary completeness, the closed use_type set, the two verbatim string quirks,
 the spatial-envelope query shape, the absence of `returnCentroid` on a point layer, and the
 coverage gate in both directions. Full suite: **58 unit test files green.**
+
+---
+
+## PHASE 1 STANDARD ARCGIS WIRE PASS (2026-07-28) — 26 of 27 endpoints wired (registry 86 → 112, arcgis 62 → 88)
+
+Source brief: `docs/implementation-packets/claude_code_phase1_prompt.md` +
+`claude_code_implementation.json` → `phase1_standard_arcgis` (27 endpoints, 570 ZIPs).
+**Config only — no connector, engine or schema change.** Branch
+`claude/phase1-standard-arcgis-gos1pi`.
+
+Every `type_map` and `status_to_bucket` value below is **VERBATIM live groupBy output**, never
+guessed. Seven `recon-fetch` rounds (the sandbox has no egress; the runner is the probe channel):
+**30369196972 / 30369206672 / 30369213992** (r1 type/status/sample), **30369593803** (r2 enlarged
+samples + timeout retries + description fields), **30370026584** (r3 better fields, coded-value
+domains, New Hanover narrowed scan), **30370252139** (r4), **30370572544** (r5 ZIP-predicate
+proof), **30370755906** (r6 Spokane + volume sizing), **30370939582** (r7 date-literal proof).
+Target lists are committed under `scripts/recon/p1-*.json`.
+
+### Standing answer — map keys must be the TRIMMED value
+
+`sources/arcgis.ts` trims **both** sides before lookup: the type value at l.268
+(`String(readCol(...)).trim()`) and the status value at l.232, and `buildBucketLookup` trims each
+configured status at l.595. Several of these layers ship padded or trailing-space values
+(`'D-NEW '`, `'LEGACY '`, `'COO   '`, `'BSD-Building (Residential New) '`). **A map key written with
+the untrimmed string silently never matches** — it is not a parse error, the value just falls
+through to `unclassified` / unmapped-status. Every key in this pass is stored trimmed, and a
+validator asserted all 26 entries' keys against the live vocabularies (0 mismatches, 0 status value
+in two buckets).
+
+### Two packet errors corrected on evidence
+
+1. **Adams CO `date_field` does not exist.** The packet gives `ApplicationDate`; the live layer
+   answers `{"error":{"code":400,...["'Invalid field: ApplicationDate' parameter is invalid"]}}`
+   (run 30370939582). The real column is **`CaseOpened`**. Left uncorrected this would have been
+   written into `incremental_field` → `orderByFields=ApplicationDate DESC` → **every query for that
+   entry fails** and the entry quarantines. Both `file_date` and `incremental_field` use
+   `CaseOpened`.
+2. **Lancaster NE `Issued` is a STRING date.** `Issued >= DATE '2024-07-28'` returns HTTP 400
+   "Unable to complete operation" (run 30370939582), matching the packet's own note that it is
+   `MM/DD/YYYY` text. **`recency_days` is deliberately not set there** — the option emits a
+   `>= DATE '...'` literal (the Anaheim string-date standing answer).
+
+### Verified rather than assumed
+
+- **The exact ZIP predicate the connector emits** — `{zipCol}='{zip}'`, l.534 — was run against all
+  7 native-ZIP endpoints (run 30370572544): `Zip='23451'` 15,981 · `ZIPCODE='28401'` 51,232 ·
+  `ZIPCODE='40202'` 231 · `ZipCode='65201'` 14,806 · `ZIP='68502'` 10 · `PropertyZip='72201'` 6,100 ·
+  `Site_Zip='99201'` **0**.
+- **The Spokane 0 is real coverage, not a broken mapping.** `Site_Zip` is `esriFieldTypeString` and a
+  groupBy over it (run 30370755906) shows the layer holds **no 99201/99202/99203/99204/99207 rows at
+  all** — those are City of Spokane ZIPs and this is the **County** ledger. 28 of the packet's 46
+  Spokane ZIPs do appear (99208 751 · 99223 619 · 99218 569 · 99224 544 · 99005 431 …); the rest will
+  honestly render 0 county permits.
+- **Every date column used for `recency_days` provably accepts a `DATE` literal** (run 30370939582) —
+  which is exactly how the two failures above surfaced.
+
+### Field deviations from the packet, each on evidence
+
+The packet names a `type_field`/`status_field` per endpoint. Seven were overridden because the named
+column is opaque codes, free text, or a near-constant — the same layer publishes a readable twin:
+
+| Endpoint | Packet field | Used instead | Why |
+|---|---|---|---|
+| Brunswick NC | `PermitType` / `PermitStatus` | `ProjectType` / `PemitProjectStatus` | `PermitType` is a 224-value inspection/fee ledger; `PermitStatus` is 96 percent the single value `Active` (267,495 / 276,775) |
+| DeKalb GA | `workType` | `WorkTypeDescription` | 59 opaque codes (`W-COMB`, `D-ALT`, `M-R+`) vs readable twin |
+| Saint Paul MN | `FOLDER_TYPE` | `SUB_TYPE` | `FOLDER_TYPE` is a TRADE split; `SUB_TYPE` is the building-use classifier |
+| Lincoln NE | `ClassCode` | `UseType` | `ClassCode` is bare digits `101/102/103/104` (needs an external codebook); `PermType` probed and rejected — single value `New` |
+| Little Rock AR | `PermitType` | `BldUseDesc` | `PermitType` is 3-letter TRADE codes (ELE/PLU/MEC/BLD) |
+| Topeka KS | `case_type` | `case_type_desc` | `BLDR-` codes vs readable twin |
+| Kent DE | `PermitStatus` | `StatusDesc` | 2-letter codes (`AP`/`CL`/`CO`) vs readable twin |
+
+**Kent's TYPE stayed on the coded `StructureType`**: `StructureDesc` was probed as the obvious
+candidate and **rejected — it is free-text project narrative** ("12x16 deck", "10x12 screened
+porch"), 334+ values almost all count=1. The layer publishes no coded-value domain, so only
+unambiguous codes are mapped and the rest (RAPD 13,115 · ACCE 6,412 · PWP 5,737 · RARM 4,773 …)
+**fail closed to `unclassified` rather than be invented**.
+
+### Wired (26)
+
+| registry_id | Coverage | type values | use-types | status values | ZIP scoping | recency_days |
+|---|---|---|---|---|---|---|
+| `kent-county-de-building-permits` | DE/Kent | 29 | 5 | 10 | spatial 5 mi | 730 |
+| `virginia-beach-building-permits` | VA/Virginia Beach | 4 | 3 | 10 | native `Zip` | 365 |
+| `durham-building-permits` | NC/Durham | 4 | 2 | 9 | spatial 5 mi | 730 |
+| `cabarrus-county-plan-reviews` | NC/Cabarrus | 2 | 1 | 34 | spatial 5 mi | 730 |
+| `new-hanover-county-building-permits` | NC/New Hanover | 56 | 5 | 18 | native `ZIPCODE` | 730 |
+| `brunswick-county-permits` | NC/Brunswick | 4 | 3 | 7 | spatial 5 mi | 730 |
+| `dekalb-county-building-permits` | GA/DeKalb | 34 | 5 | 5 | spatial 5 mi | 730 |
+| `forsyth-county-ga-building-permits` | GA/Forsyth | 3 | 3 | 19 | spatial 5 mi | 730 |
+| `savannah-commercial-building-permits` | GA/Chatham | 1 | 1 | 3 | spatial 5 mi | — |
+| `louisville-active-construction-permits` | KY/Jefferson | 23 | 4 | 1 | native `ZIPCODE` | — |
+| `kenton-county-devtracking-permits` | KY/Kenton | 9 | 4 | 2 | spatial 5 mi | — |
+| `saint-paul-approved-building-permits` | MN/Ramsey | 21 | 6 | 6 | spatial 5 mi | 730 |
+| `sioux-falls-building-permits` | SD/Minnehaha | 2 | 2 | 11 | spatial 5 mi | 730 |
+| `bozeman-building-permits` | MT/Gallatin | 19 | 5 | 4 | spatial 5 mi | — |
+| `missoula-addresses-with-permits` | MT/Missoula | 10 | 4 | 18 | spatial 5 mi | 730 |
+| `columbia-mo-permits` | MO/Boone | 20 | 4 | 22 | native `ZipCode` | 730 |
+| `overland-park-building-permits` | KS/Johnson | 2 | 2 | 3 | spatial 5 mi | — |
+| `topeka-building-permits` | KS/Shawnee | 12 | 2 | 10 | spatial 5 mi | — |
+| `lincoln-residential-new-construction-permits` | NE/Lancaster | 10 | 5 | 2 | native `ZIP` | — |
+| `little-rock-permits` | AR/Pulaski | 6 | 2 | 5 | native `PropertyZip` | — |
+| `bentonville-catalyst-permits` | AR/Benton | 35 | 4 | 17 | spatial 5 mi | 730 |
+| `adams-county-building-permits` | CO/Adams | 6 | 3 | 18 | spatial 5 mi | — |
+| `canyon-county-building-permits` | ID/Canyon | 13 | 3 | 5 | spatial 5 mi | — |
+| `san-jose-permits` | CA/Santa Clara | 39 | 6 | 42 | spatial 5 mi | — |
+| `salem-structure-permits` | OR/Marion | 13 | 4 | 1 | spatial 5 mi | — |
+| `spokane-county-building-planning-permits` | WA/Spokane | 47 | 4 | 10 | native `Site_Zip` | — |
+### NOT wired — 1 rejection with receipts
+
+**`DE/Sussex` — `map.sussexcountyde.gov/.../Permit_Points/MapServer/0` (826,857 rows, 22 ZIPs).**
+Its `pt_a_type_desc` column is a perfectly good readable type source, but the **status vocabulary is
+undecodable**: `a_status` holds padded 4-char codes — `'C   '` 721,538 · `'O   '` 98,000 · `'CO  '`
+3,898 · `'NO  '` 1,680 · `'E   '` 1,339 · `'OO  '` 287 · `'HIST'` 94 · `'BEAC'` 26 · `'PERM'` 20 ·
+`'FLR '` 15 — and three independent attempts to find an authoritative decode all came back empty:
+the layer metadata publishes **no coded-value domain** (`fields[].domain` is null), there is **no
+paired description column** in the schema, and the MapServer **legend has a single unlabeled symbol**
+(run 30370252139). A cross-tab of `a_status` x `a_project_shdesc` confirms the codes are orthogonal
+to project type (`BEAC`, `CO`, `NO` all appear under `ACC. STRUC`), so context does not decode them
+either. **`'C'` alone is 87 percent of the layer** — guessing it wrong (Closed vs Cancelled vs
+Current) would mis-bucket the entire dataset. Skipped per the packet's own "if any endpoint fails,
+document and skip" rule. Wiring it needs a codebook from Sussex County, not more probing.
+
+### Honest shape limits (not defects)
+
+The packet asks for "at least 3 use-types" and "at least 2 buckets" per entry. Several entries cannot
+reach that **because the source vocabulary genuinely does not contain it**, and inventing categories
+to hit a target is exactly what the anti-fabrication rule forbids:
+
+- **1 use-type:** `cabarrus-county-plan-reviews` (`Building`/`Site`/`NA` only),
+  `savannah-commercial-building-permits` (layer 0 is commercial-only; the residential companion is
+  layer `/1` and is not in the packet).
+- **2 use-types:** `durham-building-permits`, `sioux-falls-building-permits`,
+  `overland-park-building-permits`, `topeka-building-permits` (every value is residential),
+  `little-rock-permits`.
+- **1 bucket:** `louisville-active-construction-permits` (status is `Issued` on all 23,297 rows) and
+  `salem-structure-permits` (`Issued` on all 832) — the Frisco single-`ISSUED` precedent.
+- **`kenton-county-devtracking-permits` publishes only ~59 of 1,622 rows**: `PROJECT_ST` is blank on
+  1,563 (96 percent), and the connector drops a blank status (`blank_status`, l.233). Fail-closed by
+  design, recorded rather than papered over.
+
+### Two previously-rejected jurisdictions REOPENED
+
+- **Saint Paul MN** — the MINNESOTA WIRE PASS recorded "St. Paul's org is live but its permits layer
+  STALLED at 2025-06-30". This is a **different service** (org `9meaaHE3uiba0zr8`,
+  `Approved_Building_Permits`) and it is current: 29,703 rows carry `ISSUEDATE >= 2024-07-28`.
+- **San Jose CA** — the CALIFORNIA WIRE PASS rejected `planningpermits30` because every row carried
+  the opaque status code `30`. This is a **different service** (`PLN_PermitsAndComplaints` layer 8)
+  with a real 45-value vocabulary and the richest `type_map` in this pass (all six use-types).
+
+### New Hanover — recovered, not skipped
+
+Every full-table groupBy against `gis.nhcgov.com/.../BuildingPermits/FeatureServer/0` **aborted at
+the 30 s probe timeout across two rounds** (482,334 rows). It is not an unusable source: narrowing
+the scan to `ISSUE_DATE > 2025-01-01` returned both vocabularies cleanly (74 types, 18 statuses), and
+the **runtime query is ZIP-scoped so it never runs a full-table scan** either. Caveat recorded: the
+vocabularies were captured from that narrowed window, so a value occurring only in the
+2024-07 → 2025-01 slice of the `recency_days: 730` window would log as unmapped rather than
+mis-bucket.
+
+### `recency_days` — added beyond the packet, with measured justification
+
+The packet does not mention `recency_days`. It is set on 13 entries where a ZIP/envelope pull would
+otherwise approach or exceed `max_rows` (20,000) — `ZIPCODE='28401'` alone returns **51,232** rows.
+`max_rows` truncation is newest-first, so it is a safe backstop, but the cached-row size is the real
+constraint (the CLEVELAND 5.98 MB ceiling). Measured trailing-2-year counts drove each choice, e.g.
+New Hanover 51,232 → 5,328 · Boone 14,806 → 3,189 · Brunswick 276,775 → 91,704.
+**Virginia Beach gets the tightest window (365 days)** because it is the one geometry-less endpoint:
+every row it returns must be geocoded, and 23451 alone holds 15,981 rows all-time vs 2,646 in the
+trailing year.
+
+### Virginia Beach — the one geometry-less endpoint
+
+`has_geometry: false` in the packet, confirmed live: the layer serves attributes only, with no
+`esriGeometryPoint` and no lat/lng columns. So the packet's blanket "use `spatial_point_col`
+= `geometry`" does not apply — records place through the engine's **geocode path** (Anaheim/Boulder
+precedent) with `geocode_assemble: true`, since `StreetAddress` is street-only. ZIP scoping is native
+(`Zip`), so no `spatial_zip_radius_mi`.
+
+### Not yet live — deploy is the remaining step
+
+`jurisdiction-registry.json` is a static import bundled into the edge function
+(`index.ts:69`, `import jurisdictionRegistry from "./jurisdiction-registry.json"`). These 26 entries
+therefore do **nothing** until `deploy-edge-functions.yml` runs for `get-address-report`, and the
+affected ZIP pages carry no records until the cache refreshes (`dev_refresh_fire`, daily 09:00 UTC).
+All **558** ZIP pages in the 26 covered counties were measured at **0 development-backed sites** —
+every one is on the bare EPA facilities floor today.
+
+---
+
+## PHASE 2 ARCGIS NO-STATUS WIRE PASS (2026-07-28) — all 12 endpoints wired (arcgis 88 → 100, registry 112 → 124)
+
+Source brief: `docs/implementation-packets/claude_code_phase2_prompt.md` +
+`claude_code_implementation.json` → `phase2_arcgis_no_status` (12 endpoints, 247 ZIPs).
+**Config only — no connector, engine or schema change.** Branch `claude/phase2-arcgis-no-status`.
+Vocabularies are VERBATIM live groupBy output; four `recon-fetch` rounds — **30380143920**,
+**30380342906**, **30380564556**, **30380718707** (targets under `scripts/recon/p2-*.json`).
+
+### STANDING ANSWER — `status_const` does NOT bypass `status_to_bucket`
+
+The Phase 2 brief says to set `status_const: "operating"` and *"set `status_to_bucket` to null or
+omit"*, "to bypass status_to_bucket entirely". **That is wrong and would have emitted ZERO records
+from all 12 endpoints.** The connector applies the constant as the row's `status_raw`
+(`arcgis.ts:232`) and then buckets it through the same lookup as a live value (`l.218`); its own
+docstring says so — *"Applied verbatim as each row's status_raw and bucketed through
+status_to_bucket like any live value"* (`l.79`). With the map omitted the lookup is empty, every row
+counts as an unmapped status, and `continue` drops it. `status_to_bucket` is also a **required**
+field on the interface (`l.51`), so omitting it would make `buildBucketLookup` throw.
+
+Every Phase 2 entry therefore pairs `status_const: "operating"` with
+`"operating": ["operating"]` — the shape `nvdot-project-boundaries` already uses.
+
+⚠️ **Pre-existing defect noticed while confirming this** (NOT touched by this PR, flagged for the
+owner): **`san-antonio-prelim-plan-review`** sets `status_const: "proposed"` but has **all four
+buckets empty**, so by the same mechanism it emits **zero records**. It needs
+`"proposed": ["proposed"]`.
+
+### Two packet data errors corrected on evidence
+
+1. **Aurora's `date_field` is a corrupted literal** — the packet gives `"(2021-07-26"`. The real
+   column is **`IssueDate`** (verified: 41,327 rows `>= 2024-07-28` of 164,091).
+2. **Loudoun's ZIP column is NUMERIC.** The connector's default predicate `ZI_ZIP='20147'` returns
+   HTTP 400 *"Unable to complete operation"*; unquoted `ZI_ZIP = 20147` returns **7,915**. Wired via
+   `zip_where_template`, the documented escape hatch — `column_map.zip` would have silently failed.
+
+### Charleston — scope corrected by measurement, then wired
+
+`energov_history` is not a building-permit layer; it is **every** Energov case. A live `MODULENAME`
+groupBy: **InspectionManagement 229,975** · PermitManagement 111,000 · PlanManagement 33,533 ·
+CodeManagement 3,784 · ProjectManagement 3,139 · RequestManagement 2,315 · BusinessLicenseEntity 128
+· IndividualLicense 40 · ApplicationManagement 13 = 383,927. **60% of the layer is inspections** —
+which is also why the packet's `WORKCLASS` is blank on 239,354 rows (62%): an inspection has no work
+class. `extra_where: "MODULENAME = 'PermitManagement'"` drops inspections, licences and code cases
+**at source** (the Seattle/Chicago precedent), leaving real permits.
+
+### Field deviations from the packet, each on evidence
+
+| Endpoint | Packet field | Used instead | Why |
+|---|---|---|---|
+| Huntsville AL | `TypeOfWork` | `OccupancyType` | `TypeOfWork` is a work class (New Construction / Alteration / Addition) |
+| Knoxville TN | `PERMITTYPE` | `LANDUSE` | opaque abbreviations with no domain — `CO` could be Commercial or Certificate of Occupancy |
+| Aurora CO | `FolderDesc` | `SubDesc` | `FolderDesc` is permit-PROCESS categories (Counter Permit 71,480) — how it was filed, not what was built |
+| Albuquerque NM | `TypeofWork` | `TypeofStructure` | work class vs building use |
+| Thurston WA | `BPTYPE` | `BPTYPE_Desc` | `SF`/`MH`/`DEMOB` codes vs readable twin |
+
+### Sheridan WY — wired, with a recorded limitation
+
+`Type_of_Bu` is **free text**, not a controlled vocabulary: hundreds of values, **285 of the 363
+parsed occur exactly once**, inconsistent casing and leading spaces (`" single family dwelling"`,
+`" garage"`, `"Change of Use - Oil field service business"`), and the response was still truncated.
+A *complete* type_map is impossible. Only unambiguous high-frequency values are mapped (keys stored
+**trimmed**, which merges the leading-space variants); the long tail fails closed to `unclassified`
+rather than be invented. Records still emit with their own coordinates and `record_url`.
+
+### Thurston WA — the coordinate trap
+
+`X`/`Y` look like coordinate columns but are **state-plane** (wkid 102749). `column_map` reads the
+flattened geometry (`__lat`/`__lng`), which the connector reprojects to 4326 — mapping `X`/`Y` would
+have placed every marker in the wrong hemisphere.
+
+### Wired (12)
+
+| registry_id | Coverage | type values | use-types | ZIP scoping | recency_days |
+|---|---|---|---|---|---|
+| `new-castle-county-permits` | DE/New Castle | 3 | 2 | spatial 5 mi | 730 |
+| `loudoun-county-residential-permits` | VA/Loudoun | 6 | 1 | `zip_where_template` | — |
+| `charleston-county-permits` | SC/Charleston | 41 | 4 | spatial 5 mi | 730 |
+| `huntsville-building-permits` | AL/Madison | 6 | 2 | spatial 5 mi | — |
+| `chattanooga-permits-archive` | TN/Hamilton | 2 | 2 | spatial 5 mi | 730 |
+| `knoxville-building-permits` | TN/Knox | 19 | 6 | spatial 5 mi | 730 |
+| `desoto-county-permits` | MS/DeSoto | 4 | 2 | spatial 5 mi | — |
+| `flathead-county-building-permits` | MT/Flathead | 6 | 3 | spatial 5 mi | — |
+| `aurora-building-permits` | CO/Adams + CO/Arapahoe | 44 | 6 | spatial 5 mi | 730 |
+| `sheridan-county-building-permits` | WY/Sheridan | 16 | 2 | spatial 5 mi | — |
+| `albuquerque-building-permits` | NM/Bernalillo | 26 | 4 | spatial 5 mi | 730 |
+| `thurston-county-residential-permits` | WA/Thurston | 5 | 2 | native `ZIP5` | 730 |
+### Honest shape limits and scope notes
+
+- **`loudoun-county-residential-permits` has ONE use-type** — it is a residential-only layer
+  (`UNIT_TYPE` is entirely single-family/multi-family/group-quarters).
+- **`chattanooga-permits-archive` is a FROZEN ARCHIVE** — the layer is literally named
+  `Chatt_permits_to_12_31_2025` and spans 2006-01-01 → 2025-12-31; it will not gain new permits.
+- **`flathead-county-building-permits` is layer `/1`, "Current Year Permits" — 243 rows.** Layer
+  `/0` holds prior years and is not in the packet, so it is not wired.
+- **`aurora-building-permits` declares BOTH Adams and Arapahoe** — Aurora straddles the line,
+  confirmed against our own rows (80010/80011/80019 Adams; 80012–80016 Arapahoe).
+- Two hosts were flaky during recon and needed retries: Charleston (`fetch failed` ×2) and Knox
+  (HTTP 503 ×2). Both succeeded on retry; neither is an unusable source.
+
+### Not yet live — deploy is the remaining step
+
+Same as Phase 1: `jurisdiction-registry.json` is a static import bundled into the edge function
+(`index.ts:69`), so these 12 entries do nothing until `deploy-edge-functions.yml` runs for
+`get-address-report` and the cache refreshes (`dev_refresh_fire`, daily 09:00 UTC).

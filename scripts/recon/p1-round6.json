@@ -1,0 +1,42 @@
+[
+ {
+  "id": "26-site-zip-vocab",
+  "url": "https://services3.arcgis.com/WlYQgAChrqj0tuQi/arcgis/rest/services/Spokane_County_Building_and_Planning_Permits/FeatureServer/0/query?where=1%3D1&outFields=Site_Zip&returnGeometry=false&groupByFieldsForStatistics=Site_Zip&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22Site_Zip%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 6000
+ },
+ {
+  "id": "26-site-zip-numeric",
+  "url": "https://services3.arcgis.com/WlYQgAChrqj0tuQi/arcgis/rest/services/Spokane_County_Building_and_Planning_Permits/FeatureServer/0/query?where=Site_Zip%3D99201&returnCountOnly=true&f=json",
+  "print_chars": 800
+ },
+ {
+  "id": "02-vb-2yr",
+  "url": "https://services2.arcgis.com/CyVvlIiUfRBmMQuu/arcgis/rest/services/Building_Permits_Applications_view/FeatureServer/0/query?where=Zip%3D%2723451%27%20AND%20IssueDate%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 800
+ },
+ {
+  "id": "02-vb-1yr",
+  "url": "https://services2.arcgis.com/CyVvlIiUfRBmMQuu/arcgis/rest/services/Building_Permits_Applications_view/FeatureServer/0/query?where=Zip%3D%2723451%27%20AND%20IssueDate%20%3E%3D%20DATE%20%272025-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 800
+ },
+ {
+  "id": "05-nh-2yr",
+  "url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0/query?where=ZIPCODE%3D%2728401%27%20AND%20ISSUE_DATE%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 800
+ },
+ {
+  "id": "05-nh-1yr",
+  "url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0/query?where=ZIPCODE%3D%2728401%27%20AND%20ISSUE_DATE%20%3E%3D%20DATE%20%272025-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 800
+ },
+ {
+  "id": "16-boone-2yr",
+  "url": "https://gis.gocolumbiamo.com/arcgis/rest/services/View_Services/City_Projects_Construction_Updated/MapServer/3/query?where=ZipCode%3D%2765201%27%20AND%20ISSUE_DATE%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 800
+ },
+ {
+  "id": "20-pulaski-2yr",
+  "url": "https://maps.littlerock.gov/server/rest/services/Permits_All/MapServer/0/query?where=PropertyZip%3D%2772201%27%20AND%20PermitIssueDate%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 800
+ }
+]

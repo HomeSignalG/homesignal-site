@@ -1,0 +1,22 @@
+[
+ {
+  "id": "01-zip-unquoted",
+  "url": "https://logis.loudoun.gov/gis/rest/services/Projects/ResBuildingPermits/MapServer/1/query?where=ZI_ZIP%20%3D%2020147&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "02-MODULENAME",
+  "url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/ENERGOV/energov_history/FeatureServer/0/query?where=1%3D1&outFields=MODULENAME&returnGeometry=false&groupByFieldsForStatistics=MODULENAME&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22MODULENAME%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 4000
+ },
+ {
+  "id": "05-knox-sample2",
+  "url": "https://services8.arcgis.com/Ty9G85JMF2cDHlRt/arcgis/rest/services/BuildingPermits/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "05-knox-datelit",
+  "url": "https://services8.arcgis.com/Ty9G85JMF2cDHlRt/arcgis/rest/services/BuildingPermits/FeatureServer/0/query?where=DATEISSUED%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 300
+ }
+]

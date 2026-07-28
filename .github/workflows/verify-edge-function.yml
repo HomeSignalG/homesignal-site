@@ -142,12 +142,12 @@ jobs:
           PR_DIFF="${RUNNER_TEMP}/pr.diff" CHECK_ERR="${RUNNER_TEMP}/check.out" \
             deno run --allow-read --allow-env "${RUNNER_TEMP}/gate.ts"
 
-      - name: Assert geocode_assemble flags (exactly six, Boulder unflagged)
+      - name: Assert geocode_assemble flags (exactly seven, Boulder unflagged)
         run: |
           cat > "${RUNNER_TEMP}/assert-flags.ts" <<'TS'
           // The registry is an object keyed by platform (socrata/arcgis/ckan/csv/carto),
           // each an array of entries; readme keys hold non-entry arrays. Flatten the real
-          // entries and confirm the six intended `geocode_assemble` flags — and only those —
+          // entries and confirm the seven intended `geocode_assemble` flags — and only those —
           // and that Boulder is NOT flagged.
           const path = "supabase/functions/get-address-report/jurisdiction-registry.json";
           const reg = JSON.parse(Deno.readTextFileSync(path)) as Record<string, unknown>;
@@ -166,6 +166,13 @@ jobs:
             "columbus-building-permits",
             "fort-worth-development-permits",
             "pierce-county-pals-permits",
+            // Added 2026-07-28 (Phase 1 ArcGIS wire pass, PR #418). Virginia Beach is the one
+            // geometry-less endpoint in that pass — the layer serves attributes only, with no
+            // esriGeometryPoint and no lat/lng columns — so its records place through the
+            // geocode path, and StreetAddress is street-only ("2101 PARKS AVE", with City/
+            // State/Zip in separate columns). That is exactly the case geocode_assemble
+            // exists for: a bare street line does not match the Census geocoder.
+            "virginia-beach-building-permits",
           ].sort();
           console.log(`flagged (${flagged.length}): ${flagged.join(", ")}`);
           let ok = true;
@@ -179,6 +186,6 @@ jobs:
             console.error("::error::boulder-construction-permits must NOT be geocode_assemble-flagged");
           }
           if (!ok) Deno.exit(1);
-          console.log("registry flags OK — exactly six intended entries flagged, Boulder unflagged");
+          console.log("registry flags OK — exactly seven intended entries flagged, Boulder unflagged");
           TS
           deno run --allow-read "${RUNNER_TEMP}/assert-flags.ts"

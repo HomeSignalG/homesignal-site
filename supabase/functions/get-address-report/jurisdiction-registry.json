@@ -6180,6 +6180,2477 @@
       "record_url_precision": "dataset",
       "incremental_field": "PER_ENT_DATE",
       "_receipts": "2026-07-28 Phoenix wire pass. City of Phoenix Planning & Development Department's OWN ArcGIS MapServer (maps.phoenix.gov), service Public/Planning_Permit, LAYER 1 'Permits' — 70,791 rows (live returnCountOnly). Corrects the ARIZONA WIRE PASS rejection 'Phoenix: no first-party per-record permit dataset', which was true of the CKAN CATALOGUE and false of the city: no catalogue lists this host. esriGeometryPoint, query response spatialReference wkid 4326 → __lat/__lng; maxRecordCount 2000; advancedQueryCapabilities.supportsPagination true (resultOffset 2000 verified live). FRESH: max PER_ENT_DATE 2026-07-24, max PER_ISSUE_DATE 2026-07-24. file_date = PER_ENT_DATE (permit enter date) NOT PER_ISSUE_DATE, on two live facts: PER_ENT_DATE is 100% populated (70,791/70,791) vs PER_ISSUE_DATE 65,980/70,791, and buildWhere() applies recency_days to firstCol(column_map.file_date) — so the recency window and the displayed filing date are the same column. Both are esriFieldTypeDate, so the DATE '<cutoff>' literal applies (no Anaheim string-compare workaround). 4 PERMIT_STAT values VERBATIM via groupBy, summing EXACTLY to 70,791: DONE 42,488 → operating / OPEN 28,222 → proposed / EXPR 64 + VOID 17 → excluded. 238 PER_TYPE_DESC values (NOT the brief's '250+'), enumerated THREE agreeing ways — groupBy n DESC, groupBy n ASC (the Mesa/Gilbert $limit-truncation defence) and returnDistinctValues: identical 238-value sets, no nulls, counts summing EXACTLY to 70,791 → 0 unclassified. Civic/Public 97 values/23,400 rows · Development 46/18,949 · Utility 23/10,548 · Commercial 22/10,464 · Residential 12/5,389 · Industrial 38/2,041. Two upstream string quirks preserved VERBATIM (normalising either would silently unclassify them): 'SIGN  PERMIT' has a DOUBLE SPACE (3,685 rows) and 'UTILITY TRENCHING CI VIL PERMIT' has a mid-word space in CIVIL (622 rows). The brief's 'Other' bucket is written as Development: use_type is a CLOSED six-value vocabulary and lib/map.js TYPE_EXACT maps 'development' → cat('other') = the 'Other project' circle, so Development renders exactly what the brief asked for while an off-vocabulary 'Other' would miss TYPE_EXACT and fall through to keyword guessing. Self-describing values (POLYGON WIRE PASS #2 rule) resolved against the layer's OWN PER_TYPE department code via a live PER_TYPE x PER_TYPE_DESC x SCOPE_DESC crosstab (242 pairs, sum 70,791): F#### is the Fire range and 63 of its 136 values are NOT FP-/FIRE-prefixed (DEDICATED FUNCTION MONITORING F175, PRE-ACTION SYSTEM F107, SMOKE CONTROL OR EXHAUST F116, PRIVATE FIRE FLOW TEST F810, ...) → Civic/Public on the code, never a guess; where the fire permit's SUBJECT is industrial (INDUSTRIAL OVEN F121, WRECKING YARDS F286, HIGH PILE COMBUSTIBLE STORAGE F102, TIRE REBUILDING F198, PLANT EXTRACTION F280, MOBILE FLEET FUELING F148, ...) the subject wins → Industrial; solar PV F193/F194/F209/F800 (5,558 rows) → Utility (the brief's own BATTERY→Utility rule); AVIATION FACILITY F360 → Civic/Public (dallas-specific-use-permits maps Airport → Civic/Public); DEVELOPMENTALLY DISABLED GRP HOME INSP F424 → Civic/Public (tucson-residential maps Residential Care Facility → Civic/Public); REPAIR GARAGE F204 and SHELL - STRUC/ELEC/PLMB/MECH (BLDS, SCOPE_DESC 'COMMERCIAL SHELL') → Commercial. Recorded asymmetry: 'FP INDUSTRIAL OVENS' is Civic/Public while 'INDUSTRIAL OVEN' is Industrial — the brief lists the FP rule ahead of the hazmat rule and that ordering is preserved. NO ZIP column anywhere on the layer → spatial_zip_radius_mi 3 (the engine-standard ZIP approximation); rows place by their OWN point geometry, and a geometry-less row cannot satisfy the envelope, so 100% of emitted records are pinned. return_centroid is NOT set — this is a point layer. out_fields projects the 8 mapped columns of 18 (the Miami/Columbus dense-metro CPU guard); it does not change which records are emitted. record_url_precision 'dataset', NOT the brief's 'none' — that value does not exist (the connector type is 'record' | 'dataset' and the anti-fabrication gate requires every site to carry a URL). Both per-record candidates were probed live and NEITHER discriminates: apps-secure.phoenix.gov/pdd/search/permits/1500027 returns HTTP 200 whose body is '<title>P&D Online - Error</title>', and ?permitNumber=1500027 returns the same search shell as the bare path (49,163 vs 48,822 bytes) — templating either would be guessing (San Diego rule). RECENCY 365, NOT the brief's 1095: 1095 was DEPLOYED and MEASURED live via pg_net with nothing persisted — 85003 7.16 MB/9,375 records, 85008 4.74, 85015 4.65, 85032 3.62, i.e. every probe ZIP over the brief's own 3.5 MB ceiling, so the named contingency could not satisfy the constraint it was given for. At 365 the same ZIPs land at 2.84/1.80/1.79/1.51 MB, verified against ALL 136 modelled Maricopa ZIPs (not a sample): worst case 85006 at 3,954 records → 3.21 MB cached, 0 of 136 rows over 3.5 MB. Window is exact — oldest surviving file_date 2025-07-28. GO-LIVE (DB-verified): Maricopa ZIP pages with source records 40 → 97; 78 pages carry 96,352 Phoenix records with 0 missing record_url, 0 missing coordinates, 0 unclassified, 0 non-point scope. Gate proof cache-wide: AZ/Maricopa ONLY. Receipts: docs/source-registry.md 'PHOENIX BUILDING PERMITS'; regression test/phoenix-connector.test.mjs."
+    },
+    {
+      "registry_id": "kent-county-de-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://gis.kentcountyde.gov/server/rest/services/LayersForApps/Permits_Data/MapServer/1",
+      "dataset_url": "https://gis.kentcountyde.gov/server/rest/services/LayersForApps/Permits_Data/MapServer/1",
+      "jurisdiction": "Kent County, Delaware",
+      "coverage": [
+        {
+          "state": "DE",
+          "county": "Kent"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "ProjectName",
+          "StructureDesc"
+        ],
+        "status_raw": "StatusDesc",
+        "type_source": "StructureType",
+        "file_date": "IssueDate",
+        "case_number": "PermitNumber",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "SFD": "Residential",
+        "SFA": "Residential",
+        "SHED": "Residential",
+        "POOL": "Residential",
+        "MANH": "Residential",
+        "MHP": "Residential",
+        "OFFI": "Commercial",
+        "AMUS": "Commercial",
+        "SIGN": "Commercial",
+        "SIGD": "Commercial",
+        "INDU": "Industrial",
+        "CHUR": "Civic/Public",
+        "SCHO": "Civic/Public",
+        "PUBL": "Civic/Public",
+        "DEMO": "Development",
+        "DEMS": "Development",
+        "DEM2": "Development",
+        "DEM3": "Development",
+        "DEMOMH": "Development",
+        "DEMOR": "Development",
+        "DEMOAG": "Development",
+        "DEMOC": "Development",
+        "RENO": "Development",
+        "RENW": "Development",
+        "REN3": "Development",
+        "REN6": "Development",
+        "RE30": "Development",
+        "FOUN": "Development",
+        "MOVI": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Pending (Submittal Received)",
+          "Plan Check"
+        ],
+        "approved": [
+          "Approved (Plan Review Complete)",
+          "Permit Issued"
+        ],
+        "operating": [
+          "Certificate of Occupancy",
+          "Closed (Project Complete)"
+        ],
+        "exclude": [
+          "Withdrawn by Applicant",
+          "Void",
+          "Refunded",
+          "Refund Requested"
+        ]
+      },
+      "incremental_field": "IssueDate",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. TYPE: StructureType, 72 distinct values summing to 119284 (top: \"SFD\" 21285 / \"RAPD\" 13115 / \"SHED\" 11497 / \"RENO\" 10866 / \"ACCE\" 6412 / \"FEN\" 6206 / \"POOL\" 6154 / \"PWP\" 5737). These are opaque 4-letter codes and the layer publishes NO coded-value domain (probed: fields[].domain is null throughout). StructureDesc was probed as a candidate readable twin and REJECTED — it is FREE-TEXT project narrative ('12x16 deck', '10x12 screened porch'), 334+ values almost all count=1, not a classifier. So only codes that are unambiguous on their face are mapped (SFD/SFA/SHED/POOL/MANH/MHP, OFFI/AMUS/SIGN/SIGD, INDU, CHUR/SCHO/PUBL, the DEMO* family, RENO/RENW/REN3/REN6/RE30/FOUN/MOVI); the rest (RAPD 13115, ACCE 6412, PWP 5737, RARM 4773 and ~40 more) are deliberately LEFT UNMAPPED and fail closed to use_type 'unclassified' rather than be invented. STATUS uses StatusDesc, the readable twin of the PermitStatus codes, 11 distinct values summing to 119284 (top: \"Approved (Plan Review Complete)\" 62988 / \"Closed (Project Complete)\" 26446 / \"Certificate of Occupancy\" 24158 / \"Permit Issued\" 3915 / \"Pending (Submittal Received)\" 867). No ZIP and no address column anywhere in the schema -> spatial_zip_radius_mi. recency_days 730 bounds a 119,284-row layer against max_rows; note only 1,106 rows carry IssueDate >= 2024-07-28, so this ledger is largely historical."
+    },
+    {
+      "registry_id": "virginia-beach-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services2.arcgis.com/CyVvlIiUfRBmMQuu/arcgis/rest/services/Building_Permits_Applications_view/FeatureServer/0",
+      "dataset_url": "https://services2.arcgis.com/CyVvlIiUfRBmMQuu/arcgis/rest/services/Building_Permits_Applications_view/FeatureServer/0",
+      "jurisdiction": "City of Virginia Beach",
+      "coverage": [
+        {
+          "state": "VA",
+          "county": "Virginia Beach"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PermitType",
+          "StreetAddress"
+        ],
+        "status_raw": "Status",
+        "type_source": "PermitType",
+        "file_date": "IssueDate",
+        "address": "StreetAddress",
+        "case_number": "PermitNumber",
+        "zip": "Zip"
+      },
+      "type_map": {
+        "Building": "Development",
+        "Civil": "Development",
+        "Utility": "Utility",
+        "Amusement": "Commercial"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Pending",
+          "Pre-Issuance",
+          "Pending Revisions"
+        ],
+        "approved": [
+          "Active"
+        ],
+        "operating": [
+          "Final",
+          "Closed"
+        ],
+        "exclude": [
+          "Expired",
+          "Void",
+          "Rejected",
+          "Withdrawn"
+        ]
+      },
+      "geocode_assemble": true,
+      "incremental_field": "IssueDate",
+      "recency_days": 365,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. GEOMETRY-LESS TABLE — the one Phase 1 endpoint with has_geometry false; the layer serves attributes only (no esriGeometryPoint, no lat/lng columns), so records place via the engine's geocode path (Anaheim/Boulder precedent) with geocode_assemble true because StreetAddress is street-only. Native Zip column: the exact predicate the connector emits, Zip='23451', returns 15,981 (run 30370572544) — proven, not assumed. TYPE PermitType 12 distinct values summing to 103116 (top: \"Building\" 21505 / \"Electrical\" 18322 / \"Mechanical\" 15553 / \"Plumbing\" 11956 / \"Moving and Hauling\" 11567 / \"Utility\" 6989): only the four values that describe a real construction/land use are mapped; the trade permits (Electrical/Mechanical/Plumbing/Gas), Elevator, Fire, Moving and Hauling and Complaint carry no building-use meaning and fail closed. STATUS 10 distinct values summing to 103116 (top: \"Closed\" 58249 / \"Final\" 21254 / \"Active\" 20124 / \"Expired\" 2940 / \"Void\" 531 / \"Pending\" 8). recency_days 365 is deliberately the tightest window in this pass: every returned row must be geocoded, and 23451 alone holds 15,981 rows all-time vs 2,646 in the trailing year (run 30370755906)."
+    },
+    {
+      "registry_id": "durham-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://webgis.durhamnc.gov/server/rest/services/PublicServices/Inspections/MapServer/12",
+      "dataset_url": "https://webgis.durhamnc.gov/server/rest/services/PublicServices/Inspections/MapServer/12",
+      "jurisdiction": "City & County of Durham",
+      "coverage": [
+        {
+          "state": "NC",
+          "county": "Durham"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "TYPE",
+          "PROJECT_NAME"
+        ],
+        "status_raw": "PmtStatus",
+        "type_source": "TYPE",
+        "file_date": "ISSUE_DATE",
+        "case_number": "PermitNum",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "RESI": "Residential",
+        "MULTI_FAMILY": "Residential",
+        "MHP": "Residential",
+        "NON_RESI": "Commercial"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Received",
+          "On Hold"
+        ],
+        "approved": [
+          "Issued",
+          "CO Pending"
+        ],
+        "operating": [
+          "CO Issued",
+          "Cond. CO Issued",
+          "Complete"
+        ],
+        "exclude": [
+          "Void",
+          "Disapproved"
+        ]
+      },
+      "incremental_field": "ISSUE_DATE",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. TYPE 5 distinct values summing to 90920: RESI/MULTI_FAMILY/MHP -> Residential, NON_RESI -> Commercial. Only TWO use-types exist in the vocabulary, so the packet's 'at least 3 categories' target is not reachable honestly here — the layer genuinely classifies nothing else. STATUS 10 distinct values summing to 91766 (top: \"CO Issued\" 68397 / \"Void\" 13723 / \"Issued\" 7409 / \"Cond. CO Issued\" 1024 / \"Disapproved\" 780) maps to all four buckets. No ZIP column -> spatial. recency_days 730 (10,715 rows carry ISSUE_DATE >= 2024-07-28 of 92,042)."
+    },
+    {
+      "registry_id": "cabarrus-county-plan-reviews",
+      "platform": "arcgis",
+      "service_url": "https://location.cabarruscounty.us/arcgisservices/rest/services/Current_Accela_Permits/Plan_Reviews/MapServer/0",
+      "dataset_url": "https://location.cabarruscounty.us/arcgisservices/rest/services/Current_Accela_Permits/Plan_Reviews/MapServer/0",
+      "jurisdiction": "Cabarrus County",
+      "coverage": [
+        {
+          "state": "NC",
+          "county": "Cabarrus"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "B1_PER_SUB_TYPE",
+          "StreetAddress"
+        ],
+        "status_raw": "B1_APPL_STATUS",
+        "type_source": "B1_PER_SUB_TYPE",
+        "file_date": "B1_FILE_DD",
+        "address": "StreetAddress",
+        "case_number": "B1_ALT_ID",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Building": "Development",
+        "Site": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "In Review",
+          "In Process",
+          "Building Permit In Process",
+          "Initial Submission",
+          "Resubmittal Required",
+          "Intake Complete",
+          "Additional Info Requested",
+          "Awaiting Information",
+          "RTAP Received",
+          "Pending Payment",
+          "Pending Site Approval",
+          "Plans Received",
+          "Notification Sent",
+          "Pending",
+          "Awaiting Payment",
+          "Changes Required",
+          "Awaiting Resubmittal",
+          "Field Revision in for Approval",
+          "Pending Revision",
+          "Plans in for Approval",
+          "Pending Precon"
+        ],
+        "approved": [
+          "Approved for Permitting",
+          "Approved with Conditions",
+          "Building Approved",
+          "Building Approved with Cond",
+          "County Review Complete",
+          "City Review Complete",
+          "Utility Permitting",
+          "Preconstruction"
+        ],
+        "operating": [
+          "BU Complete",
+          "Record Complete",
+          "Closed"
+        ],
+        "exclude": [
+          "County - Not Applicable",
+          "City - Not Applicable"
+        ]
+      },
+      "incremental_field": "B1_FILE_DD",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. Accela plan-review layer. TYPE B1_PER_SUB_TYPE is coarse — 3 distinct values summing to 128600 (top: \"Building\" 100313 / \"NA\" 24614 / \"Site\" 3673) — so only Building and Site map; 'NA' (24,614) fails closed. STATUS is the rich field: 34 distinct values summing to 128600, mapped across all four buckets by workflow stage. No ZIP -> spatial. recency_days 730 (17,187 of 128,600)."
+    },
+    {
+      "registry_id": "new-hanover-county-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0",
+      "dataset_url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0",
+      "jurisdiction": "New Hanover County, North Carolina",
+      "coverage": [
+        {
+          "state": "NC",
+          "county": "New Hanover"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PERMIT_TYPE",
+          "STREET"
+        ],
+        "status_raw": "PERMIT_STATUS",
+        "type_source": "PERMIT_TYPE",
+        "file_date": "ISSUE_DATE",
+        "address": [
+          "NUMBER",
+          "DIR",
+          "STREET",
+          "TYPE"
+        ],
+        "case_number": "PERMIT_NUMBER",
+        "zip": "ZIPCODE",
+        "lat": "Lat",
+        "lng": "Lon"
+      },
+      "type_map": {
+        "NHC Residential Building": "Residential",
+        "NHC Residential Trade Permit": "Residential",
+        "NHC Residential Electrical": "Residential",
+        "NHC Residential Plumbing": "Residential",
+        "NHC Residential Mechanical": "Residential",
+        "NHC Residential Accessory": "Residential",
+        "NHC Residential Addition": "Residential",
+        "NHC Residential Mechanical Gas Piping": "Residential",
+        "NHC Residential Mechanical Venting": "Residential",
+        "NHC Residential Mechanical Gas Appliances": "Residential",
+        "NHC Residential Building Application": "Residential",
+        "NHC Residential Relocation": "Residential",
+        "NHC Residential Equipment Changeout": "Residential",
+        "NHC Residential Occupancy Certification": "Residential",
+        "NHC Commercial Building": "Commercial",
+        "NHC Commercial Trade Permit": "Commercial",
+        "NHC Commercial Electrical": "Commercial",
+        "NHC Commercial Plumbing": "Commercial",
+        "NHC Commercial Mechanical": "Commercial",
+        "NHC Commercial Accessory": "Commercial",
+        "NHC Commercial Equipment Changeout": "Commercial",
+        "NHC Commercial Sign": "Commercial",
+        "NHC Commercial Mechanical Gas Piping": "Commercial",
+        "NHC Commercial Mechanical Venting": "Commercial",
+        "NHC Commercial Mechanical Gas Appliances": "Commercial",
+        "NHC Commercial Change of Use": "Commercial",
+        "NHC Commercial Building Application": "Commercial",
+        "NHC Commercial Occupancy Certification": "Commercial",
+        "NHC Commercial Facility License": "Commercial",
+        "NHC Commercial Awning": "Commercial",
+        "NHC FLI Public Swimming Pool": "Commercial",
+        "NHC FLI Body Art": "Commercial",
+        "NHC FLI Temporary Food Establishment": "Commercial",
+        "NHC FLI Change of Ownership/Remodel": "Commercial",
+        "NHC FLI Limited Food Establishment": "Commercial",
+        "NHC FLI Mobile Unit": "Commercial",
+        "NHC FLI Remodel": "Commercial",
+        "NHC FLI Display Spa at Temporary Event": "Commercial",
+        "NHC Residential Demolition": "Development",
+        "NHC Commercial Demolition": "Development",
+        "NHC Land Disturbance Permit": "Development",
+        "NHC Stormwater Permit": "Development",
+        "NHC Floodplain Development Permit": "Development",
+        "NHC Zoning Permit": "Development",
+        "NHC OSWP Well Permit": "Utility",
+        "NHC OSWP Septic Repair Permit": "Utility",
+        "NHC OSWP Construction Authorization": "Utility",
+        "NHC OSWP System Re-use Permit": "Utility",
+        "NHC OSWP LSS Option": "Utility",
+        "NHC OSWP Engineered Option": "Utility",
+        "NHC OSWP Application": "Utility",
+        "NHC OSWP General Use": "Utility",
+        "NHC OSWP Water Sample": "Utility",
+        "NHC Commercial Cell Tower Equipment Modification": "Utility",
+        "NHC Fire Foster Care": "Civic/Public",
+        "NHC Fire Daycare/Group Home": "Civic/Public"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "In Review",
+          "Certificate Review",
+          "Awaiting Payment",
+          "On Hold",
+          "Resubmittal Required",
+          "Review Approved"
+        ],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [
+          "Complete",
+          "Certificate of Compliance (CC) Issued",
+          "Certificate of Occupancy (CO) Issued",
+          "Temporary Certificate of Occupancy (TCO) Issued",
+          "Partial Certificate of Compliance (PCC) Issued"
+        ],
+        "exclude": [
+          "Expired",
+          "Void",
+          "Withdrawn",
+          "Revoked",
+          "Stop Work Order",
+          "Suspended"
+        ]
+      },
+      "incremental_field": "ISSUE_DATE",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. RECOVERED, not skipped. Every full-table groupBy against this layer ABORTED at the 30s probe timeout across two rounds (482,334 rows) — the vocabularies were obtained by narrowing the scan to ISSUE_DATE > 2025-01-01 (run 30370026584), and the runtime query is ZIP-scoped so it never runs a full-table scan either. TYPE 74 distinct values summing to 35411 (top: \"NHC Residential Trade Permit\" 13360 / \"NHC Residential Building\" 3831 / \"NHC Residential Electrical\" 2747 / \"NHC Commercial Trade Permit\" 1932 / \"NHC Commercial Electrical\" 1895 / \"NHC Commercial Equipment Changeout\" 1129). STATUS 18 distinct values summing to 35411 (top: \"Complete\" 19140 / \"Issued\" 8502 / \"Expired\" 3162 / \"Certificate of Compliance (CC) Issued\" 1654 / \"Certificate of Occupancy (CO) Issued\" 1397 / \"Void\" 1091). Native ZIPCODE plus its own Lat/Lon columns; ZIPCODE='28401' returns 51,232 (run 30370572544) — which is why recency_days 730 is set: 51,232 all-time vs 5,328 in the trailing two years, and max_rows is 20,000."
+    },
+    {
+      "registry_id": "brunswick-county-permits",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/W6gamXPYQeLXrdAd/arcgis/rest/services/Permit_Locations/FeatureServer/0",
+      "dataset_url": "https://services1.arcgis.com/W6gamXPYQeLXrdAd/arcgis/rest/services/Permit_Locations/FeatureServer/0",
+      "jurisdiction": "Brunswick County, North Carolina",
+      "coverage": [
+        {
+          "state": "NC",
+          "county": "Brunswick"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "ProjectType",
+          "ParcelAddress"
+        ],
+        "status_raw": "PemitProjectStatus",
+        "type_source": "ProjectType",
+        "file_date": "DateIssued",
+        "address": "ParcelAddress",
+        "case_number": "PermitNumber",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Residential": "Residential",
+        "Commercial": "Commercial",
+        "Residential Storm Water": "Development",
+        "Commercial Storm Water": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Project Hold",
+          "Corrective Action"
+        ],
+        "approved": [
+          "Current"
+        ],
+        "operating": [
+          "Complete"
+        ],
+        "exclude": [
+          "Cancel",
+          "Denied",
+          "Inactive"
+        ]
+      },
+      "incremental_field": "DateIssued",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. DELIBERATE FIELD DEVIATION FROM THE PACKET, on evidence. The packet names PermitType/PermitStatus. PermitType is a 224-value inspection-and-fee ledger ('RE-INSPECTION FEE' 22,164, 'CONTRACTOR CHANGE' 8,494) that mostly does not describe a building use, and PermitStatus is 96% the single uninformative value 'Active' (267,495 of 276,775) — bucketing on it would put nearly the whole layer in one band. The same layer publishes ProjectType, a clean 6-value use classifier (\"Residential\" 238287 / \"Commercial\" 35770 / \"Misc Fee\" 1487 / \"Residential Storm Water\" 622 / \"Commercial Storm Water\" 490 / \"Farm Exempt\" 70 / null 0), and PemitProjectStatus (upstream typo preserved verbatim), a real 7-value lifecycle: \"Complete\" 226905 / \"Current\" 27382 / \"Inactive\" 19167 / \"Cancel\" 1717 / \"Denied\" 1263 / \"Project Hold\" 335 / \"Corrective Action\" 6. Both are used instead. No ZIP -> spatial. recency_days 730 (91,704 of 276,775)."
+    },
+    {
+      "registry_id": "dekalb-county-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://dcgis.dekalbcountyga.gov/mapping/rest/services/Building_Permit_Applications/FeatureServer/0",
+      "dataset_url": "https://dcgis.dekalbcountyga.gov/mapping/rest/services/Building_Permit_Applications/FeatureServer/0",
+      "jurisdiction": "DeKalb County, Georgia",
+      "coverage": [
+        {
+          "state": "GA",
+          "county": "DeKalb"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "WorkTypeDescription",
+          "locationLine1"
+        ],
+        "status_raw": "status",
+        "type_source": "WorkTypeDescription",
+        "file_date": "issuedDateTime",
+        "address": "locationLine1",
+        "case_number": "applicationNumber",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "New Construction": "Development",
+        "Alteration to Existing Structure": "Development",
+        "Additions to Existing Structures": "Development",
+        "Repairs to Existing Structure": "Development",
+        "Demolition": "Development",
+        "Fire Damage to Existing Structure": "Development",
+        "Building a Retaining Wall": "Development",
+        "Residential General Combination": "Residential",
+        "Residential Air Conditioning": "Residential",
+        "Residential Heating System": "Residential",
+        "Residential Gas Line": "Residential",
+        "Swimming Pool Permit": "Residential",
+        "Multifamily Enrollment": "Residential",
+        "Commercial General Combination": "Commercial",
+        "Commercial Air Conditioning": "Commercial",
+        "Commercial Heating System": "Commercial",
+        "Commercial Gas Line": "Commercial",
+        "Commercial Hood": "Commercial",
+        "Commercial Clean Agent Fire": "Commercial",
+        "Tenant or Use Change Permit": "Commercial",
+        "Stand Alone Water Meter": "Utility",
+        "Stand Alone Sewer Tap": "Utility",
+        "Plumbing Sewer Line": "Utility",
+        "Plumbing Gas Line": "Utility",
+        "Plumbing Supply Line": "Utility",
+        "Plumbing Drain System": "Utility",
+        "Electrical Line Work": "Utility",
+        "Electrical Temporary Pole": "Utility",
+        "Temporary Power": "Utility",
+        "Personal Care Home": "Civic/Public",
+        "Child Daycare": "Civic/Public",
+        "Adult Daycare": "Civic/Public",
+        "IN-HOME DAYCARE": "Civic/Public",
+        "Community Living Arrangement": "Civic/Public"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Open"
+        ],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [
+          "Closed"
+        ],
+        "exclude": [
+          "Void",
+          "Stop Work"
+        ]
+      },
+      "incremental_field": "issuedDateTime",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. The packet's workType is a 59-value opaque code set (W-COMB, D-ALT, M-R+). The layer publishes WorkTypeDescription, its readable twin, so THAT is the type_source: 58 distinct values summing to 90883 (top: \"Fire Marshal Special Work type\" 8858 / \"General Combined Plumbing\" 8258 / \"Alteration to Existing Structure\" 7956 / \"Electrical Combined Line\" 6832 / \"Residential General Combination\" 5394 / \"New Construction\" 5249). STATUS uses the 5-value 'status' column (\"Closed\" 44882 / \"Issued\" 22156 / \"Void\" 15312 / \"Open\" 8468 / \"Stop Work\" 94) rather than statusDescription, whose corresponding label is the less useful 'Issued Status Code'. Trade and fire-operational work types are left unmapped and fail closed. No ZIP -> spatial. recency_days 730 (26,202 of 90,899)."
+    },
+    {
+      "registry_id": "forsyth-county-ga-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://geo.forsythco.com/gis3/rest/services/Public_EnerGovPlans/Building_Permits/MapServer/0",
+      "dataset_url": "https://geo.forsythco.com/gis3/rest/services/Public_EnerGovPlans/Building_Permits/MapServer/0",
+      "jurisdiction": "Forsyth County, Georgia",
+      "coverage": [
+        {
+          "state": "GA",
+          "county": "Forsyth"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PermitType",
+          "PermitClassDescription"
+        ],
+        "status_raw": "PermitStatus",
+        "type_source": "PermitType",
+        "file_date": "IssueDate",
+        "case_number": "PermitNumber",
+        "record_url": "Link",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Building (Residential)": "Residential",
+        "Building (Commercial)": "Commercial",
+        "Grading Stockpiling": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Submitted - Online",
+          "Submitted",
+          "In Review",
+          "Revision In Review",
+          "Fees Due",
+          "Fees Paid",
+          "Revision Requested",
+          "On Hold",
+          "Released to Planning - Revision Requested",
+          "Resubmittal Requested",
+          "Revision Received",
+          "Released to Permitting",
+          "Released to Permitting Revision"
+        ],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [
+          "Complete"
+        ],
+        "exclude": [
+          "Expired",
+          "Void",
+          "Denied",
+          "Withdrawn"
+        ]
+      },
+      "incremental_field": "IssueDate",
+      "recency_days": 730,
+      "record_url_precision": "record",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. RECORD-PRECISION record_url: the layer carries a per-record 'Link' column. TYPE 6 distinct values summing to 177685 (top: \"Building (Residential)\" 130737 / \"Building (Commercial)\" 25729 / \"Sign Permit\" 10113 / \"LEGACY \" 9885 / \"Grading Stockpiling\" 1170 / \"Film Permit\" 51) — Building (Residential)/Building (Commercial)/Grading Stockpiling map; 'LEGACY' (9,885), Sign Permit and Film Permit fail closed. STATUS 19 distinct values summing to 177685 across all four buckets. No ZIP -> spatial. recency_days 730 bounds a 177,669-row layer over only 4 ZIPs (2,369 rows carry IssueDate >= 2024-07-28)."
+    },
+    {
+      "registry_id": "savannah-commercial-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://pub.sagis.org/arcgis/rest/services/Savannah/BuildingPermit_FC/FeatureServer/0",
+      "dataset_url": "https://pub.sagis.org/arcgis/rest/services/Savannah/BuildingPermit_FC/FeatureServer/0",
+      "jurisdiction": "City of Savannah / Chatham County",
+      "coverage": [
+        {
+          "state": "GA",
+          "county": "Chatham"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PermitType",
+          "Address"
+        ],
+        "status_raw": "PermitStatus",
+        "type_source": "PermitType",
+        "file_date": "IssuedDate_DATE",
+        "address": "Address",
+        "case_number": "PermitNumber",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Building Commercial Permit": "Commercial"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "In Review"
+        ],
+        "approved": [
+          "Issued",
+          "Approved"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "incremental_field": "IssuedDate_DATE",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. SCOPE CAVEAT: this is SAGIS layer 0, which is COMMERCIAL permits only (653 rows, single type value 'Building Commercial Permit'); the residential companion is layer /1 and is NOT part of the Phase 1 packet, so it is not wired here. type_map therefore has exactly one category — honest, not a gap. STATUS \"Issued\" 522 / \"In Review\" 91 / \"Approved\" 40. Coverage is declared for Chatham County but the permits are issued by the City of Savannah. No ZIP -> spatial."
+    },
+    {
+      "registry_id": "louisville-active-construction-permits",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/79kfd2K6fskCAkyg/arcgis/rest/services/active_construction_permits/FeatureServer/0",
+      "dataset_url": "https://services1.arcgis.com/79kfd2K6fskCAkyg/arcgis/rest/services/active_construction_permits/FeatureServer/0",
+      "jurisdiction": "Louisville Metro, Kentucky",
+      "coverage": [
+        {
+          "state": "KY",
+          "county": "Jefferson"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PERMIT_TYPE",
+          "ADDRESS"
+        ],
+        "status_raw": "PERMIT_STATUS",
+        "type_source": "PERMIT_TYPE",
+        "file_date": "ISSUE_DATE",
+        "address": "ADDRESS",
+        "case_number": "PERMIT_NUMBER",
+        "zip": "ZIPCODE",
+        "lat": "LATITUDE",
+        "lng": "LONGITUDE"
+      },
+      "type_map": {
+        "Residential New": "Residential",
+        "Residential Addition": "Residential",
+        "Residential Alteration": "Residential",
+        "Residential Foundation": "Residential",
+        "HVAC Residential": "Residential",
+        "Electrical Residential": "Residential",
+        "PoolSpa Residential": "Residential",
+        "Commercial New": "Commercial",
+        "Commercial Addition": "Commercial",
+        "Commercial Alteration": "Commercial",
+        "Commercial Foundation": "Commercial",
+        "HVAC Commercial": "Commercial",
+        "Electrical Commercial": "Commercial",
+        "PoolSpa Commercial": "Commercial",
+        "Mechanical Refrigeration": "Commercial",
+        "Range Hood": "Commercial",
+        "Cell Tower": "Utility",
+        "Gas Restoration Pemit": "Utility",
+        "Wrecking Permit": "Development",
+        "Building Moving": "Development",
+        "Change of Use": "Development",
+        "Parking Lot": "Development",
+        "Retaining Wall": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "incremental_field": "ISSUE_DATE",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. Native ZIPCODE plus its own LATITUDE/LONGITUDE columns; ZIPCODE='40202' returns 231 (run 30370572544). TYPE 29 distinct values summing to 23297 (top: \"HVAC Residential\" 5594 / \"Electrical Residential\" 4262 / \"Residential Alteration\" 2450 / \"Residential Addition\" 1718 / \"Residential New\" 1701 / \"Electrical Commercial\" 1622) is clean and explicitly residential-vs-commercial, giving four use-types. STATUS is a SINGLE value — 'Issued' on all 23,297 rows — so status_to_bucket has one bucket (approved). That is the honest shape of an 'active construction permits' layer (the Frisco single-ISSUED precedent), not an omission."
+    },
+    {
+      "registry_id": "kenton-county-devtracking-permits",
+      "platform": "arcgis",
+      "service_url": "https://services2.arcgis.com/90vxQoG8CT8O1MXs/arcgis/rest/services/DevTracking_Permits_KC_Processing/FeatureServer/0",
+      "dataset_url": "https://services2.arcgis.com/90vxQoG8CT8O1MXs/arcgis/rest/services/DevTracking_Permits_KC_Processing/FeatureServer/0",
+      "jurisdiction": "Planning & Development Services of Kenton County",
+      "coverage": [
+        {
+          "state": "KY",
+          "county": "Kenton"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PERMIT_TYP",
+          "ADDRESS"
+        ],
+        "status_raw": "PROJECT_ST",
+        "type_source": "PERMIT_TYP",
+        "file_date": "PERMIT_DAT",
+        "address": "ADDRESS",
+        "case_number": "PIDN",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Residential": "Residential",
+        "Multi Family": "Residential",
+        "Senior Living": "Residential",
+        "Commercial - Final": "Commercial",
+        "Commercial - Proposed": "Commercial",
+        "Institutional - Proposed": "Civic/Public",
+        "Institutional - Final": "Civic/Public",
+        "Industrial - Final": "Industrial",
+        "Industrial - Proposed": "Industrial"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Underway"
+        ],
+        "operating": [
+          "Complete"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "PERMIT_DAT",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. TYPE is excellent — \"Residential\" 1193 / \"Multi Family\" 231 / \"Senior Living\" 138 / \"Commercial - Final\" 22 / \"Commercial - Proposed\" 14 / \"Institutional - Proposed\" 11 / \"Institutional - Final\" 6 / \"Industrial - Final\" 4 / \"Industrial - Proposed\" 3 — and is the only Phase 1 vocabulary that populates Residential, Commercial, Institutional (Civic/Public) and Industrial directly. KNOWN LIMITATION, recorded rather than papered over: PROJECT_ST is BLANK on 1,563 of 1,622 rows (96%); the connector treats a blank status as blank_status and drops the row, so this entry publishes only the 59 rows carrying 'Complete' (33) or 'Underway' (26). Fail-closed by design. No ZIP -> spatial."
+    },
+    {
+      "registry_id": "saint-paul-approved-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/9meaaHE3uiba0zr8/arcgis/rest/services/Approved_Building_Permits/FeatureServer/0",
+      "dataset_url": "https://services1.arcgis.com/9meaaHE3uiba0zr8/arcgis/rest/services/Approved_Building_Permits/FeatureServer/0",
+      "jurisdiction": "City of Saint Paul, Minnesota",
+      "coverage": [
+        {
+          "state": "MN",
+          "county": "Ramsey"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "SUB_TYPE",
+          "ADDRESS"
+        ],
+        "status_raw": "STATUS",
+        "type_source": "SUB_TYPE",
+        "file_date": "ISSUEDATE",
+        "address": "ADDRESS",
+        "case_number": "PERMITNUMBER",
+        "lat": "LATITUE",
+        "lng": "LONGITUTE"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Single Family Dwelling": "Residential",
+        "Residential (Multi-Fam)": "Residential",
+        "2-Family/Duplex": "Residential",
+        "Accessory Structure": "Residential",
+        "Factory Built Fireplace": "Residential",
+        "Wood Stove": "Residential",
+        "Commercial": "Commercial",
+        "Signs": "Commercial",
+        "Billboards": "Commercial",
+        "Temporary Sign": "Commercial",
+        "Dynamic Display Sign": "Commercial",
+        "Institutional": "Civic/Public",
+        "Mixed (Commercial/Residential)": "Development",
+        "Demolition": "Development",
+        "Moving Into St Paul": "Development",
+        "Moving Within St Paul": "Development",
+        "Solar PV Systems": "Utility",
+        "Solar": "Utility",
+        "High Voltage": "Utility",
+        "Sewer/Disposal Only": "Utility",
+        "Hazardous Materials": "Industrial"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "In Process"
+        ],
+        "approved": [
+          "Active/Issued",
+          "Issued"
+        ],
+        "operating": [
+          "Finaled",
+          "Inspected",
+          "Finaled - No Inspection"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "ISSUEDATE",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. City of Saint Paul. NOTE this REOPENS a previously-rejected jurisdiction: the MINNESOTA WIRE PASS recorded 'St. Paul's org is live but its permits layer STALLED at 2025-06-30'. This is a DIFFERENT service (org 9meaaHE3uiba0zr8, Approved_Building_Permits) and it is current — 29,703 rows carry ISSUEDATE >= 2024-07-28. FIELD DEVIATION: the packet names FOLDER_TYPE, which is a TRADE split (Building/Electrical/Mechanical/Plumbing Permit); SUB_TYPE is the actual building-use classifier (56 distinct values summing to 317968, top: \"Single Family Dwelling\" 65353 / \"Electrical\" 52044 / \"Gas\" 28484 / \"Plumbing/Inside Water (All)\" 27699 / \"Refrigeration\" 19332 / \"Service & Circuits \" 16204) and is used instead. STATUS \"Finaled\" 250097 / \"Active/Issued\" 45209 / \"Inspected\" 21873 / \"Issued\" 687 / \"Finaled - No Inspection\" 84 / \"In Process\" 18. Own LATITUE/LONGITUTE columns (upstream misspellings preserved verbatim). No ZIP -> spatial. recency_days 730."
+    },
+    {
+      "registry_id": "sioux-falls-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://gis.siouxfalls.gov/arcgis/rest/services/Data/Community/MapServer/3",
+      "dataset_url": "https://gis.siouxfalls.gov/arcgis/rest/services/Data/Community/MapServer/3",
+      "jurisdiction": "City of Sioux Falls, South Dakota",
+      "coverage": [
+        {
+          "state": "SD",
+          "county": "Minnehaha"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PERMITTYPE",
+          "MAINADDRESS"
+        ],
+        "status_raw": "PERMITSTATUS",
+        "type_source": "PERMITTYPE",
+        "file_date": "ISSUEDATE",
+        "address": "MAINADDRESS",
+        "case_number": "PERMITNUMBER",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Residential Building": "Residential",
+        "Commercial Building": "Commercial"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Under Review"
+        ],
+        "approved": [
+          "Issued",
+          "Approved",
+          "Issued - Groundwork Only"
+        ],
+        "operating": [
+          "Finaled",
+          "Closed"
+        ],
+        "exclude": [
+          "Cancelled",
+          "Withdrawn",
+          "Expired",
+          "Void",
+          "Denied"
+        ]
+      },
+      "incremental_field": "ISSUEDATE",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. TYPE is a clean two-value split (\"Residential Building\" 131037 / \"Commercial Building\" 27332) — Residential/Commercial only, so two categories is the honest ceiling. STATUS 11 distinct values summing to 158369 (top: \"Finaled\" 142183 / \"Issued\" 8109 / \"Cancelled\" 4503 / \"Withdrawn\" 1908 / \"Expired\" 1600 / \"Approved\" 38) fills all four buckets. No ZIP -> spatial. recency_days 730 (24,669 of 158,264)."
+    },
+    {
+      "registry_id": "bozeman-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://gisweb.bozeman.net/arcgis/rest/services/Internal/Building_Permits/MapServer/1",
+      "dataset_url": "https://gisweb.bozeman.net/arcgis/rest/services/Internal/Building_Permits/MapServer/1",
+      "jurisdiction": "City of Bozeman, Montana",
+      "coverage": [
+        {
+          "state": "MT",
+          "county": "Gallatin"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PERMIT_TYPE",
+          "LOCATION"
+        ],
+        "status_raw": "PERMIT_STATUS",
+        "type_source": "PERMIT_TYPE",
+        "file_date": "PERMIT_ISSUE_DATE",
+        "address": "LOCATION",
+        "case_number": "PERMIT_NUMBER",
+        "lat": "LATITUDE",
+        "lng": "LONGITUDE"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "BP RESIDENTIAL - 1 & 2 FAMILY": "Residential",
+        "BP RESIDENTIAL - MULTIFAMILY": "Residential",
+        "BUILDING PERMIT - RESIDENTIAL": "Residential",
+        "ELEC PERMIT - RESIDENTIAL": "Residential",
+        "PLUMBING PERMIT - RESIDENTIAL": "Residential",
+        "MECH PERMIT - RESIDENTIAL": "Residential",
+        "BUILDING PERMIT GARAGE/CARPORT": "Residential",
+        "BUILDING PERMIT PORCH/DECK/MEZ": "Residential",
+        "ELEC PERMIT - COMMERCIAL": "Commercial",
+        "MECH PERMIT - COMMERCIAL": "Commercial",
+        "PLUMBING PERMIT - COMMERCIAL": "Commercial",
+        "BP - BUSINESS": "Commercial",
+        "BP - HOTEL / MOTEL": "Commercial",
+        "BP - MERCANTILE": "Commercial",
+        "BP ASSEMBLY - RESTAURANTS, BAR": "Commercial",
+        "BP ASSEMBLY - GENERAL": "Civic/Public",
+        "BP STORAGE - LOW HAZARD": "Industrial",
+        "BP STORAGE - MOD. HAZARD": "Industrial",
+        "BUILDING PERMIT - REMODEL": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "To Be Issued"
+        ],
+        "approved": [
+          "Permit Printed"
+        ],
+        "operating": [
+          "Final Inspection Complete"
+        ],
+        "exclude": [
+          "Permit Revoked"
+        ]
+      },
+      "incremental_field": "PERMIT_ISSUE_DATE",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. City of Bozeman 'Active and Open' layer (879 rows). TYPE 23 distinct values summing to 878 (top: \"ELEC PERMIT - RESIDENTIAL\" 109 / \"PLUMBING PERMIT - RESIDENTIAL\" 101 / \"MECH PERMIT - RESIDENTIAL\" 95 / \"BUILDING PERMIT GARAGE/CARPORT\" 68 / \"BUILDING PERMIT PORCH/DECK/MEZ\" 68) resolves cleanly into Residential, Commercial, Industrial (the two BP STORAGE hazard classes) and Civic/Public. STATUS is the cleanest lifecycle in the pass — \"Permit Printed\" 568 / \"To Be Issued\" 192 / \"Final Inspection Complete\" 111 / \"Permit Revoked\" 7 — one value per bucket. Own LATITUDE/LONGITUDE columns. No site ZIP (CONTRACTOR_ZIP and OWNER_ZIP_CODE are party addresses, NOT the job site, and are deliberately not used) -> spatial."
+    },
+    {
+      "registry_id": "missoula-addresses-with-permits",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/HfwHS0BxZBQ1E5DY/arcgis/rest/services/AddressesWithPermits_mso/FeatureServer/0",
+      "dataset_url": "https://services.arcgis.com/HfwHS0BxZBQ1E5DY/arcgis/rest/services/AddressesWithPermits_mso/FeatureServer/0",
+      "jurisdiction": "City of Missoula, Montana",
+      "coverage": [
+        {
+          "state": "MT",
+          "county": "Missoula"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "B1_PER_TYPE",
+          "Address"
+        ],
+        "status_raw": "RecordStatus",
+        "type_source": "B1_PER_TYPE",
+        "file_date": "ApplicationDate",
+        "address": "FullAddress",
+        "case_number": "RecordID",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Residential Construction": "Residential",
+        "Commercial Construction": "Commercial",
+        "Utility Excavation": "Utility",
+        "Right-of-Way": "Utility",
+        "Paving": "Development",
+        "Demolition": "Development",
+        "Grading": "Development",
+        "SWPPP": "Development",
+        "Zoning Compliance": "Development",
+        "Moving": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Open",
+          "Drawing",
+          "Waiting ACA Issuance",
+          "Waiting Review Fee",
+          "Approved"
+        ],
+        "approved": [
+          "Issued",
+          "Issue",
+          "Issued Permit",
+          "Active"
+        ],
+        "operating": [
+          "Final",
+          "Closed",
+          "Inspections Complete",
+          "C of O",
+          "Temporary C of O",
+          "Asphalt Warranty"
+        ],
+        "exclude": [
+          "Expired",
+          "Violation",
+          "Asphalt Repair Not Done"
+        ]
+      },
+      "incremental_field": "ApplicationDate",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. TYPE 18 distinct values summing to 121483 (top: \"Mechanical\" 23812 / \"Utility Excavation\" 23454 / \"Electrical\" 21578 / \"Plumbing\" 15377 / \"Residential Construction\" 14574 / \"Commercial Construction\" 6076): construction and infrastructure values map; the bare trade permits (Mechanical/Electrical/Plumbing, 60,767 rows combined) describe no building use and fail closed. STATUS 18 distinct values summing to 121483. No ZIP -> spatial. recency_days 730 (18,253 of 121,239)."
+    },
+    {
+      "registry_id": "columbia-mo-permits",
+      "platform": "arcgis",
+      "service_url": "https://gis.gocolumbiamo.com/arcgis/rest/services/View_Services/City_Projects_Construction_Updated/MapServer/3",
+      "dataset_url": "https://gis.gocolumbiamo.com/arcgis/rest/services/View_Services/City_Projects_Construction_Updated/MapServer/3",
+      "jurisdiction": "City of Columbia, Missouri",
+      "coverage": [
+        {
+          "state": "MO",
+          "county": "Boone"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PERMIT_TYPE",
+          "MUNIS_LOCATION"
+        ],
+        "status_raw": "PERMIT_STATUS",
+        "type_source": "PERMIT_TYPE",
+        "file_date": "ISSUE_DATE",
+        "address": "MUNIS_LOCATION",
+        "case_number": "PERMIT_NUMBER",
+        "zip": "ZipCode",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "BSD-Building (Residential New)": "Residential",
+        "BSD-Building (Residential Alter/Add)": "Residential",
+        "BSD-Deck Only": "Residential",
+        "BSD-Pool/Spa": "Residential",
+        "BSD-Generator (Residential)": "Residential",
+        "BSD-Building (Commercial)": "Commercial",
+        "BSD-Sign Permit": "Commercial",
+        "BSD-Sidewalk Cafe Permit": "Commercial",
+        "BSD-Demolition Structure(s)": "Development",
+        "BSD-Land Disturbance": "Development",
+        "BSD-Retaining Wall": "Development",
+        "BSD-Footing/Foundation": "Development",
+        "BSD-Right of Way": "Development",
+        "BSD-Paving Sub Permit": "Development",
+        "Utility (Electric)": "Utility",
+        "Utility (Water)": "Utility",
+        "Utility (Sewer)": "Utility",
+        "BSD-Cell Tower": "Utility",
+        "BSD-Small Wireless Facility": "Utility",
+        "BSD-Solar Photovoltaic System": "Utility"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Submitted",
+          "Submitted Online",
+          "Application Completeness Check",
+          "Plan Review",
+          "On Hold",
+          "Initial Screening Process",
+          "Awaiting Fee Payment",
+          "Requires Re-submit",
+          "Assigned",
+          "Approved"
+        ],
+        "approved": [
+          "Issued",
+          "Active",
+          "Created (Sub-Permit)",
+          "Tracking Permit"
+        ],
+        "operating": [
+          "Complete",
+          "Closed",
+          "Certificate Of Occupancy",
+          "Certificate of Occupancy (Temporary)"
+        ],
+        "exclude": [
+          "Expired",
+          "Withdrawn",
+          "Void",
+          "Disapproved"
+        ]
+      },
+      "incremental_field": "ISSUE_DATE",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. City of Columbia. Native ZipCode column; ZipCode='65201' returns 14,806 (run 30370572544), which is why recency_days 730 is set (3,189 in the trailing two years, against max_rows 20,000). TYPE 38 distinct values summing to 46528 (top: \"BSD-Right of Way\" 7824 / \"BSD-Mechanical\" 6477 / null 5317 / \"BSD-Electrical\" 4633 / \"BSD-Reroof\" 3400 / \"BSD-Building (Residential New) \" 3068) gives Residential, Commercial, Development and Utility; the BSD- trade permits and Fire operational permits fail closed, as does the NULL type on 5,317 rows. STATUS 23 distinct values summing to 46528."
+    },
+    {
+      "registry_id": "overland-park-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/YQsWDBr0DjMtoTQo/arcgis/rest/services/Building_Permits/FeatureServer/0",
+      "dataset_url": "https://services1.arcgis.com/YQsWDBr0DjMtoTQo/arcgis/rest/services/Building_Permits/FeatureServer/0",
+      "jurisdiction": "City of Overland Park, Kansas",
+      "coverage": [
+        {
+          "state": "KS",
+          "county": "Johnson"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PermitType",
+          "MainAddressLine1"
+        ],
+        "status_raw": "PermitStatus",
+        "type_source": "PermitType",
+        "file_date": "IssueDate",
+        "address": "MainAddressLine1",
+        "case_number": "CaseNumber",
+        "lat": "Latitude",
+        "lng": "Longitude"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Building (Residential)": "Residential",
+        "Building (Commercial)": "Commercial"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [
+          "Complete/Finaled",
+          "TCO"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "IssueDate",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. City of Overland Park. TYPE \"Building (Mech/Elec/Plumb)\" 6074 / \"Building (Residential)\" 5651 / \"Building (Commercial)\" 1247 — 'Building (Mech/Elec/Plumb)' (6,074) is a trade bucket and fails closed, leaving Residential/Commercial. STATUS \"Complete/Finaled\" 8706 / \"Issued\" 4231 / \"TCO\" 35. Own Latitude/Longitude columns. No ZIP -> spatial."
+    },
+    {
+      "registry_id": "topeka-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://maps.topeka.gov/arcgis/rest/services/CityworksViews/BuildingPermits/MapServer/1",
+      "dataset_url": "https://maps.topeka.gov/arcgis/rest/services/CityworksViews/BuildingPermits/MapServer/1",
+      "jurisdiction": "City of Topeka, Kansas",
+      "coverage": [
+        {
+          "state": "KS",
+          "county": "Shawnee"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "case_type_desc",
+          "location"
+        ],
+        "status_raw": "case_status",
+        "type_source": "case_type_desc",
+        "file_date": "date_issued",
+        "address": "location",
+        "case_number": "case_number",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Residential Interior Remodel": "Residential",
+        "DSP Res Building New": "Residential",
+        "Residential Building Footing and Foundat": "Residential",
+        "DSP Res Accessory Structure": "Residential",
+        "Residential Building Deck": "Residential",
+        "Residential Exterior Alteration": "Residential",
+        "Residential Building Addition": "Residential",
+        "Residential Covered Porch": "Residential",
+        "Residential Multi Garage": "Residential",
+        "Residential Single Garage": "Residential",
+        "Residential Elevator": "Residential",
+        "Residential Erosion and Sediment Control": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "REVIEW",
+          "PENDING",
+          "OPEN"
+        ],
+        "approved": [
+          "ISSUED"
+        ],
+        "operating": [
+          "CLOSED",
+          "DONE",
+          "INSPECT"
+        ],
+        "exclude": [
+          "VOID",
+          "EXPIRED",
+          "INACTIVE"
+        ]
+      },
+      "incremental_field": "date_issued",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. City of Topeka. The packet's case_type is a BLDR- code set; the layer publishes case_type_desc, its readable twin, used here: 12 distinct values summing to 6964 (top: \"Residential Interior Remodel\" 1483 / \"DSP Res Building New\" 1188 / \"Residential Building Footing and Foundat\" 1153 / \"Residential Erosion and Sediment Control\" 768 / \"DSP Res Accessory Structure\" 491). EVERY value is residential — this is a residential building layer — so type_map is single-category by the data's own shape. STATUS 10 distinct values summing to 6964. No ZIP -> spatial."
+    },
+    {
+      "registry_id": "lincoln-residential-new-construction-permits",
+      "platform": "arcgis",
+      "service_url": "https://gis.lincoln.ne.gov/public/rest/services/Planning/Residential_New_Construction_Permits/MapServer/4",
+      "dataset_url": "https://gis.lincoln.ne.gov/public/rest/services/Planning/Residential_New_Construction_Permits/MapServer/4",
+      "jurisdiction": "City of Lincoln, Nebraska",
+      "coverage": [
+        {
+          "state": "NE",
+          "county": "Lancaster"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "UseType",
+          "Address"
+        ],
+        "status_raw": "CurrStatus",
+        "type_source": "UseType",
+        "file_date": "Issued",
+        "address": "FullAddress",
+        "case_number": "PermNo",
+        "zip": "ZIP",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "R-3 Residential, Basement-Unfinished": "Residential",
+        "R-3 Residential Garage": "Residential",
+        "R-3 Residential, 1&2 Family": "Residential",
+        "R-3 Res, Basement-Finish": "Residential",
+        "R-2 Resident, Multi-Family": "Residential",
+        "Residential": "Residential",
+        "Parking Stall": "Development",
+        "S-2 Storage, Low Hazard, Parking": "Industrial",
+        "U Utility, Miscellaneous": "Utility",
+        "A-1 Assembly, Theater w/Stage": "Civic/Public"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [
+          "C of O Issued"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "Issued",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. FIELD DEVIATION: the packet names ClassCode, whose live values are the bare digits '101' 1504 / '102' 956 / '104' 113 / '103' 49 — mapping those to use-types would require an external Census/ICC codebook this repo does not carry, i.e. a guess. PermType was probed as an alternative and is a SINGLE value ('New', all 2,622 rows) — useless. UseType is the real classifier and is used instead: \"R-3 Residential, Basement-Unfinished\" 718 / \"R-3 Residential Garage\" 683 / \"R-3 Residential, 1&2 Family\" 632 / \"R-3 Res, Basement-Finish\" 462 / \"R-2 Resident, Multi-Family\" 75 / \"Parking Stall\" 25 / \"S-2 Storage, Low Hazard, Parking\" 7 / \"U Utility, Miscellaneous\" 4 / \"Residential\" 1. It yields Residential, Development, Industrial, Utility and Civic/Public. STATUS \"C of O Issued\" 2236 / \"Issued\" 386. Native ZIP column; ZIP='68502' returns 10 (small because the layer is residential NEW construction only). NO recency_days: 'Issued' is a STRING MM/DD/YYYY field and rejects the `>= DATE '...'` literal the option emits (probed: HTTP 400 'Unable to complete operation', run 30370939582) — the Anaheim string-date standing answer."
+    },
+    {
+      "registry_id": "little-rock-permits",
+      "platform": "arcgis",
+      "service_url": "https://maps.littlerock.gov/server/rest/services/Permits_All/MapServer/0",
+      "dataset_url": "https://maps.littlerock.gov/server/rest/services/Permits_All/MapServer/0",
+      "jurisdiction": "City of Little Rock, Arkansas",
+      "coverage": [
+        {
+          "state": "AR",
+          "county": "Pulaski"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PermitType",
+          "PropertyAddress"
+        ],
+        "status_raw": "PermitStatus",
+        "type_source": "BldUseDesc",
+        "file_date": "PermitIssueDate",
+        "address": "PropertyAddress",
+        "case_number": "PermitNumber",
+        "zip": "PropertyZip",
+        "lat": "Latitude",
+        "lng": "Longitude"
+      },
+      "type_map": {
+        "SINGLE FAMILY/DUPLEX": "Residential",
+        "MULTI FAMILY": "Residential",
+        "APARTMENT COMPLEX": "Residential",
+        "MODULAR/MOBILE HOME": "Residential",
+        "DORM/ASSISTED LIVING": "Residential",
+        "COMMERCIAL": "Commercial"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Open"
+        ],
+        "approved": [],
+        "operating": [
+          "Closed"
+        ],
+        "exclude": [
+          "Void",
+          "Stop Work",
+          "Deleted"
+        ]
+      },
+      "incremental_field": "PermitIssueDate",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. FIELD DEVIATION: the packet names PermitType, whose values are 3-letter TRADE codes (ELE 123,372 / PLU 66,167 / MEC 47,564 / BLD 38,457) that describe the trade, not the structure. BldUseDesc is the building-use column and is used as type_source: \"SINGLE FAMILY/DUPLEX\" 178885 / \"COMMERCIAL\" 61258 / \"MULTI FAMILY\" 20853 / \"APARTMENT COMPLEX\" 14999 / \"MODULAR/MOBILE HOME\" 1109 / \"DORM/ASSISTED LIVING\" 789 / \" \" 2. Two use-types is its honest ceiling. STATUS \"Closed\" 199420 / \"Open\" 68397 / \"Void\" 9671 / \"Stop Work\" 401 / \"Deleted\" 6. Native PropertyZip; PropertyZip='72201' returns 6,100 (run 30370572544) — under max_rows, so no recency_days despite the 277,895-row layer. Own Latitude/Longitude columns."
+    },
+    {
+      "registry_id": "bentonville-catalyst-permits",
+      "platform": "arcgis",
+      "service_url": "https://gis.bentonvillear.com/arcgis/rest/services/Electric_System/Catalyst_Planning/FeatureServer/1",
+      "dataset_url": "https://gis.bentonvillear.com/arcgis/rest/services/Electric_System/Catalyst_Planning/FeatureServer/1",
+      "jurisdiction": "City of Bentonville, Arkansas",
+      "coverage": [
+        {
+          "state": "AR",
+          "county": "Benton"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PERMIT_TYPE",
+          "SITE_ADDR"
+        ],
+        "status_raw": "STATUS",
+        "type_source": "PERMIT_TYPE",
+        "file_date": "ISSUED",
+        "address": "SITE_ADDR",
+        "case_number": "PERMIT_NO",
+        "lat": "LAT",
+        "lng": "LON"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "NEW RESIDENTIAL": "Residential",
+        "ELECTRIC RESIDENTIAL": "Residential",
+        "MECHANICAL RESIDENTIAL": "Residential",
+        "PLUMBING RESIDENTIAL": "Residential",
+        "FENCE RESIDENTIAL": "Residential",
+        "ALTERATION REMODEL RES": "Residential",
+        "ALTERATION REMODEL RESIDENTIAL": "Residential",
+        "RES ACCESSORY STRUCTURE": "Residential",
+        "POOL RESIDENTIAL": "Residential",
+        "ADDITION RESIDENTIAL": "Residential",
+        "FIRE SPRINKLER RESIDENTIAL": "Residential",
+        "NEW COMMERCIAL": "Commercial",
+        "ELECTRIC COMMERCIAL": "Commercial",
+        "PLUMBING COMMERCIAL": "Commercial",
+        "MECHANICAL COMMERCIAL": "Commercial",
+        "MECHANICAL COMMERICAL": "Commercial",
+        "ALTERATION REMODEL COM": "Commercial",
+        "ALTERATION REMODEL COMMERCIAL": "Commercial",
+        "COM TENANT IN-FILL": "Commercial",
+        "FENCE COMMERCIAL": "Commercial",
+        "POOL COMMERCIAL": "Commercial",
+        "ADDITION COMMERCIAL": "Commercial",
+        "SIGNS": "Commercial",
+        "TEMP SIGNS": "Commercial",
+        "COMMERCIAL COMPLETION": "Commercial",
+        "DEMOLITION- RESIDENTIAL": "Development",
+        "DEMOLITION RESIDENTIAL": "Development",
+        "DEMOLITION- COMMERCIAL": "Development",
+        "DEMOLITION COMMERCIAL": "Development",
+        "GRADING": "Development",
+        "FLOODPLAIN DEVELOPMENT": "Development",
+        "RETAINING WALL": "Development",
+        "MOVING": "Development",
+        "PHASING PLAN": "Development",
+        "RIGHT OF WAY": "Utility"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "RECEIVED",
+          "IN REVIEW",
+          "UNDER REVIEW",
+          "AWAITING REVISIONS",
+          "WAITING ON APPLICANT",
+          "ON HOLD",
+          "APPROVED"
+        ],
+        "approved": [
+          "ISSUED",
+          "SHELL COMPLETE"
+        ],
+        "operating": [
+          "FINALED",
+          "CO ISSUED",
+          "CLOSED",
+          "TEMP CO ISSUED",
+          "PROCESS FINAL"
+        ],
+        "exclude": [
+          "EXPIRED",
+          "DENIED",
+          "ON HOLD-STOP WORK"
+        ]
+      },
+      "incremental_field": "ISSUED",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. City of Bentonville. Both full-table groupBys ABORTED on the first pass (slow host) and succeeded on retry (run 30369593803) — a timeout here is host latency, not an unusable source. TYPE 50 distinct values summing to 50462 (top: \"ELECTRIC RESIDENTIAL\" 8066 / \"MECHANICAL RESIDENTIAL\" 7798 / \"PLUMBING RESIDENTIAL\" 7765 / \"NEW RESIDENTIAL\" 5974 / \"FENCE RESIDENTIAL\" 2869 / \"ELECTRIC COMMERCIAL\" 2289); the vocabulary carries explicit RESIDENTIAL/COMMERCIAL suffixes, and upstream duplicates and typos are preserved VERBATIM as separate keys ('ALTERATION REMODEL COM' and 'ALTERATION REMODEL COMMERCIAL'; 'MECHANICAL COMMERICAL' alongside 'MECHANICAL COMMERCIAL'; 'DEMOLITION- RESIDENTIAL' alongside 'DEMOLITION RESIDENTIAL') because the lookup is an exact match. STATUS 18 distinct values summing to 50477. Own LAT/LON columns. No ZIP -> spatial. recency_days 730 (10,324 of 50,482)."
+    },
+    {
+      "registry_id": "adams-county-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services3.arcgis.com/4PNQOtAivErR7nbT/arcgis/rest/services/Building_Permits_Eye_On_Adams/FeatureServer/0",
+      "dataset_url": "https://services3.arcgis.com/4PNQOtAivErR7nbT/arcgis/rest/services/Building_Permits_Eye_On_Adams/FeatureServer/0",
+      "jurisdiction": "Adams County, Colorado",
+      "coverage": [
+        {
+          "state": "CO",
+          "county": "Adams"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "BuildingUse",
+          "CombinedAddress"
+        ],
+        "status_raw": "ApplicationStatus",
+        "type_source": "BuildingUse",
+        "file_date": "CaseOpened",
+        "address": "CombinedAddress",
+        "case_number": "RecordID_",
+        "record_url": "LinkToAccela",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Residential": "Residential",
+        "Single Family": "Residential",
+        "Mobile Home": "Residential",
+        "Commercial": "Commercial",
+        "Agricultural Business": "Commercial",
+        "Industrial": "Industrial"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "In Review",
+          "Received",
+          "Awaiting Client Reply",
+          "ProjectDox Review",
+          "Approved Fees Due",
+          "Pay Fees Due",
+          "Open",
+          "Application Received",
+          "Resubmittal Required",
+          "Building Review",
+          "Plans Approved"
+        ],
+        "approved": [
+          "Permit Issued"
+        ],
+        "operating": [
+          "Case Finaled",
+          "Closed",
+          "C of O Issued",
+          "Case Closed",
+          "Closed, Approved",
+          "CO Issued"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "CaseOpened",
+      "record_url_precision": "record",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. PACKET DATA ERROR CORRECTED: the packet gives date_field 'ApplicationDate', which DOES NOT EXIST on this layer — the live probe returns {\"error\":{\"code\":400,...\"'Invalid field: ApplicationDate' parameter is invalid\"}} (run 30370939582). Left uncorrected it would have gone into orderByFields and failed EVERY query for this entry. The real column is CaseOpened, used for both file_date and incremental_field. RECORD-PRECISION record_url via the per-record LinkToAccela column. TYPE BuildingUse 8 distinct values summing to 71674 (top: \"Residential\" 41688 / \"\" 21506 / \"Commercial\" 4877 / \"Single Family\" 2449 / \"Industrial\" 715 / \"Agricultural Business\" 352) gives Residential, Commercial and Industrial; the empty value (21,506) fails closed. STATUS 18 distinct values summing to 71674. No ZIP -> spatial. No recency_days: CaseOpened was not date-literal-probed, and an unverified DATE literal would risk quarantining the whole entry."
+    },
+    {
+      "registry_id": "canyon-county-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://maps.canyonco.org/arcgisserver/rest/services/DSD/Building_Permits_NEW_2023/FeatureServer/1",
+      "dataset_url": "https://maps.canyonco.org/arcgisserver/rest/services/DSD/Building_Permits_NEW_2023/FeatureServer/1",
+      "jurisdiction": "Canyon County, Idaho",
+      "coverage": [
+        {
+          "state": "ID",
+          "county": "Canyon"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "BP_AppType",
+          "BP_Address"
+        ],
+        "status_raw": "BP_Status",
+        "type_source": "BP_AppType",
+        "file_date": "PermitIssuedDate",
+        "address": "BP_Address",
+        "case_number": "BP_PermitNumber",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Single Family Residence": "Residential",
+        "Residential Addition Alteration": "Residential",
+        "Guest House": "Residential",
+        "Manufactured Home": "Residential",
+        "Accessory": "Residential",
+        "Move-On Residence": "Residential",
+        "MH - Foundation": "Residential",
+        "Commercial": "Commercial",
+        "Commercial Addition Alteration": "Commercial",
+        "Tenant Improvement": "Commercial",
+        "Sign Permit": "Commercial",
+        "Commercial/Industrial Sign": "Commercial",
+        "Foundation Only": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Active"
+        ],
+        "operating": [
+          "Closed"
+        ],
+        "exclude": [
+          "Expired",
+          "WithDrawn",
+          "Void"
+        ]
+      },
+      "incremental_field": "PermitIssuedDate",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. TYPE 15 distinct values summing to 3022 (top: \"Accessory\" 1033 / \"Single Family Residence\" 929 / \"Residential Addition Alteration\" 605 / \"Guest House\" 173 / \"Commercial\" 110 / \"Manufactured Home\" 91) — a clean per-structure vocabulary. STATUS \"Closed\" 1999 / \"Active\" 789 / \"Expired\" 188 / \"WithDrawn\" 56 / \"Void\" 14. No ZIP -> spatial."
+    },
+    {
+      "registry_id": "san-jose-permits",
+      "platform": "arcgis",
+      "service_url": "https://geo.sanjoseca.gov/server/rest/services/PLN/PLN_PermitsAndComplaints/MapServer/8",
+      "dataset_url": "https://geo.sanjoseca.gov/server/rest/services/PLN/PLN_PermitsAndComplaints/MapServer/8",
+      "jurisdiction": "City of San Jose, California",
+      "coverage": [
+        {
+          "state": "CA",
+          "county": "Santa Clara"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "SUBDESC",
+          "ADDRESS"
+        ],
+        "status_raw": "PERMITAPPROVAL",
+        "type_source": "SUBDESC",
+        "file_date": "ISSUEDATE",
+        "address": "ADDRESS",
+        "case_number": "FOLDERNUM",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Single-Family": "Residential",
+        "1 & 2 Family Residential": "Residential",
+        "Apartment": "Residential",
+        "Condo": "Residential",
+        "Townhouse": "Residential",
+        "Duplex": "Residential",
+        "2nd Unit Added": "Residential",
+        "Apt/Condo/Townhouse": "Residential",
+        "Single Dwelling Unit": "Residential",
+        "Manufactured Home": "Residential",
+        "SRO/Fraternity/Shelter": "Residential",
+        "Convalescent/Residential Care": "Residential",
+        "Nursing/Assisted Living": "Residential",
+        "Retail": "Commercial",
+        "Office": "Commercial",
+        "Restaurant": "Commercial",
+        "Hotel/Motel": "Commercial",
+        "Bank": "Commercial",
+        "Medical/Dental Clinic": "Commercial",
+        "Health Club": "Commercial",
+        "Service Station": "Commercial",
+        "Theater": "Commercial",
+        "Cafeteria": "Commercial",
+        "Repair Garage": "Commercial",
+        "Closed Public Parking Garage": "Commercial",
+        "Open Public Parking Garage": "Commercial",
+        "Warehouse/Storage": "Industrial",
+        "Manufacturing": "Industrial",
+        "Industrial Plant": "Industrial",
+        "Data Center": "Industrial",
+        "R & D Lab": "Industrial",
+        "Commercial/Industrial": "Industrial",
+        "Church": "Civic/Public",
+        "School/Daycare": "Civic/Public",
+        "Recreation Building": "Civic/Public",
+        "Assembly": "Civic/Public",
+        "Antenna/Cell Site": "Utility",
+        "Mixed Use": "Development",
+        "Multiple Use": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "B-2. Fnd only, E-2. Fnd only, P-2. Fnd only, M-2. Fnd only",
+          "B-2. Fnd only, E-2. Fnd only, P-2. Fnd only",
+          "B-3. Shell, E-3. Shell, P-3. Shell, M-3. Shell",
+          "B-2. Fnd only"
+        ],
+        "operating": [
+          "B-Complete",
+          "B-Complete, E-Complete, M-Complete, P-Complete",
+          "E-Complete",
+          "B-Complete, E-Complete",
+          "P-Complete",
+          "E-Complete, M-Complete",
+          "B-4. Complete",
+          "B-4. Complete, E-4. Complete, P-4. Complete, M-4. Complete",
+          "B-4. Complete, E-4. Complete",
+          "E-4. Complete",
+          "E-Complete, M-Complete, P-Complete",
+          "M-Complete",
+          "E-Complete, P-Complete",
+          "B-4. Complete, E-4. Complete, M-4. Complete",
+          "E-4. Complete, M-4. Complete",
+          "P-4. Complete",
+          "B-Complete, E-Complete, P-Complete",
+          "E-4. Complete, P-4. Complete, M-4. Complete",
+          "B-4. Complete, P-4. Complete",
+          "B-Complete, P-Complete",
+          "B-4. Complete, E-4. Complete, P-4. Complete",
+          "E-4. Complete, P-4. Complete",
+          "B-Complete, E-Complete, M-Complete",
+          "E-4. Complete, M-Complete",
+          "M-Complete, P-Complete",
+          "E-Complete, P-Complete, M-Complete",
+          "P-4. Complete, M-4. Complete",
+          "M-4. Complete",
+          "B-4. Complete, M-4. Complete",
+          "B-Complete, M-Complete",
+          "B-4. Complete, P-4. Complete, M-4. Complete",
+          "B-Complete, M-Complete, P-Complete",
+          "B-Complete, E-4. Complete",
+          "E-4. Complete, P-Complete",
+          "B-Complete, E-4. Complete, M-4. Complete",
+          "B-4. Complete, E-Complete",
+          "E-Complete, P-4. Complete",
+          "E-Complete, M-4. Complete"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "ISSUEDATE",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. City of San Jose. NOTE this REOPENS a previously-rejected jurisdiction: the CALIFORNIA WIRE PASS rejected 'San Jose planningpermits30' because every row carried the single opaque status code '30'. This is a DIFFERENT service (PLN_PermitsAndComplaints layer 8) with a real vocabulary. TYPE SUBDESC 51 distinct values summing to 17682 (top: \"Single-Family\" 6015 / \"Survey\" 4332 / \"1 & 2 Family Residential\" 1522 / \"Apartment\" 1335 / \"2nd Unit Added\" 770 / \"Non-Voluntary\" 766 / \"Condo\" 750 / \"Townhouse\" 473) is the richest in the pass and populates all six use-types; the administrative values (Survey 4,332, Non-Voluntary, Voluntary, Address Assignment, Permit Search, Plan Retrieval/Copy, Copy Fee, Information Only, Undefined, Flood, Temporary Use) are NOT development and fail closed. STATUS PERMITAPPROVAL is a COMPOSITE of per-discipline sub-statuses (B=Building, E=Electrical, M=Mechanical, P=Plumbing) with 45 live combinations; all 45 are listed VERBATIM — any combination reporting 'Complete' buckets operating, the foundation-only and shell combinations bucket approved. Envelope-query sanity check returned geometry already in wkid 4326 (run 30370572544). No ZIP -> spatial."
+    },
+    {
+      "registry_id": "salem-structure-permits",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/kIA6yS9KDGqZL7U3/arcgis/rest/services/Structure_Permits/FeatureServer/0",
+      "dataset_url": "https://services.arcgis.com/kIA6yS9KDGqZL7U3/arcgis/rest/services/Structure_Permits/FeatureServer/0",
+      "jurisdiction": "City of Salem, Oregon",
+      "coverage": [
+        {
+          "state": "OR",
+          "county": "Marion"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "SUBDESCRIPTION",
+          "PROPERTYADDRESS"
+        ],
+        "status_raw": "STATUS",
+        "type_source": "SUBDESCRIPTION",
+        "file_date": "ISSUEDDATE",
+        "address": "PROPERTYADDRESS",
+        "case_number": "FOLDERNUMBER",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Single Family": "Residential",
+        "Duplex": "Residential",
+        "Triplex/Quadplex": "Residential",
+        "Multi Family": "Residential",
+        "Multi Family Phased": "Residential",
+        "Accessory Dwelling Unit": "Residential",
+        "Manufactured Dwelling": "Residential",
+        "Commercial": "Commercial",
+        "Commercial Phased": "Commercial",
+        "Commercial-Civil site work only": "Development",
+        "Multifamily-Civil site work only": "Development",
+        "Parking Lot": "Development",
+        "Wireless Installation": "Utility"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "incremental_field": "ISSUEDDATE",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. City of Salem structure permits (832 rows). TYPE 13 distinct values summing to 832 (top: \"Single Family\" 394 / \"Commercial\" 208 / \"Triplex/Quadplex\" 86 / \"Multi Family\" 65 / \"Accessory Dwelling Unit\" 33 / \"Multi Family Phased\" 14) is clean and per-structure. STATUS is a SINGLE value, 'Issued' on all 832 rows -> one bucket (approved); the honest shape of an issued-permit layer. No ZIP -> spatial."
+    },
+    {
+      "registry_id": "spokane-county-building-planning-permits",
+      "platform": "arcgis",
+      "service_url": "https://services3.arcgis.com/WlYQgAChrqj0tuQi/arcgis/rest/services/Spokane_County_Building_and_Planning_Permits/FeatureServer/0",
+      "dataset_url": "https://services3.arcgis.com/WlYQgAChrqj0tuQi/arcgis/rest/services/Spokane_County_Building_and_Planning_Permits/FeatureServer/0",
+      "jurisdiction": "Spokane County, Washington",
+      "coverage": [
+        {
+          "state": "WA",
+          "county": "Spokane"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Permit_Type",
+          "Site_Address"
+        ],
+        "status_raw": "Status",
+        "type_source": "Permit_Type",
+        "file_date": "Issued_Date",
+        "address": "Site_Address",
+        "case_number": "Permit_Number",
+        "zip": "Site_Zip",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "Residential Dwelling - New Construction": "Residential",
+        "Residential - Roofing, Siding, Windows": "Residential",
+        "Residential - Accessory Structure (Garage, Carport, Lean-To, Shop)": "Residential",
+        "Mechanical - Residential": "Residential",
+        "Plumbing - Residential": "Residential",
+        "Residential - Minor Alteration": "Residential",
+        "Residential Deck": "Residential",
+        "Residential - Alteration": "Residential",
+        "Residential - Addition": "Residential",
+        "Residential Dwelling/Garage - Zero Lot Line": "Residential",
+        "Residential Change of Use": "Residential",
+        "Swimming Pool - Residential": "Residential",
+        "Patio/Carport/Roof Cover": "Residential",
+        "Manufactured Home Placement": "Residential",
+        "E-Residential Dwelling - Two Family": "Residential",
+        "Residential Retaining Wall": "Residential",
+        "Townhouse": "Residential",
+        "Residential Modular Home": "Residential",
+        "Residential Dwelling - Fire Disaster Rebuild": "Residential",
+        "Residential Phased, Footing/Foundation": "Residential",
+        "Manufactured Home Park/Replacement": "Residential",
+        "Commercial Building, New": "Commercial",
+        "Commercial - Roofing, Siding, Windows": "Commercial",
+        "Mechanical - Commercial": "Commercial",
+        "Plumbing - Commercial": "Commercial",
+        "Commercial Alterations/Tenant Improvements": "Commercial",
+        "Commercial Alterations - Minor": "Commercial",
+        "Commercial Addition": "Commercial",
+        "Commercial Change of Use": "Commercial",
+        "Commercial Coach": "Commercial",
+        "Commercial Duplicate Building on Same Site": "Commercial",
+        "Commercial Phased, Footing/Foundation": "Commercial",
+        "Commercial Phase, Shell Only": "Commercial",
+        "Sign - Wall/Marquee/Cabinet Replace": "Commercial",
+        "Sign - Pylon": "Commercial",
+        "Demolition": "Development",
+        "Grading - Residential": "Development",
+        "Grading - Commercial": "Development",
+        "Blasting": "Development",
+        "Relocation": "Development",
+        "Title Elimination": "Development",
+        "Project/Plan Revision": "Development",
+        "Solar/Photo Voltaic - Prescriptive": "Utility",
+        "Residential Solar/Photo Voltaic - Ground Mount": "Utility",
+        "On Site Septic Review": "Utility",
+        "Tower": "Utility",
+        "Reservoir": "Utility"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "ISSUED",
+          "APPROVED",
+          "REISSUED"
+        ],
+        "operating": [
+          "CLOSED",
+          "FINALED",
+          "WARRANTY"
+        ],
+        "exclude": [
+          "APPLICANT CANCELLED",
+          "CANCELLED",
+          "FEES REFUNDED",
+          "EXPIRED WITH INSPECTIONS PENDING"
+        ]
+      },
+      "incremental_field": "Issued_Date",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. Spokane COUNTY building and planning permits. Native Site_Zip (esriFieldTypeString). IMPORTANT NEGATIVE RESULT, verified rather than assumed: the connector's exact predicate Site_Zip='99201' returns 0 (run 30370572544). That is NOT a broken mapping — a groupBy over Site_Zip (run 30370755906) shows the layer simply holds no 99201/99202/99203/99204/99207 rows, because those are City of Spokane ZIPs and this is the COUNTY's ledger. 28 of the packet's 46 Spokane ZIPs do appear (99208 751 / 99223 619 / 99218 569 / 99224 544 / 99005 431 / 99217 388 / 99004 372 ...); the remaining city ZIPs will honestly render 0 county permits. TYPE 57 distinct values summing to 6839 (top: \"Mechanical - Residential\" 2302 / \"Residential - Roofing, Siding, Windows\" 1409 / \"Residential Dwelling - New Construction\" 678 / \"Residential - Accessory Structure (Garage, Carport, Lean-To, Shop)\" 525 / \"Plumbing - Residential\" 326) — the most descriptive vocabulary in the pass. STATUS \"CLOSED\" 3637 / \"ISSUED\" 3139 / \"APPLICANT CANCELLED\" 48 / \"CANCELLED\" 4 / \"EXPIRED WITH INSPECTIONS PENDING\" 3 / \"FEES REFUNDED\" 2; Status_Description was probed and rejected as the source because it is prose ('Fees paid and permit issued.')."
+    },
+    {
+      "registry_id": "new-castle-county-permits",
+      "platform": "arcgis",
+      "service_url": "https://gis.nccde.org/agsserver/rest/services/CustomMaps/Permits/FeatureServer/4",
+      "dataset_url": "https://gis.nccde.org/agsserver/rest/services/CustomMaps/Permits/FeatureServer/4",
+      "jurisdiction": "New Castle County, Delaware",
+      "coverage": [
+        {
+          "state": "DE",
+          "county": "New Castle"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "APTYPE",
+          "DESCRIPTION"
+        ],
+        "type_source": "APTYPE",
+        "file_date": "ISSDTTM",
+        "case_number": "APNO",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "SFD DEVEL": "Residential",
+        "MULTI RES": "Residential",
+        "COMMBLDG": "Commercial"
+      },
+      "status_const": "operating",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [
+          "operating"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "ISSDTTM",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). TYPE APTYPE 3 distinct values summing to 31806: \"SFD DEVEL\" 27446 / \"COMMBLDG\" 3796 / \"MULTI RES\" 564. No ZIP and no address column in the schema -> spatial_zip_radius_mi. ISSDTTM accepts a DATE literal (1,428 rows >= 2024-07-28 of 31,806 — a largely historical ledger)."
+    },
+    {
+      "registry_id": "loudoun-county-residential-permits",
+      "platform": "arcgis",
+      "service_url": "https://logis.loudoun.gov/gis/rest/services/Projects/ResBuildingPermits/MapServer/1",
+      "dataset_url": "https://logis.loudoun.gov/gis/rest/services/Projects/ResBuildingPermits/MapServer/1",
+      "jurisdiction": "Loudoun County, Virginia",
+      "coverage": [
+        {
+          "state": "VA",
+          "county": "Loudoun"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "UNIT_TYPE",
+          "STREET_ADDRESS"
+        ],
+        "type_source": "UNIT_TYPE",
+        "file_date": "YEAR_ISSUED",
+        "address": "STREET_ADDRESS",
+        "case_number": "PERMIT_NUMBER",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "zip_where_template": "ZI_ZIP = {zip}",
+      "type_map": {
+        "SINGLE-FAMILY DETACHED": "Residential",
+        "SINGLE-FAMILY ATTACHED": "Residential",
+        "MULTI-FAMILY ATTACHED": "Residential",
+        "MULTI-FAMILY STACKED": "Residential",
+        "GROUP QUARTER": "Residential",
+        "GROUP QUARTERS": "Residential"
+      },
+      "status_const": "operating",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [
+          "operating"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "YEAR_ISSUED",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). Residential-only layer, so ONE use-type is the honest ceiling: \"SINGLE-FAMILY DETACHED\" 17742 / \"SINGLE-FAMILY ATTACHED\" 14626 / \"MULTI-FAMILY ATTACHED\" 7865 / \"MULTI-FAMILY STACKED\" 5394 / \"GROUP QUARTER\" 951 / \"GROUP QUARTERS\" 88. NATIVE ZIP VIA TEMPLATE, not column_map.zip — ZI_ZIP is NUMERIC and the connector's default predicate ZI_ZIP='20147' returns HTTP 400 'Unable to complete operation', while the unquoted ZI_ZIP = 20147 returns 7,915 (runs 30380342906 / 30380564556). zip_where_template is the documented escape hatch for exactly this. NO recency_days: YEAR_ISSUED is a string year, not a Date column."
+    },
+    {
+      "registry_id": "charleston-county-permits",
+      "platform": "arcgis",
+      "service_url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/ENERGOV/energov_history/FeatureServer/0",
+      "dataset_url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/ENERGOV/energov_history/FeatureServer/0",
+      "jurisdiction": "Charleston County, South Carolina",
+      "coverage": [
+        {
+          "state": "SC",
+          "county": "Charleston"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "WORKCLASS",
+          "PROJECTNAME"
+        ],
+        "type_source": "WORKCLASS",
+        "file_date": "APPLICATIONDATE",
+        "case_number": "CASENUMBER",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Residential": "Residential",
+        "Single Family Home": "Residential",
+        "Residential New": "Residential",
+        "Bldg. - Single Family Residential and Accessory": "Residential",
+        "Type - SFR/Townhome <1/2 acre": "Residential",
+        "Residential Addition / Renovation": "Residential",
+        "xx(DO NOT USE)Bldg Permit - Residential": "Residential",
+        "Bldg Permit - Residential New SFR Dwelling Unit": "Residential",
+        "MH (Not In Flood Zone)": "Residential",
+        "Pool (R)": "Residential",
+        "Limited Home Rental (LHR)": "Residential",
+        "Extended Home Rental (EHR)": "Residential",
+        "Home Occupation": "Residential",
+        "Commercial": "Commercial",
+        "Commercial New": "Commercial",
+        "Bldg. - Commercial": "Commercial",
+        "Bldg Permit - Commercial": "Commercial",
+        "Site Constr - Commercial": "Commercial",
+        "Business License": "Commercial",
+        "Sign": "Commercial",
+        "Sign - On-Premise(NEW)": "Commercial",
+        "New": "Development",
+        "Alteration": "Development",
+        "Repair": "Development",
+        "Addition": "Development",
+        "Demolition": "Development",
+        "Use Change": "Development",
+        "New - Development": "Development",
+        "Site Construction": "Development",
+        "Site Constr - General": "Development",
+        "Roadway": "Development",
+        "New - Site Work Only Development": "Development",
+        "Redevelopment - Limited": "Development",
+        "Tree Removal": "Development",
+        "Upgrade": "Development",
+        "Solar Panel": "Utility",
+        "Power Pole": "Utility",
+        "Low Voltage Elec.": "Utility",
+        "Electric": "Utility",
+        "Utility Building": "Utility",
+        "Bonding / Grounding": "Utility"
+      },
+      "status_const": "operating",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [
+          "operating"
+        ],
+        "exclude": []
+      },
+      "extra_where": "MODULENAME = 'PermitManagement'",
+      "incremental_field": "APPLICATIONDATE",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). SCOPE CORRECTION, measured. energov_history is not a building-permit layer — it is EVERY Energov case. A live MODULENAME groupBy (run 30380718707) returns InspectionManagement 229,975 / PermitManagement 111,000 / PlanManagement 33,533 / CodeManagement 3,784 / ProjectManagement 3,139 / RequestManagement 2,315 / BusinessLicenseEntity 128 / IndividualLicense 40 / ApplicationManagement 13 = 383,927. So 60 percent of the layer is INSPECTIONS, which is also why the packet's WORKCLASS is blank on 239,354 rows (62 percent) — an inspection carries no work class. extra_where MODULENAME = 'PermitManagement' drops inspections, licences and code cases AT SOURCE (the Seattle/Chicago drop-noise-at-source precedent), leaving real permits. TYPE WORKCLASS 181 distinct values summing to 383927; the mapped subset covers the building/site work classes and the long tail fails closed. No ZIP/address -> spatial. This host is flaky: two probes returned 'fetch failed' before succeeding."
+    },
+    {
+      "registry_id": "huntsville-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://maps.huntsvilleal.gov/server/rest/services/Licenses/BuildingPermits/MapServer/0",
+      "dataset_url": "https://maps.huntsvilleal.gov/server/rest/services/Licenses/BuildingPermits/MapServer/0",
+      "jurisdiction": "City of Huntsville, Alabama",
+      "coverage": [
+        {
+          "state": "AL",
+          "county": "Madison"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "OccupancyType",
+          "Address"
+        ],
+        "type_source": "OccupancyType",
+        "file_date": "Permit_Issue_DateTime",
+        "address": "Address",
+        "case_number": "PermitID",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Single Family": "Residential",
+        "Multi Apt": "Residential",
+        "Townhomes": "Residential",
+        "Duplex": "Residential",
+        "Condo": "Residential",
+        "Commercial": "Commercial"
+      },
+      "status_const": "operating",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [
+          "operating"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "Permit_Issue_DateTime",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). FIELD DEVIATION: the packet names TypeOfWork, which is a WORK CLASS (New Construction 9,773 / Alteration 5,187 / Addition 2,547 / Demolition 740 / Moving 6) and says nothing about the building. OccupancyType is the USE and is used instead: \"Single Family\" 11306 / \"Commercial\" 3043 / \"Multi Apt\" 2728 / \"Townhomes\" 902 / \"Duplex\" 241 / \"Condo\" 33. No ZIP -> spatial."
+    },
+    {
+      "registry_id": "chattanooga-permits-archive",
+      "platform": "arcgis",
+      "service_url": "https://services2.arcgis.com/cclAu9OKhOfjeUdr/arcgis/rest/services/Chatt_permits_to_12_31_2025/FeatureServer/0",
+      "dataset_url": "https://services2.arcgis.com/cclAu9OKhOfjeUdr/arcgis/rest/services/Chatt_permits_to_12_31_2025/FeatureServer/0",
+      "jurisdiction": "City of Chattanooga / Hamilton County, Tennessee",
+      "coverage": [
+        {
+          "state": "TN",
+          "county": "Hamilton"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "P_TYPE",
+          "ADDRESS"
+        ],
+        "type_source": "P_TYPE",
+        "file_date": "PERMIT_DAT",
+        "address": "ADDRESS",
+        "case_number": "PERMIT_NUM",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Residential": "Residential",
+        "Non-Residential": "Commercial"
+      },
+      "status_const": "operating",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [
+          "operating"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "PERMIT_DAT",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). TYPE P_TYPE is a clean two-value split: \"Residential\" 31146 / \"Non-Residential\" 11487 — two use-types is the honest ceiling. NOTE the layer is named Chatt_permits_to_12_31_2025 and is a FROZEN ARCHIVE ending 2025-12-31 (PERMIT_DAT spans 2006-01-01 to 2025-12-31); it will not gain new permits. No ZIP -> spatial."
+    },
+    {
+      "registry_id": "knoxville-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services8.arcgis.com/Ty9G85JMF2cDHlRt/arcgis/rest/services/BuildingPermits/FeatureServer/0",
+      "dataset_url": "https://services8.arcgis.com/Ty9G85JMF2cDHlRt/arcgis/rest/services/BuildingPermits/FeatureServer/0",
+      "jurisdiction": "City of Knoxville / Knox County, Tennessee",
+      "coverage": [
+        {
+          "state": "TN",
+          "county": "Knox"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "LANDUSE",
+          "ADDRESS"
+        ],
+        "type_source": "LANDUSE",
+        "file_date": "DATEISSUED",
+        "address": "ADDRESS",
+        "case_number": "PERMITNUMBER",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Single Family Residential": "Residential",
+        "Multifamily Residential": "Residential",
+        "Multifamily Residental": "Residential",
+        "Multifamily Residentia": "Residential",
+        "Mulitfamily Residential": "Residential",
+        "Multifamily": "Residential",
+        "Multifamily Land Use": "Residential",
+        "Commercial": "Commercial",
+        "Office": "Commercial",
+        "Wholesale": "Commercial",
+        "Industrial": "Industrial",
+        "Institutional": "Civic/Public",
+        "Public/Quasi-public": "Civic/Public",
+        "Public/Quasi Public Land": "Civic/Public",
+        "Public Park": "Civic/Public",
+        "Private Recreation": "Civic/Public",
+        "Transportation/Communications/Utilities": "Utility",
+        "Mixed": "Development",
+        "Under Construction/Other Uses": "Development"
+      },
+      "status_const": "operating",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [
+          "operating"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "DATEISSUED",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). FIELD DEVIATION: the packet names PERMITTYPE, whose values are opaque abbreviations (SFR 8,207 / MF 1,376 / SFA 1,254 / CO 663 / MH 599 / DR 413 / INS 146 / DC 140 / IN 109 / OT 60 / AG 37 / PU 30) with no coded-value domain — CO alone could be Commercial or Certificate of Occupancy. The layer publishes LANDUSE, a real land-use classifier, used instead: 25 distinct values summing to 13028 (top: \"Single Family Residential\" 9383 / \"Multifamily Residential\" 1827 / \"Commercial\" 1039 / \"Multifamily Residental\" 363 / \"Institutional\" 119). Upstream misspellings are preserved VERBATIM as separate keys ('Multifamily Residental', 'Multifamily Residentia', 'Mulitfamily Residential') because the lookup is exact-match. This host returned 503 twice before succeeding. No ZIP -> spatial."
+    },
+    {
+      "registry_id": "desoto-county-permits",
+      "platform": "arcgis",
+      "service_url": "https://gis.desotocountyms.gov/arcgis/rest/services/Permits_Energov/FeatureServer/0",
+      "dataset_url": "https://gis.desotocountyms.gov/arcgis/rest/services/Permits_Energov/FeatureServer/0",
+      "jurisdiction": "DeSoto County, Mississippi",
+      "coverage": [
+        {
+          "state": "MS",
+          "county": "DeSoto"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Permit_Typ",
+          "Address"
+        ],
+        "type_source": "Permit_Typ",
+        "file_date": "Date",
+        "address": "Address",
+        "case_number": "APBTP",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Building (Residential)": "Residential",
+        "Mobile Home": "Residential",
+        "Modular Home": "Residential",
+        "Building (Commercial)": "Commercial"
+      },
+      "status_const": "operating",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [
+          "operating"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "Date",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). TYPE 4 distinct values summing to 5616: \"Building (Residential)\" 5344 / \"Building (Commercial)\" 152 / \"Mobile Home\" 117 / \"Modular Home\" 3. No ZIP -> spatial."
+    },
+    {
+      "registry_id": "flathead-county-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services6.arcgis.com/o8tYBvi7zCbkyszZ/arcgis/rest/services/Building_Permits/FeatureServer/1",
+      "dataset_url": "https://services6.arcgis.com/o8tYBvi7zCbkyszZ/arcgis/rest/services/Building_Permits/FeatureServer/1",
+      "jurisdiction": "Flathead County, Montana",
+      "coverage": [
+        {
+          "state": "MT",
+          "county": "Flathead"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "BuildingUse",
+          "Address"
+        ],
+        "type_source": "BuildingUse",
+        "file_date": "DateIssued",
+        "address": "Address",
+        "case_number": "PermitNumber",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Single Family Residence": "Residential",
+        "Townhouse": "Residential",
+        "Apartments": "Residential",
+        "Duplex": "Residential",
+        "Commercial": "Commercial",
+        "Health Care": "Civic/Public"
+      },
+      "status_const": "operating",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [
+          "operating"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "DateIssued",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). SCOPE NOTE: this is layer /1, 'Current Year Permits' — only 243 rows; layer /0 holds prior years and is NOT in the packet, so it is not wired. TYPE BuildingUse 7 distinct values summing to 243: \"Single Family Residence\" 109 / \"Townhouse\" 61 / \"Commercial\" 53 / \"Apartments\" 12 / \"Quasi\" 5 / \"Duplex\" 2 / \"Health Care\" 1 — ClassOfWork was probed as an alternative and rejected because it encodes work class (SFR-NEW / COM-MOD), not use. No ZIP -> spatial."
+    },
+    {
+      "registry_id": "aurora-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://ags.auroragov.org/aurora/rest/services/OpenData/MapServer/44",
+      "dataset_url": "https://ags.auroragov.org/aurora/rest/services/OpenData/MapServer/44",
+      "jurisdiction": "City of Aurora, Colorado",
+      "coverage": [
+        {
+          "state": "CO",
+          "county": "Adams"
+        },
+        {
+          "state": "CO",
+          "county": "Arapahoe"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "SubDesc",
+          "Address"
+        ],
+        "type_source": "SubDesc",
+        "file_date": "IssueDate",
+        "address": "Address",
+        "case_number": "Permit_",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Single-Family Detached": "Residential",
+        "Single Family Detached Plan": "Residential",
+        "Single Family Revision": "Residential",
+        "Multi-Family Building": "Residential",
+        "Multi Family Plan": "Residential",
+        "Residential Miscellaneous": "Residential",
+        "Basement Finish Permit": "Residential",
+        "Residential Deck Permit": "Residential",
+        "Residential Patio Cover": "Residential",
+        "Residential Addition Permit": "Residential",
+        "Residential Pool": "Residential",
+        "Res. Hook, Set, & Tie-RT4": "Residential",
+        "Sales Office for Residential": "Residential",
+        "Sales Trailer - Residential": "Residential",
+        "Commercial Miscellaneous": "Commercial",
+        "Tenant Improvement": "Commercial",
+        "Tenant Finish-NT1": "Commercial",
+        "Business Use Building": "Commercial",
+        "Mercantile Use Building": "Commercial",
+        "Hotel Building": "Commercial",
+        "Commercial Swimming Pool": "Commercial",
+        "Sales Trailer - Commercial": "Commercial",
+        "Sign Permit-Wall Mount/Cabinet": "Commercial",
+        "Sign Permit-Ground/Monument > 6'": "Commercial",
+        "Sign Permit-Monument <= 6'": "Commercial",
+        "Non-Res. Addition-NT8": "Commercial",
+        "Factory Use Building": "Industrial",
+        "Storage Use Building": "Industrial",
+        "Racking/High Piled Combustibles": "Industrial",
+        "Above Ground Fuel Storage": "Industrial",
+        "Below Ground Fuel Storage": "Industrial",
+        "Assembly Building": "Civic/Public",
+        "Group E": "Civic/Public",
+        "Solar PV Residential Permit": "Utility",
+        "Solar PV Commercial Permit": "Utility",
+        "Rooftop Mount Antennae": "Utility",
+        "Ground Mount Antennae": "Utility",
+        "Radio Frequency": "Utility",
+        "Private Development": "Development",
+        "City Project": "Development",
+        "Demolition Full Structure-8Q": "Development",
+        "Partial Demolition-8Q": "Development",
+        "Damage Repair-RT6": "Development",
+        "Change in Occupancy": "Development"
+      },
+      "status_const": "operating",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [
+          "operating"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "IssueDate",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). PACKET DATA ERROR CORRECTED: the packet's date_field is the corrupted literal '(2021-07-26'. The real column is IssueDate, verified live (41,327 rows >= 2024-07-28 of 164,091). FIELD DEVIATION: the packet names FolderDesc, whose values are permit-PROCESS categories (Counter Permit 71,480 / Online Building Folder 40,641 / Limited Building Permit 27,264) that describe how the permit was filed, not what was built. SubDesc is the building descriptor and is used instead: 69 distinct values summing to 161042 (top: \"Roofing-RT2\" 34622 / \"Solar PV Residential Permit\" 15764 / \"Plan Revisions\" 14667 / \"Mechanical Permit\" 13289 / \"Plumbing Permit\" 12390). COVERAGE IS BOTH COUNTIES — Aurora straddles the line, confirmed against our own rows: 80010/80011/80019 are Adams pages and 80012/80013/80014/80015/80016 are Arapahoe. No ZIP -> spatial."
+    },
+    {
+      "registry_id": "sheridan-county-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services5.arcgis.com/V4b98G4pSkzvUam9/arcgis/rest/services/Building_Permits_view/FeatureServer/1",
+      "dataset_url": "https://services5.arcgis.com/V4b98G4pSkzvUam9/arcgis/rest/services/Building_Permits_view/FeatureServer/1",
+      "jurisdiction": "Sheridan County, Wyoming",
+      "coverage": [
+        {
+          "state": "WY",
+          "county": "Sheridan"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Type_of_Bu",
+          "ADDFULL"
+        ],
+        "type_source": "Type_of_Bu",
+        "file_date": "Year",
+        "address": "ADDFULL",
+        "case_number": "Permit_Num",
+        "lat": "Lat",
+        "lng": "Long"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "single family dwelling": "Residential",
+        "addition to home": "Residential",
+        "accessory building": "Residential",
+        "Accessory Dwelling": "Residential",
+        "garage": "Residential",
+        "addition to single family dwelling": "Residential",
+        "accessory building (shop)": "Residential",
+        "cabin": "Residential",
+        "attached garage": "Residential",
+        "Shed": "Residential",
+        "Carport": "Residential",
+        "Accessory building (garage)": "Residential",
+        "addition to garage": "Residential",
+        "addition": "Development",
+        "change of use": "Development",
+        "Change of Use - Home Occupation": "Development"
+      },
+      "status_const": "operating",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [
+          "operating"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "Year",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). KNOWN LIMITATION, recorded rather than papered over: Type_of_Bu is FREE TEXT, not a controlled vocabulary — the groupBy returns hundreds of values, 285 of the 363 parsed occur exactly once, with inconsistent casing and leading spaces (' single family dwelling', ' garage', 'Change of Use - Oil field service business'), and the response was still truncated. A COMPLETE type_map is therefore impossible. Only unambiguous high-frequency values are mapped (keys stored TRIMMED, which also merges the leading-space variants); the long tail fails closed to use_type 'unclassified' rather than be invented. Records still emit with their own coordinates and record_url. NO recency_days: Year is an INTEGER year, not a Date column. No ZIP -> spatial."
+    },
+    {
+      "registry_id": "albuquerque-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/MapServer/0",
+      "dataset_url": "https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/MapServer/0",
+      "jurisdiction": "City of Albuquerque, New Mexico",
+      "coverage": [
+        {
+          "state": "NM",
+          "county": "Bernalillo"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "TypeofStructure",
+          "CalculatedAddress"
+        ],
+        "type_source": "TypeofStructure",
+        "file_date": "DateIssued",
+        "address": "CalculatedAddress",
+        "case_number": "PermitNumber",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "type_map": {
+        "Single Family": "Residential",
+        "RESIDENCE": "Residential",
+        "TOWNHOUSE": "Residential",
+        "Apartment": "Residential",
+        "DUPLEX": "Residential",
+        "Condo": "Residential",
+        "Modular": "Residential",
+        "Accessory": "Residential",
+        "3-4 APT": "Residential",
+        "5-9 APT": "Residential",
+        "10-19 APT": "Residential",
+        "20-49 APT": "Residential",
+        "GT50 APT": "Residential",
+        "Commercial": "Commercial",
+        "NEW OFFICE": "Commercial",
+        "RESTAURANT": "Commercial",
+        "RETAIL": "Commercial",
+        "GAS/AUTO": "Commercial",
+        "HOTEL/MOTEL": "Commercial",
+        "REC/AMUSE": "Commercial",
+        "WRHS/STORAGE": "Industrial",
+        "INDUSTRIAL": "Industrial",
+        "SCHOOL": "Civic/Public",
+        "HOSPITAL": "Civic/Public",
+        "GOV OFFICE": "Civic/Public",
+        "CHURCH": "Civic/Public"
+      },
+      "status_const": "operating",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [
+          "operating"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "DateIssued",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). FIELD DEVIATION: the packet names TypeofWork, a work class (Alterations / New Building / Addition). TypeofStructure is the building USE and is used instead: 31 distinct values summing to 45382 (top: \"Not Specified\" 15558 / \"Single Family\" 13123 / \"Commercial\" 6187 / \"RESIDENCE\" 5676 / \"Other\" 1273 / \"Accessory\" 1141). 'Not Specified' (15,558, 34 percent) and the empty value fail closed. No ZIP -> spatial."
+    },
+    {
+      "registry_id": "thurston-county-residential-permits",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/MA2nPVLxVTdAZLej/arcgis/rest/services/Residential_Building_Permits/FeatureServer/0",
+      "dataset_url": "https://services1.arcgis.com/MA2nPVLxVTdAZLej/arcgis/rest/services/Residential_Building_Permits/FeatureServer/0",
+      "jurisdiction": "Thurston County, Washington",
+      "coverage": [
+        {
+          "state": "WA",
+          "county": "Thurston"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "BPTYPE_Desc",
+          "SITEADDR"
+        ],
+        "type_source": "BPTYPE_Desc",
+        "file_date": "ISSUEDATE",
+        "address": "SITEADDR",
+        "case_number": "PERMITID",
+        "zip": "ZIP5",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "Single-family": "Residential",
+        "Manufactured Home": "Residential",
+        "Multifamily": "Residential",
+        "Accessory Dwelling": "Residential",
+        "Demolition": "Development"
+      },
+      "status_const": "operating",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [
+          "operating"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "ISSUEDATE",
+      "recency_days": 730,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). TYPE uses BPTYPE_Desc, the readable twin of the BPTYPE codes (SF/MH/MF/DEMOB/DESF...): \"Single-family\" 48540 / \"Manufactured Home\" 9349 / \"Demolition\" 3381 / \"Multifamily\" 2978 / \"Accessory Dwelling\" 288. NATIVE ZIP: ZIP5 is a string column and the connector's exact predicate ZIP5='98501' returns 8,387 (run 30380342906) — proven, not assumed. The X/Y columns are STATE-PLANE (wkid 102749), NOT lat/lng, so column_map reads the flattened geometry (__lat/__lng) which the connector reprojects to 4326; mapping X/Y would have placed every marker in the wrong hemisphere."
     }
   ],
   "ckan": [
@@ -6433,6 +8904,76 @@
       },
       "recency_days": 365,
       "_receipts": "2026-07-16 PA wire pass (FIRST carto entry - new additive sources/carto.ts, SQL API; 16 offline unit checks incl. bidirectional gate proof). FRESH: max permitissuedate 2026-07-10 over the city's official L&I permits table (live SQL receipt). Statuses VERBATIM within the kept types over 365d: Issued 9,302 / Completed 2,611 / Amendment-* lifecycle -> proposed / Expired+Cancelled+Amendment Denied+Withdrawn (+ Stop Work/Refused/Denied from the full-table + sample receipts) excluded. typeofwork vocab VERBATIM: kept 12 construction/land-use values (Addition and/or Alteration 5,007, Change of Use 2,406, New construction+GFA 1,877, New Construction 971, demolition classes, lot-line actions); DROPPED at source: Make Safe permits (safety orders), Signs, Parking Only, Family Daycare, Fences Only, Site Clearing + the Plumbing 13,300/Electrical 8,187/Mechanical/Fire Suppression trade classes via the permittype IN-list. ZIP is ZIP+4 ('19143-3005') -> the connector's LIKE prefix scoping + 5-digit truncation. Geometry via PostGIS ST_Y/ST_X(the_geom) - live-verified real Philly coords. record_url dataset-precision on the SQL endpoint (OpenDataPhilly portal 404s - retired; no per-record public URL pattern verified; the machine endpoint IS the official record interface - Boulder precedent). NOTE: recency on permitissuedate excludes null-issue-date zoning applications (they carry Refused/Denied statuses in the sample - excluded anyway)."
+    }
+  ],
+  "_opendatasoft_readme": [
+    "Opendatasoft connector entries. STATUS: the connector is NOT BUILT YET — sources/ has no",
+    "opendatasoft.ts and index.ts makes no opendatasoftForZip() call, so NOTHING READS THIS ARRAY",
+    "at runtime. These entries are the staged data half; they become live the moment the additive",
+    "connector lands (the path ckan.ts / csv.ts / carto.ts each took). Adding the array is inert and",
+    "safe: index.ts selects registry.<platform> by name, so an unread key changes no behavior.",
+    "",
+    "API shape for the future connector — prefer Explore v2.1 over Search v1: v1 nests every row",
+    "under records[].fields and caps rows at 10,000, while v2.1 returns a flat results[] with a",
+    "SQL-ish where, limit/offset and total_count, which is far closer to the sibling connectors:",
+    "  /api/explore/v2.1/catalog/datasets/<dataset_id>/records?where=<zip_col>=\"<zip>\"&limit=100&offset=N",
+    "ZIP scoping is PROVEN three independent ways that agree (see the entry's _receipts)."
+  ],
+  "opendatasoft": [
+    {
+      "registry_id": "shelby-county-building-permits",
+      "platform": "opendatasoft",
+      "base_url": "https://data.opendatasoft.com",
+      "dataset_id": "shelby-county-building-and-demolition-permits@datamidsouth",
+      "service_url": "https://data.opendatasoft.com/api/records/1.0/search/?dataset=shelby-county-building-and-demolition-permits@datamidsouth",
+      "dataset_url": "https://data.opendatasoft.com/explore/dataset/shelby-county-building-and-demolition-permits@datamidsouth/",
+      "jurisdiction": "Shelby County, Tennessee",
+      "coverage": [
+        {
+          "state": "TN",
+          "county": "Shelby"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "record_type",
+          "site_address"
+        ],
+        "status_raw": "status",
+        "type_source": "record_type",
+        "file_date": "date_status",
+        "address": "site_address",
+        "case_number": "record_id",
+        "zip": "zip_code",
+        "lat": "lat",
+        "lng": "lon"
+      },
+      "spatial_point_col": "geo_point_2d",
+      "type_map": {
+        "Residential Alteration Permit": "Residential",
+        "Residential New Construction Permit": "Residential",
+        "Residential Accessory Structure Permit": "Residential",
+        "Residential Addition Permit": "Residential",
+        "Commercial Alteration Permit": "Commercial",
+        "Commercial New Construction Permit": "Commercial",
+        "Commercial Accessory Structure Permit": "Commercial",
+        "Commercial Addition Permit": "Commercial",
+        "Demolition Permit": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Issued",
+          "Inspection Phase"
+        ],
+        "operating": [
+          "Closed - Complete"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "date_status",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 3 (docs/implementation-packets/claude_code_phase3_prompt.md). STAGED CONFIG — the Opendatasoft connector does not exist yet, so this entry is inert until sources/opendatasoft.ts and an index.ts call land; see _opendatasoft_readme. Vocabularies are VERBATIM live facet output — recon-fetch runs 30381742794 (r1), 30381831357 (r2), 30381943709 (r3); targets scripts/recon/p3-round*.json. Dataset: 8,751 records, update_frequency MONTHLY, data_processed 2026-07-01, publisher Innovate Memphis. BOTH VOCABULARIES ARE COMPLETE — each sums to EXACTLY 8,751. status (3): Issued 4,707 / Closed - Complete 4,036 / Inspection Phase 8 — a real status column, so status_to_bucket applies and status_const is NOT used (the packet offered it as a fallback for status-less layers). TYPE DEVIATION FROM THE PACKET: the packet names permit_type, whose 5 values are WORK CLASSES (Alteration 3,889 / New Construction 1,900 / Accessory Structure 1,478 / Demolition 757 / Addition 727) and cannot reach the required 3 use-types. record_type is used instead — 9 values, also summing exactly to 8,751, encoding use AND work class: Residential Alteration 2,373 / Residential New Construction 1,664 / Commercial Alteration 1,516 / Residential Accessory Structure 1,237 / Demolition 757 / Residential Addition 655 / Commercial Accessory Structure 241 / Commercial New Construction 236 / Commercial Addition 72 -> Residential + Commercial + Development = 3 use-types, 0 unmapped. ZIP SCOPING PROVEN THREE INDEPENDENT WAYS THAT AGREE: refine.zip_code=38002 -> nhits 750, q=zip_code:38002 -> nhits 750, and Explore v2.1 where=zip_code=\"38002\" -> total_count 750; control 38117 -> 351. GEOGRAPHY: per-record lat/lon doubles plus a centroid GeoJSON Point, geo_point_2d and a record-level geometry Point — no geocoding needed. date_status is a real ODS date field (e.g. 2025-10-24). record_url_precision is 'dataset': there is no per-record URL column and the metadata's Accela reference (aca-prod.accela.com/SHELBYCO/Default.aspx) is a portal ROOT, not a deep link — templating one would be guessing (Boulder/Philadelphia precedent). All 41 packet ZIPs are modeled and resolve to TN/Shelby (verified against public.communities)."
     }
   ]
 }

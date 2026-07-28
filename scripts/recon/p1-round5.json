@@ -1,0 +1,42 @@
+[
+ {
+  "id": "zipclause-02-Zip",
+  "url": "https://services2.arcgis.com/CyVvlIiUfRBmMQuu/arcgis/rest/services/Building_Permits_Applications_view/FeatureServer/0/query?where=Zip%3D%2723451%27&returnCountOnly=true&f=json",
+  "print_chars": 400
+ },
+ {
+  "id": "zipclause-05-ZIPCODE",
+  "url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0/query?where=ZIPCODE%3D%2728401%27&returnCountOnly=true&f=json",
+  "print_chars": 400
+ },
+ {
+  "id": "zipclause-10-ZIPCODE",
+  "url": "https://services1.arcgis.com/79kfd2K6fskCAkyg/arcgis/rest/services/active_construction_permits/FeatureServer/0/query?where=ZIPCODE%3D%2740202%27&returnCountOnly=true&f=json",
+  "print_chars": 400
+ },
+ {
+  "id": "zipclause-16-ZipCode",
+  "url": "https://gis.gocolumbiamo.com/arcgis/rest/services/View_Services/City_Projects_Construction_Updated/MapServer/3/query?where=ZipCode%3D%2765201%27&returnCountOnly=true&f=json",
+  "print_chars": 400
+ },
+ {
+  "id": "zipclause-19-ZIP",
+  "url": "https://gis.lincoln.ne.gov/public/rest/services/Planning/Residential_New_Construction_Permits/MapServer/4/query?where=ZIP%3D%2768502%27&returnCountOnly=true&f=json",
+  "print_chars": 400
+ },
+ {
+  "id": "zipclause-20-PropertyZip",
+  "url": "https://maps.littlerock.gov/server/rest/services/Permits_All/MapServer/0/query?where=PropertyZip%3D%2772201%27&returnCountOnly=true&f=json",
+  "print_chars": 400
+ },
+ {
+  "id": "zipclause-26-Site_Zip",
+  "url": "https://services3.arcgis.com/WlYQgAChrqj0tuQi/arcgis/rest/services/Spokane_County_Building_and_Planning_Permits/FeatureServer/0/query?where=Site_Zip%3D%2799201%27&returnCountOnly=true&f=json",
+  "print_chars": 400
+ },
+ {
+  "id": "spatial-24-sanity",
+  "url": "https://geo.sanjoseca.gov/server/rest/services/PLN/PLN_PermitsAndComplaints/MapServer/8/query?where=1%3D1&geometry=%7B%22xmin%22%3A-121.95%2C%22ymin%22%3A37.25%2C%22xmax%22%3A-121.85%2C%22ymax%22%3A37.36%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=SUBDESC&returnGeometry=true&outSR=4326&resultRecordCount=2&f=json",
+  "print_chars": 1200
+ }
+]
