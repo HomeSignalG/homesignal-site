@@ -2863,3 +2863,110 @@ therefore do **nothing** until `deploy-edge-functions.yml` runs for `get-address
 affected ZIP pages carry no records until the cache refreshes (`dev_refresh_fire`, daily 09:00 UTC).
 All **558** ZIP pages in the 26 covered counties were measured at **0 development-backed sites** —
 every one is on the bare EPA facilities floor today.
+
+---
+
+## PHASE 2 ARCGIS NO-STATUS WIRE PASS (2026-07-28) — all 12 endpoints wired (arcgis 88 → 100, registry 112 → 124)
+
+Source brief: `docs/implementation-packets/claude_code_phase2_prompt.md` +
+`claude_code_implementation.json` → `phase2_arcgis_no_status` (12 endpoints, 247 ZIPs).
+**Config only — no connector, engine or schema change.** Branch `claude/phase2-arcgis-no-status`.
+Vocabularies are VERBATIM live groupBy output; four `recon-fetch` rounds — **30380143920**,
+**30380342906**, **30380564556**, **30380718707** (targets under `scripts/recon/p2-*.json`).
+
+### STANDING ANSWER — `status_const` does NOT bypass `status_to_bucket`
+
+The Phase 2 brief says to set `status_const: "operating"` and *"set `status_to_bucket` to null or
+omit"*, "to bypass status_to_bucket entirely". **That is wrong and would have emitted ZERO records
+from all 12 endpoints.** The connector applies the constant as the row's `status_raw`
+(`arcgis.ts:232`) and then buckets it through the same lookup as a live value (`l.218`); its own
+docstring says so — *"Applied verbatim as each row's status_raw and bucketed through
+status_to_bucket like any live value"* (`l.79`). With the map omitted the lookup is empty, every row
+counts as an unmapped status, and `continue` drops it. `status_to_bucket` is also a **required**
+field on the interface (`l.51`), so omitting it would make `buildBucketLookup` throw.
+
+Every Phase 2 entry therefore pairs `status_const: "operating"` with
+`"operating": ["operating"]` — the shape `nvdot-project-boundaries` already uses.
+
+⚠️ **Pre-existing defect noticed while confirming this** (NOT touched by this PR, flagged for the
+owner): **`san-antonio-prelim-plan-review`** sets `status_const: "proposed"` but has **all four
+buckets empty**, so by the same mechanism it emits **zero records**. It needs
+`"proposed": ["proposed"]`.
+
+### Two packet data errors corrected on evidence
+
+1. **Aurora's `date_field` is a corrupted literal** — the packet gives `"(2021-07-26"`. The real
+   column is **`IssueDate`** (verified: 41,327 rows `>= 2024-07-28` of 164,091).
+2. **Loudoun's ZIP column is NUMERIC.** The connector's default predicate `ZI_ZIP='20147'` returns
+   HTTP 400 *"Unable to complete operation"*; unquoted `ZI_ZIP = 20147` returns **7,915**. Wired via
+   `zip_where_template`, the documented escape hatch — `column_map.zip` would have silently failed.
+
+### Charleston — scope corrected by measurement, then wired
+
+`energov_history` is not a building-permit layer; it is **every** Energov case. A live `MODULENAME`
+groupBy: **InspectionManagement 229,975** · PermitManagement 111,000 · PlanManagement 33,533 ·
+CodeManagement 3,784 · ProjectManagement 3,139 · RequestManagement 2,315 · BusinessLicenseEntity 128
+· IndividualLicense 40 · ApplicationManagement 13 = 383,927. **60% of the layer is inspections** —
+which is also why the packet's `WORKCLASS` is blank on 239,354 rows (62%): an inspection has no work
+class. `extra_where: "MODULENAME = 'PermitManagement'"` drops inspections, licences and code cases
+**at source** (the Seattle/Chicago precedent), leaving real permits.
+
+### Field deviations from the packet, each on evidence
+
+| Endpoint | Packet field | Used instead | Why |
+|---|---|---|---|
+| Huntsville AL | `TypeOfWork` | `OccupancyType` | `TypeOfWork` is a work class (New Construction / Alteration / Addition) |
+| Knoxville TN | `PERMITTYPE` | `LANDUSE` | opaque abbreviations with no domain — `CO` could be Commercial or Certificate of Occupancy |
+| Aurora CO | `FolderDesc` | `SubDesc` | `FolderDesc` is permit-PROCESS categories (Counter Permit 71,480) — how it was filed, not what was built |
+| Albuquerque NM | `TypeofWork` | `TypeofStructure` | work class vs building use |
+| Thurston WA | `BPTYPE` | `BPTYPE_Desc` | `SF`/`MH`/`DEMOB` codes vs readable twin |
+
+### Sheridan WY — wired, with a recorded limitation
+
+`Type_of_Bu` is **free text**, not a controlled vocabulary: hundreds of values, **285 of the 363
+parsed occur exactly once**, inconsistent casing and leading spaces (`" single family dwelling"`,
+`" garage"`, `"Change of Use - Oil field service business"`), and the response was still truncated.
+A *complete* type_map is impossible. Only unambiguous high-frequency values are mapped (keys stored
+**trimmed**, which merges the leading-space variants); the long tail fails closed to `unclassified`
+rather than be invented. Records still emit with their own coordinates and `record_url`.
+
+### Thurston WA — the coordinate trap
+
+`X`/`Y` look like coordinate columns but are **state-plane** (wkid 102749). `column_map` reads the
+flattened geometry (`__lat`/`__lng`), which the connector reprojects to 4326 — mapping `X`/`Y` would
+have placed every marker in the wrong hemisphere.
+
+### Wired (12)
+
+| registry_id | Coverage | type values | use-types | ZIP scoping | recency_days |
+|---|---|---|---|---|---|
+| `new-castle-county-permits` | DE/New Castle | 3 | 2 | spatial 5 mi | 730 |
+| `loudoun-county-residential-permits` | VA/Loudoun | 6 | 1 | `zip_where_template` | — |
+| `charleston-county-permits` | SC/Charleston | 41 | 4 | spatial 5 mi | 730 |
+| `huntsville-building-permits` | AL/Madison | 6 | 2 | spatial 5 mi | — |
+| `chattanooga-permits-archive` | TN/Hamilton | 2 | 2 | spatial 5 mi | 730 |
+| `knoxville-building-permits` | TN/Knox | 19 | 6 | spatial 5 mi | 730 |
+| `desoto-county-permits` | MS/DeSoto | 4 | 2 | spatial 5 mi | — |
+| `flathead-county-building-permits` | MT/Flathead | 6 | 3 | spatial 5 mi | — |
+| `aurora-building-permits` | CO/Adams + CO/Arapahoe | 44 | 6 | spatial 5 mi | 730 |
+| `sheridan-county-building-permits` | WY/Sheridan | 16 | 2 | spatial 5 mi | — |
+| `albuquerque-building-permits` | NM/Bernalillo | 26 | 4 | spatial 5 mi | 730 |
+| `thurston-county-residential-permits` | WA/Thurston | 5 | 2 | native `ZIP5` | 730 |
+### Honest shape limits and scope notes
+
+- **`loudoun-county-residential-permits` has ONE use-type** — it is a residential-only layer
+  (`UNIT_TYPE` is entirely single-family/multi-family/group-quarters).
+- **`chattanooga-permits-archive` is a FROZEN ARCHIVE** — the layer is literally named
+  `Chatt_permits_to_12_31_2025` and spans 2006-01-01 → 2025-12-31; it will not gain new permits.
+- **`flathead-county-building-permits` is layer `/1`, "Current Year Permits" — 243 rows.** Layer
+  `/0` holds prior years and is not in the packet, so it is not wired.
+- **`aurora-building-permits` declares BOTH Adams and Arapahoe** — Aurora straddles the line,
+  confirmed against our own rows (80010/80011/80019 Adams; 80012–80016 Arapahoe).
+- Two hosts were flaky during recon and needed retries: Charleston (`fetch failed` ×2) and Knox
+  (HTTP 503 ×2). Both succeeded on retry; neither is an unusable source.
+
+### Not yet live — deploy is the remaining step
+
+Same as Phase 1: `jurisdiction-registry.json` is a static import bundled into the edge function
+(`index.ts:69`), so these 12 entries do nothing until `deploy-edge-functions.yml` runs for
+`get-address-report` and the cache refreshes (`dev_refresh_fire`, daily 09:00 UTC).
