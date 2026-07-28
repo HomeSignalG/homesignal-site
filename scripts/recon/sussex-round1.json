@@ -1,0 +1,9 @@
+[
+  { "id": "sx-service-root", "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer?f=json", "print_chars": 9000 },
+  { "id": "sx-services-list", "url": "https://map.sussexcountyde.gov/trdserver/rest/services?f=json", "print_chars": 9000 },
+  { "id": "sx-layer0-meta", "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/0?f=json", "extract": "a_status|domain|subtype|description|relationship", "extract_context": 900, "extract_max": 12 },
+  { "id": "sx-query-domains", "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/queryDomains?layers=0&f=json", "print_chars": 9000 },
+  { "id": "sx-all-layers", "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/layers?f=json", "extract": "\"name\":\"[^\"]*\"|codedValues", "extract_context": 300, "extract_max": 25 },
+  { "id": "sx-sample-rows", "url": "https://map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/0/query?where=1%3D1&outFields=*&resultRecordCount=3&returnGeometry=true&outSR=4326&f=json", "print_chars": 14000 },
+  { "id": "sx-county-site", "url": "https://sussexcountyde.gov/", "extract": "permit", "extract_context": 400, "extract_max": 12 }
+]

@@ -1,0 +1,28 @@
+[
+ {
+  "id": "sx-bpl-links",
+  "url": "https://sussexcountyde.gov/building-permits-and-licenses",
+  "extract": "href=\"[^\"]{4,120}\"",
+  "extract_context": 0,
+  "extract_max": 120
+ },
+ {
+  "id": "sx-pl-links",
+  "url": "https://sussexcountyde.gov/permits-and-licenses",
+  "extract": "href=\"[^\"]{4,120}\"",
+  "extract_context": 0,
+  "extract_max": 120
+ },
+ {
+  "id": "sx-site-search-status",
+  "url": "https://sussexcountyde.gov/search/node?keys=permit+status+code",
+  "extract": "search-result|<h3|href=\"/[a-z0-9-]+\"",
+  "extract_context": 180,
+  "extract_max": 20
+ },
+ {
+  "id": "sx-portal-item",
+  "url": "https://map.sussexcountyde.gov/portal/sharing/rest/content/items/75d84889df3c45c98365e3b5b9619c6c?f=json",
+  "print_chars": 3000
+ }
+]
