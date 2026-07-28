@@ -1,0 +1,17 @@
+[
+ {
+  "id": "05-LANDUSE",
+  "url": "https://services8.arcgis.com/Ty9G85JMF2cDHlRt/arcgis/rest/services/BuildingPermits/FeatureServer/0/query?where=1%3D1&outFields=LANDUSE&returnGeometry=false&groupByFieldsForStatistics=LANDUSE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22LANDUSE%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "05-RESNONRES",
+  "url": "https://services8.arcgis.com/Ty9G85JMF2cDHlRt/arcgis/rest/services/BuildingPermits/FeatureServer/0/query?where=1%3D1&outFields=RESNONRES&returnGeometry=false&groupByFieldsForStatistics=RESNONRES&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22RESNONRES%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 12000
+ },
+ {
+  "id": "02-MODULENAME",
+  "url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/ENERGOV/energov_history/FeatureServer/0/query?where=1%3D1&outFields=MODULENAME&returnGeometry=false&groupByFieldsForStatistics=MODULENAME&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22MODULENAME%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 4000
+ }
+]

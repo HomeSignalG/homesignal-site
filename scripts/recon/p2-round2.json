@@ -1,0 +1,122 @@
+[
+ {
+  "id": "09-Type_of_Bu",
+  "url": "https://services5.arcgis.com/V4b98G4pSkzvUam9/arcgis/rest/services/Building_Permits_view/FeatureServer/1/query?where=1%3D1&outFields=Type_of_Bu&returnGeometry=false&groupByFieldsForStatistics=Type_of_Bu&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22Type_of_Bu%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 24000
+ },
+ {
+  "id": "11-BPTYPE",
+  "url": "https://services1.arcgis.com/MA2nPVLxVTdAZLej/arcgis/rest/services/Residential_Building_Permits/FeatureServer/0/query?where=1%3D1&outFields=BPTYPE&returnGeometry=false&groupByFieldsForStatistics=BPTYPE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22BPTYPE%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "11-BPTYPE_Desc",
+  "url": "https://services1.arcgis.com/MA2nPVLxVTdAZLej/arcgis/rest/services/Residential_Building_Permits/FeatureServer/0/query?where=1%3D1&outFields=BPTYPE_Desc&returnGeometry=false&groupByFieldsForStatistics=BPTYPE_Desc&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22BPTYPE_Desc%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "02-CASETYPE",
+  "url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/ENERGOV/energov_history/FeatureServer/0/query?where=1%3D1&outFields=CASETYPE&returnGeometry=false&groupByFieldsForStatistics=CASETYPE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22CASETYPE%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 20000
+ },
+ {
+  "id": "03-OccupancyType",
+  "url": "https://maps.huntsvilleal.gov/server/rest/services/Licenses/BuildingPermits/MapServer/0/query?where=1%3D1&outFields=OccupancyType&returnGeometry=false&groupByFieldsForStatistics=OccupancyType&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22OccupancyType%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "10-TypeofStructure",
+  "url": "https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/MapServer/0/query?where=1%3D1&outFields=TypeofStructure&returnGeometry=false&groupByFieldsForStatistics=TypeofStructure&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22TypeofStructure%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "08-FolderGroupDesc",
+  "url": "https://ags.auroragov.org/aurora/rest/services/OpenData/MapServer/44/query?where=1%3D1&outFields=FolderGroupDesc&returnGeometry=false&groupByFieldsForStatistics=FolderGroupDesc&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22FolderGroupDesc%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "08-SubDesc",
+  "url": "https://ags.auroragov.org/aurora/rest/services/OpenData/MapServer/44/query?where=1%3D1&outFields=SubDesc&returnGeometry=false&groupByFieldsForStatistics=SubDesc&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22SubDesc%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 20000
+ },
+ {
+  "id": "07-ClassOfWork",
+  "url": "https://services6.arcgis.com/o8tYBvi7zCbkyszZ/arcgis/rest/services/Building_Permits/FeatureServer/1/query?where=1%3D1&outFields=ClassOfWork&returnGeometry=false&groupByFieldsForStatistics=ClassOfWork&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22ClassOfWork%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "04-CATEGORY",
+  "url": "https://services2.arcgis.com/cclAu9OKhOfjeUdr/arcgis/rest/services/Chatt_permits_to_12_31_2025/FeatureServer/0/query?where=1%3D1&outFields=CATEGORY&returnGeometry=false&groupByFieldsForStatistics=CATEGORY&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22CATEGORY%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "04-DEV_TYPE_C",
+  "url": "https://services2.arcgis.com/cclAu9OKhOfjeUdr/arcgis/rest/services/Chatt_permits_to_12_31_2025/FeatureServer/0/query?where=1%3D1&outFields=DEV_TYPE_C&returnGeometry=false&groupByFieldsForStatistics=DEV_TYPE_C&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22DEV_TYPE_C%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "05-knox-sample-retry",
+  "url": "https://services8.arcgis.com/Ty9G85JMF2cDHlRt/arcgis/rest/services/BuildingPermits/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "zipclause-01-ZI_ZIP",
+  "url": "https://logis.loudoun.gov/gis/rest/services/Projects/ResBuildingPermits/MapServer/1/query?where=ZI_ZIP%3D%2720147%27&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "zipclause-11-ZIP5",
+  "url": "https://services1.arcgis.com/MA2nPVLxVTdAZLej/arcgis/rest/services/Residential_Building_Permits/FeatureServer/0/query?where=ZIP5%3D%2798501%27&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "datelit-00-ISSDTTM",
+  "url": "https://gis.nccde.org/agsserver/rest/services/CustomMaps/Permits/FeatureServer/4/query?where=ISSDTTM%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "datelit-02-APPLICATIONDATE",
+  "url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/ENERGOV/energov_history/FeatureServer/0/query?where=APPLICATIONDATE%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "datelit-03-Permit_Issue_DateTime",
+  "url": "https://maps.huntsvilleal.gov/server/rest/services/Licenses/BuildingPermits/MapServer/0/query?where=Permit_Issue_DateTime%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "datelit-04-PERMIT_DAT",
+  "url": "https://services2.arcgis.com/cclAu9OKhOfjeUdr/arcgis/rest/services/Chatt_permits_to_12_31_2025/FeatureServer/0/query?where=PERMIT_DAT%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "datelit-05-DATEISSUED",
+  "url": "https://services8.arcgis.com/Ty9G85JMF2cDHlRt/arcgis/rest/services/BuildingPermits/FeatureServer/0/query?where=DATEISSUED%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "datelit-06-Date",
+  "url": "https://gis.desotocountyms.gov/arcgis/rest/services/Permits_Energov/FeatureServer/0/query?where=Date%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "datelit-07-DateIssued",
+  "url": "https://services6.arcgis.com/o8tYBvi7zCbkyszZ/arcgis/rest/services/Building_Permits/FeatureServer/1/query?where=DateIssued%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "datelit-08-IssueDate",
+  "url": "https://ags.auroragov.org/aurora/rest/services/OpenData/MapServer/44/query?where=IssueDate%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "datelit-10-DateIssued",
+  "url": "https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/MapServer/0/query?where=DateIssued%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "datelit-11-ISSUEDATE",
+  "url": "https://services1.arcgis.com/MA2nPVLxVTdAZLej/arcgis/rest/services/Residential_Building_Permits/FeatureServer/0/query?where=ISSUEDATE%20%3E%3D%20DATE%20%272024-07-28%27&returnCountOnly=true&f=json",
+  "print_chars": 300
+ }
+]
