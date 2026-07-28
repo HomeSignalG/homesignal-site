@@ -8613,5 +8613,75 @@
       "recency_days": 365,
       "_receipts": "2026-07-16 PA wire pass (FIRST carto entry - new additive sources/carto.ts, SQL API; 16 offline unit checks incl. bidirectional gate proof). FRESH: max permitissuedate 2026-07-10 over the city's official L&I permits table (live SQL receipt). Statuses VERBATIM within the kept types over 365d: Issued 9,302 / Completed 2,611 / Amendment-* lifecycle -> proposed / Expired+Cancelled+Amendment Denied+Withdrawn (+ Stop Work/Refused/Denied from the full-table + sample receipts) excluded. typeofwork vocab VERBATIM: kept 12 construction/land-use values (Addition and/or Alteration 5,007, Change of Use 2,406, New construction+GFA 1,877, New Construction 971, demolition classes, lot-line actions); DROPPED at source: Make Safe permits (safety orders), Signs, Parking Only, Family Daycare, Fences Only, Site Clearing + the Plumbing 13,300/Electrical 8,187/Mechanical/Fire Suppression trade classes via the permittype IN-list. ZIP is ZIP+4 ('19143-3005') -> the connector's LIKE prefix scoping + 5-digit truncation. Geometry via PostGIS ST_Y/ST_X(the_geom) - live-verified real Philly coords. record_url dataset-precision on the SQL endpoint (OpenDataPhilly portal 404s - retired; no per-record public URL pattern verified; the machine endpoint IS the official record interface - Boulder precedent). NOTE: recency on permitissuedate excludes null-issue-date zoning applications (they carry Refused/Denied statuses in the sample - excluded anyway)."
     }
+  ],
+  "_opendatasoft_readme": [
+    "Opendatasoft connector entries. STATUS: the connector is NOT BUILT YET — sources/ has no",
+    "opendatasoft.ts and index.ts makes no opendatasoftForZip() call, so NOTHING READS THIS ARRAY",
+    "at runtime. These entries are the staged data half; they become live the moment the additive",
+    "connector lands (the path ckan.ts / csv.ts / carto.ts each took). Adding the array is inert and",
+    "safe: index.ts selects registry.<platform> by name, so an unread key changes no behavior.",
+    "",
+    "API shape for the future connector — prefer Explore v2.1 over Search v1: v1 nests every row",
+    "under records[].fields and caps rows at 10,000, while v2.1 returns a flat results[] with a",
+    "SQL-ish where, limit/offset and total_count, which is far closer to the sibling connectors:",
+    "  /api/explore/v2.1/catalog/datasets/<dataset_id>/records?where=<zip_col>=\"<zip>\"&limit=100&offset=N",
+    "ZIP scoping is PROVEN three independent ways that agree (see the entry's _receipts)."
+  ],
+  "opendatasoft": [
+    {
+      "registry_id": "shelby-county-building-permits",
+      "platform": "opendatasoft",
+      "base_url": "https://data.opendatasoft.com",
+      "dataset_id": "shelby-county-building-and-demolition-permits@datamidsouth",
+      "service_url": "https://data.opendatasoft.com/api/records/1.0/search/?dataset=shelby-county-building-and-demolition-permits@datamidsouth",
+      "dataset_url": "https://data.opendatasoft.com/explore/dataset/shelby-county-building-and-demolition-permits@datamidsouth/",
+      "jurisdiction": "Shelby County, Tennessee",
+      "coverage": [
+        {
+          "state": "TN",
+          "county": "Shelby"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "record_type",
+          "site_address"
+        ],
+        "status_raw": "status",
+        "type_source": "record_type",
+        "file_date": "date_status",
+        "address": "site_address",
+        "case_number": "record_id",
+        "zip": "zip_code",
+        "lat": "lat",
+        "lng": "lon"
+      },
+      "spatial_point_col": "geo_point_2d",
+      "type_map": {
+        "Residential Alteration Permit": "Residential",
+        "Residential New Construction Permit": "Residential",
+        "Residential Accessory Structure Permit": "Residential",
+        "Residential Addition Permit": "Residential",
+        "Commercial Alteration Permit": "Commercial",
+        "Commercial New Construction Permit": "Commercial",
+        "Commercial Accessory Structure Permit": "Commercial",
+        "Commercial Addition Permit": "Commercial",
+        "Demolition Permit": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Issued",
+          "Inspection Phase"
+        ],
+        "operating": [
+          "Closed - Complete"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "date_status",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-28 PHASE 3 (docs/implementation-packets/claude_code_phase3_prompt.md). STAGED CONFIG — the Opendatasoft connector does not exist yet, so this entry is inert until sources/opendatasoft.ts and an index.ts call land; see _opendatasoft_readme. Vocabularies are VERBATIM live facet output — recon-fetch runs 30381742794 (r1), 30381831357 (r2), 30381943709 (r3); targets scripts/recon/p3-round*.json. Dataset: 8,751 records, update_frequency MONTHLY, data_processed 2026-07-01, publisher Innovate Memphis. BOTH VOCABULARIES ARE COMPLETE — each sums to EXACTLY 8,751. status (3): Issued 4,707 / Closed - Complete 4,036 / Inspection Phase 8 — a real status column, so status_to_bucket applies and status_const is NOT used (the packet offered it as a fallback for status-less layers). TYPE DEVIATION FROM THE PACKET: the packet names permit_type, whose 5 values are WORK CLASSES (Alteration 3,889 / New Construction 1,900 / Accessory Structure 1,478 / Demolition 757 / Addition 727) and cannot reach the required 3 use-types. record_type is used instead — 9 values, also summing exactly to 8,751, encoding use AND work class: Residential Alteration 2,373 / Residential New Construction 1,664 / Commercial Alteration 1,516 / Residential Accessory Structure 1,237 / Demolition 757 / Residential Addition 655 / Commercial Accessory Structure 241 / Commercial New Construction 236 / Commercial Addition 72 -> Residential + Commercial + Development = 3 use-types, 0 unmapped. ZIP SCOPING PROVEN THREE INDEPENDENT WAYS THAT AGREE: refine.zip_code=38002 -> nhits 750, q=zip_code:38002 -> nhits 750, and Explore v2.1 where=zip_code=\"38002\" -> total_count 750; control 38117 -> 351. GEOGRAPHY: per-record lat/lon doubles plus a centroid GeoJSON Point, geo_point_2d and a record-level geometry Point — no geocoding needed. date_status is a real ODS date field (e.g. 2025-10-24). record_url_precision is 'dataset': there is no per-record URL column and the metadata's Accela reference (aca-prod.accela.com/SHELBYCO/Default.aspx) is a portal ROOT, not a deep link — templating one would be guessing (Boulder/Philadelphia precedent). All 41 packet ZIPs are modeled and resolve to TN/Shelby (verified against public.communities)."
+    }
   ]
 }
