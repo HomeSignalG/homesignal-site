@@ -1,4 +1,4 @@
-// GATE 2B — full 457-record Del Valle inventory parity, Street / Satellite / Focus.
+// GATE 2B — full 517-record Del Valle inventory parity, Street / Satellite / Focus.
 //
 // WHY THIS RUNS IN CI: the build sandbox has no egress, so the complete inventory cannot
 // be exported there. This script runs on a GitHub runner (which does have egress), reads
@@ -42,8 +42,8 @@ const TABS = DEV.filter(r => !r.registry_id);
 const EXPORTED_AT = new Date().toISOString();
 
 // Fail generation unless the inventory is exactly what Gate 2B requires.
-if (RAW.length !== 457) fail(`inventory total ${RAW.length}, expected 457`);
-if (DEV.length !== 428) fail(`development ${DEV.length}, expected 428`);
+if (RAW.length !== 517) fail(`inventory total ${RAW.length}, expected 517`);
+if (DEV.length !== 488) fail(`development ${DEV.length}, expected 488`);
 if (FAC.length !== 29) fail(`facilities ${FAC.length}, expected 29`);
 
 const idOf = r => r.source_ref || r.name;
@@ -65,8 +65,8 @@ const project = (r, i) => ({
 const aDev = DEV.map(project);
 const aFac = FAC.map((r, i) => Object.assign(project(r, 10000 + i), { _facility: true, record_kind: 'facility' }));
 const ADAPTED = aDev.concat(aFac);
-if (ADAPTED.length !== 457) fail(`adapter emitted ${ADAPTED.length}, expected 457`);
-if (new Set(ADAPTED.map(r => r.id)).size !== 457) fail('adapter produced duplicate ids');
+if (ADAPTED.length !== 517) fail(`adapter emitted ${ADAPTED.length}, expected 517`);
+if (new Set(ADAPTED.map(r => r.id)).size !== 517) fail('adapter produced duplicate ids');
 for (const r of ADAPTED) {
   if (!r.id || typeof r.lat !== 'number' || typeof r.lng !== 'number' || !r.source_ref)
     fail('adapted row missing a required source value: ' + JSON.stringify(r).slice(0, 140));
@@ -93,7 +93,7 @@ const HS_SEED = {
   changes: [], meetings: [], environmental_risk: {},
   coverage: [{ zip: ZIP, name: 'Del Valle (78617)', covered: true }], topicCategories: [],
 };
-writeFileSync(join(OUT, 'fixture-457.json'), JSON.stringify({ exported_at: EXPORTED_AT, fixture_sha256: fixtureSha, adapted_sha256: adaptedSha, rows: RAW }, null, 1));
+writeFileSync(join(OUT, 'fixture-517.json'), JSON.stringify({ exported_at: EXPORTED_AT, fixture_sha256: fixtureSha, adapted_sha256: adaptedSha, rows: RAW }, null, 1));
 
 // ── STEP 3 — real Chromium against the real seed path ───────────────────────────────────
 const MIME = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json' };
@@ -204,7 +204,7 @@ for (const [key, label] of MODES) {
   await page.screenshot({ path: join(OUT, `gate2b-${key}-full.png`) });
 }
 const [A, B, C] = [per.Street, per.Satellite, per.Focus];
-if (A.total !== 457) {
+if (A.total !== 517) {
   // Do not just report the count — name the records. The adapted set is the source of
   // truth for what SHOULD be present; whatever it has that the canonical set does not is
   // the exact loss, with the fields that decide inclusion attached.
@@ -213,11 +213,11 @@ if (A.total !== 457) {
     id: r.source_ref || r.name, name: r.name, record_kind: r.record_kind,
     registry_id: r.registry_id, type: r.type, status: r.status, lat: r.lat, lng: r.lng,
   }));
-  const dbg = { canonical: A.total, expected: 457, missing_count: missing.length,
+  const dbg = { canonical: A.total, expected: 517, missing_count: missing.length,
     visible_len: A.dev, facs_len: A.fac, lettered: A.lettered, rest: A.rest, missing };
   writeFileSync(join(OUT, 'gate2b-missing.json'), JSON.stringify(dbg, null, 1));
   console.log('MISSING RECORD DIAGNOSTIC:\n' + JSON.stringify(dbg, null, 1));
-  fail(`canonical inventory ${A.total}, expected 457 (Street) — see gate2b-missing.json`);
+  fail(`canonical inventory ${A.total}, expected 517 (Street) — see gate2b-missing.json`);
 }
 if (!intercepted) fail('seed was not intercepted');
 
@@ -234,14 +234,14 @@ const sameSet = JSON.stringify(ids) === JSON.stringify(Object.keys(iB).sort()) &
 
 // ── STEP 7 — filter parity, per mode ────────────────────────────────────────────────────
 // The baseline here is window.__canonSet() — the SAME canonical set the parity collector
-// uses (visible ∪ facs ∪ restFacs = 457). `before`/`restored` must therefore read 457, and
+// uses (visible ∪ facs ∪ restFacs = 517). `before`/`restored` must therefore read 517, and
 // `removed_count` is a real count of hidden records rather than a real count plus the 5
 // restFacs the old 452-row window could never see.
 //
 // EXPECTED (derived from the accepted lifecycle census, not hard-coded guesses):
-//   proposed 36 · approved 323 · operating 93 − 29 facilities = 64 · unknown 5 (the TABS rows)
+//   proposed 38 · approved 326 · operating 148 − 29 facilities = 119 · unknown 5 (the TABS rows)
 // Facilities carry filterKey 'facility', so no lifecycle toggle may remove one.
-const FILTER_EXPECT = { proposed: 36, approved: 323, operating: 64, unknown: 5 };
+const FILTER_EXPECT = { proposed: 38, approved: 326, operating: 119, unknown: 5 };
 const facIdSet = new Set(A.records.filter(r => r.kind === 'facility').map(r => r.id));
 const filters = {};
 for (const key of ['proposed', 'approved', 'operating', 'unknown']) {
@@ -275,7 +275,7 @@ for (const key of ['proposed', 'approved', 'operating', 'unknown']) {
   filters[key].identical_across_modes = shas.every(s => s === shas[0]);
   filters[key].expected_removed = FILTER_EXPECT[key];
   filters[key].baseline_is_canonical = MODES.every(([, l]) =>
-    filters[key][l].before === 457 && filters[key][l].restored === 457);
+    filters[key][l].before === 517 && filters[key][l].restored === 517);
   filters[key].removed_matches_expected = MODES.every(([, l]) =>
     filters[key][l].removed_count === FILTER_EXPECT[key]);
   filters[key].facilities_never_removed = MODES.every(([, l]) => filters[key][l].removed_facilities === 0);
@@ -293,7 +293,7 @@ const report = {
   step3_validation: { intercepted, seed_source: 'gate2b-delvalle-78617-full', canonical: A.total,
     dev: A.dev, fac: A.fac, tabs: tabs.length, lettered: A.lettered, rest: A.rest,
     focusExpected: C.focusExpected, focusMarkerCount: C.focusMarkerCount, complete: A.complete,
-    unexplained_loss: 457 - A.total },
+    unexplained_loss: 517 - A.total },
   step5_aggregates: Object.fromEntries(MODES.map(([, l]) => [l, {
     total: per[l].total, dev: per[l].dev, fac: per[l].fac, category: per[l].by_category,
     symbol: per[l].by_symbol, lifecycle: per[l].by_lifecycle, registry: per[l].by_registry,
@@ -314,7 +314,7 @@ writeFileSync(join(OUT, 'gate2b-report.json'), JSON.stringify(report, null, 1));
 console.log(JSON.stringify(report, null, 1));
 await browser.close(); srv.close();
 
-const hardFail = mism.length || !sameSet || A.total !== 457 || pageErrors.length
+const hardFail = mism.length || !sameSet || A.total !== 517 || pageErrors.length
   || !report.facilities_all_square
   || Object.values(filters).some(f => !f.identical_across_modes || !f.baseline_is_canonical
        || !f.removed_matches_expected || !f.facilities_never_removed)
