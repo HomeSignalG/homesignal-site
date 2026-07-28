@@ -1,0 +1,122 @@
+[
+ {
+  "id": "00-de-newcastle-type",
+  "url": "https://gis.nccde.org/agsserver/rest/services/CustomMaps/Permits/FeatureServer/4/query?where=1%3D1&outFields=APTYPE&returnGeometry=false&groupByFieldsForStatistics=APTYPE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22APTYPE%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "00-de-newcastle-sample",
+  "url": "https://gis.nccde.org/agsserver/rest/services/CustomMaps/Permits/FeatureServer/4/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "01-va-loudoun-type",
+  "url": "https://logis.loudoun.gov/gis/rest/services/Projects/ResBuildingPermits/MapServer/1/query?where=1%3D1&outFields=UNIT_TYPE&returnGeometry=false&groupByFieldsForStatistics=UNIT_TYPE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22UNIT_TYPE%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "01-va-loudoun-sample",
+  "url": "https://logis.loudoun.gov/gis/rest/services/Projects/ResBuildingPermits/MapServer/1/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "02-sc-charleston-type",
+  "url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/ENERGOV/energov_history/FeatureServer/0/query?where=1%3D1&outFields=WORKCLASS&returnGeometry=false&groupByFieldsForStatistics=WORKCLASS&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22WORKCLASS%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "02-sc-charleston-sample",
+  "url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/ENERGOV/energov_history/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "03-al-madison-type",
+  "url": "https://maps.huntsvilleal.gov/server/rest/services/Licenses/BuildingPermits/MapServer/0/query?where=1%3D1&outFields=TypeOfWork&returnGeometry=false&groupByFieldsForStatistics=TypeOfWork&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22TypeOfWork%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "03-al-madison-sample",
+  "url": "https://maps.huntsvilleal.gov/server/rest/services/Licenses/BuildingPermits/MapServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "04-tn-hamilton-type",
+  "url": "https://services2.arcgis.com/cclAu9OKhOfjeUdr/arcgis/rest/services/Chatt_permits_to_12_31_2025/FeatureServer/0/query?where=1%3D1&outFields=P_TYPE&returnGeometry=false&groupByFieldsForStatistics=P_TYPE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22P_TYPE%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "04-tn-hamilton-sample",
+  "url": "https://services2.arcgis.com/cclAu9OKhOfjeUdr/arcgis/rest/services/Chatt_permits_to_12_31_2025/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "05-tn-knox-type",
+  "url": "https://services8.arcgis.com/Ty9G85JMF2cDHlRt/arcgis/rest/services/BuildingPermits/FeatureServer/0/query?where=1%3D1&outFields=PERMITTYPE&returnGeometry=false&groupByFieldsForStatistics=PERMITTYPE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22PERMITTYPE%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "05-tn-knox-sample",
+  "url": "https://services8.arcgis.com/Ty9G85JMF2cDHlRt/arcgis/rest/services/BuildingPermits/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "06-ms-desoto-type",
+  "url": "https://gis.desotocountyms.gov/arcgis/rest/services/Permits_Energov/FeatureServer/0/query?where=1%3D1&outFields=Permit_Typ&returnGeometry=false&groupByFieldsForStatistics=Permit_Typ&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22Permit_Typ%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "06-ms-desoto-sample",
+  "url": "https://gis.desotocountyms.gov/arcgis/rest/services/Permits_Energov/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "07-mt-flathead-type",
+  "url": "https://services6.arcgis.com/o8tYBvi7zCbkyszZ/arcgis/rest/services/Building_Permits/FeatureServer/1/query?where=1%3D1&outFields=BuildingUse&returnGeometry=false&groupByFieldsForStatistics=BuildingUse&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22BuildingUse%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "07-mt-flathead-sample",
+  "url": "https://services6.arcgis.com/o8tYBvi7zCbkyszZ/arcgis/rest/services/Building_Permits/FeatureServer/1/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "08-co-adams-type",
+  "url": "https://ags.auroragov.org/aurora/rest/services/OpenData/MapServer/44/query?where=1%3D1&outFields=FolderDesc&returnGeometry=false&groupByFieldsForStatistics=FolderDesc&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22FolderDesc%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "08-co-adams-sample",
+  "url": "https://ags.auroragov.org/aurora/rest/services/OpenData/MapServer/44/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "09-wy-sheridan-type",
+  "url": "https://services5.arcgis.com/V4b98G4pSkzvUam9/arcgis/rest/services/Building_Permits_view/FeatureServer/1/query?where=1%3D1&outFields=Type_of_Bu&returnGeometry=false&groupByFieldsForStatistics=Type_of_Bu&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22Type_of_Bu%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "09-wy-sheridan-sample",
+  "url": "https://services5.arcgis.com/V4b98G4pSkzvUam9/arcgis/rest/services/Building_Permits_view/FeatureServer/1/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "10-nm-bernalillo-type",
+  "url": "https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/MapServer/0/query?where=1%3D1&outFields=TypeofWork&returnGeometry=false&groupByFieldsForStatistics=TypeofWork&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22TypeofWork%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "10-nm-bernalillo-sample",
+  "url": "https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/MapServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "11-wa-thurston-type",
+  "url": "https://services1.arcgis.com/MA2nPVLxVTdAZLej/arcgis/rest/services/Residential_Building_Permits/FeatureServer/0/query?where=1%3D1&outFields=BPTYPE&returnGeometry=false&groupByFieldsForStatistics=BPTYPE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22BPTYPE%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 16000
+ },
+ {
+  "id": "11-wa-thurston-sample",
+  "url": "https://services1.arcgis.com/MA2nPVLxVTdAZLej/arcgis/rest/services/Residential_Building_Permits/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=1&returnGeometry=true&f=json",
+  "print_chars": 9000
+ }
+]
