@@ -1356,6 +1356,82 @@
       "recency_days": 365,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-25 pg_net recon (response ids 110467-110482): data.marincounty.gov Socrata 'Building Permits' mkbn-caye; FRESH max issued_date 2026-07-24T14:57 over 50,223 rows (min 2002-07-17). Native TEXT zipcode + latitude/longitude columns (sample row zipcode '94949', 38.0612464/-122.5434833) -> no zip_numeric, no spatial scoping needed. NO status column -> socrata status_const='approved' (issuance ledger, guarded by non-empty issued_date). CATEGORY AXIS: permit_work_class is a semicolon-joined multi-select whose values duplicate on trailing whitespace ('Land Develop; OtherLand Develop; Transportation; Health; ' vs the same string untrimmed) with 31,572 blank rows -> UNUSABLE as a verbatim whitelist. permit_category is clean, 4 values: Maintenance 20,961 / All other Construction 13,729 / blank 11,614 / Minor Improvement 3,919. Whitelist keeps ONLY 'All other Construction' (725 rows in the trailing 365d), verified by reading real descriptions: 'Detached A D U; Outdoor Bbq; Retaining Walls', 'Poles With Foundations For Athletic Field Lights At High School', 'Repair Fire Damaged Building', 'Replace Deck & Add Concrete Structural Beams', 'Voluntary Seismic Retrofit In Accordance W/ 2022 Cebc Ch A3'. DROPPED at source: 'Minor Improvement' = solar PV/battery installs, many carrying NO description at all ('PV INSTALL 7KW, 16 MODULES, 1 ESS'), and 'Maintenance' = water-heater/furnace/panel-upgrade/re-roof/window/EV-charger trades ('Remove & replace furnace like for like.', 'REMOVE AND REPLACE CLASS A COMP SHINGLE ROOF.') -- same trades-noise drop policy as the WA/MN/IL sources. Zero blank descriptions in the kept set (title always substantive); 6 of 725 lack coords and fall to the address geocode path. type_permit RESIDENTIAL 670 / COMMERCIAL 55 drives type_map. NO per-record URL column exists in the schema (permit_tracking_id / permit_number / unique_id only, no portal id triplet) -> dataset-precision record_url, the Boston/Philadelphia precedent. Coverage gated to CA/Marin (28 modeled ZIP pages; the dataset's 94952 Petaluma row plus the 94913 / '949' / 'UNKNOWN' junk ZIP values are not modeled Marin pages and are unreachable through the gate). | 2026-07-27 icon-completeness pass: status_const='approved' assigns the bucket DIRECTLY in the connector (`bucket = entry.status_const`), bypassing status_to_bucket entirely — this source has NO status column, so the other buckets are structurally inapplicable. Filled as [] for schema completeness only; buildBucketLookup already reads a missing bucket as [] (`s2b[b] ?? []`), so this is a PURE NO-OP with zero behavior change. 'approved' was already the const; all four buckets now present."
+    },
+    {
+      "registry_id": "austin-zoning-cases",
+      "platform": "socrata",
+      "domain": "data.austintexas.gov",
+      "dataset_id": "edir-dcnf",
+      "dataset_url": "https://data.austintexas.gov/d/edir-dcnf",
+      "jurisdiction": "City of Austin Planning Department",
+      "coverage": [
+        {
+          "state": "TX",
+          "county": "Travis"
+        }
+      ],
+      "column_map": {
+        "title": "case_name",
+        "status_raw": "detailed_status",
+        "type_source": "sub_type",
+        "file_date": "application_start_date",
+        "decision_date": "approval_date",
+        "address": "site_address",
+        "lat": "latitude",
+        "lng": "longitude",
+        "case_number": "case_number",
+        "record_url": "link"
+      },
+      "type_map": {
+        "Zoning/Rezoning": "Development",
+        "Planned Unit Development (PUD)": "Development",
+        "Planned Development Agreement (PDA)": "Development",
+        "Traditional Neighborhood District (TND)": "Development",
+        "Amended Neighborhood Plan": "Civic/Public",
+        "New Neighborhood Plan": "Civic/Public",
+        "Historical": "Civic/Public",
+        "Capital View Corridor Height": "Civic/Public",
+        "Restrictive Covenant Amendment": "Civic/Public",
+        "Restricted Covenant Termination": "Civic/Public",
+        "Municipal Utility District (MUD)": "Utility",
+        "Ordinance Zoning Text Amendment": "Civic/Public"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Pending",
+          "In Review",
+          "Case Assigned",
+          "Scheduled for Hearing",
+          "Scheduled for Council Hearing",
+          "Notice Sent",
+          "Notice Requested",
+          "Notice/Hearing Determination",
+          "Awaiting Update",
+          "Postponed"
+        ],
+        "approved": [
+          "Approved",
+          "Approved and Released",
+          "Reading Approved",
+          "Recommended for Approval",
+          "Partial Approval"
+        ],
+        "operating": [
+          "Closed"
+        ],
+        "exclude": [
+          "Withdrawn",
+          "Expired",
+          "Denied",
+          "Aborted",
+          "VOID",
+          "Cancelled"
+        ]
+      },
+      "spatial_zip_radius_mi": 3,
+      "spatial_point_col": "location",
+      "record_url_precision": "record",
+      "_receipts": "2026-07-28 Austin Zoning Cases (workbook row ATX-ZC). City of Austin's own Socrata portal, dataset edir-dcnf ('Zoning Cases', category Building and Development). 6,919 rows (select count(1)), data_portal_update on the sampled row 2026-07-27 - fresh. **spatial_point_col 'location' IS REQUIRED AND WAS NOT IN THE WIRING BRIEF.** The socrata connector QUARANTINES an entry that sets spatial_zip_radius_mi without spatial_point_col (sources/socrata.ts: `if (spatial && (!deps.zipCentroid || !entry.spatial_point_col))` -> 'spatial_zip_radius_mi set but no zipCentroid/spatial_point_col - skipped'), so radius alone would have emitted ZERO records - the same class as the Arlington/harris-county-permits missing-ZIP-scoping bug. Live probing found the dataset DOES publish a Socrata Point column named `location` alongside the flat latitude/longitude strings, and the exact SoQL the connector emits was verified: `within_circle(location, 30.2672, -97.7431, 4828)` returns 2,201 rows around downtown Austin with real per-record lat/lng and links. Same shape as chicago-building-permits / mesa-building-permits / new-orleans-permits. 22 detailed_status values enumerated VERBATIM via $group (complete - the response carried all 22, and they sum to EXACTLY 6,919): Closed 5,386 / Withdrawn 448 / Approved 275 / Expired 267 / Denied 166 / Scheduled for Hearing 75 / In Review 74 / Pending 69 / Recommended for Approval 50 / Scheduled for Council Hearing 39 / Notice Sent 17 / Case Assigned 9 / Aborted 8 / VOID 7 / Cancelled 6 / Reading Approved 5 / Approved and Released 5 / Awaiting Update 4 / Postponed 4 / Notice/Hearing Determination 2 / Partial Approval 2 / Notice Requested 1. Every one is mapped, none twice: approved 337 + proposed 294 + operating 5,386 + exclude 902 = 6,919. 12 sub_type values, also complete and summing to EXACTLY 6,919: Zoning/Rezoning 5,029 / Amended Neighborhood Plan 559 / Historical 505 / Capital View Corridor Height 281 / PUD 230 / Restrictive Covenant Amendment 106 / Restricted Covenant Termination 77 / PDA 64 / MUD 55 / New Neighborhood Plan 7 / Ordinance Zoning Text Amendment 3 / TND 3 - so 0 unclassified. Field population live: link 6,919/6,919 (100%%) -> record_url_precision 'record', a real per-case abc.austintexas.gov detail URL, never a template; site_address 6,919; status_date 6,919; application_start_date 6,914 (99.9%%) -> file_date; case_name 6,917; approval_date only 1,538 (22%%) -> mapped to decision_date, absent on the rest (absent stays absent). latitude/longitude are populated on 5,900 of 6,919 (85%%); the other 1,019 carry no coordinate and are LISTED but not pinned - accepted per the brief, and honest: no geocoding is attempted and no point is invented. site_address embeds a ZIP ('2701 E 7TH , AUSTIN,TX 78702') but there is no ZIP COLUMN, which is why scoping is spatial rather than zip_where_template. No recency window - 6,919 rows is small and zoning cases stay relevant for years."
     }
   ],
   "arcgis": [
