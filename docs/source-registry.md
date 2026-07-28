@@ -2970,3 +2970,93 @@ have placed every marker in the wrong hemisphere.
 Same as Phase 1: `jurisdiction-registry.json` is a static import bundled into the edge function
 (`index.ts:69`), so these 12 entries do nothing until `deploy-edge-functions.yml` runs for
 `get-address-report` and the cache refreshes (`dev_refresh_fire`, daily 09:00 UTC).
+
+---
+
+## SUSSEX COUNTY DE — RE-EXAMINED AND STILL NOT WIREABLE (2026-07-28)
+
+`map.sussexcountyde.gov/trdserver/rest/services/Permit_Points/MapServer/0` — the one endpoint
+skipped in the Phase 1 ArcGIS pass. Re-opened on instruction to hunt for a status codebook.
+Branch `claude/skipped-endpoints-geocode`; three `recon-fetch` rounds — **30389940983**,
+**30390093619**, **30390265675** (targets under `scripts/recon/sussex-round*.json`).
+**Outcome: no registry entry. The blocker is unchanged and is now proven from five independent
+angles instead of three.**
+
+Everything else about this layer is good: `esriGeometryPoint` in WGS84, 827,020 rows, a readable
+`a_use_desc` type source, and per-row parcel ids. The single blocker is that its lifecycle status
+cannot be decoded, and the dominant code covers **87%** of the layer.
+
+### No public codebook exists — five independent probes
+
+1. **Field domains are null.** `a_status` carries `"domain": null` on **both** the MapServer and
+   the FeatureServer view of the same layer (`.../FeatureServer/0?f=json`).
+2. **`queryDomains` returns nothing.** The service advertises `"supportsQueryDomains": true`, and
+   `.../MapServer/queryDomains?layers=[0]&f=json` answers **`{"domains":[]}`**.
+3. **No lookup table.** The service root reports exactly one layer and **`"tables":[]`**.
+4. **The publisher attached no documentation.** The service's own portal item
+   (`serviceItemId 75d84889df3c45c98365e3b5b9619c6c`) carries `"description": null`,
+   `"documentation": null`, `"snippet": "."`, `"tags": ["."]`, `scoreCompleteness 35`.
+5. **The folders that would hold a companion permits service are not public.** Both
+   `/trdserver/rest/services/Community_Development?f=json` and `/Munis?f=json` return
+   **`{"error":{"code":499,"message":"Token Required"}}`**. (`Planning_And_Zoning` IS public and
+   holds only wetlands + a transportation-improvement-district layer.)
+
+Plus the Phase 1 findings that still hold: the MapServer legend renders a single unlabeled symbol,
+and `a_status` × `a_project_shdesc` is orthogonal (`BEAC`, `CO`, `NO` all appear under `ACC. STRUC`).
+
+### The obvious guess is affirmatively WRONG, not merely unproven
+
+The tempting read is "`C` = closed/completed, `O` = open." Live evidence refutes it as a safe
+default. `a_status` × count/min/max `pt_p_issue_date`, all 12 values (a groupBy over `1=1`, so the
+set is complete by construction and sums to the layer):
+
+| a_status | n | min issue date | max issue date |
+|---|---|---|---|
+| `C   ` | 721,713 | 1982-06-01 | **2032-02-15** |
+| `O   ` | 97,926 | 2004-10-29 | 2026-07-23 |
+| `CO  ` | 3,896 | 2012-10-03 | 2026-07-22 |
+| `NO  ` | 1,686 | 2020-07-14 | 2026-07-23 |
+| `E   ` | 1,339 | 2007-05-16 | 2025-04-29 |
+| `HIST` | 94 | 1982-12-10 | 2016-12-09 |
+| `FLR ` | 30 | *(null)* | *(null)* |
+| `BEAC` | 26 | 2019-11-12 | 2025-04-04 |
+| `PERM` | 111 | *(null)* | *(null)* |
+| `OO  ` | 170 | *(null)* | *(null)* |
+| `PNZ ` | 20 | *(null)* | *(null)* |
+| `'    '` | 9 | 2016-10-14 | 2021-07-14 |
+
+**`C` is not an archival marker: 35,515 `C` rows carry an issue date after 2025-01-01, versus
+18,271 `O` rows** (`returnCountOnly` on each) — and `C`'s max issue date is **forward-dated to
+2032**. So `C` is the normal code for brand-new permits too, and bucketing it as `operating`
+("built") would stamp 721,713 records — including 35,515 issued in the last 18 months — with a
+lifecycle the source never states. That is the exact failure the registry's "NEVER GUESS THE
+BUCKET" rule exists to prevent, at the largest scale it could occur.
+
+**A second undecoded status dimension cross-cuts the first.** `h_mun_stat` (1 char, 8 values)
+splits every `a_status`: `C` alone is 691,646 under `h_mun_stat=C`, 17,134 under `W`, 11,702 under
+`A`, 925 under `X`, 225 under `D`, 77 under `E`, 4 under `H`. So even a correct decode of
+`a_status` would not settle the lifecycle on its own.
+
+Four of the twelve codes (`FLR` 30, `OO` 170, `PERM` 111, `PNZ` 20 — 331 rows) carry **no issue
+date at all**, so they would be excluded regardless.
+
+**Standing answer: "map it to the best of your ability" is not available for a status vocabulary.**
+`status_to_bucket` is an exact verbatim lookup and an unmapped value fails closed; a partial map
+built only from codes we can *guess* would publish a few hundred rows while excluding 826,000+, and
+a wrong `C` would mis-bucket the whole layer. Wiring this needs a codebook from Sussex County —
+a records request or a published data dictionary — not more probing.
+
+### Bonus finding for whoever wires it later — the layer duplicates each permit per fee module
+
+`pt_a_permit_no` is **not** unique and is **recycled across years**. Permit `158677` returns three
+rows: OBJECTID 1 (`pt_f_pifm_key` `FSF`, issued 2021-06-07), OBJECTID 2 (`POT`, same date, all
+other mapped fields identical) and OBJECTID 353543 (`HIST`, issued **1996-08-05**). Mapping
+`case_number: "pt_a_permit_no"` is therefore the correct choice: `source_id` becomes
+`arcgis:<entry>:158677` for the FSF/POT pair, so engine v22's exact-identity dedup collapses them,
+while the 1996 row survives as a distinct record because `file_date` is part of the dedup key.
+Left unmapped (e.g. falling back to OBJECTID), the same permit would be emitted 2-3× per ZIP page.
+
+Other shape notes for a future wire: no ZIP column and no address column anywhere in the 27 fields,
+so ZIP scoping must be `spatial_zip_radius_mi` on the layer's own points; `a_use_desc`
+("RESIDENTIAL SINGLE FAMILY", …) is the readable type source; `h_description1`/`h_description2` are
+right-padded 60-char fragments of one description.
