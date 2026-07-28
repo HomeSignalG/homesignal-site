@@ -590,6 +590,27 @@ legal/framing change not covered by the one-time sign-off.
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 
 ### Status
+- 🟢 **AUSTIN ZONING CASES wired — `austin-zoning-cases` (socrata, registry 85 → 86)**
+  (live-verified 2026-07-28). City of Austin's own portal, dataset `edir-dcnf`, 6,919 rows,
+  fresh (`data_portal_update` 2026-07-27). Config only. **New standing answer (so no session
+  re-derives): a Socrata entry using `spatial_zip_radius_mi` MUST also set `spatial_point_col`
+  — without it the connector QUARANTINES the entry and emits ZERO records**
+  (`sources/socrata.ts`: `if (spatial && (!deps.zipCentroid || !entry.spatial_point_col))`).
+  That is the Arlington / `harris-county-permits` failure class: config that looks complete,
+  passes every unit test, and silently produces nothing. Austin publishes a Point column
+  `location` alongside its flat `latitude`/`longitude`, and the exact SoQL was verified before
+  wiring — `within_circle(location, 30.2672, -97.7431, 4828)` → 2,201 rows with real coords and
+  links. Both vocabularies are complete and sum to EXACTLY 6,919: **22 `detailed_status`**
+  (operating 5,386 · exclude 902 · approved 337 · proposed 294, none in two buckets) and
+  **12 `sub_type`** → 0 unclassified. `link` is 100% populated so `record_url_precision` is
+  `record` (a real per-case `abc.austintexas.gov` URL, never a template). Smoke (deployed run
+  30316761128): 78701 451 → 2,318 sourced · 78702 682 → 2,489 · 78704 907 → 2,416, with
+  **1,818 / 1,753 / 1,448 Austin records and 100% of them pinned, 0 missing `record_url`,
+  0 unclassified**; rows land at 2.18–2.35 MB, under the working ceiling. Gate proof: rides
+  TX/Travis pages ONLY. ⚠️ **Correction to the brief's expectation:** the 1,019 rows with no
+  lat/lng do NOT "list without pinning" — a row with no `location` can never satisfy
+  `within_circle`, so it drops at source; hence 100% pinned rather than an 85/15 split.
+  Receipts: docs/source-registry.md "AUSTIN ZONING CASES".
 - 🟢 **POLYGON WIRE PASS #2 — NDOT · Dallas SUPs · Henderson ×2 wired (registry 81 → 85)**
   (live-verified 2026-07-27). **Config only** — all four are polygon layers riding the
   `featurePoint()` centroid path from the pass below. `nvdot-project-boundaries` (STATEWIDE NV,

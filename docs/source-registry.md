@@ -2597,3 +2597,83 @@ core. The available levers would be a smaller `spatial_zip_radius_mi` or an `out
 projection (the Miami/Columbus CPU-hazard pattern). **Not touched here** — this pass was scoped to
 the Henderson entries, and changing Cleveland's radius changes what residents see. Logged with
 numbers so the ceiling claim in these docs is no longer wrong.
+
+---
+
+## AUSTIN ZONING CASES (2026-07-28) — `austin-zoning-cases` wired (registry 85 → 86)
+
+Socrata, City of Austin's own portal, dataset `edir-dcnf` "Zoning Cases" (category *Building and
+Development*). 6,919 rows, fresh — `data_portal_update` on the sampled row 2026-07-27. Config
+only; no connector change.
+
+### Standing answer — a Socrata spatial entry MUST carry `spatial_point_col`
+
+The wiring brief specified `spatial_zip_radius_mi: 3` with no point column, because the dataset
+has no ZIP field. **That combination emits ZERO records.** The socrata connector quarantines it:
+
+```ts
+if (spatial && (!deps.zipCentroid || !entry.spatial_point_col)) {
+  report.quarantined.push({ reason: "spatial_zip_radius_mi set but no zipCentroid/spatial_point_col — skipped" })
+```
+
+This is the same failure class as the Arlington / `harris-county-permits` missing-ZIP-scoping bug
+— config that looks complete, passes every unit test, and silently produces nothing.
+
+Live probing found the dataset **does** publish a Socrata Point column named **`location`**,
+alongside the flat `latitude`/`longitude` strings that the brief mapped. The exact SoQL the
+connector emits was verified *before* wiring: `within_circle(location, 30.2672, -97.7431, 4828)`
+→ **2,201 rows** around downtown Austin, returning real per-record coordinates and links. Same
+option pair as `chicago-building-permits`, `mesa-building-permits`, `new-orleans-permits`.
+
+### Vocabularies — both complete, both summing to exactly 6,919
+
+**22 `detailed_status` values** (`$group`, complete — the response carried all 22). Every one is
+mapped and none appears twice:
+
+| bucket | rows | values |
+|---|---|---|
+| operating | 5,386 | Closed |
+| exclude | 902 | Withdrawn 448 · Expired 267 · Denied 166 · Aborted 8 · VOID 7 · Cancelled 6 |
+| approved | 337 | Approved 275 · Recommended for Approval 50 · Reading Approved 5 · Approved and Released 5 · Partial Approval 2 |
+| proposed | 294 | Scheduled for Hearing 75 · In Review 74 · Pending 69 · Scheduled for Council Hearing 39 · Notice Sent 17 · Case Assigned 9 · Awaiting Update 4 · Postponed 4 · Notice/Hearing Determination 2 · Notice Requested 1 |
+| **total** | **6,919** | ✅ |
+
+**12 `sub_type` values**, also complete and summing to 6,919 → **0 unclassified**:
+Zoning/Rezoning 5,029 · Amended Neighborhood Plan 559 · Historical 505 · Capital View Corridor
+Height 281 · PUD 230 · Restrictive Covenant Amendment 106 · Restricted Covenant Termination 77 ·
+PDA 64 · MUD 55 · New Neighborhood Plan 7 · Ordinance Zoning Text Amendment 3 · TND 3.
+
+### Field population (live)
+
+| field | populated | use |
+|---|---|---|
+| `link` | 6,919 / 6,919 (100 %) | `record_url_precision: "record"` — a real per-case `abc.austintexas.gov` detail URL, never a template |
+| `site_address` | 6,919 | `address` (embeds a ZIP, but there is no ZIP *column* — hence spatial, not `zip_where_template`) |
+| `application_start_date` | 6,914 (99.9 %) | `file_date` |
+| `case_name` | 6,917 | `title` |
+| `approval_date` | 1,538 (22 %) | `decision_date`, absent on the rest — absent stays absent |
+| `latitude`/`longitude` | 5,900 (85 %) | per-record point |
+
+**Correction to the brief's expectation about the 1,019 coordinate-less rows.** The brief
+anticipated they would "list but not pin." Under spatial scoping they do neither — a row with no
+`location` can never satisfy `within_circle`, so it is excluded at source. That is why the live
+result below shows **100 % of emitted records pinned** rather than an 85/15 split. Nothing is
+fabricated either way; the difference is only *where* those rows drop out.
+
+### Live go-live smoke (deployed run 30316761128, green)
+
+Three Austin ZIPs re-run through the live engine, all HTTP 200, persisted via
+`dev_refresh_collect()`.
+
+| ZIP | sourced (was → now) | `austin-zoning-cases` | pinned | no `record_url` | unclassified | buckets |
+|---|---|---|---|---|---|---|
+| 78701 | 451 → 2,318 | 1,818 | **1,818 (100 %)** | 0 | 0 | 3 |
+| 78702 | 682 → 2,489 | 1,753 | **1,753 (100 %)** | 0 | 0 | 3 |
+| 78704 | 907 → 2,416 | 1,448 | **1,448 (100 %)** | 0 | 0 | 3 |
+
+Cached rows land at 2.18 / 2.35 / 2.28 MB — under the 3.5 MB working ceiling (and far under the
+Cleveland 5.98 MB outlier). **0 sourced sites missing coordinates and 0 missing `record_url`
+across all three pages, counting every source on the page, not just this one.**
+
+**Coverage-gate proof** (cache-wide, live): `austin-zoning-cases` appears on **TX / Travis pages
+only** — 3 ZIPs, 5,019 records, nothing outside Travis County.
