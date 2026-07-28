@@ -1,0 +1,22 @@
+[
+ {
+  "id": "p3-zip-refine",
+  "url": "https://data.opendatasoft.com/api/records/1.0/search/?dataset=shelby-county-building-and-demolition-permits%40datamidsouth&rows=0&refine.zip_code=38002",
+  "print_chars": 700
+ },
+ {
+  "id": "p3-zip-q-field",
+  "url": "https://data.opendatasoft.com/api/records/1.0/search/?dataset=shelby-county-building-and-demolition-permits%40datamidsouth&rows=0&q=zip_code%3A38002",
+  "print_chars": 700
+ },
+ {
+  "id": "p3-zip-where",
+  "url": "https://data.opendatasoft.com/api/records/1.0/search/?dataset=shelby-county-building-and-demolition-permits%40datamidsouth&rows=0&q=&refine.zip_code=38117",
+  "print_chars": 700
+ },
+ {
+  "id": "p3-v2-where",
+  "url": "https://data.opendatasoft.com/api/explore/v2.1/catalog/datasets/shelby-county-building-and-demolition-permits%40datamidsouth/records?where=zip_code%3D%2238002%22&limit=1",
+  "print_chars": 1500
+ }
+]

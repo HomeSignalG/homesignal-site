@@ -1,0 +1,22 @@
+[
+ {
+  "id": "p3-facet-propclassdesc",
+  "url": "https://data.opendatasoft.com/api/records/1.0/search/?dataset=shelby-county-building-and-demolition-permits%40datamidsouth&rows=0&facet=propclassdesc",
+  "print_chars": 9000
+ },
+ {
+  "id": "p3-facet-permit_class",
+  "url": "https://data.opendatasoft.com/api/records/1.0/search/?dataset=shelby-county-building-and-demolition-permits%40datamidsouth&rows=0&facet=permit_class",
+  "print_chars": 9000
+ },
+ {
+  "id": "p3-facet-record_type",
+  "url": "https://data.opendatasoft.com/api/records/1.0/search/?dataset=shelby-county-building-and-demolition-permits%40datamidsouth&rows=0&facet=record_type",
+  "print_chars": 9000
+ },
+ {
+  "id": "p3-facet-prop_lucdesc",
+  "url": "https://data.opendatasoft.com/api/records/1.0/search/?dataset=shelby-county-building-and-demolition-permits%40datamidsouth&rows=0&facet=prop_lucdesc",
+  "print_chars": 9000
+ }
+]
