@@ -96,6 +96,95 @@ export const REPRESENTATIVE_ZIPS = [
   },
 ];
 
+// Every per-ZIP assertion, as a pure function of (cached row, stamped flag, rendered page).
+// Pure and re-runnable: that is what lets the race guard replay it against a fresher row.
+export function assertZip(zip, rep, isIndexable, st) {
+  const fails = [];
+  const wantFac = (rep.counts && rep.counts.facilities != null) ? rep.counts.facilities : null;
+  const sites = Array.isArray(rep.sites) ? rep.sites : [];
+
+  // NEW LAYOUT: every tracker page must render the shared left-sidebar shell.
+  if (!st.shell) fails.push(`ZIP ${zip}: new sidebar shell did not render (old layout?)`);
+  // SUBSTANCE GATE: indexable iff the stamped flag is true AND the page rendered content.
+  const renderedForPolicy = st.rendered != null ? st.rendered : sites;
+  const isIndex = /(^|[^n])index/i.test(st.robots) && !/noindex/i.test(st.robots);
+  const expectIndex = isIndexable && renderedForPolicy.length > 0;
+  if (isIndex !== expectIndex) {
+    fails.push(`ZIP ${zip}: robots="${st.robots}" (indexable=${isIndex}) violates the substance gate ` +
+      `(expected ${expectIndex ? 'index' : 'noindex'}; flag=${isIndexable}, sites=${renderedForPolicy.length})`);
+  }
+  if (st.mislabeled && st.mislabeled.length) {
+    fails.push(`ZIP ${zip}: ${st.mislabeled.length} record(s) whose label contradicts its dot colour ` +
+      `[${st.mislabeled.slice(0, 3).join(', ')}] (stage/colour must agree)`);
+  }
+
+  if (!st.mapInited) {
+    fails.push(`ZIP ${zip}: map did not initialize`);
+    return { fails, check: [] };
+  }
+
+  // Facility-count reconciliation (page vs cached report).
+  const facShown = st.facText != null ? parseInt(st.facText, 10) : null;
+  if (wantFac != null && facShown != null && facShown !== wantFac) {
+    fails.push(`ZIP ${zip}: facility count ${facShown} != cached counts.facilities ${wantFac}`);
+  }
+
+  // THE ANTI-FABRICATION INVARIANT: every rendered site must carry a record_url.
+  const check = st.rendered != null ? st.rendered : sites;
+  const noSource = check.filter((s) => !(s && (s.url || s.record_url)));
+  if (noSource.length) {
+    fails.push(`ZIP ${zip}: ${noSource.length} rendered site(s) with NO record_url — ` +
+      `[${noSource.slice(0, 3).map((s) => (s && s.label) || '??').join(', ')}] (fabrication gate)`);
+  }
+
+  // ── Task 6 extensions (render-layer invariants; no extra network) ──────────────────
+  // 1) record_url points somewhere official (pattern + domain, not body-200).
+  const badUrl = check.filter((s) => { const u = s && (s.url || s.record_url); return u && !validRecordUrl(u); });
+  if (badUrl.length) {
+    fails.push(`ZIP ${zip}: ${badUrl.length} record(s) with a malformed record_url — ` +
+      `[${badUrl.slice(0, 3).map((s) => (s && (s.url || s.record_url)) || '??').join(', ')}]`);
+  }
+  // 2) a jurisdiction-scope record must NOT be rendered as a precise point.
+  const fakePoint = check.filter((s) => s && s.geo_precision === 'jurisdiction' && s.scope === 'point');
+  if (fakePoint.length) {
+    fails.push(`ZIP ${zip}: ${fakePoint.length} jurisdiction-scope record(s) rendered as a precise point ` +
+      `[${fakePoint.slice(0, 3).map((s) => (s && s.label) || '??').join(', ')}]`);
+  }
+  // 3) no bucket outside the lifecycle map: every development record's type ∈ {built,approved,proposed}.
+  const devRecs = check.filter((s) => s && s.relevance === 'development');
+  const badBucket = devRecs.filter((s) => !LIFECYCLE_BUCKETS.has(s.type));
+  if (badBucket.length) {
+    fails.push(`ZIP ${zip}: ${badBucket.length} development record(s) with a bucket outside the map ` +
+      `(type ∉ built/approved/proposed) [${badBucket.slice(0, 3).map((s) => `${(s.label||'??')}=${s.type}`).join(', ')}]`);
+  }
+  // 4) Task 5 — ONE PREDICATE PER NUMBER: each cached count === the rendered array it heads.
+  const c = rep.counts || {};
+  const proposedN = devRecs.filter((s) => s.type === 'proposed').length;
+  const approvedN = devRecs.filter((s) => s.type === 'approved').length;
+  const operatingN = devRecs.filter((s) => s.type === 'built').length;
+  const commentN = check.filter((s) => s && s.comment_open === true).length;
+  if (c.proposed != null && c.proposed !== proposedN)
+    fails.push(`ZIP ${zip}: counts.proposed ${c.proposed} !== rendered proposed rail ${proposedN} (Task 5)`);
+  if (c.approved != null && c.approved !== approvedN)
+    fails.push(`ZIP ${zip}: counts.approved ${c.approved} !== rendered approved rail ${approvedN} (Task 5)`);
+  if (c.operating != null && c.operating !== operatingN)
+    fails.push(`ZIP ${zip}: counts.operating ${c.operating} !== rendered operating rail ${operatingN} (Task 5)`);
+  if (c.comment_open != null && c.comment_open !== commentN)
+    fails.push(`ZIP ${zip}: counts.comment_open ${c.comment_open} !== commentable set ${commentN} (Task 5)`);
+
+  // TABS invariant (docs/tdlr-tabs-adapter-runbook.md §3): TX permit filings must carry
+  // a canonical record_url whose suffix matches project_no.
+  const tabsBad = check.filter((s) => {
+    const v = validateTabsSite(s);
+    return !v.ok && !v.skip;
+  });
+  if (tabsBad.length) {
+    fails.push(`ZIP ${zip}: ${tabsBad.length} TABS site(s) with project_no/url mismatch ` +
+      `[${tabsBad.slice(0, 2).map((s) => s.project_no || s.label).join(', ')}]`);
+  }
+  return { fails, check, facShown };
+}
+
 /** Summarize engine source-run reports across connector families. */
 export function summarizeSourceReports(engineJson) {
   const reports = [];
