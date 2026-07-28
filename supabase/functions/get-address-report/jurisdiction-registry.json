@@ -6176,7 +6176,7 @@
     "STREET_FULL_NAME"
    ],
    "spatial_zip_radius_mi": 3,
-   "recency_days": 1095,
+   "recency_days": 365,
    "record_url_precision": "dataset",
    "incremental_field": "PER_ENT_DATE",
    "_receipts": "PLACEHOLDER"
