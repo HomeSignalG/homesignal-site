@@ -1,0 +1,22 @@
+[
+  { "id": "nj-columns", "url": "https://data.nj.gov/resource/w9se-dmra.json?$limit=2", "print_chars": 6000 },
+  { "id": "nj-status-vocab", "url": "https://data.nj.gov/resource/w9se-dmra.json?$select=permitstatusdesc,count(*)%20as%20n&$group=permitstatusdesc&$order=n%20DESC&$limit=500", "print_chars": 8000 },
+  { "id": "nj-type-vocab", "url": "https://data.nj.gov/resource/w9se-dmra.json?$select=permittypedesc,count(*)%20as%20n&$group=permittypedesc&$order=n%20DESC&$limit=1000", "print_chars": 20000 },
+  { "id": "nj-fresh", "url": "https://data.nj.gov/resource/w9se-dmra.json?$select=max(permitdate)%20as%20maxdate,min(permitdate)%20as%20mindate,count(*)%20as%20n", "print_chars": 2000 },
+
+  { "id": "buf-columns", "url": "https://data.buffalony.gov/resource/9p2d-f3yt.json?$limit=2", "print_chars": 6000 },
+  { "id": "buf-type-vocab", "url": "https://data.buffalony.gov/resource/9p2d-f3yt.json?$select=aptype,count(*)%20as%20n&$group=aptype&$order=n%20DESC&$limit=500", "print_chars": 12000 },
+  { "id": "buf-zip-vocab", "url": "https://data.buffalony.gov/resource/9p2d-f3yt.json?$select=zip,count(*)%20as%20n&$group=zip&$order=n%20DESC&$limit=200", "print_chars": 8000 },
+
+  { "id": "pg-columns", "url": "https://data.princegeorgescountymd.gov/resource/weik-ttee.json?$limit=2", "print_chars": 6000 },
+  { "id": "pg-type-vocab", "url": "https://data.princegeorgescountymd.gov/resource/weik-ttee.json?$select=permit_type,count(*)%20as%20n&$group=permit_type&$order=n%20DESC&$limit=500", "print_chars": 12000 },
+  { "id": "pg-fresh", "url": "https://data.princegeorgescountymd.gov/resource/weik-ttee.json?$select=max(permit_issuance_date)%20as%20maxdate,count(*)%20as%20n", "print_chars": 2000 },
+
+  { "id": "arl-probe", "url": "https://datahub-v2.arlingtonva.us/api/RealEstate/Permit", "print_chars": 4000 },
+
+  { "id": "mke-fields", "url": "https://data.milwaukee.gov/api/3/action/datastore_search?resource_id=828e9630-d7cb-42e4-960e-964eae916397&limit=2", "print_chars": 8000 },
+
+  { "id": "butler-meta", "url": "https://services5.arcgis.com/SU4Aj97XUNDcwkDb/arcgis/rest/services/Permits_Premium/FeatureServer/0?f=json", "print_chars": 20000 },
+  { "id": "butler-count", "url": "https://services5.arcgis.com/SU4Aj97XUNDcwkDb/arcgis/rest/services/Permits_Premium/FeatureServer/0/query?where=1%3D1&returnCountOnly=true&f=json", "print_chars": 1000 },
+  { "id": "butler-sample", "url": "https://services5.arcgis.com/SU4Aj97XUNDcwkDb/arcgis/rest/services/Permits_Premium/FeatureServer/0/query?where=1%3D1&outFields=*&resultRecordCount=3&f=json", "print_chars": 8000 }
+]
