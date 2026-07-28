@@ -1,0 +1,57 @@
+[
+ {
+  "id": "phx-layer-meta",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1?f=json",
+  "print_chars": 30000
+ },
+ {
+  "id": "phx-count-all",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "phx-status-groupby",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=1%3D1&outStatistics=%5B%7B%22statisticType%22%3A+%22count%22%2C+%22onStatisticField%22%3A+%22OBJECTID%22%2C+%22outStatisticFieldName%22%3A+%22n%22%7D%5D&groupByFieldsForStatistics=PERMIT_STAT&orderByFields=n+DESC&returnGeometry=false&f=json",
+  "print_chars": 4000
+ },
+ {
+  "id": "phx-type-groupby-desc",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=1%3D1&outStatistics=%5B%7B%22statisticType%22%3A+%22count%22%2C+%22onStatisticField%22%3A+%22OBJECTID%22%2C+%22outStatisticFieldName%22%3A+%22n%22%7D%5D&groupByFieldsForStatistics=PER_TYPE_DESC&orderByFields=n+DESC&returnGeometry=false&resultRecordCount=2000&f=json",
+  "print_chars": 200000
+ },
+ {
+  "id": "phx-type-groupby-asc",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=1%3D1&outStatistics=%5B%7B%22statisticType%22%3A+%22count%22%2C+%22onStatisticField%22%3A+%22OBJECTID%22%2C+%22outStatisticFieldName%22%3A+%22n%22%7D%5D&groupByFieldsForStatistics=PER_TYPE_DESC&orderByFields=n+ASC&returnGeometry=false&resultRecordCount=2000&f=json",
+  "print_chars": 200000
+ },
+ {
+  "id": "phx-type-distinct",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=1%3D1&outFields=PER_TYPE_DESC&returnDistinctValues=true&returnGeometry=false&orderByFields=PER_TYPE_DESC+ASC&resultRecordCount=2000&f=json",
+  "print_chars": 200000
+ },
+ {
+  "id": "phx-mod-desc-distinct",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=1%3D1&outFields=MOD_DESC&returnDistinctValues=true&returnGeometry=false&f=json",
+  "print_chars": 4000
+ },
+ {
+  "id": "phx-sample-3",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=1%3D1&outFields=%2A&resultRecordCount=3&outSR=4326&returnGeometry=true&f=json",
+  "print_chars": 9000
+ },
+ {
+  "id": "phx-date-range",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=1%3D1&outStatistics=%5B%7B%22statisticType%22%3A+%22min%22%2C+%22onStatisticField%22%3A+%22PER_ISSUE_DATE%22%2C+%22outStatisticFieldName%22%3A+%22min_iss%22%7D%2C+%7B%22statisticType%22%3A+%22max%22%2C+%22onStatisticField%22%3A+%22PER_ISSUE_DATE%22%2C+%22outStatisticFieldName%22%3A+%22max_iss%22%7D%2C+%7B%22statisticType%22%3A+%22min%22%2C+%22onStatisticField%22%3A+%22PER_ENT_DATE%22%2C+%22outStatisticFieldName%22%3A+%22min_ent%22%7D%2C+%7B%22statisticType%22%3A+%22max%22%2C+%22onStatisticField%22%3A+%22PER_ENT_DATE%22%2C+%22outStatisticFieldName%22%3A+%22max_ent%22%7D%2C+%7B%22statisticType%22%3A+%22count%22%2C+%22onStatisticField%22%3A+%22PER_ISSUE_DATE%22%2C+%22outStatisticFieldName%22%3A+%22n_iss%22%7D%2C+%7B%22statisticType%22%3A+%22count%22%2C+%22onStatisticField%22%3A+%22PER_ENT_DATE%22%2C+%22outStatisticFieldName%22%3A+%22n_ent%22%7D%2C+%7B%22statisticType%22%3A+%22count%22%2C+%22onStatisticField%22%3A+%22PER_NUM%22%2C+%22outStatisticFieldName%22%3A+%22n_num%22%7D%5D&returnGeometry=false&f=json",
+  "print_chars": 3000
+ },
+ {
+  "id": "phx-recent30",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=PER_ISSUE_DATE+%3E%3D+DATE+%272026-06-28%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ },
+ {
+  "id": "phx-ent-recency-1095",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=PER_ENT_DATE+%3E%3D+DATE+%272023-07-29%27&returnCountOnly=true&f=json",
+  "print_chars": 500
+ }
+]
