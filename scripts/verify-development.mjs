@@ -22,9 +22,7 @@
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import {
-  validRecordUrl,
-  validateTabsSite,
-  LIFECYCLE_BUCKETS,
+  assertZip,
   summarizeSourceReports,
 } from './lib/verify-dev-helpers.mjs';
 
@@ -47,10 +45,10 @@ const zipUrl = (zip) => SITE_BASE + ZIP_PATH.replace('{zip}', encodeURIComponent
 // (records ingested per source, records excluded + why, unmapped statuses, geocode failures).
 const RUN_REPORT_SAMPLE = process.env.RUN_REPORT_SAMPLE ? parseInt(process.env.RUN_REPORT_SAMPLE, 10) : 3;
 
-// Task 6: a record_url must POINT SOMEWHERE OFFICIAL — validated by URL PATTERN + DOMAIN, not by
-// an HTTP 200 body (many official portals, e.g. Austin's abc.austintexas.gov, sit behind a bot
-// challenge that 200s with a non-record page). We require an absolute http(s) URL with a real host.
-const LIFECYCLE = LIFECYCLE_BUCKETS;
+// The per-ZIP assertions themselves live in ./lib/verify-dev-helpers.mjs as the pure
+// `assertZip(zip, rep, isIndexable, st)` — pure so the race guard below can replay them
+// against a freshly-read cache row, and so test/verify-development-race-guard.test.mjs can
+// drive the SHIPPED predicate rather than a copy of it.
 
 async function loadReports() {
   // KEYSET-paginated: one unbounded select of every row's `sites` jsonb started timing out
@@ -112,6 +110,27 @@ async function loadIndexableZips() {
   return zips;
 }
 
+// ── SINGLE-ZIP LIVE READ (the race guard's evidence) ──────────────────────────────────
+// Reads ONE ZIP's cached report row + its stamped substance flag as of NOW, the same two
+// reads the page itself makes. Used only on the recheck path, so the happy walk pays nothing.
+async function readZipState(zip) {
+  const hdr = { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` };
+  const q = encodeURIComponent(zip);
+  const [rr, mr] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/development_reports?zip=eq.${q}&select=zip,counts,sites,home_lat,home_lng,refreshed_at&limit=1`, { headers: hdr }),
+    fetch(`${SUPABASE_URL}/rest/v1/app_community_meta?zip=eq.${q}&select=indexable&limit=1`, { headers: hdr }),
+  ]);
+  if (!rr.ok) return null;
+  const rows = await rr.json();
+  if (!Array.isArray(rows) || !rows.length) return null;
+  let indexable = false;
+  if (mr.ok) {
+    const m = await mr.json();
+    indexable = !!(Array.isArray(m) && m[0] && m[0].indexable === true);
+  }
+  return { rep: rows[0], indexable };
+}
+
 // Property dossier rows (gap-analysis §4.5) — zero-touch: every cached address is verified.
 async function loadPropertyReports() {
   const url = `${SUPABASE_URL}/rest/v1/property_reports?select=address,zip,counts,sites,sources_checked&order=address`;
@@ -135,6 +154,47 @@ async function gotoWithRetry(page, target) {
   }
 }
 
+// Load a ZIP page and read back everything the assertions need. Split out of the walk so
+// the race guard can re-drive the exact same page load against a freshly-read cache row.
+async function renderZipPage(page, zip) {
+  await gotoWithRetry(page, zipUrl(zip));
+  // Wait until the page has rendered its results block (the app exposes the rendered
+  // sites on window for verification; if it doesn't yet, add: window.__HS_SITES = sites).
+  await page.waitForFunction(() => {
+    return typeof window.__HS_SITES !== 'undefined'
+      || document.querySelector('#map .leaflet-container, #map canvas');
+  }, { timeout: 15000 });
+
+  return page.evaluate(() => {
+    const sites = Array.isArray(window.__HS_SITES) ? window.__HS_SITES : null;
+    // LABEL↔COLOUR AGREEMENT (regression guard for the 12,000-page mislabel): the label a
+    // resident reads and the dot's colour must both derive from the record's lifecycle stage.
+    // Compute both in-page and flag any development point where they disagree — e.g. an orange
+    // "proposed" dot whose subheader says "operating now", or a green recorded subdivision
+    // labelled "Permitted construction". Falls back to no-op if the page didn't expose the hook.
+    const OK = { built: ['operating now', 'built', 'recorded'], approved: ['approved'], proposed: ['proposed'] };
+    const mislabeled = [];
+    if (sites && typeof window.__HS_KIND === 'function' && window.__HS_COLORS) {
+      for (const s of sites) {
+        if (!s || s.relevance !== 'development' || s.scope !== 'point') continue;
+        const kind = String(window.__HS_KIND(s) || '').toLowerCase();
+        const colorBucket = s.type === 'built' ? 'built' : (s.type === 'approved' ? 'approved' : 'proposed');
+        const allow = OK[colorBucket] || [];
+        if (!allow.some((w) => kind.includes(w))) mislabeled.push(`${s.label || '??'} [${s.type}]→"${window.__HS_KIND(s)}"`);
+      }
+    }
+    const rm = document.getElementById('robots-meta');
+    return {
+      rendered: sites,
+      facText: (document.getElementById('cFac') || {}).textContent || null,
+      mapInited: !!document.querySelector('#map .leaflet-container, #map canvas'),
+      mislabeled,
+      shell: !!document.querySelector('.side, .nav'),                 // new left-sidebar shell present
+      robots: rm ? (rm.getAttribute('content') || '') : '',
+    };
+  });
+}
+
 async function main() {
   let reports = await loadReports();
   reports.sort((a, b) => a.zip.localeCompare(b.zip));
@@ -147,137 +207,56 @@ async function main() {
   const fails = [];
   let emptyOk = 0;
 
+  let raceHealed = 0;
   for (const rep of reports) {
     const zip = rep.zip;
-    const wantFac = (rep.counts && rep.counts.facilities != null) ? rep.counts.facilities : null;
-    const sites = Array.isArray(rep.sites) ? rep.sites : [];
-    const target = zipUrl(zip);
     try {
-      await gotoWithRetry(page, target);
-      // Wait until the page has rendered its results block (the app exposes the rendered
-      // sites on window for verification; if it doesn't yet, add: window.__HS_SITES = sites).
-      await page.waitForFunction(() => {
-        return typeof window.__HS_SITES !== 'undefined'
-          || document.querySelector('#map .leaflet-container, #map canvas');
-      }, { timeout: 15000 });
+      let st = await renderZipPage(page, zip);
+      let res = assertZip(zip, rep, indexableZips.has(zip), st);
 
-      const st = await page.evaluate(() => {
-        const sites = Array.isArray(window.__HS_SITES) ? window.__HS_SITES : null;
-        // LABEL↔COLOUR AGREEMENT (regression guard for the 12,000-page mislabel): the label a
-        // resident reads and the dot's colour must both derive from the record's lifecycle stage.
-        // Compute both in-page and flag any development point where they disagree — e.g. an orange
-        // "proposed" dot whose subheader says "operating now", or a green recorded subdivision
-        // labelled "Permitted construction". Falls back to no-op if the page didn't expose the hook.
-        const OK = { built: ['operating now', 'built', 'recorded'], approved: ['approved'], proposed: ['proposed'] };
-        const mislabeled = [];
-        if (sites && typeof window.__HS_KIND === 'function' && window.__HS_COLORS) {
-          for (const s of sites) {
-            if (!s || s.relevance !== 'development' || s.scope !== 'point') continue;
-            const kind = String(window.__HS_KIND(s) || '').toLowerCase();
-            const colorBucket = s.type === 'built' ? 'built' : (s.type === 'approved' ? 'approved' : 'proposed');
-            const allow = OK[colorBucket] || [];
-            if (!allow.some((w) => kind.includes(w))) mislabeled.push(`${s.label || '??'} [${s.type}]→"${window.__HS_KIND(s)}"`);
-          }
+      // ── RACE GUARD (the whole 2026-07-24→28 red streak) ────────────────────────────
+      // The reads above are a SNAPSHOT taken at run start, but the walk takes ~3h and the
+      // pg_cron job `dev-reports-rolling-refresh` (dev_refresh_tick, every 15 min) rewrites
+      // ~800 development_reports rows/hour — 2,400+ of the 12,722 rows change underneath a
+      // single run, and `app-content-refresh` restamps app_community_meta.indexable hourly.
+      // A page loaded at T+2h therefore renders a row the snapshot has never seen, and the
+      // count/robots assertions compare live against stale. That is not a page defect, so on
+      // ANY mismatch we re-read THAT ZIP's row + flag live and replay the same assertions.
+      // We read the row on both sides of the reload and accept the page if it matches EITHER
+      // committed state — the page must have rendered a real row, just not necessarily the
+      // one we sampled. A genuine defect matches neither and still fails.
+      if (res.fails.length) {
+        const before = await readZipState(zip);
+        st = await renderZipPage(page, zip);
+        const after = await readZipState(zip);
+        const seen = [];
+        for (const cand of [before, after]) {
+          if (!cand) continue;
+          if (seen.includes(cand.rep.refreshed_at)) continue;
+          seen.push(cand.rep.refreshed_at);
+          const again = assertZip(zip, cand.rep, cand.indexable, st);
+          if (!again.fails.length) { res = again; break; }
+          res = again;                       // keep the freshest verdict for the report
         }
-        const rm = document.getElementById('robots-meta');
-        return {
-          rendered: sites,
-          facText: (document.getElementById('cFac') || {}).textContent || null,
-          mapInited: !!document.querySelector('#map .leaflet-container, #map canvas'),
-          mislabeled,
-          shell: !!document.querySelector('.side, .nav'),                 // new left-sidebar shell present
-          robots: rm ? (rm.getAttribute('content') || '') : '',
-        };
-      });
-
-      // NEW LAYOUT: every tracker page must render the shared left-sidebar shell.
-      if (!st.shell) fails.push(`ZIP ${zip}: new sidebar shell did not render (old layout?)`);
-      // SUBSTANCE GATE: indexable iff the stamped flag is true AND the page rendered content.
-      const renderedForPolicy = st.rendered != null ? st.rendered : sites;
-      const isIndex = /(^|[^n])index/i.test(st.robots) && !/noindex/i.test(st.robots);
-      const expectIndex = indexableZips.has(zip) && renderedForPolicy.length > 0;
-      if (isIndex !== expectIndex) {
-        fails.push(`ZIP ${zip}: robots="${st.robots}" (indexable=${isIndex}) violates the substance gate ` +
-          `(expected ${expectIndex ? 'index' : 'noindex'}; flag=${indexableZips.has(zip)}, sites=${renderedForPolicy.length})`);
-      }
-      if (st.mislabeled && st.mislabeled.length) {
-        fails.push(`ZIP ${zip}: ${st.mislabeled.length} record(s) whose label contradicts its dot colour ` +
-          `[${st.mislabeled.slice(0, 3).join(', ')}] (stage/colour must agree)`);
+        if (!res.fails.length) {
+          raceHealed++;
+          console.log(`  ~ ${zip} → re-checked against the live row after a mid-run refresh; consistent`);
+        }
       }
 
-      if (!st.mapInited) {
-        fails.push(`ZIP ${zip}: map did not initialize`);
-        continue;
-      }
-
-      // Facility-count reconciliation (page vs cached report).
-      const facShown = st.facText != null ? parseInt(st.facText, 10) : null;
-      if (wantFac != null && facShown != null && facShown !== wantFac) {
-        fails.push(`ZIP ${zip}: facility count ${facShown} != cached counts.facilities ${wantFac}`);
-      }
-
-      // THE ANTI-FABRICATION INVARIANT: every rendered site must carry a record_url.
-      const check = st.rendered != null ? st.rendered : sites;
-      const noSource = check.filter((s) => !(s && (s.url || s.record_url)));
-      if (noSource.length) {
-        fails.push(`ZIP ${zip}: ${noSource.length} rendered site(s) with NO record_url — ` +
-          `[${noSource.slice(0, 3).map((s) => (s && s.label) || '??').join(', ')}] (fabrication gate)`);
-      } else if (check.length === 0) {
+      if (res.fails.length) {
+        fails.push(...res.fails);
+      } else if (res.check.length === 0) {
         emptyOk++;
         console.log(`  ✓ ${zip} → empty-but-valid (0 sites)`);
       } else {
-        console.log(`  ✓ ${zip} → ${check.length} site(s), all sourced · facilities ${facShown ?? '?'}`);
-      }
-
-      // ── Task 6 extensions (render-layer invariants; no extra network) ──────────────────
-      // 1) record_url points somewhere official (pattern + domain, not body-200).
-      const badUrl = check.filter((s) => { const u = s && (s.url || s.record_url); return u && !validRecordUrl(u); });
-      if (badUrl.length) {
-        fails.push(`ZIP ${zip}: ${badUrl.length} record(s) with a malformed record_url — ` +
-          `[${badUrl.slice(0, 3).map((s) => (s && (s.url || s.record_url)) || '??').join(', ')}]`);
-      }
-      // 2) a jurisdiction-scope record must NOT be rendered as a precise point.
-      const fakePoint = check.filter((s) => s && s.geo_precision === 'jurisdiction' && s.scope === 'point');
-      if (fakePoint.length) {
-        fails.push(`ZIP ${zip}: ${fakePoint.length} jurisdiction-scope record(s) rendered as a precise point ` +
-          `[${fakePoint.slice(0, 3).map((s) => (s && s.label) || '??').join(', ')}]`);
-      }
-      // 3) no bucket outside the lifecycle map: every development record's type ∈ {built,approved,proposed}.
-      const devRecs = check.filter((s) => s && s.relevance === 'development');
-      const badBucket = devRecs.filter((s) => !LIFECYCLE.has(s.type));
-      if (badBucket.length) {
-        fails.push(`ZIP ${zip}: ${badBucket.length} development record(s) with a bucket outside the map ` +
-          `(type ∉ built/approved/proposed) [${badBucket.slice(0, 3).map((s) => `${(s.label||'??')}=${s.type}`).join(', ')}]`);
-      }
-      // 4) Task 5 — ONE PREDICATE PER NUMBER: each cached count === the rendered array it heads.
-      const c = rep.counts || {};
-      const proposedN = devRecs.filter((s) => s.type === 'proposed').length;
-      const approvedN = devRecs.filter((s) => s.type === 'approved').length;
-      const operatingN = devRecs.filter((s) => s.type === 'built').length;
-      const commentN = check.filter((s) => s && s.comment_open === true).length;
-      if (c.proposed != null && c.proposed !== proposedN)
-        fails.push(`ZIP ${zip}: counts.proposed ${c.proposed} !== rendered proposed rail ${proposedN} (Task 5)`);
-      if (c.approved != null && c.approved !== approvedN)
-        fails.push(`ZIP ${zip}: counts.approved ${c.approved} !== rendered approved rail ${approvedN} (Task 5)`);
-      if (c.operating != null && c.operating !== operatingN)
-        fails.push(`ZIP ${zip}: counts.operating ${c.operating} !== rendered operating rail ${operatingN} (Task 5)`);
-      if (c.comment_open != null && c.comment_open !== commentN)
-        fails.push(`ZIP ${zip}: counts.comment_open ${c.comment_open} !== commentable set ${commentN} (Task 5)`);
-
-      // TABS invariant (docs/tdlr-tabs-adapter-runbook.md §3): TX permit filings must carry
-      // a canonical record_url whose suffix matches project_no.
-      const tabsBad = check.filter((s) => {
-        const v = validateTabsSite(s);
-        return !v.ok && !v.skip;
-      });
-      if (tabsBad.length) {
-        fails.push(`ZIP ${zip}: ${tabsBad.length} TABS site(s) with project_no/url mismatch ` +
-          `[${tabsBad.slice(0, 2).map((s) => s.project_no || s.label).join(', ')}]`);
+        console.log(`  ✓ ${zip} → ${res.check.length} site(s), all sourced · facilities ${res.facShown ?? '?'}`);
       }
     } catch (e) {
       fails.push(`ZIP ${zip}: ${e.message.split('\n')[0]}`);
     }
   }
+  if (raceHealed) console.log(`\n${raceHealed} ZIP(s) re-checked against a mid-run cache refresh and found consistent.`);
 
   // ── Task 6 — SOURCE RUN REPORT ──────────────────────────────────────────────────────────
   // Drive a few dev-bearing ZIPs through the LIVE engine and surface its per-source run report:
@@ -389,6 +368,7 @@ async function main() {
     `- ZIPs checked: **${reports.length}**`,
     `- Property pages checked: **${props.length}**`,
     `- Passed: **${reports.length + props.length - fails.length}** (empty-but-valid: ${emptyOk})`,
+    ...(raceHealed ? [`- Re-checked after a mid-run cache refresh and found consistent: **${raceHealed}**`] : []),
     `- Failed: **${fails.length}**${propFails ? ` (${propFails} property-page)` : ''}`,
     ...(fails.length
       ? [``, `## Failures`, ...fails.map((f) => `- ${f}`)]
