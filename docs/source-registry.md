@@ -3000,6 +3000,15 @@ one new arcgis entry has a real status column and no constant at all.
 | `prince-georges-county-permits` | socrata | Prince George's County (MD) | no geometry → `geocode_assemble`; **numeric ZIP** | 20772 → **33**, 20740 → **13**, 20785 → **7** |
 | `butler-county-ks-permits` | arcgis | Butler County (KS) | no jobsite ZIP → `spatial_zip_radius_mi` | envelope smoke returns real Butler points, lat 37.67–37.76 |
 
+### Coverage strings verified against the live `communities` table
+
+The coverage gate matches `communities.state`/`county` verbatim (trim + lowercase), so a wrong
+county string is a silent no-op — the `harris-county-permits` failure class. Queried live:
+**NY/`Erie` → 72 ZIP pages**, **MD/`Prince George's` → 36**, **KS/`Butler` → 19** — each exactly the
+ZIP count the packet lists for that endpoint, so all three entries have a real surface the moment
+the function is deployed. (The rejected three would have had one too: NJ's ten counties hold 359 ZIP
+pages, VA/Arlington 11, WI/Milwaukee 36 — their blockers are the datasets, not our coverage.)
+
 Every vocabulary is complete — each set sums **exactly** to its row count: Buffalo 27 `aptype`
 values = 275,572; Prince George's 3 `permit_category` = 461,508 (and 115 `permit_type` = 461,508);
 Butler 9 `open_closed` + 1 null = 911.
