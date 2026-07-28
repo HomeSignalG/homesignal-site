@@ -1,0 +1,102 @@
+[
+ {
+  "id": "phx-env-85003-all",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=1%3D1&geometry=-112.12950992761185%2C33.407621739130434%2C-112.02529007238815%2C33.49457826086956&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-env-85003-1095",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=PER_ENT_DATE+%3E%3D+DATE+%272023-07-29%27&geometry=-112.12950992761185%2C33.407621739130434%2C-112.02529007238815%2C33.49457826086956&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-env-85003-open-done",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=PERMIT_STAT+IN+%28%27OPEN%27%2C%27DONE%27%29&geometry=-112.12950992761185%2C33.407621739130434%2C-112.02529007238815%2C33.49457826086956&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-env-85008-all",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=1%3D1&geometry=-112.05051918442106%2C33.42302173913044%2C-111.94628081557894%2C33.509978260869566&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-env-85008-1095",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=PER_ENT_DATE+%3E%3D+DATE+%272023-07-29%27&geometry=-112.05051918442106%2C33.42302173913044%2C-111.94628081557894%2C33.509978260869566&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-env-85008-open-done",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=PERMIT_STAT+IN+%28%27OPEN%27%2C%27DONE%27%29&geometry=-112.05051918442106%2C33.42302173913044%2C-111.94628081557894%2C33.509978260869566&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-env-85015-all",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=1%3D1&geometry=-112.15324428537204%2C33.46472173913044%2C-112.04895571462797%2C33.551678260869565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-env-85015-1095",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=PER_ENT_DATE+%3E%3D+DATE+%272023-07-29%27&geometry=-112.15324428537204%2C33.46472173913044%2C-112.04895571462797%2C33.551678260869565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-env-85015-open-done",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=PERMIT_STAT+IN+%28%27OPEN%27%2C%27DONE%27%29&geometry=-112.15324428537204%2C33.46472173913044%2C-112.04895571462797%2C33.551678260869565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-env-85032-all",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=1%3D1&geometry=-112.05661414112892%2C33.58032173913044%2C-111.95218585887109%2C33.667278260869566&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-env-85032-1095",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=PER_ENT_DATE+%3E%3D+DATE+%272023-07-29%27&geometry=-112.05661414112892%2C33.58032173913044%2C-111.95218585887109%2C33.667278260869566&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-env-85032-open-done",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=PERMIT_STAT+IN+%28%27OPEN%27%2C%27DONE%27%29&geometry=-112.05661414112892%2C33.58032173913044%2C-111.95218585887109%2C33.667278260869566&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-name-nulls",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=PERMIT_NAME+IS+NULL&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-street-nulls",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=STREET_FULL_NAME+IS+NULL&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-pernum-blank",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=PER_NUM+IS+NULL+OR+PER_NUM+%3D+%27%27&returnCountOnly=true&f=json",
+  "print_chars": 300
+ },
+ {
+  "id": "phx-page-offset",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=1%3D1&outFields=OBJECTID%2CPER_NUM&returnGeometry=false&resultOffset=2000&resultRecordCount=3&orderByFields=PER_ENT_DATE+DESC&f=json",
+  "print_chars": 1500
+ },
+ {
+  "id": "phx-connector-shape-85003",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1/query?where=1%3D1&geometry=-112.12950992761185%2C33.407621739130434%2C-112.02529007238815%2C33.49457826086956&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=true&outSR=4326&resultOffset=0&resultRecordCount=1000&orderByFields=PER_ENT_DATE+DESC&f=json",
+  "print_chars": 2500
+ },
+ {
+  "id": "phx-portal-root",
+  "url": "https://apps-secure.phoenix.gov/pdd/search/permits",
+  "print_chars": 3000
+ },
+ {
+  "id": "phx-portal-permit-1500027",
+  "url": "https://apps-secure.phoenix.gov/pdd/search/permits/1500027",
+  "print_chars": 3000
+ },
+ {
+  "id": "phx-portal-q",
+  "url": "https://apps-secure.phoenix.gov/pdd/search/permits?permitNumber=1500027",
+  "print_chars": 3000
+ }
+]

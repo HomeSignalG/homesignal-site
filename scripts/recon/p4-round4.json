@@ -1,0 +1,32 @@
+[
+ {
+  "id": "pg-num-20772-count",
+  "url": "https://data.princegeorgescountymd.gov/resource/weik-ttee.json?$select=count%28%2A%29%20as%20n&$where=zip_code%3D20772%20AND%20%28permit_category%20in%20%28%27Building%20Permit%27%2C%27Site%20Road%20Permit%27%29%29%20AND%20permit_issuance_date%20%3E%20%272025-07-28T00%3A00%3A00%27",
+  "print_chars": 400
+ },
+ {
+  "id": "pg-num-20740-count",
+  "url": "https://data.princegeorgescountymd.gov/resource/weik-ttee.json?$select=count%28%2A%29%20as%20n&$where=zip_code%3D20740%20AND%20%28permit_category%20in%20%28%27Building%20Permit%27%2C%27Site%20Road%20Permit%27%29%29%20AND%20permit_issuance_date%20%3E%20%272025-07-28T00%3A00%3A00%27",
+  "print_chars": 400
+ },
+ {
+  "id": "pg-num-20785-count",
+  "url": "https://data.princegeorgescountymd.gov/resource/weik-ttee.json?$select=count%28%2A%29%20as%20n&$where=zip_code%3D20785%20AND%20%28permit_category%20in%20%28%27Building%20Permit%27%2C%27Site%20Road%20Permit%27%29%29%20AND%20permit_issuance_date%20%3E%20%272025-07-28T00%3A00%3A00%27",
+  "print_chars": 400
+ },
+ {
+  "id": "pg-num-20772-sample",
+  "url": "https://data.princegeorgescountymd.gov/resource/weik-ttee.json?$where=zip_code%3D20772%20AND%20%28permit_category%20in%20%28%27Building%20Permit%27%2C%27Site%20Road%20Permit%27%29%29%20AND%20permit_issuance_date%20%3E%20%272025-07-28T00%3A00%3A00%27&$limit=3",
+  "print_chars": 3000
+ },
+ {
+  "id": "pg-siteroad-types",
+  "url": "https://data.princegeorgescountymd.gov/resource/weik-ttee.json?$select=permit_type%2Ccount%28%2A%29%20as%20n&$group=permit_type&$order=n%20DESC&$limit=200&$where=permit_category%20%3D%20%27Site%20Road%20Permit%27",
+  "print_chars": 6000
+ },
+ {
+  "id": "buf-landing-retry",
+  "url": "https://data.buffalony.gov/d/9p2d-f3yt",
+  "print_chars": 300
+ }
+]

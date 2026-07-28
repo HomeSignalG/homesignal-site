@@ -2680,6 +2680,231 @@ only** — 3 ZIPs, 5,019 records, nothing outside Travis County.
 
 ---
 
+## PHOENIX BUILDING PERMITS (2026-07-28) — `phoenix-building-permits` wired (registry 86 → 87)
+
+ArcGIS, the City of Phoenix Planning & Development Department's **own** MapServer:
+`https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1` (layer 1,
+"Permits"). **70,791 rows** (live `returnCountOnly`), `esriGeometryPoint`, `maxRecordCount`
+2000, `advancedQueryCapabilities.supportsPagination: true`. Config only — **no connector,
+engine or schema change**. Live receipts throughout are recon-fetch runs `30317981665`
+(round 1), `30318114268` (round 2), `30318327760` (round 3) and `30318842763` (round 4),
+plus deploy runs `30318596568` / `30318695983`.
+
+### ⚠️ Correction to the ARIZONA WIRE PASS
+
+That pass recorded *"**Phoenix**: no first-party per-record permit dataset (the CKAN hit is a
+1 KB HUD aggregate)"* — true of the **CKAN catalogue**, false of the city. Phoenix publishes
+its permit ledger on its own ArcGIS Server at `maps.phoenix.gov`, which no catalogue lists.
+**Standing answer: an empty open-data catalogue is not evidence that a city publishes
+nothing — probe the city's own GIS host before recording a rejection.**
+
+### Freshness + field receipts
+
+| fact | value | how |
+|---|---|---|
+| rows | 70,791 | `where=1=1&returnCountOnly=true` |
+| geometry | `esriGeometryPoint`, `spatialReference {wkid:4326}` on the query response | layer metadata + 3 sampled features |
+| `PER_ENT_DATE` | **100 % populated** (70,791 / 70,791), max **2026-07-24** | `outStatistics` count + max |
+| `PER_ISSUE_DATE` | 65,980 / 70,791 (4,811 null), max 2026-07-24 | same |
+| `PER_NUM` | 70,791 / 70,791, **0 blank** | `PER_NUM IS NULL OR PER_NUM = ''` → `{"count":0}` |
+| `PERMIT_NAME` | 2,650 null (3.7 %) | `PERMIT_NAME IS NULL` |
+| date type | both `esriFieldTypeDate` → the connector's `DATE '<cutoff>'` literal is valid | field list; `PER_ISSUE_DATE >= DATE '2026-06-28'` → `{"count":996}` |
+| `MOD_DESC` | a single value `"Building"` — **not** used as `type_source` | `returnDistinctValues` |
+
+`file_date` is **`PER_ENT_DATE`** (when the permit process started) rather than the brief's
+suggested `PER_ISSUE_DATE`, for two reasons: it is 100 % populated where the issue date is
+93.2 %, and `buildWhere()` applies `recency_days` to `firstCol(column_map.file_date)` — so the
+recency window and the displayed filing date are guaranteed to be the same column.
+
+### Status vocabulary — 4 values, summing to EXACTLY 70,791
+
+`DONE 42,488` + `OPEN 28,222` + `EXPR 64` + `VOID 17` = **70,791**. Bucketed as the brief
+specifies: `OPEN → proposed`, `DONE → operating`, `EXPR`/`VOID` → excluded.
+
+### Type vocabulary — 238 values (not "250+"), summing to EXACTLY 70,791
+
+Enumerated **three independent ways that agree exactly**: `groupBy` ordered `n DESC`, `groupBy`
+ordered `n ASC` (the Mesa/Gilbert `$limit`-truncation defence), and `returnDistinctValues` —
+238 values each time, identical sets, no nulls, counts summing to 70,791. **0 unclassified.**
+
+| use_type | values | rows |
+|---|---|---|
+| Civic/Public | 97 | 23,400 |
+| Development | 46 | 18,949 |
+| Utility | 23 | 10,548 |
+| Commercial | 22 | 10,464 |
+| Residential | 12 | 5,389 |
+| Industrial | 38 | 2,041 |
+
+**Standing answer — the brief's "Other" bucket is written as `Development`.** `use_type` is a
+**closed six-value vocabulary** across all 87 registry entries (Industrial · Development ·
+Residential · Utility · Commercial · Civic/Public), and `lib/map.js`'s `TYPE_EXACT` table is
+likewise closed. An off-vocabulary `"Other"` would miss `TYPE_EXACT` entirely and fall through
+to keyword guessing on the record's title. `'development'` is precisely the generic member —
+`TYPE_EXACT['development'] = cat('other')` → the **"Other project"** circle — so writing
+`Development` produces exactly the rendering the brief asked for, inside the existing
+vocabulary. It also matches how every other entry maps demolition (Tucson, Gilbert, SLC).
+
+**Two upstream string quirks are preserved VERBATIM** and pinned by a unit test, because
+normalising either would silently unclassify thousands of rows: `'SIGN  PERMIT'` (double
+space, 3,685 rows) and `'UTILITY TRENCHING CI VIL PERMIT'` (a mid-word space in "CIVIL",
+622 rows).
+
+### Self-describing values — the Dallas rule, applied with evidence
+
+The brief's keyword rules leave ~60 values to a default. Per the POLYGON WIRE PASS #2 standing
+answer (*never let a keyword default swallow a value that names what it is*), each was
+resolved against **the layer's own `PER_TYPE` department code**, obtained from a live
+`PER_TYPE × PER_TYPE_DESC × SCOPE_DESC` crosstab (242 pairs, summing to 70,791):
+
+* **`F####` is the Fire Department code range.** 136 of the 238 values (25,723 rows) are
+  purely `F####`, and **63 of them are not `FP `- or `FIRE`-prefixed** — e.g.
+  `DEDICATED FUNCTION MONITORING` (F175, `SCOPE_DESC` "DEDICATED FUNCTION MONITORING"),
+  `PRE-ACTION SYSTEM` (F107), `SMOKE CONTROL OR EXHAUST` (F116),
+  `PRIVATE FIRE FLOW TEST` (F810, "PRIVATE FIRE HYDRANT FLOW TEST >3000 GPM"). The brief's
+  `FP `-prefix rule would have dropped all of them into the generic bucket; they are
+  `Civic/Public` **on the layer's own department code**, not on a guess.
+* **Where the fire code permits an INDUSTRIAL subject, the subject wins** — `INDUSTRIAL OVEN`,
+  `WRECKING YARDS, SALVAGE, AND JUNK YARDS`, `HIGH PILE(D) COMBUSTIBLE STORAGE`,
+  `TIRE REBUILDING OPERATION`, `PLANT EXTRACTION SYSTEM`, `LUMBER & MULCH YARDS`,
+  `SPRAYING DIPPING & POWDER COATING OPS`, `MOBILE FLEET FUELING SITE OPERATION`,
+  `COMM LIQ CLASS IIIB BIOFUELS STORE/USE`, `WOOD PRODUCTS, PALLETS`,
+  `COMBUST DUST OR FIBER PRODUCING INSTALL`/`OP`, `OUTSIDE COMBUSTIBLE MATS STORAGE & USE`,
+  `FLAMM/COMBUST PIPELINE MODIFICATION`, `FIRE OUTDOOR COMBUSTIBLE STORAGE` → **Industrial**.
+* **Solar is an energy install, not a fire inspection** — `SOLAR PHOTOVOLTAIC SYSTEM`,
+  `… SYSTEM OTC`, `… /BATTERY SYSTEM`, `… /BATTERY SYSTEM OTC` (F193/F194/F209/F800, 5,558
+  rows) → **Utility**, consistent with the brief's own `BATTERY → Utility` rule.
+  `COMMERCIAL STREET LIGHT` (STL, `SCOPE_DESC` "STREET LIGHT INSTALLATION") → **Utility**.
+* **`AVIATION FACILITY`** (F360) → **Civic/Public**, matching `dallas-specific-use-permits`,
+  where `Airport → Civic/Public`. **`DEVELOPMENTALLY DISABLED GRP HOME INSP`** (F424,
+  `SCOPE_DESC` "GROUP HOME FIRE INSP") → **Civic/Public**, matching
+  `tucson-residential-building-permits`, where `Residential Care Facility → Civic/Public`.
+* **`REPAIR GARAGE`** (F204) and **`SHELL - STRUC/ELEC/PLMB/MECH`** (BLDS, `SCOPE_DESC`
+  "COMMERCIAL SHELL"/"COMMERCIAL NEW") → **Commercial**.
+* **Trade combos with no `OTC` prefix** (`MECH/ELEC`, `PLMB/ELEC`, `PLMB/MECH`,
+  `PLMB/MECH/ELEC`) → **Utility**, the same split the brief defines for their `OTC` twins.
+
+One deliberate asymmetry, recorded rather than smoothed: `FP INDUSTRIAL OVENS` is
+`Civic/Public` while `INDUSTRIAL OVEN` is `Industrial`. The brief lists the `FP ` rule ahead of
+the hazmat rule, and that ordering is preserved.
+
+### record_url — dataset precision, NOT "none"
+
+The brief asked for `record_url_precision: "none"`. **That value does not exist**: the
+connector's type is `"record" | "dataset"`, and the anti-fabrication gate requires every
+emitted site to carry a `record_url` (`verify-development.mjs` fails CI otherwise). Both
+candidate per-record URL patterns were probed live and **neither discriminates**:
+
+* `apps-secure.phoenix.gov/pdd/search/permits/1500027` → HTTP 200 but the body is
+  `<title>P&amp;D Online - Error</title>` — a real permit number renders the error page.
+* `…/pdd/search/permits?permitNumber=1500027` → HTTP 200, 49,163 bytes — byte-for-byte the
+  same search shell as the bare `…/pdd/search/permits` (48,822 bytes); the parameter is ignored.
+
+Templating either would be guessing (the San Diego "the SPA shell alone did NOT discriminate"
+rule). So `record_url_precision: "dataset"` with `dataset_url` = the city's own permit search
+at `https://apps-secure.phoenix.gov/pdd/search/permits` — the Boston / Philadelphia precedent.
+
+### ⚠️ recency_days is **365**, not the brief's 1095 — the 3.5 MB ceiling was measured
+
+The brief set the ceiling ("if any Phoenix ZIP exceeds 3.5 MB, apply `recency_days: 1095`").
+`1095` was deployed first and **measured live** via `pg_net` (deploy run `30318596568`), with
+nothing persisted:
+
+| ZIP | `recency_days: 1095` | `recency_days: 365` |
+|---|---|---|
+| 85003 | **7.16 MB** / 9,375 records | **2.84 MB** / 3,705 |
+| 85008 | **4.74 MB** / 6,168 | **1.80 MB** / 2,333 |
+| 85015 | **4.65 MB** / 6,095 | **1.79 MB** / 2,342 |
+| 85032 | **3.62 MB** / 4,747 | **1.51 MB** / 1,974 |
+
+Every probe ZIP was over the ceiling at 1095, so the brief's named contingency could not
+satisfy the brief's own constraint; 365 was chosen as the smallest change to the same lever.
+The window is exact — the oldest surviving `file_date` is **2025-07-28**, the 365-day
+boundary, and the newest is 2026-07-24, the layer max.
+
+**The choice is verified against every Maricopa ZIP, not a sample.** Round 4 ran the exact
+connector query shape (3-mile envelope, `PER_ENT_DATE >= DATE '2025-07-28'`,
+`PERMIT_STAT IN ('OPEN','DONE')`) for **all 136 modelled Maricopa ZIP pages**: the maximum is
+**85006 at 3,954 records**, and its live cached row measures **3.21 MB**. `0 of 136` rows
+exceed 3.5 MB.
+
+Two levers were considered and rejected: `out_fields` does not help (it trims the *fetch*, not
+the emitted record count that drives row size — it is set anyway, as the Miami/Columbus CPU
+guard), and reducing `spatial_zip_radius_mi` was rejected because radius changes what residents
+actually see.
+
+### Go-live results (DB-verified)
+
+Re-cached all 136 modelled Maricopa ZIPs through the live engine (`pg_net` → `dev_refresh_collect`;
+4 transient 503 cold-starts retried, the documented pattern):
+
+* **Maricopa ZIP pages carrying real source records: 40 → 96** (+56 lifted off the EPA
+  facilities floor). **77 pages carry Phoenix records**, totalling **95,585** — the 59 that do
+  not are Mesa / Chandler / Gilbert / Scottsdale-east / far-west-valley ZIPs outside Phoenix
+  city limits, which correctly return 0 from a Phoenix-only layer.
+* **Anti-fabrication + map-render invariants across all 95,585 Phoenix records: 0 missing
+  `record_url`, 0 missing coordinates, 0 `unclassified`, 0 non-`point` scope.** Coordinates are
+  what make a record renderable, and all three map views read the same `MAP_SITES` dataset, so
+  a pinned record renders in 2D, satellite and focus alike.
+* Rows with no geometry never reach the page: spatial ZIP scoping filters on the geometry
+  itself, so a geometry-less row cannot satisfy the envelope (the San Diego
+  garbage-coordinate precedent). Hence 100 % pinned rather than a listed/pinned split.
+* **Heaviest row 85006 at 3.21 MB; 0 rows over 3.5 MB.**
+
+**Known characteristic, recorded not hidden:** `title` is `PERMIT_NAME` exactly as the brief
+specifies, and that column is null on 3.7 % of the layer — **4,063 of the 96,352 cached records
+(4.2 %) carry a blank `title`**. None of them is label-less: `0 of 96,352` have a blank `label`,
+because the connector falls back to the permit number (`label = title || case_number ||
+"Development record"`). So those pins read as their real permit number rather than a
+description — an honest fallback, not a gap.
+
+**Bidirectional coverage-gate proof, live:** `85701` (Tucson, AZ/Pima) and `85122`
+(Casa Grande, AZ/Pinal) both returned **0 Phoenix records** through the deployed engine, and
+`test/phoenix-connector.test.mjs` asserts the stronger unit-level fact — an out-of-coverage ZIP
+**never fetches** the Phoenix layer at all.
+
+### CI verifier status — read this before re-investigating
+
+**`verify-development` (run 30319267075, 3 h 32 m) FAILED — no Phoenix page is in the failure
+list.** 390 failure lines over 165 distinct ZIPs, of which the only Arizona-range entries are
+**85724 and 85745, both `Tucson (…)` / Pima County** (DB-confirmed; served by
+`tucson-*`, untouched here). **0 of the 136 Maricopa ZIPs failed**, including all 78 carrying
+Phoenix records. This is pre-existing: the previous run (30305825744, *before* this change) had
+**8 failing 85xxx ZIPs — 85641, 85704, 85735, 85742, 85746, 85748, 85749, 85750, every one
+Tucson/Pima** — so Arizona failures went **8 → 2**. The 97 → 390 growth is entirely `75xxx`
+(Dallas, 72 ZIPs), `89xxx` (NV, 44) and `92xxx` (San Diego, 18) — the PR #413/#414/#415 sources.
+385 of the 390 lines are the `counts.* !== rendered <band> rail` class already red on `main`
+(last three completed runs: failure at 2:54:54, 3:27:04, 3:12:42); the other 5 are substance-gate
+`robots="index, follow"` lines on AL/OK/ID ZIPs. Neither class is a function of adding a registry
+source, and `claude/verify-development-fa…` is already open against it.
+
+**`verify-geocodes` (run 30319270760) was CANCELLED at 6:00:18 — GitHub's hard 6-hour job cap**,
+not a failure and not a verdict (the workflow declares no concurrency group, so nothing cancelled
+it externally). **It would have had nothing to check here anyway: all 96,352 Phoenix records are
+`geo_precision:"point"` with `geocode_source` null on every one — 0 geocoded.** The geofence
+applies to GEOCODED points only; source-supplied geometry is never fenced.
+
+The equivalent containment check was therefore run directly against the data. Emitted Phoenix
+pins span **lat 33.2907–33.8892, lng −112.3078–−111.7597**, versus the publisher's own declared
+layer extent (metadata `extent`, EPSG:3857 → WGS84) of **lat 33.2905–33.8929, lng −112.3044–−111.7589**
+— i.e. inside on three sides, with **exactly 2 records of 96,352** sitting ~315 m west of the
+declared western edge. Both were inspected and are **real, not bad coordinates**: case 26007590
+"BLDG D - TCO" and 26007591 "BLDG E - TCO", `11580 W INDIAN SCHOOL RD`, ZIP 85392, filed
+2026-05-21. Longitude −112.3078 is ≈115th Ave (Phoenix's origin is Central Ave at −112.074;
+115 blocks ÷ 8 per mile ≈ 14.4 mi ≈ 0.24°), which matches that address. **Standing answer: an
+ArcGIS layer's declared `extent` is cached/rounded metadata, not a containment guarantee — do not
+treat a small overshoot as a geocoding defect.**
+
+### Regression cover
+
+`test/phoenix-connector.test.mjs` (new, offline) drives the **shipped** connector over a real
+captured query response committed at `fixtures/phoenix/planning-permit-layer1-sample.json`.
+It pins the vocabulary completeness, the closed use_type set, the two verbatim string quirks,
+the spatial-envelope query shape, the absence of `returnCentroid` on a point layer, and the
+coverage gate in both directions. Full suite: **58 unit test files green.**
+
+---
+
 ## PHASE 1 STANDARD ARCGIS WIRE PASS (2026-07-28) — 26 of 27 endpoints wired (registry 86 → 112, arcgis 62 → 88)
 
 Source brief: `docs/implementation-packets/claude_code_phase1_prompt.md` +
@@ -2969,6 +3194,127 @@ have placed every marker in the wrong hemisphere.
 
 Same as Phase 1: `jurisdiction-registry.json` is a static import bundled into the edge function
 (`index.ts:69`), so these 12 entries do nothing until `deploy-edge-functions.yml` runs for
+`get-address-report` and the cache refreshes (`dev_refresh_fire`, daily 09:00 UTC).
+
+---
+
+## PHASE 4 SPECIAL-HANDLING WIRE PASS (2026-07-28) — 3 of 6 endpoints wired (registry 125 → 128), 3 rejected with receipts
+
+Source brief: `docs/implementation-packets/claude_code_phase4_prompt.md` +
+`claude_code_implementation.json` → `phase4_special_handling` (6 endpoints, 533 ZIPs).
+**Config only — no connector, engine or schema change.** Branch `claude/phase4-special-handling`.
+Every vocabulary below is VERBATIM live output; four `recon-fetch` rounds — **30384902474**,
+**30385163406**, **30385461375**, **30385625756** (targets under `scripts/recon/p4-*.json`).
+
+### STANDING ANSWER — on **socrata**, `status_const` DOES bypass `status_to_bucket` (the opposite of arcgis)
+
+The Phase 2 standing answer above ("`status_const` does NOT bypass `status_to_bucket`") is an
+**arcgis** fact and does not carry to the socrata connector. `sources/socrata.ts` assigns the
+constant to *both* sides directly — `statusRaw = entry.status_const; bucket = entry.status_const;`
+(l.283-285) — and never consults the lookup, so a socrata `status_const` entry keeps all four
+buckets **empty** (the `east-baton-rouge-building-permits` / `marin-county-building-permits`
+shape), while an arcgis one must echo the constant into its bucket. Wiring either connector with
+the other's shape emits zero records. Both new socrata entries here use the empty-bucket form; the
+one new arcgis entry has a real status column and no constant at all.
+
+### Wired (3)
+
+| registry_id | platform | jurisdiction | special handling | live receipt |
+|---|---|---|---|---|
+| `buffalo-building-permits` | socrata | City of Buffalo (NY/Erie) | no status column → `status_const` | 14214 → **67** rows, 14216 → **92** on the exact query the connector builds |
+| `prince-georges-county-permits` | socrata | Prince George's County (MD) | no geometry → `geocode_assemble`; **numeric ZIP** | 20772 → **33**, 20740 → **13**, 20785 → **7** |
+| `butler-county-ks-permits` | arcgis | Butler County (KS) | no jobsite ZIP → `spatial_zip_radius_mi` | envelope smoke returns real Butler points, lat 37.67–37.76 |
+
+### Coverage strings verified against the live `communities` table
+
+The coverage gate matches `communities.state`/`county` verbatim (trim + lowercase), so a wrong
+county string is a silent no-op — the `harris-county-permits` failure class. Queried live:
+**NY/`Erie` → 72 ZIP pages**, **MD/`Prince George's` → 36**, **KS/`Butler` → 19** — each exactly the
+ZIP count the packet lists for that endpoint, so all three entries have a real surface the moment
+the function is deployed. (The rejected three would have had one too: NJ's ten counties hold 359 ZIP
+pages, VA/Arlington 11, WI/Milwaukee 36 — their blockers are the datasets, not our coverage.)
+
+Every vocabulary is complete — each set sums **exactly** to its row count: Buffalo 27 `aptype`
+values = 275,572; Prince George's 3 `permit_category` = 461,508 (and 115 `permit_type` = 461,508);
+Butler 9 `open_closed` + 1 null = 911.
+
+### Prince George's — `zip_code` is a NUMBER (the connector's default predicate 400s)
+
+The socrata connector's default ZIP clause is `upper(zip_code)='20772'`, which the portal rejects:
+`HTTP 400 query.soql.type-mismatch — "Type mismatch for upper, is number"` (verified live, run
+30385461375). `zip_numeric: true` switches it to `zip_code=20772`, which returns rows. This is the
+`east-baton-rouge-building-permits` option and the second time it has been needed; **check the ZIP
+column's TYPE before wiring any socrata entry** — the failure is a hard 400, not an empty result,
+so it would have surfaced only after deploy.
+
+### Butler KS — the packet's boolean type flags are "No" on 100% of rows
+
+The brief specifies a custom `type_map` over `buildingpermit` / `solarpermit` /
+`buildingsiteonlypermit` ("all Yes/No strings", *"If `buildingpermit = "Yes"` → Residential or
+Commercial … If `solarpermit = "Yes"` → Utility"*). **A groupBy over all three fields returns
+exactly ONE combination:** `{buildingpermit:"No", buildingsiteonlypermit:"No", solarpermit:"No"}`,
+`n=911` — there is no `Yes` anywhere in the layer. Their field *aliases* explain why: "Building
+Permit **Complete**", "Solar Permit **Complete**", "Building Site Only Permit **Complete**" — they
+are workflow-completion checkboxes (`defaultValue: "No"`), not permit-type flags. A `type_map` over
+them would classify every record identically and carry zero information.
+
+The only other candidate, `zoning` (16 verbatim values summing to 911 — RURAL RESIDENTIAL DISTRICT
+363, AGRICULTURAL DISTRICT 40 192, AGRICULTURAL DISTRICT 80 133, URBAN JURISDICTION 126, …), is the
+**parcel's** zoning district, not the permit's use; mapping it would invent a classification the
+source never states. The entry therefore ships with **no `type_map`** and every record is
+`use_type:"unclassified"` (logged) — the fail-closed outcome the registry rules prescribe, not a
+guess. **Standing answer: a boolean-flag "type" field must be proven to vary before a `type_map` is
+built on it — a single groupBy combination means the field is a workflow checkbox, not a classifier.**
+
+Butler's other trap: the layer's only ZIP field is `cama_zip`, the CAMA landowner's **mailing** ZIP
+(ZIP+4, frequently out of state — 01801 MA, 15317 PA, 30068 GA observed), **not** the jobsite. It is
+not mapped; scoping is `spatial_zip_radius_mi: 5` on the layer's own point geometry.
+
+### NOT wired — 3 rejections with receipts
+
+1. **NJ statewide (`data.nj.gov` `w9se-dmra`) — unscopable and unplaceable.** The dataset has **no
+   ZIP column, no street-address column and no geometry**: the 36 columns are comu/treasurycode/
+   muniname/munitype/county/recordid/**block**/**lot**/permitno/status/permitstatusdesc/permitdate/
+   certdate/permittype/permittypedesc/certtype/certtypedesc/certcount/…fees…/usegroup/usegroupdesc/
+   censusnumber/censusdesc/public/source/sourcedesc/version/processdate/pk. The socrata connector
+   needs either a ZIP column or `spatial_point_col` + radius; it has neither, so the entry would be
+   quarantined ("no zip column mapped — statewide dataset skipped") and emit nothing. There is also
+   nothing to geocode — block/lot is not an address, and the packet's fallback ("municipality
+   centroid lookup") would place every permit in a town at one fabricated point, which the
+   anti-fabrication directive forbids. Other findings while confirming: the row count is
+   **2,755,796**, not the packet's 99,808; `permitstatusdesc` has only 2 values (Permit 1,418,735 /
+   Certificate 1,337,061); and `permitdate` ranges **1113-11-11 → 2925-08-15** (unusable dates).
+2. **Arlington VA (`datahub-v2.arlingtonva.us/api/RealEstate/Permit`) — no connector, and no
+   scopable field.** `platform: "json_api"` does not exist: `sources/` holds arcgis, socrata, ckan,
+   csv, carto (+ tceq-cr, tdlr-tabs) only, and `index.ts` calls exactly those. Even with a
+   connector, the response has **no ZIP, no address and no geometry** (permitKey, provalLrsnId,
+   realEstatePropertyCode, permitNbr, permitActivationDate, permitCode, permitCostEstimateAmt,
+   permitCompletedDate, permitCompletedPct, permitNoteText) — records join to parcels by
+   `realEstatePropertyCode`, and no parcel endpoint is in scope for this packet. The packet's own
+   date field, **`permitActivationDate`, is an empty string on every sampled record**.
+3. **Milwaukee WI (`data.milwaukee.gov` CKAN `828e9630-…`) — no ZIP column.** The resource's 10
+   fields are `_id`, Date Opened, **Address**, Record ID, Permit Type, Status, Date Issued,
+   Construction Total Cost, Use of Building, Dwelling units impact (16,685 rows). `sources/ckan.ts`
+   requires a mapped ZIP column and quarantines the resource otherwise ("no zip column mapped —
+   resource skipped for ZIP report"); the CKAN connector has no spatial-radius option and no
+   `geocode_assemble`, and the Address values are street-only ("2033 S 24TH ST"), the same
+   ungeolocatable shape that rejected Somerville MA and Orlando FL.
+
+All three are documented, not wired — an unusable source is documented, never wired.
+
+### ⚠️ Pre-existing defect noticed while confirming this (NOT touched by this PR)
+
+**`cincinnati-building-permits` (socrata) carries `include_types: ["Building","Wrecking"]`, which
+the socrata connector never reads.** `include_types` is a **csv-only** option (`sources/csv.ts:61`,
+applied at `l.316`); `grep -rn include_types sources/ index.ts` matches csv.ts and nothing else. The
+entry's intended noise filter is therefore inert — every Cincinnati permit type is ingested. The fix
+is to move the filter into `extra_where` (the socrata equivalent), but that changes what a live
+state renders, so it is flagged for the owner rather than changed here.
+
+### Not yet live — deploy is the remaining step
+
+Same as Phases 1–3: `jurisdiction-registry.json` is a static import bundled into the edge function
+(`index.ts:69`), so these 3 entries do nothing until `deploy-edge-functions.yml` runs for
 `get-address-report` and the cache refreshes (`dev_refresh_fire`, daily 09:00 UTC).
 
 ---

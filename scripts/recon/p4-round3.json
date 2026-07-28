@@ -1,0 +1,52 @@
+[
+ {
+  "id": "buf-smoke-14214",
+  "url": "https://data.buffalony.gov/resource/9p2d-f3yt.json?$where=upper%28zip%29%3D%2714214%27%20AND%20%28aptype%20in%20%28%27NEW%20RESI%27%2C%27NEW%20COM%27%2C%27DEMOLITION%27%2C%27GC%27%2C%27GARSHED%27%2C%27INTBLDOUT%27%2C%27PARKINGLOT%27%2C%27SWIM%20POOL%27%2C%27FENDRIVE%27%2C%27TOWERSATT%27%2C%27TANK%27%2C%27OUTDORCAFE%27%29%29%20AND%20issued%20%3E%20%272025-07-28T00%3A00%3A00%27&$limit=3",
+  "print_chars": 6000
+ },
+ {
+  "id": "buf-smoke-14214-count",
+  "url": "https://data.buffalony.gov/resource/9p2d-f3yt.json?$select=count%28%2A%29%20as%20n&$where=upper%28zip%29%3D%2714214%27%20AND%20%28aptype%20in%20%28%27NEW%20RESI%27%2C%27NEW%20COM%27%2C%27DEMOLITION%27%2C%27GC%27%2C%27GARSHED%27%2C%27INTBLDOUT%27%2C%27PARKINGLOT%27%2C%27SWIM%20POOL%27%2C%27FENDRIVE%27%2C%27TOWERSATT%27%2C%27TANK%27%2C%27OUTDORCAFE%27%29%29%20AND%20issued%20%3E%20%272025-07-28T00%3A00%3A00%27",
+  "print_chars": 500
+ },
+ {
+  "id": "buf-smoke-14216-count",
+  "url": "https://data.buffalony.gov/resource/9p2d-f3yt.json?$select=count%28%2A%29%20as%20n&$where=upper%28zip%29%3D%2714216%27%20AND%20%28aptype%20in%20%28%27NEW%20RESI%27%2C%27NEW%20COM%27%2C%27DEMOLITION%27%2C%27GC%27%2C%27GARSHED%27%2C%27INTBLDOUT%27%2C%27PARKINGLOT%27%2C%27SWIM%20POOL%27%2C%27FENDRIVE%27%2C%27TOWERSATT%27%2C%27TANK%27%2C%27OUTDORCAFE%27%29%29%20AND%20issued%20%3E%20%272025-07-28T00%3A00%3A00%27",
+  "print_chars": 500
+ },
+ {
+  "id": "pg-smoke-20772",
+  "url": "https://data.princegeorgescountymd.gov/resource/weik-ttee.json?$where=upper%28zip_code%29%3D%2720772%27%20AND%20%28permit_category%20in%20%28%27Building%20Permit%27%2C%27Site%20Road%20Permit%27%29%29%20AND%20permit_issuance_date%20%3E%20%272025-07-28T00%3A00%3A00%27&$limit=3",
+  "print_chars": 4000
+ },
+ {
+  "id": "pg-smoke-20772-count",
+  "url": "https://data.princegeorgescountymd.gov/resource/weik-ttee.json?$select=count%28%2A%29%20as%20n&$where=upper%28zip_code%29%3D%2720772%27%20AND%20%28permit_category%20in%20%28%27Building%20Permit%27%2C%27Site%20Road%20Permit%27%29%29%20AND%20permit_issuance_date%20%3E%20%272025-07-28T00%3A00%3A00%27",
+  "print_chars": 500
+ },
+ {
+  "id": "pg-smoke-20740-count",
+  "url": "https://data.princegeorgescountymd.gov/resource/weik-ttee.json?$select=count%28%2A%29%20as%20n&$where=upper%28zip_code%29%3D%2720740%27%20AND%20%28permit_category%20in%20%28%27Building%20Permit%27%2C%27Site%20Road%20Permit%27%29%29%20AND%20permit_issuance_date%20%3E%20%272025-07-28T00%3A00%3A00%27",
+  "print_chars": 500
+ },
+ {
+  "id": "buf-landing",
+  "url": "https://data.buffalony.gov/d/9p2d-f3yt",
+  "print_chars": 400
+ },
+ {
+  "id": "pg-landing",
+  "url": "https://data.princegeorgescountymd.gov/d/weik-ttee",
+  "print_chars": 400
+ },
+ {
+  "id": "butler-spatial-smoke",
+  "url": "https://services5.arcgis.com/SU4Aj97XUNDcwkDb/arcgis/rest/services/Permits_Premium/FeatureServer/0/query?where=1%3D1&geometry=%7B%22xmin%22%3A%20-96.93%2C%20%22ymin%22%3A%2037.67%2C%20%22xmax%22%3A%20-96.83%2C%20%22ymax%22%3A%2037.77%2C%20%22spatialReference%22%3A%20%7B%22wkid%22%3A%204326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=permitid,open_closed&returnGeometry=true&outSR=4326&f=json",
+  "print_chars": 3000
+ },
+ {
+  "id": "butler-zoning-vocab",
+  "url": "https://services5.arcgis.com/SU4Aj97XUNDcwkDb/arcgis/rest/services/Permits_Premium/FeatureServer/0/query?where=1%3D1&groupByFieldsForStatistics=zoning&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22OBJECTID%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&f=json",
+  "print_chars": 5000
+ }
+]
