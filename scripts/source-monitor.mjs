@@ -149,6 +149,98 @@ async function arcgisDistinct(layerUrl, field, extraWhere) {
   return (r.json.features || []).map((f) => f.attributes[field]);
 }
 
+// ── live status-domain readers for the non-arcgis/socrata families ──────────────
+// Each mirrors what its connector actually fetches, so a value flagged here is a value the
+// connector would really see and really drop. Any of them returning null means "could not
+// read" → reported as unreachable, never as drift.
+
+// CKAN: the same datastore_search_sql action the connector pages with (sources/ckan.ts).
+async function ckanStatusCounts(entry, field) {
+  const where = entry.extra_where ? ` WHERE ${entry.extra_where}` : '';
+  const sql = `SELECT "${field}" AS v, COUNT(*) AS n FROM "${entry.resource_id}"${where} GROUP BY "${field}"`;
+  const r = await jget(`${entry.base_url}/api/3/action/datastore_search_sql?sql=${encodeURIComponent(sql)}`);
+  if (!r.ok || r.json?.success !== true) return null;
+  return (r.json.result?.records || []).map((x) => ({ value: x.v, n: parseInt(x.n, 10) || 0 }));
+}
+
+// Carto: raw SQL over the same table the connector SELECTs (sources/carto.ts).
+async function cartoStatusCounts(entry, field) {
+  const where = entry.extra_where ? ` WHERE ${entry.extra_where}` : '';
+  const sql = `SELECT ${field} AS v, count(*) AS n FROM ${entry.table}${where} GROUP BY ${field}`;
+  const r = await jget(`${entry.sql_url}?q=${encodeURIComponent(sql)}`);
+  if (!r.ok || r.json?.error) return null;
+  return (r.json.rows || []).map((x) => ({ value: x.v, n: parseInt(x.n, 10) || 0 }));
+}
+
+// Opendatasoft: a facet read returns the distinct values + counts without pulling rows.
+async function odsStatusCounts(entry, field) {
+  const r = await jget(`${entry.base_url}/api/records/1.0/search/?dataset=${encodeURIComponent(entry.dataset_id)}` +
+    `&rows=0&facet=${encodeURIComponent(field)}`);
+  if (!r.ok || !r.json) return null;
+  const grp = (r.json.facet_groups || []).find((g) => g.name === field);
+  if (!grp) return [];
+  return (grp.facets || []).map((f) => ({ value: f.name, n: f.count ?? 0 }));
+}
+
+// CSV: no query API — download the file and count the status column, applying the SAME
+// include_types / recency projection the connector applies at parse time (sources/csv.ts),
+// so rows the connector never processes cannot register as drift.
+function parseCsvRows(text) {
+  const out = []; let i = 0; const n = text.length;
+  while (i < n) {
+    const row = [];
+    for (;;) {
+      if (text[i] === '"') {
+        let s = ++i, field = '';
+        for (;;) {
+          const q = text.indexOf('"', i);
+          if (q < 0) { field += text.slice(s); i = n; break; }
+          if (text[q + 1] === '"') { field += text.slice(s, q + 1); i = s = q + 2; continue; }
+          field += text.slice(s, q); i = q + 1; break;
+        }
+        row.push(field);
+      } else {
+        let e = i;
+        while (e < n && text[e] !== ',' && text[e] !== '\n' && text[e] !== '\r') e++;
+        row.push(text.slice(i, e)); i = e;
+      }
+      if (text[i] === ',') { i++; continue; }
+      break;
+    }
+    if (text[i] === '\r') i++;
+    if (text[i] === '\n') i++;
+    if (row.length > 1 || row[0] !== '') out.push(row);
+  }
+  return out;
+}
+async function csvStatusCounts(entry, field) {
+  const r = await jget(entry.url, { asText: true });
+  if (!r.ok || !r.text) return null;
+  const rows = parseCsvRows(r.text);
+  if (rows.length < 2) return null;
+  const hIdx = new Map(rows[0].map((h, idx) => [String(h).trim(), idx]));
+  const sIdx = hIdx.get(field);
+  if (sIdx == null) return null;
+  const typeCol = Array.isArray(entry.column_map?.type_source) ? entry.column_map.type_source[0] : entry.column_map?.type_source;
+  const tIdx = typeCol ? hIdx.get(typeCol) : undefined;
+  const include = entry.include_types ? new Set(entry.include_types.map((t) => String(t).trim())) : null;
+  const dateCol = Array.isArray(entry.column_map?.file_date) ? entry.column_map.file_date[0] : entry.column_map?.file_date;
+  const dIdx = dateCol ? hIdx.get(dateCol) : undefined;
+  const cutoff = entry.recency_days > 0 ? Date.now() - entry.recency_days * 86400000 : null;
+  const tally = new Map();
+  for (let k = 1; k < rows.length; k++) {
+    const row = rows[k];
+    if (include && tIdx != null) { if (!include.has(String(row[tIdx] ?? '').trim())) continue; }
+    if (cutoff != null && dIdx != null) {
+      const d = new Date(String(row[dIdx] ?? '').trim());
+      if (isNaN(d.getTime()) || d.getTime() < cutoff) continue;
+    }
+    const v = String(row[sIdx] ?? '').trim();
+    tally.set(v, (tally.get(v) ?? 0) + 1);
+  }
+  return [...tally].map(([value, n]) => ({ value, n }));
+}
+
 async function arcgisMaxDate(layerUrl, dateField) {
   const stats = encodeURIComponent(JSON.stringify([{ statisticType: 'max', onStatisticField: dateField, outStatisticFieldName: 'mx' }]));
   const r = await jget(`${layerUrl}/query?where=1%3D1&outStatistics=${stats}&f=json`);
@@ -512,7 +604,17 @@ if (wired.length && !DRY) writeFileSync(REGISTRY_PATH, JSON.stringify(registry, 
 // Blank/null is not drift: the connectors count it as blank_status and fail closed.
 async function statusDomainDrift() {
   const out = [];
-  const families = [['arcgis', registry.arcgis || []], ['socrata', registry.socrata || []]];
+  // EVERY connector family with a status column, not just the two big ones. Shipping a
+  // completeness gate that itself covers only part of the surface would recreate exactly the
+  // partial-sampling gap this check exists to close (founder decision, 2026-07-29).
+  const families = [
+    ['arcgis', registry.arcgis || []],
+    ['socrata', registry.socrata || []],
+    ['ckan', registry.ckan || []],
+    ['csv', registry.csv || []],
+    ['carto', registry.carto || []],
+    ['opendatasoft', registry.opendatasoft || []],
+  ];
   for (const [family, entries] of families) {
     for (const e of entries) {
       const field = e.column_map?.status_raw;
@@ -524,15 +626,25 @@ async function statusDomainDrift() {
       }
       if (!mapped.size) continue;                       // nothing declared → not a drift signal
       let live = null;
-      if (family === 'arcgis') {
-        const rows = await arcgisGroupBy(e.service_url, field, e.extra_where);
-        if (rows) live = rows.map((r) => ({ value: r.value, n: r.n }));
-      } else {
-        const where = e.extra_where ? `&$where=${encodeURIComponent(e.extra_where)}` : '';
-        const r = await jget(`https://${e.domain}/resource/${e.dataset_id}.json` +
-          `?$select=${encodeURIComponent(field)},count(*) as n&$group=${encodeURIComponent(field)}&$limit=2000${where}`);
-        if (r.ok && Array.isArray(r.json)) live = r.json.map((x) => ({ value: x[field], n: parseInt(x.n, 10) || 0 }));
-      }
+      try {
+        if (family === 'arcgis') {
+          const rows = await arcgisGroupBy(e.service_url, field, e.extra_where);
+          if (rows) live = rows.map((r) => ({ value: r.value, n: r.n }));
+        } else if (family === 'socrata') {
+          const where = e.extra_where ? `&$where=${encodeURIComponent(e.extra_where)}` : '';
+          const r = await jget(`https://${e.domain}/resource/${e.dataset_id}.json` +
+            `?$select=${encodeURIComponent(field)},count(*) as n&$group=${encodeURIComponent(field)}&$limit=2000${where}`);
+          if (r.ok && Array.isArray(r.json)) live = r.json.map((x) => ({ value: x[field], n: parseInt(x.n, 10) || 0 }));
+        } else if (family === 'ckan') {
+          live = await ckanStatusCounts(e, field);
+        } else if (family === 'carto') {
+          live = await cartoStatusCounts(e, field);
+        } else if (family === 'opendatasoft') {
+          live = await odsStatusCounts(e, field);
+        } else if (family === 'csv') {
+          live = await csvStatusCounts(e, field);
+        }
+      } catch { live = null; }   // any read failure → unreachable, never a false drift
       if (!live) { out.push({ registry_id: e.registry_id, family, field, unreachable: true, missing: [] }); continue; }
       let missing = live
         .filter((v) => v.value != null && String(v.value).trim() !== '' && !mapped.has(String(v.value).trim()))
@@ -555,7 +667,8 @@ async function statusDomainDrift() {
 }
 const drift = await statusDomainDrift();
 const driftReal = drift.filter((d) => !d.unreachable && d.missing.length);
-const driftChecked = [...(registry.arcgis || []), ...(registry.socrata || [])]
+const driftChecked = ['arcgis', 'socrata', 'ckan', 'csv', 'carto', 'opendatasoft']
+  .flatMap((f) => registry[f] || [])
   .filter((e) => e.column_map?.status_raw && !e.status_const &&
     ['proposed', 'approved', 'operating', 'exclude'].some((b) => (e.status_to_bucket?.[b] || []).length)).length;
 
