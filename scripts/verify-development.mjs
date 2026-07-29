@@ -293,7 +293,7 @@ async function main() {
             ` [live value differs only in case; update the registry map to match]`);
         if ((rep.unmapped_statuses || []).length)
           fails.push(`RUN-REPORT ${r.zip} ${rep.registry_id}: unmapped status(es) reached the engine — ` +
-            `${rep.unmapped_statuses.map((u) => `${u.status}(${u.count})`).join(', ')} (add to registry status_to_bucket)`);
+            `${rep.unmapped_statuses.map((u) => `${u.status}(${u.count}${u.sample ? `, e.g. ${u.sample}` : ''})`).join(', ')} (add to registry status_to_bucket)`);
         if ((rep.no_record_url || 0) > 0)
           fails.push(`RUN-REPORT ${r.zip} ${rep.registry_id}: ${rep.no_record_url} record(s) with no derivable record_url`);
       }

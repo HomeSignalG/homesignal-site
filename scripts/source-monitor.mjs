@@ -138,6 +138,17 @@ async function arcgisGroupBy(layerUrl, field, extraWhere) {
   return (r.json.features || []).map((f) => ({ value: f.attributes[field], n: f.attributes.n ?? f.attributes.N ?? 0 }));
 }
 
+// Distinct values, VERBATIM. Needed because ArcGIS groupBy statistics can CASE-FOLD the
+// returned value (the Denver standing answer: groupBy said UPPERCASE, the layer stores mixed
+// case), which would make an exact-match drift check report false positives every night.
+// groupBy is still used for the counts; anything it flags is confirmed against this first.
+async function arcgisDistinct(layerUrl, field, extraWhere) {
+  const where = encodeURIComponent(extraWhere || '1=1');
+  const r = await jget(`${layerUrl}/query?where=${where}&outFields=${encodeURIComponent(field)}&returnDistinctValues=true&returnGeometry=false&f=json`);
+  if (!r.ok || r.json.error) return null;
+  return (r.json.features || []).map((f) => f.attributes[field]);
+}
+
 async function arcgisMaxDate(layerUrl, dateField) {
   const stats = encodeURIComponent(JSON.stringify([{ statisticType: 'max', onStatisticField: dateField, outStatisticFieldName: 'mx' }]));
   const r = await jget(`${layerUrl}/query?where=1%3D1&outStatistics=${stats}&f=json`);
@@ -485,6 +496,69 @@ for (const f of findings) {
 }
 if (wired.length && !DRY) writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 1) + '\n');
 
+// Phase 3.5 — STATUS-DOMAIN DRIFT across the WHOLE registry.
+//
+// An unmapped status is the one soft-fail that DROPS a record: the connectors exclude it
+// (it cannot be bucketed) and only count it in their run report. verify-development already
+// fails on that report, but it drives a bounded RUN_REPORT_SAMPLE of ZIPs through the live
+// engine (3 by default) out of thousands, so an unmapped status on a quiet county can sit
+// undetected indefinitely — that is exactly how the Fort Worth / Provo drops (2026-07-29
+// TX/UT sweep) stayed invisible. This check is per-ENTRY instead of per-ZIP: one live
+// distinct-value read per registry entry, diffed against its own status_to_bucket, so
+// EVERY entry is covered every night regardless of which ZIPs get sampled.
+//
+// Values are compared EXACTLY after trim — the connectors do `lookup.get(statusRaw)` on a
+// trimmed string with no case folding, so a case difference is a real miss, not noise.
+// Blank/null is not drift: the connectors count it as blank_status and fail closed.
+async function statusDomainDrift() {
+  const out = [];
+  const families = [['arcgis', registry.arcgis || []], ['socrata', registry.socrata || []]];
+  for (const [family, entries] of families) {
+    for (const e of entries) {
+      const field = e.column_map?.status_raw;
+      // status_const entries have no status column to drift (bucket is assigned in code).
+      if (!field || e.status_const) continue;
+      const mapped = new Set();
+      for (const b of ['proposed', 'approved', 'operating', 'exclude']) {
+        for (const v of (e.status_to_bucket?.[b] || [])) mapped.add(String(v).trim());
+      }
+      if (!mapped.size) continue;                       // nothing declared → not a drift signal
+      let live = null;
+      if (family === 'arcgis') {
+        const rows = await arcgisGroupBy(e.service_url, field, e.extra_where);
+        if (rows) live = rows.map((r) => ({ value: r.value, n: r.n }));
+      } else {
+        const where = e.extra_where ? `&$where=${encodeURIComponent(e.extra_where)}` : '';
+        const r = await jget(`https://${e.domain}/resource/${e.dataset_id}.json` +
+          `?$select=${encodeURIComponent(field)},count(*) as n&$group=${encodeURIComponent(field)}&$limit=2000${where}`);
+        if (r.ok && Array.isArray(r.json)) live = r.json.map((x) => ({ value: x[field], n: parseInt(x.n, 10) || 0 }));
+      }
+      if (!live) { out.push({ registry_id: e.registry_id, family, field, unreachable: true, missing: [] }); continue; }
+      let missing = live
+        .filter((v) => v.value != null && String(v.value).trim() !== '' && !mapped.has(String(v.value).trim()))
+        .map((v) => ({ value: String(v.value).trim(), n: v.n }))
+        .sort((a, b) => b.n - a.n);
+      // CONFIRM before reporting (arcgis only): groupBy may have case-folded the value, in
+      // which case the "unmapped" string never actually occurs in the data. Keep only values
+      // the verbatim distinct-value read also shows as absent from status_to_bucket. A failed
+      // confirmation read is treated as "cannot confirm" → report nothing, never a false red.
+      if (missing.length && family === 'arcgis') {
+        const verbatim = await arcgisDistinct(e.service_url, field, e.extra_where);
+        if (!verbatim) { out.push({ registry_id: e.registry_id, family, field, unreachable: true, missing: [] }); continue; }
+        const present = new Set(verbatim.filter((v) => v != null).map((v) => String(v).trim()));
+        missing = missing.filter((m) => present.has(m.value) && !mapped.has(m.value));
+      }
+      if (missing.length) out.push({ registry_id: e.registry_id, family, field, unreachable: false, missing });
+    }
+  }
+  return out;
+}
+const drift = await statusDomainDrift();
+const driftReal = drift.filter((d) => !d.unreachable && d.missing.length);
+const driftChecked = [...(registry.arcgis || []), ...(registry.socrata || [])]
+  .filter((e) => e.column_map?.status_raw && !e.status_const &&
+    ['proposed', 'approved', 'operating', 'exclude'].some((b) => (e.status_to_bucket?.[b] || []).length)).length;
+
 // Phase 4 — report
 const snapshot = await devBackedSnapshot();
 let prevSnapshot = null;
@@ -507,10 +581,29 @@ const section = [
   `|---|---|---|`,
   ...findings.map((f) => `| ${f.id} | ${f.result} | ${String(f.evidence).replace(/\|/g, '\\|').slice(0, 300)} |`),
   ...(flagged.length ? [``, `### Flagged shapes — what connector work each needs`, ...flagged.map((f) => `- **${f.id}** — ${f.res?.shape || 'unrecognized shape'}: ${f.res?.needs || ''}`)] : []),
+  // Status-domain drift: an unmapped status DROPS records, so it is reported first-class and
+  // fails the run (the workflow greps STATUS_DRIFT=1 after committing this report).
+  ``,
+  `### Status-domain drift — unmapped statuses DROP records`,
+  `- Registry entries checked: **${driftChecked}** · entries with drift: **${driftReal.length}** · unreachable: **${drift.length - driftReal.length}**`,
+  ...(driftReal.length
+    ? [
+      ``,
+      `| registry_id | status field | unmapped value(s) — records dropped |`,
+      `|---|---|---|`,
+      ...driftReal.map((d) => `| ${d.registry_id} | ${d.field} | ${d.missing.map((m) => `\`${String(m.value).replace(/\|/g, '\\|')}\` (${m.n})`).join(', ').slice(0, 400)} |`),
+      ``,
+      `Fix: add each value verbatim to that entry's \`status_to_bucket\` in \`jurisdiction-registry.json\`. Never normalize or re-case — the connectors match exactly after trim.`,
+    ]
+    : [`- No unmapped statuses anywhere in the registry.`]),
 ].filter((x) => x !== null).join('\n') + '\n';
 
 if (!DRY) appendFileSync(REPORT_PATH, section);
 console.log(section);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, section);
-console.log(`${DRY ? '[dry-run] ' : ''}done: ${wired.length} wired, ${flagged.length} flagged, ${findings.length} findings.`);
+console.log(`${DRY ? '[dry-run] ' : ''}done: ${wired.length} wired, ${flagged.length} flagged, ${findings.length} findings, ${driftReal.length} status-drift.`);
 if (wired.length) console.log('REGISTRY_CHANGED=1');
+// Grep-able marker (same idiom as REGISTRY_CHANGED). The workflow fails the run on this
+// AFTER committing the report, so the evidence lands even though the run goes red. Printed
+// last so it is never confused with a per-target line.
+if (driftReal.length) console.log('STATUS_DRIFT=1');
