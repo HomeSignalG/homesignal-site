@@ -824,6 +824,17 @@ composition, fail-closed without centroid, classic-path regression).
 ### Rejected in the same pass (anti-fabrication receipts — do not re-derive)
 - **Aurora**: data.auroragov.org DNS does not resolve (ENOTFOUND). Monitor re-probes nightly.
 - **Douglas County CO**: data-dougco.opendata.arcgis.com DCAT → HTTP 500 CONT_0001.
+  ⚠️ **AMENDED 2026-07-30 — the CATALOG 500 was not the whole story, and the source is still
+  unusable, for a different reason.** Found SEARCH-FIRST (the catalog 500s; the service does not):
+  `services6.arcgis.com/ONZht79c8QWuX759/arcgis/rest/services/Building_Permits/FeatureServer/0`
+  answers **200**. But it is **AGGREGATE BY DESIGN** — 684 rows of `Geography × Year × Quarter`
+  carrying `Single_Units, Double_Units, Row_Units, Apartment_Units, Total_Units` and
+  `Residential_Value / Commercial_Value / Industrial_Value / Institutional_Value /
+  NonResidential_Value / TotalPermits_Value`. **`geometryType` is null**; there is no permit
+  number, address, status or type. 684 rows are PERIODS, not permits — nothing to pin, classify
+  or link. **`candidates_exhausted` for Douglas on this source** (14 ZIP pages, CO's largest
+  single gap). Same class as the NJ DCA statewide dataset.
+  *Recorded so the catalog-500 note is not read as "unprobed" and re-derived a third time.*
 - **Arapahoe / Larimer / Weld counties**: no `data-<name>.opendata.arcgis.com` domain record
   (404 "Domain record(s) not found") — no first-party open-data catalog found at the standard
   Hub pattern; county permit systems not discoverable this pass.
