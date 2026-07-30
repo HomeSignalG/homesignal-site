@@ -138,7 +138,8 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
   design** (it is deliberately last so evidence lands first). Run summary, verbatim:
   `Registry entries checked: 105 · gating: 1 · unreachable: 3` ·
   `[dry-run] done: 0 wired, 147 flagged, 196 findings, 1 status-drift.`
-  **105/105 is now claimable — San Diego was the last unobserved entry.**
+  **105 CHECKED — 101 clean, 3 unreachable, 1 gating.** San Diego was the last unobserved
+  entry, so the sweep is complete; but "105/105 clean" would be wrong — see SD-UNREACHABLE.
 - **What it found — San Diego is the SOLE gating entry:**
   `| san-diego-approved-permits | APPROVAL_STATUS | no recency window — whole dataset is
   in-window | ``Pending Invoice Payment`` (11) |` — 11 records dropped today.
@@ -163,28 +164,35 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
   `docs/**` and `CLAUDE.md` are already in `unit-tests.yml`'s path filters, so `unit` registers.
 - **Acceptance:** merged; no future session depends on the workbook upload for the rules.
 
-### 6b. SD-FIX — `Pending Invoice Payment` — **GATED, contradicts a recorded receipt**
-- **State:** BLOCKED
-- **Gate:** **Founder decision.** The entry's `_receipts` records, from the 2026-07-27
-  icon-completeness pass: *"the dataset is APPROVED/issued permits by construction (its own
-  title), so no pre-issuance status exists in the published domain and `proposed:[]` is the
-  truth."* `Pending Invoice Payment` **is** a pre-issuance status. Mapping it overturns that
-  receipt, so it needs an explicit SUPERSESSION (Rule 14), not a quiet new value.
-- **Depends on:** — · **Blocks:** PR-428 (its acceptance is "merge when the drift check runs
-  green"; this is the only thing keeping it red)
-- **The current bucket map** is `proposed: []` · `approved: [Issued, Inspecting, Inspection
-  Followup]` · `operating: [Closed]` · `exclude: [Cancelled]`. The lifecycle puts
-  `Pending Invoice Payment` before `Issued` — pay the invoice, then it issues.
-- **Recommendation:** map it to **`proposed`** and supersede the receipt. The value is
-  self-describing English, not an opaque code like Cincinnati's `APRV_NR`, so
-  `status_unresolved` would be over-cautious and would keep dropping the 11 records.
-- **Expiry or error?** The 2026-07-27 receipt reasoned from *the dataset's title*, not from an
-  enumeration — so either it was incomplete then, or the value is new since. Decisive test:
-  the `APPROVAL_ISSUE_DATE` of the 11 records. Before 2026-07-27 → the enumeration missed
-  them (error); after → the world changed (expiry, the row 405 pattern). Needs a runner probe;
-  sandbox egress is 403.
-- **Acceptance:** bucket decided, receipt superseded explicitly, 11 records recovered, drift
-  check green.
+### 6b. SD-FIX — `Pending Invoice Payment` — **RESOLVED**
+- **State:** DONE (pending the confirming monitor run) · **Gate:** cleared by the founder
+- **Outcome:** mapped to `proposed`. A parallel session (`915eaab`) landed the same
+  `status_to_bucket` change but left `_receipts` untouched; `f5c9e22`/HEAD adds the
+  supersession, which was the missing half.
+- ⚠️ **My first reading of the receipt was WRONG and the correction matters.** I quoted only
+  its closing clause — *"the dataset is APPROVED/issued permits by construction (its own
+  title), so no pre-issuance status exists"* — and concluded the entry had never been probed.
+  The **first half of the same 1,637-character string** is a genuine 2026-07-16 enumeration:
+  28,515 rows, 151 type|status combos, vocabulary verbatim, **5 statuses found**.
+- **So the supersession overturns the INFERENCE only.** The enumeration was correct when run;
+  the "by construction" line inferred from the dataset title that no pre-issuance status
+  *could* exist, and that is the part that is wrong. The vocabulary grew — **expiry, not
+  error**, the same shape as the TX government feeds. The receipt explicitly states the
+  original enumeration is not being called incorrect.
+- **Rule shipped from this** (PR #436): a receipt may hold both a measurement and an inference;
+  quote and evaluate the whole receipt before superseding any part, and mark a
+  "by construction"/"by definition" clause as inference even inside a real probe.
+
+### 6c. SD-UNREACHABLE — the drift report counts unreachables but never names them
+- **State:** READY · **Gate:** NONE · **Depends on:** —
+- **Detail:** run `30569691125` reports `unreachable: 3` **once, in the section header, and
+  emits no list**. Verified by searching the whole drift section: exactly one occurrence of the
+  word. Gating, Tier-2, Tier-3 and `status_unresolved` findings all name their `registry_id`;
+  unreachables do not. So for those 3 entries "unreachable" is indistinguishable from "clean" —
+  the instrument-silence failure (§8) inside the instrument built to prevent it.
+- **New item rather than an extension of #428 (Rule 16)** — found mid-flight on authorized work.
+- **Acceptance:** the report names each unreachable `registry_id` and the reason its reader
+  returned null.
 
 ### 7. TDLR-TABS — investigate before fix-or-delete
 - **State:** READY
