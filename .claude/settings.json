@@ -18,7 +18,17 @@
       "mcp__github__create_pull_request",
       "mcp__github__pull_request_read",
       "mcp__Claude_Code_Remote__add_repo",
-      "mcp__Claude_Code_Remote__register_repo_root"
+      "mcp__Claude_Code_Remote__register_repo_root",
+      "mcp__Supabase__deploy_edge_function",
+      "mcp__Supabase__list_edge_functions",
+      "mcp__Supabase__get_edge_function",
+      "mcp__Supabase__get_advisors",
+      "mcp__Supabase__get_logs",
+      "mcp__github__merge_pull_request",
+      "mcp__github__actions_run_trigger",
+      "mcp__github__actions_list",
+      "mcp__github__get_job_logs",
+      "mcp__github__list_pull_requests"
     ]
   }
 }
