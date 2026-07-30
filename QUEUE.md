@@ -35,6 +35,87 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ---
 
+## RESUME POINT — read this first (written 2026-07-30, end of session)
+
+The next session continues the **Live loop**: run the scoreboard → take the state nearest 90%
+→ uncovered counties largest-first → search-first discovery → three-part liveness test → wire on
+an existing connector family → PR/merge/deploy/verify → one-line report when a state crosses 90%.
+**Rank on RECORD coverage, never the county-gate.**
+
+### Established this session (do not re-derive)
+
+- **Workbook row 419 EXISTS and is the baseline.** An earlier check in this session reported
+  "row 419 does not exist"; that check was picking the alphabetically-last upload filename, which
+  sorted `0071` above `0073`/`0075`. **Select the workbook by mtime, not by name.**
+- **NV record-coverage reproduced independently against the DB**, and it matches rows 419/421:
+
+  | county | ZIP pages | record-backed | dark |
+  |---|---|---|---|
+  | Humboldt | 8 | 2 | **6** |
+  | Elko | 14 | 10 | **4** |
+  | Nye | 11 | 7 | **4** |
+  | Washoe | 27 | 24 | **3** |
+  | Clark | 76 | 75 | 1 |
+  | Douglas | 9 | 8 | 1 |
+  | Lyon / Carson / Storey / Churchill | 13 | 13 | 0 |
+
+  **139 of 158 record-backed = 88.0%.** 90% of 158 → 143, so NV needs **+4 pages**.
+  (Row 419 read 138 yesterday; one page has re-cached since — row 406 volatility. Query is in the
+  session transcript; re-run it rather than quoting these numbers as settled.)
+
+- **The 17 dark NV ZIPs are named, and this reframes the work.** Jarbidge (89826), Lamoille,
+  Owyhee, Ruby Valley · Denio (89404), Mc Dermitt, Orovada, Paradise Valley, Valmy, Winnemucca
+  (89445) · Amargosa Valley, Manhattan, Duckwater, Gabbs · Empire, Gerlach (89412), Reno (89510).
+  These are the least-developed ZIPs in the Great Basin (Jarbidge pop. ~12, Denio ~50) and sit
+  almost entirely on federal land. **No county permit portal will ever exist for them** — so NV's
+  last 4 pages are a *statewide/federal* discovery problem, not a county one. Do not spend another
+  pass looking for a Humboldt or Elko county permit portal.
+
+### NV candidates assessed — receipts, so nobody re-probes
+
+| candidate | verdict | evidence |
+|---|---|---|
+| **Washoe County ArcGIS Hub** (`explore-washoe.opendata.arcgis.com`) | **candidates_exhausted** | DCAT pulled complete via pg_net — 207,005 bytes, JSON terminated, **429 titles**. Permit/planning filter returns only `Planned Land Use`, `Planning Areas`, `Regulated Zoning Codes Table`, `Subdivisions` — regulatory base layers, **no per-record status or date**. County permits run through OneNv.us (Accela), no open API found. |
+| **Washoe own server** `wcgisweb.washoecounty.us/arcgis` | no permit service | 200; 32 folders, 5 root services, none permit-related. |
+| **NDOM `DMRE_Approved_Permits_Notices`** | **STALE — reject** | 200, 204 rows, point geometry, has Lat/Long + County + DateApproved. County groupBy sums to **exactly 204** (positive control). Newest `DateApproved` = **2025-10-01, zero 2026 records**. Same class as St. Paul / Worcester / KCMO. ⚠️ Also **not** mining notices despite the name — the schema is exploration **drill-hole** permits (`DrillingContractor`, `DrillRigType`, `TotalDepth`, `BOPETestDate`). → nightly reprobe list. |
+| **NDOM `LandUseProposals`** | **blocked on schema — the most promising, unfinished** | 200, polygon (the shipped `featurePoint()` centroid path would apply), real on-mission records with **per-record `ProjectURL`** to BLM ePlanning / NV Clearinghouse / USFS (Silver Star Solar 1, Esmeralda 7 Solar, Goldrush Mine, Wabuska Geothermal, Argus Mineral Exploration). `exceededTransferLimit: true`, so >25 rows. **Two real blockers:** (1) fields are only `ProjectName, ProjectURL, CommentsDue, Acres` — **no status column and no filing date**; `CommentsDue` is null on 3 of the first 6 and the populated ones are 2023. That is the North Richland Hills reject shape. (2) polygons are enormous (43k–122k acres); one centroid against a 3-mile ZIP circle misrepresents the footprint. **Not wired. Not rejected either** — see NV-1. |
+
+### Open — NV-1: finish or firmly reject `LandUseProposals`
+
+Unfinished, and it is the live question. To close it, in order:
+1. Row count + full `CommentsDue` non-null ratio (is there ANY usable date, or is `status_const:
+   'proposed'` + no date the only option — and does the engine's "drop undated items" rule then
+   drop everything?).
+2. **The decisive test:** do its centroids land within 3 mi of **≥4 of the 17 named dark ZIPs**?
+   If not, it cannot move NV to 90% regardless of how clean the vocabulary is — reject and move on.
+3. Untried on the same org, ranked: `POOAndNotices` (Plans of Operation — the layer-0 path 400s,
+   find the right layer index), `NEPA_Data`, `All_BLM_Case_Recordation_Products_-_NV_view`
+   (layer 0 returned no fields — probably a group layer or different index).
+
+**If NV cannot reach 90%, that is a legitimate outcome** (pre-answered: record why, skip, next
+state). Next by record_pct: **DE 67.6%** → CO 57.9% → NC 48.8% → TN 44.2%.
+
+### Housekeeping carried into the next session
+
+- **PR #440 open** (`claude/typemap-completion`) — terminal-entry handling in the scoreboard,
+  suite green. Merge it.
+- **The scoreboard's live output has still never been read.** Run `30584138998` (source-monitor on
+  `main`, dispatched 21:37Z) carries the first real run. Its "Live scoreboard" step reports
+  **success in <=1s** — but that step is `continue-on-error: true`, which makes a FAILED step
+  report success, and <=1s is tight for 14 keyset pages over 13,292 rows. **Read the step's own
+  stdout before believing it ran**; a `live-scoreboard failed: ...` line would be invisible at job
+  level. (`config.js` does carry both keys in the format the fallback regex expects, so a
+  credentials failure is not the likely cause — but that is reasoning, not the log.)
+- ⚠️ **Expect the scoreboard to DISAGREE with row 419, and the disagreement is by construction:**
+  `scoreStates` measures the **coverage GATE** (does a complete entry declare this county?), while
+  row 419 measures **records actually landing**. Rows 258/259 and 419 both say the gate overstates.
+  Per the founder's instruction — *"If they disagree, trust the DB and fix the scoreboard"* — the
+  fix is to make the scoreboard's denominator record-based. **This is the highest-value single
+  change in the queue**: until it lands, the scoreboard ranks states by the wrong number.
+- **pg_net probing works with NO `User-Agent` header** — every probe above returned 200.
+
+---
+
 ## Ordered items
 
 ### 1. DB-01 — `public.communities` planner-statistics diagnosis
