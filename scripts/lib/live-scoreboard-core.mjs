@@ -139,3 +139,62 @@ export function rankDiscoveryWork(researchRows, zips, wiredIds = new Set()) {
     // Ready work first; blocked rows still listed, but never above something actionable.
     .sort((a, b) => (b.ready - a.ready) || (b.zip_pages_potential - a.zip_pages_potential));
 }
+
+/**
+ * LIST 2 (generated half) — uncovered COUNTIES ranked by ZIP pages, per state.
+ *
+ * This is the real shape of the goal. The statewide path is exhausted: every statewide non-EPA
+ * source for a non-Live state is unusable (NJ no geography, DE stale to 2024, WI needs a
+ * connector, NH/VA/NC are environmental permits). TX/UT/NV each reached Live via a statewide
+ * source and there are no more.
+ *
+ * Per-county is cheap because pages are modelled top-10-counties-per-state, so coverage
+ * concentrates: 46 of 47 non-Live states need TEN OR FEWER counties. Ranking largest-first per
+ * state turns "make a state Live" into a short, ordered list of metro counties — the ones most
+ * likely to publish Socrata/ArcGIS open data.
+ *
+ * `to_reach_90` is the honest target: how many MORE pages that state needs, not how many are
+ * missing in total. Stop adding counties once it crosses the threshold.
+ */
+export function rankUncoveredCounties(entries, zips, { threshold = LIVE_THRESHOLD } = {}) {
+  const wired = entries.filter((e) => !isFloorSource(e.registry_id));
+  const complete = wired.filter((e) => entryCompleteness(e).complete);
+  const covered = (z) => complete.some((e) => coversZip(e, z));
+
+  const perState = new Map();
+  for (const z of zips) {
+    const s = perState.get(z.state) || { total: 0, done: 0, counties: new Map() };
+    s.total++;
+    if (covered(z)) s.done++;
+    else {
+      const key = z.county || '(unknown county)';
+      s.counties.set(key, (s.counties.get(key) || 0) + 1);
+    }
+    perState.set(z.state, s);
+  }
+
+  const out = [];
+  for (const [state, s] of perState) {
+    if (s.total && s.done / s.total >= threshold) continue;          // already Live
+    const need = Math.max(0, Math.ceil(s.total * threshold) - s.done);
+    const ranked = [...s.counties.entries()]
+      .map(([county, zip_pages]) => ({ county, zip_pages }))
+      .sort((a, b) => b.zip_pages - a.zip_pages || a.county.localeCompare(b.county));
+
+    // How many counties, largest-first, actually clear the bar.
+    let acc = 0, counties_needed = 0;
+    for (const c of ranked) { if (acc >= need) break; acc += c.zip_pages; counties_needed++; }
+
+    out.push({
+      state,
+      zip_pages: s.total,
+      covered_complete: s.done,
+      pct_complete: s.total ? s.done / s.total : 0,
+      to_reach_90: need,
+      counties_needed,
+      counties: ranked,
+    });
+  }
+  // Cheapest conversions first — fewest counties, then fewest pages needed.
+  return out.sort((a, b) => a.counties_needed - b.counties_needed || a.to_reach_90 - b.to_reach_90);
+}

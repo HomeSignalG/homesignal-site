@@ -404,6 +404,33 @@ known-good control**, so a channel-wide failure is distinguishable from a per-ho
 permanently and nothing downstream ever revisits it. Here it contaminated a whole state's
 inventory and the parking decision built on it.
 
+### READ `CLAUDE.md` BEFORE ANY PHASE — it already contains the answer
+
+**Before starting a phase, read `CLAUDE.md`.** Not skim, not rely on the session summary — read
+the sections covering the surface you are about to touch. A standing answer is written down
+precisely so no future session pays for it twice.
+
+> **Two worked cases, both 2026-07-30, both in a single day:**
+>
+> 1. **The vendor-adapter conclusion.** `CLAUDE.md` records that per-state portals are the wrong
+>    unit and a **civic-agenda VENDOR adapter** is the real unlock, with Granicus / Legistar /
+>    CivicClerk / iQM2 / CivicPlus already built. A TX-GOV phase re-derived that from scratch
+>    across 19 counties and 8 vendor systems.
+> 2. **The NJ DCA dataset.** `CLAUDE.md` records it verbatim as *"aggregate-by-design (no
+>    address/ZIP)"* — already rejected. A later phase probed it fresh, pulled the full 46-column
+>    field list, and re-established the same rejection. The only thing gained was a sharper
+>    reason (it is per-permit and **ungeolocatable**, not aggregate).
+>
+> Neither re-derivation produced a different decision. Both cost a full phase.
+
+**Why this keeps happening:** re-deriving *feels* like diligence, and it produces real evidence,
+so nothing in the output flags it as waste. The tell is that the conclusion matches something
+already written down — by which point the cost is already paid.
+
+**The cheap check:** before probing a source or opening a state, grep `CLAUDE.md` and
+`docs/source-registry.md` for the jurisdiction, the vendor and the dataset id. A hit means the
+question is already answered; verify it still holds rather than starting over.
+
 ### SEARCH FIRST, PROBE SECOND — a guessed URL cannot return a verdict
 
 **A negative result from a URL you guessed answers "was my guess right", NOT "does the source

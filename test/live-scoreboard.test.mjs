@@ -108,3 +108,28 @@ test('an already-wired id is not re-listed as discovery work', () => {
     [{ registry_id: 'dup', coverage: [{ state: 'ZZ' }] }], zips('ZZ', 3), new Set(['dup']));
   assert.deepEqual(list, []);
 });
+
+test('uncovered counties rank largest-first, and counties_needed stops at 90%', async () => {
+  const { rankUncoveredCounties } = await import('../scripts/lib/live-scoreboard-core.mjs');
+  // 100 pages: 60 already covered by a complete entry, 40 spread over four uncovered counties.
+  const done = { registry_id: 'ok', coverage: [{ state: 'CO', county: 'Denver' }], status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
+  const pages = [
+    ...zips('CO', 60, 'Denver'),
+    ...zips('CO', 20, 'ElPaso'), ...zips('CO', 12, 'Larimer'),
+    ...zips('CO', 5, 'Weld'), ...zips('CO', 3, 'Boulder'),
+  ];
+  const [co] = rankUncoveredCounties([done], pages);
+  assert.equal(co.zip_pages, 100);
+  assert.equal(co.covered_complete, 60);
+  assert.equal(co.to_reach_90, 30, 'needs 90 covered, has 60');
+  assert.deepEqual(co.counties.map((c) => c.county), ['ElPaso', 'Larimer', 'Weld', 'Boulder'],
+    'largest-first');
+  assert.equal(co.counties_needed, 2, 'ElPaso 20 + Larimer 12 = 32 >= 30; stop there');
+});
+
+test('a state already at 90% is not listed as county work', async () => {
+  const { rankUncoveredCounties } = await import('../scripts/lib/live-scoreboard-core.mjs');
+  const done = { registry_id: 'ok', coverage: [{ state: 'ZZ', county: 'A' }], status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
+  const out = rankUncoveredCounties([done], [...zips('ZZ', 95, 'A'), ...zips('ZZ', 5, 'B')]);
+  assert.deepEqual(out, [], 'Live states drop off the work list entirely');
+});
