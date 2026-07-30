@@ -35,23 +35,47 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ---
 
-## RESUME POINT — read this first (updated 2026-07-31, DE complete)
+## RESUME POINT — read this first (updated 2026-07-31)
 
-The loop: run the scoreboard -> state nearest 90% on RECORD coverage -> uncovered counties
-largest-first -> search-first discovery -> three-part liveness test -> wire on an existing
-connector family -> PR/merge/deploy/verify -> one-line report when a state crosses 90%.
+### THE LOOP — note step 4, which I skipped once and reported a false Live
+
+`run scoreboard` → nearest state to 90% on RECORD coverage → uncovered counties largest-first →
+search-first discovery → three-part liveness test → wire on an existing connector family →
+**merge → deploy → re-cache (`development_reports`) → MATERIALIZE (`app_refresh_zip` →
+`app_projects`) → measure from `app_projects`** → one-line report when a state crosses 90%.
+
+🔴 **LIVE MEANS PAGES, MEASURED AFTER DEPLOY AND RE-CACHE (founder, 2026-07-31).** Wired + merged +
+emitting is NOT Live. Never declare Live from anything but a post-deploy DB read of `app_projects`.
+**Connector output is not page coverage** — a source can emit 468 perfect records into the cache
+while every page still serves pre-materialization data. Full rule in
+`docs/maps-go-live-governance.md`.
+
+⚠️ **And do not separate development from the EPA floor on a registry-id name.** In `app_projects` a
+facility row carries the FRS facility's OWN id in `registry_id` (e.g. `110054576320`), so
+`registry_id <> 'epa-frs'` counts the floor as coverage — it reported Sussex **22/22** when the truth
+was **0/22**. **Use `record_kind = 'development'`.**
 
 ### Done
 
-- **SCOREBOARD FIXED (row 429)** — PR #442. Ranks on RECORDS LANDING, not the coverage gate;
-  emits both plus `gate_overstatement`. RPC `dev_zip_source_ids` (parked at
-  `docs/dev-zip-source-ids-rpc.sql`), `continue-on-error` removed, runner asserts its own row
-  count. Control: NV reproduces 139/158 exactly.
-- **NV — UNREACHABLE** per rows 427/428. Do not reopen without a statewide federal-land source.
-- ✅ **DE — 46/68 (67.6%) -> 68/68 (100%).** Sussex was the only dark county; all 22 ZIP pages now
-  carry records. Wired `sussex-county-de-conditional-use` (PRs #444 · #445 docs · #446 pin fix).
-  468 records, 0 missing `record_url`, 0 unclassified, 0 missing coordinates. Bidirectional gate
-  proof: 0 Sussex records on Kent or New Castle pages.
+- **SCOREBOARD** — ranks on records (#442) and now reads **`app_projects`, not the cache** (#450).
+  Control: reproduces the row-419 baseline exactly across ten states.
+- ✅ **DE — 46/68 (67.6%) → 68/68 (100%), page-verified after materialization.** Wired
+  `sussex-county-de-conditional-use`; 468 rows across all 22 Sussex pages, 0 gate leaks.
+- **NV — UNREACHABLE** (rows 427/428). **CO — UNREACHABLE at 82.9%** by arithmetic.
+- **CO/Weld wired (#451)** — +12 pages, does not clear 90%. **Still needs deploy → re-cache →
+  materialize → measure.**
+
+### Next — NC 48.8%, then TN 44.2%
+
+Dark counties already measured, so do not re-derive:
+- **NC** (83/170, needs +70): Mecklenburg **34** · Buncombe 20 · Chatham 12 · Orange 10 · Union 9 ·
+  Wake 2. Mecklenburg is Charlotte — a real open-data city and half the gap. 34+20+12 = 66, so NC
+  needs essentially Mecklenburg + Buncombe + Chatham + Orange to clear 90%. Check that arithmetic
+  FIRST (row 428) before probing.
+- **TN** (88/199, needs +91): Shelby **41** · Rutherford 15 · Montgomery 13 · Williamson 12 ·
+  Sumner 9 · Maury 8 · Wilson 7 · Hamilton 5 · Davidson 1. Total dark = 111, so TN is reachable only
+  by taking almost all of them; Shelby (Memphis) sits behind `SHELBY-429`, a **new connector family
+  (gated)**. Very likely UNREACHABLE — do the arithmetic before the search.
 
 ### Three findings from the DE build worth carrying
 
