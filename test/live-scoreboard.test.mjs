@@ -15,8 +15,8 @@ const zips = (state, n, county = 'X', src = []) =>
   Array.from({ length: n }, (_, i) => ({ zip: `${state}${i}`, state, county, source_ids: [...src] }));
 
 test('BOTH maps are required — one alone is not complete', () => {
-  assert.equal(entryCompleteness({ status_to_bucket: { approved: ['Issued'] }, type_map: { A: 'Residential' } }).complete, true);
-  assert.deepEqual(entryCompleteness({ status_to_bucket: { approved: ['Issued'] } }).missing, ['type_map']);
+  assert.equal(entryCompleteness({ status_to_bucket: { proposed: [], approved: ['Issued'], operating: [], exclude: [] }, type_map: { A: 'Residential' } }).complete, true);
+  assert.deepEqual(entryCompleteness({ status_to_bucket: { proposed: [], approved: ['Issued'], operating: [], exclude: [] } }).missing, ['type_map']);
   assert.deepEqual(entryCompleteness({ type_map: { A: 'Residential' } }).missing, ['status_to_bucket']);
   assert.deepEqual(entryCompleteness({}).missing.sort(), ['status_to_bucket', 'type_map']);
 });
@@ -34,7 +34,7 @@ test('status_const satisfies COLOR — the Detroit issuance-ledger precedent', (
 
 test('EPA-FRS is tracked but never counts toward Live (row 272)', () => {
   assert.ok(isFloorSource('epa-frs'));
-  const entries = [{ registry_id: 'epa-frs', coverage: [{ state: 'NH' }], status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } }];
+  const entries = [{ registry_id: 'epa-frs', coverage: [{ state: 'NH' }], status_to_bucket: { proposed: [], approved: ['x'], operating: [], exclude: [] }, type_map: { t: 'u' } }];
   const [nh] = scoreStates(entries, zips('NH', 10, 'X', ['epa-frs']));
   assert.equal(nh.covered_complete, 0, 'the facilities floor must not make a state Live');
   assert.equal(nh.live, false);
@@ -50,7 +50,7 @@ test('statewide coverage (no county) covers every ZIP in the state; county-scope
 });
 
 test('90% is the threshold, measured on ZIP PAGES', () => {
-  const e = { registry_id: 'x', coverage: [{ state: 'ZZ', county: 'A' }], status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
+  const e = { registry_id: 'x', coverage: [{ state: 'ZZ', county: 'A' }], status_to_bucket: { proposed: [], approved: ['x'], operating: [], exclude: [] }, type_map: { t: 'u' } };
   const pages = [...zips('ZZ', 9, 'A', ['x']), ...zips('ZZ', 1, 'B')];   // 9 of 10 carry a record
   const [s] = scoreStates([e], pages);
   assert.equal(s.zip_pages, 10);
@@ -64,7 +64,7 @@ test('THE ROW-429 FIX — a declared county with NO records landing is NOT Live'
   // The entry is complete and its coverage declares the whole state, so the GATE reads 100%.
   // Not one record reaches a page. Before this fix the state read Live on nothing at all.
   const e = { registry_id: 'declared-but-dark', coverage: [{ state: 'ZZ' }],
-    status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
+    status_to_bucket: { proposed: [], approved: ['x'], operating: [], exclude: [] }, type_map: { t: 'u' } };
   const [s] = scoreStates([e], zips('ZZ', 20));
   assert.equal(s.covered_gate, 20, 'the gate still says every page is covered');
   assert.equal(s.pct_gate, 1);
@@ -75,7 +75,7 @@ test('THE ROW-429 FIX — a declared county with NO records landing is NOT Live'
 
 test('the UT shape — gate says Live, records say 35%, records win', () => {
   const e = { registry_id: 'udot-active-projects', coverage: [{ state: 'UT' }],
-    status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
+    status_to_bucket: { proposed: [], approved: ['x'], operating: [], exclude: [] }, type_map: { t: 'u' } };
   const pages = [...zips('UT', 109, 'A', ['udot-active-projects']), ...zips('UT', 201, 'B')];
   const [ut] = scoreStates([e], pages);
   assert.equal(ut.zip_pages, 310);
@@ -86,7 +86,7 @@ test('the UT shape — gate says Live, records say 35%, records win', () => {
 });
 
 test('a record from an INCOMPLETE entry counts as any-source, never as Live', () => {
-  const half = { registry_id: 'no-type', coverage: [{ state: 'ZZ' }], status_to_bucket: { a: ['x'] } };
+  const half = { registry_id: 'no-type', coverage: [{ state: 'ZZ' }], status_to_bucket: { proposed: [], approved: ['x'], operating: [], exclude: [] } };
   const [s] = scoreStates([half], zips('ZZ', 10, 'A', ['no-type']));
   assert.equal(s.covered_records, 0, 'unclassified pins are not coverage');
   assert.equal(s.covered_any, 10);
@@ -95,7 +95,7 @@ test('a record from an INCOMPLETE entry counts as any-source, never as Live', ()
 });
 
 test('records_observed is returned so the runner can refuse a wrong zero', () => {
-  const e = { registry_id: 'x', coverage: [{ state: 'ZZ' }], status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
+  const e = { registry_id: 'x', coverage: [{ state: 'ZZ' }], status_to_bucket: { proposed: [], approved: ['x'], operating: [], exclude: [] }, type_map: { t: 'u' } };
   const [none] = scoreStates([e], zips('ZZ', 5));
   assert.equal(none.records_observed, 0,
     'zero observations must be visible — an upstream fetch failure and a genuinely dark state '
@@ -105,8 +105,8 @@ test('records_observed is returned so the runner can refuse a wrong zero', () =>
 });
 
 test('convertible_by_completion isolates what a pure registry fix would win', () => {
-  const done = { registry_id: 'a', coverage: [{ state: 'ZZ', county: 'A' }], status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
-  const half = { registry_id: 'b', coverage: [{ state: 'ZZ', county: 'B' }], status_to_bucket: { a: ['x'] } };
+  const done = { registry_id: 'a', coverage: [{ state: 'ZZ', county: 'A' }], status_to_bucket: { proposed: [], approved: ['x'], operating: [], exclude: [] }, type_map: { t: 'u' } };
+  const half = { registry_id: 'b', coverage: [{ state: 'ZZ', county: 'B' }], status_to_bucket: { proposed: [], approved: ['x'], operating: [], exclude: [] } };
   const [s] = scoreStates([done, half], [...zips('ZZ', 5, 'A', ['a']), ...zips('ZZ', 7, 'B', ['b'])]);
   assert.equal(s.covered_complete, 5);
   assert.equal(s.covered_any, 12);
@@ -114,7 +114,7 @@ test('convertible_by_completion isolates what a pure registry fix would win', ()
 });
 
 test('THE CORE FIX — a NOT_WIRED row can never enter the registry-work list', () => {
-  const wired = [{ registry_id: 'wired-incomplete', platform: 'arcgis', coverage: [{ state: 'ZZ' }], status_to_bucket: { a: ['x'] } }];
+  const wired = [{ registry_id: 'wired-incomplete', platform: 'arcgis', coverage: [{ state: 'ZZ' }], status_to_bucket: { proposed: [], approved: ['x'], operating: [], exclude: [] } }];
   const research = [{ registry_id: 'WIDSPS-WI-BP', platform: 'Web Portal', research_status: 'Needs Connector', coverage: [{ state: 'WI' }] }];
   const work = rankRegistryWork(wired, zips('ZZ', 4));
   assert.equal(work.length, 1);
@@ -158,7 +158,7 @@ test('an already-wired id is not re-listed as discovery work', () => {
 test('uncovered counties rank largest-first, and counties_needed stops at 90%', async () => {
   const { rankUncoveredCounties } = await import('../scripts/lib/live-scoreboard-core.mjs');
   // 100 pages: 60 already covered by a complete entry, 40 spread over four uncovered counties.
-  const done = { registry_id: 'ok', coverage: [{ state: 'CO', county: 'Denver' }], status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
+  const done = { registry_id: 'ok', coverage: [{ state: 'CO', county: 'Denver' }], status_to_bucket: { proposed: [], approved: ['x'], operating: [], exclude: [] }, type_map: { t: 'u' } };
   const pages = [
     ...zips('CO', 60, 'Denver', ['ok']),
     ...zips('CO', 20, 'ElPaso'), ...zips('CO', 12, 'Larimer'),
@@ -175,7 +175,7 @@ test('uncovered counties rank largest-first, and counties_needed stops at 90%', 
 
 test('a state already at 90% is not listed as county work', async () => {
   const { rankUncoveredCounties } = await import('../scripts/lib/live-scoreboard-core.mjs');
-  const done = { registry_id: 'ok', coverage: [{ state: 'ZZ', county: 'A' }], status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
+  const done = { registry_id: 'ok', coverage: [{ state: 'ZZ', county: 'A' }], status_to_bucket: { proposed: [], approved: ['x'], operating: [], exclude: [] }, type_map: { t: 'u' } };
   const out = rankUncoveredCounties([done], [...zips('ZZ', 95, 'A', ['ok']), ...zips('ZZ', 5, 'B')]);
   assert.deepEqual(out, [], 'Live states drop off the work list entirely');
 });
@@ -194,7 +194,7 @@ test('aggregate-by-design is its own blocker — periods are not permits', async
 test('a terminal entry leaves the work list but is still reported and still not Live', async () => {
   const m = await import('../scripts/lib/live-scoreboard-core.mjs');
   const term = { registry_id: 'clark-county-active-projects', platform: 'arcgis',
-    coverage: [{ state: 'NV', county: 'Clark' }], status_to_bucket: { a: ['x'] },
+    coverage: [{ state: 'NV', county: 'Clark' }], status_to_bucket: { proposed: [], approved: ['x'], operating: [], exclude: [] },
     vocab_terminal: 'Rule 5: free-text type field (capital-projects descriptions)' };
   const pages = zips('NV', 76, 'Clark', ['clark-county-active-projects']);
   assert.deepEqual(m.rankRegistryWork([term], pages), [], 'never ranked — it cannot be completed');
@@ -204,3 +204,19 @@ test('a terminal entry leaves the work list but is still reported and still not 
   const [nv] = m.scoreStates([term], pages);
   assert.equal(nv.covered_complete, 0, 'terminal is still INCOMPLETE — the pins are unclassified');
 });
+
+test('ROW 264 — all four bucket KEYS must be present; a missing key is PARTIAL', async () => {
+  const m = await import('../scripts/lib/live-scoreboard-core.mjs');
+  const full = { proposed: [], approved: ['Recorded'], operating: [], exclude: [] };
+  assert.equal(m.entryCompleteness({ status_to_bucket: full, type_map: { A: 'Residential' } }).complete, true,
+    'one populated bucket + all four keys is COMPLETE — settled on the Del Valle pilot, where '
+    + 'austin-site-plan-cases has no operating stage yet TX is the reference Live state');
+  assert.deepEqual(
+    m.entryCompleteness({ status_to_bucket: { approved: ['Recorded'] }, type_map: { A: 'x' } }).missing,
+    ['status_to_bucket'],
+    'omitting a key is not the same as declaring it empty: [] claims "no such stage", absence claims nothing');
+  assert.deepEqual(m.REQUIRED_BUCKETS, ['proposed', 'approved', 'operating', 'exclude']);
+  // status_const carries the whole vocabulary, so it has no buckets to declare (Detroit).
+  assert.equal(m.entryCompleteness({ status_const: 'approved', type_map: { A: 'x' } }).complete, true);
+});
+

@@ -33,9 +33,33 @@ const nonEmptyMap = (m) => !!m && typeof m === 'object' && !Array.isArray(m) &&
  * because the publisher has no status column (the Detroit precedent). That is COMPLETE, not
  * missing — treating it as missing would rank correctly-wired issuance ledgers as broken.
  */
+export const REQUIRED_BUCKETS = ['proposed', 'approved', 'operating', 'exclude'];
+
+/**
+ * Row 264 verbatim: "Required buckets: proposed (orange), approved (blue), operating (green),
+ * exclude (removed from map). YES = all required buckets present. PARTIAL = missing buckets."
+ *
+ * "PRESENT" MEANS THE KEY EXISTS, NOT THAT IT IS POPULATED — settled empirically against the
+ * Del Valle 78617 pilot rather than by reading the sentence twice. `austin-site-plan-cases` is
+ * the largest contributor to that page (267 records) and carries only THREE non-empty buckets:
+ * Austin site plans have no 'operating' status. It sits inside TX, the reference Live state at
+ * 99.7%. So if "present" meant "non-empty", the pilot's own biggest source would be PARTIAL and
+ * the reference state could not be Live. Registry-wide only 52 of 129 entries have all four
+ * non-empty, which is the same answer at scale.
+ *
+ * An absent KEY is different: it means the author never considered that lifecycle stage, and
+ * those records fail closed silently. Requiring the key forces the decision to be explicit —
+ * `operating: []` says "this source has no built stage", which is a claim; omitting it says
+ * nothing.
+ */
+const bucketKeysComplete = (m) =>
+  !!m && typeof m === 'object' && !Array.isArray(m) && REQUIRED_BUCKETS.every((k) => k in m);
+
 export function entryCompleteness(entry) {
   const missing = [];
-  const hasStatus = nonEmptyMap(entry?.status_to_bucket) || !!entry?.status_const;
+  // status_const is the whole vocabulary by design (Detroit) — there are no buckets to declare.
+  const hasStatus = !!entry?.status_const
+    || (nonEmptyMap(entry?.status_to_bucket) && bucketKeysComplete(entry?.status_to_bucket));
   const hasType = nonEmptyMap(entry?.type_map) || !!entry?.use_type_const;
   if (!hasStatus) missing.push('status_to_bucket');   // pin COLOR
   if (!hasType) missing.push('type_map');             // pin ICON
