@@ -702,6 +702,18 @@ async function statusDomainDrift() {
       classify(outLive, false);
       gating.sort((a, b) => b.n - a.n); latent.sort((a, b) => b.n - a.n);
 
+      // One ROW PER VALUE, not per window half. A value present both inside and outside the
+      // window is one unresolved value with two counts — listing it twice makes the same
+      // finding look like two, and inflates the apparent size of the hatch.
+      const merged = new Map();
+      for (const u of unresolvedHits) {
+        const cur = merged.get(u.value) ?? { ...u, n: 0, nOut: 0, window: 'out' };
+        if (u.window === 'in') { cur.n = u.n; cur.window = 'in'; } else { cur.nOut = u.n; }
+        merged.set(u.value, cur);
+      }
+      unresolvedHits.length = 0;
+      unresolvedHits.push(...merged.values());
+
       // The escape hatch is BOUNDED. status_unresolved suppresses the gate for a value whose
       // meaning no one could establish — but if those records are more than 5% of what the
       // connector actually fetches, that is not an edge case, it is a mapping failure hiding
@@ -810,7 +822,7 @@ const section = [
       ``,
       `| registry_id | value | in-window records | share of fetched | first seen | records at first seen | what was asked, and of whom |`,
       `|---|---|---|---|---|---|---|`,
-      ...driftUnresolved.flatMap((d) => d.unresolved.map((u) => `| ${d.registry_id} | \`${String(u.value).replace(/\|/g, '\\|')}\` | ${u.window === 'in' ? u.n : `0 (out-of-window: ${u.n})`} | ${d.inTotal ? ((u.window === 'in' ? u.n : 0) / d.inTotal * 100).toFixed(2) + '%' : 'n/a'} | ${u.first_seen || '—'} | ${u.records_at_first_seen ?? '—'} | ${String(u.asked || '—').replace(/\|/g, '\\|').slice(0, 220)} |`)),
+      ...driftUnresolved.flatMap((d) => d.unresolved.map((u) => `| ${d.registry_id} | \`${String(u.value).replace(/\|/g, '\\|')}\` | ${u.n}${u.nOut ? ` (+${u.nOut} out-of-window)` : ''} | ${d.inTotal ? (u.n / d.inTotal * 100).toFixed(2) + '%' : 'n/a'} | ${u.first_seen || '—'} | ${u.records_at_first_seen ?? '—'} | ${String(u.asked || '—').replace(/\|/g, '\\|').slice(0, 220)} |`)),
     ]
     : []),
 ].filter((x) => x !== null).join('\n') + '\n';

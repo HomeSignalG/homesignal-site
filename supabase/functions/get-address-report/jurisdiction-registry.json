@@ -9066,7 +9066,9 @@
         "Approval - Construction - Master Plan Establish": "Development"
       },
       "status_to_bucket": {
-        "proposed": [],
+        "proposed": [
+          "Pending Invoice Payment"
+        ],
         "approved": [
           "Issued",
           "Inspecting",
