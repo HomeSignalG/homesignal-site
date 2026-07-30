@@ -25,8 +25,9 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 - **Goal (row 380):** 12,722 ZIP pages, 50 states. Live: NV 158 + TX 668 + UT 310 = **1,136**.
   **8,215 remain** — 5,647 across 34 partial states, 2,568 across 13 untouched.
-- **LIVE is not COVERED (row 381).** Texas is the warning: 668/668 live, **zero**
-  `government_notice` sources across all 22 counties. Always report both numbers.
+- **LIVE is not COVERED (row 381).** Texas is the standing example. ⚠️ **The "zero
+  `government_notice` sources" half is FALSE as measured 2026-07-30** — see TX-GOV below.
+  The principle stands; the number does not. Always report both numbers.
 - **7-phase playbook (rows 383–389).** Phases 1–6 are the work and are autonomous.
   **Phase 7 is the gate: the CLAIM** — sitemap, coverage claim, or reporting a state live.
   One report per state at Phase 7, not per phase.
@@ -85,7 +86,8 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 - ⚠️ **Group A and Group B are ALREADY COMMITTED. Do not re-scope them.** Group A:
   new-orleans +27 · new-hanover +6 · tacoma-accela +1 · gilbert-energov +1. Group B:
   `status_unresolved` for cincinnati 7 · new-orleans 2 · fort-collins 1 · san-jose 1.
-- **Remaining, exactly three things:** (1) rebase onto `9f0c5d8` — test-rebase clean, 67/67;
+- **Remaining, exactly three things:** (1) rebase onto `0d011e6` — **done**, 64/64 (not the
+  recorded 67/67; see the reconciliation log);
   (2) **San Diego `workflow_dispatch`** — the last unaudited entry; (3) merge when the drift
   check would run green.
 - **Acceptance:** rebased · San Diego observed · drift check green · merged. **No 105/105
@@ -105,9 +107,17 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 - **State:** READY (Tier 0 — close out live states first, row 355)
 - **Gate:** NONE for scoping and reporting. Phase 7 GATED as for any state.
 - **Depends on:** —
-- **Detail:** 22 counties, 668 ZIP pages, **zero sources wired**. Never started; an ingest
-  build, not cleanup, and still unscoped. This is the gap between Texas VERIFIED and Texas
-  COVERED.
+- ⚠️ **SCOPE CONTRADICTED BY MEASUREMENT — awaiting founder ruling.** Rows 328/355/364/381
+  say "zero sources wired." Measured live 2026-07-30: **4 active `government_notice` feeds
+  writing to `alerts` across 3 of 22 counties, producing 132 notices, newest 18:06Z** —
+  Denton 102 (Granicus RSS + RSS), Brazoria 25 (Legistar), Williamson 5 (RSS). A 5th row,
+  `travis-tx-civicclerk-meetings`, is `pipeline_type='government_notice'` but
+  `target_table='meetings'`, which is why the count reads 5 by pipeline_type and 4 by
+  target_table. National control: 747 active gov feeds / 16 states / 1,259 notices.
+- **Both numbers:** TX is **668/668 pages live**; **58/668 (8.7%) carry notices**; 610 render
+  honest-empty; **19 of 22 counties have no notice source**, incl. Dallas 174 pages, El Paso
+  145, Tarrant 99, Travis 86.
+- **Detail:** this is a PARTIAL build on already-supported connectors, not an unstarted one.
 - **Acceptance:** per-county source verdict for all 22 using the three-state system
   (`first_party_found` · `verification_blocked` · `candidates_exhausted`; **never assign
   `aggregator_locked` autonomously**), what is wireable on an already-supported connector
@@ -216,5 +226,5 @@ Numbers reconciled against the artifact before acting (Rule 15).
 | "1,136 live, 8,215 remain" of 12,722 | 1,136 + 8,215 = 9,351 ≠ 12,722. | **Not an error** — the 3,371 gap is pages already modelled inside the 34 partial states. "Remaining" counts pages left to model, not pages in unfinished states. Both figures right, counting different things. |
 | Chat seed listed 6 items | Row 376 lists 5 more still outstanding: San Diego, tdlr-tabs, Shelby, pg_net watchdog, Arlington delta. | Added as items 6–10. QUEUE.md must never drift from reality (row 348); omitting known in-flight work would be drift. |
 | Chat order: DB-01 → #428 → #431 → TX → Harris/Bexar → Tier 1 | Row 355 puts Tier 0 (TX, Harris/Bexar) ahead of Tier 1. | ✅ **No conflict** — chat order also places both ahead of Tier 1. No dependency inversion found: #431 is independent of #428, and the row-349 inversion (status_unresolved at step 2 depending on #428 at step 4) is dissolved because Group B is already committed. |
-| Row 376: #428 test-rebase "clean, **67/67**" | Measured on the actual rebases: `main` **62** · #428 adds 2 test files (`status-drift-windowing`, `unmapped-status-sample`) → **64** · #431 adds 4 → **66** · both merged → **68**. | **67 matches none of these.** Most likely taken when #428 carried only one new test file (62+4+1). All four measured numbers are green; no work is blocked. Flagged, not worked around. |
+| Rows 329 + 364: #428 test-rebase "clean, **67/67**" | Measured on the actual rebases: `main` **62** · #428 adds 2 test files (`status-drift-windowing`, `unmapped-status-sample`) → **64** · #431 adds 4 → **66** · both merged → **68**. | **67 matches none of these.** Most likely taken when #428 carried only one new test file (62+4+1). All four measured numbers are green; no work is blocked. Flagged, not worked around. **Correction:** an earlier version of this row cited row 376 — the claim actually lived in rows 329 and 364. Verify the citation as well as the number. |
 | DB-01 hypothesis (row 397) | Disproved on four independent counts. | **SUPERSEDED**, and the founder has already recorded it in workbook 0071 rows 399–401. Not re-reported. |
