@@ -235,6 +235,7 @@ async function runEntry(
   const excludeCount = new Map<string, number>();
   const unmappedCount = new Map<string, number>();
   const caseFold = new Map<string, CaseFoldMatch>();
+  const unmappedSample = new Map<string, string>();   // status → first case/permit no seen
 
   let rows: Record<string, unknown>[];
   try {
@@ -250,7 +251,15 @@ async function runEntry(
     if (!statusRaw) { report.blank_status++; continue; }
     const hit = resolveNormalized(lookup, statusRaw);
     const bucket = hit.value;
-    if (bucket === undefined) { unmappedCount.set(statusRaw, (unmappedCount.get(statusRaw) ?? 0) + 1); continue; }
+    if (bucket === undefined) {                                        // unmapped → exclude + FLAG
+      unmappedCount.set(statusRaw, (unmappedCount.get(statusRaw) ?? 0) + 1);
+      // Name a concrete record so the flag is actionable, not just a count.
+      if (!unmappedSample.has(statusRaw)) {
+        const cn = valOrNull(readCol(row, entry.column_map.case_number));
+        if (cn) unmappedSample.set(statusRaw, String(cn));
+      }
+      continue;
+    }
     if (hit.caseInsensitive) noteCaseFold(caseFold, "status", statusRaw, hit.matchedKey);
     if (bucket === "exclude") { excludeCount.set(statusRaw, (excludeCount.get(statusRaw) ?? 0) + 1); continue; }
     const rec = await normalizeRow(row, entry, statusRaw, bucket, zip, deps, report, typeLookup, caseFold);
@@ -259,7 +268,7 @@ async function runEntry(
 
   report.emitted = records.length;
   report.excluded_by_status = [...excludeCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
-  report.unmapped_statuses = [...unmappedCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
+  report.unmapped_statuses = [...unmappedCount].map(([status, count]) => ({ status, count, sample: unmappedSample.get(status) ?? null })).sort((a, b) => b.count - a.count);
   report.case_insensitive_matches = caseFoldList(caseFold);
   return { records, report };
 }

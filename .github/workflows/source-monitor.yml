@@ -75,6 +75,11 @@ jobs:
           else
             echo "registry_changed=false" >> "$GITHUB_OUTPUT"
           fi
+          if grep -q '^STATUS_DRIFT=1$' monitor-out.txt; then
+            echo "status_drift=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "status_drift=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Commit report (+ any auto-wired registry entries)
         if: github.event.inputs.dry_run != 'true'
@@ -103,3 +108,14 @@ jobs:
             -f function=get-address-report
           echo "deploy-edge-functions dispatched; the nightly dev_refresh (09:00 UTC) + app-content"
           echo "refresh (09:20 UTC) will materialize the new records onto pages tonight."
+
+      # LAST step on purpose. An unmapped status DROPS records, so the run must go red — but
+      # every existing side effect (report commit, registry auto-wire push, engine deploy
+      # dispatch) has to complete first, or the evidence dies with the failed run and a
+      # legitimately auto-wired source silently never deploys. `| tee` masks node's own exit
+      # code, hence the grep-able STATUS_DRIFT marker (same idiom as REGISTRY_CHANGED).
+      - name: Fail on status-domain drift (unmapped statuses are dropping records)
+        if: always() && steps.monitor.outputs.status_drift == 'true'
+        run: |
+          echo "::error::Unmapped status value(s) found in live data for one or more registry entries — those records are being DROPPED by the connectors. See the 'Status-domain drift' table in docs/source-monitor-report.md (also in this run's job summary) for the exact registry_id, status field, values and record counts, then add each value VERBATIM to that entry's status_to_bucket in jurisdiction-registry.json."
+          exit 1

@@ -1192,7 +1192,51 @@
         "blds_standard": "statuscurrentmapped used over raw codes (Permit Issued 21,999 / Permit Finaled 139,840 / Application Accepted 3,206 / In Review 5,596 / Approved 519); raw-code oddballs (ADD INS, APRV_NR, BILLED, CAGIS, PAID, ROUTE...) surface in unmapped_statuses, never guessed",
         "types": "permittypemapped Building 44,298 + Wrecking 5,703 kept; HVAC/Plumbing/Signs/Elevator/Fire/Excavation-Fill/Repair/Fences/Parking/Misc/Temp/CoO dropped at source",
         "record_precision": "native per-record link column + native originalzip + latitude/longitude"
-      }
+      },
+      "status_unresolved": [
+        {
+          "value": "CAGIS",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 1,
+          "asked": "ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statuscurrent`. No column-level definition is published. (2) The dataset description states \"A data dictionary providing definitions of columns and attributes is available as an attachment\", and the attachment does exist: \"Cincinnati Building Permits Data Dictionary.pdf\", assetId 8a0b9735-8510-4281-9e7a-04fddc4525af. Fetched 200 but it is a FlateDecode-compressed PDF and pg_net stores responses as text (truncated at the first NUL, 206 chars), so it COULD NOT BE READ from this environment — not that it does not exist. A human with ordinary web access can open it and this value should be bucketed or confirmed from it. (3) Decisive live evidence instead: grouping `statuscurrent` (raw) against `statuscurrentmapped` over all history returns the value UNCHANGED for all seven codes (PAID 279, APRV_NR 81, REVIEWED 8, ADD INS/BILLED/CAGIS/RENEW 1 each) — the publisher's OWN mapping column does not expand them, which is why they read as raw internal codes. Not bucketed: the source states no lifecycle stage."
+        },
+        {
+          "value": "ADD INS",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 1,
+          "asked": "ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statuscurrent`. No column-level definition is published. (2) The dataset description states \"A data dictionary providing definitions of columns and attributes is available as an attachment\", and the attachment does exist: \"Cincinnati Building Permits Data Dictionary.pdf\", assetId 8a0b9735-8510-4281-9e7a-04fddc4525af. Fetched 200 but it is a FlateDecode-compressed PDF and pg_net stores responses as text (truncated at the first NUL, 206 chars), so it COULD NOT BE READ from this environment — not that it does not exist. A human with ordinary web access can open it and this value should be bucketed or confirmed from it. (3) Decisive live evidence instead: grouping `statuscurrent` (raw) against `statuscurrentmapped` over all history returns the value UNCHANGED for all seven codes (PAID 279, APRV_NR 81, REVIEWED 8, ADD INS/BILLED/CAGIS/RENEW 1 each) — the publisher's OWN mapping column does not expand them, which is why they read as raw internal codes. Not bucketed: the source states no lifecycle stage."
+        },
+        {
+          "value": "APRV_NR",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 15,
+          "asked": "ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statuscurrent`. No column-level definition is published. (2) The dataset description states \"A data dictionary providing definitions of columns and attributes is available as an attachment\", and the attachment does exist: \"Cincinnati Building Permits Data Dictionary.pdf\", assetId 8a0b9735-8510-4281-9e7a-04fddc4525af. Fetched 200 but it is a FlateDecode-compressed PDF and pg_net stores responses as text (truncated at the first NUL, 206 chars), so it COULD NOT BE READ from this environment — not that it does not exist. A human with ordinary web access can open it and this value should be bucketed or confirmed from it. (3) Decisive live evidence instead: grouping `statuscurrent` (raw) against `statuscurrentmapped` over all history returns the value UNCHANGED for all seven codes (PAID 279, APRV_NR 81, REVIEWED 8, ADD INS/BILLED/CAGIS/RENEW 1 each) — the publisher's OWN mapping column does not expand them, which is why they read as raw internal codes. Not bucketed: the source states no lifecycle stage."
+        },
+        {
+          "value": "PAID",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 27,
+          "asked": "ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statuscurrent`. No column-level definition is published. (2) The dataset description states \"A data dictionary providing definitions of columns and attributes is available as an attachment\", and the attachment does exist: \"Cincinnati Building Permits Data Dictionary.pdf\", assetId 8a0b9735-8510-4281-9e7a-04fddc4525af. Fetched 200 but it is a FlateDecode-compressed PDF and pg_net stores responses as text (truncated at the first NUL, 206 chars), so it COULD NOT BE READ from this environment — not that it does not exist. A human with ordinary web access can open it and this value should be bucketed or confirmed from it. (3) Decisive live evidence instead: grouping `statuscurrent` (raw) against `statuscurrentmapped` over all history returns the value UNCHANGED for all seven codes (PAID 279, APRV_NR 81, REVIEWED 8, ADD INS/BILLED/CAGIS/RENEW 1 each) — the publisher's OWN mapping column does not expand them, which is why they read as raw internal codes. Not bucketed: the source states no lifecycle stage."
+        },
+        {
+          "value": "REVIEWED",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 3,
+          "asked": "ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statuscurrent`. No column-level definition is published. (2) The dataset description states \"A data dictionary providing definitions of columns and attributes is available as an attachment\", and the attachment does exist: \"Cincinnati Building Permits Data Dictionary.pdf\", assetId 8a0b9735-8510-4281-9e7a-04fddc4525af. Fetched 200 but it is a FlateDecode-compressed PDF and pg_net stores responses as text (truncated at the first NUL, 206 chars), so it COULD NOT BE READ from this environment — not that it does not exist. A human with ordinary web access can open it and this value should be bucketed or confirmed from it. (3) Decisive live evidence instead: grouping `statuscurrent` (raw) against `statuscurrentmapped` over all history returns the value UNCHANGED for all seven codes (PAID 279, APRV_NR 81, REVIEWED 8, ADD INS/BILLED/CAGIS/RENEW 1 each) — the publisher's OWN mapping column does not expand them, which is why they read as raw internal codes. Not bucketed: the source states no lifecycle stage."
+        },
+        {
+          "value": "RENEW",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 0,
+          "asked": "ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statuscurrent`. No column-level definition is published. (2) The dataset description states \"A data dictionary providing definitions of columns and attributes is available as an attachment\", and the attachment does exist: \"Cincinnati Building Permits Data Dictionary.pdf\", assetId 8a0b9735-8510-4281-9e7a-04fddc4525af. Fetched 200 but it is a FlateDecode-compressed PDF and pg_net stores responses as text (truncated at the first NUL, 206 chars), so it COULD NOT BE READ from this environment — not that it does not exist. A human with ordinary web access can open it and this value should be bucketed or confirmed from it. (3) Decisive live evidence instead: grouping `statuscurrent` (raw) against `statuscurrentmapped` over all history returns the value UNCHANGED for all seven codes (PAID 279, APRV_NR 81, REVIEWED 8, ADD INS/BILLED/CAGIS/RENEW 1 each) — the publisher's OWN mapping column does not expand them, which is why they read as raw internal codes. Not bucketed: the source states no lifecycle stage."
+        },
+        {
+          "value": "BILLED",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 0,
+          "asked": "ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statuscurrent`. No column-level definition is published. (2) The dataset description states \"A data dictionary providing definitions of columns and attributes is available as an attachment\", and the attachment does exist: \"Cincinnati Building Permits Data Dictionary.pdf\", assetId 8a0b9735-8510-4281-9e7a-04fddc4525af. Fetched 200 but it is a FlateDecode-compressed PDF and pg_net stores responses as text (truncated at the first NUL, 206 chars), so it COULD NOT BE READ from this environment — not that it does not exist. A human with ordinary web access can open it and this value should be bucketed or confirmed from it. (3) Decisive live evidence instead: grouping `statuscurrent` (raw) against `statuscurrentmapped` over all history returns the value UNCHANGED for all seven codes (PAID 279, APRV_NR 81, REVIEWED 8, ADD INS/BILLED/CAGIS/RENEW 1 each) — the publisher's OWN mapping column does not expand them, which is why they read as raw internal codes. Not bucketed: the source states no lifecycle stage."
+        }
+      ]
     },
     {
       "registry_id": "new-orleans-permits",
@@ -1236,11 +1280,21 @@
           "Zoning Review",
           "Returned for revision",
           "Materials resubmitted",
-          "Permit Inactive - Awaiting Response"
+          "Permit Inactive - Awaiting Response",
+          "Inspection - Pending",
+          "Inspection Required",
+          "Plan Review - Mechanical - Completed"
         ],
         "approved": [
           "Permit Issued",
-          "Permit Issuance - Active"
+          "Permit Issuance - Active",
+          "Permit Approved",
+          "Sub-Permits Issued",
+          "Foundation Release",
+          "Permit Approval Letter",
+          "Application Acceptance - Approved No Review",
+          "Application Acceptance - Approved w/Review",
+          "Extension Issued"
         ],
         "operating": [
           "Certificate of Completion",
@@ -1249,13 +1303,30 @@
           "Permit Finaled",
           "Inspections Finaled",
           "Inspection - Completed",
-          "Meter Release"
+          "Meter Release",
+          "Temporary Certificate of Occupancy",
+          "Sub-Permits Finaled",
+          "Certificate of Occupancy - Issued w/Meter",
+          "Inspection - Completed No Requirements",
+          "Complete - Historical Import"
         ],
         "exclude": [
           "Permit Expired",
           "Permit Expired Due to Inactivity",
           "Closed",
-          "VOIDED - Owner Changed Contractor"
+          "VOIDED - Owner Changed Contractor",
+          "VOIDED",
+          "VOIDED - Applicant Withdrew Permit",
+          "VOIDED - Duplicate Permit",
+          "VOIDED - Issued in Error",
+          "Permit Denied",
+          "Permit Rescinded",
+          "Zoning Denied",
+          "Permit Application Expired",
+          "Permit not required",
+          "Sub-Permit not required",
+          "Different Permit Type required",
+          "PERMIT CANCELLED "
         ]
       },
       "type_map": {
@@ -1269,7 +1340,21 @@
       "spatial_zip_radius_mi": 3,
       "spatial_point_col": "location_1",
       "record_url_precision": "dataset",
-      "_receipts": "2026-07-25 pg_net recon (ids 105023-105031): data.nola.gov Socrata 'Permits' rcm3-fn58; FRESH max issuedate 2026-07-24; 345,113 rows. NO zip column -> spatial within_circle on the location_1 Point (records keep own per-parcel lat/lng, read via dot-path location_1.latitude/longitude). type whitelist keeps New Construction/Renovation (Structural)/Demolition/Accessory Structure, drops trades/solar/roofing/HVAC/electrical at source (extra_where verified live). currentstatus buckets verbatim. No per-record link column -> dataset_url precision (data.nola.gov/d/rcm3-fn58 -> 200). Coverage gated to LA/Orleans (20 modeled ZIP pages). | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 110 distinct currentstatus values (full $group enumeration, ordered alphabetically) — unlike the other sources in this pass New Orleans DOES publish real pre-issuance states, so proposed is populated VERBATIM with the 15 unambiguous pre-issuance values listed. This is the ONE behavior-changing edit in the pass (it admits previously-unmapped records). The long free-text tail ('see 1312173-movg', 'state bldg.no city inspection needed', 'must refile this one EXPIRED', ...) is deliberately left UNMAPPED so it continues to fail closed rather than being guessed into a bucket."
+      "_receipts": "2026-07-25 pg_net recon (ids 105023-105031): data.nola.gov Socrata 'Permits' rcm3-fn58; FRESH max issuedate 2026-07-24; 345,113 rows. NO zip column -> spatial within_circle on the location_1 Point (records keep own per-parcel lat/lng, read via dot-path location_1.latitude/longitude). type whitelist keeps New Construction/Renovation (Structural)/Demolition/Accessory Structure, drops trades/solar/roofing/HVAC/electrical at source (extra_where verified live). currentstatus buckets verbatim. No per-record link column -> dataset_url precision (data.nola.gov/d/rcm3-fn58 -> 200). Coverage gated to LA/Orleans (20 modeled ZIP pages). | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 110 distinct currentstatus values (full $group enumeration, ordered alphabetically) — unlike the other sources in this pass New Orleans DOES publish real pre-issuance states, so proposed is populated VERBATIM with the 15 unambiguous pre-issuance values listed. This is the ONE behavior-changing edit in the pass (it admits previously-unmapped records). The long free-text tail ('see 1312173-movg', 'state bldg.no city inspection needed', 'must refile this one EXPIRED', ...) is deliberately left UNMAPPED so it continues to fail closed rather than being guessed into a bucket.",
+      "status_unresolved": [
+        {
+          "value": "PILING AFFAVDAVIT",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 1,
+          "asked": "ASKED 2026-07-30 (pg_net). Socrata dataset metadata https://data.nola.gov/api/views/rcm3-fn58.json -> 200: `currentstatus` IS documented, but only at COLUMN level — \"The most recently completed event in the permit's workflow (e.g. 'Application Submitted', 'Zoning Review', etc.)\" — which defines the column, not this value. A dictionary is attached (\"Safety & Permits - Data Dictionary for NOLA Permits.xlsx\", assetId 6faf82bc-fea7-4b87-a3a7-eab635b842f1); fetched 200 but xlsx is a zip and pg_net truncates binary at the first NUL (5 chars), so it COULD NOT BE READ here. Publisher contact published in the dataset metadata: data@nola.gov. Not bucketed: no definition obtained."
+        },
+        {
+          "value": "SMFA IZ Compliance",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 2,
+          "asked": "ASKED 2026-07-30 (pg_net). Socrata dataset metadata https://data.nola.gov/api/views/rcm3-fn58.json -> 200: `currentstatus` IS documented, but only at COLUMN level — \"The most recently completed event in the permit's workflow (e.g. 'Application Submitted', 'Zoning Review', etc.)\" — which defines the column, not this value. A dictionary is attached (\"Safety & Permits - Data Dictionary for NOLA Permits.xlsx\", assetId 6faf82bc-fea7-4b87-a3a7-eab635b842f1); fetched 200 but xlsx is a zip and pg_net truncates binary at the first NUL (5 chars), so it COULD NOT BE READ here. Publisher contact published in the dataset metadata: data@nola.gov. Not bucketed: no definition obtained."
+        }
+      ]
     },
     {
       "registry_id": "east-baton-rouge-building-permits",
@@ -2189,7 +2274,15 @@
         ]
       },
       "record_url_precision": "record",
-      "_receipts": "Verified live 2026-07-14 via pg_net: City of Fort Collins' own AGO org (dLpFH5mwVvxSN4OE) 'Current Building Permits' layer, found via the successor hub open-data-fcgov.hub.arcgis.com (the old opendata.fcgov.com Socrata portal is DECOMMISSIONED - 503 'This site has moved'). POINT geometry, NATIVE ZIP column, and a PER-RECORD official Accela link (WEB -> accela-aca.fcgov.com CapDetail) = record-precision record_url. A curated CURRENT-permits snapshot (2,177 rows; no date column -> no recency filter; the layer itself is the currency guarantee, Provo CurrentProjects precedent). 14 statuses + 13 types enumerated VERBATIM via groupBy; Stock Plan (647) and General Alteration remodel noise (708) dropped at source, keeping the 10 new-construction/addition/demolition types. 'Issued FF' (1 row) left unmapped on purpose (ambiguous semantics -> connector excludes + surfaces it)."
+      "_receipts": "Verified live 2026-07-14 via pg_net: City of Fort Collins' own AGO org (dLpFH5mwVvxSN4OE) 'Current Building Permits' layer, found via the successor hub open-data-fcgov.hub.arcgis.com (the old opendata.fcgov.com Socrata portal is DECOMMISSIONED - 503 'This site has moved'). POINT geometry, NATIVE ZIP column, and a PER-RECORD official Accela link (WEB -> accela-aca.fcgov.com CapDetail) = record-precision record_url. A curated CURRENT-permits snapshot (2,177 rows; no date column -> no recency filter; the layer itself is the currency guarantee, Provo CurrentProjects precedent). 14 statuses + 13 types enumerated VERBATIM via groupBy; Stock Plan (647) and General Alteration remodel noise (708) dropped at source, keeping the 10 new-construction/addition/demolition types. 'Issued FF' (1 row) left unmapped on purpose (ambiguous semantics -> connector excludes + surfaces it).",
+      "status_unresolved": [
+        {
+          "value": "Issued FF",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 1,
+          "asked": "NOT YET ASKED by this pass, but ALREADY RECORDED as a deliberate non-mapping: this entry's own _receipts states \"'Issued FF' (1 row) left unmapped on purpose (ambiguous semantics -> connector excludes + surfaces it)\" (2026-07-14 wire pass). status_unresolved now records that decision instead of leaving it to be re-derived. NOTE this entry has NO recency window (recency_days null AND file_date null), so its whole dataset is in-window and this value would otherwise GATE. OPEN QUESTION for the City of Fort Collins."
+        }
+      ]
     },
     {
       "registry_id": "colorado-springs-planning-applications",
@@ -2426,7 +2519,8 @@
           "Staff Report Complete",
           "Staff Report In Process",
           "Waiting for Information",
-          "Recording Revisions Routed"
+          "Recording Revisions Routed",
+          "Recording Revisions Required"
         ],
         "approved": [
           "Approved",
@@ -4366,7 +4460,8 @@
         "operating": [
           "Finaled",
           "Finaled No Inspection Req'd",
-          "Closed"
+          "Closed",
+          "Finaled  No Inspection Req'd"
         ],
         "exclude": [
           "Cancelled",
@@ -6703,7 +6798,11 @@
           "Awaiting Payment",
           "On Hold",
           "Resubmittal Required",
-          "Review Approved"
+          "Review Approved",
+          "Submitted",
+          "Submitted - Online",
+          "Application Incomplete",
+          "Site Evaluated"
         ],
         "approved": [
           "Issued"
@@ -6713,7 +6812,8 @@
           "Certificate of Compliance (CC) Issued",
           "Certificate of Occupancy (CO) Issued",
           "Temporary Certificate of Occupancy (TCO) Issued",
-          "Partial Certificate of Compliance (PCC) Issued"
+          "Partial Certificate of Compliance (PCC) Issued",
+          "Partial Certificate of Occupancy (PCO) Issued"
         ],
         "exclude": [
           "Expired",
@@ -6721,7 +6821,8 @@
           "Withdrawn",
           "Revoked",
           "Stop Work Order",
-          "Suspended"
+          "Suspended",
+          "Denied"
         ]
       },
       "incremental_field": "ISSUE_DATE",
@@ -7926,7 +8027,15 @@
         "FOLDERNUM"
       ],
       "page_size": 2000,
-      "recency_days": 365
+      "recency_days": 365,
+      "status_unresolved": [
+        {
+          "value": "PME",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 1,
+          "asked": "NOT YET ASKED — no publisher query has been made. Live windowed groupBy (2026-07-30): OUT-of-window only (1 record). Every other PERMITAPPROVAL value is a discipline-completion list (B-/E-/P-/M- Complete); 'PME' is bare and matches no pattern. OPEN QUESTION for the City of San Jose PLN."
+        }
+      ]
     },
     {
       "registry_id": "salem-structure-permits",
@@ -8957,7 +9066,9 @@
         "Approval - Construction - Master Plan Establish": "Development"
       },
       "status_to_bucket": {
-        "proposed": [],
+        "proposed": [
+          "Pending Invoice Payment"
+        ],
         "approved": [
           "Issued",
           "Inspecting",
@@ -8972,7 +9083,7 @@
       },
       "record_url_template": "https://opendsd.sandiego.gov/web/approvals/{APPROVAL_ID}",
       "spatial_zip_radius_mi": 3,
-      "_receipts": "2026-07-16 CA wire pass (FIRST csv entry - new additive sources/csv.ts, fetch-once memo). FRESH SAME-DAY: max APPROVAL_ISSUE_DATE 2026-07-15 over 28,515 rows (15.0 MB YTD-2026 file; runner csv_stats receipt, run 29508593119). Vocabulary VERBATIM from the same run: statuses Issued/Closed/Inspecting/Inspection Followup/Cancelled -> Issued+Inspecting+Inspection Followup=approved, Closed=operating (Boston precedent), Cancelled=exclude; 151 type|status combos enumerated - kept 10 construction/land-use types, DROPPED at parse: Traffic Control (5,807), No-Plan trades combos, Photovoltaic SB 379 (rooftop solar), Construction Noise, Transportation, Right Of Way Pmt-Const Plan, Electrical/Mechanical/Plumbing Pmt, Fire Pmt variants, Sign Pmt, Zone History Letter + paperwork classes. NO ZIP column -> spatial_zip_radius_mi 3 on each row's OWN GIS_LATITUDE/GIS_LONGITUDE (which also self-excludes the file's garbage-coordinate rows: max GIS_LONGITUDE=324108.6 observed - a bad point can never sit near a centroid). RECORD-PRECISION record_url VERIFIED: opendsd.sandiego.gov API discriminates (ApprovalId 2618042 -> full record matching the CSV row; 999999999 -> 'could not be found') so /web/approvals/{APPROVAL_ID} is a real per-record official page. PROJECT_STATUS NOT used (17,813 blanks); APPROVAL_STATUS is the status column. File is YTD-2026 (inherent recency window). | 2026-07-27 icon-completeness pass: the dataset is APPROVED/issued permits by construction (its own title), so no pre-issuance status exists in the published domain and proposed:[] is the truth. Existing approved/operating/exclude assignments were left untouched."
+      "_receipts": "2026-07-16 CA wire pass (FIRST csv entry - new additive sources/csv.ts, fetch-once memo). FRESH SAME-DAY: max APPROVAL_ISSUE_DATE 2026-07-15 over 28,515 rows (15.0 MB YTD-2026 file; runner csv_stats receipt, run 29508593119). Vocabulary VERBATIM from the same run: statuses Issued/Closed/Inspecting/Inspection Followup/Cancelled -> Issued+Inspecting+Inspection Followup=approved, Closed=operating (Boston precedent), Cancelled=exclude; 151 type|status combos enumerated - kept 10 construction/land-use types, DROPPED at parse: Traffic Control (5,807), No-Plan trades combos, Photovoltaic SB 379 (rooftop solar), Construction Noise, Transportation, Right Of Way Pmt-Const Plan, Electrical/Mechanical/Plumbing Pmt, Fire Pmt variants, Sign Pmt, Zone History Letter + paperwork classes. NO ZIP column -> spatial_zip_radius_mi 3 on each row's OWN GIS_LATITUDE/GIS_LONGITUDE (which also self-excludes the file's garbage-coordinate rows: max GIS_LONGITUDE=324108.6 observed - a bad point can never sit near a centroid). RECORD-PRECISION record_url VERIFIED: opendsd.sandiego.gov API discriminates (ApprovalId 2618042 -> full record matching the CSV row; 999999999 -> 'could not be found') so /web/approvals/{APPROVAL_ID} is a real per-record official page. PROJECT_STATUS NOT used (17,813 blanks); APPROVAL_STATUS is the status column. File is YTD-2026 (inherent recency window). | 2026-07-27 icon-completeness pass: the dataset is APPROVED/issued permits by construction (its own title), so no pre-issuance status exists in the published domain and proposed:[] is the truth. Existing approved/operating/exclude assignments were left untouched. | SUPERSEDED 2026-07-30. The 2026-07-16 enumeration (28,515 rows, 151 type|status combos) was correct when run and found 5 statuses. The 2026-07-27 icon-completeness line then inferred from the dataset title that no pre-issuance status COULD exist - that inference is what is wrong. Live drift check 2026-07-30 returned 'Pending Invoice Payment' with 11 in-window records. The vocabulary grew; the original enumeration is not being called incorrect."
     }
   ],
   "carto": [
