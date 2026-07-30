@@ -8953,6 +8953,43 @@
       "recency_days": 1825,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-31 DE/Sussex wire. Sussex is the ONLY dark DE county (22 of 68 DE ZIP pages; Kent 17/17 and New Castle 29/29 already carry their own county source). Layer: Sussex County's OWN enterprise server, Hosted/Conditional_Use_View, 2,566 rows, POLYGON geometry (rides the shipped featurePoint() centroid path). LIVENESS (three-part): name clean; entity = Sussex County DE Planning & Zoning; newest application_rcvd_date 2026-07-27, three days before wiring. STATUS VOCABULARY IS COMPLETE AND VERBATIM: live groupBy on cc_decision returned 16 values summing to EXACTLY 2,566 (positive control), exceededTransferLimit=false. Mapped above verbatim; the connector trims both sides so 'Approved ' folds onto 'Approved'. Deliberately UNMAPPED, fail-closed: null (172) = filed, no Council decision yet, and the value '8/19/2025' (1) = a date typed into the decision field, a publisher data-entry error with no bucketable meaning. Those 173 rows are DROPPED, not guessed. TYPE IS A CONSTANT AND THAT IS THE HONEST CHOICE, NOT A SHORTCUT: proposed_use is the semantically correct column and is FREE TEXT -- 400+ distinct values over 2,566 rows, mostly n=1, with typos ('electrial subsation') and prose ('operate a food truck for a period exceeding three days'). Rule 5 terminal, no type_map exists. current_zoning IS a closed 38-value vocabulary summing to exactly 2,566, and was REJECTED as the type source because it describes the PARCEL, not the PROPOSAL: a conditional use is by definition something the existing zoning does not allow, so AR-1 -> Residential would have labelled an electrical substation 'Residential'. use_type_const 'Development' renders the generic 'Other project' pin and asserts nothing about the use (Phoenix residual-bucket precedent). record_url_precision is 'dataset': the layer carries no per-case URL column and Sussex's case search is not addressable per application_number, so templating one would be guessing. CORRECTION 2026-07-31, same day: the first wire OMITTED column_map.lat/lng, so all 468 emitted records came back scope='area' / geo_precision='jurisdiction' and every one sat on its ZIP centroid instead of its own parcel. The connector flattens each feature's geometry -- here the polygon's shoelace centroid via featurePoint() -- into the synthetic row fields __lat/__lng, and an entry must MAP them ('lat':'__lat','lng':'__lng') exactly as kent-county-de-building-permits and new-castle-county-permits already do. Omitting them is silent: returnGeometry=true is always sent, featurePoint() resolves correctly, and the coordinates are simply never read -- the records still publish, still carry record_url, and still count toward coverage, so nothing fails. Caught by checking scope on the live cached rows rather than trusting the record count."
+    },
+    {
+      "registry_id": "weld-county-site-plan-review",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/ewjSqmSyHJnkfBLL/arcgis/rest/services/Site_Plan_Review_open_data/FeatureServer/0",
+      "dataset_url": "https://gishub.weldgov.com/items/957de6a1420c4d9095cec5ac185d33e4",
+      "jurisdiction": "Weld County, Colorado",
+      "coverage": [
+        {
+          "state": "CO",
+          "county": "Weld"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "CASE_NAME",
+          "SUBDIVISIO"
+        ],
+        "status_raw": "PER_STATUS",
+        "file_date": "DATE_",
+        "case_number": "RECP_NUM",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 5,
+      "use_type_const": "Development",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Recorded"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "incremental_field": "DATE_",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-31 CO/Weld wire. Weld is 12 of CO's 57 dark pages. NOTE: CO is recorded UNREACHABLE at 90% by arithmetic (Douglas aggregate-by-design + Jefferson no permit dataset in a complete 479-title DCAT = 24 of 57 dark pages, ceiling 116/140 = 82.9%). This is wired anyway because 12 real pages is 12 real pages. Layer: Weld County's own GIS Hub, Site_Plan_Review_open_data, 434 rows, POLYGON (rides the shipped featurePoint() centroid path). LIVENESS: newest DATE_ 2026-07-21, 417 of 434 dated. STATUS -- USE PER_STATUS, NOT 'STATUS'. PER_STATUS enumerates completely: Recorded 432 + ' Recorded' 1 + ' ' 1 = EXACTLY 434 (positive control); the connector trims, so both Recorded forms fold onto one key, and the bare ' ' is blank and fails closed. Mapped Recorded -> approved: a recorded site plan is approved, not necessarily built. The column literally named STATUS was REJECTED as Rule 5 FREE TEXT: 373 of 434 rows are a bare ' ' and the remainder are annotations rather than states -- 'AMD TO SPR 211', 'ANNEX GREELEY', 'AUTO DEALER', 'IRRIGATION PUMP', 'NO APPROVEL FOUN', 'REF. SPR-16', 'REF. Z-377'. Only ACTIVE (26) and INACTIVE (1) are statuses at all. A column's NAME is not its vocabulary. TYPE: use_type_const 'Development'. Same reasoning as sussex-county-de-conditional-use -- ZONING is present and closed but describes the PARCEL, not the PROPOSAL. column_map.lat/lng = __lat/__lng, without which every record silently lands on the ZIP centroid at scope 'area' (the Sussex defect, caught only by checking scope on live rows)."
     }
   ],
   "ckan": [
