@@ -85,6 +85,16 @@ export function scoreStates(entries, zips) {
   }).sort((a, b) => b.pct_complete - a.pct_complete || b.zip_pages - a.zip_pages);
 }
 
+/**
+ * An entry can be INCOMPLETE and yet impossible to complete. Rule 5 (free-text type field),
+ * Rule 6 (null-dominant column) and opaque codes with no citable meaning are all terminal: the
+ * vocabulary does not exist to be mapped. Such an entry is marked `vocab_terminal: "<reason>"`
+ * on the registry row and then EXCLUDED from the ranked work list — it stays INCOMPLETE for Live
+ * purposes, because its pins really are unclassified, but it must never sit at the top of the
+ * queue absorbing attention that cannot resolve it.
+ */
+export const terminalReason = (e) => e?.vocab_terminal || null;
+
 /** LIST 1 — ranked additive registry work. WIRED_INCOMPLETE only. Never contains NOT_WIRED. */
 export function rankRegistryWork(entries, zips) {
   const out = [];
@@ -92,6 +102,7 @@ export function rankRegistryWork(entries, zips) {
     if (isFloorSource(e.registry_id)) continue;
     const { complete, missing } = entryCompleteness(e);
     if (complete) continue;
+    if (terminalReason(e)) continue;                 // cannot be completed — never rank it
     const pages = zips.filter((z) => coversZip(e, z)).length;
     out.push({
       state: 'WIRED_INCOMPLETE',
@@ -206,4 +217,11 @@ export function rankUncoveredCounties(entries, zips, { threshold = LIVE_THRESHOL
   }
   // Cheapest conversions first — fewest counties, then fewest pages needed.
   return out.sort((a, b) => a.counties_needed - b.counties_needed || a.to_reach_90 - b.to_reach_90);
+}
+
+/** Terminal entries, reported separately so "not in the work list" never reads as "done". */
+export function listTerminal(entries) {
+  return entries
+    .filter((e) => !isFloorSource(e.registry_id) && terminalReason(e) && !entryCompleteness(e).complete)
+    .map((e) => ({ registry_id: e.registry_id, platform: e.platform || null, reason: terminalReason(e) }));
 }

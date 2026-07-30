@@ -144,3 +144,17 @@ test('aggregate-by-design is its own blocker — periods are not permits', async
   assert.equal(d.ready, false, 'a live 200-OK first-party source that cannot be pinned is not ready');
   assert.equal(d.zip_pages_potential, 14);
 });
+
+test('a terminal entry leaves the work list but is still reported and still not Live', async () => {
+  const m = await import('../scripts/lib/live-scoreboard-core.mjs');
+  const term = { registry_id: 'clark-county-active-projects', platform: 'arcgis',
+    coverage: [{ state: 'NV', county: 'Clark' }], status_to_bucket: { a: ['x'] },
+    vocab_terminal: 'Rule 5: free-text type field (capital-projects descriptions)' };
+  const pages = zips('NV', 76, 'Clark');
+  assert.deepEqual(m.rankRegistryWork([term], pages), [], 'never ranked — it cannot be completed');
+  const [t] = m.listTerminal([term]);
+  assert.equal(t.registry_id, 'clark-county-active-projects');
+  assert.match(t.reason, /Rule 5/);
+  const [nv] = m.scoreStates([term], pages);
+  assert.equal(nv.covered_complete, 0, 'terminal is still INCOMPLETE — the pins are unclassified');
+});
