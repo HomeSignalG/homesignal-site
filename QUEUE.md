@@ -111,25 +111,46 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
   **four** renames, not five — `tdlr-tabs` imports a nonexistent module and cannot be moved.
 - **Acceptance:** merged, `unit` green at 66 files.
 
-### 4. TX-GOV — Texas `government_notice`
-- **State:** READY (Tier 0 — close out live states first, row 355)
-- **Gate:** NONE for scoping and reporting. Phase 7 GATED as for any state.
-- **Depends on:** —
-- ⚠️ **SCOPE CONTRADICTED BY MEASUREMENT — awaiting founder ruling.** Rows 328/355/364/381
-  say "zero sources wired." Measured live 2026-07-30: **4 active `government_notice` feeds
-  writing to `alerts` across 3 of 22 counties, producing 132 notices, newest 18:06Z** —
-  Denton 102 (Granicus RSS + RSS), Brazoria 25 (Legistar), Williamson 5 (RSS). A 5th row,
-  `travis-tx-civicclerk-meetings`, is `pipeline_type='government_notice'` but
-  `target_table='meetings'`, which is why the count reads 5 by pipeline_type and 4 by
-  target_table. National control: 747 active gov feeds / 16 states / 1,259 notices.
-- **Both numbers:** TX is **668/668 pages live**; **58/668 (8.7%) carry notices**; 610 render
-  honest-empty; **19 of 22 counties have no notice source**, incl. Dallas 174 pages, El Paso
-  145, Tarrant 99, Travis 86.
-- **Detail:** this is a PARTIAL build on already-supported connectors, not an unstarted one.
-- **Acceptance:** per-county source verdict for all 22 using the three-state system
-  (`first_party_found` · `verification_blocked` · `candidates_exhausted`; **never assign
-  `aggregator_locked` autonomously**), what is wireable on an already-supported connector
-  family vs what needs new code, and what renders honest-empty and why.
+### 4. TX-GOV — Texas `government_notice` — **CLOSED / PARKED**
+- **State:** **DONE (closed 2026-07-30)** — Phase 2 discovery complete across all 19 uncovered
+  counties. **Closed at 7 of 610 pages reachable.**
+- **Gate:** founder decision taken — **park after the cheap wins.**
+- **The reason: vendor fragmentation.** 19 counties span **at least 8 distinct systems**, and
+  **69% of the gap** — Dallas 174 + El Paso 145 + Tarrant 99 = **418 pages** — needs bespoke work
+  or a new connector family. There is no cheap majority. Tier 1 is 629 pages converting **six
+  states** from partial to COMPLETE on connectors that already exist; TX is already 668/668 live,
+  so the gov gap **deepens a live state** while Tier 1 **makes six more states exist.**
+- ✅ **Shipped:** `gov-comal-tx-commission` — Comal County, 7 pages, Granicus
+  `co-comal-tx.granicus.com/ViewPublisherRSS.php?view_id=1&mode=agendas`. Both halves wired
+  (`public.feeds` sort_order 850 + `feeds.csv`). Verify on post-deploy rows after the 2-hourly
+  ingest — **not cache.**
+
+#### The inventory — attached so nobody re-derives it
+
+| Verdict | Counties (pages) |
+|---|---|
+| **`first_party_found`, WIRED** | Comal 7 |
+| **`verification_blocked`** — source exists, our probe refused | Dallas 174 (PDFs; WebFetch 403) · Tarrant 99 (live system `agendamgmtprod.tarrantcountytx.gov`) · Travis 86 (not re-probed search-first) · Bexar 2 (CivicPlus AgendaCenter; **400**) · Harris 1 (Legistar confirmed; **400** twice) |
+| **Rejected on liveness** | Tarrant Granicus (archive + **Test View** only) · Hays 8 (100 items, newest **Nov 2019**) |
+| **New connector family needed** | El Paso 145 **NovusAgenda** · Bastrop 5 **CivicWeb** · Burnet 4 **DestinyHosted** · Llano 3 **CIRA** |
+| **Bespoke county systems** | Collin 28 (ColdFusion `eagenda`) · Montgomery 22 (static) · Fort Bend 21 (ColdFusion `agendalink`) |
+| **Not probed** | Hudspeth · Caldwell · Lampasas · Liberty · Walker (1 each = 5) |
+
+*(7 + 174 + 99 + 86 + 2 + 1 + 8 + 145 + 5 + 4 + 3 + 28 + 22 + 21 + 5 = 610 ✓)*
+
+#### CIRA sweep — run, and it does NOT change the parking decision
+`newtools.cira.state.tx.us` is a genuine Texas state-association host carrying many counties'
+Commissioners Court notices on a uniform path (`/page/<county>.Commissioners.Court`,
+`/page/<county>.Public.Notices`) — Cooke, Robertson, Comanche, Polk, Liberty, Presidio, Fannin,
+Medina, Gaines, Llano surfaced in one search. **But it hosts the SMALL rural counties we do not
+model.** Of our 19, only **Llano (3) and Liberty (1)** are CIRA-hosted — **4 pages**, not a
+statewide long tail of modelled pages. Content is PDFs behind HTML listing pages, so it would
+still need a new adapter. **Lever rejected.**
+
+#### DEFERRED — scoped, parked, do not start
+Tarrant `agendamgmtprod` characterisation (99) · NovusAgenda spike + modelled-county sweep
+(145) · Collin / Montgomery / Fort Bend bespoke (71) · Dallas + Travis search-first re-probes
+(260) · the 5 unprobed single-page counties.
 
 ### 5. EXP-HARRIS-BEXAR — Step B expansion
 - **State:** BLOCKED
