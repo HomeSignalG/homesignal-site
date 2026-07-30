@@ -37,25 +37,46 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 ## Ordered items
 
 ### 1. DB-01 — `public.communities` planner-statistics diagnosis
-- **State:** READY
-- **Gate:** NONE for investigation and reporting. **GATED:** any autovacuum setting change or
-  schema change.
+- **State:** **DONE** (2026-07-30) — recorded in workbook 0071 rows 399–401; row 397 marked
+  SUPERSEDED.
+- **Gate:** was NONE for investigation. No autovacuum or schema change was made.
 - **Depends on:** —
-- **Measured, read-only (row 397):** 13,292 rows while `pg_stat_user_tables.n_live_tup`
-  reports 0 · 5,977 sequential scans have read 79,444,961 rows (13,292 per scan — the whole
-  table every time) · `idx_communities_zip_codes_gin` exists and is not being chosen · no user
-  table carries a `last_analyze` or `last_autoanalyze` · `app_projects` is 1,706 MB /
-  2,641,302 rows / 316,707 dead tuples.
-- **Hypothesis only:** with no statistics the planner assumes the table is empty and prefers a
-  sequential scan. **Counter-evidence:** `autovacuum=on`, `track_counts=on`, and
-  `app_projects.n_mod_since_analyze=0` — inconsistent with ANALYZE never having run.
-- **Settled:** regional read replicas are NOT the lever — the read path is a primary-key lookup
-  against a materialised per-ZIP row behind a static site.
-- **Acceptance:** baseline `EXPLAIN` captured **before** `ANALYZE`, re-measured after, delta
-  reported with arithmetic; row 397 updated with what was **established**, not the hypothesis.
+- **SUPERSEDED: the hypothesis was FALSE on every count.** It claimed no planner statistics, so
+  the planner assumed the table was empty and chose sequential scans over the GIN index.
+  1. **The planner was never blind.** `pg_class.reltuples` = **13,212** (real 13,292, 0.6% off)
+     and `pg_stats` carried all **10** columns including `zip_codes`. `n_live_tup` belongs to the
+     cumulative stats collector — a different subsystem from the planner.
+  2. **`n_live_tup = 0` was arithmetically correct.** `communities` has had **zero writes** in
+     the stats window (`n_tup_ins/upd/del` all 0), so the derived live-tuple figure is 0 and
+     `n_mod_since_analyze = 0`, which is why autovacuum correctly never fired — there was
+     nothing to analyze. Positive controls on the same query: `alerts` 374 ins → 11,526 live;
+     `app_projects` 930,086 ins → 2,641,302 live.
+  3. **The GIN index was already serving the hot path** — `idx_scan` = **14,697**, and the live
+     plan is `Bitmap Index Scan on idx_communities_zip_codes_gin`, 0.465 ms.
+  4. **ANALYZE changed no plan.** `reltuples` 13,212 → 13,292, `n_live_tup` 0 → 13,292, plan
+     identical, 0.465 → 0.453 ms (noise).
+  5. **Scope error caught:** `pg_stat_statements` had been reset ~2.5 h earlier while the table
+     counters cover a far longer window, so the 5,977 seq scans **cannot** be attributed from
+     it. Stated rather than guessed.
+- **Settled, unchanged:** regional read replicas are NOT the lever.
+- **Spun out:** see DB-02 below.
+
+### 1a. DB-02 — latent: `communities` slug lookup cannot use its index
+- **State:** BLOCKED (no action needed today — recorded so it is not rediscovered as an
+  emergency; workbook 0071 row 400)
+- **Gate:** NONE
+- **Depends on:** —
+- **Detail:** the only slug index is `communities_slug_lower_key` on the **expression**
+  `lower(slug)`, which a plain `slug = $1` predicate cannot use — hence `idx_scan = 0` on it and
+  a 13,291-row `Seq Scan` (3.209 ms) when that predicate is issued. **Harmless today: no code
+  path issues it** — `hs-resolve.js` uses `zip_codes=cs.{…}` (GIN) and `id=in.(…)` (PK).
+- **Acceptance:** if anything ever queries by raw slug, either add a plain btree on `slug` or
+  make the query use `lower(slug)`.
 
 ### 2. PR-428 — registry status/type maps + drift gate
-- **State:** READY
+- **State:** IN-PROGRESS — **rebased onto `0d011e6`** (current main; founder confirmed the
+  prompt's two shas were contradictory). 4 commits preserved, suite **64/64 green**. San Diego
+  dispatch running.
 - **Gate:** NONE
 - **Depends on:** —
 - **Actual state (rows 370–375, verified from GitHub):** open, `mergeable_state: clean`,
@@ -71,7 +92,7 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
   claim until San Diego is observed** (row 344 — do not round a partial up to a complete).
 
 ### 3. PR-431 — connector fixture suites into CI
-- **State:** READY
+- **State:** IN-PROGRESS — **rebased onto `0d011e6`**, suite **66/66 green**, CI running.
 - **Gate:** NONE
 - **Depends on:** — (independent of #428; both branched from `c49c7c4`)
 - **Detail:** head `claude/fixture-suites-into-ci` @ `44df2e0`, 1 commit, 8 files, +60/−31.
@@ -102,11 +123,25 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
   (Rule 10). **Then stop** — no rows inserted, no coverage claim changed.
 
 ### 6. SD-AUDIT — San Diego `workflow_dispatch`
-- **State:** READY
+- **State:** IN-PROGRESS — `source-monitor.yml` dispatched on the #428 ref with
+  `dry_run=true` (observes, commits nothing). No per-entry input exists; the drift check sweeps
+  all 105, so San Diego is audited as part of the sweep.
 - **Gate:** NONE
 - **Depends on:** PR-428 (the drift check it exercises lives on that branch)
-- **Detail:** the last unaudited entry of the 105.
+- **Detail:** the last unaudited entry of the 105. It is the CSV-family reader
+  (`san-diego-approved-permits`, a 15 MB published file), which is why it was never observed.
 - **Acceptance:** run observed; only then may the entry set be described as complete.
+  **No 105/105 claim until then.**
+
+### 6a. GOV-PORT — port durable governance out of the workbook onto main
+- **State:** IN-PROGRESS — **PR #434 open** (`claude/governance-port-to-repo`).
+- **Gate:** NONE
+- **Depends on:** —
+- **Detail:** `docs/maps-go-live-governance.md` carries Instructions rows 331–344, 346–362,
+  379–394; `CLAUDE.md` gains the division-of-record pointer. Verified current: rows **1–396 are
+  byte-identical between workbook 0070 and 0071**, so the port reflects the live revision.
+  `docs/**` and `CLAUDE.md` are already in `unit-tests.yml`'s path filters, so `unit` registers.
+- **Acceptance:** merged; no future session depends on the workbook upload for the rules.
 
 ### 7. TDLR-TABS — investigate before fix-or-delete
 - **State:** READY
@@ -181,3 +216,5 @@ Numbers reconciled against the artifact before acting (Rule 15).
 | "1,136 live, 8,215 remain" of 12,722 | 1,136 + 8,215 = 9,351 ≠ 12,722. | **Not an error** — the 3,371 gap is pages already modelled inside the 34 partial states. "Remaining" counts pages left to model, not pages in unfinished states. Both figures right, counting different things. |
 | Chat seed listed 6 items | Row 376 lists 5 more still outstanding: San Diego, tdlr-tabs, Shelby, pg_net watchdog, Arlington delta. | Added as items 6–10. QUEUE.md must never drift from reality (row 348); omitting known in-flight work would be drift. |
 | Chat order: DB-01 → #428 → #431 → TX → Harris/Bexar → Tier 1 | Row 355 puts Tier 0 (TX, Harris/Bexar) ahead of Tier 1. | ✅ **No conflict** — chat order also places both ahead of Tier 1. No dependency inversion found: #431 is independent of #428, and the row-349 inversion (status_unresolved at step 2 depending on #428 at step 4) is dissolved because Group B is already committed. |
+| Row 376: #428 test-rebase "clean, **67/67**" | Measured on the actual rebases: `main` **62** · #428 adds 2 test files (`status-drift-windowing`, `unmapped-status-sample`) → **64** · #431 adds 4 → **66** · both merged → **68**. | **67 matches none of these.** Most likely taken when #428 carried only one new test file (62+4+1). All four measured numbers are green; no work is blocked. Flagged, not worked around. |
+| DB-01 hypothesis (row 397) | Disproved on four independent counts. | **SUPERSEDED**, and the founder has already recorded it in workbook 0071 rows 399–401. Not re-reported. |

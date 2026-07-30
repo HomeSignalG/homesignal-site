@@ -15,6 +15,7 @@ on:
       - 'supabase/functions/**'
       - 'docs/**'
       - 'CLAUDE.md'
+      - 'QUEUE.md'
       - '.github/workflows/**'
       - '.github/workflows/unit-tests.yml'
   pull_request:
@@ -31,6 +32,7 @@ on:
       - 'supabase/functions/**'
       - 'docs/**'
       - 'CLAUDE.md'
+      - 'QUEUE.md'
       - 'docs/government-feed-onboarding*.md'
       - 'docs/candidates/**'
       - '.github/workflows/**'
