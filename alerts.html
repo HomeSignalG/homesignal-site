@@ -180,6 +180,13 @@ HS.onReady(async function () {
   //
   // The empty states above are untouched — they are accurate as written. No
   // distance claim is added; homeFor()/distanceMi() stay anti-fabrication.
+  // The page's own town, for the section-1 heading. app_community_meta.name is
+  // "Brigham City (84302)" for a ZIP page — strip the parenthetical. Falls back
+  // to the ZIP itself rather than inventing a name.
+  function townLabel() {
+    var n = c && c.name ? String(c.name).replace(/\s*\(\d{5}\)\s*$/, '').trim() : '';
+    return n || S.zip;
+  }
   function countyLabel() {
     // Never invent a county name. A ZIP whose chain root is not a county falls
     // back to the generic phrase rather than guessing.
@@ -197,6 +204,55 @@ HS.onReady(async function () {
       return 'Local news from across ' + countyLabel() + ' — not limited to this ZIP.';
     }
   };
+  // ---- TWO-SECTION LOCAL NEWS -------------------------------------------
+  // These pages carry ANOTHER TOWN'S news, not county-SCALE news: Walburg shows
+  // Austin water policy because Walburg shares Williamson County with Austin's
+  // coverage. A reader can tell those apart if the page does, so the evidence
+  // distinction is surfaced as ORDERING, never as filtering.
+  //
+  // Section 1 = items whose resolver zip_set names THIS ZIP (app_changes
+  // .zip_targeted, written by app_refresh_zip). Section 2 = everything else from
+  // the county root, carrying the scope disclosure — which belongs here and NOT
+  // on section 1, where it would understate the evidence.
+  //
+  // NOTHING IS FILTERED. Both sections render every item the page already has;
+  // the materializer's 48-row cap is untouched (measured: max eligible pool in
+  // any county is 45, so the cap has never bound).
+  //
+  // Legacy rows predating the column have zip_targeted null -> false -> section
+  // 2, i.e. they fail toward the labelled, disclosed side.
+  function isZipTargeted(ch) { return ch && ch.zip_targeted === true; }
+
+  function newsSectionsHTML(items, mode) {
+    var named = items.filter(isZipTargeted);
+    var other = items.filter(function (x) { return !isZipTargeted(x); });
+
+    // DEGRADATION rung 2: no evidence-backed item -> ONE undifferentiated list
+    // under the generic heading, carrying the scope disclosure. An empty
+    // "News naming X" header is a true claim that reads as a defect.
+    if (!named.length) return sectionHTML('Local News', other, mode, scopeNote('Local News'));
+
+    // Rung 3: every item is ZIP-evidenced -> KEEP THE NAMED HEADING, no scope
+    // line. Deliberately NOT a generic "Local News" list: rung 2 and rung 3 mean
+    // OPPOSITE things (all other-town vs all town-specific), and letting both
+    // render "Local News" — distinguished only by the presence of a scope line —
+    // reproduces the "for your area" vs "on file for this ZIP" ambiguity one
+    // level down. A heading should state what the content IS. A lone section is
+    // structurally identical to any single-category group, so it stands fine.
+    if (!other.length) return sectionHTML('News naming ' + townLabel(), named, mode, '');
+    return sectionHTML('News naming ' + townLabel(), named, mode, '')
+         + sectionHTML('Other news from ' + countyLabel(), other, mode,
+                       ' · not specific to ' + S.zip);
+  }
+
+  function sectionHTML(heading, items, mode, note) {
+    return '<div class="groupHead" data-category="Local News"><span class="gd traffic"></span> '
+      + HS.esc(heading)
+      + ' <span class="gc">— ' + items.length + ' change' + (items.length === 1 ? '' : 's')
+      + HS.esc(note || '') + '</span></div>'
+      + sortItems(items, mode, 'news').map(function (ch) { return HS.tpl.storyCard(ch); }).join('');
+  }
+
   // Category -> the group-heading suffix. Keyed on the category string the
   // materializer writes, so a category with no county-wide sourcing gets nothing.
   function scopeNote(category) {
@@ -245,6 +301,18 @@ HS.onReady(async function () {
       + sortItems(open, mode, tab).map(function(ch){ return HS.tpl.storyCard(ch).replace('class="card"','class="card inband"'); }).join('')
       + '</div>') : '';
 
+    // Local News splits into evidence-named / other-county sections; every other
+    // tab keeps the existing category grouping untouched.
+    if (tab === 'news') {
+      document.getElementById('alGroups').innerHTML = rest.length
+        ? newsSectionsHTML(rest, mode)
+        : (!open.length && !quiet.length
+            ? '<div class="quiet" style="margin-top:4px"><b>Nothing in this category right now.</b> '
+              + HS.esc(TAB_EMPTY.news) + '</div>' : '');
+      paintQuietAndControls(quiet);
+      return;
+    }
+
     var groups = {};
     sortItems(rest, mode, tab).forEach(function (ch) { (groups[ch.category] = groups[ch.category] || []).push(ch); });
     var dotColor = { 'Traffic & getting around':'traffic','Home value & cost of living':'value','Environment & utilities':'water','Government & civic':'safety','Development':'traffic','Planning & zoning':'traffic','Upcoming Meetings':'safety' };
@@ -259,6 +327,12 @@ HS.onReady(async function () {
       ? '<div class="quiet" style="margin-top:4px"><b>Nothing in this category right now.</b> ' + HS.esc(TAB_EMPTY[tab] || '') + '</div>'
       : '');
 
+    paintQuietAndControls(quiet);
+  }
+
+  // Shared tail for both render paths (category grouping and the Local News
+  // two-section path), so neither can drift from the other.
+  function paintQuietAndControls(quiet) {
     document.getElementById('alQuiet').innerHTML = quiet.length ? (
       '<div class="groupHead" style="color:var(--ink-3)"><span class="gd" style="background:var(--line)"></span> Good to know · lower relevance to you</div>'
       + '<div class="quiet">' + quiet.map(function(q){return '<b>' + HS.esc(q.title) + '</b>';}).join(' · ')
