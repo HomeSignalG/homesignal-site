@@ -241,7 +241,7 @@ rule when scope is added mid-step.**
 | Blocker | Established workaround |
 |---|---|
 | **Sandbox egress is 403-blocked** | Probe live endpoints **server-side via `pg_net`**, not from the sandbox. |
-| **`pg_net` worker stalls** (seen twice in one session, 263 queued, 15 min no completions) | Clear with `net.worker_restart()`. History shows **no silent data rot**, so it is transient. |
+| ~~**`pg_net` worker stalls** — clear with `net.worker_restart()`~~ | ⛔ **SUPERSEDED 2026-07-30 — see §7.1. There is no stall.** The observed symptom is a ~31% outbound request failure rate. `worker_restart()` was never the mechanism that cleared it. |
 | **`pg_net` stores responses as TEXT and truncates at the first NUL** | PDFs (FlateDecode) and xlsx (zip) are **UNREADABLE**. That is an environment limit, **never evidence a document does not exist** — say so explicitly. |
 | **`net._http_response` rows get pruned** | Collect results promptly, or re-fire. |
 | **Socrata group-by truncates at `$limit`** | A distinct count from a truncated group-by is a **FLOOR** — report it as such. |
@@ -251,6 +251,74 @@ rule when scope is added mid-step.**
 | **Branch protection requires the `unit` check**, and a file outside every workflow path filter can never register it | This deadlocked a `CLAUDE.md`-only PR. **Add the path, and disclose it.** |
 | **GitHub merge can return 502 or "405 merge already in progress"** | **Retry** rather than treating it as a content problem. |
 | **Actions budget was once set to $0** (stop-usage) and halted every workflow | Before adding or widening any scheduled job, **state the billing impact** and prefer extending `source-monitor`'s existing nightly `0 7 * * *` run. |
+
+### 7.1 SUPERSEDED — "clear a stalled `pg_net` worker with `net.worker_restart()`"
+
+**SUPERSEDED 2026-07-30. The workaround describes a failure mode that does not exist.** It is
+recorded here rather than deleted, because the reasoning error is the reusable part.
+
+**What was recorded:** *"`pg_net` worker stalls (seen twice in one session, 263 queued, 15 min
+no completions) — clear with `net.worker_restart()`."*
+
+**What was measured** (last 90 minutes of `net._http_response`, 2026-07-30):
+
+```
+1,092 OK · 452 HTTP 503 · 30 request timeouts · 5 DNS timeouts
+QUEUE DEPTH: 0
+```
+
+**~31% of outbound requests are FAILING**, 452 of them 503s from `get-address-report`. The
+worker is not stalled and was not stalled. A 90-second timeout per hung request plus a ~29%
+503 rate collapses throughput — which, observed from outside, is **indistinguishable from a
+wedged worker.** "263 queued, nothing landing in 15 minutes" is exactly what that produces.
+
+**So `worker_restart()` never cleared anything.** The requests finished timing out and the
+queue drained on its own; the restart happened to precede the drain. That is also why a second
+restart later the same day appeared to "fail" — restarting was never the mechanism.
+
+**The class of error:** an inference recorded where a measurement belongs — the same failure as
+the San Diego receipt's "by construction" clause (§8). Two events correlated, a cause was
+inferred, and the inference entered the governance record as established guidance. Both this
+doc and the workbook (row 391) carried it, so every session inherited it.
+
+**What to do instead:** do not restart the worker. Measure first — `select status_code,
+count(*) from net._http_response where created > now() - interval '90 minutes' group by 1`
+alongside `select count(*) from net.http_request_queue`. A **queue depth of 0 with slow
+throughput is a request-failure problem, not a worker problem.** The open investigation is
+**PGNET-503** in `QUEUE.md`.
+
+**The general rule:** before recording a remedy, establish that it *caused* the recovery. "I did
+X and the problem went away" is correlation. A remedy recorded on correlation is worse than no
+remedy, because it stops anyone looking for the real cause.
+
+### A concurrent writer is a design constraint, not an accident
+
+**Two sessions have write access to this repo and to `jurisdiction-registry.json`.** Treat that
+as normal, because it is.
+
+**Before any registry edit**, check whether another session has touched that entry since your
+branch point, and **state the result in your report** — the entry, the commits inspected, the
+outcome:
+
+```
+git log --since=<branch-point> -S'"registry_id": "<id>"' origin/main
+```
+
+**Never resolve a collision by force-push.** Rebase onto the other session's work and commit
+only the delta it is missing.
+
+> **Worked case — 2026-07-30, two collisions in one day.** A parallel session wired the TX
+> `government_notice` feeds (15:48 / 18:20 UTC) while this session was reporting them as
+> unwired; and a parallel session landed the *same* `san-diego-approved-permits` status map in
+> `915eaab` while this session was preparing it. The first surfaced as a `stale info` push
+> rejection, the second because the remote was read before force-pushing.
+>
+> Both were caught. **Neither was caught by method** — converging on the same edit twice is
+> luck. And the second collision mattered: `915eaab` changed `status_to_bucket` but left
+> `_receipts` untouched, so force-pushing would have destroyed the reporting fix, while
+> *skipping* the rebase would have left the superseded inference standing next to a bucket that
+> contradicted it. Rebasing and committing only the missing `_receipts` delta was the only
+> action that preserved both.
 
 **Reading repo state:** `HomeSignalG/homesignal-site` is **PUBLIC** — read PRs, commits and
 files directly by URL. **Verify state by reading it, never by relaying a summary.**
