@@ -4,8 +4,9 @@
 // (54-column ledger; GIS_LATITUDE/GIS_LONGITUDE, no ZIP column → spatial scoping;
 // per-record OpenDSD approval URL verified real-vs-bogus). Commits the offline gate
 // proof as a durable, re-runnable suite.
-// Run: npx -y esbuild scripts/csv.fixture-test.ts --bundle --format=esm \
-//        --outfile=/tmp/csv-test.mjs && node /tmp/csv-test.mjs
+// Run: node scripts/run-unit-tests.mjs   (or: node test/csv-fixture.test.ts)
+// Discovered automatically by run-unit-tests.mjs and executed in the `unit` CI job.
+// node >=22.6 strips the TypeScript types natively — no esbuild step.
 import { _clearCsvCache, csvForZip, parseCsv, type CsvRegistryEntry } from "../supabase/functions/get-address-report/sources/csv.ts";
 
 let failures = 0;

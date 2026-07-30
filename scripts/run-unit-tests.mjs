@@ -1,6 +1,9 @@
 #!/usr/bin/env node
-// Run every test/*.test.mjs in deterministic order. Used by unit-tests CI and
-// local verification — new regression files are picked up automatically.
+// Run every test/*.test.mjs and test/*.test.ts in deterministic order. Used by
+// unit-tests CI and local verification — new regression files are picked up
+// automatically. .test.ts is accepted because the connector fixture suites are
+// TypeScript (typed registry entries); node >=22.6 strips their types natively,
+// the same mechanism the .test.mjs suites already rely on to import sources/*.ts.
 import { readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -9,11 +12,11 @@ import { join, dirname } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const testDir = join(root, 'test');
 const files = readdirSync(testDir)
-  .filter((f) => f.endsWith('.test.mjs'))
+  .filter((f) => f.endsWith('.test.mjs') || f.endsWith('.test.ts'))
   .sort();
 
 if (!files.length) {
-  console.error('No test/*.test.mjs files found');
+  console.error('No test/*.test.{mjs,ts} files found');
   process.exit(1);
 }
 
