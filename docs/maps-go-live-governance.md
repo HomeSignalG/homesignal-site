@@ -381,6 +381,44 @@ recorded as **EXPIRED / AMENDED**, never as a mistake. Reserve "wrong" for claim
 false at the time they were made. Conflating the two punishes correct work and destroys the
 incentive to record measurements at all.
 
+### SEARCH FIRST, PROBE SECOND — a guessed URL cannot return a verdict
+
+**A negative result from a URL you guessed answers "was my guess right", NOT "does the source
+exist."** Recording a guessed 404 as `candidates_exhausted` writes off a jurisdiction that may
+have a perfectly good first-party feed.
+
+**Method, in this order:** search for the county's actual agenda/notice page → read what vendor
+and identifiers it really uses → *then* probe that exact endpoint. Never invent
+`<county>.<vendor>.com/<path>` and treat the response as evidence about the county.
+
+> **Worked case — TX-GOV Phase 2, 2026-07-30.** Twelve guessed probes across the four largest
+> uncovered TX counties yielded **zero** usable sources. One search then found Tarrant's real
+> Granicus view — `view_id=7` — immediately. **The guess had been `view_id=1`, which 404'd at 16
+> bytes.** Recording that 404 as `candidates_exhausted` would have written off **99 ZIP pages**
+> that have a live first-party feed.
+
+**This is Rule 13 in a new costume:** the probe answered a different question than the one asked.
+Scope errors are not only about `extra_where` and `recency_days` — a wrong *URL* is a wrong
+scope too.
+
+**Corollaries, each measured the same day:**
+
+- **A 200 is not a verdict either.** Travis's guessed CivicPlus RSS returned 200 / 30,670 bytes
+  and **was not a feed** (0 `<item>`). Check the shape, not the status.
+- **Valid RSS with 0 items is `first_party_UNCONFIRMED`, never `first_party_found`.** Tarrant's
+  `view_id=7` returns 200, valid RSS, and the correct entity title — and **0 items**, with no
+  event dates on its listing page. A *retired* view returns exactly that: Tarrant demonstrably
+  retires views and leaves them serving (`view_id=2` is titled **"(NOT IN USE) Commissioners
+  Court Archive"**). Two explanations, not separated — so currency must be established against a
+  known-good comparison feed before wiring.
+- **Name the channel that produced each verdict.** WebSearch and WebFetch are not
+  interchangeable here: WebSearch works, **WebFetch is host-dependent** (403 on
+  `dallascounty.org`). A transport failure is a **transport** verdict, never a source verdict —
+  the same distinction as `verification_blocked` vs `candidates_exhausted`.
+- **Watch out for the cross-entity lookalike.** `elpasotexas.granicus.com` is the **City** of El
+  Paso; the **County** uses NovusAgenda. A right-looking host for the wrong government is the
+  documented trap that once surfaced Calgary and Brampton data for US searches.
+
 ### A gate that did not FIRE must be distinguishable from a gate that did not RUN
 
 **In the job summary, not only in the log.** A skipped step, a step whose condition never
