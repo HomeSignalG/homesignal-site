@@ -419,6 +419,50 @@ scope too.
   Paso; the **County** uses NovusAgenda. A right-looking host for the wrong government is the
   documented trap that once surfaced Calgary and Brampton data for US searches.
 
+### ITEM COUNT IS NOT A LIVENESS SIGNAL
+
+**The feed with the most items can be the worst thing to wire.** Item count is exactly the signal
+a reasonable person trusts, and it is the one that fails hardest.
+
+> **Worked case — Tarrant County Granicus, 2026-07-30.** Enumerating every view:
+>
+> | view_id | items | title |
+> |---|---|---|
+> | 2 | **0** | `(NOT IN USE) Commissioners Court A…` |
+> | 5 | 2 | `(NOT IN USE) Commissioners Court A…` |
+> | 6 | **100** | `IFRAME - Commissioners Court Archive` |
+> | 7 | 0 | `Public Notice (Agenda Feed)` |
+> | 8 | 0 | `Trustee Sales (Agenda Feed)` |
+> | 9 | **100** | **`Test View (Agenda Feed)`** |
+>
+> The two **highest-item** views are an **archive** and a **TEST VIEW**. A "pick the view with
+> the most items" heuristic would have wired **test data onto 99 production ZIP pages**,
+> presented to residents as county notices — **worse than the empty feed it was trying to
+> avoid.**
+
+**Liveness requires all three, together:**
+
+1. **A clean NAME** — reject any title containing `test`, `NOT IN USE`, `archive`, `IFRAME`, or
+   similar operator scaffolding.
+2. **Recent item DATES** — not merely a non-zero count.
+3. **The correct ENTITY** — the county, not the city of the same name (§ search-first).
+
+### The retired-view signature — why 0 items can never stand alone
+
+**`200` + valid RSS + correct entity title + `0` items is INDISTINGUISHABLE from a live-but-quiet
+feed.** It is therefore **never** `first_party_found` on its own — mark it
+**`first_party_UNCONFIRMED`** and separate the two explanations before wiring.
+
+This is documented, not hypothetical: Tarrant's `view_id=2` is *titled* `(NOT IN USE)` and serves
+exactly that response. **The publisher retires views and leaves them serving.** So a feed that
+looks perfect and simply has nothing in it today may be a decommissioned endpoint that will never
+carry another item.
+
+**To separate them:** enumerate the publisher's other views and compare against a **known-good
+control feed** from the same vendor (Denton's `view_id=26` → 101 items). If every live-named view
+is empty while archive/test views hold content, the publisher has migrated — find the new system
+rather than wiring the corpse.
+
 ### A gate that did not FIRE must be distinguishable from a gate that did not RUN
 
 **In the job summary, not only in the log.** A skipped step, a step whose condition never
