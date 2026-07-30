@@ -267,26 +267,39 @@ Tarrant `agendamgmtprod` characterisation (99) · NovusAgenda spike + modelled-c
   cache-wide (row 377). Founder decision stands: **BUILD it, do not drop the entry.**
 - **Acceptance:** connector built, entry emits records, fixture suite in CI.
 
-### 9. PGNET-503 — why does `get-address-report` 503 to ~29% of pg_net requests?
-- **State:** READY — **priority: above all state work, below SD-UNREACHABLE** (founder,
-  2026-07-30)
+### 9. PGNET-EGRESS — is our probe path producing false negatives?
+- **State:** IN-PROGRESS — **priority: above all state work** (founder, 2026-07-30)
 - **Gate:** **REPORT ONLY.** No fix, no retry logic, no scheduled job without approval.
-- **Depends on:** —
-- ⛔ **SUPERSEDES "PGNET-WATCHDOG".** That item was to detect stalls and restart the worker. It
-  **treats a failure mode that does not exist** — see the measurement below. Detecting and
-  restarting would have been work against a phantom.
-- **Measured (last 90 min of `net._http_response`, 2026-07-30):**
-  `1,092 OK · 452 HTTP 503 · 30 request timeouts · 5 DNS timeouts` · **QUEUE DEPTH 0.**
-  **~31% of outbound requests are failing**, 452 of them 503s from the edge function. The worker
-  is not stalled and never was: a 90 s timeout per hung request plus a ~29% 503 rate collapses
-  throughput, which from outside is indistinguishable from a wedged worker.
-- **Report only — four questions:**
-  1. Is the 503 **cold starts, concurrency limits, memory, or rate limiting?**
-  2. Does `dev_refresh_tick` **silently absorb** these?
-  3. If so, **how many scheduled refreshes fail per day?**
-  4. Does **anything retry**?
-- **Acceptance:** those four answered with measurements. No remedy recorded until it is shown to
-  *cause* the recovery — that is what produced the superseded restart guidance.
+- ⛔ **Renamed and widened from PGNET-503** (itself the supersession of PGNET-WATCHDOG, which
+  treated a stall that does not exist). Widened because this is now a **CORRECTNESS** problem,
+  not a throughput one: **a `candidates_exhausted` verdict from our probe path is currently
+  unsafe**, and we have already seen what a wrong exhausted verdict costs — 99 pages nearly
+  written off on a guessed 404.
+- **Evidence — two distinct signatures:**
+  - **503s:** `1,092 OK · 452 HTTP 503 · 30 request timeouts · 5 DNS timeouts`, **queue depth 0**
+    — a ~31% failure rate.
+  - **400s:** four probes across **three unrelated hosts** — `bexar.org` ×2,
+    `newtools.cira.state.tx.us`, `harriscountytx.legistar.com` — all returning **~330-byte 400s**
+    (339/339/311/339). That uniformity is an egress signature, not four coincidental refusals.
+  - **WebFetch returns 403** on `bexar.org` and `harriscountytx.legistar.com` — a *different*
+    status from a *different* datacenter egress path. Two paths, two rejections, neither clean.
+- **Three questions, report only:**
+  1. **The 503s** — cold starts, concurrency limits, memory, or rate limiting? Does
+     `dev_refresh_tick` silently absorb them, how many scheduled refreshes fail per day, and does
+     anything retry?
+  2. **The 400s** — capture a **full response body and headers**. WAF fingerprinting Supabase
+     egress, a missing User-Agent, or something we send? A ~330-byte uniform body across
+     unrelated hosts should be identifiable.
+  3. ⭐ **MOST IMPORTANT — what fraction of TX-GOV's `verification_blocked` verdicts are actually
+     ours?** Re-run the blocked probes through a channel that is **not** pg_net. In flight:
+     `recon-fetch.yml` on a GitHub runner (clean egress) with `scripts/recon/tx-egress-recheck.json`
+     — 8 blocked targets **plus 2 known-200 controls** (Comal, Denton) so a runner-wide failure is
+     distinguishable from a per-host one.
+- **Why Q3 matters:** if our probe path produces false negatives, **the TX inventory understates
+  what is reachable and TX-GOV was parked on bad data.** TX-GOV is **not** being reopened now —
+  the question is whether it was parked for the right reason.
+- **Acceptance:** all three answered with measurements. No remedy recorded until it is shown to
+  *cause* the recovery.
 
 ### 10. ARLINGTON-DELTA — measure the clean delta
 - **State:** BLOCKED (waiting on the rolling refresh)

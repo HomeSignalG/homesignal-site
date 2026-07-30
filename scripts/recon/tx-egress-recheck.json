@@ -1,0 +1,42 @@
+[
+  {
+    "id": "CONTROL-comal-granicus-known-200",
+    "url": "https://co-comal-tx.granicus.com/ViewPublisherRSS.php?view_id=1&mode=agendas"
+  },
+  {
+    "id": "CONTROL-denton-granicus-known-200",
+    "url": "https://dentoncounty.granicus.com/ViewPublisherRSS.php?view_id=26&mode=agendas"
+  },
+  {
+    "id": "blocked-bexar-agendacenter",
+    "url": "https://www.bexar.org/AgendaCenter"
+  },
+  {
+    "id": "blocked-bexar-rss",
+    "url": "https://www.bexar.org/RSSFeed.aspx?ModID=1&CID=All-0"
+  },
+  {
+    "id": "blocked-harris-legistar",
+    "url": "https://harriscountytx.legistar.com/Calendar.aspx"
+  },
+  {
+    "id": "blocked-cira-llano",
+    "url": "https://newtools.cira.state.tx.us/page/llano.Public.Notices"
+  },
+  {
+    "id": "blocked-cira-liberty",
+    "url": "https://newtools.cira.state.tx.us/page/liberty.Commissioners.Court"
+  },
+  {
+    "id": "blocked-dallas-comcrt",
+    "url": "https://www.dallascounty.org/government/comcrt/"
+  },
+  {
+    "id": "blocked-travis-civicplus-rss",
+    "url": "https://www.traviscountytx.gov/RSSFeed.aspx?ModID=65&CID=All-0"
+  },
+  {
+    "id": "blocked-tarrant-agendamgmtprod",
+    "url": "https://agendamgmtprod.tarrantcountytx.gov/"
+  }
+]
