@@ -84,6 +84,26 @@ export interface ArcgisRegistryEntry {
    *  (e.g. `issued_date IS NOT NULL`) so it never outruns the data. Never use it to override
    *  a real status column — entries that have one keep mapping it. */
   status_const?: string;
+  /** Dataset-level use_type for layers whose only type-bearing column is FREE TEXT, i.e. a
+   *  vocabulary that cannot be enumerated and therefore cannot be mapped (Rule 5 terminal).
+   *  The MIRROR of status_const, and subject to the same discipline: it is a constant because
+   *  the publisher states no classifiable type, NEVER an override for a layer that has one --
+   *  entries with a mappable type_source keep mapping it, and setting both is a config error
+   *  the loader rejects below.
+   *
+   *  It must be a member of the CLOSED use_type vocabulary (lib/map.js::TYPE_EXACT). For a
+   *  heterogeneous land-use case list the honest member is "Development" -- the generic value
+   *  that renders the "Other project" pin and asserts nothing about the use (the Phoenix
+   *  residual-bucket precedent). Do NOT reach for a specific type to make an entry look
+   *  complete; that is fabrication with extra steps.
+   *
+   *  Worked case: Sussex County DE conditional-use applications. proposed_use is free prose
+   *  ("operate a food truck for a period exceeding three days"), 400+ values mostly n=1, so no
+   *  type_map exists. current_zoning IS a closed 38-value vocabulary but describes the PARCEL,
+   *  not the PROPOSAL -- a conditional use is by definition something the zoning does not
+   *  already allow, so mapping AR-1 to Residential would label an electrical substation
+   *  "Residential". Constant "Development" is the only non-fabricating option. */
+  use_type_const?: string;
   /** Optional ZIP-scoping override for layers with NO ZIP column but a ZIP embedded in a text
    *  field (e.g. a full "…, UT 84604" address). A VERBATIM SQL template with a `{zip}` token,
    *  used as the ZIP clause INSTEAD of `{zip_col}='{zip}'` (e.g.
@@ -210,6 +230,18 @@ async function runEntry(
   };
   const records: NormalizedRecord[] = [];
 
+  // A constant and a map are mutually exclusive by design. Silently letting the map win would
+  // hide a config error in the exact field that decides the pin ICON: the author believes the
+  // constant is in force, the connector ignores it, and the disagreement is invisible until a
+  // page renders the wrong shape. Fail the entry loudly instead.
+  if (entry.use_type_const && entry.type_map && Object.keys(entry.type_map).length > 0) {
+    report.quarantined.push({
+      reason: "config error: use_type_const AND type_map both set — a constant is for layers with NO classifiable type column; remove one",
+      sample: entry.service_url,
+    });
+    return { records, report };
+  }
+
   const zipCol = firstCol(entry.column_map.zip);
   const spatial = (entry.spatial_zip_radius_mi ?? 0) > 0;
   if (spatial && !deps.zipCentroid) {
@@ -299,7 +331,9 @@ async function normalizeRow(
   const typeSrcVal = String(readCol(row, cm.type_source) ?? "").trim();
   const typeHit = typeLookup && typeSrcVal ? resolveNormalized(typeLookup, typeSrcVal) : null;
   if (typeHit?.caseInsensitive) noteCaseFold(caseFold, "type", typeSrcVal, typeHit.matchedKey);
-  const useType = typeHit?.value || "unclassified";
+  // A mapped value always wins; the constant only fills where the publisher states no
+  // classifiable type at all. Mirrors status_const, and still never guesses from the title.
+  const useType = typeHit?.value || entry.use_type_const || "unclassified";
 
   // geography: source coords → point; else geocode a full address → address; else jurisdiction.
   let lat = numOrNull(readCol(row, cm.lat));
