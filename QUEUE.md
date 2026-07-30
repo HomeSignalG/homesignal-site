@@ -75,9 +75,17 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
   make the query use `lower(slug)`.
 
 ### 2. PR-428 — registry status/type maps + drift gate
-- **State:** IN-PROGRESS — **rebased onto `0d011e6`** (current main; founder confirmed the
-  prompt's two shas were contradictory). 4 commits preserved, suite **64/64 green**. San Diego
-  dispatch running.
+- **State:** **DONE — MERGED** `484f277` (squash), 2026-07-30.
+- **Verified green before merge, not assumed:** confirming run `30573378376` →
+  `Registry entries checked: 105 · gating: 0 · unreachable: 3` ·
+  `No in-window unmapped statuses anywhere in the registry. Nothing gates.` ·
+  `[dry-run] done: 0 wired, 146 flagged, 196 findings, 0 status-drift.` The Tier 1 table is
+  gone entirely. Step 8 (the gate) shows **skipped**, which is the designed path — the step is
+  driven by the `STATUS_DRIFT=1` marker and the marker was never set. Checked the log rather
+  than reading a skipped step as a pass. PR checks: `unit` ×2, `verify`, `monitor` all success.
+- **Option 3 (merge with the gate red) was rejected by the founder** — it would have left
+  `source-monitor` permanently red on `main`, the exact condition avoided by not hosting this
+  check in `verify-development`.
 - **Gate:** NONE
 - **Depends on:** —
 - **Actual state (rows 370–375, verified from GitHub):** open, `mergeable_state: clean`,
