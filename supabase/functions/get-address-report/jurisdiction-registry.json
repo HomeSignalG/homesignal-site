@@ -5348,6 +5348,7 @@
     },
     {
       "registry_id": "clark-county-active-projects",
+      "vocab_terminal": "Rule 5 — free-text type field. Probed live 2026-07-30: 150 rows in scope (PROSTATUS <> 'Archive'). This is Clark County CAPITAL IMPROVEMENT PROJECTS, not permits — the schema is contracts (PRONAME, PRONUM, Contractor, BIDAWARD, ConstructionStart, EstTotalCost), and every type-bearing field (PROJ_DESC, ProjDescription, ProjConstDesc, Prodsc) is free prose. There is no bounded vocabulary to map, so type_map cannot be completed and records correctly fall through to the keyword classifier. Excluded from the ranked work list; still counts as INCOMPLETE for Live, because the pins genuinely are unclassified.",
       "platform": "arcgis",
       "service_url": "https://services2.arcgis.com/MLoS3Qx4BXmDoTIY/arcgis/rest/services/Active_Projects/FeatureServer/0",
       "dataset_url": "https://services2.arcgis.com/MLoS3Qx4BXmDoTIY/arcgis/rest/services/Active_Projects/FeatureServer/0",
