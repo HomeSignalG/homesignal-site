@@ -4,8 +4,9 @@
 // Permits row shape (resource 6ddcd912-…) with native zip / y_latitude / x_longitude.
 // These commit the "offline unit-tested incl. a bidirectional gate proof" claim in the
 // MA status block as a durable, re-runnable suite.
-// Run: npx -y esbuild scripts/ckan.fixture-test.ts --bundle --format=esm \
-//        --outfile=/tmp/ckan-test.mjs && node /tmp/ckan-test.mjs
+// Run: node scripts/run-unit-tests.mjs   (or: node test/ckan-fixture.test.ts)
+// Discovered automatically by run-unit-tests.mjs and executed in the `unit` CI job.
+// node >=22.6 strips the TypeScript types natively — no esbuild step.
 import { ckanForZip, type CkanRegistryEntry } from "../supabase/functions/get-address-report/sources/ckan.ts";
 
 let failures = 0;

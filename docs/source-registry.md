@@ -1502,8 +1502,13 @@ mechanics: geometry extracted in the SELECT (`ST_Y(the_geom) AS __lat, ST_X(the_
 AS __lng` — records place by their OWN PostGIS point), **ZIP+4 handled with a prefix
 `LIKE '<zip>%'`** (Philly stores `19143-3005`) and the emitted `zip` truncated to 5,
 recency as a PostgreSQL interval (`<date> > now() - interval 'N days'`). 16 offline
-fixture tests (`scripts/carto.fixture-test.ts`), all passing — incl. the bidirectional
-gate proof (Allegheny + Utah ZIPs → 0 fetches) and the SQL-error quarantine.
+fixture tests (`test/carto-fixture.test.ts`) — incl. the bidirectional gate proof
+(Allegheny + Utah ZIPs → 0 fetches) and the SQL-error quarantine.
+**Runner + status:** discovered by `scripts/run-unit-tests.mjs` and executed in the
+`unit` CI job; 16/16 pass. Until 2026-07-30 this suite lived at
+`scripts/carto.fixture-test.ts`, which **no workflow or runner ever referenced** — the
+"all passing" claim previously here attested to nothing, because the suite had never
+run in CI since it was written. It passes now, and a regression in it now goes red.
 
 ### WIRED — philadelphia-li-permits (Carto, City of Philadelphia L&I)
 - **FRESH**: newest `permitissuedate` **2026-07-10** (live receipt; the city loads in
@@ -2000,7 +2005,9 @@ Golden = the 2,452 cached records (20 ZIPs, 502 distinct cases, frozen 2026-07-1
   (17 enumerated, no dual-bucket, fail-closed), normalization vs the committed
   7-real-feature fixture `fixtures/madison/planning-projects-sample.json` (captured
   live 2026-07-24; stable public records, not a full-payload snapshot), edge shapes.
-- `scripts/arcgis.fixture-test.ts` (esbuild-run, carto/ckan/csv pattern): the ACTUAL
+- `test/arcgis-fixture.test.ts` (discovered by `scripts/run-unit-tests.mjs`, executed in
+  the `unit` CI job; 31/31 pass — carto/ckan/csv follow the same pattern at
+  `test/{carto,ckan,csv}-fixture.test.ts`): the ACTUAL
   `arcgisForZip` with mocked fetch — coverage gate (Dane yes / Milwaukee no / Utah
   no / 0 fetches out of coverage), spatial envelope params, pagination
   (exceededTransferLimit + resultOffset), deterministic source_ids, dedup, empty

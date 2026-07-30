@@ -7,8 +7,9 @@
 // normalization, status mapping, unknown-status fail-closed exclusion, source
 // point geometry, deterministic source IDs, duplicate prevention, empty
 // upstream response, and upstream error handling.
-// Run: npx -y esbuild scripts/arcgis.fixture-test.ts --bundle --format=esm --platform=node \
-//        --outfile=/tmp/arcgis-test.mjs && node /tmp/arcgis-test.mjs
+// Run: node scripts/run-unit-tests.mjs   (or: node test/arcgis-fixture.test.ts)
+// Discovered automatically by run-unit-tests.mjs and executed in the `unit` CI job.
+// node >=22.6 strips the TypeScript types natively — no esbuild step.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {

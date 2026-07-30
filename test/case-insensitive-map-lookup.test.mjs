@@ -1,15 +1,23 @@
-// Case-insensitive status_to_bucket + type_map lookup — the DENVER regression.
+// Case-insensitive status_to_bucket + type_map lookup — the DENVER-shaped exposure.
 //
-// WHAT BROKE. Both registry lookups were exact-after-trim. Denver's residential permit
-// layer reads its status AND its use_type from the same column (`CLASS`), and the live layer
-// now publishes that column UPPERCASE ('NEW BUILDING') while the registry map carries the
-// mixed-case spelling ('New Building') it was wired from. Exact lookup therefore treated a
-// case change as a brand-new value: fail-closed dropped EVERY row, and the page went from
-// hundreds of permits to zero with nothing failing — the drop is a silent `continue`.
+// THE DEFECT THIS GUARDS. Both registry lookups were exact-after-trim, so a value differing
+// from its registry key ONLY in case read as a brand-new value: fail-closed dropped the row
+// on a silent `continue`, with nothing failing anywhere. Denver is the worked example because
+// its residential permit layer reads BOTH its status and its use_type from one column
+// (`CLASS`), so a single unresolved case difference takes out both lookups at once.
 //
-// A case-only difference is the SAME value. This suite pins that the SHIPPED connectors
-// (sources/arcgis.ts, driven end to end here) now:
-//   • emit records for the CURRENT uppercase live values — the acceptance criterion;
+// WHAT IS NOT TRUE (recorded so this file stops asserting it): Denver did not drift, and its
+// pages were never zeroed. The layer stores BOTH cases split by vintage — Title Case for rows
+// inside the entry's 365-day window, UPPERCASE for older rows — and the connector only ever
+// fetches the windowed rows, so production read Title Case throughout and matched exactly.
+// Measured on the deployed engine (ZIP 80207): both Denver entries fetched == emitted, with
+// empty unmapped_statuses AND empty case_insensitive_matches.
+//
+// The guard is still load-bearing: those uppercase spellings are real values in the same
+// layer, one recency_days widening or one re-issued historical permit away from being fetched
+// and silently dropped. A case-only difference is the SAME value. This suite pins that the
+// SHIPPED connectors (sources/arcgis.ts, driven end to end here) now:
+//   • emit records for uppercase live values — the acceptance criterion;
 //   • still prefer an EXACT key when one exists;
 //   • NOTE a case-only match on the run report (`case_insensitive_matches`) instead of
 //     absorbing it silently — suppressing the signal would suppress exactly this drift;
@@ -42,12 +50,16 @@ try {
 const REG = JSON.parse(readFileSync(join(root, 'supabase/functions/get-address-report/jurisdiction-registry.json'), 'utf8'));
 const DENVER = REG.arcgis.find((e) => e.registry_id === 'denver-residential-construction-permits');
 ok(!!DENVER, 'registry carries denver-residential-construction-permits');
-// The registry is wired from the mixed-case spelling; that is the whole premise.
+// The registry is wired from the mixed-case spelling only — the uppercase spelling is
+// absent, so an uppercase live value can resolve ONLY via the case-insensitive path.
+// (Denver's layer holds BOTH cases, split by vintage: Title Case inside the entry's
+// 365-day window, UPPERCASE outside it. Production reads only the windowed rows and was
+// never broken. This suite pins the case-insensitive lookup, not a Denver case flip.)
 ok(DENVER.status_to_bucket.approved.includes('New Building') &&
    !DENVER.status_to_bucket.approved.includes('NEW BUILDING'),
-  "registry map holds 'New Building' and NOT the uppercase spelling the layer now returns");
+  "registry map holds 'New Building' and not the uppercase spelling");
 ok(DENVER.column_map.status_raw === 'CLASS' && DENVER.column_map.type_source === 'CLASS',
-  'CLASS drives BOTH status and use_type — one case flip breaks both lookups');
+  'CLASS drives BOTH status and use_type — one unresolved case difference would break both lookups');
 
 // ── helpers: drive the shipped arcgis connector over a synthetic layer response ───
 const DENVER_CENTROID = { lat: 39.7392, lng: -104.9903 };   // 80202, zipcodes v3.0.0
@@ -80,11 +92,11 @@ async function runDenver(classes) {
   return { sites, report: reports[0], calls };
 }
 
-// ── 1. ACCEPTANCE — the current UPPERCASE live values emit records ────────────────
+// ── 1. ACCEPTANCE — uppercase live values emit records via the case-insensitive path ──
 {
   const { sites, report } = await runDenver(['NEW BUILDING', 'ADDITION', 'NEW BUILDING']);
   ok(sites.length === 3,
-    `all 3 uppercase-CLASS rows emit (got ${sites.length}) — the Denver acceptance criterion`);
+    `all 3 uppercase-CLASS rows emit (got ${sites.length}) — the case-insensitive acceptance criterion`);
   ok(report.unmapped_statuses.length === 0,
     'none of them lands in unmapped_statuses', JSON.stringify(report.unmapped_statuses));
   ok(sites.every((s) => s.bucket === 'approved'),
