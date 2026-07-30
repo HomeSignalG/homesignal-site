@@ -153,7 +153,11 @@ export interface NormalizedRecord {
   needs_review?: boolean;
 }
 
-export interface UnmappedStatus { status: string; count: number; }
+// An unmapped status is EXCLUDED from the output (it cannot be bucketed correctly) but must
+// never vanish silently: `sample` carries the first case/permit number seen with that value so
+// the run report names a concrete record a human can look up. Type stays non-fatal by design —
+// an unmapped type only degrades the pin shape, it never drops the record.
+export interface UnmappedStatus { status: string; count: number; sample?: string | null; }
 export interface ExcludedStatus { status: string; count: number; }
 // CaseFoldMatch is declared with the shared lookup helpers further down this file.
 
@@ -275,6 +279,7 @@ async function runEntry(
   const excludeCount = new Map<string, number>();
   const unmappedCount = new Map<string, number>();
   const caseFold = new Map<string, CaseFoldMatch>();
+  const unmappedSample = new Map<string, string>();   // status → first case/permit no seen
 
   let rows: Record<string, unknown>[];
   try {
@@ -307,6 +312,11 @@ async function runEntry(
       bucket = hit.value;
       if (bucket === undefined) {                                      // unmapped → exclude + FLAG
         unmappedCount.set(rawStatus, (unmappedCount.get(rawStatus) ?? 0) + 1);
+        // Name a concrete record so the flag is actionable, not just a count.
+        if (!unmappedSample.has(rawStatus)) {
+          const cn = valOrNull(readCol(row, entry.column_map.case_number));
+          if (cn) unmappedSample.set(rawStatus, String(cn));
+        }
         continue;
       }
       if (hit.caseInsensitive) noteCaseFold(caseFold, "status", rawStatus, hit.matchedKey);
@@ -322,7 +332,7 @@ async function runEntry(
 
   report.emitted = records.length;
   report.excluded_by_status = [...excludeCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
-  report.unmapped_statuses = [...unmappedCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
+  report.unmapped_statuses = [...unmappedCount].map(([status, count]) => ({ status, count, sample: unmappedSample.get(status) ?? null })).sort((a, b) => b.count - a.count);
   report.case_insensitive_matches = caseFoldList(caseFold);
   return { records, report };
 }
