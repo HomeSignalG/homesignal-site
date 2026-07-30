@@ -192,9 +192,10 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
   "by construction"/"by definition" clause as inference even inside a real probe.
 
 ### 6c. SD-UNREACHABLE — the drift report counts unreachables but never names them
-- **State:** READY — ⬆️ **NEXT ITEM AFTER THE #428 MERGE, ahead of all state work**
-  (founder, 2026-07-30) · **Gate:** NONE · **Depends on:** PR-428 merging (the emitter is that
-  branch's file)
+- **State:** **DONE — PR #438 open.** Both failure paths now carry a distinct reason; the report
+  emits a named `registry_id · family · field · why` table, and states `Unreachable: 0`
+  positively when there are none. `test/unreachable-naming.test.mjs`, 5 assertions, pins the
+  naming rather than the counting. Suite 68 → 69. · **Gate:** NONE
 - ⚠️ **This is not a logging gap.** For those 3 entries, "unreachable" reads **identically to
   "clean" in every downstream consumer** — the exact failure this check exists to prevent,
   reproduced inside the check. A nightly green is currently compatible with 3 entries never
@@ -209,7 +210,8 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
   returned null.
 
 ### 6d. REGISTRY-COLLISION-PROTOCOL — state the concurrency check before any registry edit
-- **State:** READY · **Gate:** NONE · **Depends on:** —
+- **State:** **DONE** — shipped in PR #436 as "A concurrent writer is a design constraint, not
+  an accident". · **Gate:** NONE · **Depends on:** —
 - **Why:** **two registry collisions in one day.** A parallel session wired the TX
   `government_notice` feeds (15:48 / 18:20 UTC), and another landed the *same* San Diego
   `status_to_bucket` map in `915eaab` while this session was preparing it. Both were caught —
@@ -244,17 +246,26 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
   cache-wide (row 377). Founder decision stands: **BUILD it, do not drop the entry.**
 - **Acceptance:** connector built, entry emits records, fixture suite in CI.
 
-### 9. PGNET-WATCHDOG — stalled-worker watchdog
-- **State:** READY (**hygiene priority, not urgent** — row 327/341)
-- **Gate:** NONE to build. **Note row 391:** state billing impact before adding any scheduled
-  job; prefer extending `source-monitor`'s existing `0 7 * * *` run over a new one.
+### 9. PGNET-503 — why does `get-address-report` 503 to ~29% of pg_net requests?
+- **State:** READY — **priority: above all state work, below SD-UNREACHABLE** (founder,
+  2026-07-30)
+- **Gate:** **REPORT ONLY.** No fix, no retry logic, no scheduled job without approval.
 - **Depends on:** —
-- **Detail:** worker stalled twice in one session (263 queued, 15 min no completions);
-  `net.worker_restart()` cleared it both times. `dev_refresh_tick` drives the rolling ZIP
-  refresh through pg_net, so a stall halts refresh with no signal. **History disproves silent
-  data rot:** 12,722 cached ZIPs, oldest `refreshed_at` 2026-07-25, only 10 rows staler than
-  2 days, **0 staler than 7**.
-- **Acceptance:** a stall raises a signal; no new scheduled job.
+- ⛔ **SUPERSEDES "PGNET-WATCHDOG".** That item was to detect stalls and restart the worker. It
+  **treats a failure mode that does not exist** — see the measurement below. Detecting and
+  restarting would have been work against a phantom.
+- **Measured (last 90 min of `net._http_response`, 2026-07-30):**
+  `1,092 OK · 452 HTTP 503 · 30 request timeouts · 5 DNS timeouts` · **QUEUE DEPTH 0.**
+  **~31% of outbound requests are failing**, 452 of them 503s from the edge function. The worker
+  is not stalled and never was: a 90 s timeout per hung request plus a ~29% 503 rate collapses
+  throughput, which from outside is indistinguishable from a wedged worker.
+- **Report only — four questions:**
+  1. Is the 503 **cold starts, concurrency limits, memory, or rate limiting?**
+  2. Does `dev_refresh_tick` **silently absorb** these?
+  3. If so, **how many scheduled refreshes fail per day?**
+  4. Does **anything retry**?
+- **Acceptance:** those four answered with measurements. No remedy recorded until it is shown to
+  *cause* the recovery — that is what produced the superseded restart guidance.
 
 ### 10. ARLINGTON-DELTA — measure the clean delta
 - **State:** BLOCKED (waiting on the rolling refresh)
@@ -298,6 +309,7 @@ Numbers reconciled against the artifact before acting (Rule 15).
 | Tier 1: DE 22 · CO 37 · OR 89 · WA 105 · AZ 148 · CA 228 | Row 356 identical; sums to **629** = row 356's stated total. | ✅ Matches. |
 | "1,136 live, 8,215 remain" of 12,722 | 1,136 + 8,215 = 9,351 ≠ 12,722. | **Not an error** — the 3,371 gap is pages already modelled inside the 34 partial states. "Remaining" counts pages left to model, not pages in unfinished states. Both figures right, counting different things. |
 | Chat seed listed 6 items | Row 376 lists 5 more still outstanding: San Diego, tdlr-tabs, Shelby, pg_net watchdog, Arlington delta. | Added as items 6–10. QUEUE.md must never drift from reality (row 348); omitting known in-flight work would be drift. |
+| "pg_net worker stalls — clear with `net.worker_restart()`" (workbook row 391 + governance doc) | Measured 2026-07-30: **queue depth 0**, `1,092 OK · 452 503 · 30 request timeouts · 5 DNS timeouts` — a **~31% request-failure rate**, not a stall. | **SUPERSEDED.** `worker_restart()` never cleared anything; the requests timed out and the queue drained on its own. I applied it twice today and credited it for a drain it did not cause — post hoc, an inference recorded where a measurement belongs. Item re-scoped to PGNET-503. |
 | Chat order: DB-01 → #428 → #431 → TX → Harris/Bexar → Tier 1 | Row 355 puts Tier 0 (TX, Harris/Bexar) ahead of Tier 1. | ✅ **No conflict** — chat order also places both ahead of Tier 1. No dependency inversion found: #431 is independent of #428, and the row-349 inversion (status_unresolved at step 2 depending on #428 at step 4) is dissolved because Group B is already committed. |
 | Rows 329 + 364: #428 test-rebase "clean, **67/67**" | Measured on the actual rebases: `main` **62** · #428 adds 2 test files (`status-drift-windowing`, `unmapped-status-sample`) → **64** · #431 adds 4 → **66** · both merged → **68**. | **67 matches none of these.** Most likely taken when #428 carried only one new test file (62+4+1). All four measured numbers are green; no work is blocked. Flagged, not worked around. **Correction:** an earlier version of this row cited row 376 — the claim actually lived in rows 329 and 364. Verify the citation as well as the number. |
 | DB-01 hypothesis (row 397) | Disproved on four independent counts. | **SUPERSEDED**, and the founder has already recorded it in workbook 0071 rows 399–401. Not re-reported. |
