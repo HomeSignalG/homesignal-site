@@ -3457,3 +3457,90 @@ Saint Paul resumes publishing. Re-wiring then is one appended registry entry.
 `max(<date column>)` BEFORE adding an entry — a stalled layer that fits the schema perfectly
 still cannot serve a "what's being built near you" page, and a recency window applied to it
 produces a silent zero rather than a visible failure.
+
+---
+
+## SUSSEX COUNTY DE — WIRED via CONDITIONAL USE (2026-07-31) — `sussex-county-de-conditional-use` (arcgis 101 → 102)
+
+### First: this does NOT overturn "SUSSEX COUNTY DE — RE-EXAMINED AND STILL NOT WIREABLE (2026-07-28)"
+
+Both records stand. They are **different endpoints on different hosts**, and reading them as
+contradictory is the mistake this section exists to prevent:
+
+| | 2026-07-28 — rejected, still rejected | 2026-07-31 — wired |
+|---|---|---|
+| host | `map.sussexcountyde.gov/**trdserver**/` | `maps.sussexcountyde.gov/**server**/` |
+| layer | `Permit_Points/MapServer/0` | `Hosted/Conditional_Use_View/FeatureServer/0` |
+| content | building permit POINTS | conditional-use APPLICATIONS |
+| rows | 827,020 | 2,566 |
+| blocker | `a_status` undecodable — no domain, no `queryDomains`, no lookup table, no publisher docs; `C` is 87% of the layer and forward-dated to 2032, so bucketing it would mis-stamp 721,713 records | none — vocabulary enumerates completely |
+
+The Permit_Points blocker is **unchanged**: it still needs a codebook from the county, not more
+probing. Do not wire it. The earlier pass simply never reached this second server — it was hunting
+a codebook for the layer it already had.
+
+### Why this county mattered enough to look twice
+
+Sussex is the **only dark Delaware county**: 22 of DE's 68 ZIP pages, with Kent (17/17) and New
+Castle (29/29) already carrying their own county source. DE is one county away from the 90% bar.
+
+### Liveness — three-part test, all three pass
+
+Clean NAME (`Conditional_Use_View`, no `test`/`archive`/`NOT IN USE`) · correct ENTITY (Sussex
+County DE Planning & Zoning, on the county's own enterprise server) · recent DATES — newest
+`application_rcvd_date` **2026-07-27**, three days before wiring. 2,566 rows, POLYGON geometry
+riding the shipped `featurePoint()` centroid path.
+
+### Status vocabulary — VERBATIM and COMPLETE
+
+Live groupBy on `cc_decision`, `exceededTransferLimit: false`, **16 values summing to EXACTLY
+2,566** — the positive control that makes the enumeration trustworthy:
+
+`Approved` 1864 · `Denied` 238 · `Withdrawn` 187 · *(null)* 172 · `WITHDRAWN` 53 · `APPROVED` 33 ·
+`Approval` 7 · `Approved ` 3 · `DENIED` 2 · `Deferred` 1 · `Defered` 1 · `Approved with Conditions` 1 ·
+`Approved with revised conditiona` 1 · `WITHDRAWN BY APPLICANT` 1 · `WITHDRAWN BY COUNTY` 1 ·
+`8/19/2025` 1
+
+Mapped verbatim; the connector trims both sides, so `Approved ` folds onto `Approved`.
+**173 rows stay deliberately UNMAPPED and fail closed:** the 172 nulls (filed, no Council decision
+yet) and the single `8/19/2025` — a date typed into a decision field, a publisher data-entry error
+with no bucketable meaning. Dropped, never guessed.
+
+### The type field needed a connector change — and the obvious shortcut was WRONG
+
+`proposed_use` is the semantically correct column and is **free prose**: 400+ distinct values over
+2,566 rows, overwhelmingly n=1, with typos (`electrial subsation`, `mantenance dispatch office`)
+and whole sentences (`operate a food truck for a period exceeding three days`). **Rule 5 terminal**
+— no `type_map` can exist.
+
+`current_zoning` **is** a closed vocabulary — 38 values summing to exactly 2,566 — and was
+**REJECTED as the type source anyway**, which is the finding worth carrying:
+
+> **A conditional use is BY DEFINITION something the existing zoning does not allow.** Zoning
+> describes the PARCEL; `use_type` must describe the PROPOSAL. Mapping `AR-1 → Residential` would
+> have labelled an electrical-substation application "Residential" — on 1,987 of 2,566 rows. A
+> closed, tidy, live vocabulary can still be the wrong column, and it is more dangerous than a
+> missing one because it looks complete.
+
+So `use_type_const` now exists in `sources/arcgis.ts`, mirroring `status_const`, set to
+**`Development`** — the generic member of the closed `TYPE_EXACT` vocabulary, rendering the "Other
+project" pin and asserting nothing about the use (Phoenix residual-bucket precedent).
+
+### It closed a latent FALSE-LIVE trap
+
+The Live scoreboard's `entryCompleteness()` **already accepted `use_type_const`** as satisfying the
+pin-icon requirement — while **no connector implemented it and no registry entry used it**. The
+first entry to set it would have been counted toward its state's Live percentage while the
+connector emitted `use_type: "unclassified"` and the pages rendered unclassified pins, with nothing
+failing anywhere. Setting both a constant and a `type_map` is now a **quarantined config error**
+rather than a silent precedence decision.
+
+### Coverage receipts — records land county-wide, not in one cluster
+
+Live envelope probes at the connector's own `spatial_zip_radius_mi: 5` (Rule 13 — same scope the
+connector asks), around real ZIP centroids spanning the county:
+**19966 Millsboro 452 · 19930 Bethany Beach 284 · 19975 Selbyville 286 · 19973 Seaford 236.**
+
+`record_url_precision: "dataset"` — the layer carries no per-case URL column and Sussex's case
+search is not addressable per `application_number`, so templating one would be guessing.
+
