@@ -63,6 +63,14 @@ jobs:
         with:
           node-version: '20'
 
+      # Regenerates the ranked work list nightly instead of it being computed by hand.
+      # Reads the committed anon key from config.js (public, RLS-gated) so it needs no secret,
+      # and runs BEFORE the monitor so the scoreboard lands in the log even if the drift gate
+      # later fails the run.
+      - name: Live scoreboard (ranked work list)
+        continue-on-error: true
+        run: node scripts/live-scoreboard.mjs
+
       - name: Run source monitor
         id: monitor
         run: |

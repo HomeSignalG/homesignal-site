@@ -18,13 +18,23 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import {
-  scoreStates, rankRegistryWork, rankDiscoveryWork, isFloorSource, LIVE_THRESHOLD,
+  scoreStates, rankRegistryWork, rankDiscoveryWork, rankUncoveredCounties,
+  isFloorSource, LIVE_THRESHOLD,
 } from './lib/live-scoreboard-core.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const REGISTRY = `${ROOT}/supabase/functions/get-address-report/jurisdiction-registry.json`;
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
-const KEY = process.env.SUPABASE_ANON_KEY || '';
+// Credentials: env first, else the committed anon key in config.js -- the same path
+// source-monitor.mjs uses. The anon key is public and RLS-gated, so this needs no secret
+// plumbing and the scoreboard can ride the existing nightly run.
+function fromConfigJs(name) {
+  try {
+    const cfg = readFileSync(`${ROOT}/config.js`, 'utf8');
+    return (cfg.match(new RegExp(`${name}\\s*:\\s*'([^']+)'`)) || [])[1] || '';
+  } catch { return ''; }
+}
+const SUPABASE_URL = (process.env.SUPABASE_URL || fromConfigJs('SUPABASE_URL') || '').replace(/\/$/, '');
+const KEY = process.env.SUPABASE_ANON_KEY || fromConfigJs('SUPABASE_ANON_KEY') || '';
 const AS_JSON = process.argv.includes('--json');
 
 function flattenRegistry(path) {
@@ -76,10 +86,11 @@ const pct = (n) => `${(n * 100).toFixed(1)}%`;
   const states = scoreStates(entries, zips);
   const registryWork = rankRegistryWork(entries, zips);
   const discovery = rankDiscoveryWork(research, zips, wiredIds);
+  const counties = rankUncoveredCounties(entries, zips);
   const live = states.filter((s) => s.live);
 
   if (AS_JSON) {
-    console.log(JSON.stringify({ threshold: LIVE_THRESHOLD, states, registryWork, discovery }, null, 2));
+    console.log(JSON.stringify({ threshold: LIVE_THRESHOLD, states, registryWork, discovery, counties }, null, 2));
     return;
   }
 
@@ -107,6 +118,13 @@ const pct = (n) => `${(n * 100).toFixed(1)}%`;
     console.log(`  ${String(d.zip_pages_potential).padStart(5)} pages  ${d.registry_id}  [${d.platform || '?'}]  `
       + (d.ready ? 'READY' : `BLOCKED: ${d.blockers.join('; ')}`));
   }
+  console.log(`\n--- LIST 3: uncovered COUNTIES per state, cheapest state first (${counties.length}) ---`);
+  for (const c of counties.slice(0, 14)) {
+    console.log(`  ${String(c.state).padEnd(4)} ${String(c.covered_complete).padStart(4)}/${String(c.zip_pages).padEnd(5)} `
+      + `${pct(c.pct_complete).padStart(6)}  need +${String(c.to_reach_90).padStart(3)} pages via ${c.counties_needed} count(y/ies): `
+      + c.counties.slice(0, c.counties_needed || 1).map((x) => `${x.county}(${x.zip_pages})`).join(', '));
+  }
+
   console.log('\nList 2 is never merged into List 1: a NOT_WIRED row is discovery, and "Needs Connector"');
   console.log('is a new connector family — a founder gate, not a quick win.\n');
 })().catch((e) => { console.error(`live-scoreboard failed: ${e.message}`); process.exit(1); });
