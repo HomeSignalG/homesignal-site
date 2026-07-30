@@ -9,8 +9,10 @@ import {
   isFloorSource, LIVE_THRESHOLD,
 } from '../scripts/lib/live-scoreboard-core.mjs';
 
-const zips = (state, n, county = 'X') =>
-  Array.from({ length: n }, (_, i) => ({ zip: `${state}${i}`, state, county }));
+// `src` is the list of registry ids that actually LANDED on that ZIP's cached page. Defaulting
+// it to [] rather than "whatever the gate says" is the whole point of the record-based fix.
+const zips = (state, n, county = 'X', src = []) =>
+  Array.from({ length: n }, (_, i) => ({ zip: `${state}${i}`, state, county, source_ids: [...src] }));
 
 test('BOTH maps are required — one alone is not complete', () => {
   assert.equal(entryCompleteness({ status_to_bucket: { approved: ['Issued'] }, type_map: { A: 'Residential' } }).complete, true);
@@ -33,7 +35,7 @@ test('status_const satisfies COLOR — the Detroit issuance-ledger precedent', (
 test('EPA-FRS is tracked but never counts toward Live (row 272)', () => {
   assert.ok(isFloorSource('epa-frs'));
   const entries = [{ registry_id: 'epa-frs', coverage: [{ state: 'NH' }], status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } }];
-  const [nh] = scoreStates(entries, zips('NH', 10));
+  const [nh] = scoreStates(entries, zips('NH', 10, 'X', ['epa-frs']));
   assert.equal(nh.covered_complete, 0, 'the facilities floor must not make a state Live');
   assert.equal(nh.live, false);
 });
@@ -49,7 +51,7 @@ test('statewide coverage (no county) covers every ZIP in the state; county-scope
 
 test('90% is the threshold, measured on ZIP PAGES', () => {
   const e = { registry_id: 'x', coverage: [{ state: 'ZZ', county: 'A' }], status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
-  const pages = [...zips('ZZ', 9, 'A'), ...zips('ZZ', 1, 'B')];   // 9 of 10 covered
+  const pages = [...zips('ZZ', 9, 'A', ['x']), ...zips('ZZ', 1, 'B')];   // 9 of 10 carry a record
   const [s] = scoreStates([e], pages);
   assert.equal(s.zip_pages, 10);
   assert.equal(s.covered_complete, 9);
@@ -58,10 +60,54 @@ test('90% is the threshold, measured on ZIP PAGES', () => {
   assert.equal(LIVE_THRESHOLD, 0.9);
 });
 
+test('THE ROW-429 FIX — a declared county with NO records landing is NOT Live', () => {
+  // The entry is complete and its coverage declares the whole state, so the GATE reads 100%.
+  // Not one record reaches a page. Before this fix the state read Live on nothing at all.
+  const e = { registry_id: 'declared-but-dark', coverage: [{ state: 'ZZ' }],
+    status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
+  const [s] = scoreStates([e], zips('ZZ', 20));
+  assert.equal(s.covered_gate, 20, 'the gate still says every page is covered');
+  assert.equal(s.pct_gate, 1);
+  assert.equal(s.covered_records, 0, 'but nothing landed');
+  assert.equal(s.live, false, 'records decide, not the gate');
+  assert.equal(s.gate_overstatement, 20, 'and the gap is reported, not hidden');
+});
+
+test('the UT shape — gate says Live, records say 35%, records win', () => {
+  const e = { registry_id: 'udot-active-projects', coverage: [{ state: 'UT' }],
+    status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
+  const pages = [...zips('UT', 109, 'A', ['udot-active-projects']), ...zips('UT', 201, 'B')];
+  const [ut] = scoreStates([e], pages);
+  assert.equal(ut.zip_pages, 310);
+  assert.equal(ut.covered_gate, 310);
+  assert.equal(ut.covered_records, 109);
+  assert.ok(Math.abs(ut.pct_records - 109 / 310) < 1e-9);
+  assert.equal(ut.live, false, 'UT is 35% on records and must not read Live');
+});
+
+test('a record from an INCOMPLETE entry counts as any-source, never as Live', () => {
+  const half = { registry_id: 'no-type', coverage: [{ state: 'ZZ' }], status_to_bucket: { a: ['x'] } };
+  const [s] = scoreStates([half], zips('ZZ', 10, 'A', ['no-type']));
+  assert.equal(s.covered_records, 0, 'unclassified pins are not coverage');
+  assert.equal(s.covered_any, 10);
+  assert.equal(s.convertible_by_completion, 10, 'a pure vocabulary fix would convert all ten');
+  assert.equal(s.live, false);
+});
+
+test('records_observed is returned so the runner can refuse a wrong zero', () => {
+  const e = { registry_id: 'x', coverage: [{ state: 'ZZ' }], status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
+  const [none] = scoreStates([e], zips('ZZ', 5));
+  assert.equal(none.records_observed, 0,
+    'zero observations must be visible — an upstream fetch failure and a genuinely dark state '
+    + 'produce identical percentages, so the count is what tells them apart');
+  const [some] = scoreStates([e], [...zips('ZZ', 2, 'A', ['x']), ...zips('ZZ', 3, 'A')]);
+  assert.equal(some.records_observed, 2);
+});
+
 test('convertible_by_completion isolates what a pure registry fix would win', () => {
   const done = { registry_id: 'a', coverage: [{ state: 'ZZ', county: 'A' }], status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
   const half = { registry_id: 'b', coverage: [{ state: 'ZZ', county: 'B' }], status_to_bucket: { a: ['x'] } };
-  const [s] = scoreStates([done, half], [...zips('ZZ', 5, 'A'), ...zips('ZZ', 7, 'B')]);
+  const [s] = scoreStates([done, half], [...zips('ZZ', 5, 'A', ['a']), ...zips('ZZ', 7, 'B', ['b'])]);
   assert.equal(s.covered_complete, 5);
   assert.equal(s.covered_any, 12);
   assert.equal(s.convertible_by_completion, 7, 'the 7 pages an additive fix alone would convert');
@@ -114,7 +160,7 @@ test('uncovered counties rank largest-first, and counties_needed stops at 90%', 
   // 100 pages: 60 already covered by a complete entry, 40 spread over four uncovered counties.
   const done = { registry_id: 'ok', coverage: [{ state: 'CO', county: 'Denver' }], status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
   const pages = [
-    ...zips('CO', 60, 'Denver'),
+    ...zips('CO', 60, 'Denver', ['ok']),
     ...zips('CO', 20, 'ElPaso'), ...zips('CO', 12, 'Larimer'),
     ...zips('CO', 5, 'Weld'), ...zips('CO', 3, 'Boulder'),
   ];
@@ -130,7 +176,7 @@ test('uncovered counties rank largest-first, and counties_needed stops at 90%', 
 test('a state already at 90% is not listed as county work', async () => {
   const { rankUncoveredCounties } = await import('../scripts/lib/live-scoreboard-core.mjs');
   const done = { registry_id: 'ok', coverage: [{ state: 'ZZ', county: 'A' }], status_to_bucket: { a: ['x'] }, type_map: { t: 'u' } };
-  const out = rankUncoveredCounties([done], [...zips('ZZ', 95, 'A'), ...zips('ZZ', 5, 'B')]);
+  const out = rankUncoveredCounties([done], [...zips('ZZ', 95, 'A', ['ok']), ...zips('ZZ', 5, 'B')]);
   assert.deepEqual(out, [], 'Live states drop off the work list entirely');
 });
 
@@ -150,7 +196,7 @@ test('a terminal entry leaves the work list but is still reported and still not 
   const term = { registry_id: 'clark-county-active-projects', platform: 'arcgis',
     coverage: [{ state: 'NV', county: 'Clark' }], status_to_bucket: { a: ['x'] },
     vocab_terminal: 'Rule 5: free-text type field (capital-projects descriptions)' };
-  const pages = zips('NV', 76, 'Clark');
+  const pages = zips('NV', 76, 'Clark', ['clark-county-active-projects']);
   assert.deepEqual(m.rankRegistryWork([term], pages), [], 'never ranked — it cannot be completed');
   const [t] = m.listTerminal([term]);
   assert.equal(t.registry_id, 'clark-county-active-projects');

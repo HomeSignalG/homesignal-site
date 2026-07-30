@@ -56,33 +56,77 @@ export function coversZip(entry, zip) {
 
 /**
  * Per-state Live status.
- * zips: [{zip, state, county}] — the state's modelled ZIP PAGES, which is the denominator row
- * 272 specifies. Not cached rows, not records: pages.
+ *
+ * TWO DIFFERENT QUESTIONS, and conflating them was the defect (workbook row 429):
+ *
+ *   GATE    — does a complete registry entry DECLARE this ZIP's county?
+ *   RECORDS — did a complete entry actually LAND a record on this ZIP's cached page?
+ *
+ * The gate OVERSTATES, every time, because declaring a county does not put a permit within
+ * three miles of a ZIP centroid. Measured 2026-07-30: UT reads Live on the gate and 35.2% on
+ * records; TX 666/668 vs 668/668. Row 419 defines the baseline on records, rows 258/259 warn
+ * the gate overstates, and row 272's "90%+ of ZIPs have at least one development source" is a
+ * statement about ZIPs that HAVE one, not counties that were declared.
+ *
+ * So: `live` is decided on RECORDS. The gate is still computed and emitted beside it, because
+ * the gap between them is itself the diagnostic — a large `gate_overstatement` means an entry
+ * is wired but not reaching pages (the Arlington / harris-county-plats class).
+ *
+ * zips: [{zip, state, county, source_ids}] — `source_ids` is the list of registry ids that
+ * actually landed on that ZIP's cached report. A ZIP with no cached row, or a cached row
+ * carrying only the EPA facilities floor, correctly has none: the floor's sites carry a null
+ * source_registry_id, so it can never make a state Live (row 272).
+ *
+ * A MISSING source_ids is treated as "no records", which is the honest reading for an
+ * uncached ZIP — but it makes a failed upstream fetch indistinguishable from a genuinely dark
+ * state. That is a WRONG ZERO waiting to happen, so `records_observed` is returned per state
+ * and the runner MUST assert on it before reporting. It is not optional: this exact zero
+ * already appeared once, when a keyset page returned only the first 5,000 ZIPs and NV's 89xxx
+ * range sorted past the end.
  */
 export function scoreStates(entries, zips) {
   const wired = entries.filter((e) => !isFloorSource(e.registry_id));
   const complete = wired.filter((e) => entryCompleteness(e).complete);
+  const completeIds = new Set(complete.map((e) => e.registry_id));
+  const wiredIds = new Set(wired.map((e) => e.registry_id));
   const byState = new Map();
 
   for (const z of zips) {
-    const s = byState.get(z.state) || { state: z.state, zip_pages: 0, covered_complete: 0, covered_any: 0 };
+    const s = byState.get(z.state) || {
+      state: z.state, zip_pages: 0,
+      covered_records: 0, covered_records_any: 0, covered_gate: 0, records_observed: 0,
+    };
     s.zip_pages++;
-    if (complete.some((e) => coversZip(e, z))) s.covered_complete++;
-    if (wired.some((e) => coversZip(e, z))) s.covered_any++;
+
+    const ids = Array.isArray(z.source_ids) ? z.source_ids : [];
+    if (ids.length) s.records_observed++;
+    if (ids.some((id) => completeIds.has(id))) s.covered_records++;
+    if (ids.some((id) => wiredIds.has(id))) s.covered_records_any++;
+    if (complete.some((e) => coversZip(e, z))) s.covered_gate++;
+
     byState.set(z.state, s);
   }
 
   return [...byState.values()].map((s) => {
-    const pct = s.zip_pages ? s.covered_complete / s.zip_pages : 0;
+    const pct = s.zip_pages ? s.covered_records / s.zip_pages : 0;
     return {
       ...s,
+      // Kept under the old names so every existing consumer keeps working, but they now mean
+      // RECORDS. Renaming silently would have been the worse option: a caller reading
+      // `covered_complete` would have gone on believing it was reading the gate.
+      covered_complete: s.covered_records,
+      covered_any: s.covered_records_any,
       pct_complete: pct,
-      // The gap that INCOMPLETE vocabularies alone account for — i.e. how many pages a pure
-      // additive registry fix would convert, with no discovery at all.
-      convertible_by_completion: s.covered_any - s.covered_complete,
+      pct_records: pct,
+      pct_gate: s.zip_pages ? s.covered_gate / s.zip_pages : 0,
+      // How much the gate overstates. This is the UT 310-vs-109 number.
+      gate_overstatement: s.covered_gate - s.covered_records,
+      // Pages an ADDITIVE registry fix alone would convert -- records already landing from a
+      // wired-but-incomplete entry, needing only a vocabulary.
+      convertible_by_completion: s.covered_records_any - s.covered_records,
       live: pct >= LIVE_THRESHOLD,
     };
-  }).sort((a, b) => b.pct_complete - a.pct_complete || b.zip_pages - a.zip_pages);
+  }).sort((a, b) => b.pct_records - a.pct_records || b.zip_pages - a.zip_pages);
 }
 
 /**
@@ -177,9 +221,13 @@ export function rankDiscoveryWork(researchRows, zips, wiredIds = new Set()) {
  * missing in total. Stop adding counties once it crosses the threshold.
  */
 export function rankUncoveredCounties(entries, zips, { threshold = LIVE_THRESHOLD } = {}) {
-  const wired = entries.filter((e) => !isFloorSource(e.registry_id));
-  const complete = wired.filter((e) => entryCompleteness(e).complete);
-  const covered = (z) => complete.some((e) => coversZip(e, z));
+  const complete = entries
+    .filter((e) => !isFloorSource(e.registry_id))
+    .filter((e) => entryCompleteness(e).complete);
+  const completeIds = new Set(complete.map((e) => e.registry_id));
+  // RECORD-based, matching scoreStates. A county whose ZIPs are declared but dark is still
+  // work to be done -- ranking it as covered is precisely how the gate hid the real gap.
+  const covered = (z) => (Array.isArray(z.source_ids) ? z.source_ids : []).some((id) => completeIds.has(id));
 
   const perState = new Map();
   for (const z of zips) {
