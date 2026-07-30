@@ -1655,12 +1655,15 @@
           "Waiting for Appeal",
           "Planning Commission",
           "Council",
-          "Heritage Board"
+          "Heritage Board",
+          "Zoning Board"
         ],
         "approved": [
           "Approved",
           "Monitoring Conditions",
-          "Awaiting Signatures"
+          "Awaiting Signatures",
+          "Administrative Approval",
+          "Approved w/ Conditions"
         ],
         "operating": [],
         "exclude": []
@@ -1910,7 +1913,8 @@
           "Pending HCLC Review",
           "Hold",
           "Appeal",
-          "Continued"
+          "Continued",
+          "Corrections Submitted"
         ],
         "approved": [
           "Issued",
@@ -4473,7 +4477,20 @@
         "Surfacing or Resurfacing": "Utility",
         "Signal and Light": "Utility",
         "Sidewalk": "Utility",
-        "Sign": "Utility"
+        "Sign": "Utility",
+        "Other": "Utility",
+        "Joint Highway Committee": "Utility",
+        "Contingency": "Utility",
+        "Environmental": "Utility",
+        "Active Transportation": "Utility",
+        "Studies": "Utility",
+        "Not Applicable": "Utility",
+        "Enhancement": "Utility",
+        "Freight": "Utility",
+        "Grade and Drainage": "Utility",
+        "Non-Construction": "Utility",
+        "Program Efficiency": "Utility",
+        "Railroad Related": "Utility"
       },
       "status_to_bucket": {
         "proposed": [
@@ -4866,7 +4883,45 @@
         "Towers": "Utility",
         "Carports": "Development",
         "Undetermined use (Shell Buildings Only)": "Development",
-        "Barns": "Development"
+        "Barns": "Development",
+        "Gas Station": "Commercial",
+        "Golf Course/Tennis Courts": "Commercial",
+        "Indoor/Outdoor Sport Complex": "Commercial",
+        "Funeral Home": "Commercial",
+        "Professional Services (CPAs, Attorneys, Architect/Engineer, etc)": "Commercial",
+        "Theater": "Commercial",
+        "Veterinarian Clinic": "Commercial",
+        "Department Stores": "Commercial",
+        "Indoor Arcade": "Commercial",
+        "Hotel/Motel": "Commercial",
+        "Photography Studio": "Commercial",
+        "Take Out Food Establishment": "Commercial",
+        "Night Club": "Commercial",
+        "Fitness Center": "Commercial",
+        "Day care - Not Educational": "Commercial",
+        "Parking Garage": "Commercial",
+        "Warehouse Distribution": "Industrial",
+        "Manufacturing": "Industrial",
+        "Fabricating": "Industrial",
+        "Packaging": "Industrial",
+        "Repair/Processing": "Industrial",
+        "Mini-Warehouse": "Industrial",
+        "Bldg w/Materials or Products That Constitute a Health, Fire, Explosion or Toxic Health Hazard": "Industrial",
+        "Church": "Civic/Public",
+        "Hospital": "Civic/Public",
+        "Fire Station": "Civic/Public",
+        "Park": "Civic/Public",
+        "Library": "Civic/Public",
+        "Junior/Community College/University": "Civic/Public",
+        "School (Other than ISD) Through the 12th Grade": "Civic/Public",
+        "Child Care For  5+ Children Over the Age of 2 1/2 Years": "Civic/Public",
+        "Post Office": "Civic/Public",
+        "Nursing Home": "Civic/Public",
+        "Retirement Community": "Civic/Public",
+        "Dormitory": "Civic/Public",
+        "Utilities": "Utility",
+        "Unmanned Utility/Existing Site": "Utility",
+        "Retaining Wall": "Development"
       },
       "status_to_bucket": {
         "proposed": [
@@ -5184,7 +5239,8 @@
       "status_to_bucket": {
         "proposed": [],
         "approved": [
-          "Approved"
+          "Approved",
+          "Approved as amended"
         ],
         "operating": [],
         "exclude": [
