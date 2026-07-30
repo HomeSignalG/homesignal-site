@@ -155,6 +155,7 @@ export interface NormalizedRecord {
 
 export interface UnmappedStatus { status: string; count: number; }
 export interface ExcludedStatus { status: string; count: number; }
+// CaseFoldMatch is declared with the shared lookup helpers further down this file.
 
 export interface SocrataRunReport {
   registry_id: string;
@@ -163,6 +164,8 @@ export interface SocrataRunReport {
   emitted: number;                   // records that made it into a band
   excluded_by_status: ExcludedStatus[];   // matched the "exclude" bucket (intended drop)
   unmapped_statuses: UnmappedStatus[];     // status in NO bucket → excluded + FLAGGED
+  /** matched a registry key only after case-folding — NON-failing drift note */
+  case_insensitive_matches: CaseFoldMatch[];
   blank_status: number;              // rows with no status value → excluded
   geocode_failures: number;          // rows needing geocode that failed → quarantined
   no_record_url: number;             // rows that could produce no URL → quarantined
@@ -241,6 +244,7 @@ async function runEntry(
   const report: SocrataRunReport = {
     registry_id: entry.registry_id, dataset_id: entry.dataset_id,
     fetched: 0, emitted: 0, excluded_by_status: [], unmapped_statuses: [],
+    case_insensitive_matches: [],
     blank_status: 0, geocode_failures: 0, no_record_url: 0, quarantined: [],
   };
   const records: NormalizedRecord[] = [];
@@ -256,9 +260,21 @@ async function runEntry(
     return { records, report };
   }
 
-  const lookup = buildBucketLookup(entry.status_to_bucket);
+  // Registry maps are normalized (trim + case-fold) with a collision guard. A collision
+  // whose targets differ cannot be resolved → quarantine THIS entry only, so the other
+  // sources on the page still ship (the quarantine-don't-stop rule).
+  let lookup: NormalizedLookup<Bucket>;
+  let typeLookup: NormalizedLookup<string> | null;
+  try {
+    lookup = buildBucketLookup(entry.status_to_bucket, entry.registry_id);
+    typeLookup = buildTypeLookup(entry.type_map, entry.registry_id);
+  } catch (e) {
+    report.quarantined.push({ reason: `registry map collision: ${(e as Error).message}`, sample: entry.dataset_id });
+    return { records, report };
+  }
   const excludeCount = new Map<string, number>();
   const unmappedCount = new Map<string, number>();
+  const caseFold = new Map<string, CaseFoldMatch>();
 
   let rows: Record<string, unknown>[];
   try {
@@ -287,24 +303,27 @@ async function runEntry(
         report.blank_status++; continue;                              // blank → exclude + count
       }
     } else {
-      bucket = lookup.get(rawStatus);
+      const hit = resolveNormalized(lookup, rawStatus);
+      bucket = hit.value;
       if (bucket === undefined) {                                      // unmapped → exclude + FLAG
         unmappedCount.set(rawStatus, (unmappedCount.get(rawStatus) ?? 0) + 1);
         continue;
       }
+      if (hit.caseInsensitive) noteCaseFold(caseFold, "status", rawStatus, hit.matchedKey);
       if (bucket === "exclude") {                                      // intended drop
         excludeCount.set(rawStatus, (excludeCount.get(rawStatus) ?? 0) + 1);
         continue;
       }
     }
 
-    const rec = await normalizeRow(row, entry, statusRaw, bucket as Exclude<Bucket, "exclude">, deps, report, zip);
+    const rec = await normalizeRow(row, entry, statusRaw, bucket as Exclude<Bucket, "exclude">, deps, report, zip, typeLookup, caseFold);
     if (rec) records.push(rec);
   }
 
   report.emitted = records.length;
   report.excluded_by_status = [...excludeCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
   report.unmapped_statuses = [...unmappedCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
+  report.case_insensitive_matches = caseFoldList(caseFold);
   return { records, report };
 }
 
@@ -326,6 +345,8 @@ async function normalizeRow(
   deps: SocrataDeps,
   report: SocrataRunReport,
   reportZip: string | null,
+  typeLookup: NormalizedLookup<string> | null,
+  caseFold: Map<string, CaseFoldMatch>,
 ): Promise<NormalizedRecord | null> {
   const cm = entry.column_map;
   const title = String(readCol(row, cm.title) ?? "").trim();
@@ -340,7 +361,9 @@ async function normalizeRow(
 
   // classification (never from the title)
   const typeSrcVal = String(readCol(row, cm.type_source) ?? "").trim();
-  const useType = (entry.type_map && typeSrcVal && entry.type_map[typeSrcVal]) || "unclassified";
+  const typeHit = typeLookup && typeSrcVal ? resolveNormalized(typeLookup, typeSrcVal) : null;
+  if (typeHit?.caseInsensitive) noteCaseFold(caseFold, "type", typeSrcVal, typeHit.matchedKey);
+  const useType = typeHit?.value || "unclassified";
 
   // geography: source coords → point; else geocode a full address → address; else jurisdiction.
   let lat = numOrNull(readCol(row, cm.lat));
@@ -547,14 +570,126 @@ function layerFor(useType: string): string {
   }
 }
 
-/** status → bucket, exact after trim. Later buckets don't override earlier ones (a status
- *  should appear in exactly one; if duplicated, first wins and the map should be fixed). */
-function buildBucketLookup(s2b: StatusToBucket): Map<string, Bucket> {
-  const m = new Map<string, Bucket>();
+// ─────────────── SHARED normalized map lookup (status_to_bucket + type_map) ───────────────
+// Used by all five connectors (socrata / arcgis / ckan / carto / csv) so one normalization
+// rule governs every registry map. Both sides of the comparison are trimmed AND case-folded,
+// the same normalization `coverageMatches` above already applies to state/county.
+//
+// WHY: the lookup used to be exact-after-trim, so a publisher that changed the CASE of a
+// status value (Denver's residential CLASS: 'New Building' → 'NEW BUILDING') silently
+// dropped every record — the fail-closed path is correct about unmapped values but a
+// case-only difference is the SAME value, not a new one.
+//
+// An EXACT hit is still preferred; the case-folded map is the fallback, and a hit that only
+// matched case-insensitively is NOTED on the run report (non-failing) so the drift is
+// visible rather than invisibly absorbed.
+//
+// COLLISION GUARD: if two keys of one map collapse to the same normalized form AND point at
+// different targets, the lookup cannot choose — that throws at build time (the caller
+// quarantines the entry, so one bad map never blanks the other sources on the page). A
+// collapse onto the SAME target is benign (some registry maps enumerate case variants
+// defensively) and keeps first-wins. `test/registry-map-collisions.test.mjs` asserts the
+// live registry is collision-free, so a new one goes red in CI before it can ship.
+
+export function normKey(s: unknown): string { return String(s ?? "").trim().toLowerCase(); }
+
+export interface NormalizedLookup<T> {
+  /** trimmed registry key → value (exact match, the pre-existing behavior) */
+  exact: Map<string, T>;
+  /** trimmed + lowercased registry key → value */
+  folded: Map<string, T>;
+  /** normalized key → the registry key it came from (for the case-fold note) */
+  origin: Map<string, string>;
+}
+
+export class RegistryMapCollisionError extends Error {
+  constructor(message: string) { super(message); this.name = "RegistryMapCollisionError"; }
+}
+
+export function buildNormalizedLookup<T>(
+  pairs: Iterable<[string, T]>,
+  mapName: string,
+  registryId: string,
+): NormalizedLookup<T> {
+  const exact = new Map<string, T>();
+  const folded = new Map<string, T>();
+  const origin = new Map<string, string>();
+  for (const [rawKey, value] of pairs) {
+    const k = String(rawKey).trim();
+    if (!exact.has(k)) exact.set(k, value);            // first wins (unchanged)
+    const nk = k.toLowerCase();
+    if (folded.has(nk)) {
+      const prev = folded.get(nk) as T;
+      if (prev !== value) {
+        throw new RegistryMapCollisionError(
+          `${registryId}: ${mapName} keys ${JSON.stringify(origin.get(nk))} and ${JSON.stringify(k)} ` +
+          `collapse to the same normalized form ${JSON.stringify(nk)} but map to different values ` +
+          `(${JSON.stringify(String(prev))} vs ${JSON.stringify(String(value))}). Case-insensitive ` +
+          `lookup cannot choose between them — fix the registry map.`,
+        );
+      }
+      continue;                                        // same target → benign, first wins
+    }
+    folded.set(nk, value);
+    origin.set(nk, k);
+  }
+  return { exact, folded, origin };
+}
+
+/** status → bucket. Later buckets don't override earlier ones (a status should appear in
+ *  exactly one; if duplicated, first wins and the map should be fixed). */
+export function buildBucketLookup(s2b: StatusToBucket, registryId = "?"): NormalizedLookup<Bucket> {
+  const pairs: [string, Bucket][] = [];
   (["proposed", "approved", "operating", "exclude"] as Bucket[]).forEach((b) => {
-    for (const status of s2b[b] ?? []) { const k = status.trim(); if (!m.has(k)) m.set(k, b); }
+    for (const status of s2b[b] ?? []) pairs.push([status, b]);
   });
-  return m;
+  return buildNormalizedLookup(pairs, "status_to_bucket", registryId);
+}
+
+/** type_source value → use_type. null when the entry declares no type_map (→ unclassified). */
+export function buildTypeLookup(
+  typeMap: Record<string, string> | undefined,
+  registryId = "?",
+): NormalizedLookup<string> | null {
+  if (!typeMap) return null;
+  return buildNormalizedLookup(Object.entries(typeMap), "type_map", registryId);
+}
+
+export function resolveNormalized<T>(
+  lk: NormalizedLookup<T>,
+  raw: string,
+): { value: T | undefined; caseInsensitive: boolean; matchedKey: string | null } {
+  const k = raw.trim();
+  if (lk.exact.has(k)) return { value: lk.exact.get(k), caseInsensitive: false, matchedKey: k };
+  const nk = k.toLowerCase();
+  if (lk.folded.has(nk)) {
+    return { value: lk.folded.get(nk), caseInsensitive: true, matchedKey: lk.origin.get(nk) ?? null };
+  }
+  return { value: undefined, caseInsensitive: false, matchedKey: null };
+}
+
+/** Non-failing note: this live value matched a registry key only after case-folding. */
+export interface CaseFoldMatch {
+  field: "status" | "type";
+  value: string;        // the LIVE value as the source published it
+  matched_key: string;  // the registry key it matched case-insensitively
+  count: number;
+}
+
+export function noteCaseFold(
+  m: Map<string, CaseFoldMatch>,
+  field: "status" | "type",
+  value: string,
+  matchedKey: string | null,
+): void {
+  const key = `${field} ${value} ${matchedKey ?? ""}`;
+  const cur = m.get(key);
+  if (cur) { cur.count++; return; }
+  m.set(key, { field, value, matched_key: matchedKey ?? "", count: 1 });
+}
+
+export function caseFoldList(m: Map<string, CaseFoldMatch>): CaseFoldMatch[] {
+  return [...m.values()].sort((a, b) => b.count - a.count);
 }
 
 function firstCol(ref?: ColumnRef): string | null {

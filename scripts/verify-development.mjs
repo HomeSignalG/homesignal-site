@@ -284,6 +284,13 @@ async function main() {
         console.log(`  · ${r.zip} ${rep.registry_id} (${rep.family}): fetched ${rep.fetched}, emitted ${rep.emitted}, ` +
           `excluded ${excl}, unmapped ${(rep.unmapped_statuses || []).length}, ` +
           `geocode-fail ${rep.geocode_failures || 0}, no-url ${rep.no_record_url || 0}`);
+        // NON-FAILING: a registry key that matched only after case-folding. The record IS
+        // published (a case-only difference is the same value), but the publisher changed
+        // the spelling — surfaced so the drift is visible instead of silently absorbed.
+        if ((rep.case_insensitive_matches || []).length)
+          console.log(`    case-insensitive match(es) — ${rep.case_insensitive_matches
+            .map((c) => `${c.field} "${c.value}" → registry key "${c.matched_key}" (${c.count})`).join(', ')}` +
+            ` [live value differs only in case; update the registry map to match]`);
         if ((rep.unmapped_statuses || []).length)
           fails.push(`RUN-REPORT ${r.zip} ${rep.registry_id}: unmapped status(es) reached the engine — ` +
             `${rep.unmapped_statuses.map((u) => `${u.status}(${u.count})`).join(', ')} (add to registry status_to_bucket)`);
