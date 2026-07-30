@@ -79,11 +79,54 @@ async function fetchZipPages() {
   return rows;
 }
 
+/**
+ * Per-ZIP record evidence, via the read-only `dev_zip_source_ids` RPC.
+ *
+ * Reading development_reports.sites directly is a multi-MB-per-row read (Cleveland 44127 is
+ * 5.98 MB / 5,511 sites), so the aggregation happens server-side and only the ids come back.
+ * Keyset-paginated on `zip` — and that pagination is NOT boilerplate: a single un-paginated
+ * call returned the first 5,000 ZIPs only, NV's 89xxx range sorted past the end, and every
+ * NV page read as dark. The zero looked exactly like a real finding.
+ */
+async function fetchZipSourceIds() {
+  const hdr = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
+  const map = new Map();
+  let after = '';
+  for (;;) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/dev_zip_source_ids`, {
+      method: 'POST', headers: hdr,
+      body: JSON.stringify({ p_after: after, p_limit: 5000 }),
+    });
+    if (!r.ok) throw new Error(`dev_zip_source_ids failed: HTTP ${r.status} ${await r.text()}`);
+    const page = await r.json();
+    if (!page.length) break;
+    for (const row of page) map.set(String(row.zip), row.source_ids || []);
+    const cursor = page[page.length - 1].zip;
+    if (cursor === undefined || cursor === null) {
+      throw new Error('keyset cursor missing: `zip` not returned — refusing to loop');
+    }
+    after = cursor;
+    if (page.length < 5000) break;
+  }
+  return map;
+}
+
 const pct = (n) => `${(n * 100).toFixed(1)}%`;
 
 (async () => {
   const entries = flattenRegistry(REGISTRY);
   const zips = await fetchZipPages();
+  const srcByZip = await fetchZipSourceIds();
+  for (const z of zips) z.source_ids = srcByZip.get(String(z.zip)) || [];
+
+  // ASSERT THE INSTRUMENT RAN. A failed or truncated fetch makes every state read 0% — a
+  // success-shaped output attesting to nothing, which is the defect this step was rebuilt to
+  // stop reproducing. Refuse to report rather than publish a zero we cannot stand behind.
+  const withRecords = zips.filter((z) => z.source_ids.length).length;
+  if (!srcByZip.size) throw new Error('dev_zip_source_ids returned 0 rows — refusing to report a scoreboard of zeroes');
+  if (!withRecords) throw new Error(`dev_zip_source_ids returned ${srcByZip.size} rows but matched 0 of ${zips.length} ZIP pages — join is broken, refusing to report`);
+  console.log(`record evidence: ${srcByZip.size} cached ZIP reports read; ${withRecords} of ${zips.length} modelled ZIP pages carry >=1 sourced record`);
+
   const wiredIds = new Set(entries.map((e) => e.registry_id));
 
   let research = [];
@@ -101,16 +144,17 @@ const pct = (n) => `${(n * 100).toFixed(1)}%`;
     return;
   }
 
-  console.log(`\nLIVE SCOREBOARD — 90%+ of a state's ZIP PAGES covered by >=1 entry with BOTH maps complete`);
+  console.log(`\nLIVE SCOREBOARD — 90%+ of a state's ZIP PAGES carrying a RECORD from an entry with BOTH maps complete`);
+  console.log(`(ranked on RECORDS LANDING, not the coverage gate — workbook rows 419/429; the gate is shown beside it)`);
   console.log(`(EPA-FRS tracked, never counted — ${entries.filter((e) => isFloorSource(e.registry_id)).length} floor entr(y/ies) excluded)\n`);
   console.log(`LIVE: ${live.length} of ${states.length} states — ${live.map((s) => s.state).join(', ') || '(none)'}\n`);
 
-  console.log(`state  pages  complete   %      any-source  convertible-by-completion  LIVE`);
+  console.log(`state  pages  records   record%   gate  gate%   gate-overstates  convertible  LIVE`);
   for (const s of states) {
     console.log(
-      `${String(s.state).padEnd(6)} ${String(s.zip_pages).padStart(5)} ${String(s.covered_complete).padStart(9)} `
-      + `${pct(s.pct_complete).padStart(6)} ${String(s.covered_any).padStart(11)} `
-      + `${String(s.convertible_by_completion).padStart(26)}  ${s.live ? 'YES' : ''}`);
+      `${String(s.state).padEnd(6)} ${String(s.zip_pages).padStart(5)} ${String(s.covered_records).padStart(8)} `
+      + `${pct(s.pct_records).padStart(8)} ${String(s.covered_gate).padStart(6)} ${pct(s.pct_gate).padStart(6)} `
+      + `${String(s.gate_overstatement).padStart(16)} ${String(s.convertible_by_completion).padStart(12)}  ${s.live ? 'YES' : ''}`);
   }
 
   console.log(`\n--- LIST 1: WIRED + INCOMPLETE — additive registry work (${registryWork.length}) ---`);
