@@ -46,7 +46,7 @@
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
 import {
   firstColOf, windowClause, andWhere, windowLabel, renderBytes, differenceCategory,
-  unresolvedIndex, UNRESOLVED_VOLUME_BOUND,
+  unresolvedIndex, UNRESOLVED_VOLUME_BOUND, unreachableRows,
 } from './lib/status-drift.mjs';
 
 const DRY = process.argv.includes('--dry-run');
@@ -665,10 +665,22 @@ async function statusDomainDrift() {
         return null;
       };
 
-      let inLive = null, outLive = null;
-      try { inLive = await readDomain(false); } catch { inLive = null; }
+      // An unreachable entry is NOT a clean entry. Capture WHY, and which read failed, so the
+      // report can name it — a count alone makes "could not be read" indistinguishable from
+      // "read and found nothing wrong", which is the exact failure this check exists to catch.
+      let inLive = null, outLive = null, readErr = null;
+      try { inLive = await readDomain(false); } catch (err) { inLive = null; readErr = err?.message || String(err); }
       try { outLive = await readDomain(true); } catch { outLive = null; }
-      if (!inLive) { out.push({ registry_id: e.registry_id, family, field, unreachable: true, inWindow: [], outWindow: [], notes: [], unresolved: [] }); continue; }
+      if (!inLive) {
+        out.push({
+          registry_id: e.registry_id, family, field, unreachable: true,
+          unreachableReason: readErr
+            ? `in-window status read threw: ${readErr}`
+            : `in-window status read returned null (${family} reader could not resolve a status domain)`,
+          inWindow: [], outWindow: [], notes: [], unresolved: [],
+        });
+        continue;
+      }
 
       const mappedKeys = [...mapped];
       const unresolved = unresolvedIndex(e);
@@ -680,7 +692,16 @@ async function statusDomainDrift() {
       let presentIn = null;
       if (family === 'arcgis') {
         const verbatim = await arcgisDistinct(e.service_url, field, andWhere(e.extra_where, windowClause(family, e)));
-        if (!verbatim) { out.push({ registry_id: e.registry_id, family, field, unreachable: true, inWindow: [], outWindow: [], notes: [], unresolved: [] }); continue; }
+        if (!verbatim) {
+          out.push({
+            registry_id: e.registry_id, family, field, unreachable: true,
+            unreachableReason: 'arcgis returnDistinctValues confirmation returned null — groupBy '
+              + 'counts cannot be trusted verbatim without it, so the entry is reported unreachable '
+              + 'rather than reported from case-folded values',
+            inWindow: [], outWindow: [], notes: [], unresolved: [],
+          });
+          continue;
+        }
         presentIn = new Set(verbatim.filter((v) => v != null).map((v) => String(v).trim()));
       }
 
@@ -742,6 +763,7 @@ const driftReal = drift.filter((d) => !d.unreachable && (d.inWindow.length || d.
 const driftLatent = drift.filter((d) => !d.unreachable && d.outWindow.length);
 const driftNotes = drift.filter((d) => !d.unreachable && d.notes.length);
 const driftUnresolved = drift.filter((d) => !d.unreachable && d.unresolved.length);
+const driftUnreachable = drift.filter((d) => d.unreachable);
 const driftChecked = ['arcgis', 'socrata', 'ckan', 'csv', 'carto', 'opendatasoft']
   .flatMap((f) => registry[f] || [])
   .filter((e) => e.column_map?.status_raw && !e.status_const &&
@@ -773,8 +795,26 @@ const section = [
   // fails the run (the workflow greps STATUS_DRIFT=1 after committing this report).
   ``,
   `### Status-domain drift — unmapped statuses DROP records`,
-  `- Registry entries checked: **${driftChecked}** · **gating** (in-window unmapped or volume bound breached): **${driftReal.length}** · unreachable: **${drift.filter((d) => d.unreachable).length}**`,
+  `- Registry entries checked: **${driftChecked}** · **gating** (in-window unmapped or volume bound breached): **${driftReal.length}** · unreachable: **${driftUnreachable.length}**`,
   `- Every probe below applies that entry's OWN \`extra_where\` + \`recency_days\` + status field, so it asks the question the connector asks (Rule 13). The scope tested is printed with each entry.`,
+  // An entry that could not be READ is not an entry that came back clean. Naming them is the
+  // whole point: a bare count leaves "unreachable" indistinguishable from "clean" in every
+  // downstream consumer, so a green run stayed compatible with N entries never having been
+  // read at all — the failure this check exists to prevent, reproduced inside the check.
+  ...(driftUnreachable.length
+    ? [
+      ``,
+      `#### Unreachable — status domain could NOT be read · **not clean, not checked**`,
+      ``,
+      `These entries were **not** verified. Absence of a finding below is absence of evidence, not evidence of absence — a value could be dropping records here and this run would not know.`,
+      ``,
+      `| registry_id | family | status field | why the read failed |`,
+      `|---|---|---|---|`,
+      ...unreachableRows(driftUnreachable).map((u) => `| ${u.registry_id} | ${u.family} | ${u.field} | ${
+        String(u.reason).replace(/\|/g, '\\|').slice(0, 300)
+      } |`),
+    ]
+    : [``, `- **Unreachable: 0** — every checked entry's status domain was actually read.`]),
   ...(driftReal.length
     ? [
       ``,

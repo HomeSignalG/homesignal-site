@@ -78,3 +78,20 @@ export function unresolvedIndex(e) {
   for (const u of (e.status_unresolved || [])) m.set(String(u.value).trim(), u);
   return m;
 }
+
+/** Rows for the "Unreachable" table. An entry whose status domain could NOT be read is not an
+ *  entry that came back clean — but a bare COUNT makes the two indistinguishable in every
+ *  downstream consumer, so a green run stays compatible with N entries never having been read.
+ *  That is the failure the drift check exists to prevent, reproduced inside the check, which is
+ *  why the reason is carried through rather than reconstructed at render time. A missing reason
+ *  is itself reported, never silently blanked. */
+export function unreachableRows(drift) {
+  return (drift || [])
+    .filter((d) => d && d.unreachable)
+    .map((d) => ({
+      registry_id: d.registry_id,
+      family: d.family || '—',
+      field: d.field || '—',
+      reason: d.unreachableReason || 'reader returned null; no reason captured',
+    }));
+}
