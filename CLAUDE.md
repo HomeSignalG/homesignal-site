@@ -30,6 +30,52 @@ If you can't produce the evidence in the same message, you don't yet know it —
 
 ---
 
+## Standing autonomy grant — ship this class without asking (founder, 2026-07-30)
+
+**Do not ask permission for work you have already verified.** Verifying first and asking after
+spends the full cost and ships nothing; that ordering is the thing this grant exists to fix.
+
+**Autonomous — implement, PR, merge, deploy, then report — when ALL of these hold:**
+
+1. **`jurisdiction-registry.json` only.** No other file.
+2. **Strictly additive** — 0 keys removed, 0 values re-cased, every pre-existing list preserved
+   verbatim as a prefix. Assert it programmatically before committing; do not eyeball a diff.
+3. **Every key byte-verified against the live endpoint, in the connector's own scope** (Rule 13
+   below).
+4. **Every value self-describing** — `Approved`, `Denied`, `Submitted`. Never an opaque code.
+5. **Full unit suite green.**
+
+**Still gated — stop and ask:** any code change · any opaque-coded value · anything that changes
+what residents see · any new scheduled job · anything that alters a coverage claim.
+
+### Rule 13 — probe the question the connector asks
+
+A probe whose scope differs from the connector's answers a **different question**. Use the same
+`extra_where`, the same `recency_days` window, the same status field. Unsafe in BOTH directions:
+**too narrow invents absences, too wide invents drift.** State the probe scope alongside every
+vocabulary finding.
+
+*Three real misses:* UDOT (probed the in-scope subset → wrongly concluded keys existed nowhere) ·
+Denver (probed unwindowed → wrongly concluded the layer had flipped to UPPERCASE; it stores both
+cases split by vintage and production was never broken) · the nightly drift check itself (probed
+unwindowed, so it would have reported 61 entries' history as drift forever).
+
+### An instrument must prove it ran before its silence counts as evidence
+
+"No match" and "did not run" must never be indistinguishable. A green check that never executed,
+a `grep` that silently skipped a file it treats as binary, a suite no runner references — each
+produces success-shaped output while attesting to nothing. When a check reports clean, confirm it
+actually ran over what you think it ran over (e.g. the CI log's own file count).
+
+### A provenance field records what was actually done
+
+Never write a provenance claim you did not perform — that is fabrication in the one field that
+exists to prevent it. **"Not yet asked" is a valid and required value.** If a source could not be
+read, record what was attempted, what was found, and why it failed (naming the document and its
+id), rather than implying an answer.
+
+---
+
 ## 0. The prime directive: communities are DATA, not code
 
 **We are scaling to 100+ communities (goal: all ~3,144 U.S. counties). A new
