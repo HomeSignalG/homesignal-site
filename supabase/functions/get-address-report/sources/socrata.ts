@@ -682,7 +682,10 @@ export function noteCaseFold(
   value: string,
   matchedKey: string | null,
 ): void {
-  const key = `${field} ${value} ${matchedKey ?? ""}`;
+  // NUL is written as an escape, never a raw byte: a literal 0x00 makes this file
+  // "binary" to grep/file, which then SKIP it silently without -a — "no match" and
+  // "did not run" become indistinguishable on a file every audit searches.
+  const key = `${field}\u0000${value}\u0000${matchedKey ?? ""}`;
   const cur = m.get(key);
   if (cur) { cur.count++; return; }
   m.set(key, { field, value, matched_key: matchedKey ?? "", count: 1 });

@@ -3,8 +3,9 @@
 // (docs/source-registry.md "PENNSYLVANIA WIRE PASS"): the permits-table row shape with
 // ZIP+4 zip, verbatim statuses, and ST_Y/ST_X geometry extraction. Commits the offline
 // gate proof as a durable, re-runnable suite.
-// Run: npx -y esbuild scripts/carto.fixture-test.ts --bundle --format=esm \
-//        --outfile=/tmp/carto-test.mjs && node /tmp/carto-test.mjs
+// Run: node scripts/run-unit-tests.mjs   (or: node test/carto-fixture.test.ts)
+// Discovered automatically by run-unit-tests.mjs and executed in the `unit` CI job.
+// node >=22.6 strips the TypeScript types natively — no esbuild step.
 import { buildWhere, cartoForZip, type CartoRegistryEntry } from "../supabase/functions/get-address-report/sources/carto.ts";
 
 let failures = 0;
