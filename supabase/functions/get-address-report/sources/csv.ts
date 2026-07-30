@@ -28,9 +28,16 @@
 // design pinned in docs/source-registry.md for the 14.9 MB San Diego file. Batches
 // should fire such ZIPs in modest waves so cold isolates don't multiply the download.
 
-import {
+// Types and values are imported separately: Node's type stripping (used by the offline
+// fixture scripts) does no type analysis, so a TYPE listed in a value import becomes a real
+// runtime import and fails to resolve. Deno erases it either way.
+import type {
   Bucket, ColumnMap, ColumnRef, ExcludedStatus, NormalizedRecord, StatusToBucket,
-  UnmappedStatus, coverageMatches,
+  UnmappedStatus, CaseFoldMatch, NormalizedLookup,
+} from "./socrata.ts";
+import {
+  coverageMatches,
+  buildBucketLookup, buildTypeLookup, resolveNormalized, noteCaseFold, caseFoldList,
 } from "./socrata.ts";
 
 // ───────────────────────────── registry entry + types ─────────────────────────────
@@ -78,6 +85,8 @@ export interface CsvRunReport {
   emitted: number;
   excluded_by_status: ExcludedStatus[];
   unmapped_statuses: UnmappedStatus[];
+  /** matched a registry key only after case-folding — NON-failing drift note */
+  case_insensitive_matches: CaseFoldMatch[];
   blank_status: number;
   /** spatial mode only: ZIP-scoped candidates dropped for having no coordinates. */
   skipped_no_coords: number;
@@ -137,6 +146,7 @@ async function runEntry(
   const report: CsvRunReport = {
     registry_id: entry.registry_id, url: entry.url,
     file_rows: 0, fetched: 0, emitted: 0, excluded_by_status: [], unmapped_statuses: [],
+    case_insensitive_matches: [],
     blank_status: 0, skipped_no_coords: 0, geocode_failures: 0, no_record_url: 0, quarantined: [],
   };
   const records: NormalizedRecord[] = [];
@@ -178,25 +188,39 @@ async function runEntry(
   }
   report.fetched = zipRows.length;
 
-  const lookup = buildBucketLookup(entry.status_to_bucket);
+  // Registry maps are normalized (trim + case-fold) with a collision guard — see the shared
+  // helpers in sources/socrata.ts. An unresolvable collision quarantines THIS entry only.
+  let lookup: NormalizedLookup<Bucket>;
+  let typeLookup: NormalizedLookup<string> | null;
+  try {
+    lookup = buildBucketLookup(entry.status_to_bucket, entry.registry_id);
+    typeLookup = buildTypeLookup(entry.type_map, entry.registry_id);
+  } catch (e) {
+    report.quarantined.push({ reason: `registry map collision: ${(e as Error).message}`, sample: entry.url });
+    return { records, report };
+  }
   const excludeCount = new Map<string, number>();
   const unmappedCount = new Map<string, number>();
+  const caseFold = new Map<string, CaseFoldMatch>();
   const maxRows = entry.max_rows ?? 20000;
 
   for (const row of zipRows) {
     if (records.length >= maxRows) break;
     const statusRaw = String(readCol(row, entry.column_map.status_raw) ?? "").trim();
     if (!statusRaw) { report.blank_status++; continue; }
-    const bucket = lookup.get(statusRaw);
+    const hit = resolveNormalized(lookup, statusRaw);
+    const bucket = hit.value;
     if (bucket === undefined) { unmappedCount.set(statusRaw, (unmappedCount.get(statusRaw) ?? 0) + 1); continue; }
+    if (hit.caseInsensitive) noteCaseFold(caseFold, "status", statusRaw, hit.matchedKey);
     if (bucket === "exclude") { excludeCount.set(statusRaw, (excludeCount.get(statusRaw) ?? 0) + 1); continue; }
-    const rec = await normalizeRow(row, entry, statusRaw, bucket, deps, report);
+    const rec = await normalizeRow(row, entry, statusRaw, bucket, deps, report, typeLookup, caseFold);
     if (rec) records.push(rec);
   }
 
   report.emitted = records.length;
   report.excluded_by_status = [...excludeCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
   report.unmapped_statuses = [...unmappedCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
+  report.case_insensitive_matches = caseFoldList(caseFold);
   return { records, report };
 }
 
@@ -211,6 +235,8 @@ async function normalizeRow(
   bucket: Exclude<Bucket, "exclude">,
   deps: CsvDeps,
   report: CsvRunReport,
+  typeLookup: NormalizedLookup<string> | null,
+  caseFold: Map<string, CaseFoldMatch>,
 ): Promise<NormalizedRecord | null> {
   const cm = entry.column_map;
   const title = String(readCol(row, cm.title) ?? "").trim();
@@ -225,7 +251,9 @@ async function normalizeRow(
 
   // classification (never from the title)
   const typeSrcVal = String(readCol(row, cm.type_source) ?? "").trim();
-  const useType = (entry.type_map && typeSrcVal && entry.type_map[typeSrcVal]) || "unclassified";
+  const typeHit = typeLookup && typeSrcVal ? resolveNormalized(typeLookup, typeSrcVal) : null;
+  if (typeHit?.caseInsensitive) noteCaseFold(caseFold, "type", typeSrcVal, typeHit.matchedKey);
+  const useType = typeHit?.value || "unclassified";
 
   // geography: source coords → point; else geocode a full address → address; else jurisdiction.
   let lat = numOrNull(readCol(row, cm.lat));
@@ -394,14 +422,6 @@ function milesBetween(lat1: number, lng1: number, lat2: number, lng2: number): n
 }
 
 // ───────────────────────────── small helpers (ckan.ts siblings) ─────────────────────────────
-
-function buildBucketLookup(s2b: StatusToBucket): Map<string, Bucket> {
-  const m = new Map<string, Bucket>();
-  for (const b of ["proposed", "approved", "operating", "exclude"] as Bucket[]) {
-    for (const status of s2b[b] ?? []) { const k = status.trim(); if (!m.has(k)) m.set(k, b); }
-  }
-  return m;
-}
 
 function readCol(row: Record<string, unknown>, ref?: ColumnRef): unknown {
   if (!ref) return undefined;
