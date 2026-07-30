@@ -133,3 +133,14 @@ test('a state already at 90% is not listed as county work', async () => {
   const out = rankUncoveredCounties([done], [...zips('ZZ', 95, 'A'), ...zips('ZZ', 5, 'B')]);
   assert.deepEqual(out, [], 'Live states drop off the work list entirely');
 });
+
+test('aggregate-by-design is its own blocker — periods are not permits', async () => {
+  const { rankDiscoveryWork } = await import('../scripts/lib/live-scoreboard-core.mjs');
+  const [d] = rankDiscoveryWork(
+    [{ registry_id: 'douglas-co-building-permits', platform: 'arcgis',
+       coverage: [{ state: 'CO', county: 'Douglas' }], aggregate_only: true }],
+    zips('CO', 14, 'Douglas'));
+  assert.deepEqual(d.blockers, ['AGGREGATE_NOT_PER_RECORD (periods, not permits)']);
+  assert.equal(d.ready, false, 'a live 200-OK first-party source that cannot be pinned is not ready');
+  assert.equal(d.zip_pages_potential, 14);
+});

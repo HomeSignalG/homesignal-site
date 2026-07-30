@@ -114,6 +114,10 @@ export function rankRegistryWork(entries, zips) {
  *   NJ DCA (2,755,796 rows, 200 OK) — no ZIP, no lat/lng, no address ⇒ cannot be scoped at all
  *   DE FirstMap (79,000 rows, point geometry) — newest P_YEAR 2024, nothing in 2025/26 ⇒ stale
  *   WI DSPS — research status "Needs Connector" ⇒ new connector family, a founder gate
+ *   Douglas CO (684 rows, 200 OK) — quarterly AGGREGATE table, periods not permits
+ *
+ * Three sources, three DIFFERENT disqualifiers, none visible from "a first-party source exists".
+ * That is why this list carries blockers rather than ranking on page count.
  */
 export function rankDiscoveryWork(researchRows, zips, wiredIds = new Set()) {
   return researchRows
@@ -124,6 +128,11 @@ export function rankDiscoveryWork(researchRows, zips, wiredIds = new Set()) {
       if (r.research_status && /needs connector/i.test(r.research_status)) blockers.push('NEW_CONNECTOR_FAMILY (founder gate)');
       if (r.has_geography === false) blockers.push('NO_GEOGRAPHY (no ZIP, point or address)');
       if (r.stale_since) blockers.push(`STALE (newest ${r.stale_since})`);
+      // Aggregate-by-design: a real, live, first-party "permits" dataset that publishes PERIODS
+      // rather than permits. Douglas County CO's Building_Permits FeatureServer is 684 rows of
+      // Geography x Year x Quarter with unit counts and dollar values -- no permit number, no
+      // address, no status, no geometry. Nothing to pin, classify or link.
+      if (r.aggregate_only) blockers.push('AGGREGATE_NOT_PER_RECORD (periods, not permits)');
       if (r.reserved) blockers.push(`RESERVED (${r.reserved})`);
       return {
         state: 'NOT_WIRED',
