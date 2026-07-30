@@ -73,28 +73,42 @@ connector family -> PR/merge/deploy/verify -> one-line report when a state cross
    only by checking `scope` on live rows. A registry-wide assertion now pins it (0 violations
    across 102 arcgis entries).
 
-### Next — CO, and it looks HARD; measure before committing
+### CO — UNREACHABLE at 90% by ARITHMETIC (2026-07-31). Wire Weld anyway, then move on.
 
-Record coverage, measured 2026-07-31: **CO 83/140 = 59.3%, 57 dark, needs +43.**
+CO is **83/140 = 59.3%**, 57 dark, needs **+43**. Two counties holding **24** of those 57 dark
+pages have confirmed-unusable sources, so CO's ceiling is **140 − 24 = 116/140 = 82.9%**, below the
+bar, **even if every other county yields perfectly**:
 
-| county | ZIP pages | dark |
-|---|---|---|
-| Douglas | 14 | 14 |
-| Weld | 12 | 12 |
-| Jefferson | 10 | 10 |
-| Larimer | 13 | 8 |
-| Arapahoe | 11 | 5 |
-| El Paso | 34 | 5 |
-| Boulder | 8 | 2 |
-| La Plata | 1 | 1 |
+- **Douglas (14 dark)** — `Building_Permits` FeatureServer is **aggregate-by-design** (row 424:
+  684 rows of Geography × Year × Quarter, `geometryType: null`). Nothing to pin or classify.
+- **Jefferson (10 dark)** — its Open Data Hub DCAT was pulled complete (**479 titles**, JSON
+  terminated) and contains **no permit or land-use case dataset** — the only near-match is a
+  `Subdivision` base layer. `gis.jeffco.us/arcgis/rest/services` 404s (host resolves, path wrong);
+  its citizen permit portal is a login-gated Accela search, not an API.
 
-⚠️ **CO needs essentially EVERY remaining county** (14+12+10+8 = 44, barely over the 43 needed), and
-CLAUDE.md already records rejections for most of them: **Douglas = aggregate-by-design** (row 424,
-684 rows of Geography x Year x Quarter, `geometryType: null`), Arapahoe/Larimer/Weld "no
-first-party catalog", Adams/Jeffco "polygon district layers only" (that last one predates the
-polygon geometry pass — **worth re-probing, the connector can pin polygons now**). Apply row 428
-early: if the dark ZIPs cannot yield records, record CO UNREACHABLE and move on rather than
-grinding.
+**Apply row 428: record CO UNREACHABLE, skip, move on.** Reopen only if Douglas or Jefferson
+publishes a per-record source. This is arithmetic, not a search verdict — no amount of further
+probing on the other six counties can close it.
+
+**Still worth wiring — Weld (+12 pages), because 12 real pages is 12 real pages.** Fully probed
+2026-07-31, ready for a one-pass wire:
+
+```
+https://services.arcgis.com/ewjSqmSyHJnkfBLL/arcgis/rest/services/Site_Plan_Review_open_data/FeatureServer/0
+```
+- 434 rows · **polygon** (rides `featurePoint()`) · newest `DATE_` **2026-07-21**, 417 of 434 dated.
+- Fields: `SPR_S, SUBDIVISIO, LOTS, BLOCK, S_T_R, ZONING, PARCEL__, STATUS, AREA, ACRES, RECP_NUM,
+  DATE_, CASE_NAME, B1_PER_ID1..3, B1_ALT_ID, PER_STATUS`.
+- **Use `PER_STATUS`, NOT `STATUS`.** `PER_STATUS` enumerates completely — `Recorded` 432 +
+  `" Recorded"` 1 + `" "` 1 = **exactly 434** (connector trims, so the two Recorded forms fold).
+  Map `Recorded → approved` (a recorded site plan is approved, not necessarily built).
+  `STATUS` is **Rule 5 free text**: 373 rows are a bare `" "` and the remainder are annotations,
+  not states — `AMD TO SPR 211`, `ANNEX GREELEY`, `AUTO DEALER`, `IRRIGATION PUMP`,
+  `NO APPROVEL FOUN`, `REF. SPR-16`, `REF. Z-377`. Only `ACTIVE` (26) and `INACTIVE` (1) are
+  statuses at all.
+- **Type: `use_type_const: "Development"`** — same reasoning as Sussex; `ZONING` describes the
+  parcel, not the proposal.
+- **REMEMBER `column_map.lat/lng = __lat/__lng`** or all records silently land on ZIP centroids.
 
 After CO by record_pct: **NC 48.8% -> TN 44.2% -> VA 39.7% -> WA 37.6% -> MD 37.5% -> AZ 36.8% ->
 UT 35.2%.**
