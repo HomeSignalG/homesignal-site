@@ -137,5 +137,28 @@ const run = (entry, communities = sussex) => arcgisForZip('19966', communities, 
   ok(new Set(all).size === all.length, 'no status value is bucketed twice');
 }
 
+// ── 7. EVERY arcgis entry must have a geography path — the error I actually made ────
+// Omitting column_map.lat/lng is SILENT: returnGeometry=true is always sent, featurePoint()
+// resolves the polygon centroid correctly, and the coordinates are simply never read. The
+// records still publish, still carry a record_url, and still count toward coverage — so no
+// count, no CI job and no anti-fabrication gate notices. They just all land on the ZIP
+// centroid instead of their own parcel. That is what happened to all 468 Sussex records on
+// their first cache, and it was caught only by checking `scope` on the live rows.
+{
+  const { readFileSync } = await import('node:fs');
+  const reg = JSON.parse(readFileSync(join(root, 'supabase/functions/get-address-report/jurisdiction-registry.json'), 'utf8'));
+  const missing = reg.arcgis.filter((e) => {
+    const cm = e.column_map ?? {};
+    return !(cm.lat && cm.lng) && !cm.address;   // no own point, and nothing to geocode from
+  }).map((e) => e.registry_id);
+  ok(missing.length === 0,
+    'every arcgis entry maps coordinates (__lat/__lng or real columns) OR an address to geocode',
+    missing.join(', '));
+
+  const sx = reg.arcgis.find((e) => e.registry_id === 'sussex-county-de-conditional-use');
+  ok(sx?.column_map?.lat === '__lat' && sx?.column_map?.lng === '__lng',
+    'sussex reads the flattened polygon centroid — records pin to their parcel, not the ZIP centroid');
+}
+
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll checks passed');
 process.exit(fails ? 1 : 0);
