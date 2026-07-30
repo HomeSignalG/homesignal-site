@@ -184,7 +184,13 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
   "by construction"/"by definition" clause as inference even inside a real probe.
 
 ### 6c. SD-UNREACHABLE — the drift report counts unreachables but never names them
-- **State:** READY · **Gate:** NONE · **Depends on:** —
+- **State:** READY — ⬆️ **NEXT ITEM AFTER THE #428 MERGE, ahead of all state work**
+  (founder, 2026-07-30) · **Gate:** NONE · **Depends on:** PR-428 merging (the emitter is that
+  branch's file)
+- ⚠️ **This is not a logging gap.** For those 3 entries, "unreachable" reads **identically to
+  "clean" in every downstream consumer** — the exact failure this check exists to prevent,
+  reproduced inside the check. A nightly green is currently compatible with 3 entries never
+  having been read at all.
 - **Detail:** run `30569691125` reports `unreachable: 3` **once, in the section header, and
   emits no list**. Verified by searching the whole drift section: exactly one occurrence of the
   word. Gating, Tier-2, Tier-3 and `status_unresolved` findings all name their `registry_id`;
@@ -193,6 +199,24 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 - **New item rather than an extension of #428 (Rule 16)** — found mid-flight on authorized work.
 - **Acceptance:** the report names each unreachable `registry_id` and the reason its reader
   returned null.
+
+### 6d. REGISTRY-COLLISION-PROTOCOL — state the concurrency check before any registry edit
+- **State:** READY · **Gate:** NONE · **Depends on:** —
+- **Why:** **two registry collisions in one day.** A parallel session wired the TX
+  `government_notice` feeds (15:48 / 18:20 UTC), and another landed the *same* San Diego
+  `status_to_bucket` map in `915eaab` while this session was preparing it. Both were caught —
+  the first by a `stale info` push rejection, the second by reading the remote before
+  force-pushing — but **converging on the same edit twice is luck, not method.** Two sessions
+  with write access to one registry needs a stated protocol.
+- **The protocol:** before any `jurisdiction-registry.json` edit, check whether another session
+  has touched that entry on `main` (or on the target branch) since your branch point, and
+  **say so in the report** — naming the entry, the commits inspected, and the result.
+  `git log --since=<branch-point> -S'"registry_id": "<id>"' origin/main` is the cheap form.
+- **Never resolve a collision by force-push.** Rebase onto the other session's work and commit
+  only the delta it is missing — that is what recovered the San Diego `_receipts` supersession,
+  which `915eaab` had left untouched.
+- **Acceptance:** the check is stated in every registry-edit report; the rule lands in
+  `docs/maps-go-live-governance.md`.
 
 ### 7. TDLR-TABS — investigate before fix-or-delete
 - **State:** READY
