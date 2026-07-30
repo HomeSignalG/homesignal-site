@@ -242,6 +242,7 @@ rule when scope is added mid-step.**
 |---|---|
 | **Sandbox egress is 403-blocked** | Probe live endpoints **server-side via `pg_net`**, not from the sandbox. |
 | ~~**`pg_net` worker stalls** — clear with `net.worker_restart()`~~ | ⛔ **SUPERSEDED 2026-07-30 — see §7.1. There is no stall.** The observed symptom is a ~31% outbound request failure rate. `worker_restart()` was never the mechanism that cleared it. |
+| **`pg_net` + a `User-Agent` header ⇒ HTTP 400 from IIS hosts** | **The 400 is OURS, not their WAF.** pg_net serializes a header name IIS rejects: `HTTP Error 400. The request has an invalid header name.` — a **339-byte** body. Proven same-URL, same-second: with a UA → **400**; **no headers → 200** and full valid RSS. **Omit the User-Agent on pg_net probes.** |
 | **`pg_net` stores responses as TEXT and truncates at the first NUL** | PDFs (FlateDecode) and xlsx (zip) are **UNREADABLE**. That is an environment limit, **never evidence a document does not exist** — say so explicitly. |
 | **`net._http_response` rows get pruned** | Collect results promptly, or re-fire. |
 | **Socrata group-by truncates at `$limit`** | A distinct count from a truncated group-by is a **FLOOR** — report it as such. |
@@ -380,6 +381,28 @@ never contain*, and only the second kind can be falsified by the vocabulary simp
 recorded as **EXPIRED / AMENDED**, never as a mistake. Reserve "wrong" for claims that were
 false at the time they were made. Conflating the two punishes correct work and destroys the
 incentive to record measurements at all.
+
+### A "blocked" verdict must be re-tested on a SECOND channel before it is recorded
+
+**Our probe path produces false negatives, and they look exactly like a hostile source.**
+
+> **Worked case — TX-GOV Phase 2, 2026-07-30.** Four probes across three unrelated hosts
+> (`bexar.org` ×2, `newtools.cira.state.tx.us`, `harriscountytx.legistar.com`) returned identical
+> ~330-byte 400s. That was recorded as `verification_blocked` and reasoned about as a WAF
+> fingerprinting Supabase egress. **It was a `User-Agent` header we were sending.**
+>
+> Re-run on a GitHub runner (`recon-fetch.yml`, clean egress), **8 of 8 "blocked" targets
+> returned 200** — Bexar 313,925 b, Harris Legistar 206,720 b, CIRA 83,411 b, Dallas 56,345 b,
+> Tarrant's live system 69,291 b. Controls agreed with pg_net where pg_net worked (Comal
+> **78,088 b on both paths, byte-identical**), proving the channel rather than assuming it.
+
+**The rule:** before recording `verification_blocked` — and *never* `candidates_exhausted` — on a
+transport failure, re-test on a channel that does not share the failing path. **Always include a
+known-good control**, so a channel-wide failure is distinguishable from a per-host one.
+
+**Why it is worth the extra run:** a wrong `candidates_exhausted` writes off real coverage
+permanently and nothing downstream ever revisits it. Here it contaminated a whole state's
+inventory and the parking decision built on it.
 
 ### SEARCH FIRST, PROBE SECOND — a guessed URL cannot return a verdict
 
