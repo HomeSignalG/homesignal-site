@@ -80,7 +80,13 @@ async function fetchZipPages() {
 }
 
 /**
- * Per-ZIP record evidence, via the read-only `dev_zip_source_ids` RPC.
+ * Per-ZIP PAGE record evidence, via the read-only `dev_zip_source_ids` RPC.
+ *
+ * LIVE MEANS PAGES (founder, 2026-07-31). The RPC reads `app_projects` — the table pages
+ * actually serve — NOT `development_reports`, which is the connector's cache. Those two
+ * disagree for as long as it takes app_refresh_zip() to materialize, and reading the cache is
+ * how Delaware got reported Live at 68/68 while its pages were still 46/68 with zero rows from
+ * the new source. Wired + merged + emitting is not Live.
  *
  * Reading development_reports.sites directly is a multi-MB-per-row read (Cleveland 44127 is
  * 5.98 MB / 5,511 sites), so the aggregation happens server-side and only the ids come back.
@@ -145,6 +151,7 @@ const pct = (n) => `${(n * 100).toFixed(1)}%`;
   }
 
   console.log(`\nLIVE SCOREBOARD — 90%+ of a state's ZIP PAGES carrying a RECORD from an entry with BOTH maps complete`);
+  console.log(`(page evidence read from app_projects AFTER deploy + materialize — never the development_reports cache)`);
   console.log(`(ranked on RECORDS LANDING, not the coverage gate — workbook rows 419/429; the gate is shown beside it)`);
   console.log(`(EPA-FRS tracked, never counted — ${entries.filter((e) => isFloorSource(e.registry_id)).length} floor entr(y/ies) excluded)\n`);
   console.log(`LIVE: ${live.length} of ${states.length} states — ${live.map((s) => s.state).join(', ') || '(none)'}\n`);
