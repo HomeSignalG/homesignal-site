@@ -661,3 +661,37 @@ belongs in columns H–M; deployment and sweep history belongs on the Instructio
 > **additive-only applies to WORKBOOK cells exactly as it applies to the registry:** extend an
 > existing string, never replace one, unless the founder has asked for a correction to that
 > specific value.
+
+---
+
+## LIVE MEANS PAGES, MEASURED AFTER DEPLOY AND RE-CACHE (founder, 2026-07-31)
+
+**A state is Live when its ZIP PAGES are record-backed in the database, measured AFTER deploy and
+re-cache. Wired + merged + emitting is NOT Live.**
+
+Never declare Live from anything but a post-deploy DB read of the page table. In particular:
+
+- **Connector output is not page coverage.** A source can emit perfectly — correct count, correct
+  `scope: point`, coordinates spanning the county's real extent — into `development_reports` while
+  every page still serves pre-materialization data. The cache and the pages are different tables
+  and they disagree for as long as it takes `app_refresh_zip()` to run.
+- **A cache row is not deploy verification** (the mirror of row 344).
+- **The pipeline has FOUR steps, and skipping the last one is invisible:** merge → deploy →
+  re-cache (`development_reports`) → **materialize (`app_projects`)**. Only the fourth changes what
+  a resident sees.
+
+*The case that produced this rule:* Delaware was reported Live at 68/68 on 2026-07-31. Measured
+against `app_projects` at that moment it was **46/68 — unchanged**, with **zero** rows from the new
+source. The connector had emitted 468 records into the cache and all of them were correct. The
+report was still false.
+
+**And the wrong filter that nearly hid it:** in `app_projects` a facility row carries the FRS
+facility's OWN id in `registry_id` (e.g. `110054576320`), so filtering `registry_id <> 'epa-frs'`
+counts the EPA floor as coverage. That filter reported Sussex **22/22** when the truth was **0/22** —
+a plausible, authoritative-looking, wrong non-zero. **Separate development from the floor on
+`record_kind`, never on a registry-id name.**
+
+Enforced: `dev_zip_source_ids` now reads `app_projects` with `record_kind = 'development'`, so the
+scoreboard cannot be fed cache numbers. Accepted only because it reproduces the row-419 baseline
+exactly across ten states, which the cache-based version did not.
+
