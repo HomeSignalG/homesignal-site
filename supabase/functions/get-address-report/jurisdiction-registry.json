@@ -1192,7 +1192,27 @@
         "blds_standard": "statuscurrentmapped used over raw codes (Permit Issued 21,999 / Permit Finaled 139,840 / Application Accepted 3,206 / In Review 5,596 / Approved 519); raw-code oddballs (ADD INS, APRV_NR, BILLED, CAGIS, PAID, ROUTE...) surface in unmapped_statuses, never guessed",
         "types": "permittypemapped Building 44,298 + Wrecking 5,703 kept; HVAC/Plumbing/Signs/Elevator/Fire/Excavation-Fill/Repair/Fences/Parking/Misc/Temp/CoO dropped at source",
         "record_precision": "native per-record link column + native originalzip + latitude/longitude"
-      }
+      },
+      "status_unresolved": [
+        {
+          "value": "CAGIS",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 1,
+          "asked": "NOT YET ASKED — no publisher query has been made. Evidence to date: a live windowed groupBy on statuscurrentmapped (2026-07-30) shows it OUTSIDE the 365-day window only (1 record). This entry's own _receipts already classes it a raw-code oddball. 'CAGIS' is Cincinnati/Hamilton County's GIS agency, which suggests a routing state rather than a permit lifecycle stage — suggestive, not a definition. OPEN QUESTION for data@cincinnati-oh.gov: what lifecycle stage does statuscurrentmapped='CAGIS' denote?"
+        },
+        {
+          "value": "ADD INS",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 1,
+          "asked": "NOT YET ASKED — no publisher query has been made. Live windowed groupBy (2026-07-30): 1 record IN-window. Plausibly 'additional inspection' or 'add insulation'; the two would bucket differently and the source states neither. OPEN QUESTION for data@cincinnati-oh.gov."
+        },
+        {
+          "value": "APRV_NR",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 15,
+          "asked": "NOT YET ASKED — no publisher query has been made. Live windowed groupBy (2026-07-30): 15 records IN-window, 66 out. Plausibly 'approved - no review'; if so it is pre-issuance (proposed), but the abbreviation is not expanded anywhere in the dataset. OPEN QUESTION for data@cincinnati-oh.gov."
+        }
+      ]
     },
     {
       "registry_id": "new-orleans-permits",
@@ -1236,11 +1256,21 @@
           "Zoning Review",
           "Returned for revision",
           "Materials resubmitted",
-          "Permit Inactive - Awaiting Response"
+          "Permit Inactive - Awaiting Response",
+          "Inspection - Pending",
+          "Inspection Required",
+          "Plan Review - Mechanical - Completed"
         ],
         "approved": [
           "Permit Issued",
-          "Permit Issuance - Active"
+          "Permit Issuance - Active",
+          "Permit Approved",
+          "Sub-Permits Issued",
+          "Foundation Release",
+          "Permit Approval Letter",
+          "Application Acceptance - Approved No Review",
+          "Application Acceptance - Approved w/Review",
+          "Extension Issued"
         ],
         "operating": [
           "Certificate of Completion",
@@ -1249,13 +1279,30 @@
           "Permit Finaled",
           "Inspections Finaled",
           "Inspection - Completed",
-          "Meter Release"
+          "Meter Release",
+          "Temporary Certificate of Occupancy",
+          "Sub-Permits Finaled",
+          "Certificate of Occupancy - Issued w/Meter",
+          "Inspection - Completed No Requirements",
+          "Complete - Historical Import"
         ],
         "exclude": [
           "Permit Expired",
           "Permit Expired Due to Inactivity",
           "Closed",
-          "VOIDED - Owner Changed Contractor"
+          "VOIDED - Owner Changed Contractor",
+          "VOIDED",
+          "VOIDED - Applicant Withdrew Permit",
+          "VOIDED - Duplicate Permit",
+          "VOIDED - Issued in Error",
+          "Permit Denied",
+          "Permit Rescinded",
+          "Zoning Denied",
+          "Permit Application Expired",
+          "Permit not required",
+          "Sub-Permit not required",
+          "Different Permit Type required",
+          "PERMIT CANCELLED "
         ]
       },
       "type_map": {
@@ -1269,7 +1316,21 @@
       "spatial_zip_radius_mi": 3,
       "spatial_point_col": "location_1",
       "record_url_precision": "dataset",
-      "_receipts": "2026-07-25 pg_net recon (ids 105023-105031): data.nola.gov Socrata 'Permits' rcm3-fn58; FRESH max issuedate 2026-07-24; 345,113 rows. NO zip column -> spatial within_circle on the location_1 Point (records keep own per-parcel lat/lng, read via dot-path location_1.latitude/longitude). type whitelist keeps New Construction/Renovation (Structural)/Demolition/Accessory Structure, drops trades/solar/roofing/HVAC/electrical at source (extra_where verified live). currentstatus buckets verbatim. No per-record link column -> dataset_url precision (data.nola.gov/d/rcm3-fn58 -> 200). Coverage gated to LA/Orleans (20 modeled ZIP pages). | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 110 distinct currentstatus values (full $group enumeration, ordered alphabetically) — unlike the other sources in this pass New Orleans DOES publish real pre-issuance states, so proposed is populated VERBATIM with the 15 unambiguous pre-issuance values listed. This is the ONE behavior-changing edit in the pass (it admits previously-unmapped records). The long free-text tail ('see 1312173-movg', 'state bldg.no city inspection needed', 'must refile this one EXPIRED', ...) is deliberately left UNMAPPED so it continues to fail closed rather than being guessed into a bucket."
+      "_receipts": "2026-07-25 pg_net recon (ids 105023-105031): data.nola.gov Socrata 'Permits' rcm3-fn58; FRESH max issuedate 2026-07-24; 345,113 rows. NO zip column -> spatial within_circle on the location_1 Point (records keep own per-parcel lat/lng, read via dot-path location_1.latitude/longitude). type whitelist keeps New Construction/Renovation (Structural)/Demolition/Accessory Structure, drops trades/solar/roofing/HVAC/electrical at source (extra_where verified live). currentstatus buckets verbatim. No per-record link column -> dataset_url precision (data.nola.gov/d/rcm3-fn58 -> 200). Coverage gated to LA/Orleans (20 modeled ZIP pages). | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 110 distinct currentstatus values (full $group enumeration, ordered alphabetically) — unlike the other sources in this pass New Orleans DOES publish real pre-issuance states, so proposed is populated VERBATIM with the 15 unambiguous pre-issuance values listed. This is the ONE behavior-changing edit in the pass (it admits previously-unmapped records). The long free-text tail ('see 1312173-movg', 'state bldg.no city inspection needed', 'must refile this one EXPIRED', ...) is deliberately left UNMAPPED so it continues to fail closed rather than being guessed into a bucket.",
+      "status_unresolved": [
+        {
+          "value": "PILING AFFAVDAVIT",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 1,
+          "asked": "NOT YET ASKED — no publisher query has been made. Live windowed groupBy (2026-07-30): OUT-of-window only (1 record). Appears to be a source-side misspelling of AFFIDAVIT; recorded VERBATIM as the publisher writes it — correcting a publisher's spelling in a registry key would stop it matching. OPEN QUESTION for data.nola.gov."
+        },
+        {
+          "value": "SMFA IZ Compliance",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 2,
+          "asked": "NOT YET ASKED — no publisher query has been made. Live windowed groupBy (2026-07-30): OUT-of-window only (2 records). 'IZ' is likely inclusionary zoning and the entry already carries a separate 'IZ Compliance'; 'SMFA' is unexpanded. OPEN QUESTION for data.nola.gov."
+        }
+      ]
     },
     {
       "registry_id": "east-baton-rouge-building-permits",
@@ -2189,7 +2250,15 @@
         ]
       },
       "record_url_precision": "record",
-      "_receipts": "Verified live 2026-07-14 via pg_net: City of Fort Collins' own AGO org (dLpFH5mwVvxSN4OE) 'Current Building Permits' layer, found via the successor hub open-data-fcgov.hub.arcgis.com (the old opendata.fcgov.com Socrata portal is DECOMMISSIONED - 503 'This site has moved'). POINT geometry, NATIVE ZIP column, and a PER-RECORD official Accela link (WEB -> accela-aca.fcgov.com CapDetail) = record-precision record_url. A curated CURRENT-permits snapshot (2,177 rows; no date column -> no recency filter; the layer itself is the currency guarantee, Provo CurrentProjects precedent). 14 statuses + 13 types enumerated VERBATIM via groupBy; Stock Plan (647) and General Alteration remodel noise (708) dropped at source, keeping the 10 new-construction/addition/demolition types. 'Issued FF' (1 row) left unmapped on purpose (ambiguous semantics -> connector excludes + surfaces it)."
+      "_receipts": "Verified live 2026-07-14 via pg_net: City of Fort Collins' own AGO org (dLpFH5mwVvxSN4OE) 'Current Building Permits' layer, found via the successor hub open-data-fcgov.hub.arcgis.com (the old opendata.fcgov.com Socrata portal is DECOMMISSIONED - 503 'This site has moved'). POINT geometry, NATIVE ZIP column, and a PER-RECORD official Accela link (WEB -> accela-aca.fcgov.com CapDetail) = record-precision record_url. A curated CURRENT-permits snapshot (2,177 rows; no date column -> no recency filter; the layer itself is the currency guarantee, Provo CurrentProjects precedent). 14 statuses + 13 types enumerated VERBATIM via groupBy; Stock Plan (647) and General Alteration remodel noise (708) dropped at source, keeping the 10 new-construction/addition/demolition types. 'Issued FF' (1 row) left unmapped on purpose (ambiguous semantics -> connector excludes + surfaces it).",
+      "status_unresolved": [
+        {
+          "value": "Issued FF",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 1,
+          "asked": "NOT YET ASKED by this pass, but ALREADY RECORDED as a deliberate non-mapping: this entry's own _receipts states \"'Issued FF' (1 row) left unmapped on purpose (ambiguous semantics -> connector excludes + surfaces it)\" (2026-07-14 wire pass). status_unresolved now records that decision instead of leaving it to be re-derived. NOTE this entry has NO recency window (recency_days null AND file_date null), so its whole dataset is in-window and this value would otherwise GATE. OPEN QUESTION for the City of Fort Collins."
+        }
+      ]
     },
     {
       "registry_id": "colorado-springs-planning-applications",
@@ -2426,7 +2495,8 @@
           "Staff Report Complete",
           "Staff Report In Process",
           "Waiting for Information",
-          "Recording Revisions Routed"
+          "Recording Revisions Routed",
+          "Recording Revisions Required"
         ],
         "approved": [
           "Approved",
@@ -4366,7 +4436,8 @@
         "operating": [
           "Finaled",
           "Finaled No Inspection Req'd",
-          "Closed"
+          "Closed",
+          "Finaled  No Inspection Req'd"
         ],
         "exclude": [
           "Cancelled",
@@ -6703,7 +6774,11 @@
           "Awaiting Payment",
           "On Hold",
           "Resubmittal Required",
-          "Review Approved"
+          "Review Approved",
+          "Submitted",
+          "Submitted - Online",
+          "Application Incomplete",
+          "Site Evaluated"
         ],
         "approved": [
           "Issued"
@@ -6713,7 +6788,8 @@
           "Certificate of Compliance (CC) Issued",
           "Certificate of Occupancy (CO) Issued",
           "Temporary Certificate of Occupancy (TCO) Issued",
-          "Partial Certificate of Compliance (PCC) Issued"
+          "Partial Certificate of Compliance (PCC) Issued",
+          "Partial Certificate of Occupancy (PCO) Issued"
         ],
         "exclude": [
           "Expired",
@@ -6721,7 +6797,8 @@
           "Withdrawn",
           "Revoked",
           "Stop Work Order",
-          "Suspended"
+          "Suspended",
+          "Denied"
         ]
       },
       "incremental_field": "ISSUE_DATE",
@@ -7926,7 +8003,15 @@
         "FOLDERNUM"
       ],
       "page_size": 2000,
-      "recency_days": 365
+      "recency_days": 365,
+      "status_unresolved": [
+        {
+          "value": "PME",
+          "first_seen": "2026-07-30",
+          "records_at_first_seen": 1,
+          "asked": "NOT YET ASKED — no publisher query has been made. Live windowed groupBy (2026-07-30): OUT-of-window only (1 record). Every other PERMITAPPROVAL value is a discipline-completion list (B-/E-/P-/M- Complete); 'PME' is bare and matches no pattern. OPEN QUESTION for the City of San Jose PLN."
+        }
+      ]
     },
     {
       "registry_id": "salem-structure-permits",

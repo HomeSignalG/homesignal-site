@@ -44,6 +44,10 @@
 // Env: FRESH_DAYS (default 400), MIN_STATUS_COVERAGE (default 0.6), TIMEOUT_MS (default 25000).
 
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
+import {
+  firstColOf, windowClause, andWhere, windowLabel, renderBytes, differenceCategory,
+  unresolvedIndex, UNRESOLVED_VOLUME_BOUND,
+} from './lib/status-drift.mjs';
 
 const DRY = process.argv.includes('--dry-run');
 // Gate-validation mode (DRY-RUN ONLY): probe targets even when a registry entry already
@@ -213,7 +217,11 @@ function parseCsvRows(text) {
   }
   return out;
 }
-async function csvStatusCounts(entry, field) {
+// `window`: 'in' → rows the connector fetches; 'out' → rows it never sees (older than the
+// recency cutoff, or with an unparseable/absent date — csv.ts drops both). include_types is
+// applied to BOTH, because it is not part of the recency window: a type the connector never
+// ingests is out of scope entirely, not "latent".
+async function csvStatusCounts(entry, field, window = 'in') {
   const r = await jget(entry.url, { asText: true });
   if (!r.ok || !r.text) return null;
   const rows = parseCsvRows(r.text);
@@ -227,13 +235,18 @@ async function csvStatusCounts(entry, field) {
   const dateCol = Array.isArray(entry.column_map?.file_date) ? entry.column_map.file_date[0] : entry.column_map?.file_date;
   const dIdx = dateCol ? hIdx.get(dateCol) : undefined;
   const cutoff = entry.recency_days > 0 ? Date.now() - entry.recency_days * 86400000 : null;
+  // No window exists (no recency_days, or no date column to apply it to) ⇒ the whole dataset
+  // IS in-window and there is no out-of-window half at all.
+  const windowed = cutoff != null && dIdx != null;
+  if (window === 'out' && !windowed) return [];
   const tally = new Map();
   for (let k = 1; k < rows.length; k++) {
     const row = rows[k];
     if (include && tIdx != null) { if (!include.has(String(row[tIdx] ?? '').trim())) continue; }
-    if (cutoff != null && dIdx != null) {
+    if (windowed) {
       const d = new Date(String(row[dIdx] ?? '').trim());
-      if (isNaN(d.getTime()) || d.getTime() < cutoff) continue;
+      const fresh = !isNaN(d.getTime()) && d.getTime() >= cutoff;
+      if (window === 'in' ? !fresh : fresh) continue;
     }
     const v = String(row[sIdx] ?? '').trim();
     tally.set(v, (tally.get(v) ?? 0) + 1);
@@ -625,48 +638,98 @@ async function statusDomainDrift() {
         for (const v of (e.status_to_bucket?.[b] || [])) mapped.add(String(v).trim());
       }
       if (!mapped.size) continue;                       // nothing declared → not a drift signal
-      let live = null;
-      try {
+
+      // Read the SAME domain twice: once inside the connector's window, once outside it.
+      const readDomain = async (invert) => {
+        const win = windowClause(family, e, invert);
+        // An entry with no window has no out-of-window half — say so rather than re-reading
+        // the same rows and reporting them twice under two different tiers.
+        if (invert && !win && family !== 'csv') return e.recency_days > 0 ? null : [];
+        const where = andWhere(e.extra_where, win);
         if (family === 'arcgis') {
-          const rows = await arcgisGroupBy(e.service_url, field, e.extra_where);
-          if (rows) live = rows.map((r) => ({ value: r.value, n: r.n }));
-        } else if (family === 'socrata') {
-          const where = e.extra_where ? `&$where=${encodeURIComponent(e.extra_where)}` : '';
-          const r = await jget(`https://${e.domain}/resource/${e.dataset_id}.json` +
-            `?$select=${encodeURIComponent(field)},count(*) as n&$group=${encodeURIComponent(field)}&$limit=2000${where}`);
-          if (r.ok && Array.isArray(r.json)) live = r.json.map((x) => ({ value: x[field], n: parseInt(x.n, 10) || 0 }));
-        } else if (family === 'ckan') {
-          live = await ckanStatusCounts(e, field);
-        } else if (family === 'carto') {
-          live = await cartoStatusCounts(e, field);
-        } else if (family === 'opendatasoft') {
-          live = await odsStatusCounts(e, field);
-        } else if (family === 'csv') {
-          live = await csvStatusCounts(e, field);
+          const rows = await arcgisGroupBy(e.service_url, field, where);
+          return rows ? rows.map((r) => ({ value: r.value, n: r.n })) : null;
         }
-      } catch { live = null; }   // any read failure → unreachable, never a false drift
-      if (!live) { out.push({ registry_id: e.registry_id, family, field, unreachable: true, missing: [] }); continue; }
-      let missing = live
-        .filter((v) => v.value != null && String(v.value).trim() !== '' && !mapped.has(String(v.value).trim()))
-        .map((v) => ({ value: String(v.value).trim(), n: v.n }))
-        .sort((a, b) => b.n - a.n);
-      // CONFIRM before reporting (arcgis only): groupBy may have case-folded the value, in
-      // which case the "unmapped" string never actually occurs in the data. Keep only values
-      // the verbatim distinct-value read also shows as absent from status_to_bucket. A failed
-      // confirmation read is treated as "cannot confirm" → report nothing, never a false red.
-      if (missing.length && family === 'arcgis') {
-        const verbatim = await arcgisDistinct(e.service_url, field, e.extra_where);
-        if (!verbatim) { out.push({ registry_id: e.registry_id, family, field, unreachable: true, missing: [] }); continue; }
-        const present = new Set(verbatim.filter((v) => v != null).map((v) => String(v).trim()));
-        missing = missing.filter((m) => present.has(m.value) && !mapped.has(m.value));
+        if (family === 'socrata') {
+          const w = where ? `&$where=${encodeURIComponent(where)}` : '';
+          const r = await jget(`https://${e.domain}/resource/${e.dataset_id}.json` +
+            `?$select=${encodeURIComponent(field)},count(*) as n&$group=${encodeURIComponent(field)}&$limit=2000${w}`);
+          return (r.ok && Array.isArray(r.json)) ? r.json.map((x) => ({ value: x[field], n: parseInt(x.n, 10) || 0 })) : null;
+        }
+        if (family === 'ckan')   return ckanStatusCounts({ ...e, extra_where: where }, field);
+        if (family === 'carto')  return cartoStatusCounts({ ...e, extra_where: where }, field);
+        if (family === 'csv')    return csvStatusCounts(e, field, invert ? 'out' : 'in');
+        // opendatasoft has NO connector (`sources/opendatasoft.ts` does not exist), so there
+        // is no "what the connector fetches" to mirror. Facets cannot be windowed either.
+        if (family === 'opendatasoft') return invert ? [] : odsStatusCounts(e, field);
+        return null;
+      };
+
+      let inLive = null, outLive = null;
+      try { inLive = await readDomain(false); } catch { inLive = null; }
+      try { outLive = await readDomain(true); } catch { outLive = null; }
+      if (!inLive) { out.push({ registry_id: e.registry_id, family, field, unreachable: true, inWindow: [], outWindow: [], notes: [], unresolved: [] }); continue; }
+
+      const mappedKeys = [...mapped];
+      const unresolved = unresolvedIndex(e);
+      const inTotal = inLive.reduce((s, v) => s + (v.n || 0), 0);
+
+      // Confirm arcgis groupBy values verbatim before reporting (groupBy can CASE-FOLD).
+      // Scoped to the SAME window the counts came from, or the confirmation would answer a
+      // different question than the probe — the exact Rule 13 trap this pass exists to fix.
+      let presentIn = null;
+      if (family === 'arcgis') {
+        const verbatim = await arcgisDistinct(e.service_url, field, andWhere(e.extra_where, windowClause(family, e)));
+        if (!verbatim) { out.push({ registry_id: e.registry_id, family, field, unreachable: true, inWindow: [], outWindow: [], notes: [], unresolved: [] }); continue; }
+        presentIn = new Set(verbatim.filter((v) => v != null).map((v) => String(v).trim()));
       }
-      if (missing.length) out.push({ registry_id: e.registry_id, family, field, unreachable: false, missing });
+
+      const notes = [], gating = [], latent = [], unresolvedHits = [];
+      const classify = (list, isIn) => {
+        for (const v of (list || [])) {
+          if (v.value == null || String(v.value).trim() === '') continue;   // blank → blank_status, fails closed
+          const val = String(v.value).trim();
+          if (mapped.has(val)) continue;
+          if (isIn && presentIn && !presentIn.has(val)) continue;           // groupBy case-fold artefact
+          const diff = differenceCategory(val, mappedKeys);
+          if (diff) { notes.push({ value: val, n: v.n, window: isIn ? 'in' : 'out', ...diff }); continue; }
+          const u = unresolved.get(val);
+          if (u) { unresolvedHits.push({ value: val, n: v.n, window: isIn ? 'in' : 'out', ...u }); continue; }
+          (isIn ? gating : latent).push({ value: val, n: v.n });
+        }
+      };
+      classify(inLive, true);
+      classify(outLive, false);
+      gating.sort((a, b) => b.n - a.n); latent.sort((a, b) => b.n - a.n);
+
+      // The escape hatch is BOUNDED. status_unresolved suppresses the gate for a value whose
+      // meaning no one could establish — but if those records are more than 5% of what the
+      // connector actually fetches, that is not an edge case, it is a mapping failure hiding
+      // behind the hatch, and it gates anyway.
+      const unresolvedIn = unresolvedHits.filter((u) => u.window === 'in').reduce((s, u) => s + (u.n || 0), 0);
+      const unresolvedShare = inTotal > 0 ? unresolvedIn / inTotal : 0;
+      const boundBreached = unresolvedShare > UNRESOLVED_VOLUME_BOUND;
+
+      if (gating.length || latent.length || notes.length || unresolvedHits.length) {
+        out.push({
+          registry_id: e.registry_id, family, field, unreachable: false,
+          window: windowLabel(family, e), outWindowReadable: outLive != null,
+          inWindow: gating, outWindow: latent, notes, unresolved: unresolvedHits,
+          inTotal, unresolvedIn, unresolvedShare, boundBreached,
+        });
+      }
     }
   }
   return out;
 }
 const drift = await statusDomainDrift();
-const driftReal = drift.filter((d) => !d.unreachable && d.missing.length);
+// ONLY tier 1 (in-window unmapped) and a breached unresolved-volume bound fail the run.
+// Out-of-window values and difference-category notes are reported, never gated: the connector
+// cannot fetch them today, so failing on them would red the run nightly for history.
+const driftReal = drift.filter((d) => !d.unreachable && (d.inWindow.length || d.boundBreached));
+const driftLatent = drift.filter((d) => !d.unreachable && d.outWindow.length);
+const driftNotes = drift.filter((d) => !d.unreachable && d.notes.length);
+const driftUnresolved = drift.filter((d) => !d.unreachable && d.unresolved.length);
 const driftChecked = ['arcgis', 'socrata', 'ckan', 'csv', 'carto', 'opendatasoft']
   .flatMap((f) => registry[f] || [])
   .filter((e) => e.column_map?.status_raw && !e.status_const &&
@@ -698,17 +761,58 @@ const section = [
   // fails the run (the workflow greps STATUS_DRIFT=1 after committing this report).
   ``,
   `### Status-domain drift — unmapped statuses DROP records`,
-  `- Registry entries checked: **${driftChecked}** · entries with drift: **${driftReal.length}** · unreachable: **${drift.length - driftReal.length}**`,
+  `- Registry entries checked: **${driftChecked}** · **gating** (in-window unmapped or volume bound breached): **${driftReal.length}** · unreachable: **${drift.filter((d) => d.unreachable).length}**`,
+  `- Every probe below applies that entry's OWN \`extra_where\` + \`recency_days\` + status field, so it asks the question the connector asks (Rule 13). The scope tested is printed with each entry.`,
   ...(driftReal.length
     ? [
       ``,
-      `| registry_id | status field | unmapped value(s) — records dropped |`,
-      `|---|---|---|`,
-      ...driftReal.map((d) => `| ${d.registry_id} | ${d.field} | ${d.missing.map((m) => `\`${String(m.value).replace(/\|/g, '\\|')}\` (${m.n})`).join(', ').slice(0, 400)} |`),
+      `#### Tier 1 — IN-WINDOW unmapped · **these gate the run** (records the connector fetches and drops today)`,
       ``,
-      `Fix: add each value verbatim to that entry's \`status_to_bucket\` in \`jurisdiction-registry.json\`. Never normalize or re-case — the connectors match exactly after trim.`,
+      `| registry_id | status field | window scope probed | unmapped value(s) — records dropped |`,
+      `|---|---|---|---|`,
+      ...driftReal.map((d) => `| ${d.registry_id} | ${d.field} | ${String(d.window).replace(/\|/g, '\\|').slice(0, 160)} | ${
+        d.inWindow.map((m) => `\`${String(m.value).replace(/\|/g, '\\|')}\` (${m.n})`).join(', ').slice(0, 300) || '—'
+      }${d.boundBreached ? ` · ⚠️ status_unresolved holds ${d.unresolvedIn}/${d.inTotal} in-window records (${(d.unresolvedShare * 100).toFixed(1)}%) — over the ${(UNRESOLVED_VOLUME_BOUND * 100).toFixed(0)}% bound, so the hatch no longer suppresses the gate` : ''} |`),
+      ``,
+      `Fix: add each value verbatim to that entry's \`status_to_bucket\`. Never normalize or re-case — the connectors match exactly after trim. If a value's meaning cannot be established from the publisher, put it in \`status_unresolved\` (with \`first_seen\`, \`records_at_first_seen\` and the question asked) rather than guessing a bucket.`,
     ]
-    : [`- No unmapped statuses anywhere in the registry.`]),
+    : [`- **No in-window unmapped statuses anywhere in the registry.** Nothing gates.`]),
+  ...(driftLatent.length
+    ? [
+      ``,
+      `#### Tier 2 — OUT-OF-WINDOW unmapped · non-failing (latent: outside \`recency_days\`, so the connector cannot fetch them today)`,
+      ``,
+      `Map these anyway where the domain is bounded and enumerable — a \`recency_days\` widening or one re-issued historical record is all it takes to pull them in. They do not gate.`,
+      ``,
+      `| registry_id | status field | value(s) (records outside the window) |`,
+      `|---|---|---|`,
+      ...driftLatent.map((d) => `| ${d.registry_id} | ${d.field} | ${d.outWindow.map((m) => `\`${String(m.value).replace(/\|/g, '\\|')}\` (${m.n})`).join(', ').slice(0, 400)} |`),
+    ]
+    : []),
+  ...(driftNotes.length
+    ? [
+      ``,
+      `#### Tier 3 — difference categories · non-failing`,
+      ``,
+      `| registry_id | live value (byte-level) | registry key (byte-level) | category | resolves in production? |`,
+      `|---|---|---|---|---|`,
+      ...driftNotes.flatMap((d) => d.notes.map((nt) => `| ${d.registry_id} | \`${renderBytes(nt.value).replace(/\|/g, '\\|')}\` | \`${renderBytes(nt.key).replace(/\|/g, '\\|')}\` | ${nt.category} | ${nt.resolves ? 'yes — case-folded lookup matches it' : '**NO — interior whitespace is not collapsed, so the record is still DROPPED**'} |`)),
+      ``,
+      `\`·\` marks a space. A case-only difference resolves via the case-insensitive lookup; a whitespace-only difference does **not** — \`resolveNormalized\` trims and case-folds but never collapses interior runs, so the registry key must be corrected to the publisher's exact bytes.`,
+    ]
+    : []),
+  ...(driftUnresolved.length
+    ? [
+      ``,
+      `#### status_unresolved — known values with no established meaning · non-failing below the ${(UNRESOLVED_VOLUME_BOUND * 100).toFixed(0)}% volume bound`,
+      ``,
+      `These are **not** bucketed and their records are still dropped, fail-closed. Listing one only records that a human looked and could not attribute a meaning — never that it is safe.`,
+      ``,
+      `| registry_id | value | in-window records | share of fetched | first seen | records at first seen | what was asked, and of whom |`,
+      `|---|---|---|---|---|---|---|`,
+      ...driftUnresolved.flatMap((d) => d.unresolved.map((u) => `| ${d.registry_id} | \`${String(u.value).replace(/\|/g, '\\|')}\` | ${u.window === 'in' ? u.n : `0 (out-of-window: ${u.n})`} | ${d.inTotal ? ((u.window === 'in' ? u.n : 0) / d.inTotal * 100).toFixed(2) + '%' : 'n/a'} | ${u.first_seen || '—'} | ${u.records_at_first_seen ?? '—'} | ${String(u.asked || '—').replace(/\|/g, '\\|').slice(0, 220)} |`)),
+    ]
+    : []),
 ].filter((x) => x !== null).join('\n') + '\n';
 
 if (!DRY) appendFileSync(REPORT_PATH, section);
