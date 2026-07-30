@@ -35,83 +35,87 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ---
 
-## RESUME POINT — read this first (updated 2026-07-31)
+## RESUME POINT — read this first (updated 2026-07-31, DE complete)
 
 The loop: run the scoreboard -> state nearest 90% on RECORD coverage -> uncovered counties
 largest-first -> search-first discovery -> three-part liveness test -> wire on an existing
 connector family -> PR/merge/deploy/verify -> one-line report when a state crosses 90%.
 
-### Done this session
+### Done
 
-- **SCOREBOARD FIXED (row 429) — PR #442, merged `2b2ee3a`.** It now ranks on **records landing**,
-  not the coverage gate, and emits both plus `gate_overstatement`. New read-only RPC
-  `dev_zip_source_ids` supplies per-ZIP record evidence (parked at `docs/dev-zip-source-ids-rpc.sql`);
-  EPA-FRS is excluded by construction because its sites carry a null `source_registry_id`.
-  `continue-on-error` removed and the runner asserts its own row count. Suite 70 green, scoreboard
-  tests 14 -> 18. **Positive control: NV reproduces 139/158 exactly.**
-- **PR #440 merged** (terminal entries) and **#441 merged** (NV resume point).
-- **NV recorded UNREACHABLE** per rows 427/428. Do not reopen without a statewide federal-land
-  source.
+- **SCOREBOARD FIXED (row 429)** — PR #442. Ranks on RECORDS LANDING, not the coverage gate;
+  emits both plus `gate_overstatement`. RPC `dev_zip_source_ids` (parked at
+  `docs/dev-zip-source-ids-rpc.sql`), `continue-on-error` removed, runner asserts its own row
+  count. Control: NV reproduces 139/158 exactly.
+- **NV — UNREACHABLE** per rows 427/428. Do not reopen without a statewide federal-land source.
+- ✅ **DE — 46/68 (67.6%) -> 68/68 (100%).** Sussex was the only dark county; all 22 ZIP pages now
+  carry records. Wired `sussex-county-de-conditional-use` (PRs #444 · #445 docs · #446 pin fix).
+  468 records, 0 missing `record_url`, 0 unclassified, 0 missing coordinates. Bidirectional gate
+  proof: 0 Sussex records on Kent or New Castle pages.
 
-### In flight — DE, the current state (67.6%, and it is ONE county)
+### Three findings from the DE build worth carrying
 
-Measured through the new RPC: **68 ZIP pages, 46 record-backed, 22 dark — and every dark page is
-Sussex County.** Kent (17/17) and New Castle (29/29) each carry their OWN county source
-(`kent-county-de-building-permits`, `new-castle-county-permits`), so Sussex needs its own — the
-same pattern, not a new one. 90% of 68 = 62, so DE needs **+16 of Sussex's 22**. Unlike NV, Sussex
-is booming coastal development (Rehoboth, Lewes, Millsboro): the records certainly exist.
+1. **A clean closed vocabulary can be the WRONG column, and that is more dangerous than a missing
+   one — it looks complete.** Sussex `current_zoning` is a tidy 38-value set summing exactly to
+   2,566. It was rejected as the type source because a conditional use is BY DEFINITION something
+   the existing zoning does not allow: `AR-1 -> Residential` would have labelled an
+   electrical-substation application "Residential" on 1,987 of 2,566 rows. Zoning describes the
+   PARCEL; `use_type` must describe the PROPOSAL.
+2. **`use_type_const` was a live false-Live trap and is now real.** The scoreboard already accepted
+   it as satisfying the pin-icon requirement while NO connector implemented it and NO entry used
+   it. The first entry to set it would have been counted toward Live while pages rendered
+   unclassified pins, with nothing failing. Now implemented in `sources/arcgis.ts` (mirrors
+   `status_const`); setting both it and a `type_map` is a quarantined config error.
+3. **Omitting `column_map.lat/lng` fails SILENTLY.** All 468 Sussex records first cached at
+   `scope:"area"` on the ZIP centroid instead of their parcels. `returnGeometry=true` is always
+   sent and `featurePoint()` resolves fine — the coordinates are just never read, so the records
+   publish, carry `record_url`, pass the anti-fabrication gate and count toward coverage. Caught
+   only by checking `scope` on live rows. A registry-wide assertion now pins it (0 violations
+   across 102 arcgis entries).
 
-**DE-1 — resolve `BuildingPermitsSSD`, the live candidate.** Found via AGO search:
+### Next — CO, and it looks HARD; measure before committing
 
-```
-https://services1.arcgis.com/bFDgLqS5IyUBQLAd/arcgis/rest/services/BuildingPermitsSSD/FeatureServer/0
-```
-- HTTP 200 · layer name `Buiding Permits` (their typo) · **point** geometry · **2,942 rows** ·
-  owner `jvogl@de`.
-- Fields: `JURISDICTI, PARCEL_ID, R_NR, R_UNITS, NR_SF, NOTES, RECTYPE, COUNTY, X, Y, P_YEAR(Date)`.
-- Shape for a wire, if it survives: **no status column** -> `status_const` (Detroit precedent);
-  `RECTYPE` is the type field; `P_YEAR` the date; sibling DE entries use
-  `spatial_zip_radius_mi: 5`, `recency_days: 730`, `record_url_precision: "dataset"`.
+Record coverage, measured 2026-07-31: **CO 83/140 = 59.3%, 57 dark, needs +43.**
 
-⚠️ **BLOCKING QUESTION, resolve before wiring anything:** its schema (`P_YEAR`, `COUNTY`, `RECTYPE`,
-`R_NR`, `NR_SF`) **matches row 420's already-rejected `DE-STATEWIDE-BP`** (DE FirstMap, stale,
-max `P_YEAR` 2024). Row counts differ — 2,942 vs 79,000 — so it is not the same service, but it
-is plausibly a Sussex-scoped extract of the same stale data. **If it is, row 420's rejection
-applies and it must not be wired.** The deciding probe was fired and did not land (pg_net queue
-252 deep — row 411 behaviour, it drains on its own; do NOT `worker_restart()`):
+| county | ZIP pages | dark |
+|---|---|---|
+| Douglas | 14 | 14 |
+| Weld | 12 | 12 |
+| Jefferson | 10 | 10 |
+| Larimer | 13 | 8 |
+| Arapahoe | 11 | 5 |
+| El Paso | 34 | 5 |
+| Boulder | 8 | 2 |
+| La Plata | 1 | 1 |
 
-```
-.../BuildingPermitsSSD/FeatureServer/0/query?where=1=1
-  &groupByFieldsForStatistics=COUNTY
-  &outStatistics=[{"statisticType":"count","onStatisticField":"OBJECTID","outStatisticFieldName":"n"},
-                  {"statisticType":"max","onStatisticField":"P_YEAR","outStatisticFieldName":"newest"}]
-```
-Accept only if **max `P_YEAR` reaches 2025-26** AND the county spread is Sussex-bearing. A 2024
-ceiling means it IS the FirstMap data and DE-1 closes as STALE.
+⚠️ **CO needs essentially EVERY remaining county** (14+12+10+8 = 44, barely over the 43 needed), and
+CLAUDE.md already records rejections for most of them: **Douglas = aggregate-by-design** (row 424,
+684 rows of Geography x Year x Quarter, `geometryType: null`), Arapahoe/Larimer/Weld "no
+first-party catalog", Adams/Jeffco "polygon district layers only" (that last one predates the
+polygon geometry pass — **worth re-probing, the connector can pin polygons now**). Apply row 428
+early: if the dark ZIPs cannot yield records, record CO UNREACHABLE and move on rather than
+grinding.
 
-### DE candidates already rejected — receipts, do not re-probe
+After CO by record_pct: **NC 48.8% -> TN 44.2% -> VA 39.7% -> WA 37.6% -> MD 37.5% -> AZ 36.8% ->
+UT 35.2%.**
 
-| candidate | verdict |
-|---|---|
-| `data-1-sussex.opendata.arcgis.com` | **WRONG STATE — Sussex County, NEW JERSEY.** Its catalogue is "1930/2007 Aerial Photography of Sussex County, NJ", NJ Highlands well-head layers. WebSearch returned it for a *Delaware* query. Same cross-state trap CLAUDE.md records for Kent (DE/RI). Reject on entity. |
-| DelDOT Sussex Permit Program hub | DCAT returns an **empty `dataset` array** — nothing published. |
-| `gis.sussexcountyde.gov` | DNS does not resolve. **The county's real host is `maps.sussexcountyde.gov/server`** (200; folders `Hosted`, `Utilities`; root services `Seaford_Fire_Addresses_MIL1`, `Zoning_Dimension`). Its folders are UNENUMERATED — do that before concluding the county publishes no permits. |
-| DE statewide building permits (FirstMap) | Row 420, already rejected STALE. Do not re-probe. |
-
-### After DE
-
-By record_pct: **CO 57.9% -> NC 48.8% -> TN 44.2% -> VA 39.7% -> WA 37.6% -> MD 37.5% -> AZ 36.8%
--> UT 35.2%.** Re-run the scoreboard first — its numbers moved when the denominator changed, and
-its live output has still never been read end to end.
+Already measured, so the next session does not re-derive:
+- **NC** dark: Mecklenburg 34 · Buncombe 20 · Chatham 12 · Orange 10 · Union 9 · Wake 2.
+  Mecklenburg alone is a third of the gap and is Charlotte — a real open-data city.
+- **TN** dark: Shelby 41 · Rutherford 15 · Montgomery 13 · Williamson 12 · Sumner 9 · Maury 8 ·
+  Wilson 7 · Hamilton 5 · Davidson 1. Shelby = Memphis; note QUEUE item SHELBY-429 (opendatasoft
+  connector) is a NEW CONNECTOR FAMILY and therefore gated.
 
 ### Standing notes
 
 - **pg_net probes: send NO `User-Agent`** (a UA makes IIS hosts 400 — the failure is ours).
-- **Always paginate the RPC.** One un-paginated call returned the first 5,000 ZIPs, NV's 89xxx
-  sorted past the end, and NV read 0/158 — a wrong zero that looked like a finding.
-- **Apply rows 427/428:** when a state's dark ZIPs are structurally unpublishable, record it
-  UNREACHABLE with the ZIP list and population evidence, skip, move on. Retiring a search line is
-  a result.
+- **Always paginate `dev_zip_source_ids`.** One un-paginated call returned the first 5,000 ZIPs,
+  NV's 89xxx sorted past the end, and NV read 0/158 — a wrong zero that looked like a finding.
+- **Check `scope` on live rows after any wire**, not just the record count (finding 3 above).
+- **Read `docs/source-registry.md` for the county BEFORE probing it** — Sussex already had a
+  "STILL NOT WIREABLE" section for a DIFFERENT endpoint (`/trdserver/Permit_Points`, 827,020 rows,
+  undecodable `a_status`). That record still stands; the reconciliation table is in the new
+  "SUSSEX COUNTY DE — WIRED via CONDITIONAL USE" section.
 
 ---
 
