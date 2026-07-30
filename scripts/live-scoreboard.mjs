@@ -55,18 +55,25 @@ async function fetchZipPages() {
   const rows = [];
   let last = '';
   for (;;) {
+    // ONE select, and it MUST include `id` — the keyset cursor. A second `select` param makes
+    // PostgREST take the first, `id` comes back undefined, the cursor never advances and this
+    // loop re-reads page 1 forever. That is not hypothetical: it burned a run before this guard.
     const url = `${SUPABASE_URL}/rest/v1/communities`
-      + `?select=zip_codes,state,county&level=eq.zip&order=id.asc&limit=1000`
+      + `?select=id,zip_codes,state,county&level=eq.zip&order=id.asc&limit=1000`
       + (last ? `&id=gt.${encodeURIComponent(last)}` : '');
-    const r = await fetch(`${url}&select=id,zip_codes,state,county`, { headers: hdr });
+    const r = await fetch(url, { headers: hdr });
     if (!r.ok) throw new Error(`communities read failed: HTTP ${r.status}`);
     const page = await r.json();
     if (!page.length) break;
+    const cursor = page[page.length - 1].id;
+    if (cursor === undefined || cursor === null) {
+      throw new Error('keyset cursor missing: `id` not returned — refusing to loop');
+    }
     for (const c of page) {
       if (!c.state) continue;
       rows.push({ zip: (c.zip_codes || [])[0] || c.id, state: c.state, county: c.county || null });
     }
-    last = page[page.length - 1].id;
+    last = cursor;
     if (page.length < 1000) break;
   }
   return rows;
