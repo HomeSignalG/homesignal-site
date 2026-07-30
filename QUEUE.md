@@ -100,7 +100,12 @@ state). Next by record_pct: **DE 67.6%** → CO 57.9% → NC 48.8% → TN 44.2%.
 - **PR #440 open** (`claude/typemap-completion`) — terminal-entry handling in the scoreboard,
   suite green. Merge it.
 - **The scoreboard's live output has still never been read.** Run `30584138998` (source-monitor on
-  `main`, dispatched 21:37Z) carries the first real run; read its "Live scoreboard" step.
+  `main`, dispatched 21:37Z) carries the first real run. Its "Live scoreboard" step reports
+  **success in <=1s** — but that step is `continue-on-error: true`, which makes a FAILED step
+  report success, and <=1s is tight for 14 keyset pages over 13,292 rows. **Read the step's own
+  stdout before believing it ran**; a `live-scoreboard failed: ...` line would be invisible at job
+  level. (`config.js` does carry both keys in the format the fallback regex expects, so a
+  credentials failure is not the likely cause — but that is reasoning, not the log.)
 - ⚠️ **Expect the scoreboard to DISAGREE with row 419, and the disagreement is by construction:**
   `scoreStates` measures the **coverage GATE** (does a complete entry declare this county?), while
   row 419 measures **records actually landing**. Rows 258/259 and 419 both say the gate overstates.
