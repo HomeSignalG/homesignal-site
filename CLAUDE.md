@@ -48,6 +48,18 @@ spends the full cost and ships nothing; that ordering is the thing this grant ex
 **Still gated — stop and ask:** any code change · any opaque-coded value · anything that changes
 what residents see · any new scheduled job · anything that alters a coverage claim.
 
+**Unblocking exception.** A *gated* change may proceed without approval when it is the **minimum
+necessary to unblock an instruction already given**, is **additive**, has **no behavioral
+surface**, and is **disclosed plainly in the same report**. Applying a gate so mechanically that
+it blocks the instruction that created it is a failure of the gate, not compliance with it.
+
+*The case that produced this rule:* branch protection requires the `unit` check on every PR, but
+no workflow path filter matched root-level `CLAUDE.md` — so the PR adding this very section could
+never register the check and could never merge. Adding `CLAUDE.md` to `unit-tests.yml`'s path
+lists is a workflow change (gated), and it shipped anyway: one additive line, no job, no
+schedule, no step, no behavior. It also removed a real hole — **no check had ever run on a change
+to this file**, the one file that tells every future session how to behave.
+
 ### Rule 13 — probe the question the connector asks
 
 A probe whose scope differs from the connector's answers a **different question**. Use the same
