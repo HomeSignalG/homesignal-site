@@ -8900,6 +8900,57 @@
       "spatial_zip_radius_mi": 5,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-28 Phase 4 recon (recon-fetch runs 30384902474 / 30385163406 / 30385461375): Butler County KS 'Permits_Premium' FeatureServer layer 0. FRESH — CreationDate min 2026-01-08, max 2026-07-28 (today), 911 rows, esriGeometryPoint in wkid 4326, so records place by their OWN per-parcel points. STATUS VOCABULARY IS COMPLETE — 9 verbatim open_closed values + 1 null summing to EXACTLY 911: Issued 449 + Final Inspection 235 -> approved · Submitted 99 + Inspector Review 35 + In Review/Requested Info 7 + In Review 1 -> proposed · Closed 51 + Completed (Cert. of Occupancy) 17 + Completed (Cert. of Completion) 16 -> operating; the 1 null fails closed (blank status -> excluded + counted). NO type_map ON PURPOSE — the Phase 4 packet's premise (buildingpermit / solarpermit / buildingsiteonlypermit as boolean type flags) DOES NOT HOLD against live data: a groupBy over all three fields returns exactly ONE combination, {buildingpermit:'No', buildingsiteonlypermit:'No', solarpermit:'No'}, n=911, i.e. 100% of rows. Their field ALIASES read 'Building Permit Complete' / 'Solar Permit Complete' / 'Building Site Only Permit Complete' — they are workflow-completion checkboxes defaulted to 'No', never permit-type flags, so any type_map over them would classify every record identically and carry no information. The only other candidate, `zoning` (16 verbatim values summing to 911 — RURAL RESIDENTIAL DISTRICT 363, AGRICULTURAL DISTRICT 40 192, AGRICULTURAL DISTRICT 80 133, URBAN JURISDICTION 126 …), is the PARCEL's zoning district, not the permit's use, so mapping it would invent a classification the source never states. Every record is therefore use_type:'unclassified' (logged) — the fail-closed outcome, not a guess. NO ZIP SCOPING COLUMN: the only ZIP field is cama_zip, the CAMA landowner's MAILING zip (ZIP+4 and frequently out of state — 01801 MA, 15317 PA, 30068 GA observed), NOT the jobsite -> spatial_zip_radius_mi 5 around the ZIP centroid, the county-wide-entry default. SPATIAL SMOKE (run 30385461375): an envelope query around a sampled jobsite returns features with real Butler County points (lat 37.67-37.76, lng -96.83 to -96.92) and live open_closed values. record_url: `parcel_data` is populated on 911/911 rows but is THE SAME layer-root URL on every record (https://ww1.bucoks.com/bucogis1/rest/services/PublicOutreach/Parcels_Data_BldgLL_Condos/FeatureServer/0/), not a per-record link — mapping it would present a generic URL as the record's own, so it is left unmapped and the entry falls back to dataset precision. Coverage gated to KS/Butler."
+    },
+    {
+      "registry_id": "sussex-county-de-conditional-use",
+      "platform": "arcgis",
+      "service_url": "https://maps.sussexcountyde.gov/server/rest/services/Hosted/Conditional_Use_View/FeatureServer/0",
+      "dataset_url": "https://sussexcountyde.gov/planning-zoning",
+      "jurisdiction": "Sussex County, Delaware",
+      "coverage": [
+        {
+          "state": "DE",
+          "county": "Sussex"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "development_name",
+          "proposed_use"
+        ],
+        "status_raw": "cc_decision",
+        "file_date": "application_rcvd_date",
+        "decision_date": "cc_decision_date",
+        "case_number": "application_number"
+      },
+      "spatial_zip_radius_mi": 5,
+      "use_type_const": "Development",
+      "status_to_bucket": {
+        "proposed": [
+          "Deferred",
+          "Defered"
+        ],
+        "approved": [
+          "Approved",
+          "APPROVED",
+          "Approval",
+          "Approved with Conditions",
+          "Approved with revised conditiona"
+        ],
+        "operating": [],
+        "exclude": [
+          "Withdrawn",
+          "WITHDRAWN",
+          "WITHDRAWN BY APPLICANT",
+          "WITHDRAWN BY COUNTY",
+          "Denied",
+          "DENIED"
+        ]
+      },
+      "incremental_field": "application_rcvd_date",
+      "recency_days": 1825,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-31 DE/Sussex wire. Sussex is the ONLY dark DE county (22 of 68 DE ZIP pages; Kent 17/17 and New Castle 29/29 already carry their own county source). Layer: Sussex County's OWN enterprise server, Hosted/Conditional_Use_View, 2,566 rows, POLYGON geometry (rides the shipped featurePoint() centroid path). LIVENESS (three-part): name clean; entity = Sussex County DE Planning & Zoning; newest application_rcvd_date 2026-07-27, three days before wiring. STATUS VOCABULARY IS COMPLETE AND VERBATIM: live groupBy on cc_decision returned 16 values summing to EXACTLY 2,566 (positive control), exceededTransferLimit=false. Mapped above verbatim; the connector trims both sides so 'Approved ' folds onto 'Approved'. Deliberately UNMAPPED, fail-closed: null (172) = filed, no Council decision yet, and the value '8/19/2025' (1) = a date typed into the decision field, a publisher data-entry error with no bucketable meaning. Those 173 rows are DROPPED, not guessed. TYPE IS A CONSTANT AND THAT IS THE HONEST CHOICE, NOT A SHORTCUT: proposed_use is the semantically correct column and is FREE TEXT -- 400+ distinct values over 2,566 rows, mostly n=1, with typos ('electrial subsation') and prose ('operate a food truck for a period exceeding three days'). Rule 5 terminal, no type_map exists. current_zoning IS a closed 38-value vocabulary summing to exactly 2,566, and was REJECTED as the type source because it describes the PARCEL, not the PROPOSAL: a conditional use is by definition something the existing zoning does not allow, so AR-1 -> Residential would have labelled an electrical substation 'Residential'. use_type_const 'Development' renders the generic 'Other project' pin and asserts nothing about the use (Phoenix residual-bucket precedent). record_url_precision is 'dataset': the layer carries no per-case URL column and Sussex's case search is not addressable per application_number, so templating one would be guessing."
     }
   ],
   "ckan": [
