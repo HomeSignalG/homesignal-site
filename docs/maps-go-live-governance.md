@@ -278,6 +278,41 @@ one sequence — **none by anything firing, all by looking:**
 **Corollary: a correct result from a broken method is more dangerous than a wrong one, because
 nothing in the output flags it.**
 
+### A receipt may hold BOTH a measurement and an inference — evaluate the whole thing
+
+**Quote and evaluate the WHOLE receipt before superseding any part of it.** Superseding the
+*measurement* when only the *inference* is wrong corrupts the record: it discards a sound probe
+and makes the entry look less trustworthy than it is.
+
+**When a receipt reasons "by construction" or "by definition", mark that clause as an
+INFERENCE — even when the surrounding receipt is a real probe.** A measurement establishes what
+the vocabulary *was*; an inference from the dataset's title or name asserts what it *could
+never contain*, and only the second kind can be falsified by the vocabulary simply growing.
+
+> **Worked case — `san-diego-approved-permits`, 2026-07-30.** The drift check found
+> `Pending Invoice Payment` (11 in-window records) on an entry whose `_receipts` said *"the
+> dataset is APPROVED/issued permits by construction (its own title), so no pre-issuance status
+> exists in the published domain and `proposed:[]` is the truth."*
+>
+> Read on its own, that line says the entry was never probed — and the first reading of it
+> concluded exactly that. **It was wrong.** The *first half* of the same 1,637-character
+> receipt, dated 2026-07-16, is a genuine enumeration: *"max APPROVAL_ISSUE_DATE 2026-07-15
+> over 28,515 rows… Vocabulary VERBATIM from the same run: statuses Issued/Closed/Inspecting/
+> Inspection Followup/Cancelled… 151 type|status combos enumerated."*
+>
+> So a measurement existed and found 5 statuses; the 2026-07-27 line layered an inference on
+> top of it. **The enumeration was correct when run. The inference — that no pre-issuance
+> status could exist — is the only part that was wrong.** The vocabulary grew: this is the
+> **expiry, not error** pattern, the same shape as the TX government feeds.
+>
+> The supersession was worded to overturn the inference alone and to state explicitly that the
+> original enumeration is *not* being called incorrect.
+
+**Corollary — expiry is not error.** A claim that was true when written and went stale is
+recorded as **EXPIRED / AMENDED**, never as a mistake. Reserve "wrong" for claims that were
+false at the time they were made. Conflating the two punishes correct work and destroys the
+incentive to record measurements at all.
+
 ### Provenance fields record what was done
 **"NOT YET ASKED" is a valid and required value.**
 
