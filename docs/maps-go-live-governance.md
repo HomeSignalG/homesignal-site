@@ -313,6 +313,30 @@ recorded as **EXPIRED / AMENDED**, never as a mistake. Reserve "wrong" for claim
 false at the time they were made. Conflating the two punishes correct work and destroys the
 incentive to record measurements at all.
 
+### A gate that did not FIRE must be distinguishable from a gate that did not RUN
+
+**In the job summary, not only in the log.** A skipped step, a step whose condition never
+evaluated, and a step that ran and passed all render the same way in a run's step list — so
+"nothing went red" is not evidence that anything was checked.
+
+> **Worked case — `source-monitor` step 8, 2026-07-30.** The drift gate is deliberately the last
+> step and fires on a `STATUS_DRIFT=1` marker. On the confirming run it reported **`skipped`**,
+> not `success`. That was correct — the marker was never set because nothing gated — but a
+> skipped gate and an unevaluated gate are indistinguishable from the summary. The merge went
+> ahead only after reading the log for the positive statement:
+> `Registry entries checked: 105 · gating: 0 · unreachable: 3` and
+> `No in-window unmapped statuses anywhere in the registry. Nothing gates.`
+
+**The same defect one layer down:** that run reported `unreachable: 3` **without naming the
+entries**. Every other finding class prints its `registry_id`; unreachables were only counted.
+For those 3 entries "unreachable" reads identically to "clean" in every downstream consumer, so
+a nightly green stayed compatible with 3 entries never having been read at all — the failure the
+check exists to prevent, reproduced inside the check.
+
+**Both fixes are the same rule:** a check must emit a positive statement of what it covered —
+counts *and* identities — and a gate must report a distinguishable outcome for "ran, nothing to
+report" versus "did not run."
+
 ### Provenance fields record what was done
 **"NOT YET ASKED" is a valid and required value.**
 
