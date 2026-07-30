@@ -88,6 +88,32 @@ id), rather than implying an answer.
 
 ---
 
+## Maps / ingest go-live — READ THE GOVERNANCE DOC FIRST
+
+**`docs/maps-go-live-governance.md` is binding for all Maps / ingest state work. Read it
+before planning or implementing a state build** — before proposing an approach, before
+touching the registry or a connector, before answering a question about what was decided.
+
+It holds the durable rules ported out of the founder's workbook
+(`00NNMaps IngestFeedInventory.xlsx`, Instructions tab) so no session depends on an upload
+being present: the goal and the LIVE-is-not-COVERED distinction, the state tier order, the
+7-phase go-live playbook and its Phase 7 founder gate, the autonomy envelope, the known
+environment blockers and their established workarounds, queue discipline and Rules 14–16,
+settled decisions, and the workbook editing conventions.
+
+**Division of record — three files, three jobs, do not mix them:**
+
+| File | Holds |
+|---|---|
+| **`QUEUE.md`** (repo root) | **In-flight work** — items, states, gates, dependencies. Claude Code owns it; it must never drift from reality. |
+| **`docs/maps-go-live-governance.md`** | **The durable rules** — playbook, tiers, autonomy envelope, blockers, settled decisions. |
+| **The workbook** | The founder's **measured per-ZIP and per-source record**, plus worked examples. |
+
+**Do not mirror queue items into the workbook or into this file** — two queues drift, which is
+the exact problem `QUEUE.md` exists to end.
+
+---
+
 ## 0. The prime directive: communities are DATA, not code
 
 **We are scaling to 100+ communities (goal: all ~3,144 U.S. counties). A new
