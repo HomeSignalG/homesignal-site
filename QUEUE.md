@@ -133,9 +133,19 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
   (Rule 10). **Then stop** — no rows inserted, no coverage claim changed.
 
 ### 6. SD-AUDIT — San Diego `workflow_dispatch`
-- **State:** IN-PROGRESS — `source-monitor.yml` dispatched on the #428 ref with
-  `dry_run=true` (observes, commits nothing). No per-entry input exists; the drift check sweeps
-  all 105, so San Diego is audited as part of the sweep.
+- **State:** **DONE — OBSERVED.** Run `30569691125` on the #428 ref, `dry_run=true`.
+  Step 5 "Run source monitor" **succeeded** (9.5 min); step 8, the drift gate, failed **by
+  design** (it is deliberately last so evidence lands first). Run summary, verbatim:
+  `Registry entries checked: 105 · gating: 1 · unreachable: 3` ·
+  `[dry-run] done: 0 wired, 147 flagged, 196 findings, 1 status-drift.`
+  **105/105 is now claimable — San Diego was the last unobserved entry.**
+- **What it found — San Diego is the SOLE gating entry:**
+  `| san-diego-approved-permits | APPROVAL_STATUS | no recency window — whole dataset is
+  in-window | ``Pending Invoice Payment`` (11) |` — 11 records dropped today.
+  Tier 2 (latent, non-gating): `new-orleans-permits` 6 out-of-window values. Tier 3: 6
+  `denver-residential-construction-permits` case-only differences, all resolving via the
+  case-folded lookup — **independent confirmation that Denver never drifted** (row 342).
+  3 entries unreachable, reported as unreachable and never as drift, as designed.
 - **Gate:** NONE
 - **Depends on:** PR-428 (the drift check it exercises lives on that branch)
 - **Detail:** the last unaudited entry of the 105. It is the CSV-family reader
@@ -152,6 +162,29 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
   byte-identical between workbook 0070 and 0071**, so the port reflects the live revision.
   `docs/**` and `CLAUDE.md` are already in `unit-tests.yml`'s path filters, so `unit` registers.
 - **Acceptance:** merged; no future session depends on the workbook upload for the rules.
+
+### 6b. SD-FIX — `Pending Invoice Payment` — **GATED, contradicts a recorded receipt**
+- **State:** BLOCKED
+- **Gate:** **Founder decision.** The entry's `_receipts` records, from the 2026-07-27
+  icon-completeness pass: *"the dataset is APPROVED/issued permits by construction (its own
+  title), so no pre-issuance status exists in the published domain and `proposed:[]` is the
+  truth."* `Pending Invoice Payment` **is** a pre-issuance status. Mapping it overturns that
+  receipt, so it needs an explicit SUPERSESSION (Rule 14), not a quiet new value.
+- **Depends on:** — · **Blocks:** PR-428 (its acceptance is "merge when the drift check runs
+  green"; this is the only thing keeping it red)
+- **The current bucket map** is `proposed: []` · `approved: [Issued, Inspecting, Inspection
+  Followup]` · `operating: [Closed]` · `exclude: [Cancelled]`. The lifecycle puts
+  `Pending Invoice Payment` before `Issued` — pay the invoice, then it issues.
+- **Recommendation:** map it to **`proposed`** and supersede the receipt. The value is
+  self-describing English, not an opaque code like Cincinnati's `APRV_NR`, so
+  `status_unresolved` would be over-cautious and would keep dropping the 11 records.
+- **Expiry or error?** The 2026-07-27 receipt reasoned from *the dataset's title*, not from an
+  enumeration — so either it was incomplete then, or the value is new since. Decisive test:
+  the `APPROVAL_ISSUE_DATE` of the 11 records. Before 2026-07-27 → the enumeration missed
+  them (error); after → the world changed (expiry, the row 405 pattern). Needs a runner probe;
+  sandbox egress is 403.
+- **Acceptance:** bucket decided, receipt superseded explicitly, 11 records recovered, drift
+  check green.
 
 ### 7. TDLR-TABS — investigate before fix-or-delete
 - **State:** READY
