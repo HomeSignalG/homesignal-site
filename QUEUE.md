@@ -120,6 +120,52 @@ Williamson 12 · Sumner 9 · Maury 8 · Wilson 7 · Hamilton 5 · Davidson 1. Ne
 page, and the largest (Shelby/Memphis) sits behind `SHELBY-429`, a **new connector family
 (GATED)**. **Do the arithmetic first — TN is very likely UNREACHABLE** (row 428).
 
+### 🔴 IN FLIGHT — FDOT / Florida. Merged, NOT deployed. Resume here.
+
+**The strategic finding this came from, which matters more than FL itself:** all three states that
+ever cleared 90% (TX, NV, UT) did it via a **statewide DOT layer**. Row 420 declares the statewide
+path exhausted, but that refers to the **workbook's own six candidates** — the **state-DOT CLASS was
+never enumerated for the other 47 states.** Per-county wiring yields ~11 pages a pass; a state DOT
+yields a whole state. **This is the lever. Sweep it.**
+
+Confirmed live this pass by direct probe:
+
+| DOT | endpoint | status | dark pages |
+|---|---|---|---|
+| **FDOT** | `gis.fdot.gov/arcgis/rest/services/Active_Construction_Projects/FeatureServer/`**`1`** | WIRED (#457, merged `8f81ea8`) — 2,428 rows, polyline | **413 of 441** |
+| **MassDOT** | `gis.massdot.state.ma.us/arcgis/rest/services` → `Projects` folder | 200, folder confirmed, **unprobed** | **574 of 627** |
+| **PennDOT** | `gis.penndot.gov/arcgis/rest/services` → `paprojects`, `projectpath` | 200, folders confirmed, **unprobed** | **488 of 560** |
+
+⚠️ **FDOT layer index is 1, not 0.** Layer 0 returns HTTP 200 carrying
+`{"error":{"code":500,"message":"json"}}`; the service doc lists exactly one layer, id 1.
+
+**Coverage was pre-measured (the Charlotte lesson, applied before the wire).** Envelope counts at
+`spatial_zip_radius_mi: 3` against four DARK FL ZIPs: **34761 → 3 · 33785 → 0 · 33186 → 13 ·
+33462 → 23.** Three of four hit — much better than Charlotte's two-of-four-zero, because state
+highways run through suburbs and rural areas where a city portal never reaches. That is *why* the
+DOT class generalises.
+
+**EXACT RESUME STEPS — the pipeline is stalled at step 2 of 5:**
+1. ✅ merged to `main` (`8f81ea8`)
+2. 🔴 **DEPLOY — `deploy-edge-functions.yml` was dispatched and DID NOT LAND. The function is still
+   `get-address-report` **v112** (updated 23:03Z), which predates the FDOT merge. Re-dispatch and
+   CONFIRM the version increments before going further** — everything after this step is worthless
+   against a stale engine.
+3. fire all **441** FL ZIPs (`net.http_post` per `dev_refresh_fire_batch`'s shape)
+4. `dev_refresh_collect()`
+5. **`app_refresh_zip()` per ZIP — DO NOT SKIP**, then measure from `app_projects` with
+   `record_kind='development'`. FL is NOT Live until that read says so.
+
+**FL is at 28/441 (6.4%) today and no claim has been made.** If FDOT lands on ~3 of 4 dark pages it
+would take FL to roughly 75-80% — real, but likely still short of 90%, so expect FL to need a second
+source (its four metro candidates are already rejected with receipts: Fort Lauderdale stale,
+Orlando ungeolocatable, Tampa WAF-blocked, Miami too slow).
+
+**After FL: probe MassDOT and PennDOT the same way** — service root → find the projects layer →
+count/geometry/fields → constants matched to the DOT precedent (all four existing DOT entries use
+`use_type_const`-equivalent `Utility`; "active construction" → `status_const: "approved"`) →
+pre-measure against dark ZIPs → wire → deploy → recache → **materialize** → measure.
+
 ### Standing notes
 
 - **pg_net probes: send NO `User-Agent`** (a UA makes IIS hosts 400 — the failure is ours).
