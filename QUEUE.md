@@ -914,3 +914,48 @@ are not 0; that is a lookup to do, not a rejection.
 `row_permits_open_view`, `construction_projects_lfucg`) were fired but the daily `dev_refresh_fire`
 pg_cron fired at the same moment and put **253 reports** ahead of them in the pg_net queue.
 Resume by re-firing those three once `net.http_request_queue` reaches 0.
+
+---
+
+## 🚧 BLOCKER — pg_net worker HARD-STALLED at 02:15:00Z; `worker_restart()` measurably does NOT fix it
+
+All further source discovery runs through pg_net (the sandbox has no egress), so this stops the KY
+pass mid-probe. Recorded with receipts because it **upgrades the existing PGNET-EGRESS note**.
+
+**The stall, measured:**
+
+```
+newest response  2026-07-31 02:15:00.749117+00   (frozen)
+max response id  13032                            (frozen)
+queue depth      53 → 56                          (grew only by the 3 probes I added)
+```
+
+`max(id)` and `max(created)` did not move for **~20 minutes** while the queue stayed full. This is a
+TOTAL stall — qualitatively different from the ~31% request-failure rate already recorded, where
+responses kept arriving.
+
+**`net.worker_restart()` was tried ONCE, deliberately, to settle the "superseded" question with
+evidence — and it CONFIRMS the supersession.** It returned `true`, and **10 minutes later the queue
+was still 56 and `max_id` still 13032 — zero effect**. Prior sessions credited it with drains it did
+not cause (post hoc); this time it was measured against a genuine stall and did nothing.
+**Standing answer, now evidence-backed in BOTH directions: `worker_restart()` neither clears a stall
+nor causes a drain. Do not run it and do not wait on it.** The only thing that has ever cleared this
+is time.
+
+**What was in flight when it froze** (so nothing is misread as a result): the daily
+`dev_refresh_fire` cron had just fired ~250 ZIP re-caches, plus 3 LFUCG probes
+(`row_permits_open_view/1`, `construction_projects_lfucg/0`,
+`Construction_Locations_view_layer/0`). **None of those three has answered — they are UNANSWERED,
+not rejected.** The interrupted cron re-cache is harmless (`dev_refresh_collect` is transient-safe
+and never overwrites content with an empty response).
+
+### RESUME HERE (exact steps, no re-derivation needed)
+
+1. `select count(*) from net.http_request_queue;` → wait for **0**. Do not measure anything until it is.
+2. Re-probe the 3 LFUCG layers above (+ `Residential_New_Construction_Public` and
+   `zone_compliance_public`, whose real layer ids are **not 0** — `FeatureServer/0` returns
+   "The requested layer (layerId: 0) was not found"; enumerate the FeatureServer root for the true ids).
+3. Apply the three-part liveness test; a layer with **no status column AND no real date** is a reject
+   (Development_Plan / Chatham / North Richland Hills class — three instances now).
+4. KY needs **70 of its 82 dark pages**, so Fayette 19 alone is not enough — Daviess 10, Campbell 10,
+   Warren 9, Boone 8, Oldham 8, Bullitt 7 all have to be probed too.
