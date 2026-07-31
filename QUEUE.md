@@ -1511,3 +1511,42 @@ County Regional Planning Agency. **31,868 rows, point geometry.**
   lesson): `P_DESC` values are work scopes ("SINGLE FAMILY RESIDENCE ON SLAB W/ ATTACHED…"), no
   personal names.
 - Expected lift is modest: Hamilton is **26/31 already backed**, so at most **5 pages**.
+
+---
+
+## TN wire pass #3 — Chattanooga + Clarksville-Montgomery WIRED (PR #467), registry 111 → 114
+
+Supersedes the "candidates, not yet wired" note above — all three entries are now written,
+additive-proven and unit-green; **only the merge is outstanding.**
+
+| entry | county | rows | vocabulary (positive control) | predicted lift |
+|---|---|---|---|---|
+| `chattanooga-building-permits` | Hamilton | 31,868 | `P_TYPE` Residential 29,873 + Non-Residential 1,995 = **31,868 exact** | **4 of 5** dark ZIPs |
+| `clarksville-montgomery-final-subdivisions` | Montgomery | 94 | `RPC_ACTION` APPROVED 93 + APPROVAL 1 = **94 exact** | combined **4–8 of 13** |
+| `clarksville-montgomery-preliminary-subdivisions` | Montgomery | 69 | `RPC_ACTION` APPROVED 69 = **69 exact** | (see above) |
+
+**Montgomery's lift is a RANGE, deliberately.** Of the 26 (ZIP × layer) probes over the 13 dark
+ZIPs, 8 returned non-zero `{1,1,2,2,6,7,10,21}` and 18 returned 0. A ZIP counts as backed if
+EITHER layer hits, so the true figure is somewhere in 4–8 and the per-ZIP labelling is **not**
+asserted — ordering inside a subquery does not control `net.http_get` evaluation order. Measure
+exactly after go-live; do not restate the range as a result.
+
+⚠️ **The Chattanooga probe corrected a wrong geographic assumption, and that is the lesson.**
+Hamilton's 5 dark ZIPs (37308 / 37311 / 37336 / 37338 / 37373) sit **25–30 mi north/east of
+Chattanooga proper**, so a city permit layer was expected to return 0 for all of them. Measured
+against those ZIPs specifically it returns non-zero for **4 of 5**. Probing the 26 already-backed
+Hamilton ZIPs would have answered a different question entirely (Rule 13). **Measure the dark set;
+never reason from the map.**
+
+### Still-open GitHub Actions incident (same one as #466)
+
+`unit` has been wedged on step 6 for **3+ hours** across the original run, a cancel-and-rerun, and
+the duplicate push/pull_request runs — with the suite green locally (71 files) on every commit.
+On #466 this was **proven** not to be the change: `git diff` between the green commit and the
+wedged commit returned EMPTY (byte-identical trees). #466 cleared on its own after ~2 h.
+
+**Remaining steps once #467 merges** (nothing else is blocking): deploy `deploy-edge-functions.yml`
+on `main` → confirm `get-address-report` version increments → fire Hamilton's 5 dark + Montgomery's
+13 dark ZIPs → `dev_refresh_collect()` → verify invariants + the bidirectional gate proof →
+`app_refresh_zip` → measure TN from `app_projects`. Expect TN 68.8% → roughly 73–76%, still short
+of 90% (the ceiling is ~78%; Williamson/Sumner/Maury/Wilson have no source at all).
