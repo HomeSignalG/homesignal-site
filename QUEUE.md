@@ -130,7 +130,25 @@ page, and the largest (Shelby/Memphis) sits behind `SHELBY-429`, a **new connect
 wires were Sussex +22 and Weld +11). **MA needs 565 for 90%: it is TWO PAGES SHORT — the cheapest
 Live in the system.**
 
-**The two pages are ALREADY IDENTIFIED and the attempt is IN FLIGHT.** Of the 71 dark MA ZIPs,
+**FINAL STATE 01:29Z: 562/627 = 89.6%. THREE PAGES SHORT of the 565 needed.** Two re-fire rounds
+were run against the stale ZIPs: the first (16 ZIPs) gained **+6 pages** (556 -> 562); the second
+(10 ZIPs) lit 6 more MassDOT ZIPs in the cache (552 -> 558 `md_zips`) but added **ZERO net pages**,
+because those 6 were already backed by another source. **10 ZIPs have now failed THREE consecutive
+rounds and will not drain** — they queue and never return, consistent with the 90s timeout.
+
+**TO FINISH MA (3 pages), in order of likelihood:**
+- **The 10 stuck ZIPs are probably not the answer** — two rounds of them yielded 6 cache hits and 0
+  net pages. Do not keep re-firing them blindly; first check *why* they hang (their `home_lat`/
+  `home_lng`, whether their reports are unusually large, whether they 503 or genuinely time out).
+- **Better: 7 dark MA ZIPs have `jsonb_array_length(sites)=0`** — completely empty reports, not just
+  missing MassDOT. Those are the anomaly worth investigating; an empty report on a modelled MA ZIP
+  suggests the engine returned nothing at all, which is a different failure from "no MassDOT in
+  range."
+- Failing both, MA is legitimately 89.6% and the honest call is that MassDOT's 3-mile reach does not
+  cover the last 65 ZIPs. **89.6% with +503 pages gained is still by far the best result of the
+  session** — do not treat 3 short as a failure.
+
+**(historical) The two pages were identified and an attempt was made:** Of the 71 dark MA ZIPs,
 **0 were never cached** but **16 still hold pre-v114 cache** — they never ran against the MassDOT
 engine because their requests keep failing. Those 16 were re-fired at 01:22Z and **the queue stalled
 at 16 with none completing** (row 411: ~31% of pg_net requests fail; these are the persistent
