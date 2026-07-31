@@ -140,15 +140,24 @@ exactly, and the envelope pre-check hit **4 of 4** dark MA ZIPs (01035 162 · 02
 3. ❌ **The query SHAPE is cleared too.** The connector's own form —
    `outFields=*&returnGeometry=true&outSR=4326&resultRecordCount=1` — returns **HTTP 200 with a
    valid polyline feature in wkid 4326**. The layer answers what the connector asks.
-4. 🔎 **So the fault is in the ENTRY's own fields, not the layer.** Remaining suspects, in order:
-   **(a) `title` -> `["Descriptn","Location"]`** — if both are null on most rows the record is
-   dropped for having no title; FDOT's `Description` was populated, this may not be. Check
-   `Descriptn IS NOT NULL` and `Location IS NOT NULL` counts.
-   **(b) `case_number` -> `Project`** (String) — check non-null.
-   **(c) `incremental_field: "From_Date"` set WITHOUT `recency_days`** — FDOT has the same pairing
-   and works, but confirm the combination is not filtering to an empty window here.
-   **(d)** the spatial envelope — LEAST likely, since the pre-check used exactly
-   `spatial_zip_radius_mi: 3` and returned 162/50/80/743.
+4. ❌ **EVERY MAPPED FIELD IS CLEARED — all probed live, all well-populated:**
+   `Descriptn IS NOT NULL` **14,251** · `Location IS NOT NULL` **13,693** ·
+   `Project IS NOT NULL` **24,045** · `From_Date` **24,045** · `Status` **13,484**.
+   So title, case_number, file_date and status_raw all resolve. **No field mapping explains it.**
+
+5. 🔴 **CHECK THIS FIRST NOW — a TIMING artefact may mean there is no bug at all.**
+   v114 landed at **01:02:22Z**. The 627 ZIPs were re-fired at ~01:03. But the "572 MA ZIPs
+   re-cached since 01:00Z" I measured **includes the tail of the FIRST (v113, stale) fire**, and the
+   last `dev_refresh_collect()` at 01:08 still had **30 requests queued**. **It is entirely possible
+   the v114 responses had not landed when I measured zero.**
+   **Before diagnosing anything: run `dev_refresh_collect()` again, confirm the queue is 0, confirm
+   MA `refreshed_at` is later than 01:03Z, THEN count `massdot-highway-projects` records.** If they
+   appear, there was never a defect — only my measurement was early, which is the same
+   emission-vs-coverage mistake in a new costume.
+
+6. If records are still 0 after a clean post-01:03 collect: read the connector's quarantine reason
+   (the one thing never checked), then try an `out_fields` projection — 41 fields x 24,045 rows may
+   be failing at page scale.
 5. **`outFields=*` size** — 41 fields x 24,045 rows; if paging is being rejected at scale, try the
    additive `out_fields` projection (added during the FL/Miami work).
 
