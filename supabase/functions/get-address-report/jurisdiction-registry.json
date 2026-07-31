@@ -9309,6 +9309,72 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-31 KY wire pass, Fayette. LFUCG's OWN hosted layer, row_permits_open_view layer 0 'row_permits_master' (right-of-way permits). 1,426 rows, esriGeometryPoint. LIVE: editingInfo.dataLastEditDate = 1785464435449 = 2026-07-31, the SAME DAY as wiring. ORG IDENTITY VERIFIED, not guessed: services1.arcgis.com/Mg7DLdfYcSWIaDnu, owner 'emiller_lfucg4' (LFUCG), reached via scoped AGO search + owner check. data.lexingtonky.gov is NOT a Socrata domain (404 'Domain not found') and maps.lexingtonky.gov serves basemaps/locators only. ALL THREE vocabularies enumerated live with a positive control, EACH summing to EXACTLY 1,426: Status 4 values (Partially Completed 521, Approved 505, Initiated 397, Reissued 3 - no nulls); PermitCategory 8 values (Communications/alarm/signal lines 448, Potable Water 357, Undefined 262, Electric Power Lines 158, Gas/oil/steam/petroleum 123, Sewers and drain lines 66, Misc contractors 11, 'Test, questionable names' 1); PermitType 4 values (SurfaceCut 485, AGP 413, Installation 349, empty-string 179). 'Partially Completed' is APPROVED not operating - the work is authorised and underway, not built. The single 'Test, questionable names' row is a junk test record and is dropped at source via extra_where. use_type_const 'Roads & infrastructure': the entire layer is right-of-way permits (source-stated by the service's own name), and it is the same call already made for Asheville's 'Right of Way' record_type_type. PermitCategory was NOT used as type_source because 262 'Undefined' + 11 'Misc' + 1 'Test' are not self-describing. PII CHECK PERFORMED (after the Asheville trap): 12 DescriptionOfWork + ApplicantCompany values read directly - every applicant is a COMPANY (Kinetic, SLM, Columbia Gas, Windstream Communications, Kentucky Utilities, Kentucky American Water) and descriptions are work scopes ('PLACING 24 FIBER 1800 ON 7TH ST', 'Repair service leak'). No personal names, so DescriptionOfWork is safe as title. No URL column -> dataset precision. No ZIP column -> spatial_zip_radius_mi 3. COVERAGE PRE-VERIFIED with the connector's own envelope query on all 19 modelled Fayette ZIPs: 16 return records (40502 956, 40503 591, ...), and exactly 3 return 0 - 40324 Georgetown, 40361 Paris, 40391 Winchester, which are other counties' towns modelled under the Fayette root. REJECTED in the same pass with receipts: Development_Plan (4,439 rows but NO status column and no usable date - Year is a SmallInteger and created_date is a single bulk-load timestamp); construction_projects_lfucg + Construction_Locations_view_layer are two views over the SAME RMP_Locations source (37 sanitary-sewer capital projects; wiring both would double-emit)."
+    },
+    {
+      "registry_id": "boone-county-ky-planning-board-actions",
+      "platform": "arcgis",
+      "service_url": "https://secure.boonecountygis.com/server/rest/services/ServicesBoone/PlanningAndZoningGroup_Boone/MapServer/7",
+      "dataset_url": "https://secure.boonecountygis.com/server/rest/services/ServicesBoone/PlanningAndZoningGroup_Boone/MapServer/7",
+      "jurisdiction": "Boone County Planning Commission",
+      "coverage": [
+        {
+          "state": "KY",
+          "county": "Boone"
+        }
+      ],
+      "column_map": {
+        "title": "REQUEST",
+        "status_raw": "BRDACTION",
+        "file_date": "ACTIONDATE",
+        "decision_date": "ACTIONDATE",
+        "address": "SITEADD1",
+        "lat": "GMDLATDD",
+        "lng": "GMDLONDD",
+        "case_number": "FILENUMBER",
+        "record_url": "HTMLLINK"
+      },
+      "use_type_const": "Development",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "APPROVAL",
+          "APPROVAL WITH 1 CONDITION",
+          "APPROVAL WITH 2 CONDITIONS",
+          "APPROVAL WITH 3 CONDITIONS",
+          "APPROVAL WITH 4 CONDITIONS",
+          "APPROVAL WITH 5 CONDITIONS",
+          "APPROVAL WITH 6 CONDITIONS",
+          "APPROVAL WITH 7 CONDITIONS",
+          "APPROVAL WITH CONDITIONS",
+          "APPROVAL WITH 8 CONDITIONS",
+          "APPROVAL WITH 9 CONDITIONS",
+          "APPROVAL WITH 10 CONDITIONS",
+          "APPROVAL WITH 11 CONDITIONS",
+          "APPROVAL WITH 13 CONDITIONS",
+          "APPROVAL WITH 14 CONDITIONS",
+          "APPROVAL WITH 17 CONDITIONS",
+          "APPROVAL WITH 12 CONDITIONS",
+          "APPROVAL WITH 15 CONDITIONS",
+          "APPROVAL WITH 1 CONDITIONS",
+          "APPROVAL WITH 2 CONSITIONS",
+          "APPROVAL WITH 4 CONDITION"
+        ],
+        "operating": [],
+        "exclude": [
+          "DISAPPROVAL",
+          "WITHDRAWN",
+          "DENIED",
+          "UNKNOWN",
+          "",
+          "UPHOLD THE ZONING ADMINISTRATORS DECISION",
+          "OVERTURN THE ZONING ADMINISTRATORS DECISION",
+          "OVERRULE THE ZONING ADMINISTRATORS DECISION",
+          "OVERTUEN ZA DETERMINATION"
+        ]
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "record",
+      "_receipts": "2026-07-31 KY wire pass, Boone. Boone County Planning Commission 'BCPC Board Activities Layer' (ServicesBoone/PlanningAndZoningGroup_Boone layer 7) on the county's OWN server secure.boonecountygis.com (ArcGIS Server v11.4). 1,773 polygon rows. HOST FOUND VIA WEB SEARCH, then verified: linkgis.org (the NKY consortium for Kenton/Campbell/Pendleton) exposes NO REST directory (gis.linkgis.org fails DNS, linkgis.org/arcgis 404s a WordPress page); Boone's own server does, and CNTYFIPS is 21015 = Boone County KY on 1,772 of 1,773 rows. FRESHNESS VERIFIED WITH THE PAIRED PROBE (the KY-floodplain lesson): max ACTIONDATE = 2026-07-08 AND the windowed control 'ACTIONDATE >= DATE 2024-07-31' returns 91 - a healthy non-zero, so the max date is corroborated by volume rather than resting on one row. STATUS VOCABULARY IS CLOSED AND COMPLETE: live groupBy on BRDACTION returned 30 distinct values summing to EXACTLY 1,773 (positive control). All 30 are mapped verbatim -> 0 unclassified, nothing left to fail closed. The source's OWN TYPOS are preserved verbatim because the connector matches the stored string: 'APPROVAL WITH 2 CONSITIONS' (1), 'APPROVAL WITH 4 CONDITION' (1), 'APPROVAL WITH 1 CONDITIONS' (1), 'OVERTUEN ZA DETERMINATION' (1). Buckets: approved 1,560 (APPROVAL + every APPROVAL WITH N CONDITIONS variant) + exclude 213 = 1,773. EXCLUDE is deliberate and explicit rather than left unmapped, so the vocabulary is 100% covered: DISAPPROVAL 159, WITHDRAWN 23, DENIED 1, UNKNOWN 11, empty-string 8, and the 11 zoning-administrator APPEAL outcomes (UPHOLD/OVERTURN/OVERRULE/OVERTUEN) - appeals are not development authorisations. GMDSTATUS was NOT used as status_raw: it is single-valued ('COMPLETED' on all 1,773) and describes the RECORD, not the decision. use_type_const 'Development': REQUEST is free text ('CONDITIONAL USE PERMIT TO ALLOW AN INDOOR/OUTDOOR EVENT CENTER') so it cannot be a type_map source (Rule 5), and 'Development' is the generic member of the CLOSED six-value TYPE_EXACT set (Phoenix precedent). PII: REQUEST describes the REQUEST, not the applicant - no personal-name field is mapped (the Asheville lesson). record_url HTMLLINK is a real per-record document page populated on 1,744 of 1,773 (98.4%); the connector's column -> template -> dataset_url chain gives the rest honest dataset precision. lat/lng come from the layer's OWN GMDLATDD/GMDLONDD columns rather than a derived polygon centroid. No ZIP column -> spatial_zip_radius_mi 3. REJECTED in the same pass: layer 6 'BCPC Card Activities' (1,733 rows) has NO ACTIONDATE column - only GIS GMDCREATED/GMDEDITED housekeeping; ServicesNKY exposes only zoning-district and economic-development boundaries, no permit ledger."
     }
   ],
   "ckan": [
