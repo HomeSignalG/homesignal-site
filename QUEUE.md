@@ -2996,3 +2996,52 @@ Miscellaneous or Update 390 · Grading 51 · *(null)* 3.
 The sweep's value stands — it found Allentown (**live, 3,939 records**) and correctly surfaced these
 two as candidates. That two of three turned out stale is the ordinary hit rate, not a fault in the
 method: **the sweep finds ledgers; the freshness gate decides which are worth wiring.**
+
+---
+
+## ⚠️ CORRECTION — WORCESTER MA IS NOT STALLED. A live first-party ledger exists. (2026-07-31)
+
+The MASSACHUSETTS WIRE PASS recorded **"Worcester STALLED at 2025-09-09 → nightly reprobe list."**
+That is **wrong about the city**, though it may be true of whichever endpoint was probed then.
+
+The vendor sweep's last unidentified owner, `Innovation_andTechnology` (org `j8dqo2DJE7mVUBU1`),
+resolves to the **City of Worcester's Innovation & Technology department**, and its `Building_Permits`
+service is live:
+
+- **52,299 rows**, and a sample record reads
+  `Record__ B-26-1878 · Record_Type "Building Permit" · Record_Status "Complete" ·
+  Address "202 MAY ST Worcester MA 01602" · Date_Submitted "5/15/2026"`
+- **2,227 records carry a 2026 `Date_Submitted`** — the feed is current, not stalled
+- Both vocabularies are complete and **sum EXACTLY to 52,299**:
+  `Record_Status` = Complete 34,223 + Active 18,076; `Record_Type` = Building Permit 52,299 (single value)
+- The org also publishes Electrical / Gas / Mechanical / Plumbing permits separately, plus
+  `Bathing Beach Licenses` and `Welding Cards` — an unmistakably New England municipal roster, and
+  `MBL` (Map-Block-Lot) in the schema confirms it
+
+### 🔁 THIRD instance of a freshness probe lying — and a NEW variant
+
+`max(Date_Submitted)` returned **`"9/9/2025"`**, which is **not** the newest record. `Date_Submitted`
+is an `esriFieldTypeString` holding `M/D/YYYY`, so `max()` sorts **lexicographically**: `"9/9/2025"`
+beats `"5/15/2026"` because `9` > `5` at the first character.
+
+That is a third distinct way a max-date probe has misled this session:
+
+| variant | seen at | what max() said | the truth |
+|---|---|---|---|
+| omitted recency window | Chicago→DuPage | 88 rows in scope | 7 |
+| corrupt future date | Hawaii County | year ~5005 | 5 rows in the last year |
+| **string date, lexicographic sort** | **Worcester** | **9/9/2025** | **5/15/2026 — newer** |
+
+**Standing answer, strengthened: NEVER accept `max(dateField)` alone. Pair it with a windowed COUNT,
+and when the field is `esriFieldTypeString`, treat `max()` as meaningless for chronology** — count on
+a `LIKE '%/YYYY'` pattern instead, which is exactly what settled this (2,227 rows in 2026).
+
+### Why it is NOT being wired: the page ceiling is ≤ 4
+
+**Worcester County MA is 99 modelled pages with only 4 dark** — already 96% record-backed. Wiring this
+would add at most 4 pages and plausibly zero, since the 4 dark are likely rural towns rather than
+Worcester city. The source is also a **geometry-less Table** (no coordinates, no ZIP column — address
+is a single free-text string), so it would need the arcgis geocode path plus address parsing.
+
+**Cost is real, ceiling is ≤4 pages. Not wired — recorded as a correction and a reprobe-list removal.**
+If Worcester's 4 dark ZIPs are ever shown to be city ZIPs, revisit; the source is live and good.
