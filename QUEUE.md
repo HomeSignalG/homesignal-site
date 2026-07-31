@@ -3070,3 +3070,54 @@ parsing, and the entire prize is one PO-box ZIP.
 
 **The genuinely valuable output of this thread is the correction, not the source**: Worcester comes
 off the stalled/reprobe list, and the string-date `max()` trap is now documented with a receipt.
+
+---
+
+## WAVE 22 — paged the title-shape sweep to result 400; NEW HAVEN CT closed, and a Vermont lookalike
+
+Continued paging `title:"Building Permits" AND type:"Feature Service"` (results 201–400) plus
+`title:"Permits Issued"/"Permit Activity"/"Building Activity"`. Every US hit was cross-checked against
+the dark list and the registry **before** probing.
+
+### ⚠️ `admin_Waterbury` is WATERBURY, **VERMONT** — not Waterbury, Connecticut
+
+`Residential Permits Issued _ 2016_2025` looked like the answer to **New Haven County CT (41/41 dark)**
+— Waterbury is one of its largest cities. The org's other 125 items settle it beyond doubt, and the
+two decisive tells are *state-specific infrastructure*:
+
+- **`BioFinder_Processing_WFL1`** — BioFinder is **Vermont's** state biodiversity mapping system
+- **`GMP Substations _ Total kW Connected`** — GMP is **Green Mountain Power, Vermont's** utility
+- plus `Waterbury Center _ Designated Village`, a Vermont village designation
+
+It is also **not a live ledger** but one layer in a **town-plan analysis series** —
+`WTB _ Housing`, `WTB _ Energy`, `WTB _ Demographics`, `WTB _ Landuse Chapter Maps`,
+`Visioning _ Density Layers`, `Waterbury _ Parcel Opportunity Mapping`. A municipal-plan chapter set,
+not a permit feed. Rejected on both counts. *(Waterbury VT sits in Washington County VT — 26 dark —
+so even taken at face value it was never the New Haven answer.)*
+
+**New standing tell:** when two same-named places straddle states, **look for state-specific
+infrastructure in the org's other layers** — a state biodiversity program, a state utility, a state
+DOT. It is faster and more certain than reading coordinates.
+
+### NEW HAVEN COUNTY CT (41 dark) — closed, no ledger exists
+
+Searched all six major cities (New Haven, Waterbury, Meriden, Milford, Hamden, West Haven) by title
+shape. **10 results, and not one building ledger:**
+`Cannabis Permitted Parcels 8_17_2022` (New Haven's own org) · `Milford Open Gov` ·
+`Permit Inspection_Milford_form` · `Grease Trap Permit`.
+Combined with the already-closed CT statewide route (the DECD layer is municipality-year aggregates),
+**New Haven County has no reachable per-record permit source.**
+
+### Everything else on pages 3–4 mapped to already-covered or unmodelled ground
+
+- **Already 0 dark**: Durham NC (12/12 backed), New Castle DE (29/29), Wake NC (2 dark of 39 —
+  `WakeCountyGovernment` + `OpenData_ral` already serving it)
+- **Already wired**: Memphis (`opmautomation_memegis` = the DPD ledger), San Marcos TX (Hays),
+  Las Vegas (NV locked), Seattle, Tempe, Miami-Dade, Nashville, KCMO
+- **0 modelled ZIP pages** (blocker class C): Forsyth, Catawba, Burke, Caldwell, Alexander NC
+  (the `WPCOG_GIS1` regional set), Luna NM, Onondaga NY, Yolo CA, Pasadena/LA County
+- **Non-US**: Oakville, Mississauga, Victoria BC, Calgary, Saugeen Shores, Columbia-Shuswap
+- **Stale on the title**: Syracuse `Building Permits (2013-2019)`
+
+**Sweep status: paged to result 400 of 1,064.** The yield curve is clear — page 1 produced Allentown,
+pages 3–4 produced zero wireable sources and one instructive lookalike.
