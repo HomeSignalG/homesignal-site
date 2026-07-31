@@ -736,3 +736,48 @@ polygon rows, `OpenDate` max **2026-07-30** (fresh the day before wiring). Confi
 
 **NC after Charlotte lands: 83 → ~115 of 170 (67.6%).** The remaining 51 dark pages to clear
 90% are Buncombe 20 (no wireable source found — above), Chatham 12, Orange 10, Union 9.
+
+### Charlotte GO-LIVE VERIFIED (post-deploy, from `app_projects`)
+
+Merged `cf4ac82` → deployed **v115** (01:50Z, confirmed before firing — not a dispatched-is-not-landed
+repeat) → fired all 34 Mecklenburg ZIPs → waited for `net.http_request_queue` to reach **0** →
+`dev_refresh_collect()` → `app_refresh_zip` on all 34.
+
+- **32 of 34 ZIPs carry Charlotte records; 19,814 records; 0 missing `record_url`, 0 unclassified.**
+- **Bidirectional gate proof, cache-wide:** the 32 ZIPs carrying `charlotte-land-dev-commercial-projects`
+  span exactly **1 state / 1 county — NC/Mecklenburg**. No leak.
+- All 34 materialized `quality=pass`.
+- **NC: 83 → 115 of 170 = 67.6%** (from `app_projects`, the only reading that counts).
+
+### NC's remaining path to 90% — needs 38 of the 55 dark pages
+
+Chatham 12 + Orange 10 + Union 9 + Wake 2 + Mecklenburg 2 (Cornelius/Davidson) = **33 — not enough
+on their own.** Buncombe's 20 are effectively required, so NC is NOT capped, but it is gated on
+Buncombe.
+
+**ASHEVILLE IS THE UNLOCK AND IT IS VERIFIED-READY — not yet wired (two open design calls).**
+`https://gis.ashevillenc.gov/server/rest/services/Permits/AccelaPermitsView/MapServer/2`
+("Accela Permits View"). Found only after correcting the URL twice: `gis.buncombecounty.org` and
+`/arcgis/` both fail (the latter 500s) — the real path is **`/server/`**, recovered by walking the
+Hub DCAT item `b8fdb63db30b42d0875afb617e1551f4` → its `url`.
+
+- **65,438 rows, `esriGeometryPoint`, FRESH — `date_opened` max 2026-07-30.**
+- Schema is a full Accela ledger: `record_id`, `record_name`, `date_opened` (Date), `record_status`,
+  `record_status_date`, `record_type`, `record_type_group/category/type/subtype`, `address`,
+  `job_value`, `description`.
+- **Both vocabularies enumerated with a positive control, each summing to EXACTLY 65,438:**
+  `record_status` **42 values** (Finaled 14998, Expired 11806, CO Issued 10420, CC Issued 10249,
+  Issued 6603, Closed 4891, Revoked 1889, Reissued 1461, … 9 NULL) and `record_type_category`
+  **56 values**. `record_type_group` is uniformly `"Permits"` (65,438) — useless for typing.
+- `date_opened >= DATE '2025-07-31'` → **3,983 rows**, so `recency_days: 365` is the right window.
+
+**Two decisions to settle before wiring (both are "changes what residents see" — gated):**
+1. **`record_type_category` = `NA` on 22,714 rows (35%)** — the single largest value, with no honest
+   mapping. It would land `unclassified` and fall through to keyword rules.
+2. **Trades noise** — Electrical 4,052, Plumbing 1,630, Mechanical 1,092, Fire Alarm 1,189,
+   Sprinkler 1,054, Reroof 747, Gas Piping 576, Low Voltage 447. WA/MN/IL dropped trades at source;
+   MI **kept** them (founder-specified). Needs the same explicit call here.
+3. No per-record URL column exists → `dataset` precision (Boulder/Philadelphia precedent).
+
+Asheville is a CITY source, so expect it to cover a subset of Buncombe's 20 (Charlotte covered
+32/34); Chatham/Orange/Union still needed after it.
