@@ -2695,3 +2695,56 @@ or simply nothing published (Toledo). There is no single fix that would have unl
 itself the finding: **below roughly the top-40 dark counties, the failures stop being one systemic wall
 and become long-tail idiosyncrasy** — which is exactly the regime a vendor adapter (blocker A1) is
 designed for, since these cities all run permitting through portals rather than GIS.
+
+---
+
+## WAVE 16 — Des Moines · Omaha · Allentown · Fort Wayne · Frederick · Manchester NH (2026-07-31)
+
+Registry-grep first again: NY County, Hamilton OH and Fulton GA were flagged **already wired** and
+skipped without a probe. **0 wired** from the rest.
+
+### ⚠️ `gis.frederickco.gov` is FREDERICK, **COLORADO** — not Frederick County, Maryland
+
+The most convincing lookalike of the session, and worth recording because three independent signals
+all pointed the wrong way: the AGO owner is `GISFrederick`, the layer is titled
+**`Active Building Permits`**, and the schema is genuinely good
+(`FullAddress, PermitId, PermitType, Status, Description, UpdateDate, StatusDate, OpenedDate,
+ClosedDate, ParcelID`, point geometry).
+
+Two receipts caught it:
+
+1. **The declared extent is `xmin -105.036, ymin 40.081`** — Colorado, ~1,400 miles from Maryland.
+2. **A live sample settles it beyond doubt**: records at `-104.977/40.120`, `-104.981/40.121`,
+   `-104.931/40.104`, with addresses like **`8245 W I-25 FRONTAGE RD UNIT 4`** — Interstate 25 runs
+   through Colorado, not Maryland.
+
+So `frederickco.gov` is the **Town of Frederick, Colorado** (Weld County), not "Frederick County".
+**Colorado is founder-locked as UNREACHABLE**, so the source is out of scope regardless.
+
+⚠️ **Nuance worth keeping — I nearly rejected it on the extent alone, which would have been the wrong
+method.** My own Phoenix standing answer says *a declared ArcGIS `extent` is cached metadata, not a
+containment guarantee.* An extent is a **lead**, never the proof. The live sample is what made this a
+fact. Extent to suspect → sample to confirm.
+
+### Rejections with receipts
+
+- **Des Moines / Polk IA (34)** — building-permit search total **0**.
+- **Fort Wayne / Allen IN (33)** — total **0**.
+- **Omaha / Douglas NE (35)** — total 1, **0** permit services.
+- **Allentown / Lehigh PA (34)** — a deliberately over-broad query returned 4,575 results and **not one
+  municipal building ledger**: PA DMO mining permits, Florida DEP environmental resource permits, BLM
+  leases, and parking-permit zones from Brisbane, Sydney, Kingston and Halifax. A textbook illustration
+  that result *volume* is not signal.
+- **Manchester / Hillsborough NH (34)** — 12 results; the only permit-shaped hits are a
+  **Manchester AIRPORT tall-equipment form** and `PermitsProAccela` owned by **`CarrollCo_MD`**
+  (Carroll County, Maryland — another cross-state lookalike).
+- **Carroll County MD `PermitsProAccela`** — probed anyway because the name says Accela. **Layer 0 is
+  `Address`** (`ACCTID, Full_Addre, ST_NUMBER, … ZIPCODE, County, State`) — an **address registry**.
+  **Fifth confirmation of the vendor-folder trap**: a service named for the permitting vendor holding
+  everything except permits.
+
+### Session sweep totals
+
+Counties probed across waves 1–16: **~40**, covering roughly **1,900 dark pages**. Sources wired: **2**
+(Stamford CT, plus the Chicago→DuPage coverage extension). Everything else is receipted in the
+BLOCKER REGISTER above.
