@@ -2641,3 +2641,57 @@ counties already 0 dark (Charleston SC).
 **Spokane · Sioux Falls · KCMO · Hartford** were all investigated as opportunities and are all **already
 in the registry**. Dark pages in a wired county usually mean the wired source has no rows for those
 ZIPs — **not** that the county needs wiring. Run the registry grep first, every time.
+
+---
+
+## WAVE 15 — Fargo · Toledo · Harrisburg · Cedar Rapids · Waukesha · Gary · Prescott · Montgomery AL (2026-07-31)
+
+**Registry-grep ran FIRST this time** (the rule from the correction above): all 16 candidate counties
+confirmed genuinely unwired before a single probe. **0 wired** — but every rejection is now cheap and
+receipted rather than a full recon.
+
+### Harrisburg / Dauphin PA (30 dark) — REJECTED: a two-month sample with no year
+
+`running_building_permit_master` (org `9n3LUAMi3B692MBL`, `emrubin_COHBG` — genuinely the City of
+Harrisburg). Point geometry, and the field list is only
+`Address, City, Month, Parcel_ID, State, Type, Value, ZIP, ObjectId`. Four disqualifying facts:
+
+1. **200 rows total, and the `Month` groupBy is exactly `"January "` 100 + `"Feb"` 100** — a
+   two-month extract, split evenly, with the month written two different ways (one with a trailing
+   space, one abbreviated).
+2. **There is NO YEAR anywhere in the schema.** `Month` is a bare month name, so **no `file_date` can
+   be derived** — the Tustin/North Richland Hills class.
+3. **`ZIP` is NULL** on the sampled rows despite the column existing.
+4. **No status column** at all.
+
+Its sibling layers in the same org — `Hot_Spots_running_building_permit_master`,
+`running_building_permit_master_Prediction`, `Describe_distribution_of_running_building_permit_master`
+— confirm what it is: **a GIS analyst's working/teaching dataset**, not the city's permit ledger.
+
+### Montgomery AL (28 dark) — REJECTED: private layer
+
+`Building_Permit` on org `lDchLOqyFQHnIw15` (`MHAtoday1`) returns
+`{"error":{"code":499,"message":"Token Required"}}`. Access-restricted, the Buffalo class. *(Owner is
+also a housing authority rather than the city permitting office — but access settled it first.)*
+
+### Rejections with receipts
+
+- **Fargo / Cass ND (30)** — West Fargo's own org publishes **Sidewalk & Driveway**, **Right of Way**,
+  and **Residential/Commercial Civil Site** permitting lookups — infrastructure permits, not building.
+  The one `2025_Building_Permits_Fargo` hit is owned by `david@horizonfargo.com_CCIM`, **a commercial
+  real-estate brokerage** — third party, barred.
+- **Toledo / Lucas OH (30)** — 16 results, **0** permit/development services.
+- **Cedar Rapids / Linn IA (28)** — only `Dust Control Permitting`, `Open Burn Permits`, and a
+  `Music & Event Permit Navigator`. No construction ledger.
+- **Waukesha WI (27) + Lake IN (27)** — 172 results; the only permit-shaped hits are BLM national
+  leases, Louisville APCD operating permits, and Bloomington **parking** permit zones.
+- **Prescott / Yavapai AZ (27) + Tuscaloosa AL (27)** — 47 results, no first-party construction ledger.
+
+### The pattern this wave sharpens
+
+Every one of these eight failed for a **different** reason — wrong permit domain (Fargo, Cedar Rapids),
+third-party owner (Fargo CCIM), private layer (Montgomery), analyst sample with no year (Harrisburg),
+or simply nothing published (Toledo). There is no single fix that would have unlocked them, which is
+itself the finding: **below roughly the top-40 dark counties, the failures stop being one systemic wall
+and become long-tail idiosyncrasy** — which is exactly the regime a vendor adapter (blocker A1) is
+designed for, since these cities all run permitting through portals rather than GIS.
