@@ -9184,6 +9184,92 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "record",
       "_receipts": "2026-07-31 NC wire pass. City of Charlotte's OWN ArcGIS Server (gis.charlottenc.gov, v11.3), service PLN/LandDevCommercialProjects layer 0 'Land Dev Commercial Projects'. 7,029 rows (returnCountOnly). geometryType esriGeometryPolygon -> derived shoelace centroid; return_centroid NOT set (classic ArcGIS Server MapServer silently ignores it - standing answer). No ZIP column anywhere -> spatial_zip_radius_mi 3. FRESH: max OpenDate = 2026-07-30 (orderByFields=OpenDate DESC), the day before wiring. BOTH vocabularies enumerated live via groupBy with a positive control - each sums to EXACTLY 7,029: Status 22 values (Approved 1986, Closed 1921, Complete 923, NULL 450, Scheduled 442, Withdrawn 373, In Progress 280, Construction Completed 227, Revisions 214, In Process 142, Not eligible 28, Revisions Needed 16, Approval Pending Payment 9, Pending Additional Information 5, Awaiting Plans 3, No Show 2, Void 2, DONE 2, Expedited Fees Pending 1, In Review 1, OPEN 1, Replaced 1) and Category 5 values (1205+427+1317+1699+2381). All 21 non-null statuses mapped -> 0 unclassified; the 450 NULL-status rows FAIL CLOSED (never published). Bucket sums: proposed 1114 + approved 1986 + operating 1152 + exclude 2327 = 6579, + 450 null = 7029. 'Closed' is EXCLUDED deliberately (administrative closure, ambiguous lifecycle - Minneapolis precedent); 'Complete'/'Construction Completed'/'DONE' are the real operating states. use_type_const 'Commercial' rather than a 55-value ProjectType type_map: the SERVICE ITSELF is scoped to commercial land development (layer name), so the value is source-stated, not guessed, and 'Commercial' is a member of the CLOSED six-value TYPE_EXACT vocabulary in lib/map.js. record_url: ProjectDetail is a REAL per-record Accela URL (aca-prod.accela.com/CHARLOTTE/Cap/CapDetail.aspx?...capID1=20LDC&capID3=00243), populated on 3,570 of 7,029 (50.8%); the connector's column -> template -> dataset_url chain gives the rest honest 'dataset' precision, so no row is dropped by the anti-fabrication gate. REJECTED with receipts in the same pass: Accela/Accela MapServer is a reference basemap (parcels/zoning/review areas), NOT a permit ledger; PLN/Rezonings only 78 rows; NCDOT_ActiveConstructionProjects is statewide but tiny (257 multipoint + 161 polyline) AND its point layer is esriGeometryMultipoint, which featurePoint() does not handle (no 'points' branch) -> no coordinates, area scope, no coverage credit."
+    },
+    {
+      "registry_id": "asheville-accela-permits",
+      "platform": "arcgis",
+      "service_url": "https://gis.ashevillenc.gov/server/rest/services/Permits/AccelaPermitsView/MapServer/2",
+      "dataset_url": "https://gis.ashevillenc.gov/server/rest/services/Permits/AccelaPermitsView/MapServer/2",
+      "jurisdiction": "City of Asheville",
+      "coverage": [
+        {
+          "state": "NC",
+          "county": "Buncombe"
+        }
+      ],
+      "column_map": {
+        "title": "record_type",
+        "status_raw": "record_status",
+        "type_source": "record_type_type",
+        "file_date": "date_opened",
+        "decision_date": "record_status_date",
+        "address": "address",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "record_id"
+      },
+      "type_map": {
+        "Residential": "Residential",
+        "Commercial": "Commercial",
+        "Stormwater": "Infrastructure",
+        "Right of Way": "Roads & infrastructure"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Plan Check",
+          "Pending Applicant Action",
+          "Application Received",
+          "Submittal Required",
+          "Pending Payment",
+          "Permit Verification",
+          "Pending",
+          "Application Incomplete",
+          "Application Complete",
+          "Pending Bldg Permits",
+          "In Review",
+          "Hold Pending Code Enforcement"
+        ],
+        "approved": [
+          "Issued",
+          "Reissued",
+          "Renewed",
+          "Partial Issued",
+          "Approved",
+          "Active",
+          "Inspections",
+          "Pending Inspection"
+        ],
+        "operating": [
+          "Finaled",
+          "CO Issued",
+          "CC Issued",
+          "Closed",
+          "In Compliance",
+          "Certificate of Compliance",
+          "TCC Issued",
+          "TCO Issued 90 Days",
+          "TCO Issued 60 Days",
+          "TCO Issued 30 Days",
+          "TCC Issued 90 Days",
+          "Final Release",
+          "Project Closed"
+        ],
+        "exclude": [
+          "Expired",
+          "Revoked",
+          "Denied",
+          "Lapsed",
+          "Inactive",
+          "Disapproved",
+          "Referred to Legal",
+          "DISABLED"
+        ]
+      },
+      "extra_where": "record_type_type IN ('Residential','Commercial','Stormwater','Right of Way') AND (record_type_category IS NULL OR record_type_category NOT IN ('Electrical','Plumbing','Mechanical','Multi-Trade','Gas Piping','Low Voltage Electrical','Fire Alarm','Sprinkler System','Reroof','Change Out','Refrigeration','Exhaust Hood','Hood Suppression','Like for Like','Repair-Replacement'))",
+      "recency_days": 365,
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-31 NC wire pass, Buncombe. City of Asheville's OWN ArcGIS Server, Permits/AccelaPermitsView layer 2 'Accela Permits View'. 65,438 rows, esriGeometryPoint, FRESH (date_opened max 2026-07-30). HOST FOUND ONLY BY CORRECTING THE URL TWICE: gis.buncombecounty.org is a different (county) server and https://gis.ashevillenc.gov/ARCGIS/... 500s - the real path is /server/, recovered by walking Hub DCAT item b8fdb63db30b42d0875afb617e1551f4 -> its 'url'. THREE vocabularies enumerated live with a positive control, EACH summing to EXACTLY 65,438: record_status 42 values (Finaled 14998, Expired 11806, CO Issued 10420, CC Issued 10249, Issued 6603, Closed 4891, Revoked 1889, Reissued 1461, Plan Check 676, Pending Applicant Action 565, Renewed 423, In Compliance 387, Active 281, Application Received 209, Inspections 208, Denied 118, TCO Issued 90 Days 62, Submittal Required 44, Pending Payment 37, Permit Verification 13, TCO Issued 60 Days 11, Pending 10, Lapsed 10, NULL 9, Pending Inspection 9, Inactive 8, Partial Issued 6, Disapproved 5, Application Incomplete 5, TCC Issued 4, TCO Issued 30 Days 3, Certificate of Compliance 3, TCC Issued 90 Days 2, Approved 2, Referred to Legal 2, Application Complete 2, Pending Bldg Permits 2, Hold Pending Code Enforcement 1, DISABLED 1, Project Closed 1, Final Release 1, In Review 1); record_type_category 56 values; and record_type_type 9 values (Residential 28865, Commercial 19740, Sign 4931, Fire 3550, Event-Temporary Use 3350, Over The Counter 2992, Stormwater 919, Outdoor Vendor 558, Right of Way 533). Bucket sums: proposed 1565 + approved 8993 + operating 41032 + exclude 13839 = 65429, + 9 NULL (fail closed) = 65438. TYPE SOURCE IS record_type_type, NOT record_type_category: category is 'NA' on 22,714 rows (35%, its single largest value) and record_type_group is uniformly 'Permits' (65,438) - both useless. The NA rows are fully typed at record_type_type (Residential 6131 / Sign 4931 / Commercial 4465 / Event 3350 / ...), so 0 unclassified. NOISE DROPPED AT SOURCE via extra_where, following the WA/MN/IL precedent (MI kept trades only because the founder named the Detroit trio): the 5 non-development record_type_type values (Sign 4931, Fire 3550, Event-Temporary Use 3350, Over The Counter 2992, Outdoor Vendor 558 = 15,381) plus 15 trade/minor-repair record_type_category values. Live positive control on the exact filter + 365-day window: 2,280 rows (unfiltered 365-day window is 3,983). *** PRIVACY - THIS IS WHY title IS record_type *** Both record_name AND description carry PRIVATE INDIVIDUALS' NAMES on residential permits ('ECKL, ELIZABETH'; 'BENNETT, ABBY'; description '...FOR SHANE HOLLIFIELD'). Publishing either as a map-pin title would put a resident's name next to their home address on a public page. NEITHER FIELD IS MAPPED. record_type is 0-null (verified: count where record_type IS NULL OR '' = 0 in window) and self-describing across 112 values ('Res: New SFD', 'Com: Demo', 'ROW: Encroachment'), so it is the title. No per-record URL column exists -> dataset precision (Boulder/Philadelphia precedent). No ZIP column -> spatial_zip_radius_mi 3; sample rows carry real Asheville points (35.494/-82.524) and full addresses."
     }
   ],
   "ckan": [
