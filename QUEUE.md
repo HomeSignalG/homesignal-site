@@ -1615,3 +1615,97 @@ After a pg_net wedge clears, the backlog is released as a **burst**, and the edg
 timed out on **11 of 18** requests at a 90 s `timeout_milliseconds`. Re-firing the failures in
 smaller batches at **120 s** returned **7/7 then 33/33 with zero failures**. When re-firing after
 a stall, raise the timeout and split the batch.
+
+---
+
+## NY downstate recon (2026-07-31) — the 3 largest dark counties in the WHOLE dataset
+
+After TN closed, the national scoreboard (fully-dark counties, ≥18 pages, excluding locked
+NV/CO and capped TN/NC/KY) puts the top three in New York:
+
+| rank | county | dark pages |
+|---|---|---|
+| 1 | **NY / Suffolk** | **107** |
+| 2 | **NY / Westchester** | **75** |
+| 3 | **NY / Nassau** | **70** |
+
+That is **252 pages** — bigger than any state-level opportunity left. The NEW YORK WIRE PASS
+recorded these as "no portals found," which is vague; this pass replaces that with receipts.
+
+### WESTCHESTER — firm REJECT, with receipts
+
+The county's ArcGIS server **is live** (`giswww.westchestergov.com/arcgis/rest/services` → 200,
+`currentVersion` 11.5) and its AGO org `XKEHpOulfycN9cGC` responds — so "no portal" was wrong.
+It still yields nothing wireable:
+
+- Folder **`Municity5`** — Municity IS a municipal permitting system, so this was the real lead.
+  It returns `{"error":{"code":499,"message":"Token Required"}}` — **access-restricted, not public.**
+- Folder **`DOH_Permit`** — also `499 Token Required`. (And DOH = Department of Health: septic/food
+  permits, not building permits, so it would not have been the right source anyway.)
+- Folder **`LocalMunicipality`** — enumerated in full: only `Buchanan_MS4_Viewer`,
+  `HastingsImage`, `New_Castle_Reference`, `North_Castle_High_Conservation_Areas`. No permits.
+- AGO org services matching permit/develop/subdiv/zoning/plat are **tax parcels and zoning only**
+  (`Tax_Parcels`, `OssTaxParcelsEPVS*`, `Zoning`, `New_Castle_Zoning`, …). A parcel registry is
+  not a permit ledger.
+
+### SUFFOLK — BLOCKED, explicitly NOT a rejection → nightly reprobe list
+
+`gis.suffolkcountyny.gov/arcgis/rest/services` returns **HTTP 403 serving a page titled
+"Suffolk County Server Maintenance"** — on **two separate probes**, so it is persistent rather
+than a momentary blip, but it is still a *maintenance* state, not an absence of data.
+`gis3.suffolkcountyny.gov` fails DNS and `data-suffolkcountyny.hub.arcgis.com` 404s
+("Domain record(s) not found"). **Do not record Suffolk as sourceless** — 107 pages ride on it and
+the server may simply be down. Re-probe it.
+
+### NASSAU + the Long Island towns — no reachable host
+
+`gis.nassaucountyny.gov` 404 · `gis.brookhavenny.gov` HTTP 500 · `maps.huntingtonny.gov` DNS fail.
+
+### AGO content search: ran, and found only CROSS-ORG LOOKALIKES
+
+All ten loose searches returned 200 with non-zero totals (so the instrument demonstrably ran —
+"Long Island building permits" 88 results, "Suffolk County GIS New York" 89, "Westchester County
+permits New York" 12). Every permit/development-shaped hit was from somewhere else entirely:
+**"Development Pipeline" / "Lynn Development Pipeline" → Lynn, MASSACHUSETTS** (owner `LSDrago`),
+**"Zoning" → CityofSaintPaul, MINNESOTA**, and Westchester's own only match was a **"Film Permit
+Layer Update"** — film shoots, not construction. This is the documented unscoped-search trap;
+the titles look right and the geography is wrong.
+
+**Long Island's towns (Brookhaven, Islip, Huntington, Babylon, Smithtown) run permitting on
+vendor portals with no public GIS layer.** That is the structural reason, and it is the same
+shape as TN's Williamson/Sumner/Maury/Wilson.
+
+### Tier-2 dark counties (Bergen NJ · Montgomery+Lancaster PA · St. Louis MO · Jefferson AL · Oklahoma · Sedgwick KS · Alameda CA) — ALL REJECTED
+
+The next eight largest fully-dark counties after the NY three, ~460 pages combined. Probed on
+both routes (AGO content search, then the per-portal DCAT/Socrata route that found Memphis and
+Nashville). **None wireable.** Receipts:
+
+- **AGO content search ran and found nothing.** All ten loose searches returned 200; totals were
+  mostly non-zero (Bergen 12, Jefferson AL 6, Alameda 16, Lancaster 1, Oklahoma City 1 …) so the
+  instrument demonstrably executed — and **0 permit/subdivision/development-shaped Feature or Map
+  Services** across every one of them.
+- **Oakland CA (Alameda, 51 pages) — the near-miss worth recording.** `data.oaklandca.gov`'s
+  Socrata catalog DOES list a dataset literally titled **"Permit Applications"** (`ryhf-m453`),
+  which looks like exactly the right source. Both `…/resource/ryhf-m453.json?$limit=1` and the
+  `count(1)` form return **HTTP 404 `{"error":true,"message":"Not found"}`** — the dataset is
+  catalog-visible but **not readable**. This is the **Buffalo NY failure class** (catalog permit
+  items that are restricted views), and it is the reason a catalogue listing is never sufficient
+  evidence: *read a row before believing a dataset exists.*
+- **St. Louis County MO (63 pages)** — `data.stlouisco.com` DCAT is **live and valid** (200,
+  project-open-data schema, parsed successfully). Searched its full `dataset` array: the only
+  matches are **`Zoning`, `Zoning and Jurisdictions`, `Zoning in Unincorporated Areas`**. Zoning
+  is not a permit ledger. `gis.stlouisco.com` fails DNS.
+- **Oklahoma City (52 pages)** — `data.okc.gov` returns **403 with a `NOINDEX, NOFOLLOW` bot-wall
+  page**. Not a 404: the portal exists but refuses automated reads (the Tampa/El Paso WAF class).
+  → reprobe list.
+- **Wichita / Sedgwick KS (50 pages)** — `opendata.wichita.gov` serves **HTML**, not the DCAT JSON
+  its path implies ("City of Wichita Open Data Portal with Apps"). No machine catalog found.
+- **Birmingham / Jefferson AL (60 pages)** — `data.birminghamal.gov` Socrata catalog API **404s**.
+- **Montgomery County PA (64 pages)** — `data.montcopa.org` fails DNS. (The PENNSYLVANIA WIRE PASS
+  already recorded its DCAT hub as live-but-0-permit-datasets; this is consistent.)
+
+**The pattern is now consistent across three independent passes (TN collar counties, NY downstate,
+these eight): large dark counties are dark because their jurisdictions run permitting on VENDOR
+PORTALS with no public per-record GIS or open-data layer.** That is a structural ceiling, not a
+discovery failure — and it is why no remaining state can reach 90%.
