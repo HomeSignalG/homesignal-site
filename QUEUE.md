@@ -2206,3 +2206,48 @@ searching.
 
 The unlock for this class is therefore **not** more discovery. It is the **vendor adapter**
 (Accela / EnerGov / CitizenServe / Municity) — a code change, and gated.
+
+---
+
+## ORANGE COUNTY CA (85 dark) — probed, 0 wireable sources (2026-07-31)
+
+With the NY top-3 closed, the scoreboard was re-run from `app_projects` rather than a stale ranking.
+Orange County CA was the largest metro not yet swept (85 dark pages; PA/Allegheny 92 and MI/Oakland
+78 rank higher but were both swept in earlier waves). Anaheim is already wired
+(`anaheim-land-use-cases`); the other cities were the target.
+
+**Result: 0 wireable sources.** Three genuine OC city orgs found and enumerated:
+
+| org | city | items | outcome |
+|---|---|---|---|
+| `jchaconas_cnb` | **Newport Beach** | 23 | `PermitJurisdictionAgency` is a **boundary polygon layer** — fields `CA_NAME`, `PermitJurAgency`, `Shape__Area`. Which agency issues permits *where*, not what was permitted. |
+| `jromero_tustinca` | **Tustin** | 111 | `Planning Department Current Projects` — a real layer, but **10 rows and NO DATE FIELD**. |
+| `dperez_fullertoncagis` | **Fullerton** | 30 | every item is a **Survey123 form** (budget survey, playground survey, kickball tournament). |
+
+### Tustin: rejected for having no date column at all
+
+`PlanningCurrentProjects` is point geometry with a usable status, and it is the closest thing to a
+development ledger in the county outside Anaheim. Its complete field list:
+
+```
+OBJECTID, USER_Project_Number, USER_Project_Location, USER_Project_Planner,
+USER_Description, USER_Status, Pictures, Planner1, Planner2, Ptitle1, Ptitle2,
+Pphone1, Pphone2, Pemail1, Pemail2, DecLinks, Declaration
+```
+
+**No filing date, no decision date, no issue date.** Every registry entry needs a `file_date`, and
+absent fields stay absent — there is nothing to infer one from. This is the North Richland Hills /
+McKinney EnerGov rejection class. It is also only **10 rows**, so even with a date it would move
+nothing.
+
+### Two URL guesses failed DNS — and that is not a receipt
+
+`data.cityofirvine.org` and `opendata.ocgov.com` both returned `Couldn't resolve host name`. Per the
+Frisco standing answer, **a dead guessed host is not evidence a city publishes nothing** — those two
+are recorded as *unprobed*, not as rejections. The org-scoped AGO route above is what actually
+carries the receipts here.
+
+**Reinforces the ceiling.** Four counties probed this session — Suffolk, Westchester, Nassau, Orange
+(337 dark pages between them) — and the finding is unchanged across all four: reachable jurisdiction
+GIS publishes parcels, zoning, boundaries and environmental overlays; the permit ledger sits in a
+vendor portal with no public per-record layer. **Discovery is not the bottleneck any more.**
