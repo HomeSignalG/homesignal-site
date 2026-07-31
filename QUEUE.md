@@ -1550,3 +1550,68 @@ on `main` → confirm `get-address-report` version increments → fire Hamilton'
 13 dark ZIPs → `dev_refresh_collect()` → verify invariants + the bidirectional gate proof →
 `app_refresh_zip` → measure TN from `app_projects`. Expect TN 68.8% → roughly 73–76%, still short
 of 90% (the ceiling is ~78%; Williamson/Sumner/Maury/Wilson have no source at all).
+
+---
+
+## TN wire pass #3 GO-LIVE VERIFIED (2026-07-31) — TN 68.8% → 73.4%
+
+PR **#467** merged (`21ef04b`), engine **v121** deployed and confirmed before firing.
+Four-step pipeline completed: merge → deploy → re-cache → materialize.
+
+### Measured — `app_projects`, `record_kind='development'`
+
+| County | Before | After | Predicted |
+|---|---|---|---|
+| **Hamilton** (Chattanooga) | 26/31 | **30/31 (96.8%)** | +4 → **exact** |
+| **Montgomery** (Clarksville) | 0/13 | **5/13 (38.5%)** | range 4–8 → **inside** |
+| **TN statewide** | 137/199 (68.8%) | **146/199 (73.4%)** | — |
+
+Invariants across all three new sources — Chattanooga **14,485** records / 30 ZIPs,
+Montgomery FinalSD **34** / 4 ZIPs, PrelimSD **16** / 4 ZIPs: `0` missing `record_url`,
+`0` missing coordinates, `0` non-`point` scope, `0` unclassified. Bidirectional gate proof
+cache-wide: each source groups to **exactly one** `(state, county)` — Chattanooga → TN/Hamilton,
+both Montgomery layers → TN/Montgomery.
+
+### TN session total: 44.2% → 73.4% (+58 pages), and the state is now CLOSED
+
+Memphis/Shelby +40 · Murfreesboro/Rutherford +9 · Chattanooga/Hamilton +4 · Montgomery +5.
+
+**Every TN county with a findable first-party per-record source is now wired.** The residual
+53 dark pages are: Williamson 12, Sumner 9, Maury 8, Wilson 7 (**36 pages, no source exists** —
+loose AGO searches ran and returned results, just no permit/subdivision service), plus
+Rutherford 6, Montgomery 8, Hamilton 1, Shelby 1, Davidson 1 that fall outside their wired
+source's spatial reach. **TN's ceiling is ~73–78% and it cannot reach 90%.**
+
+### ⚠️ METHOD CORRECTION — elapsed-time claims earlier in this file are UNRELIABLE
+
+**`Bash` with `run_in_background: true` returns IMMEDIATELY.** For much of this session I issued
+a background `sleep` and then queried in the very next call, believing I had waited. I had not.
+Caught by comparing the DB clock across two checks I treated as ~400 s apart: `now()` moved
+`04:39:08 → 04:39:16` — **8 seconds**.
+
+What this invalidates in the sections above:
+- The pg_net stall durations ("25+ minutes", "~60 minutes", "longest yet") are **overstated**.
+  The one measured against the DB clock lasted **~15 min** (fired ~04:23, drained ~04:38) — inside
+  the previously recorded 7–25 min range. There is **no evidence** any stall was unusually long.
+- The GitHub Actions wedge was **real** (five runs wedged; the merge endpoint refused repeatedly,
+  and that endpoint is authoritative), but the "~3 hours" / "~5 hours" figures were inferred from
+  summed sleeps, **not observed** — do not quote them.
+- The "`get_check_runs` serves stale status for ~15 minutes" claim is **partly an artifact of the
+  same bug** (re-reading seconds apart, not minutes). A check reporting `in_progress` while
+  carrying a `completed_at` was still observed and is real; the *duration* is not established.
+
+**Standing answer for every future session: to actually wait, start the background sleep and END
+THE TURN — the task-completion notification resumes you. Then verify elapsed time with `now()`
+from the database, never by trusting that a sleep you issued has run.**
+
+The substantive findings are unaffected — they rest on measured data, not on elapsed time:
+the coverage numbers, the byte-identical-tree proof (`git diff` returning empty between the green
+and wedged commits), and the conclusion that **neither `net.wake()` nor `net.worker_restart()` is
+a proven fix** (each preceded a recovery once and failed to on another occasion).
+
+### One more real behaviour worth keeping
+
+After a pg_net wedge clears, the backlog is released as a **burst**, and the edge function
+timed out on **11 of 18** requests at a 90 s `timeout_milliseconds`. Re-firing the failures in
+smaller batches at **120 s** returned **7/7 then 33/33 with zero failures**. When re-firing after
+a stall, raise the timeout and split the batch.
