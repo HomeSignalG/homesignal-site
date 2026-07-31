@@ -120,7 +120,35 @@ Williamson 12 · Sumner 9 · Maury 8 · Wilson 7 · Hamilton 5 · Davidson 1. Ne
 page, and the largest (Shelby/Memphis) sits behind `SHELBY-429`, a **new connector family
 (GATED)**. **Do the arithmetic first — TN is very likely UNREACHABLE** (row 428).
 
-### 🔴🔴 READ FIRST — MA/MassDOT: 627 ZIPs WERE FIRED AGAINST A STALE ENGINE. DISCARD THAT RUN.
+### 🔴🔴 READ FIRST — MA/MassDOT EMITS ZERO RECORDS. The entry is deployed and wrong somewhere.
+
+**UPDATE 01:04Z, supersedes the stale-engine note below.** The deploy landed on a second dispatch —
+**v114 confirmed** — 627 ZIPs were re-fired against it and **572 MA ZIPs re-cached since 01:00Z**,
+and `massdot-highway-projects` still produced **ZERO records**. The engine has the entry and the
+pages refreshed against it, so **this is a DEFECT IN THE ENTRY**, not a stale deploy.
+
+**The layer itself is confirmed good** — 24,045 rows, both vocabularies enumerated and summing
+exactly, and the envelope pre-check hit **4 of 4** dark MA ZIPs (01035 162 · 02559 50 · 01267 80 ·
+01105 743). The source works; our query of it does not.
+
+**DIAGNOSE IN THIS ORDER — do not re-probe the vocabularies, they are correct:**
+1. **Read the run report / quarantine reason.** The connector records why it skipped an entry. One
+   read, fastest answer.
+2. **`From_Date` is the prime suspect.** I mapped `file_date` -> `From_Date`, but this is a
+   LINEAR-REFERENCED EVENT table (`Route_ID`/`From_Measure`/`To_Measure`) — `From_Date`/`To_Date` are
+   very likely **route-measure validity dates, not project dates**, and may be null layer-wide, which
+   would drop every record. Check `From_Date IS NOT NULL` counts; alternatives are `created_date`
+   (Date) or `ScheduledAdDate`/`bidOpenedDate`/`ntpDate` (String).
+3. **Polyline + envelope.** FDOT is polyline too and worked, so less likely — but this layer is
+   ArcGIS 11.3 with a `SHAPE:Geometry` field alongside `Shape__Length`, which FDOT did not have.
+4. **`outFields=*` size** — 41 fields x 24,045 rows; try the additive `out_fields` projection.
+
+**Do NOT write MassDOT off.** 574 dark of 627 and a 4-of-4 pre-check still make it the largest single
+page gain available; the FDOT analogue moved FL from 6.4% to 68.7%.
+
+---
+
+### (superseded) MA 627 ZIPs were fired against a stale engine
 
 **`massdot-highway-projects` is MERGED to `main` (`df82e3e`) but the deploy DID NOT LAND.** The
 function was still **v113** four minutes after dispatch — v113 is the FDOT deploy and does NOT
