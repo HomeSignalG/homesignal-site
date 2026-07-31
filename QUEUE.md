@@ -172,7 +172,34 @@ would take FL to roughly 75-80% — real, but likely still short of 90%, so expe
 source (its four metro candidates are already rejected with receipts: Fort Lauderdale stale,
 Orlando ungeolocatable, Tampa WAF-blocked, Miami too slow).
 
-**After FL: probe MassDOT and PennDOT the same way** — service root → find the projects layer →
+### NEXT TWO, both located by probe 2026-07-31 — ready to wire
+
+**MA-DOT (574 dark of 627 — the largest single prize left).** CLEAN SHAPE, do this one first:
+```
+https://gis.massdot.state.ma.us/arcgis/rest/services/Projects/HighwayProjects/FeatureServer/0
+```
+Service root 200; exactly **one layer, id 0 "Highway Projects"**. Same shape as FDOT. Still to
+measure before wiring: row count, geometry type, field list, and the envelope pre-check against
+dark MA ZIPs.
+
+**PA-DOT (488 dark of 560) — DIFFERENT SHAPE, read this before wiring.**
+```
+https://gis.penndot.gov/arcgis/rest/services/paprojects/paprojects/MapServer
+```
+200, but **46 layers, and the STATUS IS ENCODED IN THE LAYER NAME rather than in a column**:
+`5=Under Construction Points`, `16=Underway Lines`, `1=Underway Points`, `20=Under Construction
+Lines`, `17=Four Year Plan Lines`, `3=Twelve Year Program Points`, `0=Completed Points`, …plus
+boundary and bridge-condition layers that are NOT development records.
+
+So PennDOT is **one registry entry PER STATUS LAYER**, each with its own `status_const` — e.g.
+Under Construction / Underway -> `approved`, Four Year Plan / Twelve Year Program / Anticipated /
+Under Development -> `proposed`, Completed -> `operating`. Do NOT wire the boundary layers (25-33)
+or the bridge-condition layers (34-45); they are reference geography and asset ratings, not
+projects. Points and Lines are the same projects in two geometries — **pick ONE per status or the
+same project double-emits** (the engine-v22 duplicate class, uncatchable across two
+`source_registry_id`s).
+
+**Probe each the same way FDOT was probed** — service root → find the projects layer →
 count/geometry/fields → constants matched to the DOT precedent (all four existing DOT entries use
 `use_type_const`-equivalent `Utility`; "active construction" → `status_const: "approved"`) →
 pre-measure against dark ZIPs → wire → deploy → recache → **materialize** → measure.
