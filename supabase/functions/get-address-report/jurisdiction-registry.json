@@ -9270,6 +9270,45 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-31 NC wire pass, Buncombe. City of Asheville's OWN ArcGIS Server, Permits/AccelaPermitsView layer 2 'Accela Permits View'. 65,438 rows, esriGeometryPoint, FRESH (date_opened max 2026-07-30). HOST FOUND ONLY BY CORRECTING THE URL TWICE: gis.buncombecounty.org is a different (county) server and https://gis.ashevillenc.gov/ARCGIS/... 500s - the real path is /server/, recovered by walking Hub DCAT item b8fdb63db30b42d0875afb617e1551f4 -> its 'url'. THREE vocabularies enumerated live with a positive control, EACH summing to EXACTLY 65,438: record_status 42 values (Finaled 14998, Expired 11806, CO Issued 10420, CC Issued 10249, Issued 6603, Closed 4891, Revoked 1889, Reissued 1461, Plan Check 676, Pending Applicant Action 565, Renewed 423, In Compliance 387, Active 281, Application Received 209, Inspections 208, Denied 118, TCO Issued 90 Days 62, Submittal Required 44, Pending Payment 37, Permit Verification 13, TCO Issued 60 Days 11, Pending 10, Lapsed 10, NULL 9, Pending Inspection 9, Inactive 8, Partial Issued 6, Disapproved 5, Application Incomplete 5, TCC Issued 4, TCO Issued 30 Days 3, Certificate of Compliance 3, TCC Issued 90 Days 2, Approved 2, Referred to Legal 2, Application Complete 2, Pending Bldg Permits 2, Hold Pending Code Enforcement 1, DISABLED 1, Project Closed 1, Final Release 1, In Review 1); record_type_category 56 values; and record_type_type 9 values (Residential 28865, Commercial 19740, Sign 4931, Fire 3550, Event-Temporary Use 3350, Over The Counter 2992, Stormwater 919, Outdoor Vendor 558, Right of Way 533). Bucket sums: proposed 1565 + approved 8993 + operating 41032 + exclude 13839 = 65429, + 9 NULL (fail closed) = 65438. TYPE SOURCE IS record_type_type, NOT record_type_category: category is 'NA' on 22,714 rows (35%, its single largest value) and record_type_group is uniformly 'Permits' (65,438) - both useless. The NA rows are fully typed at record_type_type (Residential 6131 / Sign 4931 / Commercial 4465 / Event 3350 / ...), so 0 unclassified. NOISE DROPPED AT SOURCE via extra_where, following the WA/MN/IL precedent (MI kept trades only because the founder named the Detroit trio): the 5 non-development record_type_type values (Sign 4931, Fire 3550, Event-Temporary Use 3350, Over The Counter 2992, Outdoor Vendor 558 = 15,381) plus 15 trade/minor-repair record_type_category values. Live positive control on the exact filter + 365-day window: 2,280 rows (unfiltered 365-day window is 3,983). *** PRIVACY - THIS IS WHY title IS record_type *** Both record_name AND description carry PRIVATE INDIVIDUALS' NAMES on residential permits ('ECKL, ELIZABETH'; 'BENNETT, ABBY'; description '...FOR SHANE HOLLIFIELD'). Publishing either as a map-pin title would put a resident's name next to their home address on a public page. NEITHER FIELD IS MAPPED. record_type is 0-null (verified: count where record_type IS NULL OR '' = 0 in window) and self-describing across 112 values ('Res: New SFD', 'Com: Demo', 'ROW: Encroachment'), so it is the title. No per-record URL column exists -> dataset precision (Boulder/Philadelphia precedent). No ZIP column -> spatial_zip_radius_mi 3; sample rows carry real Asheville points (35.494/-82.524) and full addresses."
+    },
+    {
+      "registry_id": "lexington-row-permits",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/Mg7DLdfYcSWIaDnu/arcgis/rest/services/row_permits_open_view/FeatureServer/0",
+      "dataset_url": "https://services1.arcgis.com/Mg7DLdfYcSWIaDnu/arcgis/rest/services/row_permits_open_view/FeatureServer/0",
+      "jurisdiction": "Lexington-Fayette Urban County Government",
+      "coverage": [
+        {
+          "state": "KY",
+          "county": "Fayette"
+        }
+      ],
+      "column_map": {
+        "title": "DescriptionOfWork",
+        "status_raw": "Status",
+        "file_date": "EstimatedStartDate",
+        "decision_date": "EstimatedEndDate",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "RequestID"
+      },
+      "use_type_const": "Roads & infrastructure",
+      "status_to_bucket": {
+        "proposed": [
+          "Initiated"
+        ],
+        "approved": [
+          "Approved",
+          "Reissued",
+          "Partially Completed"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "extra_where": "PermitCategory <> 'Test, questionable names'",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-31 KY wire pass, Fayette. LFUCG's OWN hosted layer, row_permits_open_view layer 0 'row_permits_master' (right-of-way permits). 1,426 rows, esriGeometryPoint. LIVE: editingInfo.dataLastEditDate = 1785464435449 = 2026-07-31, the SAME DAY as wiring. ORG IDENTITY VERIFIED, not guessed: services1.arcgis.com/Mg7DLdfYcSWIaDnu, owner 'emiller_lfucg4' (LFUCG), reached via scoped AGO search + owner check. data.lexingtonky.gov is NOT a Socrata domain (404 'Domain not found') and maps.lexingtonky.gov serves basemaps/locators only. ALL THREE vocabularies enumerated live with a positive control, EACH summing to EXACTLY 1,426: Status 4 values (Partially Completed 521, Approved 505, Initiated 397, Reissued 3 - no nulls); PermitCategory 8 values (Communications/alarm/signal lines 448, Potable Water 357, Undefined 262, Electric Power Lines 158, Gas/oil/steam/petroleum 123, Sewers and drain lines 66, Misc contractors 11, 'Test, questionable names' 1); PermitType 4 values (SurfaceCut 485, AGP 413, Installation 349, empty-string 179). 'Partially Completed' is APPROVED not operating - the work is authorised and underway, not built. The single 'Test, questionable names' row is a junk test record and is dropped at source via extra_where. use_type_const 'Roads & infrastructure': the entire layer is right-of-way permits (source-stated by the service's own name), and it is the same call already made for Asheville's 'Right of Way' record_type_type. PermitCategory was NOT used as type_source because 262 'Undefined' + 11 'Misc' + 1 'Test' are not self-describing. PII CHECK PERFORMED (after the Asheville trap): 12 DescriptionOfWork + ApplicantCompany values read directly - every applicant is a COMPANY (Kinetic, SLM, Columbia Gas, Windstream Communications, Kentucky Utilities, Kentucky American Water) and descriptions are work scopes ('PLACING 24 FIBER 1800 ON 7TH ST', 'Repair service leak'). No personal names, so DescriptionOfWork is safe as title. No URL column -> dataset precision. No ZIP column -> spatial_zip_radius_mi 3. COVERAGE PRE-VERIFIED with the connector's own envelope query on all 19 modelled Fayette ZIPs: 16 return records (40502 956, 40503 591, ...), and exactly 3 return 0 - 40324 Georgetown, 40361 Paris, 40391 Winchester, which are other counties' towns modelled under the Fayette root. REJECTED in the same pass with receipts: Development_Plan (4,439 rows but NO status column and no usable date - Year is a SmallInteger and created_date is a single bulk-load timestamp); construction_projects_lfucg + Construction_Locations_view_layer are two views over the SAME RMP_Locations source (37 sanitary-sewer capital projects; wiring both would double-emit)."
     }
   ],
   "ckan": [

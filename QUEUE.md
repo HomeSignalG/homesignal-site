@@ -812,3 +812,208 @@ Remaining after Asheville lands: Chatham 12, Orange 10, Union 9, Wake 2, Mecklen
 (Cornelius/Davidson, outside Charlotte's jurisdiction). County-host probes for
 Chatham/Orange/Union were fired but the pg_net queue backed up to 54 behind a scheduled refresh —
 **not yet answered, do not record them as rejected.**
+
+---
+
+## NC GO-LIVE VERIFIED — Asheville landed; NC 48.8% → 72.9% (2026-07-31)
+
+Merged `e6af373` (#462) → deployed **v116** (confirmed before firing) → fired all 20 Buncombe ZIPs →
+queue to **0** → `dev_refresh_collect()` (94 rows) → `app_refresh_zip` on all 20.
+
+- **9 of 20 Buncombe ZIPs carry Asheville records; 4,673 records; 0 missing `record_url`,
+  0 unclassified.** Exactly the 9 the pre-verify predicted.
+- **Bidirectional gate proof, cache-wide: 9 ZIPs, NC/Buncombe only.** No leak.
+- 20/20 materialized, 18 `quality=pass` (2 are honest empties on the facilities floor).
+- **NC: 115 → 124 of 170 = 72.9%** (from `app_projects`).
+
+⚠️ **Asheville is a CITY source and reaches only 9 of Buncombe's 20** — the other 11 are rural
+mountain ZIPs (Marshall 28753, Black Mountain fringe, Hendersonville-adjacent) outside the city's
+permit jurisdiction. That was measured with the connector's own query shape BEFORE wiring, not
+discovered after.
+
+### NC is 29 pages short — reachable only via Chatham (12) + Orange (10) + Union (9) = 31
+
+Dark now: Buncombe 11 (rural, no source), Chatham 12, Orange 10, Union 9, Wake 2, Mecklenburg 2
+(Cornelius/Davidson, outside Charlotte). **NC is NOT recorded UNREACHABLE** — the evidence does not
+support it yet:
+
+- **Orange County's own server is a FIRM reject** — `gis.orangecountync.gov/arcgis/rest/services`
+  is live (v10.81) and its full service list carries **no permit service** at all (basemaps,
+  parcels, zoning, land use, ARIES/Tyler311 locators only). Its 10 ZIPs would need Chapel Hill,
+  whose host serves an Esri **Portal** HTML page at both `/arcgis/rest/services` and
+  `/server/rest/services` — no REST directory found yet.
+- **Chatham and Union are NOT rejected — they are UNANSWERED.** Every host tried was a guess and
+  failed for guess-shaped reasons: `gisdata.chathamcountync.gov` and `maps.unioncountync.gov` fail
+  DNS, `gis.unioncountync.gov` 404s, `www.chathamcountync.gov` is WAF-403,
+  `data-chathamnc.opendata.arcgis.com` returns "Domain record(s) not found".
+  **A DNS failure on a hostname I invented is not evidence the county publishes nothing** (the
+  Phoenix standing answer, restated).
+
+⚠️ **SECOND CROSS-ORG LOOKALIKE THIS SESSION — guessed AGO org ids keep returning other states.**
+`services1.arcgis.com/JLuzSHjNrLL4Okwb`, guessed for "Union County NC", returned a 39 KB service
+list containing **`Gilbert_Zoning_General_Industrial_and_Light_Industrial`** — that is **Gilbert,
+ARIZONA**. Earlier the same session, `ZOyb2t4B0UYuYNYH` guessed for "Asheville" returned **SEATTLE**
+layers. Both were discarded, neither was wired. **Standing answer, now twice-proven: never accept a
+guessed `services*.arcgis.com/<orgid>` without an identity check on the returned service names.**
+The method that actually works is the one that found Asheville: locate the Hub DCAT feed, read the
+item, take its `url`.
+
+### NC IS CAPPED AT 72.9% (124/170) — every remaining dark county probed, receipts below
+
+Not a stop, not a failure: 90% needs 153 and no wireable first-party per-record source exists for
+the 46 remaining dark pages. Recorded so no session re-derives it.
+
+| Dark | Pages | Verdict |
+|---|---|---|
+| Buncombe (rural) | 11 | Asheville is a CITY source; measured with the connector's own envelope query — these 11 return **0**. No county-wide permit source found. |
+| Chatham | 12 | **REJECTED — `Chatham_ConditionalUsePermits`** (real host found: `gisservices.chathamcountync.gov/opendataagol`, owner `Chatham01`). 144 polygon rows, but **no permit date at all** (only GIS `created_date`/`last_edited_date` housekeeping and a 100%-null `ExpirationDate`), `PermitStatus` is single-valued (`Valid` 141 + 3 null), and `ConditionalUseClass` is 14 **opaque zoning codes** (B-1, IND-H, RA-40, CUD-CC…). This is a zoning-overlay registry, not development activity — the **North Richland Hills precedent** ("no status and no date column"). Contrast Sussex DE, which WAS wired: 2,566 rows, real `application_rcvd_date` (2026-07-27) and a 16-value status vocabulary. |
+| Orange | 10 | **FIRM REJECT** — `gis.orangecountync.gov` is live (v10.81) and its full service list has **no permit service**. Chapel Hill (its main town) serves an Esri Portal page at both `/arcgis/` and `/server/`, and its verified AGO org `7KRXAKALbBGlCW77` (`ToCHadmin`) carries only **`Permits_Issued_2013_to_2016`** — a decade-stale snapshot. |
+| Union | 9 | **No org found.** A scoped AGO search for "Union County North Carolina permits" returned zero Union-owned items (only Raleigh, NCDOT, ECU, Esri). Every host guess failed DNS/404. Recorded as *unfound*, not proven absent. |
+| Wake | 2 | 27520, 27522 — verified **genuinely dark** (0 point-dev in cache), not an unmaterialized row. |
+| Mecklenburg | 2 | 28031 Cornelius, 28036 Davidson — outside Charlotte's permit jurisdiction, verified 0. |
+
+**NC final: 48.8% → 72.9%, +41 pages this session** (Charlotte 32 + Asheville 9), 2 entries wired,
+24,487 records, 0 missing `record_url`, 0 unclassified, 0 gate leaks.
+
+**Next per the loop: KY at 34.9%** (126 pages, 44 backed, 70 to 90%). Dark: Fayette/Lexington 19,
+Daviess 10, Campbell 10, Warren 9, Boone 8, Oldham 8, Bullitt 7, Madison 5, Jefferson 4, Kenton 1,
+Christian 1 = 82 — so 90% IS arithmetically reachable if Lexington + the mid-size metros wire.
+
+---
+
+## KY IN PROGRESS — Lexington/Fayette recon (2026-07-31)
+
+KY 34.9% (126 pages, 44 backed, **70 to 90%**). Dark: Fayette 19, Daviess 10, Campbell 10,
+Warren 9, Boone 8, Oldham 8, Bullitt 7, Madison 5, Jefferson 4, Kenton 1, Christian 1 = **82**,
+so 90% is arithmetically reachable.
+
+**LFUCG (Lexington-Fayette) org located and IDENTITY-VERIFIED: `services1.arcgis.com/Mg7DLdfYcSWIaDnu`,
+owner `emiller_lfucg4`.** Found via scoped AGO search + owner check — NOT a guessed org id
+(`data.lexingtonky.gov` is not a Socrata domain — 404 "Domain not found"; `maps.lexingtonky.gov`
+serves basemaps/locators only, no permits).
+
+Org service roster (candidates for the next pass): `Development_Plan`,
+`subdivision_development_plan_public`, `zone_compliance_public`, `ZoneChangeApplicationspublic`,
+`row_permits_open_view`, `construction_projects_lfucg`, `Construction_Locations_view_layer`,
+`PW_Construction_Location`, `Residential_New_Construction_Public`,
+`Commercial_New_Construction_Sqft_Public`.
+
+**`Development_Plan` — REJECTED.** 4,439 polygon rows, but the full field list is
+`OBJECTID, ID, LOG, NAME, Prefix, Year, Case_, DocumentName, ACREAGE, created_by/date,
+last_edited_by/date` — **no status column at all**, and **no usable date**: `Year` is a
+SmallInteger (2007), not a date, and `created_date` is identical across sampled rows
+(1783526417915 = a bulk GIS load), so it dates the import, not the plan. Sampled rows are
+2006/2007 plan archives with scanned PDFs. Same class as the North Richland Hills reject and
+the Chatham reject above: no status + no real date ⇒ not a development-activity feed.
+
+⚠️ **`Residential_New_Construction_Public` and `zone_compliance_public` are TABLES, not layers** —
+`FeatureServer/0` returns `"The requested layer (layerId: 0) was not found."` Their real layer ids
+are not 0; that is a lookup to do, not a rejection.
+
+**BLOCKED, not finished:** the remaining three probes (`Development_Plan` max(Year),
+`row_permits_open_view`, `construction_projects_lfucg`) were fired but the daily `dev_refresh_fire`
+pg_cron fired at the same moment and put **253 reports** ahead of them in the pg_net queue.
+Resume by re-firing those three once `net.http_request_queue` reaches 0.
+
+---
+
+## 🚧 BLOCKER — pg_net worker HARD-STALLED at 02:15:00Z; `worker_restart()` measurably does NOT fix it
+
+All further source discovery runs through pg_net (the sandbox has no egress), so this stops the KY
+pass mid-probe. Recorded with receipts because it **upgrades the existing PGNET-EGRESS note**.
+
+**The stall, measured:**
+
+```
+newest response  2026-07-31 02:15:00.749117+00   (frozen)
+max response id  13032                            (frozen)
+queue depth      53 → 56                          (grew only by the 3 probes I added)
+```
+
+`max(id)` and `max(created)` did not move for **~20 minutes** while the queue stayed full. This is a
+TOTAL stall — qualitatively different from the ~31% request-failure rate already recorded, where
+responses kept arriving.
+
+**`net.worker_restart()` was tried ONCE, deliberately, to settle the "superseded" question with
+evidence — and it CONFIRMS the supersession.** It returned `true`, and **10 minutes later the queue
+was still 56 and `max_id` still 13032 — zero effect**. Prior sessions credited it with drains it did
+not cause (post hoc); this time it was measured against a genuine stall and did nothing.
+**Standing answer, now evidence-backed in BOTH directions: `worker_restart()` neither clears a stall
+nor causes a drain. Do not run it and do not wait on it.** The only thing that has ever cleared this
+is time.
+
+**What was in flight when it froze** (so nothing is misread as a result): the daily
+`dev_refresh_fire` cron had just fired ~250 ZIP re-caches, plus 3 LFUCG probes
+(`row_permits_open_view/1`, `construction_projects_lfucg/0`,
+`Construction_Locations_view_layer/0`). **None of those three has answered — they are UNANSWERED,
+not rejected.** The interrupted cron re-cache is harmless (`dev_refresh_collect` is transient-safe
+and never overwrites content with an empty response).
+
+### RESUME HERE (exact steps, no re-derivation needed)
+
+1. `select count(*) from net.http_request_queue;` → wait for **0**. Do not measure anything until it is.
+2. Re-probe the 3 LFUCG layers above (+ `Residential_New_Construction_Public` and
+   `zone_compliance_public`, whose real layer ids are **not 0** — `FeatureServer/0` returns
+   "The requested layer (layerId: 0) was not found"; enumerate the FeatureServer root for the true ids).
+3. Apply the three-part liveness test; a layer with **no status column AND no real date** is a reject
+   (Development_Plan / Chatham / North Richland Hills class — three instances now).
+4. KY needs **70 of its 82 dark pages**, so Fayette 19 alone is not enough — Daviess 10, Campbell 10,
+   Warren 9, Boone 8, Oldham 8, Bullitt 7 all have to be probed too.
+
+### KY: Lexington WIRED (`lexington-row-permits`, registry 107 → 108, PR #463); statewide + 3 metros rejected
+
+**Wired — `lexington-row-permits`** (KY/Fayette). LFUCG's own `row_permits_open_view` layer 0
+(`row_permits_master`), right-of-way permits. **1,426 point rows, `dataLastEditDate` = 2026-07-31,
+the SAME DAY as wiring.** Org identity verified via owner `emiller_lfucg4`, not a guessed org id.
+All three vocabularies enumerate to **exactly 1,426**. `Partially Completed` → **approved** (work
+authorised and underway, not built). The single `Test, questionable names` row is dropped at source.
+`use_type_const: "Roads & infrastructure"` — source-stated by the service name, same call as
+Asheville's `Right of Way`. **PII re-checked** (12 values read): every applicant is a COMPANY
+(Kinetic, Columbia Gas, Kentucky American Water) and descriptions are work scopes, so
+`DescriptionOfWork` is safe as title. **Coverage pre-verified on all 19 modelled Fayette ZIPs:
+16 return records**; the 3 zeros are Georgetown/Paris/Winchester — other counties' towns modelled
+under the Fayette root.
+
+🔴 **NEW STANDING ANSWER — A MAX-DATE PROBE CAN BE POISONED BY ONE CORRUPT FUTURE-DATED ROW.
+ALWAYS PAIR IT WITH A WINDOWED COUNT.**
+`Ky_DOW_Floodplain_Permits_WM_gdb` (Kentucky Division of Water, **statewide**, 9,519 points, real
+`COUNTY`/`DDLAT`/`DDLNG`/`PERMITNUM`, self-describing `PURPOSE`) looked like the statewide win KY
+needs. `orderByFields=STATDATE DESC` returned **`STATDATE` 1872115200000 = 2029-04** — a future date,
+i.e. a data-entry error. Trusting row 1 would have recorded this source as "fresh through 2029."
+The control that caught it: `where STATDATE >= DATE '2023-07-31'` → **`count: 1`**, and that 1 IS the
+bogus row. The real newest is **2020-10-10**. **REJECTED — stalled 5 years.**
+*(The layer's own `dataLastEditDate` 2026-07-09 is also misleading: it dates a schema/metadata touch,
+not new permits. Layer edit date is NOT data freshness.)*
+
+**Also rejected this pass, with receipts:**
+- **Kentucky statewide portal** (`opengisdata.ky.gov`, 2.5 MB DCAT) carries permits, but every one is
+  environmental/regulatory, not building: Floodplain (above), KPDES discharge, Inter-System Operation
+  (KISOPs), Permitted Mine Boundaries, Permitted Water Withdrawal. `kygisserver.ky.gov` root returns
+  no permit service.
+- **Daviess/Owensboro (10), Warren/Bowling Green (9), Boone (8)** — scoped AGO searches returned
+  **0 permit services and no city/county-government owners** (owners are consultants, universities,
+  KYTC contractors). ⚠️ My first three searches returned `total: 0` because multi-word AGO queries are
+  **ANDed** — that was a QUERY-SHAPE artifact, not absence; re-run loose (78 / 151 / 1 results) before
+  concluding. Recorded as *unfound*, not proven absent.
+
+**KY projection: 44 → 60 of 126 = 47.6%** once Fayette lands. 90% needs 114, so KY cannot reach it
+without Daviess/Warren/Boone/Campbell/Oldham/Bullitt sources that do not appear to exist publicly.
+
+### RI probed while CI was blocked — no wireable source, state likely capped at 0%
+
+RI is the highest-leverage remaining target on paper (81 pages, 0% backed, and small enough that one
+statewide source would carry it). It does not exist:
+
+- **RIGIS statewide clearinghouse** (`rigis-edc.opendata.arcgis.com`, **1.88 MB DCAT read in full**)
+  contains **ZERO** datasets matching permit / development / construction / subdivision. Its org
+  `services2.arcgis.com/S8zZg9pg23JUEexQ` carries one construction-ish layer,
+  `TDI_and_Construction_Effort` — a transit planning layer, not permits.
+- **Providence** (`data.providenceri.gov`, Socrata — the portal DOES exist) has exactly three permit
+  datasets: `Special Event Permits`, `Special Events`, and
+  **`Department of Inspections and Standards Permits 2009-2018`** — a historical archive whose own
+  title states it ends in **2018**. Stalled 8 years. Reject.
+- A scoped AGO search for Providence RI returned 2,222 items and **0 permit/construction/development
+  services**.
+
+RI stays on the EPA facilities floor. Not recorded UNREACHABLE (per-town sources for Warwick/Cranston/
+Pawtucket were not individually probed), but there is no statewide path.
