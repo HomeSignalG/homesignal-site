@@ -1908,3 +1908,52 @@ sources" is **STALE**. The registry now carries **`miami-building-permits`** (FL
 **`fdot-active-construction-projects`** (FL statewide). Miami-Dade currently reads 75/80 backed.
 The FLORIDA WIRE PASS section above describes the state at the time of that pass, not today —
 **always check the live registry rather than quoting a wire-pass narrative.**
+
+---
+
+## FL/Lee — `lee-county-fl-development-orders` GO-LIVE VERIFIED (2026-07-31)
+
+PR **#476** merged (`380f8cb`), engine **v123** deployed and confirmed before firing.
+
+| Scope | Before | After |
+|---|---|---|
+| **FL / Lee** | 12 / 36 (33.3%) | **35 / 36 (97.2%)** |
+| **FL statewide** | 327 / 441 (74.1%) | **350 / 441 (79.4%)** |
+
+**2,236 records across 23 of the 24 dark ZIPs** — far beyond the 6 probed pre-wire (only 6 of 24
+were sampled, so the prediction was a floor, not a ceiling). Invariants: `0` missing `record_url`,
+`0` missing coordinates, `0` non-`point`, `0` unclassified. Gate proof cache-wide: **exactly one
+jurisdiction, FL/Lee**. Oldest `file_date` 2023-08-02 (the 1095-day edge).
+⚠️ `newest` is **2027-09-20** — another future-dated source row, same class as Murfreesboro's. The
+paired freshness probe (1,610 in the trailing year) is what establishes the layer is genuinely
+active; the max date alone would not.
+
+### ⚠️⚠️ DATA-LOSS BUG FOUND THE HARD WAY — `net._http_response` IS PURGED ON A TTL
+
+**The first Lee run was silently LOST.** All 24 requests fired, the queue drained to 0 — and
+`dev_refresh_collect()` returned **0**, because by the time it ran `net._http_response` had been
+**purged to 0 rows** (pg_net retains responses only for a retention window). The reports were never
+written: Lee still showed 0 records and a `refreshed_at` of 12:30. Re-firing and collecting after
+~3 minutes captured all 24.
+
+**Standing answer — a DRAINED QUEUE IS NOT PROOF THE DATA WAS CAPTURED.** `q = 0` only means the
+requests were *sent*. The responses live in `net._http_response` on a TTL and are deleted whether
+or not you read them. **Call `dev_refresh_collect()` promptly after a batch — minutes, not tens of
+minutes — and verify with `select count(*) from net._http_response` before concluding anything
+from a zero.** This is the same shape as the wrong-zero trap in CLAUDE.md's claims discipline: a
+`collected = 0` reads as "nothing to do" and is indistinguishable from "the evidence evaporated."
+Every long wait in this session was a chance to lose a batch this way.
+
+### The vendor-signature sweep, final scoreboard
+
+| candidate | dark | outcome |
+|---|---|---|
+| `JohnsCreekGA` → GA/Fulton | 40 | ✅ wired, **+6** |
+| `LeeCountyFLGIS` → FL/Lee | 24 | ✅ wired, **+23** |
+| `HartfordData` → CT/Hartford | 51 (apparent) | ❌ already wired |
+| `Marion_County` → IN/Marion | 40 | ❌ ordinance PDFs, no ledger |
+| `dpwgis_lacounty` → CA/LA | — | ❌ no modelled ZIP pages (gated) |
+
+**+29 pages from one inverted search**, after four county-by-county passes had concluded the
+frontier was exhausted. That is the durable lesson: when county-name search is exhausted, search
+by **what the data is called** and by **vendor signature**, then map hits onto the dark list.
