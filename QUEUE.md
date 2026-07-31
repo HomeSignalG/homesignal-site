@@ -1823,3 +1823,54 @@ measured and documented here, and NOT shipped.
 counties where its records provably fall within the 3-mile page radius? If yes, the rule should be
 stated once (e.g. "a spatial source may declare any county in which it provably places ≥1 record
 within the page radius") so it is applied consistently rather than case by case.
+
+---
+
+## GA/Fulton — `johns-creek-building-permits` GO-LIVE VERIFIED (2026-07-31)
+
+PR **#473** merged (`04b2892`), engine **v122** deployed and confirmed before firing, queue clear
+at fire time. Full pipeline: merge → deploy → re-cache → materialize.
+
+| Scope | Before | After |
+|---|---|---|
+| **GA / Fulton** | 0 / 40 (0.0%) | **6 / 40 (15.0%)** |
+| **GA statewide** | 48 / 177 (27.1%) | **54 / 177 (30.5%)** |
+
+**4,565 records across 6 ZIPs** — one MORE than the 5 predicted, because only 5 of Fulton's 40
+dark ZIPs were probed pre-wire, not all 40. Invariants: `0` missing `record_url`, `0` missing
+coordinates, `0` non-`point`, `0` unclassified. Gate proof cache-wide: **exactly one jurisdiction,
+GA/Fulton**. Recency boundary exact — oldest `file_date` **2023-08-01** (the 1095-day edge),
+newest 2026-06-23. 3 ZIPs failed on the first pass and were re-fired at a raised timeout; they
+returned honest zeros (outside Johns Creek's spatial reach), so the page count is unchanged by them.
+
+### THE METHOD THAT FOUND THIS — invert the search when county-by-county is exhausted
+
+Four county-by-county passes had concluded the sweep was over. This source was found by the
+opposite approach: **sweep AGO by permit-ledger PHRASING and VENDOR SIGNATURE, nationally, then
+map the hits onto the dark-county list.** Queries like `active building permits`,
+`permit applications`, `EnerGov permits`, `Accela permits`, `CityView permits` returned **484
+candidate services**; cross-referencing those owners against dark counties surfaced Fulton — the
+largest dark county with an unwired source, in a state where DeKalb, Forsyth and Chatham were
+already wired. **County-name searching cannot find a source whose title never mentions the
+county** ("Building Permits Issued", owner `JohnsCreekGA`). Use this inversion before declaring a
+region sourceless.
+
+### ⚠️ THE SAME SWEEP PRODUCED A FALSE POSITIVE — check the registry BEFORE wiring
+
+`HartfordData`'s "Building Permits 20200101 to Current" (35,691 rows) looked like a major find:
+CT/Hartford showed 51 dark pages and the CONNECTICUT WIRE PASS says "Hartford's Socrata
+decommissioned." Full recon was run — vocabularies enumerated (RECORD_STATUS 36 values summing to
+exactly 35,691; RECORD_TYPE_TYPE 7 values summing to exactly 35,691), freshness paired-probed
+(3,786 trailing-year / 13,479 in 1095 days), PII checked.
+
+**It is already wired as `hartford-building-permits` — identical `service_url`.** The 9 already-backed
+Hartford County pages come from that very entry. The ZIP distribution proved the rest independently:
+of the 6 dark Hartford-range ZIPs only 06119 appears in the source at all (12 records) — the other
+five (06107/06108/06109/06111/06118) are West Hartford, East Hartford, Wethersfield and Newington,
+**separate municipalities the City of Hartford does not permit**. So the true lift was ~1 page, not 51.
+
+**Two standing answers:** (a) **Grep the registry for an existing entry with the same
+`service_url` BEFORE doing recon, not after** — it would have saved a full recon pass here.
+(b) **A county's dark-page count is NOT the addressable lift for a CITY source.** Hartford County
+has 60 pages; the City of Hartford permits ~10 ZIPs. Always intersect the source's own ZIP/spatial
+footprint with the dark set before quoting a number.
