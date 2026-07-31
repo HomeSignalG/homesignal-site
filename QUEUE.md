@@ -158,7 +158,18 @@ DOT class generalises.
 5. **`app_refresh_zip()` per ZIP — DO NOT SKIP**, then measure from `app_projects` with
    `record_kind='development'`. FL is NOT Live until that read says so.
 
-**FL is at 28/441 (6.4%) today and no claim has been made.** If FDOT lands on ~3 of 4 dark pages it
+🟢 **MEASURED RESULT (page-verified from `app_projects`, 2026-07-31 00:36Z): FL 28 -> 151/441 =
+34.2%.** 864 FDOT rows on pages, **0 gate leaks** onto non-FL pages, 0 non-point, 0 missing
+`record_url`, 0 wrong `use_type`. **+123 pages from ONE registry entry** — against ~11 for an entire
+county. That is the state-DOT thesis confirmed empirically, and it is the single most important
+number in this queue.
+
+⚠️ **AND IT IS INCOMPLETE: only ~200 of the 441 fired ZIPs ever landed — 241 were still queued when
+the session ended and `dev_refresh_collect()` returned the same 364 twice.** So 34.2% is a FLOOR,
+not the final figure. **Re-fire the FL ZIPs whose `refreshed_at` is still older than 00:33Z, collect,
+materialize, and re-measure before drawing any conclusion about whether FDOT alone gets FL near 90%.**
+
+**FL was at 28/441 (6.4%) before this.** If FDOT lands on ~3 of 4 dark pages it
 would take FL to roughly 75-80% — real, but likely still short of 90%, so expect FL to need a second
 source (its four metro candidates are already rejected with receipts: Fort Lauderdale stale,
 Orlando ungeolocatable, Tampa WAF-blocked, Miami too slow).
