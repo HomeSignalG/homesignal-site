@@ -1061,3 +1061,23 @@ select public.dev_refresh_collect();
 itself after ~20 min; Fayette 19 — still frozen at handoff). Cheap GET probes drained normally
 throughout. `worker_restart()` was measured as a no-op against it (see the blocker section above).
 Time is the only thing that has cleared it.
+
+### ✅ SUPERSEDES THE HANDOFF BLOCK ABOVE — the stall cleared and KY LANDED
+
+The pg_net queue drained on its own (again, without intervention). Full pipeline completed:
+
+```
+queue 0 · 20 Fayette reports returned · dev_refresh_collect() 123 · app_refresh_zip 19/19 quality=pass
+```
+
+- **16 of 19 Fayette ZIPs carry Lexington records; 8,732 records; 0 missing `record_url`,
+  0 unclassified** — exactly the 16 the pre-verify predicted.
+- **Bidirectional gate proof, cache-wide: 16 ZIPs, KY/Fayette ONLY.** No leak.
+- **KY: 44 → 60 of 126 = 34.9% → 47.6%** (measured from `app_projects`, post-deploy).
+
+The "KY still measures 34.9%" line in the handoff block above was correct **when written** and is now
+stale — kept for the record of how the stall presented, but **47.6% is the current truth**.
+
+**Session totals (all post-deploy `app_projects` reads): NC 48.8% → 72.9% (+41 pages), KY 34.9% →
+47.6% (+16 pages), MA 89.6% → 90.4% (Live). 3 entries wired (registry 105 → 108), 33,219 records,
+0 missing `record_url`, 0 unclassified, 0 gate leaks across all three.**
