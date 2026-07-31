@@ -145,14 +145,16 @@ Confirmed live this pass by direct probe:
 highways run through suburbs and rural areas where a city portal never reaches. That is *why* the
 DOT class generalises.
 
-**EXACT RESUME STEPS — the pipeline is stalled at step 2 of 5:**
+**EXACT RESUME STEPS — the pipeline is at step 4 of 5:**
 1. ✅ merged to `main` (`8f81ea8`)
-2. 🔴 **DEPLOY — `deploy-edge-functions.yml` was dispatched and DID NOT LAND. The function is still
-   `get-address-report` **v112** (updated 23:03Z), which predates the FDOT merge. Re-dispatch and
-   CONFIRM the version increments before going further** — everything after this step is worthless
-   against a stale engine.
+2. ✅ **DEPLOYED — `get-address-report` v113 at 2026-07-31 00:33Z.** The first dispatch silently did
+   not land (the function sat at v112, predating the merge) and was caught only by re-reading the
+   version. **A dispatched deploy is not a landed deploy — always confirm the version increments.**
+3. ✅ all **441** FL ZIPs fired through the deployed engine
 3. fire all **441** FL ZIPs (`net.http_post` per `dev_refresh_fire_batch`'s shape)
-4. `dev_refresh_collect()`
+4. 🔴 **`dev_refresh_collect()` — RUN THIS FIRST.** At hand-off 441 were still queued and 0 had
+   landed; pg_net drains slowly and ~31% of requests fail (row 411), so **re-fire any FL ZIP whose
+   `refreshed_at` is still older than 00:33Z** before collecting again. Do NOT `worker_restart()`.
 5. **`app_refresh_zip()` per ZIP — DO NOT SKIP**, then measure from `app_projects` with
    `record_kind='development'`. FL is NOT Live until that read says so.
 
