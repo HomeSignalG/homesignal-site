@@ -1081,3 +1081,55 @@ stale — kept for the record of how the stall presented, but **47.6% is the cur
 **Session totals (all post-deploy `app_projects` reads): NC 48.8% → 72.9% (+41 pages), KY 34.9% →
 47.6% (+16 pages), MA 89.6% → 90.4% (Live). 3 entries wired (registry 105 → 108), 33,219 records,
 0 missing `record_url`, 0 unclassified, 0 gate leaks across all three.**
+
+---
+
+## BOONE MERGED + DEPLOYED, re-cache PENDING (2026-07-31)
+
+**Do not report Boone/KY as improved beyond 47.6%.** *Wired + merged + emitting is not Live.*
+
+| Step | State |
+|---|---|
+| PR #464 merged to `main` | ✅ `a3e6a28` |
+| Engine deployed | ✅ **v118** (confirmed via `list_edge_functions` before firing) |
+| 8 Boone ZIPs fired | ✅ |
+| Reports returned | ❌ **0 of 8** — pg_net stalled, `max(id)` frozen at 13622, queue 58 |
+| collect / materialize | ⏸ not run |
+| **KY measured** | **60/126 = 47.6%** — unchanged, report it that way |
+
+Expected once the queue drains: **+8 → 68/126 = 54.0%**.
+
+### RESUME (same 3 steps as the Lexington entry above, with Boone's ZIP set)
+
+```sql
+select count(*) from net.http_request_queue;   -- wait for 0 FIRST
+-- re-fire only if the queue drained without them returning:
+with bz as (select distinct z.zip from public.communities c, unnest(c.zip_codes) z(zip)
+            where c.level='zip' and c.state='KY' and c.county='Boone')
+select net.http_post('https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/get-address-report',
+  jsonb_build_object('zip', d.zip, 'lat', d.home_lat, 'lng', d.home_lng),
+  '{}'::jsonb, '{"Content-Type":"application/json"}'::jsonb, 90000)
+from public.development_reports d join bz on bz.zip=d.zip;
+-- then: dev_refresh_collect() -> app_refresh_zip over the 8 -> measure from app_projects
+```
+
+### 📌 pg_net ZIP-refresh stall — now observed FOUR times tonight, same signature
+
+Buncombe 20 (cleared ~20 min) · Fayette 19 (cleared, +16 pages) · the 253-deep cron batch (cleared) ·
+Boone 8 (stalled at handoff). Signature every time: `net.http_request_queue` frozen at exactly the
+outstanding count while `max(net._http_response.id)` stops advancing. **It has ALWAYS cleared on its
+own.** `worker_restart()` was measured against it and did nothing (see the blocker section above) —
+do not run it, do not wait on it, just re-check later.
+**Cheap GET probes drain normally throughout; it is the 90 s ZIP-refresh POSTs that pile up.**
+
+### Session close — 4 entries wired (registry 105 → 109), 3 states measured up
+
+| State | Before | After | Verified |
+|---|---|---|---|
+| MA | 89.6% | **90.4% (Live)** | ✅ post-deploy `app_projects` |
+| NC | 48.8% | **72.9%** | ✅ post-deploy `app_projects` |
+| KY | 34.9% | **47.6%** | ✅ post-deploy `app_projects` |
+| KY (Boone) | — | *+8 pending* | ⏸ merged + deployed, not cached |
+
+33,219 records across the three landed entries · 0 missing `record_url` · 0 unclassified ·
+0 gate leaks. NC capped at 72.9% and RI dead-ended, both with per-county receipts above.
