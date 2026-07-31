@@ -120,6 +120,90 @@ Williamson 12 · Sumner 9 · Maury 8 · Wilson 7 · Hamilton 5 · Davidson 1. Ne
 page, and the largest (Shelby/Memphis) sits behind `SHELBY-429`, a **new connector family
 (GATED)**. **Do the arithmetic first — TN is very likely UNREACHABLE** (row 428).
 
+### 🔴 IN FLIGHT — FDOT / Florida. Merged, NOT deployed. Resume here.
+
+**The strategic finding this came from, which matters more than FL itself:** all three states that
+ever cleared 90% (TX, NV, UT) did it via a **statewide DOT layer**. Row 420 declares the statewide
+path exhausted, but that refers to the **workbook's own six candidates** — the **state-DOT CLASS was
+never enumerated for the other 47 states.** Per-county wiring yields ~11 pages a pass; a state DOT
+yields a whole state. **This is the lever. Sweep it.**
+
+Confirmed live this pass by direct probe:
+
+| DOT | endpoint | status | dark pages |
+|---|---|---|---|
+| **FDOT** | `gis.fdot.gov/arcgis/rest/services/Active_Construction_Projects/FeatureServer/`**`1`** | WIRED (#457, merged `8f81ea8`) — 2,428 rows, polyline | **413 of 441** |
+| **MassDOT** | `gis.massdot.state.ma.us/arcgis/rest/services` → `Projects` folder | 200, folder confirmed, **unprobed** | **574 of 627** |
+| **PennDOT** | `gis.penndot.gov/arcgis/rest/services` → `paprojects`, `projectpath` | 200, folders confirmed, **unprobed** | **488 of 560** |
+
+⚠️ **FDOT layer index is 1, not 0.** Layer 0 returns HTTP 200 carrying
+`{"error":{"code":500,"message":"json"}}`; the service doc lists exactly one layer, id 1.
+
+**Coverage was pre-measured (the Charlotte lesson, applied before the wire).** Envelope counts at
+`spatial_zip_radius_mi: 3` against four DARK FL ZIPs: **34761 → 3 · 33785 → 0 · 33186 → 13 ·
+33462 → 23.** Three of four hit — much better than Charlotte's two-of-four-zero, because state
+highways run through suburbs and rural areas where a city portal never reaches. That is *why* the
+DOT class generalises.
+
+**EXACT RESUME STEPS — the pipeline is at step 4 of 5:**
+1. ✅ merged to `main` (`8f81ea8`)
+2. ✅ **DEPLOYED — `get-address-report` v113 at 2026-07-31 00:33Z.** The first dispatch silently did
+   not land (the function sat at v112, predating the merge) and was caught only by re-reading the
+   version. **A dispatched deploy is not a landed deploy — always confirm the version increments.**
+3. ✅ all **441** FL ZIPs fired through the deployed engine
+3. fire all **441** FL ZIPs (`net.http_post` per `dev_refresh_fire_batch`'s shape)
+4. 🔴 **`dev_refresh_collect()` — RUN THIS FIRST.** At hand-off 441 were still queued and 0 had
+   landed; pg_net drains slowly and ~31% of requests fail (row 411), so **re-fire any FL ZIP whose
+   `refreshed_at` is still older than 00:33Z** before collecting again. Do NOT `worker_restart()`.
+5. **`app_refresh_zip()` per ZIP — DO NOT SKIP**, then measure from `app_projects` with
+   `record_kind='development'`. FL is NOT Live until that read says so.
+
+🟢 **FINAL MEASURED RESULT (page-verified from `app_projects`, full drain, 2026-07-31 00:40Z):
+FL 28 -> 303/441 = 68.7%.** 3,908 FDOT rows across 303 ZIP pages · **0 gate leaks** onto non-FL
+pages · 0 non-point · 0 missing `record_url` · 0 wrong `use_type`.
+
+🔴 **+275 PAGES FROM ONE REGISTRY ENTRY.** For comparison, this session's per-county wires were
+Sussex +22 and Weld +11. **That is a 25x difference per unit of work, and it settles the strategy:
+sweep state DOTs first, counties second.** FL is still short of 90% (needs 397), so not Live — but
+no county wire could have moved it this far.
+
+**FL was at 28/441 (6.4%) before this.** If FDOT lands on ~3 of 4 dark pages it
+would take FL to roughly 75-80% — real, but likely still short of 90%, so expect FL to need a second
+source (its four metro candidates are already rejected with receipts: Fort Lauderdale stale,
+Orlando ungeolocatable, Tampa WAF-blocked, Miami too slow).
+
+### NEXT TWO, both located by probe 2026-07-31 — ready to wire
+
+**MA-DOT (574 dark of 627 — the largest single prize left).** CLEAN SHAPE, do this one first:
+```
+https://gis.massdot.state.ma.us/arcgis/rest/services/Projects/HighwayProjects/FeatureServer/0
+```
+Service root 200; exactly **one layer, id 0 "Highway Projects"**. Same shape as FDOT. Still to
+measure before wiring: row count, geometry type, field list, and the envelope pre-check against
+dark MA ZIPs.
+
+**PA-DOT (488 dark of 560) — DIFFERENT SHAPE, read this before wiring.**
+```
+https://gis.penndot.gov/arcgis/rest/services/paprojects/paprojects/MapServer
+```
+200, but **46 layers, and the STATUS IS ENCODED IN THE LAYER NAME rather than in a column**:
+`5=Under Construction Points`, `16=Underway Lines`, `1=Underway Points`, `20=Under Construction
+Lines`, `17=Four Year Plan Lines`, `3=Twelve Year Program Points`, `0=Completed Points`, …plus
+boundary and bridge-condition layers that are NOT development records.
+
+So PennDOT is **one registry entry PER STATUS LAYER**, each with its own `status_const` — e.g.
+Under Construction / Underway -> `approved`, Four Year Plan / Twelve Year Program / Anticipated /
+Under Development -> `proposed`, Completed -> `operating`. Do NOT wire the boundary layers (25-33)
+or the bridge-condition layers (34-45); they are reference geography and asset ratings, not
+projects. Points and Lines are the same projects in two geometries — **pick ONE per status or the
+same project double-emits** (the engine-v22 duplicate class, uncatchable across two
+`source_registry_id`s).
+
+**Probe each the same way FDOT was probed** — service root → find the projects layer →
+count/geometry/fields → constants matched to the DOT precedent (all four existing DOT entries use
+`use_type_const`-equivalent `Utility`; "active construction" → `status_const: "approved"`) →
+pre-measure against dark ZIPs → wire → deploy → recache → **materialize** → measure.
+
 ### Standing notes
 
 - **pg_net probes: send NO `User-Agent`** (a UA makes IIS hosts 400 — the failure is ours).
