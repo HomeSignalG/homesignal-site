@@ -1874,3 +1874,37 @@ five (06107/06108/06109/06111/06118) are West Hartford, East Hartford, Wethersfi
 (b) **A county's dark-page count is NOT the addressable lift for a CITY source.** Hartford County
 has 60 pages; the City of Hartford permits ~10 ZIPs. Always intersect the source's own ZIP/spatial
 footprint with the dark set before quoting a number.
+
+### Mining the rest of the 484-candidate sweep — one win, one false positive, one reject
+
+The vendor-signature sweep's full result set was reviewed (not just the Fulton hit). Outcomes:
+
+| candidate | dark pages | outcome |
+|---|---|---|
+| `JohnsCreekGA` → **GA/Fulton** | 40 | ✅ **WIRED, live, +6 pages** |
+| `HartfordData` → CT/Hartford | 51 (apparent) | ❌ **already wired**; true lift ~1 page |
+| `Marion_County` / data.indy.gov → **IN/Marion** | 40 | ❌ **rejected, receipts below** |
+| `dpwgis_lacounty` → CA/Los Angeles | — | **not addressable** |
+| `LeeCountyFLGIS` → FL/Lee | 24 | untested lead, left for a future pass |
+
+- **IN / Marion (Indianapolis) — firm REJECT.** `data.indy.gov`'s DCAT is **live and parsed
+  successfully** (200, project-open-data schema), so this is a real read. Searched its full
+  `dataset` array for permit/building/construction/development/subdivision: the matches are
+  **building footprints, building/unit addresses, CDBG areas, Community Development Corporations,
+  and ~20 scanned ORDINANCE documents** ("Improvement Location Permit Ord 75-AO-2", "Subdivision
+  Control Ord 58-AO-13" …) — every one on the `documents/` path, i.e. PDFs of law, not data.
+  **No per-record permit ledger exists in the catalog.** IN has zero registry entries and stays at
+  zero. Scoped AGO searches for "Indianapolis permits" / "Marion County Indiana permits" /
+  "Indy building permits" returned totals of 4 / 0 / 0 with no permit service.
+- **CA / Los Angeles — NOT addressable, and not a source problem.** LA County returned **no rows at
+  all** from the dark-county query because it has **no `level=zip` communities modelled**. A ZIP
+  expansion is a schema/data change (the NYC-borough / Boston-Suffolk / Philadelphia precedent) and
+  is GATED — do not treat LA as a recon failure.
+- **FL / Lee — genuine untested lead** (`LeeCountyFLGIS` "Development Orders",
+  `ITTENBJD@Lee_County_FL.gov_LeeGIS` "Development Activity Projects", 24 dark pages).
+
+⚠️ **Correction to an earlier note in this file:** "FL is on the EPA facilities floor with 0 permit
+sources" is **STALE**. The registry now carries **`miami-building-permits`** (FL/Miami-Dade) and
+**`fdot-active-construction-projects`** (FL statewide). Miami-Dade currently reads 75/80 backed.
+The FLORIDA WIRE PASS section above describes the state at the time of that pass, not today —
+**always check the live registry rather than quoting a wire-pass narrative.**
