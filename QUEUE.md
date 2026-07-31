@@ -2511,3 +2511,63 @@ safe is already written and shipped.
 | First-party sourcing rule | 18 (Spokane) | **founder call** — data exists, owner is a utility |
 | Stalled ledgers | 42 (Providence) + others | reprobe list |
 | WAF / 403 | 91 (Wichita 50, Tulsa 39, + OKC 52 earlier) | reprobe list |
+
+---
+
+## ⚠️ CORRECTION — SPOKANE IS ALREADY WIRED. My "blocked on provenance" claim was WRONG. (2026-07-31)
+
+**Retracting a claim I merged to `main` a few hours ago in #487.** That entry said Spokane County was
+blocked because the only public ledger is owned by Avista (the utility), and it **asked the founder for
+a ruling**. That question should never have been asked: **`spokane-county-building-planning-permits`
+has been in `jurisdiction-registry.json` since 2026-07-28**, wired in the Phase 1 standard arcgis
+pass — using the **exact same `service_url`** I "discovered":
+
+```
+https://services3.arcgis.com/WlYQgAChrqj0tuQi/arcgis/rest/services/
+  Spokane_County_Building_and_Planning_Permits/FeatureServer/0
+```
+
+It uses the native `Site_Zip` column (`column_map.zip`), a 47-value verbatim `Permit_Type` map and a
+10-value status map. It is live and it was live the whole time.
+
+**So Spokane's 18 dark pages are not a provenance block at all** — they are rural Spokane County ZIPs
+that simply carry no rows in `Site_Zip`. The entry has **no `spatial_zip_radius_mi`**, so a ZIP only
+lights up if it literally appears in the data. That is correct behaviour, not a blocker. **No founder
+decision is required. Disregard that ask.**
+
+**Same root cause, third occurrence — and I had already written the rule down.** The Hartford false
+positive produced this standing answer: *grep the registry for the `service_url` BEFORE running recon.*
+I skipped it again here, and again on Sioux Falls and KCMO:
+
+| candidate | reality |
+|---|---|
+| Spokane County | **already wired** 2026-07-28, same service_url |
+| **Sioux Falls** | **already wired** 2026-07-28, same service_url (`gis.siouxfalls.gov` Data/Community/3) |
+| **KCMO** | **already wired** as `kcmo-building-permits`, same AGO org `4o5uMWTHuOhUVJPd` |
+
+**What actually stopped the bad Sioux Falls commit was the additive-proof guard**, not my judgement:
+the `assert len(ids)==len(set(ids))` duplicate-`registry_id` check failed and the file was never
+written. The guard works — but it is the last line of defence, not the first.
+
+### THE RULE, now with a concrete first step (do this before ANY recon)
+
+```
+python3 -c "import json;d=json.load(open('supabase/functions/get-address-report/jurisdiction-registry.json'));
+allе=[e for k,v in d.items() if isinstance(v,list) and k in ('arcgis','socrata','ckan','csv','carto','opendatasoft') for e in v];
+print([e['registry_id'] for e in allе if '<host-or-org-id>' in json.dumps(e).lower()])"
+```
+
+**The registry is the state of the world; QUEUE.md prose and dark-page counts are not.** A county
+having dark pages does **not** mean it is unwired — it usually means the wired source has no rows for
+those specific ZIPs. **Checking costs one command; not checking cost three full recon passes today and
+one incorrect merged claim addressed to the founder.**
+
+### Registry state, measured just now (so the next session starts from fact, not prose)
+
+**144 entries** across arcgis/socrata/ckan/csv/carto/opendatasoft, declaring coverage over
+**115 distinct (state, county) pairs.**
+
+### Still genuinely NOT wired (verified by the same grep, not by prose)
+
+`sedgwick` · `wichita` · `honolulu` · `milwaukee` · `providence` — all return **zero** registry hits.
+The wave-9/13 findings on those five stand unchanged.
