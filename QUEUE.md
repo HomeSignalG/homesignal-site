@@ -959,3 +959,42 @@ and never overwrites content with an empty response).
    (Development_Plan / Chatham / North Richland Hills class — three instances now).
 4. KY needs **70 of its 82 dark pages**, so Fayette 19 alone is not enough — Daviess 10, Campbell 10,
    Warren 9, Boone 8, Oldham 8, Bullitt 7 all have to be probed too.
+
+### KY: Lexington WIRED (`lexington-row-permits`, registry 107 → 108, PR #463); statewide + 3 metros rejected
+
+**Wired — `lexington-row-permits`** (KY/Fayette). LFUCG's own `row_permits_open_view` layer 0
+(`row_permits_master`), right-of-way permits. **1,426 point rows, `dataLastEditDate` = 2026-07-31,
+the SAME DAY as wiring.** Org identity verified via owner `emiller_lfucg4`, not a guessed org id.
+All three vocabularies enumerate to **exactly 1,426**. `Partially Completed` → **approved** (work
+authorised and underway, not built). The single `Test, questionable names` row is dropped at source.
+`use_type_const: "Roads & infrastructure"` — source-stated by the service name, same call as
+Asheville's `Right of Way`. **PII re-checked** (12 values read): every applicant is a COMPANY
+(Kinetic, Columbia Gas, Kentucky American Water) and descriptions are work scopes, so
+`DescriptionOfWork` is safe as title. **Coverage pre-verified on all 19 modelled Fayette ZIPs:
+16 return records**; the 3 zeros are Georgetown/Paris/Winchester — other counties' towns modelled
+under the Fayette root.
+
+🔴 **NEW STANDING ANSWER — A MAX-DATE PROBE CAN BE POISONED BY ONE CORRUPT FUTURE-DATED ROW.
+ALWAYS PAIR IT WITH A WINDOWED COUNT.**
+`Ky_DOW_Floodplain_Permits_WM_gdb` (Kentucky Division of Water, **statewide**, 9,519 points, real
+`COUNTY`/`DDLAT`/`DDLNG`/`PERMITNUM`, self-describing `PURPOSE`) looked like the statewide win KY
+needs. `orderByFields=STATDATE DESC` returned **`STATDATE` 1872115200000 = 2029-04** — a future date,
+i.e. a data-entry error. Trusting row 1 would have recorded this source as "fresh through 2029."
+The control that caught it: `where STATDATE >= DATE '2023-07-31'` → **`count: 1`**, and that 1 IS the
+bogus row. The real newest is **2020-10-10**. **REJECTED — stalled 5 years.**
+*(The layer's own `dataLastEditDate` 2026-07-09 is also misleading: it dates a schema/metadata touch,
+not new permits. Layer edit date is NOT data freshness.)*
+
+**Also rejected this pass, with receipts:**
+- **Kentucky statewide portal** (`opengisdata.ky.gov`, 2.5 MB DCAT) carries permits, but every one is
+  environmental/regulatory, not building: Floodplain (above), KPDES discharge, Inter-System Operation
+  (KISOPs), Permitted Mine Boundaries, Permitted Water Withdrawal. `kygisserver.ky.gov` root returns
+  no permit service.
+- **Daviess/Owensboro (10), Warren/Bowling Green (9), Boone (8)** — scoped AGO searches returned
+  **0 permit services and no city/county-government owners** (owners are consultants, universities,
+  KYTC contractors). ⚠️ My first three searches returned `total: 0` because multi-word AGO queries are
+  **ANDed** — that was a QUERY-SHAPE artifact, not absence; re-run loose (78 / 151 / 1 results) before
+  concluding. Recorded as *unfound*, not proven absent.
+
+**KY projection: 44 → 60 of 126 = 47.6%** once Fayette lands. 90% needs 114, so KY cannot reach it
+without Daviess/Warren/Boone/Campbell/Oldham/Bullitt sources that do not appear to exist publicly.
