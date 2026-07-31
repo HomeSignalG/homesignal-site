@@ -676,3 +676,63 @@ paprojects/MapServer`, 46 layers with status encoded in the layer NAME, one entr
 status layer with `status_const`. Traps already recorded: layers 25–33 are boundaries,
 34–45 bridge-condition, and Points vs Lines are the same projects twice (would
 double-emit — pick one).
+
+---
+
+## NC WIRE PASS — Charlotte wired; NCDOT, Buncombe, PennDOT rejected with receipts (2026-07-31)
+
+**Order followed the founder's own sequence** (DE → CO/Weld → **NC 48.8%** → TN 44.2%).
+NV (88.0%, 4 pages short) and CO are founder-recorded UNREACHABLE — locked, skipped.
+
+### Wired: `charlotte-land-dev-commercial-projects` (arcgis, registry 105 → 106) — PR #461, merged `cf4ac82`, engine **v115**
+
+City of Charlotte's OWN ArcGIS Server, `PLN/LandDevCommercialProjects` layer 0. 7,029
+polygon rows, `OpenDate` max **2026-07-30** (fresh the day before wiring). Config only.
+
+- Both vocabularies enumerated live with a **positive control — each sums to EXACTLY 7,029**
+  (Status 22 values; Category 5). All 21 non-null statuses mapped → **0 unclassified**; the
+  450 NULL-status rows **fail closed**.
+- `use_type_const: "Commercial"` instead of a 55-value ProjectType map — the SERVICE is
+  scoped to commercial land development by its own name, so the value is source-stated, and
+  `Commercial` is a member of the CLOSED six-value `TYPE_EXACT` set in `lib/map.js`.
+- `ProjectDetail` is a REAL per-record Accela URL on 3,570 of 7,029 (50.8%); the connector's
+  column → template → `dataset_url` chain gives the rest honest `dataset` precision, so **no
+  row is dropped** by the anti-fabrication gate.
+- **Pre-verified yield before deploying** (Rule 13 — probed the query shape the connector
+  actually sends, a ±3 mi envelope on each ZIP centroid): **32 of 34 Mecklenburg ZIPs return
+  records** (253–2,244 each). Only 28031 Cornelius and 28036 Davidson return 0 — genuinely
+  outside Charlotte's jurisdiction, correct for a CITY source.
+
+### Rejected, with receipts — do not re-probe these
+
+- **PennDOT `paprojects`** (488 dark PA pages). The recorded trap was right that status lives
+  in the LAYER NAME — and `PROJ_STATUS_DESC` must NOT be used instead: layer 0 "Completed
+  Points" and layer 1 "Underway Points" carry the SAME six values, so that column is an
+  administrative record state, not the construction phase. **The real blocker is different and
+  fatal: the layers are SEGMENT-level, not project-level.** Distinct `PROJ_ID` vs rows —
+  Completed 4,343/10,515 (2.4×) · Underway 353/1,129 (3.2×) · Four Year Plan 504/1,151 ·
+  Twelve Year 501/642 · Under Development 2,725/4,701 · Anticipated 325/951 (2.9×); layer 5
+  HTTP 400s on both stat queries. One project = many rows with **different geometry each**, so
+  the engine's exact-identity dedup (which includes lat/lng) cannot collapse them — the
+  engine-v22 double-emit class, uncatchable *within* one source. Deduping needs a connector
+  change (gated: changes what residents see). Points vs Lines are also the same projects twice
+  (counts pair up: 10515/10849, 1129/1155, 5467/5467).
+- **NCDOT `NCDOT_ActiveConstructionProjects`** — the statewide-DOT class that carried TX/NV/UT,
+  but too small AND partly unpinnable: 257 points + 161 lines statewide. Layer 0 is
+  `esriGeometryMultipoint`, and **`featurePoint()` has no `points` branch** (only x/y, centroid,
+  rings, paths) → no coordinates → area scope → **no coverage credit** (see the MA standing
+  answer above). Only the 161 polyline rows would pin. Fields are also join-qualified
+  (`GdbGisuPub.HICAMS.ActiveProjectLine.*`).
+- **Buncombe County (20 dark pages)** — three candidates, all rejected: AGO `Permits` is
+  **STALLED at 2020-06-02** (`dataLastEditDate` 1591115952764), 329 rows, multipoint, truncated
+  export field names (`FIRST_reco`, `FIRST_stat`); `New Commercial Building Permits` layer 0 is
+  literally named **`resultLayer`** and is a census-tract AGGREGATE (`TRACT_FIPS`, `POPULATION`,
+  `Point_Count`, `percent_permits`) — analysis output, not per-record permits, the NJ-DCA class;
+  `Helene_Building_Trade_Permits` is a geometry-less table, last edit 2025-08-11.
+  ⚠️ Guessed AGO org `ZOyb2t4B0UYuYNYH` for "Asheville" returned **SEATTLE** layers — the
+  cross-org lookalike trap; the guess was discarded, not used.
+- **Charlotte `Accela/Accela` MapServer** is a reference basemap (parcels, zoning, review
+  areas), NOT a permit ledger. `PLN/Rezonings` is only 78 rows.
+
+**NC after Charlotte lands: 83 → ~115 of 170 (67.6%).** The remaining 51 dark pages to clear
+90% are Buncombe 20 (no wireable source found — above), Chatham 12, Orange 10, Union 9.
