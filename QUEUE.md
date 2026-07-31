@@ -71,26 +71,44 @@ Dark: **Mecklenburg 34** · Buncombe 20 · Chatham 12 · Orange 10 · Union 9 ·
 Top four = 76 ≥ 70, so **NC IS reachable** — but only by landing essentially all of
 Mecklenburg + Buncombe + Chatham + Orange. Confirm that arithmetic still holds before each wire.
 
-**NC-1 — `charlotte-rezonings`, probed 2026-07-31, ready to wire but coverage UNPROVEN.**
+**NC-1 — `charlotte-rezonings`: MEASURED, and it does NOT solve Mecklenburg. Low priority.**
 
 ```
 https://gis.charlottenc.gov/arcgis/rest/services/PLN/Rezonings/MapServer/0
 ```
-- Charlotte's open-data portal is live and complete: DCAT 2,474 titles, JSON terminated.
-- 78 rows · POLYGON (rides `featurePoint()`) · newest `Received` **2026-06-15** · per-record
-  **`Hyperlink`** → `record_url_precision: "record"`.
-- `Status` enumerates completely: **`Pen` × 78** — the whole layer is PENDING rezonings. Maps
-  cleanly to `proposed`. That single value is the finding: this is a current-cases slice, not a
-  history, which is why it is small.
-- `Type` is **CD 63 + CV 15 = 78** — both OPAQUE CODES. Do **not** guess them (Conditional
-  District / Conventional is inference, not the publisher's word). Use `use_type_const:
-  "Development"` and skip `Type` entirely, exactly as Sussex and Weld do.
-- ⚠️ **THE OPEN QUESTION, and it decides whether this is worth wiring: do 78 polygons at
-  `spatial_zip_radius_mi: 5` actually reach 34 Mecklenburg ZIP pages?** Charlotte is dense so the
-  circles overlap heavily, but this is unmeasured. **Measure it BEFORE wiring** — run envelope
-  counts against a spread of Mecklenburg ZIP centroids (the method used for Sussex: 19966/19930/
-  19973/19975 returned 452/284/236/286). If it reaches only a handful of pages, wire it anyway for
-  those pages but do not expect NC to move, and go to the other Charlotte candidates first.
+- 78 rows · POLYGON · newest `Received` 2026-06-15 · per-record **`Hyperlink`** (record precision).
+- `Status` enumerates completely: **`Pen` × 78** — the entire layer is PENDING rezonings, a
+  current-cases slice rather than a history. Maps cleanly to `proposed`.
+- `Type` is **CD 63 + CV 15 = 78**, both OPAQUE CODES. Do NOT guess them; use
+  `use_type_const: "Development"` and skip `Type`, as Sussex and Weld do.
+
+🔴 **THE COVERAGE MEASUREMENT WAS RUN, AND IT IS THE ANSWER.** Envelope counts at the connector's
+own `spatial_zip_radius_mi: 5`, against four ZIPs taken from the DARK Mecklenburg set:
+
+| ZIP | place | rezonings within 5 mi |
+|---|---|---|
+| 28031 | Cornelius | **0** |
+| 28036 | Davidson | **0** |
+| 28078 | Huntersville | 5 |
+| 28105 | Matthews | 6 |
+
+**Two of four dark ZIPs get nothing at all.** The reason is structural, not sampling: Charlotte's
+78 pending rezonings cluster in the CITY CORE, and the core ZIPs are **already record-backed**. The
+34 dark Mecklenburg pages are the outer suburbs and satellite towns — Cornelius, Davidson,
+Huntersville, Matthews, Mint Hill — which a City-of-Charlotte layer does not reach by construction.
+
+**Consequence for NC:** Mecklenburg was half the gap (34 of the 70 needed) on the assumption that a
+Charlotte source would cover it. That assumption is now measured false. Wiring this yields maybe a
+handful of pages, so it is **worth doing only as filler**, never as the thing that moves NC.
+**Re-do NC's reachability arithmetic before spending another pass on it** — the honest read is that
+NC now needs a MECKLENBURG COUNTY source (not a City of Charlotte one) plus Buncombe, Chatham and
+Orange, and if the county has none, NC is likely UNREACHABLE under row 428.
+
+⚠️ **Generalise this — it is the cheapest lesson in the queue:** a big-city open-data portal covers
+the CITY, and a county's dark pages are usually the parts of the county that are NOT the city. Run
+the envelope count against the actual DARK ZIPs before assuming a metro source closes a county.
+Note the Mecklenburg county hub is separately dead: `data-mecklenburgcounty.opendata.arcgis.com`
+returned **404**.
 
 **Other Charlotte candidates, unprobed, from the same complete DCAT:** `Special Use Permits`
 (`services.arcgis.com/9Nl857LBlQVyzq54/.../Special_Use_Permits/FeatureServer/0`) ·
