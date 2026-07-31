@@ -120,79 +120,28 @@ Williamson 12 · Sumner 9 · Maury 8 · Wilson 7 · Hamilton 5 · Davidson 1. Ne
 page, and the largest (Shelby/Memphis) sits behind `SHELBY-429`, a **new connector family
 (GATED)**. **Do the arithmetic first — TN is very likely UNREACHABLE** (row 428).
 
-### 🔴🔴 READ FIRST — MA/MassDOT EMITS ZERO RECORDS. The entry is deployed and wrong somewhere.
+### ✅ MA/MassDOT — DONE AND MEASURED. 8.5% -> 88.7%. Two pages short of Live.
 
-**UPDATE 01:04Z, supersedes the stale-engine note below.** The deploy landed on a second dispatch —
-**v114 confirmed** — 627 ZIPs were re-fired against it and **572 MA ZIPs re-cached since 01:00Z**,
-and `massdot-highway-projects` still produced **ZERO records**. The engine has the entry and the
-pages refreshed against it, so **this is a DEFECT IN THE ENTRY**, not a stale deploy.
+**Page-verified from `app_projects` after deploy -> fire -> collect -> materialize
+(2026-07-31 01:15Z): MA 53 -> 556 of 627 = 88.7%.** 80,652 MassDOT rows across 552 ZIP pages ·
+**0 gate leaks** onto non-MA pages.
 
-**The layer itself is confirmed good** — 24,045 rows, both vocabularies enumerated and summing
-exactly, and the envelope pre-check hit **4 of 4** dark MA ZIPs (01035 162 · 02559 50 · 01267 80 ·
-01105 743). The source works; our query of it does not.
+🔴 **+503 PAGES FROM ONE ENTRY — the largest single gain of the session** (FL was +275; the county
+wires were Sussex +22 and Weld +11). **MA needs 565 for 90%: it is TWO PAGES SHORT.** Finding two
+more MA pages is the cheapest Live in the system — check the 71 still-dark MA ZIPs for any that a
+re-fire would catch, since ~29 ZIPs never re-cached cleanly.
 
-**DIAGNOSE IN THIS ORDER — do not re-probe the vocabularies, they are correct:**
-1. **Read the run report / quarantine reason.** The connector records why it skipped an entry. One
-   read, fastest answer.
-2. ❌ **`From_Date` IS CLEARED — I was wrong, do not chase it.** Probed live: `From_Date IS NOT
-   NULL` returns **24,045**, i.e. EVERY row has it. `Status IS NOT NULL` returns **13,484**, exactly
-   the predicted 24,045 − 10,561. Neither column is the cause.
-3. ❌ **The query SHAPE is cleared too.** The connector's own form —
-   `outFields=*&returnGeometry=true&outSR=4326&resultRecordCount=1` — returns **HTTP 200 with a
-   valid polyline feature in wkid 4326**. The layer answers what the connector asks.
-4. ❌ **EVERY MAPPED FIELD IS CLEARED — all probed live, all well-populated:**
-   `Descriptn IS NOT NULL` **14,251** · `Location IS NOT NULL` **13,693** ·
-   `Project IS NOT NULL` **24,045** · `From_Date` **24,045** · `Status` **13,484**.
-   So title, case_number, file_date and status_raw all resolve. **No field mapping explains it.**
-
-5. 🔴 **CHECK THIS FIRST NOW — a TIMING artefact may mean there is no bug at all.**
-   v114 landed at **01:02:22Z**. The 627 ZIPs were re-fired at ~01:03. But the "572 MA ZIPs
-   re-cached since 01:00Z" I measured **includes the tail of the FIRST (v113, stale) fire**, and the
-   last `dev_refresh_collect()` at 01:08 still had **30 requests queued**. **It is entirely possible
-   the v114 responses had not landed when I measured zero.**
-   **Before diagnosing anything: run `dev_refresh_collect()` again, confirm the queue is 0, confirm
-   MA `refreshed_at` is later than 01:03Z, THEN count `massdot-highway-projects` records.** If they
-   appear, there was never a defect — only my measurement was early, which is the same
-   emission-vs-coverage mistake in a new costume.
-
-6. If records are still 0 after a clean post-01:03 collect: read the connector's quarantine reason
-   (the one thing never checked), then try an `out_fields` projection — 41 fields x 24,045 rows may
-   be failing at page scale.
-5. **`outFields=*` size** — 41 fields x 24,045 rows; if paging is being rejected at scale, try the
-   additive `out_fields` projection (added during the FL/Miami work).
-
-**Do NOT write MassDOT off.** 574 dark of 627 and a 4-of-4 pre-check still make it the largest single
-page gain available; the FDOT analogue moved FL from 6.4% to 68.7%.
-
----
-
-### (superseded) MA 627 ZIPs were fired against a stale engine
-
-**`massdot-highway-projects` is MERGED to `main` (`df82e3e`) but the deploy DID NOT LAND.** The
-function was still **v113** four minutes after dispatch — v113 is the FDOT deploy and does NOT
-contain the MassDOT entry.
-
-**I then fired all 627 MA ZIPs anyway, before confirming the version.** Those requests hit v113 and
-can only have returned facilities-only reports with **zero** MassDOT records. **Do not collect that
-run and conclude MassDOT is broken — it was never given a chance to run.**
-
-**RESUME EXACTLY HERE:**
-1. **Re-dispatch `deploy-edge-functions.yml` and WAIT until `get-address-report` reports v114 or
-   higher.** Check with `list_edge_functions`. Do not proceed on a dispatch alone.
-2. **Re-fire all 627 MA ZIPs** (the first fire is void).
-3. `dev_refresh_collect()` — expect to repeat it; pg_net drains slowly and ~31% fail (row 411).
-4. **`app_refresh_zip()` per MA ZIP.**
-5. Measure from `app_projects` with `record_kind='development'`.
-
-**THE PRE-CHECK IS ALREADY DONE AND IS EXCELLENT — do not redo it.** Envelope counts at 3 mi against
-four DARK MA ZIPs: **01035 → 162 · 02559 → 50 · 01267 → 80 · 01105 → 743. Four of four hit**, versus
-three of four for FL (which still gained +275 pages) and two-of-four-ZERO for Charlotte. MA has
-**574 dark of 627**; if FL's ratio holds this is the largest single page gain available anywhere.
-
-⚠️ **THE PROCESS LESSON, and it cost a whole run:** I wrote the rule *"a dispatched deploy is not a
-landed deploy — always confirm the version increments"* into this queue during the FL wire, and then
-violated it one step later on MA. **The check is worthless unless it runs BEFORE the fire, not
-after.** Confirm the version, then fire. Never the other way round.
+⚠️ **THE "ZERO RECORDS" SCARE WAS MY MEASUREMENT, NOT A DEFECT — and the lesson is the one that
+already bit once tonight.** I measured 0 MassDOT records while 30 requests were still queued and the
+`refreshed_at` window I used still included the tail of the earlier stale-engine fire. I then wrote a
+ranked bug diagnosis and probed five field mappings — `Descriptn` 14,251 · `Location` 13,693 ·
+`Project` 24,045 · `From_Date` 24,045 · `Status` 13,484 — **every one of which came back healthy**,
+because there was never anything wrong. One clean `dev_refresh_collect()` at queue 0 produced 46,279
+records immediately.
+**RULE, third costume of the same error tonight: DO NOT MEASURE UNTIL THE QUEUE IS 0 AND
+`refreshed_at` IS LATER THAN THE DEPLOY.** Cache-vs-pages, fire-before-deploy, and now
+measure-before-drain are all the same mistake — reading a number before the thing that produces it
+has finished.
 
 ### 🔴 IN FLIGHT — FDOT / Florida. Merged, NOT deployed. Resume here.
 
