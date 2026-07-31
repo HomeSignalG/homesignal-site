@@ -9814,6 +9814,80 @@
       "recency_days": 1095,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-31: City of Allentown's OWN AGO account (org WUqVDRuvIiIiH2Pl, owner AllentownPA), layer EnerGov_Permits_Buildings, 5,309 rows, point geometry. FRESH: max ISSUEDATE = 1785369600000 ms = 2026-07-28, three days before wiring. BOTH vocabularies enumerated live and EACH SUMS EXACTLY TO 5,309: STATUSNAME = Issued 2376 + Complete 2175 + Expired 656 + Inspections Complete 28 + Temporary CO 16 + Cancelled 13 + Fees Due 13 + Void 11 + In Review 9 + Stop Work Order 7 + On Hold 3 + In Progress 1 + Fees Paid 1; TYPE = Building 3719 + Residential Building (LEGACY) 286 + Commercial Building (LEGACY) 263 + Electrical (Residential)(LEGACY) 258 + Electrical (Commercial)(LEGACY) 197 + Plumbing (Commercial)(LEGACY) 151 + Plumbing (Residential)(LEGACY) 151 + Mechanical (Residential)(LEGACY) 135 + Building Tank (LEGACY) 62 + Mechanical (Commercial)(LEGACY) 51 + Building Sprinkler (LEGACY) 35 + Building Annual Electric Permit (LEGACY) 1. The 9 LEGACY trade types (1,041 rows) are dropped at source via extra_where, following the WA/MN/IL trades precedent; 4,268 construction rows are kept. use_type comes from TYPE: the dominant value 'Building' (3719) is GENERIC and is therefore written as 'Development', the generic member of the closed TYPE_EXACT vocabulary in lib/map.js -- it is deliberately NOT guessed into Residential/Commercial, because only the two LEGACY values state which. NATIVE ZIP: POSTALCODE is populated ('18104','18103') so column_map.zip is used and NO spatial_zip_radius_mi is needed. Verified real WGS84 coordinates under outSR=4326 (-75.520/40.593, -75.481/40.582 -- Allentown). ISSUEDATE is esriFieldTypeDate so recency_days applies normally. No per-record URL column -> dataset precision on the city's Building Standards page. FOUND BY THE SEARCH INVERSION (title:'Building Permits' AND type:'Feature Service', sorted newest-modified) AFTER a county-name search for Allentown had returned 4,575 results and missed it entirely."
+    },
+    {
+      "registry_id": "naperville-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/rXJ6QApc2sOtl1Pd/arcgis/rest/services/Building_Permits_View/FeatureServer/0",
+      "dataset_url": "https://www.naperville.il.us/services/building-permits/",
+      "jurisdiction": "City of Naperville, Illinois",
+      "coverage": [
+        {
+          "state": "IL",
+          "county": "DuPage"
+        },
+        {
+          "state": "IL",
+          "county": "Will"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PERMITTYPE",
+          "DESCRIPTION"
+        ],
+        "status_raw": "PERMITSTATUS",
+        "type_source": "PERMITTYPE",
+        "file_date": "ISSUEDATE",
+        "address": [
+          "STREETNUMBER",
+          "PREDIRECTION",
+          "STREETNAME",
+          "STREETTYPE",
+          "CITY",
+          "STATE"
+        ],
+        "zip": "POSTALCODE",
+        "case_number": "PERMITNUMBER"
+      },
+      "type_map": {
+        "RESIDENTIAL": "Residential",
+        "RESIDENTIAL: OTHER IMPROVEMENTS": "Residential",
+        "COMMERCIAL": "Commercial",
+        "TEMPORARY IMPROVEMENTS": "Development",
+        "GREEN ENERGY": "Utility"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "IN REVIEW",
+          "FEES DUE",
+          "AWAITING CUSTOMER RESPONSE",
+          "SUBMITTED - ONLINE",
+          "SUBMITTED",
+          "On Hold"
+        ],
+        "approved": [
+          "ISSUED",
+          "FEES PAID",
+          "APPROVED",
+          "To Be Issued",
+          "TEMPORARY OCCUPANCY"
+        ],
+        "operating": [
+          "COMPLETE",
+          "FINAL INSPECTION PASSED"
+        ],
+        "exclude": [
+          "VOID",
+          "CANCELLED",
+          "EXPIRED",
+          "DENIED"
+        ]
+      },
+      "extra_where": "PERMITTYPE IN ('RESIDENTIAL','RESIDENTIAL: OTHER IMPROVEMENTS','COMMERCIAL','TEMPORARY IMPROVEMENTS','GREEN ENERGY')",
+      "recency_days": 1095,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-31: City of Naperville's OWN AGO org (rXJ6QApc2sOtl1Pd), layer EPL_BldgPermits, 34,571 rows. GEOMETRY-LESS TABLE -> the Boulder/Anaheim geocode path (native zip + address fields, no lat/lng in column_map), modelled directly on boulder-construction-permits. FRESH AND HIGH-VOLUME: 10,067 rows with ISSUEDATE >= 2025-07-31 (a full year window). BOTH vocabularies enumerated live and EACH SUMS EXACTLY TO 34,571: PERMITSTATUS = ISSUED 14359 + COMPLETE 13886 + VOID 1871 + FEES PAID 1039 + IN REVIEW 685 + FEES DUE 582 + AWAITING CUSTOMER RESPONSE 502 + CANCELLED 489 + FINAL INSPECTION PASSED 445 + EXPIRED 419 + TEMPORARY OCCUPANCY 134 + SUBMITTED - ONLINE 68 + APPROVED 37 + On Hold 22 + SUBMITTED 21 + To Be Issued 11 + DENIED 1; PERMITTYPE = FINANCE DEPARTMENT 7945 + RESIDENTIAL: OTHER IMPROVEMENTS 7660 + DEPARTMENT OF PUBLIC WORKS 3528 + MISCELLANEOUS 3240 + RESIDENTIAL 2564 + TRUCK ROUTE PERMIT 1489 + COMMERCIAL 1446 + SUB-PERMIT 1361 + FIRE DEPARTMENT PERMIT 1084 + SIGN 952 + COMMUNITY SERVICES DEPARTMENT 864 + ELEVATOR 776 + RIGHT-OF-WAY 590 + TELECOMMUNICATIONS 406 + ACCOUNTS PAYABLE 375 + TEMPORARY IMPROVEMENTS 148 + SPECIAL EVENTS 140 + GREEN ENERGY 3. extra_where keeps only the 5 CONSTRUCTION types (11,821 rows) and drops 13 administrative/non-construction types at source -- FINANCE DEPARTMENT and ACCOUNTS PAYABLE are internal accounting records, DEPARTMENT OF PUBLIC WORKS / TRUCK ROUTE / RIGHT-OF-WAY / SPECIAL EVENTS are not building work, and SIGN/ELEVATOR/FIRE/TELECOM follow the established trades-noise precedent. \u26a0\ufe0f max(ISSUEDATE) returns 20714096083000 ms = the year 2626, a CORRUPT FUTURE DATE -- the third such poisoning this session; the paired windowed count (10,067 in the last year) is what established freshness, not max(). COVERAGE IS TWO COUNTIES because the CITY genuinely straddles them (the frisco-active-building-permits Collin+Denton precedent, not a speculative widening): verified against modelled rows -- 60540/60563/60565/60566/60567 are DuPage and 60564 is Will, and ALL SIX were dark before this."
     }
   ],
   "ckan": [
