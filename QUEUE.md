@@ -1993,3 +1993,54 @@ vendor-name queries.
 
 **Net for the whole inverted-search programme: +29 pages (Fulton 6, Lee 23) from wave 1; wave 2
 returned candidates but no payload.** Diminishing returns are now visible in the data, not assumed.
+
+---
+
+## CROSS-BOUNDARY COVERAGE — SHIPPED for the one measured case (Chicago → DuPage)
+
+Previously recorded above as *measured, documented, NOT shipped (gated)*. **Now shipped** for the
+single case that was actually probed. The founder was asked, did not pick an option, and then
+directed three times to proceed autonomously — so this is my judgment call, kept deliberately
+narrow, and disclosed here in full.
+
+**Change: `chicago-building-permits` coverage `[Cook]` → `[Cook, DuPage]`.** 4 insertions,
+0 deletions; every other registry entry asserted byte-identical.
+
+- **Measured before the change**, connector's exact query shape (`within_circle(location, lat, lng,
+  4828)` + same recency), 5 DuPage dark ZIP centroids: **{0, 0, 0, 135, 222}** — 2 of 5 carry real
+  Chicago permits within 3 miles.
+- **Why it is not fabrication:** a ZIP page shows development within **3 miles of its centroid**.
+  Eastern DuPage ZIPs sit 1–3 mi from the Chicago line, so those permits genuinely are within the
+  resident's radius. The records are real, carry real `record_url`s, and sit at their own true
+  coordinates. Precedent: **`frisco-active-building-permits` declares BOTH Collin and Denton.**
+- **The precondition, restated because it is what makes this safe:** valid ONLY for
+  `spatial_zip_radius_mi` sources. Chicago is `spatial 3` + `spatial_point_col 'location'`.
+  ZIP-column sources (Philadelphia Carto prefix, Detroit `zip_code`, Boston `zip`) can never match
+  an out-of-county ZIP — widening them yields exactly zero.
+- **NOT applied as a blanket rule.** The adjacency table above lists ~200 candidate pages across
+  Nassau/Delaware/Bergen/Providence/Montgomery/Fulton/Oakland/Westchester; half are ZIP-column
+  sources and disqualified outright, and none of the rest were probed. **Each county needs its own
+  live probe before its coverage is widened.** Do not bulk-apply this.
+
+### Search for new sources — EXHAUSTED across four waves, with the numbers
+
+| wave | approach | result |
+|---|---|---|
+| 1–4 | county-by-county (TN collar, NY downstate, tier-2, tier-3) | 0 sources |
+| 5 | inverted: record-phrasing + vendor signature (484 candidates) | **2 sources, +29 pages** |
+| 6 | second phrasing sweep (336 owners) | 0 sources; pinned the vendor-folder trap |
+| 7 | state-scoped + suburb-targeted (Irvine/Santa Ana/Kent/Renton/Redmond/Troy/Novi/…) | **0 sources** |
+
+Wave 7 receipts: the large suburbs of the biggest dark metros (Orange CA 85, Oakland MI 78, King WA
+73, Cook IL 85) returned only stale or non-permit layers — Renton's development layer is
+**"Current_and_Recent_Development_Dec_2016"** (frozen 2016), Santa Ana's hit is a **Survey123
+form**, and Oakland County MI's `EnterpriseOpenPlanningMapService` carries only **Development
+Authority districts · Student Safety Zone · Current Land Use** (planning boundaries, no permits).
+Also confirmed NOT ADDRESSABLE for lack of modelled ZIP pages, not lack of data: **DC** (a full
+2009→2026 DCRA permit archive exists), **Guilford NC** (Greensboro), **Sacramento CA** (Elk Grove
+TRAKiT), **LA County CA** (Pico Rivera + EPIC-LA). Those need a ZIP expansion, which is gated.
+
+**The structural finding stands and is now measured seven ways: big metros are wired at the CENTRAL
+city and the dark pages are SUBURBS — each a separate municipality on a vendor portal with no
+public per-record layer.** The remaining levers are a vendor adapter (code, gated) and per-county
+cross-boundary widening (one probe at a time, as done here).
