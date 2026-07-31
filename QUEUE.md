@@ -1433,3 +1433,81 @@ Two API lessons from it: `get_check_runs` / `list_workflow_jobs` **serve stale s
 minutes** (a check reporting `in_progress` had `completed_at` 03:41:34), so neither is authoritative
 — the **merge endpoint** is, because it is the actual gate. And a cancelled run takes several
 minutes to become re-runnable (`403 This workflow is already running`).
+
+---
+
+## TN/Rutherford — `murfreesboro-building-permits` GO-LIVE VERIFIED (2026-07-31)
+
+PR **#466** merged (`16e22c1`), engine **v120** deployed and confirmed before firing
+(`list_edge_functions` → version 120), queue confirmed clear (q=0) at fire time.
+Four-step pipeline completed: merge → deploy → re-cache → materialize.
+
+### Measured result — `app_projects`, `record_kind='development'`
+
+| Scope | Before | After |
+|---|---|---|
+| **TN/Rutherford** | 0 / 15 (0.0%) | **9 / 15 (60.0%)** |
+| **TN statewide** | 128 / 199 (64.3%) | **137 / 199 (68.8%)** |
+
+**The pre-wire prediction held EXACTLY.** The envelope probe predicted 9 of 15 ZIPs and
+**2,606** record-placements; go-live produced **2,606 records across exactly 9 ZIPs**.
+
+### Invariants across all 2,606 records
+
+`0` missing `record_url` · `0` missing coordinates · `0` non-`point` scope · `0` unclassified.
+Bidirectional gate proof, cache-wide: grouping every cached site carrying this
+`source_registry_id` by its page's `(state, county)` returns **exactly one row — TN/Rutherford,
+9 ZIPs, 2,606 records**.
+
+Recency window exact: oldest `file_date` **2023-08-01** = the `recency_days: 1095` boundary.
+`newest` is **2027-09-27** — the single future-dated typo row predicted at recon time, now
+confirmed as exactly one record. It is a real permit with a bad date, so it is kept, not dropped.
+
+### TN session total: 44.2% → 68.8% (+49 pages)
+
+Memphis/Shelby +40, Murfreesboro/Rutherford +9. TN remains **capped below 90%** — see the
+per-county table in the previous section; Williamson/Sumner/Maury/Wilson (36 pages) have no
+first-party per-record source, so even wiring the two remaining candidates (Montgomery ~13,
+Chattanooga ~5) caps TN near 78%.
+
+### ⚠️ CORRECTION — neither `net.wake()` nor `worker_restart()` is a proven fix for the pg_net stall
+
+The previous section recorded that `net.wake()` was followed by immediate recovery, explicitly
+hedged as "correlation, not proof of causation." **That hedge was right, and the claim is now
+disconfirmed.** On the Rutherford fire (9th stall occurrence, q pinned at 15):
+
+- `net.check_worker_is_up()` again returned cleanly → worker **alive but not draining**.
+- `net.wake()` → **no effect**; still q=15 with `max(net._http_response.id)` frozen ~20 min later.
+- `net.worker_restart()` → returned `true`, and the queue drained fully (q=0, **15/15 → 200**)
+  shortly after.
+
+So across two stalls the "successful" intervention was a *different* function each time. The only
+claim the evidence supports is the long-standing one: **these stalls clear on their own after a
+variable interval (observed ~7–25+ min), and no intervention has been shown to cause recovery.**
+`check_worker_is_up()` remains genuinely useful as a *diagnostic* — it distinguishes a dead worker
+from a wedged one, which no earlier session could do — but it is not a remedy.
+**Do not record either function as "the fix."**
+
+### Chattanooga recon COMPLETE — ready to wire, not yet wired
+
+`services2.arcgis.com/cclAu9OKhOfjeUdr/.../Building_Permits_to_April_2021/FeatureServer/**0**`
+(service name is historical; the layer is current). Owner `RandA_CHCRPA` = Chattanooga-Hamilton
+County Regional Planning Agency. **31,868 rows, point geometry.**
+
+- **Fresh**: 1,289 rows in the trailing year, 5,706 in the 1095-day window (paired control).
+- **Type source is `P_TYPE`, NOT the opaque `DEV_TYPE_C`.** `DEV_TYPE_C` is 26 numeric codes
+  (101/102/100/328/…) that DO sum exactly to 31,868 but carry no domain and no renderer labels —
+  they look like Census C-404 construction codes, and **guessing that is exactly the prohibited
+  move**. The layer's own renderer keys on `P_TYPE`, whose values are self-describing:
+  **Residential 29,873 + Non-Residential 1,995 = 31,868 exactly**, confirmed in both count-DESC
+  and count-ASC orderings.
+- Suggested mapping: `Residential → Residential`, `Non-Residential → Development` (the generic
+  closed-vocabulary member — "Non-Residential" spans commercial/industrial/civic, so mapping it to
+  `Commercial` would be a guess).
+- `CATEGORY` is useless as a type: a single value `New` on all 31,868 rows.
+- No status column → `status_const: "Issued"`. No ZIP column → spatial 3-mi. No per-record URL →
+  `dataset` precision.
+- `ADDRESS` is the title, **0 nulls** in the connector's window. PII check performed (the Asheville
+  lesson): `P_DESC` values are work scopes ("SINGLE FAMILY RESIDENCE ON SLAB W/ ATTACHED…"), no
+  personal names.
+- Expected lift is modest: Hamilton is **26/31 already backed**, so at most **5 pages**.
