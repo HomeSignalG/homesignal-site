@@ -2444,3 +2444,70 @@ only the sourcing rule stops it.
   Leon County has **0 modelled ZIP pages**, so it is not addressable regardless.
 - **Charleston County SC** — a real `Building Permits 2025` layer exists, but Charleston's 25 pages are
   **already 0 dark**. Nothing to gain; not wired.
+
+---
+
+## WAVE 13 — Honolulu · Milwaukee · San Mateo · CT statewide · Anne Arundel · Eugene · Ventura · Snohomish (2026-07-31)
+
+**0 wired — but this wave found a SECOND, cheaper capability gap that blocks two fresh, live,
+first-party ledgers.** Unlike the vendor-portal wall, the missing piece here already exists in the
+codebase for a different connector.
+
+### 🔑 THE FINDING: two live ledgers blocked by ONE missing capability — a geocode path for the
+### socrata + csv connectors
+
+The `arcgis` connector already has a geocode path (the Boulder / Anaheim geometry-less-table route:
+Census geocode + the v20 `GEOCODE_FENCE_MI` fence). **`socrata` and `csv` do not.** Both connectors
+can only scope by a native ZIP column or by `spatial_point_col`. Two of the best sources found all
+session fail on exactly that and nothing else:
+
+| source | pages | rows | freshness | why blocked |
+|---|---|---|---|---|
+| **Honolulu** `data.honolulu.gov` `4vab-c87q` | **38** | **432,021** | **FRESH — max `issuedate` 2025-07-01** | address is TEXT only |
+| **Milwaukee** `data.milwaukee.gov` `buildingpermits` (CSV) | **36** | — | issued dates run to 2017+ in the head sample | address is TEXT only |
+
+- **Honolulu** carries a rich, current schema — `buildingpermitno, buildingpermittype, issuedate,
+  statusdescription, proposeduse, occupancygroupcategory, estimatedvalueofwork, newbuilding,
+  demolition, addition, alteration, commercialresidential, accessorydwellingunitadu, totalfloorarea,
+  tmk, jobaddress, joblocation, address`. Every location field was type-checked against the column
+  metadata: **`jobaddress`, `joblocation`, `locationpermitissued`, `address` and `tmk` are ALL
+  `dataTypeName: text`.** No Socrata `location`/`point` type, no lat/lng pair, no ZIP column.
+  Per the Austin standing answer, a socrata entry with `spatial_zip_radius_mi` but no
+  `spatial_point_col` is **quarantined and emits zero records** — so it cannot be wired as config.
+- **Milwaukee**'s CSV header is exactly 9 columns:
+  `"Date Opened","Address","Record ID","Permit Type","Status","Date Issued","Construction Total Cost","Use of Building","Dwelling units impact"`
+  — `Address` is a bare street string (`2033 S 24TH ST`), no city/state/ZIP, no coordinates.
+
+**Why this matters more than the other blockers:** this is **not** a "the data doesn't exist" wall.
+Both cities publish first-party, per-record, addressed permit ledgers. **74 dark pages** are blocked
+by a capability the repo already implements for `arcgis`. Extending it to `socrata`/`csv` is a code
+change (gated), but a far smaller one than a vendor adapter — and the geocode fence that makes it
+safe is already written and shipped.
+
+### Rejections with receipts
+
+- **CT statewide — `CT Housing Data Hub - Permitting DECD` is AGGREGATE BY DESIGN.** 4,732 rows,
+  **polygon** geometry (town boundaries), and the field list settles it:
+  `Municipality, year, places, county, total_units, units_1, units_2, units_3_4, units_5p,
+  demolitions, year_permits, year_demos, perc_permits, perc_demos, net` — municipality-by-year
+  counts, no address, no per-record row. Identical to the NJ DCA rejection class. This closes the
+  statewide route for **Fairfield / Hartford / New Haven / Litchfield / New London** at once.
+- **San Mateo CA (31)** — `datahub.smcgov.org` is live (695 KB catalog, searched in full). Every
+  permit match is a **performance metric**: `PercentOfBuildingPermitsCreatedOnline`,
+  `Percentage of Online Permits Issued By Year`. No ledger.
+- **Anne Arundel MD (37) · Eugene/Lane OR (37) · Ventura CA (34) · Snohomish WA (33)** — combined
+  AGO search returned 28 results; every service is a **boundary or footprint layer**
+  (`Agricultural Land`, `regulatory_boundaries`, `Municipal Boundary`, `LandUseOverlays`) plus two
+  Bellingham WA university demographic layers. No permit ledger.
+- **Honolulu AGO route** — separately searched; returns only `Building Footprint Centerpoints` and
+  `Building Footprints (CCH)`. The Socrata dataset above is the city's only permit publication.
+
+### Running blocker tally (for the end-of-run review)
+
+| class | blocked pages | fix |
+|---|---|---|
+| Vendor portals (Accela/EnerGov/CitizenServe/SmartGov/Municity) | most of the long tail | **vendor adapter** — code, gated |
+| **socrata/csv geocode path** | **74** (Honolulu 38 + Milwaukee 36) | **extend the existing arcgis geocode path** — code, gated, small |
+| First-party sourcing rule | 18 (Spokane) | **founder call** — data exists, owner is a utility |
+| Stalled ledgers | 42 (Providence) + others | reprobe list |
+| WAF / 403 | 91 (Wichita 50, Tulsa 39, + OKC 52 earlier) | reprobe list |
