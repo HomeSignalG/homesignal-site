@@ -2851,3 +2851,64 @@ that needs no engineering at all.
 | 1 | **C — ZIP expansion** (Sacramento first, then LA/Harris/Bexar/Onslow) | large + unlocks already-found sources | **pure data, zero code** |
 | 2 | **A2 — socrata/csv geocode path** | 74 (Honolulu + Milwaukee) | small code; `arcgis` already has the pattern + fence |
 | 3 | **A1 — vendor adapter** | the long tail | largest code change |
+
+---
+
+## 🟢 GO-LIVE: `allentown-energov-building-permits` — 5 Lehigh PA pages, 3,939 records (2026-07-31)
+
+Merged (#495), deployed (**`get-address-report` v126**), all 34 Lehigh ZIPs re-fired and collected,
+5 pages materialized `quality=pass`:
+
+| ZIP | development |
+|---|---|
+| 18102 | 1,537/1,537 |
+| 18103 | 863/863 |
+| 18104 | 728/728 |
+| 18109 | 568/568 |
+| 18101 | 243/243 |
+
+**3,939 records — 0 missing `record_url`, 0 missing coordinates, 0 non-`point` scope, 0 unclassified.**
+Bidirectional gate proof: they ride **`PA/Lehigh` and nothing else**. Lehigh goes 34 dark → 29.
+
+Only 5 of the 34 Lehigh ZIPs light up because the source is the **City of Allentown**, and Allentown's
+own ZIPs are exactly 18101–18104/18109 (18106 and 18195 are PO/edge blocks with no permits in window).
+The other 29 are separate Lehigh boroughs and townships — correct behaviour, not a gap.
+
+---
+
+## ⚠️ CORRECTION to WAVE 17 — the counties were not exhausted; MY SEARCH WAS
+
+Wave 17 concluded that *"county-by-county probing is now the wrong instrument"* after 22 consecutive
+dry counties. **That conclusion was too strong, and wave 18 disproved it within the hour.**
+
+Switching from *county-name* search to **ledger-title-shape** search
+(`title:"Building Permits" AND type:"Feature Service"`, sorted newest-modified) immediately surfaced
+three PA ledgers in counties I had already written up as closed:
+
+| found | county | dark | outcome |
+|---|---|---|---|
+| `EnerGov Building Permits Current` | **Lehigh (Allentown)** | 34 | ✅ **WIRED — 3,939 records live** |
+| `Lancaster County Building Permits` | Lancaster | 56 | rejected — 28 rows of `Year / Project_type / Units_permitted_by_type`, an **aggregate** |
+| `Building_Permits` (`rrwenschhof_dauphinco`) | Dauphin | 30 | no permit Feature/Map Service in the org's 218 items |
+
+**The Allentown miss is the receipt.** In wave 16 I searched `(Allentown OR Bethlehem PA OR "Lehigh
+County") AND permits`, got **4,575 results**, and recorded Lehigh as having *"not one municipal building
+ledger."* The ledger existed the whole time, on the city's own AGO account, and the shape search found
+it in one query.
+
+### Standing answer (new): county-name search and title-shape search FAIL DIFFERENTLY — run both
+
+- **County-name search** drowns in cross-org lookalikes and generic "permit" noise (mining, parking,
+  stormwater, environmental). A high result count is *anti*-signal: 4,575 results returned nothing.
+- **Title-shape search sorted by newest-modified** surfaces live ledgers regardless of how the owner
+  named their org — which is exactly how Johns Creek, Lee County and now Allentown were found.
+- **Never record a county as "no ledger published" on a county-name search alone.** The wave 14–17
+  rejections were all county-name-only and are hereby downgraded from *closed* to
+  **needs a title-shape re-sweep**.
+
+### Also worth recording: the vendor wall is not absolute
+
+Allentown's dataset is literally named **`EnerGov_Permits_Buildings`** — the same vendor that blocks
+the long tail. **A city can export its own vendor data to ArcGIS Online**, and when it does the records
+are reachable as ordinary config with no adapter. That does not remove blocker A1, but it means the
+vendor-portal counties are worth a title-shape sweep *before* assuming an adapter is required.
