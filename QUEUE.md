@@ -1081,3 +1081,155 @@ stale — kept for the record of how the stall presented, but **47.6% is the cur
 **Session totals (all post-deploy `app_projects` reads): NC 48.8% → 72.9% (+41 pages), KY 34.9% →
 47.6% (+16 pages), MA 89.6% → 90.4% (Live). 3 entries wired (registry 105 → 108), 33,219 records,
 0 missing `record_url`, 0 unclassified, 0 gate leaks across all three.**
+
+---
+
+## BOONE MERGED + DEPLOYED, re-cache PENDING (2026-07-31)
+
+**Do not report Boone/KY as improved beyond 47.6%.** *Wired + merged + emitting is not Live.*
+
+| Step | State |
+|---|---|
+| PR #464 merged to `main` | ✅ `a3e6a28` |
+| Engine deployed | ✅ **v118** (confirmed via `list_edge_functions` before firing) |
+| 8 Boone ZIPs fired | ✅ |
+| Reports returned | ❌ **0 of 8** — pg_net stalled, `max(id)` frozen at 13622, queue 58 |
+| collect / materialize | ⏸ not run |
+| **KY measured** | **60/126 = 47.6%** — unchanged, report it that way |
+
+Expected once the queue drains: **+8 → 68/126 = 54.0%**.
+
+### RESUME (same 3 steps as the Lexington entry above, with Boone's ZIP set)
+
+```sql
+select count(*) from net.http_request_queue;   -- wait for 0 FIRST
+-- re-fire only if the queue drained without them returning:
+with bz as (select distinct z.zip from public.communities c, unnest(c.zip_codes) z(zip)
+            where c.level='zip' and c.state='KY' and c.county='Boone')
+select net.http_post('https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/get-address-report',
+  jsonb_build_object('zip', d.zip, 'lat', d.home_lat, 'lng', d.home_lng),
+  '{}'::jsonb, '{"Content-Type":"application/json"}'::jsonb, 90000)
+from public.development_reports d join bz on bz.zip=d.zip;
+-- then: dev_refresh_collect() -> app_refresh_zip over the 8 -> measure from app_projects
+```
+
+### 📌 pg_net ZIP-refresh stall — now observed FOUR times tonight, same signature
+
+Buncombe 20 (cleared ~20 min) · Fayette 19 (cleared, +16 pages) · the 253-deep cron batch (cleared) ·
+Boone 8 (stalled at handoff). Signature every time: `net.http_request_queue` frozen at exactly the
+outstanding count while `max(net._http_response.id)` stops advancing. **It has ALWAYS cleared on its
+own.** `worker_restart()` was measured against it and did nothing (see the blocker section above) —
+do not run it, do not wait on it, just re-check later.
+**Cheap GET probes drain normally throughout; it is the 90 s ZIP-refresh POSTs that pile up.**
+
+### Session close — 4 entries wired (registry 105 → 109), 3 states measured up
+
+| State | Before | After | Verified |
+|---|---|---|---|
+| MA | 89.6% | **90.4% (Live)** | ✅ post-deploy `app_projects` |
+| NC | 48.8% | **72.9%** | ✅ post-deploy `app_projects` |
+| KY | 34.9% | **47.6%** | ✅ post-deploy `app_projects` |
+| KY (Boone) | — | *+8 pending* | ⏸ merged + deployed, not cached |
+
+33,219 records across the three landed entries · 0 missing `record_url` · 0 unclassified ·
+0 gate leaks. NC capped at 72.9% and RI dead-ended, both with per-county receipts above.
+
+### ✅ SUPERSEDES THE PENDING BLOCK ABOVE — Boone LANDED
+
+The stall cleared on its own (**4th of 4** — it always has). Full pipeline completed:
+
+```
+queue 0 · 10 Boone reports returned · dev_refresh_collect() 91 · app_refresh_zip 8/8 quality=pass
+```
+
+- **8 of 8 Boone ZIPs carry records; 1,438 records; 0 missing `record_url`, 0 unclassified.**
+- **Bidirectional gate proof, cache-wide: 8 ZIPs, KY/Boone ONLY.**
+- **KY: 60 → 68 of 126 = 47.6% → 54.0%** (from `app_projects`, post-deploy v118).
+
+The "KY still measures 47.6% / do not report Boone" block above was correct when written and is now
+stale — kept as the record of how the stall presented. **54.0% is the current truth.**
+
+### FINAL SESSION TOTALS — 4 entries wired (registry 105 → 109), all verified post-deploy
+
+| State | Before | After |
+|---|---|---|
+| MA | 89.6% | **90.4% — LIVE** |
+| NC | 48.8% | **72.9%** (+41 pages) |
+| KY | 34.9% | **54.0%** (+24 pages) |
+
+**34,657 records · 0 missing `record_url` · 0 unclassified · 0 gate leaks across all four entries.**
+Every yield was predicted with the connector's own query shape BEFORE deploying and landed exactly:
+32/34 Mecklenburg · 9/20 Buncombe · 16/19 Fayette · 8/8 Boone.
+
+**Next state for the loop:** KY needs 46 more of its 58 remaining dark pages (Daviess 10, Campbell 10,
+Warren 9, Oldham 8, Bullitt 7, Madison 5, Jefferson 4, Fayette 3, Kenton 1, Christian 1) — the big
+three were searched and returned no first-party permit service (recorded as *unfound*, not proven
+absent). After KY the ranking is WY 81 · HI 88 · ID 89 · AK 91 · TN 92 · VA 93 pages to 90%.
+
+### KY: Campbell + Kenton REJECTED — LINK-GIS serves permitting BASEMAPS, not permit records
+
+Found the real LINK-GIS endpoint via web search after my host guesses failed: **`maps.linkgis.org/server/rest/services`**
+(v11.3, 22 folders). `gis.linkgis.org` fails DNS and `linkgis.org/arcgis` 404s a WordPress page — those
+were guesses, this is the live root.
+
+Two folders looked exactly right and both are **reference layers, not ledgers**:
+
+- **`PermittingSystem/PermittingSystem`** — layers are `AddressPts_KC_Parcels_City_Join` (point) and
+  `Parcels_KC_PVA_City_ZipCode_Join` (polygon). That is the *geometry the permitting app draws on*,
+  not the permits.
+- **`SmartGov/CC_Theme_SmartGov`** (SmartGov = the Paladin permitting platform) — 16 layers, all
+  Campbell County reference: address points, condos, zoning, parcels + label variants, roads, flood
+  zones, ZIP codes, city boundaries. No permit records.
+- `Campbell_County` folder — parks, snow routes, storm/water service areas. No permits.
+- `CommunityDevelopment` — a single `ExportWebMap` GPServer (a print service).
+
+**Same class as Charlotte's `Accela/Accela` reject: a permitting SYSTEM's basemap is not a permit
+ledger.** Standing answer worth keeping — a folder named `PermittingSystem` or `SmartGov` is a strong
+lead and a weak fact; open the layer list before believing it.
+
+Also confirmed: Boone's own server exposes **only Boone** — its `Member`, `Partner` and `Hosted`
+folders are all EMPTY (62-byte responses), so the `ServicesNKY` folder does not extend the BCPC
+board-action ledger to Campbell/Kenton.
+
+**KY is now effectively capped.** Remaining dark 58, need 46: Daviess 10 + Warren 9 (searched, no
+first-party permit service found), Campbell 10 + Kenton 1 (rejected above), Oldham 8, Bullitt 7,
+Madison 5, Jefferson 4, Fayette 3, Christian 1. Even wiring every un-probed county leaves it short
+of 46 without Daviess/Warren/Campbell. Not recorded UNREACHABLE — Oldham/Bullitt/Madison were never
+individually probed — but there is no plausible path to 90%.
+
+### WY probed — no statewide and no metro source; all 103 pages structurally dark
+
+WY was the next target (103 pages, 12 backed, 81 to 90%) and fits the profile that carried TX/NV/UT —
+a big rural state where one statewide DOT layer lifts everything. **It does not exist here.**
+
+- **Wyoming Geospatial Hub** (`data.geospatialhub.org`, **2.44 MB DCAT read in full**) — every dataset
+  matching permit/construction/development is water-rights or extractive and mostly a 2001–2012
+  river-basin study: SEO Agricultural/Domestic/Industrial/Municipal/Stock/Coal-Bed-Methane **Well**
+  Permit Locations, Stock Pond Permits, Reservoir Water Right Permits, Instream Flow Permits, EPA
+  Permitted Water Dischargers, Oil & Gas / Wind development *potential* rasters. **No building or
+  land-development permit dataset of any kind.**
+- **"Road Travel and Construction Map for Wyoming"** — the one construction-sounding hit — is
+  explicitly *"the metadata record for WYDOT's live road conditions web-map; link in record"*. A
+  viewer app, not a data service. **Standing answer: a Hub "dataset" can be a metadata stub for an
+  APPLICATION — read `description` before chasing it.**
+- **WYDOT's own host** `gis.wyoroad.info` 404s at both `/arcgis/rest/services` and `/server/rest/services`.
+- **Cheyenne (224 results) and Casper (126)** — scoped AGO searches both RAN and returned **0**
+  permit/construction/development services. Non-zero totals, so this is a real absence, not the
+  AND-ed-query artifact that produced false zeros earlier in the KY pass.
+
+WY dark is uniform: Natrona 13, Laramie 13, Albany 12, Fremont 12, Sweetwater 12, Park 8, Campbell 7,
+Teton 7 — **every county 0 backed**. No path to 90%.
+
+### Frontier status after this session — the remaining states are a different problem
+
+| State | Pages to 90% | Verdict |
+|---|---|---|
+| KY | 46 | effectively capped (Campbell/Kenton rejected, Daviess/Warren unfound) |
+| WY | 81 | **no source exists** — statewide + both metros probed |
+| HI / ID / AK / TN / VA / MS | 88–93 each | unprobed; each needs MULTIPLE sources, not one wire |
+
+The single-source-lifts-a-state era is over for the states that remain. NC and KY both moved
+substantially this session but neither could reach 90%, and the reason is the same in every case:
+**small and rural jurisdictions do not publish per-record permit data**, and the vendor-platform
+folders that look like they do (`PermittingSystem`, `SmartGov`, `Accela`) turn out to serve the
+basemap their permitting app draws on.

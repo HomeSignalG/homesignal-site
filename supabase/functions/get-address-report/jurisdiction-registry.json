@@ -9375,6 +9375,52 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "record",
       "_receipts": "2026-07-31 KY wire pass, Boone. Boone County Planning Commission 'BCPC Board Activities Layer' (ServicesBoone/PlanningAndZoningGroup_Boone layer 7) on the county's OWN server secure.boonecountygis.com (ArcGIS Server v11.4). 1,773 polygon rows. HOST FOUND VIA WEB SEARCH, then verified: linkgis.org (the NKY consortium for Kenton/Campbell/Pendleton) exposes NO REST directory (gis.linkgis.org fails DNS, linkgis.org/arcgis 404s a WordPress page); Boone's own server does, and CNTYFIPS is 21015 = Boone County KY on 1,772 of 1,773 rows. FRESHNESS VERIFIED WITH THE PAIRED PROBE (the KY-floodplain lesson): max ACTIONDATE = 2026-07-08 AND the windowed control 'ACTIONDATE >= DATE 2024-07-31' returns 91 - a healthy non-zero, so the max date is corroborated by volume rather than resting on one row. STATUS VOCABULARY IS CLOSED AND COMPLETE: live groupBy on BRDACTION returned 30 distinct values summing to EXACTLY 1,773 (positive control). All 30 are mapped verbatim -> 0 unclassified, nothing left to fail closed. The source's OWN TYPOS are preserved verbatim because the connector matches the stored string: 'APPROVAL WITH 2 CONSITIONS' (1), 'APPROVAL WITH 4 CONDITION' (1), 'APPROVAL WITH 1 CONDITIONS' (1), 'OVERTUEN ZA DETERMINATION' (1). Buckets: approved 1,560 (APPROVAL + every APPROVAL WITH N CONDITIONS variant) + exclude 213 = 1,773. EXCLUDE is deliberate and explicit rather than left unmapped, so the vocabulary is 100% covered: DISAPPROVAL 159, WITHDRAWN 23, DENIED 1, UNKNOWN 11, empty-string 8, and the 11 zoning-administrator APPEAL outcomes (UPHOLD/OVERTURN/OVERRULE/OVERTUEN) - appeals are not development authorisations. GMDSTATUS was NOT used as status_raw: it is single-valued ('COMPLETED' on all 1,773) and describes the RECORD, not the decision. use_type_const 'Development': REQUEST is free text ('CONDITIONAL USE PERMIT TO ALLOW AN INDOOR/OUTDOOR EVENT CENTER') so it cannot be a type_map source (Rule 5), and 'Development' is the generic member of the CLOSED six-value TYPE_EXACT set (Phoenix precedent). PII: REQUEST describes the REQUEST, not the applicant - no personal-name field is mapped (the Asheville lesson). record_url HTMLLINK is a real per-record document page populated on 1,744 of 1,773 (98.4%); the connector's column -> template -> dataset_url chain gives the rest honest dataset precision. lat/lng come from the layer's OWN GMDLATDD/GMDLONDD columns rather than a derived polygon centroid. No ZIP column -> spatial_zip_radius_mi 3. REJECTED in the same pass: layer 6 'BCPC Card Activities' (1,733 rows) has NO ACTIONDATE column - only GIS GMDCREATED/GMDEDITED housekeeping; ServicesNKY exposes only zoning-district and economic-development boundaries, no permit ledger."
+    },
+    {
+      "registry_id": "memphis-dpd-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services2.arcgis.com/saWmpKJIUAjyyNVc/arcgis/rest/services/DPD_Building_Permits/FeatureServer/0",
+      "dataset_url": "https://data.memphistn.gov/datasets/MEMEGIS::dpd-building-permits-1",
+      "jurisdiction": "City of Memphis Division of Planning & Development",
+      "coverage": [
+        {
+          "state": "TN",
+          "county": "Shelby"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Construction_Type",
+          "Description"
+        ],
+        "status_raw": null,
+        "type_source": "Sub_Type",
+        "file_date": "Issued_Date",
+        "address": "Address",
+        "lat": "Latitude",
+        "lng": "Longitude",
+        "case_number": "Record_ID"
+      },
+      "type_map": {
+        "RES": "Residential",
+        "Residential": "Residential",
+        "COM": "Commercial",
+        "Commercial": "Commercial"
+      },
+      "status_const": "Issued",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "extra_where": "Issued_Date IS NOT NULL",
+      "recency_days": 1095,
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-31 TN wire pass, Shelby (Memphis) - the largest single dark county found this session (41 modelled ZIP pages, 0 backed). City of Memphis DPD Building Permits, the city's OWN AGO layer DPD_Building_Permits/FeatureServer/0. 26,520 rows, esriGeometryPoint. ORG IDENTITY VERIFIED: owner 'opmautomation_memegis' (City of Memphis ArcGIS Online), reached via the city's Hub DCAT at data.memphistn.gov -> item 3018811a721a49a98843baeb29de6256 -> its 'url'. www.datamidsouth.org and data.memphistn.gov are NOT Socrata domains (both 404 the Socrata catalog API); shelbycountytn.gov's ArcGIS is live but its OPD_Codes folder is EMPTY. FRESHNESS VERIFIED WITH THE PAIRED PROBE (the KY-floodplain lesson): max Issued_Date = 2026-06-30 AND the windowed control 'Issued_Date >= DATE 2025-07-31' returns 4,208 - corroborated by volume, not resting on one row. Layer dataLastEditDate 2026-07-24. BOTH vocabularies enumerated live with a positive control, EACH summing to EXACTLY 26,520: Sub_Type 4 values (RES 17,621 / COM 6,344 / Residential 1,999 / Commercial 556 - the SAME two concepts in two encodings, both mapped verbatim) and Construction_Type 7 values (ALT 12,786, New 5,580, ACC 4,224, ADD 2,321, Alteration 884, Accessory 488, Addition 237). No nulls in either. 0 unclassified. No trades/noise classes exist in this layer, so no whitelist is needed - ALT/ACC/ADD/New are all real construction. NO STATUS COLUMN -> status_const 'Issued' guarded by extra_where 'Issued_Date IS NOT NULL', exactly the Detroit/Cleveland/Nashville issuance-ledger pattern. THREE NULL-RATE PROBES WERE STILL QUEUED BEHIND A pg_net STALL WHEN THIS WAS WIRED, so each unknown is made safe BY CONSTRUCTION rather than by assumption: (a) title is the ARRAY ['Construction_Type','Description'] - arrays JOIN, and Construction_Type is proven 0-null by its vocabulary summing to exactly 26,520, so the title can never be empty (Detroit's proven shape); (b) any null Issued_Date is excluded by extra_where; (c) any row without coordinates simply fails the spatial envelope and self-excludes - no fabricated placement. ZIP_Code is native but NULL on 2,749 of 26,520 (10.4%), so it is deliberately NOT mapped as 'zip' - spatial_zip_radius_mi 3 places every row by its OWN Latitude/Longitude instead of silently losing the 10%. recency_days 1095 bounds dense-metro row size (Henderson precedent). PII CHECK PERFORMED (the Asheville lesson): 12 Description + Address values read directly - all are work scopes ('Inground swimming pool', 'New house construction with 4 bedrooms', 'Interior tenant improvement to existing restaurant space'). No personal names; the only proper noun seen was a business (City Silo). Description is safe in the title. No per-record URL column -> dataset precision, pointing at the city's own Hub dataset page."
     }
   ],
   "ckan": [
