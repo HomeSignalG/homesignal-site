@@ -1763,3 +1763,63 @@ is now very low and four passes have measured it. The two genuinely open items a
 ones (Suffolk NY 107 pages behind a maintenance page, OKC 52 behind a UA-invariant WAF), plus any
 NEW vendor-side capability (e.g. an Accela/EnerGov/Municity public-API adapter) which would unlock
 many jurisdictions at once rather than one at a time. That is the shape of the remaining upside.
+
+---
+
+## CROSS-BOUNDARY COVERAGE — a measured, registry-only opportunity. FOUNDER DECISION REQUIRED.
+
+A different lever from source discovery, found after four recon passes concluded the dark-county
+sweep is exhausted. **No new source is needed** — it widens the `coverage` array of a source
+already wired and live.
+
+### The mechanism, and its one hard precondition
+
+A ZIP page shows development **within 3 miles of the ZIP centroid**. Many dark ZIPs sit *right on*
+the boundary of a county that is already lit. Measured: **dark ZIPs within 7 mi of an
+already-backed ZIP in a DIFFERENT county** —
+
+| state / county | near-dark pages | closest backed ZIP |
+|---|---|---|
+| NY / Nassau | 40 | 1.2 mi |
+| PA / Delaware | 36 | 1.3 mi |
+| NJ / Bergen | 29 | 1.3 mi |
+| RI / Providence | 27 | 1.8 mi |
+| PA / Montgomery | 25 | 0.9 mi |
+| GA / Fulton | 25 | 1.1 mi |
+| MI / Oakland | 20 | 2.4 mi |
+| NY / Westchester | 18 | 0.9 mi |
+
+⚠️ **PRECONDITION — this ONLY works for `spatial_zip_radius_mi` sources.** A source scoped by a
+native ZIP column (Philadelphia's Carto `LIKE '<zip>%'` prefix match, Detroit's `zip_code`,
+Boston's `zip`) can NEVER match an out-of-county ZIP, so widening its coverage yields **exactly
+zero**. Half the table above is therefore not actionable as-is: Philadelphia (Delaware/Montgomery
+PA) and Detroit (Oakland MI) are ZIP-column sources. **Check the scoping mode before proposing any
+widening** — otherwise this looks like a 200-page win and delivers nothing.
+
+### Live proof on the one clean spatial case
+
+`chicago-building-permits` is `spatial_zip_radius_mi: 3` + `spatial_point_col`. Probed the exact
+connector query shape (`within_circle(location, lat, lng, 4828)` + the same recency window)
+against 5 DuPage dark ZIP centroids:
+
+**counts `{0, 0, 0, 135, 222}` — 2 of 5 carry real Chicago permits within 3 miles.**
+(Multiset only; per-ZIP labelling not asserted — subquery ordering does not control
+`net.http_get` evaluation order.)
+
+### Why this is NOT fabrication — and why I am still asking
+
+The records are real, carry real `record_url`s, and sit at their own true coordinates. A resident
+in eastern DuPage genuinely has Chicago construction within 3 miles of their home, which is exactly
+what the page claims to show. There is established precedent for multi-county coverage where a
+source's data legitimately reaches: **`frisco-active-building-permits` declares BOTH Collin and
+Denton** because the city straddles the line; UDOT/TxDOT/NDOT declare statewide.
+
+**But the autonomy grant gates this explicitly: "anything that changes what residents see · anything
+that alters a coverage claim."** Widening a `coverage` array does both. It is registry-only and
+additive, which satisfies conditions 1 and 2 of the grant — and fails the gate list. So it is
+measured and documented here, and NOT shipped.
+
+**The question for the founder:** should a wired source's `coverage` be widened to adjacent
+counties where its records provably fall within the 3-mile page radius? If yes, the rule should be
+stated once (e.g. "a spatial source may declare any county in which it provably places ≥1 record
+within the page radius") so it is applied consistently rather than case by case.
