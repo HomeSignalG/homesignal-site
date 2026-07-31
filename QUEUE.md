@@ -127,9 +127,20 @@ page, and the largest (Shelby/Memphis) sits behind `SHELBY-429`, a **new connect
 **0 gate leaks** onto non-MA pages.
 
 🔴 **+503 PAGES FROM ONE ENTRY — the largest single gain of the session** (FL was +275; the county
-wires were Sussex +22 and Weld +11). **MA needs 565 for 90%: it is TWO PAGES SHORT.** Finding two
-more MA pages is the cheapest Live in the system — check the 71 still-dark MA ZIPs for any that a
-re-fire would catch, since ~29 ZIPs never re-cached cleanly.
+wires were Sussex +22 and Weld +11). **MA needs 565 for 90%: it is TWO PAGES SHORT — the cheapest
+Live in the system.**
+
+**The two pages are ALREADY IDENTIFIED and the attempt is IN FLIGHT.** Of the 71 dark MA ZIPs,
+**0 were never cached** but **16 still hold pre-v114 cache** — they never ran against the MassDOT
+engine because their requests keep failing. Those 16 were re-fired at 01:22Z and **the queue stalled
+at 16 with none completing** (row 411: ~31% of pg_net requests fail; these are the persistent
+failures, likely hitting the 90s timeout).
+
+**RESUME: re-fire those 16 and collect until the queue reaches 0.** The selector is exact —
+MA `level='zip'` pages with `development_reports.refreshed_at <= 2026-07-31 01:03Z` and no
+`app_projects` row with `record_kind='development'`. **Only 2 of the 16 need to succeed for
+Massachusetts to become the 4th Live state.** The other 55 dark ZIPs re-cached cleanly and are
+genuinely outside MassDOT's 3-mile reach — do not chase those.
 
 ⚠️ **THE "ZERO RECORDS" SCARE WAS MY MEASUREMENT, NOT A DEFECT — and the lesson is the one that
 already bit once tonight.** I measured 0 MassDOT records while 30 requests were still queued and the
