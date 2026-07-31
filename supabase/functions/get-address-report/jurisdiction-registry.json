@@ -9753,6 +9753,67 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-31: City of Stamford's own Land Use Bureau major-developments tracker (layer MasterDevelopments_20241003), 44 rows, point geometry in wkid 103016/6434 (CT State Plane NAD83(2011)) -- the connector sends outSR=4326 so it reprojects server-side. BOTH vocabularies enumerated live and EACH SUMS EXACTLY TO 44: USER_Project_Status = Approved - FSP 27 + Completed 10 + Under Construction 6 + Approved - GDP 1; USER_Development_Type = New Construction 32 + Adaptive Reuse / Conversion 10 + Other 2. 0 unclassified either way. file_date is USER_Approval_Date, populated on 43 of 44 rows (probed: where USER_Approval_Date <> '' -> 43); USER_Building_Permit_Date is REJECTED as the date field because max() over it returns the empty string -- it is unpopulated. Dates are STRINGS 'yyyy-mm-dd hh:mm:ss', so recency_days is deliberately ABSENT (it emits a DATE literal -- the Anaheim standing answer); isoDay() parses this shape. FRESHNESS CAVEAT, stated not hidden: newest USER_Approval_Date is 2024-07-29, ~12 months old -- this is a CURATED tracker of ongoing/proposed major projects, not a continuous issuance ledger, so an approved-2023 project still Under Construction is a currently-true record; it is NOT evidence of new filings in the last year. Under Construction is bucketed operating (the building physically exists and is rising) alongside Completed. No per-record URL column -> dataset precision on the Land Use Bureau page. No ZIP column -> spatial 3-mi. Covers the 6 modelled Stamford ZIP pages 06901/02/03/05/06/07, all dark before this."
+    },
+    {
+      "registry_id": "allentown-energov-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/WUqVDRuvIiIiH2Pl/arcgis/rest/services/EnerGov_Building_Permits_Current/FeatureServer/0",
+      "dataset_url": "https://www.allentownpa.gov/Government/Departments/Building-Standards-and-Safety",
+      "jurisdiction": "City of Allentown, Pennsylvania",
+      "coverage": [
+        {
+          "state": "PA",
+          "county": "Lehigh"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "WORKCLASS",
+          "ADDRESSLINE1"
+        ],
+        "status_raw": "STATUSNAME",
+        "type_source": "TYPE",
+        "file_date": "ISSUEDATE",
+        "address": [
+          "ADDRESSLINE1"
+        ],
+        "zip": "POSTALCODE",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "PERMITNUMBER"
+      },
+      "type_map": {
+        "Building": "Development",
+        "Residential Building (LEGACY)": "Residential",
+        "Commercial Building (LEGACY)": "Commercial"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "In Review",
+          "In Progress",
+          "Fees Due",
+          "On Hold"
+        ],
+        "approved": [
+          "Issued",
+          "Fees Paid",
+          "Temporary CO"
+        ],
+        "operating": [
+          "Complete",
+          "Inspections Complete"
+        ],
+        "exclude": [
+          "Expired",
+          "Cancelled",
+          "Void",
+          "Stop Work Order"
+        ]
+      },
+      "extra_where": "TYPE NOT IN ('Electrical (Residential)(LEGACY)','Electrical (Commercial)(LEGACY)','Plumbing (Commercial)(LEGACY)','Plumbing (Residential)(LEGACY)','Mechanical (Residential)(LEGACY)','Mechanical (Commercial)(LEGACY)','Building Sprinkler (LEGACY)','Building Tank (LEGACY)','Building Annual Electric Permit (LEGACY)')",
+      "recency_days": 1095,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-31: City of Allentown's OWN AGO account (org WUqVDRuvIiIiH2Pl, owner AllentownPA), layer EnerGov_Permits_Buildings, 5,309 rows, point geometry. FRESH: max ISSUEDATE = 1785369600000 ms = 2026-07-28, three days before wiring. BOTH vocabularies enumerated live and EACH SUMS EXACTLY TO 5,309: STATUSNAME = Issued 2376 + Complete 2175 + Expired 656 + Inspections Complete 28 + Temporary CO 16 + Cancelled 13 + Fees Due 13 + Void 11 + In Review 9 + Stop Work Order 7 + On Hold 3 + In Progress 1 + Fees Paid 1; TYPE = Building 3719 + Residential Building (LEGACY) 286 + Commercial Building (LEGACY) 263 + Electrical (Residential)(LEGACY) 258 + Electrical (Commercial)(LEGACY) 197 + Plumbing (Commercial)(LEGACY) 151 + Plumbing (Residential)(LEGACY) 151 + Mechanical (Residential)(LEGACY) 135 + Building Tank (LEGACY) 62 + Mechanical (Commercial)(LEGACY) 51 + Building Sprinkler (LEGACY) 35 + Building Annual Electric Permit (LEGACY) 1. The 9 LEGACY trade types (1,041 rows) are dropped at source via extra_where, following the WA/MN/IL trades precedent; 4,268 construction rows are kept. use_type comes from TYPE: the dominant value 'Building' (3719) is GENERIC and is therefore written as 'Development', the generic member of the closed TYPE_EXACT vocabulary in lib/map.js -- it is deliberately NOT guessed into Residential/Commercial, because only the two LEGACY values state which. NATIVE ZIP: POSTALCODE is populated ('18104','18103') so column_map.zip is used and NO spatial_zip_radius_mi is needed. Verified real WGS84 coordinates under outSR=4326 (-75.520/40.593, -75.481/40.582 -- Allentown). ISSUEDATE is esriFieldTypeDate so recency_days applies normally. No per-record URL column -> dataset precision on the city's Building Standards page. FOUND BY THE SEARCH INVERSION (title:'Building Permits' AND type:'Feature Service', sorted newest-modified) AFTER a county-name search for Allentown had returned 4,575 results and missed it entirely."
     }
   ],
   "ckan": [
