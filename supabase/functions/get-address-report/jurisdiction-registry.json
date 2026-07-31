@@ -9125,6 +9125,65 @@
       "incremental_field": "From_Date",
       "record_url_precision": "dataset",
       "_receipts": "2026-07-31 MA STATEWIDE wire, second of the state-DOT sweep (after fdot-active-construction-projects, which took FL from 6.4% to 68.7% -- +275 pages from ONE entry vs +22 for a county). MA had 574 dark pages of 627, the largest single prize remaining. Layer: MassDOT's own server, Projects/HighwayProjects, ONE layer id 0, 24,045 rows, POLYLINE (rides featurePoint()'s path-midpoint), linear-referenced (Route_ID/From_Measure/To_Measure). BOTH VOCABULARIES ENUMERATED LIVE AND COMPLETE -- each groupBy sums to EXACTLY 24,045 with exceededTransferLimit:false, the positive control. Unlike FDOT this layer has REAL status and type columns, so it gets real maps rather than constants. Status: DESIGN 8,392 -> proposed; CONSTRUCTION 1,489 -> approved; COMPLETE 3,603 -> operating. Proj_Type: 56 values mapped verbatim, all -> Utility, matching the UDOT/TxDOT/NDOT precedent where every highway project type maps to Utility. DELIBERATELY UNMAPPED, FAIL CLOSED: Status null (10,561 rows, 44%), Proj_Type null (10,666), 'Unsure' (112) and the empty string (31). THE 44% NULL STATUS WAS CHASED TO GROUND -- do not re-open. Probed both candidate rescue columns scoped to exactly the null-Status rows; both enumerations sum to exactly 10,561. constructionStatus is ENTIRELY EMPTY there (10,334 null + 227 empty string). DesignStatus is populated on only 230 of 10,561 (2.2%), and its values (Initial 164, PNF 39, Tabled 23, Denied 3, Approved 1) are pre-application states that would need their own mapping for ~200 rows. The gap is in MassDOT's data, not in the column choice, so Status stays status_raw and ~13,484 rows publish. More_Info exists per row but its populated-ness was NOT measured, so precision stays 'dataset'. NOT YET DEPLOYED OR MEASURED: run the envelope pre-check against dark MA ZIPs, then deploy (CONFIRM THE VERSION INCREMENTS -- a dispatched deploy silently did not land during the FL wire), fire, collect, MATERIALIZE via app_refresh_zip, and measure from app_projects."
+    },
+    {
+      "registry_id": "charlotte-land-dev-commercial-projects",
+      "platform": "arcgis",
+      "service_url": "https://gis.charlottenc.gov/arcgis/rest/services/PLN/LandDevCommercialProjects/MapServer/0",
+      "dataset_url": "https://gis.charlottenc.gov/arcgis/rest/services/PLN/LandDevCommercialProjects/MapServer/0",
+      "jurisdiction": "City of Charlotte",
+      "coverage": [
+        {
+          "state": "NC",
+          "county": "Mecklenburg"
+        }
+      ],
+      "column_map": {
+        "title": "ProjectName",
+        "status_raw": "Status",
+        "file_date": "OpenDate",
+        "decision_date": "StatusDate",
+        "address": "Address",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "ProjectNumber",
+        "record_url": "ProjectDetail"
+      },
+      "use_type_const": "Commercial",
+      "status_to_bucket": {
+        "proposed": [
+          "Scheduled",
+          "In Progress",
+          "Revisions",
+          "In Process",
+          "Revisions Needed",
+          "Approval Pending Payment",
+          "Pending Additional Information",
+          "Awaiting Plans",
+          "Expedited Fees Pending",
+          "In Review",
+          "OPEN"
+        ],
+        "approved": [
+          "Approved"
+        ],
+        "operating": [
+          "Complete",
+          "Construction Completed",
+          "DONE"
+        ],
+        "exclude": [
+          "Closed",
+          "Withdrawn",
+          "Not eligible",
+          "No Show",
+          "Void",
+          "Replaced"
+        ]
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "record",
+      "_receipts": "2026-07-31 NC wire pass. City of Charlotte's OWN ArcGIS Server (gis.charlottenc.gov, v11.3), service PLN/LandDevCommercialProjects layer 0 'Land Dev Commercial Projects'. 7,029 rows (returnCountOnly). geometryType esriGeometryPolygon -> derived shoelace centroid; return_centroid NOT set (classic ArcGIS Server MapServer silently ignores it - standing answer). No ZIP column anywhere -> spatial_zip_radius_mi 3. FRESH: max OpenDate = 2026-07-30 (orderByFields=OpenDate DESC), the day before wiring. BOTH vocabularies enumerated live via groupBy with a positive control - each sums to EXACTLY 7,029: Status 22 values (Approved 1986, Closed 1921, Complete 923, NULL 450, Scheduled 442, Withdrawn 373, In Progress 280, Construction Completed 227, Revisions 214, In Process 142, Not eligible 28, Revisions Needed 16, Approval Pending Payment 9, Pending Additional Information 5, Awaiting Plans 3, No Show 2, Void 2, DONE 2, Expedited Fees Pending 1, In Review 1, OPEN 1, Replaced 1) and Category 5 values (1205+427+1317+1699+2381). All 21 non-null statuses mapped -> 0 unclassified; the 450 NULL-status rows FAIL CLOSED (never published). Bucket sums: proposed 1114 + approved 1986 + operating 1152 + exclude 2327 = 6579, + 450 null = 7029. 'Closed' is EXCLUDED deliberately (administrative closure, ambiguous lifecycle - Minneapolis precedent); 'Complete'/'Construction Completed'/'DONE' are the real operating states. use_type_const 'Commercial' rather than a 55-value ProjectType type_map: the SERVICE ITSELF is scoped to commercial land development (layer name), so the value is source-stated, not guessed, and 'Commercial' is a member of the CLOSED six-value TYPE_EXACT vocabulary in lib/map.js. record_url: ProjectDetail is a REAL per-record Accela URL (aca-prod.accela.com/CHARLOTTE/Cap/CapDetail.aspx?...capID1=20LDC&capID3=00243), populated on 3,570 of 7,029 (50.8%); the connector's column -> template -> dataset_url chain gives the rest honest 'dataset' precision, so no row is dropped by the anti-fabrication gate. REJECTED with receipts in the same pass: Accela/Accela MapServer is a reference basemap (parcels/zoning/review areas), NOT a permit ledger; PLN/Rezonings only 78 rows; NCDOT_ActiveConstructionProjects is statewide but tiny (257 multipoint + 161 polyline) AND its point layer is esriGeometryMultipoint, which featurePoint() does not handle (no 'points' branch) -> no coordinates, area scope, no coverage credit."
     }
   ],
   "ckan": [
