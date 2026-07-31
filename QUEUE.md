@@ -178,9 +178,56 @@ Orlando ungeolocatable, Tampa WAF-blocked, Miami too slow).
 ```
 https://gis.massdot.state.ma.us/arcgis/rest/services/Projects/HighwayProjects/FeatureServer/0
 ```
-Service root 200; exactly **one layer, id 0 "Highway Projects"**. Same shape as FDOT. Still to
-measure before wiring: row count, geometry type, field list, and the envelope pre-check against
-dark MA ZIPs.
+**FULLY PROBED 2026-07-31 — both vocabularies enumerated. Write the entry directly from this.**
+24,045 rows · POLYLINE (rides `featurePoint()` path-midpoint) · linear-referenced
+(`Route_ID`/`From_Measure`/`To_Measure`).
+
+Unlike FDOT this has **REAL status and type columns**, so it gets real maps, not constants.
+
+**`Status` — complete, sums to EXACTLY 24,045, `exceededTransferLimit:false`:**
+`DESIGN` 8,392 -> **proposed** · `CONSTRUCTION` 1,489 -> **approved** · `COMPLETE` 3,603 ->
+**operating** · **null 10,561 (44%) -> UNMAPPED, fails closed.** Publishing ~13,484 rows.
+✅ **THE 44% NULL WAS CHASED AND IS REAL — do not re-open it.** Probed the two candidate rescue
+columns scoped to exactly the null-Status rows (`where Status IS NULL`); both enumerations sum to
+exactly **10,561**, the positive control:
+- **`constructionStatus`: null 10,334 + `""` 227 = 10,561. ENTIRELY EMPTY.** No help whatsoever.
+- **`DesignStatus`: only 230 of 10,561 populated (2.2%)** — `Initial` 164 · `PNF` 39 · `Tabled` 23 ·
+  `Denied` 3 · `Approved` 1. Nowhere near enough to switch `status_raw`, and `PNF`/`Initial` are
+  pre-application states that would need their own mapping for 200 rows.
+
+So the gap is in MassDOT's own data, not in the column choice. **Accept the loss, keep `Status` as
+`status_raw`, publish ~13,484 rows, and do NOT invent a bucket for the nulls.**
+
+**`Proj_Type` — complete, sums to EXACTLY 24,045, 60 values, `exceededTransferLimit:false`.**
+All are self-describing highway/bridge work and every one maps to **`Utility`**, matching the
+UDOT/TxDOT/NDOT precedent (enumerate verbatim rather than using a constant — that is what proves
+the vocabulary was read). Top values: `Hwy Reconstr - No Added Capacity` 1,358 · `Traffic Signals`
+1,133 · `Resurfacing DOT Owned Non-Interstate` 1,068 · `Roadway - Reconstr - Sidewalks and Curbing`
+904 · `Resurfacing Interstate` 893 · `Hwy Reconstr - Restr and Rehab` 842 · `Resurfacing` 819 ·
+`Bridge Replacement` 795 · `Hwy Reconstr - Minor Widening` 744 · `Safety Improvements` 711 ·
+`Bridge Preservation` 700 · `Structures Maintenance` 466 · `Bikeway/Bike Path Construction` 454 ·
+`Bridge Reconstruction/Rehab` 362 · `Sidewalk Construction and Repairs` 248 · `Pavement Marking`
+163 · `Vertical Construction (Ch 149)` 142 · `Guard Rail & Fencing` 126 · `New Construction` 126 ·
+`Hwy Reconstr - Added Capacity` 114 · `Structural Signing` 106 · `Tunnels` 83 · `Hwy Reconstr -
+Major Widening` 83 · `Painting - Structural` 77 · `Drainage` 76 · `Culvert Replacement` 74 ·
+`Reclamation` 68 · `Intelligent Transportation Sys` 54 · `Electrical` 53 · `Bridge Maintenance` 51 ·
+`Landscaping` 47 · `Lighting` 39 · `Miscellaneous/No Prequal` 36 · `Sign Installation/Upgrading` 35 ·
+`Shared Use Path Construction` 27 · `Other, TIP` 25 · `Contract Highway Maintenance` 22 · `Sewer and
+Water` 17 · `Demolition` 15 · `Highway Sweeping` 11 · `Tree Trimming` 11 · `Chemical Storage Sheds`
+10 · `Bike Facility Construction` 7 · `Process/Recycle/Trnsprt Soils` 7 · `Highway Relocation` 5 ·
+`Pump Station Reconstruction/Rehab` 5 · `Drawbridge Maintenance` 5 · `New Bridge` 5 · `Culvert
+Reconstruction/Rehab` 4 · `Limited Access Pavement Preservation` 2 · `Impact Attenuators` 2 ·
+`Dredging` 2 · `Catch Basin Cleaning` 1 · `Bridge Maintenance - Deck Repairs` 1 · `Marine
+Construction` 1 · `Milling and Cold Planing` 1.
+**LEAVE UNMAPPED, fail closed:** `Unsure` 112 · `""` (empty string) 31 · null 10,666.
+
+**column_map:** `title` `["Descriptn","Location"]` · `status_raw` `Status` · `type_source`
+`Proj_Type` · `case_number` `Project` or `Project_Num` · `file_date` `From_Date` ·
+`lat`/`lng` **`__lat`/`__lng`** (do not omit) · `spatial_zip_radius_mi: 3`.
+`More_Info` is a candidate per-record URL — check it is populated before claiming `record`
+precision, else `dataset`.
+
+**Still to do before wiring:** the envelope pre-check against dark MA ZIPs (the Charlotte gate).
 
 **PA-DOT (488 dark of 560) — DIFFERENT SHAPE, read this before wiring.**
 ```
