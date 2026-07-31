@@ -120,6 +120,58 @@ Williamson 12 · Sumner 9 · Maury 8 · Wilson 7 · Hamilton 5 · Davidson 1. Ne
 page, and the largest (Shelby/Memphis) sits behind `SHELBY-429`, a **new connector family
 (GATED)**. **Do the arithmetic first — TN is very likely UNREACHABLE** (row 428).
 
+### ✅ MA/MassDOT — DONE AND MEASURED. 8.5% -> 88.7%. Two pages short of Live.
+
+**Page-verified from `app_projects` after deploy -> fire -> collect -> materialize
+(2026-07-31 01:15Z): MA 53 -> 556 of 627 = 88.7%.** 80,652 MassDOT rows across 552 ZIP pages ·
+**0 gate leaks** onto non-MA pages.
+
+🔴 **+503 PAGES FROM ONE ENTRY — the largest single gain of the session** (FL was +275; the county
+wires were Sussex +22 and Weld +11). **MA needs 565 for 90%: it is TWO PAGES SHORT — the cheapest
+Live in the system.**
+
+**FINAL STATE 01:29Z: 562/627 = 89.6%. THREE PAGES SHORT of the 565 needed.** Two re-fire rounds
+were run against the stale ZIPs: the first (16 ZIPs) gained **+6 pages** (556 -> 562); the second
+(10 ZIPs) lit 6 more MassDOT ZIPs in the cache (552 -> 558 `md_zips`) but added **ZERO net pages**,
+because those 6 were already backed by another source. **10 ZIPs have now failed THREE consecutive
+rounds and will not drain** — they queue and never return, consistent with the 90s timeout.
+
+**TO FINISH MA (3 pages), in order of likelihood:**
+- **The 10 stuck ZIPs are probably not the answer** — two rounds of them yielded 6 cache hits and 0
+  net pages. Do not keep re-firing them blindly; first check *why* they hang (their `home_lat`/
+  `home_lng`, whether their reports are unusually large, whether they 503 or genuinely time out).
+- **Better: 7 dark MA ZIPs have `jsonb_array_length(sites)=0`** — completely empty reports, not just
+  missing MassDOT. Those are the anomaly worth investigating; an empty report on a modelled MA ZIP
+  suggests the engine returned nothing at all, which is a different failure from "no MassDOT in
+  range."
+- Failing both, MA is legitimately 89.6% and the honest call is that MassDOT's 3-mile reach does not
+  cover the last 65 ZIPs. **89.6% with +503 pages gained is still by far the best result of the
+  session** — do not treat 3 short as a failure.
+
+**(historical) The two pages were identified and an attempt was made:** Of the 71 dark MA ZIPs,
+**0 were never cached** but **16 still hold pre-v114 cache** — they never ran against the MassDOT
+engine because their requests keep failing. Those 16 were re-fired at 01:22Z and **the queue stalled
+at 16 with none completing** (row 411: ~31% of pg_net requests fail; these are the persistent
+failures, likely hitting the 90s timeout).
+
+**RESUME: re-fire those 16 and collect until the queue reaches 0.** The selector is exact —
+MA `level='zip'` pages with `development_reports.refreshed_at <= 2026-07-31 01:03Z` and no
+`app_projects` row with `record_kind='development'`. **Only 2 of the 16 need to succeed for
+Massachusetts to become the 4th Live state.** The other 55 dark ZIPs re-cached cleanly and are
+genuinely outside MassDOT's 3-mile reach — do not chase those.
+
+⚠️ **THE "ZERO RECORDS" SCARE WAS MY MEASUREMENT, NOT A DEFECT — and the lesson is the one that
+already bit once tonight.** I measured 0 MassDOT records while 30 requests were still queued and the
+`refreshed_at` window I used still included the tail of the earlier stale-engine fire. I then wrote a
+ranked bug diagnosis and probed five field mappings — `Descriptn` 14,251 · `Location` 13,693 ·
+`Project` 24,045 · `From_Date` 24,045 · `Status` 13,484 — **every one of which came back healthy**,
+because there was never anything wrong. One clean `dev_refresh_collect()` at queue 0 produced 46,279
+records immediately.
+**RULE, third costume of the same error tonight: DO NOT MEASURE UNTIL THE QUEUE IS 0 AND
+`refreshed_at` IS LATER THAN THE DEPLOY.** Cache-vs-pages, fire-before-deploy, and now
+measure-before-drain are all the same mistake — reading a number before the thing that produces it
+has finished.
+
 ### 🔴 IN FLIGHT — FDOT / Florida. Merged, NOT deployed. Resume here.
 
 **The strategic finding this came from, which matters more than FL itself:** all three states that
@@ -576,3 +628,51 @@ Numbers reconciled against the artifact before acting (Rule 15).
 | Chat order: DB-01 → #428 → #431 → TX → Harris/Bexar → Tier 1 | Row 355 puts Tier 0 (TX, Harris/Bexar) ahead of Tier 1. | ✅ **No conflict** — chat order also places both ahead of Tier 1. No dependency inversion found: #431 is independent of #428, and the row-349 inversion (status_unresolved at step 2 depending on #428 at step 4) is dissolved because Group B is already committed. |
 | Rows 329 + 364: #428 test-rebase "clean, **67/67**" | Measured on the actual rebases: `main` **62** · #428 adds 2 test files (`status-drift-windowing`, `unmapped-status-sample`) → **64** · #431 adds 4 → **66** · both merged → **68**. | **67 matches none of these.** Most likely taken when #428 carried only one new test file (62+4+1). All four measured numbers are green; no work is blocked. Flagged, not worked around. **Correction:** an earlier version of this row cited row 376 — the claim actually lived in rows 329 and 364. Verify the citation as well as the number. |
 | DB-01 hypothesis (row 397) | Disproved on four independent counts. | **SUPERSEDED**, and the founder has already recorded it in workbook 0071 rows 399–401. Not re-reported. |
+
+---
+
+## MA IS LIVE — 90.4% (2026-07-31 02:xxZ)
+
+**Measured from `app_projects` after materialization, not from the connector cache:**
+
+```
+ma_pages 627 · backed 567 · pct 90.4 · needed 565
+```
+
+The last three pages came from **five ZIPs whose cache already carried development
+records that had never been materialized** — 01475 (18), 02339 (60), 01035 (155),
+01022 (224), 01020 (449) = 906 records, all cached at 01:30Z, after the previous
+materialize pass. `app_refresh_zip` on those five: all `quality=pass`, +5 pages.
+
+MA: **8.5% → 90.4%**, four sources, 0 gate leaks.
+
+### NEW STANDING ANSWER — `source_registry_id is not null` in the cache is NOT the coverage metric
+
+A national sweep for the same "cached but unmaterialized" class found 32 more ZIPs
+(WA 22 / KS 3 / MD 2 / CT 1 / AZ 1 / NY 1 / VA 1 / CO 1). **All 32 materialized to
+`development=0/0`.** They are not a bug and not a backlog:
+
+`app_refresh_zip`'s `app_projects` development insert requires
+`coalesce(el->>'scope','')='point'`. An **area-scope** record — a real permit with a
+real `record_url` but no coordinates — is routed instead into `app_changes` as a
+`'Planning & zoning'` notice, **capped at `limit 6`**. Receipts: 98499 carries 192
+`pierce-county-pals-permits` records, every one `scope:"area"` with a URL; 10044
+carries 53 `nyc-dobnow-approved-permits`, same shape.
+
+So:
+- **Coverage = point-scope development rows in `app_projects`.** That is what pins the
+  map, and all three map views read the same dataset.
+- Counting `source_registry_id is not null` over `development_reports.sites`
+  **over-counts**, because it silently includes area-scope records that can never
+  become pins. It is a LEAD, not the fact.
+- The 56,279 coordless rows already in `app_projects` are **point**-scope records whose
+  coords the materializer's own 100-mile fence later NULLed — a different, expected class.
+
+Those 32 ZIPs are honest: residents see the permits as notices, just not as pins.
+Nothing to fix; do not re-open them as a coverage backlog.
+
+**Next:** PennDOT (488 dark PA pages) — `gis.penndot.gov/arcgis/rest/services/paprojects/
+paprojects/MapServer`, 46 layers with status encoded in the layer NAME, one entry per
+status layer with `status_const`. Traps already recorded: layers 25–33 are boundaries,
+34–45 bridge-condition, and Points vs Lines are the same projects twice (would
+double-emit — pick one).
