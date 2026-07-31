@@ -1165,3 +1165,34 @@ Every yield was predicted with the connector's own query shape BEFORE deploying 
 Warren 9, Oldham 8, Bullitt 7, Madison 5, Jefferson 4, Fayette 3, Kenton 1, Christian 1) — the big
 three were searched and returned no first-party permit service (recorded as *unfound*, not proven
 absent). After KY the ranking is WY 81 · HI 88 · ID 89 · AK 91 · TN 92 · VA 93 pages to 90%.
+
+### KY: Campbell + Kenton REJECTED — LINK-GIS serves permitting BASEMAPS, not permit records
+
+Found the real LINK-GIS endpoint via web search after my host guesses failed: **`maps.linkgis.org/server/rest/services`**
+(v11.3, 22 folders). `gis.linkgis.org` fails DNS and `linkgis.org/arcgis` 404s a WordPress page — those
+were guesses, this is the live root.
+
+Two folders looked exactly right and both are **reference layers, not ledgers**:
+
+- **`PermittingSystem/PermittingSystem`** — layers are `AddressPts_KC_Parcels_City_Join` (point) and
+  `Parcels_KC_PVA_City_ZipCode_Join` (polygon). That is the *geometry the permitting app draws on*,
+  not the permits.
+- **`SmartGov/CC_Theme_SmartGov`** (SmartGov = the Paladin permitting platform) — 16 layers, all
+  Campbell County reference: address points, condos, zoning, parcels + label variants, roads, flood
+  zones, ZIP codes, city boundaries. No permit records.
+- `Campbell_County` folder — parks, snow routes, storm/water service areas. No permits.
+- `CommunityDevelopment` — a single `ExportWebMap` GPServer (a print service).
+
+**Same class as Charlotte's `Accela/Accela` reject: a permitting SYSTEM's basemap is not a permit
+ledger.** Standing answer worth keeping — a folder named `PermittingSystem` or `SmartGov` is a strong
+lead and a weak fact; open the layer list before believing it.
+
+Also confirmed: Boone's own server exposes **only Boone** — its `Member`, `Partner` and `Hosted`
+folders are all EMPTY (62-byte responses), so the `ServicesNKY` folder does not extend the BCPC
+board-action ledger to Campbell/Kenton.
+
+**KY is now effectively capped.** Remaining dark 58, need 46: Daviess 10 + Warren 9 (searched, no
+first-party permit service found), Campbell 10 + Kenton 1 (rejected above), Oldham 8, Bullitt 7,
+Madison 5, Jefferson 4, Fayette 3, Christian 1. Even wiring every un-probed county leaves it short
+of 46 without Daviess/Warren/Campbell. Not recorded UNREACHABLE — Oldham/Bullitt/Madison were never
+individually probed — but there is no plausible path to 90%.
