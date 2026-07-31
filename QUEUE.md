@@ -1674,3 +1674,38 @@ the titles look right and the geography is wrong.
 **Long Island's towns (Brookhaven, Islip, Huntington, Babylon, Smithtown) run permitting on
 vendor portals with no public GIS layer.** That is the structural reason, and it is the same
 shape as TN's Williamson/Sumner/Maury/Wilson.
+
+### Tier-2 dark counties (Bergen NJ · Montgomery+Lancaster PA · St. Louis MO · Jefferson AL · Oklahoma · Sedgwick KS · Alameda CA) — ALL REJECTED
+
+The next eight largest fully-dark counties after the NY three, ~460 pages combined. Probed on
+both routes (AGO content search, then the per-portal DCAT/Socrata route that found Memphis and
+Nashville). **None wireable.** Receipts:
+
+- **AGO content search ran and found nothing.** All ten loose searches returned 200; totals were
+  mostly non-zero (Bergen 12, Jefferson AL 6, Alameda 16, Lancaster 1, Oklahoma City 1 …) so the
+  instrument demonstrably executed — and **0 permit/subdivision/development-shaped Feature or Map
+  Services** across every one of them.
+- **Oakland CA (Alameda, 51 pages) — the near-miss worth recording.** `data.oaklandca.gov`'s
+  Socrata catalog DOES list a dataset literally titled **"Permit Applications"** (`ryhf-m453`),
+  which looks like exactly the right source. Both `…/resource/ryhf-m453.json?$limit=1` and the
+  `count(1)` form return **HTTP 404 `{"error":true,"message":"Not found"}`** — the dataset is
+  catalog-visible but **not readable**. This is the **Buffalo NY failure class** (catalog permit
+  items that are restricted views), and it is the reason a catalogue listing is never sufficient
+  evidence: *read a row before believing a dataset exists.*
+- **St. Louis County MO (63 pages)** — `data.stlouisco.com` DCAT is **live and valid** (200,
+  project-open-data schema, parsed successfully). Searched its full `dataset` array: the only
+  matches are **`Zoning`, `Zoning and Jurisdictions`, `Zoning in Unincorporated Areas`**. Zoning
+  is not a permit ledger. `gis.stlouisco.com` fails DNS.
+- **Oklahoma City (52 pages)** — `data.okc.gov` returns **403 with a `NOINDEX, NOFOLLOW` bot-wall
+  page**. Not a 404: the portal exists but refuses automated reads (the Tampa/El Paso WAF class).
+  → reprobe list.
+- **Wichita / Sedgwick KS (50 pages)** — `opendata.wichita.gov` serves **HTML**, not the DCAT JSON
+  its path implies ("City of Wichita Open Data Portal with Apps"). No machine catalog found.
+- **Birmingham / Jefferson AL (60 pages)** — `data.birminghamal.gov` Socrata catalog API **404s**.
+- **Montgomery County PA (64 pages)** — `data.montcopa.org` fails DNS. (The PENNSYLVANIA WIRE PASS
+  already recorded its DCAT hub as live-but-0-permit-datasets; this is consistent.)
+
+**The pattern is now consistent across three independent passes (TN collar counties, NY downstate,
+these eight): large dark counties are dark because their jurisdictions run permitting on VENDOR
+PORTALS with no public per-record GIS or open-data layer.** That is a structural ceiling, not a
+discovery failure — and it is why no remaining state can reach 90%.
