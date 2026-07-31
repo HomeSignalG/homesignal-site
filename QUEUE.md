@@ -134,14 +134,23 @@ exactly, and the envelope pre-check hit **4 of 4** dark MA ZIPs (01035 162 · 02
 **DIAGNOSE IN THIS ORDER — do not re-probe the vocabularies, they are correct:**
 1. **Read the run report / quarantine reason.** The connector records why it skipped an entry. One
    read, fastest answer.
-2. **`From_Date` is the prime suspect.** I mapped `file_date` -> `From_Date`, but this is a
-   LINEAR-REFERENCED EVENT table (`Route_ID`/`From_Measure`/`To_Measure`) — `From_Date`/`To_Date` are
-   very likely **route-measure validity dates, not project dates**, and may be null layer-wide, which
-   would drop every record. Check `From_Date IS NOT NULL` counts; alternatives are `created_date`
-   (Date) or `ScheduledAdDate`/`bidOpenedDate`/`ntpDate` (String).
-3. **Polyline + envelope.** FDOT is polyline too and worked, so less likely — but this layer is
-   ArcGIS 11.3 with a `SHAPE:Geometry` field alongside `Shape__Length`, which FDOT did not have.
-4. **`outFields=*` size** — 41 fields x 24,045 rows; try the additive `out_fields` projection.
+2. ❌ **`From_Date` IS CLEARED — I was wrong, do not chase it.** Probed live: `From_Date IS NOT
+   NULL` returns **24,045**, i.e. EVERY row has it. `Status IS NOT NULL` returns **13,484**, exactly
+   the predicted 24,045 − 10,561. Neither column is the cause.
+3. ❌ **The query SHAPE is cleared too.** The connector's own form —
+   `outFields=*&returnGeometry=true&outSR=4326&resultRecordCount=1` — returns **HTTP 200 with a
+   valid polyline feature in wkid 4326**. The layer answers what the connector asks.
+4. 🔎 **So the fault is in the ENTRY's own fields, not the layer.** Remaining suspects, in order:
+   **(a) `title` -> `["Descriptn","Location"]`** — if both are null on most rows the record is
+   dropped for having no title; FDOT's `Description` was populated, this may not be. Check
+   `Descriptn IS NOT NULL` and `Location IS NOT NULL` counts.
+   **(b) `case_number` -> `Project`** (String) — check non-null.
+   **(c) `incremental_field: "From_Date"` set WITHOUT `recency_days`** — FDOT has the same pairing
+   and works, but confirm the combination is not filtering to an empty window here.
+   **(d)** the spatial envelope — LEAST likely, since the pre-check used exactly
+   `spatial_zip_radius_mi: 3` and returned 162/50/80/743.
+5. **`outFields=*` size** — 41 fields x 24,045 rows; if paging is being rejected at scale, try the
+   additive `out_fields` projection (added during the FL/Miami work).
 
 **Do NOT write MassDOT off.** 574 dark of 627 and a 4-of-4 pre-check still make it the largest single
 page gain available; the FDOT analogue moved FL from 6.4% to 68.7%.
