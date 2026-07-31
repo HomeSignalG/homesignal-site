@@ -1017,3 +1017,47 @@ statewide source would carry it). It does not exist:
 
 RI stays on the EPA facilities floor. Not recorded UNREACHABLE (per-town sources for Warwick/Cranston/
 Pawtucket were not individually probed), but there is no statewide path.
+
+---
+
+## STATE AT HANDOFF — Lexington MERGED + DEPLOYED, re-cache PENDING on the pg_net stall
+
+**Do not report KY as improved.** Per the founder's own Live definition, *wired + merged + emitting is
+not Live* — and the fourth step has not completed.
+
+| Step | State |
+|---|---|
+| PR #463 merged to `main` | ✅ `3618231` |
+| Engine deployed | ✅ **v117** (confirmed via `list_edge_functions` before firing) |
+| 19 Fayette ZIPs fired | ✅ |
+| Reports returned | ❌ **0 of 19** — `net.http_request_queue` frozen at exactly 19 |
+| `dev_refresh_collect` | ⏸ not run (nothing to collect) |
+| `app_refresh_zip` | ⏸ not run |
+| **KY measured** | **still 44/126 = 34.9%** — unchanged, and it must be reported that way |
+
+Expected once the queue drains: **+16 pages → 60/126 = 47.6%** (pre-verified with the connector's own
+envelope query; the 3 zeros are Georgetown/Paris/Winchester).
+
+### RESUME (3 commands, no re-derivation)
+
+```sql
+-- 1. wait for 0
+select count(*) from net.http_request_queue;
+
+-- 2. re-fire the 19 (only if the queue drained WITHOUT them returning)
+with fz as (select distinct z.zip from public.communities c, unnest(c.zip_codes) z(zip)
+            where c.level='zip' and c.state='KY' and c.county='Fayette')
+select net.http_post('https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/get-address-report',
+  jsonb_build_object('zip', d.zip, 'lat', d.home_lat, 'lng', d.home_lng),
+  '{}'::jsonb, '{"Content-Type":"application/json"}'::jsonb, 90000)
+from public.development_reports d join fz on fz.zip=d.zip;
+
+-- 3. after queue hits 0 again: collect, then materialize, then measure from app_projects
+select public.dev_refresh_collect();
+-- then app_refresh_zip over the 19, then the standard state-coverage query
+```
+
+⚠️ **The stall recurred twice tonight on ZIP-refresh POSTs specifically** (Buncombe 20 — cleared
+itself after ~20 min; Fayette 19 — still frozen at handoff). Cheap GET probes drained normally
+throughout. `worker_restart()` was measured as a no-op against it (see the blocker section above).
+Time is the only thing that has cleared it.
