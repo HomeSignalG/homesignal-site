@@ -1196,3 +1196,40 @@ first-party permit service found), Campbell 10 + Kenton 1 (rejected above), Oldh
 Madison 5, Jefferson 4, Fayette 3, Christian 1. Even wiring every un-probed county leaves it short
 of 46 without Daviess/Warren/Campbell. Not recorded UNREACHABLE — Oldham/Bullitt/Madison were never
 individually probed — but there is no plausible path to 90%.
+
+### WY probed — no statewide and no metro source; all 103 pages structurally dark
+
+WY was the next target (103 pages, 12 backed, 81 to 90%) and fits the profile that carried TX/NV/UT —
+a big rural state where one statewide DOT layer lifts everything. **It does not exist here.**
+
+- **Wyoming Geospatial Hub** (`data.geospatialhub.org`, **2.44 MB DCAT read in full**) — every dataset
+  matching permit/construction/development is water-rights or extractive and mostly a 2001–2012
+  river-basin study: SEO Agricultural/Domestic/Industrial/Municipal/Stock/Coal-Bed-Methane **Well**
+  Permit Locations, Stock Pond Permits, Reservoir Water Right Permits, Instream Flow Permits, EPA
+  Permitted Water Dischargers, Oil & Gas / Wind development *potential* rasters. **No building or
+  land-development permit dataset of any kind.**
+- **"Road Travel and Construction Map for Wyoming"** — the one construction-sounding hit — is
+  explicitly *"the metadata record for WYDOT's live road conditions web-map; link in record"*. A
+  viewer app, not a data service. **Standing answer: a Hub "dataset" can be a metadata stub for an
+  APPLICATION — read `description` before chasing it.**
+- **WYDOT's own host** `gis.wyoroad.info` 404s at both `/arcgis/rest/services` and `/server/rest/services`.
+- **Cheyenne (224 results) and Casper (126)** — scoped AGO searches both RAN and returned **0**
+  permit/construction/development services. Non-zero totals, so this is a real absence, not the
+  AND-ed-query artifact that produced false zeros earlier in the KY pass.
+
+WY dark is uniform: Natrona 13, Laramie 13, Albany 12, Fremont 12, Sweetwater 12, Park 8, Campbell 7,
+Teton 7 — **every county 0 backed**. No path to 90%.
+
+### Frontier status after this session — the remaining states are a different problem
+
+| State | Pages to 90% | Verdict |
+|---|---|---|
+| KY | 46 | effectively capped (Campbell/Kenton rejected, Daviess/Warren unfound) |
+| WY | 81 | **no source exists** — statewide + both metros probed |
+| HI / ID / AK / TN / VA / MS | 88–93 each | unprobed; each needs MULTIPLE sources, not one wire |
+
+The single-source-lifts-a-state era is over for the states that remain. NC and KY both moved
+substantially this session but neither could reach 90%, and the reason is the same in every case:
+**small and rural jurisdictions do not publish per-record permit data**, and the vendor-platform
+folders that look like they do (`PermittingSystem`, `SmartGov`, `Accela`) turn out to serve the
+basemap their permitting app draws on.
