@@ -857,3 +857,24 @@ layers. Both were discarded, neither was wired. **Standing answer, now twice-pro
 guessed `services*.arcgis.com/<orgid>` without an identity check on the returned service names.**
 The method that actually works is the one that found Asheville: locate the Hub DCAT feed, read the
 item, take its `url`.
+
+### NC IS CAPPED AT 72.9% (124/170) — every remaining dark county probed, receipts below
+
+Not a stop, not a failure: 90% needs 153 and no wireable first-party per-record source exists for
+the 46 remaining dark pages. Recorded so no session re-derives it.
+
+| Dark | Pages | Verdict |
+|---|---|---|
+| Buncombe (rural) | 11 | Asheville is a CITY source; measured with the connector's own envelope query — these 11 return **0**. No county-wide permit source found. |
+| Chatham | 12 | **REJECTED — `Chatham_ConditionalUsePermits`** (real host found: `gisservices.chathamcountync.gov/opendataagol`, owner `Chatham01`). 144 polygon rows, but **no permit date at all** (only GIS `created_date`/`last_edited_date` housekeeping and a 100%-null `ExpirationDate`), `PermitStatus` is single-valued (`Valid` 141 + 3 null), and `ConditionalUseClass` is 14 **opaque zoning codes** (B-1, IND-H, RA-40, CUD-CC…). This is a zoning-overlay registry, not development activity — the **North Richland Hills precedent** ("no status and no date column"). Contrast Sussex DE, which WAS wired: 2,566 rows, real `application_rcvd_date` (2026-07-27) and a 16-value status vocabulary. |
+| Orange | 10 | **FIRM REJECT** — `gis.orangecountync.gov` is live (v10.81) and its full service list has **no permit service**. Chapel Hill (its main town) serves an Esri Portal page at both `/arcgis/` and `/server/`, and its verified AGO org `7KRXAKALbBGlCW77` (`ToCHadmin`) carries only **`Permits_Issued_2013_to_2016`** — a decade-stale snapshot. |
+| Union | 9 | **No org found.** A scoped AGO search for "Union County North Carolina permits" returned zero Union-owned items (only Raleigh, NCDOT, ECU, Esri). Every host guess failed DNS/404. Recorded as *unfound*, not proven absent. |
+| Wake | 2 | 27520, 27522 — verified **genuinely dark** (0 point-dev in cache), not an unmaterialized row. |
+| Mecklenburg | 2 | 28031 Cornelius, 28036 Davidson — outside Charlotte's permit jurisdiction, verified 0. |
+
+**NC final: 48.8% → 72.9%, +41 pages this session** (Charlotte 32 + Asheville 9), 2 entries wired,
+24,487 records, 0 missing `record_url`, 0 unclassified, 0 gate leaks.
+
+**Next per the loop: KY at 34.9%** (126 pages, 44 backed, 70 to 90%). Dark: Fayette/Lexington 19,
+Daviess 10, Campbell 10, Warren 9, Boone 8, Oldham 8, Bullitt 7, Madison 5, Jefferson 4, Kenton 1,
+Christian 1 = 82 — so 90% IS arithmetically reachable if Lexington + the mid-size metros wire.
