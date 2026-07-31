@@ -187,9 +187,16 @@ Unlike FDOT this has **REAL status and type columns**, so it gets real maps, not
 **`Status` — complete, sums to EXACTLY 24,045, `exceededTransferLimit:false`:**
 `DESIGN` 8,392 -> **proposed** · `CONSTRUCTION` 1,489 -> **approved** · `COMPLETE` 3,603 ->
 **operating** · **null 10,561 (44%) -> UNMAPPED, fails closed.** Publishing ~13,484 rows.
-⚠️ That 44% null is large but honest — do NOT invent a bucket for it. `constructionStatus` and
-`DesignStatus` are separate columns and may cover some of those rows; **check them before accepting
-the 44% loss**, and if one is populated where `Status` is null, that is a better `status_raw`.
+✅ **THE 44% NULL WAS CHASED AND IS REAL — do not re-open it.** Probed the two candidate rescue
+columns scoped to exactly the null-Status rows (`where Status IS NULL`); both enumerations sum to
+exactly **10,561**, the positive control:
+- **`constructionStatus`: null 10,334 + `""` 227 = 10,561. ENTIRELY EMPTY.** No help whatsoever.
+- **`DesignStatus`: only 230 of 10,561 populated (2.2%)** — `Initial` 164 · `PNF` 39 · `Tabled` 23 ·
+  `Denied` 3 · `Approved` 1. Nowhere near enough to switch `status_raw`, and `PNF`/`Initial` are
+  pre-application states that would need their own mapping for 200 rows.
+
+So the gap is in MassDOT's own data, not in the column choice. **Accept the loss, keep `Status` as
+`status_raw`, publish ~13,484 rows, and do NOT invent a bucket for the nulls.**
 
 **`Proj_Type` — complete, sums to EXACTLY 24,045, 60 values, `exceededTransferLimit:false`.**
 All are self-describing highway/bridge work and every one maps to **`Utility`**, matching the
