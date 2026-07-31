@@ -2375,3 +2375,72 @@ no new connector code.
 
 Per the Frisco standing answer, the three 404/DNS entries are **guessed hostnames** and are recorded
 as *unprobed*, never as evidence the city publishes nothing.
+
+---
+
+## WAVE 10-12 — STAMFORD WIRED AND LIVE; Spokane blocked on provenance (2026-07-31)
+
+### 🟢 GO-LIVE: `stamford-major-developments` — 6 dark Fairfield CT pages now carry records
+
+Merged (#486), deployed (**`get-address-report` v125**), all 6 Stamford ZIPs re-fired and collected,
+all 6 materialized `quality=pass`:
+
+| ZIP | development |
+|---|---|
+| 06901 | 44/44 |
+| 06902 | 44/44 |
+| 06906 | 44/44 |
+| 06905 | 33/33 |
+| 06907 | 26/26 |
+| 06903 | 1/1 |
+
+**192 records across 6 pages — 0 missing `record_url`, 0 missing coordinates, 0 non-`point` scope,
+0 unclassified.** Bidirectional gate proof: they ride **`CT/Fairfield` and nothing else**.
+Fairfield goes 46 dark → 40.
+
+### 🔴 SPOKANE COUNTY WA (18 dark) — BLOCKED ON PROVENANCE, not on data. FOUNDER REVIEW.
+
+This is the most substantive blocker of the session, because **the data exists and is well-shaped**;
+only the sourcing rule stops it.
+
+- **The ledger:** `Spokane County Building and Planning Permits`, **6,839 rows**, point geometry, and
+  a schema that needs no spatial scoping at all:
+  `Permit_Year, Permit_Month, Issued_Date, Final_Date, Permit_Number, Status, Status_Description,
+  Project_Description, Parcel_Number, Site_Address, Site_Zip, Permit_Type, Jurisdiction`
+  — **native `Site_Zip`** plus per-record points.
+- **The problem: the owner is `Avista_Data_Owner` — Avista Corp, the electric/gas UTILITY** serving
+  Spokane. That is a third-party republisher of county data, which **wiring rule 0 (first-party only)
+  bars**. It is the same class as `Birm_Demo_Permits` (National Trust for Historic Preservation),
+  rejected earlier today — and consistency demands the same answer.
+- **I searched hard for the first-party original and it does not exist publicly.**
+  `gismo.spokanecounty.org` **is live** and its full folder list was enumerated:
+  `ACPdata, Annexations, Assessor, BPPublic, CodeRed, CommunityMaps, Elections, EnvServices, OpenData,
+  Parks, Planning, PublicWorks, SmartGov, StormWater, Utilities, WaterResources, …`
+  - **`BPPublic`** (Building & Planning Public) — 10 services, all basemap:
+    `ParcelandAddress, Plats, CriticalAreas, Contours, AirportOverlay, DistrictsAndPrecincts, …`
+  - **`OpenData/Planning`** — layers are `Zoning District | Urban Growth Areas | Comprehensive Plan`
+  - **`SmartGov`** — contains exactly ONE service: **`SmartGov_Parcels`**. SmartGov *is* the county's
+    permitting vendor, and the folder holds parcels. **The vendor-folder trap, confirmed a fourth time.**
+  - `gisdatamaps.spokanecounty.org` → DNS failure (guessed host, unprobed).
+  - City of Spokane Valley's own `Permitting_EVV_Hosted` layer 0 is **"BPA Easement", 1 row** — a
+    Bonneville Power easement polygon, not permits.
+
+  **Founder question:** Avista's copy is the only public per-record Spokane permit ledger. Wiring it
+  would light 18 pages but would breach first-party sourcing. Held pending your call.
+
+### Rejections with receipts
+
+- **PA York + Lancaster (103)** — search returns only **DMO mining permits** (bituminous/anthracite
+  surface + underground), BLM leases, and permitted landfills. No building ledger.
+- **Albany NY (47)** — building-permit search total **0**.
+- **St. Louis County MO (63)** — one hit, an **aggregate monthly valuation summary for Beverly Hills**
+  (and Beverly Hills CA at that). Not per-record.
+- **Macomb MI (40)** — total 10, **0** permit/development services.
+- **Kanawha WV (47)** — total 8, 0 hits. **Erie NY (55)** — total 20, 0 hits.
+- **Mobile AL (39)** — `gis_cityofmobile` is live (418 items); permit-shaped hits are `ROW Permitting`
+  (right-of-way) and a `Development Framework` plan layer. No ledger.
+  ⚠️ **Correction:** the `Active Building Permits - All` hit that looked like Mobile belongs to owner
+  `cakee` = **Leon County, FLORIDA** (`intervector.leoncountyfl.gov`) — another cross-org lookalike.
+  Leon County has **0 modelled ZIP pages**, so it is not addressable regardless.
+- **Charleston County SC** — a real `Building Permits 2025` layer exists, but Charleston's 25 pages are
+  **already 0 dark**. Nothing to gain; not wired.
