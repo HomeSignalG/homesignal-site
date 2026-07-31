@@ -1957,3 +1957,39 @@ Every long wait in this session was a chance to lose a batch this way.
 **+29 pages from one inverted search**, after four county-by-county passes had concluded the
 frontier was exhausted. That is the durable lesson: when county-name search is exhausted, search
 by **what the data is called** and by **vendor signature**, then map hits onto the dark list.
+
+### Second-wave vendor-signature sweep — 0 wireable, but it pinned the strategy's FAILURE MODE
+
+Ran a second sweep with 8 new phrasings ("development orders", "permits issued", "residential /
+commercial building permits", "site plan review", "building permit activity", "new construction
+permits", "plan review") → **336 distinct owners**. Matched them against dark counties
+data-driven, by extracting place tokens from the DARK ZIP pages' own `communities.name` values
+rather than guessing city names.
+
+**Result: 0 new wireable sources.** Two findings worth keeping.
+
+**1. Substring place-matching is a false-positive machine.** Matching a place token inside an
+owner/title produced mostly garbage: `ridge` → `dorothy.harrington@ridgefieldwa.us` and
+`Cambridge_Data`; `orange` (CA/Orange, 85 dark) → a *Pasco County FL* trail study; `columbia`
+(PA/Lancaster) → `ColumbianaGIS` (Ohio); `chester` (NJ/Morris) → `Chesterfield_County` (Virginia).
+Use it to GENERATE candidates, never to conclude one matches — every hit needs an identity check.
+
+**2. ⚠️ THE VENDOR-FOLDER TRAP IS THE STRATEGY'S BUILT-IN FALSE POSITIVE — 4th and 5th instances.**
+Searching by vendor signature surfaces services *named after the permitting vendor*, and those are
+usually the **basemap the vendor's app draws**, not the permit ledger:
+- **`cityofelcajon` / service literally named `EnerGov`** (San Diego County, 53 dark — a real
+  prize). Its layer list is **Site Address Point · Building Inspection Boundary · TaxParcel EC ·
+  Zoning Overlay · Zoning · El Cajon Municipal · General Plan Land Use · Council District · School
+  Districts**. Reference geography, zero permit records.
+- **`WorcesterGIS` / `OpenGov_Permitting`** — layer 0 is **"Highway Exits"**.
+
+Joins the previously recorded `Accela/Accela` (Charlotte), `PermittingSystem` and `SmartGov`
+(LINK-GIS) instances. **STANDING ANSWER: a service named EnerGov / Accela / OpenGov / SmartGov /
+CityView / PermittingSystem is a NAME, not a payload. Read the LAYER LIST before believing it —
+the permit ledger, when it exists, is usually named for the RECORDS ("Building Permits Issued",
+"DevelopmentOrders"), not for the software.** This is exactly why the two wins this session
+(`Building_Permits_Issued`, `DevelopmentOrders`) were found by record-phrasing queries, not by the
+vendor-name queries.
+
+**Net for the whole inverted-search programme: +29 pages (Fulton 6, Lee 23) from wave 1; wave 2
+returned candidates but no payload.** Diminishing returns are now visible in the data, not assumed.
