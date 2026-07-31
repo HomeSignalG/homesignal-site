@@ -9027,6 +9027,104 @@
       "incremental_field": "StartDate",
       "record_url_precision": "dataset",
       "_receipts": "2026-07-31 FL STATEWIDE wire, on the STATE-DOT pattern that produced all three Live states. TX, NV and UT each reached 90% via a statewide DOT layer (txdot-projects-info-all, nvdot-project-boundaries, udot-active-projects); workbook row 420 records the statewide path as exhausted, but that list is the WORKBOOK'S six candidates -- the state-DOT CLASS was never enumerated for the other 47 states. FDOT is the first of that sweep. LIVE PROBE: gis.fdot.gov root 200, service 'Active FDOT Construction Project Feature Service', POLYLINE (rides featurePoint()'s path-midpoint). NOTE layer index is 1, not 0 -- layer 0 returns HTTP 200 carrying {'error':{'code':500,'message':'json'}}; the service doc lists exactly one layer, id 1 'Construction Projects'. 2,428 rows. Fields: ContractId, Item, District, County, RoadwayId, BeginMP, EndMP, Description, StartDate, EstEndDate, Cost, FinProjNum, Vendor, ProjectMgr, Website. NO status column and NO type column, so both are constants, matched to the three proven DOT entries rather than guessed: every one of them maps project types to 'Utility', so use_type_const='Utility'; and the layer is by definition ACTIVE CONSTRUCTION, which is exactly UDOT's 'Active'/'Under Construction' -> approved, so status_const='approved'. spatial_zip_radius_mi=3 and record_url_precision='dataset' both follow UDOT/TxDOT. Website is present per row but its populated-ness was NOT measured, so precision stays 'dataset' -- upgrade to 'record' only after confirming it is non-null across the layer. NOT YET DEPLOYED OR MEASURED: FL has 413 dark pages of 441 and zero permit sources today. Whether 2,428 polylines at a 3-mile radius reach those pages is UNVERIFIED -- run the envelope count against dark FL ZIPs before claiming coverage (the Charlotte lesson)."
+    },
+    {
+      "registry_id": "massdot-highway-projects",
+      "platform": "arcgis",
+      "service_url": "https://gis.massdot.state.ma.us/arcgis/rest/services/Projects/HighwayProjects/FeatureServer/0",
+      "dataset_url": "https://gis.massdot.state.ma.us/arcgis/rest/services/Projects/HighwayProjects/FeatureServer/0",
+      "jurisdiction": "Massachusetts Department of Transportation",
+      "coverage": [
+        {
+          "state": "MA"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Descriptn",
+          "Location"
+        ],
+        "status_raw": "Status",
+        "type_source": "Proj_Type",
+        "file_date": "From_Date",
+        "case_number": "Project",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 3,
+      "type_map": {
+        "Hwy Reconstr - No Added Capacity": "Utility",
+        "Traffic Signals": "Utility",
+        "Resurfacing DOT Owned Non-Interstate": "Utility",
+        "Roadway - Reconstr - Sidewalks and Curbing": "Utility",
+        "Resurfacing Interstate": "Utility",
+        "Hwy Reconstr - Restr and Rehab": "Utility",
+        "Resurfacing": "Utility",
+        "Bridge Replacement": "Utility",
+        "Hwy Reconstr - Minor Widening": "Utility",
+        "Safety Improvements": "Utility",
+        "Bridge Preservation": "Utility",
+        "Structures Maintenance": "Utility",
+        "Bikeway/Bike Path Construction": "Utility",
+        "Bridge Reconstruction/Rehab": "Utility",
+        "Sidewalk Construction and Repairs": "Utility",
+        "Pavement Marking": "Utility",
+        "Vertical Construction (Ch 149)": "Utility",
+        "Guard Rail & Fencing": "Utility",
+        "New Construction": "Utility",
+        "Hwy Reconstr - Added Capacity": "Utility",
+        "Structural Signing": "Utility",
+        "Tunnels": "Utility",
+        "Hwy Reconstr - Major Widening": "Utility",
+        "Painting - Structural": "Utility",
+        "Drainage": "Utility",
+        "Culvert Replacement": "Utility",
+        "Reclamation": "Utility",
+        "Intelligent Transportation Sys": "Utility",
+        "Electrical": "Utility",
+        "Bridge Maintenance": "Utility",
+        "Landscaping": "Utility",
+        "Lighting": "Utility",
+        "Miscellaneous/No Prequal": "Utility",
+        "Sign Installation/Upgrading": "Utility",
+        "Shared Use Path Construction": "Utility",
+        "Other, TIP": "Utility",
+        "Contract Highway Maintenance": "Utility",
+        "Sewer and Water": "Utility",
+        "Demolition": "Utility",
+        "Highway Sweeping": "Utility",
+        "Tree Trimming": "Utility",
+        "Chemical Storage Sheds": "Utility",
+        "Bike Facility Construction": "Utility",
+        "Process/Recycle/Trnsprt Soils": "Utility",
+        "Highway Relocation": "Utility",
+        "Pump Station Reconstruction/Rehab": "Utility",
+        "Drawbridge Maintenance": "Utility",
+        "New Bridge": "Utility",
+        "Culvert Reconstruction/Rehab": "Utility",
+        "Limited Access Pavement Preservation": "Utility",
+        "Impact Attenuators": "Utility",
+        "Dredging": "Utility",
+        "Catch Basin Cleaning": "Utility",
+        "Bridge Maintenance - Deck Repairs": "Utility",
+        "Marine Construction": "Utility",
+        "Milling and Cold Planing": "Utility"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "DESIGN"
+        ],
+        "approved": [
+          "CONSTRUCTION"
+        ],
+        "operating": [
+          "COMPLETE"
+        ],
+        "exclude": []
+      },
+      "incremental_field": "From_Date",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-31 MA STATEWIDE wire, second of the state-DOT sweep (after fdot-active-construction-projects, which took FL from 6.4% to 68.7% -- +275 pages from ONE entry vs +22 for a county). MA had 574 dark pages of 627, the largest single prize remaining. Layer: MassDOT's own server, Projects/HighwayProjects, ONE layer id 0, 24,045 rows, POLYLINE (rides featurePoint()'s path-midpoint), linear-referenced (Route_ID/From_Measure/To_Measure). BOTH VOCABULARIES ENUMERATED LIVE AND COMPLETE -- each groupBy sums to EXACTLY 24,045 with exceededTransferLimit:false, the positive control. Unlike FDOT this layer has REAL status and type columns, so it gets real maps rather than constants. Status: DESIGN 8,392 -> proposed; CONSTRUCTION 1,489 -> approved; COMPLETE 3,603 -> operating. Proj_Type: 56 values mapped verbatim, all -> Utility, matching the UDOT/TxDOT/NDOT precedent where every highway project type maps to Utility. DELIBERATELY UNMAPPED, FAIL CLOSED: Status null (10,561 rows, 44%), Proj_Type null (10,666), 'Unsure' (112) and the empty string (31). THE 44% NULL STATUS WAS CHASED TO GROUND -- do not re-open. Probed both candidate rescue columns scoped to exactly the null-Status rows; both enumerations sum to exactly 10,561. constructionStatus is ENTIRELY EMPTY there (10,334 null + 227 empty string). DesignStatus is populated on only 230 of 10,561 (2.2%), and its values (Initial 164, PNF 39, Tabled 23, Denied 3, Approved 1) are pre-application states that would need their own mapping for ~200 rows. The gap is in MassDOT's data, not in the column choice, so Status stays status_raw and ~13,484 rows publish. More_Info exists per row but its populated-ness was NOT measured, so precision stays 'dataset'. NOT YET DEPLOYED OR MEASURED: run the envelope pre-check against dark MA ZIPs, then deploy (CONFIRM THE VERSION INCREMENTS -- a dispatched deploy silently did not land during the FL wire), fire, collect, MATERIALIZE via app_refresh_zip, and measure from app_projects."
     }
   ],
   "ckan": [
