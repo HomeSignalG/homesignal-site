@@ -1615,3 +1615,62 @@ After a pg_net wedge clears, the backlog is released as a **burst**, and the edg
 timed out on **11 of 18** requests at a 90 s `timeout_milliseconds`. Re-firing the failures in
 smaller batches at **120 s** returned **7/7 then 33/33 with zero failures**. When re-firing after
 a stall, raise the timeout and split the batch.
+
+---
+
+## NY downstate recon (2026-07-31) — the 3 largest dark counties in the WHOLE dataset
+
+After TN closed, the national scoreboard (fully-dark counties, ≥18 pages, excluding locked
+NV/CO and capped TN/NC/KY) puts the top three in New York:
+
+| rank | county | dark pages |
+|---|---|---|
+| 1 | **NY / Suffolk** | **107** |
+| 2 | **NY / Westchester** | **75** |
+| 3 | **NY / Nassau** | **70** |
+
+That is **252 pages** — bigger than any state-level opportunity left. The NEW YORK WIRE PASS
+recorded these as "no portals found," which is vague; this pass replaces that with receipts.
+
+### WESTCHESTER — firm REJECT, with receipts
+
+The county's ArcGIS server **is live** (`giswww.westchestergov.com/arcgis/rest/services` → 200,
+`currentVersion` 11.5) and its AGO org `XKEHpOulfycN9cGC` responds — so "no portal" was wrong.
+It still yields nothing wireable:
+
+- Folder **`Municity5`** — Municity IS a municipal permitting system, so this was the real lead.
+  It returns `{"error":{"code":499,"message":"Token Required"}}` — **access-restricted, not public.**
+- Folder **`DOH_Permit`** — also `499 Token Required`. (And DOH = Department of Health: septic/food
+  permits, not building permits, so it would not have been the right source anyway.)
+- Folder **`LocalMunicipality`** — enumerated in full: only `Buchanan_MS4_Viewer`,
+  `HastingsImage`, `New_Castle_Reference`, `North_Castle_High_Conservation_Areas`. No permits.
+- AGO org services matching permit/develop/subdiv/zoning/plat are **tax parcels and zoning only**
+  (`Tax_Parcels`, `OssTaxParcelsEPVS*`, `Zoning`, `New_Castle_Zoning`, …). A parcel registry is
+  not a permit ledger.
+
+### SUFFOLK — BLOCKED, explicitly NOT a rejection → nightly reprobe list
+
+`gis.suffolkcountyny.gov/arcgis/rest/services` returns **HTTP 403 serving a page titled
+"Suffolk County Server Maintenance"** — on **two separate probes**, so it is persistent rather
+than a momentary blip, but it is still a *maintenance* state, not an absence of data.
+`gis3.suffolkcountyny.gov` fails DNS and `data-suffolkcountyny.hub.arcgis.com` 404s
+("Domain record(s) not found"). **Do not record Suffolk as sourceless** — 107 pages ride on it and
+the server may simply be down. Re-probe it.
+
+### NASSAU + the Long Island towns — no reachable host
+
+`gis.nassaucountyny.gov` 404 · `gis.brookhavenny.gov` HTTP 500 · `maps.huntingtonny.gov` DNS fail.
+
+### AGO content search: ran, and found only CROSS-ORG LOOKALIKES
+
+All ten loose searches returned 200 with non-zero totals (so the instrument demonstrably ran —
+"Long Island building permits" 88 results, "Suffolk County GIS New York" 89, "Westchester County
+permits New York" 12). Every permit/development-shaped hit was from somewhere else entirely:
+**"Development Pipeline" / "Lynn Development Pipeline" → Lynn, MASSACHUSETTS** (owner `LSDrago`),
+**"Zoning" → CityofSaintPaul, MINNESOTA**, and Westchester's own only match was a **"Film Permit
+Layer Update"** — film shoots, not construction. This is the documented unscoped-search trap;
+the titles look right and the geography is wrong.
+
+**Long Island's towns (Brookhaven, Islip, Huntington, Babylon, Smithtown) run permitting on
+vendor portals with no public GIS layer.** That is the structural reason, and it is the same
+shape as TN's Williamson/Sumner/Maury/Wilson.
