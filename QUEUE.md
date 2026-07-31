@@ -2793,3 +2793,61 @@ BLOCKER REGISTER are the only things that move coverage from here:
    fence included.
 
 Both are gated. Neither has been taken.
+
+---
+
+## WAVE 18 — the SEARCH INVERSION, re-run: a THIRD blocker class, and it is PURE DATA
+
+Instead of probing counties by name, swept AGO by **ledger title shape** sorted newest-modified —
+the technique that found Johns Creek and Lee County. Of 32 `title:"Issued Building Permits"` hits,
+most are **Canadian** (Surrey, Mississauga, Oakville, Abbotsford) or university coursework (UBC
+DES 401, a `geog351fa21` student layer, UT Austin, Muhlenberg). Two were live US first-party ledgers:
+
+| source | owner | status |
+|---|---|---|
+| `Issued Building Permits Current Year` + `…Archive` | **`Publisher_SacCity`** — City of Sacramento | **live, first-party, unwired** |
+| `Residential Issued Building Permits` | `gis_onslow` — Onslow County NC | live, first-party, unwired |
+
+**Neither can be used, and NOT because of the source.** Measured just now:
+
+```sql
+-- CA/Sacramento and NC/Onslow, communities where level='zip'
+→ 0 rows.  Neither county has ANY modelled ZIP page.
+```
+
+### This is blocker class **C — no modelled ZIP pages** (new, and distinct from A and B)
+
+Blockers A (needs code) and B (needs the source to change) both assume a page exists to fill.
+**Here the source is fine and the page does not exist.** Sacramento County is a ~1.6M-person metro
+publishing a current-year permit ledger under its own city account, and it produces exactly zero value
+because HomeSignal models zero Sacramento ZIPs.
+
+Known members of class C, now with a live wireable source attached to one of them:
+
+| county | modelled ZIP pages | note |
+|---|---|---|
+| **CA / Sacramento** | **0** | ← **live first-party ledger found this wave** |
+| CA / Los Angeles | 0 | `LA County Permitting (EPIC-LA Case History)` seen earlier, also unusable |
+| NC / Onslow | 0 | live first-party ledger |
+| TX / Harris | 1 | 2 correctly-wired plat entries emitting ~0 (queue item 5) |
+| TX / Bexar | 2 | same |
+| DC · NC / Guilford | 0 | recorded earlier |
+
+**It stays gated, and the gate is already written down.** Queue item **EXP-HARRIS-BEXAR** is
+`State: BLOCKED · Gate: Founder decision — it moves the coverage claim. Report, then hold.`
+A Sacramento expansion is the identical action on a different county, so the identical gate applies.
+**Reported, not shipped** — no rows inserted, no coverage claim changed.
+
+**Why it deserves the founder's attention above A1/A2:** it is **pure data**. The communities model
+already supports it (the NYC-borough / Boston-Suffolk / Philadelphia-County precedent, all shipped),
+it needs **no connector, engine or schema change**, and for Sacramento a wireable source is already
+identified and waiting. Of the three blocker classes it is the cheapest to clear and the only one
+that needs no engineering at all.
+
+### Revised recommendation order (all three gated, none taken)
+
+| rank | blocker | pages | cost |
+|---|---|---|---|
+| 1 | **C — ZIP expansion** (Sacramento first, then LA/Harris/Bexar/Onslow) | large + unlocks already-found sources | **pure data, zero code** |
+| 2 | **A2 — socrata/csv geocode path** | 74 (Honolulu + Milwaukee) | small code; `arcgis` already has the pattern + fence |
+| 3 | **A1 — vendor adapter** | the long tail | largest code change |
