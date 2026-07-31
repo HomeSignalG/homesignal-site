@@ -9706,6 +9706,53 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-31 FL/Lee wire, from the vendor-signature sweep. Lee County FL's own AGO org LvWGAAhHwbCJ2GMP, DevelopmentOrders/FeatureServer/0. 17,967 rows total, esriGeometryPolygon -> rides the featurePoint() shoelace-centroid path; return_centroid NOT set (opt-in only). No ZIP column -> spatial 3-mi. TYPE IS GENUINELY OPAQUE AND IS DELIBERATELY NOT INTERPRETED. The values are LDO / DOS / VAC / ADD (plus MOP in data), and the Murfreesboro check was applied in full: the layer's renderer is type 'simple' with NO uniqueValueInfos, and the field DOES carry a codedValue domain named 'DevelopmentOrderType' - but every entry maps a code to ITSELF ({'code':'LDO','name':'LDO'}, {'code':'DOS','name':'DOS'}, ...), so the domain supplies NO human-readable expansion. Guessing that LDO = 'Local Development Order' is exactly the prohibited move, so use_type_const 'Development' is used - the generic member of the closed TYPE_EXACT vocabulary - and the code is not read at all. NEW STANDING ANSWER: a codedValue domain whose name EQUALS its code is not a legend; it is an opaque code wearing a domain, and it must be treated as unmappable. STATUS is fully self-describing and enumerated IN THE CONNECTOR'S OWN WINDOW (Rule 13), summing EXACTLY to the windowed count 3,073: Closed-Finaled 1313 -> operating; Issued 1061 + Issued-Extension Pending 6 + Pending CC Issuance 3 -> approved; Waiting on Applicant 186 + In Review 131 + Documents Uploaded 7 + Payment Required 5 -> proposed; Closed-Withdrawn 176 + Closed-Abandoned 94 + Closed-Expired 33 + Closed-Denied 16 + Closed-Vacated 15 + Closed-Voided 15 + Closed-Administrative 6 + Closed-Old 4 + Closed-Conversion 2 -> exclude. Any status outside this set fails closed. FRESHNESS (paired probe): 1,610 rows in the trailing year AND 3,073 in the 1095-day window. STATUS_DATE is a real esriFieldTypeDate so recency_days' DATE literal applies. NULL-SAFE TITLE BY CONSTRUCTION: title is the ARRAY ['PROJECT_NAME','DOLABEL'] and readCol drops nulls before joining; DOLABEL is proven 0-null in window (PROJECT_NAME has 1 null of 3,073), so the title can never be empty. VERIFIED_BY is a staff-name field and is deliberately NOT mapped (the Asheville PII lesson); PII check on the mapped text passed - PROJECT_NAME/DESCRIPTION samples are project scopes ('PADDLE CREEK LOT SPLIT', 'Reconfiguration of 5 lots into 4 lots'). KNOWN, BOUNDED DUPLICATION - disclosed rather than hidden: sampled rows repeated the same PROJECT_NAME across consecutive features, so multi-polygon development orders exist. distinct DOLABEL in window returned EXACTLY 2000, which is the server's maxRecordCount cap - the value is TRUNCATED and the true distinct count could NOT be established. What is established: distinct >= 2000 of 3,073 rows, so duplication is at most ~1.5x. This is NOT the Houston plat class (that was two layers where one was a proven subset of the other, double-emitting across two source_registry_ids); this is one layer where a single order may legitimately cover several parcels, and each polygon centroid is a real distinct location. Re-measure after go-live. REJECTED alongside it, with receipts: the same org's 'Development Activity Projects (public)' (678 rows) has NO DATE FIELD AT ALL (Name/Status/Area/Type/RecordNumber/Description/ConstructionValue only) - unwireable, the North Richland Hills class. COVERAGE PREDICTION, measured on the connector's exact query shape against 6 of Lee's 24 DARK ZIPs: ALL SIX non-zero - {6, 15, 74, 141, 378, 508}. Multiset only; per-ZIP labelling not asserted."
+    },
+    {
+      "registry_id": "stamford-major-developments",
+      "platform": "arcgis",
+      "service_url": "https://services3.arcgis.com/V28nrLFIbcYZbnPl/arcgis/rest/services/Stamford_Developments/FeatureServer/0",
+      "dataset_url": "https://www.stamfordct.gov/government/departments/land-use-bureau",
+      "jurisdiction": "City of Stamford",
+      "coverage": [
+        {
+          "state": "CT",
+          "county": "Fairfield"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "USER_Project_Name"
+        ],
+        "status_raw": "USER_Project_Status",
+        "type_source": "USER_Development_Type",
+        "file_date": "USER_Approval_Date",
+        "address": [
+          "USER_Address"
+        ],
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "USER_ZB_application__"
+      },
+      "type_map": {
+        "New Construction": "Development",
+        "Adaptive Reuse / Conversion": "Development",
+        "Other": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Approved - FSP",
+          "Approved - GDP"
+        ],
+        "operating": [
+          "Completed",
+          "Under Construction"
+        ],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-31: City of Stamford's own Land Use Bureau major-developments tracker (layer MasterDevelopments_20241003), 44 rows, point geometry in wkid 103016/6434 (CT State Plane NAD83(2011)) -- the connector sends outSR=4326 so it reprojects server-side. BOTH vocabularies enumerated live and EACH SUMS EXACTLY TO 44: USER_Project_Status = Approved - FSP 27 + Completed 10 + Under Construction 6 + Approved - GDP 1; USER_Development_Type = New Construction 32 + Adaptive Reuse / Conversion 10 + Other 2. 0 unclassified either way. file_date is USER_Approval_Date, populated on 43 of 44 rows (probed: where USER_Approval_Date <> '' -> 43); USER_Building_Permit_Date is REJECTED as the date field because max() over it returns the empty string -- it is unpopulated. Dates are STRINGS 'yyyy-mm-dd hh:mm:ss', so recency_days is deliberately ABSENT (it emits a DATE literal -- the Anaheim standing answer); isoDay() parses this shape. FRESHNESS CAVEAT, stated not hidden: newest USER_Approval_Date is 2024-07-29, ~12 months old -- this is a CURATED tracker of ongoing/proposed major projects, not a continuous issuance ledger, so an approved-2023 project still Under Construction is a currently-true record; it is NOT evidence of new filings in the last year. Under Construction is bucketed operating (the building physically exists and is rising) alongside Completed. No per-record URL column -> dataset precision on the Land Use Bureau page. No ZIP column -> spatial 3-mi. Covers the 6 modelled Stamford ZIP pages 06901/02/03/05/06/07, all dark before this."
     }
   ],
   "ckan": [
