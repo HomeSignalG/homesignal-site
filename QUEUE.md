@@ -2089,3 +2089,78 @@ county needs its own in-scope probe before its coverage is widened.
 **Operational note:** the daily `dev_refresh_fire` cron fired 250 requests mid-run. It was allowed to
 drain before the final batch; `dev_refresh_collect()` was called promptly after every batch (13/13,
 26/26, then the remainder), so no response was lost to the `net._http_response` TTL.
+
+---
+
+## SUFFOLK NY (107 dark pages) — probed to the TOWN level, still 0 wireable sources (2026-07-31)
+
+Suffolk was the largest single dark-county opportunity left (107 pages, ahead of Westchester 75
+and Nassau 70). It has now been probed at both levels. **Still not wireable — but the county
+server stays on the reprobe list, because a maintenance page is not an absence of data.**
+
+### The county server: unchanged, probe #5
+
+`gis.suffolkcountyny.gov/arcgis/rest/services` → **HTTP 403**, body `<title>Suffolk County Server
+Maintenance</title>`. Five probes across sessions, same response. `data-suffolkcountyny.hub.arcgis.com`
+→ 404 `"Domain record(s) not found"`. **Do not record Suffolk as sourceless on this basis.**
+
+### The town level — the right place to look, and the reason the county server may not matter
+
+**In New York, towns issue building permits, not counties.** Suffolk's ten towns are the correct
+target, so the county server being down may never have been the real blocker. Searched AGO by town
+name, then **org-scoped** each real hit (the unscoped search returned the documented cross-org
+lookalike trap: Brookhaven **GA**, Huntington **WV**, Marshall **WV**, Morgantown **WV**, Bermuda).
+
+Three genuine Suffolk-town orgs found and enumerated in full:
+
+| org | town | items | permit ledger? |
+|---|---|---|---|
+| `TOB_Planning` | **Babylon** (⚠️ TOB = Babylon, not Brookhaven) | 136 | no |
+| `ewarner_islipgis` | **Islip** | 106 | no |
+| `tosgov` | **Smithtown** | 13 | no — MS4 stormwater only |
+
+What they publish instead: zoning, tax parcels, flood/wetlands, sewer districts, garbage-pickup
+zones, cannabis buffers. The established pattern — **where a jurisdiction's GIS is reachable, it
+publishes parcels and zoning; the permit ledger lives in a vendor portal with no public layer.**
+
+### The two `OPENGOV` services are the vendor-folder trap, confirmed by enumeration
+
+Both looked like a permitting-vendor hit and neither is. Enumerated their layer lists:
+
+- Babylon `opengov_feature_service` → 21 layers: Superfund, easements, FEMA floodzone, wetlands,
+  fire districts, zoning, parcels. **Regulatory overlays.**
+- Islip `OPENGOV_WFL1` → 41 layers: jurisdiction buffers, tidal/freshwater wetland buffers, SLOSH
+  zones, ROW buffers, tax parcels. **Regulatory overlays.**
+
+Islip's `Opengov311`/`TOWN CLERK` are 311 and clerk records, not construction permits.
+
+### `GH_disadvantPermits` — a real permit schema, REJECTED on freshness
+
+The one true permit ledger found anywhere in Suffolk. Babylon, polygon geometry (the
+`featurePoint()` centroid path would have handled it), and a complete schema: `AppDate`, `Status`,
+`PermitType`, `PermitDesc`, `PermitNumb`, `COIssued`, `Physical_A`/`Physical_Z` (address + ZIP).
+
+**Vocabulary positive control passes exactly:** 2 `Status` values, `OPEN` 4,150 + `CLSD` 17 =
+**4,167** = the layer's own row count.
+
+**It is stalled, and the freshness probe is paired:**
+
+| probe | count |
+|---|---|
+| newest `AppDate` (string `yyyymmdd`, so lexicographic DESC == chronological) | **20240531** |
+| rows with `AppDate >= '20240601'` | **0** |
+| rows with `AppDate >= '20230101'` (the control) | **181** |
+
+The non-zero control proves the query shape works — a malformed `where` would have returned 0 for
+both. **14 months stale**, and it is a Green-Homes grant-program subset rather than the town's
+ledger. Under the entry's own `recency_days` window it would emit **zero records**, so wiring it
+would add a source that publishes nothing. Rejected.
+
+### OKC (52 pages) — reprobed, and the blocker is now NAMED
+
+`data.okc.gov` still 403s. The body identifies the product: `_Incapsula_Resource` —
+an **Imperva/Incapsula WAF**, not a missing portal. Same class as Tampa and El Paso. Stays on the
+reprobe list with a precise receipt rather than "bot-wall".
+
+**Net: 0 sources wired from 159 dark pages (Suffolk 107 + OKC 52).** Recorded as receipts, not as
+an absence of effort — and Suffolk's county server plus OKC's WAF both remain reprobe candidates.
