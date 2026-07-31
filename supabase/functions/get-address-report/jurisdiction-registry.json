@@ -9472,6 +9472,46 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-31 TN wire pass, Rutherford (Murfreesboro) - the largest fully-dark county left in TN (15 modelled ZIP pages, 0 backed). City of Murfreesboro's OWN AGO org A5C0MR9xfkxVRwat; ORG IDENTITY VERIFIED by the org's items resolving to murfreesborotn.maps.arcgis.com (the Liquor Permit App items), not by guessing a subdomain - the Asheville/Union-County cross-org lookalike trap. Layer is 'Permits', id 3 of the Buiilding_Permits FeatureServer (note the publisher's typo in the service name); FeatureServer/0 does NOT exist, the layer list had to be read from the service descriptor. 30,659 rows, esriGeometryPoint. CODED-VALUE RESOLUTION: PRMT_TYPE is a bare esriFieldTypeSmallInteger with NO coded-value domain - on its face an opaque code, which is a hard gate. It is resolved from the layer's OWN drawingInfo.renderer uniqueValueInfos, i.e. publisher-authored metadata, NOT inference: 101='SF DETACHED', 102='SF ATTACHED', 103='NEW COMMERCIAL'. POSITIVE CONTROL: 28,922 + 1,343 + 394 = 30,659 EXACTLY, the full layer count, and nothing falls through to the renderer's '<all other values>' default. 0 unclassified. Layer_Name was the other candidate type field and is 100% NULL across all 30,659 rows (groupBy count DESC and count ASC both return a single null group of 30,659 - the Mesa/Gilbert $limit-truncation defence) - checked, not assumed. FRESHNESS VERIFIED WITH THE PAIRED PROBE (the KY-floodplain lesson, and it mattered here): orderByFields=PRMT_DATE DESC returns a FUTURE date (~2027-09), so the max alone would have been either 'very fresh' or a poisoned max with no way to tell. The windowed controls settle it - 609 rows in the trailing year and 2,234 in the 1095-day window - and exactly 1 row of 2,234 is future-dated, a single data-entry typo (logged; the record is real, so it is not dropped). NO STATUS COLUMN AT ALL -> status_const 'Issued', the Detroit/Cleveland/Nashville/Memphis issuance-ledger pattern; PRMT_DATE is aliased 'PERMIT DATE' on a layer of building permits. NO ZIP COLUMN -> spatial_zip_radius_mi 3; every row places by its OWN point. The connector sends outSR=4326 (out_sr default), so the layer's native wkid 102100 Web Mercator is reprojected server-side - raw probes omitting outSR return Web Mercator and that is NOT a defect. NULL-SAFETY BY CONSTRUCTION: title/address are the ARRAY ['ADD_NO','DIRP','ST_NAME','ST_TYPE'] and readCol FILTERS nulls/empties BEFORE joining, so the null DIRP present on every sampled row cannot produce a malformed title (yields e.g. '3606 PIMLICO LN'). In the connector's own 1095-day scope: ADD_NO null 1, ST_NAME null 5, of 2,234. BUS_NAM was REJECTED as the title source - 2,114 of 2,234 null (94.6%). No per-record URL column -> record_url_precision 'dataset' on the city's own AGO item page (probed 200). COVERAGE PREDICTION, measured over ALL 15 Rutherford ZIPs on the connector's exact query shape (envelope, inSR=4326, same recency clause - Rule 13) and REPRODUCED IDENTICALLY across two independent runs: 9 of 15 ZIPs non-zero, counts {0 x6, 1, 62, 124, 132, 228, 423, 463, 535, 638}, 2,606 record-placements (adjacent 3-mi circles overlap - the documented Chicago behaviour). Note the id->ZIP labelling of those 15 counts is NOT asserted: ordering inside a subquery does not control net.http_get evaluation order, so only the multiset is claimed."
+    },
+    {
+      "registry_id": "chattanooga-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services2.arcgis.com/cclAu9OKhOfjeUdr/arcgis/rest/services/Building_Permits_to_April_2021/FeatureServer/0",
+      "dataset_url": "https://www.arcgis.com/home/item.html?id=2520adb8beec4334980d5ff80075eeea",
+      "jurisdiction": "Chattanooga-Hamilton County Regional Planning Agency",
+      "coverage": [
+        {
+          "state": "TN",
+          "county": "Hamilton"
+        }
+      ],
+      "column_map": {
+        "title": "ADDRESS",
+        "status_raw": null,
+        "type_source": "P_TYPE",
+        "file_date": "PERMIT_DAT",
+        "address": "ADDRESS",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "PERMIT_NUM"
+      },
+      "type_map": {
+        "Residential": "Residential",
+        "Non-Residential": "Development"
+      },
+      "status_const": "Issued",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "recency_days": 1095,
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-31 TN wire pass, Hamilton (Chattanooga). Chattanooga-Hamilton County Regional Planning Agency's own AGO org cclAu9OKhOfjeUdr (owner RandA_CHCRPA); layer 0 of Building_Permits_to_April_2021 - the SERVICE NAME is historical, the layer is current (do not reject on the name). 31,868 rows, esriGeometryPoint. FRESHNESS (paired probe): 1,289 rows in the trailing year and 5,706 in the 1095-day window - corroborated by volume, not one row. TYPE SOURCE IS P_TYPE, **NOT** THE OPAQUE DEV_TYPE_C. DEV_TYPE_C is 26 numeric codes (101 23,899 / 102 3,367 / 100 1,379 / 328 512 / ...) which DO sum to exactly 31,868, but carry NO coded-value domain and NO renderer labels. They resemble Census C-404 construction codes and assuming that is precisely the prohibited guess - so they are not used. The layer's OWN renderer keys on P_TYPE, whose values are self-describing and enumerated live with a positive control in BOTH orderings: Residential 29,873 + Non-Residential 1,995 = 31,868 EXACTLY. 0 unclassified. 'Non-Residential' maps to 'Development' (the generic member of the CLOSED lib/map.js TYPE_EXACT vocabulary), NOT to 'Commercial' - non-residential spans commercial/industrial/civic, so Commercial would be a guess and use_type drives the pin SHAPE. CATEGORY is useless as a type: a single value 'New' on all 31,868 rows (it sums to the layer count, which is what proves it carries no information rather than that it is a good field). NO STATUS COLUMN -> status_const 'Issued' (Detroit/Cleveland/Nashville/Memphis/Murfreesboro issuance-ledger pattern). NO ZIP COLUMN -> spatial_zip_radius_mi 3. No per-record URL column -> dataset precision on the agency's own AGO item page. ADDRESS is the title and has 0 NULLS in the connector's own 1095-day window. PII CHECK PERFORMED (the Asheville lesson): P_DESC values read directly are work scopes ('SINGLE FAMILY RESIDENCE ON SLAB W/ ATTACHED...'), no personal names - but P_DESC is still NOT mapped, ADDRESS alone carries the title. COVERAGE PREDICTION, measured on the connector's exact query shape against the 5 ZIPs that were actually DARK (Rule 13 - probing the backed ZIPs would have answered a different question): 4 of 5 non-zero, counts {0, 2, 2, 18, 51}. NOTE this CORRECTED a wrong geographic assumption - those 5 ZIPs sit 25-30 mi north/east of Chattanooga proper and were expected to return 0; they do not. Measure, never reason from the map."
     }
   ],
   "ckan": [
