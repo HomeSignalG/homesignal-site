@@ -781,3 +781,34 @@ Hub DCAT item `b8fdb63db30b42d0875afb617e1551f4` → its `url`.
 
 Asheville is a CITY source, so expect it to cover a subset of Buncombe's 20 (Charlotte covered
 32/34); Chatham/Orange/Union still needed after it.
+
+### ASHEVILLE NOW WIRED — `asheville-accela-permits` (arcgis, registry 106 → 107), PR #462
+
+The two open design calls above were settled (founder: "keep going"), both on precedent and both
+recorded here so they are not re-litigated:
+
+1. **`NA` at 35% is a NON-ISSUE — the type source is `record_type_type`, not `record_type_category`.**
+   Category is `NA` on 22,714 rows and `record_type_group` is uniformly `"Permits"` (65,438) — both
+   useless. The NA rows are **fully typed** at `record_type_type` (Residential 6131 / Sign 4931 /
+   Commercial 4465 / Event 3350 / …), so the entry lands **0 unclassified**. 9 values, no nulls,
+   summing to exactly 65,438.
+2. **Trades and non-development types DROPPED at source** via `extra_where`, following the WA/MN/IL
+   majority precedent (MI kept trades only because the founder named the Detroit trio). Dropped: the
+   5 non-development `record_type_type` values (Sign 4931, Fire 3550, Event-Temporary Use 3350, Over
+   The Counter 2992, Outdoor Vendor 558 = **15,381**) + 15 trade/minor-repair categories. Live
+   positive control on the exact filter + 365-day window: **2,280 rows** (unfiltered window 3,983).
+
+🔒 **THIRD FINDING, AND THE MOST IMPORTANT — A PRIVACY TRAP IN THIS SOURCE.**
+**`record_name` AND `description` BOTH carry private individuals' names** on residential permits —
+`"ECKL, ELIZABETH"`, `"BENNETT, ABBY"`, and descriptions ending `"…FOR SHANE HOLLIFIELD"`. Using
+either as the map-pin title would print a resident's name next to their home address on a public,
+indexable page. **NEITHER IS MAPPED.** The title is **`record_type`** — 0 null (verified) and
+self-describing across 112 values (`Res: New SFD`, `Com: Demo`, `ROW: Encroachment`): it describes
+the WORK, not the PERSON.
+**Standing answer for every future permit source: before mapping `title`/`description`, read actual
+values — an owner-name column is common in Accela ledgers and is invisible in a schema listing.**
+
+Remaining after Asheville lands: Chatham 12, Orange 10, Union 9, Wake 2, Mecklenburg 2
+(Cornelius/Davidson, outside Charlotte's jurisdiction). County-host probes for
+Chatham/Orange/Union were fired but the pg_net queue backed up to 54 behind a scheduled refresh —
+**not yet answered, do not record them as rejected.**
