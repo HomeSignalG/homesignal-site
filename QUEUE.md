@@ -120,6 +120,34 @@ Williamson 12 · Sumner 9 · Maury 8 · Wilson 7 · Hamilton 5 · Davidson 1. Ne
 page, and the largest (Shelby/Memphis) sits behind `SHELBY-429`, a **new connector family
 (GATED)**. **Do the arithmetic first — TN is very likely UNREACHABLE** (row 428).
 
+### 🔴🔴 READ FIRST — MA/MassDOT: 627 ZIPs WERE FIRED AGAINST A STALE ENGINE. DISCARD THAT RUN.
+
+**`massdot-highway-projects` is MERGED to `main` (`df82e3e`) but the deploy DID NOT LAND.** The
+function was still **v113** four minutes after dispatch — v113 is the FDOT deploy and does NOT
+contain the MassDOT entry.
+
+**I then fired all 627 MA ZIPs anyway, before confirming the version.** Those requests hit v113 and
+can only have returned facilities-only reports with **zero** MassDOT records. **Do not collect that
+run and conclude MassDOT is broken — it was never given a chance to run.**
+
+**RESUME EXACTLY HERE:**
+1. **Re-dispatch `deploy-edge-functions.yml` and WAIT until `get-address-report` reports v114 or
+   higher.** Check with `list_edge_functions`. Do not proceed on a dispatch alone.
+2. **Re-fire all 627 MA ZIPs** (the first fire is void).
+3. `dev_refresh_collect()` — expect to repeat it; pg_net drains slowly and ~31% fail (row 411).
+4. **`app_refresh_zip()` per MA ZIP.**
+5. Measure from `app_projects` with `record_kind='development'`.
+
+**THE PRE-CHECK IS ALREADY DONE AND IS EXCELLENT — do not redo it.** Envelope counts at 3 mi against
+four DARK MA ZIPs: **01035 → 162 · 02559 → 50 · 01267 → 80 · 01105 → 743. Four of four hit**, versus
+three of four for FL (which still gained +275 pages) and two-of-four-ZERO for Charlotte. MA has
+**574 dark of 627**; if FL's ratio holds this is the largest single page gain available anywhere.
+
+⚠️ **THE PROCESS LESSON, and it cost a whole run:** I wrote the rule *"a dispatched deploy is not a
+landed deploy — always confirm the version increments"* into this queue during the FL wire, and then
+violated it one step later on MA. **The check is worthless unless it runs BEFORE the fire, not
+after.** Confirm the version, then fire. Never the other way round.
+
 ### 🔴 IN FLIGHT — FDOT / Florida. Merged, NOT deployed. Resume here.
 
 **The strategic finding this came from, which matters more than FL itself:** all three states that
