@@ -2164,3 +2164,45 @@ reprobe list with a precise receipt rather than "bot-wall".
 
 **Net: 0 sources wired from 159 dark pages (Suffolk 107 + OKC 52).** Recorded as receipts, not as
 an absence of effort — and Suffolk's county server plus OKC's WAF both remain reprobe candidates.
+
+---
+
+## WESTCHESTER (75) + NASSAU (70) — probed, 0 sources; the NY top-3 dark counties are now all closed (2026-07-31)
+
+With Suffolk (107) closed above, the other two counties on the NY dark-page leaderboard were probed
+the same way. **Both yield 0 wireable sources.** That closes all **252 pages** of the largest
+remaining dark-county opportunity in the country.
+
+### Every permit-shaped hit was a CROSS-ORG LOOKALIKE — three of them unusually convincing
+
+The instrument demonstrably ran (Westchester query total **623**, Nassau **15**). Each search
+surfaced services whose *names* were exactly what a permit ledger looks like. Org-scoping each
+owner is what killed them — and this is the third consecutive pass where the name looked right and
+the owner was in another state:
+
+| owner | looked like | actually is | receipt |
+|---|---|---|---|
+| `laikevin` | Nassau NY — `CitizenServe`, `EnerGov`, `EnerGov_Backup` | **Walton County, FLORIDA** | same org owns `WaltonCountyPropeties`, `SouthWaltonMosquitoControlDitches`, `US98_30A_Maintenance` |
+| `gis@dpw` | Westchester — `ClaritiMapLayers_WFL` (Clariti is a permitting vendor) | **San Francisco** | same org owns `ClaritiMapLayers_SFMTA_WFL1`, `SF_Honorary_Streets`, `BUF Street Trees` |
+| `npv-hv` | Westchester — `Cortlandt …` layers | a **Hudson Valley environmental consultancy** (genuinely local) | 244 items, all wetlands / habitat / inundation / soil — **0 permit ledgers** |
+
+The rest of the Westchester result set was the usual noise: NOAA lobster-management areas, City of
+Vernon **BC**, Maize **KS** `Permit_Status_2024`, and a "Mt Vernon Overlay District" owned by
+`AlexGIS` (Alexandria, not Mount Vernon NY).
+
+**Reinforces the standing answer, now with a sharper edge:** an unscoped AGO search cannot be used
+to *accept* a source, only to generate candidates. `EnerGov`/`CitizenServe`/`Clariti` in a service
+name is a **vendor** signature, not a jurisdiction signature — it says which software the owner
+bought, and says nothing about where the owner is. Resolve the owner's org before believing any
+part of the title.
+
+### Where this leaves the frontier
+
+Across Suffolk, Westchester and Nassau — 252 pages, the three largest dark counties left — the
+result is the same structural finding recorded through seven prior waves: **where a jurisdiction's
+GIS is reachable it publishes parcels, zoning and environmental overlays; the permit ledger lives
+in a vendor portal with no public per-record layer.** These counties are not dark for lack of
+searching.
+
+The unlock for this class is therefore **not** more discovery. It is the **vendor adapter**
+(Accela / EnerGov / CitizenServe / Municity) — a code change, and gated.
