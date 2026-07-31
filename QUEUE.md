@@ -2312,3 +2312,66 @@ meetings.
 
 It is a **code change**, so it sits outside the registry-only autonomy grant and is **NOT** being
 taken unasked. Logged as the single highest-value gated item.
+
+---
+
+## WAVE 9 — Indianapolis · Providence · Tulsa · Akron · Dayton · Contra Costa · Summit · Wichita (2026-07-31)
+
+Founder instruction: work through every ZIP, solve blockers where possible, **record and move on where
+not**. This wave covers 8 more counties (~330 dark pages). **0 sources wired.** Two findings are worth
+more than the rejections.
+
+### PROVIDENCE RI (42 pages) — a textbook BLDS ledger, stalled 6.5 years. TOP REPROBE CANDIDATE.
+
+`data.providenceri.gov` `ufmm-rbej`, **80,874 rows**, and the schema is the best-shaped one found in
+two sessions — it is the **BLDS standard** (same shape as Cincinnati and KCMO):
+
+```
+permitnum, permittype, permittypemapped, pin, originaladdress1, originalcity,
+originalstate, originalzip, description, estprojectcost, applieddate, issueddate,
+statuscurrent, permitclass, workclass, totalsqft, contractor*, geocoded_column{latitude,longitude}
+```
+
+Native ZIP **and** per-record coordinates — it would have needed no spatial scoping and no geocoder.
+Both vocabularies are complete and the status set **sums exactly to the row count**:
+`Complete` 61,633 + `Active` 17,705 + `Stopped` 1,536 = **80,874** ✓.
+
+**Rejected on freshness only:** max `issueddate` **2020-01-23**, max `applieddate` 2019-10-24,
+**0 rows since 2023-01-01**. The catalog title says "2009-2018" and is itself understated — the data
+runs to 2020, then stops. Under the standard 365-day window it would emit **zero records**.
+→ **nightly reprobe list, ranked first**: if Providence ever republishes, this is a same-day wire with
+no new connector code.
+
+### Rejections with receipts
+
+- **Indianapolis / Marion IN (40)** — `data.indy.gov` DCAT is **live and large (3.83 MB, valid
+  project-open-data)**, and was searched in full. Every "permit" match is a **historical zoning
+  ordinance** (`Improvement Location Permit Ord 68-AO-11`, `Planned Unit Development Ord 67-AO-1`, …).
+  The only record-shaped datasets are Building Footprints, Building/Unit Addresses, and
+  `Indianapolis Code Enforcement Violations and Investigations` — code enforcement is not a
+  development permit and belongs to a different bucket. **No per-record permit ledger published.**
+- **Contra Costa CA (43)** — `gis.cccounty.us` is **live** and its folder list was enumerated:
+  `Assessor, PublicWorks, Elections, Sheriff, ConFire, AddressPoints, CCMAP, INTERNET, …` —
+  **no permits folder**. The two plausible folders each hold exactly one service:
+  `INTERNET/BASE_DATA_ArcPro` and `CCMAP/Assessment_Parcels_ArcPro`. Parcels, not permits.
+- **Summit County OH / Akron (41)** — `Summit_Admin` org is live with **600 items**. Targeted
+  in-org search for permit/building returned **44**, and they are **building FOOTPRINT polygons**
+  (`Buildings_Buffer_yr2000`, 1994/2000 photogrammetry) plus a wall of `TaxParcel*` dashboards.
+  No permit ledger.
+- **Tulsa OK (39)** — `cityoftulsa.org/apps/opendata/` → **403**. The regional org `tsimmons_INCOG`
+  is live (150 items); targeted in-org permit search returns **3**, all irrelevant
+  (`CreekCo_Stormwater_Permit_UZA_2010` — a stormwater *urbanized-area boundary*; "City of Tulsa
+  Permitted Dispensaries"). No construction ledger.
+
+### BLOCKERS — could not resolve, moving on (for the end-of-run review)
+
+| blocker | pages | evidence | class |
+|---|---|---|---|
+| **Wichita KS / Sedgwick** | 50 | `opendata.wichita.gov` returns the **HTML portal shell on every API path tried** (`/api/feed/dcat-us/1.1.json`, `/api/feed/dcat-ap/2.1.1.json`, `/api/search/v1`). AGO search for "City of Wichita" returns **Wichita Falls, TEXAS** and an EPA case-study image — the org was never located. | portal API path unknown |
+| **Akron hub** | — | `data-akron.opendata.arcgis.com` → 404 "Domain record(s) not found" | **URL guess — unprobed, NOT rejected** |
+| **Dayton hub** | — | `data-cityofdayton.opendata.arcgis.com` → 404 "Domain record(s) not found" | **URL guess — unprobed, NOT rejected** |
+| **Tulsa County hub** | — | `opendata.tulsacounty.org` → DNS failure | **URL guess — unprobed, NOT rejected** |
+| **Tulsa city portal** | 39 | `cityoftulsa.org/apps/opendata/` → 403 | access refused |
+
+Per the Frisco standing answer, the three 404/DNS entries are **guessed hostnames** and are recorded
+as *unprobed*, never as evidence the city publishes nothing.
