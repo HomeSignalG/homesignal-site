@@ -1729,3 +1729,37 @@ Both re-probed later in the same session, after a substantial gap:
 **Method note:** both were probed with an explicit `User-Agent` header specifically to
 *distinguish* a UA filter from an IP/behaviour filter. It is a UA-invariant block — worth knowing
 before anyone spends time on header tricks.
+
+### Tier-3 spot-check (Fulton GA · Summit OH · Contra Costa CA) — also REJECTED
+
+Sampled the most promising tier-3 dark counties (38–47 pages each) — the ones with real metros
+behind them (Atlanta, Akron, the East Bay) — to test whether the vendor-portal ceiling holds
+further down the list. It does.
+
+- **Fulton GA / Atlanta (40 pages)** — `gis.atlantaga.gov` DCAT **404**;
+  `data-coaplangis.opendata.arcgis.com` **404 "Domain record(s) not found"**;
+  `opendata.atlantaregional.com` **500 `CONT_0001: Item does not exist or is inaccessible`**.
+  No reachable machine catalog.
+- **Summit OH / Akron (41 pages)** — `data.akronohio.gov` DNS fail; `gis.summitoh.net` returns
+  **"Failure when receiving data from the peer"** (TLS/connection level, not an HTTP status).
+- **Contra Costa CA (43 pages)** — the county ArcGIS server **IS live** (200, v11.5, 23 folders),
+  so this is a real read, not a dead host. Enumerated: **no permit, planning, development or
+  building folder exists at all** (`_Authoritative, Address_Locators, AddressPoints, AES, AIRPORTS,
+  AnimalServices, Assessor, AUTHORATIVE, CCMAP, ConFire, EHSD, Elections, EMPLOYEEGIS, Hosted, HSD,
+  INTERNET, INTRANET, OTHER, PublicWorks, RASTER, SHERIFF, SOFiscal, Utilities`). Drilled the three
+  public-facing candidates: **`CCMAP` → `Assessment_Parcels_ArcPro` only · `INTERNET` →
+  `BASE_DATA_ArcPro` only · `PublicWorks` → EMPTY.** Parcels and basemap, no permit ledger.
+  `opendata.cccounty.us` DNS fail.
+
+**Four passes now agree** (TN collar · NY downstate · tier-2 · tier-3). The dark counties are dark
+for one structural reason, and it is not a discovery failure: **their jurisdictions run permitting
+on vendor portals that expose no public per-record GIS or open-data layer.** Where a county GIS
+server IS reachable (Westchester, Contra Costa, St. Louis County) it publishes **parcels and
+zoning** — a parcel registry is not a permit ledger, and no amount of further searching converts
+one into the other.
+
+**Recommendation for the next session:** stop sweeping the dark-county list — the expected yield
+is now very low and four passes have measured it. The two genuinely open items are the *blocked*
+ones (Suffolk NY 107 pages behind a maintenance page, OKC 52 behind a UA-invariant WAF), plus any
+NEW vendor-side capability (e.g. an Accela/EnerGov/Municity public-API adapter) which would unlock
+many jurisdictions at once rather than one at a time. That is the shape of the remaining upside.
