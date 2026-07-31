@@ -2748,3 +2748,48 @@ fact. Extent to suspect → sample to confirm.
 Counties probed across waves 1–16: **~40**, covering roughly **1,900 dark pages**. Sources wired: **2**
 (Stamford CT, plus the Chicago→DuPage coverage extension). Everything else is receipted in the
 BLOCKER REGISTER above.
+
+---
+
+## WAVE 17 — Union/Somerset NJ · Yakima · Will/Winnebago IL · Dutchess/Saratoga NY · Ventura/SLO CA · Hawaii County
+
+All six dry. Registry-checked first; all 20 candidates confirmed unwired before probing.
+
+- **Union + Somerset NJ (57 combined)** — total **0**. Consistent with the closed NJ statewide route.
+- **Yakima WA (26)** — total 10, **0** permit services.
+- **Will + Winnebago IL (59 combined)** — total 4, **0** permit services. Confirms the earlier
+  Illinois wire-pass rejections (Rockford org live but 0 permit services; Will County's real root
+  exposes 0 public permit services).
+- **Dutchess + Saratoga NY (61 combined)** — 855 results, and **not one municipal building ledger**.
+  The permit-shaped hits are Saratoga Springs *construction site* markers owned by a personal account
+  (`ace560`), utility permits, **septic** permits, tree permits, and **Idaho Department of Water
+  Resources appropriation permits**.
+- **Ventura + San Luis Obispo CA (63 combined)** — the only hit is
+  **`034_SLOBuildingPermits_20220719` owned by `lsorvett_CalPoly`** — a Cal Poly **student/coursework
+  layer**, third-party and frozen at 2022-07-19. Barred on provenance and dead on freshness.
+- **Hawaii County (28)** — DLNR **forest-reserve researcher** permits and two "South Kona Future
+  Development *Scenarios*" planning studies. No ledger.
+
+### 📉 The marginal return has collapsed — state it plainly
+
+| waves | counties probed | sources wired |
+|---|---|---|
+| 1–13 | ~24 | 1 (Stamford) + 1 coverage extension (DuPage) |
+| **14–17** | **~22** | **0** |
+
+**Twenty-two consecutive counties, zero sources.** That is not bad luck; it is the shape of the
+remaining problem. Below roughly the top-40 dark counties every jurisdiction either publishes no
+permit data at all, publishes it only inside a vendor portal, or publishes a non-construction permit
+domain (septic, tree, utility, forest-reserve, parking).
+
+**Continuing to probe counties one at a time is now the wrong instrument.** The two code changes in the
+BLOCKER REGISTER are the only things that move coverage from here:
+
+1. **A1 — the vendor adapter** (Accela / EnerGov / CitizenServe / SmartGov / Municity / Clariti).
+   Confirmed **five** times as the wall, most recently Carroll County MD's `PermitsProAccela` holding
+   an address registry.
+2. **A2 — a geocode path for `socrata`/`csv`**, worth **74 pages** (Honolulu 38 + Milwaukee 36) from
+   two live, fresh, first-party, addressed ledgers — and `arcgis` already implements the pattern,
+   fence included.
+
+Both are gated. Neither has been taken.
