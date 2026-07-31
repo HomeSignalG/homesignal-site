@@ -2954,3 +2954,45 @@ Cleveland · Hamilton TN (`RandA_CHCRPA`). Locked: Denver, Weld, Douglas NV (**C
 **0 modelled pages** (blocker class C): Onslow NC, Pitt NC.
 Baltimore city's `Housing and Building Permits 2019-Present` reappears — still the recorded
 DECISION-NEEDED item (issuance ledger with no status and no work-type column).
+
+---
+
+## WAVE 20 — Navajo AZ and Hawaii County both REJECTED on freshness (2026-07-31)
+
+Both first-party county ledgers found by the vendor/title sweep. Both real. Both dead.
+
+### Navajo County AZ (32 dark) — stalled 2021-11-18
+
+`Building Permits` on the county's own org, **59,007 rows**, point geometry in wkid 4326.
+`Task` vocabulary enumerated live and **sums EXACTLY to 59,007**:
+Septic incl. PERC and Well 16,925 · Meter Loop or Gas Line 11,476 · Remodel or Addition 10,762 ·
+New Start Dwelling 10,234 · Garage or Accessory 6,115 · Manufactured Home 2,517 · Commercial 534 ·
+Miscellaneous or Update 390 · Grading 51 · *(null)* 3.
+
+**max `OpenDate` = 1637193600000 ms = 2021-11-18 — 4.7 years stale.** Rejected.
+*(Its schema was marginal anyway — no status, no type beyond `Task`, no address, no ZIP.)*
+
+### Hawaii County (28 dark) — a POISONED max date, caught by the paired probe
+
+`DPW Building Permits`, **15,991 rows**, point geometry. Two things worth recording:
+
+1. **The layer id is 14, not 0.** Both `/FeatureServer/0` URLs returned
+   `{"error":{"code":400,…"The requested layer (layerId: 0) was not found."}}`. The service root
+   revealed a single layer at **id 14** (`preserveLayerIds: true`). **A 400 on layer 0 is not "no
+   data" — read the service root for the real layer id.**
+2. **The freshness probe is why this rule exists.** Taken alone, `max(APRVD_DATE)` returns
+   **95774140800000 ms — the year ~5005**, a corrupt future date that would poison any
+   `orderByFields DESC` freshness check and read as "extremely fresh."
+   The **paired windowed count** settles it: rows with `APRVD_DATE >= 2025-07-31` = **5**.
+   Five records in a year, out of 15,991, on a county of ~200,000 people — the feed has stopped.
+   Sample rows are from 2009 (`b2009-0119h`, Puna, "Revised Residence (As-Built)").
+
+   **Rejected on freshness** — and this is the clearest demonstration yet that **a max-date probe
+   MUST be paired with a windowed count**. Max alone said year 5005; the window said 5 rows. Neither
+   number is interpretable without the other.
+
+### Where the vendor sweep leaves things
+
+The sweep's value stands — it found Allentown (**live, 3,939 records**) and correctly surfaced these
+two as candidates. That two of three turned out stale is the ordinary hit rate, not a fault in the
+method: **the sweep finds ledgers; the freshness gate decides which are worth wiring.**
