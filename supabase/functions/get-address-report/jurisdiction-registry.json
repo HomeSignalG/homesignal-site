@@ -9421,6 +9421,57 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-31 TN wire pass, Shelby (Memphis) - the largest single dark county found this session (41 modelled ZIP pages, 0 backed). City of Memphis DPD Building Permits, the city's OWN AGO layer DPD_Building_Permits/FeatureServer/0. 26,520 rows, esriGeometryPoint. ORG IDENTITY VERIFIED: owner 'opmautomation_memegis' (City of Memphis ArcGIS Online), reached via the city's Hub DCAT at data.memphistn.gov -> item 3018811a721a49a98843baeb29de6256 -> its 'url'. www.datamidsouth.org and data.memphistn.gov are NOT Socrata domains (both 404 the Socrata catalog API); shelbycountytn.gov's ArcGIS is live but its OPD_Codes folder is EMPTY. FRESHNESS VERIFIED WITH THE PAIRED PROBE (the KY-floodplain lesson): max Issued_Date = 2026-06-30 AND the windowed control 'Issued_Date >= DATE 2025-07-31' returns 4,208 - corroborated by volume, not resting on one row. Layer dataLastEditDate 2026-07-24. BOTH vocabularies enumerated live with a positive control, EACH summing to EXACTLY 26,520: Sub_Type 4 values (RES 17,621 / COM 6,344 / Residential 1,999 / Commercial 556 - the SAME two concepts in two encodings, both mapped verbatim) and Construction_Type 7 values (ALT 12,786, New 5,580, ACC 4,224, ADD 2,321, Alteration 884, Accessory 488, Addition 237). No nulls in either. 0 unclassified. No trades/noise classes exist in this layer, so no whitelist is needed - ALT/ACC/ADD/New are all real construction. NO STATUS COLUMN -> status_const 'Issued' guarded by extra_where 'Issued_Date IS NOT NULL', exactly the Detroit/Cleveland/Nashville issuance-ledger pattern. THREE NULL-RATE PROBES WERE STILL QUEUED BEHIND A pg_net STALL WHEN THIS WAS WIRED, so each unknown is made safe BY CONSTRUCTION rather than by assumption: (a) title is the ARRAY ['Construction_Type','Description'] - arrays JOIN, and Construction_Type is proven 0-null by its vocabulary summing to exactly 26,520, so the title can never be empty (Detroit's proven shape); (b) any null Issued_Date is excluded by extra_where; (c) any row without coordinates simply fails the spatial envelope and self-excludes - no fabricated placement. ZIP_Code is native but NULL on 2,749 of 26,520 (10.4%), so it is deliberately NOT mapped as 'zip' - spatial_zip_radius_mi 3 places every row by its OWN Latitude/Longitude instead of silently losing the 10%. recency_days 1095 bounds dense-metro row size (Henderson precedent). PII CHECK PERFORMED (the Asheville lesson): 12 Description + Address values read directly - all are work scopes ('Inground swimming pool', 'New house construction with 4 bedrooms', 'Interior tenant improvement to existing restaurant space'). No personal names; the only proper noun seen was a business (City Silo). Description is safe in the title. No per-record URL column -> dataset precision, pointing at the city's own Hub dataset page."
+    },
+    {
+      "registry_id": "murfreesboro-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services5.arcgis.com/A5C0MR9xfkxVRwat/arcgis/rest/services/Buiilding_Permits/FeatureServer/3",
+      "dataset_url": "https://murfreesborotn.maps.arcgis.com/home/item.html?id=b693b0c09e3c4ccdba4382048d85a60b",
+      "jurisdiction": "City of Murfreesboro, Tennessee",
+      "coverage": [
+        {
+          "state": "TN",
+          "county": "Rutherford"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "ADD_NO",
+          "DIRP",
+          "ST_NAME",
+          "ST_TYPE"
+        ],
+        "status_raw": null,
+        "type_source": "PRMT_TYPE",
+        "file_date": "PRMT_DATE",
+        "address": [
+          "ADD_NO",
+          "DIRP",
+          "ST_NAME",
+          "ST_TYPE"
+        ],
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "GISLINK"
+      },
+      "type_map": {
+        "101": "Residential",
+        "102": "Residential",
+        "103": "Commercial"
+      },
+      "status_const": "Issued",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "recency_days": 1095,
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-31 TN wire pass, Rutherford (Murfreesboro) - the largest fully-dark county left in TN (15 modelled ZIP pages, 0 backed). City of Murfreesboro's OWN AGO org A5C0MR9xfkxVRwat; ORG IDENTITY VERIFIED by the org's items resolving to murfreesborotn.maps.arcgis.com (the Liquor Permit App items), not by guessing a subdomain - the Asheville/Union-County cross-org lookalike trap. Layer is 'Permits', id 3 of the Buiilding_Permits FeatureServer (note the publisher's typo in the service name); FeatureServer/0 does NOT exist, the layer list had to be read from the service descriptor. 30,659 rows, esriGeometryPoint. CODED-VALUE RESOLUTION: PRMT_TYPE is a bare esriFieldTypeSmallInteger with NO coded-value domain - on its face an opaque code, which is a hard gate. It is resolved from the layer's OWN drawingInfo.renderer uniqueValueInfos, i.e. publisher-authored metadata, NOT inference: 101='SF DETACHED', 102='SF ATTACHED', 103='NEW COMMERCIAL'. POSITIVE CONTROL: 28,922 + 1,343 + 394 = 30,659 EXACTLY, the full layer count, and nothing falls through to the renderer's '<all other values>' default. 0 unclassified. Layer_Name was the other candidate type field and is 100% NULL across all 30,659 rows (groupBy count DESC and count ASC both return a single null group of 30,659 - the Mesa/Gilbert $limit-truncation defence) - checked, not assumed. FRESHNESS VERIFIED WITH THE PAIRED PROBE (the KY-floodplain lesson, and it mattered here): orderByFields=PRMT_DATE DESC returns a FUTURE date (~2027-09), so the max alone would have been either 'very fresh' or a poisoned max with no way to tell. The windowed controls settle it - 609 rows in the trailing year and 2,234 in the 1095-day window - and exactly 1 row of 2,234 is future-dated, a single data-entry typo (logged; the record is real, so it is not dropped). NO STATUS COLUMN AT ALL -> status_const 'Issued', the Detroit/Cleveland/Nashville/Memphis issuance-ledger pattern; PRMT_DATE is aliased 'PERMIT DATE' on a layer of building permits. NO ZIP COLUMN -> spatial_zip_radius_mi 3; every row places by its OWN point. The connector sends outSR=4326 (out_sr default), so the layer's native wkid 102100 Web Mercator is reprojected server-side - raw probes omitting outSR return Web Mercator and that is NOT a defect. NULL-SAFETY BY CONSTRUCTION: title/address are the ARRAY ['ADD_NO','DIRP','ST_NAME','ST_TYPE'] and readCol FILTERS nulls/empties BEFORE joining, so the null DIRP present on every sampled row cannot produce a malformed title (yields e.g. '3606 PIMLICO LN'). In the connector's own 1095-day scope: ADD_NO null 1, ST_NAME null 5, of 2,234. BUS_NAM was REJECTED as the title source - 2,114 of 2,234 null (94.6%). No per-record URL column -> record_url_precision 'dataset' on the city's own AGO item page (probed 200). COVERAGE PREDICTION, measured over ALL 15 Rutherford ZIPs on the connector's exact query shape (envelope, inSR=4326, same recency clause - Rule 13) and REPRODUCED IDENTICALLY across two independent runs: 9 of 15 ZIPs non-zero, counts {0 x6, 1, 62, 124, 132, 228, 423, 463, 535, 638}, 2,606 record-placements (adjacent 3-mi circles overlap - the documented Chicago behaviour). Note the id->ZIP labelling of those 15 counts is NOT asserted: ordering inside a subquery does not control net.http_get evaluation order, so only the multiset is claimed."
     }
   ],
   "ckan": [

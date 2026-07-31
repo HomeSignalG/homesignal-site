@@ -1233,3 +1233,203 @@ substantially this session but neither could reach 90%, and the reason is the sa
 **small and rural jurisdictions do not publish per-record permit data**, and the vendor-platform
 folders that look like they do (`PermittingSystem`, `SmartGov`, `Accela`) turn out to serve the
 basemap their permitting app draws on.
+
+---
+
+## TN/Shelby — `memphis-dpd-building-permits` GO-LIVE VERIFIED (2026-07-31)
+
+PR **#465** merged (`8f6a1ad`), engine **v119** deployed and confirmed *before* firing
+(`list_edge_functions` → version 119), queue confirmed clear (q=0) at fire time.
+
+**Four-step pipeline completed:** merge → deploy → re-cache (`development_reports`) →
+materialize (`app_refresh_zip` → `app_projects`).
+
+### Measured result — from `app_projects`, `record_kind='development'`
+
+| Scope | Before | After |
+|---|---|---|
+| **TN/Shelby** | 0 / 41 (0.0%) | **40 / 41 (97.6%)** |
+| **TN statewide** | 88 / 199 (44.2%) | **128 / 199 (64.3%)** |
+
+Prediction was "+30–41 pages, TN near 65%". Landed at +40 pages / 64.3%.
+
+### Invariants across all 47,377 cached Memphis records
+
+`0` missing `record_url` · `0` missing coordinates · `0` non-`point` scope · `0` unclassified.
+Recency window is exact: oldest surviving `file_date` **2023-08-01** = the `recency_days: 1095`
+boundary; newest **2026-06-30**.
+
+**Bidirectional gate proof, cache-wide (not a sample):** grouping every cached site carrying
+`source_registry_id='memphis-dpd-building-permits'` by its page's `(state, county)` returns
+**exactly one row — `TN/Shelby`, 40 ZIPs, 47,377 records**. No leak onto any other jurisdiction.
+
+The three null-rate unknowns that were made safe by construction at wire time are now confirmed
+against the live layer: `Description` null **4 / 26,520** (the title array's first element
+`Construction_Type` is 0-null, so no record can title-blank), `Issued_Date` null **0**
+(`extra_where` would have dropped them anyway), coordinates null **0**.
+
+**38011 (Brunswick) is an honest 0** — it refreshed successfully at 03:24Z and carries 5 sites,
+none from Memphis. It sits outside the 3-mi ring of any Memphis permit. Not a failure, not a
+retry candidate.
+
+### pg_net stall — 6th occurrence, and a NEW variant worth recording
+
+The 41-ZIP fire froze at **exactly** the outstanding count (q=41) with `max(net._http_response.id)`
+pinned at 14214. **Unlike the five prior occurrences, cheap GETs did NOT drain either** — a control
+`net.http_get('https://example.com')` queued as id 14256 and sat unanswered (q went 41→42), so the
+whole worker was stalled, not just the POST path. It cleared on its own inside ~7 minutes, and the
+control then read 200. A second, shorter stall hit the 5-ZIP retry batch and also self-cleared.
+**Still: always clears on its own; `worker_restart()` remains unnecessary and was not called.**
+
+First pass: 36 × 200, 4 × 503, 1 × null. The 5 non-200s (38108 / 38109 / 38115 / 38126 / 38132 —
+all dense core-Memphis ZIPs) were identified by a stale `refreshed_at`, re-fired, and all returned
+200. Transient cold-start, not a source problem.
+
+### Where TN stands, per county
+
+| County | Pages | Backed | Dark |
+|---|---|---|---|
+| Knox | 31 | 31 | 0 |
+| Shelby | 41 | 40 | 1 |
+| Davidson | 32 | 31 | 1 |
+| Hamilton | 31 | 26 | 5 |
+| Wilson | 7 | 0 | 7 |
+| Maury | 8 | 0 | 8 |
+| Sumner | 9 | 0 | 9 |
+| Williamson | 12 | 0 | 12 |
+| Montgomery | 13 | 0 | 13 |
+| Rutherford | 15 | 0 | 15 |
+
+TN needs **57 more pages** to reach 90%, and the only way there is the six fully-dark collar
+counties (Rutherford/Murfreesboro, Montgomery/Clarksville, Williamson/Franklin, Sumner, Maury,
+Wilson = 64 pages). That is a multi-source wire pass, not one entry — the same shape as the
+remaining frontier states.
+
+### Scoreboard correction — the metric, stated so it is not re-derived wrong
+
+A scoreboard query over `app_projects` **without** a `record_kind` filter counts the **EPA
+facilities floor** and reads ~93–99% for nearly every state. The RECORD-coverage metric is
+`record_kind='development'` only. Positive control on the corrected query: TN 88/199 = 44.2%,
+NC 124/170 = 72.9%, KY 68/126 = 54.0% — all three reproduce the previously recorded values
+exactly. `app_projects` splits 2,548,110 `development` rows / 216,173 `facility` rows.
+
+---
+
+## TN wire pass #2 — Rutherford wired; TN's own ceiling measured (2026-07-31)
+
+### `murfreesboro-building-permits` — WIRED (PR #466), registry 110 → 111
+
+City of Murfreesboro's own AGO org `A5C0MR9xfkxVRwat`, `Buiilding_Permits/FeatureServer/**3**`
+(the publisher's typo is in the service name; **layer 0 does not exist** — the layer list had to be
+read from the service descriptor). 30,659 rows, point geometry, no ZIP column → spatial 3-mi.
+
+**NEW STANDING ANSWER — a numeric code with no coded-value domain is not automatically opaque:
+check `drawingInfo.renderer.uniqueValueInfos` first.** `PRMT_TYPE` is a bare `SmallInteger` with
+`domain: null`, which reads as an opaque code and is a hard gate. The layer's OWN renderer labels
+every value present — **101 `SF DETACHED`, 102 `SF ATTACHED`, 103 `NEW COMMERCIAL`** — so the
+values are self-describing from *publisher-authored metadata*, not inference. Positive control:
+28,922 + 1,343 + 394 = **30,659 exactly**, and nothing falls to `<all other values>`. This is the
+same move as the Phoenix `PER_TYPE` department-code crosstab; without it the source would have
+been wrongly rejected.
+
+`Layer_Name` was the other candidate type field and is **100% NULL** across all 30,659 rows
+(groupBy count DESC *and* count ASC both return one null group of 30,659) — checked, not assumed.
+
+**The paired freshness probe earned its keep again.** `orderByFields=PRMT_DATE DESC` returns a
+**future date (~2027-09)**. Alone that is indistinguishable from "very fresh" and from a poisoned
+max. The windowed controls settle it: **609 rows in the trailing year, 2,234 in the 1095-day
+window**, and exactly **1 of 2,234** is future-dated — one data-entry typo, logged and kept (the
+record is real).
+
+Other config: no status column at all → `status_const: "Issued"` (Detroit/Cleveland/Nashville/
+Memphis issuance-ledger pattern). No per-record URL → `dataset` precision on the city's own AGO
+item page (probed 200). `title`/`address` are an address-part array and **`readCol` filters nulls
+before joining**, so the null `DIRP` on every sampled row cannot malform a title. `BUS_NAM` was
+rejected as title source — **2,114 of 2,234 null (94.6%)**.
+
+**Coverage prediction (measured over ALL 15 Rutherford ZIPs, connector's exact query shape,
+reproduced identically across two independent runs): 9 of 15 non-zero**, counts
+`{0×6, 1, 62, 124, 132, 228, 423, 463, 535, 638}`, 2,606 record-placements.
+⚠️ Only the **multiset** is claimed — ordering inside a subquery does **not** control
+`net.http_get` evaluation order, so the id→ZIP labelling was deliberately not asserted.
+
+### TN CANNOT REACH 90% — measured, same shape as NC and KY
+
+Per-county dark count after Memphis (from `app_projects`, `record_kind='development'`):
+
+| County | Pages | Backed | Dark | Source found? |
+|---|---|---|---|---|
+| Knox | 31 | 31 | 0 | — |
+| Shelby | 41 | 40 | 1 | Memphis (wired) |
+| Davidson | 32 | 31 | 1 | Nashville (wired) |
+| Hamilton | 31 | 26 | 5 | **Chattanooga — candidate found, not yet wired** |
+| Wilson | 7 | 0 | 7 | **none** |
+| Maury | 8 | 0 | 8 | **none** |
+| Sumner | 9 | 0 | 9 | **none** |
+| Williamson | 12 | 0 | 12 | **none** |
+| Montgomery | 13 | 0 | 13 | **Clarksville-Montgomery RPC — candidate, not yet wired** |
+| Rutherford | 15 | 0 | 15 | Murfreesboro (PR #466, predicted +9) |
+
+90% of 199 = 180 backed. Current 128. Even wiring **every** remaining candidate —
+Rutherford +9, Montgomery +13, Hamilton +5 — caps TN at **~155/199 ≈ 78%**.
+**Williamson + Sumner + Maury + Wilson = 36 pages with no first-party per-record source found**,
+on loose AGO searches that DID return results (so this is absence, not the AND-ed-query false-zero
+artifact from the KY pass).
+
+### Candidates found, not yet wired
+
+- **Montgomery / Clarksville** — the Clarksville-Montgomery County RPC's own org `bsMxxAoaPLw5EHPS`
+  (owner `cmcrpc`). `FinalSD` (94 rows, `RPC_ACTION` **APPROVED=93 | APPROVAL=1** — sums to exactly
+  94), `PrelimSD` (69, **APPROVED=69** — exactly 69), `ActivePrelims` (92). Polygon → rides the
+  `featurePoint()` centroid path. Both vocabularies self-describing with exact positive controls.
+  ⚠️ `Current_RezoningRequests` is **very fresh (2026-07-28)** but **weak and NOT recommended**:
+  only 12 rows, `RPC_ACTION` is a blank `" "` on pending rows, `map_url` is **NULL** on every
+  sampled row (so its apparent record-precision is illusory), and `ZONE_FROM`/`ZONE_TO` are opaque
+  zoning codes (C-5, R-1, AG, R-5) that cannot drive `use_type`.
+- **Hamilton / Chattanooga** — org `cclAu9OKhOfjeUdr`, `Building_Permits 1/1/2006 to 3/31/2026`
+  (owner `RandA_CHCRPA` = Chattanooga-Hamilton County Regional Planning Agency). Not yet
+  freshness-probed or vocabulary-enumerated.
+
+### Rejections with receipts (this pass)
+
+- **Host-guessing is dead as a discovery method** — all 10 guessed GIS hosts for the six dark
+  counties failed (`murfreesborotn.gov/arcgis`, `gis.franklintn.gov`, `maps.williamsoncounty-tn.gov`,
+  `gis.wilsoncountytn.gov`, `maps.maurycounty-tn.gov`, … → 404 / DNS failure / SSL error).
+  Every real source this pass came from AGO search → item → its `url`.
+- **Williamson / Sumner / Maury / Wilson** — loose AGO searches ran and returned results
+  (Columbia TN planning 111 hits, Hendersonville 23) but **0 permit/subdivision/development
+  feature services** among them.
+
+### pg_net — `net.wake()` is a NEW and better first move than `worker_restart()`
+
+The stall recurred twice more (7th and 8th occurrences), including one that froze the **production
+nightly `dev_refresh_fire` run** at q=258. Two things learned:
+
+1. **`net.check_worker_is_up()` distinguishes "worker dead" from "worker wedged"** — it raises if
+   the worker is down. It returned cleanly, proving the worker was **alive but not draining**.
+   No prior session had this instrument; every earlier stall diagnosis had to guess.
+2. **`net.wake()` correlated with immediate recovery.** After **25+ minutes** frozen at exactly
+   q=58 with `max(net._http_response.id)` pinned, `net.wake()` was followed within 90 s by a full
+   drain to **q=0** and ids advancing 14491 → 14549.
+   ⚠️ **One observation is correlation, not proof of causation** — these stalls have always cleared
+   on their own eventually. But it is the first intervention ever followed by immediate recovery,
+   whereas `worker_restart()` was previously measured as a no-op. **Try `net.wake()` first.**
+
+Also worth knowing: a `timeout_milliseconds` of 90000 in `net._http_response.error_msg` identifies a
+row as one of `dev_refresh_fire`'s OWN ZIP refreshes, not yours — useful when the nightly cron
+inserts ahead of your probes and you are trying to find your own request ids.
+
+### ⚠️ GitHub Actions incident — `unit` wedged on this repo, NOT caused by the change
+
+PR #466's `unit` check passed **green in 2m23s** on commit `22f9e41`. The merge commit `9661e0b`
+then wedged on step 6 ("Run all unit regression tests") for **over an hour**, across a
+cancel-and-rerun and a third fresh run.
+
+**`git diff 22f9e41 9661e0b` returns EMPTY — the trees are byte-identical.** The wedged runs are
+executing exactly the tree that already passed. The suite is green locally (all **71** files) on
+every commit in this branch. This is a runner-side incident, not a regression.
+
+Two API lessons from it: `get_check_runs` / `list_workflow_jobs` **serve stale status for ~15
+minutes** (a check reporting `in_progress` had `completed_at` 03:41:34), so neither is authoritative
+— the **merge endpoint** is, because it is the actual gate. And a cancelled run takes several
+minutes to become re-runnable (`403 This workflow is already running`).
