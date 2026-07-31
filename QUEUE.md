@@ -2251,3 +2251,64 @@ carries the receipts here.
 (337 dark pages between them) — and the finding is unchanged across all four: reachable jurisdiction
 GIS publishes parcels, zoning, boundaries and environmental overlays; the permit ledger sits in a
 vendor portal with no public per-record layer. **Discovery is not the bottleneck any more.**
+
+---
+
+## FINAL SWEEP — Bergen + Morris NJ, Jefferson AL: 0 sources; 518 dark pages probed this session (2026-07-31)
+
+The last three unswept counties in the top 15. **0 wireable sources**, same as the four above.
+
+### NJ — Bergen (66) + Morris (55): every hit was out of state
+
+Searched the actual municipalities (Hackensack, Fort Lee, Paramus, Teaneck, Englewood, Fair Lawn,
+Ridgewood, Morristown, Parsippany). Instrument ran — total 18 — and produced a near-perfect roster
+of lookalikes:
+
+- **Morristown, TENNESSEE** — `City of Morristown Stormwater Assets`, owner `jmacdonald_mhgis`,
+  alongside `Hamblen County Businesses` from the same org
+- **Englewood, COLORADO** — `jphillips_englewoodgov` acknowledgement forms
+- **Sarasota County FL** septic areas; **Littleton CO**; **Ridgewood Reservoir** (NYC, not Ridgewood NJ)
+
+**0 New Jersey permit ledgers.** Consistent with the statewide NJ rejection already on record (the
+mandated DCA dataset is aggregate-by-design, Jersey City is a PDF library, Newark is Cloudflare-walled).
+
+### AL — Jefferson (60): one first-party org, no ledger
+
+- `data.jccal.org` (the county's presumed hub) → **DNS failure**; recorded as *unprobed*, not rejected.
+- **AGO org search for Jefferson County AL → `total: 0`.** The county has no AGO org.
+- **`City_of_Homewood_AL`** is a genuine first-party org, 56 items enumerated in full: city limits,
+  trash + clamshell truck routes, sidewalk inventory, council wards, school buffers, fire zones,
+  landmarks. `Permit Software Info` is **metadata about which permitting software the city bought**,
+  and `BZA Case Labels` is a label layer — neither is a record ledger.
+- **`Birm_Demo_Permits` was rejected on provenance, not content.** Owner is `admin_nthp` — the
+  **National Trust for Historic Preservation**, a third party republishing Birmingham data. Wiring
+  rule 0 is first-party only, and a preservation advocacy org's copy of a city ledger is exactly the
+  intermediary the rule bars. Not probed further.
+
+### Session total: 7 counties, 518 dark pages, 0 sources wired
+
+| county | dark pages | route used | outcome |
+|---|---|---|---|
+| NY Suffolk | 107 | county server + 3 town orgs | 1 permit ledger, stalled 14 months |
+| NY Westchester | 75 | org-scoped 3 owners | all cross-org (SF, Hudson Valley consultancy) |
+| NY Nassau | 70 | org-scoped | cross-org (Walton County FL) |
+| CA Orange | 85 | org-scoped 3 city orgs | boundary layer, 10-row dateless layer, Survey123 |
+| NJ Bergen | 66 | municipality search | all out of state |
+| NJ Morris | 55 | municipality search | all out of state |
+| AL Jefferson | 60 | hub + org + city org | no ledger; one third-party copy rejected |
+
+**This is the ceiling, demonstrated seven more ways.** Every route — county GIS, county hub DCAT,
+town/city org scoping, municipality-name search, vendor-signature search — lands in the same place:
+reachable jurisdiction GIS publishes parcels, zoning, boundaries and environmental overlays, and the
+permit ledger sits behind a vendor portal with no public per-record layer.
+
+### The recommendation, stated plainly
+
+**More discovery will not move coverage. The vendor adapter will.** Accela / EnerGov / CitizenServe /
+Municity are where these counties' permits actually live — this session alone hit EnerGov,
+CitizenServe, Clariti and "Permit Software Info" as *evidence of the vendor*, never as a reachable
+ledger. One adapter widens many states at once, exactly as Granicus/Legistar/CivicClerk did for
+meetings.
+
+It is a **code change**, so it sits outside the registry-only autonomy grant and is **NOT** being
+taken unasked. Logged as the single highest-value gated item.
