@@ -2571,3 +2571,73 @@ one incorrect merged claim addressed to the founder.**
 
 `sedgwick` · `wichita` · `honolulu` · `milwaukee` · `providence` — all return **zero** registry hits.
 The wave-9/13 findings on those five stand unchanged.
+
+---
+
+## SEDGWICK COUNTY KS (50 dark) — REJECTED: a 10,000-row snapshot that stops at 2022-10-07
+
+The largest verified-unwired county. `sedgwick_county_building_permits`
+(`services9.arcgis.com/TuMyQVg8YRPEnbjv`), point geometry in wkid 4326, geocoder output columns
+(`Match_addr`, `Postal`, `Score`) plus real permit fields (`Jurisdicti, Issued_Dat, Final_Date,
+COO_Date, Milestone, WorkType, OccupancyT, RES_COM, Parcel`).
+
+**Two independent vocabularies each sum to EXACTLY 10,000** — which is the finding, not a coincidence:
+
+- `Jurisdicti`: Wichita 7,595 · Unincorporated 1,025 · Maize 577 · Goddard 315 · Mulvane 121 ·
+  *(blank)* 97 · Valley Center 77 · Clearwater 51 · Cheney 38 · Garden Plain 38 · Colwich 35 ·
+  Andale 21 · Bentley 8 · Haysville 2 = **10,000**
+- `Milestone`: Closed 8,206 · Void Permit 744 · Prior to CO 736 · Conditional to Foundation Wall 131 ·
+  Certificate of Occupancy 72 · Conditional to Framing 62 · Issue Permit 36 · Fees 7 · StopWork 4 ·
+  Received Application 1 · Conditional to ReinforcingSlab 1 = **10,000**
+
+A round 10,000 reached from two different groupings is the signature of a **one-off snapshot export**,
+not a live ledger — and the date confirms it: **max `Issued_Dat` = 1665100800000 ms = 2022-10-07**,
+nearly three years stale. Under any recency window it emits nothing. **Rejected.**
+
+*(Provenance was a secondary concern anyway — the owner is `Goddard@KS`, the City of Goddard, one of
+the county's smaller cities republishing county-wide data. Freshness settled it first.)*
+
+---
+
+# 📋 BLOCKER REGISTER — the founder's end-of-run review list (2026-07-31)
+
+Every blocker hit this session, with what it would take to clear it. Ordered by pages unblocked.
+
+### A. Needs a CODE change (outside the registry-only autonomy grant)
+
+| # | blocker | pages | evidence | fix |
+|---|---|---|---|---|
+| **A1** | **Vendor permitting portals** — Accela · EnerGov · CitizenServe · SmartGov · Municity · Clariti | the long tail (most of ~8,600 dark) | Hit as *evidence of the vendor* four separate times and never as a reachable ledger: Spokane's `SmartGov` folder holds only `SmartGov_Parcels`; Babylon + Islip `OPENGOV` services are regulatory overlays; Homewood publishes a layer literally named `Permit Software Info`; `laikevin`'s EnerGov/CitizenServe are Walton County FL | **vendor adapter** — the Granicus/Legistar/CivicClerk play, one adapter widens many states |
+| **A2** | **socrata/csv have no geocode path** | **74** (Honolulu 38 + Milwaukee 36) | Honolulu: 432,021 rows, **fresh to 2025-07-01**, first-party — but `jobaddress`/`joblocation`/`address`/`tmk` are **all `dataTypeName: text`**. Milwaukee CSV: `Address` is a bare street string. Per the Austin rule, socrata + `spatial_zip_radius_mi` without `spatial_point_col` **quarantines and emits zero** | **extend the geocode path `arcgis` already has** (Boulder/Anaheim route + the v20 `GEOCODE_FENCE_MI` fence). Smaller than A1, and the safety fence is already shipped |
+
+### B. Needs the SOURCE to change — reprobe list (no work possible now)
+
+| # | blocker | pages | evidence |
+|---|---|---|---|
+| **B1** | **Providence RI — stalled** | 42 | The best-shaped source found in two sessions: BLDS standard, 80,874 rows, **native ZIP + per-record coords**, statuses summing exactly to the row count. Max `issueddate` **2020-01-23**, 0 rows since 2023. **Ranked first — a same-day wire with no new code if it republishes** |
+| **B2** | **Wichita / Sedgwick KS** | 50 | Portal returns the **HTML shell on every API path tried**; AGO finds only Wichita Falls **TX**. The one county layer is a 10,000-row snapshot stopping 2022-10-07 (above) |
+| **B3** | **Oklahoma City** | 52 | `data.okc.gov` 403 — body identifies an **Imperva/Incapsula WAF** (`_Incapsula_Resource`), not a missing portal |
+| **B4** | **Tulsa city** | 39 | `cityoftulsa.org/apps/opendata/` 403; INCOG's only permit layers are a stormwater boundary + dispensaries |
+| **B5** | **Suffolk NY county server** | (107, town route also dry) | `<title>Suffolk County Server Maintenance</title>` on **5 probes**. Towns probed separately: Babylon/Islip/Smithtown have no ledger; Babylon's real one stalls 2024-05-31 |
+| **B6** | Worcester MA · St. Paul MN · Syracuse NY · KCMO BLDS | — | previously-recorded stalls, unchanged |
+
+### C. Guessed hostnames — **UNPROBED, not rejected** (per the Frisco standing answer)
+
+`data-akron.opendata.arcgis.com` · `data-cityofdayton.opendata.arcgis.com` ·
+`opendata.tulsacounty.org` · `data.jccal.org` · `gisdatamaps.spokanecounty.org` ·
+`data.cityofirvine.org` · `opendata.ocgov.com` — all 404/DNS. **A dead guessed host is not evidence a
+city publishes nothing.** Each needs its real portal located before any rejection is recorded.
+
+### D. NOT blockers — closed with receipts, do not re-probe
+
+Aggregate-by-design (CT DECD, NJ DCA, San Mateo metrics) · zoning-ordinance catalogues (Indianapolis) ·
+parcels/footprints/boundaries where a permit ledger was hoped for (Contra Costa, Summit, Anne Arundel,
+Eugene, Ventura, Snohomish, Grand Rapids) · dateless layers (Tustin, North Richland Hills) ·
+third-party republishers (Birmingham/NTHP) · counties with 0 modelled ZIPs (Leon FL, LA County) ·
+counties already 0 dark (Charleston SC).
+
+### E. ⚠️ NOT a blocker — the "already wired" class (see the correction above)
+
+**Spokane · Sioux Falls · KCMO · Hartford** were all investigated as opportunities and are all **already
+in the registry**. Dark pages in a wired county usually mean the wired source has no rows for those
+ZIPs — **not** that the county needs wiring. Run the registry grep first, every time.
