@@ -9591,6 +9591,59 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "PRELIMINARY subdivision plats. 69 rows. RPC_ACTION enumerated live with a positive control: APPROVED=69 = 69 EXACTLY (single self-describing value). 2026-07-31 TN wire pass, Montgomery (Clarksville). Clarksville-Montgomery County Regional Planning Commission's own AGO org bsMxxAoaPLw5EHPS (owner cmcrpc). POLYGON geometry - rides the featurePoint() area-weighted shoelace centroid path; return_centroid deliberately NOT set (opt-in only, and the derived centroid reproduces the server's to ~3 m). No type column at all -> use_type_const 'Development', the generic member of the CLOSED TYPE_EXACT vocabulary; calling a subdivision plat 'Residential' would be an inference the source does not state. NO ZIP column -> spatial_zip_radius_mi 3. No per-record URL -> dataset precision on the commission's own AGO item page. NULL-RATE PROBES RUN (not assumed safe): CASENO 0 null, SUBNAME 0 null, ACTION_DAT 0 null on BOTH layers - so the title array ['SUBNAME','CASENO'] can never be empty and the recency filter drops nothing silently. COVERAGE: probed on the connector's exact query shape against the 13 ZIPs that were actually DARK (Rule 13). Across the 26 (ZIP x layer) probes, 8 returned non-zero {1,1,2,2,6,7,10,21} and 18 returned 0. A ZIP counts as backed if EITHER layer hits, so the honest prediction is a RANGE of 4-8 of 13 pages - the per-ZIP labelling is deliberately NOT asserted because ordering inside a subquery does not control net.http_get evaluation order. Measure exactly after go-live. REJECTED from the same org, with receipts: Current_RezoningRequests is the FRESHEST layer there (2026-07-28) but is NOT wireable - only 12 rows, RPC_ACTION is a blank ' ' on the pending rows (nothing self-describing to map), map_url is NULL on every sampled row so its apparent record-precision is illusory, and ZONE_FROM/ZONE_TO are opaque zoning codes (C-5, R-1, AG, R-5). ActivePrelims (92 rows) returned 0 for ACTION_DAT within the last year, consistent with pending cases carrying no action date yet."
+    },
+    {
+      "registry_id": "johns-creek-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/bqfNVPUK3HOnCFmA/arcgis/rest/services/Building_Permits_Issued/FeatureServer/0",
+      "dataset_url": "https://www.arcgis.com/home/item.html?id=65b4974c90f8465a99fec4d4ff7d7b30",
+      "jurisdiction": "City of Johns Creek, Georgia",
+      "coverage": [
+        {
+          "state": "GA",
+          "county": "Fulton"
+        }
+      ],
+      "column_map": {
+        "title": "JobAddress",
+        "status_raw": "JobStatus",
+        "type_source": "JobTypeDescription",
+        "file_date": "ISSUE_DATE",
+        "address": "JobAddress",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "JobID"
+      },
+      "type_map": {
+        "Residential": "Residential",
+        "Commercial": "Commercial"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "In Review",
+          "Submitted",
+          "Submitted - Online",
+          "Fees Due",
+          "Fees Paid"
+        ],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [
+          "Complete"
+        ],
+        "exclude": [
+          "Expired",
+          "Void",
+          "Abandoned",
+          "Denied"
+        ]
+      },
+      "extra_where": "JobTypeDescription IN ('Residential','Commercial')",
+      "recency_days": 1095,
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-31 GA/Fulton wire. City of Johns Creek's OWN AGO org bqfNVPUK3HOnCFmA, Building_Permits_Issued/FeatureServer/0. 18,765 rows, esriGeometryPoint, no ZIP column -> spatial 3-mi. FOUND BY VENDOR/KEYWORD-SIGNATURE SEARCH, not county-by-county guessing: after four county-by-county recon passes came up empty, a broad AGO search on permit-ledger phrasings ('active building permits', 'permit applications', 'EnerGov/Accela/CityView permits') surfaced 484 candidate services nationally, which were then mapped onto the dark-county list. Fulton was the largest dark county with an unwired hit (40 pages); GA already had DeKalb, Forsyth and Chatham wired but NOT Fulton. RULE 13 CHANGED THE ANSWER HERE - enumerate in the connector's OWN window. Unwindowed, JobTypeDescription is 29.3% null; INSIDE the 1095-day window it is 43.4% null (4,403 of 10,153). Both vocabularies sum EXACTLY to their scope's row count (18,765 unwindowed; 10,153 windowed), so the enumerations are complete. extra_where whitelists JobTypeDescription IN ('Residential','Commercial') = 3,967 in-window rows. This deliberately DROPS the 43.4% null-type bucket (fails closed - a row whose type the source does not state is not guessed) AND the non-construction classes the layer carries: Right of Way 554, Tree Removal 376, Sign 376, Temporary Sign 146, Land Disturbance 141, Fence 110, Administrative Permit 59, Retaining Wall 13, Cell Tower 8, Banner Permit. So this entry publishes ~39% of the window's rows BY DESIGN. JobStatus windowed also sums exactly: Complete 6,545 -> operating, Issued 1,594 -> approved, Expired 1,243 + Void 24 + Abandoned 9 + Denied -> exclude, In Review 6 + Submitted + Submitted-Online + Fees Due 2 + Fees Paid 1 -> proposed, and 729 NULLs fail closed. All values self-describing. FRESHNESS (paired probe): 3,037 rows in the trailing year AND 10,153 in the 1095-day window - corroborated by volume, not one row. ISSUE_DATE is a real esriFieldTypeDate so recency_days' DATE literal applies. Uses the CLEANED JobStatus / JobTypeDescription columns, not the raw JobStatus_original / JobTypeDescription_original the layer also carries. JobAddress null on 3 of 10,153 in window. No per-record URL column -> dataset precision on the city's own AGO item. COVERAGE PREDICTION, measured on the connector's exact query shape (envelope, inSR=4326, same recency AND the same type whitelist) against the 5 nearest DARK Fulton ZIPs: ALL FIVE non-zero - {28, 439, 1027, 2067, 2272}. Johns Creek's own ZIPs 30022/30097/30005 were all dark. Multiset only; per-ZIP labelling not asserted."
     }
   ],
   "ckan": [
