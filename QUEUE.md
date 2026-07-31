@@ -1709,3 +1709,23 @@ Nashville). **None wireable.** Receipts:
 these eight): large dark counties are dark because their jurisdictions run permitting on VENDOR
 PORTALS with no public per-record GIS or open-data layer.** That is a structural ceiling, not a
 discovery failure — and it is why no remaining state can reach 90%.
+
+### Reprobe result — Suffolk NY and Oklahoma City are CONFIRMED BLOCKED (still not rejections)
+
+Both re-probed later in the same session, after a substantial gap:
+
+- **Suffolk County NY (107 pages — the largest single dark county in the dataset)** — still
+  **HTTP 403 serving "Suffolk County Server Maintenance"**, now across **four probes** and on
+  BOTH `/arcgis/rest/services` and `/arcgis/rest/info`. A maintenance page on the service root
+  *and* the info endpoint means the whole ArcGIS front end is down, not one bad path.
+  **Still classified BLOCKED, not sourceless** — nothing has been learned about whether Suffolk
+  publishes permit data, only that its server is unreachable. This is the single highest-value
+  reprobe in the queue.
+- **Oklahoma City (52 pages)** — still **403 with the `NOINDEX, NOFOLLOW` bot-wall**, and
+  critically **it held with a browser `User-Agent` supplied**, so the block is IP/behaviour-based,
+  **not UA-based**. Same shape as the Tampa WAF finding (403 to the edge runtime, UA-invariant).
+  A UA spoof is not the workaround; if OKC is ever wanted it needs a different egress path.
+
+**Method note:** both were probed with an explicit `User-Agent` header specifically to
+*distinguish* a UA filter from an IP/behaviour filter. It is a UA-invariant block — worth knowing
+before anyone spends time on header tricks.
