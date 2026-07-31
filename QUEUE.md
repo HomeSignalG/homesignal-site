@@ -998,3 +998,22 @@ not new permits. Layer edit date is NOT data freshness.)*
 
 **KY projection: 44 → 60 of 126 = 47.6%** once Fayette lands. 90% needs 114, so KY cannot reach it
 without Daviess/Warren/Boone/Campbell/Oldham/Bullitt sources that do not appear to exist publicly.
+
+### RI probed while CI was blocked — no wireable source, state likely capped at 0%
+
+RI is the highest-leverage remaining target on paper (81 pages, 0% backed, and small enough that one
+statewide source would carry it). It does not exist:
+
+- **RIGIS statewide clearinghouse** (`rigis-edc.opendata.arcgis.com`, **1.88 MB DCAT read in full**)
+  contains **ZERO** datasets matching permit / development / construction / subdivision. Its org
+  `services2.arcgis.com/S8zZg9pg23JUEexQ` carries one construction-ish layer,
+  `TDI_and_Construction_Effort` — a transit planning layer, not permits.
+- **Providence** (`data.providenceri.gov`, Socrata — the portal DOES exist) has exactly three permit
+  datasets: `Special Event Permits`, `Special Events`, and
+  **`Department of Inspections and Standards Permits 2009-2018`** — a historical archive whose own
+  title states it ends in **2018**. Stalled 8 years. Reject.
+- A scoped AGO search for Providence RI returned 2,222 items and **0 permit/construction/development
+  services**.
+
+RI stays on the EPA facilities floor. Not recorded UNREACHABLE (per-town sources for Warwick/Cranston/
+Pawtucket were not individually probed), but there is no statewide path.
