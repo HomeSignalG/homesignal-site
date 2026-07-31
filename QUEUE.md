@@ -2044,3 +2044,48 @@ TRAKiT), **LA County CA** (Pico Rivera + EPIC-LA). Those need a ZIP expansion, w
 city and the dark pages are SUBURBS — each a separate municipality on a vendor portal with no
 public per-record layer.** The remaining levers are a vendor adapter (code, gated) and per-county
 cross-boundary widening (one probe at a time, as done here).
+
+---
+
+## CORRECTION — the Chicago→DuPage lift was overstated 16x by my own out-of-scope probe (2026-07-31)
+
+**Shipped and verified.** PR #479 merged (`dcb1f2a`), `get-address-report` deployed at **version 124**
+(was 123), all 51 modelled DuPage ZIPs re-fired through the deployed engine and collected, both newly
+backed ZIPs materialized.
+
+**What actually landed: 2 DuPage ZIPs, 14 records** — `60105` (7) and `60399` (7), both Bensenville
+centroids whose 3-mile circle reaches Chicago's O'Hare enclave. IL coverage 131 → **133 of 474 ZIPs
+(27.6% → 28.1%)**.
+
+**The pre-deploy probe said 135 and 222. It was wrong, and the reason is Rule 13.** I probed the
+Chicago layer with the spatial clause but **without the entry's `recency_days: 365` window**. Live
+positive control on 60105's exact centroid, same `extra_where`, same 3-mile radius, run both ways:
+
+| probe scope | count |
+|---|---|
+| `within_circle` + `permit_type in (…)`, **no date window** | **88** |
+| same + `issue_date >= '2025-07-31'` (the entry's own 365-day window) | **7** |
+
+The deployed engine emitted exactly **7** for that ZIP — it matched its own scope precisely. The
+connector was never wrong; **the probe was**. This is the "too wide invents drift" half of Rule 13,
+committed against my own change, and it inflated the expected lift by ~16x.
+
+**Standing answer (new): a spatial probe MUST carry the entry's `recency_days` window, not just its
+`extra_where`.** `recency_days` is as much a part of connector scope as the spatial clause and the
+type filter — omitting it produces a plausible, authoritative-looking number that no deploy can ever
+reproduce. State the window alongside every projected-lift figure, or mark the figure UNVERIFIED.
+
+**Invariants held, cache-wide, over every `chicago-building-permits` record** (not a sample):
+87,374 records across 133 pages — **0 missing `record_url`, 0 missing coordinates, 0 non-`point`
+scope, 0 unclassified**. **Bidirectional gate proof:** those records ride exactly two jurisdictions,
+`IL/Cook` and `IL/DuPage`, and no others.
+
+**The decision still stands, at its true size.** Cross-boundary coverage on a `spatial_zip_radius_mi`
+source is correct — a Chicago permit 2.5 miles from a Bensenville home is a real development record
+for that resident, and the gate proof shows it cannot leak beyond the declared counties. But the
+payoff is **2 pages, not ~5**, and it remains explicitly **NOT a blanket rule**: every candidate
+county needs its own in-scope probe before its coverage is widened.
+
+**Operational note:** the daily `dev_refresh_fire` cron fired 250 requests mid-run. It was allowed to
+drain before the final batch; `dev_refresh_collect()` was called promptly after every batch (13/13,
+26/26, then the remainder), so no response was lost to the `net._http_response` TTL.
