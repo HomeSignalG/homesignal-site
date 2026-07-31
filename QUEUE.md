@@ -65,84 +65,42 @@ was **0/22**. **Use `record_kind = 'development'`.**
 - **CO/Weld wired (#451)** — +12 pages, does not clear 90%. **Still needs deploy → re-cache →
   materialize → measure.**
 
-### Next — NC 48.8%, then TN 44.2%
+### Next — NC (83/170 = 48.8%, needs +70 of 87 dark)
 
-Dark counties already measured, so do not re-derive:
-- **NC** (83/170, needs +70): Mecklenburg **34** · Buncombe 20 · Chatham 12 · Orange 10 · Union 9 ·
-  Wake 2. Mecklenburg is Charlotte — a real open-data city and half the gap. 34+20+12 = 66, so NC
-  needs essentially Mecklenburg + Buncombe + Chatham + Orange to clear 90%. Check that arithmetic
-  FIRST (row 428) before probing.
-- **TN** (88/199, needs +91): Shelby **41** · Rutherford 15 · Montgomery 13 · Williamson 12 ·
-  Sumner 9 · Maury 8 · Wilson 7 · Hamilton 5 · Davidson 1. Total dark = 111, so TN is reachable only
-  by taking almost all of them; Shelby (Memphis) sits behind `SHELBY-429`, a **new connector family
-  (gated)**. Very likely UNREACHABLE — do the arithmetic before the search.
+Dark: **Mecklenburg 34** · Buncombe 20 · Chatham 12 · Orange 10 · Union 9 · Wake 2.
+Top four = 76 ≥ 70, so **NC IS reachable** — but only by landing essentially all of
+Mecklenburg + Buncombe + Chatham + Orange. Confirm that arithmetic still holds before each wire.
 
-### Three findings from the DE build worth carrying
-
-1. **A clean closed vocabulary can be the WRONG column, and that is more dangerous than a missing
-   one — it looks complete.** Sussex `current_zoning` is a tidy 38-value set summing exactly to
-   2,566. It was rejected as the type source because a conditional use is BY DEFINITION something
-   the existing zoning does not allow: `AR-1 -> Residential` would have labelled an
-   electrical-substation application "Residential" on 1,987 of 2,566 rows. Zoning describes the
-   PARCEL; `use_type` must describe the PROPOSAL.
-2. **`use_type_const` was a live false-Live trap and is now real.** The scoreboard already accepted
-   it as satisfying the pin-icon requirement while NO connector implemented it and NO entry used
-   it. The first entry to set it would have been counted toward Live while pages rendered
-   unclassified pins, with nothing failing. Now implemented in `sources/arcgis.ts` (mirrors
-   `status_const`); setting both it and a `type_map` is a quarantined config error.
-3. **Omitting `column_map.lat/lng` fails SILENTLY.** All 468 Sussex records first cached at
-   `scope:"area"` on the ZIP centroid instead of their parcels. `returnGeometry=true` is always
-   sent and `featurePoint()` resolves fine — the coordinates are just never read, so the records
-   publish, carry `record_url`, pass the anti-fabrication gate and count toward coverage. Caught
-   only by checking `scope` on live rows. A registry-wide assertion now pins it (0 violations
-   across 102 arcgis entries).
-
-### CO — UNREACHABLE at 90% by ARITHMETIC (2026-07-31). Wire Weld anyway, then move on.
-
-CO is **83/140 = 59.3%**, 57 dark, needs **+43**. Two counties holding **24** of those 57 dark
-pages have confirmed-unusable sources, so CO's ceiling is **140 − 24 = 116/140 = 82.9%**, below the
-bar, **even if every other county yields perfectly**:
-
-- **Douglas (14 dark)** — `Building_Permits` FeatureServer is **aggregate-by-design** (row 424:
-  684 rows of Geography × Year × Quarter, `geometryType: null`). Nothing to pin or classify.
-- **Jefferson (10 dark)** — its Open Data Hub DCAT was pulled complete (**479 titles**, JSON
-  terminated) and contains **no permit or land-use case dataset** — the only near-match is a
-  `Subdivision` base layer. `gis.jeffco.us/arcgis/rest/services` 404s (host resolves, path wrong);
-  its citizen permit portal is a login-gated Accela search, not an API.
-
-**Apply row 428: record CO UNREACHABLE, skip, move on.** Reopen only if Douglas or Jefferson
-publishes a per-record source. This is arithmetic, not a search verdict — no amount of further
-probing on the other six counties can close it.
-
-**Still worth wiring — Weld (+12 pages), because 12 real pages is 12 real pages.** Fully probed
-2026-07-31, ready for a one-pass wire:
+**NC-1 — `charlotte-rezonings`, probed 2026-07-31, ready to wire but coverage UNPROVEN.**
 
 ```
-https://services.arcgis.com/ewjSqmSyHJnkfBLL/arcgis/rest/services/Site_Plan_Review_open_data/FeatureServer/0
+https://gis.charlottenc.gov/arcgis/rest/services/PLN/Rezonings/MapServer/0
 ```
-- 434 rows · **polygon** (rides `featurePoint()`) · newest `DATE_` **2026-07-21**, 417 of 434 dated.
-- Fields: `SPR_S, SUBDIVISIO, LOTS, BLOCK, S_T_R, ZONING, PARCEL__, STATUS, AREA, ACRES, RECP_NUM,
-  DATE_, CASE_NAME, B1_PER_ID1..3, B1_ALT_ID, PER_STATUS`.
-- **Use `PER_STATUS`, NOT `STATUS`.** `PER_STATUS` enumerates completely — `Recorded` 432 +
-  `" Recorded"` 1 + `" "` 1 = **exactly 434** (connector trims, so the two Recorded forms fold).
-  Map `Recorded → approved` (a recorded site plan is approved, not necessarily built).
-  `STATUS` is **Rule 5 free text**: 373 rows are a bare `" "` and the remainder are annotations,
-  not states — `AMD TO SPR 211`, `ANNEX GREELEY`, `AUTO DEALER`, `IRRIGATION PUMP`,
-  `NO APPROVEL FOUN`, `REF. SPR-16`, `REF. Z-377`. Only `ACTIVE` (26) and `INACTIVE` (1) are
-  statuses at all.
-- **Type: `use_type_const: "Development"`** — same reasoning as Sussex; `ZONING` describes the
-  parcel, not the proposal.
-- **REMEMBER `column_map.lat/lng = __lat/__lng`** or all records silently land on ZIP centroids.
+- Charlotte's open-data portal is live and complete: DCAT 2,474 titles, JSON terminated.
+- 78 rows · POLYGON (rides `featurePoint()`) · newest `Received` **2026-06-15** · per-record
+  **`Hyperlink`** → `record_url_precision: "record"`.
+- `Status` enumerates completely: **`Pen` × 78** — the whole layer is PENDING rezonings. Maps
+  cleanly to `proposed`. That single value is the finding: this is a current-cases slice, not a
+  history, which is why it is small.
+- `Type` is **CD 63 + CV 15 = 78** — both OPAQUE CODES. Do **not** guess them (Conditional
+  District / Conventional is inference, not the publisher's word). Use `use_type_const:
+  "Development"` and skip `Type` entirely, exactly as Sussex and Weld do.
+- ⚠️ **THE OPEN QUESTION, and it decides whether this is worth wiring: do 78 polygons at
+  `spatial_zip_radius_mi: 5` actually reach 34 Mecklenburg ZIP pages?** Charlotte is dense so the
+  circles overlap heavily, but this is unmeasured. **Measure it BEFORE wiring** — run envelope
+  counts against a spread of Mecklenburg ZIP centroids (the method used for Sussex: 19966/19930/
+  19973/19975 returned 452/284/236/286). If it reaches only a handful of pages, wire it anyway for
+  those pages but do not expect NC to move, and go to the other Charlotte candidates first.
 
-After CO by record_pct: **NC 48.8% -> TN 44.2% -> VA 39.7% -> WA 37.6% -> MD 37.5% -> AZ 36.8% ->
-UT 35.2%.**
+**Other Charlotte candidates, unprobed, from the same complete DCAT:** `Special Use Permits`
+(`services.arcgis.com/9Nl857LBlQVyzq54/.../Special_Use_Permits/FeatureServer/0`) ·
+`Land Development Commercial Projects` · `Transit Station Development Projects` ·
+`Committed Development Entitlement Update`. One of these is likely larger than 78 rows.
 
-Already measured, so the next session does not re-derive:
-- **NC** dark: Mecklenburg 34 · Buncombe 20 · Chatham 12 · Orange 10 · Union 9 · Wake 2.
-  Mecklenburg alone is a third of the gap and is Charlotte — a real open-data city.
-- **TN** dark: Shelby 41 · Rutherford 15 · Montgomery 13 · Williamson 12 · Sumner 9 · Maury 8 ·
-  Wilson 7 · Hamilton 5 · Davidson 1. Shelby = Memphis; note QUEUE item SHELBY-429 (opendatasoft
-  connector) is a NEW CONNECTOR FAMILY and therefore gated.
+**Then TN (88/199, needs +91 of 111 dark)** — Shelby **41** · Rutherford 15 · Montgomery 13 ·
+Williamson 12 · Sumner 9 · Maury 8 · Wilson 7 · Hamilton 5 · Davidson 1. Needs almost every dark
+page, and the largest (Shelby/Memphis) sits behind `SHELBY-429`, a **new connector family
+(GATED)**. **Do the arithmetic first — TN is very likely UNREACHABLE** (row 428).
 
 ### Standing notes
 
