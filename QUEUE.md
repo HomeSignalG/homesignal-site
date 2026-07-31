@@ -878,3 +878,39 @@ the 46 remaining dark pages. Recorded so no session re-derives it.
 **Next per the loop: KY at 34.9%** (126 pages, 44 backed, 70 to 90%). Dark: Fayette/Lexington 19,
 Daviess 10, Campbell 10, Warren 9, Boone 8, Oldham 8, Bullitt 7, Madison 5, Jefferson 4, Kenton 1,
 Christian 1 = 82 — so 90% IS arithmetically reachable if Lexington + the mid-size metros wire.
+
+---
+
+## KY IN PROGRESS — Lexington/Fayette recon (2026-07-31)
+
+KY 34.9% (126 pages, 44 backed, **70 to 90%**). Dark: Fayette 19, Daviess 10, Campbell 10,
+Warren 9, Boone 8, Oldham 8, Bullitt 7, Madison 5, Jefferson 4, Kenton 1, Christian 1 = **82**,
+so 90% is arithmetically reachable.
+
+**LFUCG (Lexington-Fayette) org located and IDENTITY-VERIFIED: `services1.arcgis.com/Mg7DLdfYcSWIaDnu`,
+owner `emiller_lfucg4`.** Found via scoped AGO search + owner check — NOT a guessed org id
+(`data.lexingtonky.gov` is not a Socrata domain — 404 "Domain not found"; `maps.lexingtonky.gov`
+serves basemaps/locators only, no permits).
+
+Org service roster (candidates for the next pass): `Development_Plan`,
+`subdivision_development_plan_public`, `zone_compliance_public`, `ZoneChangeApplicationspublic`,
+`row_permits_open_view`, `construction_projects_lfucg`, `Construction_Locations_view_layer`,
+`PW_Construction_Location`, `Residential_New_Construction_Public`,
+`Commercial_New_Construction_Sqft_Public`.
+
+**`Development_Plan` — REJECTED.** 4,439 polygon rows, but the full field list is
+`OBJECTID, ID, LOG, NAME, Prefix, Year, Case_, DocumentName, ACREAGE, created_by/date,
+last_edited_by/date` — **no status column at all**, and **no usable date**: `Year` is a
+SmallInteger (2007), not a date, and `created_date` is identical across sampled rows
+(1783526417915 = a bulk GIS load), so it dates the import, not the plan. Sampled rows are
+2006/2007 plan archives with scanned PDFs. Same class as the North Richland Hills reject and
+the Chatham reject above: no status + no real date ⇒ not a development-activity feed.
+
+⚠️ **`Residential_New_Construction_Public` and `zone_compliance_public` are TABLES, not layers** —
+`FeatureServer/0` returns `"The requested layer (layerId: 0) was not found."` Their real layer ids
+are not 0; that is a lookup to do, not a rejection.
+
+**BLOCKED, not finished:** the remaining three probes (`Development_Plan` max(Year),
+`row_permits_open_view`, `construction_projects_lfucg`) were fired but the daily `dev_refresh_fire`
+pg_cron fired at the same moment and put **253 reports** ahead of them in the pg_net queue.
+Resume by re-firing those three once `net.http_request_queue` reaches 0.
