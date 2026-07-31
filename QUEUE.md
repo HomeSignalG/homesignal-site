@@ -812,3 +812,48 @@ Remaining after Asheville lands: Chatham 12, Orange 10, Union 9, Wake 2, Mecklen
 (Cornelius/Davidson, outside Charlotte's jurisdiction). County-host probes for
 Chatham/Orange/Union were fired but the pg_net queue backed up to 54 behind a scheduled refresh —
 **not yet answered, do not record them as rejected.**
+
+---
+
+## NC GO-LIVE VERIFIED — Asheville landed; NC 48.8% → 72.9% (2026-07-31)
+
+Merged `e6af373` (#462) → deployed **v116** (confirmed before firing) → fired all 20 Buncombe ZIPs →
+queue to **0** → `dev_refresh_collect()` (94 rows) → `app_refresh_zip` on all 20.
+
+- **9 of 20 Buncombe ZIPs carry Asheville records; 4,673 records; 0 missing `record_url`,
+  0 unclassified.** Exactly the 9 the pre-verify predicted.
+- **Bidirectional gate proof, cache-wide: 9 ZIPs, NC/Buncombe only.** No leak.
+- 20/20 materialized, 18 `quality=pass` (2 are honest empties on the facilities floor).
+- **NC: 115 → 124 of 170 = 72.9%** (from `app_projects`).
+
+⚠️ **Asheville is a CITY source and reaches only 9 of Buncombe's 20** — the other 11 are rural
+mountain ZIPs (Marshall 28753, Black Mountain fringe, Hendersonville-adjacent) outside the city's
+permit jurisdiction. That was measured with the connector's own query shape BEFORE wiring, not
+discovered after.
+
+### NC is 29 pages short — reachable only via Chatham (12) + Orange (10) + Union (9) = 31
+
+Dark now: Buncombe 11 (rural, no source), Chatham 12, Orange 10, Union 9, Wake 2, Mecklenburg 2
+(Cornelius/Davidson, outside Charlotte). **NC is NOT recorded UNREACHABLE** — the evidence does not
+support it yet:
+
+- **Orange County's own server is a FIRM reject** — `gis.orangecountync.gov/arcgis/rest/services`
+  is live (v10.81) and its full service list carries **no permit service** at all (basemaps,
+  parcels, zoning, land use, ARIES/Tyler311 locators only). Its 10 ZIPs would need Chapel Hill,
+  whose host serves an Esri **Portal** HTML page at both `/arcgis/rest/services` and
+  `/server/rest/services` — no REST directory found yet.
+- **Chatham and Union are NOT rejected — they are UNANSWERED.** Every host tried was a guess and
+  failed for guess-shaped reasons: `gisdata.chathamcountync.gov` and `maps.unioncountync.gov` fail
+  DNS, `gis.unioncountync.gov` 404s, `www.chathamcountync.gov` is WAF-403,
+  `data-chathamnc.opendata.arcgis.com` returns "Domain record(s) not found".
+  **A DNS failure on a hostname I invented is not evidence the county publishes nothing** (the
+  Phoenix standing answer, restated).
+
+⚠️ **SECOND CROSS-ORG LOOKALIKE THIS SESSION — guessed AGO org ids keep returning other states.**
+`services1.arcgis.com/JLuzSHjNrLL4Okwb`, guessed for "Union County NC", returned a 39 KB service
+list containing **`Gilbert_Zoning_General_Industrial_and_Light_Industrial`** — that is **Gilbert,
+ARIZONA**. Earlier the same session, `ZOyb2t4B0UYuYNYH` guessed for "Asheville" returned **SEATTLE**
+layers. Both were discarded, neither was wired. **Standing answer, now twice-proven: never accept a
+guessed `services*.arcgis.com/<orgid>` without an identity check on the returned service names.**
+The method that actually works is the one that found Asheville: locate the Hub DCAT feed, read the
+item, take its `url`.
