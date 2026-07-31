@@ -3045,3 +3045,28 @@ is a single free-text string), so it would need the arcgis geocode path plus add
 
 **Cost is real, ceiling is ≤4 pages. Not wired — recorded as a correction and a reprobe-list removal.**
 If Worcester's 4 dark ZIPs are ever shown to be city ZIPs, revisit; the source is live and good.
+
+---
+
+## WORCESTER FOLLOW-UP — the ≤4 ceiling is actually ≤1, VERIFIED not assumed
+
+The entry above said the Worcester ceiling was "≤4 pages and plausibly zero, since the 4 dark are
+**likely** rural towns." That word "likely" was an assumption, so it was checked. **Named the ZIPs:**
+
+| ZIP | community |
+|---|---|
+| 01452 | **Hubbardston** — rural town, ~20 mi from Worcester |
+| 01532 | **Northborough** — separate town |
+| 01542 | **Rochdale** — village in Leicester, separate town |
+| 01653 | **Worcester (01653)** — the only city ZIP, and a **PO-box-type block** |
+
+A City of Worcester permit ledger covers **none** of the first three — they are separate
+municipalities with their own building departments. The real ceiling is therefore **1 page**, and
+01653 being a PO-box block makes even that likely to return zero records.
+
+**The not-wired decision stands, now on measurement rather than inference.** Recording the ZIP names
+so no future session re-opens this: the cost is the arcgis geocode path plus free-text address
+parsing, and the entire prize is one PO-box ZIP.
+
+**The genuinely valuable output of this thread is the correction, not the source**: Worcester comes
+off the stalled/reprobe list, and the string-date `max()` trap is now documented with a receipt.
