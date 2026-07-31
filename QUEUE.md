@@ -1133,3 +1133,35 @@ do not run it, do not wait on it, just re-check later.
 
 33,219 records across the three landed entries · 0 missing `record_url` · 0 unclassified ·
 0 gate leaks. NC capped at 72.9% and RI dead-ended, both with per-county receipts above.
+
+### ✅ SUPERSEDES THE PENDING BLOCK ABOVE — Boone LANDED
+
+The stall cleared on its own (**4th of 4** — it always has). Full pipeline completed:
+
+```
+queue 0 · 10 Boone reports returned · dev_refresh_collect() 91 · app_refresh_zip 8/8 quality=pass
+```
+
+- **8 of 8 Boone ZIPs carry records; 1,438 records; 0 missing `record_url`, 0 unclassified.**
+- **Bidirectional gate proof, cache-wide: 8 ZIPs, KY/Boone ONLY.**
+- **KY: 60 → 68 of 126 = 47.6% → 54.0%** (from `app_projects`, post-deploy v118).
+
+The "KY still measures 47.6% / do not report Boone" block above was correct when written and is now
+stale — kept as the record of how the stall presented. **54.0% is the current truth.**
+
+### FINAL SESSION TOTALS — 4 entries wired (registry 105 → 109), all verified post-deploy
+
+| State | Before | After |
+|---|---|---|
+| MA | 89.6% | **90.4% — LIVE** |
+| NC | 48.8% | **72.9%** (+41 pages) |
+| KY | 34.9% | **54.0%** (+24 pages) |
+
+**34,657 records · 0 missing `record_url` · 0 unclassified · 0 gate leaks across all four entries.**
+Every yield was predicted with the connector's own query shape BEFORE deploying and landed exactly:
+32/34 Mecklenburg · 9/20 Buncombe · 16/19 Fayette · 8/8 Boone.
+
+**Next state for the loop:** KY needs 46 more of its 58 remaining dark pages (Daviess 10, Campbell 10,
+Warren 9, Oldham 8, Bullitt 7, Madison 5, Jefferson 4, Fayette 3, Kenton 1, Christian 1) — the big
+three were searched and returned no first-party permit service (recorded as *unfound*, not proven
+absent). After KY the ranking is WY 81 · HI 88 · ID 89 · AK 91 · TN 92 · VA 93 pages to 90%.
