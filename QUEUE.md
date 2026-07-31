@@ -2912,3 +2912,45 @@ Allentown's dataset is literally named **`EnerGov_Permits_Buildings`** — the s
 the long tail. **A city can export its own vendor data to ArcGIS Online**, and when it does the records
 are reachable as ordinary config with no adapter. That does not remove blocker A1, but it means the
 vendor-portal counties are worth a title-shape sweep *before* assuming an adapter is required.
+
+---
+
+## WAVE 19 — the VENDOR-NAME sweep: the highest-yield query of the session
+
+Following the Allentown lesson (a city exporting its own EnerGov data to AGO), swept AGO by **vendor
+name** rather than by place or by permit: `title:"EnerGov" OR title:"Accela" OR title:"CityView" OR
+title:"Tyler"`. **3,885 results**, and the roster reads like a directory of cities that have done
+exactly what Allentown did:
+
+`EnerGov_Data` (Niles) · `Energov` (Carlsbad) · `EnerGov Application Layers` (Leander TX) ·
+`Accela Permit Data (Tacoma)` · `Accela Permits` (Redmond OR) · `CityView Permits` (Puyallup) ·
+`Energov_AGOL` (Pickens) · `Planning Projects Energov 3` (Gaithersburg MD) · `Katy_Energov` ·
+`EnerGovGIS` (Kyle TX) · `Weld Accela` · `Accela Building Permits` (Douglas NV) ·
+`EnerGov_Allentown_CSS` · `Energov Citation/Code Case Public` (MDPublisher) · …
+
+**This is the practical answer to blocker A1.** The vendor adapter remains the general fix, but a
+meaningful slice of vendor-portal jurisdictions have *already* published their vendor data to ArcGIS
+Online, where it is reachable as ordinary registry config. **Sweep by vendor name before concluding a
+county needs an adapter.**
+
+### Two first-party COUNTY ledgers found and under evaluation
+
+| source | county | dark | status |
+|---|---|---|---|
+| `Building Permits` (`NavajoCounty`) | **AZ / Navajo** | 32 | **59,007 rows**, point geometry — schema is minimal (`PERMIT_NUM, PERMIT_NUMBER, APN, Task, OpenDate, CloseDate`): **no status, no type, no address, no ZIP**. Evaluating `Task` as the type source and `status_const`. |
+| `DPW Building Permits` (`hawaiicountygis`) | **HI / Hawaii** | 28 | two services published; `DPW_Building_Permits` layer 0 returns HTTP 400, the live one is `dpw_b._permit`. Re-probing. |
+
+### ⚠️ `wayneit` is Wayne TOWNSHIP, not Wayne County MI
+
+`Wayne_EnerGov` / `Wayne_EnerGov2` looked like the 44-dark-page Wayne County MI prize. The org's other
+15 items settle it: **`Wayne Twp Road Closures`, `Township Wide Yard Sale`, `WayneTwp_Public_
+StormwaterLayers`**. A township, not the county. Rejected — and a reminder that the vendor sweep
+surfaces the same cross-org lookalike class as every other search, so the owner still must be resolved.
+
+### Other US ledgers seen in the sweep, mapped against the dark list
+
+Already wired (skipped): Tacoma/Pierce · Nashville · Columbus · Miami-Dade · Chicago · Detroit ·
+Cleveland · Hamilton TN (`RandA_CHCRPA`). Locked: Denver, Weld, Douglas NV (**CO/NV**).
+**0 modelled pages** (blocker class C): Onslow NC, Pitt NC.
+Baltimore city's `Housing and Building Permits 2019-Present` reappears — still the recorded
+DECISION-NEEDED item (issuance ledger with no status and no work-type column).
