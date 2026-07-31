@@ -9644,6 +9644,64 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-31 GA/Fulton wire. City of Johns Creek's OWN AGO org bqfNVPUK3HOnCFmA, Building_Permits_Issued/FeatureServer/0. 18,765 rows, esriGeometryPoint, no ZIP column -> spatial 3-mi. FOUND BY VENDOR/KEYWORD-SIGNATURE SEARCH, not county-by-county guessing: after four county-by-county recon passes came up empty, a broad AGO search on permit-ledger phrasings ('active building permits', 'permit applications', 'EnerGov/Accela/CityView permits') surfaced 484 candidate services nationally, which were then mapped onto the dark-county list. Fulton was the largest dark county with an unwired hit (40 pages); GA already had DeKalb, Forsyth and Chatham wired but NOT Fulton. RULE 13 CHANGED THE ANSWER HERE - enumerate in the connector's OWN window. Unwindowed, JobTypeDescription is 29.3% null; INSIDE the 1095-day window it is 43.4% null (4,403 of 10,153). Both vocabularies sum EXACTLY to their scope's row count (18,765 unwindowed; 10,153 windowed), so the enumerations are complete. extra_where whitelists JobTypeDescription IN ('Residential','Commercial') = 3,967 in-window rows. This deliberately DROPS the 43.4% null-type bucket (fails closed - a row whose type the source does not state is not guessed) AND the non-construction classes the layer carries: Right of Way 554, Tree Removal 376, Sign 376, Temporary Sign 146, Land Disturbance 141, Fence 110, Administrative Permit 59, Retaining Wall 13, Cell Tower 8, Banner Permit. So this entry publishes ~39% of the window's rows BY DESIGN. JobStatus windowed also sums exactly: Complete 6,545 -> operating, Issued 1,594 -> approved, Expired 1,243 + Void 24 + Abandoned 9 + Denied -> exclude, In Review 6 + Submitted + Submitted-Online + Fees Due 2 + Fees Paid 1 -> proposed, and 729 NULLs fail closed. All values self-describing. FRESHNESS (paired probe): 3,037 rows in the trailing year AND 10,153 in the 1095-day window - corroborated by volume, not one row. ISSUE_DATE is a real esriFieldTypeDate so recency_days' DATE literal applies. Uses the CLEANED JobStatus / JobTypeDescription columns, not the raw JobStatus_original / JobTypeDescription_original the layer also carries. JobAddress null on 3 of 10,153 in window. No per-record URL column -> dataset precision on the city's own AGO item. COVERAGE PREDICTION, measured on the connector's exact query shape (envelope, inSR=4326, same recency AND the same type whitelist) against the 5 nearest DARK Fulton ZIPs: ALL FIVE non-zero - {28, 439, 1027, 2067, 2272}. Johns Creek's own ZIPs 30022/30097/30005 were all dark. Multiset only; per-ZIP labelling not asserted."
+    },
+    {
+      "registry_id": "lee-county-fl-development-orders",
+      "platform": "arcgis",
+      "service_url": "https://services2.arcgis.com/LvWGAAhHwbCJ2GMP/arcgis/rest/services/DevelopmentOrders/FeatureServer/0",
+      "dataset_url": "https://www.arcgis.com/home/item.html?id=3a51d14d1c4f4988a78afad90961e7f4",
+      "jurisdiction": "Lee County, Florida",
+      "coverage": [
+        {
+          "state": "FL",
+          "county": "Lee"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PROJECT_NAME",
+          "DOLABEL"
+        ],
+        "status_raw": "STATUS",
+        "type_source": null,
+        "file_date": "STATUS_DATE",
+        "address": null,
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "DOLABEL"
+      },
+      "use_type_const": "Development",
+      "status_to_bucket": {
+        "proposed": [
+          "In Review",
+          "Waiting on Applicant",
+          "Documents Uploaded",
+          "Payment Required"
+        ],
+        "approved": [
+          "Issued",
+          "Issued-Extension Pending",
+          "Pending CC Issuance"
+        ],
+        "operating": [
+          "Closed-Finaled"
+        ],
+        "exclude": [
+          "Closed-Withdrawn",
+          "Closed-Abandoned",
+          "Closed-Expired",
+          "Closed-Denied",
+          "Closed-Vacated",
+          "Closed-Voided",
+          "Closed-Administrative",
+          "Closed-Old",
+          "Closed-Conversion"
+        ]
+      },
+      "recency_days": 1095,
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-31 FL/Lee wire, from the vendor-signature sweep. Lee County FL's own AGO org LvWGAAhHwbCJ2GMP, DevelopmentOrders/FeatureServer/0. 17,967 rows total, esriGeometryPolygon -> rides the featurePoint() shoelace-centroid path; return_centroid NOT set (opt-in only). No ZIP column -> spatial 3-mi. TYPE IS GENUINELY OPAQUE AND IS DELIBERATELY NOT INTERPRETED. The values are LDO / DOS / VAC / ADD (plus MOP in data), and the Murfreesboro check was applied in full: the layer's renderer is type 'simple' with NO uniqueValueInfos, and the field DOES carry a codedValue domain named 'DevelopmentOrderType' - but every entry maps a code to ITSELF ({'code':'LDO','name':'LDO'}, {'code':'DOS','name':'DOS'}, ...), so the domain supplies NO human-readable expansion. Guessing that LDO = 'Local Development Order' is exactly the prohibited move, so use_type_const 'Development' is used - the generic member of the closed TYPE_EXACT vocabulary - and the code is not read at all. NEW STANDING ANSWER: a codedValue domain whose name EQUALS its code is not a legend; it is an opaque code wearing a domain, and it must be treated as unmappable. STATUS is fully self-describing and enumerated IN THE CONNECTOR'S OWN WINDOW (Rule 13), summing EXACTLY to the windowed count 3,073: Closed-Finaled 1313 -> operating; Issued 1061 + Issued-Extension Pending 6 + Pending CC Issuance 3 -> approved; Waiting on Applicant 186 + In Review 131 + Documents Uploaded 7 + Payment Required 5 -> proposed; Closed-Withdrawn 176 + Closed-Abandoned 94 + Closed-Expired 33 + Closed-Denied 16 + Closed-Vacated 15 + Closed-Voided 15 + Closed-Administrative 6 + Closed-Old 4 + Closed-Conversion 2 -> exclude. Any status outside this set fails closed. FRESHNESS (paired probe): 1,610 rows in the trailing year AND 3,073 in the 1095-day window. STATUS_DATE is a real esriFieldTypeDate so recency_days' DATE literal applies. NULL-SAFE TITLE BY CONSTRUCTION: title is the ARRAY ['PROJECT_NAME','DOLABEL'] and readCol drops nulls before joining; DOLABEL is proven 0-null in window (PROJECT_NAME has 1 null of 3,073), so the title can never be empty. VERIFIED_BY is a staff-name field and is deliberately NOT mapped (the Asheville PII lesson); PII check on the mapped text passed - PROJECT_NAME/DESCRIPTION samples are project scopes ('PADDLE CREEK LOT SPLIT', 'Reconfiguration of 5 lots into 4 lots'). KNOWN, BOUNDED DUPLICATION - disclosed rather than hidden: sampled rows repeated the same PROJECT_NAME across consecutive features, so multi-polygon development orders exist. distinct DOLABEL in window returned EXACTLY 2000, which is the server's maxRecordCount cap - the value is TRUNCATED and the true distinct count could NOT be established. What is established: distinct >= 2000 of 3,073 rows, so duplication is at most ~1.5x. This is NOT the Houston plat class (that was two layers where one was a proven subset of the other, double-emitting across two source_registry_ids); this is one layer where a single order may legitimately cover several parcels, and each polygon centroid is a real distinct location. Re-measure after go-live. REJECTED alongside it, with receipts: the same org's 'Development Activity Projects (public)' (678 rows) has NO DATE FIELD AT ALL (Name/Status/Area/Type/RecordNumber/Description/ConstructionValue only) - unwireable, the North Richland Hills class. COVERAGE PREDICTION, measured on the connector's exact query shape against 6 of Lee's 24 DARK ZIPs: ALL SIX non-zero - {6, 15, 74, 141, 378, 508}. Multiset only; per-ZIP labelling not asserted."
     }
   ],
   "ckan": [
