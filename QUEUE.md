@@ -4006,3 +4006,57 @@ yields `8526 DEL WEBB BLVD`) — but **the selection cannot be fixed in config: 
 property ZIP.** Correcting only the display gives the right address on the wrong page, which is worse
 than today. The real options are (a) retire the entry, (b) keep it and accept office-pinned records,
 or (c) build a property-address geocode path — a code change. All three are founder calls.
+
+---
+
+## AUDIT — IS THE LAS VEGAS WRONG-FIELD DEFECT SYSTEMIC? NO. IT IS ISOLATED (2026-08-01)
+
+Having found one source scoped by the owner's address, the obvious question is whether others are.
+The defect has a measurable signature: **many records pinned to one coordinate** (a builder's office
+serving scattered properties). Scanned every wired source for it.
+
+**Two false starts, both worth recording as method:**
+
+1. **Records-per-distinct-point across all pages is CONFOUNDED.** Overlapping ZIP circles mean one
+   permit legitimately appears on many neighbouring pages, so a 5-mile source like
+   `overland-park-building-permits` scored 17.0 purely from page overlap. That number measures the
+   radius, not the data.
+2. **`source_ref` cannot dedupe it.** For `record_url_precision: "dataset"` entries it is the portal
+   URL, identical on every row — there is no per-record id to group on.
+
+**The metric that works: records-per-distinct-point WITHIN A SINGLE PAGE** (no cross-page duplication
+possible), excluding coordinates equal to the report centroid (those are area-scope records anchored
+there by design, and would otherwise dominate). Busiest page per source:
+
+| source | page | records | distinct points | per point |
+|---|---|---|---|---|
+| **`las-vegas-building-permits`** | 89118 | 494 | **12** | **41.2** |
+| **`clv-planning-cases`** | 89143 | 1,575 | **49** | **32.1** |
+| `brunswick-county-permits` | 28468 | 19,515 | 3,121 | 6.3 |
+| `cabarrus-county-plan-reviews` | 28027 | 11,689 | 2,026 | 5.8 |
+| `miami-building-permits` | 33145 | 3,147 | 662 | 4.8 |
+| `nyc-dobnow-approved-permits` | 10022 | 1,156 | 293 | 3.9 |
+| … 100+ others | | | | **≤ 2.9** |
+
+The separation is sharp: two entries at 32–41, then a drop to 6.3 and a long tail at ~2 (a parcel
+legitimately carrying two permits).
+
+### The second outlier is BENIGN — checked, not assumed
+`clv-planning-cases` places records by the layer's own geometry (`__lat`/`__lng`), not by geocoding an
+address, so the mechanism cannot be the Las Vegas one. Sampling 89143 shows why the ratio is high and
+why it is correct: **one project files several distinct application types at the same parcel.**
+
+```
+VUE PHASE III   → 21-0516-SDR1 · 21-0516-ZON1 · 21-0516-GPA1 · 21-0516-MOD1   (all 2021-12-15)
+Deer Springs Senior Living → 21-0169-SUP1 · SUP2 · SUP3 · 21-0169-SDR1        (all 2021-10-12)
+Centennial Hills Apartments → 21-0339-SDR1 · 21-0339-SUP1                     (2021-09-14)
+```
+
+Site-development review, rezoning, general-plan amendment and modification are four **real, separately
+docketed applications** on one parcel — each with its own case number. Collapsing them would hide real
+filings. **No change warranted.**
+
+### Conclusion
+**The wrong-field defect is isolated to `las-vegas-building-permits`.** No other wired source shows the
+signature. That is a negative result, and it is worth as much as the positive one: it bounds the
+earlier finding to a single entry instead of leaving an open question about all ~150.
