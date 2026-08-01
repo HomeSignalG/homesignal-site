@@ -3544,3 +3544,127 @@ connector asks), around real ZIP centroids spanning the county:
 `record_url_precision: "dataset"` — the layer carries no per-case URL column and Sussex's case
 search is not addressable per `application_number`, so templating one would be guessing.
 
+
+## COVERAGE-EXTENSION PASS (2026-08-01) — 108 dark pages lifted, ~39,000 records, **config only**
+
+No connector, engine or schema change in the entire pass. Every entry below is one or two added
+`coverage` elements on an **existing** registry entry, except `coconino-county-permits` and
+`bend-or-permit-applications`, which are new entries.
+
+### The method — a straddling-city ranking, computed locally, then probed live
+
+The seam: a city's permit layer does not stop at the county line, but its registry entry usually
+declares one county. For every entry carrying `spatial_zip_radius_mi`, compute which **dark** ZIP
+pages in **undeclared** counties fall within range of that source's own **lit** ZIP centroids. That
+ranking is a *lead list*; every candidate was then probed live against the layer before wiring.
+
+**Probe with the connector's own envelope math, never an equivalent-looking one.** `envelopeFor()` is
+`dLat = mi/69`, `dLng = mi/(69·cos(lat))`. A hand-rolled ±0.0724° box (right for latitude, wrong for
+longitude at 34.8°N) returned **0** for 35613; the connector's formula returns **133**. The hand-rolled
+probe would have dropped a real page and filed it as an honest empty.
+
+### Wired (13 extensions + 2 new sources)
+
+| entry | coverage added | pages | records |
+|---|---|---|---|
+| `kcmo-building-permits` | MO Clay, MO Platte | 17 | 1,414 |
+| `dekalb-county-building-permits` | GA Fulton, GA Gwinnett | 16 | 16,105 |
+| `coconino-county-permits` *(new)* | AZ Coconino | 15 | 1,873 |
+| `fairfax-recent-building-permits` | VA Arlington | 11 | 1,365 |
+| `overland-park-building-permits` | KS Wyandotte | 8 | 1,932 |
+| `kenton-county-devtracking-permits` | KY Campbell | 7 | 84 |
+| `huntsville-building-permits` | AL Limestone | 5 | 2,754 |
+| `new-orleans-permits` | LA Jefferson | 5 | 701 |
+| `bend-or-permit-applications` *(new)* | OR Deschutes | 4 | 7,864 |
+| `new-castle-county-permits` | PA Delaware, PA Chester | 5 | 41 |
+| `durham-building-permits` | NC Orange | 3 | 3,049 |
+| `minneapolis-ccs-permits` | MN Ramsey | 3 | 1,156 |
+| `albuquerque-building-permits` | NM Sandoval | 2 | 191 |
+| `denver-residential-construction-permits` | CO Jefferson | 5 | 216 |
+| `aurora-building-permits` | CO Douglas | 1 | 342 |
+| `chicago-building-permits` | IN Lake | 1 | 1 |
+
+Every one carries a **positive control** measured before wiring and a **bidirectional gate proof**
+after (records appear on the declared counties and nowhere else), with `0 missing record_url,
+0 missing coordinates, 0 unclassified` across each affected source.
+
+Two are cross-**state** extensions, which the `{state, county}` coverage shape permits and the radius
+semantics justify: `new-castle-county-permits` (a Delaware county layer reaching PA ZIPs along the
+line) and `chicago-building-permits` → IN Lake.
+
+### Reverted
+
+- **`salem-or-structure-permits` — a DUPLICATE, removed.** `salem-structure-permits` was already wired
+  on the **identical `service_url`**. The two entries had different `registry_id`s, so exact-identity
+  dedup could not collapse them and every Salem permit cached twice (97310 783 + 404, 97302 692 + 431,
+  97301 678 + 406, …). Purged; 0 records remain.
+  > **Standing answer — before wiring ANY source, grep the registry for every state in the candidate's
+  > coverage AND for the `service_url` host.** The URL match is the decisive check.
+- **`adams-county-building-permits` → CO Jefferson — reverted on SIZE.** It produced **80001 at 20,041
+  records / 19.65 MB**, the largest page in the cache, and 80002 at 16.26 MB. `denver-residential` kept
+  5 of the 6 pages at 0.15/0.10 MB; only 80005 was lost.
+
+### Rejections with receipts — do not re-probe
+
+| candidate | receipt |
+|---|---|
+| Cass County MO (KCMO) | 0 rows for all 14 Cass ZIPs, with 64155 **4,969** / 64154 **4,106** as controls **in the same query** |
+| DeKalb → GA Cobb | all 10 probed ZIPs 0, against DeKalb's 50,170 control |
+| `butler-county-ks` → KS Sedgwick | control ZIP 66840 returned **1** record — the layer is empty there |
+| `pierce-county-pals` → WA King | control 98303 **6,830** (healthy), but only 1 of 6 King ZIPs non-zero |
+| `clark-county-active-dev-permits` → OR Multnomah | all 8 probed ZIPs 0 |
+| `fairfax-active-site-construction` → VA Prince William | non-zero ZIPs at 24 / 11 / 8 in-envelope — below the noise floor |
+| Birmingham AL (Jefferson, 60 dark) | CKAN portal live, permits **stalled at 2017** (`modified` 2017-06-29) |
+| Alameda CA (51 dark) | Berkeley + Oakland Socrata catalogs complete; **neither publishes a permit ledger** |
+| St. Louis County MO (63 dark) | host 404s; AGO title search returns St. Louis County **MINNESOTA** |
+| Oakland County MI (78) · Oklahoma County OK (52) · Sedgwick KS (50) | hub 404 / 403 WAF / SPA shell, no JSON catalog |
+| Lancaster County PA (56) | the layer is a **28-row annual aggregate** (`Year`, `Project_type`, `Units_permitted_by_type`) |
+| Snohomish County WA (33) | well-shaped, but **stalled** — 0 rows dated 2026 vs 863 in 2025 |
+| Anne Arundel MD (37) | REST live **with an `InspectionsPermits` folder** — `{"code":499,"message":"Token Required"}` |
+| Howard County MD (21) | combined permits table → **403 "no row or column access to non-tabular tables"** |
+| Westchester NY (75) | REST live; `Municity5` + `DOH_Permit` folders both **Token Required** |
+| San Mateo CA (31) | permit datasets are **aggregates** ("PercentOfBuildingPermitsCreatedOnline") |
+| San Luis Obispo CA (29) | **water-well** permits + building *footprints* only |
+| Contra Costa (43) · Ventura (34) | REST roots live, **no permits folder** |
+| Orange County CA (85) | OCGIS live; only county CIP — `Construction_Management_CIP_Projects` **51 rows**, `Future_Construction_Projects` **19** |
+
+### `anaheim` Accela_Building_Permits — a good source, deliberately NOT wired
+
+`services3.arcgis.com/hPs600I3X0RTaaaq/…/Accela_Building_Permits/FeatureServer/0` is **distinct from
+the wired `anaheim-land-use-cases`** (`Open_Data_Land_Use_Permits`). Fresh (`modified` 2026-08-01),
+**191,375 rows**, property addresses with the ZIP inline, real geometry, and complete vocabularies —
+**17 `casestatus`**, **57 `typeofwork`**.
+
+**It lifts zero dark pages.** `address LIKE '%{zip}%'` scoping reaches only Anaheim's own ZIPs, and all
+seven are already lit (92805 187 · 92804 142 · 92806 135 · 92801 123 · 92802 113 · 92807 60 ·
+92808 24). None of the 85 dark Orange ZIPs is an Anaheim ZIP. The mapping cost is real: `typeofwork`
+contains a literal `"NULL"` string (5,111 rows), an empty string (649), and typo variants
+(`Phototvoltaic with Micro-Inverters` 1,720 beside `Photovoltaic with Micro-Inverters` 508; six
+spellings of tenant improvement) — each unmapped value drops records silently.
+
+> **Standing answer — measure the LIFT before paying the mapping cost.** A source can be fresh,
+> first-party, well-formed and complete and still be worth nothing, because every ZIP it reaches is
+> already lit.
+
+### ⚠️ Two defects found in EXISTING entries (not introduced by this pass)
+
+- **`las-vegas-building-permits` is scoped and labelled by the OWNER'S MAILING ADDRESS.** `ZIP`, `CITY`,
+  `STATE`, `ADDR1` are the `LEGALOWNER`'s address — e.g. `ZIP 92660 / NEWPORT BEACH / CA` on a permit
+  whose property is `8526 DEL WEBB BLVD, Sun City Summerlin`. The entry selects on that ZIP and renders
+  it as the record address; the true property address sits unused in `STNO`/`PREDIR`/`STNAME`/`SUFFIX`.
+  Live: **3,099 records / 51 pages / 1,457 distinct addresses**, with `5795 BADURA AVE STE 180` carrying
+  **174 records on one page** and the top 8 (all suite numbers) carrying 30 %. **The selection cannot be
+  fixed in config — the layer exposes no property ZIP.** Founder call: retire, accept, or build a
+  property-address path.
+- **Audited whether that defect is systemic — it is NOT.** Records-per-distinct-point *within a single
+  page* (the cross-page-duplication-free metric) separates cleanly: `las-vegas-building-permits` 41.2,
+  `clv-planning-cases` 32.1, then `brunswick` 6.3 and 100+ others at **≤2.9**. `clv-planning-cases` was
+  checked and is **benign** — one project files several distinct application types at one parcel
+  (VUE PHASE III → SDR1 · ZON1 · GPA1 · MOD1). No change warranted.
+
+### ⚠️ Correction — the "~3.5 MB working ceiling" quoted throughout this document is STALE
+
+Measured cache-wide 2026-08-01, the real high-water mark is **19.61 MB (80022, 20,067 records)**, with
+ten pages ≥18.6 MB. Earlier corrections in this file (3.5 MB → "Cleveland 44127 at 5.98 MB") are also
+superseded. **Measure with `length(sites::text)`, not `pg_column_size(sites)`** — the latter reports
+1.93 MB for those same rows because of TOAST compression, and the ceiling is a *transfer* figure.
