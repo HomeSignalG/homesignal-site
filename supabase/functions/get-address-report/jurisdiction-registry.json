@@ -9963,7 +9963,7 @@
       "registry_id": "coconino-county-permits",
       "platform": "arcgis",
       "service_url": "https://services1.arcgis.com/Rlvx5g8pKeK13apH/arcgis/rest/services/County_Permits/FeatureServer/0",
-      "dataset_url": "https://www.coconino.az.gov/168/Community-Development",
+      "dataset_url": "https://services1.arcgis.com/Rlvx5g8pKeK13apH/arcgis/rest/services/County_Permits/FeatureServer/0",
       "jurisdiction": "Coconino County, Arizona",
       "coverage": [
         {
@@ -10041,6 +10041,129 @@
       "recency_days": 365,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-01: Coconino County's OWN AGO org (Rlvx5g8pKeK13apH, owner CoconinoCountyGIS), layer County_Permits/0, item modified 2026-07-31. 109,930 rows, esriGeometryPolygon (parcel footprints) -- pinned by the featurePoint() signed-area centroid path from the POLYGON/POLYLINE GEOMETRY PASS; return_centroid is deliberately NOT set (it is opt-in per entry, never derived from geometryType). BOTH enumerated vocabularies SUM EXACTLY TO 109,930: PermitDepartmentDescr (9) = Building 59821 + Environmental Quality 23998 + Planning and Zoning 14674 + Engineering Division 5103 + Community Development 4207 + Public Works 1671 + Sustainable Building Program 411 + TUNNEL FIRE 33 + Environmental Health 12; PermitStatusCode (33) = 7. CLOSED 70329 + CANCELLED 12667 + 5. ISSUED 11383 + EXPIRED 6896 + 0. NOT SUBMITTED 1702 + ABANDONED 1473 + ARCHIVED 944 + DELETED 833 + 6. FINALED - ALL APPLICABLE INSPECTIONS COMPLETE 690 + WITHDRAWN 562 + 2. RFAI - WAITING FOR CUSTOMER 426 + 5. RE-ISSUED 393 + DENIED 386 + 1. PENDING 219 + 2. ADMINISTRATIVELY COMPLETE - INITIAL REVIEW 211 + SBP- FINALED OLD 152 + 2. RESUBMITTED - RESUB REVIEW 104 + INSPECTION COMPLETE 97 + 4. READY TO ISSUE - REVIEW COMPLETE 91 + 1. PENDING - INCOMPLETE APPLICATION 81 + 2. UNDER REVIEW 72 + 4. READY TO ISSUE - FEES DUE 57 + 6. FINALED - NEEDS CUSTOMER'S FINAL DOCUMENTS 54 + 5. ISSUED - ENGINEERING 40 + 4. READY 35 + PERMIT ISSUED 16 + REVOKED 8 + 3. ACTION NEEDED - CONTRACTOR 3 + CERTIFICATE ISSUED 2 + 4. REVISION AFTER ISSUE - RFAI 1 + 5. DENIED/DISAPPROVED 1 + LAPSED 1 + VOID 1. The status list was enumerated TWICE, orderByFields n DESC and n ASC (the Mesa/Gilbert truncation defence), and all 33 values are bucketed exactly once. STATUS FIELD CHOICE IS LOAD-BEARING: PermitStatusDescr is FREE-TEXT PROSE ('Step 5 of 7: ISSUED - Permit has been issued. If applicable, scroll to the \"Inspections\" section...') -- the Douglas County NV rejection class. PermitStatusCode is the short coded twin and is what status_raw reads. FRESH: max(SubmittedDate) = 1785369600000 ms = 2026-07-28, three days before wiring. NATIVE ZIP: ZipCode is populated, so column_map.zip is used and NO spatial_zip_radius_mi is needed. In the entry's OWN scope (department whitelist + recency_days 365) the ZIP histogram is 86046 1059 + 86004 651 + 86005 612 + 86017 568 + 86001 407 + 86024 245 + 86336 146 + 86018 128 + 86036 107 + 85931 98 + 86015 80 + 86038 50 + '0' 30 + 86040 21 + 86047 18 + 86023 13 + null 10 + 86045 9 + 86022 5 + 86320 1 = 4,258 rows. 86336 (Sedona) and 85931 (Heber) are outside Coconino; the coverage gate keeps those records off non-Coconino pages structurally. The department whitelist keeps 78,702 of 109,930 rows -- it drops Environmental Quality (septic/well), Engineering Division (utility encroachment), Public Works, TUNNEL FIRE and Environmental Health, none of which are development filings. The PermitTypeCode NOT IN list additionally drops short-term-rental registrations, public-records requests, and the counter-permit trade classes (mechanical / re-roof / electric / renewal / repair) plus special inspections. NOTE, LOGGED AS A FOLLOW-UP RATHER THAN GUESSED: PermitTypeCode carries finer residential/commercial detail (BD - SINGLE FAMILY DWELLING - SFD 3829, BD - COM - MISCELLANEOUS 780, BD - COM 447 ...) but is a long tail that was NOT fully enumerated, so type_source reads PermitDepartmentDescr instead -- a COMPLETE vocabulary whose three whitelisted values all map to 'Development', the generic member of the closed TYPE_EXACT vocabulary in lib/map.js. That guarantees 0 unclassified by construction; refining it to per-type Residential/Commercial requires enumerating PermitTypeCode in full first. record_url is dataset precision on the county's Community Development page -- the layer carries no per-record portal URL column. TARGETS 25 DARK PAGES: every one of Coconino County's modelled ZIP pages currently has 0 development records, and Coconino was explicitly recorded in the UTAH/ARIZONA MAPS COVERAGE PASS as having no wireable first-party per-record permit source. FOUND BY THE SEARCH INVERSION (title-shape sweep on '(title:\"Permits\" OR title:\"Permit Activity\" OR title:\"Issued Permits\") AND type:\"Feature Service\"', sorted newest-modified)."
+    },
+    {
+      "registry_id": "salem-or-structure-permits",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/kIA6yS9KDGqZL7U3/arcgis/rest/services/Structure_Permits/FeatureServer/0",
+      "dataset_url": "https://services.arcgis.com/kIA6yS9KDGqZL7U3/arcgis/rest/services/Structure_Permits/FeatureServer/0",
+      "jurisdiction": "City of Salem, Oregon",
+      "coverage": [
+        {
+          "state": "OR",
+          "county": "Marion"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "WORKDESCRIPTION",
+          "PROPERTYADDRESS"
+        ],
+        "status_raw": "STATUS",
+        "type_source": "SUBDESCRIPTION",
+        "file_date": "ISSUEDDATE",
+        "address": [
+          "PROPERTYADDRESS"
+        ],
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "FOLDERNUMBER"
+      },
+      "type_map": {
+        "Single Family": "Residential",
+        "Triplex/Quadplex": "Residential",
+        "Multi Family": "Residential",
+        "Multi Family Phased": "Residential",
+        "Multifamily-Civil site work only": "Residential",
+        "Accessory Dwelling Unit": "Residential",
+        "Duplex": "Residential",
+        "Manufactured Dwelling": "Residential",
+        "Commercial": "Commercial",
+        "Commercial Phased": "Commercial",
+        "Commercial-Civil site work only": "Commercial",
+        "Parking Lot": "Commercial",
+        "Wireless Installation": "Utility"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "recency_days": 365,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-01: City of Salem's OWN AGO org (kIA6yS9KDGqZL7U3, owner SalemGIS), layer Structure_Permits/0, item modified 2026-07-31. 811 rows, esriGeometryPoint. BOTH vocabularies SUM EXACTLY TO 811: STATUS (1) = Issued 811 -- this is an ACTIVE-permits layer, every row is issued, so status_to_bucket has one member and the other three buckets are deliberately empty; SUBDESCRIPTION (13) = Single Family 390 + Commercial 215 + Triplex/Quadplex 77 + Multi Family 51 + Accessory Dwelling Unit 33 + Multi Family Phased 14 + Commercial-Civil site work only 9 + Wireless Installation 9 + Duplex 6 + Manufactured Dwelling 3 + Multifamily-Civil site work only 2 + Parking Lot 1 + Commercial Phased 1 = 0 unclassified. FRESH: max(ISSUEDDATE) = 1785411342000 ms = 2026-08-01, the day of wiring, and ALL 811 rows fall inside the recency_days 365 window (the windowed count returns 811, identical to the unwindowed total -- so the window removes nothing and the layer is entirely current). NO ZIP COLUMN anywhere in the schema (FOLDERRSN, GISID, FOLDERNUMBER, PROPERTYADDRESS, CREATEDDATE, ISSUEDDATE, SUBDESCRIPTION, WORKDESCRIPTION, STATUS, FOLDERDESCRIPTION, X, Y, NEIGHBORHOOD, WARD, DAYS_FROM_DATE, FOLDERREVISION, MAPDESCRIPTION, GlobalID), so spatial_zip_radius_mi 3 is used; records place by their OWN points, and NO geocoding is involved, so there is no WORKER_RESOURCE_LIMIT risk. Stored spatialReference is wkid 2913 (Oregon North ft) -- irrelevant, sources/arcgis.ts always sends outSR=4326, and a live sample returned x -123.0321 / y 44.8875 (Salem OR). ISSUEDDATE is esriFieldTypeDate so recency_days applies normally. record_url is dataset precision on the layer's own verified-200 URL because the city page www.cityofsalem.net/community/building-and-development/building-permits returns HTTP 403 Access Denied (Akamai edge) from our egress -- the Peoria precedent. TARGETS 19 DARK PAGES in OR/Marion. FOUND BY THE SEARCH INVERSION (title-shape sweep, sorted newest-modified)."
+    },
+    {
+      "registry_id": "bend-or-permit-applications",
+      "platform": "arcgis",
+      "service_url": "https://services5.arcgis.com/JisFYcK2mIVg9ueP/arcgis/rest/services/Permit_Applications_Point/FeatureServer/0",
+      "dataset_url": "https://services5.arcgis.com/JisFYcK2mIVg9ueP/arcgis/rest/services/Permit_Applications_Point/FeatureServer/0",
+      "jurisdiction": "City of Bend, Oregon",
+      "coverage": [
+        {
+          "state": "OR",
+          "county": "Deschutes"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "TypeDesc",
+          "Address"
+        ],
+        "status_raw": "StatusDesc",
+        "type_source": "BuildingCategory",
+        "file_date": "IssueDate",
+        "address": [
+          "Address"
+        ],
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "ApplicationNumber"
+      },
+      "type_map": {
+        "Residential": "Residential",
+        "Commercial/Industrial": "Commercial",
+        "Other": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "In Plan Check",
+          "Returned for Correction",
+          "Submittals Incomplete",
+          "Pending",
+          "On Hold",
+          "Intake Pre-Screen",
+          "Revision Correction",
+          "Revision Submittals Incomplete",
+          "Pre-Screen"
+        ],
+        "approved": [
+          "Permit(s) Issued",
+          "Issued",
+          "Preparing for Issuance"
+        ],
+        "operating": [
+          "Closed",
+          "Finaled",
+          "Complete"
+        ],
+        "exclude": [
+          "Expired",
+          "Withdrawn",
+          "Expired Application",
+          "Canceled",
+          "Denied",
+          "VOID"
+        ]
+      },
+      "spatial_zip_radius_mi": 3,
+      "recency_days": 365,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-01: City of Bend's OWN AGO org (JisFYcK2mIVg9ueP, owner CityofBendOR), layer Permit_Applications_Point/0, item modified 2026-07-31. 164,845 rows, esriGeometryPoint. BOTH vocabularies SUM EXACTLY TO 164,845: StatusDesc (21) = Closed 122795 + Permit(s) Issued 26426 + Expired 6116 + Withdrawn 3192 + Expired Application 2538 + Canceled 1689 + Finaled 832 + Preparing for Issuance 381 + In Plan Check 311 + Returned for Correction 113 + Denied 111 + Submittals Incomplete 76 + VOID 61 + Pending 57 + On Hold 45 + Intake Pre-Screen 31 + Issued 24 + Revision Correction 17 + Revision Submittals Incomplete 12 + Pre-Screen 12 + Complete 6, all 21 bucketed exactly once; BuildingCategory (3) = Other 85957 + Residential 64537 + Commercial/Industrial 14351 = 0 unclassified. 'Other' is GENERIC and is written as 'Development', the generic member of the closed TYPE_EXACT vocabulary in lib/map.js -- never guessed into Residential/Commercial. FRESHNESS REQUIRED THE WINDOWED COUNT, NOT max(): max(IssueDate) returns 2013379200000 ms = 2033-10-08, a CORRUPT FUTURE DATE (the Hawaii-County year-5005 / Naperville-year-2626 class), so the max is a lie. The real freshness receipt is the BOUNDED count -- IssueDate between 2025-08-01 and 2026-08-02 returns 3,853 rows, which is also exactly what recency_days 365 will fetch. NO ZIP COLUMN: the ZIP is embedded in the free-text Address ('2348 NW AWBREY RD 97703'), so spatial_zip_radius_mi 3 is used; records place by their OWN points and no geocoding is involved. Stored spatialReference is wkid 2270 (Oregon South ft) -- irrelevant under outSR=4326; a live sample returned x -121.3169 / y 44.0702 (Bend OR). record_url is dataset precision on the layer's own verified-200 URL because www.bendoregon.gov returns HTTP 403 behind a bot-check interstitial from our egress -- the Peoria precedent. TARGETS 10 DARK PAGES in OR/Deschutes. FOUND BY THE SEARCH INVERSION (title-shape sweep, sorted newest-modified)."
     }
   ],
   "ckan": [
