@@ -3368,3 +3368,73 @@ re-applies the newest response still in the window — which can be a pre-deploy
 `bend-or-permit-applications` at 3,246 records on 97709 is the densest single page added tonight;
 row size is untested against the 3.5 MB working ceiling (Cleveland 44127 at 5.98 MB remains the
 known high-water mark). Not touched — logged with numbers.
+
+---
+
+## HUNTSVILLE → LIMESTONE CONFIRMED LIVE — 5 dark pages lifted, 2,754 records (2026-08-01)
+
+`huntsville-building-permits` coverage AL/Madison → AL/Madison + Limestone (PR #513) is deployed
+(`get-address-report` **version 134**, `updated_at` 2026-08-01T14:26:08Z). **Config only — one
+coverage entry.** Second application of the KCMO straddling-city pattern.
+
+| ZIP | probe | live engine |
+|---|---|---|
+| 35756 | 1,273 | **1,273** |
+| 35649 | 668 | **668** |
+| 35615 | 645 | **645** |
+| 35613 | 133 | **132** |
+| 35671 | 36 | **36** |
+
+The other 7 Limestone ZIPs (35610, 35611, 35614, 35620, 35647, 35652, 35739) return **0** — genuinely
+outside Huntsville's 5-mile envelope, honest empties. *(35613 lands at 132 against a probe of 133;
+one record fails a downstream gate. Recorded as measured, not rounded to match.)*
+
+Across all 90,851 `huntsville-building-permits` records cache-wide: **0 missing `record_url`,
+0 missing coordinates, 0 unclassified.** Gate proof: AL/Madison 20 ZIPs + AL/Limestone 5 ZIPs —
+exactly the two declared counties, nothing else.
+
+**Both new checks from the previous cycle were applied and both did work:**
+1. **The registry grep ran BEFORE wiring.** AL had exactly one entry and no other entry shared
+   `maps.huntsvilleal.gov` — so this extended the existing entry instead of creating a second
+   registration. That is the check whose absence produced the Salem duplicate.
+2. **Response-after-deploy was verified before trusting the collect.** Responses created 14:32:40Z
+   against a function `updated_at` of 14:26:08Z.
+
+> **New standing answer — probe with the connector's OWN envelope math, not an equivalent-looking one.**
+> `envelopeFor()` is `dLat = mi/69`, `dLng = mi/(69·cos(lat))`. A hand-rolled ±0.0724° box (correct for
+> latitude, wrong for longitude at 34.8°N) returned **0** for 35613; the connector's formula returns
+> **133**. The hand-rolled probe would have silently dropped a real page and recorded it as an honest
+> empty. This is Rule 13 in its most literal form: *the probe must ask the question the connector asks.*
+
+### Rejections with receipts from this round (do not re-probe)
+
+- **Cass County MO (14 dark)** — tested as a third KCMO county. The ledger returns **0 rows for all 14
+  Cass ZIPs**, and the zero is trustworthy because the **same single query** carried the control:
+  `USER_Zip IN (64155, 64154, 64012, 64083, 64701)` → 64155 **4,969** · 64154 **4,106** · the three Cass
+  ZIPs absent. Kansas City's permit ledger genuinely does not extend into Cass.
+- **Birmingham AL / Jefferson County (60 dark — the largest AL target)** — the city's CKAN portal is
+  live and does publish `Building Permits and Valuations` and `Demolition Permits`, but both are
+  **STALLED at 2017**: `modified` = `2017-06-29T16:59:55`, and the newest resource file is
+  `building-permits-and-valuations-2017.csv`. Annual CSV drops, abandoned.
+- **Alameda County CA (51 dark)** — Berkeley and Oakland both run real Socrata portals that answered
+  200 with full catalogs; **neither publishes a building-permit ledger**. Berkeley's only permit-shaped
+  asset is BESO energy-compliance; Oakland's are residential *parking* permits and an affordable-housing
+  aggregate. Catalog is complete, the dataset does not exist.
+- **St. Louis County MO (63 dark)** — `maps.stlouisco.com` 404s, and an AGO title search for
+  `"St Louis County" permits` returns **St. Louis County, MINNESOTA** (`ProseR@stlouiscountymn.gov_slcgis`).
+  The Kent DE/RI cross-state trap, again.
+- **Oakland County MI (78 dark)** — `data-oakgov.opendata.arcgis.com` 404 (no domain record),
+  `gisportal.oakgov.com` does not answer, and `owner:OakGov` returns **0** items.
+- **Oklahoma County OK (52 dark)** — `data.okc.gov` answers **403** from a WAF;
+  `gis-cityofokc.opendata.arcgis.com` has no domain record.
+- **Sedgwick County KS / Wichita (50 dark)** — `opendata.wichita.gov` serves the Hub SPA shell (HTML)
+  at both the `/api/feed/dcat-us/1.1.json` and `/api/search/v1/...` paths; `data.wichita.gov` and
+  `gis.wichita.gov` yield no JSON catalog.
+
+> **Standing answer extension — the unscoped-search trap applies to the Hub v3 API too.**
+> `hub.arcgis.com/api/v3/datasets?q=…` ignores the place words in the query. Searches for
+> *Oklahoma City*, *Wichita*, *Macomb*, *Oakland County Michigan* and *Suffolk County New York* all
+> returned the same lookalike set — Brampton and Oakville **Ontario**, Maricopa AZ, Detroit MI,
+> Lawrence KS, New Hanover NC, Cody WY, Mendocino CA, Ft. Pierce FL, Nashua NH — and **not one**
+> dataset from any of the five places searched. Hub v3 is a keyword index, not a geographic one;
+> discovery still has to go through per-portal DCAT or an `orgid:`-scoped search.
