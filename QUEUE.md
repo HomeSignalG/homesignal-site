@@ -3633,3 +3633,47 @@ against 38,136 in its envelope (2.5 %), not the ~8,200 predicted.
 > **Standing answer: a per-page record count cannot be extrapolated from another ZIP's pass rate** —
 > `recency_days` and the status/type filters bite very differently across a metro. Project a range if
 > you must gate a decision on it, but measure before reporting it.
+
+---
+
+## DURHAM → ORANGE + ALBUQUERQUE → SANDOVAL CONFIRMED LIVE — 5 pages, 3,240 records (2026-08-01)
+
+Deployed as `get-address-report` **version 136** after the lost commit was recovered. The re-cache
+produced an unusually clean natural experiment: both the broken and fixed responses are in
+`net._http_response` at once, same ZIPs, same query, **14 minutes apart**, straddling the deploy.
+
+| ZIP | 15:28 (registry change missing) | 15:42 (recovered) |
+|---|---|---|
+| 27517 Chapel Hill | 0 | **1,996** |
+| 27514 Chapel Hill | 0 | **1,044** |
+| 87124 Rio Rancho | 0 | **98** |
+| 87048 Corrales | 0 | **93** |
+| 27510 Carrboro | 0 | **9** |
+
+All 5 materialize `quality=pass`. Invariants: **`durham-building-permits` 40,843 records / 15 ZIPs and
+`albuquerque-building-permits` 8,246 / 24 ZIPs — 0 missing `record_url`, 0 missing coordinates,
+0 unclassified.** Gate proof: Durham → NC/Durham 12 + NC/Orange 3; Albuquerque → NM/Bernalillo 22 +
+NM/Sandoval 2. Exactly the declared counties.
+
+That 0 → non-zero pair *is* the evidence for the process finding above: the config was absent, not the
+data. It is also the argument for the standing answer — **only the behavioural check caught it.** CI
+was green, the PR merged, the branch was clean, and the registry on `main` was silently missing the
+field the PR body described.
+
+### Session tally — coverage extensions, all config-only, no connector/engine/schema change
+
+| extension | pages | records |
+|---|---|---|
+| `kcmo-building-permits` → MO Clay + Platte | 17 | 1,414 |
+| `coconino-county-permits` (new) | 15 | 1,873 |
+| `bend-or-permit-applications` (new) | 4 | 7,864 |
+| `huntsville-building-permits` → AL Limestone | 5 | 2,754 |
+| `dekalb-county-building-permits` → GA Fulton | 14 | 15,124 |
+| `durham-building-permits` → NC Orange | 3 | 3,049 |
+| `albuquerque-building-permits` → NM Sandoval | 2 | 191 |
+| **total** | **60** | **32,269** |
+
+Every one verified with a positive control before wiring, a gate proof after, and
+`0 missing record_url / 0 missing coordinates / 0 unclassified` across the affected sources.
+One wire was reverted (`salem-or-structure-permits`, a duplicate) and one declined on size
+(Sioux Falls → SD Lincoln).
