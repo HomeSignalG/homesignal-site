@@ -3174,3 +3174,49 @@ records. The fix is config-only (narrow `extra_where` to the 4 genuine construct
 `RESIDENTIAL: OTHER IMPROVEMENTS` — 7,660 rows of minor work, the same class the trades precedent
 drops — and tighten `recency_days` to 365). Measurement of the tightened scope is in flight; the
 entry will not be claimed as producing until a page actually renders records.
+
+---
+
+## 🟢 GO-LIVE CONFIRMED: `naperville-building-permits` — 4 pages, 1,507 records (2026-08-01)
+
+The scope fix (#503) worked. Deployed **v128**, re-fired all six Naperville ZIPs, **verified
+`refreshed_at` actually moved** before reading any counts, then materialized:
+
+| ZIP | county | development |
+|---|---|---|
+| 60540 | DuPage | 455/455 |
+| 60563 | DuPage | 291/291 |
+| 60564 | **Will** | 221/221 |
+| 60565 | DuPage | 202/202 |
+| 60566 | DuPage | 0 — PO-box block |
+| 60567 | DuPage | 0 — PO-box block |
+
+**1,507 records across 4 pages — 0 missing `record_url`, 0 unclassified, and 0 missing coordinates**
+(every row geocoded successfully, so the geometry-less path produced full point placement).
+Bidirectional gate proof: **`IL/DuPage` and `IL/Will`, nothing else** — the two-county coverage
+behaves exactly as the frisco precedent predicted.
+
+60566/60567 returning zero is correct, not a gap: they are PO-box ZIPs, and the source's own
+`POSTALCODE` distribution carries **no rows** for either (measured: 60540 9,784 · 60564 8,558 ·
+60563 7,124 · 60565 6,440, and neither 60566 nor 60567 appears).
+
+### What the fix actually was, and what it cost
+
+`2,490 → 487` rows per ZIP, achieved config-only by dropping `RESIDENTIAL: OTHER IMPROVEMENTS`
+(minor work — the class the trades precedent already drops) and tightening `recency_days` 1095 → 365.
+The emitted count for 60540 came in at **486**, one under the predicted 487 — the measurement was
+accurate.
+
+### Two transient failures seen on the way, both recoverable, both worth recording
+
+- **HTTP 503 `BOOT_ERROR`** — "Function failed to start". A neighbouring request returned 200 for a
+  different ZIP in the same batch, proving the function was healthy. **A single 503 is a cold start;
+  retry it rather than diagnosing it.**
+- **A 120 s pg_net timeout with `DNS time: 120000ms`** on a debug call. Told me nothing about the
+  entry. **A timed-out probe is not a negative result.**
+
+### Session scoreboard update
+
+Sources wired and CONFIRMED PRODUCING this session: **4** — Stamford CT (192 records / 6 pages),
+Allentown PA (3,939 / 5), Naperville IL (1,507 / 4), plus the Chicago→DuPage coverage extension
+(14 / 2). **17 pages lifted off the facilities floor, 5,652 records.**
