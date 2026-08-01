@@ -4060,3 +4060,53 @@ filings. **No change warranted.**
 **The wrong-field defect is isolated to `las-vegas-building-permits`.** No other wired source shows the
 signature. That is a negative result, and it is worth as much as the positive one: it bounds the
 earlier finding to a single entry instead of leaving an open question about all ~150.
+
+---
+
+## DISCOVERY WALK — I RAN THE DEAD MONITOR'S JOB BY HAND; 10 CURATED TARGETS, 0 WIREABLE (2026-08-01)
+
+`scripts/source-monitor-targets.json` carries a **`discovery[]` list of 44 official first-party
+catalogs** for facility-floor jurisdictions — curated, host-allowlisted, immune to the lookalike trap
+that wrecked my earlier ad-hoc searches. The job that walks it is the one that has been dead since
+31 July, so I walked the top 10 by dark-page count myself.
+
+| target | dark pages | outcome |
+|---|---|---|
+| `orange-county-arcgis` | 85 | REST live; only county CIP (51 + 19 polygons) — probed earlier |
+| `anaheim-dcat` | 85 | **Real source found, 0 lift — see below** |
+| `alameda-county-socrata` | 51 | `data.acgov.org` has **no Socrata views API** (404); its DCAT carries no permit dataset |
+| `contracosta-county-arcgis` | 43 | REST live, 23 folders, **no permits folder** |
+| `sonoma-county-socrata` | 40 | previously rejected (no city/ZIP/coords) — unchanged |
+| `annearundel-arcgis` | 37 | REST live and has an **`InspectionsPermits` folder** — `{"code":499,"message":"Token Required"}` |
+| `ventura-county-arcgis` | 34 | REST live, 8 folders, **no permits folder** |
+| `sanmateo-county-socrata` | 31 | catalog live; permit hits are **aggregates only** ("PercentOfBuildingPermitsCreatedOnline") |
+| `slo-county-dcat` | 29 | catalog live; permit hits are **water-well permits** + building *footprints* |
+| `howard-county-socrata` | 21 | the combined permits table `s2bd-vjgd` returns **403 "no row or column access to non-tabular tables"** |
+
+### The one real find — and why it is NOT wired
+`data-anaheim` publishes **`Accela_Building_Permits`** (`services3.arcgis.com/hPs600I3X0RTaaaq/…/FeatureServer/0`),
+**distinct from the wired `anaheim-land-use-cases`** (that one is `Open_Data_Land_Use_Permits`). It is a
+genuinely good source: `modified` **2026-08-01T17:00:45Z — today**, **191,375 rows**, property
+addresses carrying the ZIP inline (`"500 S Euclid St A Anaheim, Ca 92802"` — the property, not an
+owner), real geometry, `casenumber`, `permitissued` + `applicationreceived`, and both vocabularies
+enumerate cleanly (**17 `casestatus`**, **57 `typeofwork`**).
+
+**It lifts zero dark pages.** Scoping would be `address LIKE '%{zip}%'` (the pattern the sibling entry
+already uses), so it can only reach Anaheim's own ZIPs — and **all seven are already lit**:
+92805 187 · 92804 142 · 92806 135 · 92801 123 · 92802 113 · 92807 60 · 92808 24. **None of the 85 dark
+Orange County ZIPs is an Anaheim ZIP** — they are Irvine, Santa Ana, Newport Beach, Huntington Beach,
+Fullerton, Garden Grove, Mission Viejo. The source would add depth to seven pages that already have
+some, at the cost of mapping a 57-value vocabulary that contains a literal string `"NULL"` (5,111
+rows), an empty string (649), and near-duplicate typo variants — `Phototvoltaic with Micro-Inverters`
+(1,720) beside `Photovoltaic with Micro-Inverters` (508), `Light /  Flag Pole` (double space) beside
+`Light / Flag Pole`, and six separate spellings of tenant improvement. Every unmapped value **drops
+records silently**, and the status-drift gate that would catch that is in the dead monitor.
+
+**Recorded rather than wired, with the receipts, so the next session neither re-discovers it nor
+re-litigates it.** If Anaheim depth is later wanted, this is the entry to add and the vocabulary is
+already enumerated above.
+
+> **Standing answer — measure the LIFT before paying the mapping cost.** A source can be fresh,
+> first-party, well-formed and complete and still be worth nothing, because every ZIP it covers is
+> already lit. Check which *dark* pages a candidate can actually reach **before** enumerating its
+> vocabularies, not after.
