@@ -9852,8 +9852,7 @@
       },
       "type_map": {
         "RESIDENTIAL": "Residential",
-        "RESIDENTIAL: OTHER IMPROVEMENTS": "Residential",
-        "COMMERCIAL": "Commercial",
+          "COMMERCIAL": "Commercial",
         "TEMPORARY IMPROVEMENTS": "Development",
         "GREEN ENERGY": "Utility"
       },
@@ -9884,8 +9883,8 @@
           "DENIED"
         ]
       },
-      "extra_where": "PERMITTYPE IN ('RESIDENTIAL','RESIDENTIAL: OTHER IMPROVEMENTS','COMMERCIAL','TEMPORARY IMPROVEMENTS','GREEN ENERGY')",
-      "recency_days": 1095,
+      "extra_where": "PERMITTYPE IN ('RESIDENTIAL','COMMERCIAL','TEMPORARY IMPROVEMENTS','GREEN ENERGY')",
+      "recency_days": 365,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-31: City of Naperville's OWN AGO org (rXJ6QApc2sOtl1Pd), layer EPL_BldgPermits, 34,571 rows. GEOMETRY-LESS TABLE -> the Boulder/Anaheim geocode path (native zip + address fields, no lat/lng in column_map), modelled directly on boulder-construction-permits. FRESH AND HIGH-VOLUME: 10,067 rows with ISSUEDATE >= 2025-07-31 (a full year window). BOTH vocabularies enumerated live and EACH SUMS EXACTLY TO 34,571: PERMITSTATUS = ISSUED 14359 + COMPLETE 13886 + VOID 1871 + FEES PAID 1039 + IN REVIEW 685 + FEES DUE 582 + AWAITING CUSTOMER RESPONSE 502 + CANCELLED 489 + FINAL INSPECTION PASSED 445 + EXPIRED 419 + TEMPORARY OCCUPANCY 134 + SUBMITTED - ONLINE 68 + APPROVED 37 + On Hold 22 + SUBMITTED 21 + To Be Issued 11 + DENIED 1; PERMITTYPE = FINANCE DEPARTMENT 7945 + RESIDENTIAL: OTHER IMPROVEMENTS 7660 + DEPARTMENT OF PUBLIC WORKS 3528 + MISCELLANEOUS 3240 + RESIDENTIAL 2564 + TRUCK ROUTE PERMIT 1489 + COMMERCIAL 1446 + SUB-PERMIT 1361 + FIRE DEPARTMENT PERMIT 1084 + SIGN 952 + COMMUNITY SERVICES DEPARTMENT 864 + ELEVATOR 776 + RIGHT-OF-WAY 590 + TELECOMMUNICATIONS 406 + ACCOUNTS PAYABLE 375 + TEMPORARY IMPROVEMENTS 148 + SPECIAL EVENTS 140 + GREEN ENERGY 3. extra_where keeps only the 5 CONSTRUCTION types (11,821 rows) and drops 13 administrative/non-construction types at source -- FINANCE DEPARTMENT and ACCOUNTS PAYABLE are internal accounting records, DEPARTMENT OF PUBLIC WORKS / TRUCK ROUTE / RIGHT-OF-WAY / SPECIAL EVENTS are not building work, and SIGN/ELEVATOR/FIRE/TELECOM follow the established trades-noise precedent. \u26a0\ufe0f max(ISSUEDATE) returns 20714096083000 ms = the year 2626, a CORRUPT FUTURE DATE -- the third such poisoning this session; the paired windowed count (10,067 in the last year) is what established freshness, not max(). COVERAGE IS TWO COUNTIES because the CITY genuinely straddles them (the frisco-active-building-permits Collin+Denton precedent, not a speculative widening): verified against modelled rows -- 60540/60563/60565/60566/60567 are DuPage and 60564 is Will, and ALL SIX were dark before this."
     }
