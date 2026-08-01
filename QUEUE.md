@@ -3809,3 +3809,44 @@ Every one carries a positive control before wiring and a gate proof after. **Rev
 receipts:** Cass MO · Birmingham AL · Alameda CA · St. Louis County MO · Oakland County MI ·
 Oklahoma County OK · Sedgwick KS (twice — portal, then `butler` control) · Lancaster PA · Snohomish WA ·
 Pierce → King WA · DeKalb → Cobb GA.
+
+---
+
+## 🔴 SELF-CORRECTION — I WIRED THE LARGEST PAGE IN THE CACHE, THEN REVERTED IT (2026-08-01)
+
+Batch 4 went live and I measured the result before reporting it. `adams-county-building-permits` →
+CO Jefferson produced:
+
+| ZIP | dev records | transfer MB |
+|---|---|---|
+| **80001** | 20,041 | **19.65** ← largest page in the entire cache |
+| **80002** | 16,571 | **16.26** |
+| 80005 | 9,194 | 9.03 |
+| 80004 | 6,518 | 6.41 |
+
+Hours earlier in this same session I **declined Sioux Falls → SD Lincoln specifically to avoid adding
+15–19 MB pages**, and recorded the previous high-water mark as 19.61 MB. Then I wired an extension that
+beat it. The rule I wrote was right; I did not apply it to my own next change.
+
+**Reverted `adams-county-building-permits` → CO Jefferson.** `denver-residential-construction-permits`
+→ CO Jefferson **stays**, and it carries most of the value at a fraction of the weight:
+
+- Kept lit by Denver alone: **80001 (4,829) · 80002 (3,117) · 80123 (1,349) · 80127 (365) · 80004 (24)**
+  — 5 of the 6 pages, and 80001/80002 drop from 19.65/16.26 MB to roughly 4.7/3.0 MB.
+- **Lost: 80005 only** (Adams was its sole source). One page returns to the facilities floor.
+
+So the trade is **5 sane pages instead of 6 pages including the two heaviest rows in production** — for
+the cost of one page. 80124 (Douglas, 342) and 19311 (Chester, 15) are unaffected and stay.
+
+> **Standing answer — measure the page you just created, before you report it.** An extension's size is
+> not knowable from the envelope probe (Adams showed 20,786 in-envelope at 80001 and stored 20,041 —
+> a ~96 % pass rate, where DeKalb's Atlanta pages passed 2.5 %). The pass rate is a property of the
+> entry's filters, and `adams-county-building-permits` has effectively none. **Check
+> `length(sites::text)` on the new pages as the last step of every coverage extension**, not only when
+> something looks suspicious.
+
+⚠️ **80001 also demonstrates the silent cap for real, on a live source.** Its 20,041 total is
+20,000 from Adams (**exactly the `max_rows` default — truncated, silently**) plus 41 from elsewhere.
+Earlier today I recorded that "no live source is currently hitting the cap"; **that is now false — I
+made it false**, briefly, and the revert removes it again. The cap fix remains latent hardening, but
+this is the first live proof that a real source can hit it and say nothing.
