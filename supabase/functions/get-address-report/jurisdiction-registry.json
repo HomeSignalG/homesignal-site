@@ -4050,6 +4050,14 @@
         {
           "state": "MO",
           "county": "Jackson"
+        },
+        {
+          "state": "MO",
+          "county": "Clay"
+        },
+        {
+          "state": "MO",
+          "county": "Platte"
         }
       ],
       "column_map": {
