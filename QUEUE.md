@@ -3306,3 +3306,65 @@ Sources wired and CONFIRMED PRODUCING this session: **5** — Stamford CT (192 r
 Allentown PA (3,939 / 5), Naperville IL (1,507 / 4), **Peoria AZ (3,518 / 9, of which 4 were dark)**,
 plus the Chicago→DuPage coverage extension (14 / 2). **21 pages lifted off the facilities floor,
 9,170 records.**
+
+---
+
+## COCONINO + BEND CONFIRMED LIVE — 19 dark pages lifted, 9,737 records. SALEM WAS A DUPLICATE AND IS REVERTED (2026-08-01)
+
+Deployed as `get-address-report` **version 133** (deploy run 114 on commit `842cca0`).
+
+### What actually landed
+
+| source | coverage | pages lifted | records |
+|---|---|---|---|
+| `coconino-county-permits` | AZ / Coconino | **15** | 1,873 |
+| `bend-or-permit-applications` | OR / Deschutes | **4** | 7,864 |
+| ~~`salem-or-structure-permits`~~ | — | **0** | **reverted — duplicate** |
+
+**Coconino (15):** 86046 491 · 86004 345 · 86005 277 · 86017 213 · 86001 180 · 86024 145 · 86018 65 ·
+85931 43 · 86015 42 · 86038 27 · 86036 25 · 86023 9 · 86040 6 · 86045 4 · 86320 1.
+**Bend (4):** 97709 3,246 · 97702 2,358 · 97701 1,877 · 97703 383.
+
+**Invariants across all 9,737 records: 0 missing `record_url`, 0 missing coordinates, 0 unclassified,
+0 non-`point` scope.** Bidirectional gate proof: Coconino rides **AZ/Coconino only** (15 ZIPs),
+Bend **OR/Deschutes only** (4) — cache-wide, nothing else.
+
+### The Salem duplicate — what happened, and the rule that would have prevented it
+
+`salem-structure-permits` was **already in the registry, on the identical `service_url`**
+(`services.arcgis.com/kIA6yS9KDGqZL7U3/…/Structure_Permits`), already producing on 9 Marion pages.
+The entry I added was a second registration of the same layer.
+
+**Cause: I grepped the registry for MO and WA coverage before wiring, and did not grep OR.** The same
+grep is what caught the Louisville false lead an hour earlier. Skipping it once put duplicates in the
+cache — every Salem permit stored twice under two `source_registry_id`s (97310 783 + 404, 97302
+692 + 431, 97301 678 + 406, 97303 513 + 244, 97306 495 + 245, 97305 286 + 49, 97317 237 + 84).
+**Exact-identity dedup cannot collapse these** — `source_registry_id` is part of the dedup key. That
+is the uncatchable-duplicate class recorded when `houston-plat-applications` was rejected.
+
+**Purged and verified: `salem-or-structure-permits` = 0 records cache-wide**, and all 9 Marion pages
+are back to their pre-change counts (97310 783, 97302 692, 97301 678, 97303 513, 97306 495, 97305 286,
+97317 237, 97392 234, 97325 2).
+
+> **Standing answer, third statement of the same rule — apply it as a precondition, not a habit:**
+> before wiring ANY source, grep `jurisdiction-registry.json` for **every state in the candidate's
+> coverage** *and* for the **service_url host**. A URL match is the decisive check — the two Salem
+> entries had different `registry_id`s and identical URLs.
+
+### `dev_refresh_collect` has a 20-minute window and no processed-marker — it re-applies stale bodies
+
+The first two post-revert collects wrote the duplicate back. The function selects
+`distinct on (zip) … order by id desc` over `net._http_response` `where created > now() - interval
+'20 minutes'` and marks nothing as consumed, so **a collect that runs before the new response lands
+re-applies the newest response still in the window — which can be a pre-deploy body** — and stamps
+`refreshed_at = now()`, making the row look freshly written. It took three collects to converge.
+
+> **Standing answer:** after deploying a registry change, do not treat a collect as authoritative until
+> you have confirmed the newest `net._http_response` row for that ZIP was created **after** the
+> function's `updated_at`. `refreshed_at` proves a write happened; it does **not** prove which version
+> of the engine produced it.
+
+### Reprobe candidate
+`bend-or-permit-applications` at 3,246 records on 97709 is the densest single page added tonight;
+row size is untested against the 3.5 MB working ceiling (Cleveland 44127 at 5.98 MB remains the
+known high-water mark). Not touched — logged with numbers.
