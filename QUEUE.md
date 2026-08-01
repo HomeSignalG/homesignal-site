@@ -3947,3 +3947,62 @@ The reprobe list is `scripts/source-monitor-targets.json` and it is only consult
 > It succeeded at being loud, and took the auto-wire path down with it. When a hardened pre-step gates
 > a job whose real work is independent of it, verify the *job* still runs — a green assertion that
 > aborts everything downstream is its own kind of silent failure.
+
+---
+
+## 🔴 `las-vegas-building-permits` IS SCOPED AND LABELLED BY THE OWNER'S MAILING ADDRESS (2026-08-01)
+
+Found by ranking the **native-ZIP** sources — the seam my earlier radius-based ranking missed (KCMO is
+native-ZIP, and it was the biggest lift of the session, so the seam was worth checking). Only 8 entries
+scope by a ZIP column; the coverage payoff was nil, but one of them is wired to the wrong field.
+
+**The evidence.** `ZIP`, `CITY`, `STATE` and `ADDR1` on `OpenData_Building_Permits_` are the
+**`LEGALOWNER`'s mailing address**, not the permitted property. A row pulled verbatim:
+
+```
+ZIP        92660          CITY  NEWPORT BEACH      STATE  CA
+ADDR1      4425 JAMBOREE RD STE 115
+LEGALOWNER D & L DEVELOPMENT 4425 JAMBOREE RD STE 115 NEWPORT BEACH CA 92660
+  …but the PROPERTY is:  STNO 8526 · STNAME DEL WEBB · SUFFIX BLVD
+                          SUBDIV "SUN CITY SUMMERLIN-UNIT #14"   (Las Vegas)
+geometry   null
+```
+
+The entry uses `zip_where_template: "ZIP LIKE '{zip}%'"` and
+`column_map.address: ["ADDR1","CITY","STATE"]` — so it **selects** rows by where the owner gets mail
+and **displays** the owner's office as the record's address. The layer carries the real property
+address in `STNO`/`PREDIR`/`STNAME`/`SUFFIX`; nothing reads it.
+
+**Live blast radius — 3,099 records across 51 Clark County pages, 1,457 distinct addresses (2.1
+records per address).** The concentration is the tell, and every one of these is a suite number:
+
+| address | records | pages |
+|---|---|---|
+| 5795 BADURA AVE **STE 180** LAS VEGAS NV | **174** | 1 |
+| 7455 ARROYO CROSSING PKWY LAS VEGAS NV | 169 | 1 |
+| 6385 S RAINBOW BLVD **STE 300** LAS VEGAS NV | 139 | 1 |
+| 6345 S JONES BLVD **STE 400** LAS VEGAS NV | 126 | 1 |
+| 7895 W SUNSET RD **STE 110** LAS VEGAS NV | 96 | 1 |
+| 7255 N TENAYA WAY **STE 200** LAS VEGAS NV | 88 | 1 |
+| 770 E WARM SPRINGS RD **STE 240** LAS VEGAS NV | 78 | 1 |
+| 1140 TOWN CENTER DR **STE 250** LAS VEGAS NV | 69 | 1 |
+
+The top 8 addresses carry **939 of 3,099 records (30 %)**. A resident on 89118 sees **174 separate
+`ProdHome`/`Model` permits stacked on one builder's office suite**, while the homes actually being
+built are scattered across the valley and appear on **no** page. And the mirror failure: a Las Vegas
+property whose owner is in Newport Beach is selected for ZIP 92660 — a CA/Orange page, which the
+coverage gate correctly refuses — so it is dropped entirely.
+
+### ⚠️ Correction to my own first measurement
+My first pass reported "**3,099 of 3,099 records have a non-NV address**" from
+`addr !~* ', *NV'`. That regex requires a **comma** before NV; the field is formatted
+`"… LAS VEGAS NV"` with no comma, so it matched everything. The true figure is **2**. I caught it only
+because I sampled rows instead of trusting the count — the repo's own rule, and it nearly produced a
+dramatic and completely false claim in the same message as a real one.
+
+### Not fixed — this needs a decision, not a patch
+`column_map.address` could be pointed at `["STNO","PREDIR","STNAME","SUFFIX"]` (arrays JOIN, so that
+yields `8526 DEL WEBB BLVD`) — but **the selection cannot be fixed in config: the layer exposes no
+property ZIP.** Correcting only the display gives the right address on the wrong page, which is worse
+than today. The real options are (a) retire the entry, (b) keep it and accept office-pinned records,
+or (c) build a property-address geocode path — a code change. All three are founder calls.
