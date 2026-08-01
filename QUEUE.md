@@ -4145,3 +4145,37 @@ That distinction matters here specifically: the earlier session note about this 
 over 165 ZIPs… three consecutive ~3 h failures") described a red baseline on `main`, and run 179 shows
 it has since recovered. Neither fact tells us anything about the last three batches, which is why 180
 was dispatched rather than assumed.
+
+### Date-coverage check on the session's 39,057 records — one source flagged, then cleared
+
+I had verified `record_url`, coordinates and `use_type` across everything wired this session, but never
+**dates**. Checking: exactly one source has undated records —
+`kenton-county-devtracking-permits`, **40 of 84** on my Campbell pages (48 %).
+
+**It is not something my extension introduced.** The same entry runs **46.5 % undated on its
+pre-existing Kenton pages** (118 of 254) versus **47.6 % on the Campbell pages I added** — statistically
+identical. The extension reproduced the entry's existing behaviour faithfully.
+
+**And it is not a defect at all.** Two inferences of mine were wrong before I got there:
+
+1. *"`PERMIT_DAT` is populated on 1,602 of 1,634 rows (98 %) at source but only ~52 % in cache —
+   therefore the pipeline is losing dates."* **Wrong.** Joining ten undated cached records back to the
+   layer on `PIDN` shows `PERMIT_DAT: null` **at source** for all ten. The pipeline is faithful.
+2. *"Then undated rows must be concentrated in our envelopes."* **Also wrong, and the real answer is
+   the status vocabulary.** `PROJECT_ST` has exactly three values: `Underway` **27**, `Complete` **33**,
+   and `" "` — a single space — **1,574**. The entry maps the first two and correctly drops the blank
+   fail-closed, so it can only ever surface **60 of 1,634 rows**. Nearly all of the layer's 32 undated
+   rows sit inside that usable 60. The county has simply not entered permit dates for about half the
+   projects it actively tracks.
+
+So the 98 % figure was computed over a population that is **96 % ineligible**. Rate over the wrong
+denominator, twice — the same "a count is a lead, not a fact" failure I have now made in three
+different forms today (the comma-less `NV` regex, the page-overlap-confounded concentration metric,
+and this).
+
+> **Standing answer — a source-wide fill rate says nothing about the rows an entry actually emits.**
+> Compute it over the rows that survive `status_to_bucket` and the filters, not over the layer. Here
+> the difference is 98 % versus ~50 %, and only the second number describes what a resident sees.
+
+**No change made.** `kenton-county-devtracking-permits` is small by nature (60 usable rows county-wide)
+and behaving exactly as designed. The 84 records on the 7 Campbell pages are correct.
