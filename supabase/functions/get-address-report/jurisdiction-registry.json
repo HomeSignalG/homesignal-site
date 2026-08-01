@@ -9887,6 +9887,69 @@
       "recency_days": 365,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-31: City of Naperville's OWN AGO org (rXJ6QApc2sOtl1Pd), layer EPL_BldgPermits, 34,571 rows. GEOMETRY-LESS TABLE -> the Boulder/Anaheim geocode path (native zip + address fields, no lat/lng in column_map), modelled directly on boulder-construction-permits. FRESH AND HIGH-VOLUME: 10,067 rows with ISSUEDATE >= 2025-07-31 (a full year window). BOTH vocabularies enumerated live and EACH SUMS EXACTLY TO 34,571: PERMITSTATUS = ISSUED 14359 + COMPLETE 13886 + VOID 1871 + FEES PAID 1039 + IN REVIEW 685 + FEES DUE 582 + AWAITING CUSTOMER RESPONSE 502 + CANCELLED 489 + FINAL INSPECTION PASSED 445 + EXPIRED 419 + TEMPORARY OCCUPANCY 134 + SUBMITTED - ONLINE 68 + APPROVED 37 + On Hold 22 + SUBMITTED 21 + To Be Issued 11 + DENIED 1; PERMITTYPE = FINANCE DEPARTMENT 7945 + RESIDENTIAL: OTHER IMPROVEMENTS 7660 + DEPARTMENT OF PUBLIC WORKS 3528 + MISCELLANEOUS 3240 + RESIDENTIAL 2564 + TRUCK ROUTE PERMIT 1489 + COMMERCIAL 1446 + SUB-PERMIT 1361 + FIRE DEPARTMENT PERMIT 1084 + SIGN 952 + COMMUNITY SERVICES DEPARTMENT 864 + ELEVATOR 776 + RIGHT-OF-WAY 590 + TELECOMMUNICATIONS 406 + ACCOUNTS PAYABLE 375 + TEMPORARY IMPROVEMENTS 148 + SPECIAL EVENTS 140 + GREEN ENERGY 3. extra_where keeps only the 5 CONSTRUCTION types (11,821 rows) and drops 13 administrative/non-construction types at source -- FINANCE DEPARTMENT and ACCOUNTS PAYABLE are internal accounting records, DEPARTMENT OF PUBLIC WORKS / TRUCK ROUTE / RIGHT-OF-WAY / SPECIAL EVENTS are not building work, and SIGN/ELEVATOR/FIRE/TELECOM follow the established trades-noise precedent. \u26a0\ufe0f max(ISSUEDATE) returns 20714096083000 ms = the year 2626, a CORRUPT FUTURE DATE -- the third such poisoning this session; the paired windowed count (10,067 in the last year) is what established freshness, not max(). COVERAGE IS TWO COUNTIES because the CITY genuinely straddles them (the frisco-active-building-permits Collin+Denton precedent, not a speculative widening): verified against modelled rows -- 60540/60563/60565/60566/60567 are DuPage and 60564 is Will, and ALL SIX were dark before this."
+    },
+    {
+      "registry_id": "peoria-az-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://gis.peoriaaz.gov/arcgis/rest/services/Accela/Peoria_Building_Permit_All/FeatureServer/3",
+      "dataset_url": "https://gis.peoriaaz.gov/arcgis/rest/services/Accela/Peoria_Building_Permit_All/FeatureServer/3",
+      "jurisdiction": "City of Peoria, Arizona",
+      "coverage": [
+        {
+          "state": "AZ",
+          "county": "Maricopa"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "B1_PER_SUB_TYPE",
+          "Project_Address"
+        ],
+        "status_raw": "Project_Status",
+        "type_source": "Permit_Type",
+        "file_date": "B1_FILE_DD",
+        "address": [
+          "Project_Address"
+        ],
+        "zip": "SITUS_ZIP",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "Permit_Number"
+      },
+      "type_map": {
+        "Residential": "Residential",
+        "Commercial": "Commercial",
+        "Miscellaneous": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "In Review",
+          "Admin Review",
+          "Applicant Contacted",
+          "Incomplete Submittal",
+          "ACA App",
+          "Payment Pending",
+          "Admin Process",
+          "Pending",
+          "In Revision",
+          "Pending Renewal"
+        ],
+        "approved": [
+          "Permit Issued",
+          "Approved",
+          "Pending Issuance"
+        ],
+        "operating": [
+          "Final",
+          "Inspection Complete"
+        ],
+        "exclude": [
+          "Expired"
+        ]
+      },
+      "recency_days": 365,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-01: City of Peoria's OWN GIS host gis.peoriaaz.gov, service Accela/Peoria_Building_Permit_All. THE LAYER IS id 3, NOT 0 -- layer 0 returned {\"error\":{\"code\":500,\"message\":\"json\"}} and the service root named layer 3 'Building Permits' (the Hawaii County lesson: a failure on layer 0 is not 'no data'). 3,984 rows, esriGeometryPoint, currentVersion 11.1. THREE vocabularies enumerated live and EACH SUMS EXACTLY TO 3,984: Project_Status (16) = Final 1803 + Permit Issued 1116 + Expired 265 + Applicant Contacted 201 + In Review 144 + Incomplete Submittal 123 + Admin Review 111 + ACA App 70 + Payment Pending 47 + Admin Process 40 + Pending Issuance 26 + Approved 22 + In Revision 4 + Inspection Complete 4 + Pending Renewal 3 + Pending 5; Permit_Type (3) = Residential 2946 + Commercial 697 + Miscellaneous 341; B1_PER_GROUP (1) = Building 3984. returnDistinctValues is UNSUPPORTED on this server (HTTP 200 carrying code 400 'Unable to perform query operation'), so groupBy is the enumeration and the exact sums are the positive control. B1_PER_SUB_TYPE (15) also sums to 3,984 and contains NO trade classes (no electrical/plumbing/mechanical) -- the whole layer is B1_PER_GROUP='Building' -- so there is NOTHING to drop and no extra_where is used; the largest classes are Miscellaneous Residential 1716, New Residential 729, Miscellaneous Commercial 468, Addition-Alteration and Patio 374, Swimming Pool-Spa-Hot Tub 341. FRESH: 3,881 of 3,984 rows carry B1_FILE_DD >= 2025-08-01, so recency_days 365 keeps 97.4% of the layer; B1_FILE_DD is esriFieldTypeDate so the DATE literal applies normally. NATIVE ZIP: SITUS_ZIP is populated and the in-window ZIP histogram sums to exactly 3,881 (85383 2351 + 85345 665 + 85382 399 + 85381 301 + null 107 + 85373 39 + 85304 8 + 85305 7 + 85306 3 + 85342 1), so column_map.zip is used and NO spatial_zip_radius_mi is needed. NO GEOCODING is required (native ZIP + own point geometry), so this entry carries none of the Naperville WORKER_RESOURCE_LIMIT risk. The layer's stored spatialReference is wkid 2868 (NAD83 Arizona Central ft) -- irrelevant, because sources/arcgis.ts always sends outSR=4326; a live sample returned spatialReference 4326 with x -112.2196 / y 33.5820 (Peoria AZ), so __lat/__lng are real WGS84 and the state-plane X_COORD/Y_COORD columns are deliberately NOT used. use_type from Permit_Type: 'Miscellaneous' (341) is GENERIC and is written as 'Development', the generic member of the closed TYPE_EXACT vocabulary in lib/map.js -- never guessed into Residential/Commercial. record_url is DATASET precision on the city's own live layer URL because every resident-facing candidate failed byte-verification from both egress paths: www.peoriaaz.gov root AND the Planning/permits department page both return HTTP 403 Cloudflare 'Just a moment...' interstitials; aca-prod.accela.com/PEORIA (Default.aspx and CapHome.aspx, both tried) returns HTTP 503 Service Unavailable; and data-peoriaaz.opendata.arcgis.com returns HTTP 200 but serves the GENERIC anonymous ArcGIS Hub shell (title 'ArcGIS Hub', not a City of Peoria org) -- the Michigan-pass standing answer that a 200 on a guessed portal subdomain is not an org. The layer URL is first-party, on the city's own host, and verified 200 in the same session (Boulder/Philadelphia precedent: when the portal cannot be verified, the machine endpoint is the honest URL). TARGETS 4 DARK PAGES: 85342 dev=0, 85345 dev=0, 85373 dev=0, 85381 dev=0 (85304/85305/85306/85382/85383 already carry records). FOUND BY THE SEARCH INVERSION (title-shape sweep, page 7)."
     }
   ],
   "ckan": [
