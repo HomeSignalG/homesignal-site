@@ -4179,3 +4179,43 @@ and this).
 
 **No change made.** `kenton-county-devtracking-permits` is small by nature (60 usable rows county-wide)
 and behaving exactly as designed. The 84 records on the 7 Campbell pages are correct.
+
+### Registry integrity audit — is the Salem duplicate the only one? Yes (2026-08-01)
+
+I created a duplicate registration this session (`salem-or-structure-permits` on the same
+`service_url` as `salem-structure-permits`) and reverted it. The obvious follow-up question is whether
+any others exist. Two scans, both clean:
+
+**1. Identical service targets — 0 across 149 entries.** Normalising `service_url` (trailing slash,
+case) and falling back to `domain::dataset_id` for the non-ArcGIS platforms: **no two entries point at
+the same target.** The Salem case was the only one, it was mine, and it is gone.
+
+**2. Multiple LAYERS of one service — 4 services, and none double-emits.** This is the subtler shape,
+and it is the one the registry already has a scar from: `houston-plat-applications` (layer 1) is wired
+while layer 0 was rejected as a *proven subset*, because wiring both would have double-emitted ~25,777
+plats under two `source_registry_id`s — invisible to exact-identity dedup.
+
+| service | layers wired | distinct case numbers | shared between siblings |
+|---|---|---|---|
+| Fairfax DevelopmentTracker | 1, 4 | 6,126 | **0** |
+| Tucson PermitsCode | 81, 85 | 3,804 | **0** |
+| Henderson OpenDevPermits | 1, 2 | 10,216 | **0** |
+| Arlington OD_Property | 0, 1, 9 | 14,482 | **15 (0.10 %)** |
+
+**The Arlington 15 are id COLLISIONS, not duplicate records** — checked, not assumed:
+
+```
+011506  issued-permits      "Business 380 E FRONT STREET Suite 120"   2025-02-27  operating
+011506  permit-applications "New Tenant 918 W DIVISION STREET A"      2026-02-17  proposed
+039981  issued-permits      "Single-Family 5511 SARASOTA DRIVE"       2025-05-13  operating
+039981  permit-applications "Single-Family 1199 LYNDALE DRIVE"        2026-05-14  proposed
+```
+
+Different address, different date, different work. Arlington's three layers run **independent
+numbering sequences** that occasionally land on the same short numeric id. And it cannot cause a
+mis-collapse regardless: `source_registry_id` is part of the dedup identity, so records from different
+entries never dedup against each other.
+
+**Conclusion: no double-emit anywhere in the registry.** A negative result, but the kind worth having
+on the record — the Houston case proves this failure mode is real, and it was previously only ever
+checked for the one service where somebody happened to notice.
