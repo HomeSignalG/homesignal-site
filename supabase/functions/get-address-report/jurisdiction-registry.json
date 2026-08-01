@@ -512,6 +512,10 @@
         {
           "state": "IL",
           "county": "DuPage"
+        },
+        {
+          "state": "IN",
+          "county": "Lake"
         }
       ],
       "column_map": {
@@ -1253,6 +1257,10 @@
         {
           "state": "LA",
           "county": "Orleans"
+        },
+        {
+          "state": "LA",
+          "county": "Jefferson"
         }
       ],
       "column_map": {
@@ -2752,6 +2760,10 @@
         {
           "state": "MN",
           "county": "Hennepin"
+        },
+        {
+          "state": "MN",
+          "county": "Ramsey"
         }
       ],
       "column_map": {
@@ -6919,6 +6931,10 @@
         {
           "state": "GA",
           "county": "Fulton"
+        },
+        {
+          "state": "GA",
+          "county": "Gwinnett"
         }
       ],
       "column_map": {

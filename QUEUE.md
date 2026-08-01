@@ -3715,3 +3715,56 @@ a prediction**: PA Delaware's five hits filtered from 1,075 / 785 / 749 / 563 / 
 ### Scope note
 `fairfax` has a second entry, `fairfax-active-site-construction`, flagged by the same ranking. It was
 **not probed and not extended** — only the layer actually verified was wired.
+
+---
+
+## 🔴 CORRECTION + FINDING — THE THREE "CAPPED" SAINT PAUL PAGES ARE STALE ROWS FROM A **RETIRED** SOURCE (2026-08-01)
+
+**Correcting my own finding recorded earlier today.** I reported the silent `max_rows` cap with
+55103/55104/55105 as live evidence. The code half is right and stands. **The evidence was wrong**, and
+the truth is a different (also real) problem.
+
+`saint-paul-approved-building-permits` **is not in the registry.** It was **retired by founder call on
+2026-07-28** (commit `2abef41`, PR #427) precisely because of the payload problem I "rediscovered":
+the layer is stalled at `max(ISSUEDATE) 2025-06-30`, a 365-day window returns 0 rows, and 730 days
+implies a ~14–19 MB cached row against the ~3.5 MB ceiling. That decision was already made, with
+better analysis than mine, four days ago.
+
+**But three pages never got the memo:**
+
+| ZIP | `refreshed_at` | dev | of which `saint-paul-*` |
+|---|---|---|---|
+| 55103 | **2026-07-29 04:15Z** | 20,000 | 20,000 |
+| 55104 | **2026-07-29 01:45Z** | 20,000 | 20,000 |
+| 55105 | **2026-07-29 01:30Z** | 20,000 | 20,000 |
+| 55101 | 2026-08-01 15:33Z | 0 | 0 |
+| 55102 | 2026-07-31 23:45Z | 0 | 0 |
+| 55107 | 2026-08-01 13:30Z | 0 | 0 |
+| 55117 | 2026-08-01 13:15Z | 0 | 0 |
+
+Their Ramsey neighbours refresh daily and correctly show 0. These three are **frozen since 29 July**,
+serving 19.5 MB of records from a source that no longer exists in the registry.
+
+**Why they're stuck — and it is the transient-safe guard doing its job.** `dev_refresh_collect`
+refuses a response when `cached refreshed_at >= now() - 7 days AND new development = 0 AND cached
+development > 0`. Every nightly run now returns 0 (the source is gone) and is rejected as a suspected
+flake. The refusal does **not** bump `refreshed_at`, so the 7-day clock keeps running from 29 July and
+**the rows self-heal around 5 August**, when the guard expires and the honest 0 is accepted.
+
+**Not overridden.** Forcing these rows now means writing past a guard built specifically to stop an
+agent from clobbering good pages with a transient zero. It expires on its own in ~4 days, and the
+founder's retirement decision already anticipated these pages returning to the facilities floor.
+Flagged, not touched.
+
+### What this does to the silent-cap finding
+The `max_rows ?? 20000` + `out.slice(0, maxRows)` truncation is **still real and still silent**
+(`arcgis.ts:527/586`, `carto.ts:273`, `ckan.ts:265`, `csv.ts:205`, `socrata.ts:466`). What changes is
+the blast radius: **no live source is currently hitting it.** The only three pages at exactly 20,000
+come from the retired entry. 80022 (19.61 MB) is *not* truncation either — 19,072 Adams + 995 Aurora,
+both under the cap. So the fix is still worth doing, but it is **latent hardening, not an active
+incident.**
+
+> **Standing answer — a `source_registry_id` in the CACHE does not mean the entry is in the REGISTRY.**
+> Cached rows outlive the config that produced them. Before treating cached records as evidence about
+> current behaviour, grep the registry for that `registry_id` and check the row's `refreshed_at`. I
+> spent a finding on a source that had been deliberately deleted four days earlier.
