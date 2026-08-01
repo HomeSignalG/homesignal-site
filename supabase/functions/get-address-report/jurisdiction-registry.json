@@ -2105,6 +2105,10 @@
         {
           "state": "CO",
           "county": "Denver"
+        },
+        {
+          "state": "CO",
+          "county": "Jefferson"
         }
       ],
       "column_map": {
@@ -7833,6 +7837,10 @@
         {
           "state": "CO",
           "county": "Adams"
+        },
+        {
+          "state": "CO",
+          "county": "Jefferson"
         }
       ],
       "column_map": {
@@ -8251,6 +8259,10 @@
         {
           "state": "PA",
           "county": "Delaware"
+        },
+        {
+          "state": "PA",
+          "county": "Chester"
         }
       ],
       "column_map": {
@@ -8669,6 +8681,10 @@
         {
           "state": "CO",
           "county": "Arapahoe"
+        },
+        {
+          "state": "CO",
+          "county": "Douglas"
         }
       ],
       "column_map": {
