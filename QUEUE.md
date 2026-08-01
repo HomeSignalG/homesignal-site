@@ -3472,3 +3472,44 @@ Saint Paul ZIPs are, they are missing, and nothing says so.
 note, or a `truncated: true` flag, when `out.length` reaches `maxRows`) and has no behavioral
 surface, but nothing is currently blocked by it, so the unblocking exception does not apply.
 Recorded here with the file:line receipts so the fix is a five-minute job when approved.
+
+---
+
+## DEKALB → GA FULTON — 14 dark Atlanta pages, verified before wiring (2026-08-01)
+
+Atlanta straddles the Fulton/DeKalb line. `dekalb-county-building-permits` declared **DeKalb only**,
+so downtown Atlanta — 30303, 30308, 30309, 30312, 30313 — sits dark while the DeKalb ZIPs a mile away
+are among the richest pages in the cache.
+
+Found by a **local candidate ranking**, not by guessing: for every entry with a spatial radius, compute
+which dark ZIP pages in *undeclared* counties fall within range of that source's own lit ZIP centroids.
+DeKalb → Fulton ranked first at 19 dark pages, nearest 1.5 mi. **Proximity is a lead, not a fact**, so
+each was then probed live with the connector's own `envelopeFor()` math (radius 5).
+
+**Control 30033 (DeKalb, lit) = 50,170.** 14 of 17 probed Fulton ZIPs carry DeKalb permits in range:
+
+| ZIP | in envelope | | ZIP | in envelope |
+|---|---|---|---|---|
+| 30306 | 38,136 | | 30303 | 13,791 |
+| 30324 | 28,678 | | 30315 | 9,323 |
+| 30326 | 25,951 | | 30327 | 2,611 |
+| 30308 | 20,532 | | 30314 | 2,157 |
+| 30309 | 19,794 | | 30310 | 1,767 |
+| 30305 | 18,973 | | 30328 | 1,133 |
+| 30312 | 15,322 | | 30318 · 30331 · 30337 | **0** |
+| 30313 | 14,193 | | | |
+
+### Size, stated plainly — this interacts with the open row-size item above
+DeKalb's own pages already run **8.69–10.45 MB** (30021 8.69 · 30345 8.90 · 30032 8.80 · 30033 10.45),
+i.e. this county is *already* well past the 3.5 MB working ceiling. Measured pass rate is
+**10,844 / 50,170 = 21.6%**, so the new Fulton pages project to roughly **1–8 MB** (30306 the largest
+at ~8,200 records).
+
+**Wired.** That is below the 15–19 MB class I declined for Sioux Falls, and inside the range already
+live in this very county — so the line is consistent: *decline the ~19 MB class, ship below it, state
+the numbers either way.* If the row-size decision later goes toward an `out_fields` projection, DeKalb
+is the single highest-value entry to apply it to.
+
+Precondition grep: only `dekalb-county-building-permits` uses `dcgis.dekalbcountyga.gov`; GA Fulton's
+existing `johns-creek-building-permits` is a different host and a different layer covering north Fulton,
+so this is an extension, not a second registration.
