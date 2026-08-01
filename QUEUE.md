@@ -3220,3 +3220,89 @@ accurate.
 Sources wired and CONFIRMED PRODUCING this session: **4** — Stamford CT (192 records / 6 pages),
 Allentown PA (3,939 / 5), Naperville IL (1,507 / 4), plus the Chicago→DuPage coverage extension
 (14 / 2). **17 pages lifted off the facilities floor, 5,652 records.**
+
+---
+
+## PEORIA AZ CONFIRMED LIVE — 4 dark Maricopa pages lifted, 3,518 records (2026-08-01)
+
+`peoria-az-building-permits` (PR #505, registry 119 → 120) is deployed
+(`get-address-report` **version 129**, `updated_at` 2026-08-01T01:34:28Z) and producing.
+
+**Re-cache verified the way the earlier correction requires — `refreshed_at` MOVED before any
+count was read.** All 9 Peoria ZIPs fired at ~01:36Z; every one carries
+`refreshed_at = 2026-08-01 01:42:47Z`, past the fire moment. (The prior session's mistake was
+reading counts from a re-cache that never ran and diagnosing a non-existent engine bug.)
+
+**The 4 previously-dark pages, now lifted** (`app_refresh_zip`, all `quality=pass`):
+
+| ZIP | dev before | dev after | Peoria records |
+|---|---|---|---|
+| 85345 | 0 | 603 | 603 |
+| 85381 | 0 | 278 | 278 |
+| 85373 | 0 | 36 | 36 |
+| 85342 | 0 | 1 | 1 |
+
+Five already-lit Peoria ZIPs also grew: 85383 104 → 2,323 (2,219 Peoria) · 85382 143 → 507 (364) ·
+85305 701 → 705 (6) · 85306 714 → 715 (3) · 85304 646 → 647 (8).
+
+**Invariants across all 3,518 Peoria records: 0 missing `record_url`, 0 missing coordinates,
+0 unclassified, 0 non-`point` scope.** Bidirectional gate proof with live receipts: the records
+ride **AZ/Maricopa pages ONLY** — 9 ZIPs, all Maricopa, cache-wide.
+
+**Two traps this source would have sprung, both caught by existing standing answers:**
+1. **The layer is id 3, not 0.** Layer 0 returns `{"error":{"code":500,"message":"json"}}` — the
+   Hawaii County lesson (a failure on layer 0 is not "no data"; read the service root) is what
+   found `Building Permits` at id 3.
+2. **Stored `spatialReference` is wkid 2868** (NAD83 Arizona Central **feet**). Irrelevant, because
+   `sources/arcgis.ts` always sends `outSR=4326` — a live sample came back `spatialReference 4326`
+   at x −112.2196 / y 33.5820. The state-plane `X_COORD`/`Y_COORD` columns were deliberately NOT
+   used; `__lat`/`__lng` read the reprojected geometry.
+
+**New standing answer — `returnDistinctValues` can be UNSUPPORTED on an older ArcGIS Server, and it
+fails with HTTP 200.** `gis.peoriaaz.gov` (currentVersion 11.1) answers
+`returnDistinctValues=true` with a 200 carrying `{"error":{"code":400,…"Unable to perform query
+operation."}}`. A caller that checks only the HTTP status reads that as an empty vocabulary — the
+"wrong zero" class. groupBy worked, and the exact sums are what made it evidence: **three
+vocabularies each summing to EXACTLY 3,984** (`Project_Status` 16 values, `Permit_Type` 3,
+`B1_PER_GROUP` 1 = Building), plus `B1_PER_SUB_TYPE` (15) also summing to 3,984 and containing
+**no trade classes at all** — so there was nothing to drop and no `extra_where` is used.
+
+**`record_url` is `dataset` precision on the city's own layer URL, because every resident-facing
+candidate failed byte-verification** — recorded so nobody re-probes them:
+- `www.peoriaaz.gov` root **and** the Planning/permits department page → **HTTP 403**, Cloudflare
+  `Just a moment...` interstitial (the Tampa class: a WAF against our egress, not a dead page)
+- `aca-prod.accela.com/PEORIA` — both `Default.aspx` and `CapHome.aspx?module=Building` →
+  **HTTP 503** Service Unavailable
+- `data-peoriaaz.opendata.arcgis.com` → **HTTP 200 but the generic anonymous ArcGIS Hub shell**
+  (`<title>ArcGIS Hub</title>`, no City of Peoria org) — the Michigan-pass standing answer that a
+  200 on a guessed portal subdomain is not an org
+
+### Rejections with receipts from this round (do not re-probe)
+
+- **Santa Ana CA (Orange, 85 dark)** — `gis.santa-ana.org/server/rest/services` is live and has an
+  **`Accela` folder**, which looked like the Peoria pattern. It holds exactly two services:
+  `Accela_AP` (address points) and `Accela_PBA_BuildingInspectionArea` (inspection **areas**).
+  **The vendor-folder trap, 6th confirmation** — a folder named for a permitting vendor usually
+  holds the app's basemap, not permits.
+- **Anaheim CA** — `gis.anaheim.net/map/rest/services/OpenData2/FeatureServer` enumerated: 38
+  layers, **no permit ledger**. The only development-adjacent layer is 12 `Discretionary Cases`
+  (polygon), and Anaheim is already wired via `anaheim-land-use-cases`
+  (`Open_Data_Land_Use_Permits/FeatureServer/0`).
+- **Irvine CA** — the city's own `gis.cityofirvine.org/arcgis/rest/services` is live; all 59
+  services enumerated, **0 permit ledgers**. `ParcelClariti*` is the vendor-folder trap again
+  (Clariti is a permitting vendor; these are parcel basemaps).
+- **Fremont CA (Alameda, 51 dark)** — `Major_Residential_Projects_with_Building_Permits`
+  (City of Fremont GIS) exists but the real layer is id 80 and carries **9 rows**, 2020 vintage
+  (`Major_Res_Projects_2020_pts`). Too small and too stale to wire.
+- **Oakland CA (Alameda)** — `data.oaklandca.gov` Socrata catalog is live (568 KB, full list read).
+  Filtering every dataset name for permit/building/construction/planning returns **5 hits, none a
+  permit ledger**: parking-permit zone maps (2019), a planning-areas layer (2020), a PIT-count map.
+- **Louisville KY was a FALSE lead and the registry grep caught it before any probe cost** —
+  `louisville-active-construction-permits` has been wired since an earlier pass, and KY/Jefferson is
+  already only **4 dark of 40 pages**. This is the Spokane discipline working: grep
+  `jurisdiction-registry.json` for the county BEFORE recon.
+
+Sources wired and CONFIRMED PRODUCING this session: **5** — Stamford CT (192 records / 6 pages),
+Allentown PA (3,939 / 5), Naperville IL (1,507 / 4), **Peoria AZ (3,518 / 9, of which 4 were dark)**,
+plus the Chicago→DuPage coverage extension (14 / 2). **21 pages lifted off the facilities floor,
+9,170 records.**
