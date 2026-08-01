@@ -9958,6 +9958,89 @@
       "recency_days": 365,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-01: City of Peoria's OWN GIS host gis.peoriaaz.gov, service Accela/Peoria_Building_Permit_All. THE LAYER IS id 3, NOT 0 -- layer 0 returned {\"error\":{\"code\":500,\"message\":\"json\"}} and the service root named layer 3 'Building Permits' (the Hawaii County lesson: a failure on layer 0 is not 'no data'). 3,984 rows, esriGeometryPoint, currentVersion 11.1. THREE vocabularies enumerated live and EACH SUMS EXACTLY TO 3,984: Project_Status (16) = Final 1803 + Permit Issued 1116 + Expired 265 + Applicant Contacted 201 + In Review 144 + Incomplete Submittal 123 + Admin Review 111 + ACA App 70 + Payment Pending 47 + Admin Process 40 + Pending Issuance 26 + Approved 22 + In Revision 4 + Inspection Complete 4 + Pending Renewal 3 + Pending 5; Permit_Type (3) = Residential 2946 + Commercial 697 + Miscellaneous 341; B1_PER_GROUP (1) = Building 3984. returnDistinctValues is UNSUPPORTED on this server (HTTP 200 carrying code 400 'Unable to perform query operation'), so groupBy is the enumeration and the exact sums are the positive control. B1_PER_SUB_TYPE (15) also sums to 3,984 and contains NO trade classes (no electrical/plumbing/mechanical) -- the whole layer is B1_PER_GROUP='Building' -- so there is NOTHING to drop and no extra_where is used; the largest classes are Miscellaneous Residential 1716, New Residential 729, Miscellaneous Commercial 468, Addition-Alteration and Patio 374, Swimming Pool-Spa-Hot Tub 341. FRESH: 3,881 of 3,984 rows carry B1_FILE_DD >= 2025-08-01, so recency_days 365 keeps 97.4% of the layer; B1_FILE_DD is esriFieldTypeDate so the DATE literal applies normally. NATIVE ZIP: SITUS_ZIP is populated and the in-window ZIP histogram sums to exactly 3,881 (85383 2351 + 85345 665 + 85382 399 + 85381 301 + null 107 + 85373 39 + 85304 8 + 85305 7 + 85306 3 + 85342 1), so column_map.zip is used and NO spatial_zip_radius_mi is needed. NO GEOCODING is required (native ZIP + own point geometry), so this entry carries none of the Naperville WORKER_RESOURCE_LIMIT risk. The layer's stored spatialReference is wkid 2868 (NAD83 Arizona Central ft) -- irrelevant, because sources/arcgis.ts always sends outSR=4326; a live sample returned spatialReference 4326 with x -112.2196 / y 33.5820 (Peoria AZ), so __lat/__lng are real WGS84 and the state-plane X_COORD/Y_COORD columns are deliberately NOT used. use_type from Permit_Type: 'Miscellaneous' (341) is GENERIC and is written as 'Development', the generic member of the closed TYPE_EXACT vocabulary in lib/map.js -- never guessed into Residential/Commercial. record_url is DATASET precision on the city's own live layer URL because every resident-facing candidate failed byte-verification from both egress paths: www.peoriaaz.gov root AND the Planning/permits department page both return HTTP 403 Cloudflare 'Just a moment...' interstitials; aca-prod.accela.com/PEORIA (Default.aspx and CapHome.aspx, both tried) returns HTTP 503 Service Unavailable; and data-peoriaaz.opendata.arcgis.com returns HTTP 200 but serves the GENERIC anonymous ArcGIS Hub shell (title 'ArcGIS Hub', not a City of Peoria org) -- the Michigan-pass standing answer that a 200 on a guessed portal subdomain is not an org. The layer URL is first-party, on the city's own host, and verified 200 in the same session (Boulder/Philadelphia precedent: when the portal cannot be verified, the machine endpoint is the honest URL). TARGETS 4 DARK PAGES: 85342 dev=0, 85345 dev=0, 85373 dev=0, 85381 dev=0 (85304/85305/85306/85382/85383 already carry records). FOUND BY THE SEARCH INVERSION (title-shape sweep, page 7)."
+    },
+    {
+      "registry_id": "coconino-county-permits",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/Rlvx5g8pKeK13apH/arcgis/rest/services/County_Permits/FeatureServer/0",
+      "dataset_url": "https://www.coconino.az.gov/168/Community-Development",
+      "jurisdiction": "Coconino County, Arizona",
+      "coverage": [
+        {
+          "state": "AZ",
+          "county": "Coconino"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PermitTypeDescr",
+          "StreetAddress"
+        ],
+        "status_raw": "PermitStatusCode",
+        "type_source": "PermitDepartmentDescr",
+        "file_date": "SubmittedDate",
+        "address": [
+          "StreetAddress",
+          "City",
+          "State"
+        ],
+        "zip": "ZipCode",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "PermitApplicationNo"
+      },
+      "type_map": {
+        "Building": "Development",
+        "Planning and Zoning": "Development",
+        "Community Development": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "1. PENDING",
+          "1. PENDING - INCOMPLETE APPLICATION",
+          "2. UNDER REVIEW",
+          "2. RFAI - WAITING FOR CUSTOMER",
+          "2. ADMINISTRATIVELY COMPLETE - INITIAL REVIEW",
+          "2. RESUBMITTED - RESUB REVIEW",
+          "3. ACTION NEEDED - CONTRACTOR",
+          "4. REVISION AFTER ISSUE - RFAI"
+        ],
+        "approved": [
+          "5. ISSUED",
+          "5. RE-ISSUED",
+          "5. ISSUED - ENGINEERING",
+          "PERMIT ISSUED",
+          "CERTIFICATE ISSUED",
+          "4. READY TO ISSUE - REVIEW COMPLETE",
+          "4. READY TO ISSUE - FEES DUE",
+          "4. READY"
+        ],
+        "operating": [
+          "7. CLOSED",
+          "6. FINALED - ALL APPLICABLE INSPECTIONS COMPLETE",
+          "6. FINALED - NEEDS CUSTOMER'S FINAL DOCUMENTS",
+          "INSPECTION COMPLETE",
+          "SBP- FINALED OLD"
+        ],
+        "exclude": [
+          "CANCELLED",
+          "EXPIRED",
+          "0. NOT SUBMITTED",
+          "ABANDONED",
+          "ARCHIVED",
+          "DELETED",
+          "WITHDRAWN",
+          "DENIED",
+          "5. DENIED/DISAPPROVED",
+          "LAPSED",
+          "VOID",
+          "REVOKED"
+        ]
+      },
+      "extra_where": "PermitDepartmentDescr IN ('Building','Planning and Zoning','Community Development') AND PermitTypeCode NOT IN ('CD - SHORT TERM RENTAL REGISTRATION','CD - REQUEST FOR PUBLIC INFORMATION NON EQ','BD - CP - MECHANICAL','BD - CP - RE-ROOF','BD - CP - ELECTRIC','BD - CP - RENEWAL','BD - CP - REPAIR','BD - SPECIAL INSPECTION')",
+      "recency_days": 365,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-01: Coconino County's OWN AGO org (Rlvx5g8pKeK13apH, owner CoconinoCountyGIS), layer County_Permits/0, item modified 2026-07-31. 109,930 rows, esriGeometryPolygon (parcel footprints) -- pinned by the featurePoint() signed-area centroid path from the POLYGON/POLYLINE GEOMETRY PASS; return_centroid is deliberately NOT set (it is opt-in per entry, never derived from geometryType). BOTH enumerated vocabularies SUM EXACTLY TO 109,930: PermitDepartmentDescr (9) = Building 59821 + Environmental Quality 23998 + Planning and Zoning 14674 + Engineering Division 5103 + Community Development 4207 + Public Works 1671 + Sustainable Building Program 411 + TUNNEL FIRE 33 + Environmental Health 12; PermitStatusCode (33) = 7. CLOSED 70329 + CANCELLED 12667 + 5. ISSUED 11383 + EXPIRED 6896 + 0. NOT SUBMITTED 1702 + ABANDONED 1473 + ARCHIVED 944 + DELETED 833 + 6. FINALED - ALL APPLICABLE INSPECTIONS COMPLETE 690 + WITHDRAWN 562 + 2. RFAI - WAITING FOR CUSTOMER 426 + 5. RE-ISSUED 393 + DENIED 386 + 1. PENDING 219 + 2. ADMINISTRATIVELY COMPLETE - INITIAL REVIEW 211 + SBP- FINALED OLD 152 + 2. RESUBMITTED - RESUB REVIEW 104 + INSPECTION COMPLETE 97 + 4. READY TO ISSUE - REVIEW COMPLETE 91 + 1. PENDING - INCOMPLETE APPLICATION 81 + 2. UNDER REVIEW 72 + 4. READY TO ISSUE - FEES DUE 57 + 6. FINALED - NEEDS CUSTOMER'S FINAL DOCUMENTS 54 + 5. ISSUED - ENGINEERING 40 + 4. READY 35 + PERMIT ISSUED 16 + REVOKED 8 + 3. ACTION NEEDED - CONTRACTOR 3 + CERTIFICATE ISSUED 2 + 4. REVISION AFTER ISSUE - RFAI 1 + 5. DENIED/DISAPPROVED 1 + LAPSED 1 + VOID 1. The status list was enumerated TWICE, orderByFields n DESC and n ASC (the Mesa/Gilbert truncation defence), and all 33 values are bucketed exactly once. STATUS FIELD CHOICE IS LOAD-BEARING: PermitStatusDescr is FREE-TEXT PROSE ('Step 5 of 7: ISSUED - Permit has been issued. If applicable, scroll to the \"Inspections\" section...') -- the Douglas County NV rejection class. PermitStatusCode is the short coded twin and is what status_raw reads. FRESH: max(SubmittedDate) = 1785369600000 ms = 2026-07-28, three days before wiring. NATIVE ZIP: ZipCode is populated, so column_map.zip is used and NO spatial_zip_radius_mi is needed. In the entry's OWN scope (department whitelist + recency_days 365) the ZIP histogram is 86046 1059 + 86004 651 + 86005 612 + 86017 568 + 86001 407 + 86024 245 + 86336 146 + 86018 128 + 86036 107 + 85931 98 + 86015 80 + 86038 50 + '0' 30 + 86040 21 + 86047 18 + 86023 13 + null 10 + 86045 9 + 86022 5 + 86320 1 = 4,258 rows. 86336 (Sedona) and 85931 (Heber) are outside Coconino; the coverage gate keeps those records off non-Coconino pages structurally. The department whitelist keeps 78,702 of 109,930 rows -- it drops Environmental Quality (septic/well), Engineering Division (utility encroachment), Public Works, TUNNEL FIRE and Environmental Health, none of which are development filings. The PermitTypeCode NOT IN list additionally drops short-term-rental registrations, public-records requests, and the counter-permit trade classes (mechanical / re-roof / electric / renewal / repair) plus special inspections. NOTE, LOGGED AS A FOLLOW-UP RATHER THAN GUESSED: PermitTypeCode carries finer residential/commercial detail (BD - SINGLE FAMILY DWELLING - SFD 3829, BD - COM - MISCELLANEOUS 780, BD - COM 447 ...) but is a long tail that was NOT fully enumerated, so type_source reads PermitDepartmentDescr instead -- a COMPLETE vocabulary whose three whitelisted values all map to 'Development', the generic member of the closed TYPE_EXACT vocabulary in lib/map.js. That guarantees 0 unclassified by construction; refining it to per-type Residential/Commercial requires enumerating PermitTypeCode in full first. record_url is dataset precision on the county's Community Development page -- the layer carries no per-record portal URL column. TARGETS 25 DARK PAGES: every one of Coconino County's modelled ZIP pages currently has 0 development records, and Coconino was explicitly recorded in the UTAH/ARIZONA MAPS COVERAGE PASS as having no wireable first-party per-record permit source. FOUND BY THE SEARCH INVERSION (title-shape sweep on '(title:\"Permits\" OR title:\"Permit Activity\" OR title:\"Issued Permits\") AND type:\"Feature Service\"', sorted newest-modified)."
     }
   ],
   "ckan": [
