@@ -3438,3 +3438,37 @@ exactly the two declared counties, nothing else.
 > Lawrence KS, New Hanover NC, Cody WY, Mendocino CA, Ft. Pierce FL, Nashua NH — and **not one**
 > dataset from any of the five places searched. Hub v3 is a keyword index, not a geographic one;
 > discovery still has to go through per-portal DCAT or an `orgid:`-scoped search.
+
+### The 20,000 is a SILENT CAP, and three Saint Paul pages are hitting it
+
+Traced from the finding above. Every connector defaults `max_rows` to **20000** —
+`sources/arcgis.ts:527`, `carto.ts:273`, `ckan.ts:265`, `csv.ts:205`, `socrata.ts:466` — and the
+arcgis fetch ends at `arcgis.ts:586`:
+
+```ts
+return out.slice(0, maxRows);
+```
+
+**A truncated fetch emits nothing.** No quarantine entry, no report field, no log line — the
+report is byte-identical in shape to one that fetched everything. Confirmed live: exactly
+**3 pages cache-wide** sit at exactly 20,000 development records, all three Saint Paul, all three
+from a single source:
+
+| ZIP | source | records |
+|---|---|---|
+| 55103 | `saint-paul-approved-building-permits` | **20,000** |
+| 55104 | `saint-paul-approved-building-permits` | **20,000** |
+| 55105 | `saint-paul-approved-building-permits` | **20,000** |
+
+(80022's 19.61 MB is *not* truncation — it is 19,072 Adams County + 995 Aurora, two sources under
+the cap. Only the Saint Paul three are capped.)
+
+This is the repo's own **"no silent caps"** rule failing in production code, and the site's
+**"an instrument must prove it ran before its silence counts as evidence"** rule: a capped page and
+a complete page are indistinguishable from the output. Whatever the newest permits in those three
+Saint Paul ZIPs are, they are missing, and nothing says so.
+
+**NOT FIXED — a code change is gated.** The fix is small and additive (push a `report.quarantined`
+note, or a `truncated: true` flag, when `out.length` reaches `maxRows`) and has no behavioral
+surface, but nothing is currently blocked by it, so the unblocking exception does not apply.
+Recorded here with the file:line receipts so the fix is a five-minute job when approved.
