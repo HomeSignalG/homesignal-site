@@ -3603,3 +3603,33 @@ preserving both in full.
 > field on `main` — `git show origin/main:<file>` — before reporting it as shipped. This is the site's
 > own "an instrument must prove it ran before its silence counts as evidence" rule: a PR that merges
 > the wrong content is success-shaped output attesting to nothing.
+
+---
+
+## DEKALB → GA FULTON CONFIRMED LIVE — 14 dark Atlanta pages, 15,124 records (2026-08-01)
+
+Deployed as `get-address-report` **version 135**. All 14 materialize `quality=pass`:
+
+| ZIP | dev | | ZIP | dev |
+|---|---|---|---|---|
+| 30305 | 3,198 | | 30313 | 937 |
+| 30326 | 1,885 | | 30303 | 935 |
+| 30306 | 947 | | 30312 | 933 |
+| 30324 | 943 | | 30308 | 932 |
+| 30309 | 928 | | 30315 | 926 |
+| 30327 | 851 | | 30314 | 784 |
+| 30310 | 575 | | 30328 | 250 |
+
+Across all 111,482 `dekalb-county-building-permits` records cache-wide: **0 missing `record_url`,
+0 missing coordinates, 0 unclassified.** Gate proof: **GA/DeKalb 31 ZIPs + GA/Fulton 14 ZIPs** —
+exactly the two declared counties.
+
+### Correction: my size projection was wrong, in the safe direction
+I projected **1–8 MB** per Fulton page from a 21.6 % pass rate. Measured: **0.25–3.09 MB**
+(30305 3.09 · 30326 1.83 · 30306 0.92 · 30303 0.92 · 30328 0.25) — **every page under the 3.5 MB
+working ceiling**. The extrapolation was too pessimistic because the DeKalb ZIPs I sampled for the
+ratio sit in much denser permit territory than Atlanta's Fulton side; 30306 returned 947 records
+against 38,136 in its envelope (2.5 %), not the ~8,200 predicted.
+> **Standing answer: a per-page record count cannot be extrapolated from another ZIP's pass rate** —
+> `recency_days` and the status/type filters bite very differently across a metro. Project a range if
+> you must gate a decision on it, but measure before reporting it.
