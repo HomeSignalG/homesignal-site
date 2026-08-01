@@ -3439,6 +3439,51 @@ exactly the two declared counties, nothing else.
 > dataset from any of the five places searched. Hub v3 is a keyword index, not a geographic one;
 > discovery still has to go through per-portal DCAT or an `orgid:`-scoped search.
 
+---
+
+## 🔴 FINDING — THE DOCUMENTED ROW-SIZE CEILING IS STALE BY 3.3x, AND TEN PAGES SIT NEAR 20 MB (2026-08-01)
+
+Surfaced while sizing a Sioux Falls coverage extension. **Not fixed — reported with numbers,
+because the levers all change what residents see.**
+
+CLAUDE.md and `docs/source-registry.md` record the high-water mark as **"CLEVELAND — 44127 at
+5.98 MB / 5,511 sites"**, itself a correction of an earlier stale "3.5 MB / Minneapolis 55407"
+figure. Both are now wrong. Measured cache-wide today:
+
+| ZIP | dev records | transfer MB |
+|---|---|---|
+| 80022 (Commerce City CO) | 20,067 | **19.61** |
+| 55103 (Saint Paul MN) | **20,000** | 19.58 |
+| 57105 (Sioux Falls SD) | 19,521 | 19.58 |
+| 55104 (Saint Paul MN) | **20,000** | 19.57 |
+| 55105 (Saint Paul MN) | **20,000** | 19.57 |
+| 57104 (Sioux Falls SD) | 19,493 | 19.55 |
+| 80229 | 19,902 | 19.51 |
+| 80003 | 19,896 | 19.49 |
+| 80233 | 19,258 | 18.89 |
+| 57103 | 18,575 | 18.64 |
+
+**Measure the right number.** `pg_column_size(sites)` reports **1.93 MB** for these rows — TOAST
+compression — while `length(sites::text)`, which is what actually crosses the wire to a browser,
+is **19.61 MB**. The 3.5 MB working ceiling in the docs is a *transfer* figure, so `pg_column_size`
+is the wrong instrument and makes every row look fine.
+> **Standing answer: size a cached page with `length(sites::text)`, never `pg_column_size`.**
+
+**Three Saint Paul pages sit at EXACTLY 20,000 records.** An exact round number repeated across
+three independent ZIPs is a cap being hit, not a coincidence — so those pages are probably
+TRUNCATED, and truncation here is silent. Not chased this session; logged as the top follow-up.
+
+### Consequence for the Sioux Falls → SD Lincoln extension: probed, real, NOT wired
+Control 57104 = 141,748 in-envelope; 57108 **107,972**, 57064 **70,790**, 57032 **56,896**. Scaling
+by 57104's own filter ratio puts each new page at roughly **15–19 MB**. The extension is correct and
+would lift 3 dark pages, but shipping it adds three more rows to the class above rather than one page
+of value. **Wired the two safe extensions in the same pass (Durham → Orange, Albuquerque → Sandoval,
+which land near 2 MB) and left this one for a decision.**
+
+The levers are `spatial_zip_radius_mi` (changes what residents see), an `out_fields` projection
+(cheapest — trims per-record payload without dropping records), or a tighter `recency_days` (drops
+records). All three are gated, so none was applied.
+
 ### The 20,000 is a SILENT CAP, and three Saint Paul pages are hitting it
 
 Traced from the finding above. Every connector defaults `max_rows` to **20000** —
@@ -3513,3 +3558,78 @@ is the single highest-value entry to apply it to.
 Precondition grep: only `dekalb-county-building-permits` uses `dcgis.dekalbcountyga.gov`; GA Fulton's
 existing `johns-creek-building-permits` is a different host and a different layer covering north Fulton,
 so this is an extension, not a second registration.
+
+---
+
+## 🔴 PROCESS FAILURE — A `git reset --hard` SILENTLY DROPPED A MERGED-LOOKING CHANGE (2026-08-01)
+
+**PR #515 did not contain what its own PR body described.** It was opened for the
+Durham → NC Orange and Albuquerque → NM Sandoval coverage extensions; what actually merged was
+**only** the silent-cap QUEUE entry. The registry change and the row-size finding were never in it,
+and I reported both as shipped. They were not.
+
+**Mechanism, from the reflog:**
+
+```
+14:39:06  commit 27a956f  Extend durham -> NC Orange and albuquerque -> NM Sandoval coverage
+14:39:54  commit 81b1a63  FINDING: documented row-size ceiling is stale 3.3x
+14:40:49  reset: moving to origin/main        <-- discarded BOTH
+14:40:54  commit 7f96331  FINDING: the 20,000-row cap is silent
+```
+
+I had adopted `git fetch origin main && git reset --hard origin/main` as a habitual "sync before
+editing" prefix. Run on a feature branch that carries **unmerged** commits, it silently rewinds them,
+and the follow-up `git push --force-with-lease` then **succeeds** — the lease compares against my own
+previous push, not against the commits I had just destroyed. `--force-with-lease` protects against
+*other* writers; it is no protection at all against yourself.
+
+**How it surfaced — and why it would not have surfaced from the repo alone:** the go-live re-cache
+returned `development = 0` for all five Durham/Orange and Sandoval ZIPs while the same batch returned
+real counts for all 14 DeKalb/Fulton ZIPs, from responses timestamped **after** the deploy. The
+config-vs-behavior mismatch is what exposed it. Every repo-side signal looked green: CI passed, the PR
+merged, the branch was clean.
+
+**Recovered** by cherry-picking `27a956f` and `81b1a63` out of the reflog; the row-size section
+conflicted with the silent-cap section that had landed in the meantime and was merged by hand,
+preserving both in full.
+
+> **Standing answer — never `reset --hard` a branch that carries unpushed or unmerged work.**
+> To sync a feature branch, `git rebase origin/main` (which preserves your commits and *tells you*
+> about conflicts) or branch afresh from main and cherry-pick. Reserve `reset --hard origin/main` for
+> a branch whose work is already merged.
+>
+> **And verify the artifact, not the ceremony.** A green CI run and a successful merge attest that
+> *something* merged, not that *your change* merged. After merging a registry change, re-read the
+> field on `main` — `git show origin/main:<file>` — before reporting it as shipped. This is the site's
+> own "an instrument must prove it ran before its silence counts as evidence" rule: a PR that merges
+> the wrong content is success-shaped output attesting to nothing.
+
+---
+
+## DEKALB → GA FULTON CONFIRMED LIVE — 14 dark Atlanta pages, 15,124 records (2026-08-01)
+
+Deployed as `get-address-report` **version 135**. All 14 materialize `quality=pass`:
+
+| ZIP | dev | | ZIP | dev |
+|---|---|---|---|---|
+| 30305 | 3,198 | | 30313 | 937 |
+| 30326 | 1,885 | | 30303 | 935 |
+| 30306 | 947 | | 30312 | 933 |
+| 30324 | 943 | | 30308 | 932 |
+| 30309 | 928 | | 30315 | 926 |
+| 30327 | 851 | | 30314 | 784 |
+| 30310 | 575 | | 30328 | 250 |
+
+Across all 111,482 `dekalb-county-building-permits` records cache-wide: **0 missing `record_url`,
+0 missing coordinates, 0 unclassified.** Gate proof: **GA/DeKalb 31 ZIPs + GA/Fulton 14 ZIPs** —
+exactly the two declared counties.
+
+### Correction: my size projection was wrong, in the safe direction
+I projected **1–8 MB** per Fulton page from a 21.6 % pass rate. Measured: **0.25–3.09 MB**
+(30305 3.09 · 30326 1.83 · 30306 0.92 · 30303 0.92 · 30328 0.25) — **every page under the 3.5 MB
+working ceiling**. The extrapolation was too pessimistic because the DeKalb ZIPs I sampled for the
+ratio sit in much denser permit territory than Atlanta's Fulton side; 30306 returned 947 records
+against 38,136 in its envelope (2.5 %), not the ~8,200 predicted.
+> **Standing answer: a per-page record count cannot be extrapolated from another ZIP's pass rate** —
+> `recency_days` and the status/type filters bite very differently across a metro. Project a range if
+> you must gate a decision on it, but measure before reporting it.

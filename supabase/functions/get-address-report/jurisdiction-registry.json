@@ -6591,6 +6591,10 @@
         {
           "state": "NC",
           "county": "Durham"
+        },
+        {
+          "state": "NC",
+          "county": "Orange"
         }
       ],
       "column_map": {
@@ -8774,6 +8778,10 @@
         {
           "state": "NM",
           "county": "Bernalillo"
+        },
+        {
+          "state": "NM",
+          "county": "Sandoval"
         }
       ],
       "column_map": {
