@@ -4110,3 +4110,38 @@ already enumerated above.
 > first-party, well-formed and complete and still be worth nothing, because every ZIP it covers is
 > already lit. Check which *dark* pages a candidate can actually reach **before** enumerating its
 > vocabularies, not after.
+
+---
+
+## CLOSING VERIFICATION — all 108 pages re-checked as one set (2026-08-01)
+
+Per-batch checks are not the same as checking the whole set once at the end, so here is the
+consolidated audit of every page this session lifted, run against the live cache after the last
+deploy and the `adams` revert:
+
+| check | result |
+|---|---|
+| pages checked | **108** |
+| rows missing from `development_reports` | **0** |
+| still carrying ≥1 sourced record | **108** |
+| gone dark again | **0** |
+| sourced records across the set | **39,057** |
+| missing `record_url` | **0** |
+| `scope:"point"` with no coordinates | **0** |
+| unclassified `use_type` | **0** |
+| largest page | **3.33 MB** |
+
+The largest page is now **3.33 MB** — under the 3.5 MB working ceiling, and a long way from the
+19.65 MB I briefly created and reverted. No page from this session is in the heavy class.
+
+**`verify-development` status.** Run **179** (2026-08-01 14:45Z, scheduled) passed — but it predates
+the last three batches (Arlington/Wyandotte/Delaware/Campbell, NOLA/Ramsey/Gwinnett/Lake, Jefferson
+CO). I dispatched run **180** (`30721217869`, head `6fd519d`) so the live browser check covers the
+complete set. It walks every cached ZIP and historically runs ~3 h, so it was **still in progress when
+this entry was written** — recorded as in-flight, not as a pass. Check that run id before treating the
+session's pages as browser-verified.
+
+That distinction matters here specifically: the earlier session note about this verifier ("390 lines
+over 165 ZIPs… three consecutive ~3 h failures") described a red baseline on `main`, and run 179 shows
+it has since recovered. Neither fact tells us anything about the last three batches, which is why 180
+was dispatched rather than assumed.
