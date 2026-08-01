@@ -3121,3 +3121,56 @@ Combined with the already-closed CT statewide route (the DECD layer is municipal
 
 **Sweep status: paged to result 400 of 1,064.** The yield curve is clear — page 1 produced Allentown,
 pages 3–4 produced zero wireable sources and one instructive lookalike.
+
+---
+
+## ⚠️ NAPERVILLE IS WIRED BUT NOT YET PRODUCING — `WORKER_RESOURCE_LIMIT`, and it is MY config's fault
+
+`naperville-building-permits` merged (#502) and deployed (**v127**), but the ZIP pages still show
+**0 records**. Two diagnostic errors of my own were made and corrected before the real cause surfaced
+— both worth recording, because each would have sent the next session down a wrong path.
+
+### Mis-step 1: I nearly declared an engine bug from a re-cache that never ran
+
+The first check showed 0 Naperville sites and I began hunting a connector fault. **The refresh
+timestamps disproved it:** 60540/60563/60565 were last written by the **18:00 cron**, 60564 at 14:36,
+60566/60567 by the **00:15 cron** — *none* at ~23:34 when I fired them. My six requests never landed,
+and the `dev_refresh_collect()` that returned **188** was collecting the **cron's** responses, not mine.
+
+**Standing answer: `dev_refresh_collect()` returning a large number is NOT evidence YOUR fire landed.**
+It counts whatever is in `net._http_response`, including another writer's. **Verify
+`development_reports.refreshed_at` actually moved past the moment you fired** — that is the only proof.
+
+### Mis-step 2: the debug call timed out and told me nothing
+
+A `debug` invocation returned `timed_out: true` with `DNS time: 120000ms`. Zero information about the
+entry. Recorded only so nobody mistakes a timed-out probe for a negative result.
+
+### THE ACTUAL CAUSE — HTTP 546 `WORKER_RESOURCE_LIMIT`
+
+A single-ZIP re-fire at a 180 s timeout returned:
+
+```
+{"code":"WORKER_RESOURCE_LIMIT","message":"Function failed due to not having enough compute resources"}
+```
+
+**Why: this is a GEOMETRY-LESS table, so every emitted row needs its own Census geocode call** — and
+the entry's scope for one ZIP is **2,490 rows** (`POSTALCODE='60540'` + the 5-type `extra_where` +
+`recency_days: 1095`, measured live). Two thousand geocodes in one report blows the worker budget.
+It is the documented CPU-hazard class (Miami's `outFields=*`, San Diego's naive `parseCsv`), reached
+here through geocoding volume rather than payload size.
+
+### 🔑 NEW STANDING ANSWER — geometry-less entries have a HARD per-ZIP volume ceiling
+
+A layer with **source coordinates** costs ~nothing per row. A **geometry-less** layer costs **one
+geocode per row**, so its per-ZIP row count is a *compute budget*, not just a size preference.
+**Before wiring any geometry-less table, measure rows-per-ZIP in the connector's exact scope** — the
+same `extra_where`, the same `recency_days`. `boulder-construction-permits` works precisely because
+its per-ZIP volume is small; Naperville at ~2,490/ZIP does not.
+
+**Status: the entry is live in the registry but emitting nothing — it is inert, not wrong.** No page
+regressed and no fabricated data exists; the invariants are trivially satisfied because there are no
+records. The fix is config-only (narrow `extra_where` to the 4 genuine construction types, dropping
+`RESIDENTIAL: OTHER IMPROVEMENTS` — 7,660 rows of minor work, the same class the trades precedent
+drops — and tighten `recency_days` to 365). Measurement of the tightened scope is in flight; the
+entry will not be claimed as producing until a page actually renders records.
