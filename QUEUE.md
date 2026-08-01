@@ -3881,3 +3881,69 @@ agent-initiated write.
 > **Standing answer — a coverage REVERT does not take effect on already-cached pages for up to 7 days.**
 > Wiring is fast; unwiring is slow. Budget for that asymmetry before shipping an extension you are not
 > sure about, because the cheap-to-add change is not cheap to withdraw.
+
+---
+
+## 🔴 THE NIGHTLY SOURCE-MONITOR HAS BEEN DEAD SINCE 31 JULY — root cause found (2026-08-01)
+
+`source-monitor.yml` is the repo's own instrument for the work I have been doing by hand all session:
+it re-probes every rejected source nightly, walks first-party catalogs for facility-floor
+jurisdictions, and **auto-wires** anything that passes the fail-closed gate. **Its last two scheduled
+runs both failed**, and nothing surfaced that except the Actions tab.
+
+| run | date | event | result |
+|---|---|---|---|
+| 31 | 2026-08-01 09:05Z | schedule | **failure** |
+| 30 | 2026-07-31 09:44Z | schedule | **failure** |
+| 24 | 2026-07-30 09:29Z | schedule | success |
+
+**It never reaches the monitor.** The failing step is the one *before* it:
+
+```
+Live scoreboard (ranked work list) → node scripts/live-scoreboard.mjs
+live-scoreboard failed: dev_zip_source_ids failed: HTTP 500
+  {"code":"57014","message":"canceling statement due to statement timeout"}
+##[error]Process completed with exit code 1.
+```
+
+`bash -e` fails the step, the job aborts, and **the reprobe, the discovery walk, the auto-wire and the
+report never run at all.**
+
+### Root cause — measured, not guessed
+
+`scripts/live-scoreboard.mjs:104` requests `p_limit: 5000`. There are only **4,228** distinct
+development ZIPs in `app_projects` (2,684,556 development rows of 2,901,975 total). **The limit can
+never be reached**, so `dev_zip_source_ids`'s `GroupAggregate` cannot stop early and scans the whole
+index. Measured with `EXPLAIN ANALYZE`:
+
+| `limit` | rows scanned | execution time |
+|---|---|---|
+| 1000 | 207,827 | **1,073 ms** |
+| 5000 | **2,684,556** | **14,806 ms** ← past the PostgREST statement timeout |
+
+At 1000 the incremental sort stops as soon as the limit fills; at 5000 it degenerates into a full
+scan. This is growth-triggered — the same class as the 57014 that forced the `verify-development`
+pagination fix (PR #221) — and my own 108 new pages this session pushed it over.
+
+### The fix is one value, and it has a trap
+
+`p_limit: 5000` → `1000`. **But the loop's terminator is the same literal in a second place**
+(`scripts/live-scoreboard.mjs:115`, `if (page.length < 5000) break;`). Change only the request and the
+first 1,000-row page satisfies `1000 < 5000` and **breaks immediately** — the scoreboard would read
+1,000 of 4,228 ZIPs and report a plausible, wrong number. The existing assertions would **not** catch
+it: `srcByZip.size` and `withRecords` would both be non-zero. So the fix is *one named constant used
+in both places*, not two edits of the same digit.
+
+**NOT FIXED — a code change is gated**, and nothing I was asked to do is blocked by it (I did the
+monitor's job by hand instead). Recorded with file:line, the measurement and the trap so it is a
+five-minute job when approved.
+
+⚠️ **Two things I logged this session were logged to a list nobody is reading:** Snohomish WA
+(stalled, "→ nightly reprobe list") and the KCMO layer's `max(USER_Issue_Date) = 2025-12-31` watch item.
+The reprobe list is `scripts/source-monitor-targets.json` and it is only consulted by this dead job.
+
+> **Standing answer — the step that guards an instrument can kill the instrument.** The scoreboard step
+> is deliberately not `continue-on-error`, with a good comment explaining why (a silent pass was worse).
+> It succeeded at being loud, and took the auto-wire path down with it. When a hardened pre-step gates
+> a job whose real work is independent of it, verify the *job* still runs — a green assertion that
+> aborts everything downstream is its own kind of silent failure.
