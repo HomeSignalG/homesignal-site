@@ -3850,3 +3850,34 @@ the cost of one page. 80124 (Douglas, 342) and 19311 (Chester, 15) are unaffecte
 Earlier today I recorded that "no live source is currently hitting the cap"; **that is now false — I
 made it false**, briefly, and the revert removes it again. The cap fix remains latent hardening, but
 this is the first live proof that a real source can hit it and say nothing.
+
+### Post-revert measurement — and a correction to my own revert PR
+
+Measured after the revert deployed (v140):
+
+| ZIP | before revert | after revert |
+|---|---|---|
+| 80001 | 20,041 / **19.65 MB** | **128 / 0.15 MB** |
+| 80002 | 16,571 / **16.26 MB** | **77 / 0.10 MB** |
+| 80004 | 6,518 | 1 |
+| 80123 · 80127 | 7 · 3 | 7 · 3 |
+
+**My revert PR predicted 80001/80002 would land near 4.7 / 3.0 MB. They landed at 0.15 / 0.10 MB.**
+I had again quoted Denver's *envelope* counts (4,829 / 3,117) as if they were stored counts; Denver's
+own filters take 80001 from 4,829 candidates to **128** records. Fourth instance today of the same
+mistake, and this one is worth naming precisely: **I keep reaching for the envelope number because it
+is the one I already have.** The stored number requires a deploy and a re-cache, so the temptation is
+to publish the cheap figure. That is exactly when it must be labelled a candidate count, not a result.
+
+Batch 4 final, honest: **7 pages, 573 records** — Jefferson CO 5 (80001 128 · 80002 77 · 80123 7 ·
+80127 3 · 80004 1) · Douglas CO 1 (80124 342) · Chester PA 1 (19311 15).
+
+⚠️ **80005 still shows 9,194 records / 9.03 MB from the reverted Adams entry**, and will for up to a
+week. Same mechanism as the Saint Paul pages: `dev_refresh_collect` refuses the now-zero response while
+the cached row is under 7 days old, and the refusal does not bump `refreshed_at`. It self-heals around
+**8 August**. Not overridden — same reasoning as before, the guard exists to stop exactly this kind of
+agent-initiated write.
+
+> **Standing answer — a coverage REVERT does not take effect on already-cached pages for up to 7 days.**
+> Wiring is fast; unwiring is slow. Budget for that asymmetry before shipping an extension you are not
+> sure about, because the cheap-to-add change is not cheap to withdraw.
