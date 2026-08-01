@@ -3677,3 +3677,41 @@ Every one verified with a positive control before wiring, a gate proof after, an
 `0 missing record_url / 0 missing coordinates / 0 unclassified` across the affected sources.
 One wire was reverted (`salem-or-structure-permits`, a duplicate) and one declined on size
 (Sioux Falls → SD Lincoln).
+
+---
+
+## FOUR COVERAGE EXTENSIONS CONFIRMED LIVE — 30 dark pages, 3,407 records (2026-08-01)
+
+Deployed as `get-address-report` **version 137**. All materialize `quality=pass`.
+
+**`fairfax-recent-building-permits` → VA Arlington — 11 of 11:** 22213 432 · 22205 311 · 22207 205 ·
+22203 153 · 22204 81 · 22206 68 · 22201 57 · 22214 25 · 22211 20 · 22209 12 · 22202 1.
+**`overland-park-building-permits` → KS Wyandotte — 8 of 8:** 66103 725 · 66106 724 · 66105 223 ·
+66160 137 · 66118 78 · 66102 18 · 66112 18 · 66101 9.
+**`kenton-county-devtracking-permits` → KY Campbell — 7 of 7:** 41071 21 · 41075 18 · 41073 15 ·
+41076 15 · 41074 13 · 41001 1 · 41085 1.
+**`new-castle-county-permits` → PA Delaware — 4 of 5:** 19017 8 · 19014 7 · 19015 6 · 19013 5.
+
+Invariants across all four sources — **fairfax 19,013 records / 58 ZIPs · overland-park 165,190 / 38 ·
+new-castle 7,881 / 33 · kenton 338 / 15 — 0 missing `record_url`, 0 missing coordinates,
+0 unclassified.** Gate proof, each exactly its two declared counties: Fairfax 47 + Arlington 11 ·
+Johnson 30 + Wyandotte 8 · New Castle 29 + Delaware PA 4 · Kenton 8 + Campbell 7.
+
+**19022 (Brookhaven PA) probed at 7 in-envelope and materialized 0** — every candidate was dropped by
+the entry's own status/type/recency filters. It stays on the facilities floor. That is the honest
+outcome, and it is also the second demonstration today that **an envelope count is an upper bound, not
+a prediction**: PA Delaware's five hits filtered from 1,075 / 785 / 749 / 563 / 7 down to 8 / 7 / 6 /
+5 / 0. Envelope counts size a *candidate set*; only the live engine reports what a page will hold.
+
+### Rejections with receipts — both killed by their own controls
+- **`butler-county-ks-permits` → KS Sedgwick.** Control ZIP 66840 (inside Butler, already live)
+  returned **1** record. The source is essentially empty near the county line, so the two 1-record
+  hits in Sedgwick are noise, not coverage. *A control that comes back tiny invalidates the whole
+  probe set — it means the layer has nothing there to find, not that the target is dark.*
+- **`pierce-county-pals-permits` → WA King.** Control 98303 = **6,830** (healthy), yet only 1 of 6
+  probed King ZIPs had anything (98003, 50). Here the control being strong is exactly what makes the
+  zeros trustworthy: the query works, King County simply sits outside Pierce's permit footprint.
+
+### Scope note
+`fairfax` has a second entry, `fairfax-active-site-construction`, flagged by the same ranking. It was
+**not probed and not extended** — only the layer actually verified was wired.
