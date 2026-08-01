@@ -3768,3 +3768,44 @@ incident.**
 > Cached rows outlive the config that produced them. Before treating cached records as evidence about
 > current behaviour, grep the registry for that `registry_id` and check the row's `refreshed_at`. I
 > spent a finding on a source that had been deliberately deleted four days earlier.
+
+---
+
+## BATCH 3 CONFIRMED LIVE — 11 pages, 2,839 records (2026-08-01)
+
+Deployed as `get-address-report` **version 138**. All materialize `quality=pass`.
+
+**`new-orleans-permits` → LA Jefferson — 5 of 5:** 70053 Gretna 335 · 70005 Metairie 265 ·
+70002 42 · 70056 36 · 70001 23.
+**`minneapolis-ccs-permits` → MN Ramsey — 3 of 3:** 55116 639 · 55108 514 · 55112 3.
+**`dekalb-county-building-permits` → GA Gwinnett — 2 of 2:** 30039 882 · 30047 99.
+**`chicago-building-permits` → IN Lake — 1 of 2:** 46327 Hammond **1**.
+
+Gate proof, each exactly its declared counties: Orleans 20 + Jefferson 5 · Hennepin 28 + Ramsey 4 ·
+DeKalb 31 + Fulton 14 + Gwinnett 2 · Cook 131 + DuPage 2 + Lake IN 1. Across all 258,632 records from
+these four sources: **0 missing `record_url`, 0 missing coordinates, 0 unclassified.**
+
+⚠️ **Chicago → IN Lake is honestly near-worthless and is reported as such.** 46327 probed at **1,972**
+in-envelope and materialized **1 record**; 46320 probed at 9 and materialized **0**. Chicago's
+`extra_where` whitelist (NEW CONSTRUCTION / RENOVATION-ALTERATION / WRECKING-DEMOLITION / PORCH) plus
+its 365-day window removes essentially everything that far outside the city. The one record is real and
+carries a `record_url`, so the entry is kept rather than reverted — but it lifts one page by one row,
+and that is the whole of it. **Third demonstration today that an envelope count is an upper bound:
+1,972 → 1.**
+
+Minneapolis → Ramsey is the opposite case and matters more than its 3 pages suggest: Ramsey has been on
+the facilities floor since Saint Paul was retired, so this is the only permit source those pages have.
+
+### Session total — coverage work, all config-only
+
+**101 dark pages lifted, 38,515 records**, across `kcmo` (17) · `coconino` (15) · `bend` (4) ·
+`huntsville` (5) · `dekalb`→Fulton (14) + Gwinnett (2) · `durham` (3) · `albuquerque` (2) ·
+`fairfax`→Arlington (11) · `overland-park`→Wyandotte (8) · `kenton`→Campbell (7) ·
+`new-castle`→Delaware PA (4) · `new-orleans`→Jefferson (5) · `minneapolis`→Ramsey (3) ·
+`chicago`→Lake IN (1).
+
+Every one carries a positive control before wiring and a gate proof after. **Reverted:** 1 duplicate
+(`salem-or-structure-permits`). **Declined on size:** Sioux Falls → SD Lincoln. **Rejected with
+receipts:** Cass MO · Birmingham AL · Alameda CA · St. Louis County MO · Oakland County MI ·
+Oklahoma County OK · Sedgwick KS (twice — portal, then `butler` control) · Lancaster PA · Snohomish WA ·
+Pierce → King WA · DeKalb → Cobb GA.
