@@ -4182,6 +4182,10 @@
         {
           "state": "VA",
           "county": "Fairfax"
+        },
+        {
+          "state": "VA",
+          "county": "Arlington"
         }
       ],
       "column_map": {
@@ -7169,6 +7173,10 @@
         {
           "state": "KY",
           "county": "Kenton"
+        },
+        {
+          "state": "KY",
+          "county": "Campbell"
         }
       ],
       "column_map": {
@@ -7497,6 +7505,10 @@
         {
           "state": "KS",
           "county": "Johnson"
+        },
+        {
+          "state": "KS",
+          "county": "Wyandotte"
         }
       ],
       "column_map": {
@@ -8219,6 +8231,10 @@
         {
           "state": "DE",
           "county": "New Castle"
+        },
+        {
+          "state": "PA",
+          "county": "Delaware"
         }
       ],
       "column_map": {
