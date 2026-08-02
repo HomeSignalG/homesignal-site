@@ -4929,16 +4929,34 @@ re-check and pass; flag unchanged → still fail). Until then, treat a green
 
 ### 27 of 31 workflows had NO timeout — every one inheriting GitHub's 6-hour default
 
-Found while chasing a hung `unit` job on this branch. Only 4 workflows carried `timeout-minutes`
-(`unit-tests`, `verify-geocodes`, `gate2b-full-inventory-parity`, `load-openaddresses`); the other
-**27 were unbounded**, which is precisely the shape that let `verify-geocodes` burn **11 consecutive
-6-hour cancellations** on an account previously halted at $0. An unbounded job does not fail — it bills.
+⚠️ **CORRECTION, SAME SESSION: THE "HANG" THAT TRIGGERED THIS SWEEP NEVER HAPPENED.** An earlier version
+of this section justified the work with "three consecutive `unit` attempts on the same commit hung,
+twice in `Install playwright`". That was **wrong, and the error was mine, not CI's.** Measured from the
+API afterwards:
 
-**The hang that surfaced it is real and reproducible-ish:** three consecutive `unit` attempts on the
-same commit hung, twice in `Install playwright` (a network browser download) and once in the suite step,
-while a **SIBLING run on the identical commit passed**. Locally the full 75-file suite runs in 33 s and
-the two browser-backed suites each exit 0 alone. Same code, same minute, one hung and one passed — that
-is runner flakiness, not a code defect, and unbounded each of those would have cost 6 h.
+| run | conclusion | duration |
+|---|---|---|
+| 30770523717 | success | **2.3 min** |
+| 30770516378 | cancelled **by me at 1.8 min** | 1.8 min |
+| 30770693405 | success | **2.4 min** |
+
+Every run was normal. I was reading elapsed time by counting my own background `sleep` polls as though
+wall-clock had advanced with them, concluded jobs were stuck for 20-50 minutes, **cancelled a healthy
+job 1.8 minutes in**, pushed an empty "re-trigger CI" commit, and wrote the hang into the record. The
+same miscount produced the earlier "`verify-communities` has been running ~50 minutes" claim - its real
+duration was 22m32s. Correcting the symptom the first time without finding the cause let me repeat it
+with more consequence.
+
+**Standing answer: never infer elapsed time from how much waiting it FEELS like. Compute it -
+`now - started_at` from the API - and quote both timestamps.** A cancelled healthy job is a real cost:
+it destroys a valid check and invites an unnecessary push.
+
+**The sweep itself stands on its own evidence and is unaffected**, because the finding was never about
+the hang: it is a static property of the workflow files. Only 4 of 31 carried `timeout-minutes`
+(`unit-tests`, `verify-geocodes`, `gate2b-full-inventory-parity`, `load-openaddresses`); the other **27
+were unbounded**, inheriting GitHub's 6-hour default. That is the same shape that let `verify-geocodes`
+burn **11 consecutive 6-hour cancellations** on an account previously halted at $0 - a real, recorded
+incident, unlike the one I imagined. An unbounded job does not fail; it bills.
 
 **Every bound is sized from the workflow's OWN measured maximum successful run**, not guessed:
 
@@ -4946,14 +4964,14 @@ is runner flakiness, not a code defect, and unbounded each of those would have c
 |---|---|---|
 | `verify-development` | 251.6 min | 330 |
 | `verify-communities` | 42.8 min | 120 |
-| `source-monitor` · `spot-check` · `verify-representative-zips` | 5.9–11.6 min | 45 |
-| 16 fast verifiers / helpers | ≤ 4.1 min | 15 |
+| `source-monitor` / `spot-check` / `verify-representative-zips` | 5.9-11.6 min | 45 |
+| 16 fast verifiers / helpers | <= 4.1 min | 15 |
 | 7 dispatch-only gov-feed helpers | **no successful run on record** | 30 (conservative) |
 
 The 7 with no measurement are named as such rather than given a number pretending to be derived.
 `unit-tests` also gained a bound (15 min against a ~2.5 min measured max). Verified by parsing all 31
 workflow files: **0 jobs still unbounded, 0 parse errors.**
 
-⚠️ **`verify-development`'s 330 is a bound, not headroom** — it sits above the 251.6 min measured max on
+⚠️ **`verify-development`'s 330 is a bound, not headroom** - it sits above the 251.6 min measured max on
 purpose, but the job is already 4.2 h against what was a 6 h ceiling and grows linearly with the cache.
-The bounding report above is what actually fixes that; this only stops a hang from costing 6 h.
+The bounding report above is what actually fixes that; this only stops a genuine hang from costing 6 h.
