@@ -3275,6 +3275,10 @@
         {
           "state": "OH",
           "county": "Franklin"
+        },
+        {
+          "state": "OH",
+          "county": "Delaware"
         }
       ],
       "column_map": {
@@ -3416,6 +3420,18 @@
         {
           "state": "TN",
           "county": "Davidson"
+        },
+        {
+          "state": "TN",
+          "county": "Williamson"
+        },
+        {
+          "state": "TN",
+          "county": "Wilson"
+        },
+        {
+          "state": "TN",
+          "county": "Rutherford"
         }
       ],
       "column_map": {
@@ -8169,6 +8185,10 @@
         {
           "state": "WA",
           "county": "Spokane"
+        },
+        {
+          "state": "WA",
+          "county": "Stevens"
         }
       ],
       "column_map": {
@@ -10057,6 +10077,10 @@
         {
           "state": "AZ",
           "county": "Coconino"
+        },
+        {
+          "state": "AZ",
+          "county": "Yavapai"
         }
       ],
       "column_map": {
