@@ -4569,3 +4569,19 @@ probing that entry.**
 Also logged: the first re-cache hit **6 × 503 BOOT_ERROR** + 1 timeout of 72 fires, four minutes after
 a deploy. Those pages looked dark but were pending (`last_refresh_attempt_at` advanced,
 `refreshed_at` did not). Re-firing recovered them. Check fire/collect counts before calling a page dark.
+
+### `verify-development` PASSED — 4 h 10 m, and the margin is the thing to watch
+
+Run `30721217869` (dispatched 2026-08-01 22:25Z) completed **success** at 2026-08-02 02:35:16Z.
+I had flagged it as "in-flight, not a pass" and said it would join the broken-workflow list if it
+reached GitHub's 6-hour job cap. It did not — so the health board stays at **6 of 11 broken**, and
+`verify-development` is **not** one of them.
+
+But 4 h 10 m against a 6 h hard cap is a **70% margin consumed**, and the run walks every cached
+`development_reports` row in a real browser — so its duration grows with the cache, which this session
+alone grew by ~150 newly-lit pages across three passes. `verify-geocodes` already dies at exactly 6 h
+(11 consecutive cancellations). This is the same wall, and `verify-development` is now visibly on
+approach to it.
+
+Not fixed — sharding or budgeting that job is a workflow change (gated). Logged with the number so the
+next session can see the trend rather than rediscover the cliff.
