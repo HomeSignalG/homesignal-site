@@ -53,13 +53,24 @@ async function rest(path) {
 // A single transient Playwright nav timeout among thousands of materialized pages must
 // not fail the whole run — retry once at a longer budget before giving up (mirrors the
 // same guard in verify-development.mjs).
+//
+// NOT `networkidle` (changed 2026-08-02). This job went red daily with
+// "page.goto: Timeout 45000ms exceeded" on many community.html?zip= URLs — both the 30s
+// attempt AND the 45s retry, so not transient. `networkidle` waits for a 500ms quiet window
+// across the WHOLE page; a community page issues several Supabase reads and runs 8 of these
+// concurrently, so as the DB grew the network stopped going quiet inside the budget.
+//
+// It was also redundant. readPage() already waits on the precise readiness signal — #commPage
+// having rendered text, which by construction only happens AFTER the async data reads resolve.
+// Waiting for the document, then for the thing we actually need, is both faster and correct;
+// a global quiet-network heuristic is neither.
 async function gotoWithRetry(page, target) {
   try {
-    await page.goto(target, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30000 });
   } catch (e) {
     if (!String(e && e.message).includes('Timeout')) throw e;
     console.log(`  ~ nav timeout, retrying once: ${target}`);
-    await page.goto(target, { waitUntil: 'networkidle', timeout: 45000 });
+    await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 45000 });
   }
 }
 
@@ -69,10 +80,17 @@ async function readPage(page, zip) {
   const target = `${SITE_BASE}/community.html?zip=${zip}`;
   await gotoWithRetry(page, target);
   // The loader renders into #commPage after the async data reads resolve. Wait for content.
-  await page.waitForFunction(() => {
-    const p = document.getElementById('commPage');
-    return !!(p && p.textContent && p.textContent.trim().length > 0);
-  }, { timeout: 15000 });
+  // This is now the ONLY readiness gate (goto stops at domcontentloaded), so it carries the
+  // budget the nav used to hold. A failure here is also a far better diagnostic than an opaque
+  // nav timeout: it says the page loaded but never rendered, naming the ZIP.
+  try {
+    await page.waitForFunction(() => {
+      const p = document.getElementById('commPage');
+      return !!(p && p.textContent && p.textContent.trim().length > 0);
+    }, { timeout: 45000 });
+  } catch (e) {
+    throw new Error(`community.html?zip=${zip}: #commPage never rendered within 45s (${String(e && e.message).slice(0, 80)})`);
+  }
   return page.evaluate(() => {
     const p = document.getElementById('commPage');
     const robots = (document.getElementById('robots-meta') || {}).getAttribute
