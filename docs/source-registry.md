@@ -3982,3 +3982,65 @@ diagnosis rather than re-deriving it, and so nobody "fixes" it by widening the c
 94952 (Petaluma) returns **8** records in the entry's own scope, against a control of 19 on 94901, a
 real Marin ZIP. Petaluma is Sonoma's, Marin County has no permit jurisdiction there, and 8 rows is the
 mailing-address noise class.
+
+## 🔴 DEFECT: `nyc-dob-permit-issuance` HAS NEVER PLACED A RECORD — its recency clause cannot match
+
+Found while probing the Socrata native-ZIP entries. **This entry is wired across all five NYC boroughs,
+is documented as a live New York source, and places 0 records cache-wide.**
+
+The cause is a type mismatch that fails silently. `sources/socrata.ts::buildWhere` emits
+`${dateCol} > '${cutoff}T00:00:00'` from `recency_days`, but this dataset's `issuance_date` is **text in
+MM/DD/YYYY**, so the comparison is lexicographic and every value begins with `0` or `1` — always less
+than `'2025-…'`. Nothing can ever match. Live proof, three counts on ZIP 11214:
+
+| query | rows |
+|---|---|
+| `upper(zip_code)='11214'` (control) | **23,761** |
+| `… AND issuance_date > '2025-08-02T00:00:00'` (the connector's exact clause) | **0** |
+| `… AND issuance_date > '08/02/2025'` (string compare in the column's own format) | 9,893 |
+
+and the cache agrees: `nyc-dobnow-approved-permits` holds 62,388 records over 213 pages while
+`nyc-dob-permit-issuance` holds **none**.
+
+**Consequence for a recorded coverage claim.** The NEW YORK WIRE PASS credits both entries with
+"210 of 764 ZIPs dev-backed (27%), 66,006 dev records", and describes this dataset as *"still updates
+daily for pre-DOB-NOW jobs"*. In fact **every one of those records comes from DOB NOW**, and the entire
+BIS-legacy corpus — the pre-2021 jobs DOB NOW does not carry — has never reached a page.
+
+**Audited for blast radius: it is ONE entry, not a class.** All 19 Socrata entries carrying
+`recency_days` were sampled for their `file_date` value format. 18 return ISO
+(`2025-01-30T00:00:00.000`); only `nyc-dob-permit-issuance` returns `06/17/2020`. Three first-row nulls
+(`nyc-dobnow`, both Seattle entries) were **re-probed with `IS NOT NULL` rather than assumed**, and all
+three place records in production (62,388 / 5,843 / 331), so their columns work.
+
+**NOT FIXED — gated.** The fix changes what residents see (200+ NYC pages gain records) and the right
+form is a real decision, not an obvious edit: a string compare in MM/DD/YYYY is *month-major* and
+therefore also wrong, so the options are (a) find a genuine timestamp column on the dataset, (b) express
+the window in `extra_where` with a SoQL date conversion, or (c) drop `recency_days` and accept the
+volume (11214 alone holds 23,761 lifetime rows, so page size needs the size-oracle check first). Logged
+with receipts so the decision can be made rather than re-derived.
+
+### Wired: `philadelphia-li-permits` → PA Montgomery + PA Delaware
+
+The Philadelphia twin of the 10470 problem — and unlike 10470, this one is **safe to wire**, which is
+why the two are recorded together. ZIPs **19118** (Chestnut Hill), **19128** (Roxborough) and **19153**
+(Eastwick) are physically Philadelphia but modelled under Montgomery/Delaware by the Census crosswalk;
+this repo already records that (*"19118/19128 stay Montgomery, 19153 Delaware — Census crosswalk,
+most-specific wins"*).
+
+The difference from the NYC case is measured, not assumed: **of every ZIP in Montgomery, Delaware, Bucks
+and Chester counties, exactly three appear in Philadelphia's L&I dataset — and all three are those
+Philadelphia neighbourhoods.** There is no Pelham-Manor-equivalent, so licensing those two counties
+licenses the three real ZIPs and nothing else.
+
+In the entry's own scope (`permittype`/`typeofwork` whitelists + 365 days): **19128 = 198, 19118 = 120,
+19153 = 79**, with already-lit Philadelphia ZIPs as magnitude controls in the same query (19119 = 204,
+19116 = 100, 19154 = 82).
+
+### Unresolved by this method
+
+- **`bellevue-permits`** — its server ignores `returnDistinctValues` *and* `groupByFieldsForStatistics`
+  (returns a full 2,000-row page in both cases, HTTP 200). No aggregation path; the ZIP inventory cannot
+  be obtained this way. Low risk regardless — a single city inside its declared county.
+- **Boston / Pittsburgh (CKAN) and Shelby (ODS)** answered, and produced **no** out-of-county ZIP on a
+  modelled dark page.
