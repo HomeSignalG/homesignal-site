@@ -3946,3 +3946,39 @@ Westchester page.
 Nothing in the output looked malformed. It was caught only because *Little Rock permits in Westchester,
 New York* is absurd on its face. **Key the extraction on the groupBy column name, case-insensitively —
 never on value shape.** A count and a ZIP are both five digits.
+
+### Native-ZIP pass, Socrata half — 1 wire, and a modelling defect worth fixing separately
+
+Ran the same "ask the layer which ZIPs it holds" method against the 15 Socrata native-ZIP entries
+(SoQL `$group` on the ZIP column, each entry's own recency window). 14 answered.
+`nyc-dob-permit-issuance` returned 0 groups against a **guessed** date column (`issuance_date`) — that
+is an unverified probe, not a finding, and the entry stays unprobed rather than being recorded as empty.
+
+**Wired: `nyc-dobnow-approved-permits` → NY Nassau — 2 pages, 130 in-scope records**
+(11001 Floral Park = 93, 11040 New Hyde Park = 37, measured with the entry's own
+`work_type` whitelist and 365-day window). Both ZIPs straddle the Queens/Nassau line, so these are NYC
+properties inside a ZIP that contains NYC blocks — the same legitimacy as Columbus → Delaware and
+Sedona → Yavapai.
+
+#### ⚠️ DECLINED: `nyc-dobnow` → NY Westchester — because ZIP 10470 is modelled in the wrong county
+
+10470 (Woodlawn) carries **79 in-scope NYC DOB permits** and is a **Bronx** ZIP. This repo already
+knows that: the NYC borough expansion deliberately excluded it — *"10470 excluded — already live under
+Westchester via the Census crosswalk"* — so its page is parented to **Westchester**.
+
+The coverage gate is **county-granular**, so there is no way to license those 79 real Bronx records
+onto 10470 without simultaneously licensing NYC DOB onto every Westchester page — including **10803
+Pelham Manor (8 records)**, where NYC DOB has no jurisdiction at all and the rows are data-entry
+artifacts. That would put records on a page where nothing is being built, which is the exact defect
+class this pass has been rejecting.
+
+**The right fix is to re-parent 10470 from Westchester to Bronx**, after which the existing borough
+coverage lights it with no registry change at all. That is a `communities` change and it alters what
+residents see, so it is **gated — recommended, not done.** Recorded here so the next session finds the
+diagnosis rather than re-deriving it, and so nobody "fixes" it by widening the coverage gate.
+
+#### Declined: `marin-county-building-permits` → CA Sonoma
+
+94952 (Petaluma) returns **8** records in the entry's own scope, against a control of 19 on 94901, a
+real Marin ZIP. Petaluma is Sonoma's, Marin County has no permit jurisdiction there, and 8 rows is the
+mailing-address noise class.
