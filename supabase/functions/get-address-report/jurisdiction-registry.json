@@ -4202,6 +4202,10 @@
         {
           "state": "VA",
           "county": "Arlington"
+        },
+        {
+          "state": "VA",
+          "county": "Prince William"
         }
       ],
       "column_map": {
@@ -6474,6 +6478,10 @@
         {
           "state": "DE",
           "county": "Kent"
+        },
+        {
+          "state": "MD",
+          "county": "Queen Anne's"
         }
       ],
       "column_map": {
@@ -6939,6 +6947,10 @@
         {
           "state": "GA",
           "county": "Gwinnett"
+        },
+        {
+          "state": "GA",
+          "county": "Henry"
         }
       ],
       "column_map": {
@@ -7903,6 +7915,10 @@
         {
           "state": "ID",
           "county": "Canyon"
+        },
+        {
+          "state": "ID",
+          "county": "Ada"
         }
       ],
       "column_map": {
@@ -8348,6 +8364,10 @@
         {
           "state": "SC",
           "county": "Charleston"
+        },
+        {
+          "state": "SC",
+          "county": "Berkeley"
         }
       ],
       "column_map": {
@@ -9392,6 +9412,10 @@
         {
           "state": "KY",
           "county": "Boone"
+        },
+        {
+          "state": "OH",
+          "county": "Hamilton"
         }
       ],
       "column_map": {
@@ -9674,6 +9698,10 @@
         {
           "state": "GA",
           "county": "Fulton"
+        },
+        {
+          "state": "GA",
+          "county": "Gwinnett"
         }
       ],
       "column_map": {
