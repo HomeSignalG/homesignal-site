@@ -107,7 +107,20 @@ jobs:
           else
             git commit -m "source-monitor: nightly report"
           fi
-          git push origin "HEAD:${{ github.ref_name }}"
+          # The monitor runs ~20 minutes; any merge to main during that window makes a
+          # bare push fail "fetch first" and throws the whole nightly report away
+          # (observed 2026-08-02, run 30765171160). Rebase onto the moved tip and retry —
+          # the commit only ever touches the report + registry, so a rebase is safe.
+          for attempt in 1 2 3 4; do
+            if git push origin "HEAD:${{ github.ref_name }}"; then
+              echo "pushed on attempt $attempt"; exit 0
+            fi
+            echo "push rejected (attempt $attempt) — rebasing onto the moved tip"
+            git fetch origin "${{ github.ref_name }}"
+            git rebase "origin/${{ github.ref_name }}" || { git rebase --abort; echo "::error::rebase conflict on the monitor report — resolve manually"; exit 1; }
+            sleep $((attempt * 4))
+          done
+          echo "::error::could not push the nightly report after 4 attempts"; exit 1
 
       - name: Deploy engine so the 09:00 UTC refresh ingests the new source(s)
         if: github.event.inputs.dry_run != 'true' && steps.monitor.outputs.registry_changed == 'true'
