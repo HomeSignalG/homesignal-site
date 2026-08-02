@@ -175,8 +175,21 @@ async function loadDevReports(sb) {
       await sleep(2500 * floorRetries);
       continue;
     }
+    // A 200 can still arrive TRUNCATED: these rows carry the whole `sites` array (up to ~19.6 MB
+    // each), so a large page can drop mid-stream and res.json() throws "Unexpected end of JSON
+    // input". That killed every run of this job — the adaptive ladder below only covered !res.ok,
+    // so a body failure escaped instead of shrinking the page. Treat it as the same signal.
+    let page;
+    try {
+      page = await res.json();
+    } catch (e) {
+      if (step > 1) { step = Math.max(1, Math.floor(step / 2)); clean = 0; continue; }
+      floorRetries++;
+      if (floorRetries > 3) throw new Error(`development_reports body unreadable at floor page size: ${e.message}`);
+      await sleep(2500 * floorRetries);
+      continue;
+    }
     floorRetries = 0;
-    const page = await res.json();
     rows.push(...page);
     if (page.length < step) break;
     last = page[page.length - 1].zip;
