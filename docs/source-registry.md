@@ -3668,3 +3668,72 @@ Measured cache-wide 2026-08-01, the real high-water mark is **19.61 MB (80022, 2
 ten pages ≥18.6 MB. Earlier corrections in this file (3.5 MB → "Cleveland 44127 at 5.98 MB") are also
 superseded. **Measure with `length(sites::text)`, not `pg_column_size(sites)`** — the latter reports
 1.93 MB for those same rows because of TOAST compression, and the ceiling is a *transfer* figure.
+
+## COVERAGE-EXTENSION PASS #2 (2026-08-02)
+
+A second iteration of the straddling-city ranking, run because **the first pass changed its own
+input**: 108 newly-lit pages create centroids that were not in the `lit` set when the ranking was
+first computed, so seams open that did not exist before. Config only — `jurisdiction-registry.json`,
+7 lines' worth of `coverage` objects, no connector or engine change.
+
+**Method fix worth keeping: the `cov` table is now GENERATED FROM the registry, not hand-typed.**
+The first pass used a literal `VALUES` list, which is a snapshot that silently goes stale the moment
+an extension merges. Generating it from `jurisdiction-registry.json` means the ranking always reflects
+what is actually deployed — and it is what surfaced the ~12 pairs below, none of which the first pass
+had probed.
+
+### Wired — 7 extensions, 22 pages, 4,224 records (measured after the refresh, not predicted)
+
+| entry | coverage added | pages | records | in-envelope | control |
+|---|---|---|---|---|---|
+| `charleston-county-permits` | SC Berkeley | 4 | 2,007 | 2,046 | 2,296 |
+| `johns-creek-building-permits` | GA Gwinnett | 2 | 964 | 1,224 | 3,158 |
+| `canyon-county-building-permits` | ID Ada | 4 | 717 | 789 | 942 |
+| `dekalb-county-building-permits` | GA Henry | 2 | 221 | 249 | 14,409 |
+| `fairfax-recent-building-permits` | VA Prince William | 6 | 126 | 129 | 79 |
+| `kent-county-de-building-permits` | MD Queen Anne's | 2 | 104 | 104 | 251 |
+| `boone-county-ky-planning-board-actions` | OH Hamilton | 2 | 85 | 94 | 759 |
+
+Largest resulting page **1.18 MB** (29486) — nowhere near any ceiling.
+
+**Invariants across all 170,539 records these seven sources place cache-wide:
+0 missing `record_url`, 0 point-scope records without coordinates, 0 unclassified.**
+
+**Bidirectional gate proof, live receipts.** Each source appears in its declared counties and
+nowhere else — e.g. `charleston-county-permits` → Charleston 25 pages / 19,577 + Berkeley 4 / 2,007
+and no third county; `boone-county-ky-planning-board-actions` → Boone KY 8 / 1,438 + Hamilton OH
+2 / 85; `fairfax-recent-building-permits` → Fairfax 47 / 17,641 + Arlington 11 / 1,365 +
+Prince William 6 / 126.
+
+### Rejections with receipts — do not re-probe
+
+Every control below returned non-zero **in the same batch as the zeros**, so no zero here is a
+broken query shape.
+
+| candidate | receipt |
+|---|---|
+| `minneapolis-ccs-permits` → MN Dakota | 1 of 8 ZIPs non-zero (55120 = 125), control 55407 = **8,213** |
+| `kenton-county-devtracking-permits` → OH Hamilton | 1 of 8 (45051 = 231), control 41011 = **923** |
+| `pierce-county-pals-permits` → WA Thurston | 1 of 6 (98348 = **2,181**), control 98444 = **82,773** |
+| `weld-county-site-plan-review` → CO Larimer | 1 of 3 (80534 = 11), control 80631 = **127** |
+| `stamford-major-developments` → NY Westchester | 0 of 2, control 06901 = **44** |
+| `cleveland-issued-building-permits` → OH Summit | 0 of 3, control 44127 = **4,518** |
+| `denver-residential-construction-permits` → CO Douglas | 0 of 3, control 80211 = **1,014** |
+
+⚠️ **Pierce → Thurston is the rejection to understand rather than revisit.** 98348 alone returns
+**2,181** in-envelope records — by volume it is the second-biggest opportunity in this batch. It is
+rejected because 1-of-6 is the same shape as the already-rejected `pierce → King`, and applying the
+rule only when the volume is small would make the rule meaningless. If the bar is ever changed, change
+it deliberately and re-probe both together.
+
+### Two things this pass confirms about method
+
+1. **An envelope count sizes a candidate set; the stored result is a different number.** Predicted
+   4,635 across the seven, stored **4,224** — an 9% overshoot, with the gap concentrated where status
+   or type mapping drops rows (29492: envelope 10 → stored 5). Close enough to trust the ranking,
+   never close enough to report without measuring.
+2. **Check for an existing entry on the target county BEFORE editing** (the Salem-duplicate rule,
+   extended from "same URL host" to "same county"). Two of these seven targets were already covered —
+   GA Gwinnett by `dekalb-county-building-permits`, OH Hamilton by `cincinnati-building-permits` — and
+   both were fine, because the incumbent leaves the probed ZIPs dark and the new source is a different
+   jurisdiction's records. Fine is the conclusion of the check, not a reason to skip it.

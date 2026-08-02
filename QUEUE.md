@@ -4470,3 +4470,34 @@ count it hands the collector does not carry it.
 
 **Still in flight:** `verify-development` run `30721217869` is at 2 h 20 m as of 2026-08-02 00:42Z,
 step "Verify development pages" still running. Not a pass. If it reaches 6 h it joins the broken list.
+
+### Coverage-extension pass #2 — 22 more pages lit, and the ranking now regenerates itself
+
+The first pass changed its own input: 108 newly-lit pages put new centroids into the `lit` set, so
+adjacency seams exist now that did not exist when the ranking was first computed. Re-ran it.
+
+**Method fix that made this worth doing:** the `cov` table is now **generated from
+`jurisdiction-registry.json`** instead of a hand-typed `VALUES` list. The literal was a snapshot that
+went stale the moment an extension merged — regenerating it surfaced ~12 (source, county) pairs the
+first pass had never probed.
+
+**Wired 7, rejected 7.** Full table, receipts and the gate proof: `docs/source-registry.md`
+→ "COVERAGE-EXTENSION PASS #2 (2026-08-02)". Headline: **22 pages, 4,224 records**, largest page
+1.18 MB, and across all 170,539 records these seven sources place cache-wide, **0 missing
+`record_url`, 0 point-scope without coordinates, 0 unclassified**.
+
+Every rejection carries a control that returned non-zero **in the same batch as the zeros**, so no
+zero in this pass came from a broken query shape.
+
+⚠️ **One rejection is uncomfortable and should stay that way.** `pierce-county-pals-permits` →
+WA Thurston: ZIP 98348 alone returns **2,181** in-envelope records — by volume the second-largest
+opportunity in the batch — and it is rejected because 1-of-6 ZIPs non-zero is the same shape as the
+already-rejected `pierce → King`. Applying a rule only when the number is small is not applying a
+rule. If that bar should change, change it deliberately and re-probe both together.
+
+**Measured, not predicted:** envelope counts totalled 4,635; the stored result is **4,224**. The gap
+sits where status/type mapping drops rows (29492: envelope 10 → stored 5). That is the expected
+direction, and it is why the wiring commit said upfront that these counts size a candidate set.
+
+Deployed via `deploy-edge-functions.yml` run `30726436927` (success), then 22 ZIPs re-cached through
+the live engine via `pg_net` + `dev_refresh_collect()`.
