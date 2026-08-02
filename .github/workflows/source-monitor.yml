@@ -47,6 +47,10 @@ concurrency:
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    # Bound added 2026-08-02: an unbounded job inherits GitHub's 6-HOUR default, which is how
+    # verify-geocodes burned 11 consecutive 6 h cancellations on an account previously halted
+    # at $0. Measured max successful run: 11.6 min -> bound 45.
+    timeout-minutes: 45
     steps:
       - name: Require DEPLOY_KEY (ruleset-bypass push credential)
         env:

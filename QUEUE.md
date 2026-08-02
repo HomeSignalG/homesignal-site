@@ -4910,3 +4910,68 @@ fires within a tick, not shrinking it.
 **Full-pass time, for the record:** the refresh is a **15-minute rolling job, not nightly** — 250 ZIPs
 per tick, oldest-first, ~13–20 h for all 12,722. The oldest row in the table sits at 123.7 h, and those
 are the held pages, whose `refreshed_at` deliberately does not advance.
+
+### ⚠️ The verify-communities race guard is GREEN but UNPROVEN — it has never fired
+
+Run 30769638076 on the merged head: **12,722 pages checked, Failed: 0**, and the new counter reads
+**"Rows re-read after a mid-walk materializer change: 0"**.
+
+That zero is the honest reading of the run, and it means the guard **did not run**, not that it works.
+The three Portland failures it was written for did not recur, so the pass proves only that no race
+occurred this time. By this repo's own rule — *an instrument must prove it ran before its silence counts
+as evidence* — the guard is currently a latent instrument with no test behind it: there is no unit
+coverage for the re-read path either, because the mismatch branch needs a live REST round-trip.
+
+**Follow-up, logged not done:** give `assertZip`-style purity to the substance-gate comparison so the
+re-read branch can be driven offline with a stubbed `rest()`, and assert both outcomes (flag changed →
+re-check and pass; flag unchanged → still fail). Until then, treat a green
+`verify-communities` as evidence about the PAGES, not about the guard.
+
+### 27 of 31 workflows had NO timeout — every one inheriting GitHub's 6-hour default
+
+⚠️ **CORRECTION, SAME SESSION: THE "HANG" THAT TRIGGERED THIS SWEEP NEVER HAPPENED.** An earlier version
+of this section justified the work with "three consecutive `unit` attempts on the same commit hung,
+twice in `Install playwright`". That was **wrong, and the error was mine, not CI's.** Measured from the
+API afterwards:
+
+| run | conclusion | duration |
+|---|---|---|
+| 30770523717 | success | **2.3 min** |
+| 30770516378 | cancelled **by me at 1.8 min** | 1.8 min |
+| 30770693405 | success | **2.4 min** |
+
+Every run was normal. I was reading elapsed time by counting my own background `sleep` polls as though
+wall-clock had advanced with them, concluded jobs were stuck for 20-50 minutes, **cancelled a healthy
+job 1.8 minutes in**, pushed an empty "re-trigger CI" commit, and wrote the hang into the record. The
+same miscount produced the earlier "`verify-communities` has been running ~50 minutes" claim - its real
+duration was 22m32s. Correcting the symptom the first time without finding the cause let me repeat it
+with more consequence.
+
+**Standing answer: never infer elapsed time from how much waiting it FEELS like. Compute it -
+`now - started_at` from the API - and quote both timestamps.** A cancelled healthy job is a real cost:
+it destroys a valid check and invites an unnecessary push.
+
+**The sweep itself stands on its own evidence and is unaffected**, because the finding was never about
+the hang: it is a static property of the workflow files. Only 4 of 31 carried `timeout-minutes`
+(`unit-tests`, `verify-geocodes`, `gate2b-full-inventory-parity`, `load-openaddresses`); the other **27
+were unbounded**, inheriting GitHub's 6-hour default. That is the same shape that let `verify-geocodes`
+burn **11 consecutive 6-hour cancellations** on an account previously halted at $0 - a real, recorded
+incident, unlike the one I imagined. An unbounded job does not fail; it bills.
+
+**Every bound is sized from the workflow's OWN measured maximum successful run**, not guessed:
+
+| workflow | measured max | bound |
+|---|---|---|
+| `verify-development` | 251.6 min | 330 |
+| `verify-communities` | 42.8 min | 120 |
+| `source-monitor` / `spot-check` / `verify-representative-zips` | 5.9-11.6 min | 45 |
+| 16 fast verifiers / helpers | <= 4.1 min | 15 |
+| 7 dispatch-only gov-feed helpers | **no successful run on record** | 30 (conservative) |
+
+The 7 with no measurement are named as such rather than given a number pretending to be derived.
+`unit-tests` also gained a bound (15 min against a ~2.5 min measured max). Verified by parsing all 31
+workflow files: **0 jobs still unbounded, 0 parse errors.**
+
+⚠️ **`verify-development`'s 330 is a bound, not headroom** - it sits above the 251.6 min measured max on
+purpose, but the job is already 4.2 h against what was a 6 h ceiling and grows linearly with the cache.
+The bounding report above is what actually fixes that; this only stops a genuine hang from costing 6 h.
