@@ -3950,65 +3950,6 @@
       "_receipts": "2026-07-25 pg_net recon (ids 108016/108023/108031/108032): City of Irving (Dallas County) 'Development Permit Activity' = layer 2 of the Pending_Cases_and_Development_Activity FeatureServer (layer 0 is Municipal Boundary - the corpus hit pointed at the service root, the permit layer is 2). Point geometry. FRESH max Issued 2026-06-15; real project records e.g. Permit 2026-05-3542 'COI FLEET MAINTENACE BLDG ADDN, PH 3' UNDER CONSTRUCTION $3.78M, 'GATEWAY COMMERCE BLDG 1 (SHELL OFC/WHSE)' $8.04M. 7 verbatim Status values via groupBy: UNDER CONSTRUCTION 72 / FINALED 69 / APPLICATION 43 / EXPIRED 15 / CANCELLED 2 / APPROVED 1 / 'SEE 2024-12-9925' 1 (a data-entry artifact, excluded). 203 rows total - this is Irving's MAJOR-development tracker, not an all-permits ledger, so no recency window is applied (all rows are current development activity). No ZIP column -> spatial_zip_radius_mi. No type column -> type_map omitted (records stay use_type unclassified rather than guessed). Coverage TX/Dallas (174 dev-empty ZIP pages; Irving covers its own footprint). | 2026-07-27 icon-completeness pass: TYPE: NO type field exists on this layer. Full schema read returns OBJECTID, Permit, Value, Area_SF, StNum, StDir, StName, Project, Applied, Approved, Issued, Finaled, CO_Date, Status, Units, GlobalID, created_user/date, last_edited_user/date — no permit-type or use column. type_map is therefore deliberately ABSENT and its 808 records stay 'unclassified' (logged)."
     },
     {
-      "registry_id": "las-vegas-building-permits",
-      "platform": "arcgis",
-      "service_url": "https://services1.arcgis.com/F1v0ufATbBQScMtY/arcgis/rest/services/OpenData_Building_Permits_/FeatureServer/0",
-      "dataset_url": "https://opendataportal-lasvegas.hub.arcgis.com/",
-      "jurisdiction": "City of Las Vegas",
-      "coverage": [
-        {
-          "state": "NV",
-          "county": "Clark"
-        }
-      ],
-      "column_map": {
-        "title": [
-          "WORKTYPE",
-          "ADDR1"
-        ],
-        "status_raw": "BLDGAPPLSTATUS",
-        "type_source": "WORKTYPE",
-        "file_date": "ISSDTTM",
-        "address": [
-          "ADDR1",
-          "CITY",
-          "STATE"
-        ],
-        "case_number": "APNO"
-      },
-      "zip_where_template": "ZIP LIKE '{zip}%'",
-      "type_map": {
-        "Building": "Development",
-        "ProdHome": "Residential",
-        "MultiFam": "Residential",
-        "Model": "Residential",
-        "TI": "Development",
-        "Grading": "Development"
-      },
-      "status_to_bucket": {
-        "proposed": [],
-        "approved": [
-          "Issued",
-          "Accepted",
-          "Open"
-        ],
-        "operating": [
-          "Closed"
-        ],
-        "exclude": [
-          "Expired",
-          "Cancelled",
-          "Stop Work",
-          "Withdrawn",
-          "Hold"
-        ]
-      },
-      "extra_where": "WORKTYPE in ('Building','ProdHome','MultiFam','Model','TI','Grading')",
-      "recency_days": 365,
-      "record_url_precision": "dataset",
-      "_receipts": "2026-07-25 pg_net recon (ids 108028-108035): City of Las Vegas 'Building Permits' (OpenData_Building_Permits_, Building_Permits_MV) - the CURRENT service; the org's other hits are 'Building Permits Archived'/'Historical Building Permits' (rejected) and CLV_BLDG_OFFSITE_EXP (water-district offsite work orders, rejected). FRESH max ISSDTTM 2026-07-16 over 435,245 rows. 9 verbatim BLDGAPPLSTATUS values via groupBy: Closed 287,872 / Issued 91,308 / Expired 51,381 / Cancelled 2,565 / Stop Work 2,034 / Open 47 / Withdrawn 19 / Hold 14 / Accepted 5. APTYPE|WORKTYPE enumerated via groupBy; whitelist keeps Building (Res 9,106 + Com 8,901), ProdHome 34,341, MultiFam 891, Model 149, TI 13,941, Grading 949 - drops OTC 272,711 over-the-counter minor work plus Electrical/Plumbing/Mechanical/Patio/PoolSpa/WallFence/Sign/Disaster/AVI at source. Layer is a geometry-less TABLE (geom=NONE) with NO lat/lng columns -> records geocode from ADDR1+CITY+STATE through the engine's Census path under GEOCODE_FENCE_MI (a fence miss NULLs coords, never fabricates). Native site ZIP is ZIP+4 in places (e.g. '89145-5247') so scoping uses zip_where_template LIKE '<zip>%' (Philadelphia ZIP+4 precedent), not an exact match. Coverage NV/Clark (76 dev-empty ZIP pages). | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 9 BLDGAPPLSTATUS values (Closed 287,872 / Issued 91,308 / Expired 51,381 / Cancelled 2,565 / Stop Work 2,034 / Open 47 / Withdrawn 19 / Hold 14 / Accepted 5), all mapped — Open/Accepted are deliberately kept in approved by the existing entry (not moved), leaving no value for proposed -> []."
-    },
-    {
       "registry_id": "hartford-building-permits",
       "platform": "arcgis",
       "service_url": "https://utility.arcgis.com/usrsvcs/servers/d595ae995fb049d3ac54919ebf24b1ac/rest/services/HartfordOpenDataTables/FeatureServer/0",

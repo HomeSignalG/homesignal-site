@@ -4007,6 +4007,22 @@ property ZIP.** Correcting only the display gives the right address on the wrong
 than today. The real options are (a) retire the entry, (b) keep it and accept office-pinned records,
 or (c) build a property-address geocode path — a code change. All three are founder calls.
 
+✅ **RESOLVED 2026-08-02 (founder-authorised objective 3) — (a) RETIRE. The measurement that decided it
+is that retiring costs ZERO pages.** Of the 51 Clark County pages carrying its records, **51 keep
+content from other sources and 0 go dark**: those ZIPs are already lit by `clark-county-active-projects`,
+`clv-planning-cases`, `henderson-residential-permits` and `henderson-commercial-permits`. So this was
+never coverage-vs-correctness. Keeping the entry bought **no LIVE page** and cost **3,121 records
+asserting a locality the source does not support** — a resident of 89118 shown 174 `ProdHome`/`Model`
+permits stacked on one builder's office suite, while the homes actually being built appear on no page.
+
+**(c) is closed by a field inventory, not an opinion.** Live layer metadata (pg_net, 436,181 rows) lists
+38 fields — `APNO … STNO, PREDIR, STNAME, SUFFIX, POSTDIR, … PRCLID, SUBDIV, … LEGALOWNER, ADDR1, CITY,
+STATE, ZIP, … ObjectId` — i.e. **one ZIP field, the owner's, and no geometry**. A property-address path
+would need the whole 436k-row layer bulk-geocoded into a ZIP *before* selection: a separate ingest job,
+not a connector option. Registry 149 → 148 entries; removal asserted programmatically to be exactly this
+one id, nothing else added or dropped. Full rationale + how it comes back:
+`docs/source-registry.md` "Two defects found in EXISTING entries".
+
 ---
 
 ## AUDIT — IS THE LAS VEGAS WRONG-FIELD DEFECT SYSTEMIC? NO. IT IS ISOLATED (2026-08-01)
