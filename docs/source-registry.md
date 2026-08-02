@@ -3737,3 +3737,54 @@ it deliberately and re-probe both together.
    GA Gwinnett by `dekalb-county-building-permits`, OH Hamilton by `cincinnati-building-permits` — and
    both were fine, because the incumbent leaves the probed ZIPs dark and the new source is a different
    jurisdiction's records. Fine is the conclusion of the check, not a reason to skip it.
+
+### ⚠️ A coverage extension's yield is NOT measurable at merge time — pass #1 was understated by 10 pages / 9,668 records
+
+Found while sweeping the counties pass #2 had just touched: three Gwinnett pages lit up carrying
+`dekalb-county-building-permits` records — an extension wired in **pass #1**, not pass #2. Those pages
+had simply never been re-cached after that pass's deploy, so its report was written against a cache
+that predated its own change.
+
+Measured properly: **96 dark ZIPs across pass #1's target counties were last refreshed BEFORE that
+pass's deploy** (`refreshed_at < 2026-08-01 18:18`, the `deploy-edge-functions` run) and had therefore
+never been evaluated against the coverage it added. Re-firing all 96 lit **10 more pages carrying
+9,668 records**:
+
+| county | extension | pages gained | records |
+|---|---|---|---|
+| GA Fulton | `dekalb-county-building-permits` | 5 (30354, 30342, 30334, 30363, 30332) | 5,458 |
+| CO Douglas | `aurora-building-permits` | 1 (80138) | 2,307 |
+| GA Gwinnett | `dekalb-county-building-permits` | 3 (30071, 30093, 30078) | 1,884 |
+| IN Lake | `chicago-building-permits` | 1 (46394) | 19 |
+
+**Two of pass #1's entries change character entirely.** They were recorded as the two most marginal
+wirings in the batch:
+
+| entry | pass #1 recorded | actually |
+|---|---|---|
+| `chicago-building-permits` → IN Lake | 1 page, **1 record** | 2 pages, **20 records** |
+| `aurora-building-permits` → CO Douglas | 1 page, **342 records** | 2 pages, **2,649 records** |
+| `dekalb-county-building-permits` → GA Fulton + Gwinnett | 16 pages, 16,105 | **25 pages, 23,490** |
+| `new-castle-county-permits` → PA Delaware + Chester | 5 pages, 41 | **15 pages, 174** |
+| `minneapolis-ccs-permits` → MN Ramsey | 3 pages, 1,156 | **6 pages, 1,951** |
+| `new-orleans-permits` → LA Jefferson | 5 pages, 701 | **6 pages, 912** |
+| `overland-park-building-permits` → KS Wyandotte | 8 pages, 1,932 | 8 pages, **1,981** |
+
+The rest (KCMO, Durham, Huntsville, Kenton, Fairfax→Arlington, Albuquerque, Denver→Jefferson) were
+already fully measured and are unchanged.
+
+**The standing answer:** after wiring a coverage extension, deploying is not the last step and
+re-caching the *probed* ZIPs is not either. **Re-cache every still-dark ZIP in the target county whose
+`refreshed_at` predates the deploy, then measure.** Otherwise the pass reports whatever fraction the
+cron happened to have refreshed since — which is why the two extensions that looked least worth having
+were the two most understated. Note this cuts one way only: it understates yield, and it never affects
+a *rejection*, because rejections are probed live against the endpoint rather than read from cache.
+
+**Consolidated invariants after both passes** — across all 817,346 records that the 21 sources touched
+by pass #1 and pass #2 place over 675 pages: **0 missing `record_url`, 0 point-scope records without
+coordinates, 0 unclassified.** Largest newly-lit page 2.06 MB (80138).
+
+**Pass #2 final, fully measured** (was 22 pages / 4,224 before its own county sweep): **25 pages,
+4,296 records** — `charleston → SC Berkeley` 5/2,033 · `johns-creek → GA Gwinnett` 2/964 ·
+`canyon → ID Ada` 4/717 · `dekalb → GA Henry` 2/221 · `boone → OH Hamilton` 4/131 ·
+`fairfax-recent → VA Prince William` 6/126 · `kent-de → MD Queen Anne's` 2/104.

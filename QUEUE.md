@@ -4501,3 +4501,25 @@ direction, and it is why the wiring commit said upfront that these counts size a
 
 Deployed via `deploy-edge-functions.yml` run `30726436927` (success), then 22 ZIPs re-cached through
 the live engine via `pg_net` + `dev_refresh_collect()`.
+
+### The pass-#1 report was understated by 10 pages / 9,668 records — and the reason generalizes
+
+Swept the counties pass #2 touched and found three Gwinnett pages lighting up from
+`dekalb-county-building-permits` — a **pass #1** extension. Those pages had never been re-cached after
+pass #1's deploy, so that pass's report was written against a cache predating its own change.
+
+Measured: **96 dark ZIPs in pass #1's target counties had `refreshed_at` earlier than its deploy**
+(`2026-08-01 18:18`). Re-firing all 96 lit **10 more pages / 9,668 records**. Two entries change
+character completely — `chicago → IN Lake` from **1 record** to 20 (2 pages), and
+`aurora → CO Douglas` from 342 to **2,649** (2 pages). The two that looked least worth having were the
+two most understated.
+
+**Standing answer, now in `docs/source-registry.md`:** deploying is not the last step, and re-caching
+the *probed* ZIPs is not either. Re-cache **every still-dark ZIP in the target county whose
+`refreshed_at` predates the deploy**, then measure. This cuts one way only — it understates yield, and
+it can never affect a rejection, since rejections are probed live against the endpoint rather than read
+from cache.
+
+Pass #2 final, fully measured: **25 pages, 4,296 records** (was 22 / 4,224 before its own sweep).
+Consolidated invariants across all 817,346 records the 21 touched sources place over 675 pages:
+**0 missing `record_url`, 0 point-scope without coordinates, 0 unclassified.**
