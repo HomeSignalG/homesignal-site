@@ -79,7 +79,15 @@ export interface CartoRunReport {
   geocode_failures: number;
   no_record_url: number;
   quarantined: { reason: string; sample: string }[];
+  /** non-null ⇒ the max_rows cap bound the fetch and this report is INCOMPLETE. */
+  truncated_at_max_rows: number | null;
 }
+
+/** Set by fetchRows when the max_rows cap BOUND the fetch — i.e. the source has MORE matching
+ *  records than this report contains. Silent truncation is the dangerous shape: a capped result and
+ *  a complete one are indistinguishable apart from the count, so a truncated page reads as "we have
+ *  everything". (2026-08-02 hardening — see QUEUE.md "the 20,000 is a SILENT CAP".) */
+interface FetchMeta { truncated: boolean; cap: number }
 
 export interface CartoDeps {
   fetch: typeof fetch;
@@ -125,7 +133,7 @@ async function runEntry(
     registry_id: entry.registry_id, table: entry.table,
     fetched: 0, emitted: 0, excluded_by_status: [], unmapped_statuses: [],
     case_insensitive_matches: [],
-    blank_status: 0, geocode_failures: 0, no_record_url: 0, quarantined: [],
+    blank_status: 0, geocode_failures: 0, no_record_url: 0, quarantined: [], truncated_at_max_rows: null,
   };
   const records: NormalizedRecord[] = [];
 
@@ -150,14 +158,24 @@ async function runEntry(
   const unmappedCount = new Map<string, number>();
   const caseFold = new Map<string, CaseFoldMatch>();
 
+  const fetchMeta: FetchMeta = { truncated: false, cap: 0 };
   let rows: Record<string, unknown>[];
   try {
-    rows = await fetchRows(entry, zip, zipCol, deps);
+    rows = await fetchRows(entry, zip, zipCol, deps, fetchMeta);
   } catch (e) {
     report.quarantined.push({ reason: `fetch failed: ${(e as Error).message}`, sample: entry.table });
     return { records, report };
   }
   report.fetched = rows.length;
+  // A capped fetch is INCOMPLETE and must say so. Surfaced twice on purpose: a machine-readable
+  // field, and a quarantine note so it appears wherever quarantines are already read.
+  if (fetchMeta.truncated) {
+    report.truncated_at_max_rows = fetchMeta.cap;
+    report.quarantined.push({
+      reason: `max_rows cap of ${fetchMeta.cap} bound the fetch — the source has MORE matching records than this report contains`,
+      sample: entry.registry_id,
+    });
+  }
 
   for (const row of rows) {
     const statusRaw = String(readCol(row, entry.column_map.status_raw) ?? "").trim();
@@ -268,6 +286,7 @@ async function fetchRows(
   zip: string,
   zipCol: string,
   deps: CartoDeps,
+  meta: FetchMeta,
 ): Promise<Record<string, unknown>[]> {
   const pageSize = deps.pageSize ?? 1000;
   const maxRows = entry.max_rows ?? 20000;
@@ -278,7 +297,10 @@ async function fetchRows(
 
   const out: Record<string, unknown>[] = [];
   let offset = 0;
-  while (out.length < maxRows) {
+  // Deliberately `<=`: fetch ONE row past the cap so truncation is EXACT. A full final page
+  // does NOT prove more rows exist — a source holding precisely max_rows records is COMPLETE, and
+  // inferring truncation from a full page would cry wolf on exactly that case.
+  while (out.length <= maxRows) {
     const sql = `SELECT *${geoSel} FROM ${entry.table} WHERE ${where} LIMIT ${pageSize} OFFSET ${offset}`;
     const url = `${entry.sql_url}?q=${encodeURIComponent(sql)}`;
     const page = await getWithBackoff(url, deps) as { rows?: Record<string, unknown>[]; error?: string[] };
@@ -289,6 +311,9 @@ async function fetchRows(
     if (rows.length < pageSize) break;
     offset += pageSize;
   }
+  // The cap bound the fetch iff we actually SAW a row beyond it.
+  meta.truncated = out.length > maxRows;
+  meta.cap = maxRows;
   return out.slice(0, maxRows);
 }
 
