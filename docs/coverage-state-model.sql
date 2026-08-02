@@ -47,6 +47,39 @@
 -- ROLLBACK: drop view public.app_coverage_states;
 --   lib/data.js coverageState() fails soft (null) → pages render exactly the
 --   pre-Phase-2 behavior (data_quality gate untouched throughout).
+--
+-- ---------------------------------------------------------------------------
+-- CORRECTION 2026-08-02 — `changes` MEANT CIVIC CHANGES, AND LOCAL NEWS SILENTLY
+-- WIDENED IT. Applied via MCP migration `app_coverage_state_view_civic_changes`.
+--
+-- At rollout the two definitions were verified IDENTICAL (legacy1 = legacy2 = 0
+-- above). They could be, because `app_changes` then held only civic rows:
+-- 'Government & civic' + 'Planning & zoning' — exactly the set app_refresh_zip
+-- counts into `_nc` when it stamps data_quality. Local News later began
+-- materializing into the SAME table (79,424 rows across 9,796 ZIPs), and because
+-- this view counted `app_changes` with no category filter, it started reading
+-- news as coverage. The materializer never drifted: it counts `_nc` BEFORE the
+-- Local News insert, so `data_quality` has always been civic-only BY
+-- CONSTRUCTION. The view is the half that moved.
+--
+-- Measured cost of the drift (2026-08-02, full population 12,722):
+--   • 5,072 ZIPs reported `populated` whose only map content is the national EPA
+--     facility floor — real state `facilities_only`. They were therefore ALSO
+--     denied the accurate "meeting and permit feeds … still being wired" banner
+--     that facilities_only renders on community.html.
+--   •   662 ZIPs reported `populated` with ZERO markers of any kind and zero
+--     civic notices — real state `honestly_empty`. These are the 662 that made
+--     `legacy: populated/facilities_only => pass` fail in CI every day.
+--   → 5,734 pages carrying an OVERSTATED coverage state. Nothing rendered
+--     changed and no layout gate moved (that is keyed on data_quality, untouched)
+--     — but the instrument was asserting coverage the data does not support.
+--
+-- THE RULE, now explicit: coverage means SOURCED CIVIC/DEVELOPMENT RECORDS —
+-- permits, planning + government notices, EPA-registered facilities. A Local
+-- News article is real, sourced content and still rides the page's news list;
+-- it is NOT coverage and can never lift a ZIP's coverage state on its own.
+-- `changes` counts civic rows only; `news_items` is reported ADDITIVELY so the
+-- news is visible in the instrument rather than hidden by the narrower count.
 -- ============================================================================
 
 create or replace view public.app_coverage_states
@@ -65,6 +98,9 @@ select
       then 'temporarily_unavailable'
     when r.refreshed_at < now() - interval '72 hours'
       then 'stale_data'
+    -- `changes` here is CIVIC changes only (see the 2026-08-02 correction above):
+    -- the same set app_refresh_zip counts into `_nc`. Local News is content, not
+    -- coverage, and is reported separately as `news_items`.
     when coalesce(c.dev_markers,0) > 0 or coalesce(ch.changes,0) > 0
       then 'populated'
     when coalesce(c.fac_markers,0) > 0
@@ -74,9 +110,10 @@ select
   m.data_quality,
   r.refreshed_at,
   r.last_refresh_attempt_at,
-  coalesce(c.dev_markers,0) as dev_markers,
-  coalesce(c.fac_markers,0) as fac_markers,
-  coalesce(ch.changes,0)    as changes
+  coalesce(c.dev_markers,0)  as dev_markers,
+  coalesce(c.fac_markers,0)  as fac_markers,
+  coalesce(ch.changes,0)     as changes,
+  coalesce(ch.news_items,0)  as news_items
 from public.app_community_meta m
 left join public.development_reports r on r.zip = m.zip
 left join lateral (
@@ -85,7 +122,9 @@ left join lateral (
   from public.app_projects p where p.zip = m.zip
 ) c on true
 left join lateral (
-  select count(*) changes from public.app_changes a where a.zip = m.zip
+  select count(*) filter (where a.category <> 'Local News') changes,
+         count(*) filter (where a.category  = 'Local News') news_items
+  from public.app_changes a where a.zip = m.zip
 ) ch on true;
 
 grant select on public.app_coverage_states to anon, authenticated;

@@ -8,6 +8,7 @@
 //      with local content, populated with none, unsupported_source with a report);
 //   3. legacy data_quality consistency (honestly_empty ⇒ coverage_coming;
 //      populated/facilities_only ⇒ pass) — the old gate stays valid during rollout;
+//   3c. LOCAL NEWS IS CONTENT, NOT COVERAGE — it can never lift a coverage state;
 //   4. determinism: two reads of the same ZIP agree (pure function of columns);
 //   5. rendering: one facilities_only page and one honestly_empty/coverage page
 //      render on DESKTOP (1440×900) and MOBILE (390×844) with the
@@ -39,7 +40,7 @@ const ok = (name, cond, extra) => {
 // ── 1-3: full-population invariants (keyset-paginated; PostgREST caps at 1000) ──
 const rows = [];
 for (let last = ''; ;) {
-  const page = await rest(`app_coverage_states?select=zip,coverage_state,data_quality,dev_markers,fac_markers,changes,refreshed_at&order=zip.asc&limit=1000` + (last ? `&zip=gt.${encodeURIComponent(last)}` : ''));
+  const page = await rest(`app_coverage_states?select=zip,coverage_state,data_quality,dev_markers,fac_markers,changes,news_items,refreshed_at&order=zip.asc&limit=1000` + (last ? `&zip=gt.${encodeURIComponent(last)}` : ''));
   rows.push(...page);
   if (page.length < 1000) break;
   last = page[page.length - 1].zip;
@@ -59,6 +60,23 @@ ok('impossible: populated without content', !rows.some(r => r.coverage_state ===
 ok('impossible: unsupported_source with a report', !rows.some(r => r.coverage_state === 'unsupported_source' && r.refreshed_at !== null));
 ok('legacy: honestly_empty => coverage_coming', rows.every(r => r.coverage_state !== 'honestly_empty' || r.data_quality === 'coverage_coming'));
 ok('legacy: populated/facilities_only => pass', rows.every(r => !['populated','facilities_only'].includes(r.coverage_state) || r.data_quality === 'pass'));
+
+// ── 3c: LOCAL NEWS IS CONTENT, NOT COVERAGE (regression pin, 2026-08-02) ──
+// `app_changes` holds three categories; only 'Government & civic' and
+// 'Planning & zoning' are coverage. Local News later began materializing into the
+// SAME table, and while this view counted the table with no category filter it read
+// news as coverage — reporting 5,734 ZIPs one state better than their data supports
+// (5,072 facilities_only and 662 honestly_empty, all shown as `populated`). The
+// materializer never drifted: app_refresh_zip counts `_nc` BEFORE inserting news, so
+// data_quality has always been civic-only by construction. That asymmetry is what
+// made `legacy: populated/facilities_only => pass` fail daily. Pin the rule so a
+// future category added to app_changes cannot quietly widen coverage again.
+const newsOnly = rows.filter(r => r.news_items > 0 && r.dev_markers === 0 && r.fac_markers === 0 && r.changes === 0);
+ok('news is not coverage: news-only ZIPs are honestly_empty',
+   newsOnly.every(r => r.coverage_state === 'honestly_empty'),
+   newsOnly.filter(r => r.coverage_state !== 'honestly_empty').slice(0, 5).map(r => r.zip + ':' + r.coverage_state).join(','));
+console.log(`INFO news: ${rows.filter(r => r.news_items > 0).length} ZIP(s) carry Local News; `
+  + `${newsOnly.length} carry news and nothing else (honestly_empty by rule)`);
 
 // ── 3b: PRODUCTION COVERAGE-PASS GATES (2026-07-25 Maps data coverage pass) ──
 // The full-universe audit classified all ZIPs and resolved every FAILED /

@@ -4687,3 +4687,58 @@ carry records. Options considered and rejected, with receipts, in `docs/source-r
 
 **Native-ZIP seam is now closed** except `bellevue-permits`, whose server ignores both
 `returnDistinctValues` and groupBy.
+
+---
+
+## `verify-coverage-state`: the last failing assertion was a real overstatement on 5,734 pages
+
+`legacy: populated/facilities_only => pass` was the one check still red after #559. It was right, and
+this time the **view** was the half that was wrong — not the expectation.
+
+**What the check compares.** Two independent definitions of "this ZIP has coverage":
+`app_community_meta.data_quality` (stamped by `app_refresh_zip`) and `app_coverage_states.coverage_state`
+(computed live). At the Phase-2 rollout they were verified IDENTICAL — `legacy1 = legacy2 = 0` in
+`docs/coverage-state-model.sql`.
+
+**What drifted.** They could agree because `app_changes` then held only civic rows — `'Government & civic'`
++ `'Planning & zoning'`, exactly the set `app_refresh_zip` counts into `_nc`. Local News later began
+materializing into the **same table** (79,424 rows across 9,796 ZIPs), and the view counted that table
+with **no category filter**. So it started reading news as coverage. The materializer never moved: it
+counts `_nc` *before* the Local News insert, so `data_quality` has always been civic-only by construction.
+That asymmetry is the whole failure.
+
+**Measured cost (2026-08-02, full population 12,722):**
+
+| class | ZIPs | reported | actual |
+|---|---|---|---|
+| EPA facility floor + news, no development, no civic notices | **5,072** | `populated` | `facilities_only` |
+| news and nothing else — zero markers of any kind | **662** | `populated` | `honestly_empty` |
+
+**5,734 pages carrying an overstated coverage state.** The 5,072 were also denied the accurate
+`facilities_only` banner on `community.html` ("Local government meeting and permit feeds for this area
+are still being wired — the EPA-registered facility records below are live public data"), which is the
+one piece of copy that tells those residents the truth about what they are looking at. The 662 are the
+ones that made CI red daily.
+
+**The rule, now explicit and pinned.** Coverage means sourced **civic/development** records — permits,
+planning + government notices, EPA-registered facilities. A Local News article is real, sourced content,
+still rides the page's news list, and can never lift a ZIP's coverage state on its own. `changes` counts
+civic rows only; `news_items` is reported **additively** so the news is visible in the instrument rather
+than hidden behind the narrower count.
+
+**Applied** — migration `app_coverage_state_view_civic_changes`; SQL of record updated in
+`docs/coverage-state-model.sql` with the correction and its receipts. **Verified live against the full
+population:** total 12,722 = meta 12,722, and all eight invariants 0 — `imp1..imp4 = 0`,
+**`legacy1 = 0`, `legacy2 = 0`**. New distribution: populated 5,020 · facilities_only 6,769 ·
+honestly_empty 924 (was populated 10,754 · facilities_only 1,697 · honestly_empty 262).
+
+**Nothing rendered changed and no layout gate moved** — layout is keyed on `data_quality`, which was not
+touched. What changed is state *copy*: 5,072 pages gain the accurate facilities-only banner, and 662
+pages' coverage-coming block switches to the honest-empty paragraph, which is true of them (government
+registries, permit feeds and the EPA registry all returned 0). Indexability is unaffected — it requires
+`_ndp > 0 or _nfc >= 3`, which news never satisfied.
+
+Pinned by `test/coverage-state-news-not-coverage.test.mjs` (14 assertions, including a self-test that
+feeds the classifier the pre-fix unfiltered count and requires the WRONG verdict, so a green run proves
+the narrowing is doing something) and by a new live assertion in `scripts/verify-coverage-state.mjs`:
+a ZIP with news and no other content must be `honestly_empty`.
