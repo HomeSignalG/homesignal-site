@@ -4639,3 +4639,26 @@ being statuses that fail closed. Invariants across all 62,388 records this entry
 enqueued all 70 dark Nassau pages in one statement and the SQL connection timed out mid-flight, leaving
 it ambiguous whether any fires were issued. Firing the two target ZIPs directly succeeded immediately.
 Scope the fire to the pages the change can actually affect.
+
+### CKAN / Carto / ODS half — Philly boundary ZIPs live, and a zero-record NYC entry found
+
+**Wired and live: `philadelphia-li-permits` → PA Montgomery + PA Delaware — 3 pages / 396 records**
+(19128 = 197, 19118 = 120, 19153 = 79; max page 0.19 MB). Predicted 397 from the entry's own scope, so
+this one landed within a single record. Invariants across all 10,993 records this entry places over 48
+pages: 0 missing `record_url`, 0 point-scope without coordinates, 0 unclassified.
+
+These are the ZIPs the Philadelphia County expansion deliberately left under Montgomery/Delaware
+("Census crosswalk, most-specific wins"). Safe to wire because it was **measured**: of every ZIP in
+Montgomery, Delaware, Bucks and Chester, exactly three appear in Philadelphia's L&I data and all three
+are Philadelphia neighbourhoods — no Pelham-Manor-equivalent to license by accident. That is precisely
+what makes it different from the 10470/Westchester case declined earlier today.
+
+🔴 **`nyc-dob-permit-issuance` has NEVER placed a record.** Wired across five boroughs, documented as
+live, 0 records cache-wide. Its `issuance_date` is text in MM/DD/YYYY while the connector emits an ISO
+literal, so the comparison is lexicographic and can never match. ZIP 11214: control 23,761 rows →
+0 with the connector's exact clause. Corrects the NY wire pass's "66,006 records" claim — all of it is
+DOB NOW. **Audited: 1 of 19 Socrata recency entries, not a class.** Gated, not fixed; the options and
+receipts are in `docs/source-registry.md`.
+
+**Native-ZIP seam is now closed** except `bellevue-permits`, whose server ignores both
+`returnDistinctValues` and groupBy.
