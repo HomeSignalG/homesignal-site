@@ -4585,3 +4585,24 @@ approach to it.
 
 Not fixed — sharding or budgeting that job is a workflow change (gated). Logged with the number so the
 next session can see the trend rather than rediscover the cliff.
+
+### Native-ZIP pass, second half — 5 more pages / 1,796 records
+
+Retried the ten ArcGIS entries that could not answer `returnDistinctValues` using **groupBy
+statistics**; 8 answered. Wired `little-rock-permits` → AR Saline (2 pages / 1,782) and
+`baltimore-county-permits` → MD Harford (1 / 8) + MD Howard (2 / 6). Rejected `gilbert` → AZ Yavapai
+(2 rows, ~80 mi away). Receipts: `docs/source-registry.md` → "Native-ZIP pass, second half".
+
+**A size oracle that works, worth reusing.** Little Rock has no `recency_days`, so 10,601 lifetime rows
+on one page looked like the ~19 MB page reverted in pass #1. Measured the ratio on that source's own
+cached pages instead of guessing — 72223 stores 6,033 of 45,585 and weighs 5.13 MB, so 13% survive at
+0.87 KB each → predicted ~1,730 records / ~1.1 MB. Actual: **1,782 / 0.78 MB**. A raw row count is a
+terrible size oracle; an existing page of the same source is a good one.
+
+⚠️ **And a wrong extraction that manufactured a plausible claim.** The first parse reported
+`little-rock-permits` → **NY Westchester**. Baltimore County aliases its count column `N` and Little
+Rock `n`, so a case-sensitive lookup missed it; the fallback took the first 5-digit-looking attribute
+and read Little Rock's **count of 10601** as a ZIP, which matched a real Westchester page. Nothing
+looked malformed — it was caught only because Little Rock permits in Westchester NY is absurd.
+**Key extraction on the column name, case-insensitively, never on value shape.** A count and a ZIP are
+both five digits.

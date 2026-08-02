@@ -3899,3 +3899,50 @@ minutes after the `deploy-edge-functions` run. Those pages read as dark while be
 (43035, 43065, 37064 lit; 86337 genuinely empty). **After a deploy, check the fire/collect result
 counts before concluding a page is dark** — 65 of 72 succeeded, and the 7 failures were exactly the
 pages that looked like misses.
+
+### Native-ZIP pass, second half — the groupBy retry (3 more pairs, 5 pages / 1,796 records)
+
+Ten ArcGIS native-ZIP entries could not answer `returnDistinctValues` — 8 rejected it outright, and 2
+(**Bellevue**, **Baltimore County**) *ignored* it and returned a full page of raw rows, which is the
+dangerous failure: it looks like an answer. Retried all ten with **groupBy statistics**, which both
+works on those servers and returns counts directly. Eight answered; Bellevue ignored the aggregation
+too and remains unresolved by this method.
+
+| entry | coverage added | pages | records | max page |
+|---|---|---|---|---|
+| `little-rock-permits` | AR Saline | 2 | 1,782 | 0.78 MB |
+| `baltimore-county-permits` | MD Harford | 1 | 8 | 0.01 MB |
+| `baltimore-county-permits` | MD Howard | 2 | 6 | 0.01 MB |
+
+All straddle the relevant county line (Alexander/Mabelvale across Pulaski/Saline; Whiteford,
+Marriottsville and Woodstock bordering Baltimore County). 21043 Ellicott City had 16 in-window rows and
+published none — its rows do not survive the entry's own type/status filters. Invariants across all
+51,266 records these two entries place over 63 pages: **0 missing `record_url`, 0 point-scope without
+coordinates, 0 unclassified.**
+
+Rejected: `gilbert-energov-permits` → AZ Yavapai 85324, **2 rows**, ~80 miles from Gilbert — the
+owner-mailing-address class.
+
+#### ✅ A size oracle that works: calibrate against the source's OWN cached pages
+
+`little-rock-permits` carries **no `recency_days`**, so 72002's 10,601 lifetime rows looked like the
+~19 MB page that had to be reverted in pass #1. Rather than guess or wire-and-hope, the ratio was
+measured on pages that source already serves: **72223 stores 6,033 of 45,585 in-window rows and weighs
+5.13 MB** — 13% survive, 0.87 KB each, because `status_to_bucket` publishes only 2 of its statuses and
+fail-closes the rest. That predicted **~1,730 records / ~1.1 MB**; the actual is **1,782 / 0.78 MB**.
+
+**A raw row count is a terrible size oracle; an existing page of the same source is a good one.** Use
+it before wiring any entry whose row counts look alarming — it costs one query and it is the
+difference between shipping and reverting.
+
+#### ⚠️ A wrong extraction manufactured a cross-country coverage claim
+
+The first parse of these groupBy results reported **`little-rock-permits` → NY Westchester**. It was an
+artifact, twice over: Baltimore County aliases the count column **`N`** and Little Rock **`n`**, so a
+case-sensitive `key='n'` lookup found nothing; and the fallback — "take the first attribute that looks
+like a 5-digit ZIP" — read Little Rock's **count of 10601** as a ZIP, which matched a real modelled
+Westchester page.
+
+Nothing in the output looked malformed. It was caught only because *Little Rock permits in Westchester,
+New York* is absurd on its face. **Key the extraction on the groupBy column name, case-insensitively —
+never on value shape.** A count and a ZIP are both five digits.
