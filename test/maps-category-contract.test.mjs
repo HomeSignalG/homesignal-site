@@ -200,6 +200,28 @@ for (const k of Object.keys(REG)) {
   ok(/^<(polygon|rect|circle)\b/.test(svg), `12b: symbol "${REG[k].symbol}" (${k}) renders a real shape`);
 }
 
+// ── 12c. The POLYGON path renders the right number of vertices ──────────────
+// This is what verify-maps' browser assertion `dashboard-no-triangle-marker` was really
+// trying to prove. It could not prove it: that check required a live dashboard to happen to
+// contain an `industrial` record, so it failed whenever the visitor's ZIP had none — a data
+// condition reported as a rendering defect, red daily since at least 2026-08-02. The claim is
+// deterministic and belongs here, where it always runs.
+{
+  const vertices = (svg) => {
+    const m = svg.match(/points="([^"]+)"/);
+    return m ? m[1].trim().split(/\s+/).filter(Boolean).length : 0;
+  };
+  eq(vertices(HS.shapeEl('triangle', 12, 12, 8, '#000', 3)), 3, '12c: triangle renders exactly 3 points');
+  eq(vertices(HS.shapeEl('diamond', 12, 12, 8, '#000', 3)), 4, '12c: diamond renders exactly 4 points');
+  eq(vertices(HS.shapeEl('pentagon', 12, 12, 8, '#000', 3)), 5, '12c: pentagon renders exactly 5 points');
+  eq(vertices(HS.shapeEl('hexagon', 12, 12, 8, '#000', 3)), 6, '12c: hexagon renders exactly 6 points');
+  eq(vertices(HS.shapeEl('octagon', 12, 12, 8, '#000', 3)), 8, '12c: octagon renders exactly 8 points');
+  // And at least one registered category actually USES the polygon path, so the assertions
+  // above cannot become dead letters if the registry is ever rewritten to circles only.
+  ok(Object.keys(REG).some((k) => ['triangle', 'diamond', 'pentagon', 'hexagon', 'octagon'].includes(REG[k].symbol)),
+    '12c: some category still uses a polygon symbol');
+}
+
 // ── 14. Marker totals are unchanged by classification (nothing may vanish) ───
 {
   const inputs = POSITIVE.map(([name]) => ({ type: 'unclassified', status: 'Approved', name }))

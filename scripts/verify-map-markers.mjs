@@ -130,20 +130,32 @@ async function verifyDashboard(page, fails) {
     const markers = mapEl.querySelectorAll('.maplibregl-marker svg, .leaflet-marker-icon svg, g.hspin svg');
     const pins = markers.length ? markers : svgs;
     if (!pins.length) return [{ err: 'dashboard-no-markers' }];
-    let sawTriangle = false;
+    // WAS: "at least one marker must be a triangle". That asserted a DATA condition — the
+    // triangle is the `industrial` category, so the check failed whenever the dashboard's live
+    // items happened to contain none, and it was red daily. The rendering claim it was reaching
+    // for (the polygon path emits the right vertex count) is deterministic and now lives in
+    // test/maps-category-contract.test.mjs §12c, where it always runs.
+    // What IS invariant here: every rendered pin must carry real geometry. A blank marker is a
+    // genuine rendering regression; an absent category is not.
+    const shapes = { polygon: 0, rect: 0, circle: 0, none: 0 };
     pins.forEach((svg) => {
       const html = svg.outerHTML || '';
-      if (html.indexOf('points=') !== -1) {
-        const m = html.match(/points="([^"]+)"/);
-        if (m && m[1].trim().split(/\s+/).filter(Boolean).length === 3) sawTriangle = true;
-      }
+      if (/<polygon\b/.test(html)) shapes.polygon++;
+      else if (/<rect\b/.test(html)) shapes.rect++;
+      else if (/<circle\b/.test(html)) shapes.circle++;
+      else shapes.none++;
     });
-    if (!sawTriangle) fails.push({ err: 'dashboard-no-triangle-marker' });
+    if (shapes.none) fails.push({ err: 'dashboard-marker-without-geometry', shapes });
+    // Reported either way, so a shift in the rendered mix is visible rather than silent.
+    fails.push({ info: 'dashboard-shape-histogram', shapes });
     const mapJs = Array.from(document.scripts).some((s) => /lib\/map\.js\?v=20260720b/.test(s.src || ''));
     if (!mapJs) fails.push({ err: 'dashboard-stale-mapjs-cache-bust' });
     return fails;
   });
-  if (dash.length) fails.push('Dashboard: ' + JSON.stringify(dash));
+  const dashInfo = dash.filter((d) => d.info);
+  const dashFails = dash.filter((d) => !d.info);
+  if (dashInfo.length) console.log('Dashboard: ' + JSON.stringify(dashInfo));
+  if (dashFails.length) fails.push('Dashboard: ' + JSON.stringify(dashFails));
 }
 
 async function verifyTracker(page, fails) {
