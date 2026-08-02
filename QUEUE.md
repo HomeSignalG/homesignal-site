@@ -4628,3 +4628,14 @@ registry change. That is a `communities` change affecting what residents see →
 
 Declined `marin-county-building-permits` → CA Sonoma: 94952 Petaluma returns 8 in-scope records
 (control 94901 = 19); Marin has no jurisdiction in Petaluma.
+
+**Go-live for the Nassau wire:** 11001 = **65** records, 11040 = **37** → **2 pages / 102 records**,
+0.07 MB max. Predicted 130 from a `$where` that carried the entry's `work_type` whitelist but not its
+status bucketing; 11040 matched exactly (37) and 11001 came in at 65 rather than 93, the difference
+being statuses that fail closed. Invariants across all 62,388 records this entry places over 213 pages:
+**0 missing `record_url`, 0 point-scope without coordinates, 0 unclassified.**
+
+⚠️ **Operational note: do not fire a whole county when the target is two pages.** The first attempt
+enqueued all 70 dark Nassau pages in one statement and the SQL connection timed out mid-flight, leaving
+it ambiguous whether any fires were issued. Firing the two target ZIPs directly succeeded immediately.
+Scope the fire to the pages the change can actually affect.
