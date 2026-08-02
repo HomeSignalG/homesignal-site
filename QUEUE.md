@@ -4881,3 +4881,32 @@ how `verify-geocodes` hid 11 consecutive dead runs.
 then buy the headroom. Not implemented in this session: raising concurrency without first re-measuring
 the `networkidle` change is how the 2026-07-24→28 red streak started, and this job is the
 anti-fabrication gate.
+
+### Measured while verifying the above: ~30 % of every rolling-refresh tick fails with HTTP 503
+
+This is the missing rate behind "a held page is not evidence of a refusal", and it is **pre-existing,
+not deploy fallout** — the `get-address-report` deploy ran 22:20:46–22:21:09 UTC and the pattern is
+identical on both sides of it:
+
+| tick (UTC) | 200 | **503** | timeouts |
+|---|---|---|---|
+| 22:00 (before the deploy) | 136 | **57** | 7 |
+| 22:15 (after the deploy)  | 126 | **71** | 3 |
+
+`dev_refresh_tick()` runs every 15 minutes and `dev_refresh_fire_batch(250, 20)` fires **250
+`net.http_post` calls in one statement**. The edge function will not take 250 at once, so roughly a
+third boot-fail. A 503 carries no JSON, so `dev_refresh_collect` writes nothing for those ZIPs — but the
+claim step has already bumped `last_refresh_attempt_at`. That is **exactly** the shape the coverage-state
+view reads as `temporarily_unavailable`: attempt newer than `refreshed_at`, attempt inside 48 h. It is
+how 20769 sat "held" for 5 days without the guard ever refusing it.
+
+**Self-correcting, so not changed.** A 503'd ZIP does not advance `refreshed_at`, and the batch is
+ordered `refreshed_at asc nulls first`, so it goes to the FRONT of the next tick. Throughput confirms it:
+**8,620 of 12,722 rows refreshed in the last 13 hours**, i.e. a full pass in well under a day.
+**Do not "fix" this by lowering `_batch`** — 250/tick is what buys that pass time; at 60/tick a full
+pass would take ~2 days, which is worse than a retry. The right fix, if one is wanted, is staggering the
+fires within a tick, not shrinking it.
+
+**Full-pass time, for the record:** the refresh is a **15-minute rolling job, not nightly** — 250 ZIPs
+per tick, oldest-first, ~13–20 h for all 12,722. The oldest row in the table sits at 123.7 h, and those
+are the held pages, whose `refreshed_at` deliberately does not advance.
