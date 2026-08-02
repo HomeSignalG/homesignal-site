@@ -78,14 +78,41 @@ async function loadReports() {
       await new Promise((r) => setTimeout(r, 2500 * floorRetries));
       continue;
     }
+    // A 200 can still arrive TRUNCATED: these rows carry the whole `sites` array (up to ~19.6 MB
+    // each), so a large page can drop mid-stream and res.json() throws "Unterminated string in
+    // JSON". That killed the 2026-08-02 scheduled run in 4 minutes. The ladder above already
+    // knows how to react to "page too big" — it just never saw this signal, because it only
+    // covered !res.ok. Route a body failure down the same path.
+    let page;
+    try {
+      page = await res.json();
+    } catch (e) {
+      if (step > 1) { step = Math.max(1, Math.floor(step / 2)); clean = 0; continue; }
+      floorRetries++;
+      if (floorRetries > 3) throw new Error(`Supabase development_reports body unreadable at floor page size: ${e.message}`);
+      await new Promise((r) => setTimeout(r, 2500 * floorRetries));
+      continue;
+    }
     floorRetries = 0;
-    const page = await res.json();
     rows.push(...page);
     if (page.length < step) break;
     last = page[page.length - 1].zip;
     if (++clean >= 3 && step < 40) { step = Math.min(40, step * 2); clean = 0; }
   }
   return rows;
+}
+
+/** res.json() that cannot take the run down. A Supabase 200 can arrive TRUNCATED when the row
+ *  carries a multi-MB `sites` array, and an unguarded parse throws past every retry path — the
+ *  2026-08-02 class of failure. Callers that already degrade gracefully on !res.ok get the same
+ *  fallback here, so a torn body behaves like an unavailable read rather than a crash. */
+async function jsonOr(res, fallback, what) {
+  try {
+    return await res.json();
+  } catch (e) {
+    console.log(`  [warn] ${what}: response body unreadable (${e.message}) — treating as unavailable`);
+    return fallback;
+  }
 }
 
 // NATIONWIDE SUBSTANCE GATE (PLAN.md §11, founder-approved threshold c): the advertised
@@ -102,7 +129,8 @@ async function loadIndexableZips() {
     const url = `${SUPABASE_URL}/rest/v1/app_community_meta?select=zip&indexable=is.true&order=zip.asc&limit=1000` + (last ? `&zip=gt.${encodeURIComponent(last)}` : '');
     const res = await fetch(url, { headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` } });
     if (!res.ok) return zips;
-    const page = await res.json();
+    const page = await jsonOr(res, null, 'app_community_meta indexable page');
+    if (!Array.isArray(page)) return zips;   // torn body → return what we have, same as !res.ok
     for (const r of page) zips.add(r.zip);
     if (page.length < 1000) break;
     last = page[page.length - 1].zip;
@@ -121,11 +149,11 @@ async function readZipState(zip) {
     fetch(`${SUPABASE_URL}/rest/v1/app_community_meta?zip=eq.${q}&select=indexable&limit=1`, { headers: hdr }),
   ]);
   if (!rr.ok) return null;
-  const rows = await rr.json();
+  const rows = await jsonOr(rr, null, `development_reports zip=${zip}`);
   if (!Array.isArray(rows) || !rows.length) return null;
   let indexable = false;
   if (mr.ok) {
-    const m = await mr.json();
+    const m = await jsonOr(mr, null, `app_community_meta zip=${zip}`);
     indexable = !!(Array.isArray(m) && m[0] && m[0].indexable === true);
   }
   return { rep: rows[0], indexable };
@@ -138,7 +166,7 @@ async function loadPropertyReports() {
     headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` },
   });
   if (!res.ok) return [];   // table not present yet → nothing to verify (not a failure)
-  return res.json();
+  return jsonOr(res, [], 'property_reports');
 }
 
 // Navigation with ONE retry on timeout. At full-walk scale (5,900+ page loads) a
