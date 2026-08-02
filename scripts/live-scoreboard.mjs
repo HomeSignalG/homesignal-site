@@ -49,6 +49,11 @@ function flattenRegistry(path) {
 
 // Keyset-paginated: PostgREST caps un-paginated reads at 1,000 rows, and a silent truncation
 // here would understate every denominator (the documented verifier defect).
+// Same one-constant rule as ZIP_SOURCE_PAGE below: the URL limit and the loop terminator are
+// the SAME number by construction. Two literals that must agree is how a paged read silently
+// truncates — lower one and the loop stops after page 1, reporting a partial set as complete.
+const COMMUNITIES_PAGE = 1000;
+
 async function fetchZipPages() {
   if (!SUPABASE_URL || !KEY) throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required');
   const hdr = { apikey: KEY, Authorization: `Bearer ${KEY}` };
@@ -59,7 +64,7 @@ async function fetchZipPages() {
     // PostgREST take the first, `id` comes back undefined, the cursor never advances and this
     // loop re-reads page 1 forever. That is not hypothetical: it burned a run before this guard.
     const url = `${SUPABASE_URL}/rest/v1/communities`
-      + `?select=id,zip_codes,state,county&level=eq.zip&order=id.asc&limit=1000`
+      + `?select=id,zip_codes,state,county&level=eq.zip&order=id.asc&limit=${COMMUNITIES_PAGE}`
       + (last ? `&id=gt.${encodeURIComponent(last)}` : '');
     const r = await fetch(url, { headers: hdr });
     if (!r.ok) throw new Error(`communities read failed: HTTP ${r.status}`);
@@ -74,7 +79,7 @@ async function fetchZipPages() {
       rows.push({ zip: (c.zip_codes || [])[0] || c.id, state: c.state, county: c.county || null });
     }
     last = cursor;
-    if (page.length < 1000) break;
+    if (page.length < COMMUNITIES_PAGE) break;
   }
   return rows;
 }
@@ -94,6 +99,17 @@ async function fetchZipPages() {
  * call returned the first 5,000 ZIPs only, NV's 89xxx range sorted past the end, and every
  * NV page read as dark. The zero looked exactly like a real finding.
  */
+// PAGE SIZE IS ONE CONSTANT, USED IN BOTH PLACES ON PURPOSE (2026-08-02).
+// It was the literal 5000 twice, and that killed this job: p_limit=5000 returns all 4,286 ZIPs
+// in ONE page and takes 14,350 ms measured, over PostgREST's statement timeout — the monitor
+// died in ~19s on HTTP 500 / 57014 every night and never reached the wire step. At 1000 the same
+// call is 1,522 ms.
+// The two uses MUST move together. Lowering only the request would leave the terminator at
+// `page.length < 5000`, so the loop would break after the first page and the scoreboard would
+// silently rank on 1,000 of 4,286 ZIPs — a wrong answer that looks like a right one, which is
+// worse than the timeout it replaced.
+const ZIP_SOURCE_PAGE = 1000;
+
 async function fetchZipSourceIds() {
   const hdr = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
   const map = new Map();
@@ -101,7 +117,7 @@ async function fetchZipSourceIds() {
   for (;;) {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/dev_zip_source_ids`, {
       method: 'POST', headers: hdr,
-      body: JSON.stringify({ p_after: after, p_limit: 5000 }),
+      body: JSON.stringify({ p_after: after, p_limit: ZIP_SOURCE_PAGE }),
     });
     if (!r.ok) throw new Error(`dev_zip_source_ids failed: HTTP ${r.status} ${await r.text()}`);
     const page = await r.json();
@@ -112,7 +128,7 @@ async function fetchZipSourceIds() {
       throw new Error('keyset cursor missing: `zip` not returned — refusing to loop');
     }
     after = cursor;
-    if (page.length < 5000) break;
+    if (page.length < ZIP_SOURCE_PAGE) break;
   }
   return map;
 }

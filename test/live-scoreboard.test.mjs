@@ -4,6 +4,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   entryCompleteness, coversZip, scoreStates, rankRegistryWork, rankDiscoveryWork,
   isFloorSource, LIVE_THRESHOLD,
@@ -220,3 +221,34 @@ test('ROW 264 — all four bucket KEYS must be present; a missing key is PARTIAL
   assert.equal(m.entryCompleteness({ status_const: 'approved', type_map: { A: 'x' } }).complete, true);
 });
 
+
+// ── The RPC page size must be ONE constant, used for BOTH the request and the loop terminator.
+// 2026-08-02: it was the literal 5000 twice. p_limit=5000 returns all 4,286 ZIPs in one page at
+// 14,350 ms measured — past PostgREST's statement timeout — so source-monitor died in ~19s on
+// HTTP 500 / 57014 every night. At 1000 the same call is 1,522 ms.
+//
+// The dangerous repair is the half one: lower the request but leave `page.length < 5000` and the
+// loop breaks after the first page, ranking on 1,000 of 4,286 ZIPs. That is a WRONG scoreboard
+// that looks right — strictly worse than the timeout, because the timeout was loud.
+test('dev_zip_source_ids paging uses one shared constant, never a literal', () => {
+  const src = readFileSync(new URL('../scripts/live-scoreboard.mjs', import.meta.url), 'utf8');
+  const code = src.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+
+  assert.match(code, /const ZIP_SOURCE_PAGE = \d+;/, 'page size must be a named constant');
+  assert.match(code, /p_limit:\s*ZIP_SOURCE_PAGE/, 'the request must use the constant');
+  assert.match(code, /page\.length\s*<\s*ZIP_SOURCE_PAGE/, 'the loop terminator must use the same constant');
+
+  // No bare numeric page size may survive in either position — that is how they drift apart.
+  assert.doesNotMatch(code, /p_limit:\s*\d+/, 'p_limit must not be a numeric literal');
+  assert.doesNotMatch(code, /page\.length\s*<\s*\d+/, 'the terminator must not be a numeric literal');
+
+  // And it must stay under the measured timeout ceiling: 1000 → 1.5s, 5000 → 14.3s (fails).
+  const size = Number(code.match(/const ZIP_SOURCE_PAGE = (\d+);/)[1]);
+  assert.ok(size > 0 && size <= 2000, `ZIP_SOURCE_PAGE=${size} risks the statement timeout (5000 measured at 14,350 ms)`);
+
+  // The communities read has the SAME shape (URL limit + terminator) and the same hazard.
+  assert.match(code, /const COMMUNITIES_PAGE = \d+;/);
+  assert.match(code, /limit=\$\{COMMUNITIES_PAGE\}/, 'the communities URL limit must use the constant');
+  assert.match(code, /page\.length\s*<\s*COMMUNITIES_PAGE/, 'its terminator must use the same constant');
+  assert.doesNotMatch(code, /limit=\d+/, 'no paged read may hard-code its URL limit');
+});
