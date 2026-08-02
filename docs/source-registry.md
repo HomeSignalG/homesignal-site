@@ -3819,3 +3819,83 @@ your hypothesis is the most dangerous zero there is.**
 (7 of the 200 were not rewritten — their responses did not land in the collect window. Not the transient
 guard, which cannot apply to a page whose cached development count is 0. Reported as 193 measured
 rather than 200, so the denominator is the one actually observed.)
+
+## NATIVE-ZIP PASS (2026-08-02) — asking each layer which ZIPs it holds
+
+A third seam, and a different method from the two envelope passes. Those only reach entries with
+`spatial_zip_radius_mi`; **57 registry entries scope by native ZIP instead**, and for those the layer
+itself can name the ZIPs it holds — no proximity heuristic. Queried `returnDistinctValues` on all 31
+ArcGIS native-ZIP entries, mapped the returned ZIPs to modelled pages, kept those whose county the
+entry does not declare, then measured each candidate.
+
+### Wired — 6 pairs across 4 entries, **11 pages / 1,503 records** (measured after deploy + re-cache)
+
+| entry | coverage added | pages | records |
+|---|---|---|---|
+| `columbus-building-permits` | OH Delaware | 4 | 1,095 |
+| `nashville-building-permits-issued` | TN Williamson | 3 | 157 |
+| `spokane-county-building-planning-permits` | WA Stevens | 1 | 141 |
+| `nashville-building-permits-issued` | TN Wilson | 1 | 54 |
+| `coconino-county-permits` | AZ Yavapai | 1 | 44 |
+| `nashville-building-permits-issued` | TN Rutherford | 1 | 12 |
+
+Each is real geography: Columbus city limits genuinely extend into Delaware County (Polaris 43240 =
+491 records, Powell 43065, Lewis Center 43035); Brentwood 37027 and Nolensville 37135 straddle
+Davidson/Williamson; 99026 is unincorporated Spokane County land lying in Stevens; Sedona 86336
+straddles Coconino/Yavapai. Invariants across all 59,761 records these four entries place over 130
+pages: **0 missing `record_url`, 0 point-scope without coordinates, 0 unclassified.**
+
+### ⚠️ A distinct ZIP value is a LEAD, not coverage — the mailing-address class
+
+The decisive rejections, and the reason this method needs a second gate:
+
+| candidate | records in scope |
+|---|---|
+| `tempe-building-permits` → CA Contra Costa 94804 | **1** |
+| `coconino-county-permits` → AZ Yuma 85364 | **1** |
+| `coconino-county-permits` → AZ Mohave 86409 | **1** |
+| `detroit-building-permits` → MI Oakland 48220 | **3** |
+| `louisville-active-construction-permits` → KY Oldham (3 ZIPs) | **8** |
+| `tacoma-accela-permits` → WA King 98034 | **9** |
+
+An Arizona city's permit layer carrying a **California** ZIP is an owner mailing address or a typo,
+not a building. Wiring these would place records on pages where nothing is being built — the
+`las-vegas-building-permits` defect class. **The discriminator is record count in the connector's own
+scope plus geographic plausibility, never the presence of the value.** A handful of rows in a distant
+county is noise; hundreds in an adjacent one is a city that straddles a county line.
+
+### ⚠️ THREE hypotheses, two falsified, and the answer was in this file the whole time
+
+`coconino → AZ Yavapai` was predicted at **1,492 records over 2 pages** and delivered **44 over 1**.
+Worth recording how that was chased, because two plausible explanations were wrong:
+
+1. **"The page clips to `ZIP_RADIUS_MI` (3 mi)."** Falsified — 86336's stored records span up to
+   **15.21 mi** from the ZIP centroid (mean 8.17). There is no radius clip on a native-ZIP entry.
+2. **"My probe used `LIKE '86336%'`, the connector uses `=`."** Falsified — exact equality also
+   returns **1,487**, and `86336` is the only variant of that value in the column.
+3. **The actual cause: I probed OUTSIDE the connector's scope while claiming I was inside it.** The
+   entry carries `recency_days: 365` **and** a substantial `extra_where` (department whitelist +
+   PermitTypeCode exclusions). I noted "coconino: no recency in entry" — which was simply wrong — and
+   omitted both. **In the entry's own scope 86336 holds 146 rows, not 1,487**, and 44 published after
+   status bucketing.
+
+**The 146 was already written in this entry's own `_receipts` field, by the previous pass, one day
+earlier:** *"In the entry's OWN scope (department whitelist + recency_days 365) the ZIP histogram is
+… 86336 146 …"*. It was re-derived wrongly instead of read. That is exactly the failure CLAUDE.md
+describes — a receipt-carrying doc is *the first place to look and the last place to trust*, and
+skipping the look is the same error as over-trusting it. **Read the entry's `_receipts` before
+probing that entry.**
+
+The wiring decision itself stands on the corrected number: 146 in-scope rows is real Coconino County
+permit activity in a ZIP that genuinely straddles the county line, and the page went 0 → 44. Only the
+predicted figure was wrong. 86337 was predicted as a second page and is correctly dark — it does not
+appear in the in-scope histogram at all.
+
+### Operational note — post-deploy cold starts
+
+The first re-cache produced **6 × `503 BOOT_ERROR`** plus 1 timeout out of 72 fires, landing four
+minutes after the `deploy-edge-functions` run. Those pages read as dark while being merely pending:
+`last_refresh_attempt_at` had advanced but `refreshed_at` had not. Re-firing them recovered all four
+(43035, 43065, 37064 lit; 86337 genuinely empty). **After a deploy, check the fire/collect result
+counts before concluding a page is dark** — 65 of 72 succeeded, and the 7 failures were exactly the
+pages that looked like misses.
