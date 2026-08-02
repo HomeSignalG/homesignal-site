@@ -21,6 +21,7 @@
 
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { assertCommunityRow, indexable } from './lib/verify-communities-assert.mjs';
 import {
   loadZipStateCrosswalk,
   assertQuarantineIsHonest,
@@ -107,7 +108,10 @@ async function readPage(page, zip) {
   });
 }
 
-const indexable = (r) => /(^|[^n])index/i.test(r) && !/noindex/i.test(r);
+// `indexable` + the whole per-row comparison now live in the pure core so the RACE GUARD is
+// unit-testable offline (see scripts/lib/verify-communities-assert.mjs and its suite).
+// eslint-disable-next-line no-unused-vars
+
 
 // ── PHASE 0: cross-state ZIP modeling guard (data-only, no browser) ────────────
 // Reads every communities row and asserts the geographic model against the
@@ -209,49 +213,14 @@ async function main() {
     for (;;) {
       const i = cursor++;
       if (i >= walked.length) break;
-      let row = walked[i];
+      const row = walked[i];
       try {
         const st = await readPage(page, row.zip);
-        const tag = `${row.state} ${row.zip} (${row.name})`;
-        // RACE GUARD (2026-08-02). The meta table is read ONCE up front and the 12,722 pages
-        // are walked over the following ~15 minutes, while the materializer keeps re-stamping
-        // rows on its own schedule. A row it rewrites mid-walk makes the snapshot disagree with
-        // a page that is in fact rendering the CURRENT flag correctly.
-        //   Observed: 97212 / 97221 / 97232 (Portland OR) all failed on run 30768231260, all
-        //   three with updated_at 21:40:00 — inside a run that started 21:35 and read those
-        //   pages after. Two had flipped true -> false and one false -> true, so the pages were
-        //   right in BOTH directions and the snapshot was stale in both.
-        // Re-read the one row before calling it a failure. This never weakens the gate: a page
-        // that genuinely contradicts the CURRENT flag still fails, and every substitution is
-        // logged so a re-read can never quietly become the way a real defect is dismissed.
-        if (row.data_quality === 'pass' && row.indexable !== indexable(st.robots)) {
-          const fresh = (await rest(`app_community_meta?select=zip,data_quality,indexable&zip=eq.${encodeURIComponent(row.zip)}`))[0];
-          if (fresh && (fresh.indexable !== row.indexable || fresh.data_quality !== row.data_quality)) {
-            console.log(`  ~ ${tag} · meta changed mid-walk (indexable ${row.indexable} -> ${fresh.indexable}, `
-              + `data_quality ${row.data_quality} -> ${fresh.data_quality}) — re-checked against the fresh row`);
-            row = { ...row, data_quality: fresh.data_quality, indexable: fresh.indexable };
-            reReads++;
-          }
-        }
-        if (row.data_quality !== 'pass') {
-          // coverage_coming: honest coverage page, never indexed (flag must be false too).
-          if (st.isPass) fails.push(`${tag}: meta says coverage_coming but the page rendered a PASS state`);
-          else if (row.indexable) fails.push(`${tag}: coverage_coming row has indexable=true (materializer bug)`);
-          else if (indexable(st.robots)) fails.push(`${tag}: coverage-coming page is INDEXABLE (robots="${st.robots}")`);
-          else console.log(`  ✓ ${tag} · coverage-coming · noindex`);
-        } else if (!st.isPass) {
-          fails.push(`${tag}: expected a PASS page (real records) but got ${st.isCoverage ? 'coverage-coming' : st.isNotCovered ? 'not-covered' : 'an unrecognized state'}`);
-        } else if (row.indexable && !indexable(st.robots)) {
-          fails.push(`${tag}: substance-flagged page is NOT indexable (robots="${st.robots}")`);
-        } else if (!row.indexable && indexable(st.robots)) {
-          fails.push(`${tag}: pass-but-thin page is INDEXABLE (robots="${st.robots}") — must stay noindex`);
-        } else if (!st.h1.includes(row.zip)) {
-          fails.push(`${tag}: rendered H1 "${st.h1}" does not contain the ZIP`);
-        } else {
-          const bad = st.recordLinks.filter(h => !/^https?:\/\//i.test(h));
-          if (bad.length) fails.push(`${tag}: ${bad.length} "public record" link(s) without a real http URL (anti-fabrication)`);
-          else console.log(`  ✓ ${tag} · pass · ${row.indexable ? 'indexable' : 'thin/noindex'} · ${st.recordLinks.length} record link(s)`);
-        }
+        const res = await assertCommunityRow(row, st, async (zip) =>
+          (await rest(`app_community_meta?select=zip,data_quality,indexable&zip=eq.${encodeURIComponent(zip)}`))[0] || null);
+        if (res.reRead) reReads++;
+        for (const n of res.notes) console.log(n);
+        fails.push(...res.fails);
       } catch (e) {
         fails.push(`${row.state} ${row.zip} (${row.name}): ${e.message.split('\n')[0]}`);
       }
