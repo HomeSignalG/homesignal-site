@@ -4377,3 +4377,96 @@ after 5 August, the guard analysis is wrong and needs revisiting.
 **The other two failures are unrelated to this session:** 20769 (last refreshed 2026-07-28, 1 record)
 and 23451 (refreshed today, 2,552 records) are also in `temporarily_unavailable`. Not diagnosed —
 23451 in particular has plenty of content, so its state looks stale rather than earned.
+
+### 20769 diagnosed, 23451 self-resolved — the guard cannot tell a dead source from an honest zero
+
+Closing the gap I flagged one section above ("Not diagnosed"). Both are now settled, and one of my
+two guesses there was wrong.
+
+**23451 (Virginia Beach) — my guess was wrong, and it resolved without intervention.** I wrote that
+its state "looks stale rather than earned." It is now `populated`:
+
+```
+23451 | coverage_state=populated | refreshed_at=2026-08-01 19:45Z | dev_markers=2405
+```
+
+It was mid-cycle, not stuck. Nothing was done to it. Recording the correction rather than leaving the
+speculation standing.
+
+**20769 (Glenn Dale MD) — the same guard as 55103, a completely different cause.** The cached row:
+
+```
+zip=20769  refreshed_at=2026-07-28 20:45:00Z  sites=10  sourced=1
+counts={"development":1,"facilities":9}
+```
+
+Its one sourced record, quoted whole:
+
+```
+rid=prince-georges-county-permits  scope=area  bucket=operating  file_date=2025-07-29
+title="POF FAIRWAYS GLENN DALE MD LP SFD POF  - K. Hovnanian- ALASK"
+```
+
+and that entry in `jurisdiction-registry.json` on `origin/main`:
+
+```
+"registry_id": "prince-georges-county-permits",
+"recency_days": 365,
+"column_map": { "file_date": "permit_issuance_date", ... }
+```
+
+`2025-07-29 + 365d = 2026-07-29`. **The record left the source's own recency window the day after the
+last successful cache write.** From that day on the engine has honestly returned nothing —
+receipt, straight from `net._http_response`:
+
+```
+id=1761  created=2026-08-02 00:15:02Z  status=200
+counts={"development":0,"facilities":9}
+```
+
+The guard in `dev_refresh_collect()` refuses that write (cached `development`=1 > 0, new = 0,
+`refreshed_at` inside 7 days) and does not bump `refreshed_at` — which is exactly what
+`app_coverage_states` shows: `last_refresh_attempt_at=2026-08-02 00:15` newer than
+`refreshed_at=2026-07-28 20:45`. The attempt is made nightly and rejected nightly.
+
+Note `dev_markers` was **already 0** before any of this: the record is `scope: "area"`, so it never
+rendered as a map marker. Only the counts carried it.
+
+**And the 55103 claim I had been inferring now has its own receipt** — three consecutive live
+responses, all 200, all zero:
+
+```
+id=254   2026-08-01 22:45:03Z  {"development":0,"facilities":40}
+id=1263  2026-08-01 23:45:03Z  {"development":0,"facilities":40}
+id=1763  2026-08-02 00:15:02Z  {"development":0,"facilities":40}
+```
+
+#### The generalization, which is the part worth keeping
+
+`dev_refresh_collect`'s transient-safe guard exists to stop a flaky FRS night from blanking a good
+page. It decides on one signal — *new development count is 0 while the cached one is not* — and that
+signal **cannot distinguish a flake from a legitimate transition to zero**. Two entirely independent
+causes produced byte-identical behaviour this week:
+
+| ZIP | why the source now returns 0 | guard releases |
+|---|---|---|
+| 55103 | entry `saint-paul-approved-building-permits` **retired** 2026-07-28 | ~2026-08-05 04:15Z |
+| 20769 | its only record **aged out** of `recency_days: 365` on 2026-07-29 | ~2026-08-04 20:45Z |
+
+So whenever a source is retired, or a page's last record ages out, that page keeps displaying the
+stale content for **exactly 7 days** and `verify-coverage-state` reports `temporarily_unavailable`
+for the whole window. The verifier going red there is *expected behaviour*, not a new defect — which
+is worth knowing before someone "fixes" the verifier.
+
+**Two falsifiable predictions with dates.** 20769 should drop to facilities-only (9 EPA facilities,
+0 development) after **2026-08-04 20:45Z**; 55103 should drop off its 20,000 stale records after
+**2026-08-05 04:15Z**. If either is still showing its stale content on 6 August, this analysis is
+wrong and the guard needs re-reading.
+
+**Not fixed — teaching the guard the difference is a code change (gated).** The shape a fix would
+take, so it isn't re-derived: the guard would need a second signal that separates "the source
+answered and had nothing" from "the source did not answer" — the engine already knows which, but the
+count it hands the collector does not carry it.
+
+**Still in flight:** `verify-development` run `30721217869` is at 2 h 20 m as of 2026-08-02 00:42Z,
+step "Verify development pages" still running. Not a pass. If it reaches 6 h it joins the broken list.
