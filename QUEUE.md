@@ -4299,6 +4299,28 @@ else. That is the wrong way to find this, so I swept **every scheduled workflow*
 | sitemap | 2026-08-01 | — | healthy |
 | load-openaddresses | 2026-08-01 | — | healthy |
 
+> ⚠️ **THE TABLE ABOVE IS THE 2026-07-31 SWEEP AND IS SUPERSEDED — see below.** It is kept because
+> the per-cause breakdown is still the useful part; its *counts* are stale. An external audit on
+> 2026-08-02 measured **7 of 11** red, not 6: `verify-development` went red after this was written.
+
+### Measured state, 2026-08-02 evening — all six repaired
+
+| workflow | was | repair | PR |
+|---|---|---|---|
+| `verify-geocodes` | 11 runs cancelled at the 6h cap; then a torn-body crash at 1m39s | coordinate dedup (63,216 → 42,222), bounded worker pool, 3.5h script budget + `timeout-minutes: 240`; then the truncated-body guard | #553, #554 |
+| `verify-development` | red on `Unterminated string in JSON` | same truncated-body class — **five** unguarded parses, incl. a single-row read of a ~19.6 MB `sites` array | #555 |
+| `source-monitor` | `57014` in ~19s, never reached the wire step | RPC page size is one constant **and degrades**: starts 250, halves to a floor of 50 on `57014`, never advances the cursor on failure | #556, #557 |
+| `verify-maps` | `dashboard-no-triangle-marker` daily | it asserted a DATA condition (an `industrial` record present in live items). Deterministic claim moved offline (§12c vertex counts); browser check now asserts every pin carries real geometry | #558 |
+| `verify-communities` | nav timeouts, 30s **and** 45s | `networkidle` is unreachable with 8 concurrent tabs on a Supabase-backed page, and redundant — `#commPage` content is the real readiness signal | #559 |
+| `verify-representative-zips` | `cached development 3658 > 0` | **stale fixture**: 85004 was the facilities-only exemplar before `phoenix-building-permits` was wired. Moved to 58102 Fargo ND; 85004 retained as a dev-backed metro | #559 |
+| `verify-coverage-state` | 5 ZIPs `temporarily_unavailable` | **the verifier was right, its expectation was wrong** — that state is designed and bounded to 7 days by `dev_refresh_collect`. Now fails only on a hold that outlives its window | #559 |
+
+**Correction to a finding recorded earlier in this file:** the refresh guard was logged as unable to
+"distinguish a dead source from an honest zero". The observation is true; calling it a defect was
+not. `dev_refresh_collect`'s refusal is explicitly bounded by
+`d.refreshed_at >= now() - interval '7 days'` and its own comment states that beyond that the flake
+theory is exhausted and the clean 200 is the truth. It is a deliberate, self-releasing trade-off.
+
 ### The important part is that these are NOT one problem
 My first hypothesis — that the verification suite had simply outgrown its budget as the site reached
 12,722 pages — is **wrong**, and I checked rather than shipping it. The causes are genuinely different:
@@ -4657,8 +4679,11 @@ what makes it different from the 10470/Westchester case declined earlier today.
 live, 0 records cache-wide. Its `issuance_date` is text in MM/DD/YYYY while the connector emits an ISO
 literal, so the comparison is lexicographic and can never match. ZIP 11214: control 23,761 rows →
 0 with the connector's exact clause. Corrects the NY wire pass's "66,006 records" claim — all of it is
-DOB NOW. **Audited: 1 of 19 Socrata recency entries, not a class.** Gated, not fixed; the options and
-receipts are in `docs/source-registry.md`.
+DOB NOW. **Audited: 1 of 19 Socrata recency entries, not a class.**
+✅ **FIXED 2026-08-02 (founder-authorised, #552)** — additive `recency_expr` on the socrata
+connector, cutoff substituted at request time so the window keeps rolling. Verified live: engine
+run report for 11214 `fetched 92, emitted 92, 0 quarantined`; 43 of 51 re-cached borough pages now
+carry records. Options considered and rejected, with receipts, in `docs/source-registry.md`.
 
 **Native-ZIP seam is now closed** except `bellevue-permits`, whose server ignores both
 `returnDistinctValues` and groupBy.

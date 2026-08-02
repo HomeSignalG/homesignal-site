@@ -559,9 +559,13 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   push — that's the whole point of §0.
 - Develop on the assigned feature branch, commit with clear messages, push to that
   branch. Don't open a PR unless asked.
-- **No test/lint suite** exists (static site). "Verify" means: apply the SQL, then
-  load the affected page (e.g. `community.html?zip=…`) and confirm it renders and
-  reads the right rows.
+- ⚠️ **"No test/lint suite" is NO LONGER TRUE — corrected 2026-08-02.** There is a **73-file
+  offline unit suite** (`node scripts/run-unit-tests.mjs`, gated in CI by `unit-tests.yml`,
+  which also hard-asserts Playwright resolves so browser suites cannot skip to a false green),
+  plus **11 scheduled live verifiers**. Run the unit suite before opening a PR.
+  "Verify" for a DATA change still means what it always did: apply the SQL, then load the
+  affected page (e.g. `community.html?zip=…`) and confirm it renders and reads the right rows —
+  the suite covers code, not the contents of the database.
 - **Automated live verification (CI).** The build sandbox can't reach Supabase/`homesignal.net`
   (egress blocked), so `.github/workflows/verify-communities.yml` + `scripts/verify-communities.mjs`
   do the live check on a GitHub runner: they read the **live `communities` table** and, for
