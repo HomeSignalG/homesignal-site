@@ -83,10 +83,28 @@ export const REPRESENTATIVE_ZIPS = [
     expect: { devMin: 1, mapMarkers: true, badges: true },
   },
   {
-    zip: '85004',
-    label: 'Phoenix AZ — facilities-only honest empty',
-    state: 'AZ',
+    // 2026-08-02: this slot WAS 85004 "Phoenix AZ — facilities-only honest empty", devMax: 0.
+    // Wiring `phoenix-building-permits` made that page dev-backed (3,651 sourced records), so
+    // the verifier was correctly reporting that the page no longer matched an expectation which
+    // had itself gone stale — a fixture failing, not a product defect. It went red daily.
+    //
+    // The assertion still earns its place: it proves the honest facilities-only page renders the
+    // EPA-only coverage copy rather than a blank or a fabricated one. So it moves to a ZIP that
+    // is genuinely facilities-only — Fargo ND, in a state with no wired per-record permit source,
+    // so it will not flip the moment a metro gets wired. Verified 2026-08-02: facilities 40,
+    // development 0, sourced records 0.
+    zip: '58102',
+    label: 'Fargo ND — facilities-only honest empty',
+    state: 'ND',
     expect: { devMax: 0, facilitiesOnly: true, mapMarkers: true },
+  },
+  {
+    // And 85004 keeps its coverage as what it now IS — a dev-backed Phoenix page. Losing the
+    // exemplar entirely would have quietly dropped a metro from the representative set.
+    zip: '85004',
+    label: 'Phoenix AZ — city permit ledger (phoenix-building-permits)',
+    state: 'AZ',
+    expect: { devMin: 10, mapMarkers: true },
   },
   {
     zip: '01012',
