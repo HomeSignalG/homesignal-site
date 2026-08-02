@@ -41,7 +41,16 @@ async function loadCachedRow(zip) {
     { headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` } },
   );
   if (!res.ok) throw new Error(`Supabase read ${zip}: ${res.status}`);
-  const rows = await res.json();
+  // A single development_reports row carries its whole `sites` array (up to ~19.6 MB), so a 200
+  // can still arrive truncated and res.json() throws. Fail with the ZIP named rather than an
+  // anonymous SyntaxError — the 2026-08-02 class that killed verify-development and
+  // verify-geocodes outright.
+  let rows;
+  try {
+    rows = await res.json();
+  } catch (e) {
+    throw new Error(`Supabase read ${zip}: response body unreadable (${e.message})`);
+  }
   return rows[0] || null;
 }
 
