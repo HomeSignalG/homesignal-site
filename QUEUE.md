@@ -4910,3 +4910,19 @@ fires within a tick, not shrinking it.
 **Full-pass time, for the record:** the refresh is a **15-minute rolling job, not nightly** — 250 ZIPs
 per tick, oldest-first, ~13–20 h for all 12,722. The oldest row in the table sits at 123.7 h, and those
 are the held pages, whose `refreshed_at` deliberately does not advance.
+
+### ⚠️ The verify-communities race guard is GREEN but UNPROVEN — it has never fired
+
+Run 30769638076 on the merged head: **12,722 pages checked, Failed: 0**, and the new counter reads
+**"Rows re-read after a mid-walk materializer change: 0"**.
+
+That zero is the honest reading of the run, and it means the guard **did not run**, not that it works.
+The three Portland failures it was written for did not recur, so the pass proves only that no race
+occurred this time. By this repo's own rule — *an instrument must prove it ran before its silence counts
+as evidence* — the guard is currently a latent instrument with no test behind it: there is no unit
+coverage for the re-read path either, because the mismatch branch needs a live REST round-trip.
+
+**Follow-up, logged not done:** give `assertZip`-style purity to the substance-gate comparison so the
+re-read branch can be driven offline with a stubbed `rest()`, and assert both outcomes (flag changed →
+re-check and pass; flag unchanged → still fail). Until then, treat a green
+`verify-communities` as evidence about the PAGES, not about the guard.
