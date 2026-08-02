@@ -230,23 +230,41 @@ test('ROW 264 — all four bucket KEYS must be present; a missing key is PARTIAL
 // The dangerous repair is the half one: lower the request but leave `page.length < 5000` and the
 // loop breaks after the first page, ranking on 1,000 of 4,286 ZIPs. That is a WRONG scoreboard
 // that looks right — strictly worse than the timeout, because the timeout was loud.
-test('dev_zip_source_ids paging uses one shared constant, never a literal', () => {
+test('dev_zip_source_ids paging: one identifier, no literals, and it degrades', () => {
   const src = readFileSync(new URL('../scripts/live-scoreboard.mjs', import.meta.url), 'utf8');
   const code = src.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
 
-  assert.match(code, /const ZIP_SOURCE_PAGE = \d+;/, 'page size must be a named constant');
-  assert.match(code, /p_limit:\s*ZIP_SOURCE_PAGE/, 'the request must use the constant');
-  assert.match(code, /page\.length\s*<\s*ZIP_SOURCE_PAGE/, 'the loop terminator must use the same constant');
+  // 1. THE REQUEST AND THE TERMINATOR MUST USE THE SAME IDENTIFIER.
+  // 2026-08-02: it was the literal 5000 in both places. The dangerous half-repair is lowering
+  // only the request — the loop then breaks after page one and the scoreboard ranks on a
+  // fraction of the ZIPs. A wrong answer that looks right, worse than the timeout it replaced.
+  // Scope to fetchZipSourceIds' own body — the file has a second paged loop (communities),
+  // and matching file-wide compares the RPC's request against the WRONG terminator.
+  const fn = code.slice(code.indexOf('async function fetchZipSourceIds'));
+  const body = fn.slice(0, fn.indexOf('\n}') + 2);
+  const req = body.match(/p_limit:\s*(\w+)/);
+  const term = body.match(/page\.length\s*<\s*(\w+)/);
+  assert.ok(req, 'p_limit must not be a numeric literal');
+  assert.ok(term, 'the loop terminator must not be a numeric literal');
+  assert.equal(req[1], term[1], `request uses ${req?.[1]}, terminator uses ${term?.[1]} — they must be the same`);
 
-  // No bare numeric page size may survive in either position — that is how they drift apart.
-  assert.doesNotMatch(code, /p_limit:\s*\d+/, 'p_limit must not be a numeric literal');
-  assert.doesNotMatch(code, /page\.length\s*<\s*\d+/, 'the terminator must not be a numeric literal');
+  // 2. It must DEGRADE, not depend on one tuned number. A constant tuned to today's row count
+  // silently becomes wrong as the table grows; a ladder does not. anon's statement_timeout is
+  // 3s and the scheduled call is cold, which is exactly how p_limit=1000 still failed live.
+  assert.match(code, /const ZIP_SOURCE_PAGE = \d+;/);
+  assert.match(code, /ZIP_SOURCE_PAGE_FLOOR/, 'there must be a floor for the retry ladder');
+  assert.match(code, /57014/, 'a statement timeout must be recognised and retried smaller');
+  assert.match(code, /Math\.floor\(size \/ 2\)/, 'the page must halve on timeout');
 
-  // And it must stay under the measured timeout ceiling: 1000 → 1.5s, 5000 → 14.3s (fails).
   const size = Number(code.match(/const ZIP_SOURCE_PAGE = (\d+);/)[1]);
-  assert.ok(size > 0 && size <= 2000, `ZIP_SOURCE_PAGE=${size} risks the statement timeout (5000 measured at 14,350 ms)`);
+  assert.ok(size > 0 && size <= 500, `ZIP_SOURCE_PAGE=${size} is too large for anon's 3s timeout on a cold call`);
 
-  // The communities read has the SAME shape (URL limit + terminator) and the same hazard.
+  // 3. THE CURSOR MUST NOT ADVANCE ON FAILURE — otherwise a shrink silently SKIPS ZIPs, which
+  // would under-report coverage while looking like a successful run.
+  const retryBlock = body.slice(body.indexOf('if (!r.ok)'), body.indexOf('const page = await r.json()'));
+  assert.doesNotMatch(retryBlock, /after\s*=/, 'the retry path must not move the keyset cursor');
+
+  // 4. The communities read has the SAME shape (URL limit + terminator) and the same hazard.
   assert.match(code, /const COMMUNITIES_PAGE = \d+;/);
   assert.match(code, /limit=\$\{COMMUNITIES_PAGE\}/, 'the communities URL limit must use the constant');
   assert.match(code, /page\.length\s*<\s*COMMUNITIES_PAGE/, 'its terminator must use the same constant');

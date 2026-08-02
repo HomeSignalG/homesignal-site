@@ -99,27 +99,47 @@ async function fetchZipPages() {
  * call returned the first 5,000 ZIPs only, NV's 89xxx range sorted past the end, and every
  * NV page read as dark. The zero looked exactly like a real finding.
  */
-// PAGE SIZE IS ONE CONSTANT, USED IN BOTH PLACES ON PURPOSE (2026-08-02).
-// It was the literal 5000 twice, and that killed this job: p_limit=5000 returns all 4,286 ZIPs
-// in ONE page and takes 14,350 ms measured, over PostgREST's statement timeout — the monitor
-// died in ~19s on HTTP 500 / 57014 every night and never reached the wire step. At 1000 the same
-// call is 1,522 ms.
-// The two uses MUST move together. Lowering only the request would leave the terminator at
-// `page.length < 5000`, so the loop would break after the first page and the scoreboard would
-// silently rank on 1,000 of 4,286 ZIPs — a wrong answer that looks like a right one, which is
-// worse than the timeout it replaced.
-const ZIP_SOURCE_PAGE = 1000;
+// PAGE SIZE IS ONE CONSTANT, USED IN BOTH PLACES ON PURPOSE (2026-08-02), AND IT DEGRADES.
+//
+// History, because the first repair was not enough. It was the literal 5000 twice; p_limit=5000
+// returns all 4,286 ZIPs in ONE statement and dies on anon's `statement_timeout=3s` (measured
+// 14,350 ms). Lowering it to 1000 STILL failed live — my timings were taken as `postgres` on a
+// warm cache, which is the wrong scope: the job runs as `anon`, and the scheduled 07:00 call is
+// COLD. Measured as anon, warm: 250 → 47 ms, 500 → 108 ms, 1000 → 216 ms. Cost is linear in page
+// size, so a smaller page is genuinely cheaper per STATEMENT — and the timeout is per statement,
+// not per run.
+//
+// So: start small, and HALVE on a timeout rather than trusting one tuned number. A constant
+// tuned against today's row count silently becomes wrong as the table grows; a ladder does not.
+//
+// The two uses MUST move together. Lowering only the request would leave the terminator at the
+// old size, so the loop would break after the first page and the scoreboard would rank on a
+// fraction of the ZIPs — a wrong answer that looks like a right one, which is worse than the
+// timeout it replaced, because the timeout was loud.
+const ZIP_SOURCE_PAGE = 250;
+const ZIP_SOURCE_PAGE_FLOOR = 50;
 
 async function fetchZipSourceIds() {
   const hdr = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
   const map = new Map();
   let after = '';
+  let size = ZIP_SOURCE_PAGE;
   for (;;) {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/dev_zip_source_ids`, {
       method: 'POST', headers: hdr,
-      body: JSON.stringify({ p_after: after, p_limit: ZIP_SOURCE_PAGE }),
+      body: JSON.stringify({ p_after: after, p_limit: size }),
     });
-    if (!r.ok) throw new Error(`dev_zip_source_ids failed: HTTP ${r.status} ${await r.text()}`);
+    if (!r.ok) {
+      const body = await r.text();
+      // 57014 = statement timeout. The page is too big for this statement — shrink and retry the
+      // SAME cursor position. Never advance `after` on a failure, or ZIPs are skipped silently.
+      if (size > ZIP_SOURCE_PAGE_FLOOR && (r.status >= 500 || body.includes('57014'))) {
+        size = Math.max(ZIP_SOURCE_PAGE_FLOOR, Math.floor(size / 2));
+        console.error(`  [warn] dev_zip_source_ids HTTP ${r.status} — retrying at p_limit=${size}`);
+        continue;
+      }
+      throw new Error(`dev_zip_source_ids failed: HTTP ${r.status} ${body}`);
+    }
     const page = await r.json();
     if (!page.length) break;
     for (const row of page) map.set(String(row.zip), row.source_ids || []);
@@ -128,7 +148,8 @@ async function fetchZipSourceIds() {
       throw new Error('keyset cursor missing: `zip` not returned — refusing to loop');
     }
     after = cursor;
-    if (page.length < ZIP_SOURCE_PAGE) break;
+    // Compare against the size actually REQUESTED for this page, not the initial constant.
+    if (page.length < size) break;
   }
   return map;
 }
