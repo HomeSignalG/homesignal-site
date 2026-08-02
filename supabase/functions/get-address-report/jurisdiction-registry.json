@@ -3214,6 +3214,14 @@
         {
           "state": "MD",
           "county": "Baltimore"
+        },
+        {
+          "state": "MD",
+          "county": "Howard"
+        },
+        {
+          "state": "MD",
+          "county": "Harford"
         }
       ],
       "column_map": {
@@ -7718,6 +7726,10 @@
         {
           "state": "AR",
           "county": "Pulaski"
+        },
+        {
+          "state": "AR",
+          "county": "Saline"
         }
       ],
       "column_map": {
