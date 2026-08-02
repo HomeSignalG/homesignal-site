@@ -4219,3 +4219,61 @@ entries never dedup against each other.
 **Conclusion: no double-emit anywhere in the registry.** A negative result, but the kind worth having
 on the record — the Houston case proves this failure mode is real, and it was previously only ever
 checked for the one service where somebody happened to notice.
+
+---
+
+## 🔴 SECOND DEAD INSTRUMENT — `verify-geocodes` HAS NOT COMPLETED A RUN SINCE 23 JULY (2026-08-01)
+
+While checking whether the session's 39,057 new records passed the verifiers, I looked past
+`verify-development` at the others. `verify-geocodes` is dead, and it has been for **11 consecutive
+runs**.
+
+| | |
+|---|---|
+| last successful run | **#42, 2026-07-23T15:35:13Z** — over 9 days ago |
+| consecutive non-success since | **11** |
+| in the last 30 runs | 16 success · **11 cancelled** · 3 failure |
+
+**Every cancellation is the 6-hour job cap, to the second:**
+
+```
+#53  2026-08-01 14:46:28 → 20:46:52   (6h 00m 24s)  cancelled
+#52  2026-07-31 15:47:36 → 21:47:57   (6h 00m 21s)  cancelled
+#51  2026-07-30 15:35:01 → 21:35:19   (6h 00m 18s)  cancelled
+#49  2026-07-28 15:52:59 → 21:53:23   (6h 00m 24s)  cancelled
+#48 · #47 · #46 · #45 · #44 …          all 6h 00m,   cancelled
+```
+
+### Why nobody noticed — and why this is worse than the source-monitor
+The dead monitor fails in **14 seconds** and shows red. This one **runs for six hours and looks busy**,
+then ends in `cancelled`, which reads as benign — somebody stopped it, or a newer run superseded it.
+It is the exact failure the site's own rule names: *"a green check that never executed… produces
+success-shaped output while attesting to nothing."* Here it is not even green; it is simply never
+finishing, and the shape of the failure hides it.
+
+An earlier session recorded one of these cancellations and dismissed it correctly-but-narrowly:
+*"`verify-geocodes` was CANCELLED at 6:00:18 — GitHub's hard 6 h job cap, not a failure — and had
+nothing to check here regardless."* True of that run in isolation. **It is not one run: it is every
+run for nine days.**
+
+**Cost:** ~9 cancelled runs × 6 h = **~54 hours of runner time since 23 July, producing zero
+verification.** That is on top of the ~4 h/day the 4-shard Local News matrix already bills.
+
+### What it means for this session's work
+The geocode fence (engine v20) is the guard that stops a Census range-interpolation match in another
+state from rendering as a marker — the check that caught Fort Worth permits appearing in Michigan and
+South Carolina. **It has not run since 23 July.** I measured `0 point-scope records without
+coordinates` across my 39,057 records directly against the cache, which is the same invariant from the
+data side, so I am not asserting a problem — but the independent instrument that would catch a
+geocoding regression is not running, and has not been for the whole period in which this session added
+its records.
+
+**NOT FIXED — a code/workflow change is gated.** The likely shape is the same growth-triggered class as
+the source-monitor (the cache is now 12,722 report rows / 2.9 M `app_projects` rows, and this verifier
+walks all of them with a browser), and the likely remedy is the one the repo already used for
+`verify-development`: shard it, or bound it to changed ZIPs, rather than raising a timeout that cannot
+be raised past 6 h.
+
+> **Standing answer — `cancelled` is not a neutral outcome, it is an UNFINISHED one.** When triaging
+> workflow health, count `success` only. A run that ends `cancelled` at exactly the platform cap has
+> told you nothing, burned the full budget, and will do so again tomorrow.
