@@ -2,7 +2,7 @@
 // Proves the 2026-07-23 correction: a development is judged against its OWN address ZIP,
 // not the ZIP page it renders on (spatial_zip_radius_mi neighbouring-page display), while
 // still failing coordinates proven wrong for the record's own address.
-import { classifyPoint, collectPoints, zipOf, stateOf, normCounty } from '../scripts/verify-geocodes.mjs';
+import { classifyPoint, collectPoints, zipOf, stateOf, normCounty, dedupeByCoord } from '../scripts/verify-geocodes.mjs';
 
 let passN = 0, failN = 0;
 function ok(name, cond, detail) {
@@ -134,6 +134,29 @@ verdict('12b.property_point_passes',
     address: '2200 CALDWELL LN, DEL VALLE, TX 78617', matched_address: '2200 CALDWELL LN, DEL VALLE, TX 78617',
     statedCounty: 'Travis', match_type: 'range_interpolated', lat: 30.17, lng: -97.61, isRadiusScoped: false },
   { zcta: '78617', county: 'Travis', state: 'TX' }, 'pass', 'own_zip');
+
+// ── 13. Coordinate dedup (added 2026-08-02 with the throughput fix).
+// This job had not completed a run since 23 July — 11 consecutive cancellations at the 6h cap.
+// Deduping is what makes the work finishable, so it is pinned: the reverse lookup is a pure
+// function of lat/lng, and radius-scoped connectors repeat one record across neighbouring pages.
+const P = (id, lat, lng) => ({ id, lat, lng, src: 's', label: id, page_zip: '1', address: '', matched_address: '', statedCounty: '', match_type: 'x', record_url: '', isRadiusScoped: false });
+
+const g1 = dedupeByCoord([P('a', 30.1, -97.6), P('b', 30.1, -97.6), P('c', 31.2, -96.5)]);
+ok('13a.identical coordinates collapse to one lookup', g1.length === 2, `got ${g1.length}`);
+ok('13b.no point is lost by deduping',
+  g1.reduce((n, g) => n + g.pts.length, 0) === 3);
+ok('13c.the shared coordinate carries BOTH of its points',
+  g1.find((g) => g.pts.length === 2)?.pts.map((p) => p.id).sort().join(',') === 'a,b');
+
+// Float noise must not split one coordinate into two Census calls (rounded to 5dp ≈ 1.1 m).
+const g2 = dedupeByCoord([P('a', 30.1000001, -97.6), P('b', 30.1, -97.6)]);
+ok('13d.float noise below 5dp does not split a coordinate', g2.length === 1, `got ${g2.length}`);
+
+// Genuinely different coordinates must NOT be merged — dedup must never hide a bad geocode.
+const g3 = dedupeByCoord([P('a', 30.10000, -97.6), P('b', 30.20000, -97.6)]);
+ok('13e.distinct coordinates stay distinct (dedup never hides a point)', g3.length === 2);
+
+ok('13f.empty input is safe', dedupeByCoord([]).length === 0);
 
 console.log(`\n${passN} passed, ${failN} failed`);
 if (failN) process.exit(1);

@@ -33,6 +33,17 @@ import { fileURLToPath } from 'node:url';
 const VINTAGE = process.env.CENSUS_VINTAGE || 'Current_Current';
 const SAMPLE = process.env.SAMPLE ? parseInt(process.env.SAMPLE, 10) : 0;
 const FAIL_ON_OUTSIDE = (process.env.FAIL_ON_OUTSIDE ?? '1') !== '0';
+// THROUGHPUT (added 2026-08-02 — this job had not completed a run since 23 July: 11 consecutive
+// cancellations at exactly GitHub's 6h job cap, ~54h of runner time producing nothing).
+// It was structurally impossible, not merely slow: 63,216 geocoded points checked strictly
+// serially with `await sleep(400)` per point is 7.0h of SLEEP alone, before any network time.
+// Three changes make it finish, in order of effect: dedup identical coordinates (the reverse
+// lookup is a pure function of lat/lng, so this is lossless — 63,216 → 42,222 distinct),
+// replace the serial sleep with a bounded worker pool, and cap the wall clock so a wrong
+// throughput estimate can never again burn the full 6h silently.
+const CONCURRENCY = Math.max(1, parseInt(process.env.GEOCODE_CONCURRENCY || '4', 10));
+const REQ_STAGGER_MS = Math.max(0, parseInt(process.env.GEOCODE_STAGGER_MS || '100', 10));
+const TIME_BUDGET_MS = Math.max(60_000, parseInt(process.env.GEOCODE_TIME_BUDGET_MS || String(3.5 * 3600 * 1000), 10));
 const BATCH = 50; // lines per console write — avoids GitHub truncating one oversized write
 
 // ───────────────────────────── pure helpers (exported for tests) ─────────────────────────────
@@ -200,6 +211,20 @@ async function containing(lat, lng) {
   return { zcta: zcta ? String(zcta) : null, county: county ? String(county) : null, state: state ? String(state) : null };
 }
 
+/** Group points by their coordinate, so each distinct lat/lng is reverse-looked-up ONCE.
+ *  Lossless: the Census reverse lookup is a pure function of the coordinate, and radius-scoped
+ *  connectors legitimately repeat one record across neighbouring ZIP pages. Rounded to 5dp
+ *  (~1.1 m) so float noise cannot split a coordinate into two lookups. */
+export function dedupeByCoord(points) {
+  const byCoord = new Map();
+  for (const p of points) {
+    const k = `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`;
+    if (!byCoord.has(k)) byCoord.set(k, { lat: p.lat, lng: p.lng, pts: [] });
+    byCoord.get(k).pts.push(p);
+  }
+  return [...byCoord.values()];
+}
+
 /** Every geocoded point across both caches, with the identity + fields classifyPoint needs. */
 export function collectPoints(devReports, propReports, radiusConnectors = new Set()) {
   const pts = [];
@@ -253,10 +278,40 @@ async function main() {
   const fmt = (r) => `${r.label} [${r.id}] (${r.src}) @ ${r.lat},${r.lng} — ${r.reason} [${r.match_type}] ${r.record_url}`;
   const skipFmt = (r) => `[SKIP] id=${r.id} src=${r.src} page=${r.page_zip} matched=${r.matched_zip} own=${r.own_zip} @ ${r.lat},${r.lng} — ${r.reason}`;
 
-  for (const p of points) {
+  // ── COORDINATE DEDUP (lossless): the Census reverse lookup depends only on lat/lng, and a
+  // radius-scoped connector legitimately repeats the same record across neighbouring ZIP pages.
+  // Look each distinct coordinate up ONCE, then classify every point that shares it.
+  const coords = dedupeByCoord(points);
+  console.log(`Reverse lookups: ${coords.length} distinct coordinates for ${points.length} points `
+    + `(${points.length - coords.length} duplicates skipped) · concurrency ${CONCURRENCY} · budget ${Math.round(TIME_BUDGET_MS / 60000)} min`);
+
+  // ── BOUNDED WORKER POOL, with a hard wall-clock budget. Deferral is reported, never silent:
+  // a truncated run must be distinguishable from a clean one (a green check that did not check
+  // everything is worse than a red one).
+  const startedAt = Date.now();
+  let deferredCoords = 0, cursor = 0;
+  const worker = async (slot) => {
+    await sleep(slot * REQ_STAGGER_MS);
+    for (;;) {
+      const i = cursor++;
+      if (i >= coords.length) return;
+      if (Date.now() - startedAt > TIME_BUDGET_MS) { deferredCoords += coords.length - i; cursor = coords.length; return; }
+      const c = coords[i];
+      c.reverse = await containing(c.lat, c.lng);
+      if (REQ_STAGGER_MS) await sleep(REQ_STAGGER_MS);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, coords.length) }, (_, s) => worker(s)));
+  const elapsedMin = (Date.now() - startedAt) / 60000;
+  const deferredPoints = coords.filter((c) => !('reverse' in c)).reduce((n, c) => n + c.pts.length, 0);
+  console.log(`Reverse lookups done in ${elapsedMin.toFixed(1)} min`
+    + (deferredCoords ? ` — ⚠️ TIME BUDGET REACHED: ${deferredCoords} coordinates (${deferredPoints} points) NOT checked` : ''));
+
+  for (const c of coords) {
+    if (!('reverse' in c)) continue;   // deferred by the budget — counted above, never silently passed
+    for (const p of c.pts) {
     tierCount[p.match_type] = (tierCount[p.match_type] || 0) + 1;
-    const reverse = await containing(p.lat, p.lng);
-    await sleep(400); // be polite to the Census API
+    const reverse = c.reverse;
     const r = classifyPoint(p, reverse);
     if (r.verdict === 'skip') { skipped.push(r); continue; }
     checked++;
@@ -265,6 +320,7 @@ async function main() {
     fails.push(r);
     failByCategory[r.category] = (failByCategory[r.category] || 0) + 1;
     (srcByCategory[r.category] = srcByCategory[r.category] || new Set()).add(r.src);
+    }
   }
 
   const tierLine = Object.entries(tierCount).sort().map(([k, v]) => `${k}: ${v}`).join(' · ') || '(none)';
@@ -276,7 +332,10 @@ async function main() {
   const header = [
     `# Geocode geofence verification`,
     ``,
-    `- Geocoded points found: **${points.length}**`,
+    `- Geocoded points found: **${points.length}**   (${coords.length} distinct coordinates — ${points.length - coords.length} duplicate lookups avoided)`,
+    ...(deferredCoords
+      ? [`- ⚠️ **RUN TRUNCATED — time budget (${Math.round(TIME_BUDGET_MS / 60000)} min) reached: ${deferredCoords} coordinates / ${deferredPoints} points NOT checked.** This run does not clear them.`]
+      : [`- Reverse lookups completed in ${elapsedMin.toFixed(1)} min — full coverage, nothing deferred`]),
     `- Reverse-checked: **${checked}**   (skipped/unavailable: ${skipped.length})`,
     `- Passed: **${passed}**   (radius-scoped neighbouring-page exemptions: ${exemptions.length} — sources: ${exemptSrc.join(', ') || 'none'})`,
     `- Match-quality tiers: ${tierLine}`,

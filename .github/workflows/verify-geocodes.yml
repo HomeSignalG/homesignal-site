@@ -28,6 +28,12 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # BUDGET BACKSTOP (2026-08-02). This job did not complete a run between 23 July and 2 August:
+    # 11 consecutive cancellations at GitHub's default 6h cap, ~54h of runner time producing
+    # nothing. The script now has its own wall-clock budget (GEOCODE_TIME_BUDGET_MS, default
+    # 3.5h) and reports truncation; this is the second line of defence, so a wrong estimate
+    # inside the script can never again cost a full 6h.
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
