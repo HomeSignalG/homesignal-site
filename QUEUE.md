@@ -4277,3 +4277,57 @@ be raised past 6 h.
 > **Standing answer — `cancelled` is not a neutral outcome, it is an UNFINISHED one.** When triaging
 > workflow health, count `success` only. A run that ends `cancelled` at exactly the platform cap has
 > told you nothing, burned the full budget, and will do so again tomorrow.
+
+---
+
+## 🔴 SCHEDULED-WORKFLOW HEALTH BOARD — 6 of 11 ARE BROKEN, FOR 5 DIFFERENT REASONS (2026-08-01)
+
+I found `source-monitor` and `verify-geocodes` dead one at a time, by accident, while doing something
+else. That is the wrong way to find this, so I swept **every scheduled workflow** instead.
+
+| workflow | last SUCCESS | consecutive non-success | cause |
+|---|---|---|---|
+| **verify-geocodes** | **2026-07-23** | **11** | cancelled at the **6-hour job cap**, every run |
+| **verify-representative-zips** | **2026-07-26** | **7** | `Error: Supabase read 84302: 525` (Cloudflare SSL handshake) |
+| **verify-communities** | 2026-07-29 | 3 | `page.goto: Timeout 45000ms exceeded` across many ZIPs, live site |
+| **verify-maps** | 2026-07-29 | 3 | assertion `dashboard-no-triangle-marker` (local server, fast fail) |
+| **verify-coverage-state** | — | 3 | **not diagnosed** |
+| **source-monitor** | 2026-07-30 | 2 | `dev_zip_source_ids` HTTP 500 `57014` statement timeout |
+| verify-development | 2026-08-01 | — | recovered; run 180 dispatched, in flight |
+| verify-alerts-page | 2026-08-01 | — | healthy (3/3) |
+| verify-maps-rest-shapes | 2026-08-01 | — | healthy (3/3) |
+| sitemap | 2026-08-01 | — | healthy |
+| load-openaddresses | 2026-08-01 | — | healthy |
+
+### The important part is that these are NOT one problem
+My first hypothesis — that the verification suite had simply outgrown its budget as the site reached
+12,722 pages — is **wrong**, and I checked rather than shipping it. The causes are genuinely different:
+a platform job cap, a TLS/transport error, live-site page timeouts, a UI assertion, and a database
+statement timeout. One of them (`verify-maps`) fails in seconds against a **local** server, so it has
+nothing to do with scale at all.
+
+That matters for how to approach it: there is no single fix, and treating it as one would produce a
+plausible, wrong repair.
+
+### Why six independent breakages accumulated unnoticed
+Each one is individually easy to miss, and each fails in a *differently misleading* way:
+
+- `verify-geocodes` burns 6 h and ends **`cancelled`**, which reads as benign.
+- `source-monitor` dies in **14 s** in a pre-step, so the job it exists to run never starts.
+- `verify-representative-zips` fails on a **transport error** that looks transient — and would be, if
+  it were not the seventh in a row.
+- `verify-maps` fails on a **real assertion**, which is the only one behaving as designed.
+
+**Nothing aggregates this view.** The repo has eleven scheduled jobs and no place that says which of
+them last actually succeeded — so the answer to "is the site verified?" has been *unknowable without
+this sweep*, and has been "largely no" since **23 July**.
+
+> **Standing answer —audit the SUITE, not the run.** A per-workflow red/green glance cannot distinguish
+> "failed once" from "has not succeeded in nine days", and cannot see that six independent instruments
+> are down at once. Track **last-success date** per scheduled workflow; a job whose last success is
+> older than its own interval is down, whatever its most recent run says.
+
+**NOT FIXED — every one of these is a code or workflow change, and they are five separate repairs.**
+Recorded with dates, counts and the exact error per workflow so each can be picked up individually.
+`verify-coverage-state` is the one I did not diagnose; its three failures are real but I did not pull
+its logs.
