@@ -4331,3 +4331,49 @@ this sweep*, and has been "largely no" since **23 July**.
 Recorded with dates, counts and the exact error per workflow so each can be picked up individually.
 `verify-coverage-state` is the one I did not diagnose; its three failures are real but I did not pull
 its logs.
+
+### `verify-coverage-state` diagnosed — and the Saint Paul thread closes itself
+
+I left this one undiagnosed in the health board above. Closing that gap. It fails **2 checks of ~40**:
+
+```
+FAIL legacy: populated/facilities_only => pass
+FAIL coverage-pass: zero FAILED materializations
+  [20769:temporarily_unavailable, 23451:temporarily_unavailable,
+   55103:temporarily_unavailable, 55104:temporarily_unavailable, 55105:temporarily_unavailable]
+```
+
+**Three of the five are the Saint Paul pages** from the stale-source finding earlier in this session —
+the ones frozen at 20,000 records from `saint-paul-approved-building-permits`, an entry the founder
+**retired on 2026-07-28**. So those rows were not merely untidy: they have been **failing a verifier**
+for days, which is why `verify-coverage-state` has been red.
+
+### Two of the three have already healed — and my own work is what unstuck them
+
+I predicted these would self-heal around **5 August**, when the transient-safe guard's 7-day window
+expired. Two healed **on 1 August instead**, and the mechanism is worth stating precisely:
+
+| ZIP | refreshed_at | records | source |
+|---|---|---|---|
+| 55104 | **2026-08-01 17:00Z** | 272 | **`minneapolis-ccs-permits`** — 0 from saint-paul |
+| 55105 | **2026-08-01 17:15Z** | 510 | **`minneapolis-ccs-permits`** — 0 from saint-paul |
+| 55103 | 2026-07-29 04:15Z | 20,000 | still `saint-paul-approved-building-permits` |
+
+`dev_refresh_collect`'s guard refuses a response only when the **new** development count is **0**. While
+Ramsey had no live source, every nightly response for those ZIPs was 0 and was rejected — the rows
+could not heal. **The `minneapolis-ccs-permits` → MN Ramsey extension I wired earlier today gave those
+pages real content**, so the next nightly response was 272 and 510 rather than 0, the guard let the
+write through, and the retired source's stale rows were replaced.
+
+That was not the reason I wired Ramsey — I wired it for 3 dark pages (55116, 55108, 55112). Unblocking
+two frozen Saint Paul pages was an unintended and unforeseen consequence, and I am recording it as
+such rather than claiming I planned it.
+
+**55103 remains stuck**, because Minneapolis reaches 55104/55105 but not 55103 — so its nightly
+response is still 0 and the guard still refuses it. It should heal on its own around **5 August** when
+the 7-day window lapses. That is now a *testable prediction with a date*: if 55103 is still at 20,000
+after 5 August, the guard analysis is wrong and needs revisiting.
+
+**The other two failures are unrelated to this session:** 20769 (last refreshed 2026-07-28, 1 record)
+and 23451 (refreshed today, 2,552 records) are also in `temporarily_unavailable`. Not diagnosed —
+23451 in particular has plenty of content, so its state looks stale rather than earned.
