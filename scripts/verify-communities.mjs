@@ -203,15 +203,36 @@ async function main() {
 
   // --- Materialized pages: substance flag drives BOTH assertions ---
   let cursor = 0;
+  let reReads = 0;
   async function walkWorker() {
     const page = await browser.newPage();
     for (;;) {
       const i = cursor++;
       if (i >= walked.length) break;
-      const row = walked[i];
+      let row = walked[i];
       try {
         const st = await readPage(page, row.zip);
         const tag = `${row.state} ${row.zip} (${row.name})`;
+        // RACE GUARD (2026-08-02). The meta table is read ONCE up front and the 12,722 pages
+        // are walked over the following ~15 minutes, while the materializer keeps re-stamping
+        // rows on its own schedule. A row it rewrites mid-walk makes the snapshot disagree with
+        // a page that is in fact rendering the CURRENT flag correctly.
+        //   Observed: 97212 / 97221 / 97232 (Portland OR) all failed on run 30768231260, all
+        //   three with updated_at 21:40:00 — inside a run that started 21:35 and read those
+        //   pages after. Two had flipped true -> false and one false -> true, so the pages were
+        //   right in BOTH directions and the snapshot was stale in both.
+        // Re-read the one row before calling it a failure. This never weakens the gate: a page
+        // that genuinely contradicts the CURRENT flag still fails, and every substitution is
+        // logged so a re-read can never quietly become the way a real defect is dismissed.
+        if (row.data_quality === 'pass' && row.indexable !== indexable(st.robots)) {
+          const fresh = (await rest(`app_community_meta?select=zip,data_quality,indexable&zip=eq.${encodeURIComponent(row.zip)}`))[0];
+          if (fresh && (fresh.indexable !== row.indexable || fresh.data_quality !== row.data_quality)) {
+            console.log(`  ~ ${tag} · meta changed mid-walk (indexable ${row.indexable} -> ${fresh.indexable}, `
+              + `data_quality ${row.data_quality} -> ${fresh.data_quality}) — re-checked against the fresh row`);
+            row = { ...row, data_quality: fresh.data_quality, indexable: fresh.indexable };
+            reReads++;
+          }
+        }
         if (row.data_quality !== 'pass') {
           // coverage_coming: honest coverage page, never indexed (flag must be false too).
           if (st.isPass) fails.push(`${tag}: meta says coverage_coming but the page rendered a PASS state`);
@@ -265,6 +286,7 @@ async function main() {
     ``,
     `- Site: ${SITE_BASE}`,
     `- Materialized pages checked: **${walked.length}** (${nIdx} substance-flagged ⇒ must be indexable; rest ⇒ noindex)`,
+    `- Rows re-read after a mid-walk materializer change: **${reReads}**`,
     `- Unmaterialized pages checked: **${nonUt.length}** (must be noindexed)`,
     `- Cross-state ZIP model violations: **${modelFails.length}** (every ZIP page vs the authoritative USPS state)`,
     `- Failed: **${fails.length}**`,

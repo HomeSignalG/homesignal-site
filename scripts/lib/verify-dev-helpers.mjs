@@ -107,10 +107,34 @@ export const REPRESENTATIVE_ZIPS = [
     expect: { devMin: 10, mapMarkers: true },
   },
   {
-    zip: '01012',
-    label: 'Chester MA — honest zero-content empty',
-    state: 'MA',
+    // 2026-08-02: this slot WAS 01012 "Chester MA — honest zero-content empty", totalMax: 0.
+    // It stopped being empty: the page now carries 9 real MassDOT project records, every one
+    // sourced, valid-shaped and probing 200. Same class as the 85004 slot above — a fixture
+    // going stale because a page GAINED coverage, reported as a failure every day.
+    //
+    // THE SELECTION RULE, so the next session does not re-pick a ZIP that will graduate again:
+    // a zero-content exemplar must sit in a state with NO registry entry at all — not merely a
+    // ZIP that happens to be empty today. Chester failed precisely because MA carries a
+    // STATEWIDE entry (measured 2026-08-02: MA = 5 entries, 1 of them statewide), and a
+    // statewide layer can reach any ZIP in the state without anyone wiring that ZIP.
+    //
+    // NH has ZERO registry entries (same measurement), so this page cannot gain records until
+    // New Hampshire is wired at all — at which point re-picking is deliberate, not a surprise.
+    // Verified live 2026-08-02: development 0, facilities 0, civic 0, news 0, cached sites 0,
+    // coverage_state honestly_empty, refreshed the same day.
+    zip: '03227',
+    label: 'Center Sandwich NH — honest zero-content empty',
+    state: 'NH',
     expect: { totalMax: 0, emptyState: true, mapMarkers: true },
+  },
+  {
+    // And 01012 keeps its slot as what it now IS: the first exemplar of a STATEWIDE source
+    // lifting a rural page off the floor (MassDOT projects on a town with no city permit
+    // feed). Dropping it would have lost that pattern from the representative set.
+    zip: '01012',
+    label: 'Chester MA — statewide DOT source on a rural page',
+    state: 'MA',
+    expect: { devMin: 1, mapMarkers: true },
   },
 ];
 
