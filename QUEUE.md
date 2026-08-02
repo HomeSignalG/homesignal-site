@@ -4926,3 +4926,34 @@ coverage for the re-read path either, because the mismatch branch needs a live R
 re-read branch can be driven offline with a stubbed `rest()`, and assert both outcomes (flag changed →
 re-check and pass; flag unchanged → still fail). Until then, treat a green
 `verify-communities` as evidence about the PAGES, not about the guard.
+
+### 27 of 31 workflows had NO timeout — every one inheriting GitHub's 6-hour default
+
+Found while chasing a hung `unit` job on this branch. Only 4 workflows carried `timeout-minutes`
+(`unit-tests`, `verify-geocodes`, `gate2b-full-inventory-parity`, `load-openaddresses`); the other
+**27 were unbounded**, which is precisely the shape that let `verify-geocodes` burn **11 consecutive
+6-hour cancellations** on an account previously halted at $0. An unbounded job does not fail — it bills.
+
+**The hang that surfaced it is real and reproducible-ish:** three consecutive `unit` attempts on the
+same commit hung, twice in `Install playwright` (a network browser download) and once in the suite step,
+while a **SIBLING run on the identical commit passed**. Locally the full 75-file suite runs in 33 s and
+the two browser-backed suites each exit 0 alone. Same code, same minute, one hung and one passed — that
+is runner flakiness, not a code defect, and unbounded each of those would have cost 6 h.
+
+**Every bound is sized from the workflow's OWN measured maximum successful run**, not guessed:
+
+| workflow | measured max | bound |
+|---|---|---|
+| `verify-development` | 251.6 min | 330 |
+| `verify-communities` | 42.8 min | 120 |
+| `source-monitor` · `spot-check` · `verify-representative-zips` | 5.9–11.6 min | 45 |
+| 16 fast verifiers / helpers | ≤ 4.1 min | 15 |
+| 7 dispatch-only gov-feed helpers | **no successful run on record** | 30 (conservative) |
+
+The 7 with no measurement are named as such rather than given a number pretending to be derived.
+`unit-tests` also gained a bound (15 min against a ~2.5 min measured max). Verified by parsing all 31
+workflow files: **0 jobs still unbounded, 0 parse errors.**
+
+⚠️ **`verify-development`'s 330 is a bound, not headroom** — it sits above the 251.6 min measured max on
+purpose, but the job is already 4.2 h against what was a 6 h ceiling and grows linearly with the cache.
+The bounding report above is what actually fixes that; this only stops a hang from costing 6 h.

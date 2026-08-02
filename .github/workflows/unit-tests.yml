@@ -50,6 +50,15 @@ permissions:
 jobs:
   unit:
     runs-on: ubuntu-latest
+    # The suite itself runs in ~1 minute (75 offline files, 33 s locally). Without a bound,
+    # a hung step inherits GitHub's 6-HOUR default — the same unbounded-runner-time class as
+    # the verify-geocodes leak, on a repo whose account was previously halted at $0.
+    # Observed 2026-08-02: three consecutive attempts on the same commit hung — twice in
+    # `Install playwright` (a network browser download) and once in the suite step — while a
+    # SIBLING run on the identical commit passed, i.e. runner flakiness, not a code defect.
+    # Unbounded, each of those would have burned 6 h. 15 minutes is ~15x the real runtime and
+    # still fails fast, turning a hang into a red check instead of a silent bill.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

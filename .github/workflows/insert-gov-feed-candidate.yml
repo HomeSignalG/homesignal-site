@@ -15,6 +15,10 @@ permissions:
 jobs:
   insert:
     runs-on: ubuntu-latest
+    # Bound added 2026-08-02: an unbounded job inherits GitHub's 6-HOUR default, which is how
+    # verify-geocodes burned 11 consecutive 6 h cancellations on an account previously halted
+    # at $0. No successful run on record to measure, so a conservative 30.
+    timeout-minutes: 30
     env:
       SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr
     steps:

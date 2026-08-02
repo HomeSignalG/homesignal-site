@@ -20,6 +20,10 @@ permissions:
 jobs:
   rollback-validate:
     runs-on: ubuntu-latest
+    # Bound added 2026-08-02: an unbounded job inherits GitHub's 6-HOUR default, which is how
+    # verify-geocodes burned 11 consecutive 6 h cancellations on an account previously halted
+    # at $0. No successful run on record to measure, so a conservative 30.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
