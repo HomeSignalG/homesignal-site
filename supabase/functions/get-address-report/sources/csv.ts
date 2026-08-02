@@ -93,6 +93,8 @@ export interface CsvRunReport {
   geocode_failures: number;
   no_record_url: number;
   quarantined: { reason: string; sample: string }[];
+  /** non-null ⇒ the max_rows cap bound the emit and this report is INCOMPLETE. */
+  truncated_at_max_rows: number | null;
 }
 
 export interface CsvDeps {
@@ -147,7 +149,7 @@ async function runEntry(
     registry_id: entry.registry_id, url: entry.url,
     file_rows: 0, fetched: 0, emitted: 0, excluded_by_status: [], unmapped_statuses: [],
     case_insensitive_matches: [],
-    blank_status: 0, skipped_no_coords: 0, geocode_failures: 0, no_record_url: 0, quarantined: [],
+    blank_status: 0, skipped_no_coords: 0, geocode_failures: 0, no_record_url: 0, quarantined: [], truncated_at_max_rows: null,
   };
   const records: NormalizedRecord[] = [];
 
@@ -205,7 +207,16 @@ async function runEntry(
   const maxRows = entry.max_rows ?? 20000;
 
   for (const row of zipRows) {
-    if (records.length >= maxRows) break;
+    // A capped emit is INCOMPLETE and must say so — the same silent-truncation hazard the paged
+    // connectors carry, in the one connector that caps while EMITTING rather than while fetching.
+    if (records.length >= maxRows) {
+      report.truncated_at_max_rows = maxRows;
+      report.quarantined.push({
+        reason: `max_rows cap of ${maxRows} bound the emit — the file has MORE matching rows than this report contains`,
+        sample: entry.registry_id,
+      });
+      break;
+    }
     const statusRaw = String(readCol(row, entry.column_map.status_raw) ?? "").trim();
     if (!statusRaw) { report.blank_status++; continue; }
     const hit = resolveNormalized(lookup, statusRaw);

@@ -4007,6 +4007,22 @@ property ZIP.** Correcting only the display gives the right address on the wrong
 than today. The real options are (a) retire the entry, (b) keep it and accept office-pinned records,
 or (c) build a property-address geocode path — a code change. All three are founder calls.
 
+✅ **RESOLVED 2026-08-02 (founder-authorised objective 3) — (a) RETIRE. The measurement that decided it
+is that retiring costs ZERO pages.** Of the 51 Clark County pages carrying its records, **51 keep
+content from other sources and 0 go dark**: those ZIPs are already lit by `clark-county-active-projects`,
+`clv-planning-cases`, `henderson-residential-permits` and `henderson-commercial-permits`. So this was
+never coverage-vs-correctness. Keeping the entry bought **no LIVE page** and cost **3,121 records
+asserting a locality the source does not support** — a resident of 89118 shown 174 `ProdHome`/`Model`
+permits stacked on one builder's office suite, while the homes actually being built appear on no page.
+
+**(c) is closed by a field inventory, not an opinion.** Live layer metadata (pg_net, 436,181 rows) lists
+38 fields — `APNO … STNO, PREDIR, STNAME, SUFFIX, POSTDIR, … PRCLID, SUBDIV, … LEGALOWNER, ADDR1, CITY,
+STATE, ZIP, … ObjectId` — i.e. **one ZIP field, the owner's, and no geometry**. A property-address path
+would need the whole 436k-row layer bulk-geocoded into a ZIP *before* selection: a separate ingest job,
+not a connector option. Registry 149 → 148 entries; removal asserted programmatically to be exactly this
+one id, nothing else added or dropped. Full rationale + how it comes back:
+`docs/source-registry.md` "Two defects found in EXISTING entries".
+
 ---
 
 ## AUDIT — IS THE LAS VEGAS WRONG-FIELD DEFECT SYSTEMIC? NO. IT IS ISOLATED (2026-08-01)
@@ -4648,6 +4664,25 @@ DOB has no jurisdiction and the rows are artifacts.
 **Recommended fix: re-parent 10470 to Bronx** — then the existing borough coverage lights it with no
 registry change. That is a `communities` change affecting what residents see → **gated, not done.**
 
+✅ **DONE 2026-08-02 (founder-authorised objective 3).** Migration `reparent_10470_woodlawn_to_bronx`;
+SQL of record `docs/10470-bronx-reparent.sql`. Authority is the repo's own pinned source, `zipcodes`
+PyPI v3.0.0 — `10470 -> Bronx County, NY, STANDARD` — with a control from the same read
+(`10803 -> Westchester County`) proving it is one row and not a disagreement with the package. The row
+already *called* itself Bronx (name "Bronx (10470)", slug `bronx-10470`); only `county` and `parent_id`
+said otherwise.
+
+Every hazard the per-ZIP model names was measured, not assumed: **0 subscribers** on either chain root
+(so no subscriber is switched between communities), and Bronx and Westchester carry the **identical 6
+canonical topics** (so the subscribable set does not change). Cascaded civic content does change, and
+that is the correction: Westchester County's 29 meetings have no jurisdiction over a Bronx address and
+stop rendering; Bronx County's 9 alerts start.
+
+Live result — **10470 goes from the facilities floor to 102 development records + 20 facilities**,
+0 missing coordinates, 0 missing `source_ref`, `coverage_state` populated, indexable true. Sourced to
+**both** NYC DOB entries: the queue predicted 79 from `nyc-dobnow` alone, and
+`nyc-dob-permit-issuance` now contributes too because its text-date defect was fixed earlier the same
+day. Westchester's array 75 → 74, 0 duplicate slugs, `'10470'` resolves in exactly one community.
+
 Declined `marin-county-building-permits` → CA Sonoma: 94952 Petaluma returns 8 in-scope records
 (control 94901 = 19); Marin has no jurisdiction in Petaluma.
 
@@ -4687,3 +4722,58 @@ carry records. Options considered and rejected, with receipts, in `docs/source-r
 
 **Native-ZIP seam is now closed** except `bellevue-permits`, whose server ignores both
 `returnDistinctValues` and groupBy.
+
+---
+
+## `verify-coverage-state`: the last failing assertion was a real overstatement on 5,734 pages
+
+`legacy: populated/facilities_only => pass` was the one check still red after #559. It was right, and
+this time the **view** was the half that was wrong — not the expectation.
+
+**What the check compares.** Two independent definitions of "this ZIP has coverage":
+`app_community_meta.data_quality` (stamped by `app_refresh_zip`) and `app_coverage_states.coverage_state`
+(computed live). At the Phase-2 rollout they were verified IDENTICAL — `legacy1 = legacy2 = 0` in
+`docs/coverage-state-model.sql`.
+
+**What drifted.** They could agree because `app_changes` then held only civic rows — `'Government & civic'`
++ `'Planning & zoning'`, exactly the set `app_refresh_zip` counts into `_nc`. Local News later began
+materializing into the **same table** (79,424 rows across 9,796 ZIPs), and the view counted that table
+with **no category filter**. So it started reading news as coverage. The materializer never moved: it
+counts `_nc` *before* the Local News insert, so `data_quality` has always been civic-only by construction.
+That asymmetry is the whole failure.
+
+**Measured cost (2026-08-02, full population 12,722):**
+
+| class | ZIPs | reported | actual |
+|---|---|---|---|
+| EPA facility floor + news, no development, no civic notices | **5,072** | `populated` | `facilities_only` |
+| news and nothing else — zero markers of any kind | **662** | `populated` | `honestly_empty` |
+
+**5,734 pages carrying an overstated coverage state.** The 5,072 were also denied the accurate
+`facilities_only` banner on `community.html` ("Local government meeting and permit feeds for this area
+are still being wired — the EPA-registered facility records below are live public data"), which is the
+one piece of copy that tells those residents the truth about what they are looking at. The 662 are the
+ones that made CI red daily.
+
+**The rule, now explicit and pinned.** Coverage means sourced **civic/development** records — permits,
+planning + government notices, EPA-registered facilities. A Local News article is real, sourced content,
+still rides the page's news list, and can never lift a ZIP's coverage state on its own. `changes` counts
+civic rows only; `news_items` is reported **additively** so the news is visible in the instrument rather
+than hidden behind the narrower count.
+
+**Applied** — migration `app_coverage_state_view_civic_changes`; SQL of record updated in
+`docs/coverage-state-model.sql` with the correction and its receipts. **Verified live against the full
+population:** total 12,722 = meta 12,722, and all eight invariants 0 — `imp1..imp4 = 0`,
+**`legacy1 = 0`, `legacy2 = 0`**. New distribution: populated 5,020 · facilities_only 6,769 ·
+honestly_empty 924 (was populated 10,754 · facilities_only 1,697 · honestly_empty 262).
+
+**Nothing rendered changed and no layout gate moved** — layout is keyed on `data_quality`, which was not
+touched. What changed is state *copy*: 5,072 pages gain the accurate facilities-only banner, and 662
+pages' coverage-coming block switches to the honest-empty paragraph, which is true of them (government
+registries, permit feeds and the EPA registry all returned 0). Indexability is unaffected — it requires
+`_ndp > 0 or _nfc >= 3`, which news never satisfied.
+
+Pinned by `test/coverage-state-news-not-coverage.test.mjs` (14 assertions, including a self-test that
+feeds the classifier the pre-fix unfiltered count and requires the WRONG verdict, so a green run proves
+the narrowing is doing something) and by a new live assertion in `scripts/verify-coverage-state.mjs`:
+a ZIP with news and no other content must be `honestly_empty`.

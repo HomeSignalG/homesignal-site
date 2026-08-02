@@ -3661,6 +3661,27 @@ spellings of tenant improvement) — each unmapped value drops records silently.
   **174 records on one page** and the top 8 (all suite numbers) carrying 30 %. **The selection cannot be
   fixed in config — the layer exposes no property ZIP.** Founder call: retire, accept, or build a
   property-address path.
+  - ✅ **RETIRED 2026-08-02, and the deciding measurement is that it costs ZERO pages.** Of the 51 Clark
+    County pages carrying its records, **51 keep content from other sources and 0 go dark** — the ZIPs
+    are already lit by `clark-county-active-projects`, `clv-planning-cases`,
+    `henderson-residential-permits` and `henderson-commercial-permits`. So the choice was never
+    "coverage vs correctness": keeping the entry bought no LIVE page and cost 3,121 records asserting a
+    locality the source does not support. A resident of 89118 was shown 174 `ProdHome`/`Model` permits
+    stacked on one builder's office suite while the homes actually being built appear on no page at all.
+  - **Why the third option was closed, with a field inventory rather than an opinion.** Live layer
+    metadata (pg_net, 2026-08-02, 436,181 rows): the fields are `APNO, APBLDGKEY, APTYPE, WORKTYPE,
+    APPLICANT, APL_ADDRESS, BLDGAPPLSTATUS, ISSDTTM, DECLVLTN, CALCVLTN, STNO, PREDIR, STNAME, SUFFIX,
+    POSTDIR, STSUB, SUBDIVCODEADR, PRCLID, SUBDIV, PRCLTYPE, SUBDIVCODEPRCL, BLOCK, LOT, LEGALOWNER,
+    NAME, ADDR1, CITY, STATE, ZIP, CONTACTINFO, GALLONS, PUBLICDROPLIST, COMM, RES, MISC_FEES,
+    CODE_ANALYSIS, NSCB, ObjectId` — **one ZIP field, the owner's, and no geometry.** Pointing
+    `column_map.address` at `STNO/PREDIR/STNAME/SUFFIX` fixes the DISPLAY and leaves the SELECTION
+    wrong, i.e. the right address on the wrong page — strictly worse than today. A property-address
+    path would need the whole 436k-row layer bulk-geocoded off `PRCLID`/street fields into a ZIP before
+    selection: a separate ingest job, not a connector option.
+  - **How it comes back.** A City of Las Vegas dataset that exposes a property ZIP or per-record
+    geometry, or the bulk pre-geocode pipeline above. The retired entry's full `_receipts` (freshness,
+    the 9 verbatim `BLDGAPPLSTATUS` values, the rejected sibling services) are preserved in git history
+    at the retiring commit, so re-wiring does not start from zero.
 - **Audited whether that defect is systemic — it is NOT.** Records-per-distinct-point *within a single
   page* (the cross-page-duplication-free metric) separates cleanly: `las-vegas-building-permits` 41.2,
   `clv-planning-cases` 32.1, then `brunswick` 6.3 and 100+ others at **≤2.9**. `clv-planning-cases` was
