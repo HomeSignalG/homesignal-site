@@ -4777,3 +4777,63 @@ Pinned by `test/coverage-state-news-not-coverage.test.mjs` (14 assertions, inclu
 feeds the classifier the pre-fix unfiltered count and requires the WRONG verdict, so a green run proves
 the narrowing is doing something) and by a new live assertion in `scripts/verify-coverage-state.mjs`:
 a ZIP with news and no other content must be `honestly_empty`.
+
+---
+
+## Objective 3, item 4 — the refresh guard: it is not neutral, and the 7-day clock is the wrong release condition
+
+The item as filed was "the guard cannot distinguish a dead source from an honest zero." That is true, and
+the interesting half is what the ambiguity *costs*, which is not what the earlier note assumed.
+
+**The guard.** `dev_refresh_collect()` refuses a response when `cached refreshed_at >= now() - 7 days
+AND new facilities = 0 AND new development = 0 AND cached facilities + development > 0`. A refusal does
+not bump `refreshed_at`, so the window runs from the last GOOD write and the hold self-releases.
+
+**All 9 currently-held pages have exactly ONE source, and in every case the hold is on that sole source**
+(measured 2026-08-02). Three distinct situations, and the clock is right for only one of them:
+
+| pages | sole source | held | what the zero actually is |
+|---|---|---|---|
+| 55103 · 55109 · 55119 | `saint-paul-approved-building-permits` | 4.0–4.7 d | **true by construction** — the entry was RETIRED from the registry on 2026-07-28 |
+| 94024 · 94040 · 94041 · 95033 · 95046 | `san-jose-permits` | 5.1 d | **true** — see the receipt below |
+| 20769 | `prince-georges-county-permits` | 5.1 d | not a refusal at all — see below |
+
+**Correcting the earlier "self-healing is benign" reading.** For a page whose zero is TRUE, the hold is
+not neutral: it *prolongs the serving of records the source no longer supports*. Probed 94024 in the
+connector's OWN scope (Rule 13 — its 3-mi envelope around the ZIP centroid, its 365-day window):
+**1 `san-jose-permits` record all-time inside that envelope, 0 inside the window.** The page was caching
+**482**. The hold was protecting an artifact, and the clock expiring in ~2 days would have been the thing
+that finally corrected it.
+
+**And 20769 was never being refused.** Its fresh response carries `facilities = 9`, so the guard's
+condition cannot fire; the page was simply never *collected* — the response has to land inside
+`dev_refresh_collect`'s 20-minute window, and a fire/collect miss leaves `refreshed_at` frozen while
+`last_refresh_attempt_at` advances, which is exactly the shape the view reads as
+`temporarily_unavailable`. **A held page is therefore not evidence of a refusal.**
+
+**Both sources are ALIVE** — probed in each connector's own scope: `san-jose-permits` 11,160 rows in its
+365-day window (17,520 all-time); `prince-georges-county-permits` 347 rows with its verbatim
+`extra_where`, 461,508 all-time, max `permit_issuance_date` 2026-07-24. So "dead source" was not the
+explanation for any of the nine.
+
+**Released 2 pages against receipts rather than waiting out the clock** — 94024 (corroborated zero:
+482 cached → 0, facilities 4) and 20769 (facilities 9, never a refusal). Both `quality=pass`.
+
+### Recommendation — the release condition should be CORROBORATION, not elapsed time
+No code change made, and deliberately so: `dev_refresh_collect` is SQL and cannot probe a publisher, so
+"is this zero true?" is not answerable where the decision is currently taken. The two changes worth
+making, in order of value:
+
+1. **Retiring a registry entry should re-cache the pages that depended on it, in the same change.** A
+   retired entry's zero is true *by construction* — there is nothing to protect — yet the three Saint
+   Paul pages have each served ~20,000 stale records for five days because nobody told the cache. This
+   is an operational rule, not machinery. *(It did not bite the `las-vegas-building-permits` retirement
+   in this same session: all 51 of its pages keep content from other sources, so their `development`
+   never goes to 0 and the guard never engages.)*
+2. **A hold should carry its evidence.** `verify-coverage-state` now reports every in-window hold as INFO
+   and fails only on one that outlives its window, so the state is visible; the missing half is the
+   one-line probe — the source, in the connector's own scope — that says whether the zero is true. When
+   it is, release the page immediately, as was done here for 94024.
+
+**Do not read a hold as "the source died."** Of nine held pages, zero had a dead source: three had a
+retired entry, five had a genuinely-empty scope, and one was never being refused at all.
