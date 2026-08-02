@@ -4606,3 +4606,25 @@ and read Little Rock's **count of 10601** as a ZIP, which matched a real Westche
 looked malformed — it was caught only because Little Rock permits in Westchester NY is absurd.
 **Key extraction on the column name, case-insensitively, never on value shape.** A count and a ZIP are
 both five digits.
+
+### Socrata half of the native-ZIP pass — 1 wire, 2 declines, 1 modelling defect
+
+`$group` on the ZIP column across the 15 Socrata native-ZIP entries, each in its own recency window.
+14 answered; `nyc-dob-permit-issuance` returned 0 against a **guessed** date column, so it is recorded
+as unprobed rather than empty.
+
+**Wired:** `nyc-dobnow-approved-permits` → **NY Nassau**, 2 pages / 130 in-scope records (11001=93,
+11040=37) — both ZIPs straddle the Queens/Nassau line.
+
+⚠️ **Declined `nyc-dobnow` → NY Westchester, and the reason is a modelling defect we should fix.**
+ZIP **10470 (Woodlawn) is a BRONX ZIP parented to Westchester** in `communities` — this repo already
+records that it was excluded from the borough expansion "already live under Westchester via the Census
+crosswalk". It holds **79 in-scope NYC DOB permits** that cannot reach it, because the coverage gate is
+county-granular: licensing Westchester would also light **10803 Pelham Manor (8 records)**, where NYC
+DOB has no jurisdiction and the rows are artifacts.
+
+**Recommended fix: re-parent 10470 to Bronx** — then the existing borough coverage lights it with no
+registry change. That is a `communities` change affecting what residents see → **gated, not done.**
+
+Declined `marin-county-building-permits` → CA Sonoma: 94952 Petaluma returns 8 in-scope records
+(control 94901 = 19); Marin has no jurisdiction in Petaluma.

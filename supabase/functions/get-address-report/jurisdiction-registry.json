@@ -728,6 +728,10 @@
         {
           "state": "NY",
           "county": "Richmond"
+        },
+        {
+          "state": "NY",
+          "county": "Nassau"
         }
       ],
       "column_map": {
