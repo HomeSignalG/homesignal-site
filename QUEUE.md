@@ -4541,3 +4541,31 @@ stale dark pages in untouched counties are not hiding anything, and nobody needs
 the `0 lit_up` the hypothesis predicted. Caught only by pairing the zero with a control
 (`max(refreshed_at)` + a row count in the same window) before believing it. **A zero that agrees with
 your hypothesis is the most dangerous zero there is.**
+
+### Native-ZIP pass — 11 pages / 1,503 records, and a self-inflicted wrong number
+
+Third seam, different method: 57 entries scope by **native ZIP**, so the layer itself can name the
+ZIPs it holds. Queried `returnDistinctValues` on all 31 ArcGIS native-ZIP entries. Wired 6 pairs
+across 4 entries (columbus → OH Delaware 4/1,095 · nashville → TN Williamson 3/157, Wilson 1/54,
+Rutherford 1/12 · spokane → WA Stevens 1/141 · coconino → AZ Yavapai 1/44). Full receipts:
+`docs/source-registry.md` → "NATIVE-ZIP PASS (2026-08-02)".
+
+**The rejections are the real finding.** A distinct ZIP value is a LEAD, not coverage — these layers
+carry a few rows with an out-of-jurisdiction ZIP (Tempe AZ with a **California** ZIP, 1 record;
+Detroit → Oakland 3; Louisville → Oldham 8; Tacoma → King 9). Those are owner mailing addresses or
+typos, not buildings, and wiring them is the `las-vegas-building-permits` defect class.
+
+⚠️ **I predicted coconino → AZ Yavapai at 1,492 records / 2 pages; it delivered 44 / 1.** Two
+hypotheses were falsified before the real cause turned up: it is not a `ZIP_RADIUS_MI` clip (stored
+records span 15.21 mi from the centroid) and not `LIKE` vs `=` (exact equality also returns 1,487).
+**The cause is that I probed outside the connector's scope while stating I was inside it** — the entry
+has `recency_days: 365` and a substantial `extra_where`, and I recorded "no recency in entry", which
+was wrong. In-scope 86336 holds **146** rows.
+
+**That 146 was already in the entry's own `_receipts`, written by the previous pass one day earlier.**
+Re-derived wrongly instead of read. Standing answer added: **read an entry's `_receipts` before
+probing that entry.**
+
+Also logged: the first re-cache hit **6 × 503 BOOT_ERROR** + 1 timeout of 72 fires, four minutes after
+a deploy. Those pages looked dark but were pending (`last_refresh_attempt_at` advanced,
+`refreshed_at` did not). Re-firing recovered them. Check fire/collect counts before calling a page dark.
