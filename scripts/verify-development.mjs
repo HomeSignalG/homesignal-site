@@ -45,6 +45,24 @@ const zipUrl = (zip) => SITE_BASE + ZIP_PATH.replace('{zip}', encodeURIComponent
 // (records ingested per source, records excluded + why, unmapped statuses, geocode failures).
 const RUN_REPORT_SAMPLE = process.env.RUN_REPORT_SAMPLE ? parseInt(process.env.RUN_REPORT_SAMPLE, 10) : 3;
 
+// ── TIME BUDGET (2026-08-02) ────────────────────────────────────────────────────────────────
+// This job walks EVERY cached development_reports row — 12,722 today — through ONE Playwright
+// page, serially, at ~1.37 s each. Measured full runs: 4.17 / 3.56 / 4.83 / 3.71 / 3.90 h. The
+// workflow cap is now 330 min, and runtime is LINEAR in cached ZIPs, so the cap is reached at
+// ~15,700 — roughly one state's build away.
+//
+// The failure mode is the dangerous one: a run killed at the cap uploads NO report, so it
+// presents as a MISSING result rather than a partial one. That is exactly how verify-geocodes
+// hid 11 consecutive dead runs. This budget converts that into "checked 9,000 of 12,722, here is
+// the report, here is what was skipped" — the repo's no-silent-caps rule applied to itself.
+// It does not make the job faster; bounding the runtime is a separate change (a worker pool),
+// and `waitUntil: 'networkidle'` must move to `domcontentloaded` first — see QUEUE.md.
+const TIME_BUDGET_MS = process.env.TIME_BUDGET_MS
+  ? parseInt(process.env.TIME_BUDGET_MS, 10)
+  : 4.5 * 60 * 60 * 1000;                       // 4.5 h, inside the workflow's 330-min cap
+const STARTED_AT = Date.now();
+const budgetSpent = () => Date.now() - STARTED_AT >= TIME_BUDGET_MS;
+
 // The per-ZIP assertions themselves live in ./lib/verify-dev-helpers.mjs as the pure
 // `assertZip(zip, rep, isIndexable, st)` — pure so the race guard below can replay them
 // against a freshly-read cache row, and so test/verify-development-race-guard.test.mjs can
@@ -236,7 +254,9 @@ async function main() {
   let emptyOk = 0;
 
   let raceHealed = 0;
-  for (const rep of reports) {
+  let skippedForBudget = [];
+  for (const [idx, rep] of reports.entries()) {
+    if (budgetSpent()) { skippedForBudget = reports.slice(idx).map((r) => r.zip); break; }
     const zip = rep.zip;
     try {
       let st = await renderZipPage(page, zip);
@@ -396,17 +416,31 @@ async function main() {
   const propFails = fails.length - zipFailCount;
   await browser.close();
 
+  // A truncated walk must NOT exit 0, and the summary's own Failed count must agree with the exit
+  // code. "Ran out of time" and "everything passed" have to be distinguishable from the outside,
+  // or the next reader treats a partial sweep as a full one.
+  if (skippedForBudget.length) fails.push(`TIME BUDGET: ${skippedForBudget.length} ZIP(s) never checked — run is incomplete`);
+
   const summary = [
     `# Development page verification`,
     ``,
     `- Site: ${SITE_BASE}`,
-    `- ZIPs checked: **${reports.length}**`,
+    `- ZIPs checked: **${reports.length - skippedForBudget.length}** of ${reports.length}`,
+    ...(skippedForBudget.length
+      ? [`- ⚠️ **TIME BUDGET SPENT after ${Math.round((Date.now() - STARTED_AT) / 60000)} min — `
+         + `${skippedForBudget.length} ZIP(s) NOT CHECKED**, first skipped: `
+         + `${skippedForBudget.slice(0, 5).join(', ')}${skippedForBudget.length > 5 ? ' …' : ''}. `
+         + `This run is INCOMPLETE and says so; it is not a pass over the full cache.`]
+      : []),
     `- Property pages checked: **${props.length}**`,
     `- Passed: **${reports.length + props.length - fails.length}** (empty-but-valid: ${emptyOk})`,
     ...(raceHealed ? [`- Re-checked after a mid-run cache refresh and found consistent: **${raceHealed}**`] : []),
     `- Failed: **${fails.length}**${propFails ? ` (${propFails} property-page)` : ''}`,
     ...(fails.length
       ? [``, `## Failures`, ...fails.map((f) => `- ${f}`)]
+      : skippedForBudget.length
+      ? [``, `No failures among the pages that WERE checked — but the walk was truncated, so this is ` +
+          `not a clean bill for the cache. Re-run, or bound the runtime (QUEUE.md).`]
       : [``, `All pages resolved; every rendered record is sourced with a valid official record_url; ` +
           `no jurisdiction-scope record is rendered as a precise point; every development record buckets to ` +
           `built/approved/proposed; counts.{proposed,approved,operating,comment_open} each === their rendered ` +
