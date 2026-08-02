@@ -4523,3 +4523,21 @@ from cache.
 Pass #2 final, fully measured: **25 pages, 4,296 records** (was 22 / 4,224 before its own sweep).
 Consolidated invariants across all 817,346 records the 21 touched sources place over 675 pages:
 **0 missing `record_url`, 0 point-scope without coordinates, 0 unclassified.**
+
+### And the narrower version of that rule, measured: staleness alone hides nothing
+
+The finding above could be misread as "every stale dark page is hiding records" — which would imply a
+1,762-page sweep. Tested instead of assumed.
+
+**Sample: 200 dark pages in counties NEITHER pass touched**, all with `refreshed_at` older than the
+pass-#1 deploy — stale identically, but coverage never changed. **193 of 200 rewritten, 0 lit up**,
+against **10 of 96** and **6 of 97** for the same method on counties whose coverage did change.
+
+So the re-cache obligation attaches to a **coverage change**, not to cache age. The remaining ~544
+stale dark pages in untouched counties are not hiding anything, and nobody needs to sweep them.
+
+⚠️ **The first attempt at this measurement returned a false clean** — filtered on
+`refreshed_at > 01:50` while the clock read **01:44**, a threshold in the future. It returned exactly
+the `0 lit_up` the hypothesis predicted. Caught only by pairing the zero with a control
+(`max(refreshed_at)` + a row count in the same window) before believing it. **A zero that agrees with
+your hypothesis is the most dangerous zero there is.**

@@ -3788,3 +3788,34 @@ coordinates, 0 unclassified.** Largest newly-lit page 2.06 MB (80138).
 4,296 records** — `charleston → SC Berkeley` 5/2,033 · `johns-creek → GA Gwinnett` 2/964 ·
 `canyon → ID Ada` 4/717 · `dekalb → GA Henry` 2/221 · `boone → OH Hamilton` 4/131 ·
 `fairfax-recent → VA Prince William` 6/126 · `kent-de → MD Queen Anne's` 2/104.
+
+#### The re-cache obligation attaches to a COVERAGE CHANGE, not to cache age — measured
+
+The finding above could have been read as "the cache is generally under-lit and every stale dark page
+is hiding records." It is not, and the difference matters because the wide reading implies a
+1,762-page sweep that nobody needs to run.
+
+Tested it as a stated hypothesis. **Sample: 200 dark pages in counties NEITHER pass touched**, all
+with `refreshed_at` older than the pass-#1 deploy — i.e. stale in exactly the same way, but with
+coverage that never changed. Re-fired all 200 through the live engine.
+
+**Result: 193 of 200 were rewritten, and 0 lit up.**
+
+Against the same method on counties whose coverage *did* change: **10 of 96** (pass #1) and **6 of 97**
+(pass #2). Same query, same fire path, same collect — so the method demonstrably detects a newly-lit
+page, and its silence here is a real negative rather than an instrument that did not run.
+
+**Conclusion: general cache staleness hides nothing.** A dark page stays dark until the *config* that
+governs it changes. So the standing answer is narrower and cheaper than it first appeared — re-cache
+the target county after a coverage change, and leave the rest of the cache to the cron.
+
+⚠️ **One process note from this measurement, because it nearly became a false clean.** The first
+attempt filtered on `refreshed_at > '2026-08-02 01:50'` when the clock read **01:44** — a threshold in
+the future. It returned `0 lit_up`, which is exactly the answer the hypothesis predicted, and it was an
+artifact of a wrong filter rather than a result. It was caught only by pairing the zero with a control
+(`max(refreshed_at)` and a row count in the same window) before believing it. **A zero that agrees with
+your hypothesis is the most dangerous zero there is.**
+
+(7 of the 200 were not rewritten — their responses did not land in the collect window. Not the transient
+guard, which cannot apply to a page whose cached development count is 0. Reported as 193 measured
+rather than 200, so the denominator is the one actually observed.)
