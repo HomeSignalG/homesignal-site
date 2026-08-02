@@ -1199,6 +1199,11 @@ ZIP pages.
   jobs keep issuing/renewing — complements DOB NOW, no dual-filing); ISSUED/RE-ISSUED/
   IN PROCESS/REVOKED verbatim (11,225 blanks drop fail-closed); NB/DM/AL/FO whitelist drops
   EW (1.79M equipment work), PL, EQ (fences/sheds/scaffolds), SG at source.
+  ⚠️ **CORRECTION (2026-08-02): everything above describes the DATASET, and none of it
+  reached a page.** This entry placed **zero** records from wiring until 2026-08-02 — its
+  recency clause could not match a text MM/DD/YYYY column. The pass's "66,006 dev records"
+  is therefore entirely `nyc-dobnow-approved-permits`. Full diagnosis and fix:
+  "DEFECT: `nyc-dob-permit-issuance` HAS NEVER PLACED A RECORD" below.
 
 ### Rejected with receipts (do not re-derive)
 - **Buffalo**: every catalog permit item is a filtered VIEW with restricted rows —
@@ -4013,12 +4018,33 @@ BIS-legacy corpus — the pre-2021 jobs DOB NOW does not carry — has never rea
 (`nyc-dobnow`, both Seattle entries) were **re-probed with `IS NOT NULL` rather than assumed**, and all
 three place records in production (62,388 / 5,843 / 331), so their columns work.
 
-**NOT FIXED — gated.** The fix changes what residents see (200+ NYC pages gain records) and the right
-form is a real decision, not an obvious edit: a string compare in MM/DD/YYYY is *month-major* and
-therefore also wrong, so the options are (a) find a genuine timestamp column on the dataset, (b) express
-the window in `extra_where` with a SoQL date conversion, or (c) drop `recency_days` and accept the
-volume (11214 alone holds 23,761 lifetime rows, so page size needs the size-oracle check first). Logged
-with receipts so the decision can be made rather than re-derived.
+**FIXED 2026-08-02 (founder-authorised).** Each candidate repair was measured, not assumed:
+
+| option | verdict |
+|---|---|
+| (a) use a genuine timestamp column — `dobrundate` is the dataset's only `calendar_date` | **REJECTED.** It is a DOB re-export stamp, not a permit date: **23,212 of 23,761** rows for ZIP 11214 pass `dobrundate > cutoff`. It does not discriminate by permit age at all. |
+| (b) freeze the window into `extra_where` as a literal | **REJECTED.** SoQL `substring` + `||` do work (proven below), but an `extra_where` literal is fixed at author time and **silently ages** — a one-year window becomes a six-year window with nothing failing. That is the same class of defect as the one being repaired. |
+| (c) drop `recency_days` | **REJECTED.** 11214 alone holds 23,761 lifetime rows. |
+| **(d) `recency_expr` — a verbatim predicate whose cutoff is substituted at REQUEST time** | **ADOPTED.** |
+
+The fix is one additive optional field on the socrata connector, `recency_expr`, plus one line in the
+registry entry. Entries that do not set it are byte-identical to before. The entry now carries:
+
+```
+(substring(issuance_date,7,4)||substring(issuance_date,1,2)||substring(issuance_date,4,2)) >= '{cutoff_compact}'
+```
+
+`{cutoff_compact}` is computed from `recency_days` on every request, so **the window keeps rolling** —
+that is the whole reason it lives here and not in `extra_where`. Live receipts for ZIP 11214: the
+expression returns **391** rows at `>= '20250802'` (vs 437 for the coarser year-only form, correctly
+fewer), and **113** in the entry's full scope with its `permit_type` whitelist. Citywide in full scope:
+**17,977** records across ~213 pages ≈ 85/page — for comparison `nyc-dobnow` carries 293/page, so this
+is well inside the size envelope.
+
+Pinned by `test/socrata-text-date-recency.test.ts`, which **demonstrates the defect first** (the default
+path still emits the unmatchable ISO literal) and then proves the fix, that the broken comparison is
+gone rather than merely accompanied, that non-opted-in entries are unchanged, and that a blank
+`recency_expr` falls back to the default clause rather than silently dropping the window.
 
 ### Wired: `philadelphia-li-permits` → PA Montgomery + PA Delaware
 
