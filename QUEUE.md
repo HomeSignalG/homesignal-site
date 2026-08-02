@@ -4837,3 +4837,47 @@ making, in order of value:
 
 **Do not read a hold as "the source died."** Of nine held pages, zero had a dead source: three had a
 retired entry, five had a genuinely-empty scope, and one was never being refused at all.
+
+---
+
+## Objective 2, the requested report — what it would take to BOUND `verify-development`
+
+**Measured, not projected.** Last five completed full runs: **4.17 h · 3.56 h · 4.83 h · 3.71 h ·
+3.90 h** against the workflow's 6 h cap (two other "completed" runs at 0.06 h / 0.09 h are the
+`res.json()` deaths fixed earlier today, not full walks). Headroom on the worst of those five is
+**1.17 h — 20 %.**
+
+**What consumes it.** The job walks **every cached `development_reports` row — 12,722 today** — through
+**ONE Playwright page, strictly serially**: `const page = await browser.newPage()` followed by
+`for (const rep of reports)`, one `page.goto(…, { waitUntil: 'networkidle', timeout: 30000 })` per ZIP.
+At 4.83 h / 12,722 that is **~1.37 s per ZIP**, essentially all of it page load. There is **no
+concurrency and no time budget** — the two things `verify-geocodes` and `verify-communities` both have.
+
+**Why it is the next failure waiting to happen, precisely.** Runtime is linear in cached ZIPs, and
+cached ZIPs only grow. At the observed worst rate the cap is reached at **~15,700 ZIPs** — about
+**3,000 more pages**, which one state's build adds. And the failure mode is the bad one: a run cancelled
+at the cap **uploads no report**, so it presents as a missing result rather than a partial one — exactly
+how `verify-geocodes` hid 11 consecutive dead runs.
+
+### What it would take — three options, cheapest first
+
+1. **A bounded worker pool (recommended).** The same change already made to `verify-geocodes`:
+   N pages instead of one, a shared cursor, `CONCURRENCY` env-tunable. At N=4 the worst run lands near
+   **~1.2 h**, i.e. 5× headroom, and the cap moves out past 60,000 ZIPs. ⚠️ **One real hazard, learned
+   the hard way this week: `waitUntil: 'networkidle'` is fragile under concurrent tabs** — parallel page
+   loads keep the network busy and the condition stops settling. `verify-communities` was moved to
+   `domcontentloaded` + an explicit `waitForFunction` on the rendered root for exactly this reason, and
+   it then walked all 12,722 pages cleanly. Do that here **before** raising concurrency, not after.
+2. **An explicit time budget with an honest partial report** (`TIME_BUDGET_MS`, as added to
+   `verify-geocodes`). This does not make the job faster; it converts "cancelled, no artifact" into
+   "checked 9,000 of 12,722, here is the report, here is what was skipped." Worth doing **regardless of
+   option 1**, because it removes the silent-truncation class permanently. Pairs with the repo's own
+   no-silent-caps rule: log what was dropped.
+3. **Stop walking every ZIP every day.** Rotate: all indexable pages weekly, plus everything changed
+   since the last run daily (`refreshed_at > last_run`). Biggest saving, most behaviour change, and it
+   weakens the daily anti-fabrication guarantee — so it is the last resort, not the first move.
+
+**Recommendation: 2 then 1** — make truncation impossible to hide first (small, no behavioural risk),
+then buy the headroom. Not implemented in this session: raising concurrency without first re-measuring
+the `networkidle` change is how the 2026-07-24→28 red streak started, and this job is the
+anti-fabrication gate.
