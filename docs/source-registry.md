@@ -4091,3 +4091,76 @@ In the entry's own scope (`permittype`/`typeofwork` whitelists + 365 days): **19
   be obtained this way. Low risk regardless — a single city inside its declared county.
 - **Boston / Pittsburgh (CKAN) and Shelby (ODS)** answered, and produced **no** out-of-county ZIP on a
   modelled dark page.
+
+---
+
+## ⚠️ A TABLE'S MEANING DRIFTED WHEN A SECOND WRITER STARTED USING IT — 5,734 PAGES OVERSTATED (2026-08-02)
+
+**The most valuable finding of the 2026-08-02 session, and it was on no list.** It was found by chasing
+the last failing assertion in `verify-coverage-state` rather than by looking for it.
+
+### What broke
+
+`app_coverage_states` classifies every ZIP page's coverage. Its `populated` branch reads
+`dev_markers > 0 OR app_changes > 0`, and at the Phase-2 rollout that definition was verified **byte-for-byte
+identical** to the legacy gate `app_community_meta.data_quality` — `legacy1 = legacy2 = 0` over the full
+population (`docs/coverage-state-model.sql`).
+
+It could be identical because `app_changes` then held **only civic rows**: `'Government & civic'` and
+`'Planning & zoning'` — exactly the set `app_refresh_zip` counts into `_nc` when it stamps `data_quality`.
+
+Then **Local News began materializing into the same table** — 79,424 rows across 9,796 ZIPs. The view
+counted that table with **no category filter**. Nothing was edited; nothing failed; the *meaning of the
+table changed underneath a reader that was never told.*
+
+### Measured cost (full population, 12,722)
+
+| class | ZIPs | reported | actual |
+|---|---|---|---|
+| EPA facility floor + news, no development, no civic notices | **5,072** | `populated` | `facilities_only` |
+| news and nothing else — zero markers of any kind | **662** | `populated` | `honestly_empty` |
+
+**5,734 pages carried an overstated coverage state.** The resident-visible half is the worse half:
+`facilities_only` is the state that renders *"Local government meeting and permit feeds for this area are
+still being wired — the EPA-registered facility records below are live public data."* **5,072 residents
+were denied that banner** — the one piece of copy that tells them their page is the national EPA floor
+rather than real local coverage. The 662 are the ones that made CI red daily, which is the only reason
+any of it was found.
+
+**The materializer never drifted.** It counts `_nc` *before* the Local News insert, so `data_quality` has
+always been civic-only **by construction**. That asymmetry is why exactly one assertion failed — and why
+the instinct to "fix the failing assertion" would have been exactly backwards.
+
+### The fix
+
+`changes` counts civic rows only; `news_items` is reported **additively**, so the news is visible in the
+instrument rather than hidden behind the narrower count. Migration
+`app_coverage_state_view_civic_changes`. Verified live: all eight invariants 0, including
+`legacy1 = legacy2 = 0`. Distribution `populated 5,020 · facilities_only 6,769 · honestly_empty 924`
+(was `10,754 / 1,697 / 262`). Pinned by `test/coverage-state-news-not-coverage.test.mjs` — 14 assertions
+including a self-test that feeds the classifier the pre-fix unfiltered count and requires the **wrong**
+verdict, so a green run proves the narrowing does something.
+
+### 🔴 THE GENERAL RULE — A SHARED TABLE IS AN INTERFACE, AND A NEW WRITER CHANGES IT
+
+> **When a second writer starts putting a new kind of row into an existing table, every reader of that
+> table has silently had its question changed. Find them and update them in the same change.**
+
+This class is dangerous precisely because **nothing breaks**: no error, no failed migration, no red
+build. Both writers are correct in isolation, and the reader's code is unchanged and still runs. What
+changed is what the rows *mean*. The defect surfaces only as numbers that are quietly wrong, and it can
+survive indefinitely because a wrong-but-plausible count reads exactly like a right one.
+
+**Operationally, before adding a new row-kind to a shared table:**
+1. **Enumerate the readers** — `grep` the table name across views, RPCs, materializers, verifiers and
+   front-end queries. A view that aggregates it with no category filter is the signature.
+2. **Ask each one whether its question still means the same thing.** "Does this reader want the new rows
+   counted?" — a reader that wants them is fine; a reader that is merely *silent* about them is the bug.
+3. **Prefer a narrowing filter over a widening one**, and report the excluded set additively (here,
+   `news_items`) so the new rows stay visible rather than disappearing behind the fix.
+4. **Re-run the equivalence that was true at rollout.** Every cross-definition invariant that once
+   measured 0 — here `legacy1`/`legacy2` — is a tripwire for exactly this class. If a doc records "these
+   two definitions were verified identical", that is a check to re-run, not a fact to trust.
+
+*Two writers, one table, one reader nobody updated — and 5,072 residents told they had coverage they did
+not have.*

@@ -545,6 +545,55 @@ report" versus "did not run."
 > fabricated provenance claim inside the field built to hold provenance. Caught before commit
 > and rewritten. **Never infer provenance from plausibility.**
 
+### NEVER INFER ELAPSED TIME — COMPUTE IT (founder rule, 2026-08-02)
+
+**Compute `now - started_at` from the API and quote BOTH timestamps.** Never judge how long a job has
+been running by how much waiting it *feels* like, and never treat your own background `sleep` polls as
+though wall-clock advanced with them.
+
+*What the miscount produced on 2026-08-02, in order:* jobs 1.5 minutes old read as 20–50 minutes → a
+**fabricated CI hang** → a **healthy job cancelled at 1.8 minutes**, destroying a valid check → an empty
+"re-trigger CI" commit → the invented hang written into a commit message **and** `QUEUE.md` as the
+justification for real work. Measured afterwards, the three runs took **2.3, 1.8 (cancelled) and 2.4
+minutes**. Nothing was ever wrong.
+
+**Note the compounding, because it is the real lesson.** The same miscount had *already* produced a
+"`verify-communities` has been running ~50 minutes" claim earlier the same session (real duration:
+22m32s). That was corrected as a **symptom** — the number was fixed, the cause was not investigated —
+and it recurred hours later with far more consequence.
+
+> **A corrected symptom with an uninvestigated cause will return.** When you correct a wrong number,
+> ask what produced it before moving on. If the answer is "I'm not sure", that is the finding.
+
+### THE ROLE IS PART OF THE PROBE'S SCOPE (founder rule, 2026-08-02)
+
+Rule 13 says probe the question the connector asks. Its missing half: **the identity you probe as is
+part of the scope.** Measure in the same **role**, the same **cache state**, and the same **connection**
+the job actually uses.
+
+*The miss:* the `source-monitor` scoreboard RPC was measured **as `postgres` on a warm cache**
+(1,522 ms cold / 354 ms warm at `p_limit=1000`), a tuned constant was shipped on that evidence, and the
+live run **still died on `57014`** — because the job runs as **`anon`**, where RLS applies and
+`statement_timeout` is **3 s**, and the scheduled call is **cold**. The measurement was real and the
+conclusion was wrong, which is the dangerous combination: it was quoted as evidence.
+
+Two corollaries, both earned the same way:
+- **Degrade, don't tune.** A constant picked from one measurement is a guess about every other
+  environment. Ship a ladder that shrinks on failure instead of a number that was right once.
+- **Never advance a keyset cursor on failure.** Shrinking the page *and* moving `after` skips rows while
+  reporting success — silent data loss wearing a green check.
+
+### A DEPLOY IS PART OF AN AUTHORISED CHANGE (founder rule, 2026-08-02)
+
+**When an authorised change requires a deploy to take effect, dispatch it and disclose it in the same
+report.** Stopping at the merge is not caution; it produces the exact false-claim shape this repo keeps
+correcting.
+
+*The case:* `las-vegas-building-permits` was retired by merge, but the engine deploy is deliberately
+manual. Had the deploy been left for a separate approval, the report would have read "Las Vegas retired"
+while **51 live pages still served its 3,121 records**. A retirement that is not deployed is a registry
+edit that changes nothing. **Deploy is the step that makes an authorised change true.**
+
 ### Measurement discipline
 - **Capture the baseline BEFORE mutating what you intend to measure** — a post-deploy refresh
   destroyed the pre-deploy Arlington rows and cost the clean −397 figure.
