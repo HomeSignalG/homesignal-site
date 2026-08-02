@@ -838,6 +838,7 @@
         "FO": "Development"
       },
       "extra_where": "permit_type in ('NB','DM','AL','FO')",
+      "recency_expr": "(substring(issuance_date,7,4)||substring(issuance_date,1,2)||substring(issuance_date,4,2)) >= '{cutoff_compact}'",
       "recency_days": 365,
       "_receipts": "2026-07-15 NY wire pass: the legacy BIS ledger still updates DAILY (rowsUpdatedAt 2026-07-15) — pre-DOB-NOW jobs keep issuing/renewing here, so it complements rbx6-tga4 (different system, no dual-filing). Statuses VERBATIM: ISSUED(3,908,261)+RE-ISSUED(48,878)->approved, IN PROCESS(20,980)->proposed, REVOKED(5)->exclude; 11,225 blank statuses drop fail-closed. permit_type whitelist NB/DM/AL/FO at source (drops EW equipment work 1.79M, PL plumbing, EQ construction equipment/fences/sheds, SG signs). Native zip_code + gis_latitude/gis_longitude. Dataset-precision record_url. | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 5 permit_status values (ISSUED 3,908,536 / RE-ISSUED 48,879 / IN PROCESS 20,974 / null 11,232 / REVOKED 5) — the BIS legacy ledger records issuance only and carries NO completion state, so operating:[]."
     },

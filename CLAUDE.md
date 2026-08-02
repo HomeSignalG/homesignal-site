@@ -1136,7 +1136,15 @@ legal/framing change not covered by the one-time sign-off.
   live under Westchester via the Census crosswalk); NY 519→764 ZIP pages, 0 dup slugs.
   Every ZIP has a cached row and a materialized page — **758 pass + 6 coverage_coming
   honest empties; 0 unsourced, 0 count mismatches, 0 sites missing coords**. **210 of 764
-  ZIPs dev-backed (27%), 66,006 dev records** via **nyc-dobnow-approved-permits** (Socrata
+  ZIPs dev-backed (27%), 66,006 dev records** — ⚠️ **CORRECTED 2026-08-02: every one of those
+  records came from `nyc-dobnow-approved-permits` alone. `nyc-dob-permit-issuance` contributed
+  ZERO and had never placed a record** — its `issuance_date` is TEXT in MM/DD/YYYY while the
+  connector emitted an ISO literal, so the comparison was lexicographic and matched nothing
+  (ZIP 11214: 23,761 rows unfiltered → 0 with the connector's own clause). The "still updates
+  daily for pre-DOB-NOW jobs" description below was true of the DATASET and false of our
+  ingest of it. Fixed the same day via the additive `recency_expr` escape hatch in
+  `sources/socrata.ts`; see docs/source-registry.md "DEFECT: nyc-dob-permit-issuance". Via
+  **nyc-dobnow-approved-permits** (Socrata
   rbx6-tga4, fresh same-day; native zip + lat/lng; Permit Issued/Signed-off verbatim; 5 of
   21 verbatim work_types kept — General Construction/Structural/Foundation/Earth Work/Full
   Demolition; 16 noise types dropped at source) + **nyc-dob-permit-issuance** (ipu4-2q9a

@@ -101,6 +101,19 @@ export interface SocrataRegistryEntry {
   /** Optional: drop rows whose file_date/incremental_field is older than N days (volume cap
    *  for high-history permit datasets). Absent ⇒ no recency filter. */
   recency_days?: number;
+  /** Optional VERBATIM SoQL predicate replacing the default recency comparison, for datasets
+   *  whose date column is TEXT rather than a floating_timestamp. The default clause emits an
+   *  ISO literal (`col > '2025-08-02T00:00:00'`), which on a text column compares
+   *  LEXICOGRAPHICALLY — so an MM/DD/YYYY column matches NOTHING and the source silently
+   *  returns zero rows for every ZIP (nyc-dob-permit-issuance, found 2026-08-02).
+   *
+   *  Substituted at REQUEST TIME so the window keeps rolling — the whole point of expressing it
+   *  here rather than freezing a literal into extra_where, which would age silently:
+   *    {cutoff}         → 'YYYY-MM-DD'  (recency_days before today)
+   *    {cutoff_compact} → 'YYYYMMDD'
+   *  e.g. "(substring(d,7,4)||substring(d,1,2)||substring(d,4,2)) >= '{cutoff_compact}'".
+   *  Requires recency_days (which supplies the cutoff). Absent ⇒ default behaviour, unchanged. */
+  recency_expr?: string;
   /** Optional VERBATIM SoQL clause ANDed into every query (drop noise types at source —
    *  mirror of the arcgis connector's extra_where). Data, not code. */
   extra_where?: string;
@@ -503,10 +516,17 @@ function buildWhere(entry: SocrataRegistryEntry, zip: string, zipCol: string, ce
   // ECA/street-exception and roof permits). The connector never inspects it.
   if (entry.extra_where && entry.extra_where.trim()) clauses.push(`(${entry.extra_where.trim()})`);
   if (entry.recency_days && entry.recency_days > 0) {
-    const dateCol = firstCol(entry.column_map.file_date) || entry.incremental_field;
-    if (dateCol) {
-      const cutoff = new Date(Date.now() - entry.recency_days * 86400000).toISOString().slice(0, 10);
-      clauses.push(`${dateCol} > '${cutoff}T00:00:00'`);
+    const cutoff = new Date(Date.now() - entry.recency_days * 86400000).toISOString().slice(0, 10);
+    // TEXT-DATE ESCAPE HATCH: the default comparison below emits an ISO literal, which on a text
+    // column compares lexicographically and can silently match nothing. An entry whose date column
+    // is text supplies its own predicate; the cutoff is still computed here, so the window rolls.
+    if (entry.recency_expr && entry.recency_expr.trim()) {
+      clauses.push(entry.recency_expr.trim()
+        .replaceAll("{cutoff_compact}", cutoff.replaceAll("-", ""))
+        .replaceAll("{cutoff}", cutoff));
+    } else {
+      const dateCol = firstCol(entry.column_map.file_date) || entry.incremental_field;
+      if (dateCol) clauses.push(`${dateCol} > '${cutoff}T00:00:00'`);
     }
   }
   return clauses.join(" AND ");
