@@ -4648,6 +4648,25 @@ DOB has no jurisdiction and the rows are artifacts.
 **Recommended fix: re-parent 10470 to Bronx** — then the existing borough coverage lights it with no
 registry change. That is a `communities` change affecting what residents see → **gated, not done.**
 
+✅ **DONE 2026-08-02 (founder-authorised objective 3).** Migration `reparent_10470_woodlawn_to_bronx`;
+SQL of record `docs/10470-bronx-reparent.sql`. Authority is the repo's own pinned source, `zipcodes`
+PyPI v3.0.0 — `10470 -> Bronx County, NY, STANDARD` — with a control from the same read
+(`10803 -> Westchester County`) proving it is one row and not a disagreement with the package. The row
+already *called* itself Bronx (name "Bronx (10470)", slug `bronx-10470`); only `county` and `parent_id`
+said otherwise.
+
+Every hazard the per-ZIP model names was measured, not assumed: **0 subscribers** on either chain root
+(so no subscriber is switched between communities), and Bronx and Westchester carry the **identical 6
+canonical topics** (so the subscribable set does not change). Cascaded civic content does change, and
+that is the correction: Westchester County's 29 meetings have no jurisdiction over a Bronx address and
+stop rendering; Bronx County's 9 alerts start.
+
+Live result — **10470 goes from the facilities floor to 102 development records + 20 facilities**,
+0 missing coordinates, 0 missing `source_ref`, `coverage_state` populated, indexable true. Sourced to
+**both** NYC DOB entries: the queue predicted 79 from `nyc-dobnow` alone, and
+`nyc-dob-permit-issuance` now contributes too because its text-date defect was fixed earlier the same
+day. Westchester's array 75 → 74, 0 duplicate slugs, `'10470'` resolves in exactly one community.
+
 Declined `marin-county-building-permits` → CA Sonoma: 94952 Petaluma returns 8 in-scope records
 (control 94901 = 19); Marin has no jurisdiction in Petaluma.
 
