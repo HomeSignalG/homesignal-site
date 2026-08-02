@@ -336,7 +336,7 @@ NOT in `homesignal-ingest`. `source-monitor.mjs` runs nightly at cron `0 7 * * *
 one sequence — **none by anything firing, all by looking:**
 
 - 5 fixture suites never referenced by any workflow or runner (**0 automated signal since
-  birth**)
+  birth**) — *closed 2026-08-02: all are in the runner, see the supersession note below*
 - #428's green that ran only against a pre-#430 base
 - a drift check reading the wrong scope
 - `socrata.ts` greppable as **binary** after 2 literal NUL bytes landed, so "no match" and "did
@@ -590,6 +590,9 @@ Settled 2026-07-29/30:
   was answering a different **SCOPE** question.
 - **The five fixture suites never produced a false green** — they produced **NO signal**, having
   never been referenced by any workflow or runner.
+  ✅ **SUPERSEDED 2026-08-02 — they are wired.** PR #431 added four to `scripts/run-unit-tests.mjs`
+  and #552 added `socrata-text-date-recency.test.ts`; the runner now discovers **73** files and CI
+  gates on it. The lesson above stands as history and the finding is closed.
 
 ---
 
