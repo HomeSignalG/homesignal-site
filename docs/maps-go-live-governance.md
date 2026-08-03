@@ -789,6 +789,46 @@ Pair it with the rule above: the *actual* failure was invisible to a count of em
 those pages were never empty — they kept their county planning notices while silently losing 414
 permits.
 
+### A CROSS-LANGUAGE COUPLING NEEDS A TEST OR IT ROTS INVISIBLY (founder rule, 2026-08-03)
+
+**When a guard written in one language depends on a message authored in another, nothing checks
+the join.** The compiler cannot see it, the linter cannot see it, and the guard keeps running —
+producing success-shaped output while silently guarding nothing. It is the same family as
+"an instrument must prove it ran," one level up: here the instrument runs perfectly and is simply
+pointed at a string that moved.
+
+*The case:* `dev_refresh_collect()` (SQL) identifies a failed source with
+`reason like 'fetch failed:%'` against `quarantined[].reason` — a string authored in five
+TypeScript connectors. Reword one message and the SQL keeps executing, keeps returning row
+counts, and stops refusing anything. Pinned by `test/fetch-failure-reason-contract.test.mjs`,
+which asserts the prefixes from **both** sides — the connectors emit them, and the SQL matches
+them — plus that every connector's report array is actually read (a missed one is an unguarded
+source).
+
+**Where possible, key on a FIELD rather than on prose.** The companion truncation guard keys on
+`truncated_at_max_rows` precisely because the prose is *not* uniform: csv words its note "bound
+the emit" while the other four say "bound the fetch", so a string match would have silently
+missed one connector in five. When only prose is available, the test is not optional.
+
+### THE CONNECTOR WAS NOT AT FAULT — DO NOT GO LOOKING FOR A CONNECTOR DEFECT (2026-08-03)
+
+Recorded explicitly so a future session reading "Portland fetch failures" does not hunt for a bug
+that never existed. **There was no connector defect.** All five connectors diagnosed the failure
+correctly and precisely, per source, at the moment it happened:
+
+```
+"fetched": 0, "emitted": 0,
+"quarantined": [{ "reason": "fetch failed: error sending request for url (…):
+                  client error (Connect): Connection reset by peer (os error 104)" }]
+```
+
+The `quarantined: []` reported earlier in that investigation was a **reading error** — the report
+was fetched positionally as `arcgis_reports->0`, and for those ZIPs index 0 was a *different*
+source. Reading by `registry_id` showed the diagnosis had been there all along. The entire defect
+lived in the collect layer, which discarded a correct signal. *(Positional access into an array
+of per-source reports is a claims-discipline trap in its own right: index 0 is not "the source
+you are thinking about." Filter by `registry_id`.)*
+
 ### A FETCH THAT FAILS MUST NOT COLLECT AS AN EMPTY SUCCESS (founder rule, 2026-08-03)
 
 **"No match" and "did not run" must never be indistinguishable — and that applies to a data
