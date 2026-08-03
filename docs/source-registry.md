@@ -4267,3 +4267,112 @@ revived; St. Paul still stalled at 2025-06-30, Syracuse at 2025-08-16, KCMO at `
 2025-05-09). That one hit bought **quality on 9 pages and coverage on 0**. Any estimate of what the
 remaining reprobe candidates are worth should carry that caveat attached — the seam is cheap and it
 works, but on current evidence it mostly deepens rather than lifts.
+
+---
+
+## ✅ DELAWARE COUNTY PA — GO-LIVE MEASURED: 29 dark pages → 0. A real page lift, not depth (2026-08-03)
+
+The first candidate valued under the DEPTH-IS-NOT-COVERAGE rule above, and the first to pass it: PA has
+**no statewide DOT-style source** in the registry, so the baseline was taken BEFORE the re-cache and the
+29 dark pages were confirmed genuinely dark (`0` rows in `app_projects` carrying any `source_ref`).
+
+**Baseline → after** (`app_projects`, materialized, keyed on the exact `source_ref`
+`https://www.delcopa.gov/planning/` — never a name or domain pattern):
+
+| | before | after |
+|---|---|---|
+| Delaware County PA ZIP pages | 40 | 40 |
+| dev-backed | **11** | **40** |
+| dark | **29** | **0** |
+| pages carrying the county source | 0 | **40** |
+| rows from the county source | 0 | **5,180** (39–197 per page) |
+
+**Anti-fabrication + map-render invariants across all its cached records: 0 missing `record_url`,
+0 missing coordinates, 0 non-`point` scope, 0 without a `use_type`.** The polygon `featurePoint()`
+shoelace-centroid path carried it — `column_map.lat/lng → __lat/__lng` is what makes that true, and its
+absence is the `sussex-county-de-conditional-use` defect (records silently land on the ZIP centroid at
+scope `area`). **Bidirectional gate proof:** the entry rides **1 county, 0 pages outside PA/Delaware.**
+
+### Two corrections found while measuring, both worth keeping
+
+1. **THE ENTRY EMITTED ZERO ON ITS FIRST WIRE, AND THE SOURCE WAS NEVER THE PROBLEM.** `status_const` in
+   `sources/arcgis.ts` is the **RAW** status value, resolved through `status_to_bucket`
+   (`arcgis.ts:300-304`); in `sources/socrata.ts` it **IS** the bucket. The socrata idiom (an all-empty
+   map) applied to an arcgis entry leaves the constant unmapped, so every row is excluded — silently.
+   Full record under the status_const guard; pinned by `test/status-const-must-be-mapped.test.mjs`.
+
+2. **A RETRY SELECTOR MUST ASK "WHAT DID NOT REFRESH", NOT "WHAT IS STILL DARK".** 3 of 40 fires
+   returned 503 (normal cold-start). The retry selected pages with **no sourced sites** — which silently
+   skipped **19015**, because border-spill rows from `new-castle-county-permits` made it look non-dark
+   while its `refreshed_at` was still four hours stale. A page can be non-dark *and* unrefreshed; those
+   are different questions and only `refreshed_at` answers the second. Re-fired on `refreshed_at`,
+   19015 returned **186** county records — so the apparent "one page the source genuinely doesn't
+   reach" was an artifact of my own selector, and the final state is **40 of 40 pages covered**. The
+   wrong selector produced a plausible, almost-right number; only checking `refreshed_at` exposed it.
+
+### `new-castle-county-permits` on PA pages is DECLARED, not a gate leak — do not "fix" it
+
+Its coverage is `[{DE,New Castle},{PA,Delaware},{PA,Chester}]` with `spatial_zip_radius_mi: 5`, so real
+New Castle County DE permits within 5 miles of a border ZIP centroid legitimately appear on 10 PA
+Delaware and 5 PA Chester pages. **The consequence for planning: Chester County's 5 "dev-backed" pages
+are EXACTLY those 5 border-spill ZIPs**, so its other 34 pages have nothing of their own — Chester is a
+34-page lift candidate, not a 34-page one with partial cover.
+
+---
+
+## 🎯 CHESTER COUNTY PA — SOURCE FOUND AND ENUMERATED, NOT YET WIRED (2026-08-03)
+
+**34 dark pages of 39** (the other 5 are New Castle border spill, above). Same shape as Delaware — the
+county's Act 247 plan-review docket — and found the same way: **the recorded "six county-hub URL guesses
+404'd" was an UNREACHABLE-BY-GUESS non-verdict, not an enumerated rejection.** Nine further hostname
+guesses (`gis.chesco.org`, `arcgis.chesco.org`, `maps.chesco.org`, `gis.co.lancaster.pa.us`,
+`gis.lancastercountypa.gov`, `maps.lancastercountypa.gov`, `gis.centrecountypa.gov` ×2,
+`maps.centrecountypa.gov`) **all failed DNS — recorded as guesses, and NOT as rejections.** The real host
+came from the county's own published GIS hub instead.
+
+**Host:** `gisprodops.chesco.org` (ArcGIS 11.3) · **service:**
+`/server/rest/services/Planning_Services/Plan_Act247_AGOL_D/MapServer` · copyright
+`Chester County Planning Commission`.
+
+**⚠️ THE MERGED-LAYER TRAP, CLOSED BY ARITHMETIC — WIRE LAYER 5 ONLY.** The service exposes the parts and
+their union, and wiring both would double-emit (the `houston-plat-applications` class, uncatchable by
+exact-identity dedup across two `source_registry_id`s):
+
+| layer | name | count |
+|---|---|---|
+| 2 | `PROPOSED_LAND_DEVELOPMENTS` | 1,563 |
+| 3 | `PROPOSED_SUBDIVISIONS` | 2,105 |
+| 4 | `PROPOSED_CONDITIONAL_USE` | 58 |
+| **5** | **`PROPOSED_PLANS_MERGED`** | **3,726** |
+| 10 | `Act247_1999_2009` (archive) | 5,471 |
+
+**1,563 + 2,105 + 58 = 3,726 exactly** — layer 5 *is* the union, and the three parts are disjoint and
+exhaust it. Positive control closed.
+
+**Liveness, all three parts:** name clean; **entity correct** (the Planning Commission's own Act 247
+docket, on the county's own server); **dates fresh** — newest `SUBMIT_DATE` **2026-07-30**
+(then 07-28, 07-23).
+
+**Field choices from live non-null counts, not from the schema** (a merged layer populates fields per
+subset — the UDOT lesson): `SUBMIT_DATE` **3,726/3,726 (100%)** · `PLAN_TITLE` 3,725 · `PRIMARY_USE`
+3,722 · `REVIEW_DATE` 3,708 · `PROJECT_NAME` 3,701. **`SUBMIT_DATE` is a real `esriFieldTypeDate`**, so
+unlike Delaware's integer `Year` this carries day precision and `recency_days` applies directly.
+Window sizing, measured: **627 rows in 3y · 1,095 in 5y · 2,253 in 10y** of 3,726.
+
+**`PRIMARY_USE` is a closed vocabulary** summing exactly to the layer count: Residential 1,888 ·
+Commercial 864 · Institutional 470 · Industrial 280 · Agricultural 220 · null 4 = **3,726**.
+Mapping into the CLOSED `use_type` set (`lib/map.js::TYPE_EXACT`): Residential→Residential ·
+Commercial→Commercial · Institutional→`Civic/Public` · Industrial→Industrial · **Agricultural→
+`Development`** (there is no agricultural member; `Development` is the generic that renders the "Other
+project" circle — the Phoenix precedent — rather than forcing it into Industrial) · the 4 nulls carry
+**no type at all**, never a guessed one.
+
+**Still to settle before wiring:** no status column → `status_const` (and it MUST be a key in
+`status_to_bucket` — see the Delaware defect); polygon geometry → `__lat/__lng`; no ZIP and no address
+column → `spatial_zip_radius_mi`; `record_url_precision: "dataset"` — there is no per-plan lookup URL,
+and the hub's catalogue separately lists only layer 2, so the honest link for a merged-layer record
+needs deciding rather than templating.
+
+**New standing answer: DCAT `modified` is metadata staleness, not data staleness.** Chester's catalogue
+entry reads `modified: 2021-08-31` while the layer's newest record is **2026-07-30**. Rejecting on the
+catalogue timestamp would have been a false negative on a live, fresh source.
