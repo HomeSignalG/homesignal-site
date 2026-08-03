@@ -4591,3 +4591,88 @@ covered counties besides Philadelphia (45/46).
 | Lehigh | 34 | 5 | 29 | not probed |
 
 **Next in this seam: Centre (35) then York (47) = 82 more dark pages with live sources already found.**
+
+---
+
+## 🔬 CONNECTOR OPTION-SURFACE AUDIT — one root class, one LIVE instance worth ~52,000 records (2026-08-03)
+
+Run on the founder's instruction after the `status_const` defect turned out to be live in a second
+entry. **The question was whether other options carry the same divergence across connectors. They do,
+and one of them is not a latent hazard but a defect already in production.**
+
+### The root class
+
+A registry entry is plain JSON handed to one of five connectors. **A key the receiving connector does
+not implement is not an error and not a warning — it is silently ignored.** So an entry can look
+complete, pass every other test, and behave nothing like what its author wrote. `status_const` was one
+symptom; the class is bigger than that option.
+
+**The dangerous case is a typo.** `recency_day`, `spatial_point_cols`, `max_row` — each is accepted by
+the JSON, ignored by the connector, and invisible in review.
+
+### 🔴 THE LIVE INSTANCE — `include_types` is csv-only and SEVEN entries rely on it
+
+`include_types` is implemented **only** in `sources/csv.ts` (`grep -rn include_types sources/` matches
+csv.ts and nothing else). Seven arcgis/socrata entries carry it, and **in every one it mirrors that
+entry's own `type_map` keys exactly** — so it was plainly meant as a drop-filter. It drops nothing.
+
+**And type does NOT fail closed the way status does.** `arcgis.ts:354` is
+`typeHit?.value || entry.use_type_const || "unclassified"` — an unmapped type still PUBLISHES the row,
+labelled `unclassified`. (An unmapped *status* is excluded; the asymmetry is deliberate but it is what
+makes this silent.)
+
+**Measured in the live cache:**
+
+| entry | records | `unclassified` | % | has an `extra_where` that filters type? |
+|---|---|---|---|---|
+| `columbus-building-permits` | 42,067 | **40,469** | **96.2%** | none |
+| `cincinnati-building-permits` | 10,842 | 7,856 | 72.5% | none |
+| `nashville-building-permits-issued` | 9,025 | 3,561 | 39.5% | date-only |
+| `portland-building-permits` | 2,329 | 177 | 7.6% | none |
+| `cleveland-issued-building-permits` | 92,357 | 644 | 0.7% | ✅ filters `PERMIT_TYPE` |
+| `fairfax-active-site-construction` | 8,349 | 0 | 0% | ✅ |
+| `fairfax-recent-building-permits` | 19,103 | 0 | 0% | ✅ |
+
+**The collapse to ~0% wherever an `extra_where` happens to duplicate the intent is the tell** — the
+filter differs, not the data. **~52,000 records are published beyond what their entries intended**,
+40,469 of them from Columbus alone.
+
+⚠️ **This was HALF-KNOWN.** The Cincinnati case was noticed on 2026-07-28 and flagged for the owner
+("Pre-existing defect noticed while confirming this"). What that note missed is that it is **7 entries,
+not 1**, and it never measured the consequence. *A defect flagged without a magnitude gets triaged as
+small.*
+
+**NOT FIXED HERE — it is a gated change** (it removes tens of thousands of records from live pages,
+i.e. it changes what residents see). Two options for the founder: (a) move each whitelist into the
+connector's `extra_where` — config-only, per-entry, reversible; or (b) implement `include_types` in
+arcgis/socrata — one code change, fixes all seven at once and makes the option mean the same thing
+everywhere. **(b) is the better fix** precisely because the root class is per-connector divergence.
+
+### The divergence matrix — same NAME, different behaviour
+
+| option | arcgis | socrata | carto | ckan | csv |
+|---|---|---|---|---|---|
+| `status_const` | **RAW value**, resolved through `status_to_bucket` | **IS the bucket** | — | — | — |
+| `include_types` | ignored | ignored | ignored | ignored | **implemented** |
+| `recency_days` | `>= DATE '…'` — **breaks on STRING date cols, NO escape hatch** | ISO + **`recency_expr`** escape hatch | `> now() - interval` | `> 'YYYY-MM-DD'` — **STRING compare, silently wrong on `M/D/YYYY`** | parse-time |
+| `spatial_zip_radius_mi` | geometry envelope | `within_circle` **and REQUIRES `spatial_point_col`** (else quarantined → emits ZERO) | **not implemented** | **not implemented** | row coords |
+| `use_type_const` | only connector that has it; mutually exclusive with `type_map` (guarded, `arcgis.ts:245`) | — | — | — | — |
+
+Two further notes worth carrying:
+- **`recency_days` inclusivity is not consistent** — arcgis uses `>=`, ckan and carto use `>`. A
+  one-day boundary difference on the same option name.
+- **ckan's string comparison is the NYC trap in a different connector.** `nyc-dob-permit-issuance` was
+  found on 2026-08-02 to have never placed a record because a lexicographic compare met `MM/DD/YYYY`.
+  ckan's `recency_days` has exactly that shape. No live ckan entry hits it today (Boston and Pittsburgh
+  both carry ISO dates) — but it is one wire away, and there is no guard.
+
+### What shipped
+
+`test/connector-option-surface.test.mjs` (suite 78 → 79 files). It rejects unknown keys **by default**
+rather than reporting them, so a typo cannot pass review; ratchets the 7 known entries so the list may
+only shrink; requires each still to carry the option it is excused for (a stale excuse is its own false
+record); pins the two load-bearing asymmetries so a future "harmonisation" must face them; and
+self-tests that it catches a typo'd `recency_day`.
+
+**`shelby-county-building-permits` declares `platform: "opendatasoft"`, for which no connector exists** —
+the entry does nothing at all. Known and queued (QUEUE.md item 8, SHELBY-429).

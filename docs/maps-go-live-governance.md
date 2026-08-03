@@ -594,6 +594,40 @@ manual. Had the deploy been left for a separate approval, the report would have 
 while **51 live pages still served its 3,121 records**. A retirement that is not deployed is a registry
 edit that changes nothing. **Deploy is the step that makes an authorised change true.**
 
+### REMOVING A KNOWN CAUSE DOES NOT PROVE THE SYMPTOM IS GONE (founder rule, 2026-08-03)
+
+**After a fix, RE-MEASURE — and keep a control in the same query.** A repaired cause is evidence about
+the cause, never about the symptom. The symptom may have had two.
+
+*The case:* `san-antonio-prelim-plan-review` emitted zero because of the `status_const` defect below.
+The defect was real, the fix was correct, it was merged and deployed — and the entry **still returned 0**
+on both Bexar pages, against a same-service control (`san-antonio-permits-issued`) returning **167** on
+one of them. The second, independent reason: it scopes on a native `Zip_Code` column and the layer's own
+`returnDistinctValues` holds 29 ZIPs **ending at 78259**, while the only two Bexar pages modelled are
+78260/78261. An honest zero, and the `houston-plat-applications` class — correctly wired, zero surface,
+unlocked by a ZIP expansion rather than any registry edit.
+
+Without the re-cache, **"defect found and fixed" would have entered the record while the entry still
+emitted nothing** — the same false-coverage shape this repo keeps correcting. The control is what makes
+the re-measurement mean anything: a zero next to a non-zero control is a finding; a zero alone is a
+question.
+
+### A HUB CATALOGUE IS A PUBLISHING CHOICE, NOT AN INVENTORY (founder rule, 2026-08-03)
+
+**Enumerate `/arcgis/rest/services` itself before recording a rejection.** A DCAT/hub catalogue lists
+what someone chose to publish there; the server lists what exists.
+
+*The case:* Centre County PA's hub publishes **100 datasets and none of them is its permit layer** — the
+only keyword hit is a *page* whose description is the unrendered template literal `{{description}}`, with
+no service URL. The server's own root listing carries `Building_Permits` (**60,098 rows**, fresh: 669
+dated 2026, 1,745 in 2025). Stopping at the hub yields a confident, wrong rejection.
+
+⚠️ **RETROACTIVE CONSEQUENCE — this invalidates an unknown number of past verdicts.** Several earlier
+`candidates_exhausted` / "no permit datasets" rejections were probably reached by reading a hub or DCAT
+catalogue alone. **When any previously-rejected county comes up again, first check WHICH SURFACE its
+rejection enumerated** — hub-only rejections are non-verdicts and must be re-probed against the server
+root before being quoted. Only a rejection that names the server enumeration is conclusive.
+
 ### Measurement discipline
 - **Capture the baseline BEFORE mutating what you intend to measure** — a post-deploy refresh
   destroyed the pre-deploy Arlington rows and cost the clean −397 figure.
