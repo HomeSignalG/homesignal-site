@@ -3473,7 +3473,9 @@
         "Building Commercial - Shell",
         "Building Commercial - Structural Frame",
         "Building Commercial - Tenant Finish Out",
-        "Building Demolition Permit"
+        "Building Demolition Permit",
+        "Building Commercial - Rehab",
+        "Building Residential - Rehab"
       ],
       "type_map": {
         "Building Residential - New": "Development",
@@ -3487,7 +3489,9 @@
         "Building Commercial - Shell": "Development",
         "Building Commercial - Structural Frame": "Development",
         "Building Commercial - Tenant Finish Out": "Development",
-        "Building Demolition Permit": "Development"
+        "Building Demolition Permit": "Development",
+        "Building Commercial - Rehab": "Development",
+        "Building Residential - Rehab": "Development"
       },
       "status_const": "Issued",
       "status_to_bucket": {
@@ -3508,7 +3512,8 @@
         "types": "34-value verbatim domain; 12 construction/land-use classes kept; Rehab/storm/fire repairs, Roofing-Siding, Signs, Tree Removal, U&O, Change-Contractor, Amend, Moving, Temporary dropped at source",
         "native_zip_and_coords": "ZIP + Lat/Lon columns",
         "record_url": "dataset-precision (no per-row URL column)",
-        "icon_completeness_2026_07_27": "status_const='Issued' assigns the bucket DIRECTLY in the connector (`bucket = entry.status_const`), bypassing status_to_bucket entirely — this source has NO status column, so the other buckets are structurally inapplicable. Filled as [] for schema completeness only; buildBucketLookup already reads a missing bucket as [] (`s2b[b] ?? []`), so this is a PURE NO-OP with zero behavior change."
+        "icon_completeness_2026_07_27": "status_const='Issued' assigns the bucket DIRECTLY in the connector (`bucket = entry.status_const`), bypassing status_to_bucket entirely — this source has NO status column, so the other buckets are structurally inapplicable. Filled as [] for schema completeness only; buildBucketLookup already reads a missing bucket as [] (`s2b[b] ?? []`), so this is a PURE NO-OP with zero behavior change.",
+        "widened_before_enforcement_2026_08_03": "include_types was implemented in arcgis/socrata on 2026-08-03 (it had been csv-only and SILENTLY IGNORED), so this whitelist was about to start actually dropping rows for the first time. The live Permit_Type_Description vocabulary was enumerated BEFORE enforcing, and the dropped mass was NOT all noise: the two LARGEST dropped classes were Building Commercial - Rehab (3,738) and Building Residential - Rehab (2,357) = 6,095 rows of REAL renovation, ahead of every noise class. Both ADDED (use_type Development, matching every other member of this map). ⚠️ THIS REVERSES A DELIBERATE CHOICE recorded in the `types` receipt above, which lists Rehab among the intended drops. That intent was never realised (the option did nothing), and those rows are on live pages TODAY; enforcing as written would have REMOVED 6,095 real records. Founder rule, 2026-08-03: dropping real records to fix a config bug is a worse defect than the bug. Still dropped, each verified as process/trade rather than construction: Building Sign Permit 2,143, Change Contractor 413+182, Building Use & Occupancy 392, Tree Removal 345, Roofing/Siding 345+166, Amend Permit 108+68, Fire/Storm Damage repairs. FOR THE RECORD: the prior expectation was that this entry's dropped mass would be trades noise. It was not. Measuring changed the action."
       }
     },
     {
@@ -3549,14 +3554,16 @@
         "Addition",
         "Replacement",
         "First",
-        "Move"
+        "Move",
+        "Alteration"
       ],
       "type_map": {
         "New Construction": "Development",
         "Addition": "Development",
         "Replacement": "Development",
         "First": "Development",
-        "Move": "Development"
+        "Move": "Development",
+        "Alteration": "Development"
       },
       "status_to_bucket": {
         "approved": [
@@ -3603,7 +3610,8 @@
         "types": "NEWCLASS 6-value construction axis; New Construction/Addition/Replacement/First/Move kept, Alteration + null dropped; NEWTYPE (occupancy) rides in the title",
         "coverage_note": "Portland spans Multnomah/Washington/Clackamas; spatial envelope self-limits to the city footprint regardless",
         "record_url": "dataset-precision (no per-row URL column)",
-        "point_scope_fix": "POINT-SCOPE FIX 2026-07-25 (pg_net 109742-109744 + cache audit): the entry emitted 2,166 records that ALL carried a valid record_url but landed scope='area', so app_refresh_zip (which inserts development markers only where scope='point') produced ZERO map markers for the whole Portland metro. Cause was NOT stale fields or projection - every mapped field verified present (NEWTYPE/WORKDESC/STATUS/NEWCLASS/ISSUEDATE/PROP_ADDRE/FOLDERNUMB) and the layer geometry is already esriGeometryPoint wkid 4326. The column_map simply never mapped lat/lng to the connector's geometry-flatten fields, so every record fell through the source-coords branch to area scope. Added lat=__lat / lng=__lng (the Denver + Minneapolis pattern). Config only; no connector change; anti-fabrication untouched - records already carried genuine record_urls."
+        "point_scope_fix": "POINT-SCOPE FIX 2026-07-25 (pg_net 109742-109744 + cache audit): the entry emitted 2,166 records that ALL carried a valid record_url but landed scope='area', so app_refresh_zip (which inserts development markers only where scope='point') produced ZERO map markers for the whole Portland metro. Cause was NOT stale fields or projection - every mapped field verified present (NEWTYPE/WORKDESC/STATUS/NEWCLASS/ISSUEDATE/PROP_ADDRE/FOLDERNUMB) and the layer geometry is already esriGeometryPoint wkid 4326. The column_map simply never mapped lat/lng to the connector's geometry-flatten fields, so every record fell through the source-coords branch to area scope. Added lat=__lat / lng=__lng (the Denver + Minneapolis pattern). Config only; no connector change; anti-fabrication untouched - records already carried genuine record_urls.",
+        "widened_before_enforcement_2026_08_03": "include_types was implemented in arcgis/socrata on 2026-08-03 (previously csv-only and silently ignored), so this whitelist was about to start dropping rows for the first time. Live NEWCLASS groupBy over the whole layer returns only SEVEN values and the ONLY substantive dropped class was Alteration (2,416) — real renovation. ADDED (use_type Development), by the same standard as the founder-approved Boston whitelist, which KEEPS 'Long Form/Alteration' and drops only the Short Form minor-jobs class. ⚠️ THIS REVERSES A DELIBERATE CHOICE recorded in the `types` receipt above ('Alteration + null dropped'). That intent was never realised, and those rows are on live pages today. Still dropped: 295 rows with a NULL NEWCLASS — no classifiable type at all. Kept unchanged: New Construction 32,093, Addition 1,210, Move 207, Replacement 39, First 3."
       }
     },
     {
