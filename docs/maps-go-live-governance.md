@@ -649,6 +649,62 @@ option, and measure what each one will now do. "This commit changes no data file
 it changes no behaviour. The safe orderings are: fix the offenders first and deploy together; strip the
 option from the offenders and deploy without them; or do not deploy.
 
+### A RE-CACHE CANNOT SHRINK A PAGE TO EMPTY WITHIN 7 DAYS (founder rule, 2026-08-03)
+
+**`dev_refresh_collect()` REFUSES any update that takes a fresh row's `development` count from >0 to
+0.** It is flake protection — a transient source failure must never blank a good page — and it means
+**"re-cache and measure" structurally cannot verify an intentional REDUCTION.** A change that correctly
+empties a page will look like a failed deploy.
+
+The guard, verbatim from the shipped function:
+
+```sql
+and not (
+  d.refreshed_at >= now() - interval '7 days'
+  and coalesce((j->'counts'->>'development')::int, 0) = 0
+  and coalesce((d.counts->>'development')::int, 0) > 0
+)
+```
+
+**When a change is expected to REDUCE a page:** say so up front, EXPECT the guard to reject those
+rows, and verify the intent from the CONNECTOR'S OWN OUTPUT (a live query in the connector's scope)
+rather than from the cache. The end state arrives on its own when the 7-day escape clause expires —
+the function's own comment explains why: *"Beyond that the 'flake' theory is exhausted (7+ consecutive
+holds) and the clean 200 response is the truth."*
+
+**Do NOT hand-write the cache to force it.** The control is doing its job; defeating a safety control
+to make a number appear on schedule is never the move.
+
+*The case:* the Columbus `type_source` re-point was expected to empty 5 of 49 pages. All five returned
+clean HTTP 200s with `development: 0`, and all five were REJECTED by this guard — 44 of 49 pages
+persisted, the 5 kept serving stale MEP/sign records, and the run superficially read as "5 pages failed
+to refresh." Nothing failed. They self-empty ~7 days after their last successful refresh.
+
+### `net._http_response` PURGES ARE A DATA-LOSS PATH — VERIFY FROM `refreshed_at`, NEVER FROM THE RESPONSE TABLE (founder rule, 2026-08-03)
+
+**This is not a slow path, it is a DATA-LOSS path.** `net._http_response` can be purged wholesale
+between firing a batch and collecting it. **A lost response is indistinguishable from a request that
+never returned**, so a purge silently UNDER-REPORTS a re-cache and reads as ordinary transient failure —
+the most dangerous shape there is, because the run still looks like it half-worked.
+
+**Every re-cache measurement in this repo uses fire-then-collect, so any batch where a purge fired
+would have under-reported.** Past runs reporting "N of M returned 503" may in part have been purges.
+
+**The rule:**
+1. Fire in batches small enough to **collect within ~2 minutes**. Never fire a large batch and wait.
+2. **Verify completion from `refreshed_at` on the TARGET ROWS**, not from the response table.
+   `refreshed_at` lives on the row you are trying to change and **survives the purge**; the response
+   table never was an authoritative completion signal.
+3. Before concluding a re-cache "did not work," run `select count(*), max(id) from net._http_response`.
+   An empty table distinguishes *"the source failed"* from *"the evidence was garbage-collected."*
+
+*Observed 2026-08-03:* the whole table went to **0 rows, max id NULL**, minutes after an 86-request
+batch was fired — every response lost, and the only symptom was pages that had not moved. The same day,
+a transient outage read of Columbus showed 13,231 records / 39 unclassified where the settled state was
+14,466 / 45; splitting by `refreshed_at` resolved it immediately (44 pages post-deploy carrying 14,421
+records and **0** unclassified, 5 pages still on pre-deploy timestamps carrying all 45). **The split by
+`refreshed_at` is what made the number interpretable — the totals alone were not.**
+
 ### Measurement discipline
 - **Capture the baseline BEFORE mutating what you intend to measure** — a post-deploy refresh
   destroyed the pre-deploy Arlington rows and cost the clean −397 figure.

@@ -4717,3 +4717,64 @@ for a ZIP where Columbus issued no development permits in a year. Honest-empty o
 (the pages repopulate on the next refresh with no code or config change — the whitelist is not a
 per-ZIP exclusion), or a second Franklin County source being wired. Neither is a reason to touch this
 entry today.
+
+### 📅 THEY DO NOT EMPTY UNTIL ~2026-08-09/10 — that delay is a SAFETY CONTROL, not a failed deploy
+
+**Deployed 2026-08-03 15:55Z. All five ZIPs returned clean HTTP 200s with `development: 0` — and all
+five were REJECTED by `dev_refresh_collect()`'s transient-safe guard**, which refuses any update taking
+a FRESH row's development count from >0 to 0 (flake protection: a momentary source failure must never
+blank a good page). So immediately after the deploy:
+
+- **44 of 49 pages persisted** the re-point — 14,421 records, **0 unclassified** (from 40,468).
+- **5 pages kept serving their stale MEP/sign records**, and the cache still showed 45 unclassified —
+  exactly 3+4+2+29+7, i.e. entirely those five pages' old content.
+
+Their last successful refresh was 2026-08-02/03, so the guard's 7-day escape clause expires around
+**2026-08-09/10**, at which point the clean empty response wins and the pages settle to the EPA
+facilities floor. **If you are reading this AFTER that date and the pages are empty: that is the
+intended end state, arriving on schedule.** If you are reading it BEFORE and they still show HVAC
+permits: also expected — do not re-fire them, and do not hand-write the cache to force it.
+
+Full rule: `docs/maps-go-live-governance.md`, "A RE-CACHE CANNOT SHRINK A PAGE TO EMPTY WITHIN 7 DAYS".
+
+---
+
+## ✅ include_types ENFORCEMENT — COLUMBUS MEASURED (2026-08-03), three entries pending a DB outage
+
+Deployed 15:55Z on merge commit `5a4c24a`. Columbus re-cached and materialized the same hour; the other
+three were interrupted by a **platform-side Supabase outage** (`FATAL: 57P03 … not accepting
+connections, Hot standby mode is disabled`) — unrelated to this change, and any failure inside that
+window is an artefact of the outage, not of the wire.
+
+### Columbus — measured vs expected, on the 49 baseline ZIPs
+
+| | expected | measured |
+|---|---|---|
+| records | 14,445 | **14,466** (14,421 on the 44 pages that persisted) |
+| keep rate | 34.2% | **~34.3%** |
+| **unclassified** | — | **40,468 → 0** on every persisted page |
+| missing `record_url` / coordinates | 0 | **0 / 0** |
+| pages emptied | 5 | 0 today, **5 on ~08-09/10** (guard, see above) |
+
+**0.17% variance from prediction** — inside the stop-tolerance (30–38% keep, no sixth page dark), so the
+run proceeded. The 45 unclassified still in the cache are exactly the five held pages' old content
+(3+4+2+29+7), not a classification miss.
+
+**The point of the whole exercise:** every surviving Columbus record now carries a real `use_type`.
+Before the re-point, 96.2% of them rendered as typed pins with no type.
+
+### Two protocol gaps this deploy exposed — both now governance rules
+
+1. **A re-cache cannot shrink a page to empty within 7 days** (the guard above). "Re-cache and measure"
+   silently assumes a re-cache can REDUCE a page. It cannot, and an intentional emptying looks
+   identical to a failed deploy.
+2. **`net._http_response` can be purged between firing and collecting.** An 86-request batch was lost
+   when the table went to 0 rows minutes after firing. Fire modest batches, collect within ~2 minutes,
+   and check `max(id)` before concluding a re-cache "did not work."
+
+### Pending when the database returns
+
+Re-fire and measure **cincinnati** (expect a large drop — 111,022 trades records dropped at source),
+**nashville** (baseline 9,027 / 3,562 unclassified) and **portland** (baseline 2,329 / 177), each
+against its pinned pre-deploy baseline. Cincinnati and Nashville will likely hit the same 7-day guard on
+any page whose development count reaches zero — that is expected, not a defect.
