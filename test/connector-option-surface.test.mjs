@@ -4,24 +4,26 @@
 // connector does not implement is not an error and not a warning — it is SILENTLY IGNORED. So an
 // entry can look complete, pass every other test, and do something entirely different from what its
 // author wrote down. This is the same family as the `status_const` defect (see
-// test/status-const-must-be-mapped.test.mjs) but broader, and it is LIVE:
+// test/status-const-must-be-mapped.test.mjs) but broader.
 //
-//   `include_types` is implemented ONLY by sources/csv.ts (`grep -rn include_types sources/` matches
-//   csv.ts and nothing else), yet SEVEN entries on arcgis/socrata carry it. In every one it mirrors
-//   the entry's own type_map exactly, so the author plainly meant it as a drop-filter. It drops
-//   nothing. And an unmapped TYPE does not fail closed the way an unmapped STATUS does —
-//   `arcgis.ts:354` is `typeHit?.value || entry.use_type_const || "unclassified"`, so the row is
-//   published anyway, labelled "unclassified".
+//   THE CASE THAT PRODUCED THIS SUITE: `include_types` was implemented ONLY by sources/csv.ts, yet
+//   SEVEN entries on arcgis/socrata carried it, each mirroring its own type_map — so each plainly
+//   meant it as a drop-filter and none of them dropped anything. An unmapped TYPE does not fail
+//   closed the way an unmapped STATUS does (`typeHit?.value || use_type_const || "unclassified"`),
+//   so the rows published anyway. Measured live 2026-08-03: columbus 40,469 of 42,067 (96.2%)
+//   unclassified, cincinnati 7,856 of 10,842 (72.5%), nashville 3,561 of 9,025, portland 177 of
+//   2,329 — and ~0% wherever an `extra_where` happened to duplicate the intent (cleveland 0.7%,
+//   fairfax x2 0%), which is the tell that the FILTER differed, not the data. ~52,000 records
+//   beyond intent.
 //
-//   Measured in the live cache 2026-08-03: columbus-building-permits 40,469 of 42,067 records
-//   (96.2%) unclassified; cincinnati 7,856 of 10,842 (72.5%); nashville 3,561 of 9,025 (39.5%);
-//   portland 177 of 2,329 (7.6%). Where an `extra_where` happens to duplicate the intent the number
-//   collapses (cleveland 0.7%, fairfax x2 0%) — which is the tell that the filter, not the data, is
-//   what differs. ~52,000 records published beyond intent.
+//   ✅ CLOSED the same day by IMPLEMENTING the option in arcgis + socrata rather than patching seven
+//   `extra_where` clauses — patching symptoms would have left the divergence for the next entry to
+//   repeat. See test/include-types-pushdown.test.mjs. Enforcement against live pages was gated
+//   separately on reading the unmapped mass first (a whitelist that drops 96% of an entry is as
+//   likely to be too narrow as the data is to be noise).
 //
-// Fixing those entries changes what residents see, so it is a GATED change and is NOT done here.
-// What this suite does is make the class impossible to re-introduce, and pin the known set so it
-// cannot silently grow.
+// What this suite does is make the class impossible to RE-INTRODUCE: unknown keys are rejected by
+// default, and the surviving asymmetries are pinned so a future edit has to face them.
 //
 // THE DANGEROUS CASE IS A TYPO. `recency_day`, `spatial_point_cols`, `max_row` — each would be
 // accepted by the JSON, ignored by the connector, and invisible in review. That is why unknown keys
@@ -66,17 +68,12 @@ const entries = [];
 const ANNOTATION_KEYS = new Set(['_receipts', '_notes', '_comment', '_zip_mode_note',
   'status_unresolved', 'vocab_terminal']);
 
-// KNOWN, MEASURED, GATED — entries carrying an option their connector ignores. The fix changes what
-// residents see, so it needs the founder. This list may only ever SHRINK.
-const KNOWN_IGNORED = new Map([
-  ['cincinnati-building-permits', ['include_types']],
-  ['columbus-building-permits', ['include_types']],
-  ['cleveland-issued-building-permits', ['include_types']],
-  ['nashville-building-permits-issued', ['include_types']],
-  ['portland-building-permits', ['include_types']],
-  ['fairfax-active-site-construction', ['include_types']],
-  ['fairfax-recent-building-permits', ['include_types']],
-]);
+// KNOWN, MEASURED, GATED — entries carrying an option their connector ignores. This list may only
+// ever SHRINK.
+// ✅ EMPTIED 2026-08-03: it held seven `include_types` entries; the option is now IMPLEMENTED in
+// arcgis and socrata (test/include-types-pushdown.test.mjs), so nothing is ignored any more. That is
+// the intended way off this list — implement the option, do not excuse the entry.
+const KNOWN_IGNORED = new Map([]);
 // An entry whose `platform` has no connector at all does nothing whatsoever. Known + queued
 // (QUEUE.md item 8, SHELBY-429: build the opendatasoft connector).
 const KNOWN_NO_CONNECTOR = new Set(['shelby-county-building-permits']);
@@ -126,21 +123,28 @@ console.log('\n4) INFO — cross-connector semantic divergence (not failable, bu
   // These are recorded because the NAME is identical while the behaviour is not. A wire written from
   // one connector's habit and pasted into another is the whole failure mode.
   const notes = [
-    'status_const  arcgis=RAW value resolved through status_to_bucket | socrata=IS the bucket',
-    'include_types csv ONLY — ignored by arcgis/socrata/carto/ckan (see header; ~52k live records)',
-    'recency_days  arcgis >= DATE literal (breaks on STRING date cols, NO escape hatch) | ' +
-      'socrata ISO + recency_expr escape hatch | carto now()-interval | ckan STRING compare ' +
-      '(silently wrong on M/D/YYYY) | csv parse-time',
+    'status_const  arcgis=RAW value resolved through status_to_bucket | socrata=IS the bucket ' +
+      '(STILL DIVERGENT — the one asymmetry not yet closed)',
+    'include_types ✅ CLOSED 2026-08-03 — now arcgis + socrata + csv. carto/ckan still lack it.',
+    'recency_days  ✅ escape hatch now in arcgis + socrata + ckan (recency_expr). Default clauses ' +
+      'still differ: arcgis >= DATE literal | socrata ISO | carto now()-interval | ckan STRING ' +
+      'compare | csv parse-time. INCLUSIVITY still differs: arcgis >=, ckan/carto >.',
     'spatial_zip_radius_mi arcgis=geometry envelope | socrata=within_circle AND REQUIRES ' +
       'spatial_point_col (else quarantined, emits ZERO) | csv=row coords | carto/ckan NOT IMPLEMENTED',
     'use_type_const arcgis ONLY; mutually exclusive with type_map (guarded at arcgis.ts:245)',
   ];
   for (const n of notes) console.log(`  i ${n}`);
   // Pin the two that are load-bearing, so a "harmonisation" has to face them.
-  ok('socrata still has recency_expr and arcgis still does NOT (the asymmetry is real)',
-    OPTS.socrata.has('recency_expr') && !OPTS.arcgis.has('recency_expr'));
-  ok('include_types is still csv-only', OPTS.csv.has('include_types')
-    && !['arcgis', 'socrata', 'carto', 'ckan'].some((c) => OPTS[c].has('include_types')));
+  // These pin the CLOSED state, so a revert would be caught. They were the opposite assertions
+  // until 2026-08-03 — the guard failing on its own fix is the mechanism working.
+  ok('recency_expr now exists in arcgis, socrata AND ckan (the silent-failure class is closed)',
+    ['arcgis', 'socrata', 'ckan'].every((c) => OPTS[c].has('recency_expr')),
+    ['arcgis', 'socrata', 'ckan'].filter((c) => !OPTS[c].has('recency_expr')).join(', ') + ' missing it');
+  ok('include_types now exists in arcgis, socrata AND csv',
+    ['arcgis', 'socrata', 'csv'].every((c) => OPTS[c].has('include_types')),
+    ['arcgis', 'socrata', 'csv'].filter((c) => !OPTS[c].has('include_types')).join(', ') + ' missing it');
+  ok('status_const remains the one KNOWN-divergent option (arcgis raw vs socrata bucket)',
+    OPTS.arcgis.has('status_const') && OPTS.socrata.has('status_const'));
 }
 
 console.log('\n5) SELF-TEST — the detector can fail');
@@ -152,7 +156,8 @@ console.log('\n5) SELF-TEST — the detector can fail');
   const good = { registry_id: 'fixture', platform: 'arcgis', recency_days: 365 };
   ok('5b. the correct spelling passes',
     Object.keys(good).filter((k) => !ANNOTATION_KEYS.has(k) && !known.has(k)).length === 0);
-  ok('5c. a csv-only option on an arcgis entry is caught', !OPTS.arcgis.has('include_types'));
+  ok('5c. a carto-unsupported option is still caught (include_types is not in carto)',
+    !OPTS.carto.has('include_types'));
 }
 
 console.log(fail ? `\n${fail} check(s) FAILED` : `\nAll ${pass} connector-option-surface checks passed.`);

@@ -109,6 +109,29 @@ export interface ArcgisRegistryEntry {
    *  used as the ZIP clause INSTEAD of `{zip_col}='{zip}'` (e.g.
    *  "Address LIKE '%UT {zip}%'"). When present, column_map.zip is not required. The point
    *  geometry still supplies the precise location; this only scopes which rows the ZIP pulls. */
+  /** VERBATIM whitelist on the column_map.type_source column — the SQL twin of csv.ts's
+   *  parse-time filter, pushed down as `{typeCol} IN ('a','b',…)` so rows are dropped AT
+   *  SOURCE. Pushed down rather than filtered post-fetch on purpose: a post-fetch filter
+   *  lets a max_rows cap bind on rows the whitelist would have removed, silently costing
+   *  whitelisted records.
+   *  ⚠️ THIS OPTION WAS csv-ONLY UNTIL 2026-08-03 AND WAS SILENTLY IGNORED HERE. Six arcgis
+   *  entries carried it, each mirroring its own type_map, so their intended noise filter did
+   *  nothing — and because an unmapped TYPE does not fail closed (unlike an unmapped status;
+   *  see normalizeRow's `|| "unclassified"`), the rows published anyway. Measured live before
+   *  the fix: columbus 40,469 of 42,067 records (96.2%) unclassified, cincinnati 72.5%,
+   *  nashville 39.5%, portland 7.6% — ~52,000 records beyond intent.
+   *  Requires a SINGLE type_source column: column_map arrays JOIN their values here (the UDOT
+   *  standing answer), so an array cannot be expressed as a column IN (…) and the entry is
+   *  QUARANTINED rather than silently unfiltered. Absent ⇒ no type filter. */
+  include_types?: string[];
+  /** Escape hatch for layers whose date column is a STRING, where recency_days' `DATE '…'`
+   *  literal cannot apply (the frisco / worcester / anaheim class). Verbatim clause with
+   *  `{cutoff}` → 'YYYY-MM-DD' and `{cutoff_compact}` → 'YYYYMMDD' substituted; requires
+   *  recency_days to supply the cutoff. The socrata twin, added 2026-08-03 — socrata gained
+   *  recency_expr after the nyc-dob defect while arcgis had NO fallback at all, which is why
+   *  worcester needed a hardcoded `LIKE '%/2025'` window that goes blind every January.
+   *  Absent ⇒ default behaviour, unchanged. */
+  recency_expr?: string;
   zip_where_template?: string;
   /** SPATIAL ZIP-scoping for point layers with NO ZIP column and no ZIP anywhere in a text
    *  field (e.g. Denver's construction-permit layers: ADDRESS has no ZIP). Queries an
@@ -245,6 +268,18 @@ async function runEntry(
   if (entry.use_type_const && entry.type_map && Object.keys(entry.type_map).length > 0) {
     report.quarantined.push({
       reason: "config error: use_type_const AND type_map both set — a constant is for layers with NO classifiable type column; remove one",
+      sample: entry.service_url,
+    });
+    return { records, report };
+  }
+
+  // A whitelist that cannot be expressed is FAIL-CLOSED, never silently unfiltered — the whole
+  // point of implementing this option is that an ignored filter published ~52,000 unintended
+  // records. Emitting everything here would reproduce exactly that, just with new code.
+  if (entry.include_types?.length && !soleTypeCol(entry)) {
+    report.quarantined.push({
+      reason: "config error: include_types set but column_map.type_source is absent or a multi-column array "
+        + "(arrays JOIN their values, so no single column holds the whitelisted string) — cannot filter, entry skipped",
       sample: entry.service_url,
     });
     return { records, report };
@@ -626,14 +661,44 @@ function buildWhere(entry: ArcgisRegistryEntry, zip: string, zipCol: string): st
       : `${zipCol}='${safeZip}'`;
   const clauses = [zipClause];
   if (entry.extra_where && entry.extra_where.trim()) clauses.push(`(${entry.extra_where.trim()})`);
+  // TYPE WHITELIST, pushed down at source. Only reachable with a single type_source column —
+  // fetchRows quarantines the array case before we get here, so this never silently no-ops.
+  const typeClause = includeTypesClause(entry);
+  if (typeClause) clauses.push(typeClause);
   if (entry.recency_days && entry.recency_days > 0) {
-    const dateCol = firstCol(entry.column_map.file_date) || entry.incremental_field;
-    if (dateCol) {
-      const cutoff = new Date(Date.now() - entry.recency_days * 86400000).toISOString().slice(0, 10);
-      clauses.push(`${dateCol} >= DATE '${cutoff}'`);
+    const cutoff = new Date(Date.now() - entry.recency_days * 86400000).toISOString().slice(0, 10);
+    // recency_expr wins when present: the DATE literal below is invalid against a STRING
+    // date column, and there was previously no way to express that here.
+    if (entry.recency_expr && entry.recency_expr.trim()) {
+      clauses.push(entry.recency_expr.trim()
+        .replaceAll("{cutoff_compact}", cutoff.replaceAll("-", ""))
+        .replaceAll("{cutoff}", cutoff));
+    } else {
+      const dateCol = firstCol(entry.column_map.file_date) || entry.incremental_field;
+      if (dateCol) clauses.push(`${dateCol} >= DATE '${cutoff}'`);
     }
   }
   return clauses.join(" AND ");
+}
+
+/** `{typeCol} IN ('a','b',…)` for an entry's include_types, or null when it does not apply.
+ *  Values are used VERBATIM (they are the publisher's own strings) with SQL quotes escaped. */
+export function includeTypesClause(entry: ArcgisRegistryEntry): string | null {
+  const list = entry.include_types;
+  if (!list || !list.length) return null;
+  const typeCol = soleTypeCol(entry);
+  if (!typeCol) return null;                       // array/absent — quarantined in fetchRows
+  const vals = list.map((v) => `'${String(v).trim().replaceAll("'", "''")}'`).join(",");
+  return `${typeCol} IN (${vals})`;
+}
+
+/** The ONE type_source column, or null when type_source is absent or a multi-column array
+ *  (arrays JOIN their values, so no single column carries the whitelisted string). */
+export function soleTypeCol(entry: ArcgisRegistryEntry): string | null {
+  const ts = entry.column_map.type_source;
+  if (!ts) return null;
+  if (Array.isArray(ts)) return ts.length === 1 ? String(ts[0]) : null;
+  return String(ts);
 }
 
 async function getWithBackoff(url: string, deps: ArcgisDeps): Promise<unknown> {

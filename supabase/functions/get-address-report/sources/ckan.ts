@@ -53,6 +53,11 @@ export interface CkanRegistryEntry {
   zip_mode?: boolean;
   /** drop rows whose file_date is older than N days. Absent ⇒ no filter. */
   recency_days?: number;
+  /** Escape hatch for a TEXT date column, where the default clause's ISO literal compares
+   *  LEXICOGRAPHICALLY and can silently match nothing (the nyc-dob-permit-issuance shape).
+   *  Verbatim predicate with `{cutoff}` → 'YYYY-MM-DD' and `{cutoff_compact}` → 'YYYYMMDD';
+   *  requires recency_days to supply the cutoff. Absent ⇒ default behaviour, unchanged. */
+  recency_expr?: string;
   /** Optional VERBATIM SQL clause AND'd into every query (entry-driven scoping — drop noise
    *  permit classes at source). Data, not code: the connector never inspects it. */
   extra_where?: string;
@@ -312,10 +317,23 @@ export function buildWhere(entry: CkanRegistryEntry, zip: string, zipCol: string
   const clauses = [`"${zipCol}" = '${zip.replace(/'/g, "''")}'`];
   if (entry.extra_where && entry.extra_where.trim()) clauses.push(`(${entry.extra_where.trim()})`);
   if (entry.recency_days && entry.recency_days > 0) {
-    const dateCol = firstCol(entry.column_map.file_date);
-    if (dateCol) {
-      const cutoff = new Date(Date.now() - entry.recency_days * 86400000).toISOString().slice(0, 10);
-      clauses.push(`"${dateCol}" > '${cutoff}'`);
+    const cutoff = new Date(Date.now() - entry.recency_days * 86400000).toISOString().slice(0, 10);
+    // TEXT-DATE ESCAPE HATCH (added 2026-08-03, UNFIRED trap). The default clause below compares
+    // against an ISO literal. On a genuine date/timestamp column PostgreSQL casts and it is
+    // correct; on a TEXT column it compares LEXICOGRAPHICALLY, so an MM/DD/YYYY column matches
+    // nothing and the source silently returns zero rows for every ZIP — exactly the
+    // nyc-dob-permit-issuance defect (found 2026-08-02 on socrata, where it HAD fired and cost
+    // every record). No live ckan entry carries a text date today (Boston and Pittsburgh are both
+    // ISO), so this closes the class before it costs anything rather than after.
+    // {cutoff} → 'YYYY-MM-DD', {cutoff_compact} → 'YYYYMMDD', substituted at REQUEST time so the
+    // window keeps rolling (freezing a literal into extra_where would age silently).
+    if (entry.recency_expr && entry.recency_expr.trim()) {
+      clauses.push(entry.recency_expr.trim()
+        .replaceAll("{cutoff_compact}", cutoff.replaceAll("-", ""))
+        .replaceAll("{cutoff}", cutoff));
+    } else {
+      const dateCol = firstCol(entry.column_map.file_date);
+      if (dateCol) clauses.push(`"${dateCol}" > '${cutoff}'`);
     }
   }
   return clauses.join(" AND ");
