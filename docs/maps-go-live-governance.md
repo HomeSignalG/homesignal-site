@@ -810,6 +810,29 @@ source).
 the emit" while the other four say "bound the fetch", so a string match would have silently
 missed one connector in five. When only prose is available, the test is not optional.
 
+### AN IDENTIFIER REGEX CANNOT TELL A COLUMN FROM A STRING LITERAL (2026-08-03)
+
+Deriving a column projection (`out_fields`) by scanning an entry's `column_map` **plus its
+`extra_where`** looked mechanical and safe. It produced, for `denton-county-dev-permits`:
+
+```
+ADDITION, BARN, BUILDING, COMMERCIAL, DUPLEX, GARAGE, HOME, HOUSE, METAL, MOBILE, SHOP, TO
+```
+
+Every one of those is a **value inside** `PermitType IN ('HOUSE','MOBILE HOME','DUPLEX',…)`, not
+a column. The same bug hit miami, minneapolis and cleveland — 4 of 28 entries. **Strip quoted
+literals before extracting identifiers**, and note the asymmetry that makes this dangerous in
+both directions: an *extra* column is usually harmless, but a **missed** column silently drops a
+field from every record the entry emits — with nothing failing. Any `out_fields` pass must also
+be verified against each layer's live `fields` list before it is written. Caught pre-commit; no
+projection was shipped.
+
+### SMALL-n STATISTICS READ AS MEASUREMENTS (2026-08-03)
+
+`percentile_disc(0.95)` over **16 values** returns the maximum. Reading it as a percentile
+produced "p95 = 20,000 — most of aurora's ZIPs are truncated." Counting gave **2 of 16**. A
+percentile over a handful of rows is not a percentile; when n is small, **count the thing**.
+
 ### THE CONNECTOR WAS NOT AT FAULT — DO NOT GO LOOKING FOR A CONNECTOR DEFECT (2026-08-03)
 
 Recorded explicitly so a future session reading "Portland fetch failures" does not hunt for a bug
