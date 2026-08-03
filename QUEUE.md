@@ -5004,3 +5004,43 @@ oldest), or ship `recency_expr` for arcgis and delete the constant. Verify after
 *(Audited across all 149 entries: 51 further arcgis entries carry no `recency_days` at all, which is a
 different and deliberate choice — most are "active projects" layers where every row is current by
 construction. Those are not on this list.)*
+
+---
+
+## WORCESTER GO-LIVE — measured, and the baseline corrected my own expectation
+
+**Deployed** (`get-address-report`, run 30773978256, green) **→ forced re-cache → materialized.**
+
+⚠️ **The baseline, captured BEFORE the re-cache, corrected the premise.** The recon note said
+"Lift: 15 modeled Worcester ZIPs if usable", implying dark pages. In fact **all 99 Worcester County
+pages were ALREADY dev-backed** — every one carried ~270–404 records from
+**`massdot-highway-projects`**, the statewide DOT layer (the same source that lifted Chester 01012 and
+retired that exemplar). **So this wire adds DEPTH, not pages.** Counting it as a page lift would have
+been wrong, and only the pre-mutation baseline showed that.
+
+**Measured on the two city ZIPs whose re-cache completed:**
+
+| ZIP | development before | after | of which `worcester-building-permits` |
+|---|---|---|---|
+| 01607 | 388 (MassDOT only) | **691** | **303** |
+| 01608 | 404 (MassDOT only) | **528** | **124** |
+
+**Invariants across all 380 materialized Worcester rows: 0 missing `record_url`, 0 missing
+coordinates, 0 missing status.** (427 cached → 380 materialized is the exact-identity dedup in
+`dev_sites_deduped()`, working as designed.)
+
+**Bidirectional gate proof:** the four suburban Worcester-County ZIPs re-cached in the same batch —
+01532, 01545, 01568, 01581 — took **0** Worcester records, because `Address LIKE '%<zip>%'` matches
+only city addresses. Worcester records ride Worcester city pages and nowhere else.
+
+**7 of 13 re-cache fires timed out at 120 s** — the engine under concurrent rolling-refresh load, the
+known PGNET-503/timeout condition. Those ZIPs keep their prior rows and pick the new source up on the
+rolling refresh; nothing was lost.
+
+### The honest read on the reprobe seam
+Worcester was **1 hit in 3** on the reprobe list (St. Paul and Syracuse both still stalled; KCMO
+closed as stalled once its real column was read). The hit added **no new LIVE pages** — it deepened
+two existing ones with genuine city permit records where previously only state highway projects showed.
+That is a real quality gain for residents of those ZIPs and **not** a coverage-percentage gain. Any
+future estimate of the reprobe seam's value should use that distinction: **a revival deepens pages
+that a statewide source already lit; it only lifts pages where NO source reaches.**
