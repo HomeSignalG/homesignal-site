@@ -390,3 +390,92 @@ $$;
 -- `development_reports` DIRECTLY (`/rest/v1/development_reports?zip=eq.…&select=…,sites,…`),
 -- so residents see them. `app_projects` holding zero saint-paul rows only tells us the app
 -- surface is clean.
+
+
+-- ============================================================================
+-- PART 4 (2026-08-03) — RETIRED-SOURCE DISCRIMINATOR
+-- migration: dev_refresh_retired_source_discriminator
+-- ============================================================================
+--
+-- THE PROBLEM. The 7-day transient guard refuses a write when `development` drops to 0 on a
+-- fresh row. Right for a flake, WRONG for a deliberate reduction — and by COUNT ALONE the two
+-- are identical, the same shape as `fetched: 0` meaning both "found nothing" and "could not be
+-- reached".
+--
+-- Measured: `saint-paul-approved-building-permits` was retired from the registry, the engine
+-- correctly stopped emitting it, and 55103's clean 200 carried `development: 0` against a cached
+-- 20,000. The guard refused it for FIVE DAYS while the page served 20,000 records from a source
+-- that no longer exists. Verified live: dev_refresh_collect() returned 220 rows updated and 55103
+-- stayed at 20,042 sites / refreshed_at 2026-07-29. It would have self-healed at
+-- refreshed_at + 7 days — by accident, not design.
+--
+-- THE DISCRIMINATOR. A drop is EXPLAINED when a source that currently contributes cached records
+-- is ABSENT FROM THE PAYLOAD'S REPORTS ENTIRELY. The engine emits a run report for every entry
+-- whose coverage gate matched, so absence means the entry no longer runs for this ZIP — retired,
+-- or its coverage changed. Neither is a flake and neither resolves by waiting.
+--
+-- This STRENGTHENS the guard: an UNEXPLAINED collapse is still refused, and a source that IS
+-- reported but failed to fetch is refused by Part 1 regardless of what this says.
+--
+-- Every registry_id the payload reported on — i.e. every entry whose coverage gate matched.
+create or replace function public.dev_reported_sources(j jsonb)
+returns table(registry_id text)
+language sql
+immutable
+set search_path to 'public'
+as $$
+  select r->>'registry_id'
+  from jsonb_array_elements(
+         coalesce(j->'arcgis_reports',  '[]'::jsonb)
+      || coalesce(j->'socrata_reports', '[]'::jsonb)
+      || coalesce(j->'carto_reports',   '[]'::jsonb)
+      || coalesce(j->'ckan_reports',    '[]'::jsonb)
+      || coalesce(j->'csv_reports',     '[]'::jsonb)
+       ) r
+  where r->>'registry_id' is not null
+$$;
+
+-- Sources that CURRENTLY contribute cached records to this ZIP but are absent from the payload's
+-- reports. A non-empty result EXPLAINS the reduction.
+create or replace function public.dev_retired_sources(_zip text, j jsonb)
+returns table(registry_id text, cached_records integer)
+language sql
+stable
+set search_path to 'public'
+as $$
+  select e->>'source_registry_id', count(*)::int
+  from public.development_reports d,
+       lateral jsonb_array_elements(d.sites) e
+  where d.zip = _zip
+    and e->>'source_registry_id' is not null
+    and (e->>'source_registry_id') not in (select registry_id from public.dev_reported_sources(j))
+  group by 1
+$$;
+
+-- collect gains step (c), logging kind='retired' with blocked_update = false, and an `explained`
+-- CTE ANDed into BOTH transient clauses:
+--
+--   explained as (
+--     select distinct (r.j->>'zip') as zip from resp r
+--     where exists (select 1 from public.dev_retired_sources(r.j->>'zip', r.j))
+--   )
+--   ...
+--   and not ( d.refreshed_at >= now() - interval '7 days'
+--         and coalesce((j->'counts'->>'development')::int,0) = 0
+--         and coalesce((d.counts->>'development')::int,0) > 0
+--         and not exists (select 1 from explained x where x.zip = d.zip) )
+--
+-- ---------------------------------------------------------------------------
+-- PROOF — the discriminator itself (real cached ZIPs, synthetic payloads):
+--   R1 source still reported            -> retired: (none)
+--   R2 source ABSENT from reports       -> retired: portland-building-permits=414
+--   R3 NO reports at all (coverage gone)-> retired: portland-building-permits=414
+--   R4 ZIP with no sourced records      -> retired: (none)   [nothing to explain a drop with]
+--
+-- PROOF — the SHIPPED predicate, evaluated read-only against a real fresh row (97215):
+--   P1 development 0, source STILL reported (UNEXPLAINED) -> would_write = FALSE   (guard intact)
+--   P2 development 0, source ABSENT      (EXPLAINED)      -> would_write = TRUE    (defect fixed)
+--   P3 development 0, source FETCH FAILED                 -> would_write = FALSE   (Part 1 wins)
+--   P4 development unchanged and healthy                  -> would_write = TRUE
+-- Both directions, and the two refusal paths are independent.
+-- ---------------------------------------------------------------------------

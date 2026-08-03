@@ -142,5 +142,23 @@ console.log('\n7) FIRE-LEVEL failures — a NULL status_code must be attributabl
     /VOLUME IS NOT THE CONSTRAINT/.test(sql) && /Host SPEED binds, not row count/.test(sql));
 }
 
+console.log('\n8) RETIRED-SOURCE DISCRIMINATOR — a legitimate reduction is not a transient collapse');
+{
+  const sql = readFileSync(new URL('../docs/dev-refresh-source-failure-guard.sql', import.meta.url), 'utf8');
+  ok('SQL declares dev_reported_sources', /function public\.dev_reported_sources/.test(sql));
+  ok('SQL declares dev_retired_sources', /function public\.dev_retired_sources/.test(sql));
+  ok('a retired source is logged as its own kind', /'retired'/.test(sql));
+  // The guard must still REFUSE an unexplained collapse — a discriminator that accepted every
+  // zero would be the transient guard deleted, not strengthened.
+  ok('the SQL records that an UNEXPLAINED collapse is still refused',
+    /would_write = FALSE\s+\(guard intact\)/.test(sql));
+  ok('the SQL records that a FETCH FAILURE still refuses (Part 1 precedence)',
+    /FETCH FAILED\s+-> would_write = FALSE\s+\(Part 1 wins\)/.test(sql));
+  // Absence from the reports is the signal — the engine reports on every entry whose coverage
+  // gate matched, so "not reported" means "no longer runs here", never "ran and found nothing".
+  ok('the discriminator keys on ABSENCE FROM THE REPORTS, not on a count',
+    /ABSENT FROM THE PAYLOAD'S REPORTS ENTIRELY/.test(sql));
+}
+
 console.log(fail ? `\n${fail} check(s) FAILED` : `\nAll ${pass} fetch-failure-reason-contract checks passed.`);
 process.exit(fail ? 1 : 0);

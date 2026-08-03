@@ -416,6 +416,24 @@ pre-measure against dark ZIPs → wire → deploy → recache → **materialize*
   effect of their centroids (97208 is a downtown P.O.-box ZIP). Their sibling ZIPs recovered fully
   (97209 136 · 97213 323 · 97214 407 · 97215 414 · 97218 196 · 97219 116 · 97239 178).
 
+### 0f. RETIRED-SOURCE DISCRIMINATOR — **DONE** (founder-approved)
+- Migration `dev_refresh_retired_source_discriminator`; SQL of record
+  `docs/dev-refresh-source-failure-guard.sql` Part 4; pinned in
+  `test/fetch-failure-reason-contract.test.mjs` (48 → 54 checks).
+- **The problem:** the 7-day transient guard refused a write when `development` dropped to 0 on a
+  fresh row — right for a flake, wrong for a deliberate reduction, and **identical by COUNT
+  ALONE**. It held the saint-paul retirement off three pages for five days and would have
+  self-healed at `refreshed_at + 7 days` by accident.
+- **The discriminator:** a drop is EXPLAINED when a source that currently contributes cached
+  records is **absent from the payload's reports entirely**. The engine reports on every entry
+  whose coverage gate matched, so absence means it no longer runs for this ZIP (retired, or
+  coverage changed) — not a flake, and not something waiting resolves.
+- **It STRENGTHENS the guard.** Proven read-only against a real fresh row (97215):
+  P1 unexplained collapse → **REFUSE** · P2 explained by a retired source → **ACCEPT** ·
+  P3 source reported but fetch-failed → **REFUSE** (Part 1 takes precedence) · P4 healthy →
+  ACCEPT. Discriminator itself: source still reported → none retired; source absent → retired
+  with its cached count; no reports at all → retired; ZIP with no sourced records → none.
+
 ### 0d. SURFACE-TABLE MATRIX — **RULED: both tables authoritative; verifiers now declare their surface**
 - **Founder ruling (2026-08-03):** both tables are authoritative, each for its own surface. The
   materializer's caps exist deliberately for list pages; the map genuinely needs every site.
