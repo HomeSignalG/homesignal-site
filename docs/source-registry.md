@@ -4434,3 +4434,31 @@ enumerating before choosing.
 **Lancaster and Centre remain UNPROBED, not rejected** — every hostname tried for them failed DNS, which
 is a non-verdict. The Chester and York finds both came from the county's own published hub/planning
 host, so that is the route for those two as well.
+
+---
+
+## ⚠️ `san-antonio-prelim-plan-review` — THE status_const FIX WAS REAL BUT IS NOT SUFFICIENT (2026-08-03)
+
+**Do not record this entry as "fixed."** It had TWO independent reasons for emitting nothing, and only
+the first is repaired. Correcting my own PR #571 note, which fixed the defect and implied that was all.
+
+1. ✅ **FIXED — the silent-nothing `status_const` defect.** It set `status_const: "proposed"` with an
+   all-empty `status_to_bucket` (the socrata idiom in an arcgis entry), so the constant was unmapped and
+   every row was excluded. Now `"Scheduled for preliminary plan review"`, present in its own map.
+
+2. 🔴 **STILL ZERO — the source has no rows in either modeled page, and that is an HONEST zero.**
+   Re-cached through the deployed fix at **14:07:13Z**, both Bexar pages still return **0** from this
+   entry while the same-service control `san-antonio-permits-issued` returns **167** on 78260 — so the
+   deploy, the gate and the pages are all fine. The entry scopes on a native `Zip_Code` column, and the
+   layer's own `returnDistinctValues` over all 50 rows holds **29 ZIPs: 78023, 78201, 78203, 78204,
+   78207, 78209, 78212–78219, 78222, 78224, 78227–78229, 78237, 78242, 78248–78254, 78258, 78259.**
+   **78260 and 78261 are not among them** — and those two are the ONLY Bexar ZIP pages we model.
+
+**So this is the `houston-plat-applications` / `harris-county-plats` class: correctly wired, zero
+surface.** The unlock is a **Bexar County ZIP expansion** (the NYC-borough / Boston-Suffolk /
+Philadelphia-County precedent), not another registry edit. Both modeled Bexar pages sit in far-north
+San Antonio while the layer's activity is inner-city and west-side.
+
+**The lesson worth keeping: a fix that removes a KNOWN cause does not prove the symptom is gone.**
+Re-measure after the deploy, against a control, before calling it fixed. Had the re-cache not been run,
+"defect found and fixed" would have gone into the record while the entry still emitted nothing.
