@@ -416,6 +416,32 @@ pre-measure against dark ZIPs → wire → deploy → recache → **materialize*
   effect of their centroids (97208 is a downtown P.O.-box ZIP). Their sibling ZIPs recovered fully
   (97209 136 · 97213 323 · 97214 407 · 97215 414 · 97218 196 · 97219 116 · 97239 178).
 
+### 0d. SURFACE-TABLE MATRIX — "what residents see" is ambiguous by construction — **OPEN**
+- **State:** matrix drafted below from code (grep + reading `app_refresh_zip` and
+  `homesignalmap.html:1055`). A full pass over every read path is still owed.
+- **Why it exists:** `app_projects` being clean did NOT mean residents were safe. Every
+  "what do residents see" check today was against `app_projects`, while the development map
+  reads `development_reports` **directly**. The three St. Paul pages were clean on one surface
+  and 99.8% retired-entry data on the other, at the same moment.
+
+| Surface | Reads | Capped? |
+|---|---|---|
+| `homesignalmap.html?zip=` (dev map) | **`development_reports.sites`** (line 1055) + `app_community_meta`, `communities`, `property_reports` | **NO — every site in the row** |
+| `homesignalmap.html?addr=` | live engine + `property_reports` | n/a |
+| `development/properties/property/today/alerts/community/dashboard/index.html` | `lib/data.js` → **`app_projects`**, **`app_changes`**, `app_community_meta`, `meetings`, `communities` | **YES — materializer caps** |
+| `scripts/gen_sitemap.py` | `development_reports` | n/a |
+| verifiers | `verify-development` → `development_reports` + `app_community_meta` · `verify-alerts-page` → `app_changes` + `alerts` · `verify-maps-uncap`, `audit-marker-symbology`, `verify-facility-entity`, `source-monitor` → `app_projects` · `verify-coverage-state` → `app_community_meta` | split |
+
+- **The divergence is structural, not a bug.** `app_refresh_zip` has **five** inserts, not one
+  (an earlier note in this session said one — wrong): app_projects `record_kind='development'`
+  (`relevance='development' AND scope='point'`), app_projects `record_kind='facility'`
+  (`relevance NOT IN ('development','civic')`), then app_changes for planning & zoning
+  **`limit 6`**, civic **`limit 6`**, meetings **`limit 8`**, government notices **`limit 48`**,
+  local news **`limit 48`**. The map page applies none of those caps or filters.
+- **Consequence:** a verification that passes on one table says nothing about the other, and
+  every verification run to date inherits that ambiguity. Needs: a decision on which table is
+  authoritative per surface, and verifiers that name their surface explicitly.
+
 ### 1. DB-01 — `public.communities` planner-statistics diagnosis
 - **State:** **DONE** (2026-07-30) — recorded in workbook 0071 rows 399–401; row 397 marked
   SUPERSEDED.

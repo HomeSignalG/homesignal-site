@@ -810,6 +810,28 @@ source).
 the emit" while the other four say "bound the fetch", so a string match would have silently
 missed one connector in five. When only prose is available, the test is not optional.
 
+### A SECOND READER ON A DIVERGED SURFACE — THIRD INSTANCE, SO IT IS A PATTERN (founder rule, 2026-08-03)
+
+**When two surfaces read two tables whose contents have diverged, "the page is correct" is
+ambiguous by construction — and every verification that does not name its table inherits the
+ambiguity.**
+
+Three instances now, same shape each time: a second reader was added to a surface whose meaning
+had moved, and nothing reconciled them.
+1. **The coverage-state view** — counted coverage-gate membership, read as record-level coverage.
+2. **`app_changes` drift** — materialized rows outliving the semantics that produced them.
+3. **`app_projects` vs `development_reports`** (this one) — `app_projects` held **zero**
+   saint-paul rows while `development_reports` held **20,000 on a single ZIP**, at the same
+   moment. Every "what do residents see" check had been run against `app_projects`;
+   `homesignalmap.html:1055` reads `development_reports` **directly**, so residents saw the
+   retired data anyway. The divergence is structural — the materializer applies caps
+   (`limit 6 / 6 / 8 / 48 / 48`) and filters (`relevance='development' AND scope='point'`) that
+   the map page does not.
+
+**The rule: state the TABLE alongside any claim about what residents see, and check the table
+that the surface in question actually reads.** A clean materialized layer is not evidence about
+a surface that bypasses it. Matrix of surface → table: `QUEUE.md` item 0d.
+
 ### AN IDENTIFIER REGEX CANNOT TELL A COLUMN FROM A STRING LITERAL (2026-08-03)
 
 Deriving a column projection (`out_fields`) by scanning an entry's `column_map` **plus its
