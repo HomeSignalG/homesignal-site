@@ -434,6 +434,20 @@ pre-measure against dark ZIPs → wire → deploy → recache → **materialize*
   ACCEPT. Discriminator itself: source still reported → none retired; source absent → retired
   with its cached count; no reports at all → retired; ZIP with no sourced records → none.
 
+### 0g. UNCAPPED MAP RENDERING — one DOM marker per site, no clustering — **OPEN**
+- **State:** measured, not fixed. Founder-flagged as its own item: "20,000 divIcons is a browser
+  problem regardless of what we do to the data."
+- `homesignalmap.html` `sites.forEach(...)` builds **one Leaflet `divIcon` per site**, then
+  `spreadStackedMarkers()` fans co-located dots in screen pixels and `fitBounds` frames all of
+  them. **No clustering anywhere** — `markerClusterGroup` / `supercluster`: **0 matches in the
+  file**. Both 3D views do the same over `MAP_SITES`.
+- The LIST is capped (`listInto()`: `items.slice(0,12)`); the MAP is not. So a resident on a dense
+  page sees 12 of N in the list and N markers on the map.
+- **The data levers only shrink it, they do not fix it.** After the 365-day window the worst page
+  is 80016 at **10,421** sites (was 20,051). The type change will cut further, to a few thousand.
+  Still far past what unclustered DOM markers handle.
+- Fix is a page change (clustering / canvas renderer), which is gated — not attempted.
+
 ### 0d. SURFACE-TABLE MATRIX — **RULED: both tables authoritative; verifiers now declare their surface**
 - **Founder ruling (2026-08-03):** both tables are authoritative, each for its own surface. The
   materializer's caps exist deliberately for list pages; the map genuinely needs every site.

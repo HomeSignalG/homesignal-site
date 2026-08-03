@@ -832,6 +832,39 @@ had moved, and nothing reconciled them.
 that the surface in question actually reads.** A clean materialized layer is not evidence about
 a surface that bypasses it. Matrix of surface → table: `QUEUE.md` item 0d.
 
+### UNMAPPED IS NOT EMPTY — THEY GET OPPOSITE TREATMENT (founder rule, 2026-08-03)
+
+**`unmapped` means WE did not classify what the publisher said. `empty` means the PUBLISHER said
+nothing.** They look identical downstream — both land in `unclassified` — and they are opposite
+problems.
+
+- **Unmapped is a MAPPING DECISION.** The publisher told us exactly what the record is; we simply
+  have no entry for that value. Aurora's `Roofing-RT2` is not unclassifiable — it is *classified by
+  the source as a roof replacement*, which is maintenance, not development. The right answer is a
+  content judgement: map it, or drop it.
+- **Empty is HONEST ABSENCE.** Adams' 21,506 rows with a blank `BuildingUse` are real permits —
+  located, dated, filed by the county — about whose USE the publisher recorded nothing. Dropping
+  them would discard a record the source asserts exists. The right answer is to KEEP them under
+  the generic member (`Development` → the "Other project" shape, the Phoenix precedent) so the page
+  renders an honest "we don't know the use" rather than a missing classification.
+
+**That distinction is the line between fabrication and honest-unclassified**, and it is why the two
+cannot share a rule. Also recorded: Adams' own `_receipts` claimed its empty value "fails closed."
+It does not — only STATUS fails closed; an unmapped/empty TYPE publishes as `unclassified`. 28,555
+such rows were cached. A receipt asserting a fail-closed behaviour is worth re-checking against the
+connector, not trusted.
+
+### MEASURE A VOCABULARY IN THE WINDOW THE CONNECTOR WILL ACTUALLY ASK (founder rule, 2026-08-03)
+
+A type/status vocabulary measured over **all history** weights the decision by records the entry
+will never fetch. Measure it inside the live `recency_days` window — this is Rule 13 applied to the
+time dimension, and it is not a refinement, it changes conclusions.
+
+*The case:* Aurora's `Plan Revisions` reads **14,667** all-history and was the hardest call in the
+ruling — keep a revision to a real project, or drop it like a roof replacement? In the 365-day
+window the connector actually queries it is **6 rows**. The hard call was an artefact of the wrong
+scope. (Same probe, same layer, same day; only the window differed.)
+
 ### AN IDENTIFIER REGEX CANNOT TELL A COLUMN FROM A STRING LITERAL (2026-08-03)
 
 Deriving a column projection (`out_fields`) by scanning an entry's `column_map` **plus its
