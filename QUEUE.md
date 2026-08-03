@@ -5045,7 +5045,7 @@ That is a real quality gain for residents of those ZIPs and **not** a coverage-p
 future estimate of the reprobe seam's value should use that distinction: **a revival deepens pages
 that a statewide source already lit; it only lifts pages where NO source reaches.**
 
-### Worcester go-live COMPLETED — 7 of 9 city ZIPs, 4,480 records (supersedes the 2-ZIP figure above)
+### Worcester go-live COMPLETED — ALL 9 city ZIPs, 7,191 records (supersedes the 7-ZIP and 2-ZIP figures above)
 
 The section above was written when only 01607/01608 had re-cached. Five more landed on a second
 fire; the complete measurement:
@@ -5060,12 +5060,20 @@ fire; the complete measurement:
 | 01607 | 388 | **655** | 303 | — |
 | 01608 | 404 | **517** | 124 | — |
 
-**4,480 materialized records across 7 ZIPs: 0 missing `record_url`, 0 missing coordinates, 0 missing
-status, and 0 rows outside the MA/Worcester gate.** Every cache row sits between 1.00 and 1.69 MB,
-comfortably inside the working ceiling. **01602 and 01604 timed out twice** at 120 s / 150 s under
-concurrent rolling-refresh load; they keep their prior MassDOT rows and pick the source up on the
-rolling pass. The conclusion is unchanged: **depth, not pages** — all 99 Worcester County pages were
-already dev-backed before this wire.
+✅ **AMENDED 2026-08-03 — 01602 and 01604 picked the source up on the rolling refresh (00:45Z), so
+all 9 city ZIPs are live, not 7.** The two that timed out under load did not need re-firing; waiting
+was the correct call. Their numbers are the largest of the set:
+
+| ZIP | before (MassDOT only) | after | of which `worcester-building-permits` |
+|---|---|---|---|
+| 01604 | 375 | **1,936** | **1,561** |
+| 01602 | 366 | **1,560** | **1,194** |
+
+**VERIFIED TOTAL: 7,191 materialized records across 9 ZIPs — 0 missing `record_url`, 0 missing
+coordinates, 0 missing status, 0 rows outside the MA/Worcester gate** (keyed on
+`source_ref like '%j8dqo2DJE7mVUBU1%'`, not on a title). Cache rows 0.15–1.69 MB, inside the ceiling.
+The conclusion is unchanged: **depth, not pages** — all 99 Worcester County pages were already
+dev-backed before this wire.
 
 > ⚠️ **A wrong filter nearly turned a clean gate proof into a false alarm — third time this session.**
 > The first proof filtered on `name ilike 'Building Permit%'` and reported **57,761 rows "outside
@@ -5108,7 +5116,71 @@ here as an **observation with a hypothesis**, for the open **PGNET-503** investi
 remaining Worcester ZIPs (01602, 01604) keep their MassDOT rows and will pick the source up on the
 rolling pass. Deepening two pages a few hours sooner is not worth risking the refresh for all 12,722.
 
-> **Provisional guidance, to test rather than trust: raising a pg_net timeout to work around a slow
+> ~~**Provisional guidance, to test rather than trust: raising a pg_net timeout to work around a slow
 > engine may make the engine slower for everyone.** The timeout is not free — it is a worker-seconds
-> reservation against a shared pool. If a re-cache needs a long timeout, fire FEWER at once, or wait
-> for the rolling refresh instead of racing it.
+> reservation against a shared pool.~~ **TESTED 2026-08-03 AND THE STATED MECHANISM IS WRONG — see
+> below.**
+
+### ✅ RESOLVED BY EXPERIMENT — the timeout is a CEILING, not a reservation; the trigger is the TICK
+
+The hypothesis above was testable rather than permanently unknowable, so it was tested instead of
+left to harden into guidance.
+
+**Conditions (verified before firing):** 13:22 UTC — minute 22, i.e. between the :15 and :30 rolling
+ticks; **queue depth 0**; **0 responses in the previous 5 minutes**; and 500 responses / **3 timeouts
+(0.6 %)** over the previous 30 minutes. A genuinely quiet window with no other load.
+
+**The experiment:** 6 requests, **the same 150 s timeout shape that timed out during the incident**,
+against already-live Worcester ZIPs so a re-cache is idempotent.
+
+**Result: 6 / 6 HTTP 200, 0 timeouts.**
+
+**What that establishes:** a long timeout **alone is not sufficient** to cause the failure. That
+falsifies the mechanism I proposed — if a request reserved workers for its full timeout, six 150 s
+requests would tie up the pool here too, and they plainly did not. **A pg_net timeout is a CEILING on
+how long a request may run, not a reservation of worker-seconds.** Raising it costs nothing unless the
+request actually runs long.
+
+**The corrected reading of the incident:** under a rolling tick the engine is already 503-ing ~30 %,
+so requests genuinely DO run long — and that is the only regime where the ceiling matters. My 22
+ad-hoc requests collided with a 250-request tick; the trigger was **the collision**, not the timeout
+value.
+
+⚠️ **What the experiment does NOT isolate, stated plainly:** it varied **two** things against the
+incident — 6 requests instead of 22, and off-tick instead of on-tick. So it proves "long timeouts
+off-peak are safe" and does **not** separate count from timing. A 22-request off-tick run would
+separate them, but it costs real load for information that would not change the action.
+
+**Corrected guidance:** *fire ad-hoc re-caches BETWEEN rolling ticks (the tick fires at :00/:15/:30/:45
+— aim for the middle minutes), and check `net.http_request_queue` is near zero first. The timeout
+value is not the lever; the collision is.*
+
+**A measurement limitation worth recording:** `net._http_response.created` is the request-CREATION
+timestamp, identical for every row in a batch — **it is not a completion time**, so per-request
+duration cannot be derived from this table. That is the same gap that made the incident
+unattributable, and it is why the experiment had to be built around success/failure rather than
+latency.
+
+### PA reprobe pass 2 — one wire, two hosts that exist but do not answer, three still un-probed
+
+Applying the enumerated / access-denied / unreachable rule to the six PA counties recorded as
+"county-hub URL guesses 404'd":
+
+| county | probe | basis | verdict |
+|---|---|---|---|
+| **Delaware** | `gis.delcopa.gov/arcgis/rest/services` | **ENUMERATED** — 36 folders, `SLD_Review` read | ✅ **WIRED** (29 dark pages) |
+| York | `gis.yorkcountypa.gov` | **unreachable** — DNS RESOLVED, then timed out at 20 s *and again at 60 s* | provisional |
+| Bucks | `gis.buckscounty.org` | **unreachable** — DNS resolved, timed out at 30 s | provisional |
+| Chester | `arcgis.chesco.org` | **unreachable** — `Couldn't resolve host name` | 🔴 still a GUESS |
+| Lancaster | `gis.co.lancaster.pa.us` | **unreachable** — `Couldn't resolve host name` | 🔴 still a GUESS |
+| Centre | `gis.centrecountypa.gov`, `maps.co.centre.pa.us` | **unreachable** — both `Couldn't resolve host name` | 🔴 still a GUESS |
+
+**York and Bucks moved from "guess" to "real host that does not answer."** Their DNS resolves — the
+hostnames are correct — but the servers time out, York twice at 20 s and 60 s. That is a materially
+different state from a name that does not exist, and it is worth knowing before the next attempt:
+these may be firewalled to non-US egress, or genuinely down. Still **not** rejections.
+
+**Chester, Lancaster and Centre remain UN-RUN PROBES.** My hostnames for them were invented and failed
+DNS, which tells us nothing about those counties. Per the rule, "not found" from a guessed hostname is
+not a rejection. **Do not record them as rejected, and do not keep guessing** — the next attempt needs
+their real GIS hostnames, found from the counties' own sites rather than from a naming pattern.

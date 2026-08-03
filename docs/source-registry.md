@@ -4227,3 +4227,43 @@ the first reprobe pass instead of reading them out of this document. Read the re
 > corollary: an ArcGIS hub **404 `Domain record(s) not found`** is NOT a timeout and a longer timeout
 > cannot change it — that hostname is genuinely unregistered, so the retry belongs against the
 > jurisdiction's real GIS host, not the same guessed hub subdomain.
+
+---
+
+## 🔑 DEPTH IS NOT COVERAGE — how to value a reprobe hit before you spend on one
+
+**The single most useful thing learned in the 2026-08-02/03 pass, and it changes how the whole reprobe
+seam should be valued.**
+
+> **A revival DEEPENS pages that a statewide source has already lit. It only LIFTS pages that nothing
+> reaches. Those are different outcomes and they must be estimated separately.**
+
+**The case.** `worcester-building-permits` came back from the reprobe list and was wired — a real hit,
+7,191 records across 9 city ZIPs, all invariants clean. **It lifted zero pages.** All 99 Worcester
+County pages were **already** dev-backed before the wire, every one carrying 270–404 records from
+`massdot-highway-projects`, the STATEWIDE MassDOT layer. What changed is *what those pages show*:
+01604 went from 375 highway-project records to 1,936, of which 1,561 are actual city building permits.
+A resident of 01604 previously saw state road works and now sees construction on their street. That is
+a large quality gain and a **zero** coverage-percentage gain.
+
+**Why this is easy to get wrong.** The recon note said *"Lift: 15 modeled Worcester ZIPs if usable"*,
+which reads as a page lift. It was written before a statewide source existed for MA. Only the
+**pre-mutation baseline** exposed it — measuring after the re-cache would have shown 9 newly-rich pages
+and invited the claim that 9 pages were lifted.
+
+**The valuation rule, for estimating any future reprobe or wire:**
+
+1. **First ask whether a STATEWIDE source already covers the target.** MA has MassDOT; UT has UDOT; TX
+   has TxDOT; NV has NDOT. If one does, the candidate buys **depth only** — count it as quality, not
+   coverage, and do not put it in a page-lift forecast.
+2. **A page-lift forecast is only valid where the target pages are genuinely dark** — i.e. `0` rows in
+   `app_projects` with a `source_ref`, not merely "no city source wired".
+3. **Both are worth doing.** Depth is not a lesser outcome — highway projects are not what a resident
+   asking "what is being built near me" wants. But it must be *named* correctly, or the seam's value
+   gets measured against the wrong denominator.
+
+**Applied to the seam itself:** the reprobe list was **1 hit in 3** on its first run (Worcester
+revived; St. Paul still stalled at 2025-06-30, Syracuse at 2025-08-16, KCMO at `applieddate`
+2025-05-09). That one hit bought **quality on 9 pages and coverage on 0**. Any estimate of what the
+remaining reprobe candidates are worth should carry that caveat attached — the seam is cheap and it
+works, but on current evidence it mostly deepens rather than lifts.

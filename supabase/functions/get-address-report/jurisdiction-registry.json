@@ -10257,6 +10257,38 @@
       "extra_where": "(Permit_License_Issued_Date LIKE '%/2025' OR Permit_License_Issued_Date LIKE '%/2026')",
       "record_url_precision": "dataset",
       "_receipts": "2026-08-02 REPROBE-LIST REVIVAL. Recorded 2026-07-15 as 'Worcester -- STALLED (the St. Paul class): a real 52,108-row ledger but newest issuance 2025-09-09 (10 months stale)'. THAT RECORD IS NOW FALSE -- the source resumed. Freshness measured WITHOUT ordering on the date column, because every date here is a STRING in M/D/YYYY and ordering it is lexicographic (the nyc-dob-permit-issuance trap): counted by year suffix instead, with the total as a positive control -- LIKE '%/2026' = 2,467, LIKE '%/2025' = 5,015, total = 52,299 (grown from the recorded 52,108). Three-part liveness: NAME clean (service Building_Permits, Record_Type 'Building Permit'); DATES recent (2,467 issued in 2026); ENTITY correct (sample Address '202 MAY ST Worcester MA 01602', MBL 14-002-00017 -- Worcester MA, not a lookalike). BOTH VOCABULARIES ARE CLOSED AND SUM TO EXACTLY 52,299: Record_Status = Complete 34,223 + Active 18,076 (2 values, no others); Occupancy_Type = Residential 38,613 + Commercial 8,914 + null 3,688 + '1 or 2 Family Dwelling' 623 + Educational 270 + '3+ Family or Multi Family Dwelling' 100 + 'Commercial / Mixed Use' 62 + Municipal 29. Complete -> operating (finaled work is built); Active -> approved (permitted and in progress, the boston Open->approved convention). The 3,688 null Occupancy_Type rows carry no type and fall through rather than being guessed. GEOMETRY-LESS TABLE (layer metadata returns no geometryType; the only fields are Record__, Record_Type, Permit_For, Date_Submitted, Record_Status, Address, MBL, Occupancy_Type, Permit_License_Issued_Date, Contractor_Name, ObjectId), so it rides the anaheim-land-use-cases path: scoped by zip_where_template against the ZIP inside the Address string, with the engine geocoding the address for a point. record_url_precision is 'dataset' -- there is no per-record URL column and Worcester's permit search is not addressable per Record #, so templating one would be guessing. RECENCY IS A LIKE WINDOW, NOT recency_days, AND IT IS AN ANNUAL MAINTENANCE ITEM: Permit_License_Issued_Date is a String in M/D/YYYY, so recency_days' DATE literal cannot apply (the frisco-active-building-permits standing answer) and M/D/YYYY does not sort lexicographically either, so the socrata recency_expr trick has no arcgis equivalent. The 2025+2026 window yields 7,482 rows; EXTEND IT when 2027 opens or the source silently truncates to nothing."
+    },
+    {
+      "registry_id": "delaware-county-pa-subdivisions-land-developments",
+      "platform": "arcgis",
+      "service_url": "https://gis.delcopa.gov/arcgis/rest/services/SLD_Review/Delaware_County_Subdivisions_and_Land_Developments/FeatureServer/0",
+      "dataset_url": "https://www.delcopa.gov/planning/",
+      "jurisdiction": "Delaware County, Pennsylvania",
+      "coverage": [
+        {
+          "state": "PA",
+          "county": "Delaware"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Project_Name",
+          "Proposal"
+        ],
+        "type_source": "GeneralCategory",
+        "case_number": "DCPD_FileNo",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 3,
+      "status_const": "proposed",
+      "type_map": {
+        "Nonresidential": "Commercial",
+        "Residential": "Residential"
+      },
+      "extra_where": "Year >= 2020",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-03 PA/Delaware wire, found by probing the county's OWN GIS host after the recorded 'six county-hub URL guesses 404d' turned out to be UNREACHABLE-by-guess rather than enumerated. gis.delcopa.gov is live (ArcGIS 11.1, 36 folders); the SLD_Review folder holds this layer. Delaware is 29 of PA's 467 dark pages. LIVENESS three-part: NAME clean (Delaware County Subdivisions and Land Developments); DATES recent (Year 2026 = 48 rows, 2025 = 98, and the series runs unbroken 2009-2026 at ~110-140/yr); ENTITY correct (county planning department's own SLD review docket, on the county's own server). VOCABULARIES: Year enumerates 2009-2026 and sums to EXACTLY 2,096 = the layer's own returnCountOnly (closed positive control); GeneralCategory = Nonresidential 1,192 + Residential 893 + null 11 = EXACTLY 2,096 (closed), mapped verbatim to Commercial/Residential with the 11 nulls carrying no type rather than a guessed one. STATUS IS A CONST, AND Recommendation WAS REJECTED AS RULE-5 FREE TEXT: it holds ~110 distinct values, overwhelmingly one-off prose with upstream typos ('Disaoproval', 'addressina staff comments', 'plan discreoancies'), and 1,594 of 2,096 rows -- 76% -- literally read 'Please contact Planning Department for Recommendation'. There is no bucketable vocabulary there. status_const 'proposed' is the honest floor: a row means a subdivision or land-development plan was SUBMITTED and reviewed by the county, whose recommendation is advisory while the municipality decides. It does not assert approval, and for 76% of rows the outcome is not published at all. NO file_date, DELIBERATELY -- the source publishes YEAR GRANULARITY ONLY. column_map.file_date is omitted rather than pointed at Year, because isoDay() reads a finite number as EPOCH MILLISECONDS, so Year 2026 would render as 1970-01-01: a precise, confident, wrong date on every record. Mapping year->Jan-1 would be the same fabrication with a friendlier face. A record with no date is honest; a record dated 1970 is not. Recency therefore rides Year in extra_where at a deliberately GENEROUS window (>= 2020, 745 of 2,096 rows) -- coarse, but every row in it is genuinely from that period. SCOPING IS SPATIAL because the layer carries NO zip and NO address column at all: fields are Municipa_1, Project_Name, DCPD_MTG, Proposal, Type, GeneralCategory, Year, Plan_, DCPD_FileNo, Planning_District, Applicant, Engineer, Recommendation, Subtype. POLYGON geometry, so it rides the shipped featurePoint() shoelace-centroid path, and column_map.lat/lng are mapped to __lat/__lng -- WITHOUT which every record silently lands on the ZIP centroid at scope 'area' (the sussex-county-de-conditional-use defect, which was caught only by checking scope on live rows rather than trusting the record count). record_url_precision 'dataset': there is no per-record URL column and the county's SLD docket is not addressable per DCPD_FileNo, so templating one would be guessing."
     }
   ],
   "ckan": [
