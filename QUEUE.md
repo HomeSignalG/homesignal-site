@@ -5044,3 +5044,71 @@ two existing ones with genuine city permit records where previously only state h
 That is a real quality gain for residents of those ZIPs and **not** a coverage-percentage gain. Any
 future estimate of the reprobe seam's value should use that distinction: **a revival deepens pages
 that a statewide source already lit; it only lifts pages where NO source reaches.**
+
+### Worcester go-live COMPLETED — 7 of 9 city ZIPs, 4,480 records (supersedes the 2-ZIP figure above)
+
+The section above was written when only 01607/01608 had re-cached. Five more landed on a second
+fire; the complete measurement:
+
+| ZIP | before (MassDOT only) | after | of which `worcester-building-permits` | cache row |
+|---|---|---|---|---|
+| 01606 | 270 | **1,476** | 1,233 | 1.69 MB |
+| 01605 | 380 | **1,327** | 969 | 1.50 MB |
+| 01603 | 388 | **1,203** | 834 | 1.36 MB |
+| 01609 | 391 | **1,031** | 703 | 1.20 MB |
+| 01610 | 388 | **880** | 517 | 1.00 MB |
+| 01607 | 388 | **655** | 303 | — |
+| 01608 | 404 | **517** | 124 | — |
+
+**4,480 materialized records across 7 ZIPs: 0 missing `record_url`, 0 missing coordinates, 0 missing
+status, and 0 rows outside the MA/Worcester gate.** Every cache row sits between 1.00 and 1.69 MB,
+comfortably inside the working ceiling. **01602 and 01604 timed out twice** at 120 s / 150 s under
+concurrent rolling-refresh load; they keep their prior MassDOT rows and pick the source up on the
+rolling pass. The conclusion is unchanged: **depth, not pages** — all 99 Worcester County pages were
+already dev-backed before this wire.
+
+> ⚠️ **A wrong filter nearly turned a clean gate proof into a false alarm — third time this session.**
+> The first proof filtered on `name ilike 'Building Permit%'` and reported **57,761 rows "outside
+> Worcester County"**, which reads as a catastrophic gate leak. It is an artifact: that title is
+> common to many cities' permit records. Filtering on the column that actually identifies the source —
+> `source_ref like '%j8dqo2DJE7mVUBU1%'` — gives the real answer, **0**.
+> Same class as `%opendataportal-lasvegas%` conflating two entries on one portal, and as the
+> `%OpenData_Building_Permits_%` zero that matched nothing at all.
+> **Key a source-scoped query on `source_ref`, never on a title, a name, or a portal domain** — those
+> are shared across entries and produce both false zeros and false alarms.
+
+### ⚠️ I MAY HAVE DEGRADED THE SHARED REFRESH WITH LONG-TIMEOUT FIRES — correlation, not proof
+
+Stopped re-caching 01602/01604 after measuring this. Per-minute, from `net._http_response`:
+
+| tick | 200 | 503 | **timeouts** |
+|---|---|---|---|
+| 23:30 | 145 | 54 | 1 |
+| 23:45 | 130 | 68 | 2 |
+| 00:00 | 142 | 56 | 2 |
+| **00:16** | 29 | 33 | **138** |
+| **00:18** | 5 | 0 | **45** |
+
+Three consecutive healthy ticks (~145 OK / ~55 503 / 1–2 timeouts — the documented steady state), then
+a collapse to **192 timeouts in 20 minutes, 71 % of all responses**.
+
+**The correlation:** I fired 22 ad-hoc re-cache requests in that window with **deliberately long
+timeouts — 120 s, then 150 s, then 180 s** — to survive an engine that was already slow. pg_net has
+limited worker concurrency, so a long-timeout request *occupies* a worker for its full duration. 22
+requests holding workers for up to 3 minutes each, on top of the rolling refresh's 250-per-tick, is a
+plausible mechanism for starving the pool and timing out the scheduled batch behind me.
+
+**It is NOT proven, and I am not recording it as established.** `net._http_response` does not retain
+the request URL, so I cannot attribute the 138 timeouts at 00:16 to my requests versus the refresh's
+own. The engine may have had an independent incident. This is exactly the shape the superseded
+`worker_restart()` note got wrong — two events correlated, a cause inferred, guidance written. Recorded
+here as an **observation with a hypothesis**, for the open **PGNET-503** investigation.
+
+**What I changed anyway, because it is cheap and the downside is asymmetric:** stopped firing. The two
+remaining Worcester ZIPs (01602, 01604) keep their MassDOT rows and will pick the source up on the
+rolling pass. Deepening two pages a few hours sooner is not worth risking the refresh for all 12,722.
+
+> **Provisional guidance, to test rather than trust: raising a pg_net timeout to work around a slow
+> engine may make the engine slower for everyone.** The timeout is not free — it is a worker-seconds
+> reservation against a shared pool. If a re-cache needs a long timeout, fire FEWER at once, or wait
+> for the rolling refresh instead of racing it.
