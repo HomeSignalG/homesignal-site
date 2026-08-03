@@ -746,6 +746,84 @@ transaction and `now()` is transaction-start time, so a single collect stamps ev
 the same value. 66 pages sharing a stamp means one collect call, not a fetch-less bump. Timestamps spread
 out only when collect is invoked repeatedly.
 
+### CONCURRENCY IS PART OF A PROBE'S SCOPE (founder rule, 2026-08-03)
+
+Same code, same minute, same ZIP — **different parallelism, opposite results.** This belongs with
+Rule 13 and "the role is part of the probe's scope": a probe run at a different concurrency than
+production answers a **different question**.
+
+*The case:* ZIP 97215's cached row held **0** Portland permits while the layer held **414**.
+Invoked ALONE through the deployed engine it returned `fetched 414, emitted 414, quarantined []`
+— which read as "the engine is healthy, the cache is stale." Fired as **10 ZIPs in parallel** (the
+shape `dev_refresh_fire_batch` actually uses — default batch **250**), **7 of 10** came back
+`fetched 0` with `fetch failed: … Connection reset by peer (os error 104)`. The same ZIPs **2 at a
+time** returned 414 / 407 / 136 / 116. A single-request probe could never have found it, and
+"works when I run it" would have been recorded as an exoneration.
+
+**So: state the concurrency alongside every fetch finding, and reproduce at production
+parallelism before concluding a source is healthy.** The corollary bites in both directions — a
+solo probe that SUCCEEDS does not clear a source, and a solo probe that FAILS does not condemn one.
+
+### ESTABLISH THE BACKGROUND RATE BEFORE CLAIMING A SPIKE (founder rule, 2026-08-03)
+
+**An absolute count is not a signal. A count against its own baseline is.** Never assert a
+regression from "N rows are bad right now" without the rate that N should be compared to.
+
+*The case (founder's own, recorded because the rule is what matters):* "30 `development_reports`
+rows refreshed since 16:00 came back with ZERO sites — something deployed today is emptying pages,
+and the blast radius grows every 15 minutes." The instruction that followed was to **revert the
+paging fix**. One query disproved it — zero-site rows grouped by hour over 48 h:
+
+| hour (UTC) | refreshed | zero | % |
+|---|---|---|---|
+| 08-03 03:00 | 58 | 15 | **25.9** |
+| 08-03 12:00 | 750 | 101 | **13.5** |
+| **08-03 16:00** | **894** | **28** | **3.1** |
+
+Zeros run **2–26 % continuously**, including many hours *before* the deploy; the accused hour was
+the **lowest** full-volume rate in the window. All 30 were `data_quality='coverage_coming'`,
+`indexable=false`, and **0 of 30 had ever been lit**. Reverting would have restored 200-row
+truncation on two entries and fixed nothing. **The real defect was somewhere else entirely.**
+
+Pair it with the rule above: the *actual* failure was invisible to a count of empty rows, because
+those pages were never empty — they kept their county planning notices while silently losing 414
+permits.
+
+### A FETCH THAT FAILS MUST NOT COLLECT AS AN EMPTY SUCCESS (founder rule, 2026-08-03)
+
+**"No match" and "did not run" must never be indistinguishable — and that applies to a data
+pipeline's WRITE path, not just to CI checks.** `fetched: 0` meant both "this source found
+nothing" and "this source could not be reached." The refresh wrote the second one to production as
+if it were the first.
+
+Two halves, and the second is where it went wrong:
+- **The connectors were always right.** All five quarantine a failed fetch with a precise reason
+  (`fetch failed: …` / `fetch/parse failed: …`). Nothing upstream needed changing.
+- **`dev_refresh_collect()` threw the diagnosis away**, and its transient guard tested the
+  **AGGREGATE** `development` count — so a **per-source** collapse hid behind a *different*
+  source's contribution. ZIP 97215 emitted `development: 15` from the county's AREA planning
+  notices, 15 > 0, guard silent, **414 point permits overwritten by silence.**
+
+**The rule: a guard on a total cannot protect a part.** Any invariant over a multi-source
+aggregate must be evaluated per contributing source, or the largest contributor can vanish behind
+the smallest.
+
+Fixed by `docs/dev-refresh-source-failure-guard.sql` (migration
+`dev_refresh_per_source_failure_guard`): `dev_failed_sources(jsonb)` discriminates a failed fetch
+from an honest zero; the refusal is **per source, not per page** (a source that failed but
+contributes nothing to that ZIP does not block it); every failure is logged to
+`dev_refresh_source_failures` + `v_dev_refresh_source_health` so a refusal is never silent; and
+blocked rows keep their old `refreshed_at`, so `dev_refresh_fire_batch` (ordered `refreshed_at asc`)
+re-picks them automatically — no new scheduled job. Both directions are pinned:
+`test/fetch-failure-reason-contract.test.mjs` proves config errors, truncation notes and
+per-record quarantines do **not** block, because a guard that only blocks would freeze every
+honestly-emptied page forever.
+
+*It paid for itself on first run:* the very first collect surfaced a **second** silently-darkening
+source — `minneapolis-ccs-permits` returning `ArcGIS error: Unable to perform query. Too many
+requests.`, blocking 55413 (2,015 cached records) and 55422 (719), while correctly **not** blocking
+55119 (0 cached).
+
 ### Measurement discipline
 - **Capture the baseline BEFORE mutating what you intend to measure** — a post-deploy refresh
   destroyed the pre-deploy Arlington rows and cost the clean −397 figure.

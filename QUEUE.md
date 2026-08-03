@@ -325,6 +325,39 @@ pre-measure against dark ZIPs → wire → deploy → recache → **materialize*
 
 ## Ordered items
 
+### 0. FETCH-FAIL-GUARD — a failed fetch collected as an empty success — **FIX (1) DONE**
+- **State:** **DONE and live-proven** (2026-08-03). Migration `dev_refresh_per_source_failure_guard`;
+  SQL of record `docs/dev-refresh-source-failure-guard.sql`; contract pinned by
+  `test/fetch-failure-reason-contract.test.mjs` (30 checks, in the 82-file suite).
+- **Gate:** founder-approved ("FIX (1) FIRST"). No engine/connector change — collect layer only.
+- **The defect:** the transient guard tested the AGGREGATE `development` count, so a per-SOURCE
+  collapse hid behind another source's contribution. ZIP 97215 emitted `development: 15` from the
+  county's AREA planning notices while losing **414** Portland permits; 15 > 0, guard silent.
+- **The trigger:** concurrency, not the paging fix. 10 ZIPs in parallel → 7 return `fetched 0`
+  (`Connection reset by peer`); the same ZIPs 2 at a time → 414 / 407 / 136 / 116.
+- **Live proof, same run:** 97213 refused (323 records held, `refreshed_at` unadvanced) while five
+  siblings updated and **188 other rows updated in the same call** — per-source, not per-page.
+- **First-run catch:** `minneapolis-ccs-permits` — `"Unable to perform query. Too many requests."`
+  — blocked 55413 (2,015) and 55422 (719), correctly did NOT block 55119 (0 cached). A second
+  source that had been darkening pages silently.
+
+### 0a. FETCH-BOUND — bound the fetch (fix 2) — **NEXT, approved**
+- **State:** NOT STARTED. Founder: "Then (2) bound the fetch… Do it after (1) lands."
+- **Gate:** approved. Per-entry `page_size` / `max_rows`.
+- **The signal:** the rolling tick's own responses show `80602` at **`fetched 20000`** — the
+  `max_rows` ceiling — and `80011` at 20,018 development records. The 2026-08-03 server-capped
+  paging fix is correct, but it multiplied per-ZIP fetch volume on dense layers, which is the load
+  that makes the concurrent resets bite. Fix (1) stops the darkening; this stops the cause.
+
+### 0b. PDX-3-ZIP — 97206 / 97208 / 97227 return 0 Portland records SOLO as well as under load
+- **State:** OPEN, recorded not chased (founder: "a separate question — record it, do not chase it
+  inside this fix").
+- All three were lit before 2026-08-03 and now hold 0 `portland-building-permits` records while
+  returning cleanly (no `fetch failed:` quarantine), so this is NOT the guard's class. Candidates:
+  the `include_types` enforcement legitimately removing everything they carried, or a scoping
+  effect of their centroids (97208 is a downtown P.O.-box ZIP). Their sibling ZIPs recovered fully
+  (97209 136 · 97213 323 · 97214 407 · 97215 414 · 97218 196 · 97219 116 · 97239 178).
+
 ### 1. DB-01 — `public.communities` planner-statistics diagnosis
 - **State:** **DONE** (2026-07-30) — recorded in workbook 0071 rows 399–401; row 397 marked
   SUPERSEDED.
