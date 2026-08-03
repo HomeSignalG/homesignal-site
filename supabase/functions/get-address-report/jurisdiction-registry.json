@@ -3301,7 +3301,7 @@
           "B1_PER_SUB_TYPE"
         ],
         "status_raw": "PERMIT_STATUS",
-        "type_source": "GENERAL_TYPE",
+        "type_source": "B1_PER_SUB_TYPE",
         "file_date": "ISSUED_DT",
         "address": "SITE_ADDRESS",
         "zip": "B1_SITUS_ZIP",
@@ -3309,22 +3309,18 @@
         "record_url": "ACA_URL"
       },
       "include_types": [
-        "1,2,3 Family - New Structure",
-        "Multi Family - New Structure",
-        "Commercial - New Structure",
-        "1,2,3 Family - Demolition",
-        "Multi Family - Demolition",
-        "Commercial - Demolition",
-        "Unspecified - Demolition"
+        "Structural",
+        "New Construction",
+        "Major Alteration",
+        "Demolition",
+        "Addition"
       ],
       "type_map": {
-        "1,2,3 Family - New Structure": "Development",
-        "Multi Family - New Structure": "Development",
-        "Commercial - New Structure": "Development",
-        "1,2,3 Family - Demolition": "Development",
-        "Multi Family - Demolition": "Development",
-        "Commercial - Demolition": "Development",
-        "Unspecified - Demolition": "Development"
+        "Structural": "Development",
+        "New Construction": "Development",
+        "Major Alteration": "Development",
+        "Demolition": "Development",
+        "Addition": "Development"
       },
       "status_to_bucket": {
         "proposed": [],
@@ -3352,7 +3348,8 @@
         "types": "GENERAL_TYPE 12 values; New Structure + Demolition kept, '- Other' catch-alls + Graphics Permit (signs) + Other + null dropped/fail-closed",
         "record_precision": "native B1_SITUS_ZIP + per-record ACA_URL (Accela)",
         "dense_zip_projection": "dense Columbus ZIPs (e.g. 43214 = 2,413 construction rows/365d) at outFields=* on the 44-col schema timed the report out (Miami class); project the 8 mapped columns + page_size=2000",
-        "icon_completeness_2026_07_27": "live groupBy over the whole layer returned 4 PERMIT_STATUS values (Final Inspection Approved 463,163 / Permit Issued 166,345 / Certificate of Occupancy Issued 30,903 / Expired Permit 14,869), all mapped — no pre-issuance status exists, so proposed:[]."
+        "icon_completeness_2026_07_27": "live groupBy over the whole layer returned 4 PERMIT_STATUS values (Final Inspection Approved 463,163 / Permit Issued 166,345 / Certificate of Occupancy Issued 30,903 / Expired Permit 14,869), all mapped — no pre-issuance status exists, so proposed:[].",
+        "retarget_type_source_2026_08_03": "TYPE_SOURCE RE-POINTED GENERAL_TYPE -> B1_PER_SUB_TYPE. The `types` receipt above describes the OLD column and is superseded. Founder-approved as its own change, 2026-08-03. WHY: GENERAL_TYPE provably CANNOT express the distinction this entry needs. Live groupBy over the whole layer: its 13 values are dominated by opaque '- Other' catch-alls (1,2,3 Family - Other 430,710 / Commercial - Other 132,551 / Multi Family - Other 66,313), and a second groupBy INSIDE those rows shows they contain BOTH trades noise (MEP 261,180) AND real development — including 53,360 NEW CONSTRUCTION permits, 104,259 Structural and 60,079 Major Alteration. So the old whitelist was not merely too narrow: enforcing it would have DROPPED ~220,000 real records while keeping 28,343 (4.2% of the layer). Measured in the connector's own 365-day scope, enforcing the OLD whitelist would have taken these 49 pages from 42,209 rows to 1,598 and sent 10 of them DARK. B1_PER_SUB_TYPE VOCABULARY IS CLOSED AND BYTE-VERIFIED: 24 values summing to EXACTLY 676,274 = the layer's own returnCountOnly, with 0 NULLs (positive control). KEPT (5, all use_type 'Development' — the convention every prior member of this map used): Structural 113,814 / New Construction 66,584 / Major Alteration 60,079 / Demolition 4,398 / Addition 1,890 = 246,765 (36.5% of the layer). DROPPED, by class: trades — MEP 261,180, Fire Protection 14,107; minor/maintenance — Minor Alteration 64,113, Repair Replace 63,682, Minor Limited Scope 3,511; signage — Illuminated 9,048, Sign 2,939, Non-Illuminated 2,632, Resurface Illuminated 2,180, Resurface Non-Illuminated 436, Billboard 38, Outline Lighting 7, Graphic 7; OPAQUE, dropped because they carry no classifiable meaning and guessing one would be fabrication — Special 2,933, Regular 1,428, NA 982, Emergency 191, Temporary 63, Plans Examination 32. Minor Alteration and Repair Replace were the two judgement calls: both DROPPED, on the founder-approved Boston precedent, which keeps 'Long Form/Alteration' and drops the Short Form minor-jobs tier — the publisher itself separates 'Minor' from 'Major Alteration', so the layer draws the same line. Repair-and-replace is maintenance, dropped consistently elsewhere (Philadelphia re-roof, Seattle roof permits). EXPECTED SPLIT, measured BEFORE deploy in the connector's own scope (ISSUED_DT >= 365d, groupBy B1_SITUS_ZIP): 42,209 -> 14,445 rows (34.2% kept), which tracks the 36.5% layer-wide ratio. ⚠️ COVERAGE: 5 of the 49 pages go to ZERO — 43140 (2), 43064 (3), 43082 (3), 43210 OSU (7), 43146 (29) — and EVERY Columbus page is Columbus-only (no other source reaches any of them), so those 5 fall to the EPA facilities floor. Their entire current content was enumerated and is trades and signage with no development at all: 43064 3xMEP; 43082 2xFire Protection + 1xMEP; 43140 2xMEP; 43146 29xMEP; 43210 6xSign + 1xMEP. Adding Minor Alteration back would rescue NONE of them (none of their rows are that class) and would put 64,113 minor jobs on all 49 pages, so that option was withdrawn. Surfaced to the founder before deploy per the coverage rule. out_fields already carried B1_PER_SUB_TYPE, so no projection change was needed."
       },
       "out_fields": [
         "GENERAL_TYPE",
