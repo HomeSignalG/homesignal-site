@@ -4462,3 +4462,73 @@ San Antonio while the layer's activity is inner-city and west-side.
 **The lesson worth keeping: a fix that removes a KNOWN cause does not prove the symptom is gone.**
 Re-measure after the deploy, against a control, before calling it fixed. Had the re-cache not been run,
 "defect found and fixed" would have gone into the record while the entry still emitted nothing.
+
+---
+
+## PA REPROBE PASS 3, COMPLETED — Bucks / Lancaster / Centre resolved on ENUMERATION (2026-08-03)
+
+The six PA counties recorded as "county-hub URL guesses 404'd" are now all resolved. **Nine more
+hostname guesses failed DNS first** (`gis.chesco.org`, `arcgis.chesco.org`, `maps.chesco.org`,
+`gis.co.lancaster.pa.us`, `gis.lancastercountypa.gov`, `maps.lancastercountypa.gov`,
+`gis.centrecountypa.gov` ×2, `maps.centrecountypa.gov`) — **the pattern-guessing route is exhausted and
+should not be retried.** Every real host below came from the county's own published hub, its planning
+commission, or **PASDA** (`mapservices.pasda.psu.edu`, the state's open geospatial portal, which hosts a
+per-county MapServer for most PA counties and is a standing route worth trying first).
+
+| county | dark | real host | basis | verdict |
+|---|---|---|---|---|
+| Delaware | 29 | `gis.delcopa.gov` | enumerated | ✅ **WIRED + MEASURED → 0 dark** |
+| **Centre** | 35 | `gissites4.centrecountypa.gov` | enumerated | ✅ **SOURCE FOUND, FRESH** |
+| Chester | 34 | `gisprodops.chesco.org` | enumerated | ✅ source found, fully enumerated |
+| York | 47 | `arcweb1.ycpc.org` | enumerated | ✅ source found, fresh |
+| **Bucks** | 50 | PASDA `BucksCounty` | enumerated | ❌ **REJECTED — STALLED 2023-10-26** |
+| **Lancaster** | 56 | `arcgis.lancastercountypa.gov` | enumerated | ❌ **REJECTED — no activity layer exists** |
+
+### ✅ CENTRE COUNTY — `Building_Permits/MapServer/2`, 60,098 rows, FRESH
+
+`https://gissites4.centrecountypa.gov/arcgis/rest/services/Building_Permits/MapServer/2` · polygon ·
+**60,098 rows** · freshness by the Worcester string-date technique, with the layer total as a positive
+control: **`Issue_Date LIKE '%/2026'` → 669 · `'%/2025'` → 1,745 · `'%/2024'` → 1,833 · `1=1` → 60,098.**
+
+**⚠️ THE HUB DID NOT LIST IT.** Centre's ArcGIS hub (`gisdata-centrecountygov.opendata.arcgis.com`)
+publishes **100 datasets and NONE of them is this layer** — its only keyword hit, "Planning & Economical
+Development", is a **page** whose description is the unrendered template literal `{{description}}` and
+which carries no service URL at all. The permit service appears only in the SERVER's own root listing
+(85 services, incl. `Building_Permits` and `CloudPermit_pvcode`). **New standing answer: a hub catalogue
+is a PUBLISHING CHOICE, not an inventory — enumerate `/arcgis/rest/services` itself before rejecting.**
+Had this stopped at the hub, Centre would have been recorded as another firm rejection.
+
+**Wire notes for whoever writes it:** rich schema (`Permit_Type`, `Type_Description`,
+`Construction_Description`, `Estimated_Cost`, `Permit_Number`, `Home_Address`, `Property_Type_Group`,
+`Open_Y_N`, `Percent_Complete`) on the assessor's CAMA-linked file (`TAXIDNUM`, `Net_Change_AV`,
+`Appraiser_ID`) — still real permits. **EVERY date is an `esriFieldTypeString` in `M/D/YYYY`**, so
+`recency_days` (which emits a `DATE` literal) CANNOT apply — this is the `frisco` / `worcester` class,
+and `isoDay()` already parses `M/D/YYYY`. **`OBJECTID DESC` is NOT date order here** (sampled: 2022,
+2020, 2007, 2013, 2024, 2002), so never read freshness from it on this layer. `Open_Y_N` and
+`Permit_Type` both need enumerating before wiring; `FeatureServer` is not enabled (500 "Server object
+extension 'featureserver' not found") — use the MapServer.
+
+### ❌ BUCKS — the layer exists and is a real docket, but it STALLED at 2023-10-26
+
+PASDA `pasda/BucksCounty/MapServer/6` "Bucks County - Proposed Developments 202312" — 1,343 polygons,
+copyright "Bucks County, Pennsylvania", and genuinely the right shape: `BCPCNumber` (Bucks County
+Planning Commission), `Proposal`, `MunicName`, `Applicant`, `ReviewLett`, `GeneralLU`, and a **real
+`DateReceiv` `esriFieldTypeDate`**. **But the newest record is 2023-10-26 and only 46 rows fall in the
+last three years** — the `202312` in the layer name is an accurate vintage, not a label. Same class as
+Fort Lauderdale (2021-01-05) and Denton (2023-06-09). **Reject on staleness → nightly reprobe list.**
+Note this was reached on a DIFFERENT SURFACE from the county's own still-unresponsive host, so "Bucks
+does not answer" and "Bucks publishes nothing current" are now separately established.
+
+### ❌ LANCASTER — enumerated across THREE surfaces, no development-activity layer exists
+
+- PASDA `pasda/LancasterCounty/MapServer` — **22 layers, 0** (monuments, hydro, road centrelines).
+- Its own server `arcgis.lancastercountypa.gov` (live, ArcGIS **11.5**) — **92 root + 37 `Hosted` = 129
+  services, 0 activity layers.** The only near-matches are regulatory boundaries: `Zoning`, `PA_Zoning`,
+  `Planning_Areas`, `Agricultural_Zoning`.
+- Its hub `gis-lancastercountypa.hub.arcgis.com` — **4 datasets, all administrative**: "Paid Data",
+  "Past GIS Presentations", "GIS Presentations", "Feedback".
+
+My earlier guess `gis.lancastercountypa.gov` was simply the wrong NAME (the real one is `arcgis.`), which
+is why the first pass returned a DNS non-verdict. **This is now a real rejection on enumeration** — and
+note Lancaster sells premium layers ("Paid Data"), so this may be publishes-privately rather than
+publishes-nothing, which is a different frontier and not reachable by probing.
