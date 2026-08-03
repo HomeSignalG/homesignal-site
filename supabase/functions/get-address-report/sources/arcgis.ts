@@ -637,8 +637,26 @@ async function fetchRows(
       if (pt) { row.__lng = pt.lng; row.__lat = pt.lat; }
       out.push(row);
     }
-    if (feats.length < pageSize || page.exceededTransferLimit === false) break;
-    offset += pageSize;
+    // SERVER-CAPPED PAGING (fixed 2026-08-03). A layer may cap page size BELOW our request via its
+    // own `maxRecordCount` — Portland's is 200 against a default pageSize of 1000 — and answers with
+    // a short page plus `exceededTransferLimit: true` meaning "there IS more". Two defects lived here:
+    //   • the old `feats.length < pageSize` break SHORT-CIRCUITED before the exceededTransferLimit
+    //     check that exists to catch exactly this, so every such layer stopped after ONE page.
+    //     Measured: 3 separate Portland ZIPs cached exactly 200 records each.
+    //   • `offset += pageSize` advanced by the REQUESTED size, not the RECEIVED count, so a
+    //     server-capped page would also SKIP the difference (800 rows per page here) had the loop
+    //     continued. Latent only because the break fired first — fixing one without the other would
+    //     have turned silent truncation into silent gaps, which is worse.
+    // Now: advance by what we actually received, and stop only when the server does not say there is
+    // more AND the page came back short. `feats.length === 0` above still guards the empty case, and
+    // the `out.length <= maxRows` loop condition still bounds it.
+    offset += feats.length;
+    // Order matters, and each line covers a case the other does not:
+    //   • an EXPLICIT `false` means "that is all" even on a full page — the one thing the old
+    //     condition got right, and which a naive rewrite drops (caught by this suite);
+    //   • otherwise stop only on a SHORT page, so a server-capped page with `true` keeps going.
+    if (page.exceededTransferLimit === false) break;
+    if (page.exceededTransferLimit !== true && feats.length < pageSize) break;
   }
   // The cap bound the fetch iff we actually SAW a row beyond it.
   meta.truncated = out.length > maxRows;
