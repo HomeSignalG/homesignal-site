@@ -5235,9 +5235,9 @@ planning-commission host.** Two of the three named counties fell to it immediate
 |---|---|---|
 | **Chester** | 34 (of 39; the other 5 are New Castle border spill) | ✅ **SOURCE FOUND + FULLY ENUMERATED** — `gisprodops.chesco.org` Act 247 docket. Wire **layer 5 only** (1,563+2,105+58 = 3,726 exactly = the merged layer, so parts + union would double-emit). Vocab closed, dates fresh 2026-07-30, `SUBMIT_DATE` is a real Date at 100%. Ready to write. |
 | **York** | 47 (of 47) | ✅ **SOURCE FOUND, LIVE, FRESH** — the earlier "real host that does not answer" was the **wrong host**: `yorkcountypa.gov` is the county portal, `arcweb1.ycpc.org` is the **Planning Commission**. 26,879 rows, POINT geometry, newest `DATE_RCVD` 2026-07-27. **Open design question before wiring: type is 8 YES/NO flags, not a column**, so a precedence rule must be chosen (it drives the pin SHAPE). |
-| Lancaster | 56 | 🔴 **STILL UN-PROBED.** Guessed hostnames failed DNS again. Use the hub/planning-host route that worked for Chester and York. |
-| Centre | 35 | 🔴 **STILL UN-PROBED.** Same. |
-| Bucks | 50 | unchanged — real host, does not answer. Try its hub, not its GIS host. |
+| **Centre** | 35 | ✅ **SOURCE FOUND, FRESH** — `gissites4.centrecountypa.gov` `Building_Permits/MapServer/2`, 60,098 rows, 669 permits dated 2026 / 1,745 in 2025. ⚠️ **Its HUB does not list this layer** (100 datasets, 0 hits) — only the server's own root listing has it. Dates are `M/D/YYYY` STRINGS, so no `recency_days`; `OBJECTID DESC` is not date order. |
+| Lancaster | 56 | ❌ **REJECTED — enumerated across 3 surfaces.** PASDA 22 layers, own server (`arcgis.` not `gis.`) 92+37=129 services, hub 4 admin pages. Zero activity layers; only zoning/planning-area boundaries. May be publishes-PRIVATELY (it sells "Paid Data"), which probing cannot reach. |
+| Bucks | 50 | ❌ **REJECTED — STALLED 2023-10-26.** PASDA `BucksCounty/MapServer/6` "Proposed Developments" is the right shape (BCPC docket, real `DateReceiv` Date field, 1,343 rows) but only 46 rows in 3 years and nothing after Oct 2023. → nightly reprobe list. |
 
 **Two standing answers earned in this pass:**
 1. **A layer's DESCRIPTION can justify a wrong rejection — read the SCHEMA.** York's opens *"represents
@@ -5245,5 +5245,19 @@ planning-commission host.** Two of the three named counties fell to it immediate
 2. **DCAT `modified` is metadata staleness, not data staleness.** Chester's catalogue says 2021-08-31
    while its newest record is 2026-07-30.
 
-**Next action here is a WIRE, not a probe:** Chester is ready to write from the enumeration above; York
-needs the flag-precedence decision first. Together they are **81 dark pages.**
+**Next action here is a WIRE, not a probe — the PA seam is fully resolved.** All six counties are now
+decided on enumeration: 1 wired (Delaware), **3 sources found** (Chester 34 · York 47 · Centre 35 =
+**116 dark pages**), 2 firm rejections (Bucks stale, Lancaster absent).
+
+Readiness order:
+1. **Chester** — ready to write now. Wire layer 5 ONLY (the arithmetic proof above).
+2. **Centre** — ready to write after enumerating `Permit_Type` and `Open_Y_N`. String `M/D/YYYY` dates,
+   so recency rides `extra_where`, never `recency_days` (frisco/worcester class).
+3. **York** — needs one DESIGN decision first: type is 8 YES/NO flags, not a column, and `use_type`
+   drives the pin shape. Do not guess a precedence rule.
+
+**Standing answer earned here, worth applying to every future county: a hub catalogue is a PUBLISHING
+CHOICE, not an inventory.** Centre's hub lists 100 datasets and omits its own permit service; the layer
+exists only in the server's root listing. Enumerate `/arcgis/rest/services` before recording a rejection.
+**And try PASDA first for any PA county** — `mapservices.pasda.psu.edu/server/rest/services/pasda/<X>County/MapServer`
+resolved Bucks and Lancaster without needing their own hosts at all.
