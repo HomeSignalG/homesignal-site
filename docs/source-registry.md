@@ -4676,3 +4676,44 @@ self-tests that it catches a typo'd `recency_day`.
 
 **`shelby-county-building-permits` declares `platform: "opendatasoft"`, for which no connector exists** —
 the entry does nothing at all. Known and queued (QUEUE.md item 8, SHELBY-429).
+
+---
+
+## 🟦 FIVE COLUMBUS ZIPs ARE HONEST-EMPTY **BY DESIGN** — a ruling, not a regression (founder, 2026-08-03)
+
+**If you are reading this because five Columbus pages show only the EPA facilities floor: that is the
+intended state. Do not "fix" it.**
+
+`43140` (London) · `43064` (Plain City) · `43082` (Westerville) · `43210` (**OSU campus**) · `43146`
+(Orient) carry **no `columbus-building-permits` records** following the `type_source` re-point from
+`GENERAL_TYPE` to `B1_PER_SUB_TYPE`.
+
+**Why they are empty, enumerated before the change — this was their ENTIRE content in the connector's
+365-day window:**
+
+| ZIP | every record it held |
+|---|---|
+| 43064 | 3 × MEP |
+| 43082 | 2 × Fire Protection, 1 × MEP |
+| 43140 | 2 × MEP |
+| 43146 | 29 × MEP |
+| 43210 (OSU) | 6 × **Sign**, 1 × MEP |
+
+**Zero development by any definition** — HVAC/plumbing/electrical permits and six signs. Columbus issued
+no structural, new-construction, major-alteration, addition or demolition permit in any of these five
+ZIPs in a year. **Every Columbus page is Columbus-only** (no other registry source covers Franklin
+County), so they fall to the national EPA facilities floor rather than to a thinner page.
+
+**The founder's reasoning, recorded verbatim so it is not re-litigated:** *"Those pages currently make a
+typed-pin promise the data does not keep; showing HVAC permits and signs on a 'what is being built near
+me' map is the fabrication problem in a different costume. The EPA facilities floor is the honest state
+for a ZIP where Columbus issued no development permits in a year. Honest-empty over false-typed."*
+
+**Do not widen the whitelist to rescue them.** That was proposed and **measured**: adding
+`Minor Alteration` back rescues **ZERO** of the five (none of their records are that class) while adding
+64,113 minor jobs to all 49 pages. Withdrawn on the measurement.
+
+**What WOULD legitimately change this:** Columbus actually issuing development permits in these ZIPs
+(the pages repopulate on the next refresh with no code or config change — the whitelist is not a
+per-ZIP exclusion), or a second Franklin County source being wired. Neither is a reason to touch this
+entry today.

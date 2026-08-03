@@ -628,6 +628,27 @@ catalogue alone. **When any previously-rejected county comes up again, first che
 rejection enumerated** — hub-only rejections are non-verdicts and must be re-probed against the server
 root before being quoted. Only a rejection that names the server enumeration is conclusive.
 
+### A MECHANISM COMMIT CHANGES BEHAVIOUR FOR EVERY ENTRY ALREADY CARRYING THE OPTION (founder rule, 2026-08-03)
+
+**Implementing a previously-ignored option is not additive — it is a behaviour change for every entry
+that already sets it, including entries nobody is currently looking at.** Enumerate them BEFORE the
+deploy, and treat any that would behave badly as a PREREQUISITE, not as follow-up work.
+
+*The case:* `include_types` was csv-only and silently ignored elsewhere. Implementing it in arcgis and
+socrata was written as a pure mechanism commit — no registry entry touched. But **seven entries already
+carried the option**, so the deploy would have started enforcing seven whitelists that had never once
+run. Six were fine or improved. The seventh, `columbus-building-permits`, had its whitelist pointed at a
+column that provably cannot express the distinction: deploying the mechanism alone would have taken its
+49 pages from **42,209 records to 1,598 and sent 10 of them dark**, dropping ~220,000 real permits
+including 53,360 New Construction. The re-point was therefore a **precondition of deploying at all**,
+not an improvement on the deploy — and that is invisible in the mechanism commit's own diff, which
+touches no registry data.
+
+**The check, before deploying any mechanism change:** grep the registry for every entry that sets the
+option, and measure what each one will now do. "This commit changes no data files" is not evidence that
+it changes no behaviour. The safe orderings are: fix the offenders first and deploy together; strip the
+option from the offenders and deploy without them; or do not deploy.
+
 ### Measurement discipline
 - **Capture the baseline BEFORE mutating what you intend to measure** — a post-deploy refresh
   destroyed the pre-deploy Arlington rows and cost the clean −397 figure.
