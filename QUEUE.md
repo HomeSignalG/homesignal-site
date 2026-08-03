@@ -5160,3 +5160,27 @@ timestamp, identical for every row in a batch — **it is not a completion time*
 duration cannot be derived from this table. That is the same gap that made the incident
 unattributable, and it is why the experiment had to be built around success/failure rather than
 latency.
+
+### PA reprobe pass 2 — one wire, two hosts that exist but do not answer, three still un-probed
+
+Applying the enumerated / access-denied / unreachable rule to the six PA counties recorded as
+"county-hub URL guesses 404'd":
+
+| county | probe | basis | verdict |
+|---|---|---|---|
+| **Delaware** | `gis.delcopa.gov/arcgis/rest/services` | **ENUMERATED** — 36 folders, `SLD_Review` read | ✅ **WIRED** (29 dark pages) |
+| York | `gis.yorkcountypa.gov` | **unreachable** — DNS RESOLVED, then timed out at 20 s *and again at 60 s* | provisional |
+| Bucks | `gis.buckscounty.org` | **unreachable** — DNS resolved, timed out at 30 s | provisional |
+| Chester | `arcgis.chesco.org` | **unreachable** — `Couldn't resolve host name` | 🔴 still a GUESS |
+| Lancaster | `gis.co.lancaster.pa.us` | **unreachable** — `Couldn't resolve host name` | 🔴 still a GUESS |
+| Centre | `gis.centrecountypa.gov`, `maps.co.centre.pa.us` | **unreachable** — both `Couldn't resolve host name` | 🔴 still a GUESS |
+
+**York and Bucks moved from "guess" to "real host that does not answer."** Their DNS resolves — the
+hostnames are correct — but the servers time out, York twice at 20 s and 60 s. That is a materially
+different state from a name that does not exist, and it is worth knowing before the next attempt:
+these may be firewalled to non-US egress, or genuinely down. Still **not** rejections.
+
+**Chester, Lancaster and Centre remain UN-RUN PROBES.** My hostnames for them were invented and failed
+DNS, which tells us nothing about those counties. Per the rule, "not found" from a guessed hostname is
+not a rejection. **Do not record them as rejected, and do not keep guessing** — the next attempt needs
+their real GIS hostnames, found from the counties' own sites rather than from a naming pattern.
