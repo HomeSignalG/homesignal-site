@@ -309,6 +309,13 @@ pre-measure against dark ZIPs → wire → deploy → recache → **materialize*
 - **Always paginate `dev_zip_source_ids`.** One un-paginated call returned the first 5,000 ZIPs,
   NV's 89xxx sorted past the end, and NV read 0/158 — a wrong zero that looked like a finding.
 - **Check `scope` on live rows after any wire**, not just the record count (finding 3 above).
+- **`status_const` means the OPPOSITE thing in the two connectors — check which one you are
+  writing.** socrata: it **IS** the bucket (`"proposed"|"approved"|"operating"`), so an all-empty
+  `status_to_bucket` is correct. arcgis: it is the **RAW value**, resolved through
+  `status_to_bucket` like any column-read status (`arcgis.ts:300-304`), so with no map the constant
+  is unmapped and the entry emits **zero** — silently. Two production entries were written the
+  wrong way (`delaware-county-pa-…`, `san-antonio-prelim-plan-review`, both fixed 2026-08-03);
+  `test/status-const-must-be-mapped.test.mjs` now fails the build on a third.
 - **Read `docs/source-registry.md` for the county BEFORE probing it** — Sussex already had a
   "STILL NOT WIREABLE" section for a DIFFERENT endpoint (`/trdserver/Permit_Points`, 827,020 rows,
   undecodable `a_status`). That record still stands; the reconciliation table is in the new
@@ -5004,6 +5011,34 @@ oldest), or ship `recency_expr` for arcgis and delete the constant. Verify after
 *(Audited across all 149 entries: 51 further arcgis entries carry no `recency_days` at all, which is a
 different and deliberate choice — most are "active projects" layers where every row is current by
 construction. Those are not on this list.)*
+
+---
+
+## 🧹 BATCHED CLEANUP — 14 arcgis `status_const` values name a bucket instead of the record
+
+**Not urgent, not broken, and deliberately NOT failing the build — recorded so it is not invisible.**
+
+`test/status-const-must-be-mapped.test.mjs` check 4 lists 14 entries written as
+`status_const: "operating"` with `status_to_bucket: {operating: ["operating"]}` — circular, and the
+pipeline's own bucket vocabulary sitting in a field meant for the publisher's word:
+
+`nvdot-project-boundaries` · `new-castle-county-permits` · `loudoun-county-residential-permits` ·
+`charleston-county-permits` · `huntsville-building-permits` · `chattanooga-permits-archive` ·
+`knoxville-building-permits` · `desoto-county-permits` · `flathead-county-building-permits` ·
+`aurora-building-permits` · `sheridan-county-building-permits` · `albuquerque-building-permits` ·
+`thurston-county-residential-permits` · `fdot-active-construction-projects` (`"approved"`).
+
+**Why it does not block:** they RESOLVE, so they pass the check that matters and emit records
+normally — this is a naming rule, not the silent-nothing defect that suite exists to catch. The value
+is one *we* authored (each is an issuance ledger with **no status column**, which is what
+`status_const` is for), and its only surface is each record's `status_raw`, which nothing renders —
+`lib/map.js:576` derives the displayed lifecycle from `bucket`. A rename therefore changes **no
+resident-visible text** and would cost a re-cache of every page these 14 sources touch.
+
+**The list is RATCHETED at 14**, so a new entry written to the wrong convention still fails CI.
+**When to actually do it:** fold each rename into a re-cache those pages are getting anyway, never as
+its own re-cache. Convention to follow: `detroit-building-permits` / `cleveland-issued-building-permits`
+— `"Issued"` + `status_to_bucket.approved: ["Issued"]`. Drop the ratchet as the count falls.
 
 ---
 
