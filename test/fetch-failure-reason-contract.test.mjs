@@ -107,5 +107,25 @@ console.log('\n5) SELF-TEST — the detector can fail');
     !/j->'tabs_reports'/.test(sql));   // a name the SQL genuinely must not have
 }
 
+console.log('\n6) BOUNDED FETCH — a cap must be distinguishable from a complete fetch (fix 2)');
+{
+  // The truncation discriminator keys on the `truncated_at_max_rows` FIELD, never on prose:
+  // csv words its note "bound the emit" while the other four say "bound the fetch", so a
+  // string match would have silently missed one connector in five.
+  for (const [name] of CONNECTORS) {
+    const src = read(`${name}.ts`);
+    ok(`${name}.ts sets truncated_at_max_rows when the cap binds`,
+      /report\.truncated_at_max_rows = /.test(src));
+    ok(`${name}.ts accepts a per-entry max_rows`, /\n {2}max_rows\?: number;/.test(src));
+  }
+  const sql = readFileSync(new URL('../docs/dev-refresh-source-failure-guard.sql', import.meta.url), 'utf8');
+  ok('SQL discriminates truncation on the FIELD, not the prose',
+    /truncated_at_max_rows' is not null/.test(sql) && !/bound the emit'/.test(sql.split('PROOF')[0]));
+  ok('SQL declares dev_truncated_sources', /function public\.dev_truncated_sources/.test(sql));
+  // Truncation is DETERMINISTIC — blocking on it would freeze the page forever, so it is
+  // logged with blocked_update = false and never refuses a write.
+  ok('truncation is logged as non-blocking', /'truncated',\s*$|false, 'truncated'/m.test(sql));
+}
+
 console.log(fail ? `\n${fail} check(s) FAILED` : `\nAll ${pass} fetch-failure-reason-contract checks passed.`);
 process.exit(fail ? 1 : 0);

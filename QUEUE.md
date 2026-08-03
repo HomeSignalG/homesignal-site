@@ -341,13 +341,46 @@ pre-measure against dark ZIPs → wire → deploy → recache → **materialize*
   — blocked 55413 (2,015) and 55422 (719), correctly did NOT block 55119 (0 cached). A second
   source that had been darkening pages silently.
 
-### 0a. FETCH-BOUND — bound the fetch (fix 2) — **NEXT, approved**
-- **State:** NOT STARTED. Founder: "Then (2) bound the fetch… Do it after (1) lands."
+### 0a. FETCH-BOUND — bound the fetch (fix 2) — **VISIBILITY DONE, SIZING OPEN**
+- **State:** part 1 **DONE** (migration `dev_refresh_truncation_visibility`): a bounded fetch is
+  now distinguishable from a complete one at the collect layer, keyed on the
+  `truncated_at_max_rows` FIELD (csv words its note "bound the emit" vs the others' "bound the
+  fetch" — a prose match would have missed one connector in five). Logged as
+  `kind='truncated'`, **never blocking** — truncation is deterministic, so refusing would freeze
+  the page forever. Part 2 (per-entry sizing) OPEN — see the measurement below.
 - **Gate:** approved. Per-entry `page_size` / `max_rows`.
-- **The signal:** the rolling tick's own responses show `80602` at **`fetched 20000`** — the
-  `max_rows` ceiling — and `80011` at 20,018 development records. The 2026-08-03 server-capped
-  paging fix is correct, but it multiplied per-ZIP fetch volume on dense layers, which is the load
-  that makes the concurrent resets bite. Fix (1) stops the darkening; this stops the cause.
+- **MEASURED cache-wide 2026-08-03, so nobody re-derives it:**
+  - **Only 3 ZIPs are truncated** at the 20,000 default — 80011 + 80012
+    (`aurora-building-permits`) and 55103 (`saint-paul-approved-building-permits`). *(An earlier
+    "p95 = 20,000" reading was an artifact of `percentile_disc` over 16 values, not "most ZIPs
+    truncated" — corrected by counting.)*
+  - **Row SIZE is the sharper cost:** 55103 **20 MB** · 80011/80012/80013/80014 **18 MB** ·
+    80010 17 MB — ~3x the 5.98 MB Cleveland high-water mark in CLAUDE.md (44127 measures 6,158 kB
+    and is no longer the ceiling). `aurora-building-permits` alone is 152,414 records over 16 ZIPs.
+  - **Row COUNT is NOT the binding constraint.** 80011 (20,051 sites / 18 MB) collects fine;
+    55109 (10,995 / 11 MB) never does. The constraint is upstream host SPEED — so a global
+    `max_rows` would not have fixed either, and the per-entry value has to come from timing.
+- **⚠️ `out_fields` is the tempting lever and it has a trap** — 120 of 124 arcgis entries pull
+  `outFields=*`. Deriving the projection automatically from `column_map` + `extra_where` looked
+  clean until the derivation produced `ADDITION, BARN, DUPLEX, GARAGE, HOUSE, MOBILE, SHOP` for
+  `denton-county-dev-permits`: an identifier regex cannot tell a column from a **string literal
+  inside `PermitType IN ('HOUSE','MOBILE HOME',…)`**. Same bug hit miami / minneapolis /
+  cleveland. A projection that MISSES a column silently drops a field from every record, so any
+  `out_fields` pass must strip quoted literals first **and** be verified against each layer's
+  live `fields` list before it is written.
+
+### 0c. FIRE-TIMEOUT — a third invisible failure, one layer further out — **OPEN**
+- **State:** measured, not fixed. Neither guard can see it.
+- `net.http_post` fires with a 90 s timeout; an overrun lands in `net._http_response` with
+  **`status_code` NULL**, and `dev_refresh_collect` filters `where status_code = 200`. The row is
+  never updated and nothing records why. Receipt (18:00Z): `Timeout of 90000 ms reached. Total
+  time: 90000.951 ms (DNS 44.817, TCP/SSL 63.738, HTTP Request/Response 89892.309)`.
+- **Three ZIPs have not collected once in five days** while being re-fired every cooldown:
+  55103 (133.5 h), 55119 (118.0 h), 55109 (116.7 h).
+- **It is hiding a registry change:** those pages still serve **41,910 records** from
+  `saint-paul-approved-building-permits`, an entry that **no longer exists** in
+  `jurisdiction-registry.json`. The refresh that would drop them cannot complete, so the removal
+  never reached production.
 
 ### 0b. PDX-3-ZIP — 97206 / 97208 / 97227 return 0 Portland records SOLO as well as under load
 - **State:** OPEN, recorded not chased (founder: "a separate question — record it, do not chase it

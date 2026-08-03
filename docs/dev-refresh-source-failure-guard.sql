@@ -219,3 +219,105 @@ end $function$;
 --           97214/97215/97218/97219/97239 updated at 17:45:37, 407/414/196/116/178 intact
 --           188 other rows updated in the same call                (not a blanket refusal)
 -- Under the old collect 97213 would have been zeroed, exactly as 97215 was at 16:30.
+
+
+-- ============================================================================
+-- PART 2 (2026-08-03) — BOUNDED-FETCH VISIBILITY
+-- migration: dev_refresh_truncation_visibility
+-- ============================================================================
+--
+-- "A bound that silently truncates reintroduces the defect you just fixed."  A capped fetch
+-- and a complete one differ only by a count, so a page built from 20,000 of N records reads
+-- as "we have everything" — the same success-shaped silence.
+--
+-- Keyed on the `truncated_at_max_rows` FIELD, not on the quarantine prose: csv words its note
+-- "bound the emit" while the other four connectors say "bound the fetch", so a prose match
+-- would have silently missed one connector in five. (Verified: the field is present in all
+-- five run reports, and all five accept `max_rows`.)
+--
+-- TRUNCATION NEVER BLOCKS THE WRITE. Unlike a fetch failure it is DETERMINISTIC — it recurs
+-- on every refresh, so refusing the update would freeze the page permanently.
+--
+-- MEASURED, cache-wide 2026-08-03 (the sizing evidence, not a global constant):
+--   * exactly THREE ZIPs sit at the 20,000 default and are therefore truncated —
+--     80011 + 80012 (aurora-building-permits) and 55103 (saint-paul-approved-building-permits).
+--     Nothing else in the cache reaches it. (An earlier read of "p95 = 20,000" was an artifact
+--     of percentile_disc over 16 values, not "most ZIPs truncated" — corrected by counting.)
+--   * row SIZE is the sharper cost: 55103 = 20 MB, 80011/80012/80013/80014 = 18 MB,
+--     80010 = 17 MB — about 3x the 5.98 MB Cleveland "high-water mark" recorded in CLAUDE.md,
+--     which measures here as 6,158 kB (44127) and is no longer the ceiling.
+--   * size alone does NOT prevent a refresh: 80011/80013 at 17-18 MB collect normally.
+
+alter table public.dev_refresh_source_failures
+  add column if not exists kind text not null default 'fetch_failed',
+  add column if not exists detail jsonb;
+
+create or replace function public.dev_truncated_sources(j jsonb)
+returns table(registry_id text, cap integer, fetched integer)
+language sql
+immutable
+set search_path to 'public'
+as $$
+  select r->>'registry_id',
+         (r->>'truncated_at_max_rows')::int,
+         (r->>'fetched')::int
+  from jsonb_array_elements(
+         coalesce(j->'arcgis_reports',  '[]'::jsonb)
+      || coalesce(j->'socrata_reports', '[]'::jsonb)
+      || coalesce(j->'carto_reports',   '[]'::jsonb)
+      || coalesce(j->'ckan_reports',    '[]'::jsonb)
+      || coalesce(j->'csv_reports',     '[]'::jsonb)
+       ) r
+  where r->>'truncated_at_max_rows' is not null
+$$;
+
+-- v_dev_refresh_source_health gains a `kind` column (dropped + recreated — Postgres cannot
+-- rename a view column in place). dev_refresh_collect() gains step (b), verbatim below; the
+-- fetch-failure step (a) and the write step (c) are unchanged from Part 1.
+--
+--   -- (b) BOUNDED fetches — visible, never blocking (deterministic; a refusal would freeze).
+--   with resp as ( ...the same distinct-on-zip response set as steps (a) and (c)... )
+--   insert into public.dev_refresh_source_failures
+--         (zip, registry_id, reason, cached_records, blocked_update, kind, detail)
+--   select (r.j->>'zip'), t.registry_id,
+--          'max_rows bound the fetch at ' || t.cap || ' — this page is INCOMPLETE',
+--          t.fetched, false, 'truncated',
+--          jsonb_build_object('cap', t.cap, 'fetched', t.fetched)
+--   from resp r, lateral public.dev_truncated_sources(r.j) t;
+--
+-- Note `false, 'truncated'` — blocked_update is ALWAYS false for this kind.
+
+-- ---------------------------------------------------------------------------
+-- PROOF — the two discriminators are orthogonal (run 2026-08-03):
+--   T1 arcgis truncated                      -> truncated: aurora@20000   failed: (none)
+--   T2 csv truncated ("bound the emit")      -> truncated: sd@9000        failed: (none)
+--   T3 complete fetch                        -> truncated: (none)         failed: (none)
+--   T4 fetch FAILURE is not a truncation     -> truncated: (none)         failed: p
+-- ---------------------------------------------------------------------------
+
+-- ============================================================================
+-- OPEN, MEASURED, NOT YET FIXED — the fire-timeout class (found while sizing)
+-- ============================================================================
+-- A THIRD invisible failure sits one layer further out than either of the above, and neither
+-- guard can see it: `net.http_post` is fired with a 90 s timeout, and a request that exceeds
+-- it lands in net._http_response with **status_code NULL**, which dev_refresh_collect filters
+-- out (`where status_code = 200`). The row is never updated and nothing records why.
+--
+-- Receipt (2026-08-03 18:00Z):
+--   error_msg = 'Timeout of 90000 ms reached. Total time: 90000.951 ms
+--                (DNS 44.817 ms, TCP/SSL 63.738 ms, HTTP Request/Response 89892.309 ms)'
+--
+-- Consequence, measured:
+--   zip    refreshed_at (last SUCCESS)  last_refresh_attempt_at   stuck for
+--   55103  2026-07-29 04:15Z            2026-08-03 17:45Z         133.5 h
+--   55119  2026-07-29 20:00Z            2026-08-03 18:00Z         118.0 h
+--   55109  2026-07-29 21:00Z            2026-08-03 17:45Z         116.7 h
+-- They are re-fired every cooldown and have not collected once in five days.
+--
+-- Two things ride on that stall:
+--   1. those pages carry 41,910 records from `saint-paul-approved-building-permits`, an entry
+--      that NO LONGER EXISTS in jurisdiction-registry.json — its removal never reached the
+--      pages, because the refresh that would have dropped the records cannot complete;
+--   2. row COUNT is not the discriminator — 80011 (20,051 sites / 18 MB) collects fine while
+--      55109 (10,995 / 11 MB) never does, so the binding constraint is upstream host SPEED,
+--      not volume. A global max_rows would not have fixed either.
