@@ -5219,3 +5219,31 @@ these may be firewalled to non-US egress, or genuinely down. Still **not** rejec
 DNS, which tells us nothing about those counties. Per the rule, "not found" from a guessed hostname is
 not a rejection. **Do not record them as rejected, and do not keep guessing** — the next attempt needs
 their real GIS hostnames, found from the counties' own sites rather than from a naming pattern.
+
+---
+
+### ✅ PA reprobe pass 3 (2026-08-03) — the "real hostname" instruction, carried out
+
+Delaware is **WIRED, DEPLOYED, RE-CACHED AND MEASURED: 29 dark pages → 0, 40/40 pages carrying it,
+5,180 rows.** Full receipts in `docs/source-registry.md` "DELAWARE COUNTY PA — GO-LIVE MEASURED".
+
+Nine MORE hostname guesses for Chester/Lancaster/Centre **all failed DNS** — the pattern-guessing route
+is exhausted and is recorded as such. What worked instead: **the county's own published GIS hub or
+planning-commission host.** Two of the three named counties fell to it immediately.
+
+| county | dark | outcome of pass 3 |
+|---|---|---|
+| **Chester** | 34 (of 39; the other 5 are New Castle border spill) | ✅ **SOURCE FOUND + FULLY ENUMERATED** — `gisprodops.chesco.org` Act 247 docket. Wire **layer 5 only** (1,563+2,105+58 = 3,726 exactly = the merged layer, so parts + union would double-emit). Vocab closed, dates fresh 2026-07-30, `SUBMIT_DATE` is a real Date at 100%. Ready to write. |
+| **York** | 47 (of 47) | ✅ **SOURCE FOUND, LIVE, FRESH** — the earlier "real host that does not answer" was the **wrong host**: `yorkcountypa.gov` is the county portal, `arcweb1.ycpc.org` is the **Planning Commission**. 26,879 rows, POINT geometry, newest `DATE_RCVD` 2026-07-27. **Open design question before wiring: type is 8 YES/NO flags, not a column**, so a precedence rule must be chosen (it drives the pin SHAPE). |
+| Lancaster | 56 | 🔴 **STILL UN-PROBED.** Guessed hostnames failed DNS again. Use the hub/planning-host route that worked for Chester and York. |
+| Centre | 35 | 🔴 **STILL UN-PROBED.** Same. |
+| Bucks | 50 | unchanged — real host, does not answer. Try its hub, not its GIS host. |
+
+**Two standing answers earned in this pass:**
+1. **A layer's DESCRIPTION can justify a wrong rejection — read the SCHEMA.** York's opens *"represents
+   the geographic boundaries…"* (reads cadastral/static); its fields are a live plan-review docket.
+2. **DCAT `modified` is metadata staleness, not data staleness.** Chester's catalogue says 2021-08-31
+   while its newest record is 2026-07-30.
+
+**Next action here is a WIRE, not a probe:** Chester is ready to write from the enumeration above; York
+needs the flag-precedence decision first. Together they are **81 dark pages.**
