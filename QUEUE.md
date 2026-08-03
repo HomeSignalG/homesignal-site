@@ -5076,3 +5076,39 @@ already dev-backed before this wire.
 > `%OpenData_Building_Permits_%` zero that matched nothing at all.
 > **Key a source-scoped query on `source_ref`, never on a title, a name, or a portal domain** — those
 > are shared across entries and produce both false zeros and false alarms.
+
+### ⚠️ I MAY HAVE DEGRADED THE SHARED REFRESH WITH LONG-TIMEOUT FIRES — correlation, not proof
+
+Stopped re-caching 01602/01604 after measuring this. Per-minute, from `net._http_response`:
+
+| tick | 200 | 503 | **timeouts** |
+|---|---|---|---|
+| 23:30 | 145 | 54 | 1 |
+| 23:45 | 130 | 68 | 2 |
+| 00:00 | 142 | 56 | 2 |
+| **00:16** | 29 | 33 | **138** |
+| **00:18** | 5 | 0 | **45** |
+
+Three consecutive healthy ticks (~145 OK / ~55 503 / 1–2 timeouts — the documented steady state), then
+a collapse to **192 timeouts in 20 minutes, 71 % of all responses**.
+
+**The correlation:** I fired 22 ad-hoc re-cache requests in that window with **deliberately long
+timeouts — 120 s, then 150 s, then 180 s** — to survive an engine that was already slow. pg_net has
+limited worker concurrency, so a long-timeout request *occupies* a worker for its full duration. 22
+requests holding workers for up to 3 minutes each, on top of the rolling refresh's 250-per-tick, is a
+plausible mechanism for starving the pool and timing out the scheduled batch behind me.
+
+**It is NOT proven, and I am not recording it as established.** `net._http_response` does not retain
+the request URL, so I cannot attribute the 138 timeouts at 00:16 to my requests versus the refresh's
+own. The engine may have had an independent incident. This is exactly the shape the superseded
+`worker_restart()` note got wrong — two events correlated, a cause inferred, guidance written. Recorded
+here as an **observation with a hypothesis**, for the open **PGNET-503** investigation.
+
+**What I changed anyway, because it is cheap and the downside is asymmetric:** stopped firing. The two
+remaining Worcester ZIPs (01602, 01604) keep their MassDOT rows and will pick the source up on the
+rolling pass. Deepening two pages a few hours sooner is not worth risking the refresh for all 12,722.
+
+> **Provisional guidance, to test rather than trust: raising a pg_net timeout to work around a slow
+> engine may make the engine slower for everyone.** The timeout is not free — it is a worker-seconds
+> reservation against a shared pool. If a re-cache needs a long timeout, fire FEWER at once, or wait
+> for the rolling refresh instead of racing it.
