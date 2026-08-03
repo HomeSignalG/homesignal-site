@@ -4164,3 +4164,66 @@ survive indefinitely because a wrong-but-plausible count reads exactly like a ri
 
 *Two writers, one table, one reader nobody updated — and 5,072 residents told they had coverage they did
 not have.*
+
+---
+
+## ⛔ VENDOR-PATTERN PROBING IS A CLOSED QUESTION — DO NOT RE-RUN IT (2026-08-02)
+
+**Result: 56 Pattern-A roots probed, 4 resolved (7.1 %), 0 wireable (0 %). Zero pages gained.**
+Run against the four biggest dark counties — NY Suffolk (all ten Long Island towns), CA Orange,
+IL Cook, PA Allegheny. Recorded here so no future session pays for it again.
+
+**The patterns, from all 12 working permit entries:** 7 are jurisdiction-hosted ArcGIS on the
+jurisdiction's own domain (`{maps|mapdata|gis}.<domain>/{arcgis|gis|server|pub}/rest/services`) — the
+only probe-able shape; 4 are ArcGIS Online orgs behind a **22-char opaque orgId**; 1 is an EnerGov
+proxy behind a **32-hex id**. The last two cannot be derived from a jurisdiction name, so they are
+reachable only by discovery.
+
+⚠️ **"Accela" and "EnerGov" are NOT URL patterns, and there is no per-vendor hit rate.** They are the
+upstream permitting SYSTEMS. What this registry reads is each jurisdiction's own ArcGIS
+**republication** of them, and those service names share nothing: `accela_permit_data`,
+`Building_Permits`, `PermitsCode`, `Growth_Development_Tables_1`, `External_Planning_and_Zoning`,
+`Planning_Permit`, `ConstructionActivity_Public`, `OpenData_Tabular`, `ActiveDevelopment`.
+
+### 🔴 THE FINDING THAT MATTERS: publishes-NOTHING and publishes-PRIVATELY are different frontiers
+
+**Do not read "the pattern failed" as "the data is not there."** Two of the four live roots had the
+data sitting exactly where the pattern predicted, and would not serve it:
+
+| root | what the pattern found | verdict |
+|---|---|---|
+| `gis.cityoffullerton.com` (CA Orange) | an **`EnerGov` folder** | **access-denied** — HTTP 499 `Token Required` |
+| `gis.schaumburg.com` (IL Cook) | a **`CommunityDevelopment` folder** (22 folders listed publicly) | **access-denied** — 499 |
+| `gis.huntingtonbeachca.gov` (CA Orange) | `Planning` + `Property` enumerated completely | **enumerated** — no permit layer exists |
+| `gis.ehamptonny.gov` (NY Suffolk) | `Hosted` holds one service, `BasicTownPolygon` | **enumerated** — nothing public |
+
+Suffolk County's own `Applications` folder fails the same way (499). **Pattern probing cannot reach
+the access-denied class at all** — the URL is right, the folder is right, and the server simply
+refuses anonymously. A future session that sees this 0 % and concludes "these cities publish nothing"
+would be drawing the wrong lesson from the right number. The unlock for that class is a credential or
+an open-data request, not a better URL.
+
+### ⚠️ EVERY REJECTION MUST STATE ITS BASIS — enumeration, access-denied, or unreachable
+
+Three distinct verdicts, and only the first two are conclusive:
+
+- **enumerated** — the folder/dataset list was READ and the layer is absent. Conclusive.
+- **access-denied** — it exists and is token-gated (HTTP 499 / 403). Conclusive *for anonymous
+  access*, and a live lead for any other route.
+- **unreachable** — DNS failure, timeout, or a guessed hostname 404. **Provisional, not a verdict.**
+
+"Not found" without one of those three is **not a rejection; it is an un-run probe.** This rule has
+now caught **three** false rejections in two sessions:
+1. **Suffolk County NY** — filed "no portals found"; its server is live at ArcGIS 11.4 and simply
+   carries no permit layer (now *enumerated*).
+2. **OCPW / CA Orange** — filed as a timeout; it returns **933 datasets** when probed at 25 s.
+3. **Frisco TX** — the "dead host" was a search-result host failing DNS while the real server was
+   reachable through the city's own web map.
+…and the author of the rule broke it **one message after writing it**, guessing three dataset ids on
+the first reprobe pass instead of reading them out of this document. Read the recorded identifier.
+
+> **Standing answer: pg_net's 5 s default timeout is short enough to make a live host look dead.**
+> Hub/DCAT feeds are large documents — probe them at **≥20 s** before recording any verdict. Note the
+> corollary: an ArcGIS hub **404 `Domain record(s) not found`** is NOT a timeout and a longer timeout
+> cannot change it — that hostname is genuinely unregistered, so the retry belongs against the
+> jurisdiction's real GIS host, not the same guessed hub subdomain.

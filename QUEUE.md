@@ -4975,3 +4975,32 @@ workflow files: **0 jobs still unbounded, 0 parse errors.**
 ⚠️ **`verify-development`'s 330 is a bound, not headroom** - it sits above the 251.6 min measured max on
 purpose, but the job is already 4.2 h against what was a 6 h ceiling and grows linearly with the cache.
 The bounding report above is what actually fixes that; this only stops a genuine hang from costing 6 h.
+
+---
+
+## 🗓️ RECURRING ITEM — DATED CONSTANTS IN REGISTRY WINDOWS (review every January)
+
+**Next review due: 2027-01-01. Owner: whoever is in the registry that month.**
+
+Three entries filter on a **hardcoded year**. They are not equivalent, and only one is dangerous:
+
+| entry | window | shape | what happens over time |
+|---|---|---|---|
+| **`worcester-building-permits`** | `Permit_License_Issued_Date LIKE '%/2025' OR LIKE '%/2026'` | **FIXED WINDOW** | 🔴 **stops matching new records on 2027-01-01** and silently decays to stale-only, then to zero |
+| `anaheim-land-use-cases` | `Application_Received >= '2025/07/01'` | fixed floor | 🟡 keeps matching new records; the window only ever GROWS, accumulating old cases |
+| `tempe-building-permits` | `IssuedDate >= '2025-01-01'` | fixed floor | 🟡 same — grows, never blind to new data |
+
+**A fixed FLOOR degrades gracefully; a fixed WINDOW goes blind.** Only Worcester is the second kind,
+because its date column is a **String in M/D/YYYY**: `recency_days` emits a `DATE` literal that cannot
+apply (the `frisco-active-building-permits` standing answer), and M/D/YYYY does not sort
+lexicographically either, so a `>=` string compare is wrong too (the `nyc-dob-permit-issuance` trap).
+The socrata connector has `recency_expr` for exactly this; **arcgis has no equivalent** — building one
+is the durable fix and would retire all three constants.
+
+**January action:** extend Worcester's window to include the new year (and consider dropping the
+oldest), or ship `recency_expr` for arcgis and delete the constant. Verify after by counting
+`LIKE '%/<new year>'` with the layer total as a positive control.
+
+*(Audited across all 149 entries: 51 further arcgis entries carry no `recency_days` at all, which is a
+different and deliberate choice — most are "active projects" layers where every row is current by
+construction. Those are not on this list.)*

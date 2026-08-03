@@ -10210,6 +10210,53 @@
       "recency_days": 365,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-01: City of Bend's OWN AGO org (JisFYcK2mIVg9ueP, owner CityofBendOR), layer Permit_Applications_Point/0, item modified 2026-07-31. 164,845 rows, esriGeometryPoint. BOTH vocabularies SUM EXACTLY TO 164,845: StatusDesc (21) = Closed 122795 + Permit(s) Issued 26426 + Expired 6116 + Withdrawn 3192 + Expired Application 2538 + Canceled 1689 + Finaled 832 + Preparing for Issuance 381 + In Plan Check 311 + Returned for Correction 113 + Denied 111 + Submittals Incomplete 76 + VOID 61 + Pending 57 + On Hold 45 + Intake Pre-Screen 31 + Issued 24 + Revision Correction 17 + Revision Submittals Incomplete 12 + Pre-Screen 12 + Complete 6, all 21 bucketed exactly once; BuildingCategory (3) = Other 85957 + Residential 64537 + Commercial/Industrial 14351 = 0 unclassified. 'Other' is GENERIC and is written as 'Development', the generic member of the closed TYPE_EXACT vocabulary in lib/map.js -- never guessed into Residential/Commercial. FRESHNESS REQUIRED THE WINDOWED COUNT, NOT max(): max(IssueDate) returns 2013379200000 ms = 2033-10-08, a CORRUPT FUTURE DATE (the Hawaii-County year-5005 / Naperville-year-2626 class), so the max is a lie. The real freshness receipt is the BOUNDED count -- IssueDate between 2025-08-01 and 2026-08-02 returns 3,853 rows, which is also exactly what recency_days 365 will fetch. NO ZIP COLUMN: the ZIP is embedded in the free-text Address ('2348 NW AWBREY RD 97703'), so spatial_zip_radius_mi 3 is used; records place by their OWN points and no geocoding is involved. Stored spatialReference is wkid 2270 (Oregon South ft) -- irrelevant under outSR=4326; a live sample returned x -121.3169 / y 44.0702 (Bend OR). record_url is dataset precision on the layer's own verified-200 URL because www.bendoregon.gov returns HTTP 403 behind a bot-check interstitial from our egress -- the Peoria precedent. TARGETS 10 DARK PAGES in OR/Deschutes. FOUND BY THE SEARCH INVERSION (title-shape sweep, sorted newest-modified)."
+    },
+    {
+      "registry_id": "worcester-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/j8dqo2DJE7mVUBU1/arcgis/rest/services/Building_Permits/FeatureServer/0",
+      "dataset_url": "https://services1.arcgis.com/j8dqo2DJE7mVUBU1/arcgis/rest/services/Building_Permits/FeatureServer/0",
+      "jurisdiction": "City of Worcester, Massachusetts",
+      "coverage": [
+        {
+          "state": "MA",
+          "county": "Worcester"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Record_Type",
+          "Permit_For"
+        ],
+        "status_raw": "Record_Status",
+        "type_source": "Occupancy_Type",
+        "file_date": "Permit_License_Issued_Date",
+        "address": "Address",
+        "case_number": "Record__"
+      },
+      "zip_where_template": "Address LIKE '%{zip}%'",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Active"
+        ],
+        "operating": [
+          "Complete"
+        ],
+        "exclude": []
+      },
+      "type_map": {
+        "Residential": "Residential",
+        "1 or 2 Family Dwelling": "Residential",
+        "3+ Family or Multi Family Dwelling": "Residential",
+        "Commercial": "Commercial",
+        "Commercial / Mixed Use": "Commercial",
+        "Educational": "Civic/Public",
+        "Municipal": "Civic/Public"
+      },
+      "extra_where": "(Permit_License_Issued_Date LIKE '%/2025' OR Permit_License_Issued_Date LIKE '%/2026')",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-02 REPROBE-LIST REVIVAL. Recorded 2026-07-15 as 'Worcester -- STALLED (the St. Paul class): a real 52,108-row ledger but newest issuance 2025-09-09 (10 months stale)'. THAT RECORD IS NOW FALSE -- the source resumed. Freshness measured WITHOUT ordering on the date column, because every date here is a STRING in M/D/YYYY and ordering it is lexicographic (the nyc-dob-permit-issuance trap): counted by year suffix instead, with the total as a positive control -- LIKE '%/2026' = 2,467, LIKE '%/2025' = 5,015, total = 52,299 (grown from the recorded 52,108). Three-part liveness: NAME clean (service Building_Permits, Record_Type 'Building Permit'); DATES recent (2,467 issued in 2026); ENTITY correct (sample Address '202 MAY ST Worcester MA 01602', MBL 14-002-00017 -- Worcester MA, not a lookalike). BOTH VOCABULARIES ARE CLOSED AND SUM TO EXACTLY 52,299: Record_Status = Complete 34,223 + Active 18,076 (2 values, no others); Occupancy_Type = Residential 38,613 + Commercial 8,914 + null 3,688 + '1 or 2 Family Dwelling' 623 + Educational 270 + '3+ Family or Multi Family Dwelling' 100 + 'Commercial / Mixed Use' 62 + Municipal 29. Complete -> operating (finaled work is built); Active -> approved (permitted and in progress, the boston Open->approved convention). The 3,688 null Occupancy_Type rows carry no type and fall through rather than being guessed. GEOMETRY-LESS TABLE (layer metadata returns no geometryType; the only fields are Record__, Record_Type, Permit_For, Date_Submitted, Record_Status, Address, MBL, Occupancy_Type, Permit_License_Issued_Date, Contractor_Name, ObjectId), so it rides the anaheim-land-use-cases path: scoped by zip_where_template against the ZIP inside the Address string, with the engine geocoding the address for a point. record_url_precision is 'dataset' -- there is no per-record URL column and Worcester's permit search is not addressable per Record #, so templating one would be guessing. RECENCY IS A LIKE WINDOW, NOT recency_days, AND IT IS AN ANNUAL MAINTENANCE ITEM: Permit_License_Issued_Date is a String in M/D/YYYY, so recency_days' DATE literal cannot apply (the frisco-active-building-permits standing answer) and M/D/YYYY does not sort lexicographically either, so the socrata recency_expr trick has no arcgis equivalent. The 2025+2026 window yields 7,482 rows; EXTEND IT when 2027 opens or the source silently truncates to nothing."
     }
   ],
   "ckan": [
