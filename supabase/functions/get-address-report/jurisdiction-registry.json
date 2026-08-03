@@ -10299,6 +10299,49 @@
         "operating": [],
         "exclude": []
       }
+    },
+    {
+      "registry_id": "chester-county-pa-act247-plans",
+      "platform": "arcgis",
+      "service_url": "https://gisprodops.chesco.org/server/rest/services/Planning_Services/Plan_Act247_AGOL_D/MapServer/5",
+      "dataset_url": "https://www.chescoplanning.org/PlanReview/PlanReview.cfm",
+      "jurisdiction": "Chester County, Pennsylvania",
+      "coverage": [
+        {
+          "state": "PA",
+          "county": "Chester"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PLAN_TITLE"
+        ],
+        "type_source": "PRIMARY_USE",
+        "case_number": "PLAN_NUM",
+        "file_date": "SUBMIT_DATE",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 3,
+      "status_const": "Submitted for county review",
+      "status_to_bucket": {
+        "proposed": [
+          "Submitted for county review"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "type_map": {
+        "Residential": "Residential",
+        "Commercial": "Commercial",
+        "Institutional": "Civic/Public",
+        "Industrial": "Industrial",
+        "Agricultural": "Development"
+      },
+      "recency_days": 1825,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-03 PA/Chester wire. FOUND VIA THE COUNTY'S OWN PUBLISHED GIS HUB after nine guessed hostnames (gis./arcgis./maps.chesco.org and six more) all failed DNS -- unreachable-by-guess is a NON-VERDICT, never a rejection. Real host gisprodops.chesco.org (ArcGIS 11.3), copyright 'Chester County Planning Commission'. Chester is 34 of PA's dark pages (its other 5 are New Castle County DE border spill at a declared 5-mi radius, not its own coverage). MERGED-LAYER TRAP, CLOSED BY ARITHMETIC -- THIS IS WHY LAYER 5 AND NOT 2/3/4: the service exposes PROPOSED_LAND_DEVELOPMENTS (1,563) + PROPOSED_SUBDIVISIONS (2,105) + PROPOSED_CONDITIONAL_USE (58) = 3,726 EXACTLY = PROPOSED_PLANS_MERGED (layer 5, its own returnCountOnly). The three parts are therefore disjoint and exhaust the union, so wiring any part ALONGSIDE layer 5 would double-emit every row -- the houston-plat-applications class, which exact-identity dedup cannot catch across two source_registry_ids. Layer 10 (Act247_1999_2009, 5,471) is a separate historical archive, not wired. LIVENESS, all three parts: name clean; entity correct (the Planning Commission's own Act 247 docket on the county's own server); dates fresh -- newest SUBMIT_DATE 2026-07-30, then 07-28 and 07-23. FIELD CHOICES FROM LIVE NON-NULL COUNTS, NOT FROM THE SCHEMA (a merged layer populates fields per subset -- the UDOT lesson): SUBMIT_DATE 3,726/3,726 (100%), PLAN_TITLE 3,725, PRIMARY_USE 3,722, REVIEW_DATE 3,708, PROJECT_NAME 3,701. SUBMIT_DATE is a REAL esriFieldTypeDate, so unlike the Delaware County entry's integer Year this carries day precision and recency_days' DATE literal applies directly (no Anaheim string-compare workaround). PRIMARY_USE IS A CLOSED VOCABULARY summing exactly to the layer count: Residential 1,888 + Commercial 864 + Institutional 470 + Industrial 280 + Agricultural 220 + null 4 = 3,726. Mapped into the CLOSED use_type set (lib/map.js::TYPE_EXACT): Institutional -> 'Civic/Public'; AGRICULTURAL -> 'Development' because the set has NO agricultural member and 'Development' is the generic that renders the 'Other project' circle (the Phoenix precedent) -- forcing it into Industrial would be a guess that changes the pin SHAPE. The 4 nulls carry NO type rather than a defaulted one. STATUS IS A CONST because the layer has no status column, and per the defect found the same day on delaware-county-pa it is a SELF-DESCRIBING value that is ALSO A KEY IN status_to_bucket: arcgis status_const is the RAW value resolved through the map (arcgis.ts:300-304), unlike socrata where it IS the bucket. Every row is a plan SUBMITTED for county review, whose recommendation is advisory while the municipality decides -- it does not assert approval. POLYGON geometry, so it rides the shipped featurePoint() shoelace-centroid path and column_map.lat/lng are mapped to __lat/__lng -- WITHOUT which every record silently lands on the ZIP centroid at scope 'area' (the sussex-county-de-conditional-use defect). Verified live on the connector's own query: 2/2 returned features carry geometry.rings. SCOPING IS SPATIAL because the layer carries no zip and no address column. RULE 13 -- PROBED IN THE CONNECTOR'S OWN SCOPE, not a looser one: the exact envelope params (geometryType=esriGeometryEnvelope, inSR=4326, spatialRel=esriSpatialRelIntersects) with envelopes computed by the connector's own envelopeFor() math at 3 mi, and the same DATE literal recency_days 1825 emits. Results with a NON-ZERO CONTROL: 19301 unfiltered 381 (control) -> 95 windowed; 19310 34; 19087 32. Window sizing measured county-wide: 627 rows in 3y, 1,095 in 5y, 2,253 in 10y of 3,726; 5y chosen because plan review is slow-moving. record_url_precision 'dataset': there is no per-plan lookup URL. dataset_url is the Planning Commission's OWN Act 247 Plan Review page (verified live, HTTP 200, <title>Plan Review</title>), chosen over the GIS hub's landing page because that hub page describes ONLY layer 2 and would mislabel the subdivision and conditional-use records this merged layer also carries. The county's energov.chesco.org ePortal was NOT templated into a per-record URL -- that would be guessing. NEW STANDING ANSWER: DCAT 'modified' IS METADATA STALENESS, NOT DATA STALENESS -- this dataset's catalogue entry reads modified 2021-08-31 while its newest record is 2026-07-30. Rejecting on the catalogue timestamp would have been a false negative on a live, fresh source."
     }
   ],
   "ckan": [
