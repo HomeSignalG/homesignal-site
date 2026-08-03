@@ -369,8 +369,33 @@ pre-measure against dark ZIPs → wire → deploy → recache → **materialize*
   `out_fields` pass must strip quoted literals first **and** be verified against each layer's
   live `fields` list before it is written.
 
-### 0c. FIRE-TIMEOUT — a third invisible failure, one layer further out — **OPEN**
-- **State:** measured, not fixed. Neither guard can see it.
+### 0c. FIRE-TIMEOUT — a third invisible failure, one layer further out — **VISIBILITY DONE**
+- **State:** attribution **DONE** (migration `dev_refresh_fire_failure_visibility`). Recovery of
+  the three stuck pages is **OPEN and needs a founder call** — see "the actual blocker" below.
+- `dev_refresh_inflight` records `request_id -> zip` at FIRE time (a timeout has no payload and
+  therefore no zip — it cannot be attributed after the fact); `dev_refresh_log_fire_failures`
+  joins the response back and logs `kind='fire_failed'` (NULL status) / `'fire_http_error'`.
+  `dev_refresh_tick` now runs collect -> log_fire_failures -> fire.
+- **Proved by forcing it:** three ZIPs fired with an impossible 1 ms timeout, all landed
+  `status_code NULL`, all three attributed with error text + cached_records + request_id;
+  inflight cleared to 0. Before this they were invisible.
+- ⚠️ **THE TIMEOUT WAS NOT THE BLOCKER.** Fired ALONE, 55103 returns **200 in seconds, 16 kB**,
+  counts `{facilities 40, development 0, civic 2}` — engine healthy, retired entry already gone
+  from its output. The 90 s overruns are **concurrency queuing** behind the tick's 250-way
+  fan-out, the same trigger as the Portland resets.
+- 🔴 **THE ACTUAL BLOCKER IS THE 7-DAY TRANSIENT GUARD** — and it is refusing a *correct*
+  reduction. The clean 200 carries `development: 0` (right: the entry was retired), the cache
+  says 20,000, the row is 5 days old, so the guard refuses. Verified live: collect returned 220
+  rows updated and 55103 stayed at 20,042 sites / `refreshed_at` 2026-07-29. **A legitimate
+  reduction and a transient collapse are identical by COUNT alone** — the same shape as
+  `fetched: 0` meaning both "found nothing" and "could not be reached".
+  Self-heals **2026-08-05 04:15Z** (refreshed_at + 7 days), by accident not design.
+- **Resident impact is NOT contained** (checked, per the founder's note): `app_projects` holds
+  zero saint-paul rows, but `homesignalmap.html:1055` reads `development_reports` **directly**,
+  so those three pages render ~40,000 retired-entry records — 55103 20,000 of 20,042 sites
+  (99.8%), 55109 10,968 of 10,995, 55119 10,942 of 10,952; all carry `record_url`, ~19,483 /
+  10,364 / 10,342 pinned.
+- **Old note retained for context:** measured, not fixed. Neither payload guard can see it.
 - `net.http_post` fires with a 90 s timeout; an overrun lands in `net._http_response` with
   **`status_code` NULL**, and `dev_refresh_collect` filters `where status_code = 200`. The row is
   never updated and nothing records why. Receipt (18:00Z): `Timeout of 90000 ms reached. Total

@@ -321,3 +321,72 @@ $$;
 --   2. row COUNT is not the discriminator — 80011 (20,051 sites / 18 MB) collects fine while
 --      55109 (10,995 / 11 MB) never does, so the binding constraint is upstream host SPEED,
 --      not volume. A global max_rows would not have fixed either.
+
+
+-- ============================================================================
+-- PART 3 (2026-08-03) — FIRE-LEVEL FAILURE VISIBILITY  (the THIRD instance)
+-- migration: dev_refresh_fire_failure_visibility
+-- ============================================================================
+--
+-- `net.http_post` fires with a 90 s timeout. An overrun lands in net._http_response with
+-- **status_code NULL and no content**, and dev_refresh_collect selects `where status_code = 200`
+-- — so it is skipped in silence. NEITHER earlier guard can see it: both read the PAYLOAD, and a
+-- timeout has no payload. Same class, third instance.
+--
+-- A timeout also carries no `zip`, so it cannot be attributed after the fact. Hence
+-- `dev_refresh_inflight`: dev_refresh_fire_batch records request_id -> zip AT FIRE TIME, and
+-- dev_refresh_log_fire_failures joins net._http_response back to it, logging every fired request
+-- that did not return 200 as kind='fire_failed' (NULL status) or 'fire_http_error'. Rows are
+-- cleared only once their response has LANDED, with a 6 h backstop for pg_net's own purges.
+-- dev_refresh_tick now runs collect -> log_fire_failures -> fire.
+--
+-- PROOF (2026-08-03, forced): three ZIPs fired with an impossible 1 ms timeout, all landed
+-- status_code NULL, all three attributed —
+--   55103 fire_failed 'Timeout of 1 ms reached…' cached_records 20042 request_id 4586
+--   55109 fire_failed 'Timeout of 1 ms reached…' cached_records 10995 request_id 4587
+--   55119 fire_failed 'Timeout of 1 ms reached…' cached_records 10952 request_id 4588
+-- dev_refresh_inflight cleared to 0. Before this, all three were invisible.
+
+-- ============================================================================
+-- ⚠️ DO NOT "FIX" THE STUCK PAGES WITH A max_rows CAP — VOLUME IS NOT THE CONSTRAINT
+-- ============================================================================
+-- Measured 2026-08-03, and recorded because a cap is the intuitive wrong answer:
+--   * 80011 — 20,051 sites / 18 MB — collects fine on every tick.
+--   * 55109 — 10,995 sites / 11 MB — has never collected in five days.
+-- Half the volume, permanently stuck. **Host SPEED binds, not row count**, so no per-entry or
+-- global max_rows would have fixed either page.
+--
+-- And the three stuck ZIPs are not too big to fetch at all. Fired ALONE, 55103 returns
+-- **200 in seconds, 16 kB**, counts {facilities 40, development 0, civic 2} — the engine is
+-- healthy and the retired entry is already gone from its output. The 90 s overruns are
+-- CONCURRENCY QUEUING behind the tick's 250-way fan-out, the same trigger as the Portland
+-- connection resets.
+
+-- ============================================================================
+-- THE ACTUAL BLOCKER ON THOSE THREE PAGES IS THE 7-DAY TRANSIENT GUARD — measured, not fixed
+-- ============================================================================
+-- With the timeout removed from the picture, the clean 200 above STILL does not land. Its
+-- `development` is 0 (correctly — `saint-paul-approved-building-permits` was retired from
+-- jurisdiction-registry.json), the cached value is 20,000, and the row is 5 days old, so:
+--
+--   and not ( d.refreshed_at >= now() - interval '7 days'
+--         and coalesce((j->'counts'->>'development')::int,0) = 0
+--         and coalesce((d.counts->>'development')::int,0) > 0 )
+--
+-- refuses it. Verified live: dev_refresh_collect() returned 220 rows updated and 55103 stayed at
+-- 20,042 sites / refreshed_at 2026-07-29.
+--
+-- This is the guard doing exactly what it was written to do, on a case it cannot distinguish:
+-- **a legitimate reduction and a transient collapse are identical by COUNT alone** — the same
+-- shape as `fetched: 0` meaning both "found nothing" and "could not be reached".
+--
+-- It self-heals at 2026-08-05 04:15Z (refreshed_at + 7 days), by accident rather than design.
+-- Until then those three pages render ~40,000 records from the retired entry:
+--   zip    total sites   from the retired entry   with record_url   pinned
+--   55103  20,042        20,000  (99.8%)          20,000            19,483
+--   55109  10,995        10,968  (99.8%)          10,968            10,364
+--   55119  10,952        10,942  (99.9%)          10,942            10,342
+-- NOT contained to the materialized layer: homesignalmap.html:1055 reads
+-- `development_reports` DIRECTLY (`/rest/v1/development_reports?zip=eq.…&select=…,sites,…`),
+-- so residents see them. `app_projects` holding zero saint-paul rows only tells us the app
+-- surface is clean.

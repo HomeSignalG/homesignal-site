@@ -127,5 +127,20 @@ console.log('\n6) BOUNDED FETCH — a cap must be distinguishable from a complet
   ok('truncation is logged as non-blocking', /'truncated',\s*$|false, 'truncated'/m.test(sql));
 }
 
+console.log('\n7) FIRE-LEVEL failures — a NULL status_code must be attributable, not skipped');
+{
+  const sql = readFileSync(new URL('../docs/dev-refresh-source-failure-guard.sql', import.meta.url), 'utf8');
+  // A pg_net timeout has NO payload and NO zip, so it can only be attributed from a map
+  // recorded at FIRE time. Without that, the failure is unattributable and therefore invisible.
+  ok('SQL declares dev_refresh_inflight (request_id -> zip, at fire time)',
+    /dev_refresh_inflight/.test(sql));
+  ok('SQL declares dev_refresh_log_fire_failures', /dev_refresh_log_fire_failures/.test(sql));
+  ok('a NULL status_code is logged as its own kind', /'fire_failed'/.test(sql));
+  ok('a non-200 status_code is logged distinctly', /'fire_http_error'/.test(sql));
+  // The intuitive wrong answer, pinned so a future session does not ship it.
+  ok('SQL records that VOLUME is not the binding constraint',
+    /VOLUME IS NOT THE CONSTRAINT/.test(sql) && /Host SPEED binds, not row count/.test(sql));
+}
+
 console.log(fail ? `\n${fail} check(s) FAILED` : `\nAll ${pass} fetch-failure-reason-contract checks passed.`);
 process.exit(fail ? 1 : 0);
