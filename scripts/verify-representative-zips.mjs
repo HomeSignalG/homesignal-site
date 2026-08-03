@@ -11,6 +11,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { surfaceBanner } from './lib/surface-banner.mjs';
 import {
   REPRESENTATIVE_ZIPS,
   validRecordUrl,
@@ -332,6 +333,7 @@ async function verifyZipPage(page, spec, cached) {
 }
 
 async function main() {
+  surfaceBanner('verify-representative-zips');
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const report = {

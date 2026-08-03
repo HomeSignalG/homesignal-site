@@ -5,6 +5,7 @@
 // Env: SAMPLE (optional cap on ZIP walk for smoke runs)
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { surfaceBanner } from './lib/surface-banner.mjs';
 
 const cfg = readFileSync(new URL('../config.js', import.meta.url), 'utf8');
 const grab = (n) => {
@@ -81,6 +82,7 @@ function resolveGovTopics(communitiesById, zipRows) {
 }
 
 async function main() {
+  surfaceBanner('verify-alerts-categories');
   console.log('Loading communities…');
   const communities = await restAll('communities', 'id,name,level,parent_id,state,government_topics,zip_codes', 'id');
   const byId = new Map(communities.map((c) => [c.id, c]));

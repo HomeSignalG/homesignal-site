@@ -4,6 +4,8 @@
 // Offline: replays the (record_kind, type, status) universe snapshot below.
 // Live:    pulls N development rows from app_projects (name + source_ref) to measure
 //          keyword recovery on generic source types and per-feed circle rates.
+import { surfaceBanner } from './lib/surface-banner.mjs';
+surfaceBanner('audit-marker-symbology');
 
 global.window = { HS: {} };
 await import('../lib/templates.js');

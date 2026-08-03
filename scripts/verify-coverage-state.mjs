@@ -15,6 +15,8 @@
 //      data-coverage-state attribute matching the view, layout gate unchanged.
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
+import { surfaceBanner } from './lib/surface-banner.mjs';
+surfaceBanner('verify-coverage-state');
 
 const SITE_BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
 const cfg = readFileSync(new URL('../config.js', import.meta.url), 'utf8');

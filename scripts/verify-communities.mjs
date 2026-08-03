@@ -22,6 +22,7 @@
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { assertCommunityRow, indexable } from './lib/verify-communities-assert.mjs';
+import { surfaceBanner } from './lib/surface-banner.mjs';
 import {
   loadZipStateCrosswalk,
   assertQuarantineIsHonest,
@@ -149,6 +150,7 @@ async function verifyZipStateModel() {
 }
 
 async function main() {
+  surfaceBanner('verify-communities');
   // NATIONWIDE SUBSTANCE GATE (PLAN.md §11, founder-approved threshold c): every
   // materialized page is verified against its materializer-stamped `indexable` flag —
   // pass AND (dev-backed OR >=3 facilities), ONE rule computed in SQL and read by the

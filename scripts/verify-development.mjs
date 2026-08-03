@@ -21,6 +21,7 @@
 
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { surfaceBanner } from './lib/surface-banner.mjs';
 import {
   assertZip,
   summarizeSourceReports,
@@ -242,6 +243,7 @@ async function renderZipPage(page, zip) {
 }
 
 async function main() {
+  surfaceBanner('verify-development');
   let reports = await loadReports();
   reports.sort((a, b) => a.zip.localeCompare(b.zip));
   if (SAMPLE > 0) reports = reports.slice(0, SAMPLE);

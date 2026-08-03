@@ -29,6 +29,7 @@
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { surfaceBanner } from './lib/surface-banner.mjs';
 
 const VINTAGE = process.env.CENSUS_VINTAGE || 'Current_Current';
 const SAMPLE = process.env.SAMPLE ? parseInt(process.env.SAMPLE, 10) : 0;
@@ -275,6 +276,7 @@ function emitBatched(lines, log) {
 }
 
 async function main() {
+  surfaceBanner('verify-geocodes');
   const { SUPABASE_URL, APIKEY } = getConfig();
   const sb = (path) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` } });
   const radiusConnectors = loadRadiusConnectors();

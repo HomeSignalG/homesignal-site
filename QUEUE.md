@@ -416,31 +416,58 @@ pre-measure against dark ZIPs → wire → deploy → recache → **materialize*
   effect of their centroids (97208 is a downtown P.O.-box ZIP). Their sibling ZIPs recovered fully
   (97209 136 · 97213 323 · 97214 407 · 97215 414 · 97218 196 · 97219 116 · 97239 178).
 
-### 0d. SURFACE-TABLE MATRIX — "what residents see" is ambiguous by construction — **OPEN**
-- **State:** matrix drafted below from code (grep + reading `app_refresh_zip` and
-  `homesignalmap.html:1055`). A full pass over every read path is still owed.
-- **Why it exists:** `app_projects` being clean did NOT mean residents were safe. Every
-  "what do residents see" check today was against `app_projects`, while the development map
-  reads `development_reports` **directly**. The three St. Paul pages were clean on one surface
-  and 99.8% retired-entry data on the other, at the same moment.
+### 0d. SURFACE-TABLE MATRIX — **RULED: both tables authoritative; verifiers now declare their surface**
+- **Founder ruling (2026-08-03):** both tables are authoritative, each for its own surface. The
+  materializer's caps exist deliberately for list pages; the map genuinely needs every site.
+  **The divergence is design, not defect, and is not being collapsed.** What was missing was that
+  no verification declared which surface it spoke about — that is what was fixed.
+- **DONE:** `scripts/lib/surface-banner.mjs` + a `surfaceBanner('<name>')` call as the first line
+  of every verifier's `main()` (all **16** instrumented). Output header now reads e.g.
+  `verify-development: surface = map page (homesignalmap.html?zip=), table = development_reports +
+  app_community_meta + property_reports [UNCAPPED (cache the page reads)]`.
+  Pinned by `test/verifier-surface-declaration.test.mjs` (103 checks): every verifier imports and
+  calls it, every declaration is complete, a raw-cache reader must be marked UNCAPPED and a
+  materialized reader CAPPED, an undeclared name **throws** rather than printing nothing.
 
-| Surface | Reads | Capped? |
-|---|---|---|
-| `homesignalmap.html?zip=` (dev map) | **`development_reports.sites`** (line 1055) + `app_community_meta`, `communities`, `property_reports` | **NO — every site in the row** |
-| `homesignalmap.html?addr=` | live engine + `property_reports` | n/a |
-| `development/properties/property/today/alerts/community/dashboard/index.html` | `lib/data.js` → **`app_projects`**, **`app_changes`**, `app_community_meta`, `meetings`, `communities` | **YES — materializer caps** |
-| `scripts/gen_sitemap.py` | `development_reports` | n/a |
-| verifiers | `verify-development` → `development_reports` + `app_community_meta` · `verify-alerts-page` → `app_changes` + `alerts` · `verify-maps-uncap`, `audit-marker-symbology`, `verify-facility-entity`, `source-monitor` → `app_projects` · `verify-coverage-state` → `app_community_meta` | split |
+**Read-path audit — done from the code, not grep** (each page's actual `HS.data.*` calls and
+direct `rest/v1/` fetches):
 
-- **The divergence is structural, not a bug.** `app_refresh_zip` has **five** inserts, not one
-  (an earlier note in this session said one — wrong): app_projects `record_kind='development'`
-  (`relevance='development' AND scope='point'`), app_projects `record_kind='facility'`
-  (`relevance NOT IN ('development','civic')`), then app_changes for planning & zoning
-  **`limit 6`**, civic **`limit 6`**, meetings **`limit 8`**, government notices **`limit 48`**,
-  local news **`limit 48`**. The map page applies none of those caps or filters.
-- **Consequence:** a verification that passes on one table says nothing about the other, and
-  every verification run to date inherits that ambiguity. Needs: a decision on which table is
-  authoritative per surface, and verifiers that name their surface explicitly.
+| Page | Direct | Via `lib/data.js` | Underlying tables | Verifier |
+|---|---|---|---|---|
+| `homesignalmap.html` | **`development_reports` (UNCAPPED)**, `app_community_meta`, `communities`, `property_reports` | — | raw cache | verify-development · verify-representative-zips · audit-official-links · verify-geocodes · verify-maps · verify-map-markers |
+| `community.html` | — | community, coverageState, coverageStatus, projects, facilities, changes, meetings | app_projects, app_changes, app_community_meta, meetings, communities | verify-communities · verify-coverage-state |
+| `alerts.html` | — | community, changes, news, meetings | app_changes, meetings | verify-alerts-page · verify-alerts-categories |
+| `development.html` | — | community, projects, facilities, meetings | app_projects, app_changes, meetings | verify-facility-entity · verify-maps-live |
+| `dashboard.html` | — | community, projects, changes, meetings | app_projects, app_changes, meetings | verify-map-markers (partial) |
+| `properties.html` | — | projects, changes | app_projects, app_changes | **NONE** |
+| `property.html` | — | projects, changes, envRisk | app_projects, app_changes | **NONE** (verify-development §4.5 covers `property_reports`, not the page) |
+| `today.html` | — | community, projects, changes, meetings | app_projects, app_changes, meetings | **NONE** |
+| `index.html` | — | isCovered, changes | app_community_meta, app_changes | **NONE** |
+| `maps.html` | — | community, projects, facilities, changes, meetings | app_projects, app_changes, meetings | **NONE** |
+| `reports.html` | — | community, projects | app_projects | **NONE** |
+
+- 🔴 **SIX SURFACES HAVE NO VERIFIER** — `properties.html`, `property.html`, `today.html`,
+  `index.html`, `maps.html`, `reports.html`. Listed in `UNVERIFIED_SURFACES` and asserted by the
+  test so the list cannot quietly go stale. **That is where the next silent defect lives.**
+- **Why the caps matter when reading a result:** `app_refresh_zip` has **five** inserts — app_projects
+  `development` (`relevance='development' AND scope='point'`), app_projects `facility`
+  (`relevance NOT IN ('development','civic')`), then app_changes planning & zoning **limit 6**,
+  civic **limit 6**, meetings **limit 8**, government notices **limit 48**, local news **limit 48**.
+  A row absent from `app_changes` may be a CAP, not an absence.
+
+### 0e. ROW-SIZE DETECTOR — retired/stale entries at scale — **RUN, CACHE IS CLEAN**
+- Founder's suggestion: a `development_reports` row far larger than its peers is a cheap signal.
+  Confirmed cheap — use **`pg_column_size(sites)`** (compressed, no detoast) and it runs over all
+  12,722 rows in seconds; `length(sites::text)` times out.
+- **Baseline 2026-08-03:** p50 **2,298 bytes** · p99 **480 kB** · max **1,979 kB** stored ·
+  **25 rows over 1 MB** stored. 55103 was the largest at 20 MB uncompressed before the clear.
+- **Direct check beats the proxy, and it is also cheap:** cached `source_registry_id` values with
+  no entry in the live registry → **0 cache-wide**. Positive control in the same chain: the
+  unfiltered query returns **143** distinct source ids over 12,722 rows against **151** registry
+  entries, so the query reaches real data and the exclusion list is complete.
+  `saint-paul-approved-building-permits` was the 144th and is gone. **No other retired entry is
+  lingering anywhere.**
+- Worth a periodic check; not urgent while the retired-entry count is 0.
 
 ### 1. DB-01 — `public.communities` planner-statistics diagnosis
 - **State:** **DONE** (2026-07-30) — recorded in workbook 0071 rows 399–401; row 397 marked

@@ -6,6 +6,8 @@
 // VERIFICATION ONLY — no product code is touched by this script.
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { surfaceBanner } from './lib/surface-banner.mjs';
+surfaceBanner('verify-maps-live');
 
 const BASE = process.env.SITE_BASE || 'https://homesignal.net';
 const R = []; const ok = (n, c, extra) => R.push({ check: n, pass: !!c, extra: extra || '' });
