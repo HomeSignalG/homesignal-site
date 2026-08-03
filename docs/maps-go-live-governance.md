@@ -705,6 +705,47 @@ a transient outage read of Columbus showed 13,231 records / 39 unclassified wher
 records and **0** unclassified, 5 pages still on pre-deploy timestamps carrying all 45). **The split by
 `refreshed_at` is what made the number interpretable — the totals alone were not.**
 
+### ANCHOR A MEASUREMENT ON A FIXED SET, NEVER ON "ROWS THAT CURRENTLY CARRY X" (2026-08-03)
+
+**A query shaped like this reports a SUBSET as a TOTAL:**
+
+```sql
+with pages as (select distinct zip from development_reports r, jsonb_array_elements(r.sites) s
+               where s->>'source_registry_id' = 'X')          -- ← evaluated AFTER the change
+select count(*), sum(...) from pages join development_reports using (zip)
+```
+
+The denominator is computed from the post-change data, so **any page the change reduced to ZERO drops
+out of its own denominator** and the "total" silently describes only the survivors. It is the
+measurement-time twin of the retry-selector bug (selecting "pages still dark" cannot see a page that
+should have gone dark), and it fails in the same direction: invisibly.
+
+**Anchor on a set that cannot move:** the pinned pre-change ZIP list, or the entry's declared coverage
+(`communities` rows for its state/county). Then a page at zero still appears, as a zero.
+
+*The case:* measuring the include_types enforcement, Columbus and Chester were anchored on fixed
+baseline ZIP lists and reproduced exactly under independent verification; Cincinnati, Nashville and the
+first Portland pass used the moving shape. Portland's was caught because its coverage is 83 pages while
+the moving CTE saw only 12 — a 6x discrepancy too large to miss. Cincinnati's and Nashville's happened
+not to distort the totals (no page reached zero), which is precisely why the shape is dangerous: it is
+correct until the moment it matters.
+
+### THE COMPLETION SIGNAL IS SOUND — `refreshed_at` CANNOT BE ADVANCED WITHOUT A FETCH (verified 2026-08-03)
+
+Challenged and checked, because the rest of this session's verification rests on it. **`refreshed_at` is
+written in exactly ONE place:** `dev_refresh_collect()`'s `UPDATE`, joined to a row in `net._http_response`
+with `status_code = 200` and `mode = 'zip'`. No fire path, no retry path, no bulk stamp touches it —
+`dev_refresh_fire_batch` writes `last_refresh_attempt_at`, a different column.
+
+⚠️ **A `grep`/`ilike` for `%refreshed_at%` MATCHES `last_refresh_attempt_at` as a substring** and will tell
+you the fire path writes it. It does not. (CLAUDE.md: "a count / grep is a LEAD, not a fact" — this is
+that rule biting inside the verification of the rule.)
+
+**Identical microsecond timestamps across many rows are EXPECTED, not suspicious.** One `UPDATE` is one
+transaction and `now()` is transaction-start time, so a single collect stamps every row it touches with
+the same value. 66 pages sharing a stamp means one collect call, not a fetch-less bump. Timestamps spread
+out only when collect is invoked repeatedly.
+
 ### Measurement discipline
 - **Capture the baseline BEFORE mutating what you intend to measure** — a post-deploy refresh
   destroyed the pre-deploy Arlington rows and cost the clean −397 figure.
