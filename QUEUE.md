@@ -5233,7 +5233,7 @@ planning-commission host.** Two of the three named counties fell to it immediate
 
 | county | dark | outcome of pass 3 |
 |---|---|---|
-| **Chester** | 34 (of 39; the other 5 are New Castle border spill) | ✅ **SOURCE FOUND + FULLY ENUMERATED** — `gisprodops.chesco.org` Act 247 docket. Wire **layer 5 only** (1,563+2,105+58 = 3,726 exactly = the merged layer, so parts + union would double-emit). Vocab closed, dates fresh 2026-07-30, `SUBMIT_DATE` is a real Date at 100%. Ready to write. |
+| **Chester** | 34 (of 39; the other 5 are New Castle border spill) | ✅ **WIRED, DEPLOYED, MEASURED → 34 dark = 0.** `chester-county-pa-act247-plans` (registry 150→151), layer 5 only. 39/39 pages carry it, 2,475 rows, 0 missing record_url/coords/use_type/**file_date**, 0 outside gate. PR #574. |
 | **York** | 47 (of 47) | ✅ **SOURCE FOUND, LIVE, FRESH** — the earlier "real host that does not answer" was the **wrong host**: `yorkcountypa.gov` is the county portal, `arcweb1.ycpc.org` is the **Planning Commission**. 26,879 rows, POINT geometry, newest `DATE_RCVD` 2026-07-27. **Open design question before wiring: type is 8 YES/NO flags, not a column**, so a precedence rule must be chosen (it drives the pin SHAPE). |
 | **Centre** | 35 | ✅ **SOURCE FOUND, FRESH** — `gissites4.centrecountypa.gov` `Building_Permits/MapServer/2`, 60,098 rows, 669 permits dated 2026 / 1,745 in 2025. ⚠️ **Its HUB does not list this layer** (100 datasets, 0 hits) — only the server's own root listing has it. Dates are `M/D/YYYY` STRINGS, so no `recency_days`; `OBJECTID DESC` is not date order. |
 | Lancaster | 56 | ❌ **REJECTED — enumerated across 3 surfaces.** PASDA 22 layers, own server (`arcgis.` not `gis.`) 92+37=129 services, hub 4 admin pages. Zero activity layers; only zoning/planning-area boundaries. May be publishes-PRIVATELY (it sells "Paid Data"), which probing cannot reach. |
@@ -5249,12 +5249,17 @@ planning-commission host.** Two of the three named counties fell to it immediate
 decided on enumeration: 1 wired (Delaware), **3 sources found** (Chester 34 · York 47 · Centre 35 =
 **116 dark pages**), 2 firm rejections (Bucks stale, Lancaster absent).
 
-Readiness order:
-1. **Chester** — ready to write now. Wire layer 5 ONLY (the arithmetic proof above).
-2. **Centre** — ready to write after enumerating `Permit_Type` and `Open_Y_N`. String `M/D/YYYY` dates,
-   so recency rides `extra_where`, never `recency_days` (frisco/worcester class).
-3. **York** — needs one DESIGN decision first: type is 8 YES/NO flags, not a column, and `use_type`
-   drives the pin shape. Do not guess a precedence rule.
+Readiness order (Chester DONE — 2 of 3 PA sources now live):
+1. ~~**Chester**~~ ✅ **WIRED AND MEASURED, 34 dark → 0.**
+2. **Centre (35 dark)** — NEXT. Ready to write after enumerating `Permit_Type` and `Open_Y_N`. String
+   `M/D/YYYY` dates, so recency rides `extra_where`, never `recency_days` (frisco/worcester class);
+   `OBJECTID DESC` is NOT date order on that layer; use the MapServer (FeatureServer is not enabled).
+3. **York (47 dark)** — needs one DESIGN decision first: type is 8 YES/NO flags, not a column, and
+   `use_type` drives the pin SHAPE. Do not guess a precedence rule.
+
+**PA is now 560 pages / 158 dev-backed / 402 dark** (Delaware and Chester both at 0 dark). The two
+found-but-unwired sources are worth **82 more pages**; after that the largest remaining PA target is
+Allegheny (92 dark) and Montgomery (62), neither of which has a source yet.
 
 **Standing answer earned here, worth applying to every future county: a hub catalogue is a PUBLISHING
 CHOICE, not an inventory.** Centre's hub lists 100 datasets and omits its own permit service; the layer
