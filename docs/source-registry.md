@@ -4532,3 +4532,188 @@ My earlier guess `gis.lancastercountypa.gov` was simply the wrong NAME (the real
 is why the first pass returned a DNS non-verdict. **This is now a real rejection on enumeration** — and
 note Lancaster sells premium layers ("Paid Data"), so this may be publishes-privately rather than
 publishes-nothing, which is a different frontier and not reachable by probing.
+
+---
+
+## ✅ CHESTER COUNTY PA — GO-LIVE MEASURED: 34 dark pages → 0 (2026-08-03)
+
+Second PA county wired the same day, and the second to pass the depth-is-not-coverage test (PA has no
+statewide DOT-style source, so the dark pages were genuinely dark). Baseline captured BEFORE the
+re-cache; measured from `app_projects` on the exact `source_ref`, never a name or domain pattern.
+
+| | before | after |
+|---|---|---|
+| Chester ZIP pages | 39 | 39 |
+| dev-backed | **5** | **39** |
+| dark | **34** | **0** |
+| pages carrying the county source | 0 | **39** |
+| rows | 0 | **2,475** (3–130 per page) |
+
+⚠️ **The "5 dev-backed before" were NOT partial coverage** — they are exactly the 5 ZIPs where
+`new-castle-county-permits` spills across the DE border at its declared 5-mile radius. So the lift is
+the full 34, and the county had nothing of its own on any page.
+
+**Invariants across all 2,475 cached records: 0 missing `record_url`, 0 missing coordinates, 0
+non-`point` scope, 0 without a `use_type`, and 0 without a `file_date`** — the last one is the
+improvement over Delaware, whose year-only source deliberately carries none. `SUBMIT_DATE` being a real
+`esriFieldTypeDate` is what buys day precision. **Bidirectional gate proof: 39 pages, 1 county touched,
+0 records outside PA/Chester.**
+
+Sample of what a resident sees on 19380 (West Chester), newest first — real, dated, specific:
+`MP Renovations, LLC` 2026-06-04 Residential · `Fernhill Road ALG.` 2026-05-28 **Industrial** ·
+`DePrisco 2-Lot Subdivision` 2026-05-27 · `TRBL Walnut, LLC` 2026-05-07. Note **TRBL Walnut appears
+twice, as `SD-05-26-18910` and `LD-05-26-18908`** — a subdivision AND a land-development filing for one
+project. Those are two real filings and are correctly kept as two records because `case_number` is part
+of the dedup identity (the engine-v22 rule); collapsing them would lose a real filing.
+
+**The retry selector was `refreshed_at`, not "still dark" — and it mattered here.** 2 of 39 fires
+returned 503 (19301, 19457), and **19301 is one of the 5 border-spill pages**, so the "which pages are
+still dark" selector that failed on Delaware's 19015 would have skipped it a second time. Completion was
+verified as **39/39 refreshed, 0 stale** before materializing, rather than inferred from record counts.
+
+### PA standing after both wires (measured from `app_projects`, 2026-08-03)
+
+**PA total: 560 pages · 158 dev-backed · 402 dark.** Delaware and Chester are now the only two fully
+covered counties besides Philadelphia (45/46).
+
+| county | pages | dev-backed | dark | status |
+|---|---|---|---|---|
+| Delaware | 40 | 40 | **0** | ✅ wired today |
+| Chester | 39 | 39 | **0** | ✅ wired today |
+| Philadelphia | 46 | 45 | 1 | Carto L&I |
+| Allegheny | 119 | 27 | 92 | Pittsburgh CKAN; largest remaining |
+| Montgomery | 64 | 2 | 62 | no source found yet |
+| Lancaster | 56 | 0 | 56 | ❌ enumerated: no activity layer exists |
+| **York** | 47 | 0 | **47** | ✅ **source found** — needs the flag-precedence decision |
+| Bucks | 50 | 0 | 50 | ❌ enumerated: stalled 2023-10-26 |
+| **Centre** | 35 | 0 | **35** | ✅ **source found, fresh** — ready after 2 vocab enumerations |
+| Dauphin | 30 | 0 | 30 | not probed |
+| Lehigh | 34 | 5 | 29 | not probed |
+
+**Next in this seam: Centre (35) then York (47) = 82 more dark pages with live sources already found.**
+
+---
+
+## 🔬 CONNECTOR OPTION-SURFACE AUDIT — one root class, one LIVE instance worth ~52,000 records (2026-08-03)
+
+Run on the founder's instruction after the `status_const` defect turned out to be live in a second
+entry. **The question was whether other options carry the same divergence across connectors. They do,
+and one of them is not a latent hazard but a defect already in production.**
+
+### The root class
+
+A registry entry is plain JSON handed to one of five connectors. **A key the receiving connector does
+not implement is not an error and not a warning — it is silently ignored.** So an entry can look
+complete, pass every other test, and behave nothing like what its author wrote. `status_const` was one
+symptom; the class is bigger than that option.
+
+**The dangerous case is a typo.** `recency_day`, `spatial_point_cols`, `max_row` — each is accepted by
+the JSON, ignored by the connector, and invisible in review.
+
+### 🔴 THE LIVE INSTANCE — `include_types` is csv-only and SEVEN entries rely on it
+
+`include_types` is implemented **only** in `sources/csv.ts` (`grep -rn include_types sources/` matches
+csv.ts and nothing else). Seven arcgis/socrata entries carry it, and **in every one it mirrors that
+entry's own `type_map` keys exactly** — so it was plainly meant as a drop-filter. It drops nothing.
+
+**And type does NOT fail closed the way status does.** `arcgis.ts:354` is
+`typeHit?.value || entry.use_type_const || "unclassified"` — an unmapped type still PUBLISHES the row,
+labelled `unclassified`. (An unmapped *status* is excluded; the asymmetry is deliberate but it is what
+makes this silent.)
+
+**Measured in the live cache:**
+
+| entry | records | `unclassified` | % | has an `extra_where` that filters type? |
+|---|---|---|---|---|
+| `columbus-building-permits` | 42,067 | **40,469** | **96.2%** | none |
+| `cincinnati-building-permits` | 10,842 | 7,856 | 72.5% | none |
+| `nashville-building-permits-issued` | 9,025 | 3,561 | 39.5% | date-only |
+| `portland-building-permits` | 2,329 | 177 | 7.6% | none |
+| `cleveland-issued-building-permits` | 92,357 | 644 | 0.7% | ✅ filters `PERMIT_TYPE` |
+| `fairfax-active-site-construction` | 8,349 | 0 | 0% | ✅ |
+| `fairfax-recent-building-permits` | 19,103 | 0 | 0% | ✅ |
+
+**The collapse to ~0% wherever an `extra_where` happens to duplicate the intent is the tell** — the
+filter differs, not the data. **~52,000 records are published beyond what their entries intended**,
+40,469 of them from Columbus alone.
+
+⚠️ **This was HALF-KNOWN.** The Cincinnati case was noticed on 2026-07-28 and flagged for the owner
+("Pre-existing defect noticed while confirming this"). What that note missed is that it is **7 entries,
+not 1**, and it never measured the consequence. *A defect flagged without a magnitude gets triaged as
+small.*
+
+**NOT FIXED HERE — it is a gated change** (it removes tens of thousands of records from live pages,
+i.e. it changes what residents see). Two options for the founder: (a) move each whitelist into the
+connector's `extra_where` — config-only, per-entry, reversible; or (b) implement `include_types` in
+arcgis/socrata — one code change, fixes all seven at once and makes the option mean the same thing
+everywhere. **(b) is the better fix** precisely because the root class is per-connector divergence.
+
+### The divergence matrix — same NAME, different behaviour
+
+| option | arcgis | socrata | carto | ckan | csv |
+|---|---|---|---|---|---|
+| `status_const` | **RAW value**, resolved through `status_to_bucket` | **IS the bucket** | — | — | — |
+| `include_types` | ignored | ignored | ignored | ignored | **implemented** |
+| `recency_days` | `>= DATE '…'` — **breaks on STRING date cols, NO escape hatch** | ISO + **`recency_expr`** escape hatch | `> now() - interval` | `> 'YYYY-MM-DD'` — **STRING compare, silently wrong on `M/D/YYYY`** | parse-time |
+| `spatial_zip_radius_mi` | geometry envelope | `within_circle` **and REQUIRES `spatial_point_col`** (else quarantined → emits ZERO) | **not implemented** | **not implemented** | row coords |
+| `use_type_const` | only connector that has it; mutually exclusive with `type_map` (guarded, `arcgis.ts:245`) | — | — | — | — |
+
+Two further notes worth carrying:
+- **`recency_days` inclusivity is not consistent** — arcgis uses `>=`, ckan and carto use `>`. A
+  one-day boundary difference on the same option name.
+- **ckan's string comparison is the NYC trap in a different connector.** `nyc-dob-permit-issuance` was
+  found on 2026-08-02 to have never placed a record because a lexicographic compare met `MM/DD/YYYY`.
+  ckan's `recency_days` has exactly that shape. No live ckan entry hits it today (Boston and Pittsburgh
+  both carry ISO dates) — but it is one wire away, and there is no guard.
+
+### What shipped
+
+`test/connector-option-surface.test.mjs` (suite 78 → 79 files). It rejects unknown keys **by default**
+rather than reporting them, so a typo cannot pass review; ratchets the 7 known entries so the list may
+only shrink; requires each still to carry the option it is excused for (a stale excuse is its own false
+record); pins the two load-bearing asymmetries so a future "harmonisation" must face them; and
+self-tests that it catches a typo'd `recency_day`.
+
+**`shelby-county-building-permits` declares `platform: "opendatasoft"`, for which no connector exists** —
+the entry does nothing at all. Known and queued (QUEUE.md item 8, SHELBY-429).
+
+---
+
+## 🟦 FIVE COLUMBUS ZIPs ARE HONEST-EMPTY **BY DESIGN** — a ruling, not a regression (founder, 2026-08-03)
+
+**If you are reading this because five Columbus pages show only the EPA facilities floor: that is the
+intended state. Do not "fix" it.**
+
+`43140` (London) · `43064` (Plain City) · `43082` (Westerville) · `43210` (**OSU campus**) · `43146`
+(Orient) carry **no `columbus-building-permits` records** following the `type_source` re-point from
+`GENERAL_TYPE` to `B1_PER_SUB_TYPE`.
+
+**Why they are empty, enumerated before the change — this was their ENTIRE content in the connector's
+365-day window:**
+
+| ZIP | every record it held |
+|---|---|
+| 43064 | 3 × MEP |
+| 43082 | 2 × Fire Protection, 1 × MEP |
+| 43140 | 2 × MEP |
+| 43146 | 29 × MEP |
+| 43210 (OSU) | 6 × **Sign**, 1 × MEP |
+
+**Zero development by any definition** — HVAC/plumbing/electrical permits and six signs. Columbus issued
+no structural, new-construction, major-alteration, addition or demolition permit in any of these five
+ZIPs in a year. **Every Columbus page is Columbus-only** (no other registry source covers Franklin
+County), so they fall to the national EPA facilities floor rather than to a thinner page.
+
+**The founder's reasoning, recorded verbatim so it is not re-litigated:** *"Those pages currently make a
+typed-pin promise the data does not keep; showing HVAC permits and signs on a 'what is being built near
+me' map is the fabrication problem in a different costume. The EPA facilities floor is the honest state
+for a ZIP where Columbus issued no development permits in a year. Honest-empty over false-typed."*
+
+**Do not widen the whitelist to rescue them.** That was proposed and **measured**: adding
+`Minor Alteration` back rescues **ZERO** of the five (none of their records are that class) while adding
+64,113 minor jobs to all 49 pages. Withdrawn on the measurement.
+
+**What WOULD legitimately change this:** Columbus actually issuing development permits in these ZIPs
+(the pages repopulate on the next refresh with no code or config change — the whitelist is not a
+per-ZIP exclusion), or a second Franklin County source being wired. Neither is a reason to touch this
+entry today.

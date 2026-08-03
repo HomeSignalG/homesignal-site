@@ -117,6 +117,15 @@ export interface SocrataRegistryEntry {
   /** Optional VERBATIM SoQL clause ANDed into every query (drop noise types at source —
    *  mirror of the arcgis connector's extra_where). Data, not code. */
   extra_where?: string;
+  /** VERBATIM whitelist on the column_map.type_source column — the SoQL twin of csv.ts's
+   *  parse-time filter, pushed down as `{typeCol} IN ('a','b',…)` so rows are dropped AT
+   *  SOURCE (a post-fetch filter would let a max_rows cap bind on rows the whitelist removes).
+   *  ⚠️ csv-ONLY UNTIL 2026-08-03 AND SILENTLY IGNORED HERE: cincinnati-building-permits
+   *  carried include_types ["Building","Wrecking"] mirroring its own type_map, so its noise
+   *  filter did nothing and 7,856 of 10,842 records (72.5%) published as "unclassified".
+   *  Requires a SINGLE type_source column — an array cannot be expressed as a column IN (…),
+   *  and the entry is QUARANTINED rather than silently unfiltered. Absent ⇒ no type filter. */
+  include_types?: string[];
   /** SPATIAL ZIP-scoping for datasets with NO ZIP column (mirror of the arcgis option):
    *  within_circle(spatial_point_col, centroid, ±this many miles). Requires
    *  spatial_point_col and deps.zipCentroid; records keep their own per-parcel points. */
@@ -275,6 +284,17 @@ async function runEntry(
   const records: NormalizedRecord[] = [];
 
   const zipCol = firstCol(entry.column_map.zip);
+  // A whitelist that cannot be expressed is FAIL-CLOSED, never silently unfiltered — emitting
+  // everything here would reproduce the very defect this option was implemented to end.
+  if (entry.include_types?.length && !soleTypeCol(entry)) {
+    report.quarantined.push({
+      reason: "config error: include_types set but column_map.type_source is absent or a multi-column array "
+        + "— cannot filter, entry skipped",
+      sample: entry.dataset_id,
+    });
+    return { records, report };
+  }
+
   const spatial = (entry.spatial_zip_radius_mi ?? 0) > 0;
   if (spatial && (!deps.zipCentroid || !entry.spatial_point_col)) {
     report.quarantined.push({ reason: "spatial_zip_radius_mi set but no zipCentroid/spatial_point_col — skipped", sample: entry.dataset_id });
@@ -540,6 +560,10 @@ function buildWhere(entry: SocrataRegistryEntry, zip: string, zipCol: string, ce
   // clause ANDed into every query, used to drop noise types AT SOURCE (e.g. Seattle's
   // ECA/street-exception and roof permits). The connector never inspects it.
   if (entry.extra_where && entry.extra_where.trim()) clauses.push(`(${entry.extra_where.trim()})`);
+  // TYPE WHITELIST, pushed down at source (see include_types). Only reachable with a single
+  // type_source column; socrataForZip quarantines the array case, so this never silently no-ops.
+  const typeClause = includeTypesClause(entry);
+  if (typeClause) clauses.push(typeClause);
   if (entry.recency_days && entry.recency_days > 0) {
     const cutoff = new Date(Date.now() - entry.recency_days * 86400000).toISOString().slice(0, 10);
     // TEXT-DATE ESCAPE HATCH: the default comparison below emits an ISO literal, which on a text
@@ -555,6 +579,25 @@ function buildWhere(entry: SocrataRegistryEntry, zip: string, zipCol: string, ce
     }
   }
   return clauses.join(" AND ");
+}
+
+/** `{typeCol} IN ('a','b',…)` for an entry's include_types, or null when it does not apply.
+ *  Values are used VERBATIM (the publisher's own strings) with SoQL quotes escaped. */
+export function includeTypesClause(entry: SocrataRegistryEntry): string | null {
+  const list = entry.include_types;
+  if (!list || !list.length) return null;
+  const typeCol = soleTypeCol(entry);
+  if (!typeCol) return null;                       // array/absent — quarantined in socrataForZip
+  const vals = list.map((v) => `'${String(v).trim().replaceAll("'", "''")}'`).join(",");
+  return `${typeCol} IN (${vals})`;
+}
+
+/** The ONE type_source column, or null when absent or a multi-column array. */
+export function soleTypeCol(entry: SocrataRegistryEntry): string | null {
+  const ts = entry.column_map.type_source;
+  if (!ts) return null;
+  if (Array.isArray(ts)) return ts.length === 1 ? String(ts[0]) : null;
+  return String(ts);
 }
 
 async function getWithBackoff(url: string, deps: SocrataDeps): Promise<unknown> {
