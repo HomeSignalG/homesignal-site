@@ -4376,3 +4376,61 @@ needs deciding rather than templating.
 **New standing answer: DCAT `modified` is metadata staleness, not data staleness.** Chester's catalogue
 entry reads `modified: 2021-08-31` while the layer's newest record is **2026-07-30**. Rejecting on the
 catalogue timestamp would have been a false negative on a live, fresh source.
+
+---
+
+## 🎯 YORK COUNTY PA — SOURCE FOUND, LIVE AND FRESH, NOT YET WIRED (2026-08-03)
+
+**47 dark pages of 47** — the largest single-county lift available in PA after Delaware.
+
+**The earlier "York is a real host that does not answer" was the WRONG HOST.** York County has two
+GIS estates and only one of them serves planning: `yorkcountypa.gov` (the county portal, which is what
+was probed) versus **`arcweb1.ycpc.org` — the York County *Planning Commission*.** The second answers
+immediately at a 45 s timeout. Recording the distinction because "the county's host does not answer" is
+not the same claim as "the county publishes nothing", and only the second is a rejection.
+
+**Host:** `arcweb1.ycpc.org` (ArcGIS **11.5**) · **layer:**
+`/server/rest/services/OPEN_DATA/PLANNING_Subdivisions/FeatureServer/0` ("Subdivisions") ·
+**26,879 rows** · **`esriGeometryPoint`** — no centroid derivation needed, unlike Delaware and Chester.
+
+**⚠️ The layer DESCRIPTION is misleading and would have justified a wrong rejection.** It opens *"The
+Subdivision GIS Layer represents the geographic boundaries…"*, which reads as a static cadastral layer.
+The FIELDS say otherwise — it is a plan-review docket: `DATE_RCVD` (`esriFieldTypeDate`), `PLAN_TITLE`,
+plan-type flags `PT_PRELIM` / `PT_FINAL` / `PT_LAND_DEV` / `PT_SUBDIV` / `PT_BLDG_ADD`, use flags
+`SF_USE` / `COM_USE` / `IND_USE` / `MF_USE` / `MHP_USE` / `SR_USE` / `AG_USE` / `OTHER_USE`, and
+proposal magnitudes `PROP_LOTS` / `PROP_DU` / `PROP_NEW_BLDG_SQFT` / `TOTAL_ACRES`, plus `MCD`
+(municipality), `ENGINEER`, `NOTES`, `CONSISTENT`. **Read the schema, not the blurb.**
+
+**Liveness, all three parts:** newest `DATE_RCVD` **2026-07-27** (then 07-20); entity correct (the
+Planning Commission's own docket); names are real and specific — *Walmart – Hanover*, *Fairview South
+WWTP Expansion*, *Ballpark Commons*, *Glick & Esh*. Window sizing, measured: **727 rows in 3y,
+1,267 in 5y** of 26,879 (the bulk is decades of history).
+
+**The wire-design question to settle first — the type is a SET OF FLAGS, not a column.** Use is encoded
+as eight independent `YES`/`NO` fields, so `type_map` (which maps one source value) does not apply as-is
+and a precedence rule would have to be chosen — e.g. `IND_USE` → Industrial before `COM_USE` →
+Commercial before `SF_USE`/`MF_USE` → Residential. That is a real decision with a resident-visible
+consequence (`use_type` drives the pin SHAPE), so it is recorded here rather than guessed. Same for
+status: there is no status column, so `status_const` applies — and per the Delaware defect it MUST be a
+key in `status_to_bucket`. `PT_FINAL` YES/NO is the closest thing to a lifecycle signal and is worth
+enumerating before choosing.
+
+### PA county-by-county standing after Delaware (measured from `app_projects`, 2026-08-03)
+
+| county | pages | dev-backed | dark | note |
+|---|---|---|---|---|
+| Delaware | 40 | **40** | **0** | wired this session |
+| Philadelphia | 46 | 45 | 1 | Carto L&I |
+| Allegheny | 119 | 27 | 92 | Pittsburgh CKAN; largest remaining |
+| Montgomery | 64 | 2 | 62 | |
+| Lancaster | 56 | 0 | 56 | host guesses failed DNS — NOT probed |
+| Bucks | 50 | 0 | 50 | |
+| **York** | **47** | **0** | **47** | **source found, above** |
+| Centre | 35 | 0 | 35 | host guesses failed DNS — NOT probed |
+| **Chester** | **39** | **5** | **34** | **source found; the 5 are border spill** |
+| Dauphin | 30 | 0 | 30 | |
+| Lehigh | 34 | 5 | 29 | |
+
+**Lancaster and Centre remain UNPROBED, not rejected** — every hostname tried for them failed DNS, which
+is a non-verdict. The Chester and York finds both came from the county's own published hub/planning
+host, so that is the route for those two as well.
