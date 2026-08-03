@@ -832,6 +832,52 @@ had moved, and nothing reconciled them.
 that the surface in question actually reads.** A clean materialized layer is not evidence about
 a surface that bypasses it. Matrix of surface → table: `QUEUE.md` item 0d.
 
+### WORKED CASE — THE AUTHOR OF THE SURFACE RULE BROKE IT THE NEXT DAY (2026-08-03)
+
+The surface-matrix rule ("state the TABLE, and check the table the surface actually reads") was
+written on 2026-08-03. **Within a day I measured the Aurora/Adams window change in
+`development_reports` only and reported "−72%" as the result.** `app_projects` had not caught up —
+`app_refresh_batch` is an **8.5-hour round-robin** and those 24 pages were queued behind ~11,000
+others — so `community.html`, `development.html` and `dashboard.html` were still serving 2011
+permits while the map page showed the new window. The founder caught it by measuring the other
+table.
+
+**Two operational consequences, both now standard:**
+1. **A config change is not measured until BOTH tables are.** After re-caching
+   `development_reports`, call `app_refresh_zip` on the affected ZIPs explicitly — never wait for
+   the round-robin, and never report a delta from one table alone.
+2. **Compare like with like.** `app_projects` filters `relevance='development' AND scope='point'
+   AND record_url<>''`, so the comparable figure from `development_reports` is that same filtered
+   count, not the raw array length.
+
+### A REMEDIATION SELECTOR IS A MEASUREMENT — ANCHOR IT ON A FIXED SET TOO (2026-08-03)
+
+The anchoring rule was recorded earlier the same day for *measurements*. It bites identically on
+*remediation*, and I repeated it: the 24-ZIP re-materialization list was computed from
+"ZIPs that currently carry entry X in `development_reports`" **after** the deploy had already begun
+rewriting those rows. **80005 had been refreshed by the rolling tick at 22:15, so its Adams records
+were already gone from the cache — and the ZIP dropped out of its own remediation selector**,
+leaving 9,194 stale `app_projects` rows with `submitted_at` back to 2011-01-04 on a page nobody
+would have re-checked.
+
+**The self-correcting form, which is what to use:** select the work from the table you are
+*repairing*, compared against the table you are repairing *from* —
+`app_projects p JOIN development_reports d USING (zip) WHERE p.created_at < d.refreshed_at`. That
+cannot lose a row to the mutation it is meant to cover.
+
+### CONFIRM THE WORKING TREE MATCHES THE PUSHED REF BEFORE COMPARING STATE (2026-08-03)
+
+A container restart rolled the local checkout back to `606aa11` while the remote branch was at
+`25fedc7`. Comparing that stale tree against `origin/main` showed **5 merged PRs "missing" from the
+branch**, which read as "the deploy I just dispatched reverted the paging fix and `include_types`
+in production" — and produced a real (failed, already-completed) cancel attempt on a **clean**
+deploy. Against the actual pushed ref, **0 commits on main touched the edge function that were not
+in the branch**.
+
+**A restart can silently un-do a working directory while the remote is fine.** Before comparing
+branches — and especially before concluding a deploy reverted something — verify `git rev-parse
+HEAD` equals `git ls-remote origin <branch>`, and repair with `git reset --hard origin/<branch>`.
+
 ### UNMAPPED IS NOT EMPTY — THEY GET OPPOSITE TREATMENT (founder rule, 2026-08-03)
 
 **`unmapped` means WE did not classify what the publisher said. `empty` means the PUBLISHER said
