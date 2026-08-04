@@ -1,0 +1,48 @@
+name: verify-property-page
+
+# Live check for property.html — the saved-place dossier (Del Valle 78617 is the pilot).
+#
+# WHY IT IS SCHEDULED (founder approval, 2026-08-04): "a verifier that never runs is the
+# fixture-suite problem, and we spent a day on that one." A script in the repo that nothing
+# invokes produces no output to be wrong about — it attests to nothing while looking like coverage.
+#
+# ⚠️ SCOPE, so a green run is not over-read: property.html is AUTHENTICATED. This exercises the
+# SIGNED-OUT surface (honest empty state, no persona leak, seed reachable only by explicit opt-in)
+# plus the app_projects data a dossier would read. The RENDERED SIGNED-IN DOSSIER IS NOT COVERED —
+# founder ruling 2026-08-04: no test account, credentials in CI are a worse risk than an uncovered
+# surface. Residual is declared in scripts/lib/surface-banner.mjs::PARTIAL_SURFACES. Do not revisit.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '59 13 * * *'   # daily 13:59 UTC — after verify-maps (13:55), no slot collision
+  push:
+    branches: [main]
+    paths:
+      - 'property.html'
+      - 'lib/data.js'          # the (CFG.DATA_SOURCE || 'seed') fail-open this check pins
+      - 'config.js'            # DATA_SOURCE / DEMO_SESSION are asserted directly
+      - 'seed/delvalle.js'     # the persona markers the signed-out assertion keys on
+      - 'scripts/verify-property-page.mjs'
+      - 'scripts/lib/surface-banner.mjs'
+      - '.github/workflows/verify-property-page.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # PROVISIONAL BOUND — to be tightened from the first real run's measured duration, per the
+    # convention on verify-representative-zips ("measured max successful run: 5.9 min -> bound 45").
+    # It is set at all because an unbounded job inherits GitHub's 6-HOUR default, which is how
+    # verify-geocodes burned 11 consecutive 6 h cancellations.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Verify property.html (signed-out surface + dossier data)
+        env:
+          SITE_BASE: https://homesignal.net
+        run: node scripts/verify-property-page.mjs

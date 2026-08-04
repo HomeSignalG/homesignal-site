@@ -1244,27 +1244,17 @@ counts as evidence" — here the instrument was not silent, it was confidently s
 
 ## Rules added 2026-08-04b — two ways a search lies, and they are not the same
 
-### Confirm the tree matches `origin/main` before any measurement or grep
+### NEVER suppress stderr on a search you intend to act on — THE PRIMARY RULE
 
-Founder instruction after **three stale checkouts in one session**. A container restart silently
-resets cwd and can move `HEAD` backwards; nothing errors. It produced a **false revert alarm** (a
-restored tree read as "5 merged PRs are missing", nearly cancelling a clean deploy) and a **wrong
-test-file count** (78 vs 83 — which is what finally exposed it). Run
-`node scripts/check-tree-fresh.mjs` at session start and again after any restart. It compares
-CONTENT, not commit identity (a squash-merge gives a different SHA for identical content), ignores
-the nightly `sitemap.xml` / `source-monitor-report.md` churn, and warns about uncommitted work
-before you reset anything.
-
-### NEVER suppress stderr on a search you intend to act on
-
-⚠️ **This is a DIFFERENT failure from the one above, and it was initially misdiagnosed as that
-one.** A missed `QUEUE.md` item — a new fixed-window registry entry shipping unregistered — was
-written up as a stale-tree effect. It was not: the item was present in **every** tree the session
-ever had (`git show 606aa11:QUEUE.md | grep -ci "dated constant"` → 1).
+**Founder correction, 2026-08-04: this is the rule, and the tree check below is second-order.**
+A missed `QUEUE.md` item — a new fixed-window registry entry shipping unregistered — was written up
+as a stale-checkout effect and a tree check was mandated for it. **That diagnosis was wrong.** The
+item was present in **every** tree the session ever had
+(`git show 606aa11:QUEUE.md | grep -ci "dated constant"` → 1). The mandated fix would not have
+prevented what it was written for.
 
 The real cause: the grep ran from the **wrong working directory** with `2>/dev/null`. Every path
-argument failed to exist, stderr was discarded, and grep exited **0 with no output**. Reproduced
-verbatim:
+argument failed to exist, stderr was discarded, and grep exited **0 with no output**. Reproduced:
 
 ```
 $ cd /home/user && grep -rn "DATED CONSTANT" docs/*.md QUEUE.md 2>/dev/null
@@ -1275,18 +1265,59 @@ grep: docs/*.md: No such file or directory
 grep: QUEUE.md: No such file or directory
 ```
 
-**A search that read ZERO FILES is byte-identical to a search that found ZERO MATCHES.** `2>/dev/null`
-is what makes them indistinguishable, and a relative path is what makes it likely. So: drop the
-suppression, or pass absolute paths, or confirm the file count the search actually covered. The
-`check-tree-fresh` script does **not** catch this class — different failure, same shape.
+**A search that read ZERO FILES is byte-identical to a search that found ZERO MATCHES.**
+`2>/dev/null` is what makes them indistinguishable; a relative path is what makes it likely.
 
-Both belong to *"an instrument must prove it ran before its silence counts as evidence."* The tree
-check answers *am I looking at the right files*; this rule answers *did I look at any files at all*.
+**So, in order:** confirm `cwd` before any path-scoped search · never suppress stderr on a search
+you will act on · prefer absolute paths · when a search returns nothing, confirm it actually read
+files before treating the silence as evidence.
 
-### A misdiagnosis that is plausible is more expensive than one that is obviously wrong
+This is the sharpest instance of *"an instrument must prove it ran before its silence counts as
+evidence"* — the instrument was not silent, it was **confidently empty**.
+
+### Confirm the tree matches `origin/main` before any measurement or grep — SECOND-ORDER
+
+Worth keeping (it caught a real case within the hour of shipping), but note what it is *not*: it
+does **not** catch the silent-glob failure above. Three stale checkouts in one session produced a
+**false revert alarm** (a restored tree read as "5 merged PRs are missing", nearly cancelling a
+clean deploy) and a **wrong test-file count** (78 vs 83). Run `node scripts/check-tree-fresh.mjs`
+at session start and after any restart.
+
+It asks *"is `origin/main` an ancestor of HEAD"* — being **ahead** is normal, being **behind** is
+the hazard. Its first version alarmed on merely-ahead, which would have trained everyone to ignore
+it; that is its own lesson about check design.
+
+### A plausible misdiagnosis costs more than an obvious one — PRECISELY BECAUSE IT SHIPS
 
 "Stale checkout" explained the symptom, matched a pattern that had genuinely occurred twice that
 session, and was wrong. It would have shipped a fix (the tree check) that does not prevent the thing
 it was written to prevent. **When a cause is inferred from a pattern rather than reproduced, say so
 and then reproduce it** — here, one `git show <ref>:FILE | grep -c` against the actual historical
 tree falsified it in seconds.
+
+---
+
+## Settled and CLOSED — do not re-propose (founder rulings, 2026-08-04)
+
+### NO test account for the signed-in `property.html` dossier
+
+The rendered signed-in dossier stays **uncovered**. Founder ruling: *"Credentials in CI is a worse
+risk than an uncovered surface, and `PARTIAL_SURFACES` naming the residual is the correct handling
+— honest about what is not checked rather than implying coverage. Do not revisit."*
+
+So the correct response to "property.html is only partly verified" is **to state the residual**, not
+to widen coverage by adding secrets. `verify-property-page` covers the signed-out surface and the
+`app_projects` data a dossier reads; `scripts/lib/surface-banner.mjs::PARTIAL_SURFACES` names what
+it does not. That is the finished state, not a gap to close.
+
+### NO agricultural member in the `use_type` vocabulary
+
+York's `AG`-flagged plans render as **`Development` → the generic "Other project" circle**, and that
+stands. Considered and declined: adding a category to `lib/map.js::TYPE_EXACT` would change what
+**every resident sees nationally** — the classifier, renderer, shape legend, popup, sidebar, Street,
+Satellite and Focus all read that one table — to sharpen a **240-row** case in one county. Founder
+ruling: *"Development rendering as 'Other project' is honest ambiguity."*
+
+The general shape, worth carrying to the next vocabulary question: **a closed global vocabulary is
+not extended to express a local nuance.** The generic member is the honest answer when the specific
+one would cost a national rendering change.

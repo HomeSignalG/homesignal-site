@@ -5492,3 +5492,16 @@ has no trades class to drop (unlike the WA/MN/IL and Aurora noise drops) and is 
 for scale, since a `Dwelling` row can be a deck roof. No type whitelist separates minor from
 major here.
 
+## CLOSED 2026-08-04 — three founder rulings, recorded so they are not re-opened
+
+| item | ruling | where recorded |
+|---|---|---|
+| **York `AG` renders as "Other project"** | **DECLINED** a new `use_type` category — a national rendering change for a 240-row local case. Honest ambiguity stands. | governance "Settled and CLOSED" |
+| **Test account for the signed-in `property.html` dossier** | **DECLINED** — credentials in CI are a worse risk than an uncovered surface. `PARTIAL_SURFACES` naming the residual IS the handling. | governance "Settled and CLOSED" |
+| **CI schedule for `verify-property-page`** | **APPROVED and armed** — daily 13:59 UTC + dispatch + path filters. | `.github/workflows/verify-property-page.yml` |
+
+⚠️ **The stale-checkout mandate was issued on a WRONG CAUSE, and the founder corrected it.** The
+missed dated-constants item was not a stale tree — it was `2>/dev/null` on a grep from the wrong
+cwd, which exits 0 with no output. The governance doc now LEADS with that rule; the tree check is
+kept but demoted to second-order. A plausible misdiagnosis costs more than an obvious one precisely
+because it ships.
