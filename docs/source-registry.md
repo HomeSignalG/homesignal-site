@@ -4948,3 +4948,127 @@ fires; measure the target rows directly.
   layer grew by 5 and the 5-year window moved 1,267 → 1,269 by the same amount. `MCD` was
   deliberately NOT used in the title: it is a coded municipality domain and `readCol` would
   emit the raw code (`"10"`). Rule 13 probes: 17331 1,868 → 102; 17402 2,247 → 111.
+
+---
+
+## ALLEGHENY COUNTY PA — `allegheny-county-asbestos-permits` WIRED; PA dark 322 → 272 (2026-08-04)
+
+The county-wide seam behind Pittsburgh. `pittsburgh-pli-permits` already covered 27 of
+Allegheny's 119 ZIP pages; the ~130 suburban municipalities had no county-wide source.
+**Config only** — same host (WPRDC) and same connector (`sources/ckan.ts`) as the Pittsburgh
+entry, so no connector, engine or schema change.
+
+### Measured, post-deploy, from `development_reports` (not source-side)
+
+| | before | after |
+|---|---|---|
+| Allegheny live | 27 | **77** |
+| Allegheny dark | 92 | **42** |
+| PA dark | 322 | **272** |
+| national | 4,482 / 12,722 (35.24%) | **4,532 / 12,722 (35.62%)** |
+
+50 pages carry the source · 215 records in `development_reports` · 210 in `app_projects`.
+Native `zip_code`, so the page count is EXACT, not a spatial-radius estimate.
+
+**The 215 vs 210 gap is explained, not loss:** exactly 5 records are `scope:"area"` (no
+coordinates) and `app_projects` carries only the 210 point records. Verified it is NOT dedup —
+all 10 records on 15260 have distinct `case_number`s.
+
+### Discovery — by ENUMERATION, not a guessed hostname
+
+Found via WPRDC CKAN `package_search?q=permit` → 35 packages. **PASDA
+(`mapservices.pasda.psu.edu`) was enumerated first and is a DEAD END for activity data in these
+counties** — `pasda/AlleghenyCounty/MapServer` 41 layers, `pasda/MontgomeryCounty` 30,
+`pasda/DauphinCounty` 2, `pasda/LehighCounty` 7, and **every one is base cartography**
+(contours, parcels, building footprints, landslides, hydrology). PASDA carried Bucks only
+because Bucks published a planning docket there; it is not a standing route for permits.
+
+Allegheny's own `gisdata.alleghenycounty.us` was also enumerated: folder **`Accela` is EMPTY**
+(0 services, 0 folders) — the name is a lure; `OPENDATA` = Address_Points_Test1 + Parcels;
+`EGIS` = address/buildings/municipalities/parcels; `LandRecords` = Parcel_Features; `DPW` =
+facilities/districts/snow routes.
+
+### Vocabularies — both complete, each summing to EXACTLY 433 (positive control = row total)
+
+`status` (6): `Active - Issued` 185 · `Closed - Completed` 119 · `Approved - Renovation` 80 ·
+`Approved - Demolition` 46 · `Closed - Cancelled` 2 · `Issued` 1.
+`project_type` (4): `PAA` 307 · `UND` 46 · `DEM` 46 · `RES` 35.
+
+**Type is a constant via `type_map`, and that is the honest choice.** `project_type` is a
+permit-CLASS code, not a building-use vocabulary — the 307 `PAA` rows span a sushi restaurant,
+West Penn Hospital, Chevron Science Center, a church, a school and Lock 4 of the Allegheny
+River. Mapping it to any single use would be fabrication, so all four map to the generic member
+`Development` (Sussex / Weld / Phoenix precedent).
+
+⚠️ **`use_type_const` was deliberately NOT used** — it is implemented only in
+`sources/arcgis.ts` and is not a field on `CkanRegistryEntry`, so on a ckan entry it is
+**silently ignored** (the option-surface class), and `ckan.ts` publishes an unmapped type as
+`unclassified` rather than failing closed.
+
+### PUBLISHER SUSPENSION — disclosed, on the reprobe list
+
+The package notes carry a note dated **07/29/2026**: the county identified **undercounting**
+after an October 2025 software transition and has **SUSPENDED updates** pending a new solution;
+permits in `in progress` status are excluded. What is published is real, dated, addressed and
+per-record (max `permit_issue_date` 2026-06-29, oldest 2025-08-11), and undercounting is
+incompleteness rather than fabrication — but this entry **will age**. **Do not restate its
+coverage as complete county coverage.**
+
+### Rejected alongside, on enumeration
+
+- **`Applications for Development, ACCD`** (resource `f3b9a9aa`) — a genuinely DIFFERENT
+  package from the previously-rejected `Implemented Stormwater Control Measures, ACCD`, but
+  falls to the same disqualifier, now byte-verified from its real field list: `municipali,
+  Feature_ID, Status, App_Date, App_Sort, Acres, LandUse, PreImperv, PostImperv, Dschrg_Pts,
+  Max_nonStr` — municipality only, **NO address, NO zip, NO coordinates**; geometry exists only
+  in an SHP resource the ckan connector cannot read. **NO_GEOGRAPHY.**
+- **Dauphin County (30 dark pages)** — its hub DCAT enumerated in full: **30 datasets, all
+  parcels / hydrology / tax roll / zoning / voting. candidates_exhausted.**
+
+### Standing answer — an empty DCAT dataset array is NOT an empty server
+
+Second time this has paid (Centre, then Montgomery). Montgomery PA's hub
+`data-montcopa.opendata.arcgis.com` returns a literal `"dataset": []`, while its **server root**
+`gis.montcopa.org/arcgis/rest/services` carries **19 folders** including
+`Planning/Montgomery_County_Act247_Proposals` — Act 247 is the PA Municipalities Planning Code
+provision requiring municipalities to file subdivision and land-development proposals with the
+county planning commission, i.e. a county-wide development docket. **Enumerate the server root
+before recording a rejection.** ⚠️ `opendata-mcgov-gis` is Montgomery County **MARYLAND**
+(already wired) — the cross-state lookalike trap.
+
+---
+
+## DEFECT (FIXED) — the geocode geofence existed in 2 of 5 connectors (2026-08-04)
+
+CLAUDE.md §8 lists the fence among **"the five rules that never bend."** It was implemented in
+`arcgis.ts` and `socrata.ts` — each with its OWN copy, socrata's named `GEOCODE_FENCE_MI_GEO` /
+`milesBetweenGeo` and commented *"kept in lockstep"* — and **absent from `ckan.ts`, `carto.ts`
+and `csv.ts`.** Same divergence class as `status_const` and `include_types`, on a safety rule.
+
+**Live proof**, on the first ckan entry that ever geocoded: `allegheny-county-asbestos-permits`,
+ZIP **15202**, `"294 UNION AVENUE"` cached at **lat 42.993118 / lng −74.398022**,
+`geo_precision "address"`, `scope "point"`, with
+`matched_address "295 UNION AVE EXD, JOHNSTOWN, NY, 12095"` — wrong state, wrong ZIP, wrong
+house number, ~300 mi from Pittsburgh. Both fence checks would have rejected it.
+
+**Cache-wide census at the time of the fix: only 2 records geocode at all on those three
+connectors** — this one, and a Boston record that matched correctly
+(`8D ALLSTATE RD, DORCHESTER, MA, 02125`). Small blast radius, but every future entry on those
+connectors would have inherited the unfenced path.
+
+**Fix:** `sources/geo-fence.ts` is now the single implementation, called by all five.
+**Semantics unchanged** — the two copies were already identical in every operative detail
+(25 mi, same equirectangular distance, same trailing-ZIP regex, same mismatch test, same
+null-out, same reason strings); only the identifiers differed, so nothing was reconciled.
+`arcgis.ts` re-exports `GEOCODE_FENCE_MI` / `milesBetween`. `ckan.ts` and `carto.ts` gained an
+optional `deps.zipCentroid`; `index.ts` passes it to all five. Both halves fail OPEN when their
+input is absent, as before.
+
+**Regression:** `test/geocode-fence.test.mjs` DRIVES the fence through all five shipped
+connectors in both directions (wrong-state rejected → coords nulled, area scope, record still
+emitted with `record_url`, geofence quarantine reason; correct match passes untouched), plus a
+guard that every connector reaching `deps.geocode` routes through `fenceGeocode()`, defines no
+private copy, and that **all 5 were actually checked**. Suite 85 → 86 files.
+
+⚠️ **The guard's first version matched the old identifiers inside socrata.ts's own explanatory
+COMMENT.** It now matches a definition, not a mention — a grep is a lead, not a fact.

@@ -797,6 +797,60 @@ converts to COMPLETE far cheaper than a state at 0%, and states-completed is the
 
 ---
 
+## PA/Allegheny — `allegheny-county-asbestos-permits` GO-LIVE VERIFIED (2026-08-04)
+
+**DONE.** Registry-only wire (PR #586, merged `89b3089`), deployed via `deploy-edge-functions`
+from main, re-cached, re-materialized, measured in BOTH tables.
+
+| | before | after |
+|---|---|---|
+| Allegheny live / dark | 27 / 92 | **77 / 42** |
+| PA dark | 322 | **272** |
+| national | 4,482 / 12,722 (35.24%) | **4,532 / 12,722 (35.62%)** |
+
+50 pages carry the source · 215 records (`development_reports`) · 210 (`app_projects`) · 0
+invariant violations. Native `zip_code` → the page count is exact, not a spatial estimate.
+The 215/210 gap is the 5 `scope:"area"` records, not dedup and not loss (all 10 records on
+15260 have distinct `case_number`s).
+
+**Method notes worth keeping:** re-cache selector was `refreshed_at`, NOT "still dark" — 3 of
+92 (15086/15090/15135) missed the collector's 20-minute window and would have been invisible to
+a still-dark selector (the Chester lesson). `app_refresh_zip` was called explicitly on all 119
+rather than waiting for the 8.5 h round-robin.
+
+⚠️ **Publisher SUSPENDED updates 2026-07-29** (undercounting found after an Oct 2025 system
+transition). Data is real and current to 2026-06-29. **On the reprobe list. Do not restate as
+complete county coverage.**
+
+Receipts: docs/source-registry.md "ALLEGHENY COUNTY PA".
+
+## GEOCODE GEOFENCE — ported to the 3 unfenced connectors (2026-08-04)
+
+**DONE.** PR #587. The fence CLAUDE.md §8 calls unbendable existed in `arcgis.ts` + `socrata.ts`
+only (two private copies); `ckan.ts`, `carto.ts`, `csv.ts` had none. Live proof: ZIP 15202
+"294 UNION AVENUE" cached at a **Johnstown NY** coordinate, ~300 mi off, `scope:"point"`.
+
+Collapsed to one `sources/geo-fence.ts`, **semantics unchanged** (the two copies were already
+identical; only identifiers differed). `test/geocode-fence.test.mjs` drives all five shipped
+connectors both directions + a guard so a sixth cannot ship unfenced. Suite 85 → 86.
+
+Cache-wide census at fix time: only **2** records geocode at all on those three connectors.
+
+## NEXT — PA/Montgomery (62 dark, PA's largest remaining block)
+
+`gis.montcopa.org/arcgis/rest/services` → `Planning/Montgomery_County_Act247_Proposals`.
+Act 247 = the PA Municipalities Planning Code subdivision/land-development filing requirement,
+i.e. a county-wide development docket. **UNPROBED — vocabularies not yet enumerated.**
+
+Its hub DCAT returns a literal `"dataset": []`; the server root carries 19 folders. **An empty
+DCAT dataset array is not an empty server** — second time this has paid (Centre, Montgomery).
+⚠️ `opendata-mcgov-gis` is Montgomery County MARYLAND, already wired — cross-state lookalike.
+
+**Closed by enumeration this session, do not repeat:** PASDA for Allegheny/Montgomery/Dauphin/
+Lehigh (all base cartography, 0 activity layers) · Allegheny's own gisdata server (`Accela`
+folder EMPTY) · Dauphin (30 datasets, all parcels/hydrology/zoning — candidates_exhausted) ·
+ACCD Applications (NO_GEOGRAPHY, byte-verified field list).
+
 ## Reconciliation log
 
 Numbers reconciled against the artifact before acting (Rule 15).
