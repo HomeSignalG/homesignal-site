@@ -17,6 +17,12 @@
 //
 // The case: adams-county-building-permits, 21,506 rows with a blank `BuildingUse`.
 // Run: node scripts/run-unit-tests.mjs   (or: node test/arcgis-type-const-with-map.test.mjs)
+//
+// GENERIC — the NON-TERMINAL members of the closed use_type set (lib/map.js::TYPE_EXACT maps
+// both to cat('other')). A constant stands in for a value the publisher never gave, so it must
+// stay refinable by the downstream keyword rules; a terminal category there would be a guess
+// that fixes the pin SHAPE on no evidence.
+const GENERIC = ['Development', 'unclassified'];
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
@@ -94,7 +100,7 @@ console.log('\n3) ONLY type_map — 130 live entries. Behaviour must be byte-for
     JSON.stringify(byCase));
 }
 
-console.log('\n4) the registry itself — only the ruled entry sets both');
+console.log('\n4) the registry itself — every entry that sets both is deliberate and receipted');
 {
   const reg = JSON.parse(readFileSync(join(root, 'supabase/functions/get-address-report/jurisdiction-registry.json'), 'utf8'));
   const ent = [];
@@ -102,13 +108,21 @@ console.log('\n4) the registry itself — only the ruled entry sets both');
     if (Array.isArray(o)) o.forEach(walk);
     else if (o && typeof o === 'object') { if (o.registry_id) ent.push(o); Object.values(o).forEach(walk); }
   })(reg);
-  const both = ent.filter((e) => e.use_type_const && e.type_map).map((e) => e.registry_id);
-  ok(both.length === 1 && both[0] === 'adams-county-building-permits',
-    'exactly one entry sets both, and it is the one the founder ruled on', both.join(', '));
-  // A constant is for honest absence. An entry with a type_map but no BLANK values in the source
-  // gains nothing from one — so a new pairing should be a deliberate, receipted decision.
-  const adams = ent.find((e) => e.registry_id === 'adams-county-building-permits');
-  ok(/empty|blank/i.test(adams._receipts || ''), 'the pairing is explained in the entry\'s own receipts');
+  const both = ent.filter((e) => e.use_type_const && e.type_map);
+  // Deliberately NOT a count. The pairing was ruled legitimate (founder, 2026-08-03: an empty
+  // publisher field is honest absence, kept under a generic label), so pinning the number would
+  // fail on the next honest use of it — as it did on centre-county-pa-building-permits the very
+  // next day. What must hold is the PROPERTY, on every entry that pairs them.
+  ok(both.length >= 1, 'at least one entry exercises the pairing', String(both.length));
+  for (const e of both) {
+    // A constant is for honest absence. An entry with a type_map but no BLANK values in the source
+    // gains nothing from one — so a pairing must be a deliberate, receipted decision.
+    ok(/empt|blank|stated nothing/i.test(e._receipts || ''),
+      `${e.registry_id}: the pairing is explained in the entry's own receipts`);
+    ok(GENERIC.includes(e.use_type_const),
+      `${e.registry_id}: the constant is a GENERIC bucket (${GENERIC.join('/')}), never a terminal guess`,
+      String(e.use_type_const));
+  }
 }
 
 console.log(fails ? `\n${fails} check(s) FAILED` : `\nAll checks passed.`);
