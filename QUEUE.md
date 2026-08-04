@@ -1048,30 +1048,53 @@ An engine-side edge-reachability preflight is **proposed, not built** (that is a
   the real Montgomery County **Ohio** service host is still unfound. Entity was confirmed from
   CONTENTS only (Midtown, Belmont, Ryburn Ave, Merrimac Ave, Riverside Dr = City of Dayton, Ohio).
 
-## OH — TOLEDO / LUCAS RECON (in progress, nothing wired)
+## OH — CLOSED FOR NOW (2026-08-05). 136 / 335 live, 199 dark
 
-Two REAL orgs confirmed by NAME, not hostname: **City of Toledo** `2snQ88YUjP9CNEbe` and **Lucas
-County Auditor** `T8dczfwPixv79EgZ`. Their own servers were derived from item URLs (the Dayton
-method): `gis.toledo.oh.gov/arcgis/rest` (10 folders + 43 root services) and
-`lcaudgis.co.lucas.oh.us/gisaudserver/rest` (19 folders).
+Every OH county is wired, partially wired, blocked, or **exhausted on enumeration** — none is merely
+unprobed. Full per-county table + receipts: `docs/source-registry.md` "OHIO — STATE CLOSED FOR NOW".
 
-- **No permit or case ledger on either server.** Toledo `Public/PlanningComAppUNC10419` is a misnomer —
-  it is the plan commission's **basemap** (zoning districts, comprehensive plan, future land use,
-  parcels), all reference polygons. Lucas's `Tyler` / `TylerProduction` folders are **not empty** this
-  time but hold only Parcels / Cadastre / Pictometry — the Auditor's property data, not permits. A
-  vendor-named folder is still not a source, whether empty or full.
-- `data.toledo.gov` hub (49 datasets): the "Toledo-Lucas County Planning Commission" and "Demolition"
-  entries are **web APPS** (Experience Builder / instant / webappviewer), not data layers.
-- **CANDIDATE — `Vibrancy_Projects` layer 2** on `services.arcgis.com` (**known-reachable host**):
-  119 rows, point geometry, real addresses + project descriptions. `Incentive_Type` complete and sums
-  to 119 (Facade Improvement Grant 77 / White Box Grant 32 / Planning Grant 10); `Program_Year` sums
-  to 119 and reaches **2026 (19 rows)** — genuinely current. **Measured page lift: 16 of 30 Lucas
-  pages.** ⚠️ Two real weaknesses to decide on before wiring: **no status column** (needs
-  `status_const`) and **no date column** — `Program_Year` is an INTEGER, so every record would be
-  undated (Dayton would have been 71/264 undated; this is 119/119).
-- **`DemoCandidates` REJECTED** — 690 rows but no date, no status, no case number: `Projected_` is a
-  free-text window ("July-December 2024", already past) and the layer is titled "Demo Candidates
-  2022". A pre-decision candidate list naming private residential addresses, not a filing record.
+- **Wired:** Franklin 45/49 · Cuyahoga 39/52 · Hamilton 34/56 · Summit 14/41 (coverage limit:
+  unincorporated townships only) · Delaware 4/19 seam.
+- 🔴 **Montgomery 0/39 — BLOCKED AT THE EDGE.** Source found, wired, deployed, reverted. **The only
+  OH reprobe candidate**; config is proven correct, so it is a one-object re-add if egress opens.
+- **Lucas 0/30 — REJECTED `NO_TEMPORAL_FIELD`.** `Vibrancy_Projects` had 119 rows on a
+  known-reachable host, complete vocabularies summing to 119, current through 2026, and a measured
+  **16 of 30** page lift — rejected anyway on the founder ruling: **119/119 undated is the
+  disqualifier, not the missing status.** `Program_Year` is an integer with nothing to fall back on.
+  `DemoCandidates` also rejected (no date, no status, no case number; a pre-decision candidate list
+  naming private residences). Neither server carries a permit or case ledger; Toledo's
+  `PlanningComAppUNC10419` is a misnomer for the plan commission's **basemap**, and Lucas's `Tyler`
+  folders hold only cadastral data — **a vendor-named folder is not a source whether empty or full.**
+- **Medina 0/19 · Butler 0/15 · Warren 0/15 — exhausted.** Medina's org (confirmed Ohio from township
+  names) is utilities/parcels/zoning. Butler/Warren surfaced the City of Monroe (~15k pop, negligible
+  lift) and OKI's `Prioritization_Projects_2026`, rejected as 62 polylines with an opaque `NoteType`
+  integer and no date — the San Jose opaque-code class.
+
+## NEXT — MISSOURI. 264 pages, 53 live, **211 dark (20.1%)**, measured 2026-08-05
+
+Measured **before** probing, per the standing rule. Same shape as Ohio: metro builds, not trim —
+**six counties at 0% hold 156 of the 211 dark pages (74%)**.
+
+| County | Pages | Live | Dark | % |
+|---|---:|---:|---:|---:|
+| St. Louis | 63 | 0 | **63** | 0.0 |
+| Jackson | 57 | 32 | 25 | 56.1 |
+| Greene | 23 | 0 | **23** | 0.0 |
+| Franklin | 22 | 0 | **22** | 0.0 |
+| Jefferson | 19 | 0 | **19** | 0.0 |
+| St. Charles | 15 | 0 | **15** | 0.0 |
+| Cass | 14 | 0 | **14** | 0.0 |
+| Boone | 14 | 4 | 10 | 28.6 |
+| Clay | 21 | 11 | 10 | 52.4 |
+| Platte | 16 | 6 | 10 | 37.5 |
+
+**Two prior MO findings to reconcile before re-deriving them** (recorded in the earlier MO wire
+pass): KCMO's BLDS ledger **STALLED 2025-05-09** — that is a `STALE` reprobe candidate and Jackson /
+Clay / Platte are already partially live from another source; and the **STL RDX host was unreachable
+on dual egress**, which now reads as a possible `EDGE_EGRESS_BLOCKED` case and should be re-checked
+against §0 rather than assumed dead.
+
+**St. Louis County (63 dark) is the single largest prize in the state** and the first target.
 
 ## ⚠️ METHOD ERROR — never select a re-cache batch by "still dark"
 

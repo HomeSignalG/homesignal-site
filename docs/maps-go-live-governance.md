@@ -16,6 +16,94 @@ suspicion into the governance record is the failure this whole rule set exists t
 
 ---
 
+## 0. A `pg_net` 200 IS NOT EVIDENCE THE ENGINE CAN FETCH A HOST (2026-08-05)
+
+**This leads the doc because it is invisible to every other check in it.**
+
+A `pg_net` 200 proves **Postgres egress** can reach the host. It says **NOTHING** about the **Deno
+edge runtime the engine runs on**. For any **NEW host**, the first post-deploy re-cache is a
+**DEPLOY VERIFICATION**: read `arcgis_reports[].fetched/emitted` and `quarantined`, **never
+`counts`**. A page with 0 development records is indistinguishable from a legitimately empty one.
+
+**Corollary:** `services*.arcgis.com` is proven reachable by dozens of live entries, so an
+AGO-hosted candidate carries **materially less risk** than a city-hosted one. **Prefer it when both
+exist.**
+
+### Why no amount of recon can catch this
+
+**All recon in this repo is `pg_net`-based** — the sandbox has no egress, so every probe, every
+enumeration, every vocabulary count in this document's playbook goes out through Postgres. The
+engine does not. An edge-egress block is therefore invisible to recon **by construction**: no number
+of green probes can detect it, because the probes never touch the blocked path. Tampa and El Paso
+were caught during recon only because their block happened to be an **HTTP 403 that `pg_net` also
+received** — that was luck, not method.
+
+### The case that produced this rule — Dayton OH, wired, deployed, reverted the same hour
+
+`dayton-oh-capital-improvement-projects` passed every gate in §3: first-party host derived from the
+org's own item URLs, server root enumerated in full, both vocabularies complete and summing exactly,
+geometry verified, page lift measured at 22 of 39 before any commit. It merged (#594) and deployed —
+and the deploy was the first moment anything touched the real path:
+
+```
+fetch failed: error sending request for url (https://maps.daytonohio.gov/.../MapServer/0/query?...):
+client error (Connect): Connection reset by peer (os error 104)
+```
+
+Identical on **4 of 4** Montgomery ZIPs, `fetched 0 / emitted 0`. **The control is the same URL, byte
+for byte** — envelope, `inSR`/`outSR=4326`, `outFields=*`, `resultRecordCount=1000` — returning
+**HTTP 200, 413,143 bytes, 212 features** through `pg_net` minutes apart. The error is at **Connect**,
+before HTTP, so it is not a query-shape, URL-length or response-size problem: it is a source-IP block
+on Supabase edge egress. Reverted in #595; Montgomery OH stayed **0 / 39** with zero residue, because
+a fetch that never connected wrote nothing.
+
+**Remove the entry; do not leave it documented in place.** A registry entry whose fetch can never
+succeed still declares its `coverage`, and the coverage gate is what the config-based reading of
+"Live" keys on — 39 pages marked covered against zero records is the §5 trap exactly.
+
+---
+
+## 0b. The seven disqualifiers — record which one, and whether it came from an ENUMERATION or a GUESS
+
+| # | Disqualifier | Means | Fixable by waiting? |
+|---|---|---|---|
+| 1 | `NO_GEOGRAPHY` | no ZIP, no address, no coordinates — cannot be scoped or geocoded | no |
+| 2 | `STALE` | the dates **stopped** | **yes** — reprobe |
+| 3 | `AGGREGATE_NOT_PER_RECORD` | counts/rollups, not filings | no |
+| 4 | `NEW_CONNECTOR_FAMILY` | would require connector code, not config | not without a build |
+| 5 | `candidates_exhausted` | enumerated every surface, nothing there | only if the publisher adds one |
+| 6 | `WRONG_RECORD_CLASS` | live, fresh, per-record, geolocated — and the **wrong ledger** | no |
+| 7 | `NO_TEMPORAL_FIELD` | there are **no dates at all** | **no** |
+| — | `EDGE_EGRESS_BLOCKED` | reachable from `pg_net`, unreachable from the engine (§0) | **yes** — reprobe |
+
+**6 — `WRONG_RECORD_CLASS`. Mechanical checks all passed; only reading the CONTENT caught it.**
+Worked example, Dayton's `AccelaIncidents_UPDATE`: 12,879 rows, genuinely fresh (`RECORD_DATE`
+2026-01-02 → 2026-07-01), per-record, point geometry — and `COMPLAINT_TYPE` is **`HOUSING` on every
+one of the 12,879 rows**, with statuses `CLOSED 5,072 / OPEN 4,955 / ACTIVE 1,520 / ABATED 965 /
+PAID 196 / ABATED-PAID 61 / RESEARCH-UNDER REVIEW 48 / APPEAL-PPC 26 / EXTENSION GRANTED 23 /
+NO SERVICE 13` (summing to 12,879). Abatement, payment and appeal outcomes on housing complaints are
+a **code-enforcement ledger**; the `development` bucket is *permits, construction filings, planning
+notices*. It would also have published complaints against **named private residents' addresses** as
+development records. A schema that passes every mechanical check can still be the wrong ledger.
+
+**7 — `NO_TEMPORAL_FIELD`, and it is DISTINCT FROM `STALE`.** Stale means the dates stopped; this
+means **there are none**, and only the second is unfixable by waiting. A source where **no** record
+can be dated cannot answer *"what is being built now"*, cannot be windowed, cannot age out, and
+cannot be reprobed for staleness — it is **permanently unfalsifiable**, because a live register and
+an abandoned one are indistinguishable forever.
+
+The bar, stated as the practice this project has actually followed: **every wire shipped here
+carries a real date, or an honest null on a MINORITY of records.** Dayton would have been 71 of 264
+undated and that was already flagged as a weakness.
+
+Worked example, Toledo's `Vibrancy_Projects` — **REJECTED (founder, 2026-08-05)**: 119 rows on a
+known-reachable host, complete vocabularies each summing to 119, current through 2026 (19 rows), and
+a measured lift of 16 of 30 Lucas pages. Rejected anyway. **119 of 119 undated is the disqualifier —
+not the missing status column.** `Program_Year` is an INTEGER, the same class as Delaware County PA's
+integer `Year`; there the entry still had `Entry_Date` to fall back on, **here there is nothing**.
+
+---
+
 ## 1. The goal — all states live
 
 **12,722 ZIP pages across 50 states.** LIVE means every ZIP page in the state is modelled,

@@ -5514,3 +5514,105 @@ would have marked all 39 Montgomery pages covered while the database held **zero
 precise trap already recorded as a standing answer ("the workbook's Live column is COVERAGE-GATE
 based, not record based"). Measured from the database, which is the source of truth: Montgomery OH
 is **0 / 39**, unchanged, and the failed fetches wrote nothing.
+
+---
+
+## 🚫 TOLEDO / LUCAS OH — REJECTED (2026-08-05): `NO_TEMPORAL_FIELD`, a seventh disqualifier
+
+**Nothing wired. Lucas stays 0 of 30.** Both orgs were confirmed by NAME, not hostname — **City of
+Toledo** `2snQ88YUjP9CNEbe` and **Lucas County Auditor** `T8dczfwPixv79EgZ` — and both first-party
+servers were derived from their own item URLs (the Dayton method), never guessed:
+`gis.toledo.oh.gov/arcgis/rest` (10 folders + 43 root services) and
+`lcaudgis.co.lucas.oh.us/gisaudserver/rest` (19 folders).
+
+**No permit ledger and no case ledger on either server.**
+
+- Toledo's `Public/PlanningComAppUNC10419` is a **misnomer** — despite reading as "Planning
+  Commission Applications", its 8 layers are the plan commission's **basemap**: Official Zoning
+  District Map Numbers, 20/20 Comprehensive Plan, Future Land Use, Zoning Districts, City Parcels,
+  Jurisdictions, Overlay Districts. All reference polygons. Third instance of **read the layers, not
+  the service name** (after Summit layer 0 and Dayton's "Completed").
+- Lucas's `Tyler` and `TylerProduction` folders are **not empty this time** — but they hold only
+  Parcels, Cadastre_Annotation, Pictometry, Road_Centerlines and Auditor GIS layers, i.e. the
+  Auditor's property data. **A vendor-named folder is not a source whether it is empty or full**
+  (Summit's `tyler` and Allegheny's `Accela` were empty; this one is full and still not permits).
+- `data.toledo.gov` (49 datasets): the two "Toledo-Lucas County Planning Commission" entries and
+  "Demolition" are **web APPLICATIONS** (Experience Builder / instant / webappviewer), not data
+  layers — their only distributions are app URLs.
+
+### The one real candidate, and why it was rejected anyway
+
+**`Vibrancy_Projects` layer 2** (`services.arcgis.com/2snQ88YUjP9CNEbe`, a **known-reachable** host —
+which after the Dayton edge block is a genuine advantage). It had a strong case: 119 rows, point
+geometry, real project addresses and descriptions, **both vocabularies complete and each summing to
+exactly 119** — `Incentive_Type` Facade Improvement Grant 77 / White Box Grant 32 / Planning Grant
+10, and `Program_Year` reaching **2026 with 19 rows**, so genuinely current. **Measured page lift: 16
+of 30 Lucas pages.**
+
+**FOUNDER RULING (2026-08-05): REJECTED. `119/119 undated is the disqualifier, not the missing
+status column.`**
+
+> *"Every wire this project has shipped carries a real date or an honest null on a MINORITY of
+> records — Dayton was 71/264 and that was already flagged. A source where NO record can be dated
+> cannot answer 'what is being built now', cannot be windowed, cannot age out, and cannot be
+> reprobed for staleness. It would be permanently unfalsifiable — we could never tell a live
+> register from an abandoned one."*
+
+`Program_Year` is an **INTEGER**, the same class as Delaware County PA's integer `Year` — but **there
+the entry still had `Entry_Date` to fall back on; here there is nothing**. The layer's only other
+date-shaped fields are geocoder output columns.
+
+**`NO_TEMPORAL_FIELD` is a seventh disqualifier and is DISTINCT FROM `STALE`.** Stale means the dates
+**stopped** — reprobing can fix it. This means there are **none** — waiting cannot. Recorded in
+`docs/maps-go-live-governance.md` §0b.
+
+### Also rejected here
+
+**`DemoCandidates`** — 690 rows, point geometry, but **no date, no status, no case number**. Its only
+attributes are `Parcel`, `Address` and `Projected_`, a free-text window ("July-December 2024",
+already past), and the parent item is titled "Demo Candidates 2022". A **pre-decision candidate list
+naming private residential addresses**, not a filing record — `NO_TEMPORAL_FIELD` plus the
+`WRONG_RECORD_CLASS` concern that sank Dayton's Accela layer.
+
+---
+
+## OHIO — STATE CLOSED FOR NOW (2026-08-05). 136 / 335 live, 199 dark
+
+Every OH county is now wired, partially wired, blocked, or exhausted on **enumeration** — none is
+merely unprobed.
+
+| County | Pages | Live | Dark | Standing |
+|---|---:|---:|---:|---|
+| Franklin | 49 | 45 | 4 | **wired** (Columbus) |
+| Cuyahoga | 52 | 39 | 13 | **wired** (Cleveland) |
+| Hamilton | 56 | 34 | 22 | **wired** (Cincinnati) |
+| Summit | 41 | 14 | 27 | **partially wired** — county commission reviews UNINCORPORATED townships only; Akron and the incorporated cities run their own planning departments. A documented coverage limit, not a defect. |
+| Delaware | 19 | 4 | 15 | seam off Columbus |
+| Montgomery | 39 | 0 | 39 | 🔴 **BLOCKED AT THE EDGE** — source found, wired, deployed, reverted. See the Dayton section above. |
+| Lucas | 30 | 0 | 30 | **exhausted** — `NO_TEMPORAL_FIELD` (this section) |
+| Medina | 19 | 0 | 19 | **exhausted** — org confirmed Ohio from CONTENTS (Hinckley, Granger, Montville, Litchfield, Brunswick Hills, Wadsworth townships). 348 items: utilities, parcels, zoning, floodplain, parks, recycling. No permit or planning-case ledger; the nearest, "Medina Board of Revision Cases", is property-tax valuation appeals. |
+| Butler | 15 | 0 | 15 | **exhausted** — see below |
+| Warren | 15 | 0 | 15 | **exhausted** — see below |
+
+**Butler + Warren, with receipts.** Plain `"Butler County" AND Ohio` / `"Warren County" AND Ohio`
+searches returned 177 and 97 results dominated by cross-state noise (Indiana DNR, Virginia Tech
+student orgs, Miami University) — the standing search-lies rule. Two real first-party owners
+surfaced:
+
+- **`comgisservice` = the City of Monroe, Ohio** (confirmed from contents: it publishes "Monroe
+  Parcels in Butler County" *and* "Monroe Parcels in Warren County" — the city straddles the line).
+  Its 50 items are reference cartography plus `Subdivisions`, `Monroe Planning and Zoning` and
+  `City of Monroe Annexation Records`. Monroe's population is ~15k, so the achievable page lift is
+  negligible; logged, not wired.
+- **OKI Regional Council of Governments** `AeX7yhXqx2UBQyL7` — the Cincinnati-area MPO covering
+  Butler, Warren, Hamilton and Clermont. Its 312 items are planning studies (bike level-of-stress,
+  heat islands, job hubs, watersheds, freight plan). Its one project-shaped layer,
+  **`Prioritization_Projects_2026`, is REJECTED**: 62 **polylines** whose only classification is
+  `NoteType`, an **opaque SmallInteger**, with `Name`/`Notes` free text, **no status column and no
+  project date** (only `created_date`/`last_edited_date` edit stamps). Opaque coded vocabulary with
+  nothing to map verbatim is the **San Jose `planningpermits30`** rejection class; combined with the
+  missing date this is a map-markup layer, not a project register.
+
+**🔁 REPROBE CANDIDATES, named:** **Dayton** — the only OH county with a *found, verified, correctly
+configured* source. Its `_receipts` and this document carry the full config; if the edge-egress block
+lifts it is a one-object re-add. Nothing else in OH is waiting on time.
