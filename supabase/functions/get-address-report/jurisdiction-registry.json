@@ -10649,6 +10649,57 @@
       },
       "recency_days": 365,
       "_receipts": "2026-07-16 PA wire pass (WPRDC - Pittsburgh's regional CKAN portal, the founder-directed reuse of sources/ckan.ts). FRESH SAME-DAY: max issue_date 2026-07-15 over 63,520 rows; datastore modified 2026-07-16T03:20. Native zip_code + own latitude/longitude per record. 13 statuses VERBATIM via datastore SQL group-by: Issued(15,435)->approved, Completed(42,423)->operating, In Review/Ready For Issue/Application Finalization/Applicant Revisions/Amendment-* -> proposed, Expired(4,624)/Revoked(688)/Stop Work(29) excluded. 14 permit_type values VERBATIM: kept BUILDING(17,784) + Building & Development Application(8,264) + Demolition Permit(1,254) + Land Operations Permit(87); DROPPED at source: ELECTRICAL(20,007)/MECHANICAL(7,999)/Suppression/Fire Alarm/Occupancy Only/Sign/Floodplain/Occupant Load Placard/Storm Water/Plan Review Meeting. No per-row URL column -> dataset-precision record_url (landing page live-verified 200)."
+    },
+    {
+      "registry_id": "allegheny-county-asbestos-permits",
+      "platform": "ckan",
+      "base_url": "https://data.wprdc.org",
+      "resource_id": "8e91e9ae-45db-4d79-b217-e1d0830dbe87",
+      "dataset_url": "https://data.wprdc.org/dataset/allegheny-county-asbestos-permit",
+      "jurisdiction": "Allegheny County Health Department",
+      "coverage": [
+        {
+          "state": "PA",
+          "county": "Allegheny"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "facility_name",
+          "permit_specifications"
+        ],
+        "status_raw": "status",
+        "type_source": "project_type",
+        "file_date": "permit_issue_date",
+        "address": "s_address",
+        "lat": "latitude",
+        "lng": "longitude",
+        "zip": "zip_code",
+        "case_number": "permit_number"
+      },
+      "type_map": {
+        "PAA": "Development",
+        "UND": "Development",
+        "DEM": "Development",
+        "RES": "Development"
+      },
+      "status_to_bucket": {
+        "approved": [
+          "Active - Issued",
+          "Approved - Renovation",
+          "Approved - Demolition",
+          "Issued"
+        ],
+        "operating": [
+          "Closed - Completed"
+        ],
+        "exclude": [
+          "Closed - Cancelled"
+        ]
+      },
+      "record_url_precision": "dataset",
+      "recency_days": 730,
+      "_receipts": "2026-08-04 PA/Allegheny wire - the county-wide seam behind Pittsburgh. WPRDC CKAN, the same host and connector as pittsburgh-pli-permits, so CONFIG ONLY, no code change. DISCOVERY BY ENUMERATION, not a guessed host: WPRDC package_search q=permit returned 35 packages. PASDA was enumerated FIRST and rejected for this county - pasda/AlleghenyCounty/MapServer carries 41 layers, all base cartography (contours, parcels, building footprints, landslides) and ZERO development-activity layers; the same sweep rejected pasda/MontgomeryCounty (30 layers), pasda/DauphinCounty (2) and pasda/LehighCounty (7). Allegheny's own gisdata.alleghenycounty.us was also enumerated: folder Accela is EMPTY (0 services, 0 folders), OPENDATA = Address_Points_Test1 + Parcels, EGIS = address/buildings/municipalities/parcels, LandRecords = Parcel_Features, DPW = facilities/districts/snow routes. LIVENESS (three-part): name clean; entity = Allegheny County Health Department asbestos permitting, county-wide across all municipalities; newest permit_issue_date 2026-06-29, oldest 2025-08-11. BOTH VOCABULARIES COMPLETE AND VERBATIM, each summing to EXACTLY 433 (positive control = the resource row total): status 6 values - 'Active - Issued' 185, 'Closed - Completed' 119, 'Approved - Renovation' 80, 'Approved - Demolition' 46, 'Closed - Cancelled' 2, 'Issued' 1; project_type 4 values - PAA 307, UND 46, DEM 46, RES 35. TYPE IS A CONSTANT VIA type_map AND THAT IS THE HONEST CHOICE, NOT A SHORTCUT: project_type is a permit-CLASS code, not a building-use vocabulary - the 307 PAA rows span a sushi restaurant, West Penn Hospital, Chevron Science Center, a church, a school and Lock 4 of the Allegheny River. Mapping it to any single use would be fabrication, so all four codes map to the generic member 'Development' (the 'Other project' shape) - the Sussex/Weld/Phoenix precedent. use_type_const was deliberately NOT used: it exists only in sources/arcgis.ts and is NOT a field on CkanRegistryEntry, so on a ckan entry it would be SILENTLY IGNORED (the option-surface audit class), and ckan.ts:227 (typeHit?.value || 'unclassified') publishes an unmapped type rather than failing closed. COLUMN COMPLETENESS measured live: facility_name 433/433, zip_code 433/433, permit_issue_date 433/433, permit_number 433/433, latitude 425/433 (the 8 without coordinates fall back to the s_address geocode path). Native zip_code means the page count is EXACT, not a spatial-radius estimate. latitude/longitude are TEXT but numOrNull uses Number() so they parse; title is an array and readCol FILTERS nulls before joining, so rows with a null permit_specifications are safe. permit_issue_date is a real date type, so recency_days' default ISO literal applies and no recency_expr is needed. recency_days 730 rather than 365 because the resource spans only 2025-08-11..2026-06-29 - 730 admits nothing stale while preserving the lift as the window slides. record_url_precision 'dataset': there is no per-record URL column and the county Open Document Portal search is not addressable per permit_number, so templating one would be guessing; the landing page was live-verified 200 (43 KB). MEASURED LIFT BEFORE WIRING: 50 of Allegheny's 92 dark pages carry at least one record, 216 records land on those dark pages, 433 rows total across 78 distinct ZIPs. PUBLISHER SUSPENSION - DISCLOSED, NOT HIDDEN: the package notes carry a note dated 07/29/2026 stating the county identified undercounting after an October 2025 software transition and has SUSPENDED updates pending a new solution, and that permits in 'in progress' status are excluded. What is published is real, dated, addressed and per-record, and undercounting is incompleteness rather than fabrication (every wired permit source drops noise classes deliberately) - but this entry WILL age, so it belongs on the nightly reprobe list and the coverage claim must never be restated as complete county coverage. REJECTED ALONGSIDE, on ENUMERATION not a guess: 'Applications for Development, ACCD' (resource f3b9a9aa) is a genuinely DIFFERENT package from the previously-rejected 'Implemented Stormwater Control Measures, ACCD', but falls to the same disqualifier now byte-verified from its actual field list - municipali, Feature_ID, Status, App_Date, App_Sort, Acres, LandUse, PreImperv, PostImperv, Dschrg_Pts, Max_nonStr - municipality only, NO address, NO zip, NO coordinates in the queryable CSV, with geometry only in a SHP resource the ckan connector cannot read. NO_GEOGRAPHY. Allegheny County Asbestos Permits archive resource 0a5408a4 (2013-2025) was left unwired - superseded span, and the current resource already covers the live window."
     }
   ],
   "csv": [
