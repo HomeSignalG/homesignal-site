@@ -5193,8 +5193,10 @@ oldest), or ship `recency_expr` for arcgis and delete the constant. Verify after
 ✅ **THIS ITEM IS NOW ENFORCED, NOT JUST SCHEDULED — `test/dated-window-must-not-go-blind.test.mjs`
 (2026-08-04).** A recurring manual review is an instrument that cannot prove it ran, and it had
 already failed once: the session that shipped `centre-county-pa-building-permits` did not register
-it here, because the grep that would have found this item ran against a stale checkout predating
-it. The suite now derives the list from the registry itself and fails when an entry is **already
+it here, because the grep that would have found this item **read zero files and reported nothing** —
+it ran from the wrong working directory with `2>/dev/null`, so every missing path was silent and
+grep exited 0. *(Corrected: this was first written up as a stale-checkout effect. It was not — the
+item was present in every tree the session had.)* The suite now derives the list from the registry itself and fails when an entry is **already
 blind** (hard, always) or **goes blind at year-end** (unless named in its `EXPIRING_ACKNOWLEDGED`
 ratchet). It ships a self-test proving the cliff/grace decision fires on each violation class, so
 it cannot go vacuous. **Consequence to expect: Worcester will turn CI red on 2027-01-01** — that

@@ -1239,3 +1239,54 @@ look at `completed_at` on the job itself. And **do not report a CI diagnosis fro
 check-runs summary alone**; it is a cache, and a cache that lags is indistinguishable from a
 job that never finishes. Same family as "an instrument must prove it ran before its silence
 counts as evidence" — here the instrument was not silent, it was confidently stale.
+
+---
+
+## Rules added 2026-08-04b — two ways a search lies, and they are not the same
+
+### Confirm the tree matches `origin/main` before any measurement or grep
+
+Founder instruction after **three stale checkouts in one session**. A container restart silently
+resets cwd and can move `HEAD` backwards; nothing errors. It produced a **false revert alarm** (a
+restored tree read as "5 merged PRs are missing", nearly cancelling a clean deploy) and a **wrong
+test-file count** (78 vs 83 — which is what finally exposed it). Run
+`node scripts/check-tree-fresh.mjs` at session start and again after any restart. It compares
+CONTENT, not commit identity (a squash-merge gives a different SHA for identical content), ignores
+the nightly `sitemap.xml` / `source-monitor-report.md` churn, and warns about uncommitted work
+before you reset anything.
+
+### NEVER suppress stderr on a search you intend to act on
+
+⚠️ **This is a DIFFERENT failure from the one above, and it was initially misdiagnosed as that
+one.** A missed `QUEUE.md` item — a new fixed-window registry entry shipping unregistered — was
+written up as a stale-tree effect. It was not: the item was present in **every** tree the session
+ever had (`git show 606aa11:QUEUE.md | grep -ci "dated constant"` → 1).
+
+The real cause: the grep ran from the **wrong working directory** with `2>/dev/null`. Every path
+argument failed to exist, stderr was discarded, and grep exited **0 with no output**. Reproduced
+verbatim:
+
+```
+$ cd /home/user && grep -rn "DATED CONSTANT" docs/*.md QUEUE.md 2>/dev/null
+$ echo $?
+0
+$ cd /home/user && grep -rn "DATED CONSTANT" docs/*.md QUEUE.md
+grep: docs/*.md: No such file or directory
+grep: QUEUE.md: No such file or directory
+```
+
+**A search that read ZERO FILES is byte-identical to a search that found ZERO MATCHES.** `2>/dev/null`
+is what makes them indistinguishable, and a relative path is what makes it likely. So: drop the
+suppression, or pass absolute paths, or confirm the file count the search actually covered. The
+`check-tree-fresh` script does **not** catch this class — different failure, same shape.
+
+Both belong to *"an instrument must prove it ran before its silence counts as evidence."* The tree
+check answers *am I looking at the right files*; this rule answers *did I look at any files at all*.
+
+### A misdiagnosis that is plausible is more expensive than one that is obviously wrong
+
+"Stale checkout" explained the symptom, matched a pattern that had genuinely occurred twice that
+session, and was wrong. It would have shipped a fix (the tree check) that does not prevent the thing
+it was written to prevent. **When a cause is inferred from a pattern rather than reproduced, say so
+and then reproduce it** — here, one `git show <ref>:FILE | grep -c` against the actual historical
+tree falsified it in seconds.
