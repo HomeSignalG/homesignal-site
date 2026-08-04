@@ -24,6 +24,13 @@
  * note     — anything a reader needs to not over-read the result
  */
 export const SURFACES = {
+  'verify-property-page': {
+    surface: 'property.html (saved-place dossier; Del Valle 78617 is the pilot)',
+    tables: ['app_projects'],
+    capped: true,
+    note: 'SIGNED-OUT ONLY — property.html is authenticated, so this exercises the EMPTY state plus '
+        + 'the data a dossier would read. The rendered dossier itself is NOT covered.',
+  },
   'verify-development': {
     surface: 'map page (homesignalmap.html?zip=)',
     tables: ['development_reports', 'app_community_meta', 'property_reports'],
@@ -114,11 +121,33 @@ export const SURFACES = {
 /** Surfaces that exist and have NO verifier. This is where the next silent defect lives. */
 export const UNVERIFIED_SURFACES = [
   'properties.html  — app_projects, app_changes',
-  'property.html    — app_projects, app_changes, envRisk (property_reports is covered by verify-development §4.5, the PAGE is not)',
   'today.html       — app_projects, app_changes, meetings',
   'index.html       — app_community_meta (isCovered), app_changes',
   'maps.html        — app_projects, app_changes, meetings, facilities',
   'reports.html     — app_projects',
+];
+
+/** PARTIALLY covered surfaces — a verifier exists but does NOT cover the whole page.
+ *
+ *  WHY THIS STATE EXISTS (2026-08-04). property.html got its first verifier, and neither existing
+ *  bucket could describe the result honestly. Listing it under SURFACES alone reads as "covered"
+ *  — the exact over-read the surface rule was written to stop. Leaving it in UNVERIFIED_SURFACES
+ *  reads as "nothing checks this", which is now false. A binary model forces one of two wrong
+ *  answers, so the model was wrong.
+ *
+ *  Each entry MUST name the covering verifier AND the residual in plain words. "Partial" without
+ *  a stated residual is just "covered" with extra steps.
+ */
+export const PARTIAL_SURFACES = [
+  {
+    page: 'property.html',
+    verifier: 'verify-property-page',
+    covered: 'signed-out surface (honest empty state, no persona leak, seed reachable only by opt-in) '
+           + 'and the app_projects data a dossier would read (source_ref / coords / name)',
+    residual: 'the RENDERED SIGNED-IN DOSSIER is not covered — property.html is authenticated, so an '
+            + 'unauthenticated check can only reach the empty state. Covering it needs a test account, '
+            + 'which is a founder call.',
+  },
 ];
 
 /** Print the declaration. Call FIRST in main(), before any assertion output. */

@@ -14,7 +14,7 @@
 // Matrix of record: QUEUE.md item 0d.
 // Run: node scripts/run-unit-tests.mjs   (or: node test/verifier-surface-declaration.test.mjs)
 import { readFileSync, readdirSync } from 'node:fs';
-import { SURFACES, UNVERIFIED_SURFACES, surfaceBanner } from '../scripts/lib/surface-banner.mjs';
+import { SURFACES, UNVERIFIED_SURFACES, PARTIAL_SURFACES, surfaceBanner } from '../scripts/lib/surface-banner.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail) => {
@@ -87,6 +87,26 @@ console.log('\n4) the surfaces with NO verifier are named — that is where the 
   // The one that actually bit: the map page reads the uncapped cache, and it IS verified.
   ok('the map page has at least one verifier',
     Object.values(SURFACES).some((s) => /homesignalmap/.test(s.surface)));
+}
+
+console.log('\n5) PARTIALLY covered surfaces must name their RESIDUAL, not just their verifier');
+{
+  // A binary covered/uncovered model forced a wrong answer the first time a verifier covered only
+  // part of a page (property.html, 2026-08-04): "covered" over-reads, "unverified" under-reads.
+  // Partial is a real state — but only if it states what is still NOT checked.
+  ok('PARTIAL_SURFACES is a declared export', Array.isArray(PARTIAL_SURFACES));
+  const unverifiedPages = UNVERIFIED_SURFACES.map((e) => e.split(/\s/)[0]);
+  for (const p of PARTIAL_SURFACES) {
+    ok(`${p.page}: names the verifier that covers it`, !!(p.verifier && SURFACES[p.verifier]),
+      `verifier "${p.verifier}" is not declared in SURFACES`);
+    ok(`${p.page}: states what IS covered`, !!(p.covered && p.covered.length > 20));
+    ok(`${p.page}: states the RESIDUAL — what is still unchecked`,
+      !!(p.residual && p.residual.length > 20),
+      'a partial with no stated residual is "covered" with extra steps');
+    ok(`${p.page}: is NOT double-listed in UNVERIFIED_SURFACES`,
+      !unverifiedPages.includes(p.page),
+      'a page is unverified, partial, or covered — exactly one');
+  }
 }
 
 console.log(fail ? `\n${fail} check(s) FAILED` : `\nAll ${pass} verifier-surface-declaration checks passed.`);
