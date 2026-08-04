@@ -15,10 +15,17 @@
 //
 // WHY THIS IS A TEST AND NOT A CALENDAR REMINDER. QUEUE.md carries a "review every January"
 // item for exactly these entries. On 2026-08-04 a session shipped a NEW fixed-window entry
-// (`centre-county-pa-building-permits`) and did not register it there — the grep that would have
-// found the item ran against a stale checkout that predated it. A recurring manual review is an
-// instrument that cannot prove it ran. This one fires on its own, at the right time, from the
-// data itself.
+// (`centre-county-pa-building-permits`) and did not register it there.
+//
+// ⚠️ CORRECTED 2026-08-04: the first version of this comment blamed a stale checkout. THAT WAS
+// WRONG, and the real cause is worse. The item WAS present in every tree the session ever had
+// (verified: `git show 606aa11:QUEUE.md | grep -ci "dated constant"` → 1). The grep found nothing
+// because it ran from the WRONG WORKING DIRECTORY with `2>/dev/null` — every path argument failed
+// to exist, stderr was suppressed, and grep exited 0 with NO OUTPUT. A search that read zero files
+// is byte-identical to a search that found zero matches.
+//
+// A recurring manual review is an instrument that cannot prove it ran; so is a suppressed grep.
+// This one fires on its own, at the right time, from the data itself.
 //
 // WHAT IT ENFORCES:
 //   1. RATCHET — the set of fixed-window entries is pinned. A new one cannot ship unnoticed.
