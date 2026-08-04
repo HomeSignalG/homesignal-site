@@ -1141,3 +1141,79 @@ Enforced: `dev_zip_source_ids` now reads `app_projects` with `record_kind = 'dev
 scoreboard cannot be fed cache numbers. Accepted only because it reproduces the row-419 baseline
 exactly across ten states, which the cache-based version did not.
 
+
+---
+
+## Rules added 2026-08-04 (PA seam close — Centre + York)
+
+### Rule 13 governs VOCABULARY WIDTH, not just counts — enumerate at the window you WIRE
+
+A source's vocabulary is a **function of the window**, not a property of the layer. York's
+use-flag set holds **29** distinct combinations in a 3-year window and **32** in the 5-year
+window actually wired; three combinations exist only in the wider one. Enumerating at one
+width and wiring at another drops the difference to `unclassified` with nothing failing —
+the same silent-nothing class as a wrong `extra_where`. Probe at the exact `recency_days`,
+`extra_where` and status field the entry will ship with.
+
+### Characterise a zero in TWO steps: unwindowed control, then windowed
+
+"This page is dark" is not a finding. Both PA pages that ended with no records were honest,
+and honest in **different ways** — Centre 16686 returned **0 unwindowed** (true absence: no
+permits within 3 mi at all), while York 17372 returned **80 unwindowed / 0 windowed** (80
+plans on record, none in the last 5 years). Only the second would change if the window
+changed. Report which one it is, or the number is not yet information.
+
+### A joined flag array is NOT an empty `type_source`
+
+`readCol` joins a `column_map` array with a space and keeps every non-empty part, so a
+multi-column flag set is wireable as `type_map` keys with **no connector change** — but a
+row with every flag `NO` produces `"NO NO NO NO NO NO NO NO"`, a PRESENT value. The
+2026-08-03 ruling fills `use_type_const` only on an EMPTY value, so those rows need an
+**explicit key**; the constant will never fire on them. A single-column type source with a
+genuinely blank cell is the opposite case and does use the constant. One ruling, two
+mechanisms — pick by asking what the connector actually reads, not what the publisher meant.
+
+### Before a flag array can be a key, prove the flags are never NULL
+
+The join **drops** null/empty parts, so one NULL flag yields a SHORTER key that silently
+misses the map. Probe it explicitly, and give the zero a non-zero control from the same query
+shape (York: 0 NULL-flag rows, control `PLAN_TITLE IS NOT NULL` → 1,269).
+
+### A re-fire selector must key on the field that changes AT FIRE, not at collect
+
+Filtering pending work on `refreshed_at` re-fired the same 9 Centre ZIPs twice and never
+advanced, because `refreshed_at` only moves when `dev_refresh_collect()` runs. The claim
+field is `last_refresh_attempt_at`, set at fire time by `dev_refresh_fire_batch`. This is the
+80005 remediation-anchor lesson in the other direction: there the selector moved too fast and
+dropped rows that still needed fixing; here it never moved and re-did the same ones.
+
+### `dev_refresh_collect()` returns a GLOBAL count — it is not evidence about your fires
+
+It collects every pending response, including the scheduled rolling refresh's. A return of
+"10" after firing 9 of your own says nothing about yours. Measure the target rows directly.
+
+### An in-flight request is not a failed one
+
+18 requests with no `net._http_response` row were read as the `fire_failed` class; they were
+still in flight and all landed. `dev_refresh_log_fire_failures()` only inspects requests whose
+response has LANDED (`join net._http_response`), so it does not false-positive on in-flight
+work — confirmed by reading its definition. When an instrument seems to be firing wrongly,
+read it before trusting the alarm; here the reading was the error, not the instrument.
+
+### An opaque code can be decoded on evidence — but say which evidence, and test the decoys
+
+Centre's `Open_Y_N` (C/O/I) carries no `codedValues` domain. It was resolved by three
+independent lines — the field NAME, a **recency inversion** (73% open among 2026 permits vs
+2.4% across all history), and a **`Close_Date` asymmetry** (31.7% of C rows vs 0.4% of O
+rows). A candidate decoder that FAILED is worth recording too: `Percent_Complete` is null on
+58,085 of the 58,676 C rows and decodes nothing. The one value with no signal (`I`, n=1) is
+DECLARED in `exclude`, not left unmapped. Decoding on evidence is permitted; guessing is not,
+and the difference is whether the receipt is in the entry.
+
+### A count pinned in a test is a snapshot; assert the PROPERTY
+
+`test/arcgis-type-const-with-map.test.mjs` asserted "exactly one entry sets both `type_map`
+and `use_type_const`". That was true the day it was written and failed on the next honest use
+of the pairing, one day later. It now asserts, for EVERY such entry, that the pairing is
+explained in its own receipts and that the constant is a GENERIC (non-terminal) bucket. Pin
+the invariant, not the inventory.
