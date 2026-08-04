@@ -1217,3 +1217,25 @@ and `use_type_const`". That was true the day it was written and failed on the ne
 of the pairing, one day later. It now asserts, for EVERY such entry, that the pairing is
 explained in its own receipts and that the constant is a GENERIC (non-terminal) bucket. Pin
 the invariant, not the inventory.
+
+### `get_check_runs` can serve STALE state — confirm a "hung" job with `list_workflow_jobs`
+
+PR #579's two `unit` checks reported `in_progress` for ~25 minutes and I reported a stuck
+runner. **Both had actually completed `success` at 03:46:40 and 03:46:55 — 2m19s and 2m15s,
+entirely normal.** The check-runs endpoint was serving state ~25 minutes out of date;
+`list_workflow_jobs` on the run id had the truth, including per-step timings.
+
+**But do not over-trust the fallback either — measured the same session.** On the very next
+PR (#580) BOTH endpoints froze on identical `in_progress` state for 13+ minutes, returning
+byte-identical step timestamps across polls, so `list_workflow_jobs` is not guaranteed live.
+What it reliably adds is *per-step* detail — a step with a `started_at` and no `completed_at`,
+and a plausible elapsed time, is the only positive evidence of real progress available. When
+both endpoints agree on a frozen state, you cannot distinguish slow from stale from the API at
+all: say so, and do not report either diagnosis as fact.
+
+Two rules follow. **A long-pending check is a claim about the API, not about CI** — before
+concluding a job is hung, queued, or contended, read `list_workflow_jobs` for the run and
+look at `completed_at` on the job itself. And **do not report a CI diagnosis from the
+check-runs summary alone**; it is a cache, and a cache that lags is indistinguishable from a
+job that never finishes. Same family as "an instrument must prove it ran before its silence
+counts as evidence" — here the instrument was not silent, it was confidently stale.
