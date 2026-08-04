@@ -708,6 +708,9 @@ async function handleRequest(req: Request): Promise<Response> {
         if (g.lat == null || g.lng == null) return null;   // failed → quarantine (ckan.ts)
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
+      // ZIP centroid for the GEOCODE geofence (sources/geo-fence.ts) — without it the
+      // distance half of the fence fails open. Source-supplied coords are never fenced.
+      zipCentroid: { lat: clat, lng: clng },
     });
     // TASK 1 (CSV twin) — same generic, coverage-gated connector for first-party portals whose
     // interface is a published CSV file (e.g. San Diego's seshat.datasd.org approvals ledger).
@@ -733,6 +736,9 @@ async function handleRequest(req: Request): Promise<Response> {
         if (g.lat == null || g.lng == null) return null;   // failed → quarantine (carto.ts)
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
+      // ZIP centroid for the GEOCODE geofence (sources/geo-fence.ts) — without it the
+      // distance half of the fence fails open. Source-supplied coords are never fenced.
+      zipCentroid: { lat: clat, lng: clng },
     });
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");

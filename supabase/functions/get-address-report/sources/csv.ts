@@ -35,6 +35,7 @@ import type {
   Bucket, ColumnMap, ColumnRef, ExcludedStatus, NormalizedRecord, StatusToBucket,
   UnmappedStatus, CaseFoldMatch, NormalizedLookup,
 } from "./socrata.ts";
+import { fenceGeocode, filedZipOf } from "./geo-fence.ts";
 import {
   coverageMatches,
   buildBucketLookup, buildTypeLookup, resolveNormalized, noteCaseFold, caseFoldList,
@@ -224,7 +225,7 @@ async function runEntry(
     if (bucket === undefined) { unmappedCount.set(statusRaw, (unmappedCount.get(statusRaw) ?? 0) + 1); continue; }
     if (hit.caseInsensitive) noteCaseFold(caseFold, "status", statusRaw, hit.matchedKey);
     if (bucket === "exclude") { excludeCount.set(statusRaw, (excludeCount.get(statusRaw) ?? 0) + 1); continue; }
-    const rec = await normalizeRow(row, entry, statusRaw, bucket, deps, report, typeLookup, caseFold);
+    const rec = await normalizeRow(row, entry, statusRaw, bucket, deps, report, typeLookup, caseFold, zip);
     if (rec) records.push(rec);
   }
 
@@ -248,6 +249,7 @@ async function normalizeRow(
   report: CsvRunReport,
   typeLookup: NormalizedLookup<string> | null,
   caseFold: Map<string, CaseFoldMatch>,
+  reportZip: string | null,
 ): Promise<NormalizedRecord | null> {
   const cm = entry.column_map;
   const title = String(readCol(row, cm.title) ?? "").trim();
@@ -279,11 +281,22 @@ async function normalizeRow(
     const g = await deps.geocode(address);
     if (!g) { report.geocode_failures++; report.quarantined.push({ reason: "geocode failed", sample: address }); lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area"; }
     else {
-      lat = g.lat; lng = g.lng; geoPrecision = "address"; scope = "point";
-      if (g.match_type) geoQuality.match_type = g.match_type;
-      if (g.matched_address) geoQuality.matched_address = g.matched_address;
-      if (g.geocode_source) geoQuality.geocode_source = g.geocode_source;
-      if (g.needs_review !== undefined) geoQuality.needs_review = g.needs_review;
+      // GEOFENCE (anti-fabrication) — the shared implementation, identical across all five
+      // connectors. Census range-interpolation can match the same street name in another
+      // city/state. A miss NULLS the coords — the record stays listed as an area item, the
+      // untrusted marker is never rendered. Source-supplied coords are NEVER fenced.
+      const verdict = fenceGeocode(g, filedZipOf(readCol(row, cm.zip), reportZip), deps.zipCentroid);
+      if (!verdict.ok) {
+        report.geocode_failures++;
+        report.quarantined.push({ reason: verdict.reason, sample: address });
+        lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area";
+      } else {
+        lat = g.lat; lng = g.lng; geoPrecision = "address"; scope = "point";
+        if (g.match_type) geoQuality.match_type = g.match_type;
+        if (g.matched_address) geoQuality.matched_address = g.matched_address;
+        if (g.geocode_source) geoQuality.geocode_source = g.geocode_source;
+        if (g.needs_review !== undefined) geoQuality.needs_review = g.needs_review;
+      }
     }
   } else {
     geoPrecision = "jurisdiction"; scope = "area"; lat = null; lng = null;

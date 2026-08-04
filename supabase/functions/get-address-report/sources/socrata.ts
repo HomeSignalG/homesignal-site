@@ -388,15 +388,10 @@ async function runEntry(
   return { records, report };
 }
 
-// GEOCODE geofence constant + distance — kept in lockstep with sources/arcgis.ts
-// (GEOCODE_FENCE_MI / milesBetween). A geocoded point farther than this from the report
-// ZIP centroid is an untrusted cross-city/state match and is nulled (area scope).
-const GEOCODE_FENCE_MI_GEO = 25;
-function milesBetweenGeo(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const dLat = (lat2 - lat1) * 69;
-  const dLng = (lng2 - lng1) * 69 * Math.cos(((lat1 + lat2) / 2) * Math.PI / 180);
-  return Math.sqrt(dLat * dLat + dLng * dLng);
-}
+// The geofence lives in ONE place — sources/geo-fence.ts. It used to be duplicated here
+// as GEOCODE_FENCE_MI_GEO/milesBetweenGeo "kept in lockstep" with arcgis.ts, which is exactly
+// the divergence this collapse removes.
+import { fenceGeocode } from "./geo-fence.ts";
 
 async function normalizeRow(
   row: Record<string, unknown>,
@@ -451,20 +446,10 @@ async function normalizeRow(
       // lookups; a miss NULLS the coords — the record stays listed as an area item, the
       // untrusted marker is never rendered. Source-supplied coords (the branch above) are
       // NEVER fenced.
-      const filedZip = gi.filedZip;   // mapped ZIP col → embedded ZIP → reportZip (same fence, more accurate filed ZIP)
-      const matchedZip = ((g.matched_address || "").match(/\b(\d{5})(?:-\d{4})?\s*$/)?.[1]) ?? null;
-      const zipMismatch = !!(filedZip && matchedZip && filedZip !== matchedZip);
-      const c = deps.zipCentroid;
-      const fenceMiles = c ? milesBetweenGeo(c.lat, c.lng, g.lat, g.lng) : null;
-      const outOfFence = fenceMiles != null && fenceMiles > GEOCODE_FENCE_MI_GEO;
-      if (zipMismatch || outOfFence) {
+      const verdict = fenceGeocode(g, gi.filedZip, deps.zipCentroid);
+      if (!verdict.ok) {
         report.geocode_failures++;
-        report.quarantined.push({
-          reason: zipMismatch
-            ? `geocode geofence: matched ZIP ${matchedZip} != filed ${filedZip} — coords nulled`
-            : `geocode geofence: point ${Math.round(fenceMiles!)} mi from ZIP centroid (> ${GEOCODE_FENCE_MI_GEO}) — coords nulled`,
-          sample: address,
-        });
+        report.quarantined.push({ reason: verdict.reason, sample: address });
         lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area";
       } else {
         lat = g.lat; lng = g.lng; geoPrecision = "address"; scope = "point";
