@@ -5072,3 +5072,129 @@ private copy, and that **all 5 were actually checked**. Suite 85 → 86 files.
 
 ⚠️ **The guard's first version matched the old identifiers inside socrata.ts's own explanatory
 COMMENT.** It now matches a definition, not a mention — a grep is a lead, not a fact.
+
+---
+
+## MONTGOMERY COUNTY PA — `montgomery-county-pa-act247-proposals` GO-LIVE MEASURED: 62 dark → 0 (2026-08-04)
+
+Third PA Act 247 entry (after Chester and York) and PA's largest remaining dark block.
+**Config only.** Baseline captured BEFORE mutating: 64 pages, 2 live, 62 dark, 0 missing cache rows.
+
+| | before | after |
+|---|---|---|
+| Montgomery live / dark | 2 / 62 | **64 / 0** |
+| PA live / dark | 288 / 272 | **350 / 210** (62.50%) |
+| national | 4,532 / 12,722 | **4,591 / 12,722 (36.09%)** |
+
+**3,628 records — IDENTICAL in `development_reports` and `app_projects`**, across all 64 pages.
+**0 invariant violations**: 0 missing `record_url`, 0 missing coordinates, 0 `unclassified`,
+0 non-`point` scope, 0 non-`record` precision. Bidirectional gate proof: **PA/Montgomery ONLY,
+64 pages, 0 records on any other county.**
+
+⚠️ **The 2 pages that were already "live" were NOT partial coverage** — they are exactly
+`19118` + `19128`, the two physically-Philadelphia ZIPs modelled under Montgomery by the Census
+crosswalk, lit by `philadelphia-li-permits` spill. They now carry BOTH sources (19118: 162
+sourced = 42 Montgomery + 120 Philadelphia; 19128: 247 = 48 + 199). That is real adjacency
+across the city line, not leakage. **A "which pages are still dark" retry selector would have
+skipped both**, and they would have silently missed the new source — the retry selector was
+`refreshed_at`, the Chester lesson, and it is what caught them.
+
+### The ruling, recorded so it is not re-proposed
+
+`status_const` = `Submitted for county review` → bucket **`proposed`** (founder ruling
+2026-08-04). Act 247 requires a municipality to SUBMIT a subdivision or land-development plan
+to the COUNTY commission for REVIEW BEFORE the municipality acts, so a row is a filing under
+advisory review, not an approval; understating stage is the honest direction. On arcgis,
+`status_const` is the RAW value resolved through `status_to_bucket` (unlike socrata, where it
+IS the bucket), so the constant is a self-describing string that is also a key — wording
+deliberately identical to `chester-county-pa-act247-plans`. Measured after go-live: proposed
+3,628 / approved 0 / operating 0.
+
+### Type is a constant — same conclusion as Allegheny, reached the same way
+
+Neither candidate column is a use vocabulary. `Proposal_Type` enumerates EXACTLY against the
+layer total as a positive control — Plan Only 5,463 + Ordinance Only 301 + Plan and Ordinance
+56 + NULL 1,381 = **7,201** — but it is a FILING CLASS. `Land_Use_1` is a closed 19-value set
+whose values are OPAQUE CODES (`T RDE RAE RSA RSD AG RE RM MUN INE RDC INS U RME PO IND C OS`);
+the eight R-prefixed residential variants cannot be decoded without the county's legend, and
+`use_type` drives the pin SHAPE. `use_type_const: "Development"` (Sussex/Weld/Phoenix).
+**Future refinement if the county publishes a Land_Use legend — not chased (founder).**
+
+### The NULL-type problem dissolves inside the window
+
+1,381 of 7,201 NULL layer-wide (19%), but only **4** inside 1,095 days — and those 4 are exactly
+the rows with a NULL `Proposal_Name` and NULL `URL_Documents`. Measured: window AND named AND
+type IS NULL → **exactly 0**. The `Proposal_Name IS NOT NULL` guard drops 4 unusable rows and
+leaves a clean 813 in-scope. In-scope completeness: 817 → 813 named, 813 with URL, **817/817
+`MCPC_Number`**.
+
+### ⚠️ Window differs from both siblings — FLAGGED, not silently reconciled
+
+Named-row counts: **365d 253 · 1095d 813 · 1825d 1,396.** Chester and York both use
+`recency_days: 1825` on the SAME Act 247 mechanism (plan review is slow-moving). The founder
+ruled **1095**, so 1095 is wired (Rule 0 — a founder-set value is not mine to change). The 1,396
+figure is recorded so the three PA Act 247 windows can be reconciled deliberately later rather
+than by drift.
+
+### Verified rather than assumed
+
+- **Native SR is PA State Plane (wkid 102729 / latestWkid 2272, feet), NOT WGS84.** The
+  connector's `outSR=4326` IS honoured by this server — probed live, returned
+  `spatialReference {wkid 4326}` with first vertex `[-75.282085, 40.070857]` (Spring Mill Road,
+  Montgomery County PA). Had it been ignored, every centroid would have been a State Plane FOOT
+  value rendered as a lat/lng. **Check outSR on any layer whose native SR is not 4326.**
+- **`return_centroid` deliberately NOT set** — classic ArcGIS Server MapServer silently ignores
+  it; the shipped shoelace centroid is the path.
+- **`column_map.lat/lng` = `__lat`/`__lng`** — the Sussex defect otherwise lands every record on
+  the ZIP centroid at `scope=area`, silently, while still publishing and counting normally.
+- **`record_url_precision: "record"`, PROVEN to discriminate** (San Diego OpenDSD standing
+  answer): real id 108325 → 5,329 bytes of document listing; bogus id 99999999 → 2,178 bytes
+  matching not-found. Stronger than either sibling, both dataset-precision.
+
+### Editorial note
+The Norristown page (19401, 86 records) carries **five data-centre filings** in March 2026 —
+600 River Road, 411 Swedeland Road, 2100 Renaissance Blvd, 3200 Horizon Drive and Renaissance
+Blvd. Relevant to the data-centre thread.
+
+---
+
+## LEHIGH COUNTY PA — CLOSED (2026-08-04): WAF on its own server, hub enumerated clean
+
+The last PA county never probed beyond PASDA. Three surfaces, three verdicts:
+
+- **PASDA `pasda/LehighCounty/MapServer`** — 7 layers, all base cartography (abandoned
+  railroads, railroads, road centreline, building footprints, municipal boundary, parcels,
+  wards). **candidates_exhausted.**
+- **Its own `gis.lehighcounty.org`** — live but behind an **Incapsula/Imperva WAF**: returns a
+  212-byte JS challenge page (`_Incapsula_Resource`) to `pg_net`, not JSON. The Tampa class.
+  **verification_blocked → nightly reprobe list.**
+- **Its hub `open-data-lehighgis.opendata.arcgis.com`** — DCAT enumerated in full: **13
+  datasets**, all parcels / assessment / owner / voting precincts / bridges / landuse CODES /
+  farmland preservation / COVID testing. **Zero development-activity layers. candidates_exhausted.**
+
+Note the hub here is NOT empty (unlike Montgomery's) — it is populated and genuinely carries no
+activity layer, which is a different and firmer verdict than "the hub listed nothing."
+
+## PA SEAM — STANDING AFTER MONTGOMERY (measured 2026-08-04)
+
+**PA: 560 pages · 350 live · 210 dark · 62.50%.**
+
+| county | pages | live | dark | verdict |
+|---|---|---|---|---|
+| Montgomery | 64 | 64 | **0** | ✅ wired today |
+| Delaware | 40 | 40 | 0 | ✅ wired |
+| Chester | 39 | 39 | 0 | ✅ wired |
+| York | 47 | 46 | 1 | ✅ wired |
+| Philadelphia | 46 | 45 | 1 | ✅ Carto L&I |
+| Centre | 35 | 34 | 1 | ✅ wired |
+| **Allegheny** | 119 | 77 | **42** | ✅ wired; residual is COVERAGE-LIMITED, not unprobed — the asbestos source has no records in those 42 ZIPs |
+| **Lancaster** | 56 | 0 | **56** | ❌ enumerated across 3 surfaces: no activity layer exists |
+| **Bucks** | 50 | 0 | **50** | ❌ enumerated: PASDA docket STALLED 2023-10-26 |
+| **Dauphin** | 30 | 0 | **30** | ❌ enumerated: hub DCAT 30 datasets, all base |
+| **Lehigh** | 34 | 5 | **29** | ❌ hub enumerated clean; own server WAF-blocked (reprobe) |
+
+**Every PA county is now either wired or rejected on ENUMERATION.** The 210 remaining dark pages
+are not unprobed — 165 are firm rejections (Lancaster 56 + Bucks 50 + Dauphin 30 + Lehigh 29),
+42 are coverage-limited inside a wired county, and 3 are single stragglers. **The PA seam is
+closed.** The only routes left are a Bucks reprobe (its docket may resume), a Lehigh reprobe (if
+the WAF lifts), or municipal-level wiring in Lancaster/Dauphin.

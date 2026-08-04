@@ -851,6 +851,50 @@ Lehigh (all base cartography, 0 activity layers) · Allegheny's own gisdata serv
 folder EMPTY) · Dauphin (30 datasets, all parcels/hydrology/zoning — candidates_exhausted) ·
 ACCD Applications (NO_GEOGRAPHY, byte-verified field list).
 
+## PA/Montgomery — `montgomery-county-pa-act247-proposals` GO-LIVE VERIFIED (2026-08-04)
+
+**DONE.** PR #588, merged `0e24089`, deployed from main, re-cached, re-materialized, measured
+in BOTH tables. Baseline captured BEFORE mutating: 64 pages, 2 live, 62 dark.
+
+| | before | after |
+|---|---|---|
+| Montgomery live / dark | 2 / 62 | **64 / 0** |
+| PA live / dark | 288 / 272 | **350 / 210** (62.50%) |
+| national | 4,532 | **4,591 / 12,722 (36.09%)** |
+
+3,628 records, **identical in `development_reports` and `app_projects`**, all 64 pages,
+**0 invariant violations** (0 missing record_url, 0 missing coords, 0 unclassified, 0 non-point
+scope, 0 non-record precision). Gate proof: PA/Montgomery ONLY.
+
+Founder ruling recorded in `_receipts`: `status_const` buckets to **proposed** (Act 247 = a
+filing submitted for county review before local action, not an approval). Measured after
+go-live: proposed 3,628 / approved 0 / operating 0.
+
+⚠️ **Window 1095 differs from both siblings (Chester + York use 1825) — FLAGGED, not silently
+reconciled.** Named-row counts 365d 253 · 1095d 813 · 1825d 1,396. Reconcile deliberately.
+
+**Two method notes worth keeping.** (1) The 2 pages already "live" were the Philadelphia-physical
+crosswalk ZIPs 19118/19128; a "still dark" retry selector would have SKIPPED them and they would
+have silently missed the new source — `refreshed_at` caught them (the Chester lesson, second time
+it has paid). (2) I read a verification subquery in the SAME statement as `dev_refresh_collect()`
+and got the PRE-mutation snapshot, then briefly mistook it for a blocked write. **Never measure a
+mutation in the statement that performs it.**
+
+## PA SEAM CLOSED (2026-08-04) — 560 pages · 350 live · 210 dark
+
+Every PA county is now wired or rejected ON ENUMERATION. The 210 dark are not unprobed:
+165 firm rejections (Lancaster 56 · Bucks 50 · Dauphin 30 · Lehigh 29), 42 coverage-limited
+inside wired Allegheny, 3 single stragglers (York/Philadelphia/Centre).
+
+**Lehigh closed this session** — PASDA 7 base layers · own `gis.lehighcounty.org` behind an
+Incapsula WAF (212-byte JS challenge to pg_net → verification_blocked, reprobe) · hub DCAT
+enumerated 13 datasets, all parcels/assessment/voting/bridges/landuse-codes → candidates_exhausted.
+Note its hub is POPULATED and still carries no activity layer — a firmer verdict than Montgomery's
+empty DCAT.
+
+Remaining PA routes: Bucks reprobe (docket may resume), Lehigh reprobe (if the WAF lifts), or
+municipal-level wiring in Lancaster/Dauphin. **Nothing further is cheaply available in PA.**
+
 ## Reconciliation log
 
 Numbers reconciled against the artifact before acting (Rule 15).
