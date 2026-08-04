@@ -61,6 +61,47 @@ a fetch that never connected wrote nothing.
 succeed still declares its `coverage`, and the coverage gate is what the config-based reading of
 "Live" keys on — 39 pages marked covered against zero records is the §5 trap exactly.
 
+### `EDGE_EGRESS_BLOCKED` REQUIRES A POSITIVE CONTROL — otherwise it is just "unreachable"
+
+The rule above has an inverse failure mode: concluding "maybe the edge can reach it" about a host
+nothing can reach, and wiring it to find out. **Do not.** The verdict `EDGE_EGRESS_BLOCKED` is only
+available when a path **demonstrably works** — Dayton had one (`pg_net` returning 200 / 413,143 bytes
+/ 212 features on the exact connector URL). A host that fails from every path tested is
+**unreachable**, and there is nothing to justify the wire-and-see.
+
+**Read the failure MODE, not just the failure.** They are different verdicts:
+
+| Signature | Class | Wire-and-see justified? |
+|---|---|---|
+| Another path returns 200 | `EDGE_EGRESS_BLOCKED` | **yes** — the engine is the only untested path |
+| `Connection reset by peer` at Connect, with a working control | edge/IP block (Dayton) | yes |
+| HTTP **403** from a WAF, all paths | WAF block (Tampa, El Paso) | no |
+| DNS fails | dead host | no |
+| **TLS handshake never completes** (blackhole) | unreachable | **no** |
+
+**Worked example — St. Louis Regional Data Exchange (`rdx.stldata.org`), re-probed 2026-08-05.**
+The 2026-07-17 rejection recorded it as unreachable "from BOTH egress paths (pg_net 30s+60s timeouts
+AND GitHub-runner fetch failed ×2)" — and that record **does** name its two paths, so it is more
+careful than a "dual egress" summary suggests. Neither path is the Deno edge runtime, so it was worth
+re-checking against §0. It reproduces exactly, on all three URLs, and the timing breakdown is the
+verdict:
+
+```
+Timeout of 60000 ms reached. Total time: 60000.329 ms
+  (DNS time: 70.867 ms, TCP/SSL handshake time: 59929.462 ms, HTTP Request/Response time: 0.000 ms)
+```
+
+**DNS resolves in 71 ms; the TLS handshake consumes the entire 60 s and never completes; the HTTP
+request is never sent.** That is a packet blackhole, not a reset and not a 403. Two independent cloud
+egress paths blackhole it and **no path returns anything**, so there is no positive control and the
+edge class does not apply. **RDX stays rejected as `unreachable`** — the verdict is unchanged, but it
+is now recorded with the mechanism instead of a summary.
+
+**When recording any unreachability, name the exact paths tested and the exact failure mode.**
+"Unreachable from both egress paths" reads settled and is not: it does not say *which* two, and it
+does not distinguish a blackhole from a reset from a 403 — three different verdicts with three
+different next steps.
+
 ---
 
 ## 0b. The seven disqualifiers — record which one, and whether it came from an ENUMERATION or a GUESS

@@ -1889,6 +1889,19 @@ consolidated per-record permit ledgers anywhere we could find.
   building-permits database (updated ~monthly per the city site) but the host is
   **UNREACHABLE from BOTH egress paths** (pg_net 30s+60s timeouts AND GitHub-runner
   fetch failed ×2) — engine could never fetch it. → nightly reprobe list.
+  - ✅ **RE-PROBED 2026-08-05 against governance §0 and the verdict is UNCHANGED — now with the
+    mechanism rather than a summary.** The two paths named above are `pg_net` and a GitHub runner;
+    **neither is the Deno edge runtime the engine runs on**, which is why this was re-opened. It
+    reproduces exactly on all three URLs (`/`, `/api/3/action/status_show`,
+    `/api/3/action/package_search?q=permit`), 60 s timeout each, and the timing breakdown is the
+    answer: **`DNS time: 70.867 ms, TCP/SSL handshake time: 59929.462 ms, HTTP Request/Response
+    time: 0.000 ms`**. DNS resolves in 71 ms; the **TLS handshake consumes the whole 60 s and never
+    completes**; the request is never sent. That is a packet **blackhole** — not a `Connection reset
+    by peer` (Dayton), not a WAF 403 (Tampa/El Paso), not a DNS failure.
+  - **This is NOT the `EDGE_EGRESS_BLOCKED` class, and the distinction is the point.** That verdict
+    requires a **positive control** — a path that demonstrably works, as Dayton had (`pg_net` 200 /
+    413,143 bytes / 212 features on the exact connector URL). Here **no path returns anything**, so
+    there is nothing to justify wiring it to test the edge runtime. Class: **`unreachable`**.
 - **St. Louis city's own portal (stlouis-mo.gov/data)**: building permits ship as
   a ~monthly 30 MB Microsoft Access ZIP download — no API, not wireable as data.
 - **Springfield (gisdata-cosmo hub, live)**: 0 permit/construction datasets in the
