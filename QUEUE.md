@@ -1070,31 +1070,44 @@ unprobed. Full per-county table + receipts: `docs/source-registry.md` "OHIO — 
   lift) and OKI's `Prioritization_Projects_2026`, rejected as 62 polylines with an opaque `NoteType`
   integer and no date — the San Jose opaque-code class.
 
-## NEXT — MISSOURI. 264 pages, 53 live, **211 dark (20.1%)**, measured 2026-08-05
+## MISSOURI — CLOSED (2026-08-05). Opened 53 / 264 (20.1%), 211 dark
 
-Measured **before** probing, per the standing rule. Same shape as Ohio: metro builds, not trim —
-**six counties at 0% hold 156 of the 211 dark pages (74%)**.
+Every MO county is now wired or **rejected on enumeration**. Full per-county receipts:
+`docs/source-registry.md` "MISSOURI PASS". Shape confirmed the standing rule again — six counties at
+0% held **156 of the 211 dark pages (74%)**: metro builds, not trim.
 
-| County | Pages | Live | Dark | % |
-|---|---:|---:|---:|---:|
-| St. Louis | 63 | 0 | **63** | 0.0 |
-| Jackson | 57 | 32 | 25 | 56.1 |
-| Greene | 23 | 0 | **23** | 0.0 |
-| Franklin | 22 | 0 | **22** | 0.0 |
-| Jefferson | 19 | 0 | **19** | 0.0 |
-| St. Charles | 15 | 0 | **15** | 0.0 |
-| Cass | 14 | 0 | **14** | 0.0 |
-| Boone | 14 | 4 | 10 | 28.6 |
-| Clay | 21 | 11 | 10 | 52.4 |
-| Platte | 16 | 6 | 10 | 37.5 |
+**WIRED (3, registry arcgis 128 → 131):**
+- `stlouis-county-mo-subdivisions` — 42 rows, the only STL source carrying dates at all. **Native
+  PROP_ZIP → 18 EXACT pages** (a 3-mi radius would have estimated 33; the exact number was chosen).
+  STALE and said so: 2025-01-03…2025-12-18, and `DATESUBMIT >= 2026-01-01` returns **exactly 0**.
+  Ceiling: `MUNICIPALI` is UNINCORPORATED on 42/42.
+- `kcmo-development-cases` — the best-formed source in the state. 23,166 rows, **100% dated**, fresh to
+  within 4 days. **The 1825 window is load-bearing**: unwindowed it is 71% `Closed` (no recorded
+  outcome); in-window `Closed` vanishes and 17 self-describing values sum to exactly 2,675. `Closed` is
+  still mapped to `exclude` because the window moves. Lift **14** (Jackson 9 · Clay 2 · Platte 2 · Cass 1).
+- `columbia-mo-capital-projects` — 370 rows, status sums to exactly 370, genuinely current (to
+  2029-10-01). Lift **2**, and says so.
 
-**Two prior MO findings to reconcile before re-deriving them** (recorded in the earlier MO wire
-pass): KCMO's BLDS ledger **STALLED 2025-05-09** — that is a `STALE` reprobe candidate and Jackson /
-Clay / Platte are already partially live from another source; and the **STL RDX host was unreachable
-on dual egress**, which now reads as a possible `EDGE_EGRESS_BLOCKED` case and should be re-checked
-against §0 rather than assumed dead.
+**REJECTED with receipts:** STL zoning petitions (**0 of 3,945 dated**) · STL construction layers (no
+date field) · STL licence locations (WRONG_RECORD_CLASS) · **KCMO BLDS re-probed and still frozen at
+exactly `2025-05-09T20:22:20.907Z`** after three more months · `BW_NewCommercial_Permits` (1 page, 5
+ZIPs, one-off extract) · St. Charles CUP (**free-text prose statuses**, Douglas NV class), BZA (opaque
+`D-OT`/`D/G`/`SeeComme`, San Jose class), Zoning Application + PUD (no date), production host behind a
+**Cloudflare 403** · Greene/Springfield (no ledger) · Franklin + Jefferson (no first-party org).
 
-**St. Louis County (63 dark) is the single largest prize in the state** and the first target.
+**🔁 MO REPROBE CANDIDATES:** KCMO BLDS (stalled, would wire in minutes if it revives) · `rdx.stldata.org`
+(unreachable, TLS blackhole) · a `Subdivisions2026` successor if St. Louis publishes one.
+
+### Three reusable findings from this pass
+
+- **Fourth vendor-named folder that is not a source** — St. Louis's `Accela` holds only
+  `Accela_Parcels`. Tally: Summit `tyler` empty · Allegheny `Accela` empty · Dayton `Accela` housing
+  code-enforcement · St. Louis `Accela` parcels. **Content decides; the name promises nothing.**
+- **`preserveLayerIds: true` means layer ids are arbitrary** — STL's construction layers are **101**
+  and **100**, not 0, and the `/0` 404s came back as **HTTP 200 carrying an error object**.
+- **Unknown `*.maps.arcgis.com` subdomains return a byte-identical 12,477-byte generic portal.** Five
+  of six urlKey guesses hit it; the one real org differed at 18,684 bytes. Response size is a cheap
+  "this is not an org" discriminator before you spend a search.
 
 ## ⚠️ METHOD ERROR — never select a re-cache batch by "still dark"
 
