@@ -5662,6 +5662,38 @@ lifting out:
   only `Accela_Parcels`. The tally is now Summit `tyler` (empty), Allegheny `Accela` (empty), Dayton
   `Accela` (full — housing code enforcement), St. Louis `Accela` (full — parcels). **Content decides.**
 
+### GO-LIVE MEASURED (2026-08-05, post-deploy, both tables)
+
+| | before | after |
+|---|---|---|
+| MO live / dark | 53 / 211 (20.08%) | **83 / 181 (31.44%)** |
+| national | 4,604 (36.19%) | **4,636 / 12,722 (36.44%)** |
+
+**+30 MO pages.** Per-county: St. Louis 0 → **16** · Jackson 32 → **39** · Boone 4 → **6** ·
+Clay 11 → **13** · Platte 6 → **8** · Cass 0 → **1**.
+
+**Identical in both tables, 0 invariant violations:** `stlouis-county-mo-subdivisions` 39 records /
+16 ZIPs, `kcmo-development-cases` 1,074 / 13, `columbia-mo-capital-projects` 882 / 3 — the same counts
+in `development_reports` and `app_projects`, with **0 records missing `record_url`** and **0 point
+records missing coordinates**.
+
+**Bidirectional gate proof, live receipts:** `stlouis-county-mo-subdivisions` rides **MO/St. Louis
+only** (16 ZIPs); `kcmo-development-cases` rides **only** Jackson 8 / Clay 2 / Platte 2 / Cass 1 — its
+four declared counties and nothing else; `columbia-mo-capital-projects` rides **MO/Boone only** (3).
+
+⚠️ **THE NEW-HOST DEPLOY VERIFICATION PASSED — and it was read the right way.** `mapd.kcmo.org` had
+never been fetched by the engine. Per governance §0 the first post-deploy re-cache was read from
+`arcgis_reports[]`, not from `counts`: `kcmo-development-cases f=838 e=664` on ZIP 64108, alongside
+`stlouis-county-mo-subdivisions f=8 e=8` and `columbia-mo-capital-projects f=283 e=283`. Unlike
+Dayton, this new host is reachable from the Deno edge runtime. **The first probe fired ~1 minute after
+the deploy queued and returned an EMPTY `arcgis_reports` — a pre-deploy response.** Re-probed after
+the deploy completed; that is the trap §0 exists for, and it was caught by waiting rather than by
+reading a zero as a verdict.
+
+**Measured vs predicted:** St. Louis 16 against a predicted 18 (two of the layer's 18 ZIPs are not
+modelled as St. Louis County pages), KCMO 13 against 14, Columbia 3 against 2. Close enough to
+confirm the pre-wire method, and the measured number is the one that counts.
+
 ### REJECTED, with receipts
 
 | County | Candidate | Verdict |

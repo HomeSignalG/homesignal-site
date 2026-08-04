@@ -1070,7 +1070,14 @@ unprobed. Full per-county table + receipts: `docs/source-registry.md` "OHIO — 
   lift) and OKI's `Prioritization_Projects_2026`, rejected as 62 polylines with an opaque `NoteType`
   integer and no date — the San Jose opaque-code class.
 
-## MISSOURI — CLOSED (2026-08-05). Opened 53 / 264 (20.1%), 211 dark
+## MISSOURI — CLOSED (2026-08-05). **53 → 83 / 264 (20.08% → 31.44%), +30 pages**
+
+National **4,604 → 4,636 / 12,722 (36.44%)**. Per-county after: St. Louis 16 · Jackson 39 · Clay 13 ·
+Platte 8 · Boone 6 · Cass 1 · Greene/Franklin/Jefferson/St. Charles 0. Both tables identical
+(39/16, 1,074/13, 882/3 records/ZIPs), 0 invariant violations, gate proof clean in all three.
+⚠️ The `mapd.kcmo.org` **new-host deploy verification PASSED** (`f=838 e=664`) — and the first probe,
+fired ~1 min after the deploy queued, returned an EMPTY `arcgis_reports`. That pre-deploy response is
+exactly the §0 trap; it was caught by waiting, not by reading the zero as a verdict.
 
 Every MO county is now wired or **rejected on enumeration**. Full per-county receipts:
 `docs/source-registry.md` "MISSOURI PASS". Shape confirmed the standing rule again — six counties at
