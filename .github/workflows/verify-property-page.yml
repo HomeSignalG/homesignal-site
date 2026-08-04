@@ -30,11 +30,12 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    # PROVISIONAL BOUND — to be tightened from the first real run's measured duration, per the
-    # convention on verify-representative-zips ("measured max successful run: 5.9 min -> bound 45").
-    # It is set at all because an unbounded job inherits GitHub's 6-HOUR default, which is how
-    # verify-geocodes burned 11 consecutive 6 h cancellations.
-    timeout-minutes: 20
+    # MEASURED, not guessed (run 30922999400, the push-triggered run on the arming merge):
+    # total job 1 m 29 s — 75 s of that is the Playwright install, and the verify step itself is
+    # 3 s. Bound 10 = ~6.7x the measured total, headroom for a slow runner or a slow site while
+    # staying far under GitHub's 6-HOUR default, which is how verify-geocodes burned 11
+    # consecutive 6 h cancellations. Re-measure before loosening.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

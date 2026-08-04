@@ -5505,3 +5505,18 @@ missed dated-constants item was not a stale tree — it was `2>/dev/null` on a g
 cwd, which exits 0 with no output. The governance doc now LEADS with that rule; the tree check is
 kept but demoted to second-order. A plausible misdiagnosis costs more than an obvious one precisely
 because it ships.
+
+### `verify-property-page` — armed and MEASURED (2026-08-04)
+
+Both post-merge confirmations the founder required are done, and neither was assumed:
+
+- **Path filter registers.** The arming merge to `main` produced run **#1 via `push`** — distinct
+  from the `workflow_dispatch` run #2. (Note the ordering constraint found here: a workflow must
+  exist on the DEFAULT BRANCH before it is dispatchable — dispatching from the branch 404s — so
+  both confirmations are strictly post-merge.)
+- **Runtime measured → bound set.** Run `30922999400`: total **1 m 29 s**, of which the Playwright
+  install is 75 s and the verify step itself **3 s**. `timeout-minutes` 20 (provisional) → **10**
+  (~6.7x measured).
+- **The run is not vacuous.** Its own output: *All 14 checks passed*, and §5 independently
+  reproduced the DB figure — 78617 = **537 rows (508 development + 29 facility)**, 0 missing
+  `source_ref` / coords / name.
