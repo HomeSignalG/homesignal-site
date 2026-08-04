@@ -35,6 +35,8 @@
 // Run: node scripts/verify-maps-rest-shapes.mjs            (against production)
 //      SITE_BASE=http://localhost:8765 node scripts/verify-maps-rest-shapes.mjs
 import { chromium } from 'playwright';
+import { surfaceBanner } from './lib/surface-banner.mjs';
+surfaceBanner('verify-maps-rest-shapes');
 
 const BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
 const ZIP = process.env.HOME_ZIP || '78617';

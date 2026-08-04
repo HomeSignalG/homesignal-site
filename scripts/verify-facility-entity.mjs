@@ -13,6 +13,8 @@
 //
 // Read-only. Prints OBSERVED lines for the human report; exits 1 on any failed assertion.
 import { chromium } from 'playwright';
+import { surfaceBanner } from './lib/surface-banner.mjs';
+surfaceBanner('verify-facility-entity');
 
 const SITE = process.env.SITE_BASE || 'https://homesignal.net';
 const SB = 'https://qwnnmljucajnexpxdgxr.supabase.co';

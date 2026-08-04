@@ -27,6 +27,8 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { surfaceBanner } from './lib/surface-banner.mjs';
+surfaceBanner('verify-alerts-page');
 
 const cfg = readFileSync(new URL('../config.js', import.meta.url), 'utf8');
 const grab = (name) => {

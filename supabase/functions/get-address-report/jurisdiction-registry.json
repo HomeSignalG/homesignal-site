@@ -7856,6 +7856,7 @@
         "Agricultural Business": "Commercial",
         "Industrial": "Industrial"
       },
+      "use_type_const": "Development",
       "status_to_bucket": {
         "proposed": [
           "In Review",
@@ -7884,8 +7885,9 @@
         "exclude": []
       },
       "incremental_field": "CaseOpened",
+      "recency_days": 365,
       "record_url_precision": "record",
-      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. PACKET DATA ERROR CORRECTED: the packet gives date_field 'ApplicationDate', which DOES NOT EXIST on this layer — the live probe returns {\"error\":{\"code\":400,...\"'Invalid field: ApplicationDate' parameter is invalid\"}} (run 30370939582). Left uncorrected it would have gone into orderByFields and failed EVERY query for this entry. The real column is CaseOpened, used for both file_date and incremental_field. RECORD-PRECISION record_url via the per-record LinkToAccela column. TYPE BuildingUse 8 distinct values summing to 71674 (top: \"Residential\" 41688 / \"\" 21506 / \"Commercial\" 4877 / \"Single Family\" 2449 / \"Industrial\" 715 / \"Agricultural Business\" 352) gives Residential, Commercial and Industrial; the empty value (21,506) fails closed. STATUS 18 distinct values summing to 71674. No ZIP -> spatial. No recency_days: CaseOpened was not date-literal-probed, and an unverified DATE literal would risk quarantining the whole entry."
+      "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. PACKET DATA ERROR CORRECTED: the packet gives date_field 'ApplicationDate', which DOES NOT EXIST on this layer — the live probe returns {\"error\":{\"code\":400,...\"'Invalid field: ApplicationDate' parameter is invalid\"}} (run 30370939582). Left uncorrected it would have gone into orderByFields and failed EVERY query for this entry. The real column is CaseOpened, used for both file_date and incremental_field. RECORD-PRECISION record_url via the per-record LinkToAccela column. TYPE BuildingUse 8 distinct values summing to 71674 (top: \"Residential\" 41688 / \"\" 21506 / \"Commercial\" 4877 / \"Single Family\" 2449 / \"Industrial\" 715 / \"Agricultural Business\" 352) gives Residential, Commercial and Industrial; the empty value (21,506) fails closed. STATUS 18 distinct values summing to 71674. No ZIP -> spatial. No recency_days: CaseOpened was not date-literal-probed, and an unverified DATE literal would risk quarantining the whole entry. | 2026-08-03 FOUNDER RULING — recency_days 365 ADDED; RADIUS STAYS AT 5 MI. The absent window was an UNFINISHED VERIFICATION, not a decision: the note above says CaseOpened was never date-literal-probed. It has now been probed live and the literal WORKS — `CaseOpened >= DATE '2024-08-03'` returns 3,644 on the 80229 envelope, no error. Measured @80229: r5/all-history 44,106 (the live config; only 19,902 reached the cache) · r5/w730 3,644 · r5/w365 1,625 · r3/all 9,337 · r3/w365 551. 96% of this source's content is older than one year and 92% older than two — a 2019 permit is not development news. RADIUS IS LOAD-BEARING for the same reason as Aurora (no ZIP column); do not re-propose 3 mi. ⚠️ CORRECTION to the note above: the empty BuildingUse value does NOT 'fail closed'. An unmapped TYPE publishes as `unclassified` (only STATUS fails closed), and 28,555 such rows are cached across 10 CO pages. Open question, founder-gated. | 2026-08-03 FOUNDER RULING — use_type_const 'Development' ADDED alongside type_map. The 21,506 rows with an EMPTY BuildingUse are KEPT, not dropped: an empty value means the PUBLISHER recorded nothing about use, while the permit itself is real, located, dated and filed by the county. That is categorically different from a value the publisher DID state that we chose not to map. They render under the generic member ('Development' -> the 'Other project' shape, the Phoenix precedent) instead of as a missing classification. The connector previously QUARANTINED any entry setting both use_type_const and type_map (arcgis.ts guard) and could never have matched an empty-string type_map key anyway — `const typeHit = typeLookup && typeSrcVal ? ... : null` and `typeSrcVal` is '' for a blank column, which is FALSY, so the lookup was never attempted. The guard was relaxed to permit both, restoring the behaviour the code's own comment already described. The constant fills ONLY on an EMPTY value — a present-but-unmapped value still falls through to `unclassified`."
     },
     {
       "registry_id": "canyon-county-building-permits",
@@ -8746,7 +8748,13 @@
         "Demolition Full Structure-8Q": "Development",
         "Partial Demolition-8Q": "Development",
         "Damage Repair-RT6": "Development",
-        "Change in Occupancy": "Development"
+        "Change in Occupancy": "Development",
+        "Temporary Sales/Construction Office-NT4": "Development",
+        "Group U Building": "Development",
+        "Group Home/Day Care": "Civic/Public",
+        "Group E Private School": "Civic/Public",
+        "Miscellaneous Structure": "Development",
+        "Non-Res Fire Damage Repair-NT6": "Development"
       },
       "status_const": "operating",
       "status_to_bucket": {
@@ -8758,9 +8766,61 @@
         "exclude": []
       },
       "incremental_field": "IssueDate",
-      "recency_days": 730,
+      "recency_days": 365,
       "record_url_precision": "dataset",
-      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). PACKET DATA ERROR CORRECTED: the packet's date_field is the corrupted literal '(2021-07-26'. The real column is IssueDate, verified live (41,327 rows >= 2024-07-28 of 164,091). FIELD DEVIATION: the packet names FolderDesc, whose values are permit-PROCESS categories (Counter Permit 71,480 / Online Building Folder 40,641 / Limited Building Permit 27,264) that describe how the permit was filed, not what was built. SubDesc is the building descriptor and is used instead: 69 distinct values summing to 161042 (top: \"Roofing-RT2\" 34622 / \"Solar PV Residential Permit\" 15764 / \"Plan Revisions\" 14667 / \"Mechanical Permit\" 13289 / \"Plumbing Permit\" 12390). COVERAGE IS BOTH COUNTIES — Aurora straddles the line, confirmed against our own rows: 80010/80011/80019 are Adams pages and 80012/80013/80014/80015/80016 are Arapahoe. No ZIP -> spatial. | 2026-08-01 coverage extension -> CO Douglas. Config only. 1 of 8 Douglas ZIPs: 80124 1,595 in envelope -> 342 stored."
+      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). PACKET DATA ERROR CORRECTED: the packet's date_field is the corrupted literal '(2021-07-26'. The real column is IssueDate, verified live (41,327 rows >= 2024-07-28 of 164,091). FIELD DEVIATION: the packet names FolderDesc, whose values are permit-PROCESS categories (Counter Permit 71,480 / Online Building Folder 40,641 / Limited Building Permit 27,264) that describe how the permit was filed, not what was built. SubDesc is the building descriptor and is used instead: 69 distinct values summing to 161042 (top: \"Roofing-RT2\" 34622 / \"Solar PV Residential Permit\" 15764 / \"Plan Revisions\" 14667 / \"Mechanical Permit\" 13289 / \"Plumbing Permit\" 12390). COVERAGE IS BOTH COUNTIES — Aurora straddles the line, confirmed against our own rows: 80010/80011/80019 are Adams pages and 80012/80013/80014/80015/80016 are Arapahoe. No ZIP -> spatial. | 2026-08-01 coverage extension -> CO Douglas. Config only. 1 of 8 Douglas ZIPs: 80124 1,595 in envelope -> 342 stored. | 2026-08-03 FOUNDER RULING — WINDOW TIGHTENED TO 365d; RADIUS STAYS AT 5 MI. Do NOT re-propose radius 5 -> 3 as an obvious cleanup: it is LOAD-BEARING. This source has NO ZIP column ('No ZIP -> spatial' above), so radius is the ONLY scoping mechanism, and 5 miles is what reaches the outer ZIPs at all. Measured live at r3 with NO date filter: 80122 -> 0, 80022 -> 0. Tightening to 3 mi zeroes FIVE Aurora pages (80122, 80124, 80121, 80113, 80022), four of which carry almost nothing else (80113 has 4 other sites, 80122 11, 80121 17, 80124 33) — 80124 exists ONLY because of the 5-mile reach (see the Douglas extension note above). The WINDOW is the free lever and the RADIUS is not: r5/w365 on 80022 still returns 205. Live counts @80013: r5/w730 23,541 (the live config, already truncated at the 20,000 cap) · r3/w730 10,558 · r5/w365 9,497 · r3/w365 4,519. | 2026-08-03 FOUNDER TYPE RULING — include_types ADDED (whitelist = the 50 type_map keys), so every unmapped value now DROPS AT SOURCE instead of publishing as an unlabelled `unclassified` dot. Measured in the LIVE 365-day window (Rule 13 applied to time — all-history would have weighted this by records the entry never fetches): whole layer 16,006 rows / 60 values, 41 mapped (6,520 = 40.7%) and 19 unmapped (9,486 = 59.3%). DROPPED per founder: Roofing-RT2 2,851 · Mechanical Permit 2,198 · Plumbing Permit 2,025 · Electrical Permit 1,515 · Roofing Commercial-NT2 304 · Fire Alarm Permit 241 · Fire Sprinkler Permit 201 · Hood Suppression Permit 31 · Plan Revisions 6 — all maintenance/equipment on an EXISTING building, not development. (Plan Revisions is 14,667 all-history and 6 in-window; the scope was the whole question.) DROPPED, my call, founder-endorsed: Gating System 18 — a gate is not a structure being built. DROPPED, my call, disclosed: Fence Permit 4 (same class as Gating System) · Residential Elevator Permit 2 (equipment in an existing building) · Occupancy Load Sign Calculation 2 (paperwork, not construction). WIDENED per founder: Temporary Sales/Construction Office-NT4 23 -> Development (a genuine development signal). WIDENED, my call, founder-endorsed: Group U Building 57 -> Development, NOT Residential — Group U is the IBC 'Utility and Miscellaneous' class and spans barns, greenhouses and carports, so Residential would infer a use the code does not state. WIDENED, my call, disclosed: Group Home/Day Care 2 and Group E Private School 1 -> Civic/Public (consistent with the existing Group E mapping); Miscellaneous Structure 2 -> Development; Non-Res Fire Damage Repair-NT6 3 -> Development (the non-res twin of Damage Repair-RT6, already mapped to Development). Example titles are the CACHED `label` values residents saw, not reconstructions — title is [SubDesc, Address], e.g. `Roofing-RT2 1 S QUANTOCK ST`, `Mechanical Permit 10001 E EVANS AVE`.",
+      "include_types": [
+        "Single-Family Detached",
+        "Single Family Detached Plan",
+        "Single Family Revision",
+        "Multi-Family Building",
+        "Multi Family Plan",
+        "Residential Miscellaneous",
+        "Basement Finish Permit",
+        "Residential Deck Permit",
+        "Residential Patio Cover",
+        "Residential Addition Permit",
+        "Residential Pool",
+        "Res. Hook, Set, & Tie-RT4",
+        "Sales Office for Residential",
+        "Sales Trailer - Residential",
+        "Commercial Miscellaneous",
+        "Tenant Improvement",
+        "Tenant Finish-NT1",
+        "Business Use Building",
+        "Mercantile Use Building",
+        "Hotel Building",
+        "Commercial Swimming Pool",
+        "Sales Trailer - Commercial",
+        "Sign Permit-Wall Mount/Cabinet",
+        "Sign Permit-Ground/Monument > 6'",
+        "Sign Permit-Monument <= 6'",
+        "Non-Res. Addition-NT8",
+        "Factory Use Building",
+        "Storage Use Building",
+        "Racking/High Piled Combustibles",
+        "Above Ground Fuel Storage",
+        "Below Ground Fuel Storage",
+        "Assembly Building",
+        "Group E",
+        "Solar PV Residential Permit",
+        "Solar PV Commercial Permit",
+        "Rooftop Mount Antennae",
+        "Ground Mount Antennae",
+        "Radio Frequency",
+        "Private Development",
+        "City Project",
+        "Demolition Full Structure-8Q",
+        "Partial Demolition-8Q",
+        "Damage Repair-RT6",
+        "Change in Occupancy",
+        "Temporary Sales/Construction Office-NT4",
+        "Group U Building",
+        "Group Home/Day Care",
+        "Group E Private School",
+        "Miscellaneous Structure",
+        "Non-Res Fire Damage Repair-NT6"
+      ]
     },
     {
       "registry_id": "sheridan-county-building-permits",
@@ -10347,6 +10407,55 @@
       "recency_days": 1825,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-03 PA/Chester wire. FOUND VIA THE COUNTY'S OWN PUBLISHED GIS HUB after nine guessed hostnames (gis./arcgis./maps.chesco.org and six more) all failed DNS -- unreachable-by-guess is a NON-VERDICT, never a rejection. Real host gisprodops.chesco.org (ArcGIS 11.3), copyright 'Chester County Planning Commission'. Chester is 34 of PA's dark pages (its other 5 are New Castle County DE border spill at a declared 5-mi radius, not its own coverage). MERGED-LAYER TRAP, CLOSED BY ARITHMETIC -- THIS IS WHY LAYER 5 AND NOT 2/3/4: the service exposes PROPOSED_LAND_DEVELOPMENTS (1,563) + PROPOSED_SUBDIVISIONS (2,105) + PROPOSED_CONDITIONAL_USE (58) = 3,726 EXACTLY = PROPOSED_PLANS_MERGED (layer 5, its own returnCountOnly). The three parts are therefore disjoint and exhaust the union, so wiring any part ALONGSIDE layer 5 would double-emit every row -- the houston-plat-applications class, which exact-identity dedup cannot catch across two source_registry_ids. Layer 10 (Act247_1999_2009, 5,471) is a separate historical archive, not wired. LIVENESS, all three parts: name clean; entity correct (the Planning Commission's own Act 247 docket on the county's own server); dates fresh -- newest SUBMIT_DATE 2026-07-30, then 07-28 and 07-23. FIELD CHOICES FROM LIVE NON-NULL COUNTS, NOT FROM THE SCHEMA (a merged layer populates fields per subset -- the UDOT lesson): SUBMIT_DATE 3,726/3,726 (100%), PLAN_TITLE 3,725, PRIMARY_USE 3,722, REVIEW_DATE 3,708, PROJECT_NAME 3,701. SUBMIT_DATE is a REAL esriFieldTypeDate, so unlike the Delaware County entry's integer Year this carries day precision and recency_days' DATE literal applies directly (no Anaheim string-compare workaround). PRIMARY_USE IS A CLOSED VOCABULARY summing exactly to the layer count: Residential 1,888 + Commercial 864 + Institutional 470 + Industrial 280 + Agricultural 220 + null 4 = 3,726. Mapped into the CLOSED use_type set (lib/map.js::TYPE_EXACT): Institutional -> 'Civic/Public'; AGRICULTURAL -> 'Development' because the set has NO agricultural member and 'Development' is the generic that renders the 'Other project' circle (the Phoenix precedent) -- forcing it into Industrial would be a guess that changes the pin SHAPE. The 4 nulls carry NO type rather than a defaulted one. STATUS IS A CONST because the layer has no status column, and per the defect found the same day on delaware-county-pa it is a SELF-DESCRIBING value that is ALSO A KEY IN status_to_bucket: arcgis status_const is the RAW value resolved through the map (arcgis.ts:300-304), unlike socrata where it IS the bucket. Every row is a plan SUBMITTED for county review, whose recommendation is advisory while the municipality decides -- it does not assert approval. POLYGON geometry, so it rides the shipped featurePoint() shoelace-centroid path and column_map.lat/lng are mapped to __lat/__lng -- WITHOUT which every record silently lands on the ZIP centroid at scope 'area' (the sussex-county-de-conditional-use defect). Verified live on the connector's own query: 2/2 returned features carry geometry.rings. SCOPING IS SPATIAL because the layer carries no zip and no address column. RULE 13 -- PROBED IN THE CONNECTOR'S OWN SCOPE, not a looser one: the exact envelope params (geometryType=esriGeometryEnvelope, inSR=4326, spatialRel=esriSpatialRelIntersects) with envelopes computed by the connector's own envelopeFor() math at 3 mi, and the same DATE literal recency_days 1825 emits. Results with a NON-ZERO CONTROL: 19301 unfiltered 381 (control) -> 95 windowed; 19310 34; 19087 32. Window sizing measured county-wide: 627 rows in 3y, 1,095 in 5y, 2,253 in 10y of 3,726; 5y chosen because plan review is slow-moving. record_url_precision 'dataset': there is no per-plan lookup URL. dataset_url is the Planning Commission's OWN Act 247 Plan Review page (verified live, HTTP 200, <title>Plan Review</title>), chosen over the GIS hub's landing page because that hub page describes ONLY layer 2 and would mislabel the subdivision and conditional-use records this merged layer also carries. The county's energov.chesco.org ePortal was NOT templated into a per-record URL -- that would be guessing. NEW STANDING ANSWER: DCAT 'modified' IS METADATA STALENESS, NOT DATA STALENESS -- this dataset's catalogue entry reads modified 2021-08-31 while its newest record is 2026-07-30. Rejecting on the catalogue timestamp would have been a false negative on a live, fresh source."
+    },
+    {
+      "registry_id": "centre-county-pa-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://gissites4.centrecountypa.gov/arcgis/rest/services/Building_Permits/MapServer/2",
+      "dataset_url": "https://gissites4.centrecountypa.gov/arcgis/rest/services/Building_Permits/MapServer/2",
+      "jurisdiction": "Centre County, Pennsylvania",
+      "coverage": [
+        {
+          "state": "PA",
+          "county": "Centre"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Construction_Description"
+        ],
+        "status_raw": "Open_Y_N",
+        "type_source": "Permit_Type",
+        "case_number": "Permit_Number",
+        "file_date": "Issue_Date",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "spatial_zip_radius_mi": 3,
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "O"
+        ],
+        "operating": [
+          "C"
+        ],
+        "exclude": [
+          "I"
+        ]
+      },
+      "type_map": {
+        "Dwelling": "Residential",
+        "Mobile Home": "Residential",
+        "Commercial Building": "Commercial",
+        "Outbuilding": "Development",
+        "Addition": "Development",
+        "Demo": "Development"
+      },
+      "use_type_const": "Development",
+      "extra_where": "(Issue_Date LIKE '%/2024' OR Issue_Date LIKE '%/2025' OR Issue_Date LIKE '%/2026' OR Issue_Date LIKE '%/2027')",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-04 PA/Centre wire. Closes the last of the six PA counties recorded as 'county-hub URL guesses 404'd'. HOST FOUND BY ENUMERATING THE SERVER ROOT, NOT THE HUB: Centre's ArcGIS hub (gisdata-centrecountygov.opendata.arcgis.com) publishes 100 datasets and NONE is this layer, so a hub-only search would have recorded a firm rejection on a live, fresh source. LIVENESS with the layer total as positive control (1=1 -> 60,098): Issue_Date LIKE '%/2026' -> 669, '%/2025' -> 1,745, '%/2024' -> 1,833. OBJECTID DESC is NOT date order here (sampled 2022, 2020, 2007, 2013, 2024, 2002) so freshness must never be read from it. STATUS -- THE OPAQUE CODE WAS DECODED ON EVIDENCE, NOT GUESSED, and this is the part to re-read before changing it. Open_Y_N carries C 58,676 / O 1,414 / null 7 / I 1 (sums to exactly 60,098) and the layer publishes NO codedValues domain for it, so the meaning is not stated in metadata. THREE INDEPENDENT LINES establish C=Closed, O=Open: (1) the field is literally named Open_Y_N; (2) RECENCY -- among 2026 permits the mix INVERTS to O 487 / C 177 (73% open) against 2.4% open across all history, which is what 'recent permits are still open' predicts; (3) CLOSE_DATE -- the layer carries its own Close_Date column, populated on 31.7% of C rows but only 0.4% (6 of 1,414) of O rows, a 79x asymmetry. O->approved and C->operating follow the philadelphia-li-permits precedent (Issued->approved, Completed->operating); an open permit HAS an Issue_Date, so it is issued/approved work, not a proposal. 'I' (ONE row, no Close_Date, no signal) is DECLARED IN exclude rather than left unmapped -- per the delaware-county-pa defect a status value must be a KEY in status_to_bucket. Percent_Complete was tested as a decoder and REJECTED: it is null on 58,085 of the 58,676 C rows, i.e. no signal. FIELDS CHOSEN FROM LIVE NON-NULL COUNTS IN THE WINDOW, NOT FROM THE SCHEMA (the UDOT lesson) -- and this one MATTERED: over the 4,247 windowed rows, Home_Address is populated 0 times and Type_Description 0 times, though both exist in the schema and both read like the obvious title/address choice. Wiring either would have shipped blank records. Construction_Description is 4,229/4,247 (99.6%) and carries real specific text ('12x24 Shed', 'Demo 17x24 garage', 'Roof over front deck'), so it is the title; Permit_Number 4,247/4,247; Permit_Type 4,246/4,247. NOTE Permit_Number is not always meaningful -- one sampled row's value is literally 'x' -- but it is carried VERBATIM as case_number, never cleaned. TYPE: Permit_Type is self-describing and CLOSED, summing exactly to 60,098 (Dwelling 53,825 + Outbuilding 4,762 + Commercial Building 1,082 + Addition 199 + Mobile Home 179 + Demo 50 + null 1). Property_Type_Group was REJECTED as the type source because it is ITSELF opaque (R 42,677 / C 8,922 / A 6,920 / S 1,149 / T 406). Outbuilding, Addition and Demo map to 'Development' DELIBERATELY: the closed use_type set (lib/map.js::TYPE_EXACT) has no member for them and each is silent about what is being built on WHAT -- an addition or demolition could be to a house or a store. 'Development' is a GENERIC_EXACT bucket and therefore NON-TERMINAL, so the downstream keyword rules can still refine 'Demo 17x24 garage' from the title; a terminal guess like Residential could not be refined and would change the pin SHAPE. use_type_const 'Development' catches the ONE row whose Permit_Type is empty (the founder's Adams ruling: an empty publisher field is honest absence, kept under a generic label, not dropped) -- and post-2026-08-03 the constant fills ONLY where the publisher stated nothing. GEOMETRY IS POLYGON, so column_map.lat/lng are mapped to __lat/__lng -- WITHOUT which every record silently lands on the ZIP centroid at scope 'area' (the sussex-county-de-conditional-use defect). Verified live: sampled features carry geometry.rings, including a 2-ring multipart, which the shipped featurePoint() shoelace centroid handles. return_centroid is NOT set: this is a classic MapServer, which silently IGNORES the parameter (the POLYGON GEOMETRY PASS standing answer). SCOPING IS SPATIAL because the layer carries no ZIP column at all. WINDOW IS A YEAR-SUFFIX LIKE LIST, NOT recency_days: every date here is an esriFieldTypeString in M/D/YYYY, which recency_days' DATE literal cannot compare and which -- unlike anaheim's yyyy/mm/dd -- does not sort lexicographically either, so the string-compare workaround has no purchase. This is the worcester-building-permits class and uses its technique. 2027 IS INCLUDED PREEMPTIVELY so that when the year turns the window widens instead of silently truncating (worcester's receipts warn about exactly this); TRIM/EXTEND THE LIST AT THE ANNUAL DATED-CONSTANT REVIEW. RULE 13 -- PROBED IN THE CONNECTOR'S OWN SCOPE: the exact envelopeFor() math at 3 mi with geometryType=esriGeometryEnvelope, inSR=4326, spatialRel=esriSpatialRelIntersects, plus this entry's own extra_where. Results WITH NON-ZERO CONTROLS -- 16801 unfiltered 15,862 (control) -> 937 windowed; 16803 13,220 -> 789. record_url_precision 'dataset' on the MapServer layer's own URL (the worcester precedent): the county runs Cloudpermit (a CloudPermit_pvcode service sits on the same server) but no per-permit public URL was verified, and templating one would be guessing. OPEN QUESTION LOGGED FOR THE FOUNDER, NOT SILENTLY DECIDED: this ledger includes minor residential work ('12x24 Shed', 'Roof over front deck'). include_types is deliberately NOT set because Permit_Type contains no trades class (no electrical/plumbing/mechanical rows exist to drop, unlike the WA/MN/IL and aurora noise drops) AND it is not a proxy for scale -- a 'Dwelling' row can be a deck roof -- so no type whitelist can separate minor from major here. Reported rather than filtered."
     }
   ],
   "ckan": [

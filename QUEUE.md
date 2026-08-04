@@ -325,6 +325,182 @@ pre-measure against dark ZIPs → wire → deploy → recache → **materialize*
 
 ## Ordered items
 
+### 0. FETCH-FAIL-GUARD — a failed fetch collected as an empty success — **FIX (1) DONE**
+- **State:** **DONE and live-proven** (2026-08-03). Migration `dev_refresh_per_source_failure_guard`;
+  SQL of record `docs/dev-refresh-source-failure-guard.sql`; contract pinned by
+  `test/fetch-failure-reason-contract.test.mjs` (30 checks, in the 82-file suite).
+- **Gate:** founder-approved ("FIX (1) FIRST"). No engine/connector change — collect layer only.
+- **The defect:** the transient guard tested the AGGREGATE `development` count, so a per-SOURCE
+  collapse hid behind another source's contribution. ZIP 97215 emitted `development: 15` from the
+  county's AREA planning notices while losing **414** Portland permits; 15 > 0, guard silent.
+- **The trigger:** concurrency, not the paging fix. 10 ZIPs in parallel → 7 return `fetched 0`
+  (`Connection reset by peer`); the same ZIPs 2 at a time → 414 / 407 / 136 / 116.
+- **Live proof, same run:** 97213 refused (323 records held, `refreshed_at` unadvanced) while five
+  siblings updated and **188 other rows updated in the same call** — per-source, not per-page.
+- **First-run catch:** `minneapolis-ccs-permits` — `"Unable to perform query. Too many requests."`
+  — blocked 55413 (2,015) and 55422 (719), correctly did NOT block 55119 (0 cached). A second
+  source that had been darkening pages silently.
+
+### 0a. FETCH-BOUND — bound the fetch (fix 2) — **VISIBILITY DONE, SIZING OPEN**
+- **State:** part 1 **DONE** (migration `dev_refresh_truncation_visibility`): a bounded fetch is
+  now distinguishable from a complete one at the collect layer, keyed on the
+  `truncated_at_max_rows` FIELD (csv words its note "bound the emit" vs the others' "bound the
+  fetch" — a prose match would have missed one connector in five). Logged as
+  `kind='truncated'`, **never blocking** — truncation is deterministic, so refusing would freeze
+  the page forever. Part 2 (per-entry sizing) OPEN — see the measurement below.
+- **Gate:** approved. Per-entry `page_size` / `max_rows`.
+- **MEASURED cache-wide 2026-08-03, so nobody re-derives it:**
+  - **Only 3 ZIPs are truncated** at the 20,000 default — 80011 + 80012
+    (`aurora-building-permits`) and 55103 (`saint-paul-approved-building-permits`). *(An earlier
+    "p95 = 20,000" reading was an artifact of `percentile_disc` over 16 values, not "most ZIPs
+    truncated" — corrected by counting.)*
+  - **Row SIZE is the sharper cost:** 55103 **20 MB** · 80011/80012/80013/80014 **18 MB** ·
+    80010 17 MB — ~3x the 5.98 MB Cleveland high-water mark in CLAUDE.md (44127 measures 6,158 kB
+    and is no longer the ceiling). `aurora-building-permits` alone is 152,414 records over 16 ZIPs.
+  - **Row COUNT is NOT the binding constraint.** 80011 (20,051 sites / 18 MB) collects fine;
+    55109 (10,995 / 11 MB) never does. The constraint is upstream host SPEED — so a global
+    `max_rows` would not have fixed either, and the per-entry value has to come from timing.
+- **⚠️ `out_fields` is the tempting lever and it has a trap** — 120 of 124 arcgis entries pull
+  `outFields=*`. Deriving the projection automatically from `column_map` + `extra_where` looked
+  clean until the derivation produced `ADDITION, BARN, DUPLEX, GARAGE, HOUSE, MOBILE, SHOP` for
+  `denton-county-dev-permits`: an identifier regex cannot tell a column from a **string literal
+  inside `PermitType IN ('HOUSE','MOBILE HOME',…)`**. Same bug hit miami / minneapolis /
+  cleveland. A projection that MISSES a column silently drops a field from every record, so any
+  `out_fields` pass must strip quoted literals first **and** be verified against each layer's
+  live `fields` list before it is written.
+
+### 0c. FIRE-TIMEOUT — a third invisible failure, one layer further out — **VISIBILITY DONE**
+- **State:** attribution **DONE** (migration `dev_refresh_fire_failure_visibility`). Recovery of
+  the three stuck pages is **OPEN and needs a founder call** — see "the actual blocker" below.
+- `dev_refresh_inflight` records `request_id -> zip` at FIRE time (a timeout has no payload and
+  therefore no zip — it cannot be attributed after the fact); `dev_refresh_log_fire_failures`
+  joins the response back and logs `kind='fire_failed'` (NULL status) / `'fire_http_error'`.
+  `dev_refresh_tick` now runs collect -> log_fire_failures -> fire.
+- **Proved by forcing it:** three ZIPs fired with an impossible 1 ms timeout, all landed
+  `status_code NULL`, all three attributed with error text + cached_records + request_id;
+  inflight cleared to 0. Before this they were invisible.
+- ⚠️ **THE TIMEOUT WAS NOT THE BLOCKER.** Fired ALONE, 55103 returns **200 in seconds, 16 kB**,
+  counts `{facilities 40, development 0, civic 2}` — engine healthy, retired entry already gone
+  from its output. The 90 s overruns are **concurrency queuing** behind the tick's 250-way
+  fan-out, the same trigger as the Portland resets.
+- 🔴 **THE ACTUAL BLOCKER IS THE 7-DAY TRANSIENT GUARD** — and it is refusing a *correct*
+  reduction. The clean 200 carries `development: 0` (right: the entry was retired), the cache
+  says 20,000, the row is 5 days old, so the guard refuses. Verified live: collect returned 220
+  rows updated and 55103 stayed at 20,042 sites / `refreshed_at` 2026-07-29. **A legitimate
+  reduction and a transient collapse are identical by COUNT alone** — the same shape as
+  `fetched: 0` meaning both "found nothing" and "could not be reached".
+  Self-heals **2026-08-05 04:15Z** (refreshed_at + 7 days), by accident not design.
+- **Resident impact is NOT contained** (checked, per the founder's note): `app_projects` holds
+  zero saint-paul rows, but `homesignalmap.html:1055` reads `development_reports` **directly**,
+  so those three pages render ~40,000 retired-entry records — 55103 20,000 of 20,042 sites
+  (99.8%), 55109 10,968 of 10,995, 55119 10,942 of 10,952; all carry `record_url`, ~19,483 /
+  10,364 / 10,342 pinned.
+- **Old note retained for context:** measured, not fixed. Neither payload guard can see it.
+- `net.http_post` fires with a 90 s timeout; an overrun lands in `net._http_response` with
+  **`status_code` NULL**, and `dev_refresh_collect` filters `where status_code = 200`. The row is
+  never updated and nothing records why. Receipt (18:00Z): `Timeout of 90000 ms reached. Total
+  time: 90000.951 ms (DNS 44.817, TCP/SSL 63.738, HTTP Request/Response 89892.309)`.
+- **Three ZIPs have not collected once in five days** while being re-fired every cooldown:
+  55103 (133.5 h), 55119 (118.0 h), 55109 (116.7 h).
+- **It is hiding a registry change:** those pages still serve **41,910 records** from
+  `saint-paul-approved-building-permits`, an entry that **no longer exists** in
+  `jurisdiction-registry.json`. The refresh that would drop them cannot complete, so the removal
+  never reached production.
+
+### 0b. PDX-3-ZIP — 97206 / 97208 / 97227 return 0 Portland records SOLO as well as under load
+- **State:** OPEN, recorded not chased (founder: "a separate question — record it, do not chase it
+  inside this fix").
+- All three were lit before 2026-08-03 and now hold 0 `portland-building-permits` records while
+  returning cleanly (no `fetch failed:` quarantine), so this is NOT the guard's class. Candidates:
+  the `include_types` enforcement legitimately removing everything they carried, or a scoping
+  effect of their centroids (97208 is a downtown P.O.-box ZIP). Their sibling ZIPs recovered fully
+  (97209 136 · 97213 323 · 97214 407 · 97215 414 · 97218 196 · 97219 116 · 97239 178).
+
+### 0f. RETIRED-SOURCE DISCRIMINATOR — **DONE** (founder-approved)
+- Migration `dev_refresh_retired_source_discriminator`; SQL of record
+  `docs/dev-refresh-source-failure-guard.sql` Part 4; pinned in
+  `test/fetch-failure-reason-contract.test.mjs` (48 → 54 checks).
+- **The problem:** the 7-day transient guard refused a write when `development` dropped to 0 on a
+  fresh row — right for a flake, wrong for a deliberate reduction, and **identical by COUNT
+  ALONE**. It held the saint-paul retirement off three pages for five days and would have
+  self-healed at `refreshed_at + 7 days` by accident.
+- **The discriminator:** a drop is EXPLAINED when a source that currently contributes cached
+  records is **absent from the payload's reports entirely**. The engine reports on every entry
+  whose coverage gate matched, so absence means it no longer runs for this ZIP (retired, or
+  coverage changed) — not a flake, and not something waiting resolves.
+- **It STRENGTHENS the guard.** Proven read-only against a real fresh row (97215):
+  P1 unexplained collapse → **REFUSE** · P2 explained by a retired source → **ACCEPT** ·
+  P3 source reported but fetch-failed → **REFUSE** (Part 1 takes precedence) · P4 healthy →
+  ACCEPT. Discriminator itself: source still reported → none retired; source absent → retired
+  with its cached count; no reports at all → retired; ZIP with no sourced records → none.
+
+### 0g. UNCAPPED MAP RENDERING — one DOM marker per site, no clustering — **OPEN**
+- **State:** measured, not fixed. Founder-flagged as its own item: "20,000 divIcons is a browser
+  problem regardless of what we do to the data."
+- `homesignalmap.html` `sites.forEach(...)` builds **one Leaflet `divIcon` per site**, then
+  `spreadStackedMarkers()` fans co-located dots in screen pixels and `fitBounds` frames all of
+  them. **No clustering anywhere** — `markerClusterGroup` / `supercluster`: **0 matches in the
+  file**. Both 3D views do the same over `MAP_SITES`.
+- The LIST is capped (`listInto()`: `items.slice(0,12)`); the MAP is not. So a resident on a dense
+  page sees 12 of N in the list and N markers on the map.
+- **The data levers only shrink it, they do not fix it.** After the 365-day window the worst page
+  is 80016 at **10,421** sites (was 20,051). The type change will cut further, to a few thousand.
+  Still far past what unclustered DOM markers handle.
+- Fix is a page change (clustering / canvas renderer), which is gated — not attempted.
+
+### 0d. SURFACE-TABLE MATRIX — **RULED: both tables authoritative; verifiers now declare their surface**
+- **Founder ruling (2026-08-03):** both tables are authoritative, each for its own surface. The
+  materializer's caps exist deliberately for list pages; the map genuinely needs every site.
+  **The divergence is design, not defect, and is not being collapsed.** What was missing was that
+  no verification declared which surface it spoke about — that is what was fixed.
+- **DONE:** `scripts/lib/surface-banner.mjs` + a `surfaceBanner('<name>')` call as the first line
+  of every verifier's `main()` (all **16** instrumented). Output header now reads e.g.
+  `verify-development: surface = map page (homesignalmap.html?zip=), table = development_reports +
+  app_community_meta + property_reports [UNCAPPED (cache the page reads)]`.
+  Pinned by `test/verifier-surface-declaration.test.mjs` (103 checks): every verifier imports and
+  calls it, every declaration is complete, a raw-cache reader must be marked UNCAPPED and a
+  materialized reader CAPPED, an undeclared name **throws** rather than printing nothing.
+
+**Read-path audit — done from the code, not grep** (each page's actual `HS.data.*` calls and
+direct `rest/v1/` fetches):
+
+| Page | Direct | Via `lib/data.js` | Underlying tables | Verifier |
+|---|---|---|---|---|
+| `homesignalmap.html` | **`development_reports` (UNCAPPED)**, `app_community_meta`, `communities`, `property_reports` | — | raw cache | verify-development · verify-representative-zips · audit-official-links · verify-geocodes · verify-maps · verify-map-markers |
+| `community.html` | — | community, coverageState, coverageStatus, projects, facilities, changes, meetings | app_projects, app_changes, app_community_meta, meetings, communities | verify-communities · verify-coverage-state |
+| `alerts.html` | — | community, changes, news, meetings | app_changes, meetings | verify-alerts-page · verify-alerts-categories |
+| `development.html` | — | community, projects, facilities, meetings | app_projects, app_changes, meetings | verify-facility-entity · verify-maps-live |
+| `dashboard.html` | — | community, projects, changes, meetings | app_projects, app_changes, meetings | verify-map-markers (partial) |
+| `properties.html` | — | projects, changes | app_projects, app_changes | **NONE** |
+| `property.html` | — | projects, changes, envRisk | app_projects, app_changes | **NONE** (verify-development §4.5 covers `property_reports`, not the page) |
+| `today.html` | — | community, projects, changes, meetings | app_projects, app_changes, meetings | **NONE** |
+| `index.html` | — | isCovered, changes | app_community_meta, app_changes | **NONE** |
+| `maps.html` | — | community, projects, facilities, changes, meetings | app_projects, app_changes, meetings | **NONE** |
+| `reports.html` | — | community, projects | app_projects | **NONE** |
+
+- 🔴 **SIX SURFACES HAVE NO VERIFIER** — `properties.html`, `property.html`, `today.html`,
+  `index.html`, `maps.html`, `reports.html`. Listed in `UNVERIFIED_SURFACES` and asserted by the
+  test so the list cannot quietly go stale. **That is where the next silent defect lives.**
+- **Why the caps matter when reading a result:** `app_refresh_zip` has **five** inserts — app_projects
+  `development` (`relevance='development' AND scope='point'`), app_projects `facility`
+  (`relevance NOT IN ('development','civic')`), then app_changes planning & zoning **limit 6**,
+  civic **limit 6**, meetings **limit 8**, government notices **limit 48**, local news **limit 48**.
+  A row absent from `app_changes` may be a CAP, not an absence.
+
+### 0e. ROW-SIZE DETECTOR — retired/stale entries at scale — **RUN, CACHE IS CLEAN**
+- Founder's suggestion: a `development_reports` row far larger than its peers is a cheap signal.
+  Confirmed cheap — use **`pg_column_size(sites)`** (compressed, no detoast) and it runs over all
+  12,722 rows in seconds; `length(sites::text)` times out.
+- **Baseline 2026-08-03:** p50 **2,298 bytes** · p99 **480 kB** · max **1,979 kB** stored ·
+  **25 rows over 1 MB** stored. 55103 was the largest at 20 MB uncompressed before the clear.
+- **Direct check beats the proxy, and it is also cheap:** cached `source_registry_id` values with
+  no entry in the live registry → **0 cache-wide**. Positive control in the same chain: the
+  unfiltered query returns **143** distinct source ids over 12,722 rows against **151** registry
+  entries, so the query reaches real data and the exclusion list is complete.
+  `saint-paul-approved-building-permits` was the 144th and is gone. **No other retired entry is
+  lingering anywhere.**
+- Worth a periodic check; not urgent while the retired-entry count is 0.
+
 ### 1. DB-01 — `public.communities` planner-statistics diagnosis
 - **State:** **DONE** (2026-07-30) — recorded in workbook 0071 rows 399–401; row 397 marked
   SUPERSEDED.

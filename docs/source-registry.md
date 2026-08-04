@@ -4778,3 +4778,44 @@ Re-fire and measure **cincinnati** (expect a large drop — 111,022 trades recor
 **nashville** (baseline 9,027 / 3,562 unclassified) and **portland** (baseline 2,329 / 177), each
 against its pinned pre-deploy baseline. Cincinnati and Nashville will likely hit the same 7-day guard on
 any page whose development count reaches zero — that is expected, not a defect.
+
+---
+
+## 🔬 ARCGIS `maxRecordCount` AUDIT — 124/124 entries probed; exactly 2 truncated (2026-08-03)
+
+Run after the server-capped paging defect was found. **Every arcgis entry's layer was probed for
+`maxRecordCount`; 0 unresolved.**
+
+| | count |
+|---|---|
+| healthy (`maxRecordCount ≥ pageSize`) | **122** |
+| **truncated** (`maxRecordCount < pageSize`) | **2** |
+
+| entry | layer cap | entry pageSize | pages carrying | cached | pages AT the cap |
+|---|---|---|---|---|---|
+| `portland-building-permits` | 200 | 1000 | 21 | 1,814 | **5** |
+| `colorado-springs-planning-applications` | 200 | 1000 | 29 | 3,237 | **4** |
+
+**Portland's 5 capped pages measured against the source in the connector's own scope: 321 + 313 + 345 +
+234 + 351 = 1,564 true vs 1,000 cached — 564 records missing (36%).**
+
+⚠️ **CORRECTING AN OVER-WARNING I ISSUED BEFORE RUNNING THIS AUDIT.** On finding the defect I wrote that
+"Columbus, Cincinnati and Nashville totals may be undercounts." **They are not.**
+`columbus-building-permits` already carried `page_size: 2000`, exactly matching its layer's
+`maxRecordCount: 2000`; `nashville-building-permits-issued` is 1000/1000; `cincinnati-building-permits`
+is **socrata**, a different connector entirely. Only Portland among that day's measurements was affected.
+*A blast-radius estimate stated before the audit is a guess wearing a number's clothes — this one was
+~60x too wide (2 entries, not 124).*
+
+**Coverage, not just volume:** truncation stops the fetch after one page, so a page holding 0 records
+stays at 0 — **it cannot darken a page**. The only path by which fixing it could LIGHT a dark page is a
+page whose first 200 fetched rows all fail post-fetch filtering; with the type whitelist now pushed down
+at source, that requires all 200 to be status-excluded. Measured empirically after the fix deploys
+rather than asserted.
+
+### Why this was found at all
+
+An 18% variance on Portland's record total that did not match its expected drop. Chasing it instead of
+averaging it away surfaced a defect **older than every change in this session** — silent, and invisible
+in any total, because a truncated fetch and a small source look identical unless you notice the count is
+a suspiciously round 200.

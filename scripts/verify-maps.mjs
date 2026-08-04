@@ -16,6 +16,7 @@
 // DALFEN_ZIP (informational; the page picks the ZIP from DEFAULT_ZIP when signed out).
 
 import { chromium } from 'playwright';
+import { surfaceBanner } from './lib/surface-banner.mjs';
 
 const SITE_BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
 const MAPS_PATH = process.env.MAPS_PATH || '/maps.html';
@@ -34,6 +35,7 @@ async function gotoWithRetry(page, url) {
 }
 
 async function main() {
+  surfaceBanner('verify-maps');
   console.log(`Verifying the app map facility-slot floor against ${target}`);
   const browser = await chromium.launch();
   const page = await browser.newPage();

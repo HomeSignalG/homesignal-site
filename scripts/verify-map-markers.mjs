@@ -4,6 +4,7 @@ import { chromium } from 'playwright';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { surfaceBanner } from './lib/surface-banner.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SITE_BASE = (process.env.SITE_BASE || 'http://localhost:8765').replace(/\/$/, '');
@@ -166,6 +167,7 @@ async function verifyTracker(page, fails) {
 }
 
 async function main() {
+  surfaceBanner('verify-map-markers');
   console.log('=== map-markers unit tests ===');
   runUnit();
 

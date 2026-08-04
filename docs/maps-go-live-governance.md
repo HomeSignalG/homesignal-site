@@ -705,6 +705,289 @@ a transient outage read of Columbus showed 13,231 records / 39 unclassified wher
 records and **0** unclassified, 5 pages still on pre-deploy timestamps carrying all 45). **The split by
 `refreshed_at` is what made the number interpretable — the totals alone were not.**
 
+### ANCHOR A MEASUREMENT ON A FIXED SET, NEVER ON "ROWS THAT CURRENTLY CARRY X" (2026-08-03)
+
+**A query shaped like this reports a SUBSET as a TOTAL:**
+
+```sql
+with pages as (select distinct zip from development_reports r, jsonb_array_elements(r.sites) s
+               where s->>'source_registry_id' = 'X')          -- ← evaluated AFTER the change
+select count(*), sum(...) from pages join development_reports using (zip)
+```
+
+The denominator is computed from the post-change data, so **any page the change reduced to ZERO drops
+out of its own denominator** and the "total" silently describes only the survivors. It is the
+measurement-time twin of the retry-selector bug (selecting "pages still dark" cannot see a page that
+should have gone dark), and it fails in the same direction: invisibly.
+
+**Anchor on a set that cannot move:** the pinned pre-change ZIP list, or the entry's declared coverage
+(`communities` rows for its state/county). Then a page at zero still appears, as a zero.
+
+*The case:* measuring the include_types enforcement, Columbus and Chester were anchored on fixed
+baseline ZIP lists and reproduced exactly under independent verification; Cincinnati, Nashville and the
+first Portland pass used the moving shape. Portland's was caught because its coverage is 83 pages while
+the moving CTE saw only 12 — a 6x discrepancy too large to miss. Cincinnati's and Nashville's happened
+not to distort the totals (no page reached zero), which is precisely why the shape is dangerous: it is
+correct until the moment it matters.
+
+### THE COMPLETION SIGNAL IS SOUND — `refreshed_at` CANNOT BE ADVANCED WITHOUT A FETCH (verified 2026-08-03)
+
+Challenged and checked, because the rest of this session's verification rests on it. **`refreshed_at` is
+written in exactly ONE place:** `dev_refresh_collect()`'s `UPDATE`, joined to a row in `net._http_response`
+with `status_code = 200` and `mode = 'zip'`. No fire path, no retry path, no bulk stamp touches it —
+`dev_refresh_fire_batch` writes `last_refresh_attempt_at`, a different column.
+
+⚠️ **A `grep`/`ilike` for `%refreshed_at%` MATCHES `last_refresh_attempt_at` as a substring** and will tell
+you the fire path writes it. It does not. (CLAUDE.md: "a count / grep is a LEAD, not a fact" — this is
+that rule biting inside the verification of the rule.)
+
+**Identical microsecond timestamps across many rows are EXPECTED, not suspicious.** One `UPDATE` is one
+transaction and `now()` is transaction-start time, so a single collect stamps every row it touches with
+the same value. 66 pages sharing a stamp means one collect call, not a fetch-less bump. Timestamps spread
+out only when collect is invoked repeatedly.
+
+### CONCURRENCY IS PART OF A PROBE'S SCOPE (founder rule, 2026-08-03)
+
+Same code, same minute, same ZIP — **different parallelism, opposite results.** This belongs with
+Rule 13 and "the role is part of the probe's scope": a probe run at a different concurrency than
+production answers a **different question**.
+
+*The case:* ZIP 97215's cached row held **0** Portland permits while the layer held **414**.
+Invoked ALONE through the deployed engine it returned `fetched 414, emitted 414, quarantined []`
+— which read as "the engine is healthy, the cache is stale." Fired as **10 ZIPs in parallel** (the
+shape `dev_refresh_fire_batch` actually uses — default batch **250**), **7 of 10** came back
+`fetched 0` with `fetch failed: … Connection reset by peer (os error 104)`. The same ZIPs **2 at a
+time** returned 414 / 407 / 136 / 116. A single-request probe could never have found it, and
+"works when I run it" would have been recorded as an exoneration.
+
+**So: state the concurrency alongside every fetch finding, and reproduce at production
+parallelism before concluding a source is healthy.** The corollary bites in both directions — a
+solo probe that SUCCEEDS does not clear a source, and a solo probe that FAILS does not condemn one.
+
+### ESTABLISH THE BACKGROUND RATE BEFORE CLAIMING A SPIKE (founder rule, 2026-08-03)
+
+**An absolute count is not a signal. A count against its own baseline is.** Never assert a
+regression from "N rows are bad right now" without the rate that N should be compared to.
+
+*The case (founder's own, recorded because the rule is what matters):* "30 `development_reports`
+rows refreshed since 16:00 came back with ZERO sites — something deployed today is emptying pages,
+and the blast radius grows every 15 minutes." The instruction that followed was to **revert the
+paging fix**. One query disproved it — zero-site rows grouped by hour over 48 h:
+
+| hour (UTC) | refreshed | zero | % |
+|---|---|---|---|
+| 08-03 03:00 | 58 | 15 | **25.9** |
+| 08-03 12:00 | 750 | 101 | **13.5** |
+| **08-03 16:00** | **894** | **28** | **3.1** |
+
+Zeros run **2–26 % continuously**, including many hours *before* the deploy; the accused hour was
+the **lowest** full-volume rate in the window. All 30 were `data_quality='coverage_coming'`,
+`indexable=false`, and **0 of 30 had ever been lit**. Reverting would have restored 200-row
+truncation on two entries and fixed nothing. **The real defect was somewhere else entirely.**
+
+Pair it with the rule above: the *actual* failure was invisible to a count of empty rows, because
+those pages were never empty — they kept their county planning notices while silently losing 414
+permits.
+
+### A CROSS-LANGUAGE COUPLING NEEDS A TEST OR IT ROTS INVISIBLY (founder rule, 2026-08-03)
+
+**When a guard written in one language depends on a message authored in another, nothing checks
+the join.** The compiler cannot see it, the linter cannot see it, and the guard keeps running —
+producing success-shaped output while silently guarding nothing. It is the same family as
+"an instrument must prove it ran," one level up: here the instrument runs perfectly and is simply
+pointed at a string that moved.
+
+*The case:* `dev_refresh_collect()` (SQL) identifies a failed source with
+`reason like 'fetch failed:%'` against `quarantined[].reason` — a string authored in five
+TypeScript connectors. Reword one message and the SQL keeps executing, keeps returning row
+counts, and stops refusing anything. Pinned by `test/fetch-failure-reason-contract.test.mjs`,
+which asserts the prefixes from **both** sides — the connectors emit them, and the SQL matches
+them — plus that every connector's report array is actually read (a missed one is an unguarded
+source).
+
+**Where possible, key on a FIELD rather than on prose.** The companion truncation guard keys on
+`truncated_at_max_rows` precisely because the prose is *not* uniform: csv words its note "bound
+the emit" while the other four say "bound the fetch", so a string match would have silently
+missed one connector in five. When only prose is available, the test is not optional.
+
+### A SECOND READER ON A DIVERGED SURFACE — THIRD INSTANCE, SO IT IS A PATTERN (founder rule, 2026-08-03)
+
+**When two surfaces read two tables whose contents have diverged, "the page is correct" is
+ambiguous by construction — and every verification that does not name its table inherits the
+ambiguity.**
+
+Three instances now, same shape each time: a second reader was added to a surface whose meaning
+had moved, and nothing reconciled them.
+1. **The coverage-state view** — counted coverage-gate membership, read as record-level coverage.
+2. **`app_changes` drift** — materialized rows outliving the semantics that produced them.
+3. **`app_projects` vs `development_reports`** (this one) — `app_projects` held **zero**
+   saint-paul rows while `development_reports` held **20,000 on a single ZIP**, at the same
+   moment. Every "what do residents see" check had been run against `app_projects`;
+   `homesignalmap.html:1055` reads `development_reports` **directly**, so residents saw the
+   retired data anyway. The divergence is structural — the materializer applies caps
+   (`limit 6 / 6 / 8 / 48 / 48`) and filters (`relevance='development' AND scope='point'`) that
+   the map page does not.
+
+**The rule: state the TABLE alongside any claim about what residents see, and check the table
+that the surface in question actually reads.** A clean materialized layer is not evidence about
+a surface that bypasses it. Matrix of surface → table: `QUEUE.md` item 0d.
+
+### WORKED CASE — THE AUTHOR OF THE SURFACE RULE BROKE IT THE NEXT DAY (2026-08-03)
+
+The surface-matrix rule ("state the TABLE, and check the table the surface actually reads") was
+written on 2026-08-03. **Within a day I measured the Aurora/Adams window change in
+`development_reports` only and reported "−72%" as the result.** `app_projects` had not caught up —
+`app_refresh_batch` is an **8.5-hour round-robin** and those 24 pages were queued behind ~11,000
+others — so `community.html`, `development.html` and `dashboard.html` were still serving 2011
+permits while the map page showed the new window. The founder caught it by measuring the other
+table.
+
+**Two operational consequences, both now standard:**
+1. **A config change is not measured until BOTH tables are.** After re-caching
+   `development_reports`, call `app_refresh_zip` on the affected ZIPs explicitly — never wait for
+   the round-robin, and never report a delta from one table alone.
+2. **Compare like with like.** `app_projects` filters `relevance='development' AND scope='point'
+   AND record_url<>''`, so the comparable figure from `development_reports` is that same filtered
+   count, not the raw array length.
+
+### A REMEDIATION SELECTOR IS A MEASUREMENT — ANCHOR IT ON A FIXED SET TOO (2026-08-03)
+
+The anchoring rule was recorded earlier the same day for *measurements*. It bites identically on
+*remediation*, and I repeated it: the 24-ZIP re-materialization list was computed from
+"ZIPs that currently carry entry X in `development_reports`" **after** the deploy had already begun
+rewriting those rows. **80005 had been refreshed by the rolling tick at 22:15, so its Adams records
+were already gone from the cache — and the ZIP dropped out of its own remediation selector**,
+leaving 9,194 stale `app_projects` rows with `submitted_at` back to 2011-01-04 on a page nobody
+would have re-checked.
+
+**The self-correcting form, which is what to use:** select the work from the table you are
+*repairing*, compared against the table you are repairing *from* —
+`app_projects p JOIN development_reports d USING (zip) WHERE p.created_at < d.refreshed_at`. That
+cannot lose a row to the mutation it is meant to cover.
+
+### CONFIRM THE WORKING TREE MATCHES THE PUSHED REF BEFORE COMPARING STATE (2026-08-03)
+
+A container restart rolled the local checkout back to `606aa11` while the remote branch was at
+`25fedc7`. Comparing that stale tree against `origin/main` showed **5 merged PRs "missing" from the
+branch**, which read as "the deploy I just dispatched reverted the paging fix and `include_types`
+in production" — and produced a real (failed, already-completed) cancel attempt on a **clean**
+deploy. Against the actual pushed ref, **0 commits on main touched the edge function that were not
+in the branch**.
+
+**A restart can silently un-do a working directory while the remote is fine.** Before comparing
+branches — and especially before concluding a deploy reverted something — verify `git rev-parse
+HEAD` equals `git ls-remote origin <branch>`, and repair with `git reset --hard origin/<branch>`.
+
+### UNMAPPED IS NOT EMPTY — THEY GET OPPOSITE TREATMENT (founder rule, 2026-08-03)
+
+**`unmapped` means WE did not classify what the publisher said. `empty` means the PUBLISHER said
+nothing.** They look identical downstream — both land in `unclassified` — and they are opposite
+problems.
+
+- **Unmapped is a MAPPING DECISION.** The publisher told us exactly what the record is; we simply
+  have no entry for that value. Aurora's `Roofing-RT2` is not unclassifiable — it is *classified by
+  the source as a roof replacement*, which is maintenance, not development. The right answer is a
+  content judgement: map it, or drop it.
+- **Empty is HONEST ABSENCE.** Adams' 21,506 rows with a blank `BuildingUse` are real permits —
+  located, dated, filed by the county — about whose USE the publisher recorded nothing. Dropping
+  them would discard a record the source asserts exists. The right answer is to KEEP them under
+  the generic member (`Development` → the "Other project" shape, the Phoenix precedent) so the page
+  renders an honest "we don't know the use" rather than a missing classification.
+
+**That distinction is the line between fabrication and honest-unclassified**, and it is why the two
+cannot share a rule. Also recorded: Adams' own `_receipts` claimed its empty value "fails closed."
+It does not — only STATUS fails closed; an unmapped/empty TYPE publishes as `unclassified`. 28,555
+such rows were cached. A receipt asserting a fail-closed behaviour is worth re-checking against the
+connector, not trusted.
+
+### MEASURE A VOCABULARY IN THE WINDOW THE CONNECTOR WILL ACTUALLY ASK (founder rule, 2026-08-03)
+
+A type/status vocabulary measured over **all history** weights the decision by records the entry
+will never fetch. Measure it inside the live `recency_days` window — this is Rule 13 applied to the
+time dimension, and it is not a refinement, it changes conclusions.
+
+*The case:* Aurora's `Plan Revisions` reads **14,667** all-history and was the hardest call in the
+ruling — keep a revision to a real project, or drop it like a roof replacement? In the 365-day
+window the connector actually queries it is **6 rows**. The hard call was an artefact of the wrong
+scope. (Same probe, same layer, same day; only the window differed.)
+
+### AN IDENTIFIER REGEX CANNOT TELL A COLUMN FROM A STRING LITERAL (2026-08-03)
+
+Deriving a column projection (`out_fields`) by scanning an entry's `column_map` **plus its
+`extra_where`** looked mechanical and safe. It produced, for `denton-county-dev-permits`:
+
+```
+ADDITION, BARN, BUILDING, COMMERCIAL, DUPLEX, GARAGE, HOME, HOUSE, METAL, MOBILE, SHOP, TO
+```
+
+Every one of those is a **value inside** `PermitType IN ('HOUSE','MOBILE HOME','DUPLEX',…)`, not
+a column. The same bug hit miami, minneapolis and cleveland — 4 of 28 entries. **Strip quoted
+literals before extracting identifiers**, and note the asymmetry that makes this dangerous in
+both directions: an *extra* column is usually harmless, but a **missed** column silently drops a
+field from every record the entry emits — with nothing failing. Any `out_fields` pass must also
+be verified against each layer's live `fields` list before it is written. Caught pre-commit; no
+projection was shipped.
+
+### SMALL-n STATISTICS READ AS MEASUREMENTS (2026-08-03)
+
+`percentile_disc(0.95)` over **16 values** returns the maximum. Reading it as a percentile
+produced "p95 = 20,000 — most of aurora's ZIPs are truncated." Counting gave **2 of 16**. A
+percentile over a handful of rows is not a percentile; when n is small, **count the thing**.
+
+### THE CONNECTOR WAS NOT AT FAULT — DO NOT GO LOOKING FOR A CONNECTOR DEFECT (2026-08-03)
+
+Recorded explicitly so a future session reading "Portland fetch failures" does not hunt for a bug
+that never existed. **There was no connector defect.** All five connectors diagnosed the failure
+correctly and precisely, per source, at the moment it happened:
+
+```
+"fetched": 0, "emitted": 0,
+"quarantined": [{ "reason": "fetch failed: error sending request for url (…):
+                  client error (Connect): Connection reset by peer (os error 104)" }]
+```
+
+The `quarantined: []` reported earlier in that investigation was a **reading error** — the report
+was fetched positionally as `arcgis_reports->0`, and for those ZIPs index 0 was a *different*
+source. Reading by `registry_id` showed the diagnosis had been there all along. The entire defect
+lived in the collect layer, which discarded a correct signal. *(Positional access into an array
+of per-source reports is a claims-discipline trap in its own right: index 0 is not "the source
+you are thinking about." Filter by `registry_id`.)*
+
+### A FETCH THAT FAILS MUST NOT COLLECT AS AN EMPTY SUCCESS (founder rule, 2026-08-03)
+
+**"No match" and "did not run" must never be indistinguishable — and that applies to a data
+pipeline's WRITE path, not just to CI checks.** `fetched: 0` meant both "this source found
+nothing" and "this source could not be reached." The refresh wrote the second one to production as
+if it were the first.
+
+Two halves, and the second is where it went wrong:
+- **The connectors were always right.** All five quarantine a failed fetch with a precise reason
+  (`fetch failed: …` / `fetch/parse failed: …`). Nothing upstream needed changing.
+- **`dev_refresh_collect()` threw the diagnosis away**, and its transient guard tested the
+  **AGGREGATE** `development` count — so a **per-source** collapse hid behind a *different*
+  source's contribution. ZIP 97215 emitted `development: 15` from the county's AREA planning
+  notices, 15 > 0, guard silent, **414 point permits overwritten by silence.**
+
+**The rule: a guard on a total cannot protect a part.** Any invariant over a multi-source
+aggregate must be evaluated per contributing source, or the largest contributor can vanish behind
+the smallest.
+
+Fixed by `docs/dev-refresh-source-failure-guard.sql` (migration
+`dev_refresh_per_source_failure_guard`): `dev_failed_sources(jsonb)` discriminates a failed fetch
+from an honest zero; the refusal is **per source, not per page** (a source that failed but
+contributes nothing to that ZIP does not block it); every failure is logged to
+`dev_refresh_source_failures` + `v_dev_refresh_source_health` so a refusal is never silent; and
+blocked rows keep their old `refreshed_at`, so `dev_refresh_fire_batch` (ordered `refreshed_at asc`)
+re-picks them automatically — no new scheduled job. Both directions are pinned:
+`test/fetch-failure-reason-contract.test.mjs` proves config errors, truncation notes and
+per-record quarantines do **not** block, because a guard that only blocks would freeze every
+honestly-emptied page forever.
+
+*It paid for itself on first run:* the very first collect surfaced a **second** silently-darkening
+source — `minneapolis-ccs-permits` returning `ArcGIS error: Unable to perform query. Too many
+requests.`, blocking 55413 (2,015 cached records) and 55422 (719), while correctly **not** blocking
+55119 (0 cached).
+
 ### Measurement discipline
 - **Capture the baseline BEFORE mutating what you intend to measure** — a post-deploy refresh
   destroyed the pre-deploy Arlington rows and cost the clean −397 figure.

@@ -98,7 +98,14 @@ const run = (entry, communities = sussex) => arcgisForZip('19966', communities, 
     'a real type_map hit wins — the constant can never override a publisher-stated type');
 }
 
-// ── 4. setting BOTH is a config error and the entry is QUARANTINED, not resolved ─
+// ── 4. setting BOTH is now LEGAL and precisely scoped (founder ruling, 2026-08-03) ─
+// This assertion is INVERTED from what it was. It used to pin a hard quarantine on both-set
+// entries; the two options were then ruled to answer DIFFERENT questions — type_map is "the
+// publisher stated a value we classify", use_type_const is "the publisher stated NOTHING". The
+// old guard made the second unexpressible for any layer that also has stated values (Adams
+// County: 6 real BuildingUse values + 21,506 blanks). The quarantine is gone; what replaces it
+// is the STRICTER requirement that the constant may not swallow a present-but-unmapped value.
+// Full behavioural coverage: test/arcgis-type-const-with-map.test.mjs.
 {
   const { sites, reports } = await run({
     ...baseEntry,
@@ -106,10 +113,11 @@ const run = (entry, communities = sussex) => arcgisForZip('19966', communities, 
     column_map: { ...baseEntry.column_map, type_source: 'current_zoning' },
     type_map: { 'AR-1': 'Residential' },
   });
-  ok(sites.length === 0, 'a both-set entry emits nothing rather than silently picking one');
-  ok(/config error: use_type_const AND type_map both set/.test(reports[0]?.quarantined?.[0]?.reason ?? ''),
-    'and it says so by name — an author who set a constant must not be left believing it applied',
+  ok(sites.length > 0 && (reports[0]?.quarantined?.length ?? 0) === 0,
+    'a both-set entry is no longer a config error — it emits',
     JSON.stringify(reports[0]?.quarantined));
+  ok(sites[0]?.use_type === 'Residential',
+    'and the MAPPED value still wins — the constant never overrides a publisher-stated type');
 }
 
 // ── 5. the coverage gate still binds — a constant does not widen reach ──────────

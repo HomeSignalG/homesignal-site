@@ -261,17 +261,16 @@ async function runEntry(
   };
   const records: NormalizedRecord[] = [];
 
-  // A constant and a map are mutually exclusive by design. Silently letting the map win would
-  // hide a config error in the exact field that decides the pin ICON: the author believes the
-  // constant is in force, the connector ignores it, and the disagreement is invisible until a
-  // page renders the wrong shape. Fail the entry loudly instead.
-  if (entry.use_type_const && entry.type_map && Object.keys(entry.type_map).length > 0) {
-    report.quarantined.push({
-      reason: "config error: use_type_const AND type_map both set — a constant is for layers with NO classifiable type column; remove one",
-      sample: entry.service_url,
-    });
-    return { records, report };
-  }
+  // use_type_const AND type_map may be set TOGETHER (2026-08-03 founder ruling). They are not in
+  // competition — they answer different questions, and the difference is load-bearing:
+  //   • type_map      — the publisher STATED a value; we classify it. Absent from the map ⇒ WE
+  //                     chose not to classify it ⇒ `unclassified`.
+  //   • use_type_const — the publisher stated NOTHING. That is honest absence, not a mapping gap,
+  //                     and the record is still real (located, dated, filed). It renders under the
+  //                     generic member rather than as a missing classification.
+  // See normalizeRow: the constant fills ONLY on an EMPTY source value, never on a present-but-
+  // unmapped one — collapsing those two would erase exactly the distinction this permits.
+  // (Adams County's 21,506 blank `BuildingUse` rows are the case; its 6 stated values still map.)
 
   // A whitelist that cannot be expressed is FAIL-CLOSED, never silently unfiltered — the whole
   // point of implementing this option is that an ignored filter published ~52,000 unintended
@@ -386,7 +385,12 @@ async function normalizeRow(
   if (typeHit?.caseInsensitive) noteCaseFold(caseFold, "type", typeSrcVal, typeHit.matchedKey);
   // A mapped value always wins; the constant only fills where the publisher states no
   // classifiable type at all. Mirrors status_const, and still never guesses from the title.
-  const useType = typeHit?.value || entry.use_type_const || "unclassified";
+  // The constant applies when the entry declares NO type_map at all (its original meaning,
+  // byte-for-byte unchanged for every such entry), or when the publisher left the mapped column
+  // EMPTY. A value that is PRESENT but unmapped still falls through to `unclassified` — that is
+  // the unmapped-vs-empty distinction, and it must survive.
+  const constantApplies = !typeLookup || !typeSrcVal;
+  const useType = typeHit?.value || (constantApplies ? entry.use_type_const : undefined) || "unclassified";
 
   // geography: source coords → point; else geocode a full address → address; else jurisdiction.
   let lat = numOrNull(readCol(row, cm.lat));

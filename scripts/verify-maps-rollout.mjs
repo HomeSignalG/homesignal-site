@@ -19,6 +19,8 @@
 // sheet re-checked on one marker-rich ZIP.
 import { chromium } from 'playwright';
 import { writeFileSync, mkdirSync } from 'node:fs';
+import { surfaceBanner } from './lib/surface-banner.mjs';
+surfaceBanner('verify-maps-rollout');
 
 const BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
 const ZIPS = [
