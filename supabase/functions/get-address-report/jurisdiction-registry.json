@@ -10612,6 +10612,166 @@
       "incremental_field": "MeetingDate",
       "record_url_precision": "dataset",
       "_receipts": "2026-08-05 OH/Summit wire (Akron). Summit was 0 of 41 pages live -- the single largest dark block in Ohio. Config only. ⚠️ SMALL BY DESIGN: this layer holds 16 rows, so the honest expectation is a modest page lift, not a metro-scale one. It is wired because 16 real, dated, per-parcel filings are 16 real filings (the Weld/Chester precedent), not because it fills the county. DISCOVERY -- THE HOST WAS DERIVED FROM THE HUB'S OWN DATASET URLs, NEVER GUESSED. Summit's hub data-summitgis.opendata.arcgis.com publishes 138 datasets; extracting the accessURL hosts from its DCAT gave the two REAL Summit-Ohio hosts, scgis.summitoh.net (12 datasets) and the AGO org services3.arcgis.com/3Ukh5HzAdI6WZ3KP (124). ⚠️ CROSS-STATE TRAP, LIVE AND ADJACENT: a plain search for 'Summit County GIS' returns summitcountyco.gov and summitcountypropertyappraiser.org, which are NOT Ohio; maps.summitcounty.org is a live ArcGIS server carrying only parcel viewers and is also NOT confirmed Ohio. Summit OHIO is summitoh.net -- confirmed by co.summitoh.net and permitsearch.summitoh.net. Entity here is further confirmed from CONTENTS: the townships in the data are Sagamore, Copley, Springfield and Richfield, all Summit County OH. FULLY ENUMERATED BEFORE WIRING, ON EVERY SURFACE: the hub's 138 datasets keyword-scanned (only 'Assessed Subdivisions', a cadastral layer, matched); scgis.summitoh.net's SERVER ROOT (16 folders, ~100 root services); and every promising folder -- Admin_and_Planning (County_Council, eSIDs, Zoning only), DOSSS, Hosted (911/heat maps/floodplains/ParcelDrafter/Plats_Legacy). ⚠️ THE 'tyler' FOLDER IS EMPTY -- 0 services, 0 folders. Tyler is the EnerGov permitting vendor, so the folder NAME promises a permit system and delivers nothing; this is the second empty vendor-named folder found (Allegheny's 'Accela' was the first). A vendor name in a folder listing is not a source. permitsearch.summitoh.net is a Bootstrap HTML app with no exposed API. THE LAYER CHOICE IS LOAD-BEARING -- LAYER 2, NOT LAYER 0. The FeatureServer has three layers: 0 Point (24 rows), 1 Line (0 rows, EMPTY), 2 Polygon (16 rows). Layer 0 is NOT development: its rows are county-wide zoning ORDINANCE TEXT amendments -- 'Definitions: RVs', 'Short Term Rentals', 'OH HB 361 Second Discussion', 'Residential and PUD Districts', all ItemType 'Text'. Those are legislative policy items with a nominal point, and publishing them as per-parcel development records would misrepresent them. Layer 2 is the real per-parcel docket: 'Heartridge Subdivision Phase 3 Final Plat' (Sagamore), '790 S. Cleveland Massillon Road' Rezoning (Copley), 'Picton Parkway' Preliminary (Springfield), 'Kaczmar Subdivision' (Richfield). READ THE ROWS, NOT THE SERVICE NAME. VOCABULARIES ARE COMPLETE BY EXHAUSTION, NOT BY SAMPLE -- all 16 rows were pulled in one query, so these ARE the population: ItemType Rezoning 8 + Receipt 2 + null 2 + Final 2 + Riparian 1 + Preliminary 1 = 16; SCPCRec Approve 12 + Table 2 + Other 1 + null 1 = 16; BusinessType New 14 + Old 2 = 16. ItemNumber 16/16 and MeetingDate 16/16 populated. STATUS IS A CONST AND SCPCRec WAS DELIBERATELY REJECTED AS THE STATUS SOURCE. SCPCRec is the commission's RECOMMENDATION, not a decision: the Summit County Planning Commission is ADVISORY to the townships under Ohio law (ORC 303 zoning / ORC 711 plats), exactly the mechanism PA Act 247 encodes. Mapping SCPCRec 'Approve' (12 of 16) to the approved bucket would assert that a project is approved when the township that actually decides has not acted. Same founder ruling as the three PA Act 247 entries, and the constant uses the IDENTICAL wording so all four read the same on a page. TYPE IS A CONST for the same reason as Montgomery PA and Allegheny: ItemType is a FILING CLASS (Rezoning/Final/Preliminary/Receipt/Riparian), not a building use, and there is no use column anywhere in the schema. use_type_const 'Development' renders the generic Other project pin and asserts nothing. GEOMETRY IS POLYGON and rides the shipped featurePoint() shoelace centroid; column_map lat/lng are __lat/__lng, without which every record silently lands on the ZIP centroid at scope=area (the Sussex defect). return_centroid is NOT set: this IS a hosted AGO FeatureServer and would honour it, but the shoelace derivation is already proven equivalent to ~2.9 m and the standing answer is that return_centroid is opt-in per entry, never inferred. SCOPING IS SPATIAL at 3 mi -- no ZIP and no address column exists. MeetingDate is a real esriFieldTypeDate so recency_days' DATE literal applies directly. recency_days 1825 matches the three PA Act 247 entries (reconciled 2026-08-04) -- same advisory-review mechanism, same slow-moving cadence; all 16 rows fall inside it, verified live. record_url_precision 'dataset': the schema carries NO url column of any kind, and no per-item public URL was found, so templating one would be guessing; the county Planning & GIS page was live-verified 200 (40 KB). COVERAGE LIMIT, STATED PLAINLY: the county commission reviews UNINCORPORATED TOWNSHIPS. Akron and the incorporated cities run their own planning departments and are NOT in this layer, so Summit pages over incorporated areas will stay dark on this source. That is a real coverage boundary, not a defect, and it must not be described as county-wide coverage."
+    },
+    {
+      "registry_id": "stlouis-county-mo-subdivisions",
+      "platform": "arcgis",
+      "service_url": "https://services2.arcgis.com/w657bnjzrjguNyOy/arcgis/rest/services/Subdivisions2025/FeatureServer/0",
+      "dataset_url": "https://gis.stlouiscountymo.gov",
+      "jurisdiction": "St. Louis County, Missouri (unincorporated)",
+      "coverage": [
+        {
+          "state": "MO",
+          "county": "St. Louis"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "SUBDIVISIO",
+          "PLATTYPEDE"
+        ],
+        "status_raw": "PLATTYPEDE",
+        "file_date": "DATESUBMIT",
+        "decision_date": "RECORDEDDA",
+        "address": "PROP_ADD",
+        "zip": "PROP_ZIP",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Preliminary"
+        ],
+        "approved": [
+          "Record",
+          "Boundary Adjustment",
+          "Major Land Disturbance"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "use_type_const": "Development",
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-05 MISSOURI PASS. St. Louis County was 0 of 63 pages live -- the LARGEST single dark county block encountered in any state. Config only. The county's subdivision plat docket: 42 rows, and it is the ONLY St. Louis source found that carries dates at all. QUALITY IS THE REASON IT WAS CHOSEN OVER BIGGER LAYERS: 42/42 rows carry geometry, 42/42 carry DATESUBMIT, 42/42 carry PROP_ADD, PROP_ZIP and MUNICIPALI, and PLATTYPEDE is complete and sums to EXACTLY 42 (Boundary Adjustment 22 / Preliminary 13 / Record 6 / Major Land Disturbance 1). Native PROP_ZIP is used rather than spatial scoping -- the page count is then EXACT rather than a 3-mi estimate: 18 distinct ZIPs (63129 x8, 63128 x5, 63123 x4, 63125 x4, 63138 x3, 63026 x3, 63031/63034/63121 x2, and nine singletons), summing to 42. Measured both ways before choosing: native ZIP lights 18 of the 63 dark pages, a 3-mi spatial scope would light 33. Native ZIP wins on the standing convention that a real ZIP column is exact where a radius is an estimate (the Allegheny note). STATUS COMES FROM PLATTYPEDE, WHICH IS THE SOURCE'S OWN LIFECYCLE LANGUAGE, not a guess: Preliminary is a plat under county review -> proposed; Record (the recorded plat), Boundary Adjustment (a recorded lot-line change) and Major Land Disturbance (an issued grading permit) are all completed county actions -> approved. use_type_const 'Development' because PLATTYPEDE is a FILING CLASS, not a building use, and no use column exists anywhere in the 90-field schema. STALE, STATED PLAINLY: DATESUBMIT spans 2025-01-03 to 2025-12-18 and a direct query for DATESUBMIT >= 2026-01-01 returns EXACTLY 0 -- a calendar-2025 docket that has not rolled over in eight months. Wired under the founder's rule that a stale-but-dated, geolocated, per-record source is wired with its span stated, because understating is the honest direction; it can be windowed, can age out, and can be reprobed, which is what separates STALE from NO_TEMPORAL_FIELD. No recency_days is set: at 42 rows there is no size pressure and a window would only discard the recorded plats that ARE the operating tier (the Dayton reasoning). THE APPARENT SUCCESSORS WERE CHASED AND ARE NOT ONE: 'St. Louis County Subdivisions' (modified 2026-07-22) and 'St. Louis County Subdivisions_3_Draft' (2026-07-28) are WEB MAPS, and both point at SubdivisionTrustees_v2 -- HOA trustee REGISTRATION, a different record class entirely. 'Subdivisions_2025' is a Layer Package, not an endpoint. There is no 2026 successor service. REPROBE CONDITION: if a Subdivisions2026 (or equivalent) service appears, re-point this entry; if none appears by the next annual cycle, re-evaluate as STALE. COVERAGE CEILING, STATED PLAINLY: MUNICIPALI reads UNINCORPORATED on all 42 of 42 rows. St. Louis County contains roughly 90 incorporated municipalities that run their own planning departments and are NOT in this layer, so 18 pages is the ceiling for this source and it must never be described as county-wide coverage. Same shape as the Summit County OH limit. WHAT ELSE WAS ENUMERATED AND REJECTED IN ST. LOUIS COUNTY (org w657bnjzrjguNyOy, 2,502 items, 685 feature services, plus the county's own maps.stlouisco.com/hosting/rest server, all six folders): (a) AGS_ZoningPetitions / Zoning_Petitions -- 3,945 rows and by far the biggest layer, REJECTED NO_TEMPORAL_FIELD: count(last_edited_date) = 0 of 3,945 and max = null, the only date-typed field in the schema empty across the whole table. Its PROCEDURE_ vocabulary is also opaque AND dirty -- 2,441 blank (62%), then PEU 833 / CUP 589 / RDD 22 / SBP 12, with petition numbers leaking into the procedure column (32-15, 44-25, 17-12, 26-21) and stray ' A', ' B', ' C', ' D', R1, R2, R4. (b) Active_Construction_Points (4 rows) and _Lines (29) -- REJECTED NO_TEMPORAL_FIELD, identical 6-field schema (CountyID, Name, Status, URL) with no date field of any kind. Note both 404'd on layer 0: the service sets preserveLayerIds true and the real ids are 101 and 100 -- and those 404s arrived as HTTP 200 carrying an error object, the '200 is not verification' pattern. (c) The Accela FOLDER on the county server holds ONLY Accela_Parcels -- the FOURTH consecutive vendor-named folder that is not a permit source (Summit 'tyler' empty, Allegheny 'Accela' empty, Dayton 'Accela' full of housing code-enforcement, this one full of parcels). Content decides; the name promises nothing. (d) Transportation_Current_Projects_view -- 11 rows and the backing table is named _061722 (June 2022). (e) PlanningLocationBasedProto_WFL1 is marijuana / tobacco / liquor / childcare LICENCE locations -- WRONG_RECORD_CLASS. (f) OpenData and AGS_EconDevPrograms are reference layers and district polygons. (g) St. Louis CITY's permit database on rdx.stldata.org remains UNREACHABLE -- see its own entry."
+    },
+    {
+      "registry_id": "kcmo-development-cases",
+      "platform": "arcgis",
+      "service_url": "https://mapd.kcmo.org/kcgis/rest/services/AGOL/MapServer/25",
+      "dataset_url": "https://data.kcmo.org/",
+      "jurisdiction": "City of Kansas City, Missouri",
+      "coverage": [
+        {
+          "state": "MO",
+          "county": "Jackson"
+        },
+        {
+          "state": "MO",
+          "county": "Clay"
+        },
+        {
+          "state": "MO",
+          "county": "Platte"
+        },
+        {
+          "state": "MO",
+          "county": "Cass"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PROJECTNAME",
+          "DESCRIPTION"
+        ],
+        "status_raw": "STATUS",
+        "file_date": "APPLICATIONDATE",
+        "decision_date": "COMPLETEDATE",
+        "case_number": "PLANNUMBER",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Under Review",
+          "Review on Hold",
+          "To Council",
+          "To CPC",
+          "To BZA",
+          "Continued off-Docket",
+          "Proposed",
+          "Pending",
+          "Accepted"
+        ],
+        "approved": [
+          "Approved",
+          "Approved Subject to Conditions",
+          "Recorded",
+          "Released"
+        ],
+        "operating": [],
+        "exclude": [
+          "Voided",
+          "Dismissed",
+          "Denied",
+          "Cancelled - Customer",
+          "Canceled - Customer",
+          "Inactive",
+          "Expired",
+          "Revoked",
+          "Closed"
+        ]
+      },
+      "use_type_const": "Development",
+      "recency_days": 1825,
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-05 MISSOURI PASS. The Kansas City metro seam: Jackson 25 dark, Cass 14, Clay 10, Platte 10. Config only. This is the best-formed source found anywhere in Missouri -- the City of Kansas City's full planning-case docket, 23,166 rows, 100% dated (count(APPLICATIONDATE) = 23,166 of 23,166), APPLICATIONDATE spanning 1985-05-03 to 2026-07-31, i.e. FRESH TO WITHIN FOUR DAYS of wiring. Schema carries PLANNUMBER, PLANTYPE, STATUS, APPLICATIONDATE, COMPLETEDATE, PLANNER, DESCRIPTION, LAND_USE, DWELL_UNITS, NON_RES_AREA, LOTS, PROJECTNAME, WORKCLASS and NEXTHEARINGDATE. THE 1825-DAY WINDOW IS LOAD-BEARING AND IT SOLVES THE ONE REAL PROBLEM. Unwindowed, STATUS is 26 values summing exactly to 23,166 but dominated by 'Closed' at 16,370 (71%) -- a terminal state whose OUTCOME is not recorded, so it can support neither an approved nor an operating claim. Inside 1825 days the layer is 2,675 rows and 'Closed' DISAPPEARS ENTIRELY: the windowed vocabulary is 17 values summing exactly to 2,675 (Approved Subject to Conditions 1007 / Approved 836 / Under Review 141 / Voided 113 / Dismissed 106 / Denied 105 / Recorded 93 / Review on Hold 62 / Cancelled - Customer 55 / Inactive 44 / Expired 38 / To Council 35 / Continued off-Docket 25 / To CPC 10 / To BZA 3 / Revoked 1 / '4' 1). Every one of those is self-describing except the single opaque numeric '4', which is left UNMAPPED and fails closed. The window is the standing 1825 default and is independently the correct choice here. 'Closed' IS NEVERTHELESS MAPPED -- TO exclude, DELIBERATELY. It cannot appear in today's window, but the window MOVES: a case filed in 2024 and closed in 2027 will be both in-window and Closed. Rather than leave that to fail closed silently later, it is mapped to exclude now, because 'Closed' alone asserts neither that a project was approved nor that it was built, and asserting either would be a guess about outcome. The other terminal states (Voided, Dismissed, Denied, Cancelled/Canceled - Customer, Inactive, Expired, Revoked) are excluded for the same reason. Statuses that can only appear outside the current window (Proposed, Pending, Accepted, Released) are mapped anyway so the entry stays correct as the window advances. use_type_const 'Development' because PLANTYPE IS UNUSABLE AS A VOCABULARY: 17,447 of 23,166 are NULL (75%), and the non-null tail is contaminated with individual case identifiers and free text -- 'CLD-FnPlat-2022-00046', 'CD-CPC-2023-00051', 'Jones Iron & Metal - Alley Vacation', 'Rezoning from R-0.5 to R-0.75', 'Somerbrook 7th Plat, Final Plat', 'Final Plat - The Preserve, 8th Plat'. Never guess a decode; the generic member asserts nothing. GEOMETRY is polygon and rides the shipped featurePoint() shoelace centroid; column_map lat/lng are __lat/__lng, without which every record silently lands on the ZIP centroid at scope=area (the Sussex defect). return_centroid is NOT set -- this is a classic ArcGIS Server MapServer, which silently ignores it. Scoping is spatial at 3 mi: there is no ZIP and no address column. COVERAGE IS FOUR COUNTIES because Kansas City itself straddles them, and the measured dark-page lift is Jackson +9, Clay +2, Platte +2, Cass +1 = 14. It is the CITY's docket, not the counties' -- Independence, Lee's Summit, Blue Springs, Liberty and the rest run their own planning departments and are not in this layer. Not a claim of four-county coverage. NEW HOST -- mapd.kcmo.org has never been fetched by the engine, so per governance section 0 the first post-deploy re-cache is a DEPLOY VERIFICATION read from arcgis_reports[].fetched/emitted, not from counts. The wire-and-see is legitimate here because there IS a positive control: pg_net returns 200 on the exact connector query shape. ALSO REJECTED IN KANSAS CITY: (a) the data.kcmo.org BLDS permit ledger (ntw8-aacc) was RE-PROBED this session and is STILL STALLED at max(:updated_at) = 2025-05-09T20:22:20.907Z over 681,036 rows -- byte-identical to the value recorded on 2026-07-17, so three further months produced no movement. It stays on the reprobe list. (b) BW_NewCommercial_Permits (797 rows, hosted on services.arcgis.com) is real and per-record but max(USER_Issue_Date) is 2025-06-17 and its 797 rows carry only 5 distinct ZIPs, so the measured lift is ONE dark page; combined with the BW_ prefix and 100+ USER_bldg_type_* analysis columns marking it as a one-off study extract rather than a maintained ledger, it is not worth an entry. Recorded, not wired."
+    },
+    {
+      "registry_id": "columbia-mo-capital-projects",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/GHhNHT1xiCkCAXvo/arcgis/rest/services/CIPCentroids/FeatureServer/0",
+      "dataset_url": "https://www.como.gov/community-development/",
+      "jurisdiction": "City of Columbia, Missouri",
+      "coverage": [
+        {
+          "state": "MO",
+          "county": "Boone"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "project_name",
+          "project_description"
+        ],
+        "status_raw": "project_status_desc",
+        "file_date": "project_start_date",
+        "decision_date": "project_end_date",
+        "case_number": "project_number",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Proposed",
+          "Preliminary Design",
+          "Final Design"
+        ],
+        "approved": [
+          "Bid",
+          "Construction",
+          "On-going"
+        ],
+        "operating": [
+          "In Service",
+          "Ready to Close"
+        ],
+        "exclude": []
+      },
+      "use_type_const": "Development",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-05 MISSOURI PASS. Boone County (Columbia) was 4 of 14 live, 10 dark. Config only. The City of Columbia's capital improvement register -- the municipal-CIP class, same as the UDOT / TxDOT / NDOT infrastructure-project precedent, and the source Dayton would have been had its host been reachable. 370 rows, 369 with geometry, 367 dated. BOTH THE VOCABULARY AND THE ARITHMETIC ARE COMPLETE: project_status_desc sums to EXACTLY 370 -- Proposed 161 / On-going 57 / Preliminary Design 55 / Construction 43 / Final Design 18 / In Service 14 / Ready to Close 13 / Bid 8 / null 1. Every value is self-describing and maps to the project lifecycle without a guess: Proposed, Preliminary Design and Final Design are pre-construction -> proposed; Bid, Construction and On-going are funded and under way -> approved; In Service and Ready to Close are built infrastructure -> operating. The single null fails closed. NO status_const is needed -- unlike Dayton, this layer states its own status per record. IT IS GENUINELY CURRENT, not an annual snapshot: project_start_date spans 1969-12-31 to 2029-10-01, i.e. it carries FORWARD-DATED projects, which is the opposite of the Dayton and St. Louis staleness shape. No recency_days is set for the same reason as Dayton -- a window would discard the In Service tier that the operating bucket exists for, and at 370 rows there is no size pressure. use_type_const 'Development': the layer has dept_name and major_group_name but no building-use column, and a capital project is not a building use. Scoping is spatial at 3 mi -- no ZIP or address column. record_url_precision 'dataset': no per-record URL column exists; dataset_url is the city's own Community Development page, live-verified HTTP 200 (280 KB). Host is services.arcgis.com, already proven reachable by dozens of live entries -- the section 0 corollary applied deliberately. MEASURED LIFT IS SMALL AND SAID SO PLAINLY: 2 of Boone's 10 dark pages. Wired on the Weld / Chester / Summit precedent that real dated per-parcel records are worth wiring even in small numbers, not because it fills the county. Columbia's own org (GHhNHT1xiCkCAXvo, 68 feature services, entity confirmed by name 'City of Columbia, Missouri') carries NO permit or planning-case ledger -- the rest is parks, trails, canopy, outages and water utilities."
     }
   ],
   "ckan": [

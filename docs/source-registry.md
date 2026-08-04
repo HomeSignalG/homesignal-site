@@ -5629,3 +5629,62 @@ surfaced:
 **🔁 REPROBE CANDIDATES, named:** **Dayton** — the only OH county with a *found, verified, correctly
 configured* source. Its `_receipts` and this document carry the full config; if the edge-egress block
 lifts it is a one-object re-add. Nothing else in OH is waiting on time.
+
+---
+
+## MISSOURI PASS (2026-08-05) — 3 sources wired, every county closed on enumeration
+
+MO opened at **53 / 264 live (20.1%), 211 dark**. Six counties sat at 0% and held 156 of the 211 dark
+pages (74%) — the same shape as Ohio: metro builds, not trim. County distribution was measured
+**before** probing, per the standing rule.
+
+### WIRED (3)
+
+| Entry | County | Rows | Measured dark-page lift |
+|---|---|---:|---:|
+| `stlouis-county-mo-subdivisions` | St. Louis | 42 | **18** (native ZIP; 33 by 3-mi spatial) |
+| `kcmo-development-cases` | Jackson · Clay · Platte · Cass | 2,675 in-window (23,166 total) | **14** (J+9 · Cl+2 · P+2 · Ca+1) |
+| `columbia-mo-capital-projects` | Boone | 370 | **2** |
+
+Full config reasoning, vocabularies and arithmetic in each entry's `_receipts`. Three findings worth
+lifting out:
+
+- **The 1825-day window on KCMO is load-bearing, not conventional.** Unwindowed, `STATUS` is dominated
+  by `Closed` at 16,370 of 23,166 (71%) — a terminal state with no recorded *outcome*, so it supports
+  neither an approved nor an operating claim. Inside 1825 days `Closed` **disappears entirely** and the
+  vocabulary is 17 self-describing values summing to exactly 2,675. `Closed` is nonetheless mapped to
+  `exclude`, because the window moves: a case filed 2024 and closed 2027 will be both in-window and
+  Closed, and that must fail to a decision already made rather than to silence.
+- **Native ZIP beat spatial on St. Louis, and the cheaper number was not chosen.** 18 exact pages via
+  `PROP_ZIP` over 33 estimated pages via a 3-mi radius — the standing convention that a real ZIP column
+  is exact where a radius is an estimate.
+- **A fourth vendor-named folder that is not a source.** St. Louis County's own `Accela` folder holds
+  only `Accela_Parcels`. The tally is now Summit `tyler` (empty), Allegheny `Accela` (empty), Dayton
+  `Accela` (full — housing code enforcement), St. Louis `Accela` (full — parcels). **Content decides.**
+
+### REJECTED, with receipts
+
+| County | Candidate | Verdict |
+|---|---|---|
+| St. Louis | `AGS_ZoningPetitions` (3,945 rows) | `NO_TEMPORAL_FIELD` — **0 of 3,945** dated, `max(last_edited_date)` null. Also opaque *and* dirty: 62% blank, petition numbers (`32-15`, `44-25`) leaking into the procedure column |
+| St. Louis | `Active_Construction` Points/Lines | `NO_TEMPORAL_FIELD` — no date field in the schema. (Both 404'd on `/0`: `preserveLayerIds: true`, real ids **101**/**100**, and the 404s arrived as **HTTP 200 carrying an error object**) |
+| St. Louis | `PlanningLocationBasedProto` | `WRONG_RECORD_CLASS` — marijuana/tobacco/liquor/childcare **licences** |
+| St. Louis **city** | `rdx.stldata.org` | **UNREACHABLE** — re-probed, TLS handshake blackhole. See its own corrected entry |
+| Jackson | KCMO BLDS `ntw8-aacc` | **STALE, re-probed and unmoved** — `max(:updated_at)` = `2025-05-09T20:22:20.907Z`, byte-identical to the 2026-07-17 record over 681,036 rows. Three further months, no movement. Stays on the reprobe list |
+| Jackson | `BW_NewCommercial_Permits` | Real but **1 page** of lift (797 rows, only **5 distinct ZIPs**), stale 14 months, and `BW_` + 100 `USER_bldg_type_*` columns mark it a one-off study extract. Recorded, not wired |
+| St. Charles | `Conditional Use Permit` (707) | **Free-text prose statuses** — `CC_DECISIO` has ~300 distinct strings (`APPROVAL 05/31/00; BILL#1629; ORD #00`, `DENIAL 8/08/05`, `WITHDRAWN 12-31-97`). Nothing to map verbatim — the **Douglas County NV** class |
+| St. Charles | `Board of Zoning Adjustment` (1,110) | Opaque, dirty `VOTE`: `D-OT`, `D-OVERTU`, `D/G`, `G G`, `G/D`, `SeeComme`. Undecodable without a legend — the **San Jose `planningpermits30`** class |
+| St. Charles | `Zoning Application` (735), `PUD` (47) | `NO_TEMPORAL_FIELD` — no date field |
+| St. Charles | `gis.sccmo.org` | **Cloudflare 403 challenge** on the production host. (`gis-dev.sccmo.org` answers 200 and carries the same service — noted, but the layers there were rejected on content anyway) |
+| Greene | Springfield org `aOss8CrQf3pARS5q` | `candidates_exhausted` — entity confirmed by name; only redevelopment-area polygons (Ch. 99 / Ch. 353), comprehensive-plan goal layers and `Springfield Subdivisions`. No permit or case ledger |
+| Boone | Columbia org (68 services) | Only the CIP register (wired). No permit or case ledger — the rest is parks, trails, canopy, outages, water |
+| Franklin · Jefferson | — | `candidates_exhausted` — no first-party org found. Content-scoped searches returned only cross-state noise (Indiana DNR, Virginia Tech, BLM national) and personal accounts with no `orgId` |
+
+**Cross-state trap avoided:** `wcgis` resolves to **Westchester County GIS (NY)**, not Warren County —
+recorded during the OH pass and re-confirmed here. Every MO org was verified by returned `name`, and
+St. Louis County MO was further confirmed from **contents** ("St. Louis City Boundary Map", "Promise
+Zone Developments") against the St. Louis County **Minnesota** namesake.
+
+**Generic-portal control, worth reusing:** five of six urlKey guesses returned byte-identical
+**12,477-byte** responses (the anonymous ArcGIS portal); only the real org differed at 18,684 bytes.
+Response size is a cheap discriminator for "this subdomain is not an org".
