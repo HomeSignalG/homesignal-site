@@ -4819,3 +4819,132 @@ An 18% variance on Portland's record total that did not match its expected drop.
 averaging it away surfaced a defect **older than every change in this session** — silent, and invisible
 in any total, because a truncated fetch and a small source look identical unless you notice the count is
 a suspiciously round 200.
+
+---
+
+## PA SEAM CLOSED — CENTRE + YORK WIRED AND MEASURED (2026-08-04)
+
+Both counties recorded 2026-08-03 as "SOURCE FOUND, NOT YET WIRED" are now live. With
+Delaware (#570) and Chester (#574/#575), **every one of the six PA counties recorded as
+"county-hub URL guesses 404'd" is resolved** — 4 wired, 2 rejected with receipts (Bucks
+stalled 2023-10-26, Lancaster has no activity layer).
+
+### Measured, both surfaces (the surface-matrix rule)
+
+| county | pages | with records | dark | `development_reports` | `app_projects` pages / rows | worst page |
+|---|---|---|---|---|---|---|
+| Centre | 35 | **34** | 1 | **7,686** | 35 / 7,879 | 935 |
+| York | 47 | **46** | 1 | **2,444** | 47 / 3,060 | 155 |
+
+Across all 10,130 records from both sources: **0 missing `record_url`, 0 missing
+coordinates, 0 unclassified.** Bidirectional gate proof, cache-wide over all 12,722 ZIPs:
+the query returns exactly two rows — Centre records ride ONLY PA/Centre pages, York ONLY
+PA/York. No leakage.
+
+### Both remaining "dark" pages are HONEST — and they are honest in DIFFERENT ways
+
+This is the part worth keeping. A page with no records is not one finding; **characterise
+the zero in two steps — unwindowed control first, then windowed:**
+
+- **Centre 16686 (Tyrone)** — unwindowed envelope control **0**. The layer has no permits
+  within 3 mi of that centroid at all. Tyrone sits on the Blair County line. True absence.
+- **York 17372 (York Springs)** — unwindowed control **80**, windowed **0**. Not absence:
+  80 plans are on record, but **none received in the last 5 years**. Honest "no recent
+  activity."
+
+Reporting either as simply "dark" would have hidden which one it was, and only the second
+would change if the window changed.
+
+### CENTRE — the opaque status code was decoded on EVIDENCE, not guessed
+
+`Open_Y_N` is C 58,676 / O 1,414 / null 7 / I 1 (sums to exactly 60,098) and the layer
+publishes **no `codedValues` domain**, so the meaning is stated nowhere in metadata. Three
+independent lines establish **C = Closed, O = Open**:
+
+1. the field is named `Open_Y_N`;
+2. **recency inverts** — 2026 permits are 487 O / 177 C (73% open) against 2.4% open across
+   all history, exactly what "recent permits are still open" predicts;
+3. **`Close_Date`** is populated on 31.7% of C rows but **0.4% (6 of 1,414)** of O rows — a
+   79× asymmetry.
+
+`Percent_Complete` was **tested as a decoder and REJECTED** (null on 58,085 of 58,676 C
+rows). `I` — one row, no `Close_Date`, no signal — is **declared in `exclude`** rather than
+left unmapped, per the `delaware-county-pa` defect. Live confirmation on 16801: approved
+183 + operating 752 = 935, the O/C split reproduced end to end.
+
+**`Property_Type_Group` was rejected as the type source because it is ITSELF opaque**
+(R/C/A/S/T). `Permit_Type` is self-describing and closed.
+
+**Fields chosen from live non-null counts, not the schema — and it mattered.** Over the
+4,247 windowed rows, `Home_Address` is populated **0** times and `Type_Description` **0**
+times, though both exist in the schema and both read like the obvious title/address choice.
+Wiring either would have shipped blank records. `Construction_Description` is 99.6%.
+
+### YORK — use is a SET OF 8 FLAGS, not a column; the design question is settled
+
+There is no single use field anywhere in the schema. `column_map` arrays **JOIN with a
+single space and keep every non-empty part** (`arcgis.ts` `readCol`), so `type_source` is
+the 8 flag columns **in precedence order** and each `type_map` key is 8 space-joined
+`YES`/`NO` tokens. **No connector change was needed.**
+
+Safe ONLY because the flags are never NULL: probed live, **0 rows** with a NULL flag, with a
+non-zero control from the same query shape (`PLAN_TITLE IS NOT NULL` → 1,269). A NULL would
+have shortened the joined key and silently missed the map. The flags carry the layer's own
+`BOOLEAN` domain, so the key space is closed.
+
+**Precedence — the one judgement call, and it is reversible by editing that map alone:**
+`IND > COM > MF > MHP > SR > SF > AG > OTHER`. Most intensive use wins, because the question
+the page answers is *what is coming near my home*, and a plan flagged both single-family and
+agricultural is a subdivision on farmland. Consequence over the window: Residential 752,
+Commercial 226, Industrial 137, Development 154, **0 unclassified**.
+
+**⚠️ CORRECTS THE 2026-08-03 NOTE that "`PT_FINAL` YES/NO is the closest thing to a
+lifecycle signal." IT IS NOT.** The `PT_*` flags are themselves a multi-flag set, and **323
+rows carry `PRELIM+FINAL` together** — they describe plan TYPE, not stage, and cannot order
+a lifecycle. Status is therefore a `status_const`, self-describing and a key in its own map,
+matching `chester-county-pa-act247-plans` — the same Act 247 mechanism next door.
+
+### THREE NEW STANDING ANSWERS
+
+1. **RULE 13 GOVERNS VOCABULARY WIDTH, NOT JUST COUNTS — enumerate at the EXACT window you
+   wire.** York's use-flag set has **29** combinations in a 3-year window and **32** in the
+   5-year window actually wired; `SF+SR`, `IND+OTHER` and `MF+SR+OTHER` exist only in the
+   wider one. Enumerating at 3y and wiring at 5y would have dropped those rows to
+   `unclassified` with nothing failing. A vocabulary is a function of the window.
+2. **A JOINED FLAG ARRAY IS NOT AN EMPTY `type_source`, so `use_type_const` CANNOT catch its
+   all-`NO` rows.** York's 34 no-flag rows join to `"NO NO NO NO NO NO NO NO"` — a present
+   value. The constant fills only on an EMPTY value (the 2026-08-03 ruling), so those rows
+   need an **explicit key**. Centre, whose type source is a single column with 1 genuinely
+   blank row, is the opposite case and does use the constant. Same ruling, two mechanisms.
+3. **A RE-FIRE SELECTOR MUST KEY ON THE FIELD THAT CHANGES AT FIRE TIME, NOT AT COLLECT.**
+   Filtering pending work on `refreshed_at` re-fired the *same* 9 Centre ZIPs twice and
+   never advanced, because `refreshed_at` only moves when `dev_refresh_collect()` runs. The
+   claim field is `last_refresh_attempt_at`, which `dev_refresh_fire_batch` sets AT FIRE.
+   Same family as the 80005 remediation-anchor catch, in the other direction: there the
+   selector moved too fast, here it never moved at all.
+
+### One instrument cleared of suspicion
+
+18 in-flight requests showed no `net._http_response` row and I read that as the
+`fire_failed` class. **That was premature — they were still in flight and all landed.**
+`dev_refresh_log_fire_failures()` is sound: it inspects only requests whose response has
+LANDED (`join net._http_response`), so an in-flight request is never logged as a failure.
+The reading was the error, not the instrument. Also note `dev_refresh_collect()` returns a
+GLOBAL count including the scheduled refresh's ZIPs — it is not evidence about your own
+fires; measure the target rows directly.
+
+### Wire facts
+
+- **Centre** — `gissites4.centrecountypa.gov/.../Building_Permits/MapServer/2`, polygon
+  (shoelace centroid; `return_centroid` NOT set — a classic MapServer silently ignores it),
+  60,098 rows, no ZIP column → spatial 3 mi. Every date is an `esriFieldTypeString` in
+  `M/D/YYYY`, so `recency_days`' DATE literal cannot apply and — unlike Anaheim's
+  `yyyy/mm/dd` — a lexicographic compare has no purchase either. Year-suffix `LIKE` list
+  (the `worcester` technique), **with 2027 included preemptively** so the window widens at
+  the year turn instead of silently truncating. Rule 13 probes with non-zero controls:
+  16801 15,862 → 937; 16803 13,220 → 789.
+- **York** — `arcweb1.ycpc.org/.../PLANNING_Subdivisions/FeatureServer/0`, **point**
+  geometry (no centroid needed), 26,884 rows at wire time vs 26,879 the day before — the
+  layer grew by 5 and the 5-year window moved 1,267 → 1,269 by the same amount. `MCD` was
+  deliberately NOT used in the title: it is a coded municipality domain and `readCol` would
+  emit the raw code (`"10"`). Rule 13 probes: 17331 1,868 → 102; 17402 2,247 → 111.

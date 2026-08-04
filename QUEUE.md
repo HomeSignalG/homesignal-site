@@ -5442,3 +5442,34 @@ CHOICE, not an inventory.** Centre's hub lists 100 datasets and omits its own pe
 exists only in the server's root listing. Enumerate `/arcgis/rest/services` before recording a rejection.
 **And try PASDA first for any PA county** — `mapservices.pasda.psu.edu/server/rest/services/pasda/<X>County/MapServer`
 resolved Bucks and Lancaster without needing their own hosts at all.
+
+## PA SEAM — CLOSED (2026-08-04)
+
+All six PA counties recorded as "county-hub URL guesses 404'd" are resolved.
+
+| county | dark before | outcome |
+|---|---|---|
+| Delaware | 29 | ✅ wired (#570) → 0 dark |
+| Chester | 34 | ✅ wired (#574/#575) |
+| **Centre** | **35** | ✅ **WIRED + MEASURED (#577)** — 34/35 pages, 7,686 records; 1 honest zero (16686 Tyrone, 0 unwindowed = true absence) |
+| **York** | **47** | ✅ **WIRED + MEASURED (#578)** — 46/47 pages, 2,444 records; 1 honest zero (17372 York Springs, 80 unwindowed / 0 windowed = no activity in 5 years) |
+| Bucks | 50 | ❌ rejected — layer real but STALLED 2023-10-26 → reprobe list |
+| Lancaster | 56 | ❌ rejected — no activity layer exists |
+
+Both surfaces measured: `development_reports` 7,686 / 2,444; `app_projects` 35 pages / 7,879
+rows and 47 pages / 3,060 rows. Across all 10,130 records: 0 missing `record_url`, 0 missing
+coordinates, 0 unclassified. Bidirectional gate proof cache-wide: each source rides ONLY its
+own county's pages.
+
+**One decision is open for a founder ruling (reversible, one map):** York's use-flag
+PRECEDENCE — `IND > COM > MF > MHP > SR > SF > AG > OTHER`, most intensive use wins. It sets
+the pin SHAPE for the ~315 multi-flag rows (e.g. `SF+AG`, the second most common combination,
+renders Residential). Full reasoning + the 32 measured combinations: docs/source-registry.md
+"PA SEAM CLOSED".
+
+**One observation logged, not filtered:** Centre's ledger includes minor residential work
+("Roof over front deck", "12x24 Shed"). `include_types` is deliberately NOT set — `Permit_Type`
+has no trades class to drop (unlike the WA/MN/IL and Aurora noise drops) and is not a proxy
+for scale, since a `Dwelling` row can be a deck roof. No type whitelist separates minor from
+major here.
+
