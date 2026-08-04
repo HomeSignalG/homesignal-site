@@ -912,6 +912,36 @@ Measured named-row counts: 365d 253 · 1095d 813 · **1825d 1,396**.
 **If a future session finds a reason to narrow any of the three, narrow ALL THREE together or
 the drift returns.**
 
+### MEASURED after deploy + re-cache (2026-08-04)
+
+| | at 1095 | at 1825 |
+|---|---|---|
+| Montgomery records (`development_reports`) | 3,628 | **6,126** |
+| Montgomery records (`app_projects`) | 3,628 | **6,126** |
+| pages carrying the source | 64 | **64** |
+| oldest `file_date` | 2023-08-08 | **2021-08-05** |
+| invariant violations | 0 | **0** |
+
+**The oldest `file_date` is the proof, not the record count.** 2021-08-05 is exactly the
+1825-day boundary; those records could not exist under a 1095-day window, so the window
+demonstrably changed rather than the counts merely moving.
+
+**+2,498 page-records from +583 source rows is correct, not inflation.** Scoping is spatial at
+3 mi, so one Act 247 filing legitimately lands on every Montgomery ZIP page within range —
+3,628/813 = 4.46 pages per source row before, 6,126/1,396 = 4.39 after. The ratio is stable;
+only the window moved. Per-page counts remain honest.
+
+Coverage is unchanged (Montgomery was already 64/64 live): PA 350/210, national 4,591/12,722.
+This reconciliation bought DEPTH on pages that were already lit, not new pages.
+
+⚠️ **Operational note — batch size.** Firing all 64 ZIPs at once returned **62 × 503
+`BOOT_ERROR`** while the scheduled `dev_refresh` cron was running concurrently; the same
+function had just answered a single probe 200. Nothing was corrupted (`dev_refresh_collect`
+reads only `status_code=200`, so those rows simply kept their previous content). **Batches of
+16 ran 16/16 clean.** Use 16 when the cron may be active, and measure completion by
+`refreshed_at` on the target rows — the global collect count includes the cron's ZIPs and is
+not evidence about your own fires.
+
 ## EDITORIAL LEAD — Norristown PA data-centre cluster (surfaced 2026-08-04)
 
 **Five data-centre filings in Montgomery County PA, all March 2026, all on ZIP 19401
