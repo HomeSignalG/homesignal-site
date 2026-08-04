@@ -966,6 +966,43 @@ them `proposed` accordingly. Any editorial use must say so.
 Not yet done: no cross-check against operator identity, utility interconnect filings, or
 PA DEP records. That is the follow-up if this thread is pursued.
 
+## OH/Summit — `summit-county-oh-planning-commission-items` GO-LIVE VERIFIED (2026-08-05)
+
+**DONE.** PR #592, merged `de5b8aa`, deployed, re-cached, re-materialized, measured in both tables.
+
+| | before | after |
+|---|---|---|
+| Summit live / dark | 0 / 41 | **14 / 27** |
+| OH live / dark | 122 / 213 | **136 / 199** (40.60%) |
+| national | 4,591 | **4,604 / 12,722 (36.19%)** |
+
+36 records, identical in both tables, 0 invariant violations, gate proof OH/Summit only.
+The 27 still-dark are the documented coverage limit (county commission reviews UNINCORPORATED
+TOWNSHIPS; Akron and the incorporated cities run their own) — not a failure, and not to be
+described as county-wide coverage.
+
+## ⚠️ OH SHAPE CORRECTION — three unwired metros, not seams
+
+159 of the original 213 dark pages (75%) were in counties with ZERO wired source, three of them
+separate metros: **Akron 41 (now wired), Dayton 39, Toledo 30**. Only 54 dark pages are true seams
+inside Franklin/Cuyahoga/Hamilton, which were already at 91.8% / 75.0% / 60.7%.
+
+**NEXT IN OH, both UNPROBED:** Montgomery/Dayton 39 · Lucas/Toledo 30 · then Medina 19 / Warren 15 /
+Butler 15 collars.
+
+⚠️ **DAYTON CARRIES THE WORST NAME COLLISION IN THE DATASET.** "Montgomery County" GIS searches
+return `montcopa` (Montgomery **PA**, wired 2026-08-04), `mcgov` (Montgomery **MD**, already wired)
+and PASDA `MontgomeryCounty` (also PA). Ohio's is `mcohio.org`, and
+`gis.mcohio.org/arcgis/rest/services` returns 404 HTML — the real OH service host is still unfound.
+Confirm entity from CONTENTS before wiring anything named Montgomery.
+
+## ⚠️ METHOD ERROR — never select a re-cache batch by "still dark"
+
+Made and caught this session. A ZIP that legitimately returns ZERO records never leaves the
+"dark" set, so batch-selecting on it re-fires the same ZIPs every round while unfired ZIPs wait.
+Caught at 21/41 refreshed. **`refreshed_at` is the only correct selector — for the FIRING batch,
+not just the retry.** This is the Chester lesson generalised.
+
 ## Reconciliation log
 
 Numbers reconciled against the artifact before acting (Rule 15).

@@ -5223,3 +5223,86 @@ ratio is stable across the change (4.46 → 4.39).
 a single probe 200. Nothing was corrupted — `dev_refresh_collect` reads only 200s. Batches of
 16 ran clean. Measure completion by `refreshed_at` on the TARGET rows; the collect return value
 is global and includes the cron's ZIPs.
+
+---
+
+## OHIO — the shape correction, and SUMMIT/AKRON wired (2026-08-05)
+
+### ⚠️ OH is NOT "county seams around the wired metros" — measure before framing
+
+The remaining OH dark pages were described as seams around Columbus/Cincinnati/Cleveland. Measured,
+that is wrong in a way that changes the work:
+
+| county | pages | live | dark | |
+|---|---|---|---|---|
+| **Summit** | 41 | 0 → **14** | **27** | Akron — wired today |
+| **Montgomery** | 39 | **0** | **39** | Dayton — UNPROBED |
+| **Lucas** | 30 | **0** | **30** | Toledo — UNPROBED |
+| Hamilton | 56 | 34 | 22 | Cincinnati ✅ |
+| Medina / Warren / Butler | 49 | 0 | 49 | collars — UNPROBED |
+| Delaware | 19 | 4 | 15 | Columbus collar |
+| Cuyahoga | 52 | 39 | 13 | Cleveland ✅ |
+| Franklin | 49 | 45 | 4 | Columbus ✅ |
+
+**159 of the original 213 dark pages (75%) were in counties with ZERO wired source**, three of them
+separate metros. The three wired counties were already at 91.8% / 75.0% / 60.7%. Only 54 dark pages
+are true seams. **OH is three fresh metro builds plus trim, not a trim job.**
+
+### ⚠️ TRIPLE CROSS-STATE COLLISION ON "MONTGOMERY COUNTY" — the worst one in the dataset
+
+Searching Montgomery County GIS returns, in this order: `montcopa` = Montgomery County
+**PENNSYLVANIA** (wired 2026-08-04), `mcgov` = Montgomery County **MARYLAND** (wired earlier), and
+PASDA's `MontgomeryCounty` (also PA). Ohio's is **`mcohio.org`**. Three same-named counties, two
+already in this registry. Anyone probing Dayton must confirm entity from CONTENTS, not hostname.
+`gis.mcohio.org/arcgis/rest/services` returns 404 HTML — the real OH service host is still unfound.
+
+Summit has the same trap: `summitcountyco.gov` and `summitcountypropertyappraiser.org` are not Ohio,
+and `maps.summitcounty.org` is a live ArcGIS server carrying only parcel viewers, entity unconfirmed.
+Summit OHIO is `summitoh.net`.
+
+### ✅ `summit-county-oh-planning-commission-items` — GO-LIVE MEASURED: 0 → 14 pages
+
+| | before | after |
+|---|---|---|
+| Summit live / dark | 0 / 41 | **14 / 27** |
+| OH live / dark | 122 / 213 | **136 / 199** (40.60%) |
+| national | 4,591 | **4,604 / 12,722 (36.19%)** |
+
+**36 records, identical in `development_reports` and `app_projects`**, 14 pages, **0 invariant
+violations** (0 missing `record_url`, 0 missing coords, 0 unclassified, 0 non-`point`, 0 non-`proposed`).
+Bidirectional gate proof: **OH/Summit ONLY**. 36 page-records from 16 source rows = 2.25x spatial
+fan-out at 3 mi.
+
+**The 27 still-dark pages are the documented coverage limit, not a failure**: the county commission
+reviews UNINCORPORATED TOWNSHIPS. Akron and the incorporated cities run their own planning
+departments. Do not describe this as county-wide coverage.
+
+**Host derived from the hub's OWN dataset accessURLs**, never guessed — `scgis.summitoh.net` and the
+AGO org `services3.arcgis.com/3Ukh5HzAdI6WZ3KP`. Entity confirmed from contents (townships Sagamore,
+Copley, Springfield, Richfield).
+
+**Enumerated on every surface before wiring**: hub 138 datasets · server root 16 folders / ~100
+services · `Admin_and_Planning` / `DOSSS` / `Hosted` folders.
+
+⚠️ **The `tyler` folder is EMPTY — 0 services.** Tyler is the EnerGov permitting vendor, so the
+folder NAME promises a permit system and delivers nothing. **Second empty vendor-named folder found**
+(Allegheny's `Accela` was the first). **A vendor name in a folder listing is not a source.**
+`permitsearch.summitoh.net` is a Bootstrap HTML app with no exposed API.
+
+⚠️ **THE LAYER CHOICE IS LOAD-BEARING — layer 2, not layer 0.** Layer 0 Point (24 rows) is NOT
+development: county-wide zoning ORDINANCE TEXT amendments (`Short Term Rentals`, `OH HB 361
+Discussion`, `Definitions: RVs`), all `ItemType: Text`. Layer 1 Line is empty. Layer 2 Polygon (16)
+is the real per-parcel docket. **Read the rows, not the service name.**
+
+**`SCPCRec` was deliberately REJECTED as the status source.** It is the commission's RECOMMENDATION,
+and the commission is ADVISORY to the townships under ORC 303/711 — the same mechanism PA Act 247
+encodes. Mapping `Approve` (12 of 16) to the approved bucket would assert a project is approved when
+the township that decides has not acted. `status_const` wording and `recency_days: 1825` are
+IDENTICAL to the three PA Act 247 entries, so all four read the same.
+
+### ⚠️ METHOD ERROR MADE AND CAUGHT — do not select a re-cache batch by "still dark"
+
+Firing batches selected by `still dark` re-fired the same ZIPs twice: a ZIP that legitimately returns
+ZERO records never leaves the dark set, so it is re-picked every round while genuinely-unfired ZIPs
+wait. Caught at 21/41 refreshed. **`refreshed_at` is the only correct selector** — this is the Chester
+lesson, and it applies to the FIRING selector as well as the retry selector.
