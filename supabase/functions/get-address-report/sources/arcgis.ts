@@ -30,6 +30,7 @@ import type {
 import {
   buildBucketLookup, buildTypeLookup, resolveNormalized, noteCaseFold, caseFoldList,
 } from "./socrata.ts";
+import { fenceGeocode } from "./geo-fence.ts";
 import { buildGeocodeInput } from "./geo-input.ts";
 
 // ───────────────────────────── registry entry + types ─────────────────────────────
@@ -421,20 +422,10 @@ async function normalizeRow(
       // filedZip from the complete-address builder: mapped ZIP column → ZIP embedded in the
       // address (the Clark County fix: fence against the address's OWN ZIP, not the report
       // ZIP) → reportZip. Same fence comparison as before, just a more accurate filed ZIP.
-      const filedZip = gi.filedZip;
-      const matchedZip = ((g.matched_address || "").match(/\b(\d{5})(?:-\d{4})?\s*$/)?.[1]) ?? null;
-      const zipMismatch = !!(filedZip && matchedZip && filedZip !== matchedZip);
-      const c = deps.zipCentroid;
-      const fenceMiles = c ? milesBetween(c.lat, c.lng, g.lat, g.lng) : null;
-      const outOfFence = fenceMiles != null && fenceMiles > GEOCODE_FENCE_MI;
-      if (zipMismatch || outOfFence) {
+      const verdict = fenceGeocode(g, gi.filedZip, deps.zipCentroid);
+      if (!verdict.ok) {
         report.geocode_failures++;
-        report.quarantined.push({
-          reason: zipMismatch
-            ? `geocode geofence: matched ZIP ${matchedZip} != filed ${filedZip} — coords nulled`
-            : `geocode geofence: point ${Math.round(fenceMiles!)} mi from ZIP centroid (> ${GEOCODE_FENCE_MI}) — coords nulled`,
-          sample: address,
-        });
+        report.quarantined.push({ reason: verdict.reason, sample: address });
         lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area";
       } else {
         lat = g.lat; lng = g.lng; geoPrecision = "address"; scope = "point";
@@ -840,14 +831,7 @@ export function envelopeFor(lat: number, lng: number, radiusMi: number): { xmin:
   return { xmin: lng - dLng, ymin: lat - dLat, xmax: lng + dLng, ymax: lat + dLat };
 }
 
-/** Geofence for GEOCODED points (source-supplied geometry is never fenced): a Census
- *  interpolation landing farther than this from the report's ZIP centroid cannot be an
- *  address inside that ZIP — the coords are nulled, the record stays listed (area scope). */
-export const GEOCODE_FENCE_MI = 25;
-
-/** Equirectangular distance in miles — plenty at fence scale. */
-export function milesBetween(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const dLat = (lat2 - lat1) * 69;
-  const dLng = (lng2 - lng1) * 69 * Math.cos(((lat1 + lat2) / 2) * Math.PI / 180);
-  return Math.sqrt(dLat * dLat + dLng * dLng);
-}
+/** The geofence now lives in ONE place — sources/geo-fence.ts — because it was previously
+ *  duplicated here and in socrata.ts and MISSING from ckan/carto/csv. Re-exported so existing
+ *  importers and tests keep their entry point. */
+export { GEOCODE_FENCE_MI, milesBetween } from "./geo-fence.ts";
