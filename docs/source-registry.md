@@ -1889,6 +1889,19 @@ consolidated per-record permit ledgers anywhere we could find.
   building-permits database (updated ~monthly per the city site) but the host is
   **UNREACHABLE from BOTH egress paths** (pg_net 30s+60s timeouts AND GitHub-runner
   fetch failed ×2) — engine could never fetch it. → nightly reprobe list.
+  - ✅ **RE-PROBED 2026-08-05 against governance §0 and the verdict is UNCHANGED — now with the
+    mechanism rather than a summary.** The two paths named above are `pg_net` and a GitHub runner;
+    **neither is the Deno edge runtime the engine runs on**, which is why this was re-opened. It
+    reproduces exactly on all three URLs (`/`, `/api/3/action/status_show`,
+    `/api/3/action/package_search?q=permit`), 60 s timeout each, and the timing breakdown is the
+    answer: **`DNS time: 70.867 ms, TCP/SSL handshake time: 59929.462 ms, HTTP Request/Response
+    time: 0.000 ms`**. DNS resolves in 71 ms; the **TLS handshake consumes the whole 60 s and never
+    completes**; the request is never sent. That is a packet **blackhole** — not a `Connection reset
+    by peer` (Dayton), not a WAF 403 (Tampa/El Paso), not a DNS failure.
+  - **This is NOT the `EDGE_EGRESS_BLOCKED` class, and the distinction is the point.** That verdict
+    requires a **positive control** — a path that demonstrably works, as Dayton had (`pg_net` 200 /
+    413,143 bytes / 212 features on the exact connector URL). Here **no path returns anything**, so
+    there is nothing to justify wiring it to test the edge runtime. Class: **`unreachable`**.
 - **St. Louis city's own portal (stlouis-mo.gov/data)**: building permits ship as
   a ~monthly 30 MB Microsoft Access ZIP download — no API, not wireable as data.
 - **Springfield (gisdata-cosmo hub, live)**: 0 permit/construction datasets in the
@@ -5514,3 +5527,164 @@ would have marked all 39 Montgomery pages covered while the database held **zero
 precise trap already recorded as a standing answer ("the workbook's Live column is COVERAGE-GATE
 based, not record based"). Measured from the database, which is the source of truth: Montgomery OH
 is **0 / 39**, unchanged, and the failed fetches wrote nothing.
+
+---
+
+## 🚫 TOLEDO / LUCAS OH — REJECTED (2026-08-05): `NO_TEMPORAL_FIELD`, a seventh disqualifier
+
+**Nothing wired. Lucas stays 0 of 30.** Both orgs were confirmed by NAME, not hostname — **City of
+Toledo** `2snQ88YUjP9CNEbe` and **Lucas County Auditor** `T8dczfwPixv79EgZ` — and both first-party
+servers were derived from their own item URLs (the Dayton method), never guessed:
+`gis.toledo.oh.gov/arcgis/rest` (10 folders + 43 root services) and
+`lcaudgis.co.lucas.oh.us/gisaudserver/rest` (19 folders).
+
+**No permit ledger and no case ledger on either server.**
+
+- Toledo's `Public/PlanningComAppUNC10419` is a **misnomer** — despite reading as "Planning
+  Commission Applications", its 8 layers are the plan commission's **basemap**: Official Zoning
+  District Map Numbers, 20/20 Comprehensive Plan, Future Land Use, Zoning Districts, City Parcels,
+  Jurisdictions, Overlay Districts. All reference polygons. Third instance of **read the layers, not
+  the service name** (after Summit layer 0 and Dayton's "Completed").
+- Lucas's `Tyler` and `TylerProduction` folders are **not empty this time** — but they hold only
+  Parcels, Cadastre_Annotation, Pictometry, Road_Centerlines and Auditor GIS layers, i.e. the
+  Auditor's property data. **A vendor-named folder is not a source whether it is empty or full**
+  (Summit's `tyler` and Allegheny's `Accela` were empty; this one is full and still not permits).
+- `data.toledo.gov` (49 datasets): the two "Toledo-Lucas County Planning Commission" entries and
+  "Demolition" are **web APPLICATIONS** (Experience Builder / instant / webappviewer), not data
+  layers — their only distributions are app URLs.
+
+### The one real candidate, and why it was rejected anyway
+
+**`Vibrancy_Projects` layer 2** (`services.arcgis.com/2snQ88YUjP9CNEbe`, a **known-reachable** host —
+which after the Dayton edge block is a genuine advantage). It had a strong case: 119 rows, point
+geometry, real project addresses and descriptions, **both vocabularies complete and each summing to
+exactly 119** — `Incentive_Type` Facade Improvement Grant 77 / White Box Grant 32 / Planning Grant
+10, and `Program_Year` reaching **2026 with 19 rows**, so genuinely current. **Measured page lift: 16
+of 30 Lucas pages.**
+
+**FOUNDER RULING (2026-08-05): REJECTED. `119/119 undated is the disqualifier, not the missing
+status column.`**
+
+> *"Every wire this project has shipped carries a real date or an honest null on a MINORITY of
+> records — Dayton was 71/264 and that was already flagged. A source where NO record can be dated
+> cannot answer 'what is being built now', cannot be windowed, cannot age out, and cannot be
+> reprobed for staleness. It would be permanently unfalsifiable — we could never tell a live
+> register from an abandoned one."*
+
+`Program_Year` is an **INTEGER**, the same class as Delaware County PA's integer `Year` — but **there
+the entry still had `Entry_Date` to fall back on; here there is nothing**. The layer's only other
+date-shaped fields are geocoder output columns.
+
+**`NO_TEMPORAL_FIELD` is a seventh disqualifier and is DISTINCT FROM `STALE`.** Stale means the dates
+**stopped** — reprobing can fix it. This means there are **none** — waiting cannot. Recorded in
+`docs/maps-go-live-governance.md` §0b.
+
+### Also rejected here
+
+**`DemoCandidates`** — 690 rows, point geometry, but **no date, no status, no case number**. Its only
+attributes are `Parcel`, `Address` and `Projected_`, a free-text window ("July-December 2024",
+already past), and the parent item is titled "Demo Candidates 2022". A **pre-decision candidate list
+naming private residential addresses**, not a filing record — `NO_TEMPORAL_FIELD` plus the
+`WRONG_RECORD_CLASS` concern that sank Dayton's Accela layer.
+
+---
+
+## OHIO — STATE CLOSED FOR NOW (2026-08-05). 136 / 335 live, 199 dark
+
+Every OH county is now wired, partially wired, blocked, or exhausted on **enumeration** — none is
+merely unprobed.
+
+| County | Pages | Live | Dark | Standing |
+|---|---:|---:|---:|---|
+| Franklin | 49 | 45 | 4 | **wired** (Columbus) |
+| Cuyahoga | 52 | 39 | 13 | **wired** (Cleveland) |
+| Hamilton | 56 | 34 | 22 | **wired** (Cincinnati) |
+| Summit | 41 | 14 | 27 | **partially wired** — county commission reviews UNINCORPORATED townships only; Akron and the incorporated cities run their own planning departments. A documented coverage limit, not a defect. |
+| Delaware | 19 | 4 | 15 | seam off Columbus |
+| Montgomery | 39 | 0 | 39 | 🔴 **BLOCKED AT THE EDGE** — source found, wired, deployed, reverted. See the Dayton section above. |
+| Lucas | 30 | 0 | 30 | **exhausted** — `NO_TEMPORAL_FIELD` (this section) |
+| Medina | 19 | 0 | 19 | **exhausted** — org confirmed Ohio from CONTENTS (Hinckley, Granger, Montville, Litchfield, Brunswick Hills, Wadsworth townships). 348 items: utilities, parcels, zoning, floodplain, parks, recycling. No permit or planning-case ledger; the nearest, "Medina Board of Revision Cases", is property-tax valuation appeals. |
+| Butler | 15 | 0 | 15 | **exhausted** — see below |
+| Warren | 15 | 0 | 15 | **exhausted** — see below |
+
+**Butler + Warren, with receipts.** Plain `"Butler County" AND Ohio` / `"Warren County" AND Ohio`
+searches returned 177 and 97 results dominated by cross-state noise (Indiana DNR, Virginia Tech
+student orgs, Miami University) — the standing search-lies rule. Two real first-party owners
+surfaced:
+
+- **`comgisservice` = the City of Monroe, Ohio** (confirmed from contents: it publishes "Monroe
+  Parcels in Butler County" *and* "Monroe Parcels in Warren County" — the city straddles the line).
+  Its 50 items are reference cartography plus `Subdivisions`, `Monroe Planning and Zoning` and
+  `City of Monroe Annexation Records`. Monroe's population is ~15k, so the achievable page lift is
+  negligible; logged, not wired.
+- **OKI Regional Council of Governments** `AeX7yhXqx2UBQyL7` — the Cincinnati-area MPO covering
+  Butler, Warren, Hamilton and Clermont. Its 312 items are planning studies (bike level-of-stress,
+  heat islands, job hubs, watersheds, freight plan). Its one project-shaped layer,
+  **`Prioritization_Projects_2026`, is REJECTED**: 62 **polylines** whose only classification is
+  `NoteType`, an **opaque SmallInteger**, with `Name`/`Notes` free text, **no status column and no
+  project date** (only `created_date`/`last_edited_date` edit stamps). Opaque coded vocabulary with
+  nothing to map verbatim is the **San Jose `planningpermits30`** rejection class; combined with the
+  missing date this is a map-markup layer, not a project register.
+
+**🔁 REPROBE CANDIDATES, named:** **Dayton** — the only OH county with a *found, verified, correctly
+configured* source. Its `_receipts` and this document carry the full config; if the edge-egress block
+lifts it is a one-object re-add. Nothing else in OH is waiting on time.
+
+---
+
+## MISSOURI PASS (2026-08-05) — 3 sources wired, every county closed on enumeration
+
+MO opened at **53 / 264 live (20.1%), 211 dark**. Six counties sat at 0% and held 156 of the 211 dark
+pages (74%) — the same shape as Ohio: metro builds, not trim. County distribution was measured
+**before** probing, per the standing rule.
+
+### WIRED (3)
+
+| Entry | County | Rows | Measured dark-page lift |
+|---|---|---:|---:|
+| `stlouis-county-mo-subdivisions` | St. Louis | 42 | **18** (native ZIP; 33 by 3-mi spatial) |
+| `kcmo-development-cases` | Jackson · Clay · Platte · Cass | 2,675 in-window (23,166 total) | **14** (J+9 · Cl+2 · P+2 · Ca+1) |
+| `columbia-mo-capital-projects` | Boone | 370 | **2** |
+
+Full config reasoning, vocabularies and arithmetic in each entry's `_receipts`. Three findings worth
+lifting out:
+
+- **The 1825-day window on KCMO is load-bearing, not conventional.** Unwindowed, `STATUS` is dominated
+  by `Closed` at 16,370 of 23,166 (71%) — a terminal state with no recorded *outcome*, so it supports
+  neither an approved nor an operating claim. Inside 1825 days `Closed` **disappears entirely** and the
+  vocabulary is 17 self-describing values summing to exactly 2,675. `Closed` is nonetheless mapped to
+  `exclude`, because the window moves: a case filed 2024 and closed 2027 will be both in-window and
+  Closed, and that must fail to a decision already made rather than to silence.
+- **Native ZIP beat spatial on St. Louis, and the cheaper number was not chosen.** 18 exact pages via
+  `PROP_ZIP` over 33 estimated pages via a 3-mi radius — the standing convention that a real ZIP column
+  is exact where a radius is an estimate.
+- **A fourth vendor-named folder that is not a source.** St. Louis County's own `Accela` folder holds
+  only `Accela_Parcels`. The tally is now Summit `tyler` (empty), Allegheny `Accela` (empty), Dayton
+  `Accela` (full — housing code enforcement), St. Louis `Accela` (full — parcels). **Content decides.**
+
+### REJECTED, with receipts
+
+| County | Candidate | Verdict |
+|---|---|---|
+| St. Louis | `AGS_ZoningPetitions` (3,945 rows) | `NO_TEMPORAL_FIELD` — **0 of 3,945** dated, `max(last_edited_date)` null. Also opaque *and* dirty: 62% blank, petition numbers (`32-15`, `44-25`) leaking into the procedure column |
+| St. Louis | `Active_Construction` Points/Lines | `NO_TEMPORAL_FIELD` — no date field in the schema. (Both 404'd on `/0`: `preserveLayerIds: true`, real ids **101**/**100**, and the 404s arrived as **HTTP 200 carrying an error object**) |
+| St. Louis | `PlanningLocationBasedProto` | `WRONG_RECORD_CLASS` — marijuana/tobacco/liquor/childcare **licences** |
+| St. Louis **city** | `rdx.stldata.org` | **UNREACHABLE** — re-probed, TLS handshake blackhole. See its own corrected entry |
+| Jackson | KCMO BLDS `ntw8-aacc` | **STALE, re-probed and unmoved** — `max(:updated_at)` = `2025-05-09T20:22:20.907Z`, byte-identical to the 2026-07-17 record over 681,036 rows. Three further months, no movement. Stays on the reprobe list |
+| Jackson | `BW_NewCommercial_Permits` | Real but **1 page** of lift (797 rows, only **5 distinct ZIPs**), stale 14 months, and `BW_` + 100 `USER_bldg_type_*` columns mark it a one-off study extract. Recorded, not wired |
+| St. Charles | `Conditional Use Permit` (707) | **Free-text prose statuses** — `CC_DECISIO` has ~300 distinct strings (`APPROVAL 05/31/00; BILL#1629; ORD #00`, `DENIAL 8/08/05`, `WITHDRAWN 12-31-97`). Nothing to map verbatim — the **Douglas County NV** class |
+| St. Charles | `Board of Zoning Adjustment` (1,110) | Opaque, dirty `VOTE`: `D-OT`, `D-OVERTU`, `D/G`, `G G`, `G/D`, `SeeComme`. Undecodable without a legend — the **San Jose `planningpermits30`** class |
+| St. Charles | `Zoning Application` (735), `PUD` (47) | `NO_TEMPORAL_FIELD` — no date field |
+| St. Charles | `gis.sccmo.org` | **Cloudflare 403 challenge** on the production host. (`gis-dev.sccmo.org` answers 200 and carries the same service — noted, but the layers there were rejected on content anyway) |
+| Greene | Springfield org `aOss8CrQf3pARS5q` | `candidates_exhausted` — entity confirmed by name; only redevelopment-area polygons (Ch. 99 / Ch. 353), comprehensive-plan goal layers and `Springfield Subdivisions`. No permit or case ledger |
+| Boone | Columbia org (68 services) | Only the CIP register (wired). No permit or case ledger — the rest is parks, trails, canopy, outages, water |
+| Franklin · Jefferson | — | `candidates_exhausted` — no first-party org found. Content-scoped searches returned only cross-state noise (Indiana DNR, Virginia Tech, BLM national) and personal accounts with no `orgId` |
+
+**Cross-state trap avoided:** `wcgis` resolves to **Westchester County GIS (NY)**, not Warren County —
+recorded during the OH pass and re-confirmed here. Every MO org was verified by returned `name`, and
+St. Louis County MO was further confirmed from **contents** ("St. Louis City Boundary Map", "Promise
+Zone Developments") against the St. Louis County **Minnesota** namesake.
+
+**Generic-portal control, worth reusing:** five of six urlKey guesses returned byte-identical
+**12,477-byte** responses (the anonymous ArcGIS portal); only the real org differed at 18,684 bytes.
+Response size is a cheap discriminator for "this subdomain is not an org".

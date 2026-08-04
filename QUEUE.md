@@ -1048,30 +1048,66 @@ An engine-side edge-reachability preflight is **proposed, not built** (that is a
   the real Montgomery County **Ohio** service host is still unfound. Entity was confirmed from
   CONTENTS only (Midtown, Belmont, Ryburn Ave, Merrimac Ave, Riverside Dr = City of Dayton, Ohio).
 
-## OH — TOLEDO / LUCAS RECON (in progress, nothing wired)
+## OH — CLOSED FOR NOW (2026-08-05). 136 / 335 live, 199 dark
 
-Two REAL orgs confirmed by NAME, not hostname: **City of Toledo** `2snQ88YUjP9CNEbe` and **Lucas
-County Auditor** `T8dczfwPixv79EgZ`. Their own servers were derived from item URLs (the Dayton
-method): `gis.toledo.oh.gov/arcgis/rest` (10 folders + 43 root services) and
-`lcaudgis.co.lucas.oh.us/gisaudserver/rest` (19 folders).
+Every OH county is wired, partially wired, blocked, or **exhausted on enumeration** — none is merely
+unprobed. Full per-county table + receipts: `docs/source-registry.md` "OHIO — STATE CLOSED FOR NOW".
 
-- **No permit or case ledger on either server.** Toledo `Public/PlanningComAppUNC10419` is a misnomer —
-  it is the plan commission's **basemap** (zoning districts, comprehensive plan, future land use,
-  parcels), all reference polygons. Lucas's `Tyler` / `TylerProduction` folders are **not empty** this
-  time but hold only Parcels / Cadastre / Pictometry — the Auditor's property data, not permits. A
-  vendor-named folder is still not a source, whether empty or full.
-- `data.toledo.gov` hub (49 datasets): the "Toledo-Lucas County Planning Commission" and "Demolition"
-  entries are **web APPS** (Experience Builder / instant / webappviewer), not data layers.
-- **CANDIDATE — `Vibrancy_Projects` layer 2** on `services.arcgis.com` (**known-reachable host**):
-  119 rows, point geometry, real addresses + project descriptions. `Incentive_Type` complete and sums
-  to 119 (Facade Improvement Grant 77 / White Box Grant 32 / Planning Grant 10); `Program_Year` sums
-  to 119 and reaches **2026 (19 rows)** — genuinely current. **Measured page lift: 16 of 30 Lucas
-  pages.** ⚠️ Two real weaknesses to decide on before wiring: **no status column** (needs
-  `status_const`) and **no date column** — `Program_Year` is an INTEGER, so every record would be
-  undated (Dayton would have been 71/264 undated; this is 119/119).
-- **`DemoCandidates` REJECTED** — 690 rows but no date, no status, no case number: `Projected_` is a
-  free-text window ("July-December 2024", already past) and the layer is titled "Demo Candidates
-  2022". A pre-decision candidate list naming private residential addresses, not a filing record.
+- **Wired:** Franklin 45/49 · Cuyahoga 39/52 · Hamilton 34/56 · Summit 14/41 (coverage limit:
+  unincorporated townships only) · Delaware 4/19 seam.
+- 🔴 **Montgomery 0/39 — BLOCKED AT THE EDGE.** Source found, wired, deployed, reverted. **The only
+  OH reprobe candidate**; config is proven correct, so it is a one-object re-add if egress opens.
+- **Lucas 0/30 — REJECTED `NO_TEMPORAL_FIELD`.** `Vibrancy_Projects` had 119 rows on a
+  known-reachable host, complete vocabularies summing to 119, current through 2026, and a measured
+  **16 of 30** page lift — rejected anyway on the founder ruling: **119/119 undated is the
+  disqualifier, not the missing status.** `Program_Year` is an integer with nothing to fall back on.
+  `DemoCandidates` also rejected (no date, no status, no case number; a pre-decision candidate list
+  naming private residences). Neither server carries a permit or case ledger; Toledo's
+  `PlanningComAppUNC10419` is a misnomer for the plan commission's **basemap**, and Lucas's `Tyler`
+  folders hold only cadastral data — **a vendor-named folder is not a source whether empty or full.**
+- **Medina 0/19 · Butler 0/15 · Warren 0/15 — exhausted.** Medina's org (confirmed Ohio from township
+  names) is utilities/parcels/zoning. Butler/Warren surfaced the City of Monroe (~15k pop, negligible
+  lift) and OKI's `Prioritization_Projects_2026`, rejected as 62 polylines with an opaque `NoteType`
+  integer and no date — the San Jose opaque-code class.
+
+## MISSOURI — CLOSED (2026-08-05). Opened 53 / 264 (20.1%), 211 dark
+
+Every MO county is now wired or **rejected on enumeration**. Full per-county receipts:
+`docs/source-registry.md` "MISSOURI PASS". Shape confirmed the standing rule again — six counties at
+0% held **156 of the 211 dark pages (74%)**: metro builds, not trim.
+
+**WIRED (3, registry arcgis 128 → 131):**
+- `stlouis-county-mo-subdivisions` — 42 rows, the only STL source carrying dates at all. **Native
+  PROP_ZIP → 18 EXACT pages** (a 3-mi radius would have estimated 33; the exact number was chosen).
+  STALE and said so: 2025-01-03…2025-12-18, and `DATESUBMIT >= 2026-01-01` returns **exactly 0**.
+  Ceiling: `MUNICIPALI` is UNINCORPORATED on 42/42.
+- `kcmo-development-cases` — the best-formed source in the state. 23,166 rows, **100% dated**, fresh to
+  within 4 days. **The 1825 window is load-bearing**: unwindowed it is 71% `Closed` (no recorded
+  outcome); in-window `Closed` vanishes and 17 self-describing values sum to exactly 2,675. `Closed` is
+  still mapped to `exclude` because the window moves. Lift **14** (Jackson 9 · Clay 2 · Platte 2 · Cass 1).
+- `columbia-mo-capital-projects` — 370 rows, status sums to exactly 370, genuinely current (to
+  2029-10-01). Lift **2**, and says so.
+
+**REJECTED with receipts:** STL zoning petitions (**0 of 3,945 dated**) · STL construction layers (no
+date field) · STL licence locations (WRONG_RECORD_CLASS) · **KCMO BLDS re-probed and still frozen at
+exactly `2025-05-09T20:22:20.907Z`** after three more months · `BW_NewCommercial_Permits` (1 page, 5
+ZIPs, one-off extract) · St. Charles CUP (**free-text prose statuses**, Douglas NV class), BZA (opaque
+`D-OT`/`D/G`/`SeeComme`, San Jose class), Zoning Application + PUD (no date), production host behind a
+**Cloudflare 403** · Greene/Springfield (no ledger) · Franklin + Jefferson (no first-party org).
+
+**🔁 MO REPROBE CANDIDATES:** KCMO BLDS (stalled, would wire in minutes if it revives) · `rdx.stldata.org`
+(unreachable, TLS blackhole) · a `Subdivisions2026` successor if St. Louis publishes one.
+
+### Three reusable findings from this pass
+
+- **Fourth vendor-named folder that is not a source** — St. Louis's `Accela` holds only
+  `Accela_Parcels`. Tally: Summit `tyler` empty · Allegheny `Accela` empty · Dayton `Accela` housing
+  code-enforcement · St. Louis `Accela` parcels. **Content decides; the name promises nothing.**
+- **`preserveLayerIds: true` means layer ids are arbitrary** — STL's construction layers are **101**
+  and **100**, not 0, and the `/0` 404s came back as **HTTP 200 carrying an error object**.
+- **Unknown `*.maps.arcgis.com` subdomains return a byte-identical 12,477-byte generic portal.** Five
+  of six urlKey guesses hit it; the one real org differed at 18,684 bytes. Response size is a cheap
+  "this is not an org" discriminator before you spend a search.
 
 ## ⚠️ METHOD ERROR — never select a re-cache batch by "still dark"
 
