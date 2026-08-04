@@ -5165,13 +5165,19 @@ The bounding report above is what actually fixes that; this only stops a genuine
 
 **Next review due: 2027-01-01. Owner: whoever is in the registry that month.**
 
-Three entries filter on a **hardcoded year**. They are not equivalent, and only one is dangerous:
+**Four** entries filter on a **hardcoded year**. They are not equivalent, and only two are dangerous:
 
 | entry | window | shape | what happens over time |
 |---|---|---|---|
 | **`worcester-building-permits`** | `Permit_License_Issued_Date LIKE '%/2025' OR LIKE '%/2026'` | **FIXED WINDOW** | 🔴 **stops matching new records on 2027-01-01** and silently decays to stale-only, then to zero |
+| **`centre-county-pa-building-permits`** | `Issue_Date LIKE '%/2024' OR '%/2025' OR '%/2026' OR '%/2027'` | **FIXED WINDOW**, next year pre-included | 🟠 **goes blind 2028-01-01**, not 2027 — the list already carries the year AFTER the one it shipped in, which buys a full year of grace. Same failure mode as Worcester, one year later. |
 | `anaheim-land-use-cases` | `Application_Received >= '2025/07/01'` | fixed floor | 🟡 keeps matching new records; the window only ever GROWS, accumulating old cases |
 | `tempe-building-permits` | `IssuedDate >= '2025-01-01'` | fixed floor | 🟡 same — grows, never blind to new data |
+
+**Cheap mitigation, already applied to Centre and NOT yet to Worcester: pre-include next year.**
+A year that has not started yet matches nothing, so adding it costs zero rows today and converts a
+hard cliff into a year of slack. Worcester should get `OR LIKE '%/2027'` at the January review even
+if the durable fix below does not land — that alone removes the 2027-01-01 cliff.
 
 **A fixed FLOOR degrades gracefully; a fixed WINDOW goes blind.** Only Worcester is the second kind,
 because its date column is a **String in M/D/YYYY**: `recency_days` emits a `DATE` literal that cannot
@@ -5183,6 +5189,17 @@ is the durable fix and would retire all three constants.
 **January action:** extend Worcester's window to include the new year (and consider dropping the
 oldest), or ship `recency_expr` for arcgis and delete the constant. Verify after by counting
 `LIKE '%/<new year>'` with the layer total as a positive control.
+
+✅ **THIS ITEM IS NOW ENFORCED, NOT JUST SCHEDULED — `test/dated-window-must-not-go-blind.test.mjs`
+(2026-08-04).** A recurring manual review is an instrument that cannot prove it ran, and it had
+already failed once: the session that shipped `centre-county-pa-building-permits` did not register
+it here, because the grep that would have found this item ran against a stale checkout predating
+it. The suite now derives the list from the registry itself and fails when an entry is **already
+blind** (hard, always) or **goes blind at year-end** (unless named in its `EXPIRING_ACKNOWLEDGED`
+ratchet). It ships a self-test proving the cliff/grace decision fires on each violation class, so
+it cannot go vacuous. **Consequence to expect: Worcester will turn CI red on 2027-01-01** — that
+is the alarm working, and the fix is one `OR LIKE '%/2027'` clause or the durable `recency_expr`.
+Adding a new fixed-window entry now requires registering it in BOTH places or CI fails.
 
 *(Audited across all 149 entries: 51 further arcgis entries carry no `recency_days` at all, which is a
 different and deliberate choice — most are "active projects" layers where every row is current by
