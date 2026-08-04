@@ -5306,3 +5306,156 @@ Firing batches selected by `still dark` re-fired the same ZIPs twice: a ZIP that
 ZERO records never leaves the dark set, so it is re-picked every round while genuinely-unfired ZIPs
 wait. Caught at 21/41 refreshed. **`refreshed_at` is the only correct selector** — this is the Chester
 lesson, and it applies to the FIRING selector as well as the retry selector.
+
+---
+
+## MONTGOMERY COUNTY OH (DAYTON) — `dayton-oh-capital-improvement-projects` WIRED (2026-08-05)
+
+Montgomery was **0 of 39 pages live** — with Lucas (0/30) the largest fully-dark block in Ohio.
+**Config only** — no connector, engine or schema change. Registry `arcgis` 128 → 129 entries.
+
+**What it is.** The City of Dayton's own ArcGIS Server (`maps.daytonohio.gov/gisservices`),
+`CapitalPlanning` folder: the full municipal capital-project register — 264 rows, point geometry,
+per-record project names and descriptions. This is the **municipal analogue of the UDOT / TxDOT /
+NDOT infrastructure-project precedent**, not a permit ledger. Sample rows: `WF2412` "Midtown Water
+Main Improvements — installing approximately 1,100 LF of 8-inch water main in various streets
+within the Midtown Area" (Construction), `WF2403` "Belmont Area Water Mains Improvements, Phase 1",
+`WF2320` "Ryburn Avenue Water Main Improvements".
+
+**Pre-wire measurement, computed against live `communities` centroids before any commit:
+22 of 39 Montgomery pages** fall within 3 mi of at least one of the 264 points.
+
+### ⚠️ WORST NAME COLLISION IN THE REGISTRY — two of the three are already wired
+
+"Montgomery County GIS" returns `montcopa.org` (Montgomery **PA** — WIRED as
+`montgomery-county-pa-act247-proposals`), `opendata-mcgov-gis` (Montgomery **MD** — WIRED as the
+`montgomery-county-md-*` trio), and PASDA `MontgomeryCounty` (also PA). Ohio's county host
+`gis.mcohio.org/arcgis/rest/services` returns **404 HTML** and the real Montgomery County **Ohio**
+service host remains unfound. Confirming entity by hostname here would have wired the wrong state's
+data onto Ohio pages. Entity is confirmed from **CONTENTS only**: the rows name Midtown, Belmont,
+Ryburn Avenue, Merrimac Avenue and Riverside Drive — all City of Dayton, Ohio.
+
+### Discovery — the host was derived from the org's own item URLs, never guessed
+
+The city's eGIS hub DCAT **404s**; its Zoning hub returns **HTTP 200 with an EMPTY dataset array**
+— the *third* instance of the empty-DCAT case after Centre PA and Montgomery PA. **An empty DCAT is
+not an empty server.** The AGO community `self` endpoint confirmed a real org (`3dDB2Kk6kuA2gIGw`,
+urlKey `DaytonOhio`); an orgid-scoped search returned 74 items whose item URLs exposed
+`maps.daytonohio.gov/gisservices/rest/services`.
+
+**The server root was enumerated IN FULL before wiring — all 35 folders, not a sample:** Accela,
+Accela_UPDATES, AddressEdits, Airport, AsBuiltEditing, AsBuiltProcessManagement, Base, Basemap,
+Basemaps, Basemaps_105_1, BuildingServices, CapitalPlanning, CapitalPlanningINTERNAL, COD_Webpage,
+COVID19, EmergencyManagement, Engineering, Environmental, FieldMaps, Fire, Hansen, LCRR, OpenData,
+Orthos, Planning, Police, PublicWorks, Rhythm, Sustainability, Utilities, Viewer, Water,
+WaterReclamation, WPA, WUFO. **There is no permit ledger and no zoning-case ledger anywhere on it.**
+BuildingServices holds only `HousingInspectionAreas` + a personal editing service; Planning holds
+only cartographic lot-link label layers; OpenData is police-only; `COD_Webpage/Zoning` is a zoning
+**district** polygon layer, not cases.
+
+### 🚫 ACCELA REJECTED ON RECORD CLASS — a sixth disqualifier, `WRONG_RECORD_CLASS`
+
+This is **not** the empty-vendor-folder case. Unlike Summit's `tyler` and Allegheny's `Accela`
+(both 0 services), this Accela folder holds a real, fresh, per-record, point-geometry layer:
+`Accela_UPDATES/AccelaIncidents_UPDATE/MapServer/0`, **12,879 rows**, `RECORD_DATE` spanning
+2026-01-02 → 2026-07-01. It is still not development:
+
+- **`COMPLAINT_TYPE` has exactly ONE value across all 12,879 rows — `HOUSING`.**
+- `STATUS` enumerates CLOSED 5,072 / OPEN 4,955 / ACTIVE 1,520 / ABATED 965 / PAID 196 /
+  ABATED-PAID 61 / RESEARCH-UNDER REVIEW 48 / APPEAL-PPC 26 / EXTENSION GRANTED 23 /
+  NO SERVICE 13 — **sums to 12,879**.
+
+Abatement, payment and appeal outcomes on housing complaints are a **code-enforcement** ledger; the
+`development` bucket is defined as *permits, construction filings, planning notices*. Publishing
+complaints against named addresses as development records would also misrepresent residents'
+properties. **New standing answer:** the five recorded disqualifiers (NO_GEOGRAPHY · STALE ·
+AGGREGATE_NOT_PER_RECORD · NEW_CONNECTOR_FAMILY · candidates_exhausted) have a sixth sibling —
+**`WRONG_RECORD_CLASS`: live, fresh, per-record, geolocated, and still not the thing.** A schema
+that passes every mechanical check can still be the wrong ledger; read the vocabulary, not the
+field names.
+
+### ⚠️ THE LAYER CHOICE IS LOAD-BEARING AND THE SERVICE NAME IS MISLEADING
+
+`CapitalPlanning` exposes both `Active_Capital_Improvement_Projects` (43 rows) and
+`Completed_Capital_Improvement_Projects` (264 rows). **"Completed" is NOT a completed-only archive —
+it is the FULL register**, and Active is exactly its `Construction` + `Bidding & Award` subset.
+
+**Proven by identity, not by count:** Active's `PROJPHASE` is Construction 32 + Bidding & Award 11
+= 43, and querying Completed for those same two phases returns 43 rows whose `PROJID` set contains
+**every one** of Active's 43 (set difference = **0**). Wiring both would double-emit those 43 — the
+`houston-plat-applications` subset trap from the polygon pass, which exact-identity dedup cannot
+catch across two `source_registry_id`s. **ONE entry is wired: Completed.**
+
+### Vocabularies — complete, each summing to EXACTLY 264
+
+| `PROJTYPE` | n | → `use_type` |
+|---|---:|---|
+| Water | 153 | Utility |
+| Sewer | 61 | Utility |
+| Facility | 32 | Civic/Public |
+| Stormwater | 18 | Utility |
+
+| `PROJPHASE` | n | → bucket |
+|---|---:|---|
+| Archive | 211 | operating |
+| Construction | 32 | approved |
+| Bidding & Award | 11 | approved |
+| Planning | 6 | proposed |
+| Design | 2 | proposed |
+| Survey | 1 | proposed |
+| *(null)* | 1 | **unmapped — fails closed** |
+
+`Archive` → `operating` reads a completed capital project as built infrastructure, the same reading
+as `Closed - Completed` on Allegheny and `DONE` on Phoenix. **No `status_const` is used** — unlike
+Summit and the three PA Act 247 entries, this layer carries a real per-record phase column, so
+nothing has to be asserted. Note the register carries **no street/roadway class at all**: Dayton's
+CIP is utility-heavy because the city's Department of Water serves the wider region.
+
+### Config decisions, each measured
+
+- **Date field chosen on live non-null counts over all 264 rows — and the semantically correct
+  field won.** PROJNAME 264 / PROJDESC 264 / FISCALYR 264 / `created_date` 252 / PROJID 206 /
+  `PLANSTART` 193 / ConstructionStrtDate 192 / `PLANEND` 188. `created_date` has better coverage but
+  is a **GIS edit timestamp, not a project date**; `PLANSTART` (73%) is the project's own planned
+  start and is used as `file_date`, `PLANEND` as `decision_date`. The 71 rows with no `PLANSTART`
+  emit with no date — absent fields stay absent, never interpolated. `column_map` arrays JOIN rather
+  than fall back (`readCol`), so one field must be chosen.
+- **No `recency_days`, deliberately.** A window drops all 71 undated rows purely for lacking a date,
+  plus the `Archive` tier the `operating` bucket exists for. Measured page lift: **22 unwindowed /
+  17 at 1825 days / 19 at 3650 days**. 264 rows total, so there is no size pressure (contrast
+  Henderson's 28,391, where recency was the lever).
+- **Geometry** is `esriGeometryPoint`, 264 of 264 rows carrying geometry (verified by pulling every
+  feature with `outSR=4326`). `column_map` lat/lng are `__lat`/`__lng`, without which every record
+  silently lands on the ZIP centroid at `scope=area` (the Sussex defect).
+- **Scoping is spatial at 3 mi** — the layer has no ZIP column and no address column of any kind.
+- **`record_url_precision: "dataset"`** — `ProjectPath`, `ConstructionPlansPath`, `AwardedBidPath`
+  and `ContractNumber` are all NULL on the sampled Construction rows and are internal file paths
+  regardless, so templating a per-record URL would be guessing (Boulder / Philadelphia / Boston
+  precedent). `dataset_url` is the city's own **public** Hub site application (AGO item
+  `b5f930a7f4754f5ca96a44e81d558403`, `access: "public"`), live-verified **HTTP 200 / 43 KB** with
+  the matching title.
+
+### ⚠️ FRESHNESS — the weakest part of this wire, stated plainly
+
+`max(last_edited_date)` is **2025-12-09**, about eight months before wiring, and the companion
+public "Active Capital Improvement Projects" dashboard was last modified **the same day** — the two
+agree, so that is the register's real vintage and not a stale mirror. `FISCALYR` tops out at **2025
+with ZERO FY2026 rows**, so the register is roughly one fiscal cycle behind.
+
+It is wired anyway, and the reasoning is on the record: this is an **annual capital-budget register,
+not a daily permit feed**; it still carries a project with `PLANSTART` 2026-03-01; 43 rows are
+currently in Construction or Bidding & Award; and the failure mode of staleness here is
+**understating** what is being built, which is the honest direction — the same reasoning the founder
+endorsed for the Act 247 `status_const`.
+
+**🔁 REPROBE CONDITION (not open-ended):** if `max(last_edited_date)` has still not advanced past
+2025-12-09 by the next fiscal cycle, or FY2026 rows never appear, re-evaluate this entry as
+**STALE**.
+
+### Coverage limit, stated plainly
+
+These are the **CITY OF DAYTON's** capital projects. Kettering, Huber Heights, Centerville,
+Miamisburg, Trotwood, Oakwood, Vandalia, West Carrollton and the rest of Montgomery County run their
+own capital programs and are **not** in this layer, so Montgomery pages outside Dayton's 3-mile
+reach stay dark on this source. The `coverage` declaration is county-level because that is the
+registry contract's granularity — **it is not a claim of county-wide coverage.**
