@@ -5309,10 +5309,56 @@ lesson, and it applies to the FIRING selector as well as the retry selector.
 
 ---
 
-## MONTGOMERY COUNTY OH (DAYTON) — `dayton-oh-capital-improvement-projects` WIRED (2026-08-05)
+## 🚫 MONTGOMERY COUNTY OH (DAYTON) — WIRED, DEPLOYED, THEN REVERTED: the host blocks the ENGINE (2026-08-05)
+
+**OUTCOME: NOT WIRED.** `dayton-oh-capital-improvement-projects` was wired (#594), merged, and
+deployed — and the deploy proved the source is **unreachable from the Supabase edge runtime**. The
+entry was reverted the same hour. Montgomery OH stays **0 of 39**. Everything below is the recon
+record, which stands; only the wire is withdrawn.
+
+### ⛔ THE BLOCKER — and the standing answer that comes out of it
+
+The deployed engine reached the entry and failed at the network layer, identically on 4 of 4
+Montgomery ZIPs (45402, 45403, 45404, 45410), `fetched 0 / emitted 0`:
+
+```
+fetch failed: error sending request for url (https://maps.daytonohio.gov/.../MapServer/0/query?...):
+client error (Connect): Connection reset by peer (os error 104)
+```
+
+**The control is the strongest available: the SAME URL, byte for byte.** The exact query string the
+connector emitted — envelope, `inSR`/`outSR=4326`, `outFields=*`, `resultRecordCount=1000` — returns
+**HTTP 200, 413,143 bytes, 212 features** through `pg_net`, minutes apart from the engine's reset.
+Two clients, one URL, opposite outcomes. The error is at **Connect**, before HTTP, so it is not a
+query-shape, URL-length or response-size problem: it is a source-IP block on Supabase's edge egress.
+This is the **Tampa / El Paso class** (there a WAF 403, here a TCP reset).
+
+**No reachable route exists.** Every ArcGIS Online item for this data — `CIP Public Project Points`,
+`Active Capital Improvement Project Points`, and the `CIP All Projects Public Webmap` — is a *Map
+Service reference* pointing back at `maps.daytonohio.gov`. There is no hosted copy on
+`services*.arcgis.com`, so there is nothing to re-point the entry at.
+
+**🔑 NEW STANDING ANSWER — A `pg_net` 200 IS NOT EVIDENCE THE ENGINE CAN FETCH THE HOST.** Recon in
+this repo runs on `pg_net` (Postgres egress); the engine runs on the Deno edge runtime (different
+egress IPs). **A host can be 100% reachable to every recon probe and 0% reachable to production**, and
+because *all* recon is `pg_net`-based, this failure mode is invisible to recon **by construction** —
+no number of green probes can detect it. Tampa and El Paso were caught during recon only because
+their block happened to be an HTTP 403 that `pg_net` also received. Therefore: **for any NEW HOST,
+the first post-deploy re-cache is a DEPLOY VERIFICATION, not a formality — read
+`arcgis_reports[].fetched/emitted` and the `quarantined` reasons, never just `counts`.** A page
+showing 0 development records looks exactly like a legitimately empty page; only the connector report
+distinguishes "fetched nothing" from "could not connect". That check is what caught this, one probe
+after deploy and before any coverage was claimed.
+
+**🔁 REPROBE:** Dayton goes on the reprobe list. The data is good and the config is proven correct —
+if the block lifts, restoring the entry is a one-object re-add. A future edge-reachability preflight
+(a cheap engine-side probe of a candidate host before wiring) is proposed, not built.
+
+---
+
+### Recon record (stands — the wire is withdrawn, the findings are not)
 
 Montgomery was **0 of 39 pages live** — with Lucas (0/30) the largest fully-dark block in Ohio.
-**Config only** — no connector, engine or schema change. Registry `arcgis` 128 → 129 entries.
 
 **What it is.** The City of Dayton's own ArcGIS Server (`maps.daytonohio.gov/gisservices`),
 `CapitalPlanning` folder: the full municipal capital-project register — 264 rows, point geometry,
@@ -5458,4 +5504,13 @@ These are the **CITY OF DAYTON's** capital projects. Kettering, Huber Heights, C
 Miamisburg, Trotwood, Oakwood, Vandalia, West Carrollton and the rest of Montgomery County run their
 own capital programs and are **not** in this layer, so Montgomery pages outside Dayton's 3-mile
 reach stay dark on this source. The `coverage` declaration is county-level because that is the
-registry contract's granularity — **it is not a claim of county-wide coverage.**
+registry contract's granularity — it would not have been a claim of county-wide coverage.
+
+### Why the entry was REMOVED rather than left in place, documented
+
+A registry entry whose fetch can never succeed still declares `coverage: [{state:'OH', county:
+'Montgomery'}]`, and the coverage gate is what the config-based reading of "Live" keys on. Leaving it
+would have marked all 39 Montgomery pages covered while the database held **zero** records — the
+precise trap already recorded as a standing answer ("the workbook's Live column is COVERAGE-GATE
+based, not record based"). Measured from the database, which is the source of truth: Montgomery OH
+is **0 / 39**, unchanged, and the failed fetches wrote nothing.

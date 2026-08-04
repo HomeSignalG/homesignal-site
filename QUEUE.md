@@ -996,6 +996,83 @@ and PASDA `MontgomeryCounty` (also PA). Ohio's is `mcohio.org`, and
 `gis.mcohio.org/arcgis/rest/services` returns 404 HTML — the real OH service host is still unfound.
 Confirm entity from CONTENTS before wiring anything named Montgomery.
 
+## 🚫 DAYTON — WIRED, DEPLOYED, REVERTED. Montgomery OH stays 0 / 39 (2026-08-05)
+
+PR #594 wired `dayton-oh-capital-improvement-projects`, merged and deployed. The deploy proved
+the host **blocks the engine**. Reverted in PR #595 the same hour. DB-verified: Montgomery **0 / 39**
+unchanged, OH **136 / 335**, 0 Dayton records anywhere — the failed fetches wrote nothing.
+
+**Receipt.** 4 of 4 Montgomery ZIPs (45402/45403/45404/45410), `fetched 0 / emitted 0`:
+`client error (Connect): Connection reset by peer (os error 104)`.
+Control — the SAME URL byte for byte returns **200 / 413,143 bytes / 212 features** via `pg_net`,
+minutes apart. Error is at **Connect**, before HTTP, so not a query-shape/size problem: a source-IP
+block on Supabase edge egress. Tampa/El Paso class. No hosted copy exists — every AGO item is a Map
+Service *reference* back to `maps.daytonohio.gov`.
+
+### 🔑 A `pg_net` 200 IS NOT EVIDENCE THE ENGINE CAN FETCH THE HOST — use this before the next wire
+
+Recon runs on `pg_net` (Postgres egress); the engine runs on the Deno edge runtime (different egress).
+A host can be fully reachable to every recon probe and entirely unreachable to production, and because
+**all** recon here is `pg_net`-based, this is **invisible to recon by construction**. Tampa/El Paso
+were caught at recon only because their block was an HTTP 403 `pg_net` also received.
+
+**Operational rule:** for any **NEW HOST**, the first post-deploy re-cache is a **DEPLOY VERIFICATION,
+not a formality** — read `arcgis_reports[].fetched/emitted` and `quarantined`, never just `counts`.
+A page with 0 development records is indistinguishable from a legitimately empty one; only the
+connector report separates "fetched nothing" from "could not connect". That check caught this one
+probe after deploy, before any coverage was claimed.
+
+**Known-reachable hosts are now a wiring advantage.** `services*.arcgis.com` is proven by dozens of
+live entries; a city-hosted `gis.<city>.<state>.gov` is an unknown until the engine tries it.
+
+**🔁 REPROBE:** Dayton. Data is good, config is proven correct — a one-object re-add if the block lifts.
+An engine-side edge-reachability preflight is **proposed, not built** (that is a code change).
+
+## OH — MONTGOMERY / DAYTON RECON RECORD (stands; only the wire was withdrawn)
+
+- Server root enumerated **in full — all 35 folders** of `maps.daytonohio.gov`. **No permit ledger and
+  no zoning-case ledger anywhere on it.**
+- **Accela REJECTED on record class — a sixth disqualifier, `WRONG_RECORD_CLASS`.** 12,879 rows, fresh
+  (2026-01-02 → 2026-07-01), per-record, point geometry — and `COMPLAINT_TYPE` is `HOUSING` on **every
+  one** of the 12,879, with statuses ABATED / PAID / APPEAL-PPC / EXTENSION GRANTED (summing to
+  12,879). A housing code-enforcement ledger, not development. Live, fresh, per-record, geolocated,
+  and still not the thing. It is **not** the empty-vendor-folder case (Summit `tyler`, Allegheny
+  `Accela`) — this folder is full; the content is simply the wrong ledger.
+- **The service name is misleading and the layer choice is load-bearing.**
+  `Completed_Capital_Improvement_Projects` is the FULL register (264 rows), and
+  `Active_Capital_Improvement_Projects` (43) is exactly its `Construction`+`Bidding & Award` subset —
+  proven by `PROJID` set difference **0**, not by count. Wiring both would double-emit (houston-plat
+  trap). Third instance of *read the rows, not the service name*.
+- **Worst name collision in the registry, two of three already wired:** montcopa = Montgomery **PA**
+  (wired), mcgov = Montgomery **MD** (wired), Ohio's `gis.mcohio.org/arcgis/rest/services` **404s** —
+  the real Montgomery County **Ohio** service host is still unfound. Entity was confirmed from
+  CONTENTS only (Midtown, Belmont, Ryburn Ave, Merrimac Ave, Riverside Dr = City of Dayton, Ohio).
+
+## OH — TOLEDO / LUCAS RECON (in progress, nothing wired)
+
+Two REAL orgs confirmed by NAME, not hostname: **City of Toledo** `2snQ88YUjP9CNEbe` and **Lucas
+County Auditor** `T8dczfwPixv79EgZ`. Their own servers were derived from item URLs (the Dayton
+method): `gis.toledo.oh.gov/arcgis/rest` (10 folders + 43 root services) and
+`lcaudgis.co.lucas.oh.us/gisaudserver/rest` (19 folders).
+
+- **No permit or case ledger on either server.** Toledo `Public/PlanningComAppUNC10419` is a misnomer —
+  it is the plan commission's **basemap** (zoning districts, comprehensive plan, future land use,
+  parcels), all reference polygons. Lucas's `Tyler` / `TylerProduction` folders are **not empty** this
+  time but hold only Parcels / Cadastre / Pictometry — the Auditor's property data, not permits. A
+  vendor-named folder is still not a source, whether empty or full.
+- `data.toledo.gov` hub (49 datasets): the "Toledo-Lucas County Planning Commission" and "Demolition"
+  entries are **web APPS** (Experience Builder / instant / webappviewer), not data layers.
+- **CANDIDATE — `Vibrancy_Projects` layer 2** on `services.arcgis.com` (**known-reachable host**):
+  119 rows, point geometry, real addresses + project descriptions. `Incentive_Type` complete and sums
+  to 119 (Facade Improvement Grant 77 / White Box Grant 32 / Planning Grant 10); `Program_Year` sums
+  to 119 and reaches **2026 (19 rows)** — genuinely current. **Measured page lift: 16 of 30 Lucas
+  pages.** ⚠️ Two real weaknesses to decide on before wiring: **no status column** (needs
+  `status_const`) and **no date column** — `Program_Year` is an INTEGER, so every record would be
+  undated (Dayton would have been 71/264 undated; this is 119/119).
+- **`DemoCandidates` REJECTED** — 690 rows but no date, no status, no case number: `Projected_` is a
+  free-text window ("July-December 2024", already past) and the layer is titled "Demo Candidates
+  2022". A pre-decision candidate list naming private residential addresses, not a filing record.
+
 ## ⚠️ METHOD ERROR — never select a re-cache batch by "still dark"
 
 Made and caught this session. A ZIP that legitimately returns ZERO records never leaves the
