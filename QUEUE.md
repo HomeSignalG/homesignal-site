@@ -895,6 +895,47 @@ empty DCAT.
 Remaining PA routes: Bucks reprobe (docket may resume), Lehigh reprobe (if the WAF lifts), or
 municipal-level wiring in Lancaster/Dauphin. **Nothing further is cheaply available in PA.**
 
+## ACT 247 WINDOWS RECONCILED TO 1825 (founder ruling 2026-08-04, same day, superseding 1095)
+
+All three PA Act 247 entries now read identically. `montgomery-county-pa-act247-proposals`
+shipped at `recency_days: 1095` and was reconciled within hours to match
+`chester-county-pa-act247-plans` and `york-county-pa-planning-subdivisions`, which shipped
+first at 1825.
+
+**The reasoning, because it is the durable part:** three entries on ONE mechanism with TWO
+windows is drift. The 1095 ruling was made before the sibling convention was known. 1825 is
+also the more ACCURATE window rather than merely the consistent one — Act 247 plan reviews run
+multi-year, so a three-year cut truncates live cases mid-review.
+
+Measured named-row counts: 365d 253 · 1095d 813 · **1825d 1,396**.
+
+**If a future session finds a reason to narrow any of the three, narrow ALL THREE together or
+the drift returns.**
+
+## EDITORIAL LEAD — Norristown PA data-centre cluster (surfaced 2026-08-04)
+
+**Five data-centre filings in Montgomery County PA, all March 2026, all on ZIP 19401
+(Norristown), all Act 247 land-development submissions to the county planning commission:**
+
+- `600 River Road - Data Center` (2026-03-18)
+- `411 Swedeland Road - Data Center` (2026-03-12)
+- `2100 Renaissance Blvd - Data Center` (2026-03-11)
+- `3200 Horizon Drive - Data Center` (2026-03-11)
+- `Renaissance Blvd. - Data Center` (2026-03-11)
+
+Three filed on the SAME DAY and two more within a week — a cluster, not five unrelated
+projects. Renaissance Blvd appears twice (2100 Renaissance Blvd + a second Renaissance Blvd
+parcel). Every one carries a per-record `URL_Documents` link to the county's own document
+portal, so each is traceable to its official public record.
+
+**This is the thread the platform exists to surface** — the Stratos/Box Elder and
+Stargate/Abilene shape, in a metro county nobody was watching. Logged as a LEAD, not a
+conclusion: these are submissions under county review, not approvals, and the entry buckets
+them `proposed` accordingly. Any editorial use must say so.
+
+Not yet done: no cross-check against operator identity, utility interconnect filings, or
+PA DEP records. That is the follow-up if this thread is pursued.
+
 ## Reconciliation log
 
 Numbers reconciled against the artifact before acting (Rule 15).
