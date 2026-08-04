@@ -5198,3 +5198,28 @@ are not unprobed — 165 are firm rejections (Lancaster 56 + Bucks 50 + Dauphin 
 42 are coverage-limited inside a wired county, and 3 are single stragglers. **The PA seam is
 closed.** The only routes left are a Bucks reprobe (its docket may resume), a Lehigh reprobe (if
 the WAF lifts), or municipal-level wiring in Lancaster/Dauphin.
+
+### ACT 247 WINDOW RECONCILED TO 1825 — measured (2026-08-04)
+
+All three PA Act 247 entries now share `recency_days: 1825`. Montgomery shipped at 1095 and was
+reconciled the same day (founder ruling): three entries on one mechanism with two windows is
+drift, the siblings shipped first, and 1825 is also the more accurate window because Act 247
+plan reviews run multi-year.
+
+| | at 1095 | at 1825 |
+|---|---|---|
+| records (`development_reports` / `app_projects`) | 3,628 / 3,628 | **6,126 / 6,126** |
+| pages carrying the source | 64 | **64** |
+| oldest `file_date` | 2023-08-08 | **2021-08-05** |
+| invariant violations | 0 | **0** |
+
+**The oldest `file_date` is the proof, not the count** — 2021-08-05 is exactly the 1825-day
+boundary, so those records could not exist under the old window. **+2,498 page-records from
++583 source rows is spatial fan-out, not inflation**: scoping is 3 mi, and the pages-per-row
+ratio is stable across the change (4.46 → 4.39).
+
+⚠️ **Batch size when the refresh cron may be running: 16, not 64.** A 64-wide burst returned
+62 × 503 `BOOT_ERROR` while `dev_refresh` was active, moments after the same function answered
+a single probe 200. Nothing was corrupted — `dev_refresh_collect` reads only 200s. Batches of
+16 ran clean. Measure completion by `refreshed_at` on the TARGET rows; the collect return value
+is global and includes the cron's ZIPs.
