@@ -5972,3 +5972,96 @@ projects as segments.
   materially different from typing `<city>.maps.arcgis.com` and reading the generic anonymous
   portal — the standing trap. `lansing.maps.arcgis.com` did exactly that and returned nothing.
 
+
+## ELEVEN ZERO-COVERAGE STATES — STATEWIDE DOT DISCOVERY PASS (2026-08-05)
+
+Scope: the 11 states with **zero** live pages and no registry coverage of any kind — 2,159 pages
+where a statewide DOT wire is the ENTIRE play. **Discovery is complete for all 11; NOTHING IS
+WIRED YET** (the wiring, deploy and go-live measurement are the next step, deliberately not
+rushed). Every finding below is a live probe receipt.
+
+### Verdicts
+
+| state | pages | verdict | source / reason |
+|---|---|---|---|
+| **NJ** | 359 | ✅ **WIREABLE** | `NJDOTGIS` `Tran_STIP_24_33`, 264 polyline |
+| **ME** | 273 | ✅ **WIREABLE** | `MaineDOT_OpenData` Public Projects Points, 1,109 **multipoint** |
+| **IA** | 225 | ✅ **WIREABLE** | `IowaDOT_GIS` PSS Public Bid Point, 362 point |
+| **VT** | 212 | ✅ **WIREABLE** | `maps.vtrans.vermont.gov` Project Point Locations, 1,037 point |
+| **RI** | 81 | 🟡 **WIREABLE, multi-entry** | `risegis.ri.gov` RI STIP FFY18-27, **15 program-split layers** |
+| **AK** | 101 | 🚫 `NO_TEMPORAL_FIELD` | `AKDOT_GIS` STIP 24-27 Final: 2,282 points, real `Status`, but **ZERO date-typed fields** |
+| **WV** | 212 | 🚫 `candidates_exhausted` | `owner:WVDOT_Publisher` enumerated — 64 items, **0** project/STIP services |
+| **NH** | 247 | 🚫 no first-party source | `owner:NHDOT` → **0 items** (no such org); `NHDOT_Projects` is owned by a personal account |
+| **OK** | 197 | 🚫 no source found | 2 query shapes → 0 ODOT project services |
+| **ND** | 155 | 🚫 no first-party source | hits are City of Minot (`maps.minotnd.org`) and a consultant, not NDDOT |
+| **HI** | 97 | 🚫 no source found | 13 items, 0 project services |
+
+**Wireable total: 1,150 pages (NJ+ME+IA+VT) + RI 81.** Rejected: 1,009 pages across 6 states.
+
+### Per-source evidence
+
+**NJ — `Statewide_Transportation_Improvement_Program_STIP_Project_Locations/0`** (services.arcgis.com,
+owner `NJDOTGIS`). Layer 0 = `Tran_STIP_24_33`; the service's own description opens *"Federal
+legislation requires that each state develop one multimoda[l]…"* — it is the STIP. 264 rows,
+polyline (rides `featurePoint`). Dates: `PROJ_RECD` **246/264 non-null**, max **2023-08-03**;
+`DESCRIPTION_UPDATE` max 2023-03-24; `AWARD_DATE` **entirely null**; `UPDATED_DATE` max 2012-10-26
+(a decoy — do not pick it). ⚠️ **No usable status**: `CMSSTATUS` is BLANK on **253 of 264**
+(blank 253 + "N/A" 8 + "Determination Required" 3 = 264 exact) → needs `status_const`, bucketed
+`proposed` per the MDOT `Programmed` precedent. The program is current (FY_2024…FY_2033 funding
+columns) even though the date columns lag.
+
+**ME — `MaineDOT_OpenData/MapServer/4` "Public Projects Points"** (gis.maine.gov, owner
+`MaineDOT_OpenData`). 1,109 rows, **`esriGeometryMultipoint`** — ⚠️ **this source is only
+wireable because of the multipoint fix shipped earlier today**; before it, Maine would have wired
+and produced records with NO coordinates, exactly the Lake County IL failure.
+⚠️ **Use `reporting_status`, NOT `proj_status_code`.** `proj_status_code` is **opaque numeric
+codes** with **no coded-value domain** ("10" 647, "20" 311, "01" 53, "54" 41, "60" 37, "63" 15,
+"50" 5 = 1,109 exact) — the San Jose "30" fail-closed class. `reporting_status` on the SAME layer
+is **self-describing** and also sums exactly: "2 - Design/Permitting Phase" 503 · "4 - Construction
+Complete" 414 · "1 - Awaiting Kick-Off" 117 · "3 - Construction Phase" 75 = **1,109**.
+**Never let an opaque field decide when a self-describing one exists on the same layer.**
+Dates are thin — best fields are `ko_actual` **503/1,109** and `conbegin_forecast` **501/1,109**
+(others: `ko_forecast` 117, `conbegin_actual` 73, `concomp_forecast` 72), so **a majority of rows
+are undated**; wire with a window that requires a date and **state the ceiling** (~503 of 1,109).
+Layer 5 is the same projects as lines (1,138) — wire points only.
+
+**IA — `Project_Scheduling_Public_Bid_Point_View/0` "PSS Public Bid Point"** (services.arcgis.com,
+owner `IowaDOT_GIS`). 362 rows, point, native `COUNTY_NAME`. `STATUS` is a clean 4-value
+vocabulary summing EXACTLY: Awarded 206 · Completed 120 · Active 35 · New 1 = **362**.
+`CONTRACT_AWARDED` **322/362 non-null**. ⚠️ **The obvious candidate is the WRONG one**: Iowa's
+"Five Year Program Projects" (668 rows) is the named STIP equivalent but has **no date-typed
+column at all** — only integer `Year2` — i.e. `NO_TEMPORAL_FIELD`, the Toledo class. The Bid Point
+layer is smaller but dated and statused. **STALE-but-dated**: content dates stop at
+`CONTRACT_AWARDED` 2023-10-02 / `CONSTRUCTION_ACTUAL_START` 2022-08-01 while the edit stamp
+`REST_UPDATED` is 2026-01-28 → wire it, state the span, set a reprobe condition.
+
+**VT — `Master/AMP/FeatureServer/10` "Project Point Locations"** (maps.vtrans.vermont.gov).
+1,037 rows, point, richest schema of the group (7 date fields, `County`, `Town`).
+**FRESH — `PublishDate` max 2026-08-02, three days before this pass**; construction starts run to
+2033. ⚠️ Status is sparse: `ProjectStatus` null 636 + ACTIVE 350 + ON HOLD 50 + CANCELLED 1 =
+1,037 exact (**39% statused**), and `ConstructionStatus` is WORSE (null 954 = 92%). `County`
+populated 795/1,037. So `ProjectStatus` is the field, with a stated ceiling of ~401 emitting rows.
+Layer 9 (segments, 588) is the same projects — wire points only.
+
+**RI — `STIPMap_1827_Amend26`** (risegis.ri.gov, owner `DOA_C.DelageBaza` — RI Dept of
+Administration administers the RI STIP, so first-party). ⚠️ **Slow host**: pg_net **timed out at
+30 s** (29.7 s in the HTTP response phase) and succeeded at **90 s** — a timeout here is NOT a dead
+host, and the §0 edge-runtime question is wide open for it. Structure is the blocker: the STIP is
+**split across 15 program-specific layers** (Bridge / Pavement / Drainage / Traffic Safety / TAP /
+Transit Capital, each × points and lines) rather than one union — so RI is several registry entries
+with a subset-identity proof per pair, not one wire. Smallest prize (81 pages); deferred.
+
+### Method notes
+
+- **The generic query out-performed the per-state queries.** `q=STIP transportation improvement
+  program` surfaced first-party DOT STIP layers that the targeted `"<State> DOT projects"` searches
+  missed — including NJ's real STIP (the per-state search had only found a stale
+  `ConstructionMap_2019`) and AK's. It also surfaced leads for LATER states: **NCDOT**
+  (`gis11.services.ncdot.gov` NCDOT_STIP), **WisDOT** (`dotmaps.wi.gov` STIP Projects 4-Year),
+  **TDOT** (`spatial.tdot.tn.gov` Tennessee STIP Projects), **MDT Montana**. NC/WI/TN are all in
+  the "coverage but no statewide entry" list.
+- **Third-party copies are not first-party.** NJ, ME, NH and ND all surfaced project layers owned
+  by consultants, universities or personal accounts (`ljmarxen_rutgers`, `hk1071`,
+  `ulteiginnovation`, `pjacques@vhb.com_VHB`). Only the DOT-owned service counts.
+- **A named "STIP" layer is not automatically the right one** — Iowa's is dateless while its
+  humbler Bid Point layer is fully dated and statused. Check the fields, not the title.
