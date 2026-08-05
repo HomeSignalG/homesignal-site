@@ -6207,3 +6207,46 @@ coordinate, and even if it were, a county is not a ZIP.
 geocodable street address — **regardless of how good the rest of the schema is, and regardless of
 whether place names appear in prose.** Dates and statuses cannot rescue a record that cannot be
 placed.
+
+### NEW YORK — the MPO fallback and the county sweep BOTH come up empty (2026-08-05)
+
+Following §0i, after the three statewide rejections the next question was **who New York delegates
+to**. Both remaining layers of the search were run. **Neither yields a wireable source.**
+
+**MPO layer — searched NYMTC, CDTC, GBNRTC, GTC.** Result sets: NYMTC 20 items, CDTC 8, GBNRTC 2,
+GTC **0**. Exactly one TIP feature service exists in that set:
+`services2.arcgis.com/dU6jdOIkCUj2UDe9/…/TIP/FeatureServer/0` "Point Projects", owner
+`Putnam_County_NY`. Probed live: **11 rows**, `County` = **PUTNAM** for all 11, `mpoName` =
+**MHSTCC** for all 11 (Mid-Hudson South Transportation Coordinating Committee — one sub-regional
+council, not the NYMTC region). Point geometry, first-party, real per-record content.
+🟡 **Recorded as a MARGINAL candidate, deliberately NOT wired**: 11 records against **9 ZIP pages**,
+and its three date-ish fields are all `esriFieldTypeString` (`CreationDa` "DATE ORIGIN", `EditDate`
+"DATE EDITED", `Produpdate` "PLAN YEAR" — a year, not a date), so it would need the Anaheim
+string-compare treatment. A full wire cycle for 9 pages is poor value while ~415 NY pages have no
+source at all. Revisit if NY's other counties open up.
+
+**County sweep — orgs enumerated, not guessed.** Every one returned a real, non-empty result set
+and **zero permit or development feature services**:
+
+| county | dark pages | items enumerated | permit/development services |
+|---|---|---|---|
+| Westchester | 74 | **261** | **0** |
+| Erie | 55 | **182** | **0** |
+| Albany | 47 | **177** | **0** |
+| Dutchess | 34 | **45** | **0** |
+| Monroe | 52 | **22** | **0** |
+| Nassau | 68 | **26** | **0** |
+
+⚠️ Westchester's only permit-named layer is a **Film Permit** service — `WRONG_RECORD_CLASS`, and a
+good reminder that matching the word "permit" is a lead, not a finding.
+
+These are **negatives with stated, non-zero denominators** (§0a): 713 items enumerated across six
+counties, none of them a development source.
+
+**Where that leaves NY:** the state has no statewide source, no MPO source beyond an 11-row
+Putnam layer, and no county source in its six largest dark counties. The wired coverage that
+exists — NYC's five boroughs and Buffalo — is **city-published**, which is §0j's shape exactly.
+Remaining NY work is therefore **city-by-city** (Yonkers, White Plains, New Rochelle, Mount
+Vernon; Rochester; Albany; Syracuse — noting Syracuse was already rejected STALE 2025-08-16 in the
+NEW YORK WIRE PASS), not county-by-county — a different and more granular search than any run so
+far.
