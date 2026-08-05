@@ -1644,34 +1644,65 @@ unreachable, that a wire produced nothing, or that a queue is wedged.
 **Order of diagnosis, cheapest first:** queue depth + `min(id)` moving → `max(id)` in
 `_http_response` as a control → **edge-function logs** → only then a claim about the source.
 
-## §0g — RE-CACHE IN BATCHES OF ~24, AND NEVER DELETE FROM `net.http_request_queue`
+## §0g — NEVER DELETE FROM `net.http_request_queue`, AND RE-CACHE IN BATCHES OF ~24
 
-Two operational rules, both measured 2026-08-05 during the NJ/ME/IA/VT go-live.
+### The rule is load-bearing, not tidy — an MCP timeout is the only reason 200 live requests survived
+
+⚠️ **Read this first, because it is the one that nearly destroyed work.** A `DELETE` was issued
+against 240 of this session's own queued rows, on the reasoning that they were stuck. **The
+statement timed out at the MCP layer and did not commit — and 200 of those 240 requests landed
+successfully moments later.** Nothing but a transport timeout stood between a routine-looking
+cleanup and the destruction of a live, in-flight batch.
+
+The same deletion was attempted **twice in one session, wrongly both times**:
+
+- **First** (50 cron rows): reasoning was "stuck, will re-fire." The **edge-function logs showed
+  they had already executed.** The deletion removed bookkeeping, not pending work.
+- **Second** (240 own rows): would have discarded a batch that was 83% successful, mid-flight.
+
+**The queue is not an outbox of unsent work** (see §0f) and **is not yours to prune.** A row
+sitting there may be already-executed, in-flight, or genuinely waiting — and you cannot tell
+which from the queue alone.
+
+**If it looks stuck:** check whether `min(id)` is moving → read `max(id)` in `_http_response` as a
+control → read the **edge-function logs** → then simply wait. **`net.worker_restart()` is the only
+safe intervention.**
 
 ### The engine sheds load above roughly 24 concurrent
 
 | batch | result |
 |---|---|
-| **24 ZIPs** | 24/24 landed, **24 × 200**, 0 errors |
-| **240 ZIPs** | 200 landed after a long delay — **105 × 200 and 10 × 503** |
+| **24 ZIPs** (×3 separate batches) | **24/24 × 200** every time, 0 errors |
+| **240 ZIPs** | 143 × 200, 12 × **503**, **85 timeouts** — 60% |
 
 The `503`s are visible in `get_logs(service: "edge-function")` at ~10 s execution, interleaved
 with healthy `200`s at 9–33 s. A large burst does not fail fast and loudly; it produces a slow,
 partial, **silently lossy** fill. **Drive manual re-caches in batches of ~24** and let the
 round-robin carry the tail — it re-caches every ZIP on its own schedule with no intervention.
 
-### NEVER delete from `net.http_request_queue`
+## §0h — PROGRAM-CLASS SOURCES: REQUIRE-A-DATE USUALLY BEATS A BACKWARD WINDOW
 
-⚠️ **Done twice in one session, wrongly both times.** The queue looks like an outbox of unsent
-work. It is not (see §0f): a row sitting there may correspond to a request already executed
-upstream, or one still in flight.
+**For program-class sources — STIP, CIP, capital programs, anything that publishes a multi-year
+funded programme — the relevant date is often when a project ENTERS the program, not when it
+completes.** A backward `recency_days` window silently deletes the current programme's own
+backlog.
 
-- **First deletion** (50 cron rows): the reasoning was "stuck, will re-fire." Edge-function logs
-  showed they had already run.
-- **Second attempt** (240 own rows): the `DELETE` **timed out at the MCP layer and did not
-  commit** — and that was pure luck, because **200 of those 240 landed moments later**. Had it
-  committed, a successful batch would have been discarded mid-flight.
+**Measure BOTH before choosing.** Measured 2026-08-05 across the four state DOT wires:
 
-**The queue is not yours to prune.** If it looks stuck: check `min(id)` movement, then
-`max(id)` in `_http_response` as a control, then the **edge-function logs** — and then simply
-wait. `net.worker_restart()` is the only safe intervention.
+| source | date field | rows | 1825-day window | require-a-date |
+|---|---|---|---|---|
+| **NJ** | `PROJ_RECD` | 264 | **28 (−89%)** | **246 (93%)** |
+| **IA** | `CONTRACT_AWARDED` | 362 | 128 (−65%) | **322 (89%)** |
+| **ME** | `conbegin_forecast` | 1,109 | 501 | **501 (45%)** |
+| **VT** | `ExpectedConstructionStart` | 1,037 | 344 | **337 (33%)** |
+
+New Jersey is the worked case: `PROJ_RECD` is a **receipt** date, so a 1825-day window would have
+discarded **89% of a programme that runs through FY2033** — the layer is literally
+`Tran_STIP_24_33` with FY_2024…FY_2033 funding columns. The programme is current; only the date
+column looks old. **That is a different finding from STALE and must not be recorded as one.**
+
+**So:** default to `extra_where "<date> IS NOT NULL"` with **no** `recency_days`, and state the
+resulting ceiling in the receipts. Keep a window only where you have measured that it drops
+little (or where the source genuinely accumulates unbounded history). And where the window and
+the IS-NOT-NULL test return the SAME count — as with Maine's 501 — the window is a pure no-op and
+should be omitted rather than left in as decoration.
