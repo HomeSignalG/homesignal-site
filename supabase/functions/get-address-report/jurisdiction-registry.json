@@ -10934,6 +10934,167 @@
       "recency_days": 1825,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-05 Michigan pass. Michigan DOT's OWN ArcGIS server, Planning/MdotStip layer 2 'STIP All Projects (Points)'. ENTITY CONFIRMED FROM CONTENTS, not from the host name: the AGO item owned by MDOT_GIS is titled 'MDOT 2026-2029 Statewide Transportation Improvement Program (STIP)' and points at this exact service. The Michigan analogue of the already-wired udot-active-projects / txdot-projects-info-all / nvdot-project-boundaries statewide DOT rows. 3,742 rows, esriGeometryPoint wkid 4269. SUBSET DISCIPLINE (Houston precedent): the service publishes 4 layers - 1 'STIP Approved (Points)' 3,075, 2 'STIP All Projects (Points)' 3,742, 3 'STIP Approved (Segments)', 4 'STIP All Projects (Segments)' 17,423. Layer 1 is 100% STIP_STAT_DESC='Approved' (live groupBy: Approved 3,075, no other value) and is a strict subset of layer 2; segments are the same projects broken into route segments. ONLY the point union (layer 2) is wired - wiring any second layer would double-emit the same projects under a second source_registry_id, which exact-identity dedup cannot catch. BOTH vocabularies enumerated live via groupBy and EACH sums EXACTLY to 3,742: PHASE_STATUS 5 values (Programmed 2,562 / Active 954 / Abandoned 206 / Completed 12 / Suspended 8) and STIP_STAT_DESC 2 values (Approved 3,281 / Pending 461). status_to_bucket maps all 5 PHASE_STATUS values -> 0 unmapped. Buckets follow the UDOT precedent verbatim, which already places 'STIP' in proposed and 'Active' in approved: Programmed=in the approved program, not yet under way -> proposed; Active -> approved; Completed -> operating; Abandoned + Suspended -> exclude, AND dropped at source in extra_where (live returnCountOnly 3,528 = 3,742 - 206 - 8, exact). DATE FIELD CHOSEN ON LIVE NON-NULL COUNTS (the UDOT start_dat lesson - column_map arrays JOIN, they do not fall back, so one field must be picked): PHASE_SCHD_OBLG_DATE 3,742/3,742 non-null; PHASE_ACTL_OBLG_DATE 989/3,742; UPDT_TMSP 0/3,742 (max is null - unusable). esriFieldTypeDate, so the DATE literal applies. NOT STALE and NOT NO_TEMPORAL_FIELD: the program spans FY2026-FY2029, min PHASE_SCHD_OBLG_DATE 2025-10-01, max 2029-09-30, min STIP_FSCL_YR 2026 - a forward-looking current program, so most dates are in the future by design. recency_days 1825 is therefore a NO-OP TODAY (cutoff 2021-08-06 vs min 2025-10-01 -> drops 0 rows); it is set only as a guard if the layer later accumulates history. use_type_const 'Utility' with NO type_map, matching what UDOT/TxDOT/NDOT all map their work classes to. This is deliberate rather than a mapping gap: the only descriptive type column RPT_WK_DESC holds 1,178 distinct free-text values over 3,742 rows (live groupBy) - per-project prose, not a controlled vocabulary - and JOB_TYPE_CD is a single opaque character. Per connector semantics constantApplies = !typeLookup, so declaring no type_map makes the constant apply to every row -> 0 unclassified by construction. 'utility' is a member of the CLOSED lib/map.js TYPE_EXACT vocabulary (-> infrastructure category). CNTY_DESC carries all 83 Michigan counties and sums exactly to 3,742; all 11 modeled MI counties are represented (Wayne 377, Kent 317, Genesee 208, Ingham 202, Oakland 175, Monroe 151, Washtenaw 129, Ottawa 112, Macomb 101, Livingston 67, Shiawassee 27 = 1,866). No ZIP column anywhere, so spatial_zip_radius_mi 3 (the UDOT/Denver pattern); records keep their OWN per-project points. record_url_precision dataset - no per-record URL column exists and templating one would be guessing. HOST RISK, STATED UP FRONT (governance section 0): mdotgis.state.mi.us is a STATE-hosted server, not services*.arcgis.com, so a pg_net 200 is NOT evidence the Deno edge runtime can reach it - this is the Montgomery-OH/Dayton class. pg_net returned 200 on every probe above (the positive control), which is exactly the condition under which section 0 permits wire-and-see; verified post-deploy from arcgis_reports. A third-party AGO copy exists (services8 'MDOT_STIP' owned by user 'townsali') but is NOT first-party and was not used."
+    },
+    {
+      "registry_id": "nj-stip-projects",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/HggmsDF7UJsNN1FK/arcgis/rest/services/Statewide_Transportation_Improvement_Program_STIP_Project_Locations/FeatureServer/0",
+      "dataset_url": "https://services.arcgis.com/HggmsDF7UJsNN1FK/arcgis/rest/services/Statewide_Transportation_Improvement_Program_STIP_Project_Locations/FeatureServer/0",
+      "jurisdiction": "New Jersey Department of Transportation",
+      "coverage": [
+        {
+          "state": "NJ"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "ROUTE",
+          "PROJECT_NAME"
+        ],
+        "file_date": "PROJ_RECD",
+        "address": "DESCRIPT",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "UPC"
+      },
+      "status_const": "Programmed",
+      "use_type_const": "Utility",
+      "status_to_bucket": {
+        "proposed": [
+          "Programmed"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "extra_where": "PROJ_RECD IS NOT NULL",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-05 eleven-zero-coverage-states pass. NJDOT's OWN AGO service (owner NJDOTGIS), layer 0 'Tran_STIP_24_33'. ENTITY + PURPOSE CONFIRMED FROM CONTENTS: the service description opens 'Federal legislation requires that each state develop one multimoda[l]...' - it is the STIP. Found by the GENERIC q=STIP query; the per-state 'NJDOT projects' search surfaced only a stale ConstructionMap_2019, so the generic query is what found the real source. 264 rows, esriGeometryPolyline (rides featurePoint). NOT STALE - THE PROGRAM IS CURRENT EVEN THOUGH THE DATE COLUMNS LAG: the layer is the FY2024-FY2033 STIP and carries per-year funding columns FY_2024 through FY_2033. Its date columns are historical by nature: PROJ_RECD ('project received') max 2023-08-03 with 246/264 non-null, DESCRIPTION_UPDATE max 2023-03-24, AWARD_DATE ENTIRELY NULL, UPDATED_DATE max 2012-10-26 (a decoy - do not pick it). That is a different finding from STALE and must not be recorded as one. NO recency_days ON PURPOSE, measured not assumed: a 1825-day window (cutoff 2021-08-06) leaves only 28 of 264 rows - it would discard 89% of a CURRENT program because PROJ_RECD is a receipt date. extra_where requires a date instead, giving 246 of 264 (93%); the 18 undated rows are the stated ceiling. status_const 'Programmed' -> proposed, following the MDOT precedent, because there is NO usable status column: CMSSTATUS is BLANK on 253 of 264 (blank 253 + 'N/A' 8 + 'Determination Required' 3 = 264 exact via groupBy). use_type_const 'Utility' with no type_map, matching every other DOT entry (UDOT/TxDOT/NDOT/MDOT). No ZIP column, so spatial_zip_radius_mi 3. record_url_precision dataset - no per-record URL exists. HOST NOTE: services.arcgis.com is proven reachable by dozens of live entries, so this carries materially less edge-runtime risk than a state-hosted server; still verified from arcgis_reports post-deploy."
+    },
+    {
+      "registry_id": "maine-dot-public-projects",
+      "platform": "arcgis",
+      "service_url": "https://gis.maine.gov/mapservices/rest/services/dot/MaineDOT_OpenData/MapServer/4",
+      "dataset_url": "https://gis.maine.gov/mapservices/rest/services/dot/MaineDOT_OpenData/MapServer/4",
+      "jurisdiction": "Maine Department of Transportation",
+      "coverage": [
+        {
+          "state": "ME"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "project_title",
+          "scope_desc"
+        ],
+        "status_raw": "reporting_status",
+        "file_date": "conbegin_forecast",
+        "address": "description",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "pin"
+      },
+      "use_type_const": "Utility",
+      "status_to_bucket": {
+        "proposed": [
+          "1 - Awaiting Kick-Off",
+          "2 - Design/Permitting Phase"
+        ],
+        "approved": [
+          "3 - Construction Phase"
+        ],
+        "operating": [
+          "4 - Construction Complete"
+        ],
+        "exclude": []
+      },
+      "extra_where": "conbegin_forecast IS NOT NULL",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-05 eleven-zero-coverage-states pass. MaineDOT's OWN service on the state GIS host (gis.maine.gov), owner MaineDOT_OpenData, layer 4 'Public Projects Points'. 1,109 rows. *** THIS SOURCE IS ONLY WIREABLE BECAUSE OF THE MULTIPOINT FIX SHIPPED 2026-08-05 (PR #600). *** The layer is esriGeometryMultipoint; before that fix featurePoint() returned null for multipoint, so every record would have had NO coordinates, fallen through to scope 'area', and been dropped by the point-scope-only app_projects materializer - exactly the lake-county-il-construction-program failure. STATUS: USE reporting_status, NEVER proj_status_code. proj_status_code is OPAQUE NUMERIC CODES with NO coded-value domain ('10' 647, '20' 311, '01' 53, '54' 41, '60' 37, '63' 15, '50' 5 = 1,109 exact) - the San Jose '30' fail-closed class, undecodable without guessing. reporting_status on the SAME layer is SELF-DESCRIBING and also sums exactly to 1,109: '2 - Design/Permitting Phase' 503, '4 - Construction Complete' 414, '1 - Awaiting Kick-Off' 117, '3 - Construction Phase' 75. All 4 mapped -> 0 unmapped. STANDING LESSON: never let an opaque field decide when a self-describing one exists on the same layer. DATE CHOSEN ON LIVE NON-NULL COUNTS: conbegin_forecast 501/1,109 - the best available. Others measured and rejected: ko_actual 503 but only 402 survive a 2021 cutoff, ko_forecast 117, conbegin_actual 73, concomp_forecast 72. NO recency_days - all 501 non-null conbegin_forecast values already post-date 2021-08-06 (the window and the IS NOT NULL test return the SAME 501), so a window would be a pure no-op. *** STATED CEILING: only 501 of 1,109 rows (45%) emit. A MAJORITY OF THE LAYER IS UNDATED and is deliberately dropped rather than published undated. Understating is the honest direction. *** Layer 5 is the same projects as LINES (1,138) - points only are wired; wiring both would double-emit. HOST RISK: gis.maine.gov is STATE-HOSTED, not services*.arcgis.com, so a pg_net 200 is NOT evidence the Deno edge runtime can reach it (governance section 0, the Montgomery-OH/Dayton class). pg_net returned 200 on every probe - the positive control section 0 requires for wire-and-see. VERIFY FROM arcgis_reports POST-DEPLOY."
+    },
+    {
+      "registry_id": "iowa-dot-bid-projects",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/8lRhdTsQyJpO52F1/arcgis/rest/services/Project_Scheduling_Public_Bid_Point_View/FeatureServer/0",
+      "dataset_url": "https://services.arcgis.com/8lRhdTsQyJpO52F1/arcgis/rest/services/Project_Scheduling_Public_Bid_Point_View/FeatureServer/0",
+      "jurisdiction": "Iowa Department of Transportation",
+      "coverage": [
+        {
+          "state": "IA"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "ROUTE_NAME",
+          "WORK_DESC"
+        ],
+        "status_raw": "STATUS",
+        "file_date": "CONTRACT_AWARDED",
+        "address": "LOCATION",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "PROJECT_NUMBER"
+      },
+      "use_type_const": "Utility",
+      "status_to_bucket": {
+        "proposed": [
+          "New"
+        ],
+        "approved": [
+          "Awarded",
+          "Active"
+        ],
+        "operating": [
+          "Completed"
+        ],
+        "exclude": []
+      },
+      "extra_where": "CONTRACT_AWARDED IS NOT NULL",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-05 eleven-zero-coverage-states pass. Iowa DOT's OWN AGO service (owner IowaDOT_GIS), 'PSS Public Bid Point', 362 rows, esriGeometryPoint, native COUNTY_NAME. *** WHY THIS LAYER AND NOT THE BETTER-NAMED ONE - DO NOT 'CORRECT' THIS. *** Iowa's STIP equivalent is called 'Iowa DOT Five Year Program Projects Public VIEW' (668 rows) and is the obvious pick by NAME, but it has NO DATE-TYPED COLUMN AT ALL - its complete field list is OBJECTID, PID, Year2, County, Work_Type, Program, RouteID, Project_Location, SummaryYears, SummaryWorkType, AmountTotal, Project_Code, Shape__Length. Integer Year2 is the same class as Toledo's Program_Year, i.e. NO_TEMPORAL_FIELD: it cannot be windowed, aged out, or reprobed for staleness. The Bid Point layer is smaller but carries real dates AND a real status. A layer named 'STIP' is not automatically the right one - check the fields, not the title. STATUS is a complete 4-value vocabulary summing EXACTLY to 362 via groupBy: Awarded 206, Completed 120, Active 35, New 1 -> 0 unmapped. Buckets follow the source's own lifecycle: New = filed/not yet let -> proposed; Awarded + Active = under contract / under way -> approved; Completed -> operating. DATE: CONTRACT_AWARDED 322/362 non-null (89%), the stated ceiling; 40 undated rows are dropped by extra_where rather than published undated. STALE-BUT-DATED, WIRED DELIBERATELY WITH THE SPAN STATED: content dates stop at CONTRACT_AWARDED max 2023-10-02 and CONSTRUCTION_ACTUAL_START max 2022-08-01, while the edit stamp REST_UPDATED is 2026-01-28 - the register is still being maintained but its newest award is ~2 years old. REPROBE CONDITION: re-check max(CONTRACT_AWARDED); if it has not advanced past 2023-10-02 by the next pass, re-evaluate. NO recency_days measured not assumed: a 1825-day window leaves only 128 of 362 (-65%), discarding awards that are the whole point of the register. use_type_const 'Utility', no type_map, per the DOT precedent. spatial_zip_radius_mi 3 - COUNTY_NAME exists but there is no ZIP column."
+    },
+    {
+      "registry_id": "vtrans-project-locations",
+      "platform": "arcgis",
+      "service_url": "https://maps.vtrans.vermont.gov/arcgis/rest/services/Master/AMP/FeatureServer/10",
+      "dataset_url": "https://maps.vtrans.vermont.gov/arcgis/rest/services/Master/AMP/FeatureServer/10",
+      "jurisdiction": "Vermont Agency of Transportation (VTrans)",
+      "coverage": [
+        {
+          "state": "VT"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "ProjectName",
+          "WorkDescription"
+        ],
+        "status_raw": "ProjectStatus",
+        "file_date": "ExpectedConstructionStart",
+        "address": "ProjectDescription",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "ProjectNumber"
+      },
+      "use_type_const": "Utility",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "ACTIVE"
+        ],
+        "operating": [],
+        "exclude": [
+          "ON HOLD",
+          "CANCELLED"
+        ]
+      },
+      "extra_where": "ProjectStatus IS NOT NULL AND ExpectedConstructionStart IS NOT NULL",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-05 eleven-zero-coverage-states pass. VTrans' OWN server, Master/AMP layer 10 'Project Point Locations'. 1,037 rows, esriGeometryPoint, richest schema of the eleven-state pass (7 date fields, native County and Town). FRESH - PublishDate max 2026-08-02, THREE DAYS before this pass, and ExpectedConstructionStart runs to 2033. This is an actively published forward-looking program. STATUS: ProjectStatus is the field, and its vocabulary sums EXACTLY to 1,037 via groupBy: null 636, ACTIVE 350, ON HOLD 50, CANCELLED 1. ConstructionStatus was measured and REJECTED as worse - it is null on 954 of 1,037 (92%) (null 954, New 34, Proposed 30, Carry-Over 19 = 1,037 exact). Buckets per the source's own language: ACTIVE = under way -> approved; ON HOLD (paused) and CANCELLED (dead) -> exclude, and dropped at source in extra_where. proposed and operating are deliberately EMPTY - this vocabulary states no such stage, and inventing one would be a guess (the NDOT precedent permits empty buckets). *** STATED CEILING - THE SPARSEST OF THE FOUR: ProjectStatus is populated on only 401 of 1,037 (39%), and requiring BOTH a status and a date leaves 337 of 1,037 (33%). Two thirds of the layer is deliberately not published rather than published statusless or undated. *** County is populated on 795/1,037. NO recency_days: a 1825-day window on ExpectedConstructionStart returns 344, essentially the same as the IS NOT NULL population, so a window adds nothing - and on a forward-looking program a backward window is the wrong instrument. Layer 9 is the same projects as segments (588) - points only. HOST RISK: maps.vtrans.vermont.gov is STATE-HOSTED, not services*.arcgis.com - the Montgomery-OH/Dayton class. pg_net returned 200 on every probe (the section 0 positive control). VERIFY FROM arcgis_reports POST-DEPLOY."
     }
   ],
   "ckan": [
