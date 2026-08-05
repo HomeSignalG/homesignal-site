@@ -5827,3 +5827,148 @@ DISTRIBUTION alongside the violation count**, which is what surfaced this. Same 
 registry-only autonomy grant — flagged, not made.** Fixing it would convert Lake's 77 area records
 into pinned point records and populate the rail; the expected shape is a mean of each feature's
 `points` array, exactly as `rings` already degrades to a mean vertex.
+
+## ✅ MULTIPOINT GEOMETRY FIX — `lake-county-il-construction-program` now pins (2026-08-05)
+
+**The defect.** `featurePoint()` in `sources/arcgis.ts` resolved a pin from point geometry,
+the server's `centroid`, polygon `rings` and polyline `paths` — but **not
+`esriGeometryMultipoint`**. A multipoint layer therefore produced records with **no
+coordinates**, which fall through to `scope: "area"`, anchor at the report centroid, and are
+**dropped by the point-scope-only `app_projects` materializer**.
+
+Found live the day Illinois closed: Lake had **77 records across 27 ZIPs in
+`development_reports` and ZERO in `app_projects`**, while the polyline (Cook) and polygon
+(Champaign) entries wired the same day materialized normally. Nothing was fabricated and the
+records still rendered in the list — but **27 Lake pages served dated records with no pins**.
+
+**The fix.** One branch, last in the chain: the **mean of the feature's `points` vertices** —
+the same degradation the polygon branch already uses when a ring encloses zero area. A
+multipoint feature has no interior and no length, so there is no centroid or midpoint to
+derive; the mean IS the honest representative point. An empty `points` array still yields
+`null` — never a fabricated pin. Because the branch sits after `x/y`, `centroid`, `rings` and
+`paths`, **no existing source can change behavior** (asserted by branch-order unit tests).
+
+**PRE-DEPLOY AUDIT — Lake was the ONLY multipoint entry.** Scope distribution by
+`source_registry_id` cache-wide: Lake 0 point / 77 area (100%). The other high-area entries
+were probed live and all return `geometryType: esriGeometryPoint` —
+`butler-county-ks-permits` (86.8% area), `pierce-county-pals-permits` (82.7%),
+`clark-county-active-dev-permits` (25.1%); their registry entries carry no lat/lng columns, so
+they **geocode**, and their area records are geocode failures. A different cause, correctly
+labelled. **Nothing had been degrading silently elsewhere.**
+
+**Verified post-deploy** (deploy run 30965128296, `6bfa082b`, green 01:01:49Z; all 31 Lake rows
+`refreshed_at` 01:04Z, i.e. after the deploy — the §0 ordering trap avoided):
+
+| measure | before | after |
+|---|---|---|
+| Lake records checked | 77 | **80** |
+| `scope: "point"` | 0 | **80** |
+| `scope: "area"` | 77 | **0** |
+| pinned at report centroid | 77 | **0 of 80** |
+| pinned at own point | 0 | **80 of 80** |
+| missing coordinates | — | **0 of 80** |
+| missing `record_url` | — | **0 of 80** |
+| `app_projects` rows | **0** | **80 across 28 ZIPs** |
+
+The **centroid-vs-own-point control is what proves it is a real fix and not a relabel**: under
+the old code every record carried its report's `home_lat`/`home_lng`. Now 0 of 80 equal the
+report centroid, and the pins span lat 42.1638–42.4940 / lng −88.1704 to −87.8273 — which is
+Lake County IL (Waukegan, Gurnee, Barrington). Counting "records with a non-null lat" would
+have passed **both before and after** and proven nothing.
+
+### ⚠️ STANDING ANSWER — the `pg_net` worker can STALL, and a stall is indistinguishable from a dead host
+
+Mid-session the queue held at **256 requests with `min_id` frozen at 9817** across two
+observation windows; `max(id)` in `net._http_response` was 9816, so **nothing was being
+collected at all**. Every probe fired in that window would have read as "no response" — i.e.
+as an unreachable host — and any `EDGE_EGRESS_BLOCKED` / `UNREACHABLE` verdict recorded from
+it would have been fabricated from an instrument failure.
+
+- **The signal is `min(id)` in `net.http_request_queue` not moving**, not the queue depth (a
+  deep queue that is draining is healthy — 50 engine calls at a 90 s timeout legitimately
+  take minutes).
+- **The remedy is `select net.worker_restart();`** — it took the queue 256 → 56 within 60 s.
+- **Always pair a queue read with the control** `select max(id) from net._http_response` before
+  concluding a host is unreachable. A missing response id is not a host verdict.
+
+
+## MICHIGAN PASS (2026-08-05) — `mdot-stip-projects` wired; county-level candidates enumerated
+
+**Shape first (the standing rule: measure the county distribution before probing).** MI is
+**360 modeled ZIP pages, 50 live, 310 dark**. The registry grep — now the standard opening
+move — showed 5 pre-existing MI entries, ALL city/township scoped: `detroit-building-permits`,
+`detroit-trades-permits`, `detroit-demolition-permits` (Wayne), `ann-arbor-energov-permits`
+(Washtenaw), `independence-twp-construction-permits` (Oakland). No county-level and no
+statewide source existed.
+
+| county | ZIP pages | live | dark |
+|---|---|---|---|
+| Oakland | 87 | 9 | **78** |
+| Wayne | 76 | 32 | 44 |
+| Macomb | 40 | 0 | 40 |
+| Kent | 37 | 0 | 37 |
+| Genesee | 26 | 0 | 26 |
+| Ingham | 24 | 0 | 24 |
+| Ottawa | 19 | 0 | 19 |
+| Monroe | 17 | 0 | 17 |
+| Livingston | 13 | 0 | 13 |
+| Washtenaw | 20 | 9 | 11 |
+| Shiawassee | 1 | 0 | 1 |
+
+⚠️ **The state-level framing was again a hypothesis, not a brief.** "310 dark" reads as a
+uniform gap; the measurement says Oakland alone is a quarter of it, and 8 of 11 counties have
+**zero** wired source rather than partial coverage.
+
+### WIRED — `mdot-stip-projects` (statewide MI)
+
+See the registry entry's `_receipts` for the full evidence. Headline: MDOT's own
+`Planning/MdotStip` layer 2 'STIP All Projects (Points)', 3,742 point rows, both vocabularies
+complete and each summing exactly to 3,742, `PHASE_SCHD_OBLG_DATE` 3,742/3,742 non-null,
+FY2026–FY2029 (current program), all 83 MI counties present, all 11 modeled counties
+represented (1,866 rows). Only the point union is wired — layers 1/3/4 are subsets or the same
+projects as segments.
+
+### REJECTED, with receipts
+
+- 🚫 **Oakland County's own GIS — `WRONG_RECORD_CLASS`.** Real host recovered as
+  `gisservices.oakgov.com` (the guesses `gisrest.oakgov.com` and `gis.oakgov.com` are DNS-dead
+  and 404). Its `Enterprise` folder was enumerated in full: 13 MapServices, and the only
+  development-sounding layer, `EnterpriseOpenPlanningMapService/2 'Development Authority'`,
+  is by **its own description** *"The DevelopmentAuthority polygon feature class identifies
+  certain types of entities … Downtown Development Authorities (DDA), Tax Increment Finance
+  Authorities (TIFA)"* — **district boundaries, not filings.** The rest are `Current Land Use`,
+  `Composite Master Plan` and administrative districts. No per-record permit layer exists.
+- 🚫 **Ottawa County — `candidates_exhausted` on enumeration.** Real host `gis.miottawa.org`
+  (the `data-miottawa.opendata.arcgis.com` guess 404s "Domain record(s) not found"). Both
+  service folders enumerated in full; the only permit-adjacent services are
+  `BuildingFootprints`, `Buildings`, `CompleteBuildings` and `MasterPlanZoning` — **0 permit
+  services**.
+- 🚫 **Grand Rapids / Kent — `STALE`.** The city's AGO org is real (`L81TiOwAPO1ZvU9b`,
+  confirmed via `portals/self`, not guessed) and holds 2,008 items. Its only per-record
+  construction layer, `CGR_Construction_Projects/FeatureServer/0` (4,488 polygon rows), is
+  **frozen**: max `FiscalYear` **2023**, max `ProjectedStartDate` **2022-07-01**, max `EDATE`
+  **2017-10-05**. It is also thinly dated — `ProjectedStartDate` non-null on only
+  **1,441/4,488 (32%)** and `EDATE` on **172/4,488** — the Dayton 71/264 class. Stale is the
+  governing disqualifier; the dating would have been a second flag. `Eng_RoadConstruction`
+  (1,114 rows) carries the same schema with shapefile-truncated field names — an older export
+  of the same data, not an independent source. The remaining permit-named services in that org
+  are **aggregates** (`EPA_4_1_(A) Number of New Dwelling Units Permitted`,
+  `Multi_Family_New_Construction_Stats_2011_to_2018_YTD`) or **districts/zoning**
+  (`Zoning_All_Types`, `Downtown_Development_Authority_Boundary`,
+  `Development_Opportunity_Parcels`). → nightly reprobe list.
+- 🚫 **Michigan statewide, non-DOT.** The ArcGIS Hub datasets API over MI returns exactly one
+  state permit dataset, EGLE `Groundwater Sanitary Discharge Permits` — an environmental
+  authorization for an existing facility, i.e. the `facilities` class, not a development
+  filing.
+
+### Method notes added this pass
+
+- **URL-guessing county GIS hosts is not discovery.** All 8 first-pass host guesses failed
+  (3 DNS-dead, 4 404, 1 "Invalid URL"); every real host in this pass — `gisservices.oakgov.com`,
+  `gis.miottawa.org`, `mdotgis.state.mi.us`, `maps.grcity.us`, `services2.arcgis.com/L81Ti…` —
+  was recovered from **item URLs inside AGO search results**, never typed from a pattern.
+- **A username suffix is a derived org key, not a guess.** `akaka@grand_rapids.mi.us_grandrapids`
+  yields `grandrapids.maps.arcgis.com`, whose `portals/self` returned the real org id. That is
+  materially different from typing `<city>.maps.arcgis.com` and reading the generic anonymous
+  portal — the standing trap. `lansing.maps.arcgis.com` did exactly that and returned nothing.
+
