@@ -6115,3 +6115,61 @@ being `Old_STIP_1827_Amend3` — i.e. no newer published RI STIP map exists to p
 
 **81 pages stay on the EPA facilities floor.** → nightly reprobe list; revisit if RIDOA publishes
 a STIP layer carrying real dates.
+
+## NEW YORK — NO STATEWIDE SOURCE EXISTS (2026-08-05). NY must be done county-by-county
+
+**Shape measured first (764 pages, 233 live, 531 dark).** Registry grep: all **12** existing NY
+entries are sub-state scoped — `nyc-dobnow-approved-permits` and `nyc-dob-permit-issuance` (the
+five boroughs + a Nassau declaration) and `buffalo-building-permits` (Erie). No county-level and
+no statewide entry existed, which under §0c makes the statewide DOT the first thing to try.
+
+| county | pages | live | dark |
+|---|---|---|---|
+| Suffolk | 107 | 0 | **107** *(deferred — needs ten town wires)* |
+| Westchester | 74 | 0 | **74** |
+| Nassau | 70 | 2 | **68** |
+| Erie | 72 | 17 | **55** |
+| Monroe | 52 | 0 | **52** |
+| Albany | 47 | 0 | **47** |
+| Dutchess | 34 | 0 | **34** |
+| Saratoga | 27 | 0 | **27** |
+| Rockland | 26 | 0 | **26** |
+| New York | 100 | 77 | 23 |
+| Putnam | 9 | 0 | **9** |
+| Kings / Queens / Richmond / Bronx | 146 | 137 | 9 |
+
+**Non-Suffolk dark: 424.**
+
+### 🚫 The statewide play FAILS in New York — three independent rejections
+
+1. **`data.ny.gov` `ygg4-74a7` "Statewide Transportation Improvement Plan"** (Socrata, 2,489 rows)
+   — **`NO_GEOGRAPHY` + `NO_TEMPORAL_FIELD`.** Complete column list: `region, mpo, pin, county,
+   agency, title, description, fund_types_all, _2026, _2027, _2028, _2029, fa_cost, nfarollup`.
+   **No point, no lat/lng, no ZIP** — `county` alone cannot be resolved to a location, and
+   `_2026…_2029` are funding amounts, not dates (the RI/AK class).
+2. **`data.ny.gov` `rz8t-4kmq` "Transportation Projects in Your Neighborhood"** (Socrata, 1,937
+   rows) — **`NO_GEOGRAPHY`.** This one is otherwise excellent: real `contract_award_date` and
+   `estimated_or_actual_completed_date` (both `calendar_date`), a real `status`
+   ("Completed Project"), `type_of_work`, `public_friendly_description`. But there is **no
+   geometry column of any kind**; the only spatial field is `region` ("10 LONG ISLAND"), a DOT
+   administrative region. ⚠️ The prose in `project_status` DOES name counties ("…Nassau and
+   Suffolk Counties"), which is exactly the trap — **parsing geography out of free text is
+   guessing, and the anti-fabrication rule forbids it.**
+3. **NYSGIS_GPO** (the NY State GIS Program Office AGO org, **97 items enumerated**) — the only
+   project-named services are `Capital District Transportation Authority` (transit-authority
+   boundaries), `Regional Economic Development Councils` (regions), and `DEM Projects` (LIDAR
+   elevation extents). **Zero per-record development or permit layers.** Also
+   `gis.dot.ny.gov/arcgis/rest/services` → **404**.
+
+### The standing answer this produces
+
+⚠️ **§0c's statewide-DOT-first move is the right OPENING, not a guarantee.** New York publishes
+its STIP through **MPOs** (NYMTC, CDTC, GBNRTC …) rather than as one statewide geometry layer, so
+the state-level shortcut that lit Michigan in a single wire does not exist here. **When the
+statewide probe fails, say so with receipts and fall back to county-by-county** — do not keep
+re-probing the state.
+
+**NY is therefore a county-by-county state.** Next targets by dark count: Westchester 74 ·
+Nassau 68 · Erie 55 (Buffalo already wired; the county is the gap) · Monroe 52 (Rochester) ·
+Albany 47 · Dutchess 34 · Saratoga 27 · Rockland 26 · Putnam 9. **Suffolk 107 last** — it needs
+ten town wires.
