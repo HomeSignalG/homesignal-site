@@ -1606,3 +1606,40 @@ Measured 2026-08-05 — the worked example:
 This is the **surface-matrix rule landing on the headline metric itself**: the same question
 asked of two surfaces gives two right answers, and naming the surface is part of stating the
 fact.
+
+## §0f — A POPULATED `net.http_request_queue` DOES NOT MEAN THE REQUESTS WERE NOT SENT
+
+**Measured 2026-08-05, and it inverts the §0-adjacent assumption made earlier the same day.**
+
+Symptom: 24 engine calls fired via `net.http_post`; after 12+ minutes and a `worker_restart()`,
+`net.http_request_queue` still held all 24 and `net._http_response` held **zero** of them.
+
+That reads as "the requests never went out." **It was false.** The Supabase **edge-function logs**
+showed ~22 `POST | 200 | …/get-address-report` at the current deployment version, execution times
+9–33 s, in exactly that window. **The engine received and served the requests. pg_net simply never
+recorded the responses.**
+
+### What this changes
+
+1. **The queue is NOT an outbox you can read as "unsent."** A row sitting in
+   `http_request_queue` may correspond to a request that has already executed successfully
+   upstream. Deleting it does not cancel anything.
+2. ⚠️ **CORRECTION to an action taken earlier in this session.** 50 cron-issued re-cache rows were
+   deleted from `http_request_queue` on the reasoning that they were "stuck and will re-fire."
+   On this evidence they had most likely **already run against the engine**; the deletion removed
+   bookkeeping, not pending work. No durable harm — the round-robin re-caches regardless — but the
+   stated reasoning was wrong and must not be repeated as precedent.
+3. **`dev_refresh_collect()` reads `net._http_response`.** So when response collection fails, the
+   engine does the work, the cache is NOT updated, and a go-live measurement taken at that moment
+   reports **zero lift** for wires that are perfectly correct. **A zero measured during a pg_net
+   response-collection fault is an instrument failure, not a finding** — exactly the §0a shape.
+
+### The instrument that settles it
+
+**`mcp__Supabase__get_logs(service: "edge-function")`.** It is authoritative for "did the engine
+run this?", independent of pg_net entirely, and it reports the deployment `version` so you can also
+confirm you are looking at post-deploy traffic. Use it before concluding that a host is
+unreachable, that a wire produced nothing, or that a queue is wedged.
+
+**Order of diagnosis, cheapest first:** queue depth + `min(id)` moving → `max(id)` in
+`_http_response` as a control → **edge-function logs** → only then a claim about the source.
