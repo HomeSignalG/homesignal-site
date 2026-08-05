@@ -7040,3 +7040,112 @@ move". This is "pages moved barely, and the fix still mattered enormously." **Pa
 coverage metric, not a completeness metric — it saturates at one record. Neither number alone
 describes a source; check both, and check point-scope share per source when the question is what
 a resident actually sees.**
+
+---
+
+## UTAH PASS (2026-08-05) — 201 dark, NO WIRE, and the completeness metric earns its place
+
+**Result: UT unchanged at 109 / 310 pages (35.2%) — no source survived. But the second number is
+the finding: UT's median is 3 records per lit page against a national 62, p10 = 1, and 33 of its
+109 lit pages carry EXACTLY ONE record.** 1,722 records total.
+
+This is the first state closed under the two-number scoreboard (§0q), and it immediately separated
+two things a coverage number had merged: UT is not only under-covered, it is **thin where it is
+lit** — and the two have different causes and different fixes.
+
+### ✅ THE SCOPE/WINDOW/RADIUS HYPOTHESIS IS REFUTED — UDOT is correct as configured
+
+UT was flagged because it is the one state with a statewide DOT already wired yet stuck at ~35%.
+The natural suspicion was that `udot-active-projects` was being throttled by its own config. It is
+not, and the evidence is worth keeping because the tempting "fix" would have been a fabrication.
+
+`udot-active-projects` reads `All_Projects` (**2,145 rows**) and filters
+`pin_stat_nm NOT IN ('Closed','Abandoned')`, keeping **358**. The status vocabulary is complete and
+sums EXACTLY to 2,145: Closed 1,368 · Abandoned 419 · Scoping 74 · Proposed 71 · STIP 62 ·
+Active 53 · Close Out 47 · Under Construction 22 · Funding 15 · Substantially Compl 7 ·
+Region Review 4 · Physically Complete 2 · Awarded 1.
+
+So the filter discards **83% of the layer**, and "just include Closed" looks like a free 1,368-row
+win. **Applying §0l settles it:**
+
+| `pin_stat_nm='Closed'` | count |
+|---|---|
+| `est_compl_dat <= CURRENT_TIMESTAMP` | **49** |
+| `est_compl_dat > CURRENT_TIMESTAMP` | 0 |
+| **`est_compl_dat IS NULL`** | **1,319 (96%)** |
+
+**96% of Closed rows carry no completion date at all.** Bucketing them `operating` would assert
+that 1,319 projects were built on the strength of a status word with nothing behind it — the WSDOT
+fabrication in a new costume, and this time it would have been argued as a coverage improvement.
+Control: `Abandoned` with a past completion date returns **0**, consistent with never-built, so
+that half of the exclusion is right too.
+
+`recency_days` is absent (no window) and `spatial_zip_radius_mi` is the standard 3.
+**Scope, window and radius are all ruled out. UDOT's 358 rows are its real ceiling.**
+
+⚠️ Also observed: `All_Projects` repeats a project across rows (pin 20029 appears 4× with identical
+attributes and differing geometry), so **2,145 rows ≠ 2,145 projects** — relevant to any future
+per-project count on this layer.
+
+### The real limiter, measured
+
+**UDOT alone carries ALL 109 lit UT pages** (957 records, 8.8/zip). Only **16 ZIPs** have any
+city permit source at all — `slc-planning-petitions` (570 records / 12 ZIPs) and
+`provo-planning-applications` (195 / 4). That is the whole of Utah's municipal tier.
+
+The per-county table shows what coverage alone hides:
+
+| county | pages | lit | dark | **median records/lit page** |
+|---|---|---|---|---|
+| Salt Lake | 36 | 34 | 2 | **21** |
+| Weber | 14 | **14** | 0 | **12** |
+| Davis | 14 | 12 | 2 | **2** |
+| Utah | 29 | 17 | 12 | **2** |
+| Washington (St George) | 22 | **0** | 22 | 0 |
+| Sanpete | 14 | 0 | 14 | 0 |
+| Cache | 19 | 6 | 13 | 1 |
+
+**Weber is 100% covered at median 12; Davis is 86% covered at median 2.** Under a coverage-only
+scoreboard those two read as near-equivalent successes. They are not.
+
+### Three enumerations, all empty with non-zero denominators — §0k stop
+
+1. **Utah state clearinghouse** (`opendata.gis.utah.gov` DCAT, **608 datasets**): 8 permit-titled,
+   and every one is environmental — DAQ Title V, DAQ Approval, MS4 stormwater, groundwater,
+   permitted uranium mines — plus building *footprints* and historic districts. **No per-record
+   development permit ledger exists at the state tier.**
+2. **Washington County** (the single largest dark block, 22 pages): `BuildingPermits` on
+   `services2.arcgis.com/NdghJNs5zewWZRy3` EXISTS — 667 rows, `esriGeometryPoint`, Feature Layer,
+   with Address / PermitNum / PermitType / IssuedDate / Builder / Subdivision. **REJECTED: STALE.**
+   `dataLastEditDate` 2021-10-04 **and** an independent `orderByFields=IssuedDate DESC` probe
+   returns 2021-10-01 — two instruments agreeing, four years ten months old. Its sibling services
+   are Zoning_View and Subdivisions_View (boundaries, not filings). → reprobe list.
+3. **AGO search across the remaining targets**: a permit-titled Feature Service search returning
+   **3,186** results yielded, among Utah owners, only DAQ / floodplain / MS4 / groundwater /
+   non-resident OHV permits — every development-permit hit was an out-of-state lookalike (Waterloo,
+   Sonoma, Eugene, San Marcos TX, Dallas, Sydney, Calgary, Kitchener, Baltimore, Louisville,
+   Salem, Fairfax). St. George's own **93** items contain **zero** permit/planning/zoning/
+   subdivision layers. An owner search for `CacheCountyGIS` / `loganutah` / `TooeleCounty` /
+   `sgcity` returns **0 items** — those owners do not exist. `opendata.utah.gov` **404s**.
+
+### ⚠️ New standing answer — a GUESSED orgid returns a real 200 for someone else's data
+
+Probing `services.arcgis.com/hRUr1F8lE8Jq2uJo` as a guess at St. George returned **HTTP 200 with
+370 KB of genuine services** — `Azerbaijan_Buildings`, `Grenada_Buildings`, `DC_3D_Monuments`,
+`Coronavirus_Cases`, `Esri_US_Campus_Buildings`. A real org, real content, **nothing to do with
+Utah.** This is the `<guess>.maps.arcgis.com` generic-portal trap in a harsher form: there the 200
+is empty and obviously wrong, here it is full and plausibly wrong. **A 200 from a guessed org id
+is not evidence you found the right publisher — read the service NAMES before believing it.**
+
+### 🛑 UTAH IS `MUNICIPAL_TIER_REQUIRED` + `candidates_exhausted`
+
+Stronger than the usual stamp: it is not that closing the 201 would take more than ~5 wires each
+lighting under 20 pages — it is that **no wireable first-party per-record source was found to
+wire at all**, across three enumerated layers. Utah's cities publish parcels, zoning and
+footprints; they do not publish permit ledgers as open data. The one county that does (Washington)
+stopped updating in 2021.
+
+**Also logged as a completeness item, not a coverage one:** the 93 UT pages whose only source is
+UDOT sit at 1–3 records each. Even a modest Utah municipal source would raise the *median* far more
+than it would raise the *page count* — which is exactly the distinction §0q exists to surface, and
+the reverse of the Pierce case.
