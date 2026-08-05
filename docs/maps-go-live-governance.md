@@ -1867,3 +1867,137 @@ then wired on exactly that basis, a date pair with no status column. The two cal
 inconsistent as stated. **CPMS is on the reprobe list**, to be re-run with the past/future
 comparison against `project_completion`; if it splits the way WSDOT's did, it is wireable and the
 rejection was wrong.
+
+---
+
+## §0m — AFTER ANY WIRE, CHECK PAGES MOVED AGAINST RECORDS LANDED
+
+**A wire is not verified by "did records land". Verify it by the RATIO: pages newly lit versus
+ZIPs carrying records. A large gap is a DEFECT until explained.**
+
+This is the finding of the 2026-08-05 session, and it is worth its own rule because of how it
+presented: **nothing errored.** The deploy was green. The re-cache completed 208 of 208. Records
+landed — 129 of them, across 68 ZIPs, every one carrying a `record_url`, correct coordinates, a
+complete vocabulary and a passing coverage gate. Every invariant this project checks was zero.
+
+**And the wire had lit exactly ONE page.**
+
+The only signal was arithmetic: **+1 page against 68 ZIPs of records.** No log line, no exception,
+no red check. A session that asked "did records land?" — the natural question, and the one every
+prior pass had asked — would have reported Arizona closed and moved on.
+
+### The check
+
+After deploy and re-cache, before writing any number into a report:
+
+```
+pages newly lit   (app_projects distinct ZIPs, record_kind='development', delta)
+ZIPs with records (development_reports rows carrying the new source_registry_id)
+```
+
+They will never match exactly — some ZIPs were already lit, some records are legitimately
+area-scope. **But 1 against 68 is not a rounding difference, it is a defect.** Investigate before
+reporting. The specific cause that produced this one is §0n below; the rule stands whatever the
+cause turns out to be.
+
+### Why the usual invariants cannot catch it
+
+`0 missing record_url`, `0 missing coordinates`, `0 unclassified`, `0 out-of-coverage` are all
+**per-record** checks, and every one of them PASSED on records that were useless for the purpose.
+The defect lives one level up — in whether the records qualify for the rail at all. **A per-record
+invariant cannot see a whole-source failure.** That is why the ratio is the instrument.
+
+---
+
+## §0n — A NON-POINT-MAPPED ARCGIS ENTRY MUST DECLARE `lat: "__lat"`, `lng: "__lng"`
+
+`sources/arcgis.ts` sets `returnGeometry=true` **unconditionally**, computes `featurePoint(f)` for
+every feature, and writes the result into the **synthetic** columns `row.__lat` / `row.__lng`.
+Those columns reach the emitted record **only if `column_map` maps them.**
+
+An entry that maps neither a native lat/lng column nor `__lat`/`__lng` therefore emits records
+that **still list, still carry a `record_url`, still render in the list view — and never pin on
+any of the three map views, and never count as LIVE**, because `app_projects` is point-scope only.
+The record silently degrades to `scope:"area"` anchored at the ZIP centroid.
+
+**This is the Austin `spatial_point_col` failure class: config that looks complete, passes every
+unit test, and produces records that do not do the job.**
+
+### Measured instances (2026-08-05 audit of all 147 arcgis entries)
+
+| entry | records | pinned | % | cause |
+|---|---|---|---|---|
+| `adot-tip-fy2026-2030` | 129 | 1 | 0.8% | found at go-live via §0m |
+| `pierce-county-pals-permits` | 13,033 | 2,255 | **17.3%** | found by the follow-up audit |
+| `butler-county-ks-permits` | 1,194 | 158 | **13.2%** | found by the follow-up audit |
+
+In all three the layer was **innocent** — each is `esriGeometryPoint` or a polyline serving real
+geometry, probed directly. The partial pinning in Pierce and Butler came from the **geocode path**
+on their `address` column, which is why they looked alive rather than dead: a wholly-broken source
+is easier to notice than a 17%-working one.
+
+### The audit, and the trap in "it has lat/lng mapped"
+
+Two classes exist and both must be checked:
+
+1. **Maps neither** → the defect above. 11 arcgis entries map no lat/lng; **nine are the legitimate
+   geocode path** (geometry-less tables carrying an address — the Boulder precedent), measured at
+   75%–98.4% point-scope and healthy. Two were defective and are fixed.
+2. **Maps NATIVE columns on a non-point layer** → *immune for the wrong reason*. WSDOT pinned
+   correctly only because it happens to publish `Longitude`/`Latitude` on 1,582 of 1,582 rows;
+   had that column been partially null, the null rows would have degraded silently while the entry
+   looked correctly configured. **Audited all 26 native-lat/lng entries by measured point-scope
+   share: every one ≥95.8%, only two below 99% (overland-park 95.8%, tempe 97.7% — ordinary null
+   coordinates at source). No material instance of this class exists today.**
+
+**Measure the class, do not reason about it.** The instrument for both is the same one line:
+point-scope share per `source_registry_id` in the live cache. It catches a wrong config, a null
+native column, and a geocode ceiling without needing to know in advance which it is.
+
+---
+
+## §0o — A FIELD'S NAME AND POPULATION RATE DESCRIBE THE FIELD, NEVER WHAT IT MEANS
+
+**Compare a column's VALUES ACROSS ROWS before treating it as an identity or as a per-record
+link.** `count(*) where x is not null` answers a question nobody asked. So does the column's name.
+
+Two cases in one session, both of which changed a decision:
+
+- **ALDOT `RPT_URL` — 100% populated, and not record precision.** It looks like a per-project link
+  on every row, until two different awarded projects return the **byte-identical** URL: it is the
+  fiscal year's Awarded Projects *report*, one per year. Wired `dataset` precision despite the
+  column never being empty.
+- **ADOT `TRACS` — used as an identity, and it is a LIST.** The overlap between the adopted and
+  tentative TIP layers measured **52 of 194** on `TRACS` and **146 of 247** on `TIP_ID` — an
+  understatement of nearly 3x. `TRACS` holds a comma-separated set of project numbers
+  (`"70124, M722401X,70129,70125,70126,70127,70128"`), so string equality compares list membership
+  *and order*. The correct number changed the decision from "wire both layers" to "wire one" —
+  wiring both would have double-emitted 146 projects with **contradictory stages on the same page**.
+
+Both are the same error: trusting a field's *shape* as evidence of its *semantics*. It is the same
+family as §0l's date rule — a populated `OperComplete` is not a claim that construction finished,
+and a populated `RPT_URL` is not a claim that the link is per-record.
+
+**Before using a column as a key, a link, or a stage: pull several rows and look at the values.**
+
+---
+
+## §0p — A PRE-WIRE YIELD PROBE ORDERS CANDIDATES; IT DOES NOT SIZE THEM
+
+**A single-ZIP envelope probe samples ONE 3-mile circle inside a county of thousands of square
+miles. Treat its output as an ordering signal and a floor test, never as a forecast.** This is a
+limit of the instrument, not a failure of it — the probe is still the right tool for deciding
+*whether* a source clears the wire floor.
+
+**Measured wrong in BOTH directions, one week apart:**
+
+- **WSDOT over-predicted by ~25%.** Probes said Auburn 98001 = 25; the deployed engine emitted 19.
+  The probe counts raw layer features in a bare envelope; the connector then applies its own
+  paging, dedup and column projection.
+- **ADOT under-predicted, including two false zeroes.** Probes returned **0** at Sierra Vista
+  (Cochise) and **0** at Prescott (Yavapai). The wire lit **5 and 7** pages in those counties. The
+  county seat simply had no capital project inside its own 3-mile circle.
+
+**A zero at the county seat is not a zero for the county.** Where a probe returns zero but the
+source's own county vocabulary shows records in that county, the honest read is "not at this
+centroid", and the decision should rest on the vocabulary, not the probe.
