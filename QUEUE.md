@@ -6062,3 +6062,56 @@ a design decision, not a mechanical repeat. **Then NY non-Suffolk.**
 A backward window would discard 89% of New Jersey's CURRENT FY2024-2033 program because
 `PROJ_RECD` is a receipt date. **ME publishes 45% of its layer and VT 33%** — stated ceilings,
 not implied coverage.
+
+## ✅ ELEVEN-STATE PASS CLOSED (2026-08-05) — 4 wired and live, 7 rejected
+
+**RI resolved as `NO_TEMPORAL_FIELD` — the last item. Every one of the eleven is now wired or
+rejected on enumeration.**
+
+| metric | session start | closed |
+|---|---|---|
+| **headline — `app_projects` `record_kind='development'`** | 4,937 | **5,387** |
+| cache — `development_reports` | 4,973 | 5,419 |
+| lag | 36 | **32** |
+
+**+450 pages on the headline metric this session** (12,722 total → **42.3%**).
+
+### Wired and filling (4 states)
+
+| state | pages | before | now |
+|---|---|---|---|
+| ME | 273 | 0 | **171** |
+| VT | 212 | 0 | **112** |
+| NJ | 359 | 0 | **94** |
+| IA | 225 | 0 | **57** |
+| **total** | **1,069** | **0** | **434** |
+
+Still climbing on the round-robin with no intervention.
+
+### Rejected with receipts (7 states, 1,090 pages)
+
+| state | pages | disqualifier |
+|---|---|---|
+| NH | 247 | no first-party source (`owner:NHDOT` → 0 items) |
+| WV | 212 | `candidates_exhausted` (DOT org enumerated: 64 items, 0 project services) |
+| OK | 197 | no source found |
+| ND | 155 | no first-party source (hits are City of Minot + a consultant) |
+| AK | 101 | **`NO_TEMPORAL_FIELD`** — 2,282 points, real `Status`, **0 date-typed fields** |
+| HI | 97 | no source found |
+| RI | 81 | **`NO_TEMPORAL_FIELD`** — all 15 layers enumerated, **0 date-typed fields** |
+
+⚠️ **`NO_TEMPORAL_FIELD` disqualified TWO states in this pass** (AK, RI), both of which otherwise
+looked wireable — first-party, geolocated, per-record, and in RI's case with a real status column.
+**A programme year (`FY2018`…`FY2027`, `STIP_Year`, `Year2`, `Program_Year`) is not a date.**
+This is now the most common disqualifier after "no source at all".
+
+### ⚠️ THE LAG SIGNAL FIRED — and it worked as designed
+
+Mid-pass the materialization lag went **36 → 244** while the round-robin filled faster than
+`app_refresh` materialized. That is exactly the widening-gap signal §0e says to watch. Fixed with
+two `app_refresh_batch(1500)` calls: **244 → 72 → 32**. **Track the lag, don't just print it** —
+had only the headline been read, 244 live-but-unmaterialized pages would have been invisible.
+
+### Next
+
+**NY non-Suffolk** (531 dark; Suffolk needs ten town wires and is deliberately last).

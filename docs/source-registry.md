@@ -6065,3 +6065,53 @@ with a subset-identity proof per pair, not one wire. Smallest prize (81 pages); 
   `ulteiginnovation`, `pjacques@vhb.com_VHB`). Only the DOT-owned service counts.
 - **A named "STIP" layer is not automatically the right one** — Iowa's is dateless while its
   humbler Bid Point layer is fully dated and statused. Check the fields, not the title.
+
+## 🚫 RHODE ISLAND — REJECTED (2026-08-05): `NO_TEMPORAL_FIELD`, all 15 layers enumerated
+
+**RI is the last of the eleven zero-coverage states, and it closes the pass.**
+
+Source examined: **`risegis.ri.gov/hosting/rest/services/RIDOA/STIPMap_1827_Amend26/MapServer`**
+— the RI STIP FFY 18-27 (Amendment #26), owner `DOA_C.DelageBaza`. **First-party**: the RI
+Department of Administration administers the state STIP, so provenance was never the issue.
+
+### The structural question turned out to be MOOT — state that plainly
+
+The open design question was whether the 15 program-split layers are **disjoint programs**
+(→ separate registry entries, fine) or **a union and its parts** (→ wire the union only and prove
+the subset by identity). The enumeration answers it: every layer carries the SAME schema keyed on
+**`TIPID`** + **`TIPprogram`**, i.e. they are **disjoint program partitions** of one master TIP
+table — Bridge Capital, Pavement Capital, Drainage Capital, Traffic Safety Capital, TAP, Transit,
+Maintenance Capital & Operations, Truck Toll Facilities — each published as Points and/or Lines.
+So they would have been separate entries.
+
+**But it does not matter, because the source is disqualified before that decision is reached.**
+Do not re-open the 15-layer question: it is downstream of a test the source already fails.
+
+### The disqualifier — measured across ALL 15 layers, not a sample
+
+| layers | geometry | date-typed fields |
+|---|---|---|
+| 0–6 (Truck Toll, TAP-Pts, Transit-Pts, Maintenance, Drainage, Bridge, Traffic Safety-Pts) | point | **0** |
+| 7–13 (Transit-Lines, SRTS Details, TAP-Lines, Bridge-Line, Traffic Safety-Lines, Drainage-Line, Pavement) | polyline | **0** |
+| 14 (Drainage Capital) | polygon | **0** |
+
+**Zero `esriFieldTypeDate` / `esriFieldTypeDateOnly` fields in any of the 15.** The only temporal
+signal is the funding columns **`FY2018` … `FY2027`** — per-fiscal-year dollar amounts, which is
+the same class as Iowa's integer `Year2` and Toledo's `Program_Year`: **a programme year is not a
+date.** A source where no record can be dated cannot be windowed, cannot age out, and cannot be
+reprobed for staleness — permanently unfalsifiable.
+
+**Consistent with the AK ruling in the same pass**: Alaska's STIP has 2,282 points and a real
+`Status` column and was still rejected on exactly this test. Rhode Island is the same verdict on
+the same evidence.
+
+### Also noted (not the governing reason)
+
+The host is **slow but healthy** — it times out at a 30 s pg_net timeout and answers cleanly at
+90 s. That was an acceptable risk given both state DOT hosts (`gis.maine.gov`,
+`maps.vtrans.vermont.gov`) verified clean against the edge runtime this same session, so **the
+host was never the blocker**. The programme is also FFY **2018-2027** with the only alternative
+being `Old_STIP_1827_Amend3` — i.e. no newer published RI STIP map exists to prefer.
+
+**81 pages stay on the EPA facilities floor.** → nightly reprobe list; revisit if RIDOA publishes
+a STIP layer carrying real dates.
