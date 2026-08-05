@@ -2076,6 +2076,30 @@ suspiciously round number at a percentile boundary is exactly where a silent cap
 
 ---
 
+## §0t — A RATIO THAT EXCEEDS ITS OWN DENOMINATOR IS A QUERY DEFECT, NEVER A FINDING
+
+**Re-derive before reporting. The usual cause is a join fan-out.**
+
+A share cannot exceed 100%. When one does, the query has multiplied rows somewhere — typically a
+join to a table with more than one row per key, or an aggregate counting the joined rows rather
+than the distinct subjects.
+
+**The worked case:** the first `DOT_ONLY` measurement reported **CT at 244% DOT-only** — 254
+DOT-only pages against 104 lit. Impossible on its face, and *that impossibility is the only reason
+it was caught*. The same fan-out landing at 47% would have published silently and become a stamped
+governance fact.
+
+The fix was `distinct` on the ZIP list plus filtering the aggregate to lit pages. Rewritten, CT
+came back at **82%** — still a `DOT_ONLY` state, but the number that would have been published was
+three times the truth.
+
+**The general form of the risk:** an out-of-range value is a *lucky* defect, because it announces
+itself. Assume that for every ratio that visibly breaks its bounds there are others in range and
+equally wrong. **Sanity-bound every computed share** — against 100%, against the denominator,
+against a known control — as a matter of course, not only when a number looks odd.
+
+---
+
 ## §0r — MEASURE THE SYMPTOM ACROSS THE WHOLE POPULATION BEFORE PROBING ANY CANDIDATE'S CONFIG
 
 **When one query can measure the symptom across every member of a class, run that query instead of
@@ -2173,6 +2197,28 @@ a coverage percentage.
 
 **So do not infer the stamp from "which wire closed the state" — the wire that made the headline is
 often not the source carrying the pages. Measure the share.**
+
+### ⚠️ A HIGH MEDIAN ON A LOW LIT COUNT MEANS ONE DEEP CITY, NOT A HEALTHY STATE
+
+**Read the two numbers together or the second one lies as readily as the first.** AL's median of
+**796** is the highest in the country and AL is **not** a well-covered state: only **34 of its 262
+pages are lit**, and those 34 are Huntsville/Madison, which carry deep municipal permit ledgers.
+The median describes *the pages that exist*, so a state with a handful of dense metro pages and
+nothing else scores higher than a state with broad, honest, moderate coverage.
+
+Same shape elsewhere: **WI median 140 on 20 lit of 211** and **KS median 2,202 on 76 lit**. Against
+that, **OH's median 186 on 136 of 335** is a genuinely deep state, and **MI's median 11 on 287 of
+360** is a genuinely broad shallow one.
+
+**So the pair is: coverage says how much of the state exists, completeness says how good the
+existing part is — and NEITHER is a summary of the other.** A high median with a low lit count is a
+flag to look at *which* pages are lit, not a result to celebrate.
+
+*(This was nearly mis-called: AL's 796 was initially flagged as implausible alongside a genuinely
+broken 244% figure in the same query. Distrusting it was right — one of the two numbers WAS a
+defect — but the resolution differed: the 244% was a join fan-out, the 796 was real and simply
+measuring something other than what was assumed. **Verify a suspicious number; do not assume
+suspicion means defect.**)*
 
 ### The instrument
 

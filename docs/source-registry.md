@@ -7186,3 +7186,85 @@ not worth re-running more often than monthly**; the block has now held across tw
 and nothing on our side can influence it. The proposed edge-reachability preflight (a cheap
 engine-side probe of a candidate host *before* wiring) would have turned both of these deploy cycles
 into one probe — still proposed, still not built, and this is the second time it would have paid.
+
+---
+
+## INDIANA PASS (2026-08-05) — 196 dark of 198. NO WIRE. The DOT publishes potholes, not projects.
+
+**Result: IN unchanged at 2 / 198 pages (1.0%), median 1 record per lit page.** The lowest-covered
+state in the country, and the §0c statewide-DOT first move **fails on the merits rather than on
+reachability** — a first for this project.
+
+### ⚠️ THE STARKEST WAY TO STATE IT: Indiana has ZERO pages lit by an Indiana source
+
+Its only two lit pages are lit by **`chicago-building-permits` spilling across the state line** —
+Hammond `46327` (1 record) and Whiting `46394` (19), both in Lake County within 3 miles of Chicago.
+Every other Indiana page, including all 40 in Marion (Indianapolis) and all 33 in Allen (Fort
+Wayne), is dark. Nine of ten modelled counties are at literal zero.
+
+### 🔴 INDOT PUBLISHES A MAINTENANCE-DEFECT SYSTEM, NOT A PROJECT REGISTER
+
+INDOT has a real, active ArcGIS Online organisation — **193 owned items, 42 published services**.
+Enumerated in full, they are:
+
+**`INDOTGenDef_*` (18 services)** — General Defects: `Pothole`, `Graffiti`, `DeadTree`,
+`DamagedGuardrail`, `DamagedFence`, `DamagedSign`, `DamagedCableBarrier`, `Debris`, `Drainage`,
+`Striping`, `SignalMalfunction`, `SmallCulvert`, `RoadwayLightOutage`, `WaterPollution`, `Open`,
+`Closed`, `RO`, `Other`. **This is a work-order / maintenance-ticket system** — `WRONG_RECORD_CLASS`
+for a development tracker; a pothole report is not a project.
+
+**The rest** — `Interchanges`, `ReferencePosts`, `Ref. Posts 100th`, `INDOT_DISTRICT_SUBDISTRICT_UNIT`,
+`IR_Units`, `Indiana Mask`, `GIO_COUNTY_BOUNDARY`, `DOTGIS_Railcrossing_INDOT_FRA`, `DBE_from_DW`,
+`ITR_*`/`Toll Road Travel Plaza` (toll road ops), `Collector_QA_{Kirk,Lloyd,Marty,Tim}` (field-crew
+QA), `EnviroPermit`, `link_tbl` — reference geometry and internal operations.
+
+**There is no capital-project, STIP, TIP or construction-programme layer among them.**
+
+### The one project-shaped trail, followed to its end
+
+INDOT's org contains a **`STIP Project Viewer`** Web Map + Web Mapping Application
+(`KSandy@indot.IN.gov_indot`, modified **2017-03-23**). Walking the item → web map →
+`operationalLayers` (the Frisco recovery path) yields three backing services:
+
+```
+AGOL_AdminBoundaries -> http://gis.in.gov/arcgis/rest/services/DOT/AGOL_AdminBoundaries/MapServer
+INDOT_Roads          -> http://gis.in.gov/arcgis/rest/services/DOT/INDOT_Roads/MapServer
+STIP_Map - JoinedData-> https://gisq.in.gov/arcgis/rest/services/DOT/STIP_Map/MapServer/0
+```
+
+**Both `gis.in.gov` and `gisq.in.gov` FAIL DNS** — "Couldn't resolve host name", all four probes.
+The viewer is a nine-year-old application pointing at decommissioned infrastructure. Indiana's
+current state ArcGIS Server, `gisdata.in.gov` (live, **ArcGIS Server 11.5**, folders DNR /
+DOR_Utilities / Geocode / Hosted / IDEM / IDHS / Incidents / IndianaIndoors / IOT_Visits / Test /
+Utilities), **has no DOT folder at all.** The DOT data did not move — it stopped being published.
+
+### Rejected with receipts
+
+| candidate | why |
+|---|---|
+| `INDOT Projects` (`services5…/INDOT_Projects`) | **3 rows.** Owner `arcgis_svc`, modified **2016**. `SUB_THRESHOLD`. |
+| `TIP_Point` / `TIP_Links` | **4 rows.** Owner **`MinaeiN_cdmsmith` — CDM Smith**, a private consultancy, not INDOT. `SUB_THRESHOLD` + not first-party. |
+| `CR Projects` / `CR_Projects_view` | Owner **`ewilder@hntb.com_HNTBCorp` — HNTB**, a private engineering firm. Not a first-party publisher. |
+| `Community Crossings 2021 Round 2` | Owner `rmlawson2`, a 2021 grant round snapshot. |
+| Indianapolis `data.indy.gov` (**651 datasets**) | 31 permit/zoning-titled candidates, and **every one is a historical zoning ORDINANCE document** — the 1948 county ordinance, amendments `67-AO-1`, `75-AO-2`, `97-AO-11` … — with **no REST URL on any of them**. `WRONG_RECORD_CLASS`: legislative text, not filings. |
+| Fort Wayne | AGO search returns no permit/planning/development layer. |
+| IndianaMap (**554 items**) + statewide permit searches | Only `BZA_and_PC_Cases_in_Richmond` (Wayne County, pop. ~35k) and a `Building Permit Inputs` form owned by `DemotteAdmin` (pop. ~5k). Below any floor. |
+
+⚠️ **Provenance note worth keeping:** a plain `INDOT` search returns 776 items and the four most
+project-shaped results are owned by **private consultancies and service accounts, not INDOT** —
+HNTB, CDM Smith, `arcgis_svc`, `rmlawson2`. They rank highly because "INDOT" appears in their
+metadata. **The word in the title is not the publisher; check `owner` before treating a hit as
+first-party.**
+
+### 🛑 INDIANA IS `candidates_exhausted` + `MUNICIPAL_TIER_REQUIRED`
+
+Five enumerated layers, all empty with non-zero denominators (193 INDOT items / 42 services · 554
+IndianaMap items · 651 Indianapolis datasets · 281 "INDOT" feature services · a statewide permit
+search). **This is the first state where the statewide DOT exists, is active, is first-party and is
+reachable — and simply does not publish the class of record we need.** `NO_DOT_PROJECT_REGISTER` is
+the honest disqualifier, and it is distinct from every prior DOT rejection, which failed on
+reachability, staleness or vocabulary.
+
+**Indiana is not a wiring problem. It is a publication gap**, and no amount of probing on our side
+changes that. Recorded so no future session re-runs these five enumerations expecting a different
+answer. → reprobe list, low priority.

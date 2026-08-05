@@ -6458,3 +6458,55 @@ Warren 15 (exhausted) · Butler 15 (exhausted) · Cuyahoga 13 · Franklin 4.
 
 **IN 196 · WI 191 · MD 192**, coverage AND completeness on each close, plus the `DOT_ONLY` stamp
 where it applies.
+
+---
+
+## INDIANA — CLOSED (2026-08-05). **NO WIRE.** 2 / 198 (1.0%), median 1
+
+The lowest-covered state in the country, and it stays that way.
+
+| | IN | national |
+|---|---|---|
+| **COVERAGE** | **2 / 198 = 1.0%** | 5,868 / 12,722 = 46.12% |
+| **COMPLETENESS** median records / lit page | **1** | 62 |
+
+⚠️ **Indiana has ZERO pages lit by an Indiana source.** Its only two lit pages are lit by
+`chicago-building-permits` spilling over the state line — Hammond 46327 (1 record) and Whiting
+46394 (19), both within 3 mi of Chicago. Marion (Indianapolis) 40 pages, Allen (Fort Wayne) 33 —
+all dark. Nine of ten counties at literal zero.
+
+### 🔴 The §0c first move failed on the MERITS, not on reachability — a first
+
+**INDOT publishes a maintenance-defect system, not a project register.** Its org is real and active
+(193 items, 42 services) and consists of `INDOTGenDef_*` — Pothole, Graffiti, DeadTree,
+DamagedGuardrail, Striping, SignalMalfunction, WaterPollution (18 services) — plus reference
+geometry, toll-road ops and field-crew QA layers. **No capital-project, STIP, TIP or construction
+layer exists.**
+
+The one project-shaped trail — a **2017 `STIP Project Viewer`** — was followed to its end via the
+web-map → `operationalLayers` path. Its backing services live on `gis.in.gov` and `gisq.in.gov`,
+**both of which fail DNS**. Indiana's current state server `gisdata.in.gov` (live, ArcGIS 11.5) has
+**no DOT folder**. The data did not move; it stopped being published.
+
+### Rejected with receipts
+
+`INDOT Projects` 3 rows / 2016 / owner `arcgis_svc` · `TIP_Point` 4 rows / **CDM Smith** ·
+`CR Projects` / **HNTB** · Indianapolis `data.indy.gov` 651 datasets whose 31 permit-titled
+candidates are **all historical zoning ORDINANCES with no REST URL** · Fort Wayne nothing ·
+IndianaMap 554 items yielding only Richmond (pop 35k) and Demotte (pop 5k).
+
+⚠️ **Provenance rule reinforced:** a plain `INDOT` search returns 776 items whose four most
+project-shaped hits are owned by **private consultancies and service accounts** — HNTB, CDM Smith,
+`arcgis_svc`. They rank because "INDOT" is in their metadata. **The word in the title is not the
+publisher; check `owner`.**
+
+### 🛑 `candidates_exhausted` + `MUNICIPAL_TIER_REQUIRED` + new: `NO_DOT_PROJECT_REGISTER`
+
+Five enumerations, all empty with non-zero denominators. **Indiana is not a wiring problem, it is a
+publication gap** — the statewide DOT exists, is active, is first-party and is reachable, and does
+not publish the class of record we need. Distinct from every prior DOT rejection, which failed on
+reachability, staleness or vocabulary. → reprobe list, low priority.
+
+### Next
+
+**WI 20 lit / 211 (median 140) · MD 125 / 317 (median 22).**
