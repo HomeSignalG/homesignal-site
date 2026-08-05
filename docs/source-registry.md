@@ -6998,3 +6998,45 @@ geocode failure plus the v20 25-mile geofence nulling out-of-polygon matches.
 already excludes area-scope records, so WA's 336/362 and every other reported figure stand as
 measured. It is a possible *recovery*, logged with its numbers and deliberately not diagnosed
 from the armchair.
+
+### RESOLVED — the Pierce / Butler follow-up (2026-08-05, same day)
+
+**Diagnosed by elimination, not assumption.** The two candidate causes — the `__lat`/`__lng`
+omission, or geocode failure on a geocode-path entry — are separated by one fact: **does the
+layer have geometry?** Both layers were probed directly:
+
+| entry | geometryType | probed geometry | correct county? |
+|---|---|---|---|
+| `pierce-county-pals-permits` | `esriGeometryPoint` | `-122.6018, 47.2417` | ✅ Pierce County WA |
+| `butler-county-ks-permits` | `esriGeometryPoint` | `-96.8284, 37.7662` | ✅ Butler County KS |
+
+`sources/arcgis.ts` sets `returnGeometry=true` unconditionally and flattens every feature into
+`row.__lat`/`row.__lng`. Neither entry mapped them. **Verdict: the config omission (§0n) — a
+one-line registry fix each, NOT a data-quality ceiling.** The partial pinning that made them look
+alive rather than dead came from the **geocode path** on their `address` columns.
+
+**After the fix, deploy and re-cache of all 78 affected ZIPs:**
+
+| entry | before | after |
+|---|---|---|
+| `pierce-county-pals-permits` | 2,255 / 13,033 (17.3%) | **13,003 / 13,033 (99.8%)** |
+| `butler-county-ks-permits` | 158 / 1,194 (13.2%) | **1,201 / 1,201 (100%)** |
+
+**+11,791 records recovered from listed-but-unpinned to pinned.**
+
+### ⚠️ The page-count effect was small, and the reason is worth keeping
+
+**WA 336 → 338 (+2). National 5,851 → 5,856.** All 78 affected ZIPs are lit; 23 of them carry
+Pierce or Butler as their **sole** source — yet nearly all were *already* lit before the fix.
+
+**Because a page counts as lit on ONE point record, and the geocode path was already supplying at
+least one on almost every affected ZIP.** So the coverage metric was never wrong. What was wrong
+was **map rendering density**: those pages showed a handful of pins where the source had dozens to
+hundreds, and a resident looking at the 2D/satellite/focus views saw a fraction of the real
+development around them.
+
+**This is the inverse of §0m and belongs beside it.** §0m catches "records landed, pages didn't
+move". This is "pages moved barely, and the fix still mattered enormously." **Page count is a
+coverage metric, not a completeness metric — it saturates at one record. Neither number alone
+describes a source; check both, and check point-scope share per source when the question is what
+a resident actually sees.**
