@@ -5827,3 +5827,67 @@ DISTRIBUTION alongside the violation count**, which is what surfaced this. Same 
 registry-only autonomy grant — flagged, not made.** Fixing it would convert Lake's 77 area records
 into pinned point records and populate the rail; the expected shape is a mean of each feature's
 `points` array, exactly as `rings` already degrades to a mean vertex.
+
+## ✅ MULTIPOINT GEOMETRY FIX — `lake-county-il-construction-program` now pins (2026-08-05)
+
+**The defect.** `featurePoint()` in `sources/arcgis.ts` resolved a pin from point geometry,
+the server's `centroid`, polygon `rings` and polyline `paths` — but **not
+`esriGeometryMultipoint`**. A multipoint layer therefore produced records with **no
+coordinates**, which fall through to `scope: "area"`, anchor at the report centroid, and are
+**dropped by the point-scope-only `app_projects` materializer**.
+
+Found live the day Illinois closed: Lake had **77 records across 27 ZIPs in
+`development_reports` and ZERO in `app_projects`**, while the polyline (Cook) and polygon
+(Champaign) entries wired the same day materialized normally. Nothing was fabricated and the
+records still rendered in the list — but **27 Lake pages served dated records with no pins**.
+
+**The fix.** One branch, last in the chain: the **mean of the feature's `points` vertices** —
+the same degradation the polygon branch already uses when a ring encloses zero area. A
+multipoint feature has no interior and no length, so there is no centroid or midpoint to
+derive; the mean IS the honest representative point. An empty `points` array still yields
+`null` — never a fabricated pin. Because the branch sits after `x/y`, `centroid`, `rings` and
+`paths`, **no existing source can change behavior** (asserted by branch-order unit tests).
+
+**PRE-DEPLOY AUDIT — Lake was the ONLY multipoint entry.** Scope distribution by
+`source_registry_id` cache-wide: Lake 0 point / 77 area (100%). The other high-area entries
+were probed live and all return `geometryType: esriGeometryPoint` —
+`butler-county-ks-permits` (86.8% area), `pierce-county-pals-permits` (82.7%),
+`clark-county-active-dev-permits` (25.1%); their registry entries carry no lat/lng columns, so
+they **geocode**, and their area records are geocode failures. A different cause, correctly
+labelled. **Nothing had been degrading silently elsewhere.**
+
+**Verified post-deploy** (deploy run 30965128296, `6bfa082b`, green 01:01:49Z; all 31 Lake rows
+`refreshed_at` 01:04Z, i.e. after the deploy — the §0 ordering trap avoided):
+
+| measure | before | after |
+|---|---|---|
+| Lake records checked | 77 | **80** |
+| `scope: "point"` | 0 | **80** |
+| `scope: "area"` | 77 | **0** |
+| pinned at report centroid | 77 | **0 of 80** |
+| pinned at own point | 0 | **80 of 80** |
+| missing coordinates | — | **0 of 80** |
+| missing `record_url` | — | **0 of 80** |
+| `app_projects` rows | **0** | **80 across 28 ZIPs** |
+
+The **centroid-vs-own-point control is what proves it is a real fix and not a relabel**: under
+the old code every record carried its report's `home_lat`/`home_lng`. Now 0 of 80 equal the
+report centroid, and the pins span lat 42.1638–42.4940 / lng −88.1704 to −87.8273 — which is
+Lake County IL (Waukegan, Gurnee, Barrington). Counting "records with a non-null lat" would
+have passed **both before and after** and proven nothing.
+
+### ⚠️ STANDING ANSWER — the `pg_net` worker can STALL, and a stall is indistinguishable from a dead host
+
+Mid-session the queue held at **256 requests with `min_id` frozen at 9817** across two
+observation windows; `max(id)` in `net._http_response` was 9816, so **nothing was being
+collected at all**. Every probe fired in that window would have read as "no response" — i.e.
+as an unreachable host — and any `EDGE_EGRESS_BLOCKED` / `UNREACHABLE` verdict recorded from
+it would have been fabricated from an instrument failure.
+
+- **The signal is `min(id)` in `net.http_request_queue` not moving**, not the queue depth (a
+  deep queue that is draining is healthy — 50 engine calls at a 90 s timeout legitimately
+  take minutes).
+- **The remedy is `select net.worker_restart();`** — it took the queue 256 → 56 within 60 s.
+- **Always pair a queue read with the control** `select max(id) from net._http_response` before
+  concluding a host is unreachable. A missing response id is not a host verdict.
+
