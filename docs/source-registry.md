@@ -7149,3 +7149,40 @@ stopped updating in 2021.
 UDOT sit at 1–3 records each. Even a modest Utah municipal source would raise the *median* far more
 than it would raise the *page count* — which is exactly the distinction §0q exists to surface, and
 the reverse of the Pierce case.
+
+### DAYTON REPROBE #2 — 2026-08-05: THE BLOCK HAS NOT LIFTED. Reverted again.
+
+Re-wired, deployed and tested per the OHIO closure record's named reprobe. **Negative result,
+recorded with its receipt so the next session does not re-run it blind.**
+
+**Host still live and unchanged from `pg_net`:** 264 rows, HTTP 200, same count as the original
+recon. **Still irrelevant to the question** — and that is the point of the standing answer.
+
+**Deploy-verification probe, ZIP 45309 (Montgomery), through the deployed engine:**
+
+```
+arcgis_reports[0] = {
+  registry_id: "dayton-oh-capital-improvement-projects",
+  fetched: 0, emitted: 0,
+  quarantined: [{ reason: "fetch failed: error sending request for url (…):
+                  client error (Connect): Connection reset by peer (os error 104)" }]
+}
+counts.development = 0
+```
+
+**Byte-identical failure mode to 2026-08-04: a TCP reset at Connect, before HTTP.** Not a WAF 403,
+not DNS, not query shape — the connector's own emitted URL, rejected at the socket. The source-IP
+block on Supabase edge egress is unchanged after one day.
+
+**⚠️ The instrument is the finding, again.** `counts.development: 0` on this page is
+indistinguishable from a legitimately empty rural ZIP. Only `arcgis_reports[].quarantined[].reason`
+separates *"could not connect"* from *"fetched and found nothing"*. Had the check been
+`counts`-only, this would have been recorded as "Dayton wired, 0 records, thin county" — a wire
+that produces nothing, reported as coverage.
+
+**Status: reverted again (registry 148 → 147). Dayton REMAINS on the reprobe list**, config proven
+and parked in #594 / this document — a one-object re-add if the block ever lifts. **Re-test cadence:
+not worth re-running more often than monthly**; the block has now held across two tests a day apart,
+and nothing on our side can influence it. The proposed edge-reachability preflight (a cheap
+engine-side probe of a candidate host *before* wiring) would have turned both of these deploy cycles
+into one probe — still proposed, still not built, and this is the second time it would have paid.

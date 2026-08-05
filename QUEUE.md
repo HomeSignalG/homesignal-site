@@ -6410,3 +6410,51 @@ states are **correctly closed — nothing to redo** — but a future session sho
 ⚠️ The first version of this query reported **CT at 244% DOT-only** — impossible on its face,
 which is the only reason it was caught before publication. Recorded in §0s: *any share that can
 exceed its own denominator is a query to re-derive, not a finding.*
+
+---
+
+## OHIO — RE-CONFIRMED CLOSED (2026-08-05). 136 / 335 (40.6%), median 186
+
+**No new wire. OH was already closed on enumeration in an earlier pass and remains so** — every
+county wired, partially wired, blocked or exhausted. This pass ran its one named open item.
+
+| | OH | national |
+|---|---|---|
+| **COVERAGE** | **136 / 335 = 40.6%** | 5,868 / 12,722 = 46.12% |
+| **COMPLETENESS** median records / lit page | **186** | 62 |
+| DOT-only share | **0%** | — |
+
+**OH is the opposite shape to Utah: narrow and deep.** Its lit pages carry a median of 186 records
+(Cuyahoga 2,171, Franklin 275, Delaware 79, Hamilton 78) because it is carried entirely by city
+permit ledgers — Cleveland, Columbus, Cincinnati — with no DOT wire at all. Utah is 35% coverage at
+median 3; Ohio is 41% coverage at median 186. **Coverage alone reads them as near-equivalent.**
+
+### The one open item, tested and closed negative
+
+**Dayton / Montgomery — 39 pages, OH's largest fully-dark county.** Re-wired, deployed, probed,
+reverted. The edge-egress block has **not** lifted: the deploy-verification probe on 45309 returned
+`fetched: 0, emitted: 0` with `client error (Connect): Connection reset by peer (os error 104)` —
+byte-identical to 2026-08-04. Host still serves 264 rows at HTTP 200 to `pg_net`, which remains
+irrelevant to the question.
+
+⚠️ **`counts.development: 0` on that page is indistinguishable from a legitimately empty rural
+ZIP.** Only `arcgis_reports[].quarantined[].reason` separates "could not connect" from "fetched and
+found nothing". A `counts`-only check would have recorded *"Dayton wired, 0 records, thin county"* —
+a wire producing nothing, reported as coverage.
+
+**Dayton stays on the reprobe list** (config proven, parked in #594 and the source registry — a
+one-object re-add). **Re-test no more often than monthly**: the block has held across two tests a
+day apart and nothing on our side influences it. The proposed **edge-reachability preflight** would
+have collapsed both deploy cycles into one probe — still proposed, still not built, and this is the
+second time it would have paid.
+
+### Remaining OH dark, all previously closed on enumeration
+
+Montgomery 39 (blocked) · Lucas 30 (`NO_TEMPORAL_FIELD`) · Summit 27 (partially wired — county
+reviews unincorporated townships only) · Hamilton 22 · Medina 19 (exhausted) · Delaware 15 ·
+Warren 15 (exhausted) · Butler 15 (exhausted) · Cuyahoga 13 · Franklin 4.
+
+### Next under §0k
+
+**IN 196 · WI 191 · MD 192**, coverage AND completeness on each close, plus the `DOT_ONLY` stamp
+where it applies.
