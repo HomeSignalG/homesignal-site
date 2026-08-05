@@ -5985,3 +5985,19 @@ coordinates · 0/4,679 unclassified · 0/4,679 undated.** Pins span lat 41.732�
 against a non-zero class of 4,679 records actually emitted across 228 MI pages. (Had the entry
 emitted nothing, this same zero would have read identically — which is the trap §0a exists for.)
 
+
+### ⚠️ DO NOT CANCEL A CHECK THAT ONLY *LOOKS* HUNG (learned the hard way, 2026-08-05)
+
+The GitHub check state for this repo lagged reality by **tens of minutes** during this session,
+on BOTH `pull_request_read(get_check_runs)` and `list_workflow_jobs`. A `unit` job that had in
+fact finished **success in 2:18** kept reporting `in_progress`, and the merge API — which reads
+the same state — kept returning `405 … "unit" is in progress`.
+
+**Cancelling makes it strictly worse.** Branch protection then blocks on
+`… "unit" is cancelled`, which no amount of waiting clears, and `rerun_workflow_run` does not
+reliably replace that terminal state. **The recovery is a new commit on the branch**, which
+mints fresh check runs.
+
+**The rule:** `unit-tests.yml` sets `timeout-minutes: 15`, so a genuinely hung job cannot exceed
+15 minutes. Anything still reading "in progress" past that is the API lying — **wait, or push a
+new commit; never cancel.**
