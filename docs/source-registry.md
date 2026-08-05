@@ -6345,7 +6345,7 @@ if it grows). It is a scoped finding that the remainder is a **project, not a pa
 
 ---
 
-## CALIFORNIA PASS (2026-08-05) — 386 dark, two county wires, seven counties `MUNICIPAL_TIER_REQUIRED`
+## CALIFORNIA PASS (2026-08-05) — 386 dark, ONE county wire live, one reverted, seven counties `MUNICIPAL_TIER_REQUIRED`
 
 **Baseline measured before any probe:** CA has **523 modelled ZIP pages, 137 lit, 386 dark**,
 across exactly ten modelled counties. Registry grep first per §0c/§0j: four CA entries existed,
@@ -6425,7 +6425,7 @@ not wired). **50,969 rows**, `esriGeometryPoint`.
   13-decimal-place coordinate. Probed rather than assumed — a ~40 m box around that point holds
   **8 of 50,969** records, i.e. a real parcel with eight cases, not a geocoder dump point.
 
-### WIRED — `san-diego-county-discretionary-permits` (53 dark pages)
+### REVERTED — `san-diego-county-discretionary-permits`: wired, deployed, measured, un-wired (53 dark pages)
 
 `gis-public.sandiegocounty.gov` → `PDS/PDS_Layers/MapServer/20` "Discretionary Permits",
 **50,306 rows**, `esriGeometryPoint`, found by enumerating 25 folders → a 122-layer roster.
@@ -6454,6 +6454,56 @@ Layer 19 "Project Review" is a **group layer** (`geometryType` null, `fields` nu
 - The 53 dark SD pages are the unincorporated and North County ZIPs — Fallbrook 92028, Ramona
   92065, Alpine 91901, Valley Center 92082, Julian 92036, Borrego Springs 92004 — exactly where
   county discretionary permits land, while the 62 lit ones are the City of San Diego CSV's.
+
+⚠️ **IT DOES NOT WORK THROUGH THE ENGINE, AND THE ENTRY WAS REMOVED THE SAME DAY.** Everything
+above was verified from pg_net and is correct about the *layer*. It says nothing about whether the
+*deployed engine* can fetch it — and it cannot.
+
+**Measured after deploy (get-address-report v171), 20 attempts, 20 failures:**
+
+| instrument | result |
+|---|---|
+| 19 dark SD ZIPs, batch re-cache | **19/19** `arcgis_reports` → `fetched: 0, emitted: 0, quarantined: "fetch failed: Signal timed out."` |
+| 92028 alone, queue empty, no concurrent load | **same** — `fetched: 0`, `"Signal timed out."`, `counts.development: 0` while `counts.facilities: 30` |
+| the byte-identical connector query from pg_net | **HTTP 200 in under a second, 59.5 KB** (with `extra_where`) and 70.9 KB (without) |
+
+The gate **failed closed exactly as designed** — 0 emitted, a named quarantine reason, and not one
+fabricated record on any page. The 53 pages stayed dark rather than going live with nothing behind
+them, which is the whole point of the anti-fabrication contract.
+
+⚠️ **THE CAUSE IS UNDETERMINED, AND I AM NOT ASSERTING THE ONE I FIRST BELIEVED.** The connector
+sends a fixed `User-Agent` (`sources/arcgis.ts:742`), so the obvious hypothesis was a WAF rule on
+the request signature. A three-way control on ONE URL in ONE window looked like it confirmed that:
+
+| headers | result |
+|---|---|
+| `Accept: application/json` only | **200, 70,855 bytes** |
+| + the connector's exact `User-Agent` | **timed out, 0 bytes — reproduced twice** |
+| + `User-Agent: Mozilla/5.0` | **HTTP 400, 339 bytes** |
+
+**That control is not admissible, because the instrument is disqualified.** Earlier the same day,
+`services3.arcgis.com` — Esri's own hosted service, which certainly serves User-Agent-bearing
+browsers all day — returned **HTTP 400 `Bad Request - Invalid Header. The request has an invalid
+header name.`** to a pg_net request carrying a custom `User-Agent`, and **200** to the byte-identical
+request without one. Two unrelated hosts rejecting header-bearing pg_net requests is far better
+explained by pg_net's header serialisation than by two coincidental WAF rules.
+
+**New standing answer: pg_net custom headers are NOT a valid instrument for testing what a host
+does with a header.** Probe bare; if a header-bearing probe fails, suspect the instrument first.
+A test whose failure mode is indistinguishable from the thing it is testing proves nothing —
+the §0a shape, one level up.
+
+**What IS established, on a clean instrument:** the layer is live and fast from Postgres egress,
+and the deployed engine times out on it in 20 of 20 attempts including one with an idle queue.
+Whether that is edge-egress blocking (the Tampa / El Paso class) or a request-signature rule
+cannot be separated from the sandbox, because the only egress available here is the one just
+disqualified.
+
+**Disposition: `EDGE_EGRESS_BLOCKED`, entry reverted, added to the reprobe list.** Leaving it wired
+would have cost every one of San Diego County's 115 pages a 30-second timeout on every refresh in
+exchange for nothing. The 50,306-record layer and its exact vocabularies stay documented above so a
+future session with a working instrument — a GitHub-runner probe, which has neither pg_net's header
+handling nor the edge runtime's egress — can settle the cause in one run and re-wire in one commit.
 
 ### Window choice — the rule applied uniformly, on measured pages not projections
 
