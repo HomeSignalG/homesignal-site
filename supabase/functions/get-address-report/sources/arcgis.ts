@@ -562,6 +562,30 @@ export function featurePoint(f: ArcgisFeature): { lng: number; lat: number } | n
     return finite2(last?.[0], last?.[1]);
   }
 
+  // MULTIPOINT (esriGeometryMultipoint) — a bare `points` array of [x, y] vertices.
+  // Mean of the vertices, exactly as the polygon branch above degrades to a mean vertex
+  // when a ring encloses zero area. A multipoint feature has no interior and no length,
+  // so there is no centroid or midpoint to derive; the mean IS the honest representative
+  // point, and it is what every consumer of this function wants (one pin per feature).
+  //
+  // WHY THIS BRANCH EXISTS. Without it a multipoint layer produced NO coordinate, so every
+  // record fell through to `scope: "area"`, was anchored at the report centroid, and was
+  // dropped by the point-scope-only `app_projects` materializer. Found live 2026-08-05 on
+  // lake-county-il-construction-program: 77 records across 27 ZIPs in development_reports
+  // and ZERO in app_projects, while the polyline (Cook) and polygon (Champaign) entries
+  // wired the same day materialized normally. Nothing was fabricated and the records still
+  // rendered — but 27 Lake pages served dated records with no pins.
+  const points = g?.points;
+  if (Array.isArray(points) && points.length) {
+    let sx = 0, sy = 0, n = 0;
+    for (const p of points) {
+      if (!finite2(p?.[0], p?.[1])) continue;
+      sx += p[0]; sy += p[1]; n++;
+    }
+    if (n > 0) return finite2(sx / n, sy / n);
+    return null;
+  }
+
   return null;
 }
 

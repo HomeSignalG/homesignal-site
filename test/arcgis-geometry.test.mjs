@@ -150,6 +150,46 @@ ok(featurePoint({ geometry: { paths: [] } }) === null, 'an empty paths array yie
 ok(featurePoint({ geometry: { paths: [[[1, 1]]] } }) === null,
   'a single-vertex path is not a line — no coordinates rather than a guess');
 
+// ── 5b. MULTIPOINT geometry (esriGeometryMultipoint) — a bare `points` array ────
+// WHY THIS SECTION EXISTS. featurePoint handled x/y, the server centroid, polygon `rings`
+// and polyline `paths` — and nothing else. A multipoint layer therefore produced NO
+// coordinate at all, so every record fell through to scope "area", was anchored at the
+// report centroid, and was dropped by the point-scope-only app_projects materializer.
+// Found live 2026-08-05 on lake-county-il-construction-program (Lake County IL Division of
+// Transportation, layer 0 esriGeometryMultipoint): 77 records across 27 ZIPs present in
+// development_reports and ZERO in app_projects, while the polyline (Cook) and polygon
+// (Champaign) entries wired the same day materialized normally. 27 live pages served
+// dated records with no pins. Verified before the fix that Lake was the ONLY multipoint
+// entry — Pierce, Butler and Clark are all esriGeometryPoint and their area-scope records
+// are geocode failures, a different and correctly-labelled cause.
+ok(JSON.stringify(featurePoint({ geometry: { points: [[-88, 42.3]] } })) === JSON.stringify({ lng: -88, lat: 42.3 }),
+  'a single-vertex multipoint yields that vertex');
+ok(JSON.stringify(featurePoint({ geometry: { points: [[-88, 42], [-86, 44]] } })) === JSON.stringify({ lng: -87, lat: 43 }),
+  'multipoint yields the MEAN of its vertices (the same degradation the polygon branch uses)');
+ok(JSON.stringify(featurePoint({ geometry: { points: [[0, 0], [2, 0], [0, 2], [2, 2]] } })) === JSON.stringify({ lng: 1, lat: 1 }),
+  'four symmetric vertices yield their centre');
+ok(JSON.stringify(featurePoint({ geometry: { points: [[-88, 42], ['x', 'y'], [-86, 44]] } })) === JSON.stringify({ lng: -87, lat: 43 }),
+  'a non-numeric vertex is skipped rather than poisoning the mean');
+ok(featurePoint({ geometry: { points: [] } }) === null,
+  'an EMPTY points array yields no coordinates — never a fabricated pin');
+ok(featurePoint({ geometry: { points: [['a', 'b']] } }) === null,
+  'a multipoint whose every vertex is unusable yields no coordinates');
+ok(JSON.stringify(featurePoint({ geometry: { x: 1, y: 2, points: [[9, 9]] } })) === JSON.stringify({ lng: 1, lat: 2 }),
+  'point geometry still OUTRANKS a points array — existing point sources cannot change behavior');
+ok(JSON.stringify(featurePoint({ geometry: { points: [[9, 9]] }, centroid: { x: 5, y: 6 } })) === JSON.stringify({ lng: 5, lat: 6 }),
+  'a server centroid still OUTRANKS a points array');
+ok(JSON.stringify(featurePoint({ geometry: { rings: [[[0, 0], [4, 0], [4, 4], [0, 4], [0, 0]]], points: [[99, 99]] } })) === JSON.stringify({ lng: 2, lat: 2 }),
+  'polygon rings still OUTRANK a points array — branch order is unchanged');
+
+// The real shape the connector receives, captured from the live Lake County service.
+const LAKE_MULTIPOINT = { geometry: { points: [[-87.9584, 42.3391]] }, attributes: { Route: 'CH A22', Status: 'Active' } };
+const lakePin = featurePoint(LAKE_MULTIPOINT);
+ok(lakePin !== null, 'the REAL Lake County multipoint feature now yields a pin (it yielded null before)');
+ok(lakePin && Math.abs(lakePin.lat - 42.3391) < 1e-9 && Math.abs(lakePin.lng - -87.9584) < 1e-9,
+  'the Lake County pin lands on the feature\'s own vertex, not a synthesized point');
+ok(lakePin && lakePin.lat > 42.1 && lakePin.lat < 42.6 && lakePin.lng < -87.7 && lakePin.lng > -88.3,
+  'the Lake County pin falls inside Lake County IL, not another state');
+
 // ── 6. The query string: returnCentroid is opt-in and never leaks to other entries ──
 const src = readFileSync(SRC, 'utf8');
 ok(/if \(entry\.return_centroid\) url\.searchParams\.set\("returnCentroid", "true"\);/.test(src),
