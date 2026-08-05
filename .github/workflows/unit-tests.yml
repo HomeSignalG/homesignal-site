@@ -48,17 +48,30 @@ permissions:
   contents: read
 
 jobs:
+  # ── THE REQUIRED CHECK ────────────────────────────────────────────────────────
+  # Named `unit` because that is the string branch protection requires; renaming it
+  # would silently un-gate the repo. What changed on 2026-08-05 is its CONTENT: it
+  # now runs the offline suite only — no playwright install, no browser download,
+  # no network-backed tests. Measured: 79 of 86 suites in ~6 s locally, against
+  # ~2.5 min for the full job whose install step alone is ~25 s.
+  #
+  # Why this split exists: the merge gate, not the work, had become the binding
+  # constraint. Across five consecutive PRs the `unit` check reported in_progress
+  # to both the jobs API and the merge endpoint for 60-120 minutes after the job
+  # had actually finished — one measured run completed success in 2:18 and still
+  # blocked the merge for ~20 minutes. A job that finishes in seconds gives that
+  # stale-state window far less to hold open.
+  #
+  # What this is NOT: it is not "drop the browser tests". They still run, on the
+  # same commit, in the `browser` job below, and they still go red when they fail.
+  # Dropping them from CI entirely — or keeping them in a job with no playwright,
+  # where they take their silent skip path — is the vacuous-test failure this repo
+  # already fixed once. A test that does not run is worse than a test that fails.
   unit:
     runs-on: ubuntu-latest
-    # The suite runs in ~2.5 min in CI (75 offline files; 33 s locally). Without a bound, a
-    # hung step inherits GitHub's 6-HOUR default — the same unbounded-runner-time class as the
-    # verify-geocodes leak, on a repo whose account was previously halted at $0.
-    # 15 minutes is ~6x the measured maximum and still fails fast, turning a hang into a red
-    # check instead of a silent bill.
-    # (An earlier version of this comment cited three hung runs as the trigger. That was a
-    # misreading of elapsed time on my part — those runs took 2.3, 1.8 and 2.4 minutes. The
-    # bound is justified by the missing-timeout audit, not by an incident.)
-    timeout-minutes: 15
+    # ~6 s measured. 10 minutes is ~100x that and still turns a hang into a red
+    # check rather than a silent bill on an account previously halted at $0.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -68,9 +81,32 @@ jobs:
           # than a copy of it. Node strips types on import from 22.18; on 20 that test
           # fails loudly rather than skipping, so the whole suite needs 22.
           node-version: '22'
-      # The Video Producer / dashboard suites drive a real browser. Without
-      # playwright on the runner they take their "playwright not installed"
-      # skip path, so every runtime assertion silently passed without running.
+      # --min-files is a FLOOR, not an exact count. The risk is a suite that shrinks
+      # — a rename, a deleted file, a glob that stops matching — passing as green
+      # because zero failures is indistinguishable from zero tests. Growth is normal
+      # and must never require a workflow edit, so the gate is a minimum and the
+      # runner prints the actual count next to it on every run.
+      - name: Run the offline regression suite (the gate)
+        run: node scripts/run-unit-tests.mjs --offline --min-files=75
+
+  # ── REPORTED, NOT REQUIRED ────────────────────────────────────────────────────
+  # The browser-backed suites, on the same commit, in parallel with `unit` (no
+  # `needs:`, so a slow browser job never delays the gate). This job is absent from
+  # the branch-protection list, so it reports without blocking — but it is a normal
+  # job with no continue-on-error, so a failure shows as a RED CHECK on the PR.
+  # A non-required check that silently swallows failures would be the same problem
+  # in a different place.
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # The Video Producer / dashboard / map-raster suites drive a real browser.
+      # Without playwright on the runner they take their "playwright not installed"
+      # skip path, so every runtime assertion silently passes without running.
       # Installed into a scratch directory outside the repo so the no-bundler,
       # no-package.json rule for the site itself still holds.
       - name: Install playwright (browser-backed regression suites)
@@ -84,5 +120,8 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Verify playwright is actually available to the suites
         run: node -e "import('playwright').then(()=>console.log('playwright resolves')).catch(e=>{console.error('playwright MISSING — browser assertions would silently skip');process.exit(1)})"
-      - name: Run all unit regression tests
-        run: node scripts/run-unit-tests.mjs
+      # The FULL suite, not just the browser slice: this job is the one that proves
+      # the whole 86 still pass together, and it is cheap to run the offline files
+      # again beside the 7 that need a browser.
+      - name: Run the full regression suite (browser included)
+        run: node scripts/run-unit-tests.mjs --min-files=80
