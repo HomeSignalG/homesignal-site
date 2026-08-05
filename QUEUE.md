@@ -6001,3 +6001,64 @@ mints fresh check runs.
 **The rule:** `unit-tests.yml` sets `timeout-minutes: 15`, so a genuinely hung job cannot exceed
 15 minutes. Anything still reading "in progress" past that is the API lying — **wait, or push a
 new commit; never cancel.**
+
+## ELEVEN ZERO-COVERAGE STATES — 4 WIRED AND LIVE, 6 REJECTED, RI OPEN (2026-08-05)
+
+**Metric reminder (§0e): the headline is `app_projects` where `record_kind='development'`.**
+
+| metric | session start | measured |
+|---|---|---|
+| headline — `app_projects` `record_kind='development'` | 4,937 | **5,054** |
+| cache — `development_reports` with `source_registry_id` | 4,973 | 5,090 |
+| **materialization lag** | 36 | **36** (steady at every reading) |
+
+### Wired, deployed, engine-verified, filling
+
+| state | pages | before | measured | source |
+|---|---|---|---|---|
+| NJ | 359 | 0 | **35** | `nj-stip-projects` |
+| VT | 212 | 0 | **33** | `vtrans-project-locations` |
+| ME | 273 | 0 | **30** | `maine-dot-public-projects` |
+| IA | 225 | 0 | **19** | `iowa-dot-bid-projects` |
+| **total** | **1,069** | **0** | **117** | |
+
+**~950 pages remain to fill and need NO intervention** — the round-robin re-caches every ZIP on
+its own schedule. The figure above is a floor taken mid-fill, not the end state.
+
+**New-host verification (the §0 requirement, done for ALL FOUR, not just the first)** — read from
+`arcgis_reports` on the first post-deploy re-cache: NJ 16 fetched/16 emitted · ME 6/6 · IA 5/5 ·
+VT 4/4, **0 quarantined on all four**. Both STATE-HOSTED sources (`gis.maine.gov`,
+`maps.vtrans.vermont.gov`) reach the Deno edge runtime — the Dayton-class gamble paid off twice.
+Stored invariants: **31 of 31 `scope:"point"`, 0 missing `record_url`, 0 missing coordinates,
+0 unclassified, 0 undated.** Maine's records are point-scoped, i.e. the multipoint fix working in
+production on a SECOND source.
+
+### Rejected with receipts (6 states, 1,009 pages)
+
+AK `NO_TEMPORAL_FIELD` (2,282 points and a real `Status`, but **zero date-typed fields**) ·
+WV `candidates_exhausted` (`owner:WVDOT_Publisher` enumerated: 64 items, 0 project services) ·
+NH / OK / ND / HI no first-party source (searches returned real non-empty result sets with zero
+permit or project services — negatives with stated, non-zero denominators).
+
+### Still open
+
+**RI (81 pages)** — first-party (`risegis.ri.gov`, RI DOA administers the STIP) but the STIP is
+**split across 15 program-specific layers** (Bridge / Pavement / Drainage / Traffic Safety / TAP /
+Transit, each × points and lines) rather than one union, and the host needs a **90 s timeout**
+(it times out at 30 s). That is several registry entries with a subset-identity proof per pair —
+a design decision, not a mechanical repeat. **Then NY non-Suffolk.**
+
+### The window finding that changed all four entries
+
+**The 1825-day default is WRONG for STIP-class sources** and is omitted from all four. Measured:
+
+| source | rows | 1825-day window | require-a-date |
+|---|---|---|---|
+| NJ `PROJ_RECD` | 264 | **28 (−89%)** | **246 (93%)** |
+| IA `CONTRACT_AWARDED` | 362 | 128 (−65%) | **322 (89%)** |
+| ME `conbegin_forecast` | 1,109 | 501 | **501 (45%)** |
+| VT `ExpectedConstructionStart` | 1,037 | 344 | **337 (33%)** |
+
+A backward window would discard 89% of New Jersey's CURRENT FY2024-2033 program because
+`PROJ_RECD` is a receipt date. **ME publishes 45% of its layer and VT 33%** — stated ceilings,
+not implied coverage.
