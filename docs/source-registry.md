@@ -6587,10 +6587,18 @@ CTDOT's own hosted AGO layer, `CTDOT_Project_Work_Areas` layer 0. **2,311 rows**
   NJ / ME / IA / VT. No `recency_days`.
 - **Date field chosen on measured population:** `CurrentADVdate` 2,155/2,311 beats
   `EstConstrCompletionDate` 1,421/2,311.
-- ⚠️ **Stated ceiling:** **5** of the 2,155 dated rows carry an absurd future `CurrentADVdate`
-  (> 2035; the maximum is in the year **2222**) — a publisher data-entry artefact. They are kept
-  rather than silently dropped: the record is real, only its date is wrong, and a backward window
-  would have kept them anyway. **156** rows carry no ADV date at all and are dropped by `extra_where`.
+- ⚠️ **Sentinel dates are dropped at source — and finding them corrects my own measurement.**
+  The first wire checked only `max(CurrentADVdate)`, reported "5 absurd future rows" (> 2035, the
+  maximum in the year **2222**), and kept them. Measuring the **other end** after go-live found a
+  second sentinel the max could never reveal: **26 rows dated exactly 1900-01-01**. Both ends now
+  bound `extra_where`, and the three counts reconcile exactly — **26 below 1990 + 5 above 2035 +
+  2,124 kept = 2,155** dated rows. A false date on a page that makes factual claims about real
+  projects is worse than a dropped record, so the 31 are excluded rather than published with a
+  filing date that reads as fabricated. **156** rows carry no ADV date at all and were already
+  dropped.
+  **Standing answer: measure BOTH ends of a date field.** A max proves freshness; a min catches
+  sentinels; neither substitutes for the other. The go-live measurement is what caught it —
+  `min(submitted_at)` over the materialized rows came back **1900-01-01**.
 - **Page yield measured directly, not projected** — a 3-mile envelope around one DARK ZIP centroid
   per uncovered county:
 
