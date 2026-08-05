@@ -1760,3 +1760,52 @@ A recurring shape, seen enough times to be a prior rather than a surprise:
 partially covered while every suburban page is dark. **Always grep the registry for the state
 first** (now the standard opening move) and read the entries' SCOPE, not just their presence: a
 state with entries is not a state with coverage.
+
+## §0k — STANDING DECISION POLICY (founder, 2026-08-05)
+
+**This REPLACES asking the founder for the judgment calls below. Apply it, record the decision in
+the receipts, and move on — do not report the decision itself.**
+
+### Wire / reject floor
+
+- A candidate that passes the three-part liveness test and would light **≥ 5 pages: WIRE IT.**
+- **< 5 pages: reject as `SUB_THRESHOLD`** — *unless it is the only source in a state at zero, in
+  which case wire it.* **The first page in a state is worth more than the fifth in a covered one.**
+- **Any of the seven disqualifiers: reject with receipts and move on. Never wire for the count.**
+
+### When to stop searching a geography
+
+**Stop after THREE enumerated layers come back empty with non-zero denominators** — statewide,
+then regional/MPO, then county or city as applicable.
+
+**Three empty enumerations is a finding, not a gap in effort.** Record it as **"publishes at a tier
+we do not reach"** together with the item counts, and move to the next target. **Do not run a
+fourth layer hoping.**
+
+*(New York is the worked case: statewide 3 rejections → MPO 1 sub-threshold layer → county 713
+items / 0 dev services. Three layers, all enumerated, all empty.)*
+
+### When to declare a state out of scope
+
+**Declare `MUNICIPAL_TIER_REQUIRED` and stop, without asking**, when the remaining dark pages need
+**more than ~5 separate wires** to close **and** each wire lights **< 20 pages**.
+
+**Precedents: Suffolk NY (10 towns) and Lancaster PA.**
+
+Record the **estimated wire count** and the **per-wire yield** so the decision is auditable, then
+move to the next state. **This is not abandonment — it is a scoped finding that the work is a
+project rather than a pass.**
+
+### Window choice
+
+**Measure BOTH require-a-date and the 1825 default before choosing, always.**
+
+For program-class sources — STIP, CIP, capital programmes — see **§0h**: the relevant date is
+often when a project **enters** the programme rather than when it completes, so require-a-date
+usually wins, and NJ is the worked case at **−89%** under a backward window.
+
+> ⚠️ **INCOMPLETE — the founder's instruction was truncated mid-sentence at "For program-class
+> sources".** The clause above is filled from §0h, which the founder had already approved earlier
+> the same day, so the policy is operable as written. **Confirm and replace this block if the
+> intended wording differed.** Flagged rather than silently completed, because inventing the tail
+> of a dictated policy is exactly the kind of guess these rules exist to prevent.
