@@ -1606,3 +1606,202 @@ Measured 2026-08-05 — the worked example:
 This is the **surface-matrix rule landing on the headline metric itself**: the same question
 asked of two surfaces gives two right answers, and naming the surface is part of stating the
 fact.
+
+### ⚠️ ACT ON THE LAG — DO NOT JUST EMIT IT. THRESHOLD: ~100.
+
+**If the lag exceeds ~100, run `select public.app_refresh_batch(1500);` — repeat until it drops.
+Do not wait for the round-robin.**
+
+A lag of N means **N ZIP pages are live in the cache and INVISIBLE TO RESIDENTS** — the map page
+reads `development_reports` and shows them, while the community, development, dashboard and app
+rails read `app_projects` and do not. The headline stays healthy-looking the entire time, which is
+exactly why this needs a threshold and not a vibe.
+
+**Worked case, 2026-08-05 — the instrument paying for itself two days after it was built.** The
+lag sat at exactly **36** across every reading for a whole session, then jumped to **244** when
+the round-robin began filling four newly-wired states faster than `app_refresh` materialized.
+Nothing else in the readout changed; the headline just climbed more slowly than the cache. Two
+`app_refresh_batch(1500)` calls took it **244 → 72 → 32**. Had only the headline been read,
+**244 pages would have been serving residents nothing while the coverage number said otherwise.**
+
+
+## §0f — A POPULATED `net.http_request_queue` DOES NOT MEAN THE REQUESTS WERE NOT SENT
+
+**Measured 2026-08-05, and it inverts the §0-adjacent assumption made earlier the same day.**
+
+Symptom: 24 engine calls fired via `net.http_post`; after 12+ minutes and a `worker_restart()`,
+`net.http_request_queue` still held all 24 and `net._http_response` held **zero** of them.
+
+That reads as "the requests never went out." **It was false.** The Supabase **edge-function logs**
+showed ~22 `POST | 200 | …/get-address-report` at the current deployment version, execution times
+9–33 s, in exactly that window. **The engine received and served the requests. pg_net simply never
+recorded the responses.**
+
+### What this changes
+
+1. **The queue is NOT an outbox you can read as "unsent."** A row sitting in
+   `http_request_queue` may correspond to a request that has already executed successfully
+   upstream. Deleting it does not cancel anything.
+2. ⚠️ **CORRECTION to an action taken earlier in this session.** 50 cron-issued re-cache rows were
+   deleted from `http_request_queue` on the reasoning that they were "stuck and will re-fire."
+   On this evidence they had most likely **already run against the engine**; the deletion removed
+   bookkeeping, not pending work. No durable harm — the round-robin re-caches regardless — but the
+   stated reasoning was wrong and must not be repeated as precedent.
+3. **`dev_refresh_collect()` reads `net._http_response`.** So when response collection fails, the
+   engine does the work, the cache is NOT updated, and a go-live measurement taken at that moment
+   reports **zero lift** for wires that are perfectly correct. **A zero measured during a pg_net
+   response-collection fault is an instrument failure, not a finding** — exactly the §0a shape.
+
+### The instrument that settles it
+
+**`mcp__Supabase__get_logs(service: "edge-function")`.** It is authoritative for "did the engine
+run this?", independent of pg_net entirely, and it reports the deployment `version` so you can also
+confirm you are looking at post-deploy traffic. Use it before concluding that a host is
+unreachable, that a wire produced nothing, or that a queue is wedged.
+
+**Order of diagnosis, cheapest first:** queue depth + `min(id)` moving → `max(id)` in
+`_http_response` as a control → **edge-function logs** → only then a claim about the source.
+
+## §0g — NEVER DELETE FROM `net.http_request_queue`, AND RE-CACHE IN BATCHES OF ~24
+
+### The rule is load-bearing, not tidy — an MCP timeout is the only reason 200 live requests survived
+
+⚠️ **Read this first, because it is the one that nearly destroyed work.** A `DELETE` was issued
+against 240 of this session's own queued rows, on the reasoning that they were stuck. **The
+statement timed out at the MCP layer and did not commit — and 200 of those 240 requests landed
+successfully moments later.** Nothing but a transport timeout stood between a routine-looking
+cleanup and the destruction of a live, in-flight batch.
+
+The same deletion was attempted **twice in one session, wrongly both times**:
+
+- **First** (50 cron rows): reasoning was "stuck, will re-fire." The **edge-function logs showed
+  they had already executed.** The deletion removed bookkeeping, not pending work.
+- **Second** (240 own rows): would have discarded a batch that was 83% successful, mid-flight.
+
+**The queue is not an outbox of unsent work** (see §0f) and **is not yours to prune.** A row
+sitting there may be already-executed, in-flight, or genuinely waiting — and you cannot tell
+which from the queue alone.
+
+**If it looks stuck:** check whether `min(id)` is moving → read `max(id)` in `_http_response` as a
+control → read the **edge-function logs** → then simply wait. **`net.worker_restart()` is the only
+safe intervention.**
+
+### The engine sheds load above roughly 24 concurrent
+
+| batch | result |
+|---|---|
+| **24 ZIPs** (×3 separate batches) | **24/24 × 200** every time, 0 errors |
+| **240 ZIPs** | 143 × 200, 12 × **503**, **85 timeouts** — 60% |
+
+The `503`s are visible in `get_logs(service: "edge-function")` at ~10 s execution, interleaved
+with healthy `200`s at 9–33 s. A large burst does not fail fast and loudly; it produces a slow,
+partial, **silently lossy** fill. **Drive manual re-caches in batches of ~24** and let the
+round-robin carry the tail — it re-caches every ZIP on its own schedule with no intervention.
+
+## §0h — PROGRAM-CLASS SOURCES: REQUIRE-A-DATE USUALLY BEATS A BACKWARD WINDOW
+
+**For program-class sources — STIP, CIP, capital programs, anything that publishes a multi-year
+funded programme — the relevant date is often when a project ENTERS the program, not when it
+completes.** A backward `recency_days` window silently deletes the current programme's own
+backlog.
+
+**Measure BOTH before choosing.** Measured 2026-08-05 across the four state DOT wires:
+
+| source | date field | rows | 1825-day window | require-a-date |
+|---|---|---|---|---|
+| **NJ** | `PROJ_RECD` | 264 | **28 (−89%)** | **246 (93%)** |
+| **IA** | `CONTRACT_AWARDED` | 362 | 128 (−65%) | **322 (89%)** |
+| **ME** | `conbegin_forecast` | 1,109 | 501 | **501 (45%)** |
+| **VT** | `ExpectedConstructionStart` | 1,037 | 344 | **337 (33%)** |
+
+New Jersey is the worked case: `PROJ_RECD` is a **receipt** date, so a 1825-day window would have
+discarded **89% of a programme that runs through FY2033** — the layer is literally
+`Tran_STIP_24_33` with FY_2024…FY_2033 funding columns. The programme is current; only the date
+column looks old. **That is a different finding from STALE and must not be recorded as one.**
+
+**So:** default to `extra_where "<date> IS NOT NULL"` with **no** `recency_days`, and state the
+resulting ceiling in the receipts. Keep a window only where you have measured that it drops
+little (or where the source genuinely accumulates unbounded history). And where the window and
+the IS-NOT-NULL test return the SAME count — as with Maine's 501 — the window is a pure no-op and
+should be omitted rather than left in as decoration.
+
+
+## §0i — WHEN THE STATEWIDE PROBE FAILS, ASK WHO THE STATE DELEGATES TO
+
+§0c's statewide-DOT-first is the right **opening move, not a guarantee**. When it fails, there is
+one more search to run **before** falling back to county-by-county:
+
+**Does the state delegate its programme to MPOs or regional councils?** Metropolitan Planning
+Organizations (NYMTC, CDTC, GBNRTC, SEMCOG, DVRPC, CRTPO, GCLMPO …) and regional planning councils
+publish their own TIP/STIP geometry in many states. **That is a different search than
+county-by-county, and one MPO often covers several counties at once** — so it sits between the two
+in cost and can be worth far more than a single county probe.
+
+**New York is the worked case:** all three statewide candidates failed (see the NEW YORK section
+in `docs/source-registry.md`), and the reason is structural — **NY publishes its STIP through
+MPOs**, not as one statewide layer. The correct next question there is "what does NYMTC / CDTC /
+GBNRTC publish", not "let me re-probe NYSDOT differently".
+
+**Do not keep re-probing the state once it has failed with receipts.** Record the rejection, then
+move to the MPO question, then to counties.
+
+## §0j — THE CITY IS WIRED, THE COUNTY IS THE GAP (expect this shape; grep the registry first)
+
+A recurring shape, seen enough times to be a prior rather than a surprise:
+
+| state | wired | still dark |
+|---|---|---|
+| NY | NYC's five boroughs (DOB), Buffalo (city) | **Erie County**, and every suburban county |
+| IL | Chicago, Naperville | Cook's non-Chicago ZIPs, the collar counties |
+| OH | Cleveland, Columbus, Cincinnati (cities) | Cuyahoga / Franklin / Hamilton outside those cities |
+| MI | Detroit, Ann Arbor, Independence Twp | **Wayne, Washtenaw, Oakland** county-wide |
+
+**Big cities publish permit data; their counties usually do not** — and a state can therefore look
+partially covered while every suburban page is dark. **Always grep the registry for the state
+first** (now the standard opening move) and read the entries' SCOPE, not just their presence: a
+state with entries is not a state with coverage.
+
+## §0k — STANDING DECISION POLICY (founder, 2026-08-05)
+
+**This REPLACES asking the founder for the judgment calls below. Apply it, record the decision in
+the receipts, and move on — do not report the decision itself.**
+
+### Wire / reject floor
+
+- A candidate that passes the three-part liveness test and would light **≥ 5 pages: WIRE IT.**
+- **< 5 pages: reject as `SUB_THRESHOLD`** — *unless it is the only source in a state at zero, in
+  which case wire it.* **The first page in a state is worth more than the fifth in a covered one.**
+- **Any of the seven disqualifiers: reject with receipts and move on. Never wire for the count.**
+
+### When to stop searching a geography
+
+**Stop after THREE enumerated layers come back empty with non-zero denominators** — statewide,
+then regional/MPO, then county or city as applicable.
+
+**Three empty enumerations is a finding, not a gap in effort.** Record it as **"publishes at a tier
+we do not reach"** together with the item counts, and move to the next target. **Do not run a
+fourth layer hoping.**
+
+*(New York is the worked case: statewide 3 rejections → MPO 1 sub-threshold layer → county 713
+items / 0 dev services. Three layers, all enumerated, all empty.)*
+
+### When to declare a state out of scope
+
+**Declare `MUNICIPAL_TIER_REQUIRED` and stop, without asking**, when the remaining dark pages need
+**more than ~5 separate wires** to close **and** each wire lights **< 20 pages**.
+
+**Precedents: Suffolk NY (10 towns) and Lancaster PA.**
+
+Record the **estimated wire count** and the **per-wire yield** so the decision is auditable, then
+move to the next state. **This is not abandonment — it is a scoped finding that the work is a
+project rather than a pass.**
+
+### Window choice
+
+**Measure BOTH require-a-date and the 1825 default before choosing, always.**
+
+**For program-class sources (STIP, CIP, capital programs) the relevant date is usually programme
+ENTRY, so require-a-date normally wins. Record both numbers either way.**
+
+See **§0h** for the worked case: NJ loses **89%** under a backward 1825-day window because
+`PROJ_RECD` is a receipt date on a programme running through FY2033.

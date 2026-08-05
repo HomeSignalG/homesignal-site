@@ -6001,3 +6001,158 @@ mints fresh check runs.
 **The rule:** `unit-tests.yml` sets `timeout-minutes: 15`, so a genuinely hung job cannot exceed
 15 minutes. Anything still reading "in progress" past that is the API lying — **wait, or push a
 new commit; never cancel.**
+
+## ELEVEN ZERO-COVERAGE STATES — 4 WIRED AND LIVE, 6 REJECTED, RI OPEN (2026-08-05)
+
+**Metric reminder (§0e): the headline is `app_projects` where `record_kind='development'`.**
+
+| metric | session start | measured |
+|---|---|---|
+| headline — `app_projects` `record_kind='development'` | 4,937 | **5,054** |
+| cache — `development_reports` with `source_registry_id` | 4,973 | 5,090 |
+| **materialization lag** | 36 | **36** (steady at every reading) |
+
+### Wired, deployed, engine-verified, filling
+
+| state | pages | before | measured | source |
+|---|---|---|---|---|
+| NJ | 359 | 0 | **35** | `nj-stip-projects` |
+| VT | 212 | 0 | **33** | `vtrans-project-locations` |
+| ME | 273 | 0 | **30** | `maine-dot-public-projects` |
+| IA | 225 | 0 | **19** | `iowa-dot-bid-projects` |
+| **total** | **1,069** | **0** | **117** | |
+
+**~950 pages remain to fill and need NO intervention** — the round-robin re-caches every ZIP on
+its own schedule. The figure above is a floor taken mid-fill, not the end state.
+
+**New-host verification (the §0 requirement, done for ALL FOUR, not just the first)** — read from
+`arcgis_reports` on the first post-deploy re-cache: NJ 16 fetched/16 emitted · ME 6/6 · IA 5/5 ·
+VT 4/4, **0 quarantined on all four**. Both STATE-HOSTED sources (`gis.maine.gov`,
+`maps.vtrans.vermont.gov`) reach the Deno edge runtime — the Dayton-class gamble paid off twice.
+Stored invariants: **31 of 31 `scope:"point"`, 0 missing `record_url`, 0 missing coordinates,
+0 unclassified, 0 undated.** Maine's records are point-scoped, i.e. the multipoint fix working in
+production on a SECOND source.
+
+### Rejected with receipts (6 states, 1,009 pages)
+
+AK `NO_TEMPORAL_FIELD` (2,282 points and a real `Status`, but **zero date-typed fields**) ·
+WV `candidates_exhausted` (`owner:WVDOT_Publisher` enumerated: 64 items, 0 project services) ·
+NH / OK / ND / HI no first-party source (searches returned real non-empty result sets with zero
+permit or project services — negatives with stated, non-zero denominators).
+
+### Still open
+
+**RI (81 pages)** — first-party (`risegis.ri.gov`, RI DOA administers the STIP) but the STIP is
+**split across 15 program-specific layers** (Bridge / Pavement / Drainage / Traffic Safety / TAP /
+Transit, each × points and lines) rather than one union, and the host needs a **90 s timeout**
+(it times out at 30 s). That is several registry entries with a subset-identity proof per pair —
+a design decision, not a mechanical repeat. **Then NY non-Suffolk.**
+
+### The window finding that changed all four entries
+
+**The 1825-day default is WRONG for STIP-class sources** and is omitted from all four. Measured:
+
+| source | rows | 1825-day window | require-a-date |
+|---|---|---|---|
+| NJ `PROJ_RECD` | 264 | **28 (−89%)** | **246 (93%)** |
+| IA `CONTRACT_AWARDED` | 362 | 128 (−65%) | **322 (89%)** |
+| ME `conbegin_forecast` | 1,109 | 501 | **501 (45%)** |
+| VT `ExpectedConstructionStart` | 1,037 | 344 | **337 (33%)** |
+
+A backward window would discard 89% of New Jersey's CURRENT FY2024-2033 program because
+`PROJ_RECD` is a receipt date. **ME publishes 45% of its layer and VT 33%** — stated ceilings,
+not implied coverage.
+
+## ✅ ELEVEN-STATE PASS CLOSED (2026-08-05) — 4 wired and live, 7 rejected
+
+**RI resolved as `NO_TEMPORAL_FIELD` — the last item. Every one of the eleven is now wired or
+rejected on enumeration.**
+
+| metric | session start | closed |
+|---|---|---|
+| **headline — `app_projects` `record_kind='development'`** | 4,937 | **5,387** |
+| cache — `development_reports` | 4,973 | 5,419 |
+| lag | 36 | **32** |
+
+**+450 pages on the headline metric this session** (12,722 total → **42.3%**).
+
+### Wired and filling (4 states)
+
+| state | pages | before | now |
+|---|---|---|---|
+| ME | 273 | 0 | **171** |
+| VT | 212 | 0 | **112** |
+| NJ | 359 | 0 | **94** |
+| IA | 225 | 0 | **57** |
+| **total** | **1,069** | **0** | **434** |
+
+Still climbing on the round-robin with no intervention.
+
+### Rejected with receipts (7 states, 1,090 pages)
+
+| state | pages | disqualifier |
+|---|---|---|
+| NH | 247 | no first-party source (`owner:NHDOT` → 0 items) |
+| WV | 212 | `candidates_exhausted` (DOT org enumerated: 64 items, 0 project services) |
+| OK | 197 | no source found |
+| ND | 155 | no first-party source (hits are City of Minot + a consultant) |
+| AK | 101 | **`NO_TEMPORAL_FIELD`** — 2,282 points, real `Status`, **0 date-typed fields** |
+| HI | 97 | no source found |
+| RI | 81 | **`NO_TEMPORAL_FIELD`** — all 15 layers enumerated, **0 date-typed fields** |
+
+⚠️ **`NO_TEMPORAL_FIELD` disqualified TWO states in this pass** (AK, RI), both of which otherwise
+looked wireable — first-party, geolocated, per-record, and in RI's case with a real status column.
+**A programme year (`FY2018`…`FY2027`, `STIP_Year`, `Year2`, `Program_Year`) is not a date.**
+This is now the most common disqualifier after "no source at all".
+
+### ⚠️ THE LAG SIGNAL FIRED — and it worked as designed
+
+Mid-pass the materialization lag went **36 → 244** while the round-robin filled faster than
+`app_refresh` materialized. That is exactly the widening-gap signal §0e says to watch. Fixed with
+two `app_refresh_batch(1500)` calls: **244 → 72 → 32**. **Track the lag, don't just print it** —
+had only the headline been read, 244 live-but-unmaterialized pages would have been invisible.
+
+### Next
+
+**NY non-Suffolk** (531 dark; Suffolk needs ten town wires and is deliberately last).
+
+---
+
+## CALIFORNIA — CLOSED (2026-08-05)
+
+**Baseline: 523 pages, 137 lit, 386 dark, ten modelled counties.**
+
+### Wired (2 county-tier sources, config only)
+
+| entry | county | dark pages targeted | rows | freshness |
+|---|---|---|---|---|
+| `slo-county-planning-permits` | San Luis Obispo | **29** (0 lit before) | 50,969 | `ApplicationDate` max 2026-08-04 |
+| `san-diego-county-discretionary-permits` | San Diego | **53** | 50,306 | `PER_OPEN_DATE` max 2026-07-24 |
+
+Both vocabularies sum **exactly** to their layer counts (SLO `CaseType` 93 values → 50,969, proven
+on both groupBy orderings; SD `PER_STAT` 11 values and `PER_TYPE_DESC` 69 values → 50,306).
+
+### Rejected with receipts
+
+- **Statewide (Caltrans)** — `WRONG_RECORD_CLASS`. The DCAT catalogue was enumerated in full:
+  **69 datasets, 0 project layers** — all asset/network inventory. ⚠️ **California is the clean
+  counter-example to §0c**: nine other states' DOTs publish projects; Caltrans publishes assets.
+- **MTC (§0i regional fallback)** — `NO_TEMPORAL_FIELD`. The fallback *worked as discovery* and
+  found the largest prize in the state (185 dark pages across six Bay Area counties), then the
+  schema gate killed it: 2027 TIP, 2025 TIP and OBAG 3 all carry **zero date-typed fields and no
+  status field**. SCAG 30 items / SANDAG 29 items: 0 project layers.
+- **Seven counties** — Orange 85 · Alameda 51 · Contra Costa 43 · Sonoma 40 · Ventura 34 ·
+  San Mateo 31 · Santa Clara 15. Every one exhausted at the county tier with non-zero denominators.
+  ⚠️ **Ventura's Oil Permits are the near-miss**: 393 polygons, real `aprv_date`, a 4-value status
+  vocabulary summing exactly to 393 — and `max(aprv_date)` = **2015-05-14**. `STALE`.
+  **Check the max date before enumerating the vocabulary, not after.**
+
+**Stamp: `MUNICIPAL_TIER_REQUIRED`** for the seven. ~304 pages would need ~80+ city wires at a
+handful of pages each — an order of magnitude past §0k's >5-wires-at-<20-pages threshold.
+
+### Next
+
+**CT 269 dark**, then AL 237 · WA 225 · AZ 208 · UT 201 · OH 199 · IN 196 · WI 191 · MD 192.
+UT is the flagged case — a statewide DOT source is already wired and the state is still at 35%,
+so check whether UDOT's scope, window or radius is the limiter before assuming county work.
+OH is already scoped in `docs/source-registry.md` and may already be `MUNICIPAL_TIER_REQUIRED`.

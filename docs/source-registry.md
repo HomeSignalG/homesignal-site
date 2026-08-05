@@ -6065,3 +6065,438 @@ with a subset-identity proof per pair, not one wire. Smallest prize (81 pages); 
   `ulteiginnovation`, `pjacques@vhb.com_VHB`). Only the DOT-owned service counts.
 - **A named "STIP" layer is not automatically the right one** — Iowa's is dateless while its
   humbler Bid Point layer is fully dated and statused. Check the fields, not the title.
+
+## 🚫 RHODE ISLAND — REJECTED (2026-08-05): `NO_TEMPORAL_FIELD`, all 15 layers enumerated
+
+**RI is the last of the eleven zero-coverage states, and it closes the pass.**
+
+Source examined: **`risegis.ri.gov/hosting/rest/services/RIDOA/STIPMap_1827_Amend26/MapServer`**
+— the RI STIP FFY 18-27 (Amendment #26), owner `DOA_C.DelageBaza`. **First-party**: the RI
+Department of Administration administers the state STIP, so provenance was never the issue.
+
+### The structural question turned out to be MOOT — state that plainly
+
+The open design question was whether the 15 program-split layers are **disjoint programs**
+(→ separate registry entries, fine) or **a union and its parts** (→ wire the union only and prove
+the subset by identity). The enumeration answers it: every layer carries the SAME schema keyed on
+**`TIPID`** + **`TIPprogram`**, i.e. they are **disjoint program partitions** of one master TIP
+table — Bridge Capital, Pavement Capital, Drainage Capital, Traffic Safety Capital, TAP, Transit,
+Maintenance Capital & Operations, Truck Toll Facilities — each published as Points and/or Lines.
+So they would have been separate entries.
+
+**But it does not matter, because the source is disqualified before that decision is reached.**
+Do not re-open the 15-layer question: it is downstream of a test the source already fails.
+
+### The disqualifier — measured across ALL 15 layers, not a sample
+
+| layers | geometry | date-typed fields |
+|---|---|---|
+| 0–6 (Truck Toll, TAP-Pts, Transit-Pts, Maintenance, Drainage, Bridge, Traffic Safety-Pts) | point | **0** |
+| 7–13 (Transit-Lines, SRTS Details, TAP-Lines, Bridge-Line, Traffic Safety-Lines, Drainage-Line, Pavement) | polyline | **0** |
+| 14 (Drainage Capital) | polygon | **0** |
+
+**Zero `esriFieldTypeDate` / `esriFieldTypeDateOnly` fields in any of the 15.** The only temporal
+signal is the funding columns **`FY2018` … `FY2027`** — per-fiscal-year dollar amounts, which is
+the same class as Iowa's integer `Year2` and Toledo's `Program_Year`: **a programme year is not a
+date.** A source where no record can be dated cannot be windowed, cannot age out, and cannot be
+reprobed for staleness — permanently unfalsifiable.
+
+**Consistent with the AK ruling in the same pass**: Alaska's STIP has 2,282 points and a real
+`Status` column and was still rejected on exactly this test. Rhode Island is the same verdict on
+the same evidence.
+
+### Also noted (not the governing reason)
+
+The host is **slow but healthy** — it times out at a 30 s pg_net timeout and answers cleanly at
+90 s. That was an acceptable risk given both state DOT hosts (`gis.maine.gov`,
+`maps.vtrans.vermont.gov`) verified clean against the edge runtime this same session, so **the
+host was never the blocker**. The programme is also FFY **2018-2027** with the only alternative
+being `Old_STIP_1827_Amend3` — i.e. no newer published RI STIP map exists to prefer.
+
+**81 pages stay on the EPA facilities floor.** → nightly reprobe list; revisit if RIDOA publishes
+a STIP layer carrying real dates.
+
+## NEW YORK — NO STATEWIDE SOURCE EXISTS (2026-08-05). NY must be done county-by-county
+
+**Shape measured first (764 pages, 233 live, 531 dark).** Registry grep: all **12** existing NY
+entries are sub-state scoped — `nyc-dobnow-approved-permits` and `nyc-dob-permit-issuance` (the
+five boroughs + a Nassau declaration) and `buffalo-building-permits` (Erie). No county-level and
+no statewide entry existed, which under §0c makes the statewide DOT the first thing to try.
+
+| county | pages | live | dark |
+|---|---|---|---|
+| Suffolk | 107 | 0 | **107** *(deferred — needs ten town wires)* |
+| Westchester | 74 | 0 | **74** |
+| Nassau | 70 | 2 | **68** |
+| Erie | 72 | 17 | **55** |
+| Monroe | 52 | 0 | **52** |
+| Albany | 47 | 0 | **47** |
+| Dutchess | 34 | 0 | **34** |
+| Saratoga | 27 | 0 | **27** |
+| Rockland | 26 | 0 | **26** |
+| New York | 100 | 77 | 23 |
+| Putnam | 9 | 0 | **9** |
+| Kings / Queens / Richmond / Bronx | 146 | 137 | 9 |
+
+**Non-Suffolk dark: 424.**
+
+### 🚫 The statewide play FAILS in New York — three independent rejections
+
+1. **`data.ny.gov` `ygg4-74a7` "Statewide Transportation Improvement Plan"** (Socrata, 2,489 rows)
+   — **`NO_GEOGRAPHY` + `NO_TEMPORAL_FIELD`.** Complete column list: `region, mpo, pin, county,
+   agency, title, description, fund_types_all, _2026, _2027, _2028, _2029, fa_cost, nfarollup`.
+   **No point, no lat/lng, no ZIP** — `county` alone cannot be resolved to a location, and
+   `_2026…_2029` are funding amounts, not dates (the RI/AK class).
+2. **`data.ny.gov` `rz8t-4kmq` "Transportation Projects in Your Neighborhood"** (Socrata, 1,937
+   rows) — **`NO_GEOGRAPHY`.** This one is otherwise excellent: real `contract_award_date` and
+   `estimated_or_actual_completed_date` (both `calendar_date`), a real `status`
+   ("Completed Project"), `type_of_work`, `public_friendly_description`. But there is **no
+   geometry column of any kind**; the only spatial field is `region` ("10 LONG ISLAND"), a DOT
+   administrative region. ⚠️ The prose in `project_status` DOES name counties ("…Nassau and
+   Suffolk Counties"), which is exactly the trap — **parsing geography out of free text is
+   guessing, and the anti-fabrication rule forbids it.**
+3. **NYSGIS_GPO** (the NY State GIS Program Office AGO org, **97 items enumerated**) — the only
+   project-named services are `Capital District Transportation Authority` (transit-authority
+   boundaries), `Regional Economic Development Councils` (regions), and `DEM Projects` (LIDAR
+   elevation extents). **Zero per-record development or permit layers.** Also
+   `gis.dot.ny.gov/arcgis/rest/services` → **404**.
+
+### The standing answer this produces
+
+⚠️ **§0c's statewide-DOT-first move is the right OPENING, not a guarantee.** New York publishes
+its STIP through **MPOs** (NYMTC, CDTC, GBNRTC …) rather than as one statewide geometry layer, so
+the state-level shortcut that lit Michigan in a single wire does not exist here. **When the
+statewide probe fails, say so with receipts and fall back to county-by-county** — do not keep
+re-probing the state.
+
+**NY is therefore a county-by-county state.** Next targets by dark count: Westchester 74 ·
+Nassau 68 · Erie 55 (Buffalo already wired; the county is the gap) · Monroe 52 (Rochester) ·
+Albany 47 · Dutchess 34 · Saratoga 27 · Rockland 26 · Putnam 9. **Suffolk 107 last** — it needs
+ten town wires.
+
+## 🚫 `NO_GEOGRAPHY` — THE CANONICAL WORKED CASE: `rz8t-4kmq` (NYSDOT, 2026-08-05)
+
+**Keep this as the reference example, because it is the most TEMPTING version of the
+disqualifier** — everything else about the source is right.
+
+`data.ny.gov` **`rz8t-4kmq` "Transportation Projects in Your Neighborhood"**, NYSDOT, Socrata,
+**1,937 rows**, first-party. It has:
+
+- ✅ **Two real `calendar_date` fields** — `contract_award_date`, `estimated_or_actual_completed_date`
+- ✅ **A real status** — `status` ("Completed Project"), plus `project_status`, `schedule_performance`
+- ✅ **Rich per-record content** — `project_title`, `type_of_work`, `public_friendly_description`,
+  `construction_amount`, `contract_number`, `major_pin`
+- ✅ **Per-record granularity** — one row per contract
+
+It fails on **one** thing: **there is no geometry column of any kind.** No point, no lat/lng, no
+ZIP, no address. The only spatial field is `region` — `"10 LONG ISLAND"`, a DOT administrative
+region covering multiple counties.
+
+### ⚠️ The trap, stated explicitly
+
+The free-text `project_status` prose **does** name counties — a real row reads *"…Towns of Oyster
+Bay, Islip and Babylon, **Nassau and Suffolk Counties**"*. It is genuinely tempting to regex the
+county out of the description and place the record.
+
+**Do not. Parsing geography out of free text is guessing**, and it is exactly what the
+anti-fabrication prime directive forbids: every rendered marker must trace to a real record's own
+stated location, not to an inference drawn from prose. A county name in a sentence is not a
+coordinate, and even if it were, a county is not a ZIP.
+
+**The rule:** a source is `NO_GEOGRAPHY` when it carries no point, no lat/lng pair, no ZIP and no
+geocodable street address — **regardless of how good the rest of the schema is, and regardless of
+whether place names appear in prose.** Dates and statuses cannot rescue a record that cannot be
+placed.
+
+### NEW YORK — the MPO fallback and the county sweep BOTH come up empty (2026-08-05)
+
+Following §0i, after the three statewide rejections the next question was **who New York delegates
+to**. Both remaining layers of the search were run. **Neither yields a wireable source.**
+
+**MPO layer — searched NYMTC, CDTC, GBNRTC, GTC.** Result sets: NYMTC 20 items, CDTC 8, GBNRTC 2,
+GTC **0**. Exactly one TIP feature service exists in that set:
+`services2.arcgis.com/dU6jdOIkCUj2UDe9/…/TIP/FeatureServer/0` "Point Projects", owner
+`Putnam_County_NY`. Probed live: **11 rows**, `County` = **PUTNAM** for all 11, `mpoName` =
+**MHSTCC** for all 11 (Mid-Hudson South Transportation Coordinating Committee — one sub-regional
+council, not the NYMTC region). Point geometry, first-party, real per-record content.
+🟡 **Recorded as a MARGINAL candidate, deliberately NOT wired**: 11 records against **9 ZIP pages**,
+and its three date-ish fields are all `esriFieldTypeString` (`CreationDa` "DATE ORIGIN", `EditDate`
+"DATE EDITED", `Produpdate` "PLAN YEAR" — a year, not a date), so it would need the Anaheim
+string-compare treatment. A full wire cycle for 9 pages is poor value while ~415 NY pages have no
+source at all. Revisit if NY's other counties open up.
+
+**County sweep — orgs enumerated, not guessed.** Every one returned a real, non-empty result set
+and **zero permit or development feature services**:
+
+| county | dark pages | items enumerated | permit/development services |
+|---|---|---|---|
+| Westchester | 74 | **261** | **0** |
+| Erie | 55 | **182** | **0** |
+| Albany | 47 | **177** | **0** |
+| Dutchess | 34 | **45** | **0** |
+| Monroe | 52 | **22** | **0** |
+| Nassau | 68 | **26** | **0** |
+
+⚠️ Westchester's only permit-named layer is a **Film Permit** service — `WRONG_RECORD_CLASS`, and a
+good reminder that matching the word "permit" is a lead, not a finding.
+
+These are **negatives with stated, non-zero denominators** (§0a): 713 items enumerated across six
+counties, none of them a development source.
+
+**Where that leaves NY:** the state has no statewide source, no MPO source beyond an 11-row
+Putnam layer, and no county source in its six largest dark counties. The wired coverage that
+exists — NYC's five boroughs and Buffalo — is **city-published**, which is §0j's shape exactly.
+Remaining NY work is therefore **city-by-city** (Yonkers, White Plains, New Rochelle, Mount
+Vernon; Rochester; Albany; Syracuse — noting Syracuse was already rejected STALE 2025-08-16 in the
+NEW YORK WIRE PASS), not county-by-county — a different and more granular search than any run so
+far.
+
+## 🛑 NEW YORK — CLOSED (2026-08-05): every above-floor candidate rejected. Municipal-tier wiring is its own project.
+
+**Floor set and measured BEFORE probing** (not guessed): count the dark pages each candidate city
+could plausibly reach, and reject anything under ~5 rather than wiring for the count. Measured
+from `communities`:
+
+| city | county | dark pages | verdict |
+|---|---|---|---|
+| **Rochester** | Monroe | **25** | 🚫 `NO_TEMPORAL_FIELD` |
+| **Buffalo** | Erie | **12** | ✅ already wired — see below |
+| **Albany** | Albany | **12** | 🚫 `candidates_exhausted` |
+| White Plains | Westchester | 5 | 🚫 **0 items** returned |
+| Yonkers | Westchester | 5 | 🚫 no city source |
+| Great Neck · Schenectady | Nassau · Albany | 4 | ⬇️ below floor, not probed |
+| Mount Vernon · Poughkeepsie · New Rochelle | — | 3 | ⬇️ below floor, not probed |
+
+### The rejections
+
+- **Rochester — `NO_TEMPORAL_FIELD`.** The city's own server is live and its `Open_Data` folder
+  fully enumerated (**35 services**). ⚠️ **The prior pass's note "no permit layer; demolitions
+  token-required" was incomplete** — there IS a `Planning_Projects_Open_Data` service it missed.
+  Probed: **56 rows**, polygon, with `PROJECTNAME`, `PROJECTDESCRIPTION`, `WEBADDRESS`,
+  `PROJECTSTATUS`, `FUNDINGSOURCE` — and **zero date-typed fields**; `PROJECTYEAR` is a
+  `esriFieldTypeString` year. Same class as AK, RI, Iowa's Five Year Program and Toledo. (Even
+  had it passed, 56 rows over 25 pages was marginal.)
+- **Albany — `candidates_exhausted`.** 15 items enumerated, **0** city permit/development
+  services: zoning, parking signs, cannabis consumption locations, election districts, a
+  consultant's "South End Map", an Ulster County water inventory, and a Putnam trailway.
+- **Yonkers** — 2 items, both owned by `stalin.espinal_brooklyncollege` (a student project).
+  **White Plains** — **0 items**. Neither city publishes.
+- **Rochester Socrata** — `data.cityofrochester.gov` returns `Domain not found`. No portal.
+
+### ⚠️ Buffalo is already county-scoped — its 12 dark pages are a WINDOW limit, not a scope gap
+
+`buffalo-building-permits` declares `coverage: [{state: NY, county: Erie}]` with a native `zip`
+column and per-record `latitude`/`longitude`, so it already rides **all 72 Erie pages**; 17 carry
+records. The 12 dark pages *named* "Buffalo" simply have no permit within `recency_days: 365`.
+**Do not re-wire Buffalo or "extend its scope"** — the scope is already county-wide. Widening the
+window is a change to an existing entry (gated, non-additive) and was not made.
+
+### The honest conclusion
+
+**NY needs municipal-tier wiring at a scale that is its own project — the same answer as Suffolk's
+ten towns, and for the same reason.** The state has:
+
+- **no statewide source** (3 rejections with receipts),
+- **no MPO source** beyond an 11-row Putnam layer (below floor),
+- **no county source** across its six largest dark counties (**713 items enumerated, 0 dev services**),
+- **no city source** at any of the four cities above the 5-page floor.
+
+Its 233 live pages come entirely from **NYC's five boroughs + Buffalo** — two municipal
+publishers. Lighting the remaining **531** would mean wiring dozens of small municipalities at
+3–5 pages each, which is a different kind of project from the county- and state-tier work that
+carried UT→NY so far. **Recorded and stopped, rather than ground down for marginal counts.**
+
+**Reprobe candidates:** Rochester (if `PROJECTYEAR` is ever replaced by a real date) · Syracuse
+(STALLED 2025-08-16 per the NEW YORK WIRE PASS) · Putnam TIP (if it grows beyond 11 rows).
+
+### NY DISPOSITION UNDER §0k: `MUNICIPAL_TIER_REQUIRED`
+
+Restating the New York closure in the standing policy's own vocabulary, with the audit figures
+§0k requires.
+
+**Stamp: `MUNICIPAL_TIER_REQUIRED`.** Both conditions are met — closing NY needs **far more than
+~5 wires**, and **every remaining wire lights well under 20 pages**.
+
+| figure | value | basis |
+|---|---|---|
+| dark pages remaining | **531** (424 non-Suffolk + 107 Suffolk) | measured |
+| largest surviving single-wire yield | **< 5 pages** | the four above-floor cities are all rejected; every remaining place is 3–5 pages |
+| estimated wires to close non-Suffolk | **~85–140** | 424 pages ÷ 3–5 pages per municipality |
+| estimated wires to close Suffolk | **10** | its ten towns, ~10.7 pages/wire |
+| **total estimated wires** | **~95–150** | |
+
+**§0k threshold is >5 wires at <20 pages each. NY is ~95–150 wires at 3–5 pages each — an order
+of magnitude past it.**
+
+**Search layers already exhausted (the §0k three-layer stop, all with non-zero denominators):**
+statewide → 3 rejections · regional/MPO → 1 sub-threshold layer (Putnam, 11 rows / 9 pages) ·
+county → 713 items enumerated across six counties, **0** development services. A fourth layer
+(city) was run anyway because Rochester and Albany cleared the page floor; **both rejected**, which
+confirms the stop rule rather than contradicting it.
+
+**Applied §0k decisions, recorded not reported:** Putnam TIP → `SUB_THRESHOLD` (11 rows / 9 pages,
+string dates) · Great Neck, Schenectady, Mount Vernon, Poughkeepsie, New Rochelle → below floor,
+**not probed** · Rochester → `NO_TEMPORAL_FIELD` · Albany, White Plains, Yonkers →
+`candidates_exhausted`.
+
+⚠️ **NY is not abandoned.** It carries 233 live pages from NYC + Buffalo, and the reprobe list
+stands (Rochester if `PROJECTYEAR` becomes a real date · Syracuse, stalled 2025-08-16 · Putnam TIP
+if it grows). It is a scoped finding that the remainder is a **project, not a pass**.
+
+---
+
+## CALIFORNIA PASS (2026-08-05) — 386 dark, two county wires, seven counties `MUNICIPAL_TIER_REQUIRED`
+
+**Baseline measured before any probe:** CA has **523 modelled ZIP pages, 137 lit, 386 dark**,
+across exactly ten modelled counties. Registry grep first per §0c/§0j: four CA entries existed,
+**all city- or county-scoped** — `marin-county-building-permits`, `anaheim-land-use-cases`,
+`san-jose-permits`, `san-diego-approved-permits` (the City of San Diego CSV). **No statewide entry.**
+
+### Statewide — REJECTED, and it is a real counter-example to §0c
+
+Caltrans' DCAT catalogue was enumerated in full: **69 datasets, 0 project or programme layers.**
+Every one is asset or network inventory — highway network lines, postmiles, bridges, tunnels, rest
+areas, park-and-ride, transit stops and routes, airports, rail, districts, traffic counts, climate
+risk. `data.ca.gov` answers "Domain not found" to the Socrata catalogue API.
+
+⚠️ **Standing answer: statewide-DOT-first is an opening move, not a guarantee, and California is
+the clean counter-example.** UDOT, TxDOT, MDOT, FDOT, MassDOT, NJDOT, MaineDOT, Iowa DOT and VTrans
+all publish *projects*. Caltrans publishes *assets*. The disqualifier is
+`WRONG_RECORD_CLASS`, decided on the enumerated catalogue rather than on a guessed URL.
+
+### §0i regional fallback — FIRED, FOUND, then REJECTED on the schema
+
+§0i says that when the statewide probe fails, ask who the state delegates to. In California that is
+the MPOs, and the probe **worked as a discovery step**: MTC (Metropolitan Transportation Commission,
+the nine-county Bay Area MPO) returned 110 items including the 2027 and 2025 Transportation
+Improvement Program project layers and the OBAG 3 County Program layers. MTC's footprint is
+**185 dark CA pages** — Alameda 51 + Contra Costa 43 + Sonoma 40 + San Mateo 31 + Santa Clara 15 +
+Marin 5. It was the largest single-wire prize in the state.
+
+**It fails on the schema, and the failure is systematic across the whole family:**
+
+| layer | rows | date-typed fields | status field |
+|---|---|---|---|
+| `mtc_tip2027_projects_point` | 251 | **0 of 10 fields** | none |
+| `obag3_projects_pt` | — | **0 of 6 fields** | none |
+| `Project_Mode` (2025 TIP point) | — | **0** | none |
+
+`mtc_tip2027_projects_point` carries `tip_id, Project_County, sponsor, Project_Cost, Project_Mode,
+Project_Name, Project_Description, Geometry_Type, Project_Number` — a complete project record with
+**no time and no stage**. `obag3_projects_pt` carries `county, id, sponsor, project, mode_`. Three
+enumerated layers, three non-zero denominators, three empties → the §0k three-layer stop.
+**`NO_TEMPORAL_FIELD`.** SCAG (30 items) and SANDAG (29 items) were probed too: 0 project layers.
+
+⚠️ Worth keeping: §0i's *first successful use* still ended in a rejection. The rule earned its
+place by finding the right layers quickly — the layers themselves were not wireable. A fallback
+that surfaces the correct candidate and lets the schema gate kill it is working, not failing.
+
+### WIRED — `slo-county-planning-permits` (San Luis Obispo, 29 pages, 0 lit before)
+
+`gis.slocounty.ca.gov` → `PLN/PLN_EG_SERVICES_DATA/MapServer/79` "Prod1PointHistory", the
+production EnerGov case-history point layer (`Dev1*`/`Stage1*` are the non-production twins and are
+not wired). **50,969 rows**, `esriGeometryPoint`.
+
+- **Found by enumeration, not guess:** service root → 21 folders → `PLN` → 6 map services → an
+  84-layer roster. The AGO title search returned 10 items (non-zero denominator) and surfaced only
+  water-well and inspection-zone layers — a weak instrument on a county that publishes properly.
+- **Fresh:** `max(ApplicationDate)` = **2026-08-04**, one day before the pass; min 1988-09-27;
+  populated on **50,969 of 50,969**.
+- **Type vocabulary complete:** `CaseType` = **93 values summing exactly to 50,969**, proven on
+  both `n DESC` and `n ASC` (the Mesa/Gilbert `$limit`-truncation defence). **49 kept (33,138
+  rows)**; the 44 dropped are records-research (5,638), enforcement (2,187 + cannabis code +
+  vehicle abatement), trades MEP (1,389), express/over-the-counter (1,982), septic (920 — the same
+  wrong-record-class call made against Sonoma's septic layer) and procedural classes.
+  `WorkClass` was measured too (209 values, also exact) and **not** used — `CaseType` is the
+  coarser self-describing field.
+- ⚠️ **New standing answer — a trailing space in a publisher value is safe here, but only because
+  it was MEASURED.** `includeTypesClause` trims values before quoting them into the `IN` list, and
+  two `CaseType` values carry a trailing space. Probed live: `IN ('Renewable Energy')` → **3,359**
+  and `IN ('Express')` → **1,664**, exactly the groupBy counts of the space-carrying values, so the
+  SQL Server ANSI padding semantics hold. An **internal** double space (`Renewable Energy  ASB`)
+  survives the trim and stays in the `type_map` key.
+- **No status column** → `status_const: "Submitted"` → proposed; approved/operating/exclude
+  deliberately empty (NDOT/VTrans precedent).
+- **`record_url`:** no per-record column; dataset precision on the county's Tyler EnerGov Citizen
+  Self Service portal, **recovered from the county Planning & Building page's own HTML**
+  (`sanluisobispocountyca-energovweb.tylerhost.net/apps/selfservice#/search`) rather than templated
+  from `CaseId` (Boston/Philadelphia precedent).
+- **Placeholder-coordinate check:** three consecutive sample records shared an identical
+  13-decimal-place coordinate. Probed rather than assumed — a ~40 m box around that point holds
+  **8 of 50,969** records, i.e. a real parcel with eight cases, not a geocoder dump point.
+
+### WIRED — `san-diego-county-discretionary-permits` (53 dark pages)
+
+`gis-public.sandiegocounty.gov` → `PDS/PDS_Layers/MapServer/20` "Discretionary Permits",
+**50,306 rows**, `esriGeometryPoint`, found by enumerating 25 folders → a 122-layer roster.
+Layer 19 "Project Review" is a **group layer** (`geometryType` null, `fields` null,
+`returnCountOnly` errors 400) — enumerated and skipped, not mistaken for an empty layer.
+
+- **Fresh:** `max(PER_OPEN_DATE)` = **2026-07-24**, populated on **50,306 of 50,306**.
+- **Status vocabulary complete:** `PER_STAT` = **11 values summing exactly to 50,306** —
+  DIR Approved 18,198 · Approved 11,649 · BOS Approved 7,741 · Open 6,033 · In Review 2,367 ·
+  PC Approved 2,141 · Out to Applicant 1,438 · Issued 459 · ZA Approved 225 · Post-Approval 38 ·
+  Public Review 17. **40,451 approved + 9,855 proposed = 50,306.**
+- **Type:** `PER_TYPE_DESC` = **69 values, also exact**, every one naming a *case class*
+  (Major Use Permit, Tentative Map, Rezone, Grading Permit Maj …) rather than a building use — so
+  there is nothing to map to the closed `use_type` vocabulary without guessing.
+  `use_type_const: "Development"` with **no `type_map`** (the Phoenix precedent: the generic member
+  is written `Development`, never an off-vocabulary `"Other"`).
+- **`extra_where` drops 10,822 of 50,306**: the Landscape Plan family (9,653 — submittals attached
+  to already-approved projects) and the purely procedural classes (time extensions 475, resolution
+  amendments 57, appeals 34, verification requests 96, initial consultations 402, planning-historical
+  7, subdivision violations 9, miscellaneous 89). **39,484 kept.**
+- ⚠️ **The layer HAS a `LINK` column and it is NULL on every row** — `count(LINK)` = **0** against a
+  layer count of 50,306. Measured, not assumed; a column's existence is not evidence it is
+  populated. Dataset precision on the county's own Accela Citizen Access portal
+  (`publicservices.sandiegocounty.gov/CitizenAccess/`, probed live: HTTP 200,
+  `<TITLE>Citizen Access</TITLE>`).
+- The 53 dark SD pages are the unincorporated and North County ZIPs — Fallbrook 92028, Ramona
+  92065, Alpine 91901, Valley Center 92082, Julian 92036, Borrego Springs 92004 — exactly where
+  county discretionary permits land, while the 62 lit ones are the City of San Diego CSV's.
+
+### Window choice — the rule applied uniformly, on measured pages not projections
+
+Per §0k both windows were measured on both entries, and the **densest page was measured directly**
+with a 3-mile envelope around its ZIP centroid rather than projected from the county total:
+
+| entry | county-wide 365 / 1095 / 1825 | densest page 365 / 1095 / 1825 | chosen |
+|---|---|---|---|
+| SLO | 8,319 / 24,119 / 36,386 of 50,969 | Paso Robles 93446 — 218 / 724 / **1,345** | **1825** |
+| San Diego | 1,218 / 4,795 / 8,385 of 50,306 | Fallbrook 92028 — — / 205 / **292** | **1825** |
+
+**The rule: take the largest window (capped at 1825) whose worst MEASURED page stays far under the
+measured ceiling** — Cleveland 44127 at 5,511 sites / 5.98 MB. SLO's worst is ~875 sites after the
+65% type whitelist; San Diego's is 292. `require-a-date` is **vacuous on both** (dates are 100%
+populated), which is itself the §0h check working: it filters nothing and would reach back to 1988.
+
+### REJECTED with receipts — the seven remaining dark counties
+
+| county | dark | enumerations run (all non-zero denominators) | disqualifier |
+|---|---|---|---|
+| **Orange** | 85 | AGO title search 5 items · OC org (`UXmFoWC7yDHcDN5Q`) scoped `permits` 28 items → NPDES/discharge only · scoped `development` 64 items → watershed BMP/aquifer layers only · `gis.ocgov.com` and `ocgis.com` both dead | `candidates_exhausted` |
+| **Alameda** | 51 | county DCAT **163 datasets** → 1 zoning polygon, 0 permits · Berkeley Socrata **66 datasets** → 2 zoning polygons · Oakland Socrata → 11 name matches, all zoning / parking-permit zones / affordable-housing counts / workforce | `candidates_exhausted` |
+| **Contra Costa** | 43 | AGO search 8 items → 0 · county server `INTERNET` folder → 1 base-data service · `_Authoritative` → 11 boundary layers · `PublicWorks` → **499 Token Required** | `candidates_exhausted` |
+| **Sonoma** | 40 | AGO org 118 items → septic + coastal-commission jurisdiction · AGO search 197 items → same · **the county's own server enumerated: 40 folders**, and `AccelaPublic` holds only Parcels + Addresses while `OneStopMapPublic` holds only Parcels + Parks | `WRONG_RECORD_CLASS` |
+| **Ventura** | 34 | AGO search 35 items · county server `DataDownloads` → 22 services, only `Permitting` is case-like → 3 layers: Communication Facilities, **Mining Permits 29**, **Oil Permits 393** | **`STALE`** |
+| **San Mateo** | 31 | AGO search 28 items → 0 · AGO search 131 items → only the county CIP · `gis.smcgov.org` 404 · the CIP layer itself (210 rows) has **no date and no status field** — every column is `nvarchar(4000)` plus fiscal-year budget integers | `NO_TEMPORAL_FIELD` |
+| **Santa Clara** | 15 | `san-jose-permits` already in the registry; `data.sanjoseca.gov` answers "Domain not found" to the Socrata catalogue API | below the wire-for-the-count line |
+
+⚠️ **Ventura's Oil Permits looked wireable and are not.** 393 polygons with a real
+`aprv_date` (`esriFieldTypeDate`), a complete 4-value status vocabulary summing exactly to 393
+(EXPIRED 249 · ACTIVE 137 · ANNEXED 6 · DENIED 1) and per-permit geometry — everything the gate
+asks for except currency. `max(aprv_date)` = **2015-05-14**, eleven years stale. The vocabulary
+being perfect is not evidence the layer is alive; **check the max date before enumerating the
+vocabulary**, not after.
+
+### Stamp: `MUNICIPAL_TIER_REQUIRED` for the seven
+
+After the two wires, **~304 pages remain dark** across Orange 85, Alameda 51, Contra Costa 43,
+Sonoma 40, Ventura 34, San Mateo 31, Santa Clara 15. Every county tier above is exhausted with
+receipts, so closing them means city-tier wiring: Orange has ~30 incorporated cities, Contra Costa
+19, San Mateo 20, Alameda 14. **§0k's threshold is >5 wires each lighting <20 pages — this is
+~80+ wires at a handful of pages each**, an order of magnitude past it.
+
+**California is not abandoned.** It carries 137 pre-existing live pages plus the two new county
+wires, and the reprobe list stands (Oakland and Berkeley both run live Socrata portals that simply
+have no permit dataset today; OC Public Works publishes 1,499 feature services and could add one).
