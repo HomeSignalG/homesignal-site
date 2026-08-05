@@ -5891,3 +5891,84 @@ it would have been fabricated from an instrument failure.
 - **Always pair a queue read with the control** `select max(id) from net._http_response` before
   concluding a host is unreachable. A missing response id is not a host verdict.
 
+
+## MICHIGAN PASS (2026-08-05) — `mdot-stip-projects` wired; county-level candidates enumerated
+
+**Shape first (the standing rule: measure the county distribution before probing).** MI is
+**360 modeled ZIP pages, 50 live, 310 dark**. The registry grep — now the standard opening
+move — showed 5 pre-existing MI entries, ALL city/township scoped: `detroit-building-permits`,
+`detroit-trades-permits`, `detroit-demolition-permits` (Wayne), `ann-arbor-energov-permits`
+(Washtenaw), `independence-twp-construction-permits` (Oakland). No county-level and no
+statewide source existed.
+
+| county | ZIP pages | live | dark |
+|---|---|---|---|
+| Oakland | 87 | 9 | **78** |
+| Wayne | 76 | 32 | 44 |
+| Macomb | 40 | 0 | 40 |
+| Kent | 37 | 0 | 37 |
+| Genesee | 26 | 0 | 26 |
+| Ingham | 24 | 0 | 24 |
+| Ottawa | 19 | 0 | 19 |
+| Monroe | 17 | 0 | 17 |
+| Livingston | 13 | 0 | 13 |
+| Washtenaw | 20 | 9 | 11 |
+| Shiawassee | 1 | 0 | 1 |
+
+⚠️ **The state-level framing was again a hypothesis, not a brief.** "310 dark" reads as a
+uniform gap; the measurement says Oakland alone is a quarter of it, and 8 of 11 counties have
+**zero** wired source rather than partial coverage.
+
+### WIRED — `mdot-stip-projects` (statewide MI)
+
+See the registry entry's `_receipts` for the full evidence. Headline: MDOT's own
+`Planning/MdotStip` layer 2 'STIP All Projects (Points)', 3,742 point rows, both vocabularies
+complete and each summing exactly to 3,742, `PHASE_SCHD_OBLG_DATE` 3,742/3,742 non-null,
+FY2026–FY2029 (current program), all 83 MI counties present, all 11 modeled counties
+represented (1,866 rows). Only the point union is wired — layers 1/3/4 are subsets or the same
+projects as segments.
+
+### REJECTED, with receipts
+
+- 🚫 **Oakland County's own GIS — `WRONG_RECORD_CLASS`.** Real host recovered as
+  `gisservices.oakgov.com` (the guesses `gisrest.oakgov.com` and `gis.oakgov.com` are DNS-dead
+  and 404). Its `Enterprise` folder was enumerated in full: 13 MapServices, and the only
+  development-sounding layer, `EnterpriseOpenPlanningMapService/2 'Development Authority'`,
+  is by **its own description** *"The DevelopmentAuthority polygon feature class identifies
+  certain types of entities … Downtown Development Authorities (DDA), Tax Increment Finance
+  Authorities (TIFA)"* — **district boundaries, not filings.** The rest are `Current Land Use`,
+  `Composite Master Plan` and administrative districts. No per-record permit layer exists.
+- 🚫 **Ottawa County — `candidates_exhausted` on enumeration.** Real host `gis.miottawa.org`
+  (the `data-miottawa.opendata.arcgis.com` guess 404s "Domain record(s) not found"). Both
+  service folders enumerated in full; the only permit-adjacent services are
+  `BuildingFootprints`, `Buildings`, `CompleteBuildings` and `MasterPlanZoning` — **0 permit
+  services**.
+- 🚫 **Grand Rapids / Kent — `STALE`.** The city's AGO org is real (`L81TiOwAPO1ZvU9b`,
+  confirmed via `portals/self`, not guessed) and holds 2,008 items. Its only per-record
+  construction layer, `CGR_Construction_Projects/FeatureServer/0` (4,488 polygon rows), is
+  **frozen**: max `FiscalYear` **2023**, max `ProjectedStartDate` **2022-07-01**, max `EDATE`
+  **2017-10-05**. It is also thinly dated — `ProjectedStartDate` non-null on only
+  **1,441/4,488 (32%)** and `EDATE` on **172/4,488** — the Dayton 71/264 class. Stale is the
+  governing disqualifier; the dating would have been a second flag. `Eng_RoadConstruction`
+  (1,114 rows) carries the same schema with shapefile-truncated field names — an older export
+  of the same data, not an independent source. The remaining permit-named services in that org
+  are **aggregates** (`EPA_4_1_(A) Number of New Dwelling Units Permitted`,
+  `Multi_Family_New_Construction_Stats_2011_to_2018_YTD`) or **districts/zoning**
+  (`Zoning_All_Types`, `Downtown_Development_Authority_Boundary`,
+  `Development_Opportunity_Parcels`). → nightly reprobe list.
+- 🚫 **Michigan statewide, non-DOT.** The ArcGIS Hub datasets API over MI returns exactly one
+  state permit dataset, EGLE `Groundwater Sanitary Discharge Permits` — an environmental
+  authorization for an existing facility, i.e. the `facilities` class, not a development
+  filing.
+
+### Method notes added this pass
+
+- **URL-guessing county GIS hosts is not discovery.** All 8 first-pass host guesses failed
+  (3 DNS-dead, 4 404, 1 "Invalid URL"); every real host in this pass — `gisservices.oakgov.com`,
+  `gis.miottawa.org`, `mdotgis.state.mi.us`, `maps.grcity.us`, `services2.arcgis.com/L81Ti…` —
+  was recovered from **item URLs inside AGO search results**, never typed from a pattern.
+- **A username suffix is a derived org key, not a guess.** `akaka@grand_rapids.mi.us_grandrapids`
+  yields `grandrapids.maps.arcgis.com`, whose `portals/self` returned the real org id. That is
+  materially different from typing `<city>.maps.arcgis.com` and reading the generic anonymous
+  portal — the standing trap. `lansing.maps.arcgis.com` did exactly that and returned nothing.
+
