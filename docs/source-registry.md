@@ -6308,3 +6308,37 @@ carried UT→NY so far. **Recorded and stopped, rather than ground down for marg
 
 **Reprobe candidates:** Rochester (if `PROJECTYEAR` is ever replaced by a real date) · Syracuse
 (STALLED 2025-08-16 per the NEW YORK WIRE PASS) · Putnam TIP (if it grows beyond 11 rows).
+
+### NY DISPOSITION UNDER §0k: `MUNICIPAL_TIER_REQUIRED`
+
+Restating the New York closure in the standing policy's own vocabulary, with the audit figures
+§0k requires.
+
+**Stamp: `MUNICIPAL_TIER_REQUIRED`.** Both conditions are met — closing NY needs **far more than
+~5 wires**, and **every remaining wire lights well under 20 pages**.
+
+| figure | value | basis |
+|---|---|---|
+| dark pages remaining | **531** (424 non-Suffolk + 107 Suffolk) | measured |
+| largest surviving single-wire yield | **< 5 pages** | the four above-floor cities are all rejected; every remaining place is 3–5 pages |
+| estimated wires to close non-Suffolk | **~85–140** | 424 pages ÷ 3–5 pages per municipality |
+| estimated wires to close Suffolk | **10** | its ten towns, ~10.7 pages/wire |
+| **total estimated wires** | **~95–150** | |
+
+**§0k threshold is >5 wires at <20 pages each. NY is ~95–150 wires at 3–5 pages each — an order
+of magnitude past it.**
+
+**Search layers already exhausted (the §0k three-layer stop, all with non-zero denominators):**
+statewide → 3 rejections · regional/MPO → 1 sub-threshold layer (Putnam, 11 rows / 9 pages) ·
+county → 713 items enumerated across six counties, **0** development services. A fourth layer
+(city) was run anyway because Rochester and Albany cleared the page floor; **both rejected**, which
+confirms the stop rule rather than contradicting it.
+
+**Applied §0k decisions, recorded not reported:** Putnam TIP → `SUB_THRESHOLD` (11 rows / 9 pages,
+string dates) · Great Neck, Schenectady, Mount Vernon, Poughkeepsie, New Rochelle → below floor,
+**not probed** · Rochester → `NO_TEMPORAL_FIELD` · Albany, White Plains, Yonkers →
+`candidates_exhausted`.
+
+⚠️ **NY is not abandoned.** It carries 233 live pages from NYC + Buffalo, and the reprobe list
+stands (Rochester if `PROJECTYEAR` becomes a real date · Syracuse, stalled 2025-08-16 · Putnam TIP
+if it grows). It is a scoped finding that the remainder is a **project, not a pass**.
