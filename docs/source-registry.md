@@ -6250,3 +6250,61 @@ Remaining NY work is therefore **city-by-city** (Yonkers, White Plains, New Roch
 Vernon; Rochester; Albany; Syracuse — noting Syracuse was already rejected STALE 2025-08-16 in the
 NEW YORK WIRE PASS), not county-by-county — a different and more granular search than any run so
 far.
+
+## 🛑 NEW YORK — CLOSED (2026-08-05): every above-floor candidate rejected. Municipal-tier wiring is its own project.
+
+**Floor set and measured BEFORE probing** (not guessed): count the dark pages each candidate city
+could plausibly reach, and reject anything under ~5 rather than wiring for the count. Measured
+from `communities`:
+
+| city | county | dark pages | verdict |
+|---|---|---|---|
+| **Rochester** | Monroe | **25** | 🚫 `NO_TEMPORAL_FIELD` |
+| **Buffalo** | Erie | **12** | ✅ already wired — see below |
+| **Albany** | Albany | **12** | 🚫 `candidates_exhausted` |
+| White Plains | Westchester | 5 | 🚫 **0 items** returned |
+| Yonkers | Westchester | 5 | 🚫 no city source |
+| Great Neck · Schenectady | Nassau · Albany | 4 | ⬇️ below floor, not probed |
+| Mount Vernon · Poughkeepsie · New Rochelle | — | 3 | ⬇️ below floor, not probed |
+
+### The rejections
+
+- **Rochester — `NO_TEMPORAL_FIELD`.** The city's own server is live and its `Open_Data` folder
+  fully enumerated (**35 services**). ⚠️ **The prior pass's note "no permit layer; demolitions
+  token-required" was incomplete** — there IS a `Planning_Projects_Open_Data` service it missed.
+  Probed: **56 rows**, polygon, with `PROJECTNAME`, `PROJECTDESCRIPTION`, `WEBADDRESS`,
+  `PROJECTSTATUS`, `FUNDINGSOURCE` — and **zero date-typed fields**; `PROJECTYEAR` is a
+  `esriFieldTypeString` year. Same class as AK, RI, Iowa's Five Year Program and Toledo. (Even
+  had it passed, 56 rows over 25 pages was marginal.)
+- **Albany — `candidates_exhausted`.** 15 items enumerated, **0** city permit/development
+  services: zoning, parking signs, cannabis consumption locations, election districts, a
+  consultant's "South End Map", an Ulster County water inventory, and a Putnam trailway.
+- **Yonkers** — 2 items, both owned by `stalin.espinal_brooklyncollege` (a student project).
+  **White Plains** — **0 items**. Neither city publishes.
+- **Rochester Socrata** — `data.cityofrochester.gov` returns `Domain not found`. No portal.
+
+### ⚠️ Buffalo is already county-scoped — its 12 dark pages are a WINDOW limit, not a scope gap
+
+`buffalo-building-permits` declares `coverage: [{state: NY, county: Erie}]` with a native `zip`
+column and per-record `latitude`/`longitude`, so it already rides **all 72 Erie pages**; 17 carry
+records. The 12 dark pages *named* "Buffalo" simply have no permit within `recency_days: 365`.
+**Do not re-wire Buffalo or "extend its scope"** — the scope is already county-wide. Widening the
+window is a change to an existing entry (gated, non-additive) and was not made.
+
+### The honest conclusion
+
+**NY needs municipal-tier wiring at a scale that is its own project — the same answer as Suffolk's
+ten towns, and for the same reason.** The state has:
+
+- **no statewide source** (3 rejections with receipts),
+- **no MPO source** beyond an 11-row Putnam layer (below floor),
+- **no county source** across its six largest dark counties (**713 items enumerated, 0 dev services**),
+- **no city source** at any of the four cities above the 5-page floor.
+
+Its 233 live pages come entirely from **NYC's five boroughs + Buffalo** — two municipal
+publishers. Lighting the remaining **531** would mean wiring dozens of small municipalities at
+3–5 pages each, which is a different kind of project from the county- and state-tier work that
+carried UT→NY so far. **Recorded and stopped, rather than ground down for marginal counts.**
+
+**Reprobe candidates:** Rochester (if `PROJECTYEAR` is ever replaced by a real date) · Syracuse
+(STALLED 2025-08-16 per the NEW YORK WIRE PASS) · Putnam TIP (if it grows beyond 11 rows).
