@@ -5720,3 +5720,66 @@ Zone Developments") against the St. Louis County **Minnesota** namesake.
 **Generic-portal control, worth reusing:** five of six urlKey guesses returned byte-identical
 **12,477-byte** responses (the anonymous ArcGIS portal); only the real org differed at 18,684 bytes.
 Response size is a cheap discriminator for "this subdomain is not an org".
+
+---
+
+## ILLINOIS PASS (2026-08-05) — 3 sources wired, every county closed on enumeration
+
+IL opened at **139 / 474 live (29.3%), 335 dark** — the largest remaining block. County distribution was
+measured **before** probing. Shape matched the OH/MO pattern: seven counties at 0% holding 176 dark
+pages, plus a **suburban Cook seam of 85** left over after `chicago-building-permits` covers the city.
+
+**⚠️ CHECK THE REGISTRY BEFORE PROBING.** Two IL entries already existed — `chicago-building-permits`
+(Cook/DuPage/Lake) and `naperville-building-permits` (DuPage/Will). Discovery independently
+"found" Naperville's two permit tables and measured their lift as ~1 page, because its four main ZIPs
+(60540 · 60563 · 60564 · 60565) were **already live at 484 / 480 / 333 / 204 records** from the
+existing entry. A registry grep is a two-second step that would have skipped that whole branch.
+
+### WIRED (3)
+
+| Entry | County | Rows | Measured dark-page lift |
+|---|---|---:|---:|
+| `cook-county-il-highway-construction-program` | Cook | 70 | **78 of 85** |
+| `lake-county-il-construction-program` | Lake | 39 | **23 of 31** |
+| `champaign-il-special-use-permits` | Champaign | 54 | **9 of 33** |
+
+Three findings worth lifting out of the `_receipts`:
+
+- **A season string is not a date, but an edit-stamp date can be.** Cook DOTH's obvious timing field
+  `start` is `Spring 2026` / `Fall 2025` — 70/70 populated and unparseable, the `Program_Year` class.
+  The layer nonetheless carries `CreationDate`, a real `esriFieldTypeDate` populated **70 of 70** and
+  spanning **2026-04-14 → 2026-06-25**, entirely inside the program year the service is named for.
+  That is an honest "entered the 2026 program" date and the UDOT `created_dt` precedent.
+  **`NO_TEMPORAL_FIELD` means there are NO dates — not that the best-named field is unusable.**
+- **`Conforming` is a compliance state, not a lifecycle state.** Champaign's SUP status is exactly
+  `Conforming` / `Expired`. Conforming → **operating** (the permitted use is in effect on the ground),
+  not `approved`, which would imply a recent decision. Expired → exclude.
+- **Same service, adjacent layer, opposite verdict.** Champaign layer 19 `Zoning - Planned
+  Developments` has the same 54-row scale, a Status column and a FolderLink — and its only dates are
+  `created_date` / `last_edited_date`, GIS edit stamps. Layer 20 was wired because it carries
+  `Effective_`, `Site_Visit` and `Expiration`: dates about the permit, not about the GIS record.
+
+### REJECTED, with receipts
+
+| County | Candidate | Verdict |
+|---|---|---|
+| Madison | `MadisonCounty_DevelopmentChange_1995_2025` | `NO_TEMPORAL_FIELD` — 324 polygons whose entire schema is `LOCALE`, `LOCALE2`, `TYPE`. A 30-year land-use change study, not a filing register |
+| Winnebago | Rockford `CIP Web Map` | `NO_TEMPORAL_FIELD` — 90 points, fields are `name`/`TabName`/`description`/`pic_url`/`shortlist_id`/`tab_id`: an Esri **Shortlist app** data layer with no date of any kind. ⚠️ **Corrects the prior "Rockford org live but 0 permit services"** — a CIP Feature Service *does* exist; it is simply not wireable. Full org enumerated (100 items): wards, hydrants, snow routes, fire stations, neighbourhood associations |
+| Kane | `Kane 2020 Transportation Plan Projects` | Integer `COMP_YE` year only (the `Program_Year` class), CSV-join field names, item stale 2023-09-05 |
+| McHenry | `Woodstock_OpenGov_Permit` | **1 row**, schema `TOWNSHIP` + edit stamps — a boundary polygon. The name promises a permit register and delivers none |
+| Champaign | layer 19 `Zoning - Planned Developments` | `NO_TEMPORAL_FIELD` — GIS edit stamps only |
+| Lake | layer 1 `Construction Project Lines` | Companion half of the wired points layer (15 rows). Deliberately **not** wired: emitting the same project under two `source_registry_id`s is the houston-plat class, which exact-identity dedup cannot catch |
+| DuPage | county org | Only `Adopted_Highways_and_Trails` / `DuPage_Highways` reference layers |
+| Will | — | `willcounty` resolves to a generic **"Hub Community"**, not the county's org |
+| Kane | Aurora org (217 services) | `AFD_FirePrev_Permits_Dates` — fire-prevention inspections, `WRONG_RECORD_CLASS` |
+| Kendall | Oswego / Yorkville | `Oswego Economic Development`, `2024_Zoning_Map` — web maps and reference zoning |
+| LaSalle | — | 1 page; no first-party org found |
+
+**Cross-state trap caught:** a search for Kane County transportation projects returned
+`bdavis1@utah.gov_uplan :: Kane County Projects` — **Kane County UTAH**. Lake County was the flagged
+risk (it exists in IL, IN, OH, FL, CA and MN); its org returns the name *"Lake County Illinois GIS"*
+and its contents are Lake County Illinois routes, so entity was confirmed by name **and** contents.
+
+**Coverage ceilings, stated plainly:** Cook and Lake are **county highway programs** — Cook's 130+
+suburbs and Lake's municipalities run their own work and are not in these layers. Champaign is the
+**city** only; Urbana, Rantoul, Savoy and unincorporated Champaign County are not.

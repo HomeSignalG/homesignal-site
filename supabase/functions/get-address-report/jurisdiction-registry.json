@@ -10772,6 +10772,123 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-05 MISSOURI PASS. Boone County (Columbia) was 4 of 14 live, 10 dark. Config only. The City of Columbia's capital improvement register -- the municipal-CIP class, same as the UDOT / TxDOT / NDOT infrastructure-project precedent, and the source Dayton would have been had its host been reachable. 370 rows, 369 with geometry, 367 dated. BOTH THE VOCABULARY AND THE ARITHMETIC ARE COMPLETE: project_status_desc sums to EXACTLY 370 -- Proposed 161 / On-going 57 / Preliminary Design 55 / Construction 43 / Final Design 18 / In Service 14 / Ready to Close 13 / Bid 8 / null 1. Every value is self-describing and maps to the project lifecycle without a guess: Proposed, Preliminary Design and Final Design are pre-construction -> proposed; Bid, Construction and On-going are funded and under way -> approved; In Service and Ready to Close are built infrastructure -> operating. The single null fails closed. NO status_const is needed -- unlike Dayton, this layer states its own status per record. IT IS GENUINELY CURRENT, not an annual snapshot: project_start_date spans 1969-12-31 to 2029-10-01, i.e. it carries FORWARD-DATED projects, which is the opposite of the Dayton and St. Louis staleness shape. No recency_days is set for the same reason as Dayton -- a window would discard the In Service tier that the operating bucket exists for, and at 370 rows there is no size pressure. use_type_const 'Development': the layer has dept_name and major_group_name but no building-use column, and a capital project is not a building use. Scoping is spatial at 3 mi -- no ZIP or address column. record_url_precision 'dataset': no per-record URL column exists; dataset_url is the city's own Community Development page, live-verified HTTP 200 (280 KB). Host is services.arcgis.com, already proven reachable by dozens of live entries -- the section 0 corollary applied deliberately. MEASURED LIFT IS SMALL AND SAID SO PLAINLY: 2 of Boone's 10 dark pages. Wired on the Weld / Chester / Summit precedent that real dated per-parcel records are worth wiring even in small numbers, not because it fills the county. Columbia's own org (GHhNHT1xiCkCAXvo, 68 feature services, entity confirmed by name 'City of Columbia, Missouri') carries NO permit or planning-case ledger -- the rest is parks, trails, canopy, outages and water utilities."
+    },
+    {
+      "registry_id": "cook-county-il-highway-construction-program",
+      "platform": "arcgis",
+      "service_url": "https://services2.arcgis.com/I5Or36sMcO7Y9vQ3/arcgis/rest/services/DOTH_Construction_Projects_2026/FeatureServer/6",
+      "dataset_url": "https://www.cookcountyil.gov/agency/transportation-and-highways-0",
+      "jurisdiction": "Cook County Department of Transportation and Highways",
+      "coverage": [
+        {
+          "state": "IL",
+          "county": "Cook"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "STREET1",
+          "Limits"
+        ],
+        "file_date": "CreationDate",
+        "address": "Limits",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "status_const": "In the 2026 county construction program",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "In the 2026 county construction program"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "use_type_const": "Roads & Infrastructure",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-05 ILLINOIS PASS. Suburban Cook was the single largest dark block in the state -- 85 of 216 pages, the residue after chicago-building-permits covers the city. Config only. Cook County's own Department of Transportation and Highways 2026 construction program: 70 polyline projects on services2.arcgis.com (a host already proven reachable by dozens of live entries -- the section 0 corollary applied deliberately, so no wire-and-see is needed). MEASURED LIFT IS THE LARGEST IN ILLINOIS: 78 of the 85 dark Cook pages, because a county-wide highway program spreads across the whole suburban ring where a city permit ledger cannot. THE DATE QUESTION IS THE WHOLE DECISION, AND IT IS NOT NO_TEMPORAL_FIELD. The obvious timing field, `start`, is a SEASON STRING -- its seven values are Spring 2024 / Summer 2024 / Spring 2025 / Summer 2025 / Fall 2025 / Spring 2026 / Summer 2026, populated 70 of 70 but unparseable by any date literal, the Anaheim/Program_Year class. The layer nonetheless carries a REAL esriFieldTypeDate: CreationDate, populated 70 of 70 and spanning 2026-04-14 to 2026-06-25 -- entirely inside the program year the service is named for. That is an honest file_date meaning 'when this project entered the 2026 construction program', and it is the UDOT precedent exactly (created_dt chosen on live non-null counts). A layer with a fully-populated real date field is NOT the seventh disqualifier; NO_TEMPORAL_FIELD means there are NO dates, and here there is one on every row. STATUS IS A CONST IN THE SOURCE'S OWN LANGUAGE: there is no status column, and the honest statement is membership of the published program, so status_const is 'In the 2026 county construction program' -> approved (funded and scheduled, not asserted complete). Understating is the honest direction. use_type_const 'Roads & Infrastructure' -- a verified member of the CLOSED lib/map.js TYPE_EXACT vocabulary (it maps to cat('infrastructure')), checked in the file rather than assumed. Neither candidate type column is usable: `Scope` is free text (70/70 populated but groupBy returns nothing enumerable) and `travel` is traffic-impact prose with bare URLs mixed into the values ('Lane Closures, Lane Restrictions' 59, but also 'Please see https://www.ccdotholdorchardroad.com/'). record_url_precision 'dataset': `travel` carries a URL on a handful of rows but is a mixed traffic-impact field, not a per-record link column, so templating one would be guessing. ANNUAL SERVICES ARE SEPARATE PROGRAMS, NOT A UNION AND ITS PARTS. Cook publishes DOTH Construction Projects 2024, 2025 (service PrjLine2025) and 2026 as three distinct services. Only 2026 is wired -- the current program. They are not a superset/subset pair, so the union rule does not apply; wiring the older two would add historical road work, which is a separate decision. Layer id is 6, not 0 (preserveLayerIds true again -- third instance). COVERAGE CEILING: these are COUNTY highway projects. Municipal street work by Cook's 130+ suburbs is not in this layer, and the city of Chicago's own work is not either. 78 pages is what a county road program reaches, not county-wide development coverage."
+    },
+    {
+      "registry_id": "lake-county-il-construction-program",
+      "platform": "arcgis",
+      "service_url": "https://services3.arcgis.com/HESxeTbDliKKvec2/arcgis/rest/services/AnnualConstructionProgram/FeatureServer/0",
+      "dataset_url": "https://www.lakecountyil.gov/739/Annual-Construction-Program",
+      "jurisdiction": "Lake County, Illinois Division of Transportation",
+      "coverage": [
+        {
+          "state": "IL",
+          "county": "Lake"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Route",
+          "Descriptio"
+        ],
+        "status_raw": "Status",
+        "file_date": "Start_Date",
+        "decision_date": "End_Date",
+        "address": "From_At",
+        "record_url": "Site_URL",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Planned"
+        ],
+        "approved": [
+          "Active"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "use_type_const": "Roads & Infrastructure",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "record",
+      "_receipts": "2026-08-05 ILLINOIS PASS. Lake County was 0 of 31 pages live. Config only. Lake County Division of Transportation's Annual Construction Program on services3.arcgis.com (known-reachable host). MEASURED LIFT: 23 of the 31 dark pages -- the second largest in Illinois and, proportionally (74%), the best. ENTITY CONFIRMED AGAINST A SIX-STATE COLLISION. Lake County exists in IL, IN, OH, FL, CA and MN. The org's own returned name is 'Lake County Illinois GIS' (urlKey lakecountyil, id HESxeTbDliKKvec2), and the contents corroborate it -- county route and municipal names in the construction program are Lake County ILLINOIS. Name AND contents, not hostname. ⚠️ SMALL BY DESIGN, AND THE COUNT IS SPLIT ACROSS TWO LAYERS. Layer 0 'Construction Project Points' is esriGeometryMULTIPOINT with 39 rows; layer 1 'Construction Project Lines' is polyline with 15. ONLY LAYER 0 IS WIRED. They are companion halves of one program rather than a union and a part, so the union rule does not decide it; the points layer carries the fuller attribute set and already delivers the 23-page lift, and wiring both risks emitting the same project twice under two source_registry_ids -- the houston-plat class, which exact-identity dedup cannot catch. Layer 1 is recorded here, deliberately not wired. Vocabulary is complete and self-describing: Status is Active / Planned / null across the 39 rows. Planned -> proposed, Active -> approved; the nulls are UNMAPPED and fail closed. 31 of 39 carry Start_Date (a real esriFieldTypeDate) and 30 carry a per-record Site_URL, so record_url_precision is 'record' rather than dataset -- the county publishes a page per project. use_type_const 'Roads & Infrastructure' (verified member of the closed TYPE_EXACT set); there is no type column, and Category_1 was not adopted as one without enumeration. Freshest source found in Illinois: the item was modified 2026-07-30, six days before wiring. COVERAGE CEILING: COUNTY highway projects only. Waukegan, North Chicago, Gurnee and Lake County's other municipalities run their own programs and are not in this layer."
+    },
+    {
+      "registry_id": "champaign-il-special-use-permits",
+      "platform": "arcgis",
+      "service_url": "https://gisportal.champaignil.gov/ms/rest/services/Open_Data/Open_Data/MapServer/20",
+      "dataset_url": "https://gisportal.champaignil.gov/ms/rest/services/Open_Data/Open_Data/MapServer",
+      "jurisdiction": "City of Champaign, Illinois",
+      "coverage": [
+        {
+          "state": "IL",
+          "county": "Champaign"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "SUP_Type",
+          "Case_"
+        ],
+        "status_raw": "Status",
+        "file_date": "Effective_",
+        "decision_date": "Expiration",
+        "address": "Address",
+        "case_number": "Case_",
+        "record_url": "FolderLink",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [
+          "Conforming"
+        ],
+        "exclude": [
+          "Expired"
+        ]
+      },
+      "use_type_const": "Development",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "record",
+      "_receipts": "2026-08-05 ILLINOIS PASS. Champaign County was 0 of 33 pages live. Config only. The City of Champaign's Special Use Permit register, layer 20 of its Open_Data MapServer. MEASURED LIFT: 9 of the 33 dark pages. 54 rows, 51 with a real Effective_ date (esriFieldTypeDate), polygon geometry riding the shipped featurePoint() shoelace centroid, and a per-record FolderLink to the city's own case folder -- so record_url_precision is 'record'. Status is complete and self-describing with exactly two values: Conforming and Expired. THE MAPPING IS DELIBERATE AND WORTH STATING, because these are COMPLIANCE states rather than lifecycle states: a Conforming special use permit is one whose permitted use is in effect on the ground -> operating, not approved; Expired -> exclude. Reading 'Conforming' as approved would imply a pending or recent decision, which it is not. use_type_const 'Development': SUP_Type is a filing class, not a building use. ⚠️ THE SIBLING LAYER 19 'Zoning - Planned Developments' IS DELIBERATELY NOT WIRED -- NO_TEMPORAL_FIELD. It has the same 54-row scale, a Status column and a FolderLink, but its ONLY date fields are created_date and last_edited_date, which are GIS edit stamps rather than a filing or effective date. Layer 20 was chosen precisely because it carries Effective_, Site_Visit and Expiration -- real dates about the permit rather than about the GIS record. Same service, same scale, one wireable and one not: read the fields, not the neighbouring layer's success. COVERAGE CEILING: the CITY of Champaign only. Urbana, Rantoul, Savoy and unincorporated Champaign County run their own zoning and are not in this layer."
     }
   ],
   "ckan": [
