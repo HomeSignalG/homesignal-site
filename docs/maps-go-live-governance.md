@@ -1643,3 +1643,35 @@ unreachable, that a wire produced nothing, or that a queue is wedged.
 
 **Order of diagnosis, cheapest first:** queue depth + `min(id)` moving → `max(id)` in
 `_http_response` as a control → **edge-function logs** → only then a claim about the source.
+
+## §0g — RE-CACHE IN BATCHES OF ~24, AND NEVER DELETE FROM `net.http_request_queue`
+
+Two operational rules, both measured 2026-08-05 during the NJ/ME/IA/VT go-live.
+
+### The engine sheds load above roughly 24 concurrent
+
+| batch | result |
+|---|---|
+| **24 ZIPs** | 24/24 landed, **24 × 200**, 0 errors |
+| **240 ZIPs** | 200 landed after a long delay — **105 × 200 and 10 × 503** |
+
+The `503`s are visible in `get_logs(service: "edge-function")` at ~10 s execution, interleaved
+with healthy `200`s at 9–33 s. A large burst does not fail fast and loudly; it produces a slow,
+partial, **silently lossy** fill. **Drive manual re-caches in batches of ~24** and let the
+round-robin carry the tail — it re-caches every ZIP on its own schedule with no intervention.
+
+### NEVER delete from `net.http_request_queue`
+
+⚠️ **Done twice in one session, wrongly both times.** The queue looks like an outbox of unsent
+work. It is not (see §0f): a row sitting there may correspond to a request already executed
+upstream, or one still in flight.
+
+- **First deletion** (50 cron rows): the reasoning was "stuck, will re-fire." Edge-function logs
+  showed they had already run.
+- **Second attempt** (240 own rows): the `DELETE` **timed out at the MCP layer and did not
+  commit** — and that was pure luck, because **200 of those 240 landed moments later**. Had it
+  committed, a successful batch would have been discarded mid-flight.
+
+**The queue is not yours to prune.** If it looks stuck: check `min(id)` movement, then
+`max(id)` in `_http_response` as a control, then the **edge-function logs** — and then simply
+wait. `net.worker_restart()` is the only safe intervention.
