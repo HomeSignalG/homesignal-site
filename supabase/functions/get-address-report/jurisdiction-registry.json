@@ -11234,6 +11234,53 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-05 CALIFORNIA pass. San Luis Obispo County's OWN ArcGIS Server (gis.slocounty.ca.gov), PLN folder, PLN_EG_SERVICES_DATA MapServer layer 79 'Prod1PointHistory' - the production EnerGov case-history point layer (Dev1*/Stage1* are the non-production twins and are NOT wired). 50,969 rows, esriGeometryPoint. FOUND BY ENUMERATION, NOT GUESS: /arcgis/rest/services -> folder roster -> PLN -> 6 MapServices -> layer roster of 84; the AGO title search for 'San Luis Obispo permits' returned 10 items and surfaced only water-well and inspection-zone layers (weak instrument, non-zero denominator). FRESH: max(ApplicationDate) = 2026-08-04, one day before this pass; min = 1988-09-27. ApplicationDate is esriFieldTypeDate and is populated on 50,969 of 50,969 (100%) - count(ApplicationDate) returned exactly the layer count. WINDOW - BOTH MEASURED per the standing decision policy: require-a-date is VACUOUS here (dates are 100% populated, so it filters nothing and would reach back to 1988); 365d = 8,319, 1095d = 24,119, 1825d = 36,386 of 50,969. The choice was made on the DENSEST PAGES MEASURED DIRECTLY, not projected: a 3-mile envelope around the two densest SLO ZIP centroids returns Paso Robles 93446 218 / 724 / 1,345 and San Luis Obispo 93401 299 / 797 / (n/a) at 365 / 1095 / 1825 days. 1825 chosen under the rule applied across this pass - take the largest window (capped at 1825) whose worst MEASURED page stays far under the ceiling (Cleveland 44127, 5,511 sites / 5.98 MB): Paso Robles at 1825 is 1,345 raw, ~875 after the 65% type whitelist. TYPE VOCABULARY IS COMPLETE: CaseType has 93 distinct values summing EXACTLY to 50,969, proven twice - groupBy ordered n DESC and n ASC both returned 93 values totalling 50,969 (the Mesa/Gilbert $limit-truncation defence). 49 construction/land-use values are kept (33,138 rows); the 44 dropped are records-research (Research 5,638), enforcement (Code Enforcement 2,187, Cannabis Code, Vehicle Abatement), trades noise (Residential/Commercial Mechanical / Electrical / Plumbing 1,389), over-the-counter minor work (Express 1,664 + PMTX 318), septic (888+28+4 - the same wrong-record-class call made against Sonoma's septic layer), and procedural records (Application, Map Number, Lot, Pre-Application, Determination, CEQA, monitoring, time extensions, appeals, amendments). WorkClass was measured too (209 values, also summing exactly to 50,969) and NOT used - CaseType is the coarser, self-describing field. TRAILING-SPACE VALUES VERIFIED, NOT ASSUMED: two publisher values carry a trailing space ('Renewable Energy ', 'Express ') and includeTypesClause trims before quoting. Probed live: CaseType IN ('Renewable Energy') -> 3,359 and IN ('Express') -> 1,664, exactly the groupBy counts for the space-carrying values, so the SQL Server padding semantics hold. 'Renewable Energy  ASB' keeps its INTERNAL double space in the type_map key (trim only strips the ends). STATUS: the layer publishes NO status column - 13 fields, none of them a status. status_const 'Submitted' is the self-describing value the record actually attests (an application was filed on ApplicationDate) and buckets to proposed; approved/operating/exclude are deliberately EMPTY because this vocabulary states no such stage, and inventing one would be a guess (NDOT/VTrans precedent). RECORD URL: no per-record URL column. The county's own Planning & Building page links its Tyler EnerGov Citizen Self Service portal, so dataset_url is that portal's search page - recovered from the county page's HTML, never templated from CaseId (the Boston/Philadelphia dataset-precision precedent). SCOPE: San Luis Obispo County had 29 modelled ZIP pages and 0 lit before this entry."
+    },
+    {
+      "registry_id": "ctdot-project-work-areas",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/FCaUeJ5SOVtImake/arcgis/rest/services/CTDOT_Project_Work_Areas/FeatureServer/0",
+      "dataset_url": "https://services1.arcgis.com/FCaUeJ5SOVtImake/arcgis/rest/services/CTDOT_Project_Work_Areas/FeatureServer/0",
+      "jurisdiction": "Connecticut Department of Transportation (CTDOT)",
+      "coverage": [
+        {
+          "state": "CT"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Title",
+          "ProjectDescription"
+        ],
+        "status_raw": "CurrentSchedulePhase",
+        "file_date": "CurrentADVdate",
+        "case_number": "ProjectNumber",
+        "address": "Towns",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "use_type_const": "Utility",
+      "status_to_bucket": {
+        "proposed": [
+          "01_Planning",
+          "02_Pre-Design"
+        ],
+        "approved": [
+          "03_Final-Design",
+          "04_Contract-Processing",
+          "05_Construction",
+          "05_Construction (Pending)",
+          "Construction (Missing Dates)"
+        ],
+        "operating": [
+          "06_Completed",
+          "06_Completed (Closed)"
+        ],
+        "exclude": []
+      },
+      "extra_where": "CurrentADVdate IS NOT NULL",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-05 CONNECTICUT pass. CTDOT's own hosted AGO layer (services1.arcgis.com/FCaUeJ5SOVtImake), CTDOT_Project_Work_Areas layer 0. 2,311 rows, esriGeometryPolygon (wkid 103016 CT State Plane; the connector requests outSR=4326 and featurePoint() derives the shoelace centroid - the polygon-geometry pass). STATEWIDE coverage with no county, which the registry contract permits for a statewide dataset (the UDOT precedent) - and it matters more here than anywhere else so far, because CONNECTICUT ABOLISHED COUNTY GOVERNMENT IN 1960: there is no county tier to wire, only the state, nine Councils of Governments, and 169 towns. A statewide source is not merely convenient in CT, it is the only tier above the municipality. FRESH: max(last_edited_date) = 2026-04-30 - the layer is actively maintained. STATUS VOCABULARY IS COMPLETE: CurrentSchedulePhase has 9 values summing EXACTLY to 2,311 - 06_Completed (Closed) 902 / 06_Completed 433 / Construction (Missing Dates) 318 / 01_Planning 229 / 05_Construction 200 / 03_Final-Design 163 / 02_Pre-Design 36 / 04_Contract-Processing 20 / 05_Construction (Pending) 10. Every value is self-describing and buckets on the publisher's own numbered lifecycle: planning and pre-design -> proposed (265); final design, contract processing and all three construction phases -> approved (711); both completed phases -> operating (1,335). 265 + 711 + 1,335 = 2,311 exact. exclude is deliberately EMPTY - this vocabulary states no cancelled or abandoned stage, and inventing one would be a guess. WINDOW - BOTH MEASURED per the standing decision policy, and this is the program-class case §0h describes: require-a-date keeps 2,155 of 2,311 (93%), a 1825-day backward window on CurrentADVdate keeps only 855. The 1,300-record difference is almost exactly the 1,335 COMPLETED projects, whose advertisement dates are naturally old and which are the honest 'operating' content on a development page. require-a-date wins, as it did for NJ / ME / IA / VT. NO recency_days. DATE FIELD CHOSEN ON MEASURED POPULATION: CurrentADVdate 2,155/2,311 beats EstConstrCompletionDate 1,421/2,311. ConstructionCompletionDate, created_date and last_edited_date are also esriFieldTypeDate; the last two are EDITOR TRACKING, which is metadata about the row, never the record's own date - the same reason CTDOT_Active_Capital_Projects_with_Funding_Type and CTDOT_LOTCIP_Projects were REJECTED, since editor tracking is the ONLY date either of them carries. *** STATED CEILING: 5 of the 2,155 dated rows carry an absurd future CurrentADVdate (> 2035; the max is in the year 2222), a publisher data-entry artefact. They are kept rather than silently dropped - the record is real, only its date is wrong, and a backward window would keep them anyway. 156 of 2,311 rows have no ADV date at all and are dropped by extra_where. *** PAGE YIELD MEASURED DIRECTLY, not projected: a 3-mile envelope around six DARK CT ZIP centroids, one per uncovered county, returns New Haven 06511 196 / Middlesex 06457 128 / New London 06320 111 / Windham 06226 108 / Tolland 06084 91 / Litchfield 06759 66. Every county with zero coverage has substantial content, and the densest page is two orders of magnitude under the measured row-size ceiling. RECORD URL: no per-record URL column, so dataset precision on the layer's own REST endpoint (the Philadelphia / Boulder machine-URL precedent) rather than a templated project link. SCOPE: CT had 288 modelled ZIP pages, 19 lit (hartford-building-permits 9, stamford-major-developments 10) and 269 dark, with SIX of its eight counties at zero."
     }
   ],
   "ckan": [

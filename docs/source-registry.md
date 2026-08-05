@@ -6550,3 +6550,76 @@ receipts, so closing them means city-tier wiring: Orange has ~30 incorporated ci
 **California is not abandoned.** It carries 137 pre-existing live pages plus the two new county
 wires, and the reprobe list stands (Oakland and Berkeley both run live Socrata portals that simply
 have no permit dataset today; OC Public Works publishes 1,499 feature services and could add one).
+
+---
+
+## CONNECTICUT PASS (2026-08-05) — 269 dark, one STATEWIDE wire, six counties lifted off zero
+
+**Baseline measured before any probe:** CT has **288 modelled ZIP pages, 19 lit, 269 dark**.
+Registry grep first: **2 CT entries, both city-scoped** — `hartford-building-permits` (9 pages) and
+`stamford-major-developments` (10). **No statewide entry**, and **six of eight counties at zero**:
+New Haven 41 · Litchfield 40 · New London 33 · Windham 29 · Middlesex 23 · Tolland 16
+(Hartford 51 dark of 60, Fairfield 36 of 46).
+
+⚠️ **Connecticut is the state where §0c matters most, for a structural reason: it abolished county
+government in 1960.** There is no county tier to wire — only the state, nine Councils of
+Governments, and 169 towns. A statewide source is not a convenience here, it is the **only** tier
+above the municipality, and its absence would have forced `MUNICIPAL_TIER_REQUIRED` at 169 wires.
+
+### WIRED — `ctdot-project-work-areas` (statewide, all 288 pages in scope)
+
+CTDOT's own hosted AGO layer, `CTDOT_Project_Work_Areas` layer 0. **2,311 rows**,
+`esriGeometryPolygon` in wkid 103016 (CT State Plane) — the connector requests `outSR=4326` and
+`featurePoint()` derives the shoelace centroid, so this rides the polygon-geometry pass.
+`coverage: [{state: 'CT'}]` with no county, per the UDOT statewide precedent.
+
+- **Fresh:** `max(last_edited_date)` = **2026-04-30** — actively maintained.
+- **Status vocabulary complete:** `CurrentSchedulePhase` = **9 values summing exactly to 2,311**,
+  a numbered lifecycle that buckets itself — 01_Planning 229 + 02_Pre-Design 36 → **proposed 265**;
+  03_Final-Design 163 + 04_Contract-Processing 20 + 05_Construction 200 + 05_Construction (Pending)
+  10 + Construction (Missing Dates) 318 → **approved 711**; 06_Completed 433 + 06_Completed (Closed)
+  902 → **operating 1,335**. 265 + 711 + 1,335 = 2,311. `exclude` deliberately empty — no cancelled
+  or abandoned stage exists in this vocabulary.
+- **Window — the clean §0h program-class case.** require-a-date keeps **2,155 of 2,311 (93%)**; a
+  1825-day backward window on `CurrentADVdate` keeps only **855**. The ~1,300-record gap is almost
+  exactly the 1,335 COMPLETED projects, whose advertisement dates are naturally old and which are
+  the honest *operating* content on a development page. **require-a-date wins**, as it did for
+  NJ / ME / IA / VT. No `recency_days`.
+- **Date field chosen on measured population:** `CurrentADVdate` 2,155/2,311 beats
+  `EstConstrCompletionDate` 1,421/2,311.
+- ⚠️ **Stated ceiling:** **5** of the 2,155 dated rows carry an absurd future `CurrentADVdate`
+  (> 2035; the maximum is in the year **2222**) — a publisher data-entry artefact. They are kept
+  rather than silently dropped: the record is real, only its date is wrong, and a backward window
+  would have kept them anyway. **156** rows carry no ADV date at all and are dropped by `extra_where`.
+- **Page yield measured directly, not projected** — a 3-mile envelope around one DARK ZIP centroid
+  per uncovered county:
+
+| county | probe ZIP | projects in a 3-mile envelope |
+|---|---|---|
+| New Haven | 06511 | **196** |
+| Middlesex | 06457 | **128** |
+| New London | 06320 | **111** |
+| Windham | 06226 | **108** |
+| Tolland | 06084 | **91** |
+| Litchfield | 06759 | **66** |
+
+  Every zero-coverage county has substantial content, and the densest page is two orders of
+  magnitude under the measured row-size ceiling.
+
+### Rejected with receipts
+
+- **CT geodata hub (`geodata.ct.gov`) — `AGGREGATE_NOT_PER_RECORD`.** The DCAT catalogue enumerates
+  **574 datasets**; four match permit/project/construction by title, and **all four resolve to the
+  same layer** — `HousingDashboardDECD_Permits`, whose fields are `Municipality`, `year` (a string),
+  `places` and `Shape__Area`. ⚠️ Two of those four ("Permitting - Permits", "Permitting - Demos")
+  are **Web Maps, not feature services**; walking their `operationalLayers` (the Frisco precedent)
+  showed every one of their eight layers pointing at that same town-polygon aggregate. **A distinct
+  catalogue title is not a distinct dataset — resolve the layer before counting it as a candidate.**
+- **`CTDOT_Active_Capital_Projects_with_Funding_Type` (18 fields) and `CTDOT_LOTCIP_Projects`
+  (16 fields) — `NO_TEMPORAL_FIELD`.** Both carry date-typed fields, and in both cases the ONLY ones
+  are `created_date` and `last_edited_date`. ⚠️ **Editor tracking is metadata about the row, never
+  the record's own date** — checking field TYPES alone would have passed both. This is the
+  check-the-types rule with a second clause: check what the typed field *means*.
+- **`data.ct.gov` Socrata catalogue** — both catalogue queries timed out at
+  `api.us.socrata.com` and are recorded as **unresolved, not as an absence**; the statewide wire
+  landed on the CTDOT layer instead, so this was not pursued further. It stays on the reprobe list.
