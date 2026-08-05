@@ -6374,3 +6374,39 @@ Pierce case. Logged as a completeness item.
 
 **OH 199 · IN 196 · WI 191 · MD 192**, coverage AND completeness on each close. OH may already be
 `MUNICIPAL_TIER_REQUIRED` — check the existing record first.
+
+---
+
+## DOT_ONLY RETRO-STAMP (2026-08-05) — measured, and it CORRECTS the intuition
+
+Stamped where **≥80% of a state's lit pages have a DOT layer as their only source** (§0s). These
+states are **correctly closed — nothing to redo** — but a future session should read them as
+*broad and shallow* (or, for two of them, broad and deep) rather than finished.
+
+| `DOT_ONLY` | lit | DOT-only % | median | read as |
+|---|---|---|---|---|
+| **ME** | 171 | 100% | 2 | broad, very shallow |
+| **NJ** | 164 | 100% | 3 | broad, very shallow |
+| **VT** | 113 | 100% | 2 | broad, very shallow |
+| **IA** | 60 | 100% | 2 | broad, very shallow |
+| **MA** | 624 | 90% | **68** | broad **and deep** |
+| **UT** | 109 | 85% | 3 | broad, very shallow |
+| **FL** | 378 | 84% | 8 | broad, shallow |
+| **MI** | 287 | 83% | 11 | broad, shallow |
+| **CT** | 104 | 82% | **76** | broad **and deep** |
+
+### ⚠️ Two corrections the measurement forced
+
+1. **`DOT_ONLY` does NOT imply shallow.** MA (median 68) and CT (median 76) are DOT-dominated and
+   deep — MassDOT and CTDOT are dense programmes in small dense states, so a 3-mile envelope
+   catches many. Thinness tracks **project density per unit area**, a property of the state, not
+   of the source class.
+2. **AL is NOT `DOT_ONLY` — measured 26%, median 796.** Its two ALDOT wires added just **9** pages
+   to a state already carried by `huntsville-building-permits`. **WA (53%), TX (43%), NV (42%) and
+   AZ (30%) are mixed too**, despite the DOT wire being the headline of each pass.
+   **The wire that made the headline is often not the source carrying the pages — measure the
+   share, don't infer it from the pass title.**
+
+⚠️ The first version of this query reported **CT at 244% DOT-only** — impossible on its face,
+which is the only reason it was caught before publication. Recorded in §0s: *any share that can
+exceed its own denominator is a query to re-derive, not a finding.*

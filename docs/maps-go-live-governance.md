@@ -2091,6 +2091,20 @@ would have cost 26 round trips, tested only the one cause already in mind, and *
 Pierce entirely**, because Pierce's config looked fine under every check except the one that
 counted what it actually produced.
 
+### A GUESSED ORG ID RETURNS A REAL 200 FOR SOMEONE ELSE'S DATA
+
+**Read the service NAMES before believing a 200 from a host or org id you guessed.** Probing
+`services.arcgis.com/hRUr1F8lE8Jq2uJo` as a guess at St. George returned **HTTP 200 with 370 KB of
+genuine services** — `Azerbaijan_Buildings`, `Grenada_Buildings`, `DC_3D_Monuments`,
+`Coronavirus_Cases`, `Esri_US_Campus_Buildings`. A real organisation, real content, **wrong
+entity.**
+
+This is harsher than the known `<guess>.maps.arcgis.com` generic-portal trap, where the 200 is
+empty and obviously wrong. Here it is **full and plausible**: a service list of that size reads as
+a successful discovery, and the next step — filtering it for permit-shaped names — will happily
+return matches from the wrong publisher. **The status code tells you a server answered. Only the
+content tells you whose.**
+
 ### The corollary, learned the hard way in the same audit
 
 **A healthy-looking percentage is not proof of a healthy mechanism.** The first pass over the
@@ -2109,3 +2123,73 @@ genuine Tables** (virginia-beach, naperville, boulder, worcester, anaheim, hartf
 So: measure the population, then verify the mechanism on every member you are about to clear —
 **"it scored well" is a reason to look closer at a class you already know can fail silently, not a
 reason to stop.**
+
+---
+
+## §0s — `DOT_ONLY`: A STATEWIDE DOT WIRE BUYS COVERAGE, NOT NECESSARILY DEPTH
+
+**A statewide DOT layer is the right first move in a dark state (§0c) and it is not a substitute
+for permit sources.** A highway programme touches many ZIPs with a few records each; a city permit
+ledger touches fewer ZIPs with hundreds. Both are real; they are not interchangeable, and
+**"state closed" has meant two different things depending on which one carried it.**
+
+**Stamp a state `DOT_ONLY` when ≥80% of its lit pages have a DOT layer as their ONLY source**, and
+always report its median alongside. The stamp is a statement about **source composition**, not a
+verdict — it exists so a future session reads the state correctly instead of inferring depth from
+a coverage percentage.
+
+### Measured 2026-08-05 — and the "DOT means shallow" generalisation is only PARTLY true
+
+| state | lit | DOT-only | % | **median** |
+|---|---|---|---|---|
+| ME | 171 | 171 | **100%** | **2** |
+| NJ | 164 | 164 | **100%** | **3** |
+| VT | 113 | 113 | **100%** | **2** |
+| IA | 60 | 60 | **100%** | **2** |
+| MA | 624 | 560 | **90%** | **68** |
+| UT | 109 | 93 | **85%** | **3** |
+| FL | 378 | 319 | **84%** | **8** |
+| MI | 287 | 237 | **83%** | **11** |
+| CT | 104 | 85 | **82%** | **76** |
+| WA | 338 | 179 | 53% | 20 |
+| TX | 666 | 288 | 43% | 75 |
+| NV | 139 | 59 | 42% | 28 |
+| AZ | 224 | 68 | 30% | 139 |
+| AL | 34 | 9 | 26% | 796 |
+
+**`DOT_ONLY` (≥80%): ME · NJ · VT · IA · MA · UT · FL · MI · CT.**
+
+⚠️ **Two corrections the measurement forced, both against the intuition:**
+
+1. **MA (90%, median 68) and CT (82%, median 76) are DOT-dominated AND DEEP.** MassDOT and CTDOT
+   are dense programmes in small, dense states, so a 3-mile envelope catches many projects. **DOT
+   does not imply shallow** — it implies *project density per unit area*, which is a property of
+   the state, not of the source class. ME / VT / IA / UT sit at median 2–3 because their DOTs
+   cover huge rural areas thinly.
+2. **AL is NOT `DOT_ONLY` — measured 26%, median 796.** It was closed on two ALDOT grant
+   programmes, but those added only **9** pages to a state already carried by
+   `huntsville-building-permits`. **WA (53%), TX (43%), NV (42%) and AZ (30%) are likewise mixed,
+   not DOT-only**, despite the DOT wire being the headline of their pass.
+
+**So do not infer the stamp from "which wire closed the state" — the wire that made the headline is
+often not the source carrying the pages. Measure the share.**
+
+### The instrument
+
+```sql
+-- share of a state's lit pages whose ONLY source is a DOT layer
+bool_and(s->>'source_registry_id' in (<dot list>))  -- per zip, over development_reports
+```
+
+⚠️ **Write it with `distinct` on the ZIP list and the aggregate filtered to lit pages.** The first
+version of this query fanned out on the join and reported **CT at 244% DOT-only** — impossible on
+its face, which is the only reason it was caught. A fan-out that lands under 100% would have
+published silently. **Any share that can exceed its own denominator is a query to re-derive, not a
+finding.**
+
+### What the stamp means for the queue
+
+A `DOT_ONLY` state with a low median is **broad and shallow: correctly closed, not finished.** Its
+next unlock is municipal permit sources, and that work will move the **median** far more than the
+**page count** — the §0q asymmetry, and the reverse of the Pierce case. A `DOT_ONLY` state with a
+high median (MA, CT) needs nothing further on this axis.
