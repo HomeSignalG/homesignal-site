@@ -11281,6 +11281,90 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-05 CONNECTICUT pass. CTDOT's own hosted AGO layer (services1.arcgis.com/FCaUeJ5SOVtImake), CTDOT_Project_Work_Areas layer 0. 2,311 rows, esriGeometryPolygon (wkid 103016 CT State Plane; the connector requests outSR=4326 and featurePoint() derives the shoelace centroid - the polygon-geometry pass). STATEWIDE coverage with no county, which the registry contract permits for a statewide dataset (the UDOT precedent) - and it matters more here than anywhere else so far, because CONNECTICUT ABOLISHED COUNTY GOVERNMENT IN 1960: there is no county tier to wire, only the state, nine Councils of Governments, and 169 towns. A statewide source is not merely convenient in CT, it is the only tier above the municipality. FRESH: max(last_edited_date) = 2026-04-30 - the layer is actively maintained. STATUS VOCABULARY IS COMPLETE: CurrentSchedulePhase has 9 values summing EXACTLY to 2,311 - 06_Completed (Closed) 902 / 06_Completed 433 / Construction (Missing Dates) 318 / 01_Planning 229 / 05_Construction 200 / 03_Final-Design 163 / 02_Pre-Design 36 / 04_Contract-Processing 20 / 05_Construction (Pending) 10. Every value is self-describing and buckets on the publisher's own numbered lifecycle: planning and pre-design -> proposed (265); final design, contract processing and all three construction phases -> approved (711); both completed phases -> operating (1,335). 265 + 711 + 1,335 = 2,311 exact. exclude is deliberately EMPTY - this vocabulary states no cancelled or abandoned stage, and inventing one would be a guess. WINDOW - BOTH MEASURED per the standing decision policy, and this is the program-class case §0h describes: require-a-date keeps 2,155 of 2,311 (93%), a 1825-day backward window on CurrentADVdate keeps only 855. The 1,300-record difference is almost exactly the 1,335 COMPLETED projects, whose advertisement dates are naturally old and which are the honest 'operating' content on a development page. require-a-date wins, as it did for NJ / ME / IA / VT. NO recency_days. DATE FIELD CHOSEN ON MEASURED POPULATION: CurrentADVdate 2,155/2,311 beats EstConstrCompletionDate 1,421/2,311. ConstructionCompletionDate, created_date and last_edited_date are also esriFieldTypeDate; the last two are EDITOR TRACKING, which is metadata about the row, never the record's own date - the same reason CTDOT_Active_Capital_Projects_with_Funding_Type and CTDOT_LOTCIP_Projects were REJECTED, since editor tracking is the ONLY date either of them carries. *** SENTINEL DATES ARE DROPPED AT SOURCE, AND FINDING THEM IS A CORRECTION TO MY OWN MEASUREMENT. The first wire checked only max(CurrentADVdate) and reported '5 absurd future rows'. Measuring the OTHER end after go-live found a second sentinel the max could never reveal: 26 rows dated exactly 1900-01-01. Both ends now bound the clause, and the three counts reconcile exactly - 26 below 1990 + 5 above 2035 + 2,124 kept = 2,155 dated rows. A false date on a page that makes factual claims about real projects is worse than a dropped record, so the 31 are excluded rather than published with a fabricated-looking filing date; 156 of 2,311 rows have no ADV date at all and were already dropped. STANDING ANSWER: measure BOTH ends of a date field - a max proves freshness, a min catches sentinels, and neither substitutes for the other. *** PAGE YIELD MEASURED DIRECTLY, not projected: a 3-mile envelope around six DARK CT ZIP centroids, one per uncovered county, returns New Haven 06511 196 / Middlesex 06457 128 / New London 06320 111 / Windham 06226 108 / Tolland 06084 91 / Litchfield 06759 66. Every county with zero coverage has substantial content, and the densest page is two orders of magnitude under the measured row-size ceiling. RECORD URL: no per-record URL column, so dataset precision on the layer's own REST endpoint (the Philadelphia / Boulder machine-URL precedent) rather than a templated project link. SCOPE: CT had 288 modelled ZIP pages, 19 lit (hartford-building-permits 9, stamford-major-developments 10) and 269 dark, with SIX of its eight counties at zero."
+    },
+    {
+      "registry_id": "aldot-rebuild-alabama-grant-projects",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/LZzQi3xDiclG6XvQ/arcgis/rest/services/RALGCenterPoint08102023/FeatureServer/38",
+      "dataset_url": "https://services.arcgis.com/LZzQi3xDiclG6XvQ/arcgis/rest/services/RALGCenterPoint08102023/FeatureServer/38",
+      "jurisdiction": "Alabama Department of Transportation (ALDOT) — Rebuild Alabama Annual Grant Program",
+      "coverage": [
+        {
+          "state": "AL"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PJ_DS",
+          "FACILITY_CARRIED_NA"
+        ],
+        "status_raw": "SELECTED_IN",
+        "file_date": "SELECTED_DT",
+        "case_number": "PJ_REF_ID",
+        "address": [
+          "SPONSOR_NA",
+          "CNTY_NA"
+        ],
+        "record_url": "RPT_URL",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "use_type_const": "Utility",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Y"
+        ],
+        "operating": [],
+        "exclude": [
+          "N"
+        ]
+      },
+      "extra_where": "SELECTED_IN = 'Y' AND SELECTED_DT IS NOT NULL",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-05 ALABAMA pass. ALDOT's own hosted AGO layer (org LZzQi3xDiclG6XvQ), RALGCenterPoint08102023 layer 38 - the Rebuild Alabama Annual Grant Program awarded-project points. 1,858 rows, esriGeometryPoint, statewide coverage with no county (the UDOT precedent). FRESH: max(SELECTED_DT) = 2025-07-07. STATUS VOCABULARY IS COMPLETE: SELECTED_IN has 3 values summing EXACTLY to 1,858 - Y 765 / N 556 / a single-space blank 537. Y (selected for funding) -> approved; N (not selected) -> exclude, because an unfunded application is not a project; the blank states nothing and is excluded too rather than guessed into a bucket. proposed and operating are deliberately empty - this vocabulary describes an award decision, not a construction stage. THE DATE AND THE AWARD AGREE EXACTLY, PROVEN NOT ASSUMED: SELECTED_IN='Y' AND SELECTED_DT IS NULL returns 0, and count(SELECTED_DT) = 765 = the Y count. So requiring both in extra_where costs nothing and guards against future drift. *** STATED CEILING - THIS IS A THIN SOURCE PER PAGE, MEASURED NOT ASSUMED. It is a RURAL road-resurfacing grant programme, so its points sit on county roads rather than in the population centres HomeSignal models. A 3-mile envelope around eight dark AL ZIP centroids, one per uncovered county, returns Montgomery 36104 2 / Birmingham 35203 1 / Tuscaloosa 35401 1 / Auburn 36830 1 / Mobile 36602 0 / Fairhope 36532 0 / Pelham 35124 0 / Decatur 35601 0. It clears the >=5-page floor across 262 modelled AL pages, but it will never be a dense source and should not be expected to carry the state on its own. *** RECORD URL - AND A CORRECTION TO THE OBVIOUS READING: RPT_URL is populated on 100% of rows, which looks like record precision until the VALUES are compared. Two different awarded projects return the byte-identical URL (aldot.maps.arcgis.com/sharing/rest/content/items/3ffc668341094c66a83eaed7fa6879c2/data) - it is the fiscal-year Awarded Projects REPORT, one per year, not one per project. record_url_precision is therefore 'dataset' even though the column is never empty. STANDING ANSWER: a populated per-row URL column is not evidence of record precision - compare the values across rows before claiming it. SCOPE: AL had 262 modelled ZIP pages, 25 lit (huntsville-building-permits) and 237 dark, with EIGHT of ten counties at zero - Jefferson 60, Mobile 39, Montgomery 28, Tuscaloosa 27, Baldwin 24, Shelby 18, Morgan 16, Lee 15."
+    },
+    {
+      "registry_id": "aldot-atrip-ii-projects",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/LZzQi3xDiclG6XvQ/arcgis/rest/services/ATRIPIICenterPoint03282022/FeatureServer/23",
+      "dataset_url": "https://services.arcgis.com/LZzQi3xDiclG6XvQ/arcgis/rest/services/ATRIPIICenterPoint03282022/FeatureServer/23",
+      "jurisdiction": "Alabama Department of Transportation (ALDOT) — ATRIP-II",
+      "coverage": [
+        {
+          "state": "AL"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PJ_DS",
+          "FACILITY_CARRIED_NA"
+        ],
+        "status_raw": "SELECTED_IN",
+        "file_date": "SELECTED_DT",
+        "case_number": "PJ_REF_ID",
+        "address": [
+          "SPONSOR_NA",
+          "CNTY_NA"
+        ],
+        "record_url": "RPT_URL",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "use_type_const": "Utility",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Y"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "extra_where": "SELECTED_IN = 'Y' AND SELECTED_DT IS NOT NULL",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-05 ALABAMA pass. ALDOT's own hosted AGO layer, ATRIPIICenterPoint03282022 layer 23 - the ATRIP-II (Alabama Transportation Rehabilitation and Improvement Program, cycle II) awarded-project points. 385 rows, esriGeometryPoint, statewide. A SEPARATE funding programme from the Rebuild Alabama Annual Grant layer, not a subset of it - the Chester precedent for disjoint programmes gets a separate entry each. FRESH: max(SELECTED_DT) = 2025-01-10. *** SELECTED_IN IS SINGLE-VALUED HERE, WHICH IS THE OPPOSITE OF ITS SIBLING. groupBy returns exactly ONE value - Y, 385 of 385 - so this layer publishes only the awards, while the Rebuild Alabama layer publishes applications too (Y 765 / N 556 / blank 537). The mapping is still written as Y -> approved rather than as a constant, so that an N appearing in a future refresh is EXCLUDED by the existing bucket rather than silently accepted. exclude is empty because no such value exists today. *** *** AND THE DATE DOES NOT TRACK THE AWARD HERE, UNLIKE ITS SIBLING: SELECTED_IN='Y' AND SELECTED_DT IS NULL returns 59, so 59 of the 385 awards carry no selection date and are dropped by extra_where. 326 kept. The identical query against the Rebuild Alabama layer returns 0 - two layers with the same schema behave differently, which is why the check was run on both rather than inferred from one. *** PAGE YIELD MEASURED DIRECTLY: a 3-mile envelope around four dark AL ZIP centroids returns Tuscaloosa 35401 13 / Birmingham 35203 3 / Mobile 36602 1 / Montgomery 36104 0. Denser than the Rebuild Alabama layer on the same probes. RECORD URL - AND A CORRECTION TO THE OBVIOUS READING: RPT_URL is populated on 100% of rows, which looks like record precision until the VALUES are compared. Two different awarded projects return the byte-identical URL (aldot.maps.arcgis.com/sharing/rest/content/items/3ffc668341094c66a83eaed7fa6879c2/data) - it is the fiscal-year Awarded Projects REPORT, one per year, not one per project. record_url_precision is therefore 'dataset' even though the column is never empty. STANDING ANSWER: a populated per-row URL column is not evidence of record precision - compare the values across rows before claiming it. "
     }
   ],
   "ckan": [
