@@ -1805,3 +1805,65 @@ ENTRY, so require-a-date normally wins. Record both numbers either way.**
 
 See **§0h** for the worked case: NJ loses **89%** under a backward 1825-day window because
 `PROJ_RECD` is a receipt date on a programme running through FY2033.
+
+---
+
+## §0l — A POPULATED DATE FIELD IS NOT AN ASSERTION THAT THE EVENT HAPPENED
+
+**Before reading a lifecycle stage from a date column, compare it against `CURRENT_TIMESTAMP`
+and count BOTH sides.** A publisher populates the date it *plans* as readily as the date it
+*records*. `IS NOT NULL` on a completion date does not mean complete; a date column's NAME is
+not a claim about tense, and the field description usually will not say.
+
+**This is the highest-consequence error class the maps work has produced**, because it fails in
+exactly the direction the anti-fabrication contract exists to prevent: a page that names a real
+project and asserts a stage that has not happened. The record is real, the link is real, the pin
+is real — and the sentence is false. No downstream invariant catches it. `record_url` is present,
+coordinates are present, the vocabulary is complete, the gate passes. Only the comparison catches
+it.
+
+**Three cases, all found by measuring rather than reading the field name:**
+
+| source | field | what reading it plainly would have shipped | what measuring showed |
+|---|---|---|---|
+| **WSDOT** delivery plan | `OperComplete` | `IS NOT NULL` → "Operationally Complete" → operating, on **1,389** rows | `<= now` **803** · `> now` **586**. A SCHEDULED date — **586 not-yet-built projects marked as built** |
+| **CTDOT** work areas | `CurrentADVdate` | the max looked sane, so the field looked clean | `min()` = **1900-01-01**, a **sentinel**, 26 rows |
+| **CTDOT** work areas | `CurrentADVdate` | same field, other end | 5 rows in the **year 2222** — data-entry artefacts |
+
+The CT pair is why the rule says *both ends*. Checking `max()` alone passed the field as healthy
+while a 1900 sentinel sat in it; checking `min()` alone would have missed the year-2222 rows.
+**A date field has two ends and a present moment; a single aggregate characterises none of them.**
+
+### What to do about it
+
+- **Split, do not guess.** Where a date pair implies a lifecycle, write one registry entry per
+  slice with **disjoint server-side predicates**, and let the server evaluate them
+  (`CURRENT_TIMESTAMP`, never a literal baked at wire time — otherwise the buckets rot silently
+  as time passes and nothing reports it). WSDOT ships as three entries on one layer.
+- **Drop what no predicate matches.** WSDOT's 191 rows carrying neither date are matched by
+  nothing and emit nothing. **A row you cannot place in a stage is not a row you place in the
+  most likely stage.**
+- **Bound both ends in `extra_where`** where sentinels exist, rather than dropping the records or
+  silently keeping absurd dates. CTDOT is bounded `>= 1990-01-01 AND <= 2035-01-01`.
+- **The arithmetic reconciles or the design is wrong.** WSDOT 366 + 222 + 803 = 1,391 of 1,582,
+  191 unmatched. CT 26 + 5 + 2,124 = 2,155 dated of 2,311.
+
+### The corollary — `RPT_URL`, and why 100% populated proves nothing
+
+**A per-row URL column being 100% populated is not evidence of record precision. Compare the
+VALUES across rows before claiming it.** ALDOT's `RPT_URL` is populated on every row of both
+grant layers and looks like a per-project link — until two different awarded projects return the
+**byte-identical** URL (`…/items/3ffc668341094c66a83eaed7fa6879c2/data`). It is the fiscal year's
+Awarded Projects **report**, one per year, not one per project. Both entries are wired
+`record_url_precision: "dataset"` despite the column never being empty.
+
+Same failure shape as the date rule: **a field's population rate describes the field, not what
+the field means.** Presence is not semantics.
+
+### Consistency note, recorded rather than papered over
+
+ALDOT's **CPMS** layer was rejected earlier in the same pass for "no status field" — and WSDOT was
+then wired on exactly that basis, a date pair with no status column. The two calls are
+inconsistent as stated. **CPMS is on the reprobe list**, to be re-run with the past/future
+comparison against `project_completion`; if it splits the way WSDOT's did, it is wireable and the
+rejection was wrong.

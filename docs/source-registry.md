@@ -6707,3 +6707,125 @@ per the Chester precedent.
   region whose modelled pages are a handful of Tuscaloosa-area ZIPs.
 - **`algis.alabama.gov` and `gis.dot.state.al.us`** — both hosts fail to answer (no response, not a
   404), so ALDOT's org on ArcGIS Online is the only reachable first-party publisher.
+
+---
+
+## WASHINGTON PASS (2026-08-05) — 225 dark, one STATEWIDE wire, every zero-coverage county lifted
+
+**Result: WA 137 → 336 of 362 pages (38% → 93%). National 5,449 → 5,648 distinct
+`app_projects` ZIPs (42.83% → 44.40%).** One registry entry family, no connector, engine or
+schema change. `development_reports` cache 12,722 rows.
+
+### What was wired
+
+**`wsdot-project-delivery-plan-{proposed,under-construction,complete}`** — three registry entries
+over ONE layer, WSDOT's own server:
+`data.wsdot.wa.gov/arcgis/.../WSDOTProjectDeliveryPlanCurrent/FeatureServer/0`. 1,582 rows,
+`esriGeometryPolyline` **but with native `Longitude`/`Latitude` populated on 1,582 of 1,582**, so
+records place by the publisher's own point rather than a derived polyline midpoint. Statewide
+coverage with no county (the UDOT precedent). `spatial_zip_radius_mi: 3`.
+
+Found via the WSDOT hub DCAT: 467 datasets enumerated, 10 project-titled, of which
+*Project Delivery Plan Current* is the only one that is not a frozen year snapshot (2018–2023 are
+separate archived layers).
+
+### ⚠️ The layer publishes NO status column, and the obvious workaround fabricates 586 completions
+
+The tempting single-entry design was `extra_where: OperComplete IS NOT NULL` with
+`status_const: "Operationally Complete"` → operating, on the reading that a populated completion
+date means the project is complete.
+
+**Measured before wiring:**
+
+| predicate | rows |
+|---|---|
+| `OperComplete <= CURRENT_TIMESTAMP` | 803 |
+| `OperComplete > CURRENT_TIMESTAMP` | **586** |
+
+It is a **scheduled** completion date. That design would have marked **586 not-yet-built projects
+as built**, on pages naming real projects — the exact fabrication class the anti-fabrication
+contract exists to prevent, and one no downstream invariant catches (`record_url` present, coords
+present, vocabulary complete, gate passes). **Standing answer promoted to governance §0l: a
+populated date field is not an assertion that the event has happened.**
+
+### The three-slice design, with live proof it was necessary
+
+| registry_id | predicate | layer rows | bucket |
+|---|---|---|---|
+| `…-proposed` | `AdDate > CURRENT_TIMESTAMP` | 366 | proposed |
+| `…-under-construction` | `AdDate <= CURRENT_TIMESTAMP AND OperComplete > CURRENT_TIMESTAMP` | 222 | approved |
+| `…-complete` | `OperComplete <= CURRENT_TIMESTAMP` | 803 | operating |
+
+366 + 222 + 803 = 1,391. The remaining **191 rows carry neither date**, are matched by no
+predicate, and are **dropped rather than bucketed by guess**. Predicates use `CURRENT_TIMESTAMP`,
+evaluated server-side per request, so the buckets stay correct as time passes with no redeploy.
+Cost: three fetches per WA page instead of one, bounded at ~20 records each.
+
+**Live bucket split across all 2,646 emitted records: proposed 482 · approved 625 · operating
+1,539.** Under the naive design all 2,164 approved+operating records would have read as *built* —
+so **625 live records are correctly showing as under-construction rather than complete**. The
+fabrication is measurable on the pages it did not reach.
+
+### Invariants — all zero, across all 2,646 records from the three entries
+
+`0 missing record_url · 0 missing coordinates · 0 non-point scope · 0 missing use_type`.
+**Bidirectional gate proof with live receipts: 0 WSDOT records on any non-WA page, cache-wide.**
+
+### Vocabularies (measured, neither used as a status)
+
+`ImprovementTypeDesc` 125 values and `ProgramDesc` 5 values, **each summing EXACTLY to 1,582**
+(Preservation 856 / Improvement 609 / WSF Construction 88 / Traffic Operations Capital 26 /
+Highway Management and Facilities 3). Neither names a building use, so `use_type_const: "Utility"`
+per the DOT convention.
+
+### ⚠️ Stated ceiling — freshness is the weak point
+
+`max(LastUpdated)` = **2024-11-27**, twenty months before this pass, while the hub's
+dataset-level `modified` claims 2025-10-07. **The row-level field is the honest one and it is the
+older of the two.** This is a multi-year capital plan with AdDates running to 2042, so a stale
+edit stamp is far less damaging than on a permit ledger — but it is stated rather than buried, and
+**WSDOT goes on the reprobe list**.
+
+### Per-county result — every previously-zero county is off zero
+
+| county | pages | lit | dark |
+|---|---|---|---|
+| King | 107 | 103 | 4 |
+| Pierce | 65 | 62 | 3 |
+| Spokane | 46 | 46 | 0 |
+| Snohomish | 33 | 32 | 1 |
+| Yakima | 26 | 19 | 7 |
+| Clark | 20 | 19 | 1 |
+| Thurston | 19 | 17 | 2 |
+| Whatcom | 18 | 14 | 4 |
+| Skagit | 14 | 12 | 2 |
+| Benton | 10 | 9 | 1 |
+| Kittitas / Lewis / Stevens | 1 each | 1 each | 0 |
+| Whitman | 1 | 0 | 1 |
+
+**Snohomish, Yakima, Whatcom, Skagit, Benton and Whitman were the six counties at zero.** Five are
+now lit; Whitman is a single rural page with no WSDOT project inside 3 mi — an honest empty, not a
+wiring defect.
+
+**26 pages remain dark**, thinly spread across rural ZIPs where no capital project falls within
+the 3-mile envelope. That is the source being honest about its own footprint.
+
+### ⚠️ Predicted yield ran ~25% high — the probe envelope is not the connector's
+
+Pre-wire probes predicted Auburn 98001 = 25; the deployed engine emitted **19**. Same direction on
+the other probes. The probe counted layer features in a bare 3-mi envelope; the connector applies
+its own paging, dedup and column projection on top. **Treat pre-wire yield as an upper bound and
+an ordering signal, not a forecast** — it is still the right instrument for deciding *whether* to
+wire, and it correctly said every dark county had real content.
+
+### Operational findings from the re-cache (both worth keeping)
+
+1. **`dev_refresh_collect()` processes a BOUNDED batch per call.** After firing 225 ZIPs, a single
+   collect showed 65 of 225 refreshed and the number appeared stuck; it was not — eight further
+   calls walked it 65 → 148 → 214 → 225. **Call collect until the count stops advancing; one call
+   after a large fire is not evidence of failure.** (Distinct from §0g's global-count caveat.)
+2. **`dev_refresh_inflight` is a rolling log, not a queue.** It stayed at 225 for the WA targets
+   long after every one had landed, so **its row count is not a progress instrument** — measure
+   `development_reports.refreshed_at` instead.
+3. 11 of 225 fires returned 503/timeout on the first pass and succeeded on a re-fire. Batches of
+   24 per §0g.
