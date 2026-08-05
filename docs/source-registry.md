@@ -6829,3 +6829,172 @@ wire, and it correctly said every dark county had real content.
    `development_reports.refreshed_at` instead.
 3. 11 of 225 fires returned 503/timeout on the first pass and succeeded on a re-fire. Batches of
    24 per §0g.
+
+---
+
+## ARIZONA PASS (2026-08-05) — 208 dark, one STATEWIDE wire, five of six zero counties lifted
+
+**Result: AZ 156 → 224 of 364 pages (43% → 62%), dark 208 → 140. National 5,736 distinct
+`app_projects` ZIPs.** One registry entry, no connector/engine/schema change. All 208 dark ZIPs
+re-cached and materialized.
+
+### What was wired
+
+**`adot-tip-fy2026-2030`** — ADOT's own hosted AGO layer
+(`services6.arcgis.com/clPWQMwZfdWn4MQZ/.../lyrTIPAdoptions_Final2630_view/FeatureServer/0`),
+the **adopted FY2026-2030 Transportation Improvement Program**. 247 rows, polyline, statewide
+with no county (the UDOT precedent). 234 kept after exclusions.
+
+**Result on the ground: 159 records across 77 ZIPs — 141 point-scope, 18 area (genuinely
+geometry-less rows). 0 missing `record_url`, 0 missing coordinates, 0 missing `use_type`.
+Bidirectional gate proof: 0 ADOT records on any non-AZ page, cache-wide.**
+
+### Discovery took three hops — ADOT has no hub domain
+
+`azdot-adot` and `gisdata-azdot` `.opendata.arcgis.com` both return *"Domain record(s) not
+found"*, and `gis.azdot.gov` answers but 404s every REST path. **A server-issued 404 means the
+host is alive and the path is wrong — not that the source is dead** (the Frisco precedent). The
+route in was the **AZGeo state clearinghouse DCAT** (1,296 datasets, 23 project-titled), which
+showed ADOT publishing to AGO org `clPWQMwZfdWn4MQZ`; enumerating that org's **886 services**
+surfaced the TIP layers.
+
+### ⚠️ The obvious candidate was the wrong one
+
+**`ADOTProjects_AZGEO` is named exactly like the thing we want and is REJECTED.** Its
+`serviceDescription` is literally **"ADOT Projects DRAFT"**; it holds 57 centroids; and its
+`Status` column is **free-text prose** whose most common value is the unedited template
+placeholder `<Delete this text and enter an explanation for the AR or BS status.>` (4 rows), the
+rest project-manager notes dated 2023 (*"NTP issued 5/4/23"*). Its `ProjectPhase` column IS a
+clean 5-value vocabulary summing exactly to 57 (null 19 / Design 17 / Scoping-Procurement 15 /
+Construction 4 / Study 2) — but a third is null and the service is self-labelled draft.
+Rejected: STALE + free-text status + SUB_THRESHOLD (the Douglas County NV precedent).
+
+### ⚠️ The sibling layer is a 59% duplicate — and the first overlap measure was 3x wrong
+
+`lyrTIPAdoptions_Tentative2731_view` (268 rows, tentative FY27-31) shares **146 of this layer's
+247 `TIP_ID`s**. Wiring both would double-emit 146 projects with **contradictory stages on one
+page** — adopted vs tentative — the Houston-plat class, uncatchable by exact-identity dedup
+across two `source_registry_id`s.
+
+**Measured on `TRACS` first, it read 52 of 194 — an understatement of nearly 3x.** `TRACS` is not
+an identity; it is a **comma-separated list** of ADOT project numbers
+(`"70124, M722401X,70129,70125,70126,70127,70128"`), so string equality compares list membership
+*and order*. `TIP_ID` is the real identity (247 distinct for 247 rows). **Standing answer, same
+family as ALDOT's `RPT_URL`: read a field's VALUES before using it as a key.**
+
+### Status and date
+
+The layer publishes **no status column and no date column of any type**. `status_const` states
+exactly what the layer is — an *adopted* programme entry, funded and scheduled but not built →
+`approved`; the other three buckets are deliberately empty, because the layer asserts one thing
+about every row. No `file_date`, which is permitted — five wired entries already omit it,
+including `nvdot-project-boundaries`, the closest analogue. **Per §0l no date is read as a stage
+assertion here at all: the `FY2026..FY2030` columns are programmed dollar amounts, not dates.**
+
+### Vocabularies — both complete, both sum to exactly 247
+
+`COUNTY` reaches every dark county: Maricopa 78 · Yavapai 24 · Pima 24 · Coconino 21 · Pinal 19 ·
+Yuma 16 · Apache 13 · Cochise 10 · Mohave 10 · Navajo 9 · Statewide 6 · Santa Cruz 6 · Gila 5 ·
+Graham 2 · Greenlee 2 · La Paz 2. `TYPE`'s 22 values also sum to exactly 247 — recorded as
+measured but **not** used as `use_type` (none names a building use → `use_type_const: "Utility"`,
+the DOT convention).
+
+### Exclusions reconcile exactly
+
+10 rows are `PROJECT_LIMITS='Not Location Specific'`, 6 are `COUNTY='Statewide'` — administrative
+line items such as *"Statewide AZTRaCS Yearly License Fee"*. Real budget entries, but **not
+development at a location**, and they must never render as a project on a resident's ZIP page.
+247 − 234 kept = 13, and 10 ∪ 6 = 13, so exactly 3 rows carry both flags. The clause is written
+`(PROJECT_LIMITS IS NULL OR PROJECT_LIMITS <> …)` because **3 rows have a NULL** `PROJECT_LIMITS`
+and a bare `<>` would drop them silently under three-valued logic — measured, not assumed.
+
+### 🔴 THE DEFECT THIS PASS PRODUCED, AND THE STANDING ANSWER
+
+**The entry first shipped WITHOUT `lat`/`lng` in `column_map`, and 128 of its first 129 records
+came back `scope:"area"` anchored at the report centroid instead of pinning. AZ moved 156 → 157.**
+
+The layer was never at fault — it serves real multipart polyline `paths` in wkid 4326, verified
+directly. `sources/arcgis.ts` computes `featurePoint()` and writes the derived point into the
+**synthetic** columns `row.__lat` / `row.__lng`, which only reach the record if `column_map` maps
+them. Every other working non-point entry does exactly that — `txdot-projects-info-all`,
+`nvdot-project-boundaries`, `fort-worth-zoning-cases`, `clark-county-active-projects`.
+**WSDOT was unaffected only because it has native `Longitude`/`Latitude` columns**, which is why
+the omission survived the Washington pass without showing itself.
+
+> **STANDING ANSWER: an arcgis entry on a NON-POINT layer must declare `lat: "__lat"` and
+> `lng: "__lng"`, or every record silently degrades to area scope at the ZIP centroid — it still
+> lists, still carries a `record_url`, and still renders, but it never pins on any of the three
+> map views and never counts as LIVE, because `app_projects` is point-scope only.**
+
+This is the **Austin `spatial_point_col` failure class**: config that looks complete, passes every
+unit test, and produces records that do not do the job. Not a fabrication issue — v18 anchors area
+items at the report centroid by design and those coordinates are never rendered; the cost is
+coverage, not correctness. **What caught it was the arithmetic: +1 page against 68 ZIPs of cached
+records. "Did records land" would have read as success.** Fixed and re-cached the same day.
+
+### Per-county result — five of six zero counties lifted
+
+| county | pages | lit before | lit after | dark |
+|---|---|---|---|---|
+| Maricopa | 136 | 102 | 119 | 17 |
+| Pima | 52 | 35 | 36 | 16 |
+| Navajo | 32 | **0** | **11** | 21 |
+| Pinal | 28 | 3 | 17 | 11 |
+| Yavapai | 27 | 1 | 7 | 20 |
+| Coconino | 25 | 15 | 17 | 8 |
+| Mohave | 24 | **0** | **3** | 21 |
+| Cochise | 22 | **0** | **5** | 17 |
+| Yuma | 10 | **0** | **7** | 3 |
+| Santa Cruz | 7 | **0** | **2** | 5 |
+| Apache | 1 | **0** | **0** | 1 |
+
+### 🛑 THE REMAINING 140 ARE `MUNICIPAL_TIER_REQUIRED`
+
+Closing them needs a separate per-city or per-county permit source for Kingman / Lake Havasu
+(Mohave 21), Show Low / Winslow (Navajo 21), Prescott (Yavapai 20), Sierra Vista / Douglas
+(Cochise 17), Nogales (Santa Cruz 5) and the Maricopa/Pima rural fringe — **more than ~5 separate
+wires, each lighting well under 20 pages.** That is the §0k arithmetic for
+`MUNICIPAL_TIER_REQUIRED`. Recorded as a scoped finding, not abandonment.
+
+### ⚠️ Stated ceiling — annual cadence
+
+`editingInfo.dataLastEditDate` = **2025-06-25**, thirteen months before this pass
+(`schemaLastEditDate` 2025-10-28). Normal for a programme adopted each June rather than a permit
+ledger, and the sibling is still labelled *tentative*, so FY26-30 is still the adopted programme
+by the publisher's own labelling. **ADOT goes on the reprobe list — when FY27-31 is adopted, this
+entry is the one to REPLACE, not supplement, given the 59% overlap.**
+
+### ⚠️ Predicted yield was wrong in BOTH directions
+
+Pre-wire 3-mile envelope probes on one dark ZIP per uncovered county returned Yuma 5 · Pinal 4 ·
+Mohave 2 · Santa Cruz 2 · Navajo 1 · Apache 0 · Cochise 0 · Yavapai 0 — which read as "thin, but
+clears the floor". The wire actually lit **68 pages**, and Cochise and Yavapai, both probed at
+**zero**, came back with 5 and 7 lit pages. A single-ZIP probe samples one 3-mile circle in a
+county of thousands of square miles. **Pre-wire yield orders candidates; it does not size them,
+and a zero at the county seat is not a zero for the county.** (WA ran the other way — probes
+over-predicted by ~25%.)
+
+### Follow-up opened by the `__lat`/`__lng` audit (numbers, not a diagnosis)
+
+Auditing every arcgis entry with no `lat`/`lng` in `column_map` found **11**. Nine are the
+**geocode path** (geometry-less tables carrying an address — the Boulder precedent) and are
+working: measured point-scope share in the live cache is **75%–98.4%**
+(hartford 98.4 · worcester 96.6 · boulder 95.2 · anaheim 94.4 · virginia-beach 93.1 ·
+columbus 91.5 · bellevue 91.1 · naperville 77.3 · clark-county-active-dev 75.0).
+
+**Two are anomalous and are NOT yet explained:**
+
+| entry | records | point-scope | % |
+|---|---|---|---|
+| `butler-county-ks-permits` | 1,194 | 158 | **13.2%** |
+| `pierce-county-pals-permits` | 13,033 | 2,255 | **17.3%** |
+
+Both carry `spatial_zip_radius_mi`. Pierce is the larger prize — **10,778 records that list but
+do not pin**, in a state (WA) otherwise at 93%. Two candidate explanations, neither yet tested:
+the ADOT defect (a point/polyline layer whose derived geometry is never mapped), or ordinary
+geocode failure plus the v20 25-mile geofence nulling out-of-polygon matches.
+
+**This does not change any coverage claim** — page counts are measured from `app_projects`, which
+already excludes area-scope records, so WA's 336/362 and every other reported figure stand as
+measured. It is a possible *recovery*, logged with its numbers and deliberately not diagnosed
+from the armchair.
