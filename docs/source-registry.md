@@ -6631,3 +6631,79 @@ CTDOT's own hosted AGO layer, `CTDOT_Project_Work_Areas` layer 0. **2,311 rows**
 - **`data.ct.gov` Socrata catalogue** — both catalogue queries timed out at
   `api.us.socrata.com` and are recorded as **unresolved, not as an absence**; the statewide wire
   landed on the CTDOT layer instead, so this was not pursued further. It stays on the reprobe list.
+
+---
+
+## ALABAMA PASS (2026-08-05) — 237 dark, two statewide grant-programme wires, CPMS rejected
+
+**Baseline:** AL has **262 modelled ZIP pages, 25 lit, 237 dark**, and **eight of ten counties at
+zero** — Jefferson 60 · Mobile 39 · Montgomery 28 · Tuscaloosa 27 · Baldwin 24 · Shelby 18 ·
+Morgan 16 · Lee 15. Registry grep: **1 AL entry**, `huntsville-building-permits` (Madison 20,
+Limestone 5). No statewide entry.
+
+### WIRED — two ALDOT grant programmes, statewide
+
+ALDOT's org (`LZzQi3xDiclG6XvQ`) was found by walking an item owned by `spearsd_ALDOT` and reading
+its `orgId`; a scoped search then returned **138 feature services**, of which three are project
+layers. Two are wired:
+
+| entry | layer | rows | kept | freshness |
+|---|---|---|---|---|
+| `aldot-rebuild-alabama-grant-projects` | `RALGCenterPoint08102023` | 1,858 | **765** | `SELECTED_DT` max 2025-07-07 |
+| `aldot-atrip-ii-projects` | `ATRIPIICenterPoint03282022` | 385 | **326** | `SELECTED_DT` max 2025-01-10 |
+
+They are **separate funding programmes**, not one subset of the other, so each gets its own entry
+per the Chester precedent.
+
+- **Rebuild Alabama vocabulary is complete:** `SELECTED_IN` = 3 values summing **exactly to 1,858**
+  — Y 765 / N 556 / a single-space blank 537. Y → approved; N → exclude (an unfunded application is
+  not a project); the blank states nothing and is excluded rather than guessed.
+- ⚠️ **The same schema behaves differently on the two layers, which is why both were checked.**
+  On Rebuild Alabama, `SELECTED_IN='Y' AND SELECTED_DT IS NULL` returns **0** — award and date agree
+  exactly. On ATRIP-II the identical query returns **59**, so 59 of its 385 awards carry no
+  selection date and are dropped. And `SELECTED_IN` on ATRIP-II is **single-valued** (Y, 385 of 385)
+  where on Rebuild Alabama it carries three values. Inferring either layer's behaviour from the
+  other would have been wrong in both directions.
+- The Y → approved mapping is written as a **mapping, not a constant**, precisely so an `N`
+  appearing in a future ATRIP-II refresh is excluded by the existing bucket rather than silently
+  accepted.
+- ⚠️ **`RPT_URL` is populated on 100% of rows and is still NOT record precision.** Two different
+  awarded projects return the byte-identical URL
+  (`aldot.maps.arcgis.com/sharing/rest/content/items/3ffc668341094c66a83eaed7fa6879c2/data`) — it is
+  the fiscal-year *Awarded Projects Report*, one per year. **Standing answer: a populated per-row
+  URL column is not evidence of record precision — compare the values across rows before claiming
+  it.** This is the mirror of the San Diego `LINK` finding (a column that exists but is empty);
+  here the column is full and still not what it looks like.
+- ⚠️ **Stated ceiling — these are thin sources per page, measured not assumed.** Rebuild Alabama is
+  a *rural* road-resurfacing programme whose points sit on county roads rather than in the
+  population centres HomeSignal models. A 3-mile envelope around eight dark ZIP centroids, one per
+  uncovered county:
+
+| probe ZIP | county | Rebuild Alabama | ATRIP-II | CPMS |
+|---|---|---|---|---|
+| 35401 Tuscaloosa | Tuscaloosa | 1 | **13** | 1 |
+| 35203 Birmingham | Jefferson | 1 | 3 | 3 |
+| 36104 Montgomery | Montgomery | 2 | 0 | 0 |
+| 36602 Mobile | Mobile | 0 | 1 | 0 |
+| 36830 Auburn | Lee | 1 | — | — |
+| 36532 Fairhope | Baldwin | 0 | — | — |
+| 35124 Pelham | Shelby | 0 | — | — |
+| 35601 Decatur | Morgan | 0 | — | — |
+
+  Both clear the §0k ≥5-page floor across 262 pages, but neither will carry the state alone.
+
+### Rejected with receipts
+
+- **`CPMS Project Location` — no status vocabulary.** ALDOT's own project list, 204 polylines
+  statewide, and the richest-looking of the three: `Project_ID`, `title`, `region_county`,
+  `type_of_work`, `route`, `project_number`, `project_start`, `project_completion`, `project_cost`,
+  `funding_source`, `impact`. Its `project_start` is a **string in ISO `YYYY-MM-DD` form**, which
+  the Anaheim precedent handles fine. What it does not have is any status field — and there is no
+  self-describing value anywhere in the schema to constify. `status_const: "Programmed"` would be
+  **my** word, not the publisher's, so the layer is rejected rather than wired on an invented stage.
+  On the reprobe list: one status column would make it wireable tomorrow.
+- **`RPO Project Status` (West Alabama Regional Commission) — `SUB_THRESHOLD`.** A real §0i regional
+  find, polyline, with `Status`, `Type_of_Work` and `Description` — but **71 rows** covering a rural
+  region whose modelled pages are a handful of Tuscaloosa-area ZIPs.
+- **`algis.alabama.gov` and `gis.dot.state.al.us`** — both hosts fail to answer (no response, not a
+  404), so ALDOT's org on ArcGIS Online is the only reachable first-party publisher.
