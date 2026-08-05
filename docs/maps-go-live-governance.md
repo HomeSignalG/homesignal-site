@@ -1564,3 +1564,45 @@ correct call on weak evidence is its own failure mode**, and it is harder to spo
 original error because the revision feels like diligence. Before overturning a working
 explanation, ask what the new evidence actually rules out. A 404 on an unfinished job's logs
 ruled out nothing.
+
+## §0e — THE NATIONAL FIGURE IS `app_projects`, AND THE TABLE IS PART OF THE NUMBER
+
+**Pinned (founder, 2026-08-05).** The headline coverage number is:
+
+```sql
+select count(distinct zip) from public.app_projects where record_kind = 'development';
+```
+
+**Because that is what actually renders** — the community pages, the development pages, the
+dashboard and the app rails all read the materialized `app_projects` layer.
+`development_reports` is the **map page's uncapped cache** and legitimately runs AHEAD of it,
+because materialization reaches ZIPs on the round-robin's schedule.
+
+**Both numbers are correct. They answer different questions.** So:
+
+1. **State the table with EVERY national number from here on.** A bare "national 4,9xx" is
+   ambiguous and two people will compute it differently — which is exactly what happened.
+2. **Emit BOTH in the scoreboard, plus the lag between them.**
+3. ⚠️ **A WIDENING GAP IS ITSELF A SIGNAL** that materialization has fallen behind — track it,
+   don't just report it.
+
+### ⛔ The filter trap that produced the discrepancy
+
+`app_projects.registry_id` is **NOT** a jurisdiction-registry id on every row. On
+`record_kind='facility'` rows it carries the **EPA registry id** — 114,695 distinct values.
+So `where registry_id is not null` returns **11,711** ZIPs (the EPA facilities floor, i.e.
+nearly every page) instead of 4,937. **Filter on `record_kind='development'`, never on
+`registry_id is not null`.**
+
+Measured 2026-08-05 — the worked example:
+
+| metric | value |
+|---|---|
+| headline — `app_projects`, `record_kind='development'` | **4,937** |
+| cache — `development_reports` with `source_registry_id` | 4,973 |
+| materialization lag | **36** |
+| (wrong filter — `registry_id is not null`) | ~~11,711~~ |
+
+This is the **surface-matrix rule landing on the headline metric itself**: the same question
+asked of two surfaces gives two right answers, and naming the surface is part of stating the
+fact.
