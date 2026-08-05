@@ -1116,6 +1116,43 @@ ZIPs, one-off extract) · St. Charles CUP (**free-text prose statuses**, Douglas
   of six urlKey guesses hit it; the one real org differed at 18,684 bytes. Response size is a cheap
   "this is not an org" discriminator before you spend a search.
 
+## ILLINOIS — CLOSED (2026-08-05). **139 → 255 / 474 (29.32% → 53.80%), +116 pages**
+
+National **4,636 → 4,752 / 12,722 (37.35%)**. The largest single-state gain in the run. Full receipts:
+`docs/source-registry.md` "ILLINOIS PASS".
+
+**WIRED (3, registry arcgis 131 → 134):** `cook-county-il-highway-construction-program` (Cook 131 →
+**211**, dark 85 → 5) · `lake-county-il-construction-program` (Lake 0 → **27**, dark 31 → 4) ·
+`champaign-il-special-use-permits` (Champaign 0 → **9**). All three met or beat their pre-wire
+estimates. Gate proof clean; 0 records missing `record_url`.
+
+**REJECTED with receipts:** Madison DevelopmentChange (324 polygons, schema is `LOCALE`/`LOCALE2`/
+`TYPE`, no date) · Rockford CIP (90 points, Esri Shortlist app layer, no date — **corrects the prior
+"0 permit services"**, a CIP service does exist) · Kane 2020 Transportation Plan (integer `COMP_YE`,
+stale 2023) · McHenry Woodstock permit (1 row, a boundary polygon) · Champaign layer 19 (edit stamps
+only) · Lake layer 1 lines (companion half, withheld) · DuPage/Will/Kendall/LaSalle/Aurora.
+
+### 🔴 OPEN ITEM NEEDING A DECISION — arcgis connector does not flatten `esriGeometryMultipoint`
+
+Lake writes **77 records / 27 ZIPs into `development_reports` and ZERO into `app_projects`**.
+`featurePoint()` handles `x/y`, `centroid`, `rings` and `paths` — **no branch for `g.points`**. Lake's
+layer is multipoint, so records correctly become `scope: "area"` and the rail stays empty. **The pages
+are live and nothing is fabricated**; Lake just gets no per-project pins. One branch in
+`sources/arcgis.ts` fixes it — a **code change, outside the registry-only grant, so flagged not made.**
+
+⚠️ **The invariant check passed VACUOUSLY and that is the transferable lesson.** "0 point-scope
+records missing coordinates" returned 0 because Lake has *no point-scope records at all*. **Report the
+scope DISTRIBUTION next to the violation count** — a zero among an empty class attests to nothing.
+
+### Two method notes from this pass
+
+- **Check the registry before probing.** `chicago-building-permits` and `naperville-building-permits`
+  already existed; discovery re-found Naperville's tables and measured ~1 page of lift because its four
+  ZIPs were already live at 484/480/333/204 records. A two-second grep skips that branch.
+- **A season string is not a date, but an edit-stamp date can be.** Cook's `start` is "Spring 2026"
+  (unparseable); its `CreationDate` is real, 70/70, and inside the named program year. NO_TEMPORAL_FIELD
+  means there are NO dates — not that the best-named field is unusable.
+
 ## ⚠️ METHOD ERROR — never select a re-cache batch by "still dark"
 
 Made and caught this session. A ZIP that legitimately returns ZERO records never leaves the
