@@ -6342,3 +6342,161 @@ string dates) · Great Neck, Schenectady, Mount Vernon, Poughkeepsie, New Rochel
 ⚠️ **NY is not abandoned.** It carries 233 live pages from NYC + Buffalo, and the reprobe list
 stands (Rochester if `PROJECTYEAR` becomes a real date · Syracuse, stalled 2025-08-16 · Putnam TIP
 if it grows). It is a scoped finding that the remainder is a **project, not a pass**.
+
+---
+
+## CALIFORNIA PASS (2026-08-05) — 386 dark, two county wires, seven counties `MUNICIPAL_TIER_REQUIRED`
+
+**Baseline measured before any probe:** CA has **523 modelled ZIP pages, 137 lit, 386 dark**,
+across exactly ten modelled counties. Registry grep first per §0c/§0j: four CA entries existed,
+**all city- or county-scoped** — `marin-county-building-permits`, `anaheim-land-use-cases`,
+`san-jose-permits`, `san-diego-approved-permits` (the City of San Diego CSV). **No statewide entry.**
+
+### Statewide — REJECTED, and it is a real counter-example to §0c
+
+Caltrans' DCAT catalogue was enumerated in full: **69 datasets, 0 project or programme layers.**
+Every one is asset or network inventory — highway network lines, postmiles, bridges, tunnels, rest
+areas, park-and-ride, transit stops and routes, airports, rail, districts, traffic counts, climate
+risk. `data.ca.gov` answers "Domain not found" to the Socrata catalogue API.
+
+⚠️ **Standing answer: statewide-DOT-first is an opening move, not a guarantee, and California is
+the clean counter-example.** UDOT, TxDOT, MDOT, FDOT, MassDOT, NJDOT, MaineDOT, Iowa DOT and VTrans
+all publish *projects*. Caltrans publishes *assets*. The disqualifier is
+`WRONG_RECORD_CLASS`, decided on the enumerated catalogue rather than on a guessed URL.
+
+### §0i regional fallback — FIRED, FOUND, then REJECTED on the schema
+
+§0i says that when the statewide probe fails, ask who the state delegates to. In California that is
+the MPOs, and the probe **worked as a discovery step**: MTC (Metropolitan Transportation Commission,
+the nine-county Bay Area MPO) returned 110 items including the 2027 and 2025 Transportation
+Improvement Program project layers and the OBAG 3 County Program layers. MTC's footprint is
+**185 dark CA pages** — Alameda 51 + Contra Costa 43 + Sonoma 40 + San Mateo 31 + Santa Clara 15 +
+Marin 5. It was the largest single-wire prize in the state.
+
+**It fails on the schema, and the failure is systematic across the whole family:**
+
+| layer | rows | date-typed fields | status field |
+|---|---|---|---|
+| `mtc_tip2027_projects_point` | 251 | **0 of 10 fields** | none |
+| `obag3_projects_pt` | — | **0 of 6 fields** | none |
+| `Project_Mode` (2025 TIP point) | — | **0** | none |
+
+`mtc_tip2027_projects_point` carries `tip_id, Project_County, sponsor, Project_Cost, Project_Mode,
+Project_Name, Project_Description, Geometry_Type, Project_Number` — a complete project record with
+**no time and no stage**. `obag3_projects_pt` carries `county, id, sponsor, project, mode_`. Three
+enumerated layers, three non-zero denominators, three empties → the §0k three-layer stop.
+**`NO_TEMPORAL_FIELD`.** SCAG (30 items) and SANDAG (29 items) were probed too: 0 project layers.
+
+⚠️ Worth keeping: §0i's *first successful use* still ended in a rejection. The rule earned its
+place by finding the right layers quickly — the layers themselves were not wireable. A fallback
+that surfaces the correct candidate and lets the schema gate kill it is working, not failing.
+
+### WIRED — `slo-county-planning-permits` (San Luis Obispo, 29 pages, 0 lit before)
+
+`gis.slocounty.ca.gov` → `PLN/PLN_EG_SERVICES_DATA/MapServer/79` "Prod1PointHistory", the
+production EnerGov case-history point layer (`Dev1*`/`Stage1*` are the non-production twins and are
+not wired). **50,969 rows**, `esriGeometryPoint`.
+
+- **Found by enumeration, not guess:** service root → 21 folders → `PLN` → 6 map services → an
+  84-layer roster. The AGO title search returned 10 items (non-zero denominator) and surfaced only
+  water-well and inspection-zone layers — a weak instrument on a county that publishes properly.
+- **Fresh:** `max(ApplicationDate)` = **2026-08-04**, one day before the pass; min 1988-09-27;
+  populated on **50,969 of 50,969**.
+- **Type vocabulary complete:** `CaseType` = **93 values summing exactly to 50,969**, proven on
+  both `n DESC` and `n ASC` (the Mesa/Gilbert `$limit`-truncation defence). **49 kept (33,138
+  rows)**; the 44 dropped are records-research (5,638), enforcement (2,187 + cannabis code +
+  vehicle abatement), trades MEP (1,389), express/over-the-counter (1,982), septic (920 — the same
+  wrong-record-class call made against Sonoma's septic layer) and procedural classes.
+  `WorkClass` was measured too (209 values, also exact) and **not** used — `CaseType` is the
+  coarser self-describing field.
+- ⚠️ **New standing answer — a trailing space in a publisher value is safe here, but only because
+  it was MEASURED.** `includeTypesClause` trims values before quoting them into the `IN` list, and
+  two `CaseType` values carry a trailing space. Probed live: `IN ('Renewable Energy')` → **3,359**
+  and `IN ('Express')` → **1,664**, exactly the groupBy counts of the space-carrying values, so the
+  SQL Server ANSI padding semantics hold. An **internal** double space (`Renewable Energy  ASB`)
+  survives the trim and stays in the `type_map` key.
+- **No status column** → `status_const: "Submitted"` → proposed; approved/operating/exclude
+  deliberately empty (NDOT/VTrans precedent).
+- **`record_url`:** no per-record column; dataset precision on the county's Tyler EnerGov Citizen
+  Self Service portal, **recovered from the county Planning & Building page's own HTML**
+  (`sanluisobispocountyca-energovweb.tylerhost.net/apps/selfservice#/search`) rather than templated
+  from `CaseId` (Boston/Philadelphia precedent).
+- **Placeholder-coordinate check:** three consecutive sample records shared an identical
+  13-decimal-place coordinate. Probed rather than assumed — a ~40 m box around that point holds
+  **8 of 50,969** records, i.e. a real parcel with eight cases, not a geocoder dump point.
+
+### WIRED — `san-diego-county-discretionary-permits` (53 dark pages)
+
+`gis-public.sandiegocounty.gov` → `PDS/PDS_Layers/MapServer/20` "Discretionary Permits",
+**50,306 rows**, `esriGeometryPoint`, found by enumerating 25 folders → a 122-layer roster.
+Layer 19 "Project Review" is a **group layer** (`geometryType` null, `fields` null,
+`returnCountOnly` errors 400) — enumerated and skipped, not mistaken for an empty layer.
+
+- **Fresh:** `max(PER_OPEN_DATE)` = **2026-07-24**, populated on **50,306 of 50,306**.
+- **Status vocabulary complete:** `PER_STAT` = **11 values summing exactly to 50,306** —
+  DIR Approved 18,198 · Approved 11,649 · BOS Approved 7,741 · Open 6,033 · In Review 2,367 ·
+  PC Approved 2,141 · Out to Applicant 1,438 · Issued 459 · ZA Approved 225 · Post-Approval 38 ·
+  Public Review 17. **40,451 approved + 9,855 proposed = 50,306.**
+- **Type:** `PER_TYPE_DESC` = **69 values, also exact**, every one naming a *case class*
+  (Major Use Permit, Tentative Map, Rezone, Grading Permit Maj …) rather than a building use — so
+  there is nothing to map to the closed `use_type` vocabulary without guessing.
+  `use_type_const: "Development"` with **no `type_map`** (the Phoenix precedent: the generic member
+  is written `Development`, never an off-vocabulary `"Other"`).
+- **`extra_where` drops 10,822 of 50,306**: the Landscape Plan family (9,653 — submittals attached
+  to already-approved projects) and the purely procedural classes (time extensions 475, resolution
+  amendments 57, appeals 34, verification requests 96, initial consultations 402, planning-historical
+  7, subdivision violations 9, miscellaneous 89). **39,484 kept.**
+- ⚠️ **The layer HAS a `LINK` column and it is NULL on every row** — `count(LINK)` = **0** against a
+  layer count of 50,306. Measured, not assumed; a column's existence is not evidence it is
+  populated. Dataset precision on the county's own Accela Citizen Access portal
+  (`publicservices.sandiegocounty.gov/CitizenAccess/`, probed live: HTTP 200,
+  `<TITLE>Citizen Access</TITLE>`).
+- The 53 dark SD pages are the unincorporated and North County ZIPs — Fallbrook 92028, Ramona
+  92065, Alpine 91901, Valley Center 92082, Julian 92036, Borrego Springs 92004 — exactly where
+  county discretionary permits land, while the 62 lit ones are the City of San Diego CSV's.
+
+### Window choice — the rule applied uniformly, on measured pages not projections
+
+Per §0k both windows were measured on both entries, and the **densest page was measured directly**
+with a 3-mile envelope around its ZIP centroid rather than projected from the county total:
+
+| entry | county-wide 365 / 1095 / 1825 | densest page 365 / 1095 / 1825 | chosen |
+|---|---|---|---|
+| SLO | 8,319 / 24,119 / 36,386 of 50,969 | Paso Robles 93446 — 218 / 724 / **1,345** | **1825** |
+| San Diego | 1,218 / 4,795 / 8,385 of 50,306 | Fallbrook 92028 — — / 205 / **292** | **1825** |
+
+**The rule: take the largest window (capped at 1825) whose worst MEASURED page stays far under the
+measured ceiling** — Cleveland 44127 at 5,511 sites / 5.98 MB. SLO's worst is ~875 sites after the
+65% type whitelist; San Diego's is 292. `require-a-date` is **vacuous on both** (dates are 100%
+populated), which is itself the §0h check working: it filters nothing and would reach back to 1988.
+
+### REJECTED with receipts — the seven remaining dark counties
+
+| county | dark | enumerations run (all non-zero denominators) | disqualifier |
+|---|---|---|---|
+| **Orange** | 85 | AGO title search 5 items · OC org (`UXmFoWC7yDHcDN5Q`) scoped `permits` 28 items → NPDES/discharge only · scoped `development` 64 items → watershed BMP/aquifer layers only · `gis.ocgov.com` and `ocgis.com` both dead | `candidates_exhausted` |
+| **Alameda** | 51 | county DCAT **163 datasets** → 1 zoning polygon, 0 permits · Berkeley Socrata **66 datasets** → 2 zoning polygons · Oakland Socrata → 11 name matches, all zoning / parking-permit zones / affordable-housing counts / workforce | `candidates_exhausted` |
+| **Contra Costa** | 43 | AGO search 8 items → 0 · county server `INTERNET` folder → 1 base-data service · `_Authoritative` → 11 boundary layers · `PublicWorks` → **499 Token Required** | `candidates_exhausted` |
+| **Sonoma** | 40 | AGO org 118 items → septic + coastal-commission jurisdiction · AGO search 197 items → same · **the county's own server enumerated: 40 folders**, and `AccelaPublic` holds only Parcels + Addresses while `OneStopMapPublic` holds only Parcels + Parks | `WRONG_RECORD_CLASS` |
+| **Ventura** | 34 | AGO search 35 items · county server `DataDownloads` → 22 services, only `Permitting` is case-like → 3 layers: Communication Facilities, **Mining Permits 29**, **Oil Permits 393** | **`STALE`** |
+| **San Mateo** | 31 | AGO search 28 items → 0 · AGO search 131 items → only the county CIP · `gis.smcgov.org` 404 · the CIP layer itself (210 rows) has **no date and no status field** — every column is `nvarchar(4000)` plus fiscal-year budget integers | `NO_TEMPORAL_FIELD` |
+| **Santa Clara** | 15 | `san-jose-permits` already in the registry; `data.sanjoseca.gov` answers "Domain not found" to the Socrata catalogue API | below the wire-for-the-count line |
+
+⚠️ **Ventura's Oil Permits looked wireable and are not.** 393 polygons with a real
+`aprv_date` (`esriFieldTypeDate`), a complete 4-value status vocabulary summing exactly to 393
+(EXPIRED 249 · ACTIVE 137 · ANNEXED 6 · DENIED 1) and per-permit geometry — everything the gate
+asks for except currency. `max(aprv_date)` = **2015-05-14**, eleven years stale. The vocabulary
+being perfect is not evidence the layer is alive; **check the max date before enumerating the
+vocabulary**, not after.
+
+### Stamp: `MUNICIPAL_TIER_REQUIRED` for the seven
+
+After the two wires, **~304 pages remain dark** across Orange 85, Alameda 51, Contra Costa 43,
+Sonoma 40, Ventura 34, San Mateo 31, Santa Clara 15. Every county tier above is exhausted with
+receipts, so closing them means city-tier wiring: Orange has ~30 incorporated cities, Contra Costa
+19, San Mateo 20, Alameda 14. **§0k's threshold is >5 wires each lighting <20 pages — this is
+~80+ wires at a handful of pages each**, an order of magnitude past it.
+
+**California is not abandoned.** It carries 137 pre-existing live pages plus the two new county
+wires, and the reprobe list stands (Oakland and Berkeley both run live Socrata portals that simply
+have no permit dataset today; OC Public Works publishes 1,499 feature services and could add one).

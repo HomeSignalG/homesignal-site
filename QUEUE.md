@@ -6115,3 +6115,44 @@ had only the headline been read, 244 live-but-unmaterialized pages would have be
 ### Next
 
 **NY non-Suffolk** (531 dark; Suffolk needs ten town wires and is deliberately last).
+
+---
+
+## CALIFORNIA — CLOSED (2026-08-05)
+
+**Baseline: 523 pages, 137 lit, 386 dark, ten modelled counties.**
+
+### Wired (2 county-tier sources, config only)
+
+| entry | county | dark pages targeted | rows | freshness |
+|---|---|---|---|---|
+| `slo-county-planning-permits` | San Luis Obispo | **29** (0 lit before) | 50,969 | `ApplicationDate` max 2026-08-04 |
+| `san-diego-county-discretionary-permits` | San Diego | **53** | 50,306 | `PER_OPEN_DATE` max 2026-07-24 |
+
+Both vocabularies sum **exactly** to their layer counts (SLO `CaseType` 93 values → 50,969, proven
+on both groupBy orderings; SD `PER_STAT` 11 values and `PER_TYPE_DESC` 69 values → 50,306).
+
+### Rejected with receipts
+
+- **Statewide (Caltrans)** — `WRONG_RECORD_CLASS`. The DCAT catalogue was enumerated in full:
+  **69 datasets, 0 project layers** — all asset/network inventory. ⚠️ **California is the clean
+  counter-example to §0c**: nine other states' DOTs publish projects; Caltrans publishes assets.
+- **MTC (§0i regional fallback)** — `NO_TEMPORAL_FIELD`. The fallback *worked as discovery* and
+  found the largest prize in the state (185 dark pages across six Bay Area counties), then the
+  schema gate killed it: 2027 TIP, 2025 TIP and OBAG 3 all carry **zero date-typed fields and no
+  status field**. SCAG 30 items / SANDAG 29 items: 0 project layers.
+- **Seven counties** — Orange 85 · Alameda 51 · Contra Costa 43 · Sonoma 40 · Ventura 34 ·
+  San Mateo 31 · Santa Clara 15. Every one exhausted at the county tier with non-zero denominators.
+  ⚠️ **Ventura's Oil Permits are the near-miss**: 393 polygons, real `aprv_date`, a 4-value status
+  vocabulary summing exactly to 393 — and `max(aprv_date)` = **2015-05-14**. `STALE`.
+  **Check the max date before enumerating the vocabulary, not after.**
+
+**Stamp: `MUNICIPAL_TIER_REQUIRED`** for the seven. ~304 pages would need ~80+ city wires at a
+handful of pages each — an order of magnitude past §0k's >5-wires-at-<20-pages threshold.
+
+### Next
+
+**CT 269 dark**, then AL 237 · WA 225 · AZ 208 · UT 201 · OH 199 · IN 196 · WI 191 · MD 192.
+UT is the flagged case — a statewide DOT source is already wired and the state is still at 35%,
+so check whether UDOT's scope, window or radius is the limiter before assuming county work.
+OH is already scoped in `docs/source-registry.md` and may already be `MUNICIPAL_TIER_REQUIRED`.
