@@ -6266,3 +6266,67 @@ county.**
 ~35%, so check whether **scope, window or radius** is the limiter before assuming county work —
 and check UDOT's entry for the `__lat`/`__lng` defect above. OH may already be
 `MUNICIPAL_TIER_REQUIRED`; check the existing record first.
+
+---
+
+## NATIONAL §0n SWEEP — CLOSED (2026-08-05). 5 defective entries, 13,082 records recovered
+
+Run before UT at the founder's instruction, after the Pierce saturation finding.
+
+### The scoreboard is now TWO numbers (§0q), reported on every state close from here
+
+| | value |
+|---|---|
+| **COVERAGE** — lit pages / 12,722 | **5,863 = 46.09%** |
+| **COMPLETENESS** — median records / lit page | **62** |
+| **COMPLETENESS** — p10 records / lit page | **2** |
+| pages lit by exactly **1** record | **422** |
+| pages under 5 records | **1,130** (19.3% of lit) |
+| total development records | 2,772,675 |
+
+**p10 of 2 against a median of 62 is a thirty-fold spread.** Every state summary before today
+reported the top of that range; the bottom was invisible.
+
+### The hunt found three more Pierce-shaped entries — all now fixed and at 100%
+
+| entry | before | after |
+|---|---|---|
+| `columbus-building-permits` | 13,269 / 14,503 (91.5%) | **14,497 / 14,503 (100%)** |
+| `clark-county-active-dev-permits` | 222 / 296 (75.0%) | **346 / 346 (100%)** |
+| `bellevue-permits` | 318 / 349 (91.1%) | **350 / 350 (100%)** |
+
+Plus the two already fixed: Pierce 2,255 → 13,003 and Butler 158 → 1,201.
+**Session total: 13,082 records recovered from listed-but-unpinned to pinned**, and ~13,800 more
+upgraded from interpolated geocodes to the publisher's own parcel points.
+
+### ⚠️ A correction to my own prior audit, on the record
+
+The earlier pass classified nine of the eleven no-lat/lng arcgis entries as *"the legitimate
+geocode path, 75%–98.4%, healthy."* **That was an inference from an `address` column plus a
+good-looking percentage — not a measurement of the layer — and it was wrong for three of them.**
+They scored well *because geocoding mostly works*, which is exactly what hid the config bug.
+
+**The distinguishing check is one field:** `"type": "Table"` with `geometryType: null` is a real
+geocode path; `"Feature Layer"` with a `geometryType` is the §0n defect.
+**Final split: 5 defective · 6 genuine Tables** (virginia-beach, naperville, boulder, worcester,
+anaheim, hartford).
+
+### No sixth Pierce exists
+
+After the fixes, only geocode-path Tables and small null-coordinate residues remain below 95%
+pinned. The largest remaining unpinned pool is `virginia-beach-building-permits` at 1,052 of
+15,161 (93.1%) — genuine geocode failure on a geometry-less Table, a data-quality ceiling rather
+than a config bug.
+
+### Rules added
+
+**§0q** the two-number scoreboard · **§0r** measure the symptom across the population before
+probing any candidate's config, plus its corollary that a healthy-looking percentage is not proof
+of a healthy mechanism.
+
+### Next under §0k
+
+**UT 201 · OH 199 · IN 196 · WI 191 · MD 192**, reporting coverage AND completeness on each close.
+UT first: UDOT is wired and UT sits at ~35%, so check whether **scope, window or radius** is the
+limiter. UDOT already passes the `__lat`/`__lng` check — it appeared in the clean native-lat/lng
+audit at ≥95.8%.
