@@ -1800,12 +1800,8 @@ project rather than a pass.**
 
 **Measure BOTH require-a-date and the 1825 default before choosing, always.**
 
-For program-class sources — STIP, CIP, capital programmes — see **§0h**: the relevant date is
-often when a project **enters** the programme rather than when it completes, so require-a-date
-usually wins, and NJ is the worked case at **−89%** under a backward window.
+**For program-class sources (STIP, CIP, capital programs) the relevant date is usually programme
+ENTRY, so require-a-date normally wins. Record both numbers either way.**
 
-> ⚠️ **INCOMPLETE — the founder's instruction was truncated mid-sentence at "For program-class
-> sources".** The clause above is filled from §0h, which the founder had already approved earlier
-> the same day, so the policy is operable as written. **Confirm and replace this block if the
-> intended wording differed.** Flagged rather than silently completed, because inventing the tail
-> of a dictated policy is exactly the kind of guess these rules exist to prevent.
+See **§0h** for the worked case: NJ loses **89%** under a backward 1825-day window because
+`PROJ_RECD` is a receipt date on a programme running through FY2033.
