@@ -5951,3 +5951,37 @@ unclassified, 0 of 136 undated.**
   not resolvable in the sandbox, so browser-backed suites do not run locally. A local green does
   not license skipping CI.
 
+
+### MICHIGAN — FINAL MEASURED RESULT (2026-08-05, all 360 ZIPs re-cached)
+
+**MI 50 → 268 of 360 live (13.9% → 74.4%), +218 pages.**
+**National 4,755 → 4,973 of 12,722 (37.38% → 39.09%), +218.**
+
+| county | pages | before | after |
+|---|---|---|---|
+| Wayne | 76 | 32 | **69** |
+| Oakland | 87 | 9 | **62** |
+| Macomb | 40 | 0 | **28** |
+| Kent | 37 | 0 | **25** |
+| Genesee | 26 | 0 | **20** |
+| Ingham | 24 | 0 | **17** |
+| Washtenaw | 20 | 9 | **15** |
+| Monroe | 17 | 0 | **12** |
+| Ottawa | 19 | 0 | **10** |
+| Livingston | 13 | 0 | **9** |
+| Shiawassee | 1 | 0 | **1** |
+| **total** | **360** | **50** | **268** |
+
+**Every one of the 11 counties now carries live pages**, including all 8 that had zero.
+The 92 still dark are ZIPs with no STIP project within the 3-mile radius — an honest empty,
+not a wiring defect.
+
+**Invariants across the FULL population, denominators stated (§0a):** 4,679 MDOT records on
+228 ZIPs — **4,679/4,679 `scope:"point"` · 0/4,679 missing `record_url` · 0/4,679 missing
+coordinates · 0/4,679 unclassified · 0/4,679 undated.** Pins span lat 41.732–43.323 / lng
+−86.224 to −82.817, which is the southern Lower Peninsula — correct geography.
+
+**Bidirectional gate proof, and NOT vacuous:** 0 MDOT records on any non-MI page, measured
+against a non-zero class of 4,679 records actually emitted across 228 MI pages. (Had the entry
+emitted nothing, this same zero would have read identically — which is the trap §0a exists for.)
+
