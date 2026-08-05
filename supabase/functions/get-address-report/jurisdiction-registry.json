@@ -11234,56 +11234,6 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-05 CALIFORNIA pass. San Luis Obispo County's OWN ArcGIS Server (gis.slocounty.ca.gov), PLN folder, PLN_EG_SERVICES_DATA MapServer layer 79 'Prod1PointHistory' - the production EnerGov case-history point layer (Dev1*/Stage1* are the non-production twins and are NOT wired). 50,969 rows, esriGeometryPoint. FOUND BY ENUMERATION, NOT GUESS: /arcgis/rest/services -> folder roster -> PLN -> 6 MapServices -> layer roster of 84; the AGO title search for 'San Luis Obispo permits' returned 10 items and surfaced only water-well and inspection-zone layers (weak instrument, non-zero denominator). FRESH: max(ApplicationDate) = 2026-08-04, one day before this pass; min = 1988-09-27. ApplicationDate is esriFieldTypeDate and is populated on 50,969 of 50,969 (100%) - count(ApplicationDate) returned exactly the layer count. WINDOW - BOTH MEASURED per the standing decision policy: require-a-date is VACUOUS here (dates are 100% populated, so it filters nothing and would reach back to 1988); 365d = 8,319, 1095d = 24,119, 1825d = 36,386 of 50,969. The choice was made on the DENSEST PAGES MEASURED DIRECTLY, not projected: a 3-mile envelope around the two densest SLO ZIP centroids returns Paso Robles 93446 218 / 724 / 1,345 and San Luis Obispo 93401 299 / 797 / (n/a) at 365 / 1095 / 1825 days. 1825 chosen under the rule applied across this pass - take the largest window (capped at 1825) whose worst MEASURED page stays far under the ceiling (Cleveland 44127, 5,511 sites / 5.98 MB): Paso Robles at 1825 is 1,345 raw, ~875 after the 65% type whitelist. TYPE VOCABULARY IS COMPLETE: CaseType has 93 distinct values summing EXACTLY to 50,969, proven twice - groupBy ordered n DESC and n ASC both returned 93 values totalling 50,969 (the Mesa/Gilbert $limit-truncation defence). 49 construction/land-use values are kept (33,138 rows); the 44 dropped are records-research (Research 5,638), enforcement (Code Enforcement 2,187, Cannabis Code, Vehicle Abatement), trades noise (Residential/Commercial Mechanical / Electrical / Plumbing 1,389), over-the-counter minor work (Express 1,664 + PMTX 318), septic (888+28+4 - the same wrong-record-class call made against Sonoma's septic layer), and procedural records (Application, Map Number, Lot, Pre-Application, Determination, CEQA, monitoring, time extensions, appeals, amendments). WorkClass was measured too (209 values, also summing exactly to 50,969) and NOT used - CaseType is the coarser, self-describing field. TRAILING-SPACE VALUES VERIFIED, NOT ASSUMED: two publisher values carry a trailing space ('Renewable Energy ', 'Express ') and includeTypesClause trims before quoting. Probed live: CaseType IN ('Renewable Energy') -> 3,359 and IN ('Express') -> 1,664, exactly the groupBy counts for the space-carrying values, so the SQL Server padding semantics hold. 'Renewable Energy  ASB' keeps its INTERNAL double space in the type_map key (trim only strips the ends). STATUS: the layer publishes NO status column - 13 fields, none of them a status. status_const 'Submitted' is the self-describing value the record actually attests (an application was filed on ApplicationDate) and buckets to proposed; approved/operating/exclude are deliberately EMPTY because this vocabulary states no such stage, and inventing one would be a guess (NDOT/VTrans precedent). RECORD URL: no per-record URL column. The county's own Planning & Building page links its Tyler EnerGov Citizen Self Service portal, so dataset_url is that portal's search page - recovered from the county page's HTML, never templated from CaseId (the Boston/Philadelphia dataset-precision precedent). SCOPE: San Luis Obispo County had 29 modelled ZIP pages and 0 lit before this entry."
-    },
-    {
-      "registry_id": "san-diego-county-discretionary-permits",
-      "platform": "arcgis",
-      "service_url": "https://gis-public.sandiegocounty.gov/arcgis/rest/services/PDS/PDS_Layers/MapServer/20",
-      "dataset_url": "https://publicservices.sandiegocounty.gov/CitizenAccess/",
-      "jurisdiction": "San Diego County Planning & Development Services",
-      "coverage": [
-        {
-          "state": "CA",
-          "county": "San Diego"
-        }
-      ],
-      "column_map": {
-        "title": [
-          "PER_TYPE_DESC",
-          "PROJECT"
-        ],
-        "status_raw": "PER_STAT",
-        "file_date": "PER_OPEN_DATE",
-        "case_number": "PER_NUM",
-        "address": "ADDRESS",
-        "lat": "__lat",
-        "lng": "__lng"
-      },
-      "use_type_const": "Development",
-      "status_to_bucket": {
-        "proposed": [
-          "Open",
-          "In Review",
-          "Out to Applicant",
-          "Public Review"
-        ],
-        "approved": [
-          "DIR Approved",
-          "Approved",
-          "BOS Approved",
-          "PC Approved",
-          "ZA Approved",
-          "Issued",
-          "Post-Approval"
-        ],
-        "operating": [],
-        "exclude": []
-      },
-      "extra_where": "PER_TYPE_DESC NOT IN ('Landscape Plan','Landscape Plan Modification','Landscape Plan Revegetation','Landscape Plan Revegetation Monitoring','Tentative Map - Time Extension','Site Plan - Time Extension','Major Use Permit Time Extension','Tentative Parcel Map - Time Extension','Administrative Permit Time Extension','Variance Time Extension','Minor Use Permit Time Extension','Density Bonus Permit Time Extension','Tentative Parcel Map - Resolution Amendment','Tentative Map - Resolution Amendment','Administrative Appeal','Verification Request','Initial Consultation','Planning Historical','Subdivision Violation','Miscellaneous Activities')",
-      "recency_days": 1825,
-      "spatial_zip_radius_mi": 3,
-      "record_url_precision": "dataset",
-      "_receipts": "2026-08-05 CALIFORNIA pass. San Diego County's OWN ArcGIS Server (gis-public.sandiegocounty.gov), PDS folder, PDS_Layers MapServer layer 20 'Discretionary Permits' - the county Planning & Development Services land-use case layer for the UNINCORPORATED county. 50,306 rows, esriGeometryPoint. FOUND BY ENUMERATION: /arcgis/rest/services -> 25 folders -> PDS -> PDS_Layers -> a 122-layer roster, of which 19 'Project Review' (a group layer: geometryType null, fields null, and returnCountOnly errors 400), 20 'Discretionary Permits', 21 'Cell Site Permits' and 22 'PSR' are the case layers. 20 is the one wired. FRESH: max(PER_OPEN_DATE) = 2026-07-24, twelve days before this pass, and the field is populated on 50,306 of 50,306 (100%). STATUS VOCABULARY IS COMPLETE: PER_STAT has 11 values summing EXACTLY to 50,306 - DIR Approved 18,198 / Approved 11,649 / BOS Approved 7,741 / Open 6,033 / In Review 2,367 / PC Approved 2,141 / Out to Applicant 1,438 / Issued 459 / ZA Approved 225 / Post-Approval 38 / Public Review 17. Every value is self-describing and buckets on the publisher's own language: the five *Approved variants plus Issued and Post-Approval -> approved (40,451); Open, In Review, Out to Applicant and Public Review -> proposed (9,855); 40,451 + 9,855 = 50,306. operating and exclude are deliberately EMPTY - this vocabulary states no built stage and no dead stage, and inventing one would be a guess. TYPE: PER_TYPE_DESC has 69 values, also summing EXACTLY to 50,306, and every one names a CASE class (Major Use Permit, Tentative Map, Rezone, Grading Permit Maj, ...) rather than a building use - so there is nothing to map to the closed use_type vocabulary without guessing. use_type_const 'Development' with NO type_map is therefore the honest classification (the Phoenix precedent: the generic member is written 'Development', never an off-vocabulary 'Other'), and the record's own title carries PER_TYPE_DESC verbatim. extra_where drops 10,822 of 50,306: the Landscape Plan family (7,972 + 1,198 + 294 + 189 = 9,653 - landscaping submittals attached to already-approved projects) and the purely procedural classes (time extensions 475, resolution amendments 57, appeals 34, verification requests 96, initial consultations 402, planning-historical 7, subdivision violations 9, miscellaneous activities 89). 39,484 kept. RECORD URL: the layer HAS a LINK column and it is NULL on all 50,306 rows (count(LINK) = 0 against a layer count of 50,306) - measured, not assumed - so this is dataset precision on the county's own Accela Citizen Access portal (publicservices.sandiegocounty.gov/CitizenAccess/, probed live: HTTP 200, <TITLE>Citizen Access</TITLE>). Templating a per-record URL from PER_NUM would be a guess. WINDOW - BOTH MEASURED: 365d = 1,218, 1095d = 4,795, 1825d = 8,385 of 50,306, and the densest dark page measured directly (a 3-mile envelope around Fallbrook 92028) returns 205 at 1095 and 292 at 1825. 1825 chosen under the rule applied across this pass - take the largest window (capped at 1825) whose worst MEASURED page stays far under the ceiling (Cleveland 44127, 5,511 sites / 5.98 MB). SCOPE: San Diego County had 115 modelled ZIP pages, 62 lit by the city CSV source (san-diego-approved-permits) and 53 dark; the dark ones are the unincorporated and North County ZIPs (Fallbrook 92028, Ramona 92065, Alpine 91901, Valley Center 92082, Julian 92036, Borrego Springs 92004, ...) - exactly where county discretionary permits land."
     }
   ],
   "ckan": [

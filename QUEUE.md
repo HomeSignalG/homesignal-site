@@ -6122,12 +6122,27 @@ had only the headline been read, 244 live-but-unmaterialized pages would have be
 
 **Baseline: 523 pages, 137 lit, 386 dark, ten modelled counties.**
 
-### Wired (2 county-tier sources, config only)
+### Wired (1 live, 1 reverted — config only)
 
-| entry | county | dark pages targeted | rows | freshness |
+| entry | county | dark pages targeted | rows | outcome |
 |---|---|---|---|---|
-| `slo-county-planning-permits` | San Luis Obispo | **29** (0 lit before) | 50,969 | `ApplicationDate` max 2026-08-04 |
-| `san-diego-county-discretionary-permits` | San Diego | **53** | 50,306 | `PER_OPEN_DATE` max 2026-07-24 |
+| `slo-county-planning-permits` | San Luis Obispo | **29** (0 lit before) | 50,969 | **LIVE — 26 of 29 pages now carry development records** |
+| ~~`san-diego-county-discretionary-permits`~~ | San Diego | 53 | 50,306 | **REVERTED — `EDGE_EGRESS_BLOCKED`** |
+
+⚠️ **The San Diego entry was wired, deployed, measured and un-wired in the same pass.** The layer is
+live and fast from Postgres egress (200 in under a second, repeatedly) and its vocabularies are
+exact — but the deployed engine timed out on it **20 times out of 20**, including once against an
+idle queue. The gate failed closed: 0 emitted, a named quarantine reason, and **not one fabricated
+record**. Removing it saves 115 San Diego pages a 30-second timeout per refresh in exchange for
+nothing they were getting.
+
+⚠️ **I first blamed the connector's `User-Agent`, and that claim does not survive its own control.**
+`services3.arcgis.com` — Esri's own host — had already returned **400 "invalid header name"** to a
+pg_net request carrying a custom User-Agent and **200** to the same request without one. Two
+unrelated hosts failing that way indicts **pg_net's header serialisation**, not two coincidental
+WAF rules. **Standing answer: pg_net custom headers are not a valid instrument for testing what a
+host does with a header — probe bare, and suspect the instrument first.** The cause (edge-egress
+block vs request-signature rule) is unresolvable from the sandbox and belongs on a GitHub runner.
 
 Both vocabularies sum **exactly** to their layer counts (SLO `CaseType` 93 values → 50,969, proven
 on both groupBy orderings; SD `PER_STAT` 11 values and `PER_TYPE_DESC` 69 values → 50,306).
