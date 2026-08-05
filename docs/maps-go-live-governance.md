@@ -2001,3 +2001,83 @@ limit of the instrument, not a failure of it — the probe is still the right to
 **A zero at the county seat is not a zero for the county.** Where a probe returns zero but the
 source's own county vocabulary shows records in that county, the honest read is "not at this
 centroid", and the decision should rest on the vocabulary, not the probe.
+
+---
+
+## §0q — THE SCOREBOARD IS TWO NUMBERS: COVERAGE **AND** COMPLETENESS
+
+**Report both on every state close, from 2026-08-05 onward.** Page count saturates at ONE record:
+a page lit by a single geocoded permit and a page carrying three hundred parcel-precise filings
+are indistinguishable in every coverage number this project has ever produced.
+
+That is not a hypothetical. The Pierce fix recovered **11,791 records** from listed-but-unpinned
+to pinned and moved the page count by **+2**, because the geocode path was already supplying the
+one record each page needed to count as lit. **The coverage metric was never wrong; it was
+answering a different question than the one that matters to a resident looking at the map.**
+
+### The two numbers
+
+**COVERAGE** — distinct ZIPs in `app_projects` with `record_kind='development'`, over 12,722.
+Unchanged; still the pinned national figure.
+
+**COMPLETENESS** — the distribution of records per lit page:
+
+```sql
+with per_page as (
+  select zip, count(*) n from public.app_projects
+  where record_kind='development' group by zip
+)
+select count(*) lit_pages,
+       percentile_disc(0.5) within group (order by n) median,
+       percentile_disc(0.1) within group (order by n) p10,
+       count(*) filter (where n = 1)  pages_with_exactly_1,
+       count(*) filter (where n < 5)  pages_under_5
+from per_page;
+```
+
+**National baseline, 2026-08-05:** 5,856 lit pages · 2,770,758 records · **median 62 · p10 2 ·
+425 pages lit by exactly ONE record · 1,128 pages under 5 (19.3% of lit pages).**
+
+**Read them together.** Coverage rising while p10 stays at 2 means new pages are being lit at the
+thinnest possible margin. A p10 of 2 with a median of 62 is a thirty-fold spread — the state
+summaries have been reporting the top of that range and the bottom has been invisible.
+
+*(Control run with the baseline: p90 came back as exactly 1000, which looks like a materializer
+cap. It is not — 585 pages sit above 1000 and 44 land between 1001 and 1100. Checked, because a
+suspiciously round number at a percentile boundary is exactly where a silent cap would hide.)*
+
+---
+
+## §0r — MEASURE THE SYMPTOM ACROSS THE WHOLE POPULATION BEFORE PROBING ANY CANDIDATE'S CONFIG
+
+**When one query can measure the symptom across every member of a class, run that query instead of
+inspecting candidates one at a time. It finds causes you did not think to look for.**
+
+The instrument that found all five `__lat`/`__lng` defects was one line — point-scope share per
+`source_registry_id` in the live cache. It required no hypothesis about *why* a source might fail:
+it catches a missing geometry mapping, a partially-null native column, and a genuine geocode
+ceiling identically, as a number, and lets the causes separate themselves afterwards.
+
+The alternative — probing 26 registry entries' metadata endpoints to check their `geometryType` —
+would have cost 26 round trips, tested only the one cause already in mind, and **would have missed
+Pierce entirely**, because Pierce's config looked fine under every check except the one that
+counted what it actually produced.
+
+### The corollary, learned the hard way in the same audit
+
+**A healthy-looking percentage is not proof of a healthy mechanism.** The first pass over the
+eleven no-lat/lng arcgis entries classified nine as "the legitimate geocode path, 75%–98.4%,
+healthy". That was an inference from an `address` column plus a good-looking number, **not a
+measurement of the layer** — and it was wrong for three of them. `columbus-building-permits`
+(91.5%), `bellevue-permits` (91.1%) and `clark-county-active-dev-permits` (75.0%) are **Feature
+Layers with `esriGeometryPoint`**, carrying the publisher's own parcel point on every row. They
+scored well *because geocoding mostly works*, which is precisely what hid the config bug.
+
+**The distinguishing check is one field: `"type": "Table"` (`geometryType: null`) is a real geocode
+path; `"type": "Feature Layer"` with a `geometryType` is the §0n defect.** Final split of the
+eleven: **five defective** (pierce, butler, columbus, bellevue, clark-county-active-dev) · **six
+genuine Tables** (virginia-beach, naperville, boulder, worcester, anaheim, hartford).
+
+So: measure the population, then verify the mechanism on every member you are about to clear —
+**"it scored well" is a reason to look closer at a class you already know can fail silently, not a
+reason to stop.**
