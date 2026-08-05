@@ -5783,3 +5783,47 @@ and its contents are Lake County Illinois routes, so entity was confirmed by nam
 **Coverage ceilings, stated plainly:** Cook and Lake are **county highway programs** — Cook's 130+
 suburbs and Lake's municipalities run their own work and are not in these layers. Champaign is the
 **city** only; Urbana, Rantoul, Savoy and unincorporated Champaign County are not.
+
+### ILLINOIS GO-LIVE MEASURED (2026-08-05, post-deploy, both tables)
+
+| | before | after |
+|---|---|---|
+| IL live / dark | 139 / 335 (29.32%) | **255 / 219 (53.80%)** |
+| national | 4,636 (36.44%) | **4,752 / 12,722 (37.35%)** |
+
+**+116 pages** — the largest single-state gain in the run. Per-county: **Cook 131 → 211** (dark 85 → 5) ·
+**Lake 0 → 27** (dark 31 → 4) · **Champaign 0 → 9** (dark 33 → 24). All three beat or matched their
+pre-wire estimates (78/23/9 predicted; 80/27/9 delivered).
+
+Deploy verification read from `arcgis_reports[]`, not counts:
+`cook-county-il-highway-construction-program f=1 e=1` (60453) ·
+`lake-county-il-construction-program f=7 e=7` (60085) ·
+`champaign-il-special-use-permits f=48 e=36` (61820).
+
+**Gate proof, live receipts:** Cook rides **IL/Cook only** (81 ZIPs) · Champaign **IL/Champaign only**
+(9) · Lake **IL/Lake only** (27). **0 records missing `record_url`** across all three.
+
+### ⚠️ DEFECT FOUND AT VERIFICATION — the arcgis connector does not flatten `esriGeometryMultipoint`
+
+`lake-county-il-construction-program` writes **77 records across 27 ZIPs in `development_reports` and
+ZERO into `app_projects`**. Cook (polyline) and Champaign (polygon) materialized normally; Lake did
+not. Cause, read from the shipped code: `featurePoint()` in `sources/arcgis.ts` resolves a pin from
+`g.x/g.y`, then the server `centroid`, then polygon `rings`, then polyline `paths` — **there is no
+branch for `g.points`**, the multipoint geometry array. Lake's layer 0 is `esriGeometryMultipoint`, so
+every record falls through to no coordinate, is correctly labelled `scope: "area"`, and is anchored at
+the report centroid (the established, correct behaviour for area items). `app_projects` carries only
+point-scope records, so the rail is empty for Lake.
+
+**The pages are genuinely live and nothing is fabricated** — 77 real, dated, sourced records render in
+the list on 27 Lake pages. What Lake does not get is per-project map pins or a rail entry.
+
+⚠️ **AND THE INVARIANT CHECK PASSED VACUOUSLY.** The standard check is "0 point-scope records missing
+coordinates". Lake returned **0** — because it has *no point-scope records at all*. A count of
+violations among a class that is empty is not evidence the class is healthy. **Always report the scope
+DISTRIBUTION alongside the violation count**, which is what surfaced this. Same family as the
+`app_changes` vs `app_community_meta` mistake: an instrument must prove it ran over something.
+
+**This is a connector code change (one branch in `featurePoint()`), which is outside the
+registry-only autonomy grant — flagged, not made.** Fixing it would convert Lake's 77 area records
+into pinned point records and populate the rail; the expected shape is a mean of each feature's
+`points` array, exactly as `rings` already degrades to a mean vertex.
