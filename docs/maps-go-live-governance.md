@@ -2076,6 +2076,57 @@ suspiciously round number at a percentile boundary is exactly where a silent cap
 
 ---
 
+## §0u — CHECK THE `owner` BEFORE THE SCHEMA
+
+**A search hit's title tells you what the data is about. Only `owner` tells you who published it.
+Read `owner` first — before the schema, before the row count, before the freshness probe.**
+
+**A consultancy-owned copy of a public register is not a first-party source**, and it may be a
+snapshot of any vintage: consultancies publish to support a specific study or contract, then stop.
+The register it was copied from may have moved, changed schema or been superseded, and nothing in
+the copy will say so.
+
+### The worked case — Indiana
+
+A plain `INDOT` search returns **776 items**. Its four most project-shaped hits:
+
+| item | owner | what that is |
+|---|---|---|
+| `INDOT Projects` | `arcgis_svc` | a service account, 3 rows, last modified **2016** |
+| `TIP_Point` / `TIP_Links` | `MinaeiN_cdmsmith` | **CDM Smith** — private engineering consultancy |
+| `CR Projects` / `CR_Projects_view` | `ewilder@hntb.com_HNTBCorp` | **HNTB** — private engineering consultancy |
+| `Community Crossings 2021 Round 2` | `rmlawson2` | an individual, one grant round |
+
+**Every one ranks highly because the string "INDOT" appears in its metadata.** None is published by
+INDOT. INDOT's own account (`*@indot.IN.gov_indot`) publishes 42 services and **not one of them is
+a project register** — a fact entirely invisible from the unscoped search, which looks like it
+found four candidates.
+
+### This is the ownership sibling of the geography lookalike
+
+The known trap is **geographic**: `Sussex` (NJ) → Sussex County **Delaware**; `Brookhaven` (NY) →
+Brookhaven **Georgia**; `Kent` → Delaware/Rhode Island; `chester` (NJ/Morris) →
+`Chesterfield_County` **Virginia**; a Calgary `Building_Permits` surfacing for three Washington orgs.
+Those are caught by confirming the entity from CONTENTS.
+
+**This one is not geographic at all** — CDM Smith's `TIP_Point` really is Indiana data. It is the
+*publisher* that is wrong, and content-confirmation will happily pass it. **Contents confirm the
+PLACE; only `owner` confirms the PUBLISHER, and the registry's first-party requirement is about the
+publisher.**
+
+### The check, in order
+
+1. **`owner`** — is it the government body itself? A `*@<agency>.<state>.gov_<org>` account, a
+   recognised city/county GIS account. Not a consultancy, not a service account, not an individual.
+2. **Then** scope the enumeration to that owner or org and read what they actually publish —
+   which in Indiana's case is what revealed `NO_DOT_PROJECT_REGISTER`.
+3. **Only then** schema, row count, vocabulary, freshness.
+
+**Doing this in the wrong order costs a full evaluation of a source that was never eligible** — and
+worse, can end with wiring a consultancy's frozen snapshot as if it were the live public register.
+
+---
+
 ## §0t — A RATIO THAT EXCEEDS ITS OWN DENOMINATOR IS A QUERY DEFECT, NEVER A FINDING
 
 **Re-derive before reporting. The usual cause is a join fan-out.**
