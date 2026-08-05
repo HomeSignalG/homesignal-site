@@ -104,6 +104,50 @@ different next steps.
 
 ---
 
+## 0a. AN INVARIANT MUST REPORT THE SIZE OF THE CLASS IT CHECKED. A DENOMINATOR OF ZERO IS NOT A PASS
+
+**Every violation count must be reported next to the population it was counted over.** `0 violations`
+is only evidence when the class is non-empty. A zero inside an empty class attests to nothing, and it
+reads exactly like a healthy result — which is why this has been the shape of **every instrument
+failure in this project**.
+
+> **The rule, operationally:** never report `N violations`. Report **`N violations of M checked`**, and
+> treat **M = 0 as an UNKNOWN, not a pass.**
+
+### The worked case — Illinois, 2026-08-05
+
+The standard go-live check is *"0 point-scope records missing coordinates."*
+`lake-county-il-construction-program` returned **0** — and it was not healthy. It has **no point-scope
+records at all**: all 77 are `scope: "area"`, because the connector could not flatten its
+`esriGeometryMultipoint` geometry. The check filtered to `scope='point' AND lat IS NULL`, a filter that
+matches nothing when there are no point rows, so it passed vacuously over an empty set. The defect
+surfaced only from a *different* query — the scope **distribution** — which showed `point 0 / area 77`
+against Cook's `point 289 / area 0` and Champaign's `point 215 / area 0`.
+
+**Same family as the earlier `app_changes` vs `app_community_meta` mistake** (17 LA pages reported as
+"never materialized" when they were materialized-but-empty): an instrument must prove it ran over
+something before its silence counts as evidence.
+
+### Audit of the standing go-live invariants — which can pass vacuously
+
+| Invariant | Filter | Empty-set risk | Required denominator |
+|---|---|---|---|
+| **missing `record_url`** | `record_url IS NULL` | **LOW** — counts over ALL records of the entry, so 0 records makes the entry's absence obvious in the same row | total records emitted |
+| **point records missing coords** | `scope='point' AND lat IS NULL` | 🔴 **HIGH — this is the one that failed.** Zero point rows ⇒ vacuous 0 | **the scope distribution: point / area counts** |
+| **unclassified `use_type`** | `use_type='unclassified'` | **MEDIUM** — vacuous if the entry emitted nothing at all | total records emitted |
+| **gate proof** (`rides_only`) | distinct state/county of emitted rows | 🔴 **HIGH** — an entry that emits NOTHING rides nowhere, which reads identically to "correctly scoped" | **record count per entry, asserted > 0** |
+| **both-tables parity** | `development_reports` n vs `app_projects` n | **LOW** — a full outer join shows a NULL side, which is what caught Lake | both counts, side by side |
+
+**Two of the five can return a clean 0 over an empty set.** The gate proof is the more dangerous of
+the two, because "this source appears on no wrong county's pages" is *exactly* what a source that
+fetched nothing looks like — the Dayton edge-block would have produced a perfect-looking gate proof.
+
+**So the go-live measurement must always carry, per entry: records emitted · ZIPs touched · the scope
+distribution · then the violation counts.** If records emitted is 0, every downstream invariant is
+UNKNOWN, not green.
+
+---
+
 ## 0b. The seven disqualifiers — record which one, and whether it came from an ENUMERATION or a GUESS
 
 | # | Disqualifier | Means | Fixable by waiting? |
