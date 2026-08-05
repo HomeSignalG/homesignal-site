@@ -1494,3 +1494,115 @@ ruling: *"Development rendering as 'Other project' is honest ambiguity."*
 The general shape, worth carrying to the next vocabulary question: **a closed global vocabulary is
 not extended to express a local nuance.** The generic member is the honest answer when the specific
 one would cost a national rendering change.
+
+## §0c — BEFORE ANY COUNTY DISCOVERY: check for a STATEWIDE DOT source
+
+**Standing first move, in this order:**
+
+1. **Grep the registry for that state's existing entries.** If they are **all sub-state scoped**
+   (city / township / county), the statewide source has not been tried.
+2. **Check whether the state DOT publishes a STIP or equivalent statewide project layer.**
+   Every state DOT is federally required to maintain a **STIP** (Statewide Transportation
+   Improvement Program), so a candidate essentially always exists on paper — the question is only
+   whether it is published as a queryable per-record layer with geometry, status and a date.
+3. **If both hold, the statewide source is the play** — wire it *before* starting county-by-county
+   discovery.
+
+**Why this is the rule.** Michigan: the registry grep showed all 5 existing MI entries were
+city/township scoped, which is what made a statewide source the obvious move rather than another
+metro hunt. `mdot-stip-projects` lit **218 pages in one wire** across all 11 modeled counties —
+including 8 counties that had **zero** live pages and no wireable city or county source anywhere.
+County-by-county would have taken weeks and, on the evidence of the enumerations, would have
+returned almost nothing: Oakland's county GIS is district polygons, Ottawa has 0 permit services,
+Grand Rapids is stale to 2023, and Flint/Lansing/Macomb/Monroe/Livingston have none at all.
+
+**The same pattern is already proven four times: UDOT · TxDOT · NDOT · MDOT** (plus FDOT and
+MassDOT). One connector shape, one registry entry, statewide reach.
+
+⚠️ **State the expected yield honestly — it is NOT uniform.** MDOT took MI to 268/360 (74%), but
+UDOT leaves UT at 109/310 (35%). The lift depends on project density and on whether the layer is
+points, polylines or polygons. A statewide DOT source is the cheapest *first* wire, never a claim
+that the state is finished.
+
+### Measured gap (2026-08-05)
+
+**Statewide entries exist for 6 states:** FL (`fdot-active-construction-projects`),
+MA (`massdot-highway-projects`), MI (`mdot-stip-projects`), NV (`nvdot-project-boundaries`),
+TX (`txdot-projects-info-all`), UT (`udot-active-projects`).
+
+**11 states have ZERO live pages and no registry coverage of any kind — 2,159 pages, where a
+statewide DOT wire is the ENTIRE play:** NJ 359 · ME 273 · NH 247 · IA 225 · VT 212 · WV 212 ·
+OK 197 · ND 155 · AK 101 · HI 97 · RI 81.
+
+**33 further states carry coverage but no statewide entry**, led by NY 531 dark · CA 386 ·
+CT 268 · AL 237 · IL 218 · PA 210 · AZ 207 · WA 203 · OH 199 · IN 196 · MD 191 · WI 191 · MO 181.
+
+## §0d — THE GITHUB CHECK STATE LIES; WAITING IS ALMOST ALWAYS RIGHT
+
+One rule, three faces:
+
+- **Both `pull_request_read(get_check_runs)` and `list_workflow_jobs` serve STALE state**, for
+  tens of minutes. A `unit` job reported `in_progress` for ~20 minutes had in fact completed
+  **success in 2:18**. The merge API reads the same state, so `405 … "unit" is in progress` is
+  frequently a lie about a job that has already passed.
+- **A 404 from `get_job_logs` only proves the job has not finished YET** — logs are published on
+  completion. It is not evidence of a hang or a wedged runner.
+- **NEVER CANCEL.** Cancelling converts a slow block into `405 … "unit" is cancelled`, which is
+  TERMINAL: waiting does not clear it and `rerun_workflow_run` does not reliably replace it. The
+  only recovery is **a new commit on the branch**, which mints fresh check runs.
+
+`unit-tests.yml` sets `timeout-minutes: 15`, so a genuinely hung job cannot exceed 15 minutes.
+**Wait, and retry the merge periodically.** Two healthy runs were cancelled on a misread, and the
+docs PR that followed merged on a later retry with no intervention at all.
+
+### The meta-lesson, which is the part worth keeping
+
+In this same episode a **correct** initial read ("the API is stale, wait") was **revised** to a
+wrong one ("the runner is wedged, waiting won't help") on the strength of a 404 that did not
+support it — and then had to be corrected back when the merge simply succeeded. **Revising a
+correct call on weak evidence is its own failure mode**, and it is harder to spot than the
+original error because the revision feels like diligence. Before overturning a working
+explanation, ask what the new evidence actually rules out. A 404 on an unfinished job's logs
+ruled out nothing.
+
+## §0e — THE NATIONAL FIGURE IS `app_projects`, AND THE TABLE IS PART OF THE NUMBER
+
+**Pinned (founder, 2026-08-05).** The headline coverage number is:
+
+```sql
+select count(distinct zip) from public.app_projects where record_kind = 'development';
+```
+
+**Because that is what actually renders** — the community pages, the development pages, the
+dashboard and the app rails all read the materialized `app_projects` layer.
+`development_reports` is the **map page's uncapped cache** and legitimately runs AHEAD of it,
+because materialization reaches ZIPs on the round-robin's schedule.
+
+**Both numbers are correct. They answer different questions.** So:
+
+1. **State the table with EVERY national number from here on.** A bare "national 4,9xx" is
+   ambiguous and two people will compute it differently — which is exactly what happened.
+2. **Emit BOTH in the scoreboard, plus the lag between them.**
+3. ⚠️ **A WIDENING GAP IS ITSELF A SIGNAL** that materialization has fallen behind — track it,
+   don't just report it.
+
+### ⛔ The filter trap that produced the discrepancy
+
+`app_projects.registry_id` is **NOT** a jurisdiction-registry id on every row. On
+`record_kind='facility'` rows it carries the **EPA registry id** — 114,695 distinct values.
+So `where registry_id is not null` returns **11,711** ZIPs (the EPA facilities floor, i.e.
+nearly every page) instead of 4,937. **Filter on `record_kind='development'`, never on
+`registry_id is not null`.**
+
+Measured 2026-08-05 — the worked example:
+
+| metric | value |
+|---|---|
+| headline — `app_projects`, `record_kind='development'` | **4,937** |
+| cache — `development_reports` with `source_registry_id` | 4,973 |
+| materialization lag | **36** |
+| (wrong filter — `registry_id is not null`) | ~~11,711~~ |
+
+This is the **surface-matrix rule landing on the headline metric itself**: the same question
+asked of two surfaces gives two right answers, and naming the surface is part of stating the
+fact.
