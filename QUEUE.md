@@ -6216,3 +6216,53 @@ aimed at one state. Table truncated after use.
 **AZ 208 · UT 201 · OH 199 · IN 196 · WI 191 · MD 192.** UT first: UDOT is already wired and UT
 sits at ~35%, so check whether **scope, window or radius** is the limiter before assuming county
 work. OH may already be `MUNICIPAL_TIER_REQUIRED` — check the existing record first.
+
+---
+
+## ARIZONA — CLOSED (2026-08-05). **156 → 224 / 364 (62%)**, one statewide DOT wire
+
+**National: 5,736 distinct `app_projects` ZIPs with `record_kind='development'`.** All 208 dark
+AZ ZIPs re-cached and materialized; cache 12,722 rows.
+
+- **Wired:** `adot-tip-fy2026-2030` — ADOT's adopted FY2026-2030 Transportation Improvement
+  Program. 159 records across 77 ZIPs, 141 point-scope. 0 missing `record_url`, 0 missing
+  coordinates, 0 missing `use_type`. Gate proof: 0 ADOT records on any non-AZ page.
+- **Five of six zero counties lifted:** Navajo 0→11, Yuma 0→7, Cochise 0→5, Mohave 0→3,
+  Santa Cruz 0→2, plus Yavapai 1→7. Only single-page **Apache** is still dark.
+- **Rejected with receipts:** `ADOTProjects_AZGEO` — named exactly like the target, self-labelled
+  "ADOT Projects DRAFT", 57 rows, free-text prose `Status` whose top value is an unedited template
+  placeholder. `lyrTIPAdoptions_Tentative2731_view` — a **59% duplicate** (146 of 247 shared
+  `TIP_ID`s); wiring it would put contradictory stages on one page.
+- 🛑 **The remaining 140 are `MUNICIPAL_TIER_REQUIRED`** — Kingman/Lake Havasu 21, Show
+  Low/Winslow 21, Prescott 20, Sierra Vista/Douglas 17, Nogales 5 and the Maricopa/Pima rural
+  fringe: **more than ~5 wires, each under 20 pages.** Scoped finding, not abandonment.
+- **Stated ceiling:** `dataLastEditDate` 2025-06-25 (annual programme cadence). ADOT on the
+  reprobe list; when FY27-31 is adopted, **replace** this entry rather than supplement it.
+
+### The defect this pass produced — now a standing answer
+
+The entry shipped without `lat`/`lng` in `column_map`, so 128 of its first 129 records came back
+**area-scoped at the report centroid instead of pinning**, and AZ moved only 156 → 157. The layer
+was fine; `featurePoint()`'s derived point lands in the synthetic `__lat`/`__lng` columns, which
+only reach the record if `column_map` maps them.
+
+> **An arcgis entry on a NON-POINT layer must declare `lat: "__lat"`, `lng: "__lng"`.** Otherwise
+> records list, carry a `record_url`, render — and never pin, never count as LIVE.
+
+WSDOT was immune only because it has native lat/lng columns, which is why this survived the WA
+pass. **What caught it was the arithmetic — +1 page against 68 ZIPs of cached records.** Fixed
+and re-cached same day (#614).
+
+### Also learned: pre-wire yield probes were wrong in BOTH directions
+
+AZ probes said Cochise 0 and Yavapai 0; the wire lit 5 and 7 pages there. WA probes over-predicted
+by ~25%. **A single-ZIP probe samples one 3-mile circle in a county of thousands of square miles —
+it orders candidates, it does not size them, and a zero at the county seat is not a zero for the
+county.**
+
+### Next under §0k
+
+**UT 201 · OH 199 · IN 196 · WI 191 · MD 192.** UT first: UDOT is already wired and UT sits at
+~35%, so check whether **scope, window or radius** is the limiter before assuming county work —
+and check UDOT's entry for the `__lat`/`__lng` defect above. OH may already be
+`MUNICIPAL_TIER_REQUIRED`; check the existing record first.
