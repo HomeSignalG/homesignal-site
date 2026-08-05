@@ -5883,3 +5883,71 @@ Both post-merge confirmations the founder required are done, and neither was ass
 - **The run is not vacuous.** Its own output: *All 14 checks passed*, and §5 independently
   reproduced the DB figure — 78617 = **537 rows (508 development + 29 facility)**, 0 missing
   `source_ref` / coords / name.
+
+## MICHIGAN — CLOSED (2026-08-05). **50 → 182+ / 360**, statewide DOT source wired
+
+**Every MI county is now either wired or closed on enumeration.** One source wired:
+`mdot-stip-projects` (statewide), the Michigan analogue of the already-live UDOT / TxDOT /
+NDOT rows.
+
+**Shape measured before probing** (the standing rule — and again the state-level framing was a
+hypothesis, not a brief): "310 dark" is not uniform. Oakland alone was 78 of it, and **8 of 11
+counties had zero wired source**, not partial coverage.
+
+| county | pages | live before | live after | note |
+|---|---|---|---|---|
+| Wayne | 76 | 32 | **65** | Detroit ×3 already wired |
+| Oakland | 87 | 9 | **48** | county GIS rejected; Independence Twp already wired |
+| Macomb | 40 | **0** | **15** | no city/county source exists |
+| Washtenaw | 20 | 9 | **14** | Ann Arbor already wired |
+| Genesee | 26 | **0** | **11** | Flint org enumerated, 0 permit services |
+| Kent | 37 | **0** | **9** | Grand Rapids STALE |
+| Monroe | 17 | **0** | **7** | |
+| Ingham | 24 | **0** | **6** | Lansing has no AGO org |
+| Ottawa | 19 | **0** | **4** | county GIS enumerated, 0 permit services |
+| Livingston | 13 | **0** | **3** | |
+| Shiawassee | 1 | 0 | 0 | 1 page, no STIP project within 3 mi |
+| **MI total** | **360** | **50** | **182+** | remaining ZIPs light as they re-cache |
+
+The "after" column is measured with ~176 of 360 ZIPs re-cached through the post-deploy engine;
+the rest still hold pre-MDOT cached rows and lift as the refresh reaches them. **Report the
+denominator, not just the gain** — this number is a floor, not the end state.
+
+### The host gamble paid off — and it was checked, not assumed
+
+`mdotgis.state.mi.us` is **state-hosted, not `services*.arcgis.com`**, i.e. the Montgomery-OH /
+Dayton class where a pg_net 200 proves nothing about the Deno edge runtime. Wired under §0's
+wire-and-see (pg_net 200 = the required positive control) and then **verified from
+`arcgis_reports` on the first post-deploy re-cache**: 16 of 16 responses carried an
+`mdot-stip-projects` report — **149 fetched, 149 emitted, 0 quarantined**. The engine reaches
+the host. Stored invariants across the first batch, with denominators: **136 of 136
+`scope:"point"`, 0 of 136 missing `record_url`, 0 of 136 missing coordinates, 0 of 136
+unclassified, 0 of 136 undated.**
+
+### Rejections (receipts in docs/source-registry.md "MICHIGAN PASS")
+
+- **Oakland County** — `WRONG_RECORD_CLASS`. Its only development-named layer is DDA/TIFA
+  **district polygons** by the layer's own description.
+- **Ottawa County** — `candidates_exhausted`. Both service folders enumerated: 0 permit services.
+- **Grand Rapids / Kent** — `STALE`. FiscalYear stops at **2023**, last projected start
+  **2022-07-01**, last edit **2017-10-05**; also only 32% of rows carry any date. → reprobe list.
+- **Flint / Genesee, Lansing / Ingham, Macomb, Monroe, Livingston** — org- or keyword-scoped
+  searches returned real non-empty result sets (109 / 48 / 12 / 142 / 145 items) with **zero**
+  permit or development feature services. Negatives with stated, non-zero denominators.
+
+### Method notes
+
+- **"Check the registry before probing" is now the standard opening move** and it paid
+  immediately: the grep showed all 5 pre-existing MI entries were city/township scoped, which is
+  what made a *statewide* source the obvious play rather than another metro hunt.
+- **URL-guessing county GIS hosts is not discovery.** All 8 first-pass host guesses failed;
+  every real host was recovered from item URLs inside AGO search results.
+- ⚠️ **`list_workflow_jobs` is stale too, not just the check-runs endpoint.** A `unit` job was
+  reported `in_progress` for ~20 minutes when it had in fact completed **success in 2:18**. Two
+  healthy runs were cancelled on that misreading. **Only `completed_at` appearing is reliable** —
+  and note `timeout-minutes: 15` means a genuinely hung job cannot exceed 15 minutes, so any
+  "still running" past that is the API lying, not a hang.
+- ⚠️ **Local `node scripts/run-unit-tests.mjs` is a WEAKER instrument than CI** — Playwright is
+  not resolvable in the sandbox, so browser-backed suites do not run locally. A local green does
+  not license skipping CI.
+
