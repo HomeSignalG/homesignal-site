@@ -6173,3 +6173,37 @@ re-probing the state.
 Nassau 68 · Erie 55 (Buffalo already wired; the county is the gap) · Monroe 52 (Rochester) ·
 Albany 47 · Dutchess 34 · Saratoga 27 · Rockland 26 · Putnam 9. **Suffolk 107 last** — it needs
 ten town wires.
+
+## 🚫 `NO_GEOGRAPHY` — THE CANONICAL WORKED CASE: `rz8t-4kmq` (NYSDOT, 2026-08-05)
+
+**Keep this as the reference example, because it is the most TEMPTING version of the
+disqualifier** — everything else about the source is right.
+
+`data.ny.gov` **`rz8t-4kmq` "Transportation Projects in Your Neighborhood"**, NYSDOT, Socrata,
+**1,937 rows**, first-party. It has:
+
+- ✅ **Two real `calendar_date` fields** — `contract_award_date`, `estimated_or_actual_completed_date`
+- ✅ **A real status** — `status` ("Completed Project"), plus `project_status`, `schedule_performance`
+- ✅ **Rich per-record content** — `project_title`, `type_of_work`, `public_friendly_description`,
+  `construction_amount`, `contract_number`, `major_pin`
+- ✅ **Per-record granularity** — one row per contract
+
+It fails on **one** thing: **there is no geometry column of any kind.** No point, no lat/lng, no
+ZIP, no address. The only spatial field is `region` — `"10 LONG ISLAND"`, a DOT administrative
+region covering multiple counties.
+
+### ⚠️ The trap, stated explicitly
+
+The free-text `project_status` prose **does** name counties — a real row reads *"…Towns of Oyster
+Bay, Islip and Babylon, **Nassau and Suffolk Counties**"*. It is genuinely tempting to regex the
+county out of the description and place the record.
+
+**Do not. Parsing geography out of free text is guessing**, and it is exactly what the
+anti-fabrication prime directive forbids: every rendered marker must trace to a real record's own
+stated location, not to an inference drawn from prose. A county name in a sentence is not a
+coordinate, and even if it were, a county is not a ZIP.
+
+**The rule:** a source is `NO_GEOGRAPHY` when it carries no point, no lat/lng pair, no ZIP and no
+geocodable street address — **regardless of how good the rest of the schema is, and regardless of
+whether place names appear in prose.** Dates and statuses cannot rescue a record that cannot be
+placed.

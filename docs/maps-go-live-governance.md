@@ -1607,6 +1607,24 @@ This is the **surface-matrix rule landing on the headline metric itself**: the s
 asked of two surfaces gives two right answers, and naming the surface is part of stating the
 fact.
 
+### ⚠️ ACT ON THE LAG — DO NOT JUST EMIT IT. THRESHOLD: ~100.
+
+**If the lag exceeds ~100, run `select public.app_refresh_batch(1500);` — repeat until it drops.
+Do not wait for the round-robin.**
+
+A lag of N means **N ZIP pages are live in the cache and INVISIBLE TO RESIDENTS** — the map page
+reads `development_reports` and shows them, while the community, development, dashboard and app
+rails read `app_projects` and do not. The headline stays healthy-looking the entire time, which is
+exactly why this needs a threshold and not a vibe.
+
+**Worked case, 2026-08-05 — the instrument paying for itself two days after it was built.** The
+lag sat at exactly **36** across every reading for a whole session, then jumped to **244** when
+the round-robin began filling four newly-wired states faster than `app_refresh` materialized.
+Nothing else in the readout changed; the headline just climbed more slowly than the cache. Two
+`app_refresh_batch(1500)` calls took it **244 → 72 → 32**. Had only the headline been read,
+**244 pages would have been serving residents nothing while the coverage number said otherwise.**
+
+
 ## §0f — A POPULATED `net.http_request_queue` DOES NOT MEAN THE REQUESTS WERE NOT SENT
 
 **Measured 2026-08-05, and it inverts the §0-adjacent assumption made earlier the same day.**
@@ -1706,3 +1724,39 @@ resulting ceiling in the receipts. Keep a window only where you have measured th
 little (or where the source genuinely accumulates unbounded history). And where the window and
 the IS-NOT-NULL test return the SAME count — as with Maine's 501 — the window is a pure no-op and
 should be omitted rather than left in as decoration.
+
+
+## §0i — WHEN THE STATEWIDE PROBE FAILS, ASK WHO THE STATE DELEGATES TO
+
+§0c's statewide-DOT-first is the right **opening move, not a guarantee**. When it fails, there is
+one more search to run **before** falling back to county-by-county:
+
+**Does the state delegate its programme to MPOs or regional councils?** Metropolitan Planning
+Organizations (NYMTC, CDTC, GBNRTC, SEMCOG, DVRPC, CRTPO, GCLMPO …) and regional planning councils
+publish their own TIP/STIP geometry in many states. **That is a different search than
+county-by-county, and one MPO often covers several counties at once** — so it sits between the two
+in cost and can be worth far more than a single county probe.
+
+**New York is the worked case:** all three statewide candidates failed (see the NEW YORK section
+in `docs/source-registry.md`), and the reason is structural — **NY publishes its STIP through
+MPOs**, not as one statewide layer. The correct next question there is "what does NYMTC / CDTC /
+GBNRTC publish", not "let me re-probe NYSDOT differently".
+
+**Do not keep re-probing the state once it has failed with receipts.** Record the rejection, then
+move to the MPO question, then to counties.
+
+## §0j — THE CITY IS WIRED, THE COUNTY IS THE GAP (expect this shape; grep the registry first)
+
+A recurring shape, seen enough times to be a prior rather than a surprise:
+
+| state | wired | still dark |
+|---|---|---|
+| NY | NYC's five boroughs (DOB), Buffalo (city) | **Erie County**, and every suburban county |
+| IL | Chicago, Naperville | Cook's non-Chicago ZIPs, the collar counties |
+| OH | Cleveland, Columbus, Cincinnati (cities) | Cuyahoga / Franklin / Hamilton outside those cities |
+| MI | Detroit, Ann Arbor, Independence Twp | **Wayne, Washtenaw, Oakland** county-wide |
+
+**Big cities publish permit data; their counties usually do not** — and a state can therefore look
+partially covered while every suburban page is dark. **Always grep the registry for the state
+first** (now the standard opening move) and read the entries' SCOPE, not just their presence: a
+state with entries is not a state with coverage.
