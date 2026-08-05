@@ -6171,3 +6171,48 @@ handful of pages each — an order of magnitude past §0k's >5-wires-at-<20-page
 UT is the flagged case — a statewide DOT source is already wired and the state is still at 35%,
 so check whether UDOT's scope, window or radius is the limiter before assuming county work.
 OH is already scoped in `docs/source-registry.md` and may already be `MUNICIPAL_TIER_REQUIRED`.
+
+---
+
+## WASHINGTON — CLOSED (2026-08-05). **137 → 336 / 362 (93%)**, one statewide DOT wire
+
+**National: 5,449 → 5,648 distinct `app_projects` ZIPs with `record_kind='development'`
+(42.83% → 44.40%).** Cache 12,722 rows, lag 0 (every WA target re-cached and materialized in
+this pass).
+
+- **Wired:** `wsdot-project-delivery-plan-{proposed,under-construction,complete}` — three entries
+  over ONE WSDOT layer, split by disjoint `CURRENT_TIMESTAMP` predicates because the layer
+  publishes no status column. 2,646 records across 199 of the 225 previously-dark pages.
+- **The catch that defines the pass:** the obvious `OperComplete IS NOT NULL` design would have
+  marked **586 not-yet-built projects as built**. Promoted to governance **§0l — a populated date
+  field is not an assertion that the event happened** (with the CT 1900-sentinel and year-2222
+  cases, and the ALDOT `RPT_URL` corollary).
+- **Every previously-zero county is off zero** except single-page Whitman: Snohomish 32/33,
+  Yakima 19/26, Whatcom 14/18, Skagit 12/14, Benton 9/10, plus Lewis / Kittitas / Stevens 1/1.
+- **26 pages remain dark** — rural ZIPs with no capital project inside the 3-mile envelope.
+  Honest empties, not defects. **Not `MUNICIPAL_TIER_REQUIRED`**: the remaining gap is 26 pages
+  scattered across 10 counties, which is below any wire floor worth spending.
+- **Invariants:** 0 missing `record_url`, 0 missing coordinates, 0 non-point scope,
+  0 missing `use_type` across all 2,646 records. Gate proof: 0 WSDOT records on any non-WA page.
+- **Stated ceiling:** `max(LastUpdated)` 2024-11-27 → WSDOT on the reprobe list.
+
+### Correction carried into this item
+
+**#610's merge title claimed "plus the WSDOT wire" and that diff did not contain it** — the
+registry file was never edited, and a round was then spent diagnosing why the deployed engine had
+"dropped" entries that had never been written. The instrument (grep over the deployed bundle) was
+right; the assumption behind it was wrong. **Confirm the tree contains the change before
+diagnosing why production lacks it** — this is the §0-2026-08-04b rule, and it was skipped.
+The actual wire is #611.
+
+### Reusable tooling added this pass (DB-side, not repo)
+
+`public.dev_refresh_targets` + `public.dev_refresh_fire_targets(_batch)` — an explicit-ZIP-list
+re-cache queue, because `dev_refresh_fire_batch` orders by global `refreshed_at` and cannot be
+aimed at one state. Table truncated after use.
+
+### Next under §0k
+
+**AZ 208 · UT 201 · OH 199 · IN 196 · WI 191 · MD 192.** UT first: UDOT is already wired and UT
+sits at ~35%, so check whether **scope, window or radius** is the limiter before assuming county
+work. OH may already be `MUNICIPAL_TIER_REQUIRED` — check the existing record first.
