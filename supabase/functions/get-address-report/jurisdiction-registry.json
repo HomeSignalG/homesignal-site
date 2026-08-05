@@ -11365,6 +11365,126 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-05 ALABAMA pass. ALDOT's own hosted AGO layer, ATRIPIICenterPoint03282022 layer 23 - the ATRIP-II (Alabama Transportation Rehabilitation and Improvement Program, cycle II) awarded-project points. 385 rows, esriGeometryPoint, statewide. A SEPARATE funding programme from the Rebuild Alabama Annual Grant layer, not a subset of it - the Chester precedent for disjoint programmes gets a separate entry each. FRESH: max(SELECTED_DT) = 2025-01-10. *** SELECTED_IN IS SINGLE-VALUED HERE, WHICH IS THE OPPOSITE OF ITS SIBLING. groupBy returns exactly ONE value - Y, 385 of 385 - so this layer publishes only the awards, while the Rebuild Alabama layer publishes applications too (Y 765 / N 556 / blank 537). The mapping is still written as Y -> approved rather than as a constant, so that an N appearing in a future refresh is EXCLUDED by the existing bucket rather than silently accepted. exclude is empty because no such value exists today. *** *** AND THE DATE DOES NOT TRACK THE AWARD HERE, UNLIKE ITS SIBLING: SELECTED_IN='Y' AND SELECTED_DT IS NULL returns 59, so 59 of the 385 awards carry no selection date and are dropped by extra_where. 326 kept. The identical query against the Rebuild Alabama layer returns 0 - two layers with the same schema behave differently, which is why the check was run on both rather than inferred from one. *** PAGE YIELD MEASURED DIRECTLY: a 3-mile envelope around four dark AL ZIP centroids returns Tuscaloosa 35401 13 / Birmingham 35203 3 / Mobile 36602 1 / Montgomery 36104 0. Denser than the Rebuild Alabama layer on the same probes. RECORD URL - AND A CORRECTION TO THE OBVIOUS READING: RPT_URL is populated on 100% of rows, which looks like record precision until the VALUES are compared. Two different awarded projects return the byte-identical URL (aldot.maps.arcgis.com/sharing/rest/content/items/3ffc668341094c66a83eaed7fa6879c2/data) - it is the fiscal-year Awarded Projects REPORT, one per year, not one per project. record_url_precision is therefore 'dataset' even though the column is never empty. STANDING ANSWER: a populated per-row URL column is not evidence of record precision - compare the values across rows before claiming it. "
+    },
+    {
+      "registry_id": "wsdot-project-delivery-plan-proposed",
+      "platform": "arcgis",
+      "service_url": "https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0",
+      "dataset_url": "https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0",
+      "jurisdiction": "Washington State Department of Transportation (WSDOT)",
+      "coverage": [
+        {
+          "state": "WA"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "ProjectTitle",
+          "WorkDescription"
+        ],
+        "file_date": "AdDate",
+        "case_number": "ProjectNumber",
+        "address": [
+          "RouteIdentifier",
+          "CountyName"
+        ],
+        "lat": "Latitude",
+        "lng": "Longitude"
+      },
+      "use_type_const": "Utility",
+      "status_const": "Not Yet Advertised",
+      "status_to_bucket": {
+        "proposed": [
+          "Not Yet Advertised"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "extra_where": "AdDate > CURRENT_TIMESTAMP",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "THIS ENTRY IS THE 'Not Yet Advertised' SLICE (proposed) of the three that split WSDOT's delivery-plan lifecycle. Its predicate is `AdDate > CURRENT_TIMESTAMP`, and its file_date is AdDate. 2026-08-05 WASHINGTON pass. WSDOT's own server (data.wsdot.wa.gov), WSDOTProjectDeliveryPlanCurrent layer 0 - the statewide capital delivery plan. 1,582 rows, esriGeometryPolyline, but with NATIVE Longitude/Latitude columns populated on 1,582 of 1,582 (100%), so records place by the publisher's own point rather than a derived polyline midpoint. Statewide coverage with no county (the UDOT precedent). Found via the WSDOT hub DCAT: 467 datasets enumerated, 10 project-titled, of which 'Project Delivery Plan Current' is the only one that is not a frozen year snapshot (2018-2023 are separate archived layers). *** THE LAYER PUBLISHES NO STATUS COLUMN, AND THE OBVIOUS WORKAROUND WOULD HAVE FABRICATED 586 COMPLETIONS. The tempting single-entry design was extra_where 'OperComplete IS NOT NULL' with status_const 'Operationally Complete' -> operating, on the reading that a populated completion date means the project is complete. Measured before wiring: OperComplete <= now returns 803 and OperComplete > now returns 586. It is a SCHEDULED completion date, so that design would have marked 586 not-yet-built projects as built - the exact fabrication class the anti-fabrication contract exists to prevent. STANDING ANSWER: a populated date field is not an assertion that the event has happened; compare it against now before reading a stage from it. *** THE LIFECYCLE IS THEREFORE SPLIT ACROSS THREE ENTRIES ON THE SAME LAYER, with PROVABLY DISJOINT server-side predicates and values taken from WSDOT's own field names: AdDate > now -> 366 not yet advertised (proposed) · AdDate <= now AND OperComplete > now -> 222 advertised and not yet complete (approved) · OperComplete <= now -> 803 complete (operating). 366 + 222 + 803 = 1,391; the remaining 191 rows carry neither date and are matched by no predicate, so they are dropped rather than bucketed by guess. The predicates use CURRENT_TIMESTAMP, evaluated server-side per request, so the buckets stay correct as time passes with no redeploy. Cost: three fetches per WA page instead of one, bounded at ~20 records each. TYPE VOCABULARIES ARE COMPLETE (both measured, neither used as a status): ImprovementTypeDesc 125 values summing EXACTLY to 1,582, and ProgramDesc 5 values also summing exactly to 1,582 (Preservation 856 / Improvement 609 / WSF Construction 88 / Traffic Operations Capital 26 / Highway Management and Facilities 3). Neither names a building use, so use_type_const 'Utility' per the DOT convention. *** STATED CEILING - FRESHNESS IS THE WEAK POINT: max(LastUpdated) = 2024-11-27, twenty months before this pass, while the hub's dataset-level 'modified' claims 2025-10-07. The row-level field is the honest one and it is the older of the two. This is a multi-year capital plan with AdDates running to 2042, so a stale edit stamp is far less damaging than it would be on a permit ledger - but it is stated rather than buried, and WSDOT goes on the reprobe list. *** PAGE YIELD MEASURED DIRECTLY on the whole layer, one dark ZIP per uncovered county: Auburn 98001 (King) 25 · Everett 98201 (Snohomish) 21 · Yakima 98901 16 · Bellingham 98225 (Whatcom) 14 · Kennewick 99336 (Benton) 14 · Mount Vernon 98273 (Skagit) 2. Every dark county has real content. RECORD URL: no per-record URL column, so dataset precision on the layer's own REST endpoint. SCOPE: WA had 361 modelled ZIP pages, 137 lit by six city/county permit sources and 224 dark, with SIX counties at zero - Snohomish 33, Yakima 26, Whatcom 18, Skagit 14, Benton 10, and single-page Lewis / Whitman / Kittitas."
+    },
+    {
+      "registry_id": "wsdot-project-delivery-plan-under-construction",
+      "platform": "arcgis",
+      "service_url": "https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0",
+      "dataset_url": "https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0",
+      "jurisdiction": "Washington State Department of Transportation (WSDOT)",
+      "coverage": [
+        {
+          "state": "WA"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "ProjectTitle",
+          "WorkDescription"
+        ],
+        "file_date": "AdDate",
+        "case_number": "ProjectNumber",
+        "address": [
+          "RouteIdentifier",
+          "CountyName"
+        ],
+        "lat": "Latitude",
+        "lng": "Longitude"
+      },
+      "use_type_const": "Utility",
+      "status_const": "Advertised, Not Yet Complete",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Advertised, Not Yet Complete"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "extra_where": "AdDate <= CURRENT_TIMESTAMP AND OperComplete > CURRENT_TIMESTAMP",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "THIS ENTRY IS THE 'Advertised, Not Yet Complete' SLICE (approved) of the three that split WSDOT's delivery-plan lifecycle. Its predicate is `AdDate <= CURRENT_TIMESTAMP AND OperComplete > CURRENT_TIMESTAMP`, and its file_date is AdDate. 2026-08-05 WASHINGTON pass. WSDOT's own server (data.wsdot.wa.gov), WSDOTProjectDeliveryPlanCurrent layer 0 - the statewide capital delivery plan. 1,582 rows, esriGeometryPolyline, but with NATIVE Longitude/Latitude columns populated on 1,582 of 1,582 (100%), so records place by the publisher's own point rather than a derived polyline midpoint. Statewide coverage with no county (the UDOT precedent). Found via the WSDOT hub DCAT: 467 datasets enumerated, 10 project-titled, of which 'Project Delivery Plan Current' is the only one that is not a frozen year snapshot (2018-2023 are separate archived layers). *** THE LAYER PUBLISHES NO STATUS COLUMN, AND THE OBVIOUS WORKAROUND WOULD HAVE FABRICATED 586 COMPLETIONS. The tempting single-entry design was extra_where 'OperComplete IS NOT NULL' with status_const 'Operationally Complete' -> operating, on the reading that a populated completion date means the project is complete. Measured before wiring: OperComplete <= now returns 803 and OperComplete > now returns 586. It is a SCHEDULED completion date, so that design would have marked 586 not-yet-built projects as built - the exact fabrication class the anti-fabrication contract exists to prevent. STANDING ANSWER: a populated date field is not an assertion that the event has happened; compare it against now before reading a stage from it. *** THE LIFECYCLE IS THEREFORE SPLIT ACROSS THREE ENTRIES ON THE SAME LAYER, with PROVABLY DISJOINT server-side predicates and values taken from WSDOT's own field names: AdDate > now -> 366 not yet advertised (proposed) · AdDate <= now AND OperComplete > now -> 222 advertised and not yet complete (approved) · OperComplete <= now -> 803 complete (operating). 366 + 222 + 803 = 1,391; the remaining 191 rows carry neither date and are matched by no predicate, so they are dropped rather than bucketed by guess. The predicates use CURRENT_TIMESTAMP, evaluated server-side per request, so the buckets stay correct as time passes with no redeploy. Cost: three fetches per WA page instead of one, bounded at ~20 records each. TYPE VOCABULARIES ARE COMPLETE (both measured, neither used as a status): ImprovementTypeDesc 125 values summing EXACTLY to 1,582, and ProgramDesc 5 values also summing exactly to 1,582 (Preservation 856 / Improvement 609 / WSF Construction 88 / Traffic Operations Capital 26 / Highway Management and Facilities 3). Neither names a building use, so use_type_const 'Utility' per the DOT convention. *** STATED CEILING - FRESHNESS IS THE WEAK POINT: max(LastUpdated) = 2024-11-27, twenty months before this pass, while the hub's dataset-level 'modified' claims 2025-10-07. The row-level field is the honest one and it is the older of the two. This is a multi-year capital plan with AdDates running to 2042, so a stale edit stamp is far less damaging than it would be on a permit ledger - but it is stated rather than buried, and WSDOT goes on the reprobe list. *** PAGE YIELD MEASURED DIRECTLY on the whole layer, one dark ZIP per uncovered county: Auburn 98001 (King) 25 · Everett 98201 (Snohomish) 21 · Yakima 98901 16 · Bellingham 98225 (Whatcom) 14 · Kennewick 99336 (Benton) 14 · Mount Vernon 98273 (Skagit) 2. Every dark county has real content. RECORD URL: no per-record URL column, so dataset precision on the layer's own REST endpoint. SCOPE: WA had 361 modelled ZIP pages, 137 lit by six city/county permit sources and 224 dark, with SIX counties at zero - Snohomish 33, Yakima 26, Whatcom 18, Skagit 14, Benton 10, and single-page Lewis / Whitman / Kittitas."
+    },
+    {
+      "registry_id": "wsdot-project-delivery-plan-complete",
+      "platform": "arcgis",
+      "service_url": "https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0",
+      "dataset_url": "https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0",
+      "jurisdiction": "Washington State Department of Transportation (WSDOT)",
+      "coverage": [
+        {
+          "state": "WA"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "ProjectTitle",
+          "WorkDescription"
+        ],
+        "file_date": "OperComplete",
+        "case_number": "ProjectNumber",
+        "address": [
+          "RouteIdentifier",
+          "CountyName"
+        ],
+        "lat": "Latitude",
+        "lng": "Longitude"
+      },
+      "use_type_const": "Utility",
+      "status_const": "Operationally Complete",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [
+          "Operationally Complete"
+        ],
+        "exclude": []
+      },
+      "extra_where": "OperComplete <= CURRENT_TIMESTAMP",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "THIS ENTRY IS THE 'Operationally Complete' SLICE (operating) of the three that split WSDOT's delivery-plan lifecycle. Its predicate is `OperComplete <= CURRENT_TIMESTAMP`, and its file_date is OperComplete. 2026-08-05 WASHINGTON pass. WSDOT's own server (data.wsdot.wa.gov), WSDOTProjectDeliveryPlanCurrent layer 0 - the statewide capital delivery plan. 1,582 rows, esriGeometryPolyline, but with NATIVE Longitude/Latitude columns populated on 1,582 of 1,582 (100%), so records place by the publisher's own point rather than a derived polyline midpoint. Statewide coverage with no county (the UDOT precedent). Found via the WSDOT hub DCAT: 467 datasets enumerated, 10 project-titled, of which 'Project Delivery Plan Current' is the only one that is not a frozen year snapshot (2018-2023 are separate archived layers). *** THE LAYER PUBLISHES NO STATUS COLUMN, AND THE OBVIOUS WORKAROUND WOULD HAVE FABRICATED 586 COMPLETIONS. The tempting single-entry design was extra_where 'OperComplete IS NOT NULL' with status_const 'Operationally Complete' -> operating, on the reading that a populated completion date means the project is complete. Measured before wiring: OperComplete <= now returns 803 and OperComplete > now returns 586. It is a SCHEDULED completion date, so that design would have marked 586 not-yet-built projects as built - the exact fabrication class the anti-fabrication contract exists to prevent. STANDING ANSWER: a populated date field is not an assertion that the event has happened; compare it against now before reading a stage from it. *** THE LIFECYCLE IS THEREFORE SPLIT ACROSS THREE ENTRIES ON THE SAME LAYER, with PROVABLY DISJOINT server-side predicates and values taken from WSDOT's own field names: AdDate > now -> 366 not yet advertised (proposed) · AdDate <= now AND OperComplete > now -> 222 advertised and not yet complete (approved) · OperComplete <= now -> 803 complete (operating). 366 + 222 + 803 = 1,391; the remaining 191 rows carry neither date and are matched by no predicate, so they are dropped rather than bucketed by guess. The predicates use CURRENT_TIMESTAMP, evaluated server-side per request, so the buckets stay correct as time passes with no redeploy. Cost: three fetches per WA page instead of one, bounded at ~20 records each. TYPE VOCABULARIES ARE COMPLETE (both measured, neither used as a status): ImprovementTypeDesc 125 values summing EXACTLY to 1,582, and ProgramDesc 5 values also summing exactly to 1,582 (Preservation 856 / Improvement 609 / WSF Construction 88 / Traffic Operations Capital 26 / Highway Management and Facilities 3). Neither names a building use, so use_type_const 'Utility' per the DOT convention. *** STATED CEILING - FRESHNESS IS THE WEAK POINT: max(LastUpdated) = 2024-11-27, twenty months before this pass, while the hub's dataset-level 'modified' claims 2025-10-07. The row-level field is the honest one and it is the older of the two. This is a multi-year capital plan with AdDates running to 2042, so a stale edit stamp is far less damaging than it would be on a permit ledger - but it is stated rather than buried, and WSDOT goes on the reprobe list. *** PAGE YIELD MEASURED DIRECTLY on the whole layer, one dark ZIP per uncovered county: Auburn 98001 (King) 25 · Everett 98201 (Snohomish) 21 · Yakima 98901 16 · Bellingham 98225 (Whatcom) 14 · Kennewick 99336 (Benton) 14 · Mount Vernon 98273 (Skagit) 2. Every dark county has real content. RECORD URL: no per-record URL column, so dataset precision on the layer's own REST endpoint. SCOPE: WA had 361 modelled ZIP pages, 137 lit by six city/county permit sources and 224 dark, with SIX counties at zero - Snohomish 33, Yakima 26, Whatcom 18, Skagit 14, Benton 10, and single-page Lewis / Whitman / Kittitas."
     }
   ],
   "ckan": [
