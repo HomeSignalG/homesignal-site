@@ -1936,6 +1936,26 @@ geometry, probed directly. The partial pinning in Pierce and Butler came from th
 on their `address` column, which is why they looked alive rather than dead: a wholly-broken source
 is easier to notice than a 17%-working one.
 
+### THE DISTINGUISHING CHECK IS ONE FIELD — cheaper and safer than any percentage
+
+**Read the layer's `type` before classifying an entry as a geocode path:**
+
+| layer JSON | meaning | verdict |
+|---|---|---|
+| `"type": "Table"` with `geometryType: null` | genuinely has no geometry; the address column is the only locator | **real geocode path — correct as configured** |
+| `"type": "Feature Layer"` with a `geometryType` | every row carries the publisher's own point | **§0n defect if `column_map` maps neither native lat/lng nor `__lat`/`__lng`** |
+
+**Do not infer the class from a pin percentage.** That inference was made once and was wrong on
+three of nine entries: `columbus-building-permits` (91.5%), `bellevue-permits` (91.1%) and
+`clark-county-active-dev-permits` (75.0%) were all classified as healthy geocode-path entries on
+the strength of an `address` column and a good-looking number. **All three are Feature Layers with
+`esriGeometryPoint`. They scored well BECAUSE geocoding mostly works — which is exactly what hid
+the defect.** A 91% pin rate on a source that should be at 100% is indistinguishable from a 91%
+pin rate on a source that can only ever reach 91%, unless you look at the layer.
+
+One field separates them, it costs one metadata request, and it is decisive where a percentage is
+merely suggestive.
+
 ### The audit, and the trap in "it has lat/lng mapped"
 
 Two classes exist and both must be checked:
@@ -2041,6 +2061,14 @@ from per_page;
 **Read them together.** Coverage rising while p10 stays at 2 means new pages are being lit at the
 thinnest possible margin. A p10 of 2 with a median of 62 is a thirty-fold spread — the state
 summaries have been reporting the top of that range and the bottom has been invisible.
+
+### Verify any suspiciously round statistic before reporting it
+
+**A round number at a percentile or boundary is where a silent cap hides.** `p90 = 1000` on records
+per page is the shape a materializer limit would take, and it would have been reported as a real
+distribution. The check is two counts either side of the round value: 585 pages sit above 1000 and
+44 land between 1001 and 1100, so no cap exists and the figure is genuine. **Cheap, and the
+alternative is publishing an artefact of the pipeline as a fact about the data.**
 
 *(Control run with the baseline: p90 came back as exactly 1000, which looks like a materializer
 cap. It is not — 585 pages sit above 1000 and 44 land between 1001 and 1100. Checked, because a

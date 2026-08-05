@@ -6330,3 +6330,47 @@ of a healthy mechanism.
 UT first: UDOT is wired and UT sits at ~35%, so check whether **scope, window or radius** is the
 limiter. UDOT already passes the `__lat`/`__lng` check — it appeared in the clean native-lat/lng
 audit at ≥95.8%.
+
+---
+
+## UTAH — CLOSED (2026-08-05). **NO WIRE.** 109 / 310 (35.2%), median 3, p10 1
+
+First state closed on the two-number scoreboard, and the second number is the story.
+
+| | UT | national |
+|---|---|---|
+| **COVERAGE** | **109 / 310 = 35.2%** | 5,868 / 12,722 = 46.12% |
+| **COMPLETENESS** median records / lit page | **3** | 62 |
+| **COMPLETENESS** p10 | **1** | 2 |
+| pages lit by exactly 1 record | **33 of 109** | 420 |
+| pages under 5 records | **63 of 109** | 1,125 |
+| total records | 1,722 | 2,777,632 |
+
+- ✅ **The scope/window/radius hypothesis is REFUTED with receipts.** `udot-active-projects` is
+  correct as configured. It filters `All_Projects` (2,145 rows, vocabulary sums exactly) down to
+  358 via `NOT IN ('Closed','Abandoned')` — and including `Closed` would have been a fabrication:
+  **1,319 of its 1,368 Closed rows (96%) carry NO completion date**, only 49 have a past one, and
+  `Abandoned` with a past completion date returns 0. No `recency_days`, standard 3-mi radius.
+  **358 rows is UDOT's real ceiling.**
+- **The limiter is the municipal tier.** UDOT alone carries all 109 lit pages (957 records,
+  8.8/zip); only 16 ZIPs have any city source (SLC 12, Provo 4).
+- 🛑 **`MUNICIPAL_TIER_REQUIRED` + `candidates_exhausted`** — three enumerations empty with
+  non-zero denominators: state clearinghouse 608 datasets (8 permit-titled, all environmental) ·
+  Washington County's real `BuildingPermits` layer **STALE at 2021-10-01** on two agreeing
+  instruments · a 3,186-result AGO permit search yielding only out-of-state lookalikes, with
+  St. George's own 93 items containing zero permit layers and `opendata.utah.gov` 404.
+- **New standing answer:** a GUESSED orgid can return HTTP 200 with 370 KB of *genuine* services
+  belonging to someone else (the guess at St. George returned Azerbaijan/Grenada/DC/Coronavirus
+  layers). Read the service NAMES before believing a 200.
+
+### What the completeness number changed here
+
+Weber is **14/14 lit at median 12**; Davis is **12/14 lit at median 2**. Coverage alone reads them
+as near-equivalent. The 93 UT pages whose only source is UDOT sit at 1–3 records each — a Utah
+municipal source would raise the MEDIAN far more than the PAGE COUNT, the exact reverse of the
+Pierce case. Logged as a completeness item.
+
+### Next under §0k
+
+**OH 199 · IN 196 · WI 191 · MD 192**, coverage AND completeness on each close. OH may already be
+`MUNICIPAL_TIER_REQUIRED` — check the existing record first.
