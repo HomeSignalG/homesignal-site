@@ -8285,3 +8285,66 @@ control that caught it was grouping `use_type` and reading the actual distributi
 - every emitted `use_type` value hits `TYPE_EXACT` — no fallthrough to keyword guessing
 - duplicate-`service_url` guard green
 - full unit suite green (87 files)
+
+
+---
+
+## WRONG-COLUMN REGISTRY AUDIT (2026-08-06) — the first result is one of my own entries
+
+Ran after Lever 3, over all **156** registry entries, on the question Lever 3 raised: *how many other
+entries point `type_source` at the wrong column, or at no column at all?*
+
+**Structural audit (offline, reads the shipped registry):**
+
+| class | entries | meaning |
+|---|---|---|
+| A — no `type_source` AND no `type_map` | **44** | emits 100% `unclassified` by construction |
+| B — `type_source` set, no `type_map` | **1** | `houston-plat-applications` (`AppCode`) — map can never fire |
+| C — `type_map` set, no `type_source` | **0** | no dead maps |
+
+Only **12** class-A/B entries actually produce records today; the rest are DOT project registers with
+no surface yet. Each of the 12 was probed live (`?f=json` field list via pg_net) to ask the one
+question that matters: **does a usable type column exist that was never wired?**
+
+### FOUND — `burlington-vt-building-permits` + `burlington-vt-zoning-permits` (17,256 records, 100% unclassified)
+
+**These are my own entries, and their `_receipts` claimed "no bounded vocabulary; free prose."
+That was wrong.** The layer publishes **`PrimaryLUC`** — a **27-value self-describing** assessor
+vocabulary (`R1 - Single Fam`, `C - Commercial`, `I - Industrial`, `RA - Apartments`, `UE - Utility
+Elec` …), populated on ~97% of rows. I recorded an absence I had not checked for.
+
+20 values that STATE A USE are mapped → Residential / Commercial / Industrial / Utility.
+Unwindowed-scope coverage (Rule 13 — the probe was `where=1=1`, wider than the entries' 365-day
+window, so these are **not** a prediction of the post-deploy rate): building **121,255 / 141,701**,
+zoning **31,499 / 35,668**; both unmapped remainders reconcile to the layer total exactly.
+
+**Failing closed on purpose:** `E - Exempt`, `EL - Exmpt Land`, `TE - Partl Exempt` state a **tax
+status, not a use** — a partial exemption can sit on an ordinary house, so Civic/Public would be an
+inference. `F - Farm` / `FL - Farmland` state agriculture, for which `TYPE_EXACT` has no member.
+**Mapping those to `Development` would buy nothing real** — `development` and `unclassified` are BOTH
+in `GENERIC_EXACT` (`lib/map.js:334`) and render identically, so it would look like coverage while
+changing no pin on any map view.
+
+### REJECTED WITH RECEIPTS — the other ten
+
+- **`clv-planning-cases`** (7,653) — **two** candidate columns, both rejected. `USETYPE` is the
+  Arlington class: **260,008 of 275,595 rows blank (94.3%)** — data absence, not a mapping gap.
+  `TYPE` is fully populated (26 values, sums exactly to 275,595) but is **opaque codes** — `TMP`,
+  `SDR`, `VAC`, `ZON`, `EOT`, `WVR`, `ROC` — which the autonomy grant bars, and they describe the
+  *application* (variance, vacation, general-plan amendment), not the use.
+- **`detroit-demolition-permits`** (789) — no type column; `work_description` is free prose. The
+  whole layer IS one use, so a `type_const` would fix it — but that is a **connector change**, gated.
+- **`irving-development-permits`** (824) — layer publishes only `Permit`, `Project`, `Status`.
+- **`madison-planning-projects`** (2,433) / **`clark-county-active-projects`** (909) /
+  **`provo-planning-applications`** (195) — free-prose description fields only.
+- **`butler-county-ks-permits`** (1,204) — no single type column; type is spread across separate
+  boolean-ish flags (`buildingpermit`, `solarpermit`, `buildingsiteonlypermit`). Deriving one is a
+  connector change, gated.
+- **`fort-worth-zoning-cases`** (54) — has `ZONING_TO` / `FUTURE_LAN`; below any useful threshold.
+- **`houston-plat-applications`** / **`harris-county-plats`** — real class-B/A defects but **zero
+  surface** (Harris has one modeled ZIP, in Conroe). Logged, not fixed.
+
+**Standing answer this produced: an entry's own `_receipts` claim of "no usable column" is a LEAD,
+not a fact — re-probe the field list before trusting it, including when you wrote it.** The
+structural audit (`type_source` present? `type_map` present?) is cheap, runs offline against the
+shipped registry, and is what surfaced this; run it whenever a new entry is added.
