@@ -7552,12 +7552,34 @@ Milwaukee was queued as a thin metro. Measured: **36 of 36 pages lit, median 22,
 — it is WisDOT's **best**-served county, not its worst. Wisconsin's thin counties are **Dane**
 (20 thin, median 5) and **Waukesha** (15 thin, median 3). Do not re-queue Milwaukee as thin.
 
-Its own ledger was still probed and is **NOT WIREABLE AS CONFIG**: `data.milwaukee.gov`
-(CKAN) `buildingpermits`, 16,685 rows, modified 2026-08-05, real `Status`, ISO dates — but the
-rows carry **only `Address` ("2033 S 24TH ST"), no ZIP column and no coordinates**, and
-`sources/ckan.ts::buildWhere` makes the ZIP filter **mandatory** (`"<zipCol>" = '<zip>'`). Wiring
-it needs a connector change (address-geocode or spatial scoping in ckan), which is **gated** —
-logged, not attempted.
+### 🔧 SCOPED CODE ITEM (not a rejection) — `data.milwaukee.gov` `buildingpermits`
+
+**This source is KNOWN-GOOD and we cannot currently reach it. That is a gap in our connector, not a
+defect in the data, and it must not be filed as a rejection** — a rejection means "probed and
+unusable," and re-reading it as one would retire the largest known-good source on the board.
+
+| | |
+|---|---|
+| endpoint | `data.milwaukee.gov` (CKAN), resource `828e9630-d7cb-42e4-960e-964eae916397` |
+| rows | **16,685** |
+| freshness | dataset modified **2026-08-05** (publisher states monthly cadence) |
+| status column | **real** — `Status`, e.g. `Issued`, with a self-describing vocabulary |
+| dates | `Date Opened` / `Date Issued`, **ISO** (`2017-02-23 00:00:00`) so they sort lexicographically |
+| type column | `Permit Type` (e.g. `Residential Alteration Permit`), plus `Use of Building` |
+
+**The single blocker:** rows carry **only `Address`** (`"2033 S 24TH ST"`) — no ZIP column and no
+coordinates — while `sources/ckan.ts::buildWhere` makes the ZIP filter **mandatory**
+(`"<zipCol>" = '<zip>'`). There is no configuration that satisfies it.
+
+**Scope of the change:** teach `sources/ckan.ts` the address-only case the arcgis connector already
+handles — either the Boulder geocode path (`deps.geocode` + the §GEOCODE_FENCE, which `ckan.ts`
+already implements at `normalizeRow`) driven by a `spatial_zip_radius_mi`-style option, or an
+address-prefix scope. **`ckan.ts` already has the geocoding half; only the SCOPING half is
+missing.** Gated (connector code), so logged rather than attempted.
+
+**Why it is worth doing:** at 16,685 rows it is the largest known-good source we cannot reach, and
+it would raise Milwaukee's 36 pages from median 22 into the municipal-tier range — the same shape
+as Anne Arundel's 2 → 254.
 
 ### ✅ ANNE ARUNDEL — `anne-arundel-commercial-site-plans` + `anne-arundel-subdivision-activity`
 
@@ -7617,10 +7639,14 @@ the cache. Deploy-verification probe (21401, the mandated new-host check):
    which is the record a resident most wants to see. At 4,596 rows total there is no size pressure
    that would justify one. `prelimenary plan` is mapped **verbatim**, publisher's spelling included.
 
-**OPEN QUESTION, logged not guessed:** `Inactive` (80 + 399) is bucketed **exclude**. Layer 30's
-type vocabulary contains `Inactive/Complete Subdivision`, which hints `Inactive` may mean **built**
-(→ `operating`) rather than dormant. Excluding is the conservative reading — it drops the record
-rather than asserting a building exists. Revisit only against a published AA County definition.
+**SETTLED-CONSERVATIVE — founder ruling 2026-08-06. This is NOT an open question; do not
+re-raise it as one.** `Inactive` (80 + 399) is bucketed **exclude**, permanently, on the evidence
+available. Layer 30's type vocabulary contains `Inactive/Complete Subdivision`, which hints
+`Inactive` *might* mean **built** (→ `operating`) — but the county publishes no definition of the
+word. **Excluding drops a record; bucketing it `operating` would assert a building exists on a word
+we cannot define**, which is precisely what the anti-fabrication directive forbids. A closed
+decision with a named trigger, not a loose end: revisit **only** if Anne Arundel County publishes a
+definition of the `STATUS_1` vocabulary.
 
 ### National effect
 
@@ -7636,3 +7662,100 @@ rather than asserting a building exists. Revisit only against a published AA Cou
 | Waukesha WI | 27 | 25 | 15 | 3 | WisDOT only |
 | Frederick MD | 33 | 15 | 14 | 0 | MDOT SHA only |
 | Howard MD | 21 | 16 | 11 | 2 | MDOT SHA only |
+
+---
+
+## MUNICIPAL TIER — PASS 2 (2026-08-06): the six ranked thin counties
+
+Targets came from the §0s national measurement, not from intuition — the six DOT-only counties with
+the most pages under 5 records. **1 of 6 wired.** Every rejection below carries an enumeration
+receipt with a positive control, not an inference.
+
+| county | pages / lit / thin | median | verdict |
+|---|---|---|---|
+| **Dane WI** | 46 / 45 / 20 | 5 | ✅ **WIRED** — `madison-current-planning-projects` |
+| **Prince George's MD** | 36 / 36 / 17 | 5 | 🚫 `STALE` — a real 12,231-row ledger that stopped in 2024 |
+| **Harford MD** | 20 / 18 / 16 | 2 | 🚫 `candidates_exhausted` — 203 org items, 0 ledgers |
+| **Waukesha WI** | 27 / 25 / 15 | 3 | 🚫 token-gated server + policy-only hub |
+| **Frederick MD** | 33 / 15 / 14 | 0 | 🚫 `candidates_exhausted` — 207 org items, 0 ledgers |
+| **Howard MD** | 21 / 16 / 11 | 2 | 🚫 `NO_GEOGRAPHY` — 61,857 real permits, no address, no coords |
+
+### ✅ DANE WI — `madison-current-planning-projects`
+
+Full evidence in the entry's `_receipts`. The finding worth repeating is **where it was found**:
+Madison's ArcGIS **Hub DCAT contains no per-record planning dataset** — parsed in full (489 KB), its
+only matches are policy layers and *residential parking* permits. The live register sits on the
+city's own **server root**, one level below the hub (the Centre County lesson). Dane County's own
+hub was enumerated with a positive control — **36 datasets, 0 matching** — a real zero.
+
+596 point features, `ProjectURL` **596/596** (record precision, verified not templated), 16
+self-describing statuses, newest records are 2026 cases, max `DATES_Circulated` 2026-07-20.
+
+### 🚫 PRINCE GEORGE'S MD — `STALE`, and two traps worth keeping
+
+This is the near-miss of the pass: **a genuinely excellent schema that is 19 months dead.**
+`gisdata.pgplanning.org` `Applications/DPIE_Combined_Permits/MapServer/0` "All Permits" — 12,231
+points, native `ZIP_CODE_5` **100% populated**, `ESTIMATE_COST`, `WORK_DESCRIPTION`,
+`CLASSIFICATION` summing exactly (Commercial 1,221 + Residential 11,010 = 12,231).
+
+**It is `STALE`:** max `APPLICATION_DATE` **2024-12-19**, max `ISSUANCE_DATE` **2024-12-27**, and
+`REFERENCE_YEAR` sums to all 12,231 rows with **nothing after 2023** (2023 = 569, 2022 = 1,903,
+2021 = 1,745; 2024/2025/2026 = **0**). Fort Lauderdale / Worcester class. → nightly reprobe list.
+
+**Trap 1 — `CASE_STATUS_NAME` IS NOT THE PERMIT STATUS, and it passes every completeness check.**
+It sums exactly to 12,231 across 4 legible values (APPLICATION ON HOLD, CORRESPONDENCE SENT 7,574 ·
+REFERRED 4,491 · COMPLAINT UNDER INVESTIGATION 141 · APPLICATION INCOMPLETE 25). Mapping it would
+have marked ~12,000 **issued and closed** permits as pending. The disproof is a cross-check against
+a date field that implies state: **11,857 of 12,231 rows (97%) have an `ISSUANCE_DATE` and 11,027
+have a `CLOSE_FINAL_DATE`** — and the crosstab shows those *same* issued rows still reading
+"APPLICATION ON HOLD". A permit that was issued and closed is not an application on hold, so the
+field describes internal correspondence routing, not the permit. **`CASE_MODE_NAME` is the real
+lifecycle** and also sums exactly: CLOSED 10,696 · PERMITTED 918 · ABANDONED 328 · APPLICATION 146 ·
+EXPIRED 93 · CANCELED 32 · PENDING 18.
+→ **Generalised as §0w's cross-check: when two candidate status fields are both complete, the one
+that contradicts a populated decision date is not the lifecycle.**
+
+**Trap 2 — `DPIE_Permits` and `DPIE_Combined_Permits` are the SAME DATA under two service names.**
+Both `/0` return exactly **12,231**, and their ordered `PERMIT_NUMBER` samples are byte-identical
+(`1-2019-1, 10-2020-1, 10-2023-0, 10002-2018-1, …`). `DPIE_Combined_Permits` layers 1-4 are further
+subsets (layer 1 Residential = 11,010, matching `CLASSIFICATION` exactly). The Houston plat trap —
+wiring two of these would have double-emitted every permit on every PG page. **Wire layer 0 of one
+service only, if it ever refreshes.**
+
+### 🚫 HOWARD MD — `NO_GEOGRAPHY`, and the ledger is otherwise excellent
+
+Found only after three wrong hosts: `gis.howardcountymd.gov` TCP-times-out, the ArcGIS hub domain
+404s, and the Socrata search's top hit `s2bd-vjgd` is a **story page** (`viewType: story`), not
+data. The real ledger is **`opendata.howardcountymd.gov` `kvz2-j5cj`** — **61,857 rows**, native
+`zip`, ISO dates, both vocabularies summing exactly to 61,857 (`category`: RESIDENTIAL 51,100 ·
+COMMERCIAL 9,838 · SIGN 918 · MX 1; `type`: ELECTRICAL 22,012 · PLUMBING 15,871 · BUILDING 13,945 ·
+HVAC 4,389 · FIRE PROTECTION 4,110 · SIGN 918 · GRADING 612).
+
+**The complete column list is the disqualifier** — `permit_number, category, type, file_date,
+permit_type, census_tract, issue_date, city, zip, sewer, water`. **No address column and no
+coordinates.** There is nothing to geocode (so the Boulder path is unavailable) and nothing to pin,
+so every record would be area-scope and **`app_projects` is point-scope only — the wire would light
+zero pages while adding 61,857 unpinnable rows.** Orlando / Somerville class. It also has no status
+column (a `status_const` case) and its newest `issue_date` is 2025-11-30, ~8 months stale.
+→ reprobe if the county ever publishes an address or point column.
+
+### 🚫 HARFORD · FREDERICK · WAUKESHA — enumerated, with totals as controls
+
+- **Harford MD** — org enumerated by owner, **203 items total**. The only permit-named items are
+  **dated 2016 monthly one-offs** ("December 2016 New Construction Permits", …) and a *Subdivision
+  Plan Viewer* application; everything else is policy geography (zoning, floodplain, districts,
+  subdivision boundaries). No ledger service.
+- **Frederick MD** — org `gis_enterprise_fcgmd` enumerated, **207 items total**. All reference
+  geography (parcels, centerlines, address points, service areas). The one promising title,
+  *Division of Planning and Permitting Public Hearings*, does **not** appear under a
+  Feature/Map-Service type filter — it is an app, not a queryable service.
+- **Waukesha WI** — the county's own server answers, but **both candidate folders (`LRD`,
+  `Services`) return HTTP 499 "Token Required"**, and the public `Hosted` folder carries no
+  permit-class service. Its hub DCAT (999 KB, fully parsed) yields only policy layers: County
+  Development **Plan**, Plan Amendments, Planned Unit Development polygons.
+
+### The pass in one line
+
+**Five of six counties are thin because no reachable first-party per-record source exists — not
+because the DOT entry is weak.** That is §0s confirmed from the other direction: the municipal tier
+is the right remedy, and it is supply-limited.
