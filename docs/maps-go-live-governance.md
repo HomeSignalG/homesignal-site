@@ -2155,6 +2155,48 @@ have been fine. The damage is entirely to the DECISION about whether to wire.
 
 ---
 
+## §0w — `NO_LIFECYCLE_VOCABULARY`: A STATUS COLUMN THAT ENCODES SOMETHING OTHER THAN LIFECYCLE
+
+**A column named `status`, 100% populated, whose values sum exactly to the layer count, can still
+carry no status.** This is §0o's sharpest instance: name and population rate describe the field,
+not its meaning — and every cheap completeness check passes while the field is unusable.
+
+**The worked case — Rhode Island STIP, 2026-08-06.** All 15 layers carry a status column (9 as
+`ProjectStatus`, 6 as `ProjectSta`), every one 100% populated, every one summing **exactly** to its
+layer's `returnCountOnly`. Every value is a full English sentence restating the funding year:
+
+```
+"This project had been included in the STIP 18-27 for funding in FY2018"   (layer 13, n=31)
+"This bridge had been included in the STIP 18-27 within Bridge Group 07,
+ funding in FY2026"                                                        (layer 5,  n=40)
+```
+
+That is the `FY2018…FY2027` funding columns rendered as prose. There is **no proposed / approved /
+operating distinction anywhere in the vocabulary**, so no value can be bucketed without inventing
+one. Layer 5 has 153 distinct values and not one of them is a lifecycle state.
+
+**Distinguish it from the neighbouring disqualifiers, because the remedy differs:**
+
+| disqualifier | shape | example |
+|---|---|---|
+| opaque-coded | legible-to-the-publisher code, meaning unknown to us | San Jose `"30"` on every row |
+| `NO_LIFECYCLE_VOCABULARY` | perfectly legible, and still not a lifecycle | RI `"…funding in FY2018"` |
+
+An opaque code might be resolvable from a published domain. A non-lifecycle vocabulary cannot be —
+the information simply is not in the dataset.
+
+**The corollary that matters most: this is the test AK and HI actually passed, and it is not
+`NO_TEMPORAL_FIELD`.** RI was originally rejected for having zero date-typed fields, citing AK as
+precedent. That precedent inverted the same session — AK and HI were both wired with **no
+`file_date` at all** (it is optional; five wired entries omit it). Had the date test been the real
+one, RI would have been wired on the overturn. It stayed rejected because AK's `Status`
+(Approved / Draft / Retired / Archived) and HI's `currentphase` (Design / Construction / Planning /
+Right of Way) are real lifecycles and RI's is a funding year. **Same test, three states, two
+outcomes.** When a rejection is overturned, re-derive every rejection that cited it as precedent —
+the original may have reached the right verdict by the wrong route.
+
+---
+
 ## §0t — A RATIO THAT EXCEEDS ITS OWN DENOMINATOR IS A QUERY DEFECT, NEVER A FINDING
 
 **Re-derive before reporting. The usual cause is a join fan-out.**
