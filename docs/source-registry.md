@@ -8348,3 +8348,143 @@ changing no pin on any map view.
 not a fact — re-probe the field list before trusting it, including when you wrote it.** The
 structural audit (`type_source` present? `type_map` present?) is cheap, runs offline against the
 shipped registry, and is what surfaced this; run it whenever a new entry is added.
+
+
+---
+
+## READ-ONLY PASS during the 2026-08-06 GitHub Actions incident (no runs available)
+
+Four investigations that need no CI. **Nothing here is fixed — this is a staged queue.**
+
+### 1. BARRIER REPROBE SWEEP — 0 of 16 recovered, and a rule about the instrument
+
+Positive control passed (Fort Worth's live layer answered 200), so the sweep provably ran.
+Every stalled feed matches its recorded date **to the exact day** — that agreement is the
+control proving the right field was read, not a coincidence:
+
+| target | recorded | re-probed 2026-08-06 | verdict |
+|---|---|---|---|
+| St. Paul | 2025-06-30 | **2025-06-30** | stalled 13 mo |
+| Worcester | 2025-09-09 | **9/9/2025** | stalled 11 mo |
+| Syracuse | 2025-08-16 | **2025-08-16** | stalled 12 mo |
+| McKinney | Sep 2023 | **2023-09-26** | stalled 2.8 yr |
+| KCMO `ntw8-aacc` | 2025-05-09 | **2025-05-09** (`applieddate`) | stalled 15 mo |
+
+Also: Aurora still DNS-dead · Douglas CO still 500 CONT_0001 · Frisco alt host still TLS-timeout ·
+El Paso Accela now **404 (service gone)** · **Fort Lauderdale is now WORSE than stalled — the
+MapServer itself 500s "Service OpenData/Permits/MapServer not found"** (was: stalled 2021-01-05).
+Denton's layer is alive but rejects `max(IssueDate)` (HTTP 400) — freshness unresolved this pass,
+recorded as unverified rather than guessed.
+
+⚠️ **NEW STANDING ANSWER — THE REPROBE LIST CANNOT SETTLE THE EDGE-EGRESS CLASS, AND MUST STOP
+PRETENDING TO.** The three largest barriers by page count — **El Paso TX (145 pages),
+Miami-Dade (80), Hillsborough/Tampa (58) = 283 pages** — were each diagnosed as blocked
+*specifically because pg_net gets 200 while the Supabase edge runtime gets 403 or times out*.
+The sandbox's only egress IS pg_net. So probing them from here **answers a different question**
+(Rule 13) and a 200 is not evidence of recovery — it is the expected reading in both the broken
+and the fixed state. **Those 283 pages are gated behind a deployed-engine smoke test, not behind
+a probe**, and no amount of sweeping will resolve them. Only re-probe them from CI.
+
+### 2. THIN PAGES RANKED BY MUNICIPAL ENVELOPE (not county total)
+
+County totals conflate "the city ledger is not wired" with "no city ledger will ever reach here."
+Ranked instead on the **place** parsed from each ZIP page's own name (`"<place> (<ZIP>)"`),
+0 unparseable of 12,722.
+
+**2a. Entirely dark municipalities — each needs THAT CITY's own permit ledger. Nothing else will do:**
+
+| pages | municipality | county |
+|---|---|---|
+| 38 | **Oklahoma City** | Oklahoma OK |
+| 36 | **Indianapolis** | Marion IN |
+| 30 | **Omaha** | Douglas NE |
+| 28 | **Tulsa** | Tulsa OK |
+| 27 | **Wichita** | Sedgwick KS |
+| 26 | **Dayton** | Montgomery OH |
+| 25 | **Rochester** | Monroe NY |
+| 16 | Fort Wayne IN · 15 Toledo OH · 14 Oakland CA · 14 Rockford IL · 13 Jackson MS |
+| 12 | Shreveport LA · Albany NY · Charleston WV · Columbia SC |
+| ≤11 | Boise ID · Irvine CA · Harrisburg PA · Berkeley CA · Providence RI · Springfield MO |
+
+**2b. Partially-lit municipalities — and the attribution that splits them in two.** Being
+"partly lit" does NOT mean the city's own source works. Checking WHICH source lights the healthy
+pages separates two different problems that look identical in the totals:
+
+*CONFIG / GEOMETRY — the city's OWN source works, yet its own pages are dark. This is the real
+completeness queue:*
+
+| municipality | dark | thin | lit by | best page |
+|---|---|---|---|---|
+| **New York (Manhattan)** | 23 | 9 | `nyc-dobnow` 75 pages + `nyc-dob-permit-issuance` 66 | 1,278 |
+| **Minneapolis** | 14 | 0 | `minneapolis-ccs-permits` 28 pages / 44,431 rec | 3,008 |
+| **Cincinnati** | 14 | 2 | `cincinnati-building-permits` 30 pages | 442 |
+| **Buffalo** | 12 | 0 | `buffalo-building-permits` 17 pages | 90 |
+| Atlanta 7 · Brooklyn 6 · Pittsburgh 3+6 · Tucson 3+6 · Grand Rapids 0+9 | | | | |
+
+*SUPPLY — "lit" is only SPILLOVER from a neighbouring source; the city itself has nothing:*
+
+| municipality | dark | what actually lights it | what it needs |
+|---|---|---|---|
+| **Baltimore city** | 12 | `baltimore-county-permits` (7 pp) + `mdot-sha` (12) + **Anne Arundel** (2) | Baltimore CITY ledger (the open DECISION NEEDED) |
+| **Saint Paul** | 11 | **`minneapolis-ccs-permits`** 6 pp — Minneapolis's 3-mi circles spilling over | St Paul's own (confirmed stalled 2025-06-30) |
+| **Orlando** | 8 | `fdot-active-construction-projects` only — DOT tier | Orlando's own (rejected: ungeolocatable) |
+| **Tampa** | 1+7 | DOT/county only | Tampa's own (WAF-blocked to edge) |
+
+**Minneapolis lighting six SAINT PAUL pages is the sharpest single result here** — it is the
+`spatial_zip_radius_mi` circle reaching across a city line, and it is exactly why a county-level
+or even a place-level count overstates coverage unless you attribute the source.
+
+✅ Incidental confirmation: **`nyc-dob-permit-issuance` now contributes 2,897 records across 66
+pages.** The `recency_expr` fix for its MM/DD/YYYY text dates (2026-08-02) worked — it had
+previously placed ZERO records ever.
+
+### 3. WRONG-COLUMN AUDIT, CONTINUED — one confirmed, the rest classified
+
+Same shape as DeKalb / Overland Park / Burlington: a PROCESS field wired while a LAND-USE field
+sits unused on the same layer. **Reported, not fixed.**
+
+**CONFIRMED WRONG COLUMN — `virginia-beach-building-permits`, 9,934 unclassified (65.5%):**
+`PermitType` (current `type_source`, 4 mapped keys) carries **12 trade/department values** —
+Building 21,628 · Electrical 18,404 · Mechanical 15,669 · Plumbing 12,036 · Moving and Hauling
+11,619 · Utility 7,000 · Gas 6,005. That is the department, not the use.
+**`ConstructionType` sits UNUSED with 6 self-describing values summing EXACTLY to 103,672** —
+Residential 59,397 · Commercial 17,737 · Roof and or Siding 1,161 · Construction 1,082 ·
+Asbestos 55 · blank 24,240 (**76.6% populated**). This is the Overland Park case again.
+(`WorkType` was also checked and REJECTED — 83,260 of 103,672 blank, 80%.)
+
+**BETTER COLUMN AVAILABLE, weaker case — `columbia-mo-permits`, 4,487 (44.4%):** current
+`PERMIT_TYPE` has 38 distinct, 20 mapped. **`TYP_DESC` (55 values) is more use-explicit** — "NEW
+COMMERCIAL CHURCHES AND OTHER RELIGIOUS", "NEW COMMERCIAL PARKING GARAGES", "NEW COMMERCIAL STORES
+AND CUSTOMER SERVICES". Either widen PERMIT_TYPE or switch. **`Prim_Zoning` REJECTED** — 23
+values but OPAQUE zoning codes (`M-OF`, `ROW`, `R-1`, `C2`, `IG`, `Pd`), which the autonomy grant
+bars, and zoning is not project use. *(Its groupBy returns 0 features — the Henderson case;
+`returnDistinctValues` was required.)*
+
+**NOT wrong-column — narrow whitelist only (widen candidates):**
+- `charleston-county-permits` 8,886 (23.4%) — `WORKCLASS` is correct. `CASETYPE` was checked and
+  is **worse**: 156 values dominated by INSPECTION MILESTONES (Stormwater Site Inspection 32,931,
+  Trade Final 27,346, Building Final 19,407, Framing, Electrical Rough).
+- `kent-county-de-building-permits` 1,788 (43.7%) — `StructureType` 72 values, 29 mapped.
+  `StructureDesc` is **2,000+ distinct free text**, not a bounded vocabulary.
+- `sheridan-county-building-permits` 3,046 (46.5%) — the layer publishes only FOUR string fields
+  (`Permit_Num`, `Address`, `Type_of_Bu`, `ADDFULL`). No better column exists. Missoula class.
+
+**No action:** `brunswick-county-permits` (0.5% unclassified; `ProjectCategory` is process, not
+use) · `bozeman` / `anne-arundel-subdivision-activity` / `scottsdale` (no land-use field, small
+counts).
+
+### 4. THE COMPLETENESS QUEUE, ENUMERATED
+
+| band | pages | inside a county with a live source | county has none |
+|---|---|---|---|
+| 0 records | 6,012 | 2,197 | 3,815 |
+| 1–4 | 1,486 | 1,486 | 0 |
+| 5–19 | 1,121 | 1,121 | 0 |
+| 20+ | 4,103 | 4,103 | 0 |
+
+The honest read, from §2b's attribution: **most of the 2,197 is a single city's layer under a
+county-wide coverage declaration** (Orange County CA: one source lighting 7 of 92 pages), which is
+the supply limit §0y already established, seen from the page side. The genuinely
+config-or-geometry subset is the §2b CONFIG table — roughly **60-70 pages across Manhattan,
+Minneapolis, Cincinnati and Buffalo** where the city's own source demonstrably works. That is the
+queue worth working; the rest is supply and should not be re-counted as actionable.
