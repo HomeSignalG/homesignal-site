@@ -5998,6 +5998,15 @@ rushed). Every finding below is a live probe receipt.
 
 **Wireable total: 1,150 pages (NJ+ME+IA+VT) + RI 81.** Rejected: 1,009 pages across 6 states.
 
+> ⚠️ **THREE ROWS OF THIS TABLE ARE SUPERSEDED — 2026-08-06 seven-zero-state pass.**
+> **AK ✅ WIRED** (`akdot-stip-24-27`) and **HI ✅ WIRED** (`hdot-active-design-projects`): both
+> rejections were overturned. AK's was wrong on the RULE (`file_date` is optional — five wired
+> entries omit it), HI's was wrong on the FACT (a live first-party org and layer exist; the
+> "13 items, 0 project services" enumeration missed them). **RI stays rejected but for a
+> different reason** — `NO_LIFECYCLE_VOCABULARY` (§0w), not `NO_TEMPORAL_FIELD`; see the
+> re-derivation appended to the RHODE ISLAND section below. OK/ND/NH/WV re-probed and all four
+> confirmed. Full pass: "SEVEN-ZERO-STATE PASS" below.
+
 ### Per-source evidence
 
 **NJ — `Statewide_Transportation_Improvement_Program_STIP_Project_Locations/0`** (services.arcgis.com,
@@ -6115,6 +6124,59 @@ being `Old_STIP_1827_Amend3` — i.e. no newer published RI STIP map exists to p
 
 **81 pages stay on the EPA facilities floor.** → nightly reprobe list; revisit if RIDOA publishes
 a STIP layer carrying real dates.
+
+### ⚠️ RE-DERIVED 2026-08-06 — the VERDICT HOLDS, the REASON ABOVE DOES NOT. Read this half.
+
+The section above is superseded in its reasoning and in two of its factual claims. It is kept
+verbatim because the correction is the point.
+
+**Why it had to be re-derived.** RI was rejected on `NO_TEMPORAL_FIELD` *citing Alaska as
+precedent*. In the seven-zero-state pass (2026-08-06) **that precedent was overturned** — AK and HI
+were both wired carrying **zero date-typed fields**, because `file_date` is optional in the
+connector and five wired entries already omit it. Under §0w, a rejection whose cited precedent
+falls must be re-derived rather than left standing.
+
+**Two factual corrections to the section above:**
+
+1. **"every layer carries the SAME schema" is false.** There are two schema families:
+   layers 0-6, 10, 14 use `TIPID` / `ProjectStatus` / `Municipaliy` (sic) and — on layer 5 only —
+   real `Latitude` / `Longitude` columns; layers 7-9, 11-13 use `TIP_ID` / `ProjectSta` /
+   `Municipality` / `ProjectType`.
+2. **"the only temporal signal is the funding columns" understates what is there.** Every one of
+   the 15 layers carries a **status column**, which the original pass never looked for. Its
+   `ilike '%stat%'` filter also misses `ProjectSta` — the truncated name on 6 of the 15.
+
+**The governing reason is `NO_LIFECYCLE_VOCABULARY` (§0w), measured across all 15 layers.**
+Status is 100% populated on every layer and sums **exactly** to each layer's `returnCountOnly`
+(12, 17, 30, 9, 2, 719, 82, 5, 11, 47, 719, 10, 1, 188, 32) — and every value is prose restating
+the funding year:
+
+| layer | n | a verbatim value |
+|---|---|---|
+| 13 Pavement Capital | 188 | `This project had been included in the STIP 18-27 for funding in FY2018` (31) |
+| 5 Bridge Capital | 719 | `This bridge had been included in the STIP 18-27 within Bridge Group 07, funding in FY2026` (40) |
+| 0 Truck Toll Facilities | 12 | `This bridge had been included in the STIP 18-27 within Rhodeworks Toll Facilities, funding in FY2018` (12) |
+
+Layer 5 has **153 distinct values, none a lifecycle state**. There is no proposed/approved/
+operating distinction to map, so nothing can be bucketed without inventing it. That is the same
+test AK's `Status` (Approved/Draft/Retired/Archived) and HI's `currentphase` (Design/Construction/
+Planning/Right of Way) **passed** — so the date test was never what separated them.
+
+**Two candidate sources closed in the re-derivation, both new:**
+
+- **`RIDOA` folder fully enumerated (16 services).** The only STIP services are
+  `STIP_1827_Amend21` and `STIPMap_1827_Amend26` — Amend26 is already the newest. Confirms the
+  original "no newer STIP" note by enumeration rather than inference.
+- **🚫 `RIDOT/ePermitting` — `WRONG_RECORD_CLASS`.** The prior pass never enumerated the separate
+  `RIDOT` folder (9 services), and the name is the most promising string in it. Its 6 layers are
+  `E-911 Address Points`, `State Maintained Roads`, `Maintenance Districts`, `Municipalities`,
+  `County Boundaries`, `State Boundary` — the **basemap behind** a permitting application, not the
+  permits. Its `FeatureServer` sibling exposes no layers at all.
+
+**Verdict unchanged: 81 pages stay on the EPA facilities floor.** The reprobe trigger changes,
+though — do not revisit on "RIDOA publishes dates." Revisit only if RIDOA publishes a STIP layer
+whose status column carries a **project lifecycle**; dates alone would not have made this source
+wireable and would not now.
 
 ## NEW YORK — NO STATEWIDE SOURCE EXISTS (2026-08-05). NY must be done county-by-county
 
@@ -7374,3 +7436,91 @@ five project datasets.
 
 **13 pages remain dark** — Dane 1, Waukesha 2, Outagamie 3, Brown 1, Eau Claire 1, Kenosha 2,
 Ozaukee 3 — rural ZIPs with no programmed highway project inside the 3-mile envelope. Honest empties.
+
+---
+
+## SEVEN-ZERO-STATE PASS (2026-08-06) — AK + HI WIRED, five rejections confirmed
+
+**Scope:** the seven states at exactly **0 lit pages** — NH 247, WV 212, OK 197, ND 155, AK 101,
+HI 97, RI 81 = **1,090 pages**. Run as one pass. Four of the seven carried a prior rejection from
+the eleven-state pass; per instruction each was **either confirmed in one probe or overturned with
+evidence**, never silently re-derived.
+
+### Outcome
+
+| state | pages | prior record | this pass | lit after |
+|---|---|---|---|---|
+| **HI** | 97 | 🚫 "13 items, 0 project services" | ✅ **OVERTURNED — WIRED** | **85 (87.6%)** |
+| **AK** | 101 | 🚫 `NO_TEMPORAL_FIELD` | ✅ **OVERTURNED — WIRED** | **28 (27.7%)** |
+| **RI** | 81 | 🚫 `NO_TEMPORAL_FIELD` | 🚫 **HELD, reason replaced** → `NO_LIFECYCLE_VOCABULARY` | 0 |
+| **OK** | 197 | 🚫 "no source found" | 🚫 **HELD, receipt upgraded** | 0 |
+| **WV** | 212 | 🚫 `candidates_exhausted` | 🚫 **CONFIRMED** | 0 |
+| **NH** | 247 | 🚫 no first-party org | 🚫 **CONFIRMED** | 0 |
+| **ND** | 155 | 🚫 no first-party org | 🚫 **CONFIRMED** (§0u) | 0 |
+
+**113 pages lit. 977 stay on the EPA facilities floor** — and, importantly, **not because they were
+skipped**: every one of the five now has an enumeration receipt, not an inference.
+
+### ✅ ALASKA — `akdot-stip-24-27`
+
+`services.arcgis.com/r4A0V7UzH9fcLVvv/…/STIP_24_27_Final_NewSchema/FeatureServer/0`, owner
+`AKDOT_GIS`. **2,282 points.** `Status` sums **exactly** to 2,282 — Approved 1,094 / Draft 591 /
+null 316 / Retired 225 / Archived 56 → `proposed:[Draft]`, `approved:[Approved]`,
+`exclude:[Retired,Archived]`; the 316 nulls fail closed. No `file_date` (the layer has none), which
+is why it was rejected and why that rejection was wrong: **`file_date` is optional and five wired
+entries already omit it.**
+
+Deploy-verification probe (99501, the mandated new-host check — a page showing 0 records looks
+identical to a legitimately empty page; only the connector report distinguishes *fetched nothing*
+from *could not connect*): **fetched 164 → emitted 118**, `quarantined: []`, `no_record_url: 0`,
+`geocode_failures: 0`, 20 excluded by status, 26 blank. Go-live: **28 of 101 pages, 909 records,
+median 7.**
+
+### ✅ HAWAII — `hdot-active-design-projects`
+
+`services.arcgis.com/HQ0xoN0EzDPBOEci/…/HDOT_Active_Design_Projects_Layer_view/FeatureServer/0`.
+**483 polylines** on the `featurePoint()` centroid path. `currentphase` sums **exactly** to 483 —
+Design 237 / Construction 212 / Planning 30 / Right of Way 4 → `proposed:[Design,Planning,Right of
+Way]`, `approved:[Construction]`. ⚠️ The layer also carries `projectstatus` holding opaque codes
+`1`/`2`; it is **deliberately unused** — an opaque-coded value is a hard stop, and a self-describing
+alternative existed in the same row.
+
+⚠️ **The prior HI rejection was wrong on the FACT, not the rule** — "13 items, 0 project services"
+was an enumeration that missed a live first-party org. Deploy-verification probe (96813):
+**fetched 118 → emitted 118**, everything clean. Go-live: **85 of 97 pages, 1,848 records,
+median 9.**
+
+### 🚫 RHODE ISLAND — held, reason replaced
+
+Full re-derivation is appended to the RHODE ISLAND section above (§0w). One line: all 15 layers do
+carry a status column, 100% populated, summing exactly to every layer count — and every value is
+prose restating the funding fiscal year, so there is no lifecycle to map. Also closed this pass:
+the `RIDOA` folder enumerated (16 services, Amend26 is the newest STIP) and **`RIDOT/ePermitting`**,
+which the prior pass never saw — it is `WRONG_RECORD_CLASS`, the basemap behind a permitting app.
+
+### 🚫 OKLAHOMA — held, but the prior receipt was wrong and is replaced
+
+The record said *"no source found — 2 query shapes → 0 ODOT project services."* **That is not what
+is there.** `OKDOT_GIS` is a live first-party org. The rejection stands on what its services
+actually contain:
+
+- **`Active_Projects`** — no status column of any kind. Nothing to bucket; fails closed to nothing.
+- **`Construction_Updates`** — 120 rows, **every one `YEAR=2022`**. `STALE` by four years.
+
+An upgraded rejection is worth more than a confirmed one: "we found nothing" invites a re-probe
+forever, "we found this and it fails on X" is falsifiable.
+
+### 🚫 WEST VIRGINIA / NEW HAMPSHIRE / NORTH DAKOTA — confirmed
+
+- **WV** — `owner:WVDOT_Publisher` re-enumerated: still **64 items, 0 project/STIP services**.
+- **NH** — 22 items via `NHGRANIT` (the state's actual GIS clearinghouse, a better query than the
+  original `owner:NHDOT` → 0): hub pages, dashboards, story maps, road centerlines. No project
+  register.
+- **ND** — the project-named hits are owned by **`ulteiginnovation`** (Ulteig, a private
+  engineering consultancy) and **`Aleesha`** (an individual account). **§0u: check the `owner`
+  before the schema** — a consultancy-owned copy of a public register is not first-party and may
+  be a snapshot of any vintage.
+
+### National effect
+
+**6,493 → 6,606 of 12,722 = 51.04% → 51.93%.**
