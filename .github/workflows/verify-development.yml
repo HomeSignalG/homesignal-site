@@ -14,7 +14,13 @@ on:
         required: false
         default: ''
   schedule:
-    - cron: '37 13 * * *'   # daily 13:37 UTC — catches regressions after any deploy/data change
+    # WEEKLY, not daily, since 2026-08-06 (quota). At 187.5 runner-min/run this was 45.4% of
+    # ALL Actions spend on this repo — 2,626 min in six days — and it failed 7 of 14 runs.
+    # Weekly keeps the regression signal at a seventh of the cost; workflow_dispatch above
+    # covers on-demand checks, and the push trigger below still fires on the files that matter.
+    # The real fix is the scoped-but-unbuilt worker pool (one Playwright page, serial, ~1.37s
+    # per ZIP) — that cuts the cost itself rather than the cadence. Restore daily after it ships.
+    - cron: '37 13 * * 1'   # weekly, Mondays 13:37 UTC
   push:
     branches: [main]
     paths:
