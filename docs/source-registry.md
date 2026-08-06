@@ -7665,31 +7665,58 @@ definition of the `STATUS_1` vocabulary.
 
 ---
 
-## MUNICIPAL TIER — PASS 2 (2026-08-06): the six ranked thin counties
+## MUNICIPAL TIER — PASS 2 (2026-08-06): the six ranked thin counties — 0 of 6 wired
 
 Targets came from the §0s national measurement, not from intuition — the six DOT-only counties with
-the most pages under 5 records. **1 of 6 wired.** Every rejection below carries an enumeration
-receipt with a positive control, not an inference.
+the most pages under 5 records. **The pass wired NOTHING, and the reason is worth more than a wire
+would have been.** Every disposition below carries an enumeration receipt with a positive control.
 
 | county | pages / lit / thin | median | verdict |
 |---|---|---|---|
-| **Dane WI** | 46 / 45 / 20 | 5 | ✅ **WIRED** — `madison-current-planning-projects` |
-| **Prince George's MD** | 36 / 36 / 17 | 5 | 🚫 `STALE` — a real 12,231-row ledger that stopped in 2024 |
-| **Harford MD** | 20 / 18 / 16 | 2 | 🚫 `candidates_exhausted` — 203 org items, 0 ledgers |
-| **Waukesha WI** | 27 / 25 / 15 | 3 | 🚫 token-gated server + policy-only hub |
-| **Frederick MD** | 33 / 15 / 14 | 0 | 🚫 `candidates_exhausted` — 207 org items, 0 ledgers |
-| **Howard MD** | 21 / 16 / 11 | 2 | 🚫 `NO_GEOGRAPHY` — 61,857 real permits, no address, no coords |
+| **Dane WI** | 46 / 45 / 20 | 5 | ⚠️ **ALREADY WIRED** — the premise was wrong; residual thinness is RURAL |
+| Prince George's MD | 36 / 36 / 17 | 5 | 🚫 `STALE` — a real 12,231-row ledger that stopped in 2024 |
+| Harford MD | 20 / 18 / 16 | 2 | 🚫 `candidates_exhausted` — 203 org items, 0 ledgers |
+| Waukesha WI | 27 / 25 / 15 | 3 | 🚫 token-gated server + policy-only hub |
+| Frederick MD | 33 / 15 / 14 | 0 | 🚫 `candidates_exhausted` — 207 org items, 0 ledgers |
+| Howard MD | 21 / 16 / 11 | 2 | 🚫 `NO_GEOGRAPHY` — 61,857 real permits, no address, no coords |
 
-### ✅ DANE WI — `madison-current-planning-projects`
+### ⚠️ DANE WI — I WIRED A DUPLICATE, THE PROBE CAUGHT IT, AND THE REAL FINDING IS UNDERNEATH
 
-Full evidence in the entry's `_receipts`. The finding worth repeating is **where it was found**:
-Madison's ArcGIS **Hub DCAT contains no per-record planning dataset** — parsed in full (489 KB), its
-only matches are policy layers and *residential parking* permits. The live register sits on the
-city's own **server root**, one level below the hub (the Centre County lesson). Dane County's own
-hub was enumerated with a positive control — **36 datasets, 0 matching** — a real zero.
+**What happened.** I added `madison-current-planning-projects` for the City of Madison's
+`Planning/Current_Planning_Projects/MapServer/0`. **`madison-planning-projects` — same URL, same
+`{WI, Dane}` coverage — was already in the registry.** The deploy-verification probe on ZIP 53703
+returned **two run-reports against the identical `service_url`, each emitting ~228 records**: every
+Madison planning case double-counted on every Dane page. The entry was reverted before any re-cache,
+so **nothing reached production**.
 
-596 point features, `ProjectURL` **596/596** (record precision, verified not templated), 16
-self-describing statuses, newest records are 2026 cases, max `DATES_Circulated` 2026-07-20.
+**Why the guard did not catch it.** The additivity check asserted the new `registry_id` was unique.
+That is the wrong key — `registry_id` uniqueness says nothing about what an entry FETCHES, and
+engine-v22 exact-identity dedup cannot collapse the copies because they carry different
+`source_registry_id` values (the same reason `houston-plat-applications` layer 0 was rejected as a
+proven subset of layer 1). Now enforced by **`test/registry-duplicate-service-url.test.mjs`**, which
+fails on any two entries sharing a `service_url` without distinct non-empty `extra_where` slices.
+The WSDOT `proposed`/`under-construction`/`complete` trio is the legitimate sliced case and is
+allowed; the test carries a positive control asserting it still sees that group, so it cannot pass
+vacuously. Verified by injecting the exact duplicate: the guard fails, exit 1.
+
+**The finding underneath — and it corrects the premise of the whole pass for this county.** Dane was
+never DOT-only. It already carries **2,437 Madison records across 20 ZIPs**. Split by whether a page
+is inside Madison's reach:
+
+| Dane pages | count | median records | pages under 5 |
+|---|---|---|---|
+| carrying Madison records | 20 | **140** | **2** |
+| WisDOT only | 26 | **3** | **19** |
+
+**19 of Dane's 20 thin pages are rural ZIPs outside the city ledger's 3-mile envelope.** The
+municipal tier already works there, perfectly, everywhere it reaches. Wiring Madison again — which
+is exactly what I did — could not have moved a single one of those 19 pages.
+
+**Generalised (§0s corollary): a COUNTY-level thin count conflates two populations that need
+different remedies.** Inside the municipality the municipal tier is the answer and may already be in
+place; outside it, no city ledger can ever reach, and the remedy is a county-level or township-level
+source — or an honest acceptance that rural pages carry the DOT layer and the EPA floor. **Rank
+future municipal-tier targets on the thin pages INSIDE a municipality, not on the county total.**
 
 ### 🚫 PRINCE GEORGE'S MD — `STALE`, and two traps worth keeping
 
@@ -7756,6 +7783,8 @@ column (a `status_const` case) and its newest `issue_date` is 2025-11-30, ~8 mon
 
 ### The pass in one line
 
-**Five of six counties are thin because no reachable first-party per-record source exists — not
-because the DOT entry is weak.** That is §0s confirmed from the other direction: the municipal tier
-is the right remedy, and it is supply-limited.
+**Five of six counties are thin because no reachable first-party per-record source exists; the
+sixth was thin because part of it is rural.** Neither is a weak DOT entry. §0s is confirmed from the
+other direction — the municipal tier is the right remedy, it is **supply-limited**, and where supply
+exists it is often **already wired**. The next ranked list must be built from thin pages inside
+municipalities, and must exclude counties whose municipality already has a source.
