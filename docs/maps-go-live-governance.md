@@ -2195,6 +2195,23 @@ Right of Way) are real lifecycles and RI's is a funding year. **Same test, three
 outcomes.** When a rejection is overturned, re-derive every rejection that cited it as precedent —
 the original may have reached the right verdict by the wrong route.
 
+### The instrument that hid it: a pattern search that misses a TRUNCATED column name
+
+The original RI pass concluded "no status column exists" from a schema scan filtering
+`name ilike '%stat%'`. Six of the 15 layers name the column **`ProjectSta`** — ArcGIS truncates
+field names, and `ProjectSta` does not contain the substring `stat`. The filter returned a
+confident, clean **absence** for 6 of 15 layers, and nothing about the result announced that the
+pattern rather than the data produced it.
+
+**The rule: when a pattern search over field names returns nothing, the pattern is a suspect before
+the data is.** Government schemas truncate (`ProjectSta`, `Municipaliy`, `PRJ_TYPE` vs
+`PROJ_TYPE`), abbreviate, and misspell. Enumerate the FULL field list for at least one layer of
+each schema family and read it, rather than trusting a substring filter to have found everything.
+
+This is §0v's sibling — the equality-vs-`LIKE` wrong zero — one level up: **§0v is a wrong zero
+from the values, this is a wrong zero from the column names.** Both produce success-shaped output
+while attesting to nothing, and both end an investigation early.
+
 ---
 
 ## §0t — A RATIO THAT EXCEEDS ITS OWN DENOMINATOR IS A QUERY DEFECT, NEVER A FINDING
@@ -2272,6 +2289,34 @@ reason to stop.**
 ---
 
 ## §0s — `DOT_ONLY`: A STATEWIDE DOT WIRE BUYS COVERAGE, NOT NECESSARILY DEPTH
+
+### THE STRUCTURAL FACT — read this before anything else in this section
+
+**A DOT wire and a permit wire are not substitutes. They are different products.
+Coverage comes from one, completeness from the other.** Measured nationally across the entire
+lit population, 2026-08-06:
+
+| dominant source class | lit pages | **median records** | % under 5 records |
+|---|---|---|---|
+| DOT / transport project register | 3,404 | **8** | 37.9% |
+| municipal permit / land-use ledger | 3,202 | **252** | 6.4% |
+
+**A 31× median gap**, and **1,290 of the 1,496 thin pages (86%) are DOT-dominated.** This is not a
+discovery problem and not a handful of weak entries — it is a property of what the two source
+classes *are*. A state DOT publishes a few hundred to a few thousand programmed projects for an
+entire state; a single city publishes tens of thousands of permits a year.
+
+**The operative consequence: THE FIX FOR A THIN PAGE IS NEVER A BETTER DOT ENTRY.** Do not re-probe
+the DOT layer, do not widen its radius, do not loosen its status buckets. Add the municipal tier
+underneath it. A county sitting at a low median with a DOT layer as its only source is not
+under-configured — it is correctly configured and missing a second, different product.
+
+Worked proof, same day: **Anne Arundel MD** was DOT-only (`mdot-sha-project-portal`) at 27/37 pages
+lit, **median 2**, 92 records total. Wiring the county's own two planning registers took it to
+**37/37 lit, median 254, 10,784 records, 0 pages under 5** — a 127× median gain with the DOT entry
+untouched.
+
+---
 
 **A statewide DOT layer is the right first move in a dark state (§0c) and it is not a substitute
 for permit sources.** A highway programme touches many ZIPs with a few records each; a city permit
