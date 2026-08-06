@@ -2062,6 +2062,28 @@ centroid", and the decision should rest on the vocabulary, not the probe.
 
 ## §0q — THE SCOREBOARD IS TWO NUMBERS: COVERAGE **AND** COMPLETENESS
 
+### THE FLOOR — a permanent honest-empty population. State it, do not re-discover it.
+
+**~2,700 pages can never be reached by any wire, and that is a correct terminal state, not a
+backlog.** Measured 2026-08-06:
+
+| population | pages | why no wire reaches it |
+|---|---|---|
+| dark pages in counties that ALREADY have a source | **2,240** | the source covers the county; no record falls inside this ZIP's 3-mile circle |
+| thin pages in counties that ALREADY have a municipal source | **475** | same — the ledger works, the envelope is empty |
+| **total permanent honest-empty floor** | **~2,715 (21% of 12,722)** | |
+
+These are rural and low-density ZIPs whose county is already served. Wiring another source for
+that county cannot change them, and **re-wiring the source that already covers them is the exact
+mistake the Dane pass made** (Madison was re-wired against 19 rural pages it could never reach).
+
+**Quote the floor whenever you quote coverage.** A future session that sees 47.6% dark and reasons
+"there are 6,055 pages to win" will spend a pass rediscovering that 2,240 of them are honest
+empties. The reachable ceiling is not 100% — on today's model it is roughly **79%**, and the gap
+is geography, not effort.
+
+---
+
 **Report both on every state close, from 2026-08-05 onward.** Page count saturates at ONE record:
 a page lit by a single geocoded permit and a page carrying three hundred parcel-precise filings
 are indistinguishable in every coverage number this project has ever produced.

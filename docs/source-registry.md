@@ -7904,3 +7904,102 @@ are structurally unfixable).** Highest-value work, in order:
 3. **Deprioritise the heavily-probed heads** (Suffolk, Westchester, Lancaster, Bucks, Dayton,
    Rochester, Albany, Sonoma) — all carry documented rejections; re-probing has low expected yield
    and Dayton has already been reprobed twice, negative.
+
+---
+
+## 🔁 RETROACTIVE AUDIT — `DOT_TIER_CLOSED_ONLY` applies to TWELVE states, not five
+
+**The verdict was scoped wrong, not the probe.** Testing `OKDOT_GIS` and recording "Oklahoma
+closed" is a scope error in the conclusion: the probe answered *"does the state DOT publish a
+project register?"* and the verdict was written as *"does Oklahoma publish anything?"* Oklahoma
+City and Tulsa had never been contacted. Same shape as scoping a session to a row range and
+reporting on the table.
+
+**Audited by measurement, not by reading past notes** — a state qualifies when **no municipal
+(non-DOT) source lands a single record on any of its pages**:
+
+| state | pages | pages with ANY source | pages with a MUNICIPAL source | prior verdict rested on |
+|---|---|---|---|---|
+| NJ | 359 | 267 | **0** | NJDOT STIP wired; municipal recon rejected at *county/state* level |
+| ME | 273 | 171 | **0** | MaineDOT wired |
+| **NH** | **247** | **0** | **0** | `NHGRANIT` / `owner:NHDOT` only |
+| IA | 225 | 60 | **0** | IowaDOT wired |
+| VT | 212 | 120 | **0** | VTrans wired |
+| **WV** | **212** | **0** | **0** | `owner:WVDOT_Publisher` only |
+| **OK** | **197** | **0** | **0** | `OKDOT_GIS` only |
+| **ND** | **155** | **0** | **0** | DOT-adjacent orgs only |
+| AK | 101 | 28 | **0** | AKDOT STIP wired |
+| HI | 97 | 85 | **0** | HDOT wired |
+| **RI** | **81** | **0** | **0** | RIDOA STIP + RIDOT folder only |
+| **IN** | **198** | 2 | 2 ⚠️ | INDOT `NO_DOT_PROJECT_REGISTER` |
+
+**Total: 12 states, 2,357 pages** — more than double the five originally identified.
+
+⚠️ **Indiana is on the list despite showing 2 municipal pages.** Those 2 are
+`chicago-building-permits` bleeding across the state line into 46394/46327. **No Indiana
+municipality has ever been probed.** The lesson: *"has a municipal source"* must be read as
+*"has a municipal source **of its own**"* — a neighbouring metro's 3-mile envelope crossing a
+border is not municipal coverage of that state.
+
+**The stamp's meaning:** `DOT_TIER_CLOSED_ONLY` closes the **statewide** tier and asserts nothing
+about the municipal tier. It is NOT a rejection of the state. Six of the twelve (NJ, ME, IA, VT,
+AK, HI) additionally carry a working DOT wire and were already stamped `DOT_ONLY` — that stamp
+described *composition*; this one describes **what was actually tested**.
+
+---
+
+## MUNICIPAL TIER — PASS 3 (2026-08-06): the DOT_TIER_CLOSED_ONLY states + the never-probed metro heads
+
+**0 of 9 targets wireable.** Every one is closed below with an enumeration receipt, so the next
+session inherits a closed question rather than a gap. The forecast held: municipal supply in
+mid-size metros is thinner than page counts imply.
+
+**Scope:** the five states closed on a DOT rejection alone (NH 247 · WV 212 · IN 196 · OK 197 ·
+ND 155 = 1,007 pages) plus the never-probed metro heads (Charleston 47 · Wichita 50 ·
+Providence 42 · Indianapolis 40 · Tulsa 39 · Eugene 37 · Omaha 35).
+
+### Verdicts
+
+| target | verdict | receipt |
+|---|---|---|
+| **Indianapolis** (Marion IN) | 🚫 `candidates_exhausted` | `data.indy.gov` DCAT parsed in full — **651 datasets, 0 permit ledgers** |
+| **Providence** (RI) | 🚫 `STALE` | `data.providenceri.gov` Socrata, 200 views — only permits asset is `ufmm-rbej` **"…Permits 2009-2018"** |
+| **Omaha** (Douglas NE) | 🚫 `WRONG_RECORD_CLASS` | DOGIS `Accela_Dynamic` is inspector/fee **AREAS** + parcels + zoning, not permits |
+| **Oklahoma City** | 🚫 `EDGE_EGRESS_BLOCKED` | `data.okc.gov` **403**, `gis.okc.gov` serves an **Incapsula** JS challenge |
+| **Tulsa** | 🚫 no machine catalog found | `opendata.cityoftulsa.org` + `maps.cityoftulsa.org` DNS-fail/404 |
+| **Wichita** (Sedgwick KS) | 🚫 no machine catalog found | `opendata.wichita.gov` serves HTML (not a Hub DCAT); `gis.wichita.gov` is an HTML SPA |
+| **Charleston** (Kanawha WV) | 🚫 no first-party org | `owner:CityofCharlestonWV` / `owner:CharlestonWV` → **total 0** |
+| **WV statewide (2nd try)** | 🚫 `WRONG_RECORD_CLASS` | `services.wvgis.wvu.edu` `Applications` = DNR fishing/hunting/trails |
+| **Fargo / Bismarck (ND)** | 🚫 unreachable | `gis.fargond.gov` **SSL peer certificate failure** |
+| **Manchester NH** | 🚫 unreachable | `gis.manchesternh.gov` DNS-fail |
+
+### ⚠️ The discovery instrument failed loudly, and that is worth recording
+
+**Unscoped `sharing/rest/search` degenerated to `total: 10000` and returned CALGARY's
+`Building_Permits` as the top hit for BOTH "Manchester NH / Nashua NH building permits" AND
+"Bismarck / Fargo building permits".** That is the documented cross-org lookalike trap firing
+twice in one batch — and the `total: 10000` is the tell: the query matched essentially the whole
+public corpus, so the ranking is meaningless.
+
+The same batch returned Goddard/Maize **suburbs** for "Wichita permits", medical-marijuana
+**dispensary** maps for "Tulsa permits", and a personal account (`Nataliya1`) for "Omaha permits".
+
+**Standing answer, reinforced: an unscoped AGO keyword search is a LEAD GENERATOR, never
+evidence.** A rejection may only be written from (a) an `owner:`/`orgid:`-scoped enumeration with
+its total as a control, or (b) a machine catalog (DCAT / Socrata `views.json` / CKAN
+`package_search`) parsed in full. Every rejection in the table above rests on one of those two;
+none rests on a keyword search.
+
+### What this pass actually establishes
+
+**These are not "unexplored" any more, and that was the point of running it.** The bet was that
+unexplored ≠ exhausted; the result is that seven of these markets are now exhausted at the
+city tier, and three are blocked by infrastructure (WAF, SSL, DNS) rather than by absence — those
+three go to the **nightly reprobe list**, because a WAF rule or an expired certificate is exactly
+the kind of thing that changes.
+
+**The five `DOT_TIER_CLOSED_ONLY` states remain dark (1,007 pages) — but the stamp is now
+earned rather than assumed.** Their capitals and largest cities have been contacted and
+enumerated. The residual candidates are second-tier cities (Huntington WV, Fort Wayne IN,
+Evansville IN, Nashua NH, Concord NH, Norman OK, Grand Forks ND), which on this pass's evidence
+are less likely to publish than the capitals that already failed.
