@@ -2318,6 +2318,56 @@ untouched.
 
 ---
 
+### The corollary: a COUNTY-level thin count conflates two populations
+
+**Rank municipal-tier targets on the thin pages INSIDE a municipality, never on the county total.**
+A county's thin count sums two groups that need different remedies and that a single source can
+never both serve.
+
+Worked case — **Dane County WI, 2026-08-06**, which was ranked the #1 thin county at 20 pages under
+5 records, and turned out to need no wire at all:
+
+| Dane pages | count | median records | pages under 5 |
+|---|---|---|---|
+| carrying City of Madison records | 20 | **140** | **2** |
+| WisDOT only | 26 | **3** | **19** |
+
+**19 of the 20 thin pages are rural ZIPs outside the city ledger's 3-mile envelope**, and Madison
+was *already wired*. Ranking on the county total pointed at a county whose municipal tier was
+complete and whose real gap is geographic. Inside the municipality the municipal tier is the answer
+and may already be in place; outside it no city ledger can reach, and the remedy is a county- or
+township-level source — or honest acceptance that rural pages carry the DOT layer plus the EPA
+floor.
+
+---
+
+### NEVER ADD AN ENTRY WITHOUT CHECKING WHAT IS ALREADY FETCHING THAT LAYER
+
+**`registry_id` uniqueness is the WRONG KEY, and asserting it gives false confidence.** It says
+nothing about what an entry *fetches*. Two entries on the same `service_url` with overlapping
+coverage double-emit every record on every shared page, and **exact-identity dedup cannot save you**
+— the copies carry different `source_registry_id` values (the same reason
+`houston-plat-applications` layer 0 was rejected as a proven subset of layer 1).
+
+*The case that produced this rule:* a municipal-tier pass added
+`madison-current-planning-projects` when `madison-planning-projects` — same URL, same `{WI, Dane}`
+coverage — was already in the registry. The additivity script asserted the new id was unique and
+passed. The **deploy-verification probe** caught it: two run-reports against the identical
+`service_url`, each emitting ~228 records. Reverted before any re-cache; nothing reached production.
+
+**The rule:** two entries may share a `service_url` ONLY when each carries a distinct, non-empty
+`extra_where` — i.e. deliberate disjoint slices of one layer (the
+`wsdot-project-delivery-plan-{proposed,under-construction,complete}` trio is the legitimate case).
+**Enforced** by `test/registry-duplicate-service-url.test.mjs`, which carries a positive control
+asserting it still sees a sliced group so it cannot pass vacuously, and which was verified to FAIL
+on the exact injected duplicate.
+
+**And the wider lesson: this is why the deploy-verification probe is not optional.** Nothing in the
+config, the diff, the additivity assertions or the unit suite showed the defect. Only reading the
+connector's own run-report did.
+
+---
+
 **A statewide DOT layer is the right first move in a dark state (§0c) and it is not a substitute
 for permit sources.** A highway programme touches many ZIPs with a few records each; a city permit
 ledger touches fewer ZIPs with hundreds. Both are real; they are not interchangeable, and
