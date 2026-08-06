@@ -36,18 +36,36 @@ const registry = JSON.parse(readFileSync(
   join(root, 'supabase/functions/get-address-report/jurisdiction-registry.json'), 'utf8'));
 
 // Collect every object that looks like a source entry, wherever it sits in the file.
+//
+// ⚠️ WIDENED 2026-08-06. This originally required BOTH `registry_id` AND `service_url`, which
+// silently skipped every socrata/ckan/csv/carto entry — those address their source with
+// domain+dataset_id, not a service_url. It saw 156 of 183 entries and reported success, and the
+// `entries.length > 100` control below passed while 27 entries (15%) went unchecked. The
+// double-emit hazard is identical for them: two entries on the same Socrata dataset_id would
+// both fetch it and both emit, exactly the Madison defect. Now every entry with a registry_id is
+// collected, and the fetch identity is service_url OR domain|dataset_id, whichever it uses.
 const entries = [];
 (function walk(node) {
   if (Array.isArray(node)) { node.forEach(walk); return; }
   if (node && typeof node === 'object') {
-    if (typeof node.registry_id === 'string' && typeof node.service_url === 'string') entries.push(node);
+    if (typeof node.registry_id === 'string') entries.push(node);
     Object.values(node).forEach(walk);
   }
 })(registry);
 
+// The thing an entry FETCHES, whatever platform it is on. Entries with neither are not
+// source entries and are skipped by fetchKey() returning null.
+const fetchKey = (e) => (typeof e.service_url === 'string' && e.service_url)
+  || ((e.domain && e.dataset_id) ? `${e.domain}|${e.dataset_id}` : null);
+
 // The instrument must prove it ran before its silence counts as evidence.
-ok(entries.length > 100, `registry parsed and traversed — ${entries.length} entries with a service_url`,
-   `found only ${entries.length}; the walk is not seeing the entry list`);
+ok(entries.length >= 180, `registry parsed and traversed — ${entries.length} entries`,
+   `found only ${entries.length}; the walk is not seeing the whole entry list`);
+// Platform coverage control: the traversal must see NON-arcgis entries too. Asserting a bare
+// count is what let the 156-of-183 blind spot pass unnoticed.
+const nonArcgis = entries.filter((e) => e.platform && e.platform !== 'arcgis').length;
+ok(nonArcgis >= 20, `traversal sees ${nonArcgis} non-arcgis entries (socrata/ckan/csv/carto)`,
+   `only ${nonArcgis} non-arcgis entries seen; the walk is arcgis-blind again`);
 
 const ids = entries.map(e => e.registry_id);
 ok(new Set(ids).size === ids.length, 'every registry_id is unique',
@@ -55,8 +73,10 @@ ok(new Set(ids).size === ids.length, 'every registry_id is unique',
 
 const byUrl = new Map();
 for (const e of entries) {
-  if (!byUrl.has(e.service_url)) byUrl.set(e.service_url, []);
-  byUrl.get(e.service_url).push(e);
+  const key = fetchKey(e);
+  if (!key) continue;
+  if (!byUrl.has(key)) byUrl.set(key, []);
+  byUrl.get(key).push(e);
 }
 
 const offenders = [];
@@ -71,7 +91,7 @@ for (const [url, group] of byUrl) {
 }
 
 ok(offenders.length === 0,
-   'no two entries fetch the same service_url without disjoint extra_where slices',
+   'no two entries fetch the same source (service_url, or domain|dataset_id) without disjoint extra_where slices',
    offenders.join('\n     '));
 
 // Positive control: the assertion above is only meaningful if the traversal actually sees a

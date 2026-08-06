@@ -8488,3 +8488,106 @@ the supply limit §0y already established, seen from the page side. The genuinel
 config-or-geometry subset is the §2b CONFIG table — roughly **60-70 pages across Manhattan,
 Minneapolis, Cincinnati and Buffalo** where the city's own source demonstrably works. That is the
 queue worth working; the rest is supply and should not be re-counted as actionable.
+
+
+---
+
+## clv-planning-cases RESOLVED + the unclassified distribution (2026-08-06)
+
+### `clv-planning-cases` — the three-way call is **GENUINELY TYPELESS**, and the prize is smaller than it looks
+
+⚠️ **Rule 13 correction to my own earlier probe.** The first pass measured `USETYPE` UNWINDOWED and
+found it 94.3% blank. The entry carries **`recency_days: 1825`**, so that answered a different
+question. Re-probed inside the connector's own window (`MTG_DATE >= DATE '2021-08-07'`):
+
+- **The whole layer has 2,383 rows in-window**, not 275,595.
+- **`USETYPE` and `TYPE` return BYTE-IDENTICAL distributions in-window** — 21 values, both summing
+  to exactly 2,383. Attribute keys confirmed distinct (`USETYPE` vs `TYPE`), so this is not a
+  server substitution: in the live window `USETYPE` simply carries the same case codes.
+- Both are **opaque**: `VAR` 1,545 · `GPA` 169 · `SCD` 132 · `EOT` 91 · `SDR` 90 · `TMP` 87 ·
+  `ZON` 67 · `SUP` 64 · `VAC` 58 · `RQR` 30 · `MSP` · `MOD` · `DVN` · `ARC` · `CUV` · `DIR` ·
+  `WVR` · `ANX` · `ROC` · `SNC`.
+- **Neither field publishes a coded-value domain** (`"domain": null` on both), so there is no
+  authoritative decode — mapping them would be guessing, which the autonomy grant bars.
+- And decoding would not help anyway: these are **APPLICATION types** (variance, general-plan
+  amendment, extension of time, site development review, tentative map, zoning, special use
+  permit, vacation), not land uses. They have no image in `TYPE_EXACT`'s closed vocabulary.
+
+**Verdict: typeless — not a missing map, not a wrong column.** No fix available without a
+publisher change.
+
+**Two facts worth carrying:**
+1. The descriptive land-use strings visible unwindowed (`PRIVATE STREETS` 2,530, `TAVERNS` 867,
+   `ELECTRIC UTILITY SUBSTATIONS` 735, `MIXED USE` 326, `SCHOOLS` 174) sit ENTIRELY OUTSIDE the
+   5-year window. `USETYPE` was a real land-use field historically and stopped being one.
+   Widening recency would surface them — but that changes what residents see and is a separate
+   decision, not a type fix.
+2. **The 7,653 cached records are at most 2,383 distinct cases.** The 3-mi spatial circles overlap,
+   so one case rides several ZIP pages (the documented Chicago behaviour). Ranking by cached
+   record count overstates this entry ~3.2x.
+
+### Where the line falls — the full unclassified distribution
+
+Grand total **≈392,400** unclassified records. Cumulative share, ranked:
+
+| rank | entry | records | unclassified | % | cume % |
+|---|---|---|---|---|---|
+| 1 | dekalb-county-building-permits | 290,064 | 125,178 | 43.2 | 31.9 |
+| 2 | overland-park-building-permits | 165,936 | 84,202 | 50.7 | 53.4 |
+| 3 | arlington-issued-permits | 73,279 | 62,374 | 85.1 | 69.3 |
+| 4 | missoula-addresses-with-permits | 71,869 | 38,819 | 54.0 | 79.2 |
+| 5 | burlington-vt-building-permits | 13,327 | 13,327 | 100 | 82.6 |
+| 6 | **virginia-beach-building-permits** | 15,161 | 9,934 | 65.5 | 85.1 |
+| 7 | **charleston-county-permits** | 37,912 | 8,886 | 23.4 | 87.4 |
+| 8 | clv-planning-cases | 7,653 | 7,653 | 100 | 89.4 |
+| 9 | **austin-site-plan-cases** | 11,725 | 7,029 | 59.9 | 91.2 |
+| 10 | **columbia-mo-permits** | 10,107 | 4,487 | 44.4 | 92.3 |
+| 11 | burlington-vt-zoning-permits | 3,929 | 3,929 | 100 | 93.3 |
+| 12 | massdot-highway-projects | 92,315 | 3,142 | 3.4 | 94.1 |
+| 13 | **sheridan-county-building-permits** | 6,551 | 3,046 | 46.5 | 94.9 |
+| 14 | madison-planning-projects | 2,427 | 2,427 | 100 | 95.5 |
+| 15-24 | (bentonville · kent-de · austin-subdiv · san-jose · butler-ks · anne-arundel · txdot · clark · irving · brunswick) | | ≤1,831 each | | 98.8 |
+
+**Ranks 1-5 are already fixed on #642 or settled (arlington, Rule 6) — 82.6% of all unclassified.**
+
+**RECOMMENDED CUTOFF: rank 10.** Ranks 6, 7, 9, 10, 13 are the addressable remainder
+(~33,400 records, ~8.5%). Below rank 14 every entry is <1,900 unclassified, and the tail is
+dominated by two non-yielding shapes: **typeless** entries (clv, madison, butler, clark, irving —
+no fix exists) and **long-tail percentages on huge denominators** (massdot 3.4%, bentonville 5.8%,
+san-jose 2.3%, brunswick 0.5% — already near-complete). A live-probe pass per entry stops paying
+there.
+
+### The remaining candidates, classified
+
+- **`virginia-beach-building-permits`** — CONFIRMED wrong column (see the audit section above).
+- **`austin-site-plan-cases`** (socrata) — `proposed_land_use` is the right KIND of field but the
+  data is dirty: top value is the sentinel **`999` (5,135)**, then blank 4,638, then a mix of
+  self-describing (`Commercial` 2,932, `Single Family` 419, `Office` 271, `Industrial` 132,
+  `Public/Civic` 145, `Mixed Use` 116), abbreviations (`OFC` 488, `MF` 428, `RET` 308, `CS` 114,
+  `ROW` 158) and **compound multi-valued strings** (`999, 999` 537; `999, 999, 999`). Widen the
+  self-describing subset only; `999` and the compounds must fail closed.
+- **`buffalo-building-permits`** (socrata) — `aptype`, 27 values, 3 mapped. All trade/process:
+  REPAIR 85,922 · ELECTRICAL 76,704 · PLUMBING 42,266 · HEATING 22,182 · DEMOLITION 10,822 ·
+  GC 8,659 · FENDRIVE 6,075. Missoula class — widen to Utility, do not drop.
+- `charleston-county` · `columbia-mo` · `sheridan` · `kent-de` — widen candidates, classified in
+  the audit section above.
+
+### ⚠️ DEFECT IN MY OWN AUDIT — it covered 156 of 183 entries
+
+The structural audit reported "all 156 registry entries." **The registry has 183.** The traversal
+required BOTH `registry_id` AND `service_url`, and **socrata/ckan/csv/carto entries do not have a
+`service_url`** — they address their source with `domain` + `dataset_id`. So **27 entries (15%)
+were never examined**, including three of the high-unclassified ones (`austin-site-plan-cases`,
+`buffalo-building-permits`, `prince-georges-county-permits`).
+
+Re-run over the missing 27: **all carry a `type_source`**, so the class-A finding (44 entries with
+no type config) stands as an arcgis-only result and no new class-A entries exist.
+
+**The same blind spot was shipped in `test/registry-duplicate-service-url.test.mjs`** — its
+"proved it ran" control was `entries.length > 100`, which passes happily at 156 while 27 entries
+go unchecked. That is precisely the failure the repo's own rule warns about: an instrument must
+prove it ran over what you think it ran over. **Fixed:** the guard now collects every entry with a
+`registry_id` and keys on `service_url` OR `domain|dataset_id`, so a duplicate Socrata dataset —
+the Madison double-emit hazard on a non-arcgis platform — is now caught. Controls added: the
+count assertion is `>= 180`, plus a platform-coverage control asserting ≥20 non-arcgis entries are
+seen. Proven to FAIL against an injected socrata duplicate before being trusted.
