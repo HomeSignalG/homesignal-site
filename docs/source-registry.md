@@ -8110,3 +8110,86 @@ because a 3-mile circle is a small fraction of the city.
 2. **`max_rows` truncation is silent in the records and loud in the report.** 20,000 of ~40,000
    matching rows were emitted with no error — the connector's own truncation note is the only
    signal, which is exactly why it exists.
+
+---
+
+## THE THREE REMAINING LEVERS — measured 2026-08-06, before choosing
+
+Coverage is supply-limited (§0y). These are what is left, sized against each other rather than
+argued.
+
+### Lever 1 — COMPLETENESS on lit pages
+
+2,765 pages sit at 1-24 records. **They split on whether their county already has a publisher:**
+
+| | thin (1-4) | shallow (5-24) | total |
+|---|---|---|---|
+| county HAS a municipal source | 470 | 602 | **1,072** |
+| county has NONE | 1,017 | 676 | **1,693** |
+
+**Only the 1,072 are meaningfully actionable, and even they need a SECOND municipality wired inside
+an already-served county** — the same supply problem §0y just closed, one notch easier because the
+county demonstrably has publishers. The 1,693 need the municipal source that does not exist.
+
+### Lever 2 — THE REPROBE LIST
+
+**Sized honestly by splitting BARRIERS from ABSENCES**, because only one of them can lift:
+
+| | pages | dark | thin/shallow |
+|---|---|---|---|
+| **true barrier** (WAF · SSL · DNS · 403 · stalled feed) | **791** | 224 | 236 |
+| genuine absence (no org, wrong record class, static snapshot) | 300 | 225 | 53 |
+
+Biggest single barrier: **El Paso TX, 145 pages** behind a WAF that 403s the edge runtime while
+answering pg_net with a 200. Then Worcester MA 99 (stalled), Miami-Dade 80, Hillsborough FL 58,
+Jackson MO 57, Broward 55, Oklahoma OK 52.
+
+⚠️ **The yield is real but NOT IN OUR CONTROL.** A WAF rule relaxing, a certificate being renewed
+or a stalled feed resuming are things that happen *to* us. The correct posture is what is already
+in place — cheap nightly reprobes — not a pass.
+
+### Lever 3 — QUALITY on what is already live
+
+**2,827,392 live development records.** Defect rates:
+
+| defect | records | share |
+|---|---|---|
+| `use_type = 'unclassified'` | **385,527** | **13.6%** |
+| no `submitted_at` | 86,692 | 3.1% |
+| no coordinates (area scope) | 58,494 | 2.1% |
+
+`unclassified` is a **literal stored value**, verified distinct from the deliberate generic bucket
+`Development` (721,101 records) — the two are not confused in this measurement.
+
+**It is extremely concentrated. FOUR registry entries carry 79.1% of it:**
+
+| entry | records | unclassified | % of entry | share of all |
+|---|---|---|---|---|
+| `dekalb-county-building-permits` | 290,137 | 125,184 | 43.1% | **32.5%** |
+| `overland-park-building-permits` | 158,698 | 78,590 | 49.5% | **20.4%** |
+| `arlington-issued-permits` | 73,232 | 62,323 | 85.1% | **16.2%** |
+| `missoula-addresses-with-permits` | 71,835 | 38,809 | 54.0% | **10.1%** |
+
+138 pages carry the top-4 defect; 1,322 pages carry some unclassified record. **`use_type` drives
+the pin SHAPE on all three map views**, so an unclassified record renders as a generic circle
+instead of its real category — a visible, resident-facing defect on pages that are *already live*.
+
+⚠️ **Two of my own entries are 100% unclassified by choice** — `burlington-vt-building-permits`
+(13,327) and `burlington-vt-zoning-permits` (3,929), 4.5% of the total. Their `_receipts` record
+the reason (no bounded vocabulary; free prose), so they are honest rather than defective — but they
+belong in this table for completeness, not hidden from it.
+
+### Recommendation
+
+**Lever 3.** It is the only one of the three that needs **no discovery, no new source, and nothing
+outside our control**, and it is the only one whose fix is bounded and known in advance: add a
+`type_map` to four registry entries after enumerating each vocabulary live. It also acts on records
+already rendering to residents, rather than on pages that may never exist.
+
+Lever 1 is a smaller, harder version of the problem §0y just closed. Lever 2 is already handled
+correctly by the nightly reprobe and cannot be accelerated by effort.
+
+**Minor hygiene found while measuring (not urgent, logged):** `type` carries near-duplicate casings
+— `Roads & infrastructure` 8,978 vs `Roads & Infrastructure` 483; `Civic/Public` 68,890 vs `Civic`
+861; and lowercase singletons (`commercial` 2, `industrial` 1, `research` 1). These likely miss
+`TYPE_EXACT` and fall through to keyword guessing.
