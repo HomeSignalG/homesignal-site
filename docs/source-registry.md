@@ -8189,7 +8189,99 @@ already rendering to residents, rather than on pages that may never exist.
 Lever 1 is a smaller, harder version of the problem §0y just closed. Lever 2 is already handled
 correctly by the nightly reprobe and cannot be accelerated by effort.
 
-**Minor hygiene found while measuring (not urgent, logged):** `type` carries near-duplicate casings
-— `Roads & infrastructure` 8,978 vs `Roads & Infrastructure` 483; `Civic/Public` 68,890 vs `Civic`
-861; and lowercase singletons (`commercial` 2, `industrial` 1, `research` 1). These likely miss
-`TYPE_EXACT` and fall through to keyword guessing.
+**Minor hygiene found while measuring:** `type` carries near-duplicate casings — `Roads &
+infrastructure` 8,978 vs `Roads & Infrastructure` 483; `Civic/Public` 68,890 vs `Civic` 861; and
+lowercase singletons (`commercial` 2, `industrial` 1, `research` 1). ⚠️ **CORRECTED 2026-08-06 — my
+claim that "these likely miss `TYPE_EXACT` and fall through to keyword guessing" was WRONG.**
+`normType(s)` is `String(s||'').trim().toLowerCase()` (`lib/map.js:441`) and every `TYPE_EXACT` key
+is lowercase, so BOTH casings of each pair resolve identically. There is no defect here and no
+change was made. Recorded rather than deleted, because "likely" was doing the work of a check that
+took one file read — **read the normalizer before calling a casing difference a defect.**
+
+
+---
+
+## LEVER 3 EXECUTED — two wrong-column defects and one genuine widen (2026-08-06)
+
+Scope: the four entries carrying 79.1% of all `unclassified` records. **Config only — no connector,
+engine or schema change.** Protocol followed exactly: read the top unmapped values **with example
+titles** BEFORE deciding, then report the drop-vs-widen split, then enforce.
+
+**Split: 0 dropped · 3 fixed · 1 confirmed settled and left alone.** Two of the three were not
+mapping gaps at all — they were the **wrong COLUMN**, the Columbus class.
+
+### `arlington-issued-permits` — CONFIRMED SETTLED, NOT RE-DERIVED
+
+Its 85% is the `MainUse` **null rate**, not a mapping gap (Rule 6 — data absence, not mapping
+deficiency). One probe to confirm it still holds, per instruction:
+
+| | null/empty | of | rate |
+|---|---|---|---|
+| recorded previously | 16,198 | 18,897 | 85.7% |
+| probed 2026-08-06 | **16,176** | **18,904** | **85.6%** |
+
+Materially unchanged. No change made. Cache-side figure for the same entry: 62,374 unclassified of
+73,279 = 85.1%.
+
+### `dekalb-county-building-permits` — WRONG COLUMN (Columbus class)
+
+`type_source` was `WorkTypeDescription`. The value that exposed it: a row reading
+`WorkTypeDescription='Fire Marshal Special Work type'` while the SAME row carries
+`occupancyType='D-RETL'`, `applicationName='Marc Allen Jewelers'`, and comments describing a
+storefront refit. `WorkTypeDescription` is the **review step**, not the project's use.
+
+Switched to `OccupancyTypeDescription` — 39 distinct values summing **exactly to 91,357** (the layer
+count), populated **91,321 / 91,357 = 99.96%**. `type_map` replaced with **37 keys** summing
+**exactly to 91,321** (39 distinct minus null and empty). Enforcing the old column's narrow
+whitelist instead would have been the Columbus mistake.
+
+### `overland-park-building-permits` — WRONG COLUMN (same class)
+
+`PermitType` carries **three** values (Building (Mech/Elec/Plumb) 6,136 / Building (Residential)
+5,697 / Building (Commercial) 1,255) — 46.9% of the layer was unmappable **by construction**, not
+by omission. `WorkClass` on the same rows carries **38** self-describing values summing **exactly
+to 13,088 with ZERO nulls**. Sampled proof that PermitType is a department bucket while WorkClass is
+the work: `PermitType='Building (Mech/Elec/Plumb)'` with `WorkClass='Electrical Service'` /
+`Description='New panel and meter'`. Switched; all 38 mapped.
+
+### `missoula-addresses-with-permits` — GENUINE WIDEN (checked, not assumed)
+
+Checked for a better column FIRST, because two of three siblings turned out to have one. The layer
+publishes **exactly three fields** — `B1_PER_TYPE`, `Address`, `RecordStatus`. There is no better
+column, so this one really is a narrow whitelist.
+
+The 8 unmapped values are trades: **Mechanical 23,830 · Electrical 21,702 · Plumbing 15,388**,
+sampled at residential addresses. **Widened to `Utility`, not dropped** — dropping removes records
+residents can already see, and the entry ALREADY maps its own siblings (Utility Excavation,
+Right-of-Way) to `Utility`, so dropping would have been internally inconsistent as well as lossy.
+Fence/ADA/Roofing/Revision/Board Review → `Development`. 10 → **18 keys**, summing **exactly to
+121,854**.
+
+**Density checked and does NOT apply.** 71,835 records over 10 ZIPs is ~7,000/page — the Burlington
+shape — so it was measured rather than assumed: heaviest page **59812 at 1.59 MB / 16,528 sites**,
+under the working ceiling. No `recency_days` change.
+
+### Baseline pinned before deploy (cache-side, `use_type='unclassified'` literal)
+
+| entry | records | unclassified | rate | ZIP pages |
+|---|---|---|---|---|
+| `dekalb-county-building-permits` | 289,971 | 125,148 | 43.16% | 61 |
+| `overland-park-building-permits` | 165,688 | 84,061 | 50.73% | 38 |
+| `missoula-addresses-with-permits` | 71,835 | 38,809 | 54.03% | 10 |
+| **total (re-cache set)** | **527,494** | **248,018** | **47.02%** | **109** |
+
+`arlington-issued-permits` is excluded from the re-cache set — settled, unchanged.
+
+⚠️ **The measurement metric is the literal stored string `use_type = 'unclassified'`, NOT an empty
+value.** A first attempt measured `coalesce(use_type,'') = ''` and returned **0 across all three
+entries** — a clean-looking zero from the wrong predicate, exactly the §0s class. The positive
+control that caught it was grouping `use_type` and reading the actual distribution, where
+`unclassified` appears as a stored value alongside `Development` / `Residential` / `Utility`.
+
+### Verification before commit
+
+- `registry_id` order unchanged; no unintended field touched (**programmatic assert**, not an
+  eyeballed diff — `registry_id` uniqueness alone is the wrong key, per the Madison guard)
+- every emitted `use_type` value hits `TYPE_EXACT` — no fallthrough to keyword guessing
+- duplicate-`service_url` guard green
+- full unit suite green (87 files)
