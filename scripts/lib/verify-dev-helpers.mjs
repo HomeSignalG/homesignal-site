@@ -252,3 +252,54 @@ export function ingestionIssues(engineJson) {
   }
   return { issues, quarantined };
 }
+
+/**
+ * Bounded worker pool over an ordered item list — the shipped driver for
+ * verify-development's ZIP walk. Pure (no Playwright, no network) so a test can drive
+ * THIS function rather than a copy of it, the same reason `assertZip` lives here.
+ *
+ * Why it exists: the walk was one page, serially, ~1.37 s/ZIP → 3.6-4.8 h and 45.4% of the
+ * repo's Actions spend. N workers pull from one shared cursor, so wall clock divides by N.
+ *
+ * Two invariants the test pins, because both are ways this could quietly go wrong:
+ *  1. NEVER more than `concurrency` handlers in flight. Unbounded parallelism would trade
+ *     runner minutes for 503s against the same database the live site reads from.
+ *  2. The time budget still truncates LOUDLY. Workers check `budgetSpent()` BEFORE claiming,
+ *     and everything at or after the cursor at that moment is returned as `skipped` — so a
+ *     truncated run reports "checked N of M, here is what was skipped" instead of looking
+ *     complete. A silent cap is exactly how verify-geocodes hid 11 consecutive dead runs.
+ *
+ * `concurrency` is clamped to [1, 12]; a non-numeric value falls back to 1 (fails closed —
+ * slow, never unbounded).
+ */
+export async function runPool({ items, concurrency, budgetSpent, handle, resources }) {
+  const n = Math.max(1, Math.min(12, Number.isFinite(concurrency) ? Math.floor(concurrency) : 1));
+  const lanes = resources ? resources.slice(0, n) : Array.from({ length: n }, () => null);
+  let cursor = 0;
+  let checked = 0;
+  let skipped = null;
+  let inFlight = 0;
+  let maxInFlight = 0;
+
+  async function lane(resource) {
+    for (;;) {
+      if (budgetSpent()) {
+        if (skipped === null) skipped = items.slice(cursor);
+        return;
+      }
+      const idx = cursor++;
+      if (idx >= items.length) return;
+      inFlight++;
+      if (inFlight > maxInFlight) maxInFlight = inFlight;
+      try {
+        await handle(items[idx], resource, idx);
+        checked++;
+      } finally {
+        inFlight--;
+      }
+    }
+  }
+
+  await Promise.all(lanes.map((r) => lane(r)));
+  return { checked, skipped: skipped || [], concurrency: lanes.length, maxInFlight };
+}

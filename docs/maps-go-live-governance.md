@@ -2630,3 +2630,115 @@ A `DOT_ONLY` state with a low median is **broad and shallow: correctly closed, n
 next unlock is municipal permit sources, and that work will move the **median** far more than the
 **page count** — the §0q asymmetry, and the reverse of the Pierce case. A `DOT_ONLY` state with a
 high median (MA, CT) needs nothing further on this axis.
+
+
+---
+
+## §0z — A DRAFTED MAPPING IS A HYPOTHESIS UNTIL EVERY KEY IS BYTE-VERIFIED PRESENT (2026-08-06)
+
+**Rule.** A `type_map` / `status_to_bucket` written from domain knowledge — from what a permit
+vocabulary *usually* contains, from a brief, from a plausible zoning lexicon — is a **hypothesis**.
+It becomes fact only when **every key** is confirmed present in the live vocabulary, enumerated
+from the source itself. Draft freely; commit only what was read.
+
+**Why this class survives, and why it is invisible.** A key that matches nothing is **harmless at
+runtime**. It never errors, never warns, never appears in a run report, and never changes a
+rendered page. `type_map` is a lookup: a value the source does not emit simply never arrives to be
+looked up. So a mapping can be 20% invented and every instrument stays green. **Dead keys are only
+ever visible if you go looking for them** — which means the check has to be deliberate, before the
+commit, or it does not happen at all.
+
+**The check.** Enumerate the live vocabulary (`groupBy` counts, or `returnDistinctValues`, or
+Socrata `$group` paged to exhaustion), then assert **set membership in BOTH directions**:
+1. every `type_map` key exists in the live vocabulary → no invented keys;
+2. every live value with meaningful volume exists in `type_map` → no silent unclassified mass.
+**The arithmetic control that makes it binding: the mapped counts must SUM EXACTLY to the layer
+count** (minus explicitly-failed-closed values, named). An exact sum cannot be reached with an
+invented key in the set, which is why this project keeps stating sums rather than percentages.
+
+**Precedents in this repo, all real:**
+- **Phoenix** — the brief said "250+" `PER_TYPE_DESC` values; the live enumeration returned
+  **238**, summing exactly to 70,791. Writing to the brief's number would have shipped invented keys.
+- **Mesa** — Socrata group-by is silently truncated by `$limit`; the missing S–Z page carried
+  Single Family (Detached) 18,461+12,555. A vocabulary read once, unpaged, is a partial hypothesis
+  wearing the costume of a complete one.
+- **Burlington (my own)** — the entry's `_receipts` asserted "no bounded vocabulary; free prose."
+  Nobody had enumerated the field. `PrimaryLUC` is a 27-value self-describing vocabulary, ~97%
+  populated. **An absence claim is a hypothesis too, and this one was wrong for 17,256 records.**
+- **York County PA** — the inverse error, made by a CHECK rather than a mapping: a guard asserted
+  `type_source` must be a string and flagged York as broken. Its `type_source` is an eight-column
+  array that `readCol` JOINS (`arcgis.ts:791`), and its 32 keys are exactly the joined strings
+  (`'NO NO NO NO NO NO YES NO'`). **The entry was correct and the instrument was wrong** — caught
+  only by opening the entry instead of trusting the failure. A red check is a hypothesis too.
+
+**Corollary — the same standard binds a claim of ABSENCE.** "This layer has no usable type column"
+requires the field list, read. `clv-planning-cases` is genuinely typeless (21 opaque application
+codes, `"domain": null` on both candidate fields, no published legend) — that verdict is
+admissible *because the fields were enumerated*, not because the shape looked familiar.
+
+
+### §0z-b — A REGISTRY SIZE QUOTED FROM MEMORY IS STALE BY CONSTRUCTION
+
+**Three different registry counts were quoted in a single session — 151, 156, 183 — and only the
+last was measured.** The registry grows across passes, so any count carried forward from an earlier
+message is describing a file that no longer exists.
+
+- **151** — correct several passes earlier, then repeated after the file had grown.
+- **156** — measured, but by a traversal that required `service_url`, so it silently excluded every
+  socrata/ckan/csv/carto entry. **Wrong by 27 (15%)** while looking freshly measured, which is worse
+  than quoting from memory because it carries a receipt.
+- **183** — measured against the current branch, collecting on `registry_id` alone, all platform
+  families included.
+
+**Rule.** Never state a registry count, an entry count, or a coverage total without recomputing it
+in the same message. And when you do recompute, **key on `registry_id` alone** — any additional
+required field is a platform filter in disguise. The traversal that produced 156 is the one to keep
+in mind: an instrument can be freshly run and still under-cover, and a bare total is exactly the
+shape of result that hides it. Pair every count with a **composition control** (entries by
+`platform`, or a non-arcgis subtotal) so under-coverage is visible in the same output.
+
+*This is the counting case of "an instrument must prove it ran over what you think it ran over."*
+
+
+### §0z-c — A CHECK SATISFIED IN THE WRONG EVENT CONTEXT IS NOT SATISFIED
+
+Branch protection requires a status check **by name AND by the event that produced it**. A green
+`unit` from a `workflow_dispatch` run does not satisfy a required `unit` that protection expects
+from `pull_request`, even on the identical SHA with identical results.
+
+**The sequence that produced this (2026-08-06), because each step looks reasonable alone:**
+1. A commit was pushed **during** a GitHub Actions incident in which the repo created **no workflow
+   runs at all** for ~5.7 h. No `pull_request` run was ever created for that SHA.
+2. When runners recovered, the gate was confirmed by **dispatching** `unit-tests` manually — the
+   correct way to test whether runners were alive, but it registers the check under
+   `workflow_dispatch`.
+3. **GitHub does not retroactively create the event it skipped.** The missed `pull_request` run
+   stays missed.
+4. Closing and reopening the PR did **not** fire one either.
+
+**The fix, and the trap inside the fix:** the event must be re-fired by a push — but
+`pull_request` triggers here carry `paths:` filters, and **an empty commit touches zero paths, so
+it matches no filter and fires nothing.** A `--allow-empty` commit is the instinctive move and it
+is inert against a path-filtered workflow. The commit must touch a path the workflow actually
+watches.
+
+**Corollary for the recovery runbook:** after any incident in which runs were not created, every
+PR whose head was pushed during the window needs its check re-fired by a path-touching commit.
+Merging is blocked until then, and the PR will read `mergeable: true, mergeable_state: blocked`
+with a green check of the same name visible on the SHA — a state that looks like a GitHub bug and
+is not one.
+
+**How to tell a DROPPED event from a DELAYED one, before spending a retry push.** During recovery
+both look identical — no run for your SHA — and pushing again into a backed-up pipe just queues
+more work behind the same jam. The discriminator is **whether an OLDER SHA's event has since
+arrived**:
+- Nothing delivered anywhere in the repo → the pipe is **down**. A retry buys nothing. Wait.
+- An older SHA's events arrive and yours does not, minutes later → the pipe is **up** and yours was
+  **dropped**. Now a retry is the right move.
+
+*Measured 2026-08-06.* The queue drains **in order**, so an older push arriving is proof delivery
+resumed: `f72ae4c` (pushed 21:47Z, during the outage) had its `pull_request` runs created at
+23:10:45Z — **83 minutes late, and green**. `8b76de1` (pushed 22:54Z) had still produced **zero**
+check runs 33 minutes after that, so its event did not survive. Checking `runs?per_page=N` for any
+**non-`workflow_dispatch`** event is the cheap test — dispatch runs are created through the API and
+keep working throughout, so counting all runs hides the outage entirely.

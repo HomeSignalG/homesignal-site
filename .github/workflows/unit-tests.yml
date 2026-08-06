@@ -2,6 +2,11 @@ name: unit-tests
 
 on:
   push:
+    # Scoped to main deliberately. Before this, push and pull_request both fired on
+    # every feature-branch commit: 176 of 542 August runs were the SAME SHA twice (48% of
+    # SHAs), ~2,465 runner-min/month for zero extra information. The PR gate is unchanged —
+    # pull_request below still runs on every PR commit, so branch protection still bites.
+    branches: [main]
     paths:
       - '**/*.js'
       - '**/*.mjs'
@@ -46,6 +51,14 @@ on:
 # Read-only checkout — no elevated permissions required.
 permissions:
   contents: read
+
+# Supersede in-flight runs for the same ref: rapid pushes left earlier runs finishing
+# pointlessly. unit-tests is the one workflow clearly earning its keep (15 runner-min per
+# GREEN run) but it fired 325 times in six days, so the waste is in superseded runs, not in
+# the job itself. Keyed on workflow+ref so a PR and main never cancel each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # ── THE REQUIRED CHECK ────────────────────────────────────────────────────────

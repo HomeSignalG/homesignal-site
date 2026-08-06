@@ -14,21 +14,32 @@ on:
         required: false
         default: ''
   schedule:
-    - cron: '37 13 * * *'   # daily 13:37 UTC — catches regressions after any deploy/data change
-  push:
-    branches: [main]
-    paths:
-      - 'homesignalmap.html'
-      - 'config.js'
-      - 'shell.js'
-      - 'partials/shell.html'
-      - 'lib/data.js'
-      - 'docs/*-development-reports-seed.sql'
-      - 'docs/development-reports-cache.sql'
-      - 'scripts/verify-development.mjs'
-      - 'scripts/verify-representative-zips.mjs'
-      - 'scripts/lib/verify-dev-helpers.mjs'
-      - '.github/workflows/verify-development.yml'
+    # WEEKLY, not daily, since 2026-08-06 (quota). At 187.5 runner-min/run this was 45.4% of
+    # ALL Actions spend on this repo — 2,626 min in six days — and it failed 7 of 14 runs.
+    # Weekly keeps the regression signal at a seventh of the cost; workflow_dispatch above
+    # covers on-demand checks, and the push trigger below still fires on the files that matter.
+    # The real fix is the scoped-but-unbuilt worker pool (one Playwright page, serial, ~1.37s
+    # per ZIP) — that cuts the cost itself rather than the cadence. Restore daily after it ships.
+    - cron: '37 13 * * 1'   # weekly, Mondays 13:37 UTC
+  # PUSH TRIGGER DROPPED 2026-08-06 (quota). This was the real driver, not the cron:
+  # measured by event, push=1,416 runner-min over 6 runs vs schedule=723 — because the path
+  # list below includes docs/*-development-reports-seed.sql, so every seed commit bought a
+  # 187-minute run. Weekly cron + workflow_dispatch keep the signal. Restore verbatim once
+  # the worker pool lands and a run is cheap enough to fire per-push again.
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'homesignalmap.html'
+  #     - 'config.js'
+  #     - 'shell.js'
+  #     - 'partials/shell.html'
+  #     - 'lib/data.js'
+  #     - 'docs/*-development-reports-seed.sql'
+  #     - 'docs/development-reports-cache.sql'
+  #     - 'scripts/verify-development.mjs'
+  #     - 'scripts/verify-representative-zips.mjs'
+  #     - 'scripts/lib/verify-dev-helpers.mjs'
+  #     - '.github/workflows/verify-development.yml'
 
 jobs:
   verify:

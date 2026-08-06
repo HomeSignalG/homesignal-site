@@ -24,6 +24,7 @@ import { chromium } from 'playwright';
 import { surfaceBanner } from './lib/surface-banner.mjs';
 import {
   assertZip,
+  runPool,
   summarizeSourceReports,
 } from './lib/verify-dev-helpers.mjs';
 
@@ -56,8 +57,9 @@ const RUN_REPORT_SAMPLE = process.env.RUN_REPORT_SAMPLE ? parseInt(process.env.R
 // presents as a MISSING result rather than a partial one. That is exactly how verify-geocodes
 // hid 11 consecutive dead runs. This budget converts that into "checked 9,000 of 12,722, here is
 // the report, here is what was skipped" — the repo's no-silent-caps rule applied to itself.
-// It does not make the job faster; bounding the runtime is a separate change (a worker pool),
-// and `waitUntil: 'networkidle'` must move to `domcontentloaded` first — see QUEUE.md.
+// SUPERSEDED IN PART 2026-08-06: the worker pool below now DOES make the job faster — the
+// walk runs across N pages, so wall clock divides by N. The budget is unchanged and still
+// governs; `waitUntil: 'networkidle'` -> 'domcontentloaded' remains open (see QUEUE.md).
 const TIME_BUDGET_MS = process.env.TIME_BUDGET_MS
   ? parseInt(process.env.TIME_BUDGET_MS, 10)
   : 4.5 * 60 * 60 * 1000;                       // 4.5 h, inside the workflow's 330-min cap
@@ -257,8 +259,27 @@ async function main() {
 
   let raceHealed = 0;
   let skippedForBudget = [];
-  for (const [idx, rep] of reports.entries()) {
-    if (budgetSpent()) { skippedForBudget = reports.slice(idx).map((r) => r.zip); break; }
+
+  // ── WORKER POOL (2026-08-06) ──────────────────────────────────────────────────────────────
+  // This walk was ONE Playwright page, serially, ~1.37 s per ZIP — 3.6-4.8 h per run, 187.5
+  // runner-min average, 45.4% of the repo's ENTIRE Actions spend. Cadence and trigger cuts got
+  // that down by frequency; this cuts it by cost. N pages pull from one shared cursor, so the
+  // wall clock divides by N while the work per ZIP is unchanged.
+  //
+  // CONCURRENCY IS BOUNDED ON PURPOSE — the point is not to trade runner minutes for 503s.
+  // The per-ZIP page load is a static GitHub Pages asset plus PostgREST reads, NOT the engine
+  // (the engine is only touched by the RUN_REPORT_SAMPLE section below, which stays serial at
+  // 3 ZIPs). The ceiling is therefore PostgREST — the race guard's readZipState fires two reads
+  // per failing ZIP — so the default stays modest and is clamped to [1, 12]. Raising it past
+  // that buys little and risks rate-limiting the same database the site serves from.
+  //
+  // The TIME BUDGET is preserved exactly: workers check it before claiming, and every ZIP at or
+  // after the cursor at that moment is reported as skipped. A truncated run still fails loudly
+  // with "checked N of M, here is what was skipped" — the no-silent-caps rule applied to itself.
+  const CONCURRENCY = process.env.VERIFY_CONCURRENCY ? parseInt(process.env.VERIFY_CONCURRENCY, 10) : 6;
+  const WALK_STARTED_AT = Date.now();
+
+  async function checkOneZip(page, rep) {
     const zip = rep.zip;
     try {
       let st = await renderZipPage(page, zip);
@@ -306,6 +327,27 @@ async function main() {
       fails.push(`ZIP ${zip}: ${e.message.split('\n')[0]}`);
     }
   }
+
+  const lanes = Math.max(1, Math.min(12, Number.isFinite(CONCURRENCY) ? CONCURRENCY : 1));
+  const pool = [page];
+  for (let i = 1; i < lanes; i++) pool.push(await browser.newPage());
+  console.log(`Walking ${reports.length} ZIP(s) across ${pool.length} page(s) in parallel`);
+  const walk = await runPool({
+    items: reports, concurrency: pool.length, resources: pool, budgetSpent,
+    handle: (rep, workerPage) => checkOneZip(workerPage, rep),
+  });
+  const checked = walk.checked;
+  skippedForBudget = walk.skipped.map((r) => r.zip);
+  // Close only the extra pages — `page` is reused by the property-page section below.
+  for (let i = 1; i < pool.length; i++) await pool[i].close();
+
+  // THROUGHPUT RECEIPT — the before/after number this change exists to move. Printed every run
+  // so a regression in per-ZIP cost is visible without re-deriving it from billing.
+  const walkMs = Date.now() - WALK_STARTED_AT;
+  console.log(`\nWalk: ${checked} ZIP(s) in ${(walkMs / 60000).toFixed(1)} min at concurrency ${pool.length} `
+    + `→ ${(walkMs / Math.max(checked, 1)).toFixed(0)} ms/ZIP wall-clock `
+    + `(serial baseline was ~1370 ms/ZIP; 12,722 ZIPs = 3.6-4.8 h measured)`);
+
   if (raceHealed) console.log(`\n${raceHealed} ZIP(s) re-checked against a mid-run cache refresh and found consistent.`);
 
   // ── Task 6 — SOURCE RUN REPORT ──────────────────────────────────────────────────────────

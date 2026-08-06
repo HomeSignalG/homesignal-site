@@ -8189,7 +8189,405 @@ already rendering to residents, rather than on pages that may never exist.
 Lever 1 is a smaller, harder version of the problem §0y just closed. Lever 2 is already handled
 correctly by the nightly reprobe and cannot be accelerated by effort.
 
-**Minor hygiene found while measuring (not urgent, logged):** `type` carries near-duplicate casings
-— `Roads & infrastructure` 8,978 vs `Roads & Infrastructure` 483; `Civic/Public` 68,890 vs `Civic`
-861; and lowercase singletons (`commercial` 2, `industrial` 1, `research` 1). These likely miss
-`TYPE_EXACT` and fall through to keyword guessing.
+**Minor hygiene found while measuring:** `type` carries near-duplicate casings — `Roads &
+infrastructure` 8,978 vs `Roads & Infrastructure` 483; `Civic/Public` 68,890 vs `Civic` 861; and
+lowercase singletons (`commercial` 2, `industrial` 1, `research` 1). ⚠️ **CORRECTED 2026-08-06 — my
+claim that "these likely miss `TYPE_EXACT` and fall through to keyword guessing" was WRONG.**
+`normType(s)` is `String(s||'').trim().toLowerCase()` (`lib/map.js:441`) and every `TYPE_EXACT` key
+is lowercase, so BOTH casings of each pair resolve identically. There is no defect here and no
+change was made. Recorded rather than deleted, because "likely" was doing the work of a check that
+took one file read — **read the normalizer before calling a casing difference a defect.**
+
+
+---
+
+## LEVER 3 EXECUTED — two wrong-column defects and one genuine widen (2026-08-06)
+
+Scope: the four entries carrying 79.1% of all `unclassified` records. **Config only — no connector,
+engine or schema change.** Protocol followed exactly: read the top unmapped values **with example
+titles** BEFORE deciding, then report the drop-vs-widen split, then enforce.
+
+**Split: 0 dropped · 3 fixed · 1 confirmed settled and left alone.** Two of the three were not
+mapping gaps at all — they were the **wrong COLUMN**, the Columbus class.
+
+### `arlington-issued-permits` — CONFIRMED SETTLED, NOT RE-DERIVED
+
+Its 85% is the `MainUse` **null rate**, not a mapping gap (Rule 6 — data absence, not mapping
+deficiency). One probe to confirm it still holds, per instruction:
+
+| | null/empty | of | rate |
+|---|---|---|---|
+| recorded previously | 16,198 | 18,897 | 85.7% |
+| probed 2026-08-06 | **16,176** | **18,904** | **85.6%** |
+
+Materially unchanged. No change made. Cache-side figure for the same entry: 62,374 unclassified of
+73,279 = 85.1%.
+
+### `dekalb-county-building-permits` — WRONG COLUMN (Columbus class)
+
+`type_source` was `WorkTypeDescription`. The value that exposed it: a row reading
+`WorkTypeDescription='Fire Marshal Special Work type'` while the SAME row carries
+`occupancyType='D-RETL'`, `applicationName='Marc Allen Jewelers'`, and comments describing a
+storefront refit. `WorkTypeDescription` is the **review step**, not the project's use.
+
+Switched to `OccupancyTypeDescription` — 39 distinct values summing **exactly to 91,357** (the layer
+count), populated **91,321 / 91,357 = 99.96%**. `type_map` replaced with **37 keys** summing
+**exactly to 91,321** (39 distinct minus null and empty). Enforcing the old column's narrow
+whitelist instead would have been the Columbus mistake.
+
+### `overland-park-building-permits` — WRONG COLUMN (same class)
+
+`PermitType` carries **three** values (Building (Mech/Elec/Plumb) 6,136 / Building (Residential)
+5,697 / Building (Commercial) 1,255) — 46.9% of the layer was unmappable **by construction**, not
+by omission. `WorkClass` on the same rows carries **38** self-describing values summing **exactly
+to 13,088 with ZERO nulls**. Sampled proof that PermitType is a department bucket while WorkClass is
+the work: `PermitType='Building (Mech/Elec/Plumb)'` with `WorkClass='Electrical Service'` /
+`Description='New panel and meter'`. Switched; all 38 mapped.
+
+### `missoula-addresses-with-permits` — GENUINE WIDEN (checked, not assumed)
+
+Checked for a better column FIRST, because two of three siblings turned out to have one. The layer
+publishes **exactly three fields** — `B1_PER_TYPE`, `Address`, `RecordStatus`. There is no better
+column, so this one really is a narrow whitelist.
+
+The 8 unmapped values are trades: **Mechanical 23,830 · Electrical 21,702 · Plumbing 15,388**,
+sampled at residential addresses. **Widened to `Utility`, not dropped** — dropping removes records
+residents can already see, and the entry ALREADY maps its own siblings (Utility Excavation,
+Right-of-Way) to `Utility`, so dropping would have been internally inconsistent as well as lossy.
+Fence/ADA/Roofing/Revision/Board Review → `Development`. 10 → **18 keys**, summing **exactly to
+121,854**.
+
+**Density checked and does NOT apply.** 71,835 records over 10 ZIPs is ~7,000/page — the Burlington
+shape — so it was measured rather than assumed: heaviest page **59812 at 1.59 MB / 16,528 sites**,
+under the working ceiling. No `recency_days` change.
+
+### Baseline pinned before deploy (cache-side, `use_type='unclassified'` literal)
+
+| entry | records | unclassified | rate | ZIP pages |
+|---|---|---|---|---|
+| `dekalb-county-building-permits` | 289,971 | 125,148 | 43.16% | 61 |
+| `overland-park-building-permits` | 165,688 | 84,061 | 50.73% | 38 |
+| `missoula-addresses-with-permits` | 71,835 | 38,809 | 54.03% | 10 |
+| **total (re-cache set)** | **527,494** | **248,018** | **47.02%** | **109** |
+
+`arlington-issued-permits` is excluded from the re-cache set — settled, unchanged.
+
+⚠️ **The measurement metric is the literal stored string `use_type = 'unclassified'`, NOT an empty
+value.** A first attempt measured `coalesce(use_type,'') = ''` and returned **0 across all three
+entries** — a clean-looking zero from the wrong predicate, exactly the §0s class. The positive
+control that caught it was grouping `use_type` and reading the actual distribution, where
+`unclassified` appears as a stored value alongside `Development` / `Residential` / `Utility`.
+
+### Verification before commit
+
+- `registry_id` order unchanged; no unintended field touched (**programmatic assert**, not an
+  eyeballed diff — `registry_id` uniqueness alone is the wrong key, per the Madison guard)
+- every emitted `use_type` value hits `TYPE_EXACT` — no fallthrough to keyword guessing
+- duplicate-`service_url` guard green
+- full unit suite green (87 files)
+
+
+---
+
+## WRONG-COLUMN REGISTRY AUDIT (2026-08-06) — the first result is one of my own entries
+
+Ran after Lever 3, over all **156** registry entries, on the question Lever 3 raised: *how many other
+entries point `type_source` at the wrong column, or at no column at all?*
+
+**Structural audit (offline, reads the shipped registry):**
+
+| class | entries | meaning |
+|---|---|---|
+| A — no `type_source` AND no `type_map` | **44** | emits 100% `unclassified` by construction |
+| B — `type_source` set, no `type_map` | **1** | `houston-plat-applications` (`AppCode`) — map can never fire |
+| C — `type_map` set, no `type_source` | **0** | no dead maps |
+
+Only **12** class-A/B entries actually produce records today; the rest are DOT project registers with
+no surface yet. Each of the 12 was probed live (`?f=json` field list via pg_net) to ask the one
+question that matters: **does a usable type column exist that was never wired?**
+
+### FOUND — `burlington-vt-building-permits` + `burlington-vt-zoning-permits` (17,256 records, 100% unclassified)
+
+**These are my own entries, and their `_receipts` claimed "no bounded vocabulary; free prose."
+That was wrong.** The layer publishes **`PrimaryLUC`** — a **27-value self-describing** assessor
+vocabulary (`R1 - Single Fam`, `C - Commercial`, `I - Industrial`, `RA - Apartments`, `UE - Utility
+Elec` …), populated on ~97% of rows. I recorded an absence I had not checked for.
+
+20 values that STATE A USE are mapped → Residential / Commercial / Industrial / Utility.
+Unwindowed-scope coverage (Rule 13 — the probe was `where=1=1`, wider than the entries' 365-day
+window, so these are **not** a prediction of the post-deploy rate): building **121,255 / 141,701**,
+zoning **31,499 / 35,668**; both unmapped remainders reconcile to the layer total exactly.
+
+**Failing closed on purpose:** `E - Exempt`, `EL - Exmpt Land`, `TE - Partl Exempt` state a **tax
+status, not a use** — a partial exemption can sit on an ordinary house, so Civic/Public would be an
+inference. `F - Farm` / `FL - Farmland` state agriculture, for which `TYPE_EXACT` has no member.
+**Mapping those to `Development` would buy nothing real** — `development` and `unclassified` are BOTH
+in `GENERIC_EXACT` (`lib/map.js:334`) and render identically, so it would look like coverage while
+changing no pin on any map view.
+
+### REJECTED WITH RECEIPTS — the other ten
+
+- **`clv-planning-cases`** (7,653) — **two** candidate columns, both rejected. `USETYPE` is the
+  Arlington class: **260,008 of 275,595 rows blank (94.3%)** — data absence, not a mapping gap.
+  `TYPE` is fully populated (26 values, sums exactly to 275,595) but is **opaque codes** — `TMP`,
+  `SDR`, `VAC`, `ZON`, `EOT`, `WVR`, `ROC` — which the autonomy grant bars, and they describe the
+  *application* (variance, vacation, general-plan amendment), not the use.
+- **`detroit-demolition-permits`** (789) — no type column; `work_description` is free prose. The
+  whole layer IS one use, so a `type_const` would fix it — but that is a **connector change**, gated.
+- **`irving-development-permits`** (824) — layer publishes only `Permit`, `Project`, `Status`.
+- **`madison-planning-projects`** (2,433) / **`clark-county-active-projects`** (909) /
+  **`provo-planning-applications`** (195) — free-prose description fields only.
+- **`butler-county-ks-permits`** (1,204) — no single type column; type is spread across separate
+  boolean-ish flags (`buildingpermit`, `solarpermit`, `buildingsiteonlypermit`). Deriving one is a
+  connector change, gated.
+- **`fort-worth-zoning-cases`** (54) — has `ZONING_TO` / `FUTURE_LAN`; below any useful threshold.
+- **`houston-plat-applications`** / **`harris-county-plats`** — real class-B/A defects but **zero
+  surface** (Harris has one modeled ZIP, in Conroe). Logged, not fixed.
+
+**Standing answer this produced: an entry's own `_receipts` claim of "no usable column" is a LEAD,
+not a fact — re-probe the field list before trusting it, including when you wrote it.** The
+structural audit (`type_source` present? `type_map` present?) is cheap, runs offline against the
+shipped registry, and is what surfaced this; run it whenever a new entry is added.
+
+
+---
+
+## READ-ONLY PASS during the 2026-08-06 GitHub Actions incident (no runs available)
+
+Four investigations that need no CI. **Nothing here is fixed — this is a staged queue.**
+
+### 1. BARRIER REPROBE SWEEP — 0 of 16 recovered, and a rule about the instrument
+
+Positive control passed (Fort Worth's live layer answered 200), so the sweep provably ran.
+Every stalled feed matches its recorded date **to the exact day** — that agreement is the
+control proving the right field was read, not a coincidence:
+
+| target | recorded | re-probed 2026-08-06 | verdict |
+|---|---|---|---|
+| St. Paul | 2025-06-30 | **2025-06-30** | stalled 13 mo |
+| Worcester | 2025-09-09 | **9/9/2025** | stalled 11 mo |
+| Syracuse | 2025-08-16 | **2025-08-16** | stalled 12 mo |
+| McKinney | Sep 2023 | **2023-09-26** | stalled 2.8 yr |
+| KCMO `ntw8-aacc` | 2025-05-09 | **2025-05-09** (`applieddate`) | stalled 15 mo |
+
+Also: Aurora still DNS-dead · Douglas CO still 500 CONT_0001 · Frisco alt host still TLS-timeout ·
+El Paso Accela now **404 (service gone)** · **Fort Lauderdale is now WORSE than stalled — the
+MapServer itself 500s "Service OpenData/Permits/MapServer not found"** (was: stalled 2021-01-05).
+Denton's layer is alive but rejects `max(IssueDate)` (HTTP 400) — freshness unresolved this pass,
+recorded as unverified rather than guessed.
+
+⚠️ **NEW STANDING ANSWER — THE REPROBE LIST CANNOT SETTLE THE EDGE-EGRESS CLASS, AND MUST STOP
+PRETENDING TO.** The three largest barriers by page count — **El Paso TX (145 pages),
+Miami-Dade (80), Hillsborough/Tampa (58) = 283 pages** — were each diagnosed as blocked
+*specifically because pg_net gets 200 while the Supabase edge runtime gets 403 or times out*.
+The sandbox's only egress IS pg_net. So probing them from here **answers a different question**
+(Rule 13) and a 200 is not evidence of recovery — it is the expected reading in both the broken
+and the fixed state. **Those 283 pages are gated behind a deployed-engine smoke test, not behind
+a probe**, and no amount of sweeping will resolve them. Only re-probe them from CI.
+
+### 2. THIN PAGES RANKED BY MUNICIPAL ENVELOPE (not county total)
+
+County totals conflate "the city ledger is not wired" with "no city ledger will ever reach here."
+Ranked instead on the **place** parsed from each ZIP page's own name (`"<place> (<ZIP>)"`),
+0 unparseable of 12,722.
+
+**2a. Entirely dark municipalities — each needs THAT CITY's own permit ledger. Nothing else will do:**
+
+| pages | municipality | county |
+|---|---|---|
+| 38 | **Oklahoma City** | Oklahoma OK |
+| 36 | **Indianapolis** | Marion IN |
+| 30 | **Omaha** | Douglas NE |
+| 28 | **Tulsa** | Tulsa OK |
+| 27 | **Wichita** | Sedgwick KS |
+| 26 | **Dayton** | Montgomery OH |
+| 25 | **Rochester** | Monroe NY |
+| 16 | Fort Wayne IN · 15 Toledo OH · 14 Oakland CA · 14 Rockford IL · 13 Jackson MS |
+| 12 | Shreveport LA · Albany NY · Charleston WV · Columbia SC |
+| ≤11 | Boise ID · Irvine CA · Harrisburg PA · Berkeley CA · Providence RI · Springfield MO |
+
+**2b. Partially-lit municipalities — and the attribution that splits them in two.** Being
+"partly lit" does NOT mean the city's own source works. Checking WHICH source lights the healthy
+pages separates two different problems that look identical in the totals:
+
+*CONFIG / GEOMETRY — the city's OWN source works, yet its own pages are dark. This is the real
+completeness queue:*
+
+| municipality | dark | thin | lit by | best page |
+|---|---|---|---|---|
+| **New York (Manhattan)** | 23 | 9 | `nyc-dobnow` 75 pages + `nyc-dob-permit-issuance` 66 | 1,278 |
+| **Minneapolis** | 14 | 0 | `minneapolis-ccs-permits` 28 pages / 44,431 rec | 3,008 |
+| **Cincinnati** | 14 | 2 | `cincinnati-building-permits` 30 pages | 442 |
+| **Buffalo** | 12 | 0 | `buffalo-building-permits` 17 pages | 90 |
+| Atlanta 7 · Brooklyn 6 · Pittsburgh 3+6 · Tucson 3+6 · Grand Rapids 0+9 | | | | |
+
+*SUPPLY — "lit" is only SPILLOVER from a neighbouring source; the city itself has nothing:*
+
+| municipality | dark | what actually lights it | what it needs |
+|---|---|---|---|
+| **Baltimore city** | 12 | `baltimore-county-permits` (7 pp) + `mdot-sha` (12) + **Anne Arundel** (2) | Baltimore CITY ledger (the open DECISION NEEDED) |
+| **Saint Paul** | 11 | **`minneapolis-ccs-permits`** 6 pp — Minneapolis's 3-mi circles spilling over | St Paul's own (confirmed stalled 2025-06-30) |
+| **Orlando** | 8 | `fdot-active-construction-projects` only — DOT tier | Orlando's own (rejected: ungeolocatable) |
+| **Tampa** | 1+7 | DOT/county only | Tampa's own (WAF-blocked to edge) |
+
+**Minneapolis lighting six SAINT PAUL pages is the sharpest single result here** — it is the
+`spatial_zip_radius_mi` circle reaching across a city line, and it is exactly why a county-level
+or even a place-level count overstates coverage unless you attribute the source.
+
+✅ Incidental confirmation: **`nyc-dob-permit-issuance` now contributes 2,897 records across 66
+pages.** The `recency_expr` fix for its MM/DD/YYYY text dates (2026-08-02) worked — it had
+previously placed ZERO records ever.
+
+### 3. WRONG-COLUMN AUDIT, CONTINUED — one confirmed, the rest classified
+
+Same shape as DeKalb / Overland Park / Burlington: a PROCESS field wired while a LAND-USE field
+sits unused on the same layer. **Reported, not fixed.**
+
+**CONFIRMED WRONG COLUMN — `virginia-beach-building-permits`, 9,934 unclassified (65.5%):**
+`PermitType` (current `type_source`, 4 mapped keys) carries **12 trade/department values** —
+Building 21,628 · Electrical 18,404 · Mechanical 15,669 · Plumbing 12,036 · Moving and Hauling
+11,619 · Utility 7,000 · Gas 6,005. That is the department, not the use.
+**`ConstructionType` sits UNUSED with 6 self-describing values summing EXACTLY to 103,672** —
+Residential 59,397 · Commercial 17,737 · Roof and or Siding 1,161 · Construction 1,082 ·
+Asbestos 55 · blank 24,240 (**76.6% populated**). This is the Overland Park case again.
+(`WorkType` was also checked and REJECTED — 83,260 of 103,672 blank, 80%.)
+
+**BETTER COLUMN AVAILABLE, weaker case — `columbia-mo-permits`, 4,487 (44.4%):** current
+`PERMIT_TYPE` has 38 distinct, 20 mapped. **`TYP_DESC` (55 values) is more use-explicit** — "NEW
+COMMERCIAL CHURCHES AND OTHER RELIGIOUS", "NEW COMMERCIAL PARKING GARAGES", "NEW COMMERCIAL STORES
+AND CUSTOMER SERVICES". Either widen PERMIT_TYPE or switch. **`Prim_Zoning` REJECTED** — 23
+values but OPAQUE zoning codes (`M-OF`, `ROW`, `R-1`, `C2`, `IG`, `Pd`), which the autonomy grant
+bars, and zoning is not project use. *(Its groupBy returns 0 features — the Henderson case;
+`returnDistinctValues` was required.)*
+
+**NOT wrong-column — narrow whitelist only (widen candidates):**
+- `charleston-county-permits` 8,886 (23.4%) — `WORKCLASS` is correct. `CASETYPE` was checked and
+  is **worse**: 156 values dominated by INSPECTION MILESTONES (Stormwater Site Inspection 32,931,
+  Trade Final 27,346, Building Final 19,407, Framing, Electrical Rough).
+- `kent-county-de-building-permits` 1,788 (43.7%) — `StructureType` 72 values, 29 mapped.
+  `StructureDesc` is **2,000+ distinct free text**, not a bounded vocabulary.
+- `sheridan-county-building-permits` 3,046 (46.5%) — the layer publishes only FOUR string fields
+  (`Permit_Num`, `Address`, `Type_of_Bu`, `ADDFULL`). No better column exists. Missoula class.
+
+**No action:** `brunswick-county-permits` (0.5% unclassified; `ProjectCategory` is process, not
+use) · `bozeman` / `anne-arundel-subdivision-activity` / `scottsdale` (no land-use field, small
+counts).
+
+### 4. THE COMPLETENESS QUEUE, ENUMERATED
+
+| band | pages | inside a county with a live source | county has none |
+|---|---|---|---|
+| 0 records | 6,012 | 2,197 | 3,815 |
+| 1–4 | 1,486 | 1,486 | 0 |
+| 5–19 | 1,121 | 1,121 | 0 |
+| 20+ | 4,103 | 4,103 | 0 |
+
+The honest read, from §2b's attribution: **most of the 2,197 is a single city's layer under a
+county-wide coverage declaration** (Orange County CA: one source lighting 7 of 92 pages), which is
+the supply limit §0y already established, seen from the page side. The genuinely
+config-or-geometry subset is the §2b CONFIG table — roughly **60-70 pages across Manhattan,
+Minneapolis, Cincinnati and Buffalo** where the city's own source demonstrably works. That is the
+queue worth working; the rest is supply and should not be re-counted as actionable.
+
+
+---
+
+## clv-planning-cases RESOLVED + the unclassified distribution (2026-08-06)
+
+### `clv-planning-cases` — the three-way call is **GENUINELY TYPELESS**, and the prize is smaller than it looks
+
+⚠️ **Rule 13 correction to my own earlier probe.** The first pass measured `USETYPE` UNWINDOWED and
+found it 94.3% blank. The entry carries **`recency_days: 1825`**, so that answered a different
+question. Re-probed inside the connector's own window (`MTG_DATE >= DATE '2021-08-07'`):
+
+- **The whole layer has 2,383 rows in-window**, not 275,595.
+- **`USETYPE` and `TYPE` return BYTE-IDENTICAL distributions in-window** — 21 values, both summing
+  to exactly 2,383. Attribute keys confirmed distinct (`USETYPE` vs `TYPE`), so this is not a
+  server substitution: in the live window `USETYPE` simply carries the same case codes.
+- Both are **opaque**: `VAR` 1,545 · `GPA` 169 · `SCD` 132 · `EOT` 91 · `SDR` 90 · `TMP` 87 ·
+  `ZON` 67 · `SUP` 64 · `VAC` 58 · `RQR` 30 · `MSP` · `MOD` · `DVN` · `ARC` · `CUV` · `DIR` ·
+  `WVR` · `ANX` · `ROC` · `SNC`.
+- **Neither field publishes a coded-value domain** (`"domain": null` on both), so there is no
+  authoritative decode — mapping them would be guessing, which the autonomy grant bars.
+- And decoding would not help anyway: these are **APPLICATION types** (variance, general-plan
+  amendment, extension of time, site development review, tentative map, zoning, special use
+  permit, vacation), not land uses. They have no image in `TYPE_EXACT`'s closed vocabulary.
+
+**Verdict: typeless — not a missing map, not a wrong column.** No fix available without a
+publisher change.
+
+**Two facts worth carrying:**
+1. The descriptive land-use strings visible unwindowed (`PRIVATE STREETS` 2,530, `TAVERNS` 867,
+   `ELECTRIC UTILITY SUBSTATIONS` 735, `MIXED USE` 326, `SCHOOLS` 174) sit ENTIRELY OUTSIDE the
+   5-year window. `USETYPE` was a real land-use field historically and stopped being one.
+   Widening recency would surface them — but that changes what residents see and is a separate
+   decision, not a type fix.
+2. **The 7,653 cached records are at most 2,383 distinct cases.** The 3-mi spatial circles overlap,
+   so one case rides several ZIP pages (the documented Chicago behaviour). Ranking by cached
+   record count overstates this entry ~3.2x.
+
+### Where the line falls — the full unclassified distribution
+
+Grand total **≈392,400** unclassified records. Cumulative share, ranked:
+
+| rank | entry | records | unclassified | % | cume % |
+|---|---|---|---|---|---|
+| 1 | dekalb-county-building-permits | 290,064 | 125,178 | 43.2 | 31.9 |
+| 2 | overland-park-building-permits | 165,936 | 84,202 | 50.7 | 53.4 |
+| 3 | arlington-issued-permits | 73,279 | 62,374 | 85.1 | 69.3 |
+| 4 | missoula-addresses-with-permits | 71,869 | 38,819 | 54.0 | 79.2 |
+| 5 | burlington-vt-building-permits | 13,327 | 13,327 | 100 | 82.6 |
+| 6 | **virginia-beach-building-permits** | 15,161 | 9,934 | 65.5 | 85.1 |
+| 7 | **charleston-county-permits** | 37,912 | 8,886 | 23.4 | 87.4 |
+| 8 | clv-planning-cases | 7,653 | 7,653 | 100 | 89.4 |
+| 9 | **austin-site-plan-cases** | 11,725 | 7,029 | 59.9 | 91.2 |
+| 10 | **columbia-mo-permits** | 10,107 | 4,487 | 44.4 | 92.3 |
+| 11 | burlington-vt-zoning-permits | 3,929 | 3,929 | 100 | 93.3 |
+| 12 | massdot-highway-projects | 92,315 | 3,142 | 3.4 | 94.1 |
+| 13 | **sheridan-county-building-permits** | 6,551 | 3,046 | 46.5 | 94.9 |
+| 14 | madison-planning-projects | 2,427 | 2,427 | 100 | 95.5 |
+| 15-24 | (bentonville · kent-de · austin-subdiv · san-jose · butler-ks · anne-arundel · txdot · clark · irving · brunswick) | | ≤1,831 each | | 98.8 |
+
+**Ranks 1-5 are already fixed on #642 or settled (arlington, Rule 6) — 82.6% of all unclassified.**
+
+**RECOMMENDED CUTOFF: rank 10.** Ranks 6, 7, 9, 10, 13 are the addressable remainder
+(~33,400 records, ~8.5%). Below rank 14 every entry is <1,900 unclassified, and the tail is
+dominated by two non-yielding shapes: **typeless** entries (clv, madison, butler, clark, irving —
+no fix exists) and **long-tail percentages on huge denominators** (massdot 3.4%, bentonville 5.8%,
+san-jose 2.3%, brunswick 0.5% — already near-complete). A live-probe pass per entry stops paying
+there.
+
+### The remaining candidates, classified
+
+- **`virginia-beach-building-permits`** — CONFIRMED wrong column (see the audit section above).
+- **`austin-site-plan-cases`** (socrata) — `proposed_land_use` is the right KIND of field but the
+  data is dirty: top value is the sentinel **`999` (5,135)**, then blank 4,638, then a mix of
+  self-describing (`Commercial` 2,932, `Single Family` 419, `Office` 271, `Industrial` 132,
+  `Public/Civic` 145, `Mixed Use` 116), abbreviations (`OFC` 488, `MF` 428, `RET` 308, `CS` 114,
+  `ROW` 158) and **compound multi-valued strings** (`999, 999` 537; `999, 999, 999`). Widen the
+  self-describing subset only; `999` and the compounds must fail closed.
+- **`buffalo-building-permits`** (socrata) — `aptype`, 27 values, 3 mapped. All trade/process:
+  REPAIR 85,922 · ELECTRICAL 76,704 · PLUMBING 42,266 · HEATING 22,182 · DEMOLITION 10,822 ·
+  GC 8,659 · FENDRIVE 6,075. Missoula class — widen to Utility, do not drop.
+- `charleston-county` · `columbia-mo` · `sheridan` · `kent-de` — widen candidates, classified in
+  the audit section above.
+
+### ⚠️ DEFECT IN MY OWN AUDIT — it covered 156 of 183 entries
+
+The structural audit reported "all 156 registry entries." **The registry has 183.** The traversal
+required BOTH `registry_id` AND `service_url`, and **socrata/ckan/csv/carto entries do not have a
+`service_url`** — they address their source with `domain` + `dataset_id`. So **27 entries (15%)
+were never examined**, including three of the high-unclassified ones (`austin-site-plan-cases`,
+`buffalo-building-permits`, `prince-georges-county-permits`).
+
+Re-run over the missing 27: **all carry a `type_source`**, so the class-A finding (44 entries with
+no type config) stands as an arcgis-only result and no new class-A entries exist.
+
+**The same blind spot was shipped in `test/registry-duplicate-service-url.test.mjs`** — its
+"proved it ran" control was `entries.length > 100`, which passes happily at 156 while 27 entries
+go unchecked. That is precisely the failure the repo's own rule warns about: an instrument must
+prove it ran over what you think it ran over. **Fixed:** the guard now collects every entry with a
+`registry_id` and keys on `service_url` OR `domain|dataset_id`, so a duplicate Socrata dataset —
+the Madison double-emit hazard on a non-arcgis platform — is now caught. Controls added: the
+count assertion is `>= 180`, plus a platform-coverage control asserting ≥20 non-arcgis entries are
+seen. Proven to FAIL against an injected socrata duplicate before being trusted.
