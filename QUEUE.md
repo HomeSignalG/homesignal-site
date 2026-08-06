@@ -6551,3 +6551,101 @@ count. **§0s's prediction observed live rather than inferred from a cross-secti
 ### Next
 
 **MD** (125 / 317, median 22), then the national remaining-states report.
+
+---
+
+## MARYLAND — CLOSED (2026-08-06). **125 → 234 / 317 (73.8%)**. `DOT_ONLY` does NOT apply
+
+| | MD before | MD after | national |
+|---|---|---|---|
+| **COVERAGE** | 125 / 317 = 39.4% | **234 / 317 = 73.8%** | **6,493 / 12,722 = 51.0%** |
+| **COMPLETENESS** median | 22 | **4** | 62 |
+| p10 | — | **1** | 2 |
+| pages at exactly 1 record | — | **49** | — |
+
+- **Wired:** `mdot-sha-project-portal` — MDOT SHA's Project Portal, 293 point rows,
+  `dataLastEditDate` **2026-08-04**, the freshest DOT source wired in this run.
+  **309 records / 109 ZIPs, 100% point-scope, 0 missing `record_url`, 0 missing coords, 0 missing
+  `use_type`, 0 on any non-MD page.** Both buckets exercised: approved 173 / proposed 136.
+- **Four of six zero counties lifted:** Anne Arundel 0→27, Frederick 0→15, Charles 0→6, Calvert
+  0→3. Harford 1→18, Howard 3→16, Queen Anne's 2→10, Baltimore 46→55. **Cecil and Wicomico (1 page
+  each) stay dark** — single rural ZIPs with no SHA project inside 3 mi.
+- **§0u mattered here.** The richest items are owned by `marshall.stevenson1`, which reads like an
+  individual; confirmed first-party **by ORG, not by name** — that account and `MDOTSHA.GIS` publish
+  to the same hosted org `njFNhDsUCentVYJW`. Two siblings discarded on the same check: they point at
+  `https://shagbegis1/`, an internal hostname with no domain.
+- **§0l, inverse shape:** 133 rows carry an estimated completion date in the PAST, and **103 of
+  those are `Phase='Construction'` while `Project_Status` says In Progress.** A past *estimated*
+  completion means the estimate slipped, not that the project finished — reading it as built would
+  have marked 103 in-progress projects as operating. WSDOT was a future-scheduled date read as done;
+  this is a past-estimated date read as done. **Same rule from the other side.**
+- **§0o, harder than RPT_URL:** `Project_Portal_URL` is populated on 292/293 but has only 135
+  distinct values — **155 rows carry the placeholder `bit.ly/MDOT-SHA-No-Project-Portal-Page`**
+  while 137 carry a genuine per-project page (155 + 137 = 292 exactly). Record-precise **47% of the
+  time**, which is *worse to detect* than a uniformly-wrong column. Not mapped; precision `dataset`.
+
+**Not stamped `DOT_ONLY`:** MD keeps Montgomery (48/48) and Baltimore County on municipal permit
+sources, so SHA is additive rather than sole. The median fell 22 → 4 by dilution, the same shape as
+WI — 109 thin SHA pages joining 125 deeper permit pages.
+
+**83 pages remain dark**: Frederick 18, Charles 17, Calvert 10, Baltimore 13, Anne Arundel 10,
+Queen Anne's 6, Howard 5, Harford 2, Cecil 1, Wicomico 1.
+
+---
+
+# 🇺🇸 NATIONAL STANDING — 2026-08-06, from the scoreboard
+
+**The state list is done. This is what the numbers say remains, ordered by the data rather than by
+any prior ordering.**
+
+| | value |
+|---|---|
+| **COVERAGE** | **6,493 / 12,722 = 51.0%** |
+| **COMPLETENESS** median records / lit page | 62 (national) |
+| total dark | **6,229** |
+| states at literal ZERO | **7**, holding **1,090** pages |
+| dark in partially-covered states | **5,139** |
+
+## 🔴 THE BIGGEST RECOVERABLE BLOCK IS A CATEGORY, NOT A STATE: 7 states at ZERO
+
+**NH 247 · WV 212 · OK 197 · ND 155 · AK 101 · HI 97 · RI 81 = 1,090 pages, none ever probed in
+this run.**
+
+Every one is a **whole-state greenfield**, and the §0c first move has never been tried on any of
+them. On this run's evidence a statewide DOT wire alone took **WI 9.5% → 93.8%** and **MD 39% →
+74%**; even INDOT's failure was informative in one pass. **These seven are where the next
+1,000 pages are, and they are the cheapest per page of anything remaining** — one wire per state,
+no municipal tier, no per-county fan-out.
+
+⚠️ **NH at 247 pages is larger than Indiana, Utah or Wisconsin were**, and it has never been
+looked at.
+
+## The three shapes of what remains, and they need different work
+
+**1. BROAD AND SHALLOW — `DOT_ONLY`, needs municipal permits, will move the MEDIAN not the count.**
+NJ 74% / median 3 · MD 74% / 4 · ME 63% / 2 · VT 53% / 2 · IA 27% / 2 · UT 35% / 3 · WI 94% / 6 ·
+FL 86% / 8 · MI 81% / 11. **Their pages exist and are nearly empty.** Highest-value: **WI Milwaukee,
+MD Baltimore/Anne Arundel, MI Detroit-adjacent** — dense metros already covered but thin.
+
+**2. NARROW AND DEEP — one or two cities carrying the state, needs COVERAGE.**
+SD 9% / median 13,064 · AR 16% / 3,607 · KS 38% / 2,202 · GA 46% / 1,540 · MT 10% / 1,674 ·
+MN 20% / 1,201 · SC 16% / 884 · NC 75% / 646 · MS 9% / 506 · VA 49% / 473. **A high median on a low
+lit count is one deep city, not a healthy state** (§0s). Their unlock is a statewide DOT or a
+second metro.
+
+**3. LARGE AND GENUINELY HARD — already worked, blocked on structure.**
+**NY 531 dark** (closed `MUNICIPAL_TIER_REQUIRED`; no statewide source exists) · **CA 360**
+(`MUNICIPAL_TIER_REQUIRED`, 7 counties) · **IL 218** · **PA 210** · **OH 199** (every county closed
+on enumeration; Dayton blocked at the edge) · **IN 196** (`NO_DOT_PROJECT_REGISTER` — a publication
+gap, not a wiring problem) · **UT 201** (`candidates_exhausted`). **These 1,915 pages are the ones
+that need a different instrument, not another pass.**
+
+## Recommended order for whatever comes next
+
+1. **The 7 zero states** — 1,090 pages, one DOT wire each, cheapest per page and entirely unexplored.
+2. **Municipal permits for the thin `DOT_ONLY` metros** — Milwaukee, Baltimore, Anne Arundel.
+   Moves completeness, which is the half of the scoreboard that has never been worked.
+3. **The 1,125 pages under 5 records nationally** (§0q) — a queue in its own right; worth measuring
+   whether they cluster by state or by source before touching.
+4. **Leave category 3 alone** until there is a new instrument (a vendor adapter, a permit-portal
+   family, or the edge-reachability preflight).
