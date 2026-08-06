@@ -1808,6 +1808,42 @@ See **§0h** for the worked case: NJ loses **89%** under a backward 1825-day win
 
 ---
 
+## §0l-b — CROSS-CHECK EVERY STATUS FIELD AGAINST A DATE FIELD THAT IMPLIES STATE
+
+**§0l's inverse, and they belong together.** In §0l a *date* implied a state that had not happened
+(WSDOT's `OperComplete` marked 586 not-yet-built projects as built). Here *dates disprove a state
+that is claimed*.
+
+**A status vocabulary can pass every structural check and still not be the status.** Populated,
+closed, self-describing, summing exactly to the row count — all four, and wrong.
+
+**The worked case — Prince George's MD DPIE permits, 2026-08-06.** `CASE_STATUS_NAME` sums
+**exactly** to 12,231 across four perfectly legible values:
+
+```
+APPLICATION ON HOLD, CORRESPONDENCE SENT   7,574
+REFERRED                                   4,491
+COMPLAINT UNDER INVESTIGATION                141
+APPLICATION INCOMPLETE                        25
+```
+
+Every completeness test this project runs would bless that. It is not the permit status.
+**11,857 of 12,231 rows (97%) carry an `ISSUANCE_DATE` and 11,027 carry a `CLOSE_FINAL_DATE`** —
+and the crosstab shows those *same issued-and-closed* rows still reading "APPLICATION ON HOLD."
+A permit that was issued and then closed is not an application on hold, so the field describes
+internal correspondence routing. **`CASE_MODE_NAME` is the lifecycle** (CLOSED 10,696 · PERMITTED
+918 · ABANDONED 328 · APPLICATION 146 · EXPIRED 93 · CANCELED 32 · PENDING 18, also summing
+exactly). Mapping the first would have published ~12,000 completed permits as pending.
+
+**The check, before mapping ANY status field:** find a date column whose presence implies a state
+(`ISSUANCE_DATE`, `CLOSE_FINAL_DATE`, `issued_date`, `final_date`) and crosstab it against the
+candidate status. **If rows carrying that date still sit in a pre-decision status, the field is not
+the lifecycle** — look for another column before concluding the source is unusable. Where two
+candidate status fields are both complete, the one that contradicts a populated decision date is
+the wrong one.
+
+---
+
 ## §0l — A POPULATED DATE FIELD IS NOT AN ASSERTION THAT THE EVENT HAPPENED
 
 **Before reading a lifecycle stage from a date column, compare it against `CURRENT_TIMESTAMP`

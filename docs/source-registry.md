@@ -7801,3 +7801,106 @@ sixth was thin because part of it is rural.** Neither is a weak DOT entry. §0s 
 other direction — the municipal tier is the right remedy, it is **supply-limited**, and where supply
 exists it is often **already wired**. The next ranked list must be built from thin pages inside
 municipalities, and must exclude counties whose municipality already has a source.
+
+---
+
+## WHERE THE WORK ACTUALLY IS — national shape measured 2026-08-06
+
+Measured after the municipal-tier passes, to answer one question: **is coverage near its supply
+ceiling, or is there still a lever?** It is not near a ceiling, but the lever is not where the
+previous target lists pointed.
+
+### The four bands
+
+| band | pages | share |
+|---|---|---|
+| **dark** (0 records) | **6,055** | 47.6% |
+| deep (25+) | 3,923 | 30.8% |
+| thin (1-4) | 1,484 | 11.7% |
+| shallow (5-24) | 1,260 | 9.9% |
+
+### Dark splits in two, and only one half is actionable
+
+| | dark pages | counties |
+|---|---|---|
+| **A. county has NO lit page — no source reaches it** | **3,815 (63%)** | 243 |
+| B. county HAS lit pages — this ZIP is an empty envelope | 2,240 (37%) | 225 |
+
+Class B is the Dane pattern at national scale: a source covers the county and no record falls
+inside this ZIP's 3-mile circle. **No additional wiring of that source can change a class-B page.**
+
+### Thin splits the same way — and the thin lever IS near its ceiling
+
+| | thin pages |
+|---|---|
+| county has NO municipal source — potentially wireable | **1,009** |
+| county HAS a municipal source — empty envelope, unfixable | **475** |
+
+**475 of 1,484 thin pages (32%) cannot be improved by any wire.** That is the Dane finding
+generalised, and it is why "completeness on already-lit pages" is a smaller lever than its headline
+number suggests.
+
+### Both levers collapse into ONE task
+
+Class-A dark and wireable-thin are the same job: **find a per-record municipal or county source for
+a county that has none.**
+
+> **394 counties have no municipal source. They hold 5,777 pages — 4,768 dark + 1,009 thin —
+> which is 45% of the entire national page count.**
+
+**This is the re-derived target list, and it replaces every county ranking above it.** It is built
+on "county has no municipal source", never on a county thin-count, because a county thin-count
+conflates *not yet wired* with *no ledger will ever reach here* and only the first is actionable.
+
+| state | county | dark | thin | addressable | prior probing |
+|---|---|---|---|---|---|
+| NY | Suffolk | 107 | 0 | **107** | heavy (deferred: needs ten town wires) |
+| NY | Westchester | 74 | 0 | **74** | heavy |
+| PA | Lancaster | 56 | 0 | **56** | heavy (hub 404) |
+| AL | Jefferson | 32 | 24 | **56** | light |
+| NY | Monroe (Rochester) | 52 | 0 | **52** | rejected `NO_TEMPORAL_FIELD` |
+| **OK** | **Oklahoma (OKC)** | 52 | 0 | **52** | **city never probed** |
+| CA | Alameda (Oakland) | 51 | 0 | **51** | light |
+| NJ | Morris | 18 | 33 | **51** | light |
+| PA | Bucks | 50 | 0 | **50** | heavy (hub 404) |
+| **KS** | **Sedgwick (Wichita)** | 50 | 0 | **50** | **never probed** |
+| NY | Albany | 47 | 0 | **47** | rejected (no portal) |
+| **WV** | **Kanawha (Charleston)** | 47 | 0 | **47** | **city never probed** |
+| **WV** | **Raleigh** | 45 | 0 | **45** | **city never probed** |
+| ME | Penobscot | 23 | 22 | **45** | light |
+| CA | Contra Costa | 43 | 0 | **43** | light |
+| **RI** | **Providence** | 42 | 0 | **42** | **city never probed** |
+| NJ | Monmouth / Bergen | 33 | 51 | **84** | light |
+| **IN** | **Marion (Indianapolis)** | 40 | 0 | **40** | **city never probed** |
+| CA | Sonoma | 40 | 0 | **40** | rejected (no ZIP/coords) |
+| **OK** | **Tulsa** | 39 | 0 | **39** | **never probed** |
+| OH | Montgomery (Dayton) | 39 | 0 | **39** | heavy — reprobed twice, negative |
+| **OR** | **Lane (Eugene)** | 37 | 0 | **37** | **never probed** |
+| **NE** | **Douglas (Omaha)** | 35 | 0 | **35** | **never probed** |
+
+### ⚠️ THE GAP IN OUR OWN RECORD — five states closed at the DOT tier only
+
+**NH 247 · WV 212 · OK 197 · ND 155 · IN 196 = 1,007 pages, every one dark, and NOT ONE CITY IN
+THEM HAS EVER BEEN PROBED.** The seven-zero-state pass (2026-08-06) tested `OKDOT_GIS`,
+`WVDOT_Publisher`, `NHGRANIT` and North Dakota's DOT-adjacent orgs, and Indiana was closed
+`NO_DOT_PROJECT_REGISTER`. Every one of those verdicts is correct **about the state DOT** — and
+each was then carried in the record as though the state were closed.
+
+It is not. Oklahoma City, Tulsa, Charleston, Indianapolis, Manchester, Concord and Fargo are
+untested. **A `NO_DOT_PROJECT_REGISTER` or `candidates_exhausted` verdict scoped to a DOT closes
+the STATEWIDE tier and says nothing about the municipal tier.** Mark such states
+`DOT_TIER_CLOSED_ONLY` rather than closed.
+
+### The recommendation, stated plainly
+
+**Coverage is NOT near its supply ceiling — 45% of pages sit in counties with no municipal source.
+Completeness on already-lit pages is the smaller lever and is partly at its ceiling (475 thin pages
+are structurally unfixable).** Highest-value work, in order:
+
+1. **The five DOT-tier-only states (1,007 pages).** Highest confidence, because the search space is
+   genuinely unexplored rather than exhausted — and it is our own recording error to correct.
+2. **The never-probed metros** in the table above (Wichita, Omaha, Eugene, Providence, Tulsa,
+   Indianapolis, Charleston) — 0-3 prior mentions each in this document.
+3. **Deprioritise the heavily-probed heads** (Suffolk, Westchester, Lancaster, Bucks, Dayton,
+   Rochester, Albany, Sonoma) — all carry documented rejections; re-probing has low expected yield
+   and Dayton has already been reprobed twice, negative.
