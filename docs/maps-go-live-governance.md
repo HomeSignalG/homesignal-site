@@ -2366,6 +2366,17 @@ on the exact injected duplicate.
 config, the diff, the additivity assertions or the unit suite showed the defect. Only reading the
 connector's own run-report did.
 
+**Reverting is not the end of it — the scheduled refresh does not stop for a deploy.** The first
+account of this incident said "reverted before any re-cache, so nothing reached production." That
+was reasoned from *no manual re-cache having been run*, which is a different question, and it was
+wrong: pg_cron fired during the ~18 minutes the bad entry was live and contaminated 3 cached pages.
+
+Worse, **a response FIRED during the bad window is still poison when COLLECTED after it** —
+`dev_refresh_collect()` writes whatever is sitting in `net._http_response`, so one page was
+contaminated at the *same timestamp as the fix*. **After reverting a bad registry deploy: flush the
+collector, re-check, and only then call it clean.** A single pass reports clean while contaminated
+responses are still queued behind it.
+
 ---
 
 **A statewide DOT layer is the right first move in a dark state (§0c) and it is not a substitute
