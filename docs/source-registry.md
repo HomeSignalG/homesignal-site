@@ -7524,3 +7524,115 @@ forever, "we found this and it fails on X" is falsifiable.
 ### National effect
 
 **6,493 → 6,606 of 12,722 = 51.04% → 51.93%.**
+
+---
+
+## MUNICIPAL TIER — PASS 1 (2026-08-06): ANNE ARUNDEL MD
+
+**Why this pass exists.** The coverage number had reached 51.9%, and the question moved from
+*"does a page have anything"* to *"does a page have enough."* Measured across the whole lit
+population (1,496 pages under 5 records) the answer is not a discovery problem and not a handful
+of thin entries — **it is structural to the source class:**
+
+| dominant source class | lit pages | median records | % under 5 |
+|---|---|---|---|
+| DOT / transport project register | 3,404 | **8** | 37.9% |
+| municipal permit / land-use ledger | 3,202 | **252** | 6.4% |
+
+A **31x median gap**, and **1,290 of the 1,496 thin pages (86%)** are DOT-dominated. A state DOT
+publishes a few hundred to a few thousand programmed projects statewide; a city publishes tens of
+thousands of permits per year. §0s predicted this shape; this is it measured nationally.
+
+**So the remedy for a thin page is never to improve the DOT entry — it is to add the municipal
+tier underneath it.** Anne Arundel is pass 1.
+
+### ⚠️ Correction: MILWAUKEE IS NOT THIN, and was on the work list because of an assumption
+
+Milwaukee was queued as a thin metro. Measured: **36 of 36 pages lit, median 22, 2 pages under 5**
+— it is WisDOT's **best**-served county, not its worst. Wisconsin's thin counties are **Dane**
+(20 thin, median 5) and **Waukesha** (15 thin, median 3). Do not re-queue Milwaukee as thin.
+
+Its own ledger was still probed and is **NOT WIREABLE AS CONFIG**: `data.milwaukee.gov`
+(CKAN) `buildingpermits`, 16,685 rows, modified 2026-08-05, real `Status`, ISO dates — but the
+rows carry **only `Address` ("2033 S 24TH ST"), no ZIP column and no coordinates**, and
+`sources/ckan.ts::buildWhere` makes the ZIP filter **mandatory** (`"<zipCol>" = '<zip>'`). Wiring
+it needs a connector change (address-geocode or spatial scoping in ckan), which is **gated** —
+logged, not attempted.
+
+### ✅ ANNE ARUNDEL — `anne-arundel-commercial-site-plans` + `anne-arundel-subdivision-activity`
+
+The thinnest wired MD county: **27 of 37 pages lit, median 2, 92 records TOTAL**, every one from
+the statewide `mdot-sha-project-portal`. Config only, registry **151 → 153**.
+
+Source: the county's OWN ArcGIS Server, `gis.aacounty.org` `OpenData/Planning_OpenData`.
+(The `InspectionsPermits` folder on the same host is **token-gated — HTTP 499 "Token Required"** —
+and is not used.)
+
+| layer | rows | `STATUS_1`, enumerated live, **sums exactly** | last edited |
+|---|---|---|---|
+| 4 Commercial Site Plans | 1,395 | Approved 1128 · Active 115 · Inactive 80 · Terminated 72 | 2026-08-04T18:23:55Z |
+| 30 Subdivision Activity | 3,201 | Approved 2558 · Inactive 399 · Active 160 · Terminated 78 · null 6 | 2026-08-04T18:57:34Z |
+
+Type vocabularies also sum exactly (1,395 / 3,201). Current filings confirmed present:
+`CD-2026-0001`, `-0005`, `-0010`, `-0011`, `-0018`.
+
+**Go-live, measured after deploy + re-cache + materialize:**
+
+| | before | after |
+|---|---|---|
+| pages lit | 27 / 37 | **37 / 37 (100%)** |
+| median records | **2** | **254** |
+| pages under 5 | 19 | **0** |
+| records | 92 | **10,784** |
+
+**Invariants across all 10,692 Anne Arundel records cache-wide: 0 missing `record_url`,
+0 missing coordinates, 0 non-`point` scope.** Bidirectional gate proof with live receipts: the
+records ride **MD/Anne Arundel pages ONLY** — 37 ZIPs, and no other county or state anywhere in
+the cache. Deploy-verification probe (21401, the mandated new-host check):
+`fetched 91 → emitted 86` and `fetched 180 → emitted 149`, **0 quarantined, 0 `no_record_url`,
+0 `geocode_failures`, 0 unmapped statuses** on both.
+
+**Five decisions worth not re-deriving:**
+
+1. **Both layers are polygons on the `featurePoint()` path, so `lat`/`lng` map the synthetic
+   `__lat`/`__lng`** (§0n). Without it every record returns `scope:"area"` at the report centroid —
+   the ADOT defect, where 128 of 129 records were misplaced and the state moved +1 page.
+   `return_centroid` is deliberately **NOT** set: this is a classic ArcGIS Server MapServer, which
+   silently ignores the param.
+2. **The two layers do NOT share a schema** — `PRJ_TYPE` vs `PROJ_TYPE`, `PLN_NAME` vs `SUB_NAME`,
+   `PRJ_NUM` vs `SUB_NUM`. Field names were read per layer rather than copied across, which is the
+   error the RI pass made in the opposite direction (asserting one schema for 15 layers that had two).
+3. **Neither layer is a subset of the other — CHECKED, not assumed** (the Houston plat trap, where
+   wiring both would have double-emitted ~25,777 records per page). Their case-number namespaces are
+   disjoint: layer 4 is `C1995-0002-00-NC` shaped, layer 30 is `CD-R-2025-0001` shaped.
+4. **Subdivision types map to `Development`, NOT `Residential`.** `major`/`minor` are subdivision
+   SIZE classes under AA County's rules, not land uses — a major subdivision may be either.
+   `Residential` is the intuitive guess and is an assertion the data does not make. `Development` is
+   the generic member of the CLOSED six-value `use_type` vocabulary (`lib/map.js::TYPE_EXACT`) and
+   renders as the "Other project" circle (Phoenix precedent). The 640 blank + 1 null types are left
+   unmapped rather than assigned one.
+5. **`FN_APV_DT` maps to `decision_date`, and there is NO `recency_days`.** It is only 832/1,395 and
+   1,956/3,201 populated (~60%) because it is the FINAL APPROVAL date — Active and Inactive rows
+   legitimately have none. A recency window on it would silently drop **every pending application**,
+   which is the record a resident most wants to see. At 4,596 rows total there is no size pressure
+   that would justify one. `prelimenary plan` is mapped **verbatim**, publisher's spelling included.
+
+**OPEN QUESTION, logged not guessed:** `Inactive` (80 + 399) is bucketed **exclude**. Layer 30's
+type vocabulary contains `Inactive/Complete Subdivision`, which hints `Inactive` may mean **built**
+(→ `operating`) rather than dormant. Excluding is the conservative reading — it drops the record
+rather than asserting a building exists. Revisit only against a published AA County definition.
+
+### National effect
+
+**6,606 → 6,667 of 12,722 = 51.93% → 52.41%.**
+
+### Ranked next targets for the municipal tier (measured, not guessed)
+
+| county | pages | lit | thin | median | current source |
+|---|---|---|---|---|---|
+| Dane WI | 46 | 45 | 20 | 5 | WisDOT only |
+| Prince George's MD | 36 | 36 | 17 | 5 | MDOT SHA only |
+| Harford MD | 20 | 18 | 16 | 2 | MDOT SHA only |
+| Waukesha WI | 27 | 25 | 15 | 3 | WisDOT only |
+| Frederick MD | 33 | 15 | 14 | 0 | MDOT SHA only |
+| Howard MD | 21 | 16 | 11 | 2 | MDOT SHA only |
