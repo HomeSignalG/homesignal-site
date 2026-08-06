@@ -8069,3 +8069,44 @@ Fargo (**SSL**), Manchester NH (**DNS**), Tulsa (**DNS**) are **not** rejections
 A firewall rule, an expired certificate or a moved hostname changes without announcement, which is
 exactly what the nightly reprobe list is for. Distinguish these from Honolulu/Indianapolis/
 Providence, where the publisher was reached and the answer was no.
+
+### BURLINGTON GO-LIVE — measured, and the sizing took three probes to get right
+
+**The wire is a COMPLETENESS win, not a coverage win. It lit 0 new pages.** Chittenden's lit count
+is unchanged at 14 of 18; what changed is depth, and the split is the Dane pattern reproduced
+exactly:
+
+| Chittenden pages | count | median records | thin |
+|---|---|---|---|
+| carrying Burlington records | **6** | **2,983** | **0** |
+| VTrans only | 12 | **1** | 12 |
+
+17,256 Burlington records across 6 ZIPs. **0 missing `record_url`, 0 missing coordinates,
+0 non-`point` scope.** The 12 VTrans-only pages are outside the city ledger's 3-mile reach and no
+Burlington wiring can move them — §0s corollary, second confirmation.
+
+⚠️ **National went 6,667 → 6,697 in this window, and that +30 is NOT attributable to this pass.**
+The pg_cron auto-refresh runs continuously and touched other states meanwhile. Burlington's
+contribution is **0 pages lit, 6 pages deepened**. Stating it any other way would credit this wire
+with work it did not do.
+
+#### The sizing is the transferable lesson: THREE probes, each one correcting the last
+
+| `recency_days` | result |
+|---|---|
+| *(absent)* | **TIMEOUT at 150 s** — unbounded fetch of ~141k wide rows |
+| 1095 | HTTP 200, but **`max_rows` cap hit on BOTH layers** (`fetched=20000`, `quarantined=1` each) and a **32.75 MB** row — ~6× the worst known page |
+| **365** | `fetched` 3,131 + 896, **cap not hit, 0 quarantined**, 3,944 records, **3.29 MB** ✅ |
+
+**A small city is a DENSITY problem, not a volume problem, and that is counter-intuitive.** In a
+45k-population city the 3-mile envelope encloses essentially the entire municipality, so *every*
+record in a 20-year ledger lands on *every* city page. Dense-metro sources are usually safer here,
+because a 3-mile circle is a small fraction of the city.
+
+**Two things a future session must not repeat:**
+1. **A 200 is not a pass.** The 1095 probe returned 200 and looked healthy; the defect was visible
+   only in `quarantined: 1` (the `max_rows` note) and the response size. **Read `quarantined` and
+   the byte size on every new-host probe, not just the status code.**
+2. **`max_rows` truncation is silent in the records and loud in the report.** 20,000 of ~40,000
+   matching rows were emitted with no error — the connector's own truncation note is the only
+   signal, which is exactly why it exists.
