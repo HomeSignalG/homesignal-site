@@ -2630,3 +2630,48 @@ A `DOT_ONLY` state with a low median is **broad and shallow: correctly closed, n
 next unlock is municipal permit sources, and that work will move the **median** far more than the
 **page count** — the §0q asymmetry, and the reverse of the Pierce case. A `DOT_ONLY` state with a
 high median (MA, CT) needs nothing further on this axis.
+
+
+---
+
+## §0z — A DRAFTED MAPPING IS A HYPOTHESIS UNTIL EVERY KEY IS BYTE-VERIFIED PRESENT (2026-08-06)
+
+**Rule.** A `type_map` / `status_to_bucket` written from domain knowledge — from what a permit
+vocabulary *usually* contains, from a brief, from a plausible zoning lexicon — is a **hypothesis**.
+It becomes fact only when **every key** is confirmed present in the live vocabulary, enumerated
+from the source itself. Draft freely; commit only what was read.
+
+**Why this class survives, and why it is invisible.** A key that matches nothing is **harmless at
+runtime**. It never errors, never warns, never appears in a run report, and never changes a
+rendered page. `type_map` is a lookup: a value the source does not emit simply never arrives to be
+looked up. So a mapping can be 20% invented and every instrument stays green. **Dead keys are only
+ever visible if you go looking for them** — which means the check has to be deliberate, before the
+commit, or it does not happen at all.
+
+**The check.** Enumerate the live vocabulary (`groupBy` counts, or `returnDistinctValues`, or
+Socrata `$group` paged to exhaustion), then assert **set membership in BOTH directions**:
+1. every `type_map` key exists in the live vocabulary → no invented keys;
+2. every live value with meaningful volume exists in `type_map` → no silent unclassified mass.
+**The arithmetic control that makes it binding: the mapped counts must SUM EXACTLY to the layer
+count** (minus explicitly-failed-closed values, named). An exact sum cannot be reached with an
+invented key in the set, which is why this project keeps stating sums rather than percentages.
+
+**Precedents in this repo, all real:**
+- **Phoenix** — the brief said "250+" `PER_TYPE_DESC` values; the live enumeration returned
+  **238**, summing exactly to 70,791. Writing to the brief's number would have shipped invented keys.
+- **Mesa** — Socrata group-by is silently truncated by `$limit`; the missing S–Z page carried
+  Single Family (Detached) 18,461+12,555. A vocabulary read once, unpaged, is a partial hypothesis
+  wearing the costume of a complete one.
+- **Burlington (my own)** — the entry's `_receipts` asserted "no bounded vocabulary; free prose."
+  Nobody had enumerated the field. `PrimaryLUC` is a 27-value self-describing vocabulary, ~97%
+  populated. **An absence claim is a hypothesis too, and this one was wrong for 17,256 records.**
+- **York County PA** — the inverse error, made by a CHECK rather than a mapping: a guard asserted
+  `type_source` must be a string and flagged York as broken. Its `type_source` is an eight-column
+  array that `readCol` JOINS (`arcgis.ts:791`), and its 32 keys are exactly the joined strings
+  (`'NO NO NO NO NO NO YES NO'`). **The entry was correct and the instrument was wrong** — caught
+  only by opening the entry instead of trusting the failure. A red check is a hypothesis too.
+
+**Corollary — the same standard binds a claim of ABSENCE.** "This layer has no usable type column"
+requires the field list, read. `clv-planning-cases` is genuinely typeless (21 opaque application
+codes, `"domain": null` on both candidate fields, no published legend) — that verdict is
+admissible *because the fields were enumerated*, not because the shape looked familiar.
