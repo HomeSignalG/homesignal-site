@@ -11617,6 +11617,91 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-06 MARYLAND pass. MDOT SHA's Project Portal layer on the agency's own hosted org (services.arcgis.com/njFNhDsUCentVYJW). 293 rows, esriGeometryPoint, statewide with no county (the UDOT precedent). §0u OWNER CHECK DONE FIRST, AND IT MATTERED: the richest items are owned by 'marshall.stevenson1', which reads like an individual. Confirmed first-party by ORG rather than by name - marshall.stevenson1 and MDOTSHA.GIS (unambiguously the agency account) publish to the SAME hosted org njFNhDsUCentVYJW, so it is an agency staff account. Two sibling items were discarded on the same check: 'MDOT SHA OHD Roadway Projects' and 'OOC Construction Projects' point at https://shagbegis1/ - an internal hostname with no domain, unreachable from anywhere. FRESH: dataLastEditDate 2026-08-04, two days before this pass - the freshest DOT source wired so far. STATUS - Phase IS THE AUTHORITY, AND THE COMPLETION DATE IS NOT. Phase has 3 values summing EXACTLY to 293: Construction 177 -> approved, Design 103 -> proposed, Planning 13 -> proposed. operating and exclude are deliberately EMPTY - this is a portal of ACTIVE projects and nothing in it is finished. *** §0l, A NEW SHAPE: 133 of 293 rows carry an Estimated_Project_Completion_Ye in the PAST, and 103 of those are Phase='Construction' while Project_Status says 'In Progress'. A past ESTIMATED completion date does not mean the project completed - it means the estimate slipped. Reading it as 'built' would have marked 103 in-progress construction projects as operating. This is the inverse of the WSDOT trap (a FUTURE scheduled date read as done); here a PAST estimated date would be read as done. Both are the same rule: compare the date to now AND check what the publisher's own status field says before inferring a stage. Project_Status itself (In Progress 282 / On Hold 11 = 293 exact) is an ACTIVITY flag, not a lifecycle stage, so Phase carries the mapping and On Hold rows are kept - an on-hold project is still a real proposed project. *** *** RECORD URL DELIBERATELY NOT MAPPED, AND THIS IS A HARDER CASE THAN ALDOT'S RPT_URL. Project_Portal_URL is populated on 292 of 293 rows and looks like a per-project link. It has only 135 DISTINCT values, and the reason is a PLACEHOLDER SENTINEL: 155 rows carry 'https://bit.ly/MDOT-SHA-No-Project-Portal-Page' while 137 carry a genuine per-project page (e.g. mdot-sha-putty-hill-ave-brg-over-i695-ba1455180-maryland.hub.arcgis.com). 155 + 137 = 292, the exact non-null count. So the column is RECORD-PRECISE 47% of the time and a 'no page exists' stub the other 53% - worse to detect than RPT_URL, which was uniformly wrong and therefore obvious on the second row. Mapping it would send the majority of residents to a stub that is not their project's record. record_url_precision is 'dataset' on the layer's own REST endpoint (the Philadelphia / Boulder machine-URL precedent). *** COUNTY VOCABULARY IS COMPLETE and reaches every dark MD county: Prince George's 51 / Baltimore 49 / Anne Arundel 32 / Montgomery 27 / Harford 20 / Howard 15 / Frederick 14 / Talbot 11 / Queen Anne's 9 / Washington 9 / St. Mary's 8 / Charles 7 / Worcester 6 / Carroll 6 / Wicomico 6 / Allegany 5 / Garrett 5 / Cecil 4 / Calvert 3 / Kent 2 / Dorchester 2 / Caroline 1 / Somerset 1 = EXACTLY 293 across 23 values. Work_Type has 189 largely free-text values and is NOT used as type_source - none names a building use, so use_type_const 'Utility' per the DOT convention. GEOMETRY: point, but with NO native lat/lng columns, so lat/lng map to the synthetic __lat/__lng that featurePoint() populates - §0n. file_date is Estimated_Project_Start_Year, non-null on 278 of 293; the 15 nulls simply carry no date rather than being dropped. SCOPE: MD had 317 modelled ZIP pages, 125 lit (Montgomery trio + Baltimore County) and 192 dark, with SIX counties at zero - Anne Arundel 37, Frederick 33, Charles 23, Calvert 13, Cecil 1, Wicomico 1 - plus Harford 1/20 and Howard 3/21."
+    },
+    {
+      "registry_id": "akdot-stip-24-27",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/r4A0V7UzH9fcLVvv/arcgis/rest/services/STIP_24_27_Final_NewSchema/FeatureServer/0",
+      "dataset_url": "https://services.arcgis.com/r4A0V7UzH9fcLVvv/arcgis/rest/services/STIP_24_27_Final_NewSchema/FeatureServer/0",
+      "jurisdiction": "Alaska Department of Transportation & Public Facilities (AKDOT&PF) — STIP FFY 2024-2027 (Approved Final)",
+      "coverage": [
+        {
+          "state": "AK"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Proj_Name",
+          "Description"
+        ],
+        "status_raw": "Status",
+        "case_number": "STIP_ID",
+        "address": [
+          "Location",
+          "Region"
+        ],
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "use_type_const": "Utility",
+      "status_to_bucket": {
+        "proposed": [
+          "Draft"
+        ],
+        "approved": [
+          "Approved"
+        ],
+        "operating": [],
+        "exclude": [
+          "Retired",
+          "Archived"
+        ]
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-06 SEVEN-ZERO-STATE pass. AKDOT&PF's own hosted org (owner AKDOT_GIS, 610 items), 'STIP 24 27 Approved Final' - the approved statewide transportation improvement programme. 2,282 rows, esriGeometryPoint, statewide with no county (the UDOT precedent). §0u owner check done first: AKDOT_GIS is the agency account. *** THIS ENTRY OVERTURNS A PRIOR REJECTION, ON EVIDENCE FOUND AFTER IT. This state was rejected 2026-08-05 in the eleven-state pass with the disqualifier NO_TEMPORAL_FIELD - first-party, geolocated, per-record, real status column, but ZERO date-typed fields. That disqualifier was WRONG, and the proof is in the registry itself: file_date is OPTIONAL. Five entries already ship without it - fort-collins-building-permits, colorado-springs-planning-applications, dallas-specific-use-permits, delaware-county-pa-subdivisions-land-developments, and most directly nvdot-project-boundaries, a STATEWIDE DOT geometry layer carrying status_raw and no file_date. That is precisely this layer's shape. A missing date costs the recency window and the file_date dedup component; it does not cost the record. The original rejection was factually correct about the schema and wrong about what the schema disqualifies. *** STATUS VOCABULARY IS COMPLETE and sums EXACTLY to 2,282: Approved 1,094 -> approved (a STIP entry that is approved is funded and programmed, not built - the ADOT adopted-TIP precedent) · Draft 591 -> proposed · Retired 225 and Archived 56 -> exclude (a retired or archived programme entry is not a live project) · and 316 rows carry a NULL Status, which the connector's fail-closed status lookup DROPS rather than guessing. 1,094 + 591 = 1,685 emitted, 597 deliberately withheld. operating is empty: a STIP is a programme of future work and nothing in it is complete. STIP_Year is a SmallInteger programme year, NOT a date, and is deliberately unused - 'a programme year is not a date' is the standing answer from the original rejection and it remains correct; what changed is that a date was never required. Work_Type is present but not used as type_source - none of its values names a building use, so use_type_const 'Utility' per the DOT convention. GEOMETRY: point, no native lat/lng columns, so lat/lng map to the synthetic __lat/__lng that featurePoint() populates (§0n). RECORD URL: no per-record URL column, so dataset precision on the layer's own REST endpoint. SCOPE: AK had 101 modelled ZIP pages and ALL 101 were dark."
+    },
+    {
+      "registry_id": "hdot-active-design-projects",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/HQ0xoN0EzDPBOEci/arcgis/rest/services/HDOT_Active_Design_Projects_Layer_view/FeatureServer/0",
+      "dataset_url": "https://services.arcgis.com/HQ0xoN0EzDPBOEci/arcgis/rest/services/HDOT_Active_Design_Projects_Layer_view/FeatureServer/0",
+      "jurisdiction": "Hawaii Department of Transportation (HDOT) — Active Design Projects",
+      "coverage": [
+        {
+          "state": "HI"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "projecttitle",
+          "scope"
+        ],
+        "status_raw": "currentphase",
+        "case_number": "projectnumber",
+        "address": [
+          "rtegeo_routeno",
+          "island"
+        ],
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "use_type_const": "Utility",
+      "status_to_bucket": {
+        "proposed": [
+          "Design",
+          "Planning",
+          "Right of Way"
+        ],
+        "approved": [
+          "Construction"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-06 SEVEN-ZERO-STATE pass. HDOT's Active Design Projects layer on org HQ0xoN0EzDPBOEci. 483 rows, esriGeometryPolyline, statewide with no county. §0u OWNER CHECK: owner is 'dot_mmekuria', which reads like an individual. Confirmed first-party the same way MDOT SHA was - by ORG, not by name: dot_mmekuria also owns HDOTBridges and HDOT Highways Program Status on this same org, and the org's other publishers are dot_rwollenbecker and the HiStateGIS portal. The `dot_` prefix plus a shared agency org is the signature of department staff accounts. CONTRAST, from the same search: HDOT AADT, HDOT Pavement Conditions and HDOT STRAHNET are owned by 'Lorraine.McChesney@jacobs.com_Jacobs' - JACOBS, a private engineering consultancy - and several HDOT_*_gdb layers by 'mciepluch' and 'jacob.pellmann_mandli' (Mandli, a survey contractor). Title prefix 'HDOT' says nothing about who published it. *** currentphase IS THE STATUS FIELD, AND projectstatus IS DELIBERATELY NOT USED: projectstatus has exactly two distinct values, '1' and '2' - OPAQUE CODED, nothing to map verbatim, the San Jose planningpermits30 rejection class. currentphase is self-describing and its 4 values sum EXACTLY to 483: Design 237 + Planning 30 + Right of Way 4 -> proposed (271), Construction 212 -> approved. operating and exclude are empty - this is a layer of ACTIVE projects and nothing in it is complete. An opaque column sitting beside a self-describing one is not a reason to reject the layer; it is a reason to read the other column. *** NO DATE IS USED, AND NONE IS AVAILABLE AS A DATE: every one of this layer's ~30 date-named fields (awarddate, construction_date, nepadate, ntpdate, bid_open_date, finalpaydate ...) is typed esriFieldTypeString, not a date. Rather than string-compare against an unvalidated format, file_date is omitted entirely - which the registry permits (see the AK entry's note on nvdot-project-boundaries and four other date-less entries). ISLAND DISTRIBUTION sums exactly to 483: oahu 184 · statewide 94 · kauai 78 · hawaii 71 · maui 49 · molokai 6 · lanai 1. The 94 'statewide' rows are kept - unlike ADOT's 'Not Location Specific' administrative line items, these are real polyline features with geometry and will place wherever their line runs. GEOMETRY: polyline, no native lat/lng, so lat/lng map to __lat/__lng (§0n); return_centroid deliberately absent (polyline hard-rejects it - the TxDOT finding). SCOPE: HI had 97 modelled ZIP pages and ALL 97 were dark."
     }
   ],
   "ckan": [
