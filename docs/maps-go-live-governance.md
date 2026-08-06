@@ -2675,3 +2675,26 @@ invented key in the set, which is why this project keeps stating sums rather tha
 requires the field list, read. `clv-planning-cases` is genuinely typeless (21 opaque application
 codes, `"domain": null` on both candidate fields, no published legend) — that verdict is
 admissible *because the fields were enumerated*, not because the shape looked familiar.
+
+
+### §0z-b — A REGISTRY SIZE QUOTED FROM MEMORY IS STALE BY CONSTRUCTION
+
+**Three different registry counts were quoted in a single session — 151, 156, 183 — and only the
+last was measured.** The registry grows across passes, so any count carried forward from an earlier
+message is describing a file that no longer exists.
+
+- **151** — correct several passes earlier, then repeated after the file had grown.
+- **156** — measured, but by a traversal that required `service_url`, so it silently excluded every
+  socrata/ckan/csv/carto entry. **Wrong by 27 (15%)** while looking freshly measured, which is worse
+  than quoting from memory because it carries a receipt.
+- **183** — measured against the current branch, collecting on `registry_id` alone, all platform
+  families included.
+
+**Rule.** Never state a registry count, an entry count, or a coverage total without recomputing it
+in the same message. And when you do recompute, **key on `registry_id` alone** — any additional
+required field is a platform filter in disguise. The traversal that produced 156 is the one to keep
+in mind: an instrument can be freshly run and still under-cover, and a bare total is exactly the
+shape of result that hides it. Pair every count with a **composition control** (entries by
+`platform`, or a non-arcgis subtotal) so under-coverage is visible in the same output.
+
+*This is the counting case of "an instrument must prove it ran over what you think it ran over."*
