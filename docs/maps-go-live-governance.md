@@ -2727,3 +2727,18 @@ PR whose head was pushed during the window needs its check re-fired by a path-to
 Merging is blocked until then, and the PR will read `mergeable: true, mergeable_state: blocked`
 with a green check of the same name visible on the SHA — a state that looks like a GitHub bug and
 is not one.
+
+**How to tell a DROPPED event from a DELAYED one, before spending a retry push.** During recovery
+both look identical — no run for your SHA — and pushing again into a backed-up pipe just queues
+more work behind the same jam. The discriminator is **whether an OLDER SHA's event has since
+arrived**:
+- Nothing delivered anywhere in the repo → the pipe is **down**. A retry buys nothing. Wait.
+- An older SHA's events arrive and yours does not, minutes later → the pipe is **up** and yours was
+  **dropped**. Now a retry is the right move.
+
+*Measured 2026-08-06.* The queue drains **in order**, so an older push arriving is proof delivery
+resumed: `f72ae4c` (pushed 21:47Z, during the outage) had its `pull_request` runs created at
+23:10:45Z — **83 minutes late, and green**. `8b76de1` (pushed 22:54Z) had still produced **zero**
+check runs 33 minutes after that, so its event did not survive. Checking `runs?per_page=N` for any
+**non-`workflow_dispatch`** event is the cheap test — dispatch runs are created through the API and
+keep working throughout, so counting all runs hides the outage entirely.
