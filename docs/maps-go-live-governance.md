@@ -2698,3 +2698,32 @@ shape of result that hides it. Pair every count with a **composition control** (
 `platform`, or a non-arcgis subtotal) so under-coverage is visible in the same output.
 
 *This is the counting case of "an instrument must prove it ran over what you think it ran over."*
+
+
+### §0z-c — A CHECK SATISFIED IN THE WRONG EVENT CONTEXT IS NOT SATISFIED
+
+Branch protection requires a status check **by name AND by the event that produced it**. A green
+`unit` from a `workflow_dispatch` run does not satisfy a required `unit` that protection expects
+from `pull_request`, even on the identical SHA with identical results.
+
+**The sequence that produced this (2026-08-06), because each step looks reasonable alone:**
+1. A commit was pushed **during** a GitHub Actions incident in which the repo created **no workflow
+   runs at all** for ~5.7 h. No `pull_request` run was ever created for that SHA.
+2. When runners recovered, the gate was confirmed by **dispatching** `unit-tests` manually — the
+   correct way to test whether runners were alive, but it registers the check under
+   `workflow_dispatch`.
+3. **GitHub does not retroactively create the event it skipped.** The missed `pull_request` run
+   stays missed.
+4. Closing and reopening the PR did **not** fire one either.
+
+**The fix, and the trap inside the fix:** the event must be re-fired by a push — but
+`pull_request` triggers here carry `paths:` filters, and **an empty commit touches zero paths, so
+it matches no filter and fires nothing.** A `--allow-empty` commit is the instinctive move and it
+is inert against a path-filtered workflow. The commit must touch a path the workflow actually
+watches.
+
+**Corollary for the recovery runbook:** after any incident in which runs were not created, every
+PR whose head was pushed during the window needs its check re-fired by a path-touching commit.
+Merging is blocked until then, and the PR will read `mergeable: true, mergeable_state: blocked`
+with a green check of the same name visible on the SHA — a state that looks like a GitHub bug and
+is not one.
