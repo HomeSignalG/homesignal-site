@@ -11574,6 +11574,49 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-05 WISCONSIN pass. WisDOT's own server (dotmaps.wi.gov), HIGHWAY_PROGRAM_2_4_6_YEAR layer 1 'Construction Projects (6 Year)' - the statewide 6-year highway improvement programme. 1,750 rows, esriGeometryPolyline, statewide with no county (the UDOT precedent). Found via WisDOT's own hub DCAT (data-wisdot.opendata.arcgis.com, 63 datasets, 5 project-titled), so the publisher is WisDOT itself - §0u owner check done FIRST, before schema. *** ONLY LAYER 1 IS WIRED, AND THE REASON IS STRUCTURAL, NOT A JUDGEMENT CALL. Layers 0, 1 and 2 of this MapServer have BYTE-IDENTICAL FIELD SCHEMAS (46 fields, same names, same types) and the table carries its own membership flags LET_2YR, LET_6YR and STIP_4YR. They are three server-side VIEWS of one table: Construction 2-Year 931 rows, STIP 4-Year 1,221, Construction 6-Year 1,750. 931 < 1,221 < 1,750 and the flags are per-row, so the 6-Year view is the superset and wiring more than one would re-emit the same PROJECT_ID two or three times per page - the ADOT TIP / Houston-plat duplicate class. Identical schemas across sibling layers is the signature of a filtered view; check it before wiring a set. *** *** COUNTY IS RIGHT-PADDED AND IT PRODUCED A WRONG ZERO. Values are stored as 'MILWAUKEE                     ' (30 chars), so COUNTY='MILWAUKEE' returns 0 - which reads as 'WisDOT has no Milwaukee projects' and would have killed the wire for the state's largest dark county. COUNTY LIKE 'MILWAUKEE%' returns 94. The connector trims both sides (the Harris County precedent), so this affects RECON queries, not production - but a recon zero from a padded column is indistinguishable from a real absence. Re-measured: Milwaukee 94 / Brown 56 / Waukesha 40 / Outagamie 33 - every dark WI county has real content. 78 distinct COUNTY values. *** STATUS: CONTRACT_STATUS is SINGLE-VALUED - 'Non-Active' on all 1,750 rows (confirmed by returnDistinctValues, and a COUNTS query on it returns 1,750). It is not a vocabulary to map, so status_const states what the layer is. §0l applied to BOTH date fields: LET_DATE is 1,733 future / 17 past, and PROJECT_COMPLETION_DATE <= now returns ZERO. Nothing in this programme is built, so 'proposed' is the honest bucket for the whole layer and approved/operating/exclude are deliberately empty. DISCLOSED: the 17 rows with a past LET_DATE (1.0%) have arguably been let and could be argued into 'approved'. They are left in 'proposed' because NONE of them has a past completion date, so none is built, and understating a stage is the safe direction. This is a deliberate difference from adot-tip-fy2026-2030, which buckets ADOPTED TIP entries as 'approved': there the publisher asserts an adopted funding commitment, here the publisher's own CONTRACT_STATUS says the contract is NOT ACTIVE. Both follow the publisher rather than a house convention. TYPE VOCABULARY MEASURED, NOT USED AS use_type: CONCEPT_DESCRIPTION has 25 self-describing values (BRIDGE REPLACEMENT/PRESERVATION, PAVEMENT REPLACEMENT, RESURFACING bands, RECONDITION, RECONSTRUCTION, SEAL COAT, NEW BRIDGE, BRIDGE ELIMINATION, MISCELLANEOUS, 'To Be Determined'). None names a building use, so use_type_const 'Utility' per the DOT convention (UDOT/TxDOT/NDOT/WSDOT/CTDOT/ADOT). GEOMETRY: polyline with NO native lat/lng columns, so lat/lng map to the synthetic __lat/__lng that featurePoint() populates - §0n, the defect that cost ADOT a day. return_centroid is deliberately absent (a polyline layer hard-rejects it - the TxDOT finding). FRESH: the hub records this dataset modified 2026-07-01, the freshest of the five WisDOT project datasets (STIP 4-Year 2026-04-06, Construction 2-Year 2026-04-01). RECORD URL: no per-record URL column, so dataset precision on the layer's own REST endpoint. SCOPE: WI had 211 modelled ZIP pages, 20 lit and 191 dark, with NINE of ten counties at ZERO - Milwaukee 36, Waukesha 27, Outagamie 21, Brown 17, Eau Claire 15, Racine 14, Washington 13, Kenosha 12, Ozaukee 10. All 20 lit pages were Dane County (Madison) at median 140 records."
+    },
+    {
+      "registry_id": "mdot-sha-project-portal",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/njFNhDsUCentVYJW/arcgis/rest/services/MDOT_SHA_Project_Portal/FeatureServer/0",
+      "dataset_url": "https://services.arcgis.com/njFNhDsUCentVYJW/arcgis/rest/services/MDOT_SHA_Project_Portal/FeatureServer/0",
+      "jurisdiction": "Maryland Department of Transportation State Highway Administration (MDOT SHA) — Project Portal",
+      "coverage": [
+        {
+          "state": "MD"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Project_Name",
+          "What_to_Expect"
+        ],
+        "status_raw": "Phase",
+        "file_date": "Estimated_Project_Start_Year",
+        "case_number": "PLC_Project_Number",
+        "address": [
+          "Road_Name",
+          "City_Town",
+          "County"
+        ],
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "use_type_const": "Utility",
+      "status_to_bucket": {
+        "proposed": [
+          "Planning",
+          "Design"
+        ],
+        "approved": [
+          "Construction"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-06 MARYLAND pass. MDOT SHA's Project Portal layer on the agency's own hosted org (services.arcgis.com/njFNhDsUCentVYJW). 293 rows, esriGeometryPoint, statewide with no county (the UDOT precedent). §0u OWNER CHECK DONE FIRST, AND IT MATTERED: the richest items are owned by 'marshall.stevenson1', which reads like an individual. Confirmed first-party by ORG rather than by name - marshall.stevenson1 and MDOTSHA.GIS (unambiguously the agency account) publish to the SAME hosted org njFNhDsUCentVYJW, so it is an agency staff account. Two sibling items were discarded on the same check: 'MDOT SHA OHD Roadway Projects' and 'OOC Construction Projects' point at https://shagbegis1/ - an internal hostname with no domain, unreachable from anywhere. FRESH: dataLastEditDate 2026-08-04, two days before this pass - the freshest DOT source wired so far. STATUS - Phase IS THE AUTHORITY, AND THE COMPLETION DATE IS NOT. Phase has 3 values summing EXACTLY to 293: Construction 177 -> approved, Design 103 -> proposed, Planning 13 -> proposed. operating and exclude are deliberately EMPTY - this is a portal of ACTIVE projects and nothing in it is finished. *** §0l, A NEW SHAPE: 133 of 293 rows carry an Estimated_Project_Completion_Ye in the PAST, and 103 of those are Phase='Construction' while Project_Status says 'In Progress'. A past ESTIMATED completion date does not mean the project completed - it means the estimate slipped. Reading it as 'built' would have marked 103 in-progress construction projects as operating. This is the inverse of the WSDOT trap (a FUTURE scheduled date read as done); here a PAST estimated date would be read as done. Both are the same rule: compare the date to now AND check what the publisher's own status field says before inferring a stage. Project_Status itself (In Progress 282 / On Hold 11 = 293 exact) is an ACTIVITY flag, not a lifecycle stage, so Phase carries the mapping and On Hold rows are kept - an on-hold project is still a real proposed project. *** *** RECORD URL DELIBERATELY NOT MAPPED, AND THIS IS A HARDER CASE THAN ALDOT'S RPT_URL. Project_Portal_URL is populated on 292 of 293 rows and looks like a per-project link. It has only 135 DISTINCT values, and the reason is a PLACEHOLDER SENTINEL: 155 rows carry 'https://bit.ly/MDOT-SHA-No-Project-Portal-Page' while 137 carry a genuine per-project page (e.g. mdot-sha-putty-hill-ave-brg-over-i695-ba1455180-maryland.hub.arcgis.com). 155 + 137 = 292, the exact non-null count. So the column is RECORD-PRECISE 47% of the time and a 'no page exists' stub the other 53% - worse to detect than RPT_URL, which was uniformly wrong and therefore obvious on the second row. Mapping it would send the majority of residents to a stub that is not their project's record. record_url_precision is 'dataset' on the layer's own REST endpoint (the Philadelphia / Boulder machine-URL precedent). *** COUNTY VOCABULARY IS COMPLETE and reaches every dark MD county: Prince George's 51 / Baltimore 49 / Anne Arundel 32 / Montgomery 27 / Harford 20 / Howard 15 / Frederick 14 / Talbot 11 / Queen Anne's 9 / Washington 9 / St. Mary's 8 / Charles 7 / Worcester 6 / Carroll 6 / Wicomico 6 / Allegany 5 / Garrett 5 / Cecil 4 / Calvert 3 / Kent 2 / Dorchester 2 / Caroline 1 / Somerset 1 = EXACTLY 293 across 23 values. Work_Type has 189 largely free-text values and is NOT used as type_source - none names a building use, so use_type_const 'Utility' per the DOT convention. GEOMETRY: point, but with NO native lat/lng columns, so lat/lng map to the synthetic __lat/__lng that featurePoint() populates - §0n. file_date is Estimated_Project_Start_Year, non-null on 278 of 293; the 15 nulls simply carry no date rather than being dropped. SCOPE: MD had 317 modelled ZIP pages, 125 lit (Montgomery trio + Baltimore County) and 192 dark, with SIX counties at zero - Anne Arundel 37, Frederick 33, Charles 23, Calvert 13, Cecil 1, Wicomico 1 - plus Harford 1/20 and Howard 3/21."
     }
   ],
   "ckan": [
