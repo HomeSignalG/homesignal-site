@@ -2127,6 +2127,34 @@ worse, can end with wiring a consultancy's frozen snapshot as if it were the liv
 
 ---
 
+## §0v — A ZERO FROM AN EQUALITY TEST ON A STRING COLUMN IS NOT A FINDING UNTIL YOU HAVE TRIED `LIKE`
+
+**Twice now this has hidden a state's largest dark county.** Government string columns are
+routinely stored padded, suffixed or qualified, and `=` against the value you expected returns a
+clean, confident, completely wrong **zero** — which reads as "this source has nothing here" and
+ends the investigation.
+
+| case | the query | returned | the truth |
+|---|---|---|---|
+| **Box Elder** | `county = 'Box Elder'` | **0** | stored as `'Box Elder County, UT'` — **84** feeds |
+| **WisDOT Milwaukee** | `COUNTY = 'MILWAUKEE'` | **0** | stored right-padded to 30 chars — **94** projects |
+
+The WisDOT case is the sharper one: **Milwaukee is the largest dark county in the state**, and that
+zero, taken at face value, would have killed the wire for the whole of Wisconsin's biggest metro.
+The wire went on to light 36 of 36 Milwaukee pages.
+
+**The rule:** before a zero from a string equality test becomes a finding, re-run it as
+`LIKE 'value%'` (or `LIKE '%value%'` when the qualifier may be a prefix). If the two disagree, the
+column is padded or qualified and every prior equality test against it is suspect.
+
+**This is the wrong-zero class from the claims-discipline rules, in its most common concrete form.**
+A zero is the most dangerous result because it reads as clean and ends the search — and a padded
+column produces one indistinguishable from a real absence. Note that it usually affects **RECON
+only**: the arcgis connector trims both sides (the Harris County precedent), so production would
+have been fine. The damage is entirely to the DECISION about whether to wire.
+
+---
+
 ## §0t — A RATIO THAT EXCEEDS ITS OWN DENOMINATOR IS A QUERY DEFECT, NEVER A FINDING
 
 **Re-derive before reporting. The usual cause is a join fan-out.**
@@ -2270,6 +2298,24 @@ broken 244% figure in the same query. Distrusting it was right — one of the tw
 defect — but the resolution differed: the 244% was a join fan-out, the 796 was real and simply
 measuring something other than what was assumed. **Verify a suspicious number; do not assume
 suspicion means defect.**)*
+
+### 🔑 THE WORKED CASE — WISCONSIN, WHERE THE DILUTION WAS WATCHED HAPPENING
+
+**Before the WisDOT wire: 20 lit pages, median 140.** All of them Dane County/Madison, carried by a
+deep municipal permit source. **After: 198 lit pages, median 6.**
+
+The median did not fall because anything got worse. **178 thin DOT pages joined 20 deep permit
+pages and the median moved to where the mass now is.**
+
+- **Coverage alone reads this as an unqualified win** — +178 pages, 9.5% → 93.8%, the largest
+  single-state gain of the run. That reading is *correct*.
+- **Both numbers say what actually happened** — Wisconsin went from a **one-deep-city state** to a
+  **broad-and-shallow `DOT_ONLY` state**, and its next unlock is Milwaukee municipal permits, which
+  would raise the **median** far more than the page count.
+
+**Neither reading is wrong; only one is complete.** This is the cleanest demonstration of why the
+scoreboard is two numbers, and it is the only case so far where the dilution was *observed as it
+happened* rather than inferred from a cross-section of already-closed states.
 
 ### The instrument
 
