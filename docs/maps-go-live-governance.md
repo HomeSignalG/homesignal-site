@@ -2062,6 +2062,39 @@ centroid", and the decision should rest on the vocabulary, not the probe.
 
 ## §0q — THE SCOREBOARD IS TWO NUMBERS: COVERAGE **AND** COMPLETENESS
 
+## §0y — COVERAGE IS SUPPLY-LIMITED. STOP MUNICIPAL DISCOVERY. (founder ruling, 2026-08-06)
+
+**PROJECT-LEVEL FINDING — inherit this, do not re-test it.**
+
+At **~67% of reachable coverage**, the remaining dark pages are predominantly places whose
+**jurisdictions do not publish a per-record development source in machine-readable form.** That is
+a fact about American local-government data, not a gap in this work.
+
+**The evidence is three passes, and they converge:**
+
+| pass | targets | wires |
+|---|---|---|
+| 2 — six ranked thin counties | 6 | 0 |
+| 3 — DOT-tier states' capitals + never-probed metro heads | 9 | 0 |
+| 4 — six DOT-wired states with a real metro | 7 | 1 |
+| **total** | **22** | **2** |
+
+**And both wires came from places already on the board** — Anne Arundel already had a DOT wire and
+a modelled county; Burlington's state already had VTrans. **Neither came from unexplored
+territory.** Every rejection carries an enumeration receipt: a DCAT/Socrata/CKAN catalog parsed in
+full with its dataset count as control, or an `owner:`-scoped enumeration with its total as control.
+
+**Do not run a fourth municipal-discovery pass.** The next session inherits this as settled. If
+municipal discovery is ever reopened it needs a *new instrument* — a vendor-level adapter
+(Accela/Tyler/OpenGov/CivicPlus portal APIs discovered by pattern rather than per-city catalog
+hunting), not another city list.
+
+**What this does NOT say:** it does not say the project is finished, and it does not say the
+remaining dark pages are worthless. It says **the marginal municipal source does not exist to be
+found by catalog search**, so effort should move to the levers below.
+
+---
+
 ### ⭐ THE SCOREBOARD IS THREE NUMBERS, AND THE REACHABLE CEILING LEADS
 
 **Coverage against the total is the number most likely to be misread.** Anyone who sees 52% and
