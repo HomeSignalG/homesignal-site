@@ -11702,6 +11702,92 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-06 SEVEN-ZERO-STATE pass. HDOT's Active Design Projects layer on org HQ0xoN0EzDPBOEci. 483 rows, esriGeometryPolyline, statewide with no county. §0u OWNER CHECK: owner is 'dot_mmekuria', which reads like an individual. Confirmed first-party the same way MDOT SHA was - by ORG, not by name: dot_mmekuria also owns HDOTBridges and HDOT Highways Program Status on this same org, and the org's other publishers are dot_rwollenbecker and the HiStateGIS portal. The `dot_` prefix plus a shared agency org is the signature of department staff accounts. CONTRAST, from the same search: HDOT AADT, HDOT Pavement Conditions and HDOT STRAHNET are owned by 'Lorraine.McChesney@jacobs.com_Jacobs' - JACOBS, a private engineering consultancy - and several HDOT_*_gdb layers by 'mciepluch' and 'jacob.pellmann_mandli' (Mandli, a survey contractor). Title prefix 'HDOT' says nothing about who published it. *** currentphase IS THE STATUS FIELD, AND projectstatus IS DELIBERATELY NOT USED: projectstatus has exactly two distinct values, '1' and '2' - OPAQUE CODED, nothing to map verbatim, the San Jose planningpermits30 rejection class. currentphase is self-describing and its 4 values sum EXACTLY to 483: Design 237 + Planning 30 + Right of Way 4 -> proposed (271), Construction 212 -> approved. operating and exclude are empty - this is a layer of ACTIVE projects and nothing in it is complete. An opaque column sitting beside a self-describing one is not a reason to reject the layer; it is a reason to read the other column. *** NO DATE IS USED, AND NONE IS AVAILABLE AS A DATE: every one of this layer's ~30 date-named fields (awarddate, construction_date, nepadate, ntpdate, bid_open_date, finalpaydate ...) is typed esriFieldTypeString, not a date. Rather than string-compare against an unvalidated format, file_date is omitted entirely - which the registry permits (see the AK entry's note on nvdot-project-boundaries and four other date-less entries). ISLAND DISTRIBUTION sums exactly to 483: oahu 184 · statewide 94 · kauai 78 · hawaii 71 · maui 49 · molokai 6 · lanai 1. The 94 'statewide' rows are kept - unlike ADOT's 'Not Location Specific' administrative line items, these are real polyline features with geometry and will place wherever their line runs. GEOMETRY: polyline, no native lat/lng, so lat/lng map to __lat/__lng (§0n); return_centroid deliberately absent (polyline hard-rejects it - the TxDOT finding). SCOPE: HI had 97 modelled ZIP pages and ALL 97 were dark."
+    },
+    {
+      "registry_id": "anne-arundel-commercial-site-plans",
+      "platform": "arcgis",
+      "service_url": "https://gis.aacounty.org/arcgis/rest/services/OpenData/Planning_OpenData/MapServer/4",
+      "dataset_url": "https://gis.aacounty.org/arcgis/rest/services/OpenData/Planning_OpenData/MapServer/4",
+      "jurisdiction": "Anne Arundel County, Maryland — Office of Planning and Zoning",
+      "coverage": [
+        {
+          "state": "MD",
+          "county": "Anne Arundel"
+        }
+      ],
+      "column_map": {
+        "title": "PLN_NAME",
+        "status_raw": "STATUS_1",
+        "type_source": "PRJ_TYPE",
+        "decision_date": "FN_APV_DT",
+        "case_number": "PRJ_NUM",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Active"
+        ],
+        "approved": [
+          "Approved"
+        ],
+        "operating": [],
+        "exclude": [
+          "Terminated",
+          "Inactive"
+        ]
+      },
+      "type_map": {
+        "prelimenary plan": "Commercial",
+        "site development plan": "Commercial"
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-06 MUNICIPAL-TIER PASS (Anne Arundel, the thinnest wired MD county: 27 of 37 pages lit, median 2, 92 records TOTAL, all from mdot-sha-project-portal). Anne Arundel County's OWN ArcGIS Server, OpenData/Planning_OpenData layer 4 'Commercial Site Plans'. 1,395 polygons; rides the featurePoint() shoelace centroid path, so lat/lng MUST map the synthetic __lat/__lng (governance 0n) - the ADOT defect where 128 of 129 records came back scope:area. return_centroid is NOT set: this is a classic ArcGIS Server MapServer, which silently IGNORES the param (governance: opt-in per entry, never derived from geometryType). STATUS_1 enumerated live via groupBy and sums EXACTLY to 1,395: Approved 1128 / Active 115 / Inactive 80 / Terminated 72. All four self-describing, 0 unmapped, 0 nulls. PRJ_TYPE also sums exactly to 1,395: 'site development plan' 1122 + 'prelimenary plan' 273 (sic - the publisher's own spelling, mapped VERBATIM). Both are process stages within a layer the publisher itself names Commercial Site Plans, so both map to Commercial; the stage distinction is carried by STATUS_1, not by use_type. FN_APV_DT is esriFieldTypeDate but only 832/1395 (60%) populated - it is the FINAL APPROVAL date, so Active and Inactive rows legitimately have none. Mapped as decision_date, NOT file_date, and NO recency_days: a window on a 60%-populated approval date would silently drop every pending application, which is exactly the class of record a resident most wants to see. The register is 1,395 rows total, so no size pressure justifies one. Freshness: max(last_edited_date) 2026-08-04T18:23:55Z, two days before wiring. PLN_NAME populated 1395/1395. No ZIP column anywhere -> spatial_zip_radius_mi 3. No URL column and no verified per-record URL pattern -> record_url_precision 'dataset' on the layer's own REST endpoint (Boulder/Philadelphia precedent); templating one would be guessing. NOT A SUBSET of layer 30 (the Houston plat trap was checked, not assumed): the two layers use disjoint identifier namespaces - layer 4 PRJ_NUM is 'C1995-0002-00-NC' shaped, layer 30 is 'CD-R-2025-0001' shaped, 0 overlap in the ordered sample. OPEN QUESTION, logged not guessed: 'Inactive' (80) is bucketed EXCLUDE. Layer 30's PROJ_TYPE carries a value 'Inactive/Complete Subdivision', which hints Inactive may mean BUILT (-> operating) rather than dormant. Excluding is the conservative reading and drops the record rather than asserting a building exists. Revisit only with a published AA County definition."
+    },
+    {
+      "registry_id": "anne-arundel-subdivision-activity",
+      "platform": "arcgis",
+      "service_url": "https://gis.aacounty.org/arcgis/rest/services/OpenData/Planning_OpenData/MapServer/30",
+      "dataset_url": "https://gis.aacounty.org/arcgis/rest/services/OpenData/Planning_OpenData/MapServer/30",
+      "jurisdiction": "Anne Arundel County, Maryland — Office of Planning and Zoning",
+      "coverage": [
+        {
+          "state": "MD",
+          "county": "Anne Arundel"
+        }
+      ],
+      "column_map": {
+        "title": "SUB_NAME",
+        "status_raw": "STATUS_1",
+        "type_source": "PROJ_TYPE",
+        "decision_date": "FN_APV_DT",
+        "case_number": "SUB_NUM",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Active"
+        ],
+        "approved": [
+          "Approved"
+        ],
+        "operating": [],
+        "exclude": [
+          "Terminated",
+          "Inactive"
+        ]
+      },
+      "type_map": {
+        "major": "Development",
+        "minor": "Development",
+        "Inactive/Complete Subdivision": "Development",
+        "Major - Approved/To Be Constructed": "Development"
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-06 MUNICIPAL-TIER PASS. Anne Arundel County's own ArcGIS Server, OpenData/Planning_OpenData layer 30 'Subdivision Activity'. 3,201 polygons; featurePoint() centroid path, __lat/__lng mapped (governance 0n). return_centroid NOT set (classic MapServer ignores it). STATUS_1 enumerated live and sums EXACTLY to 3,201: Approved 2558 / Inactive 399 / Active 160 / Terminated 78 / null 6. The 6 nulls fail closed. Same four self-describing values as layer 4. PROJ_TYPE (note: layer 4 spells it PRJ_TYPE - the two layers do NOT share a schema, so the field names were read per layer rather than copied) also sums exactly to 3,201: major 1901 / blank 640 / minor 555 / 'Inactive/Complete Subdivision' 99 / 'Major - Approved/To Be Constructed' 5 / null 1. EVERY mapped value goes to 'Development', deliberately. major/minor are SUBDIVISION SIZE classes under AA County's subdivision rules, not land uses - a major subdivision may be residential or commercial. 'Residential' would be the intuitive guess and would be an assertion the data does not make. 'Development' is the generic member of the CLOSED six-value use_type vocabulary (lib/map.js TYPE_EXACT) and renders as the 'Other project' circle - the Phoenix precedent for a bucket with no defensible category. The 640 blank + 1 null carry no type and are left unmapped, falling through to unclassified rather than being assigned one. FN_APV_DT 1,956/3,201 (61%) -> decision_date, no recency_days (see the layer-4 receipt for why). Freshness: max(last_edited_date) 2026-08-04T18:57:34Z. Current filings confirmed present in the ordered sample: CD-2026-0001, CD-2026-0005, CD-2026-0010, CD-2026-0011, CD-2026-0018. SUB_NAME populated 3,200/3,201. No ZIP column -> spatial_zip_radius_mi 3. record_url_precision 'dataset'. Disjoint from layer 4 (see that entry's namespace check). Same logged OPEN QUESTION on 'Inactive' -> exclude."
     }
   ],
   "ckan": [
