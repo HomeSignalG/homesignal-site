@@ -7268,3 +7268,109 @@ reachability, staleness or vocabulary.
 **Indiana is not a wiring problem. It is a publication gap**, and no amount of probing on our side
 changes that. Recorded so no future session re-runs these five enumerations expecting a different
 answer. → reprobe list, low priority.
+
+---
+
+## WISCONSIN PASS (2026-08-05) — 191 dark, one STATEWIDE wire, ALL NINE zero counties lifted
+
+**COVERAGE: WI 20 → 198 of 211 pages (9.5% → 93.8%), dark 191 → 13. The largest single-state gain
+of the run. National 5,868 → 6,279.**
+
+**COMPLETENESS: median 140 → 6, p10 1, 27 pages at exactly one record.** Both numbers matter and
+they move in OPPOSITE directions — see below.
+
+### Wired
+
+**`wisdot-highway-program-6yr`** — WisDOT's own server (`dotmaps.wi.gov`),
+`HIGHWAY_PROGRAM_2_4_6_YEAR` layer 1, the statewide 6-Year Highway Improvement Program. 1,750 rows,
+polyline, statewide with no county. Found via **WisDOT's own hub DCAT** — §0u owner check performed
+FIRST, before schema.
+
+**1,612 records across 180 ZIPs. 100% point-scope. 0 missing `record_url`, 0 missing coordinates,
+0 missing `use_type`, 0 records on any non-WI page.**
+
+### Only layer 1 is wired, and the reason is structural
+
+Layers 0/1/2 have **byte-identical 46-field schemas**, and the table carries its own `LET_2YR` /
+`LET_6YR` / `STIP_4YR` membership flags. They are three server-side **views of one table** —
+Construction 2-Year **931**, STIP 4-Year **1,221**, Construction 6-Year **1,750**. The flags are
+per-row and 931 < 1,221 < 1,750, so the 6-Year view is the superset; wiring more would re-emit the
+same `PROJECT_ID` two or three times per page (the ADOT TIP / Houston-plat class).
+
+> **Identical schemas across sibling layers is the signature of a filtered view. Check it before
+> wiring a set.**
+
+### ⚠️ `COUNTY` IS RIGHT-PADDED, AND IT PRODUCED A WRONG ZERO ON THE STATE'S BIGGEST TARGET
+
+Values are stored as `'MILWAUKEE'` + 21 spaces. **`COUNTY='MILWAUKEE'` returns 0** — which reads as
+*"WisDOT has no Milwaukee projects"* and would have killed the wire for the largest dark county in
+the state. `COUNTY LIKE 'MILWAUKEE%'` returns **94**.
+
+The connector trims both sides (Harris County precedent), so this affects **recon, not production**
+— but a recon zero from a padded column is **indistinguishable from a real absence**, and it is the
+exact `'Box Elder'` vs `'Box Elder County, UT'` wrong-zero class. Re-measured: Milwaukee 94 ·
+Brown 56 · Waukesha 40 · Outagamie 33.
+
+### Status — §0l applied to BOTH date fields
+
+`CONTRACT_STATUS` is **single-valued**: `Non-Active` on all 1,750 (confirmed by
+`returnDistinctValues`, and a count on that value returns 1,750). Not a vocabulary to map, so
+`status_const`.
+
+| | |
+|---|---|
+| `LET_DATE` future / past | **1,733 / 17** |
+| `PROJECT_COMPLETION_DATE <= now` | **0** |
+
+**Nothing in this programme is built** → `proposed` for the whole layer; the other three buckets
+deliberately empty.
+
+**Disclosed:** the 17 rows (1.0%) with a past let date could be argued into `approved`. They stay in
+`proposed` because none has a past completion date, and **understating a stage is the safe
+direction**. This is a *deliberate* difference from `adot-tip-fy2026-2030`, which buckets adopted
+TIP entries as `approved`: there the publisher asserts an adopted funding commitment, here the
+publisher's own `CONTRACT_STATUS` says the contract is not active. **Both follow the publisher
+rather than a house convention.**
+
+### Per-county — every one of the nine zero counties lifted
+
+| county | pages | before | after |
+|---|---|---|---|
+| Dane | 46 | 20 | 45 |
+| **Milwaukee** | 36 | **0** | **36** (100%) |
+| Waukesha | 27 | **0** | 25 |
+| Outagamie | 21 | **0** | 18 |
+| Brown | 17 | **0** | 16 |
+| Eau Claire | 15 | **0** | 14 |
+| **Racine** | 14 | **0** | **14** (100%) |
+| **Washington** | 13 | **0** | **13** (100%) |
+| Kenosha | 12 | **0** | 10 |
+| Ozaukee | 10 | **0** | 7 |
+
+### 🔑 THE FIRST TIME THE COMPLETENESS DILUTION WAS WATCHED HAPPENING
+
+**Before: 20 lit pages, median 140** — all Dane County/Madison, carried by a deep municipal permit
+source. **After: 198 lit pages, median 6.**
+
+The median did not fall because anything got worse. It fell because **178 thin DOT pages joined 20
+deep permit pages**, and the median moved to where the mass is. Under a coverage-only scoreboard
+this pass is an unambiguous triumph (+178 pages, 9.5% → 93.8%). Under both numbers it is what it
+actually is: **Wisconsin went from a one-city state to a broad-and-shallow `DOT_ONLY` state**, and
+its next unlock is Milwaukee municipal permits — which would raise the MEDIAN far more than the
+page count.
+
+**This is §0s's prediction, observed live rather than inferred from a cross-section.** Stamp:
+**`DOT_ONLY`**.
+
+### Vocabulary and geometry
+
+`CONCEPT_DESCRIPTION` has 25 self-describing values (BRIDGE REPLACEMENT/PRESERVATION, PAVEMENT
+REPLACEMENT, five RESURFACING bands, RECONDITION, RECONSTRUCTION, SEAL COAT, NEW BRIDGE, BRIDGE
+ELIMINATION, MISCELLANEOUS, `To Be Determined`). Measured and recorded, **not** used as `use_type`
+— none names a building use → `use_type_const: "Utility"` per the DOT convention. Polyline with no
+native lat/lng → `lat: "__lat"`, `lng: "__lng"` (§0n). `return_centroid` deliberately absent
+(polyline hard-rejects it — TxDOT). Hub-recorded modified **2026-07-01**, the freshest of WisDOT's
+five project datasets.
+
+**13 pages remain dark** — Dane 1, Waukesha 2, Outagamie 3, Brown 1, Eau Claire 1, Kenosha 2,
+Ozaukee 3 — rural ZIPs with no programmed highway project inside the 3-mile envelope. Honest empties.

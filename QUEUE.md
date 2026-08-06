@@ -6510,3 +6510,44 @@ reachability, staleness or vocabulary. → reprobe list, low priority.
 ### Next
 
 **WI 20 lit / 211 (median 140) · MD 125 / 317 (median 22).**
+
+---
+
+## WISCONSIN — CLOSED (2026-08-05). **20 → 198 / 211 (93.8%)**, largest gain of the run. `DOT_ONLY`
+
+| | WI before | WI after | national |
+|---|---|---|---|
+| **COVERAGE** | 20 / 211 = 9.5% | **198 / 211 = 93.8%** | **6,279 / 12,722 = 49.4%** |
+| **COMPLETENESS** median | 140 | **6** | 62 |
+| p10 | — | **1** | 2 |
+| pages at exactly 1 record | — | **27** | — |
+
+- **Wired:** `wisdot-highway-program-6yr` — WisDOT's own `dotmaps.wi.gov`, 6-Year Highway
+  Improvement Program, 1,750 rows. **1,612 records / 180 ZIPs, 100% point-scope, 0 missing
+  `record_url`, 0 missing coords, 0 on any non-WI page.**
+- **All NINE zero counties lifted** — Milwaukee 0→36 (100%), Racine 0→14 (100%), Washington 0→13
+  (100%), Waukesha 0→25, Outagamie 0→18, Brown 0→16, Eau Claire 0→14, Kenosha 0→10, Ozaukee 0→7.
+  13 pages remain dark: rural ZIPs with no programmed project in a 3-mile envelope.
+- **Only layer 1 wired** — layers 0/1/2 are byte-identical-schema views of one table (931 / 1,221 /
+  1,750) selected by its own `LET_2YR`/`LET_6YR`/`STIP_4YR` flags. Wiring more would triple-emit.
+  **Identical schemas across sibling layers = filtered view; check before wiring a set.**
+- ⚠️ **`COUNTY` is right-padded and produced a WRONG ZERO on the biggest target.**
+  `COUNTY='MILWAUKEE'` → 0; `LIKE 'MILWAUKEE%'` → 94. Affects recon, not production (connector
+  trims), but a padded-column zero is indistinguishable from a real absence — the `'Box Elder'` vs
+  `'Box Elder County, UT'` class.
+- **§0l on both dates:** `LET_DATE` 1,733 future / 17 past; `PROJECT_COMPLETION_DATE <= now` = **0**.
+  Nothing is built → `proposed` for the whole layer. The 17 let-but-incomplete rows are disclosed
+  and deliberately left in `proposed` — understating a stage is the safe direction, and it differs
+  from ADOT-TIP-as-`approved` because each follows its own publisher's signal.
+
+### 🔑 The completeness dilution, watched happening
+
+**Median 140 → 6.** Nothing got worse: 178 thin DOT pages joined 20 deep Madison permit pages and
+the median moved to where the mass is. Coverage-only, this is an unambiguous triumph. Both numbers
+tell the truth: **WI went from a one-city state to a broad-and-shallow `DOT_ONLY` state**, and its
+next unlock is Milwaukee municipal permits, which would move the MEDIAN far more than the page
+count. **§0s's prediction observed live rather than inferred from a cross-section.**
+
+### Next
+
+**MD** (125 / 317, median 22), then the national remaining-states report.
