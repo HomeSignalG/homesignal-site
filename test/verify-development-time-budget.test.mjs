@@ -33,8 +33,17 @@ ok('default is 4.5 h', /4\.5 \* 60 \* 60 \* 1000/.test(src));
 }
 
 console.log('\n2) the walk STOPS on the budget and remembers what it skipped');
-ok('the ZIP loop checks the budget', /if \(budgetSpent\(\)\)/.test(src));
-ok('skipped ZIPs are captured, not just counted', /skippedForBudget = reports\.slice\(idx\)\.map/.test(src));
+// UPDATED 2026-08-06: the walk moved from an inline serial `for` loop to the shipped
+// `runPool` worker pool (scripts/lib/verify-dev-helpers.mjs) so the ~3.6-4.8 h run could be
+// parallelised. The budget mechanism did NOT change — it moved. These two checks now assert
+// that verify-development still HANDS the budget to the pool and still turns the pool's
+// skipped set into `skippedForBudget`; the pool's own behaviour (checks before claiming,
+// returns the unstarted suffix, never silently empties it) is pinned for real, by execution
+// rather than by grep, in test/verify-dev-worker-pool.test.mjs.
+ok('the walk hands budgetSpent to the pool that drives it',
+  /runPool\(\{[\s\S]{0,400}?budgetSpent/.test(src) && /budgetSpent\b/.test(src));
+ok('skipped ZIPs are captured from the pool, not just counted',
+  /skippedForBudget = walk\.skipped\.map\(\(r\) => r\.zip\)/.test(src));
 
 console.log('\n3) an incomplete run cannot read as a clean pass');
 ok('the summary reports checked-of-total, not a bare total',

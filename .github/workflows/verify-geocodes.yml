@@ -21,14 +21,19 @@ on:
   # failures are diagnosed and it can finish green.
   # schedule:
   #   - cron: '47 13 * * *'   # daily 13:47 UTC — just after verify-development
-  push:
-    branches: [main]
-    paths:
-      - 'supabase/functions/get-address-report/geocode-cache.ts'
-      - 'supabase/functions/get-address-report/sources/tdlr-tabs.ts'
-      - 'docs/geocodes-setup.sql'
-      - 'scripts/verify-geocodes.mjs'
-      - '.github/workflows/verify-geocodes.yml'
+  # PUSH TRIGGER DROPPED 2026-08-06 (quota). Even with the cron off this still cost
+  # 717 runner-min/month, and the job has been green ZERO times in 13 attempts — paying
+  # anything for a check that has never once attested is the worst value on the board.
+  # Dispatch-only until the failures are diagnosed and it can finish green; restore the
+  # push block below verbatim at that point.
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'supabase/functions/get-address-report/geocode-cache.ts'
+  #     - 'supabase/functions/get-address-report/sources/tdlr-tabs.ts'
+  #     - 'docs/geocodes-setup.sql'
+  #     - 'scripts/verify-geocodes.mjs'
+  #     - '.github/workflows/verify-geocodes.yml'
 
 jobs:
   verify:

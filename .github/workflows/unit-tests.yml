@@ -52,6 +52,14 @@ on:
 permissions:
   contents: read
 
+# Supersede in-flight runs for the same ref: rapid pushes left earlier runs finishing
+# pointlessly. unit-tests is the one workflow clearly earning its keep (15 runner-min per
+# GREEN run) but it fired 325 times in six days, so the waste is in superseded runs, not in
+# the job itself. Keyed on workflow+ref so a PR and main never cancel each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ── THE REQUIRED CHECK ────────────────────────────────────────────────────────
   # Named `unit` because that is the string branch protection requires; renaming it
