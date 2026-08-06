@@ -8003,3 +8003,69 @@ earned rather than assumed.** Their capitals and largest cities have been contac
 enumerated. The residual candidates are second-tier cities (Huntington WV, Fort Wayne IN,
 Evansville IN, Nashua NH, Concord NH, Norman OK, Grand Forks ND), which on this pass's evidence
 are less likely to publish than the capitals that already failed.
+
+---
+
+## MUNICIPAL TIER — PASS 4 (2026-08-06): the six DOT_TIER_CLOSED_ONLY states WITH a metro
+
+**1 of 7 wireable — Burlington VT.** The other six are closed below with receipts. Scope was the
+1,267 pages in NJ · ME · IA · VT · AK · HI, chosen over the 892 in states with nothing on the
+reasoning that a metro in a state where only the DOT tier was tried beats a second-tier city in a
+state whose capital already failed.
+
+| target | verdict | receipt |
+|---|---|---|
+| **Burlington VT** | ✅ **WIRED ×2** | OpenGov Building 141,701 + Zoning 35,668, fresh 2026-04-27 |
+| **Honolulu** | 🚫 `STALE` **by the publisher's own statement** | see below |
+| **Anchorage** | 🚫 no machine catalog | `data.muni.org` = SharePoint HTML; `gis.muni.org` 404 |
+| **Des Moines** | 🚫 unreachable | `maps.dsm.city` = city website HTML; `gis.dsm.city` DNS-fail |
+| **Portland ME** | 🚫 blocked | `gis.portlandmaine.gov` **403**; `data.portlandmaine.gov` no DCAT |
+| **Newark** | 🚫 wrong platform | `data.newarknj.gov` answers with a **Tableau** `tsResponse`, not a data API |
+| **Jersey City** | 🚫 no portal | `data.jerseycitynj.gov` 404 ("Huwise" shell) |
+
+### ✅ BURLINGTON VT — `burlington-vt-building-permits` + `burlington-vt-zoning-permits`
+
+Full evidence in the entries' `_receipts`. The three things worth surfacing:
+
+1. **Found by parsing the Hub DCAT in full — 123 datasets as the control.** No keyword search was
+   used anywhere in this pass (§0x).
+2. **§0l-b was run BEFORE mapping, and it CONFIRMED the field rather than refuting it** — the
+   opposite outcome to Prince George's, which is what makes the check worth running both ways.
+   `DateCompleted IS NOT NULL` → **Closed 124,826 + Stopped 2,632 and ZERO "Open."** Status and
+   date agree; every completed record is Closed/Stopped and no Open record carries a completion
+   date.
+3. **`Open` → `proposed`, not `approved`** — deliberately conservative. The layers are titled
+   *"Applications AND Permits"* and mix pre-decision applications with issued permits, so "Open"
+   does not assert a permit was granted.
+
+`PermitStatus` sums exactly on both layers (141,701 and 35,668). `PublicUrl` is a real per-record
+OpenGov URL (`burlingtonvt.portal.opengov.com/records/336809`) → record precision, verified not
+templated. Latitude **and** PublicUrl non-null on **141,701 / 141,701 = 100%**. The sibling
+`OpenGov_Fire_Marshal` layer is deliberately **not** wired — fire-marshal inspections are the
+trades/inspection noise class dropped at source in the WA/MN/IL passes.
+
+### 🚫 HONOLULU — the cleanest rejection this project has recorded
+
+`data.honolulu.gov` Socrata, 400 views enumerated. The permit ledger exists and is substantial —
+`4vab-c87q` **"Building Permits - January 1, 2005 through June 30, 2025"**, with real
+`issuedate`, `occupancygroupassessed`, contractor and valuation columns.
+
+**It disqualifies itself in its own description, verbatim:**
+
+> *"This file is a **static view** of Building Permit data. This snapshot of data is an extract
+> from the source database as of the moment of the snapshot's creation. **A snapshot does not
+> reflect changes that occur in the live data source.**"*
+
+The publisher states it never updates. Combined with the title's June-30-2025 bound (~13 months
+stale at probe time) this is `STALE` by construction, not by neglect — and it is the engine-v14
+"a tracker is worthless if it's a frozen snapshot" principle refusing a source rather than
+producing one. Honolulu's catalog carries only periodic snapshots of this shape (2010-2016,
+2016, 2005-2017, 2005-2025). → nightly reprobe list, in case a live view is ever published.
+
+### The three infrastructure blocks stay OPEN, not closed
+
+Portland ME (**403**), Des Moines (**DNS**) and — from pass 3 — Oklahoma City (**Incapsula WAF**),
+Fargo (**SSL**), Manchester NH (**DNS**), Tulsa (**DNS**) are **not** rejections of the data.
+A firewall rule, an expired certificate or a moved hostname changes without announcement, which is
+exactly what the nightly reprobe list is for. Distinguish these from Honolulu/Indianapolis/
+Providence, where the publisher was reached and the answer was no.
