@@ -7686,8 +7686,21 @@ would have been.** Every disposition below carries an enumeration receipt with a
 `Planning/Current_Planning_Projects/MapServer/0`. **`madison-planning-projects` — same URL, same
 `{WI, Dane}` coverage — was already in the registry.** The deploy-verification probe on ZIP 53703
 returned **two run-reports against the identical `service_url`, each emitting ~228 records**: every
-Madison planning case double-counted on every Dane page. The entry was reverted before any re-cache,
-so **nothing reached production**.
+Madison planning case double-counted on every Dane page.
+
+⚠️ **CORRECTION — this section first asserted "nothing reached production", and that was WRONG.**
+The claim was made from the fact that no MANUAL re-cache had been run, which is a different
+question. **The pg_cron auto-refresh does not stop for a deploy.** It fired during the ~18 minutes
+the duplicate was live and contaminated **3 pages**: 53703 (228 orig + 227 dup), 53527 (13 + 13),
+53715 (229 + 228). All three were re-cached through the corrected engine and re-materialized;
+**cache-wide duplicate records are now 0 across 0 pages**, verified directly.
+
+**A second-order trap worth its own line:** 53715 was contaminated *at the same timestamp as the
+fix*. `dev_refresh_collect()` writes whatever is sitting in `net._http_response`, and a response
+**fired** during the bad window is still poison when **collected** after it. So: after reverting a
+bad registry deploy, **flush the collector, then re-check** — a single pass reports clean while
+contaminated responses are still queued behind it. That is how a 2-page blast radius read as
+complete when it was really 3.
 
 **Why the guard did not catch it.** The additivity check asserted the new `registry_id` was unique.
 That is the wrong key — `registry_id` uniqueness says nothing about what an entry FETCHES, and
