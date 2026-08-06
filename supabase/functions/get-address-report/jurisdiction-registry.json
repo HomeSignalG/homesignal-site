@@ -11788,6 +11788,88 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-06 MUNICIPAL-TIER PASS. Anne Arundel County's own ArcGIS Server, OpenData/Planning_OpenData layer 30 'Subdivision Activity'. 3,201 polygons; featurePoint() centroid path, __lat/__lng mapped (governance 0n). return_centroid NOT set (classic MapServer ignores it). STATUS_1 enumerated live and sums EXACTLY to 3,201: Approved 2558 / Inactive 399 / Active 160 / Terminated 78 / null 6. The 6 nulls fail closed. Same four self-describing values as layer 4. PROJ_TYPE (note: layer 4 spells it PRJ_TYPE - the two layers do NOT share a schema, so the field names were read per layer rather than copied) also sums exactly to 3,201: major 1901 / blank 640 / minor 555 / 'Inactive/Complete Subdivision' 99 / 'Major - Approved/To Be Constructed' 5 / null 1. EVERY mapped value goes to 'Development', deliberately. major/minor are SUBDIVISION SIZE classes under AA County's subdivision rules, not land uses - a major subdivision may be residential or commercial. 'Residential' would be the intuitive guess and would be an assertion the data does not make. 'Development' is the generic member of the CLOSED six-value use_type vocabulary (lib/map.js TYPE_EXACT) and renders as the 'Other project' circle - the Phoenix precedent for a bucket with no defensible category. The 640 blank + 1 null carry no type and are left unmapped, falling through to unclassified rather than being assigned one. FN_APV_DT 1,956/3,201 (61%) -> decision_date, no recency_days (see the layer-4 receipt for why). Freshness: max(last_edited_date) 2026-08-04T18:57:34Z. Current filings confirmed present in the ordered sample: CD-2026-0001, CD-2026-0005, CD-2026-0010, CD-2026-0011, CD-2026-0018. SUB_NAME populated 3,200/3,201. No ZIP column -> spatial_zip_radius_mi 3. record_url_precision 'dataset'. Disjoint from layer 4 (see that entry's namespace check). 'Inactive' (399) -> exclude, SETTLED-CONSERVATIVE by the same founder ruling; see the layer-4 receipt for the reasoning and the named revisit trigger. Not an open question."
+    },
+    {
+      "registry_id": "burlington-vt-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/1bO0c7PxQdsGidPK/arcgis/rest/services/OpenGov_Building/FeatureServer/0",
+      "dataset_url": "https://services1.arcgis.com/1bO0c7PxQdsGidPK/arcgis/rest/services/OpenGov_Building/FeatureServer/0",
+      "jurisdiction": "City of Burlington, Vermont — Department of Permitting & Inspections",
+      "coverage": [
+        {
+          "state": "VT",
+          "county": "Chittenden"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "ProjectName"
+        ],
+        "status_raw": "PermitStatus",
+        "file_date": "ApplicationDate",
+        "decision_date": "DateCompleted",
+        "case_number": "PermitNo",
+        "record_url": "PublicUrl",
+        "address": "StreetAddress",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Open"
+        ],
+        "approved": [],
+        "operating": [
+          "Closed"
+        ],
+        "exclude": [
+          "Stopped"
+        ]
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "record",
+      "_receipts": "2026-08-06 SIX-STATE MUNICIPAL PASS (the DOT_TIER_CLOSED_ONLY states that DO have a DOT wire and a real metro). City of Burlington's own OpenGov permitting system, published to the city's ArcGIS org 1bO0c7PxQdsGidPK and catalogued on data.burlingtonvt.gov. FOUND BY PARSING THE HUB DCAT IN FULL (123 datasets enumerated as the control), never by keyword search - governance 0x. PermitStatus is a 3-value self-describing vocabulary and SUMS EXACTLY to each layer's count. SECTION 0l-b CROSS-CHECK RUN BEFORE MAPPING, and it CONFIRMS the field is the real lifecycle rather than refuting it (the Prince George's failure mode): DateCompleted IS NOT NULL returns Closed 124,826 + Stopped 2,632 and ZERO 'Open' - i.e. every completed record is Closed/Stopped and no Open record carries a completion date, so status and date agree. All 124,826 Closed rows carry a DateCompleted (100% of that bucket). BUCKETING, deliberately conservative: Open -> PROPOSED, not approved. These layers are titled 'Applications AND Permits' and mix pre-decision applications with issued permits; 'Open' does not assert that a permit was granted, and proposed is the reading that asserts least. Closed -> operating (work completed, evidenced by DateCompleted on 100% of them). Stopped -> exclude. record_url_precision 'record', VERIFIED not templated: PublicUrl carries a real per-record OpenGov URL, e.g. https://burlingtonvt.portal.opengov.com/records/336809 . Point geometry with native Latitude/Longitude columns; __lat/__lng mapped per the standing convention (governance 0n). Latitude AND PublicUrl are BOTH non-null on 141,701 / 141,701 rows = 100%. FRESHNESS: newest ApplicationDate 2026-04-27, ten days before this pass. No recency_days: Chittenden has only 18 modelled pages and the 3-mile envelope bounds volume naturally; a window would drop long-running open applications (the Anne Arundel reasoning). Coverage is VT/Chittenden ONLY - the addresses sampled are Burlington streets (Staniford Road, Loaldo Drive, Curtis Avenue), so despite the large row count this is a city ledger, not a statewide one; the count is ~20 years of a university city, not a state. NO type_map: the layers carry no bounded use-type vocabulary (Description and ProjectName are free prose, PrimaryLUC is an unenumerated land-use code), so records fall through to the keyword classifier rather than being assigned a guessed use_type (clark-county-active-projects precedent). Counts as INCOMPLETE for classification, deliberately. THIS ENTRY: OpenGov_Building layer 0, 141,701 point records. PermitStatus sums EXACTLY to 141,701 (Closed 124,826 / Open 14,243 / Stopped 2,632), 0 unmapped, 0 nulls."
+    },
+    {
+      "registry_id": "burlington-vt-zoning-permits",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/1bO0c7PxQdsGidPK/arcgis/rest/services/OpenGov_Zoning/FeatureServer/0",
+      "dataset_url": "https://services1.arcgis.com/1bO0c7PxQdsGidPK/arcgis/rest/services/OpenGov_Zoning/FeatureServer/0",
+      "jurisdiction": "City of Burlington, Vermont — Department of Permitting & Inspections (Zoning)",
+      "coverage": [
+        {
+          "state": "VT",
+          "county": "Chittenden"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "ProjectName"
+        ],
+        "status_raw": "PermitStatus",
+        "file_date": "ApplicationDate",
+        "decision_date": "DateCompleted",
+        "case_number": "PermitNo",
+        "record_url": "PublicUrl",
+        "address": "StreetAddress",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Open"
+        ],
+        "approved": [],
+        "operating": [
+          "Closed"
+        ],
+        "exclude": [
+          "Stopped"
+        ]
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "record",
+      "_receipts": "2026-08-06 SIX-STATE MUNICIPAL PASS (the DOT_TIER_CLOSED_ONLY states that DO have a DOT wire and a real metro). City of Burlington's own OpenGov permitting system, published to the city's ArcGIS org 1bO0c7PxQdsGidPK and catalogued on data.burlingtonvt.gov. FOUND BY PARSING THE HUB DCAT IN FULL (123 datasets enumerated as the control), never by keyword search - governance 0x. PermitStatus is a 3-value self-describing vocabulary and SUMS EXACTLY to each layer's count. SECTION 0l-b CROSS-CHECK RUN BEFORE MAPPING, and it CONFIRMS the field is the real lifecycle rather than refuting it (the Prince George's failure mode): DateCompleted IS NOT NULL returns Closed 124,826 + Stopped 2,632 and ZERO 'Open' - i.e. every completed record is Closed/Stopped and no Open record carries a completion date, so status and date agree. All 124,826 Closed rows carry a DateCompleted (100% of that bucket). BUCKETING, deliberately conservative: Open -> PROPOSED, not approved. These layers are titled 'Applications AND Permits' and mix pre-decision applications with issued permits; 'Open' does not assert that a permit was granted, and proposed is the reading that asserts least. Closed -> operating (work completed, evidenced by DateCompleted on 100% of them). Stopped -> exclude. record_url_precision 'record', VERIFIED not templated: PublicUrl carries a real per-record OpenGov URL, e.g. https://burlingtonvt.portal.opengov.com/records/336809 . Point geometry with native Latitude/Longitude columns; __lat/__lng mapped per the standing convention (governance 0n). Latitude AND PublicUrl are BOTH non-null on 141,701 / 141,701 rows = 100%. FRESHNESS: newest ApplicationDate 2026-04-27, ten days before this pass. No recency_days: Chittenden has only 18 modelled pages and the 3-mile envelope bounds volume naturally; a window would drop long-running open applications (the Anne Arundel reasoning). Coverage is VT/Chittenden ONLY - the addresses sampled are Burlington streets (Staniford Road, Loaldo Drive, Curtis Avenue), so despite the large row count this is a city ledger, not a statewide one; the count is ~20 years of a university city, not a state. NO type_map: the layers carry no bounded use-type vocabulary (Description and ProjectName are free prose, PrimaryLUC is an unenumerated land-use code), so records fall through to the keyword classifier rather than being assigned a guessed use_type (clark-county-active-projects precedent). Counts as INCOMPLETE for classification, deliberately. THIS ENTRY: OpenGov_Zoning layer 0 (zoning + certificates of occupancy), 35,668 point records. PermitStatus sums EXACTLY to 35,668 (Closed 29,852 / Open 5,699 / Stopped 117). DISJOINT FROM OpenGov_Building - separate OpenGov record types on separate FeatureServers with separate PermitNo series (Building: CBP-/DECK-/SCRT-; the Houston subset trap was checked, not assumed). The sibling OpenGov_Fire_Marshal layer is deliberately NOT wired: fire-marshal inspections are the trades/inspection noise class dropped at source in the WA/MN/IL passes."
     }
   ],
   "ckan": [

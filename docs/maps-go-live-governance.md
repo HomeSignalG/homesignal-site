@@ -2062,6 +2062,28 @@ centroid", and the decision should rest on the vocabulary, not the probe.
 
 ## §0q — THE SCOREBOARD IS TWO NUMBERS: COVERAGE **AND** COMPLETENESS
 
+### ⭐ THE SCOREBOARD IS THREE NUMBERS, AND THE REACHABLE CEILING LEADS
+
+**Coverage against the total is the number most likely to be misread.** Anyone who sees 52% and
+does not also see the ceiling will conclude there is roughly half the project left. There is not.
+
+**Report all three, in this order, on every close from 2026-08-06 onward:**
+
+| # | number | today |
+|---|---|---|
+| 1 | **coverage against REACHABLE** — the number that says how far along we actually are | **6,667 / ~10,007 = ~66%** |
+| 2 | coverage against TOTAL — the pinned national figure, unchanged | 6,667 / 12,722 = **52.41%** |
+| 3 | the honest-empty FLOOR — pages no wire can ever reach | **~2,715 (21%)** |
+
+`reachable = 12,722 − floor`. **We are about two-thirds done, not about half.** The 26-point gap
+between #1 and #2 is entirely geography, and stating #2 alone has repeatedly invited the wrong
+conclusion about how much work remains.
+
+Recompute the floor when the model changes (a ZIP-radius change or a new statewide source moves
+it); do not carry these figures forward as constants without re-measuring.
+
+---
+
 ### THE FLOOR — a permanent honest-empty population. State it, do not re-discover it.
 
 **~2,700 pages can never be reached by any wire, and that is a correct terminal state, not a
@@ -2210,6 +2232,39 @@ A zero is the most dangerous result because it reads as clean and ends the searc
 column produces one indistinguishable from a real absence. Note that it usually affects **RECON
 only**: the arcgis connector trims both sides (the Harris County precedent), so production would
 have been fine. The damage is entirely to the DECISION about whether to wire.
+
+---
+
+## §0x — A SEARCH WHOSE RESULT COUNT SATURATES HAS RANKED NOTHING
+
+**Check the count before you read the first result. It is cheaper than any result, and it is the
+tell.** When a search returns a round ceiling — ArcGIS Online's `total: 10000` is the one this
+project hits — the query matched essentially the whole public corpus. The engine then returns
+*something* at the top, and that something is **noise wearing the shape of an answer**.
+
+**The worked case, 2026-08-06.** Two unscoped AGO searches in one batch:
+
+```
+q="Manchester NH" OR "Nashua NH" building permits   → total: 10000, top hit: Building Permits ~calgary.ca
+q="Bismarck" OR "Fargo" building permits            → total: 10000, top hit: Building Permits ~calgary.ca
+```
+
+**The same Calgary layer, top-ranked for two different states 1,500 miles apart.** Neither result
+had anything to do with the query; the `10000` was visible before either was read. The same batch
+returned Wichita's *suburbs* (Goddard, Maize) for "Wichita permits", medical-marijuana
+*dispensary* maps for "Tulsa permits", and a personal account for "Omaha permits".
+
+**The rule:** an unscoped keyword search is a **lead generator, never evidence**. A rejection may
+only be written from one of two things:
+
+1. an **`owner:` / `orgid:`-scoped enumeration** with its own total as the positive control, or
+2. a **machine catalog parsed in full** — DCAT, Socrata `views.json`, CKAN `package_search` —
+   with the dataset count reported as the control.
+
+This is the ArcGIS-specific lookalike warning generalised, and hardened: the earlier version said
+*scope your query*. This one says **the saturated count is a detectable failure signal you can
+read for free**, and a top hit drawn from a saturated result set is worth nothing regardless of
+how plausible its title looks.
 
 ---
 
