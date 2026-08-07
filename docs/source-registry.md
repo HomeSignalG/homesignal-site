@@ -8820,3 +8820,36 @@ class, therefore no separate approval" **does not hold as the code stands**: the
 facilities slot to fit into. A CARB-style wire would need a new engine source alongside `frsFacilities()`,
 which is gated. This did not block the CARB evaluation — CARB fails at question 1 regardless — but it
 is the binding constraint on the next facilities proposal.
+
+### ✅ ANSWERED — "can the data model carry two source attributions on one record?" YES, and it already does
+
+Asked 2026-08-07 as a schema question. It is **not** a schema question: the one-facility-two-regulators
+model is **already built and already shipping**.
+
+- **Core identity is singular and FRS owns it.** A facility is emitted with one `registry_id`, one
+  `src`, one `record_url` (`index.ts:301` — `src: "EPA FRS · registry <rid>"`). Name and coordinates
+  come from FRS. That is correct and should stay: FRS is the incumbent, it is national, and its
+  RegistryId is the join key ECHO and NPDES already hang off.
+- **Secondary regulators hang off `env`, which is purpose-built for exactly this.** v19 stamps
+  `s.env = { link_type: "geo_matched", epa?, tceq? }`, and the page turns it into one plain-language
+  line through a helper shared by all four render paths. **TCEQ — a STATE regulator — is already
+  merged onto the FRS facility this way**, with its own programs, its own status and its own URL
+  (`f.tceq_url`), rendering **once** with both badges.
+
+**So a CARB merge needs no schema change: it is `env.carb`, the TCEQ pattern with one state agency
+swapped for another.** It remains an ENGINE change (a `sources/carb.ts` + an `enrichCarb`, exactly as
+TCEQ has), and engine changes are gated — but nothing about the data model blocks it.
+
+**The matching rule is also already settled by that precedent, and should not be re-invented:**
+`siteKey` (house number + street word + ZIP) **AND** a shared name token — precision over recall,
+verified against real 78617 data (28 confident industrial matches; same-address false positives such
+as AutoZone↔parkade correctly rejected).
+
+⚠️ **One concrete blocker if an address-based match is ever wanted: our cached facilities have no
+address.** FRS *returns* `LocationAddress`, but the engine discards it — cached facilities carry
+`address: null` and coordinates only. The TCEQ path works around this by reading the ECHO-verified
+street/ZIP into `f._fstreet` / `f._fzip` during enrichment. Any CARB matcher must do the same or
+match on coordinates + name alone.
+
+**None of this is actionable today.** There is no CARB per-facility dataset (Answer 1 above), so
+there is nothing to match, nothing to merge, and no overlap to measure.
