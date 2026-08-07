@@ -87,6 +87,34 @@ ok(badSources.length === 0,
    'every declared type_source is a usable field name or array of field names',
    badSources.join('\n     '));
 
+// ── THE SECOND INVARIANT: a type_source must SURVIVE the out_fields projection ───────────────
+//
+// SHIPPED DEFECT, 2026-08-07, caught only by measuring after deploy. `out_fields` is an optional
+// column whitelist (added for dense/slow layers to bound row size). Both burlington-vt entries
+// carried one, and `type_source: "PrimaryLUC"` was wired WITHOUT adding PrimaryLUC to it — so the
+// connector never fetched the column, read null on every row, and emitted 100% unclassified
+// behind a correct, fully-verified, completely unreachable 20-key map. 13,307 + 3,913 records.
+//
+// The first invariant above could not see this: the map HAS a source, the source IS a real field
+// name. The break is that the projection silently removes it. Same failure signature as the
+// orphan map (everything unclassified, nothing errors), different cause — so it needs its own
+// assertion rather than a widened one.
+const projectionDrops = entries.filter((e) => {
+  const src = (e.column_map || {}).type_source;
+  const of = e.out_fields;
+  if (!usableSource(src) || !Array.isArray(of) || of.length === 0) return false;
+  const need = Array.isArray(src) ? src : [src];
+  return need.some((c) => !of.includes(c));
+}).map((e) => {
+  const src = (e.column_map || {}).type_source;
+  const need = (Array.isArray(src) ? src : [src]).filter((c) => !e.out_fields.includes(c));
+  return `${e.registry_id} — type_source ${JSON.stringify(need)} not in out_fields, so it is never fetched`;
+});
+
+ok(projectionDrops.length === 0,
+   'every type_source column survives the entry\'s out_fields projection',
+   projectionDrops.join('\n     '));
+
 // ── SELF-TEST: the detector must be able to fail ─────────────────────────────────────────────
 // Without this the two assertions above would pass vacuously on a registry where the shape can
 // no longer occur, and nobody would notice the check had stopped meaning anything.
@@ -106,6 +134,17 @@ ok(badSources.length === 0,
   const arrayOk = usableSource(['IND_USE', 'COM_USE']) && !usableSource([]) && !usableSource(['IND_USE', '  ']);
   ok(arrayOk, 'SELF-TEST: an array type_source is accepted, an empty/blank-member array is not',
      'the array predicate is wrong — York County would be failed as a false positive again');
+  // SELF-TEST for the projection check, in both directions.
+  const drops = (src, of) => {
+    const need = Array.isArray(src) ? src : [src];
+    return Array.isArray(of) && of.length > 0 && need.some((c) => !of.includes(c));
+  };
+  ok(drops('PrimaryLUC', ['OBJECTID', 'Latitude']) === true
+     && drops('PrimaryLUC', ['OBJECTID', 'PrimaryLUC']) === false
+     && drops(['A', 'B'], ['A']) === true
+     && drops('Anything', undefined) === false,
+     'SELF-TEST: the projection check flags a dropped column and clears a present one',
+     'the projection predicate has drifted — the Burlington out_fields defect would ship again');
 }
 
 // ── INFORMATIONAL, never a failure ───────────────────────────────────────────────────────────
