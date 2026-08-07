@@ -8655,3 +8655,83 @@ rows) has no member of that closed vocabulary that fits without a judgment call 
 the drafted-mapping-is-a-hypothesis rule, these are recorded as an open question rather than
 guessed into production.
 
+
+## BARRIER + COMPLETENESS PASS (2026-08-07) — two recorded findings corrected
+
+### 1. The barrier reprobe sweep is AUTOMATED and ran today — do not hand-roll a duplicate
+
+`.github/workflows/source-monitor.yml` + `scripts/source-monitor-targets.json` re-probe **18
+rejected sources** and walk **44 first-party catalogs** nightly at 07:00 UTC, auto-wiring anything
+that recovers AND passes the fail-closed gate. Run `2026-08-07T08:13:08Z`: 18 re-probed, 44
+discovery targets walked, **195 candidates evaluated, auto-wired: none**, 141 flagged for connector
+work, dev-backed ZIP snapshot 471 (Δ +0).
+
+Still blocked, each with its failure mode unchanged: Denton (stale 2023-06-09) · McKinney (stale
+2023-09-26) · Frisco ×2 (`UND_ERR_CONNECT_TIMEOUT`) · El Paso Accela (**404, service gone**) ·
+Dallas ×6 (stale 2018-2021) · Denton city portal (catalog 404) · St. Paul (stale 2025-06-30) ·
+Syracuse (fresh but no status column) · El Paso + Arlington DCAT (`ENOTFOUND`) · Aurora (DNS).
+
+**The 283-page edge-egress class (El Paso 145 · Miami-Dade 80 · Tampa 58) is still unsettleable
+from here** — the sandbox's only egress is pg_net, and those were diagnosed *specifically* because
+pg_net gets 200 while the edge runtime does not. A 200 from the sandbox or from a CI runner is the
+expected reading in BOTH the broken and the fixed state (Rule 13).
+
+### 2. ⚠️ EL PASO IS NOT A WAF PROBLEM — IT IS STATUS-DEAD SINCE 2019. Reclassify BARRIER → SUPPLY.
+
+El Paso was carried as "the largest TX prize at 145 pages, blocked by a WAF." The monitor flagged
+a **different, live, fresh** El Paso layer, so it was probed properly:
+`gis.elpasotexas.gov/arcgis/rest/services/Planning/NewCommercial/MapServer/0`.
+
+It looks wireable on every structural check — point geometry, **`StreetZIP` 100% populated
+(11,322/11,322)**, `ISSUEDATE` a real `esriFieldTypeDate` **100% populated**, newest 2026-06-30,
+and BOTH vocabularies complete and exact: `B1_APPL_ST` 17 values summing to **exactly 11,322**,
+`Record_Typ` 5 values summing to **exactly 11,322**.
+
+**It emits zero anyway, and the arithmetic is unambiguous:**
+
+| probe | count |
+|---|---:|
+| total rows | 11,322 |
+| `ISSUEDATE >= DATE '2021-08-07'` (the 1825-day default window) | 2,749 |
+| `B1_APPL_ST <> ''` | 7,157 |
+| **both** | **0** |
+| `ISSUEDATE >= '2021-08-07' AND B1_APPL_ST = ''` | **2,749** |
+| **max `ISSUEDATE` among rows that HAVE a status** | **2019-10-31** |
+
+**100% of in-window rows carry a blank status.** The publisher stopped populating `B1_APPL_ST`
+on 2019-10-31; blank-status rows run 2011-01-01 → 2026-06-30. The fail-closed status rule
+(correctly) drops every one, so the entry yields **0 records at any sane window** — the WAF is
+irrelevant to the outcome. Reaching statused rows would mean a window back past 2019, i.e.
+publishing 6-to-11-year-old permits as "development around your home." Not wired.
+
+**This does not contradict the WAF finding — it refines it.** The WAF result was about the *Accela*
+endpoint (now 404 anyway). The new fact is that even a fully-open El Paso would light 0 pages from
+this layer. **The same shape as `clv-planning-cases`: a field that was real historically and
+stopped.** Check whether a status field is still being populated *inside the connector's own
+window*, not merely whether it exists.
+
+### 3. ⚠️ CORRECTION TO MY OWN §2b TABLE — the "CONFIG / GEOMETRY" queue is smaller than recorded
+
+§2b listed **Minneapolis: 14 dark, 0 thin, lit by `minneapolis-ccs-permits` (28 pages)** as the
+cleanest case of *"the city's own source works, yet its own pages are dark"* — i.e. a fixable
+radius/geometry problem. **That classification was wrong.** The 14 dark pages are not Minneapolis:
+
+| page | actual municipality | dev |
+|---|---|---:|
+| Minneapolis (55401) · (55404) | Minneapolis proper | **2,409 · 2,811** |
+| Minneapolis (55446) · (55441) | **Plymouth** (55446 centroid is 10.6 mi from downtown) | 0 |
+| Minneapolis (55431) · (55420) · (55425) | **Bloomington / Richfield** | 0 |
+| Minneapolis (55443) | **Brooklyn Park** | 0 |
+| Minneapolis (55427) | **Golden Valley / New Hope** | 0 |
+
+The municipal ranking parsed the place from the page name `"<place> (<ZIP>)"`, and that name is the
+**USPS postal label**, which covers suburbs that are separate municipalities. Minneapolis's own
+source works correctly and its 3-mile circles reach exactly as far as they should; a Plymouth
+permit was never in scope. **This is SUPPLY (each suburb needs its own ledger), not config**, and
+those pages must not be counted as an actionable completeness queue.
+
+**Standing answer: a USPS place label is not a municipality.** Any ranking keyed on the parsed
+place name conflates a city with every suburb sharing its postal name — which is the same
+attribution error, one level down, that §2b was created to fix at the county level. The remaining
+CONFIG-class candidates (Manhattan, Cincinnati, Buffalo) carry the same risk and must be
+re-attributed the same way before being worked.
