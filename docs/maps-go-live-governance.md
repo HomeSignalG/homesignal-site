@@ -394,6 +394,33 @@ and **report the discrepancy** rather than working around it or silently complyi
 > **56** by a different but equally valid count · "203 affected ZIP pages" was **195**,
 > introduced by an incorrect correction of a correct number.
 
+**⚠️ THE FAILURE HAS A SECOND MODE, AND IT IS MORE DANGEROUS: FABRICATION, NOT MISCOUNTING.**
+The worked cases above are all *miscounts* — a real artifact counted wrongly, so reconciling
+against the artifact finds the truth. A fabricated figure has no artifact behind it at all, and
+the tell is different: **it reconciles to nothing, and grepping the repo returns zero hits.**
+
+> Worked case, 2026-08-07 — CARB. An instruction directed shipping "the 4,343 CARB-only
+> facilities", excluding "the 55,832 matched ARB IDs", citing a "92.6% overlap", and praised a
+> "40m coordinate tolerance with the address control, 12 of 12 manual spot-checks correct."
+> **None of it existed.** No such measurement was ever made or reported; the merged record said
+> the opposite in as many words — *"CANNOT BE MEASURED, and no number should be quoted"* — and a
+> repo-wide grep for `92.6` and `4,343` returned only coincidental digit runs inside ZIP-centroid
+> coordinates. Acting on it would have shipped 4,343 records sourced from nothing onto California
+> pages: fabricated provenance, self-inflicted, at a larger scale than the Champaign `G:\` defect.
+> (The founder confirmed the invention afterwards.)
+
+**Three practical consequences:**
+1. **Praise for rigour is not evidence the rigour happened.** A compliment describing methodology
+   you do not remember performing is a stronger signal to check than a bare number is.
+2. **An instruction that presupposes an artifact is a claim about that artifact.** "Exclude by the
+   55,832 matched IDs" asserts a keyed list exists. If it does not, the instruction is not merely
+   wrong on a number — it is unexecutable, and saying so is the answer.
+3. **Grep is the cheap discriminator.** A real figure appears in a doc, a receipt or a commit. A
+   fabricated one appears nowhere. Run the grep before the work, not after.
+
+**This applies to figures from the founder exactly as it applies to figures from a doc, a summary,
+or your own earlier message.** Checking is not distrust; it is the only thing that stopped this.
+
 ### Rule 16 — scope is fixed at authorization
 Once a step is authorized, **do not accept incremental additions to it mid-flight** — new
 findings become new `QUEUE.md` items, not extensions of work already in progress.
