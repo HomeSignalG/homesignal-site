@@ -8735,3 +8735,26 @@ place name conflates a city with every suburb sharing its postal name — which 
 attribution error, one level down, that §2b was created to fix at the county level. The remaining
 CONFIG-class candidates (Manhattan, Cincinnati, Buffalo) carry the same risk and must be
 re-attributed the same way before being worked.
+
+### 4. NEGATIVE RESULT — the 891-page `app_projects` gap is BY DESIGN, not a materialization defect
+
+Measured 2026-08-07: `development_reports` holds **12,722** rows, `app_projects` holds **11,831**
+distinct ZIPs. The 891-page difference looks like unmaterialized pages, and 76 of them carry a
+non-zero `counts.development`, which looks like real content that never reached the app table.
+
+**Both readings are wrong, and the test that disproves them was run.** `app_refresh_zip` was
+invoked on 80 of those pages: **80/80 returned `quality=pass` and created ZERO `app_projects`
+rows.** The re-count afterwards was unchanged at 76.
+
+The cause: `counts.development` in the cache includes **area-scope civic items** (planning notices
+and meetings from the ingest side), which materialize as `notices`, not as
+`record_kind='development'`. Those 80 pages materialize as e.g.
+`84017: development=0/0 facilities=0/0 notices=34 news=9 quality=pass`. **`app_projects` holds
+development + facility records only**, so a notices-only page correctly has no row. Of the 891,
+**815 are 0-development-and-0-facilities honest empties** and the remaining 76 are notices-only.
+
+**Standing answer: `counts.development` and `record_kind='development'` are DIFFERENT POPULATIONS.**
+`counts.development` includes area-scope civic notices; `record_kind='development'` does not.
+Comparing a page count derived from one against a page count derived from the other manufactures a
+gap that does not exist. This is the same family as the already-recorded
+`registry_id <> 'epa-frs'` error — measure the population you mean, by `record_kind`.
