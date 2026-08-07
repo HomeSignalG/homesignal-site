@@ -8591,3 +8591,67 @@ prove it ran over what you think it ran over. **Fixed:** the guard now collects 
 the Madison double-emit hazard on a non-arcgis platform — is now caught. Controls added: the
 count assertion is `>= 180`, plus a platform-coverage control asserting ≥20 non-arcgis entries are
 seen. Proven to FAIL against an injected socrata duplicate before being trusted.
+
+## BURLINGTON VT — the shipped defect, the fix, and the residual (2026-08-07)
+
+**The defect was mine, and only the post-deploy measurement caught it.** #642 wired
+`type_source: "PrimaryLUC"` plus a 20-key `type_map` onto both `burlington-vt-*` entries.
+After deploy + re-cache of all 115 pages, both entries measured **100% unclassified —
+completely unchanged**, while the other three Lever 3 entries went to exactly 0.
+
+Cause: both entries carry an `out_fields` projection (an optional column whitelist that bounds
+row size). `PrimaryLUC` was not in it. The connector never requested the column, read `null` on
+every row, and emitted `unclassified` behind a map that was correct, byte-verified against the
+live layer, and **completely unreachable**. Nothing errored; CI was green.
+
+**Standing answer, so no session re-derives it: `out_fields` is a SILENT column filter. Any
+column named in `column_map` must also appear in `out_fields` when the entry has one.** A
+verified vocabulary proves the *values* are right; it says nothing about whether the connector
+ever *fetches* the field they live in. Those are two separate failures with one symptom.
+
+Fixed in #643 (append-only), guarded by a second invariant in
+`test/registry-type-path-coherence.test.mjs` — every `type_source` column must survive the
+entry's own `out_fields` projection. The pre-existing orphan-map invariant could not see this:
+the map HAS a source and the source IS a real field name.
+
+### Measured after #643 deploy (`0b2c3c6`) + re-cache of all 6 Burlington pages
+
+The Burlington surface is **6 ZIP pages, not 12** — 05401, 05403, 05404, 05408, 05439, 05446.
+Verified as complete: their per-page record counts summed to exactly 13,307 + 3,913 = 17,220,
+the two entries' full cache-wide totals.
+
+| entry | records | unclassified | before | after |
+|---|---:|---:|---:|---:|
+| burlington-vt-building-permits | 13,280 | 1,841 | 100% | **13.86%** |
+| burlington-vt-zoning-permits | 3,888 | 333 | 100% | **8.56%** |
+
+### The residual is explained, and is NOT a config error to fix blind
+
+Probed in the connector's own scope per Rule 13 — the same 365-day window on the same
+`ApplicationDate` field the entry filters on, no `extra_where` (the entry has none). Live
+`groupBy` over `PrimaryLUC` returned **23 groups summing to 3,278**, of which the map's 20 keys
+miss five:
+
+| PrimaryLUC | in-window rows | why unmapped |
+|---|---:|---|
+| `E - Exempt` | 231 | not in the map |
+| *(null)* | 160 | honest absence — never guessable |
+| `TE - Partl Exempt` | 10 | not in the map |
+| `F - Farm` | 2 | not in the map |
+| `EL - Exmpt Land` | 1 | not in the map |
+| **total** | **404** | |
+
+404 unmapped of 3,278 in-window rows = 12.3%, which reconciles with the measured page rates
+(the six ZIP circles overlap at 3 mi, so each source row is cached on several pages).
+
+`S1 - Seasonal ` is **not** in that list despite arriving with a trailing space — the connector
+trims both sides, the Harris-County-plats behaviour.
+
+**Left unmapped deliberately.** `Exempt`, `Partly Exempt` and `Exempt Land` are **tax status,
+not land use** — the Vermont grand-list codes for municipal, religious and non-profit
+property. Mapping them into the closed six-value `use_type` vocabulary would be an inference
+from a tax classification, which fails the "every value self-describing" bar. `F - Farm` (2
+rows) has no member of that closed vocabulary that fits without a judgment call either. Per
+the drafted-mapping-is-a-hypothesis rule, these are recorded as an open question rather than
+guessed into production.
+
