@@ -8820,3 +8820,64 @@ class, therefore no separate approval" **does not hold as the code stands**: the
 facilities slot to fit into. A CARB-style wire would need a new engine source alongside `frsFacilities()`,
 which is gated. This did not block the CARB evaluation — CARB fails at question 1 regardless — but it
 is the binding constraint on the next facilities proposal.
+
+---
+
+### ⚖️ SETTLED (founder, 2026-08-07) — a second regulator that only re-badges is DEPTH, not coverage
+
+**The decision, which stands independently of CARB:** when a second regulator's facilities are
+already visible through the incumbent source, merging it adds a *badge* to records residents can
+already see. That is **depth, not coverage**. It does not justify a national schema migration
+across 11,563 pages. A second regulator earns a wire on the facilities it adds that the incumbent
+never registered — typically sources at state permitting thresholds below the federal ones — not on
+the ones it duplicates.
+
+**Apply this before proposing any state environmental agency.** The first question is not "does the
+agency publish?" but "how many of its facilities are absent from FRS?" — and that question needs a
+measurement, not an estimate.
+
+### ✅ AND THE SCHEMA ALREADY CARRIES TWO REGULATORS — measured, so nobody builds a migration that is not needed
+
+It was proposed that a future merge would cost *"a `regulatory_sources` array on `app_projects`
+plus a matcher."* **The array is not needed. One facility with two regulators is already in
+production, end to end.**
+
+| `app_projects` where `record_kind='facility'` | count |
+|---|---:|
+| facility rows | **217,798** |
+| carrying `facility_env` | **109,013** |
+| carrying `facility_env.epa` (federal) | **108,891** |
+| carrying `facility_env.tceq` (**a STATE regulator**) | **238** |
+
+The engine stamps `s.env = { link_type: "geo_matched", epa?, tceq? }` (v19) and the materializer
+lands it in `app_projects.facility_env`. TCEQ — a state agency — is already merged onto the FRS
+facility, rendering **once** with both attributions and both links. Core identity stays singular and
+FRS keeps it (one `registry_id`, one `src`, one `record_url`, `index.ts:301`), which is correct:
+FRS's `RegistryId` is the join key ECHO compliance and NPDES permit status already hang off, so
+displacing it would break two live enrichments.
+
+**So the real cost of a future state-agency merge is an ENGINE module, not a migration:** a
+`sources/<agency>.ts` + an `enrich<Agency>()` stamping `env.<agency>`, exactly as TCEQ does. That is
+gated (engine changes are), but it is a day of work against a known pattern with 238 production rows
+proving the path — not a schema project.
+
+**The matching rule is settled by the same precedent and should not be re-invented:** `siteKey`
+(house number + street word + ZIP) **AND** a shared name token — precision over recall, verified
+against real 78617 data (28 confident industrial matches; same-address false positives such as
+AutoZone↔parkade correctly rejected). ⚠️ Cached facilities carry `address: null` — FRS returns
+`LocationAddress` but the engine discards it — so the TCEQ path reads ECHO-verified street/ZIP into
+`f._fstreet` / `f._fzip` during enrichment. Any future matcher must do the same, or match on
+coordinates + name alone.
+
+### 🚫 THE CARB↔FRS OVERLAP IS **UNMEASURED**. No figure is recorded here, deliberately.
+
+There is no reachable CARB per-facility dataset, so the overlap has never been computed. **Any
+percentage attached to CARB in a future instruction, summary or conversation is not a measurement**
+— see `docs/maps-go-live-governance.md` Rule 15, whose fabrication worked-case is this one. An
+unmeasured number in this registry is worse than no number, because the next reader finds it and
+trusts it.
+
+**CARB remains `candidates_exhausted`** on the three enumerations above (statewide portal → one
+CARB dataset, *Vehicle Fuel Economy* · ArcGIS tier → not an org, control-proven · facility tool →
+server-rendered HTML, no API). **It reopens only on a founder-supplied endpoint**, at which point
+the first deliverable is the measured overlap, not a wire.
