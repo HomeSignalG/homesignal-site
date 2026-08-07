@@ -8758,3 +8758,65 @@ development + facility records only**, so a notices-only page correctly has no r
 Comparing a page count derived from one against a page count derived from the other manufactures a
 gap that does not exist. This is the same family as the already-recorded
 `registry_id <> 'epa-frs'` error — measure the population you mean, by `record_kind`.
+
+## 🚫 CARB (California Air Resources Board) — REJECTED 2026-08-07: `candidates_exhausted`
+
+Evaluated for the **FACILITIES** layer (same record class as EPA FRS, same page slot). **Not wired.**
+The deciding question could not even be reached, and that is the finding.
+
+### Answer 1 — is there a per-facility machine-readable dataset? **NO.** Three enumerations, all empty.
+
+| # | tier enumerated | denominator | result |
+|---|---|---|---|
+| 1 | `data.ca.gov` statewide portal | CARB org = **1** package; facility-term search = **29** datasets | The single CARB dataset is **"Vehicle Fuel Economy"**. Of the 29, every other hit belongs to the Water Board, CalFire, OEHHA, Energy Commission or Corrections. **0 CARB per-facility datasets.** |
+| 2 | CARB ArcGIS presence | 3 endpoints | `carb.maps.arcgis.com` is **NOT an org** — see the control below. `carb.maps.arcgis.com/api/feed/dcat-us/1.1.json` → **404**. `gis.arb.ca.gov` → DNS does not resolve (that one was my URL guess and is marked as such). |
+| 3 | CARB's own facility tool | 47,656 bytes | `ww2.arb.ca.gov/applications/facility-search-engine` returns **200 HTML** with **0 `arcgis` mentions and no API/REST/JSON endpoint in the markup** — a server-rendered web application, not a feed. |
+
+**The control that makes enumeration 2 evidence rather than a guess.** A deliberately bogus
+subdomain — `zzzznotarealorg9137.maps.arcgis.com/sharing/rest/portals/self` — returns **HTTP 200
+with a 12,477-byte generic portal and `id: null`**, against CARB's 12,551 bytes and `id: null`.
+Identical shape. So the CARB subdomain answering 200 is **not** evidence an org exists, and with a
+null `id` there is no `orgid:` to scope a search with — which is precisely the condition the
+documented cross-org lookalike trap needs. Recorded per §0k: **three enumerated tiers, non-zero
+denominators, all empty → stop. CARB publishes at a tier we do not reach.**
+
+### Answer 2 — is there a date field? **NOT ASSESSABLE, and that is not the same as `NO_TEMPORAL_FIELD`.**
+
+`NO_TEMPORAL_FIELD` is a verdict about a schema that was read. No CARB dataset was reached, so no
+schema was read. Recording it as `NO_TEMPORAL_FIELD` would assert a fact about a field list nobody
+has seen. The honest stamp is `candidates_exhausted`.
+
+### Answer 3 — the overlap percentage: **CANNOT BE MEASURED, and no number should be quoted.**
+
+Measuring overlap needs the CARB facility list. There is no machine-readable CARB facility list.
+**The deciding question is unanswerable because its prerequisite does not exist** — so CARB does not
+ship, not because overlap is high, but because there is nothing to compare or wire.
+
+Two related facts that WERE measured, so a future session does not redo them:
+
+- **The California FRS baseline:** 523 modeled CA ZIP pages, **496 carry facilities**, 7,034 facility
+  rows, **5,696 distinct FRS facilities** (rows exceed distinct because the 3-mile circles overlap).
+- ⚠️ **Whether FRS already aggregates CARB is UNVERIFIED, and our endpoint cannot answer it.**
+  `frs_rest_services.get_facilities` — the call the engine actually makes — returns identity and
+  location only (`RegistryId, FacilityName, LocationAddress, City, County, State, Zip, FIPS,
+  Latitude83, Longitude83`) and **no program-provenance field**. Live receipt: LA at 0.5 mi → 200,
+  113,443 bytes, no program acronym on any record. The "FRS aggregates state programs so CARB is
+  probably duplicate" premise is plausible and **was not confirmed here**; confirming it needs a
+  different FRS service, not this one.
+- **FRS returns `LocationAddress` but the engine discards it** — cached facilities carry
+  `address: null`, coordinates only. So an address-based overlap match is not possible today
+  without an engine change. Coordinate and name matching are.
+
+### ⚠️ The architectural finding, which outlives CARB
+
+**The facilities layer is NOT registry-driven, so adding any source to it is an ENGINE CODE CHANGE,
+not config.** `frsFacilities()` in `index.ts` is a hardcoded EPA FRS fetch, and every
+`jurisdiction-registry.json` connector (arcgis / socrata / ckan / carto / csv / opendatasoft) feeds
+`counts.development` — the engine says so itself: *"TABS records are development filings →
+counts.development, never counts.facilities."*
+
+So the premise that a facilities source "fits where EPA already sits, same page slot, no new record
+class, therefore no separate approval" **does not hold as the code stands**: there is no second
+facilities slot to fit into. A CARB-style wire would need a new engine source alongside `frsFacilities()`,
+which is gated. This did not block the CARB evaluation — CARB fails at question 1 regardless — but it
+is the binding constraint on the next facilities proposal.
