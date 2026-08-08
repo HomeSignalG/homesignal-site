@@ -631,3 +631,50 @@ So `shelby-county-building-permits` is dormant **by design**, not by defect — 
 awaiting an additive connector. **Every "183 entries" figure in Rounds 1–4 and in
 `docs/source-inventory.md` is a count of declared entries, of which 182 are on a live code path.**
 No finding changes; the denominator does.
+
+---
+
+# Round 6 — DATE SEMANTICS, piece (a): SHIPPED (nothing visible changed)
+
+Per the ruling *"build it, in your three pieces, in your order. Default 'filed' first so nothing
+changes"* — piece (a) only. Pieces (b) classify and (c) render; neither is done.
+
+**What shipped.**
+
+1. **`FileDateKind` is a declared type** — `"filed" | "issued" | "scheduled" | "estimated" |
+   "decided"` (`sources/socrata.ts`), and `file_date_kind` is a required field on
+   `NormalizedRecord`, so a connector cannot silently omit it.
+2. **All five live connectors stamp it** — `arcgis`, `socrata`, `ckan`, `csv`, `carto` each emit
+   `file_date_kind: entry.file_date_kind ?? "filed"` on the same record literal as `file_date`.
+   (`opendatasoft` has no connector — §G7 — so there is nothing to stamp.)
+3. **The registry gained an optional per-entry `file_date_kind`.** **Zero entries declare one
+   yet**, which is the point: every entry keeps today's meaning by default.
+4. **The materializer stamps `app_projects.date_kind`** (migration
+   `app_projects_date_kind_stamp`; parked SQL `docs/date-kind-migration.sql`). It writes
+   `'decided'` where it falls through to `decision_date` — **the only way the §G1 substitution
+   becomes visible in the table** — and NULL where the record has no date at all.
+5. **Pinned by a new unit test** — `test/file-date-kind.test.mjs`, which also asserts it hasn't
+   missed a connector `index.ts` binds, and rejects an off-vocabulary kind. Proven to fail:
+   deleting the stamp from one connector makes it exit 1. Suite: **90/90 green.**
+
+**Backfill and the control that proves it.** All 12,722 pages were stamped (set-based for the
+three all-substituted entries, re-materialization for the rest — both compute exactly what
+`app_refresh_zip` computes). The resulting distribution:
+
+| `date_kind` | records | pages | entries |
+|---|---:|---:|---:|
+| `filed` | 2,700,721 | 6,344 | 162 |
+| *(null — record carries no date)* | 86,723 | 774 | 32 |
+| `decided` | **39,110** | **390** | **9** |
+
+**`decided` reproduces §G1's cache-side measurement to the record — 39,110 / 390 / 9, from a
+completely different instrument.** §G1 counted sites in `development_reports.sites`; this counts
+rows the materializer wrote. They agree exactly, which is the strongest available evidence that
+both readings of the substitution are right.
+
+**Nothing a resident sees has changed.** `homesignalmap.html` does not read `date_kind`; the
+`.fdate` slot still renders a bare unlabelled date. That is piece (c).
+
+**What piece (b) must now classify** — with §G1 folded in, the non-`filed` set is larger than §F3
+estimated. `dallas-specific-use-permits` (30,975 records / 164 pages) was not in the §F3 table and
+is the single largest `decided` entry, bigger than Anne Arundel and Bentonville combined.

@@ -27,7 +27,7 @@
 // fixture scripts) does no type analysis, so a TYPE listed in a value import becomes a real
 // runtime import and fails to resolve. Deno erases it either way.
 import type {
-  Bucket, ColumnMap, ColumnRef, ExcludedStatus, NormalizedRecord, StatusToBucket,
+  Bucket, ColumnMap, ColumnRef, FileDateKind, ExcludedStatus, NormalizedRecord, StatusToBucket,
   UnmappedStatus, CaseFoldMatch, NormalizedLookup,
 } from "./socrata.ts";
 import { fenceGeocode, filedZipOf } from "./geo-fence.ts";
@@ -60,6 +60,10 @@ export interface CartoRegistryEntry {
   /** false → not run in ZIP-aggregate mode. Default true. */
   zip_mode?: boolean;
   /** drop rows whose file_date is older than N days (SQL now() - interval). */
+  /** Optional: what `column_map.file_date` MEANS on this dataset —
+   *  "filed" | "issued" | "scheduled" | "estimated" | "decided". Absent ⇒ "filed".
+   *  Declared, never inferred; it is what the page labels the date with. */
+  file_date_kind?: FileDateKind;
   recency_days?: number;
   /** Optional VERBATIM SQL clause AND'd into every query (drop noise types at source). */
   extra_where?: string;
@@ -284,6 +288,7 @@ async function normalizeRow(
     layer: layerFor(useType),
     status_raw: statusRaw,
     file_date: isoDay(readCol(row, cm.file_date)),
+    file_date_kind: entry.file_date_kind ?? "filed",
     decision_date: isoDay(readCol(row, cm.decision_date)),
     address,
     lat, lng, scope, geo_precision: geoPrecision,

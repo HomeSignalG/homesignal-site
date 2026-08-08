@@ -24,7 +24,7 @@
 // geometry {x:lng,y:lat} is flattened into __lng/__lat so the column_map reads it uniformly.
 
 import type {
-  Bucket, ColumnMap, ColumnRef, NormalizedRecord, StatusToBucket,
+  Bucket, ColumnMap, ColumnRef, FileDateKind, NormalizedRecord, StatusToBucket,
   ExcludedStatus, UnmappedStatus, CaseFoldMatch, NormalizedLookup,
 } from "./socrata.ts";
 import {
@@ -60,6 +60,10 @@ export interface ArcgisRegistryEntry {
   /** updated-at column for incremental `where`; also the paging sort key when present. */
   incremental_field?: string;
   /** drop rows whose file_date/incremental_field is older than N days. Absent ⇒ no filter. */
+  /** Optional: what `column_map.file_date` MEANS on this dataset —
+   *  "filed" | "issued" | "scheduled" | "estimated" | "decided". Absent ⇒ "filed".
+   *  Declared, never inferred; it is what the page labels the date with. */
+  file_date_kind?: FileDateKind;
   recency_days?: number;
   /** hard cap on rows pulled per dataset. Default 20000. */
   max_rows?: number;
@@ -454,6 +458,7 @@ async function normalizeRow(
     layer: layerFor(useType),
     status_raw: statusRaw,
     file_date: isoDay(readCol(row, cm.file_date)),
+    file_date_kind: entry.file_date_kind ?? "filed",
     decision_date: isoDay(readCol(row, cm.decision_date)),
     address,
     lat, lng, scope, geo_precision: geoPrecision,

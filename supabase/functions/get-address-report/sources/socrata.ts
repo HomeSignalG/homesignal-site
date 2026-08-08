@@ -100,6 +100,10 @@ export interface SocrataRegistryEntry {
   incremental_field?: string;
   /** Optional: drop rows whose file_date/incremental_field is older than N days (volume cap
    *  for high-history permit datasets). Absent ⇒ no recency filter. */
+  /** Optional: what `column_map.file_date` MEANS on this dataset —
+   *  "filed" | "issued" | "scheduled" | "estimated" | "decided". Absent ⇒ "filed".
+   *  Declared, never inferred; it is what the page labels the date with. */
+  file_date_kind?: FileDateKind;
   recency_days?: number;
   /** Optional VERBATIM SoQL predicate replacing the default recency comparison, for datasets
    *  whose date column is TEXT rather than a floating_timestamp. The default clause emits an
@@ -138,6 +142,13 @@ export interface SocrataRegistryEntry {
   max_rows?: number;
 }
 
+/** What the record's `file_date` MEANS. One unlabelled date slot was carrying four
+ *  different semantics (filed / issued / scheduled-or-estimated start / decided), so the
+ *  meaning is now declared per registry entry instead of inferred by the reader. Absent ⇒
+ *  "filed", which is what the overwhelming majority of permit ledgers already are — so no
+ *  entry needs editing to keep today's behaviour. See docs/accuracy-audit-2026-08.md §F3. */
+export type FileDateKind = "filed" | "issued" | "scheduled" | "estimated" | "decided";
+
 /** Normalized internal record — the brief's shape, carried through to development_reports.sites.
  *  `type` is the LIFECYCLE bucket the page renders (built|approved|proposed); the mapped source
  *  classification is `use_type` (kept separate so the two never collide). */
@@ -158,6 +169,8 @@ export interface NormalizedRecord {
   layer: string;                     // map layer, derived from use_type (never from the title)
   status_raw: string;
   file_date: string | null;
+  /** Declared meaning of file_date; defaults to "filed" when the entry says nothing. */
+  file_date_kind: FileDateKind;
   decision_date: string | null;
   address: string | null;
   lat: number | null;
@@ -478,6 +491,7 @@ async function normalizeRow(
     layer: layerFor(useType),
     status_raw: statusRaw,
     file_date: isoDay(readCol(row, cm.file_date)),
+    file_date_kind: entry.file_date_kind ?? "filed",
     decision_date: isoDay(readCol(row, cm.decision_date)),
     address,
     lat, lng, scope, geo_precision: geoPrecision,
