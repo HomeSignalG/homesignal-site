@@ -9972,11 +9972,11 @@
         "proposed": [],
         "approved": [
           "Approved - FSP",
-          "Approved - GDP"
+          "Approved - GDP",
+          "Under Construction"
         ],
         "operating": [
-          "Completed",
-          "Under Construction"
+          "Completed"
         ],
         "exclude": []
       },

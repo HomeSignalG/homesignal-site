@@ -11,6 +11,79 @@
 
 ---
 
+# ⭐ HEADLINE FINDING — the undated count conflated "we failed to read" with "there is nothing to read"
+
+**69% of the undated records were never a backlog.** Of **86,749** development records rendering with
+no date, **59,895 come from sources that publish no day-granularity date at all.** No refresh, no
+config change and no parser fix can recover them, because there is nothing to recover — and
+producing a date would mean inventing one, which is the single thing this tracker never does.
+
+| class | records | share | recoverable? |
+|---|---:|---:|---|
+| **the source publishes no usable date** — 7 entries | **59,895** | **69.0%** | **No. Undated is the correct output.** |
+| **programme-milestone dates only** — `hdot-active-design-projects` | 1,848 | 2.1% | Not by a date fix — date-semantics piece (b), `scheduled` |
+| **the parser could not read a published format** — 2 entries | 14,905 | 17.2% | **Yes** — the isoDay fix; 10,490 recovered so far |
+| **working mapping, minority of source rows blank** — 22 entries | ~10,101 | 11.6% | No. The publisher did not publish those values. |
+
+**The worked case.** `loudoun-county-residential-permits` is 45,618 records — more than half the
+total, and the one that looked most like a backlog. Its layer publishes exactly two date-like
+fields, both `esriFieldTypeString`, and the live values are `YEAR_ISSUED = "2011"` and
+`MONTH_ISSUED = "JUNE"`. A year and a month name. There is no day. Re-cached through the **deployed
+post-fix engine** at 13:44:39Z, ZIP 20129 returned 49 Loudoun sites and ZIP 20130 returned 6 — **0
+with a `file_date` on either**. That is the correct output, not a gap.
+
+## The control that makes this trustworthy
+
+The proof is not that nothing changed — it is that **a refresh through the FIXED engine changed
+nothing, on pages that demonstrably refreshed.** After the 12:58:34Z deploy these entries had pages
+re-cached through the new code, and their null counts are byte-identical before and after:
+
+| entry | pages refreshed since deploy | null before | null after |
+|---|---:|---:|---:|
+| `adot-tip-fy2026-2030` | 7 | 685 | **685** |
+| `mdot-sha-project-portal` | 4 | 30 | **30** |
+| `dallas-specific-use-permits` | 12 | 3 | **3** |
+| `nvdot-project-boundaries` | 2 | 2,928 | **2,928** |
+| `fdot-active-construction-projects` | 2 | 25 | **25** |
+
+Meanwhile the two entries the fix targets moved on the same code: `anaheim-land-use-cases`
+**796 → 0** (7 of 7 pages), `virginia-beach-building-permits` **14,109 → 4,415** (8 of 9 pages).
+Same engine, same run, opposite results — which is what separates "nothing to read" from "failed to
+read."
+
+**Every entry in the no-date class carries a POSITIVE receipt** in `docs/source-registry.md`
+("source publishes year/month only; undated is correct", and the equivalent for each), so no future
+session reads its null count as a queue. That conflation cost two separate investigations.
+
+Full working: §H2, §H3, §H6, §H7.
+
+# ⭐ SECOND HEADLINE — `dallas-specific-use-permits` renders a DECISION date in the filing slot on 164 pages
+
+Separate finding, separate fix path — it belongs with the **date-semantics** work, not with the
+undated-records work above.
+
+`app_refresh_zip` fills the resident-facing date from `coalesce(file_date, decision_date)`. Three
+entries declare **no** `file_date`, so every one of their records renders the date a case was
+*decided* in the position that reads as when it was *filed*:
+
+| entry | records | pages | what the date actually is |
+|---|---:|---:|---|
+| **`dallas-specific-use-permits`** | **30,975** | **164** | `EFFECTIVEDATE` — cache range 2009-03-27 → 2026-05-27 |
+| `anne-arundel-subdivision-activity` | 5,149 | 37 | `FN_APV_DT` (final approval) |
+| `anne-arundel-commercial-site-plans` | 2,367 | 37 | `FN_APV_DT` |
+| + 6 entries where only a minority of rows fall through | 619 | ~192 | mixed |
+| **total** | **39,110** | **390 distinct pages** | |
+
+**Dallas is 2.9× Anne Arundel's record count and 4.4× its page count** — the largest instance by a
+wide margin, and it was invisible until the config-vs-table pass, because nothing in the registry
+declares the substitution. It is already stamped `date_kind = 'decided'` in production (Round 6), so
+the fact is now recorded in the data; what remains is piece (c), rendering the label. Until then a
+Dallas resident reads a decision date as a filing date on 164 pages.
+
+Full working: §G1, §F2, §C3.
+
+---
+
 ## A. FINDINGS, ranked by how many residents see the error
 
 ### A1 🔴 `nyc-dob-permit-issuance` — 82.7% of records fall outside their own declared window · **202 pages**
@@ -1040,3 +1113,221 @@ before the deploy propagated; `23451` never completed at all. Both need a smalle
 established levers are `out_fields` projection and `page_size` (both already exist, default-off) or
 a narrower `spatial_zip_radius_mi` — which changes what residents see and is therefore a separate,
 gated decision, not part of this mechanical fix. Logged, not worked around.
+
+---
+
+# §H7 — Loudoun re-cached through the DEPLOYED engine: still 0 dated, and that is correct
+
+The question raised on the re-cache report was the right one: *processed and still null, or merely
+queued?* Both were checked, in that order.
+
+**First, the queue state at 13:47Z:** Loudoun had **0 of 18 pages refreshed since the deploy**
+(`development_reports.refreshed_at` newest 2026-08-08 05:30Z, i.e. before the 12:58:34Z deploy), and
+the pg_net worker was draining a 250-deep backlog. So "not moved" was, at that moment, *not yet
+processed* — the report of recovery covered only the 16 ZIPs pushed through by hand.
+
+**Then the decisive test.** Three Loudoun ZIPs were fired individually and two came back at
+**13:44:39Z**, through the deployed post-fix engine:
+
+| ZIP | Loudoun sites returned | sites carrying a `file_date` |
+|---|---:|---:|
+| 20129 | 49 | **0** |
+| 20130 | 6 | **0** |
+
+**Loudoun does not recover when processed.** The fix is reading exactly the column the registry
+names — `YEAR_ISSUED` — and that column holds `"2011"`. Running the *shipped* post-fix `isoDay`
+(extracted from `sources/arcgis.ts`) over Loudoun's real live values:
+
+```
+isoDay("2011")       -> null
+isoDay("JUNE")       -> null
+isoDay("2011 JUNE")  -> null
+isoDay("2023/01/03") -> "2023-01-03"     ← control: the fix works
+```
+
+A year is not a date, and `MONTH_ISSUED` is a month NAME with no day. Producing a rendered date here
+means inventing a day. **Loudoun's 45,618 records were never in the fix's scope** (§H2) — they are in
+the *source publishes no usable date* set (§H3), recorded as settled in `docs/source-registry.md`.
+
+**So the 86,749 undated total does not reduce to one fixable batch.** Its composition:
+
+| class | records | recoverable by the isoDay fix? |
+|---|---:|---|
+| source publishes no day-granularity date (loudoun 45,618 · delaware-county-pa 5,243 · colorado-springs 3,702 · nvdot 2,928 · akdot 909 · fort-collins 810 · adot 685) | **59,895** | **no** — nothing to map |
+| programme-milestone dates only (`hdot-active-design-projects`) | 1,848 | **no** — date-semantics piece (b), `scheduled` |
+| parser could not read a published format (virginia-beach, anaheim) | 14,905 | **yes** — 10,490 recovered so far |
+| working mapping, minority of source rows carry no value (topeka, savannah, little-rock, canyon, kenton, clark, irving, austin-zoning, louisville, + 13 more) | ~10,101 | **no** — the publisher did not publish them |
+
+⚠️ **`hdot` is broken out deliberately** — an earlier draft folded it into the no-date class at
+61,743. It is not the same thing: hdot publishes 21 real date fields, all programme milestones, so
+its records are undated only until piece (b) classifies them.
+
+## Re-measure, per entry (null before → null now, and pages refreshed since the 12:58:34Z deploy)
+
+| entry | null before | null now | pages | refreshed since deploy |
+|---|---:|---:|---:|---:|
+| `anaheim-land-use-cases` | 796 | **0** | 7 | **7** |
+| `virginia-beach-building-permits` | 14,109 | **4,415** | 9 | **8** |
+| `loudoun-county-residential-permits` | 45,618 | 45,618 | 18 | 0 |
+| `delaware-county-pa-subdivisions-land-developments` | 5,243 | 5,243 | 40 | 0 |
+| `topeka-building-permits` | 4,668 | 4,668 | 23 | 0 |
+| `colorado-springs-planning-applications` | 3,702 | 3,702 | 29 | 0 |
+| `nvdot-project-boundaries` | 2,928 | 2,928 | 139 | 2 |
+| `anne-arundel-subdivision-activity` | 2,007 | 2,007 | 37 | 0 |
+| `hdot-active-design-projects` | 1,848 | 1,848 | 85 | 0 |
+| `anne-arundel-commercial-site-plans` | 1,175 | 1,175 | 37 | 0 |
+| `akdot-stip-24-27` | 909 | 909 | 28 | 0 |
+| `fort-collins-building-permits` | 810 | 810 | 5 | 0 |
+| `savannah-commercial-building-permits` | 741 | 741 | 14 | 0 |
+| `adot-tip-fy2026-2030` | 685 | 685 | 181 | 7 |
+| `little-rock-permits` | 420 | 420 | 14 | 0 |
+| 16 more, each < 300 | 1,290 | 1,290 | — | 20 |
+
+**Only the two entries the fix targets have moved.** Every other entry's null count is byte-identical
+before and after, including the entries whose pages *have* refreshed since the deploy
+(`nvdot` 2 pages, `adot` 7, `mdot-sha` 4, `dallas` 12, `fdot` 2) — a refresh through the fixed engine
+changes nothing where the source publishes no date, which is the expected result and a second
+independent confirmation of the classification.
+
+⚠️ **`topeka-building-permits` is not recovering.** Its null count is unchanged at 4,668 and **0 of
+its 23 pages have refreshed since the deploy**. It never had zero dates — 79,420 of its 84,088 rows
+were already dated — so nothing about it changed; it is in the third class above.
+
+---
+
+# §H8 — There is a THIRD gap: re-cached is not materialized. And 23451's blocker is not payload size.
+
+Two corrections to §H6/§H7, both found by checking the cache rather than the table.
+
+## H8.1 `23456` was never a WORKER_RESOURCE_LIMIT case — its CACHE was already fixed
+
+Its `development_reports` row was refreshed by the nightly rolling job at **13:30Z** (post-deploy)
+and **all 2,302 of its Virginia Beach sites carry a `file_date`**, ranging 2026-01-02 → 2026-07-31.
+`app_projects` showed 0 dated purely because the row had not been re-materialized. One
+`app_refresh_zip('23456')` moved it to **1,957 / 1,957 dated**. The 546 I recorded for it came from
+an *extra manual fire* that raced the nightly job — a self-inflicted error, not the page's state.
+
+## H8.2 The general form — 1,532 ZIPs currently have a cache newer than their table
+
+```
+zips where development_reports.refreshed_at > max(app_projects.created_at):  1,532
+  … of those, lagging by more than 5 minutes:                                1,519
+  oldest such refresh:                                        2026-08-08 05:45Z
+```
+
+The mechanism, from `cron.job`:
+
+| job | schedule | what it updates |
+|---|---|---|
+| `dev-reports-rolling-refresh` → `dev_refresh_tick()` | **every 15 min** | `development_reports` (the cache) |
+| `app-content-refresh` → `app_refresh_batch(1500)` | **hourly, :40** | `app_projects` (what the page reads) — **1,500 ZIPs per hour** |
+
+At 12,722 pages and 1,500/hour, a full materialization sweep takes **~8.5 hours**, while the cache
+re-refreshes every 15 minutes. `dev_refresh_collect()` does **not** call `app_refresh_zip` — the two
+halves are independent jobs.
+
+**So the propagation chain is three stages, not two: merged → deployed → re-cached → materialized.**
+Measuring a fix from `app_projects` understates it by up to ~8.5 hours, and the understatement is
+invisible unless you compare `refreshed_at` against the table. This is the same shape as
+merged-is-not-deployed, one level further down, and it is now written down.
+
+## H8.3 `23451`'s blocker is the GEOCODER, not payload size — the options, measured
+
+Cached row sizes for all nine Virginia Beach pages are **0.02–0.28 MB** — nowhere near any size
+ceiling (the cache-wide high-water mark is Cleveland 44127 at 5.98 MB). Payload size is not the
+constraint. The cost is **geocoding**: the entry sets `geocode_assemble: true` and the layer carries
+**no coordinate columns at all**, so every record's `StreetAddress` goes through the geocoder.
+
+| ZIP | VB sites | addresses geocoded | row size | outcome |
+|---|---:|---:|---:|---|
+| 23451 | 2,605 | **2,458** | 0.28 MB | **546 WORKER_RESOURCE_LIMIT** ×2 |
+| 23456 | 2,302 | 1,957 | 0.26 MB | succeeded via the nightly job |
+| 23454 | 2,176 | 2,032 | 0.24 MB | succeeded |
+| 23452 | 2,070 | 1,996 | 0.23 MB | succeeded |
+
+23451 is the largest geocode load in the set and the only failure — but 23454 succeeded at 2,032,
+so the threshold is marginal rather than a hard wall.
+
+**The options, in order of how little they change:**
+
+1. **Retry as the geocode cache warms — no config change at all.** `public.geocodes` holds 98,033
+   cached results and the eight successful VB pages just added thousands of Virginia Beach
+   addresses. A later attempt does strictly less work than the ones that failed. **Recommended
+   first, because it changes nothing residents see.** (Fired again at the time of writing.)
+2. **`out_fields` projection** (additive, default-off, already exists). Reduces parse work, not
+   geocode work — so on the measured evidence this is unlikely to be decisive here.
+3. **`page_size`** (same). Fewer, larger fetches; also not the bottleneck.
+4. **Narrow `recency_days` from 365.** Halving the window roughly halves the geocode load and would
+   almost certainly clear it — but it **removes records residents currently see**, so it is a
+   founder call, not a mechanical fix.
+5. **Find a Virginia Beach layer that publishes coordinates**, eliminating the geocoder entirely.
+   Highest value, highest effort, and a new-source decision.
+
+**Nothing in 2–5 is applied.** 23451 remains on its 2026-08-03 (pre-fix) cache vintage, 2,458
+records undated, pending option 1 or a ruling.
+
+## H8.4 Recoverable class — final standing
+
+| entry | undated before | undated now | dated now | pages complete |
+|---|---:|---:|---:|---|
+| `anaheim-land-use-cases` | 796 | **0** | 796 | 7 of 7 |
+| `virginia-beach-building-permits` | 14,109 | **2,458** | 11,651 | **8 of 9** |
+| **total** | **14,905** | **2,458** | **12,447** | **15 of 16** |
+
+**12,447 of 14,905 recovered — 83.5%.** The entire remainder is one page, `23451`.
+
+---
+
+# §H9 — 23451: option 1 is EXHAUSTED. Options 2–5 with measured tradeoffs.
+
+**The warm-cache retry failed.** Third attempt, response `24081` at **2026-08-08 14:06:15Z**, again
+`546 WORKER_RESOURCE_LIMIT` — after eight other Virginia Beach pages had already warmed
+`public.geocodes` (98,033 rows). So "retry until the geocode cache carries it" is closed: the page
+does not clear on repetition. `23451`'s cache remains at its **2026-08-03 15:30Z** vintage with
+**0 of 2,605 VB sites carrying a `file_date`** — genuinely pre-fix, not materialization lag.
+
+**Measured facts the options have to work against.** Row size is not the constraint (0.28 MB against
+a cache-wide high-water mark of 5.98 MB). The layer publishes **no coordinate columns**, the entry is
+`geocode_assemble: true`, and **2,458 addresses** must go through the geocoder — the largest load in
+the set. 23454 succeeded at 2,032, so the ceiling sits somewhere in 2,032–2,458.
+
+| # | option | what it changes | measured effect | what residents lose |
+|---|---|---|---|---|
+| 2 | **`out_fields` projection** | additive, default-off, already shipped | layer has **17 fields, 6 mapped**; declared width 34,720 chars/row → a projection cuts roughly **2/3 of transfer and parse** | **nothing** |
+| 3 | **`page_size`** | additive, default-off, already shipped | fewer, larger fetches | **nothing** |
+| 4 | **narrow `recency_days` 365 → 180** | one registry value | VB's real span is only 2026-01-02 → 2026-07-31, so 365 barely binds: **9,848 of 11,651 (84.5%) are already inside 180 days**. Cuts ~15.5% → ~2,077 geocodes on 23451 — *marginally* under 23454's successful 2,032 | **~381 records on this page, ~1,803 across the entry** |
+| 4b | **narrow to 90 days** | one registry value | 4,744 of 11,651 (40.7%) survive → ~1,008 geocodes, comfortably clear | **59% of every VB record** |
+| 5 | **find a VB layer that publishes coordinates** | new source | removes the geocoder entirely; the only option that fixes the cause | **nothing** — but not probed yet, so unverified |
+
+**Recommendation, and the honest caveat.** Try **2 + 3 together first**: they are the only levers that
+cost residents nothing, they are already-shipped default-off options, and a 2/3 cut in parse work is
+the largest no-loss saving available. **But the bottleneck measured here is geocoding, not parsing**,
+so they may not be decisive — which is exactly why 4 and 4b are on the table and are a founder call:
+they buy headroom by deleting records residents currently see. **Option 5 is the only one that
+removes the cause**, and it has not been probed.
+
+**Nothing applied.** `23451` stays on its pre-fix vintage, 2,458 records undated, pending a ruling.
+
+---
+
+# §C — STATUS: DELIVERED (merged in #651, not a pending item)
+
+Recorded here because it has been asked for three times. §C and §C6 are complete and in this
+document above:
+
+- **§C1** — statuses asserting an unhappened event: **ZERO**, with positive controls proving the
+  detector fires (264 dead-state values, **all** mapped to `exclude`; 196 pending-family values,
+  **none** to built/operating).
+- **§C2** — the defect runs the other way: **Phoenix `OPEN` renders 43,054 records on 77 pages as
+  *Proposed* while carrying the city's own `PER_ISSUE_DATE`**, plus 4 entries mapping a bare
+  `Approved` to `proposed` while 78 map it to `approved`.
+- **§C3** — `decision_date` holds three different things across 59 declaring entries: 5 map a
+  status-change timestamp, 7 map an end/expiry date.
+- **§C6** — 42 entries carry 280 dead map keys; **0 unmapped live values, 0 case-fold-only matches**,
+  so no entry is in the drafted-from-assumption-twice state.
+
+**§C6 deliberately did NOT sub-classify the 280 dead keys.** Splitting them into "plausible vocabulary
+the source simply has not emitted lately" versus "values that cannot exist on this layer" requires a
+**live per-entry status enumeration** — the registry cannot answer it and neither can the table, since
+a dead key produces no rows by definition. That is a further pass (42 live probes), not a
+re-reading of what is already measured, and it is not claimed as done.
