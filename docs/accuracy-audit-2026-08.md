@@ -177,3 +177,112 @@ Also not run: **pages marked covered while empty, or honest-empty while records 
 **These four are where the two worst historical defects (DeKalb, Prince George's) actually lived.**
 Nothing in this document should be read as evidence they are clean — they were not examined. Each
 needs roughly 183 live probes and is a separate pass.
+
+---
+
+# ROUND 2 (2026-08-08) — FDOT, the national distinct-URL check, and the national future-date check
+
+## D1. FDOT — one confirmed defect, one premise that does not hold
+
+**Confirmed exactly as reported:** `fdot-active-construction-projects` = **4,394 records, 357 pages,
+`count(DISTINCT source_ref) = 1`**, `submitted_at` spanning **2009-03-03 → 2029-01-23**.
+
+### ❌ The record_url ruling does not apply — FDOT already declares `dataset`
+
+The instruction was to *"demote `record_url_precision` to whatever the true precision is — one URL
+for 4,394 records is 'agency', not 'record'."* **The entry already declares
+`"record_url_precision": "dataset"`.** One shared URL is exactly what `dataset` means, so the config
+is already honest and there is nothing to demote. No fix required, and none should be made.
+
+### ✅ CONFIRMED DEFECT — `file_date` is mapped to `StartDate`, a scheduled date
+
+`"file_date": "StartDate"` in the shipped `column_map`. **445 of 4,394 records (10.1%) carry a
+`submitted_at` in the future, out to 2029-01-23, on 113 pages.**
+
+**A filing or issue date cannot be in the future.** That alone proves `StartDate` is a *scheduled
+construction start*, not a filing date — the WSDOT class — and it is provable from production data
+without reaching the live layer (the FDOT endpoint did not answer through pg_net this pass, so the
+field-list confirmation is **not obtained**; the config mapping and the future dates are the
+evidence).
+
+**Two compounding stamps on the same entry, both affecting all 4,394 records on all 357 pages:**
+- `"status_const": "approved"` — every record is stamped approved regardless of real state.
+- `"use_type_const": "Utility"` — every record is typed Utility regardless of real type.
+
+So a resident on any of 113 Florida pages can see a project stamped **approved**, typed
+**Utility**, dated **2029** — a construction start that has not happened, presented with a date that
+reads as a filing.
+
+**Correction to my own Round-1 audit:** §A4 listed FDOT among the DOT programmes whose future dates
+are "correct and not findings." That was wrong for this entry — not because future dates are
+inherently wrong for a programme, but because the future value is landing in `file_date`, the field
+the page presents as when the thing was filed.
+
+⚠️ `recency_days` is **null** for FDOT, so there is no declared window to violate. The Round-2
+premise that "the window declaration is meaningless too" does not apply — there is no window
+declaration.
+
+## D2. National distinct-URL check — **CLEAN across all 22 record-precision entries**
+
+Run as directed, per `registry_id`: `count(DISTINCT source_ref)` against `count(*)`.
+
+**First, why the raw ratio is not the test.** `app_projects.source_ref` is the **service URL**,
+constant per entry for **142 of 175** entries — including entries that are entirely correct. Run
+unqualified, the check flags 81% of the registry. It only discriminates when combined with the
+**declared** precision, which is how it was run here.
+
+**Result: 21 live entries claim `record_url_precision: "record"` (the 22nd, `austin-issued-construction-permits`, is dormant with 0 records). NONE has a ratio near 1/N.**
+
+| lowest ratios | records | distinct URLs | ratio |
+|---|---:|---:|---:|
+| `austin-zoning-cases` | 55,928 | 4,958 | 0.089 |
+| `charlotte-land-dev-commercial-projects` | 19,853 | 1,762 | 0.089 |
+| `tucson-residential-building-permits` | 11,849 | 2,283 | 0.193 |
+
+Low ratios here are the **overlapping-ZIP-circle effect** (one record cached on several pages), not
+a shared URL. Five entries sit at a perfect **1.0000** (`fort-collins`, `tucson-commercial`,
+`austin-site-plan-cases`, `slc-planning-petitions`, `austin-subdivision-cases`).
+
+**So this check would NOT have caught FDOT** — FDOT declares `dataset`, correctly, and never appears
+in the candidate set. It also would not have caught the Champaign `G:\` defect, which was a
+record-precision entry whose URLs were *distinct* and *unopenable*. **Distinctness and resolvability
+are different properties**; only fetching tests the second.
+
+## D3. National future-date check — **13,285 records · 20 entries · 1,436 pages (11.3% of all pages)**
+
+Split by whether a future date is explicable:
+
+**Programme entries — future dates are CORRECT, not findings** (a STIP/6-year plan is a schedule):
+`mdot-stip` 5,467 (73.8%) · `ctdot` 2,308 · `wisdot` 1,785 (98.0%) · `wsdot-proposed` 731 (100%) ·
+`vtrans` 398 (96.1%) · `maine-dot` 243 (54.7%) · `mdot-sha` 25 · `columbia-mo-capital` 180.
+
+**⚠️ FDOT is the exception among programmes** — see D1. Its future value lands in `file_date`, and it
+is stamped `approved`, so it reads as a filed, approved project rather than a schedule.
+
+**Permit entries — a future filing date is NOT explicable:**
+
+| entry | future | of total | pages | furthest |
+|---|---:|---:|---:|---|
+| `bentonville-catalyst-permits` | **1,427** | 31,632 | 9 | 2026-12-06 |
+| `lexington-row-permits` | 251 | 8,815 | 14 | 2026-10-05 |
+| `lee-county-fl-development-orders` | 8 | 4,851 | 2 | 2027-09-20 |
+| `champaign-il-special-use-permits` | 6 | 255 | 6 | **9999-09-09** |
+| `brunswick-county-permits` | 3 | 155,316 | 3 | **2099-02-12** |
+| `bend-or-permit-applications` | 2 | 7,974 | 2 | **2033-10-20** |
+| `new-hanover-county-building-permits` | 2 | 37,234 | 2 | 2027-06-15 |
+| `murfreesboro` · `thurston` · `summit-county-oh` · `columbia-mo-permits` | 1 each | — | 1 each | — |
+
+## D4. Anne Arundel — **NOT closed; both entries are live**
+
+Reported as *"returns 0 rows in app_projects — the retirement already took effect."* Measured:
+
+| entry | records | pages |
+|---|---:|---:|
+| `anne-arundel-subdivision-activity` | **7,148** | 37 |
+| `anne-arundel-commercial-site-plans` | **3,544** | 37 |
+
+Neither is retired and neither returns 0. No Anne Arundel finding was raised in Round 1, so there
+was nothing to close — but the entries should not be recorded as retired, because they are serving
+10,692 records on 37 pages today. (`subdivision-activity` carries records back to **1989-03-29** and
+1,999 undated rows; `commercial-site-plans` back to **2000-05-23** with 1,177 undated — both already
+counted in §A3.)
