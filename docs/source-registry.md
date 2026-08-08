@@ -8881,3 +8881,52 @@ trusts it.
 CARB dataset, *Vehicle Fuel Economy* · ArcGIS tier → not an org, control-proven · facility tool →
 server-rendered HTML, no API). **It reopens only on a founder-supplied endpoint**, at which point
 the first deliverable is the measured overlap, not a wire.
+
+## SETTLED — sources that publish no usable date (founder ruling, 2026-08-08)
+
+**These are decisions, not open questions. Do not re-investigate; do not "fix" them.** Each was
+probed live via `pg_net` against the layer's own `?f=json` field list on 2026-08-08, and the
+verdict is stated positively so a future session finds an answer rather than a gap. Full working:
+`docs/accuracy-audit-2026-08.md` §H3.
+
+| entry | what the layer publishes | verdict |
+|---|---|---|
+| `colorado-springs-planning-applications` | no date-like field of any kind | **The source publishes no date; undated is correct.** |
+| `fort-collins-building-permits` | no date field (only `B1_APPL_STATUS`) | **The source publishes no date; undated is correct.** |
+| `nvdot-project-boundaries` | only `Data_Collection_Date` — when the GIS layer was collected, not a project milestone | **The source publishes no project date; undated is correct.** |
+| `delaware-county-pa-subdivisions-land-developments` | `Year` (Integer) | **Year granularity only; undated is correct.** A year is not a date and must not be rendered as one. |
+| `akdot-stip-24-27` | `STIP_Year`, `Year_24`…`Year_27` | **Programme year only; undated is correct.** |
+| `adot-tip-fy2026-2030` | `TOTAL_YEAR` (Integer) | **Programme year only; undated is correct.** |
+| `loudoun-county-residential-permits` | `YEAR_ISSUED` = `"2011"` and `MONTH_ISSUED` = `"JUNE"` — both String, **no day** | **Year + month only; undated is correct.** Composing the two would require inventing a day. (`column_map` arrays JOIN values, they do not fall back — the UDOT standing answer — so there is no config route either.) |
+
+**Not on this list, and why:**
+- `hdot-active-design-projects` publishes **21 programme-milestone date fields** (`awarddate`,
+  `bid_open_date`, `ntpdate`, `actual_advertise_date`, `construction_date`, …). It is **not**
+  undated — it is a `file_date_kind: "scheduled"` case for date-semantics piece (b). Wiring one of
+  those into today's unlabelled date slot would relocate the ambiguity, not fix it.
+- The ~22 entries with a *minority* of undated rows (`topeka` 4,668 of 84,077, `savannah` 741 of
+  3,550, `little-rock` 420 of 48,951, …) have a **working** mapping; those individual source rows
+  carry no value. Nothing in config or code can recover a value the publisher did not publish.
+
+## DEFECT (FIXED 2026-08-08): isoDay() could not read year-first slash dates
+
+`sources/arcgis.ts` and `sources/socrata.ts` each carry their own `isoDay()`. Both accepted
+`YYYY-MM-DD`, `M/D/YYYY`, epoch milliseconds and 13-digit epoch strings — and **silently returned
+`null` for `YYYY/MM/DD`**, which two live sources publish as String columns:
+
+```
+virginia-beach-building-permits  IssueDate            "2023/01/03"   14,109 records /  9 pages
+anaheim-land-use-cases           Application_Received "2008/08/19"      796 records /  7 pages
+```
+
+Both entries declared the correct column, so nothing looked wrong in config, in CI, or in the run
+report — the records simply rendered undated. Found by the config-vs-table divergence pass
+(`docs/accuracy-audit-2026-08.md` §G2), not by any config-only check.
+
+Fix: one added regex per file, **disjoint from the existing patterns** (a 4-digit leading group can
+never match `M/D/YYYY`), so it can only turn a null into a date. Pinned by
+`test/iso-day-year-first-slash.test.mjs`, which drives the shipped source, asserts every prior form
+is byte-identical, and is proven to fail when the branch is removed.
+
+**`ckan` / `csv` / `carto` were checked and are NOT affected** — their `isoDay` delegates to
+`new Date()`, which already accepts the form.

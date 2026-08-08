@@ -32,7 +32,7 @@
 // fixture scripts) does no type analysis, so a TYPE listed in a value import becomes a real
 // runtime import and fails to resolve. Deno erases it either way.
 import type {
-  Bucket, ColumnMap, ColumnRef, ExcludedStatus, NormalizedRecord, StatusToBucket,
+  Bucket, ColumnMap, ColumnRef, FileDateKind, ExcludedStatus, NormalizedRecord, StatusToBucket,
   UnmappedStatus, CaseFoldMatch, NormalizedLookup,
 } from "./socrata.ts";
 import { fenceGeocode, filedZipOf } from "./geo-fence.ts";
@@ -61,6 +61,10 @@ export interface CsvRegistryEntry {
   zip_mode?: boolean;
   /** drop rows whose file_date is older than N days (applied in-memory on the parsed
    *  date at cache-build time). Absent ⇒ no filter. */
+  /** Optional: what `column_map.file_date` MEANS on this dataset —
+   *  "filed" | "issued" | "scheduled" | "estimated" | "decided". Absent ⇒ "filed".
+   *  Declared, never inferred; it is what the page labels the date with. */
+  file_date_kind?: FileDateKind;
   recency_days?: number;
   /** VERBATIM whitelist on column_map.type_source values — the CSV twin of the SQL
    *  connectors' extra_where noise drop. Rows whose type is not listed are dropped at
@@ -317,6 +321,7 @@ async function normalizeRow(
     layer: layerFor(useType),
     status_raw: statusRaw,
     file_date: isoDay(readCol(row, cm.file_date)),
+    file_date_kind: entry.file_date_kind ?? "filed",
     decision_date: isoDay(readCol(row, cm.decision_date)),
     address,
     lat, lng, scope, geo_precision: geoPrecision,

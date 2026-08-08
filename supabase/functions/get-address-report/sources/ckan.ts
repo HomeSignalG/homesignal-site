@@ -23,7 +23,7 @@
 // fixture scripts) does no type analysis, so a TYPE listed in a value import becomes a real
 // runtime import and fails to resolve. Deno erases it either way.
 import type {
-  Bucket, ColumnMap, ColumnRef, ExcludedStatus, NormalizedRecord, StatusToBucket,
+  Bucket, ColumnMap, ColumnRef, FileDateKind, ExcludedStatus, NormalizedRecord, StatusToBucket,
   UnmappedStatus, CaseFoldMatch, NormalizedLookup,
 } from "./socrata.ts";
 import {
@@ -53,6 +53,10 @@ export interface CkanRegistryEntry {
   /** false → not run in ZIP-aggregate mode. Default true. */
   zip_mode?: boolean;
   /** drop rows whose file_date is older than N days. Absent ⇒ no filter. */
+  /** Optional: what `column_map.file_date` MEANS on this dataset —
+   *  "filed" | "issued" | "scheduled" | "estimated" | "decided". Absent ⇒ "filed".
+   *  Declared, never inferred; it is what the page labels the date with. */
+  file_date_kind?: FileDateKind;
   recency_days?: number;
   /** Escape hatch for a TEXT date column, where the default clause's ISO literal compares
    *  LEXICOGRAPHICALLY and can silently match nothing (the nyc-dob-permit-issuance shape).
@@ -282,6 +286,7 @@ async function normalizeRow(
     layer: layerFor(useType),
     status_raw: statusRaw,
     file_date: isoDay(readCol(row, cm.file_date)),
+    file_date_kind: entry.file_date_kind ?? "filed",
     decision_date: isoDay(readCol(row, cm.decision_date)),
     address,
     lat, lng, scope, geo_precision: geoPrecision,

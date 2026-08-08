@@ -24,7 +24,7 @@
 // geometry {x:lng,y:lat} is flattened into __lng/__lat so the column_map reads it uniformly.
 
 import type {
-  Bucket, ColumnMap, ColumnRef, NormalizedRecord, StatusToBucket,
+  Bucket, ColumnMap, ColumnRef, FileDateKind, NormalizedRecord, StatusToBucket,
   ExcludedStatus, UnmappedStatus, CaseFoldMatch, NormalizedLookup,
 } from "./socrata.ts";
 import {
@@ -60,6 +60,10 @@ export interface ArcgisRegistryEntry {
   /** updated-at column for incremental `where`; also the paging sort key when present. */
   incremental_field?: string;
   /** drop rows whose file_date/incremental_field is older than N days. Absent ⇒ no filter. */
+  /** Optional: what `column_map.file_date` MEANS on this dataset —
+   *  "filed" | "issued" | "scheduled" | "estimated" | "decided". Absent ⇒ "filed".
+   *  Declared, never inferred; it is what the page labels the date with. */
+  file_date_kind?: FileDateKind;
   recency_days?: number;
   /** hard cap on rows pulled per dataset. Default 20000. */
   max_rows?: number;
@@ -454,6 +458,7 @@ async function normalizeRow(
     layer: layerFor(useType),
     status_raw: statusRaw,
     file_date: isoDay(readCol(row, cm.file_date)),
+    file_date_kind: entry.file_date_kind ?? "filed",
     decision_date: isoDay(readCol(row, cm.decision_date)),
     address,
     lat, lng, scope, geo_precision: geoPrecision,
@@ -842,6 +847,13 @@ function isoDay(v: unknown): string | null {
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
   const md = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (md) return `${md[3]}-${md[1].padStart(2, "0")}-${md[2].padStart(2, "0")}`;
+  // YEAR-first slash form, e.g. "2023/01/03". Unambiguous (a 4-digit leading group can never
+  // be a month or day) and disjoint from the two patterns above, so this only ever turns a
+  // null into a date. Two live sources publish it as a STRING column and every row was being
+  // silently dropped: virginia-beach-building-permits (IssueDate) and anaheim-land-use-cases
+  // (Application_Received). docs/accuracy-audit-2026-08.md §H1.
+  const ymd = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  if (ymd) return `${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}`;
   if (/^\d{13}$/.test(s)) { const d = new Date(Number(s)); if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10); }
   return null;
 }
