@@ -1040,3 +1040,77 @@ before the deploy propagated; `23451` never completed at all. Both need a smalle
 established levers are `out_fields` projection and `page_size` (both already exist, default-off) or
 a narrower `spatial_zip_radius_mi` — which changes what residents see and is therefore a separate,
 gated decision, not part of this mechanical fix. Logged, not worked around.
+
+---
+
+# §H7 — Loudoun re-cached through the DEPLOYED engine: still 0 dated, and that is correct
+
+The question raised on the re-cache report was the right one: *processed and still null, or merely
+queued?* Both were checked, in that order.
+
+**First, the queue state at 13:47Z:** Loudoun had **0 of 18 pages refreshed since the deploy**
+(`development_reports.refreshed_at` newest 2026-08-08 05:30Z, i.e. before the 12:58:34Z deploy), and
+the pg_net worker was draining a 250-deep backlog. So "not moved" was, at that moment, *not yet
+processed* — the report of recovery covered only the 16 ZIPs pushed through by hand.
+
+**Then the decisive test.** Three Loudoun ZIPs were fired individually and two came back at
+**13:44:39Z**, through the deployed post-fix engine:
+
+| ZIP | Loudoun sites returned | sites carrying a `file_date` |
+|---|---:|---:|
+| 20129 | 49 | **0** |
+| 20130 | 6 | **0** |
+
+**Loudoun does not recover when processed.** The fix is reading exactly the column the registry
+names — `YEAR_ISSUED` — and that column holds `"2011"`. Running the *shipped* post-fix `isoDay`
+(extracted from `sources/arcgis.ts`) over Loudoun's real live values:
+
+```
+isoDay("2011")       -> null
+isoDay("JUNE")       -> null
+isoDay("2011 JUNE")  -> null
+isoDay("2023/01/03") -> "2023-01-03"     ← control: the fix works
+```
+
+A year is not a date, and `MONTH_ISSUED` is a month NAME with no day. Producing a rendered date here
+means inventing a day. **Loudoun's 45,618 records were never in the fix's scope** (§H2) — they are in
+the *source publishes no usable date* set (§H3), recorded as settled in `docs/source-registry.md`.
+
+**So the 86,749 undated total does not reduce to one fixable batch.** Its composition:
+
+| class | records | recoverable by the isoDay fix? |
+|---|---:|---|
+| source publishes no day-granularity date (loudoun, delaware-county-pa, colorado-springs, nvdot, hdot, akdot, adot, fort-collins) | **61,743** | **no** — nothing to map |
+| parser could not read a published format (virginia-beach, anaheim) | 14,905 | **yes** — 10,490 recovered so far |
+| working mapping, minority of source rows carry no value (topeka, savannah, little-rock, canyon, kenton, clark, irving, austin-zoning, louisville, + 13 more) | ~10,101 | **no** — the publisher did not publish them |
+
+## Re-measure, per entry (null before → null now, and pages refreshed since the 12:58:34Z deploy)
+
+| entry | null before | null now | pages | refreshed since deploy |
+|---|---:|---:|---:|---:|
+| `anaheim-land-use-cases` | 796 | **0** | 7 | **7** |
+| `virginia-beach-building-permits` | 14,109 | **4,415** | 9 | **8** |
+| `loudoun-county-residential-permits` | 45,618 | 45,618 | 18 | 0 |
+| `delaware-county-pa-subdivisions-land-developments` | 5,243 | 5,243 | 40 | 0 |
+| `topeka-building-permits` | 4,668 | 4,668 | 23 | 0 |
+| `colorado-springs-planning-applications` | 3,702 | 3,702 | 29 | 0 |
+| `nvdot-project-boundaries` | 2,928 | 2,928 | 139 | 2 |
+| `anne-arundel-subdivision-activity` | 2,007 | 2,007 | 37 | 0 |
+| `hdot-active-design-projects` | 1,848 | 1,848 | 85 | 0 |
+| `anne-arundel-commercial-site-plans` | 1,175 | 1,175 | 37 | 0 |
+| `akdot-stip-24-27` | 909 | 909 | 28 | 0 |
+| `fort-collins-building-permits` | 810 | 810 | 5 | 0 |
+| `savannah-commercial-building-permits` | 741 | 741 | 14 | 0 |
+| `adot-tip-fy2026-2030` | 685 | 685 | 181 | 7 |
+| `little-rock-permits` | 420 | 420 | 14 | 0 |
+| 16 more, each < 300 | 1,290 | 1,290 | — | 20 |
+
+**Only the two entries the fix targets have moved.** Every other entry's null count is byte-identical
+before and after, including the entries whose pages *have* refreshed since the deploy
+(`nvdot` 2 pages, `adot` 7, `mdot-sha` 4, `dallas` 12, `fdot` 2) — a refresh through the fixed engine
+changes nothing where the source publishes no date, which is the expected result and a second
+independent confirmation of the classification.
+
+⚠️ **`topeka-building-permits` is not recovering.** Its null count is unchanged at 4,668 and **0 of
+its 23 pages have refreshed since the deploy**. It never had zero dates — 79,420 of its 84,088 rows
+were already dated — so nothing about it changed; it is in the third class above.
