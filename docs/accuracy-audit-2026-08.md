@@ -606,3 +606,28 @@ It compares **presence**, not **correctness**: it can prove a declared column pr
 that a value arrived from a field config never named, but it cannot tell whether a populated value is
 the *right* one. §A1 (nyc-dob out-of-window), §D1 (FDOT `StartDate`) and §E2 (lexington
 `EstimatedStartDate`) are that other class, and §C is still owed.
+
+## G7. Correction to this audit's own denominator: 182 operative entries, not 183
+
+`jurisdiction-registry.json` carries **183 entries across six platform arrays**, but `index.ts`
+reads five of them — verbatim, lines 70–78:
+
+```
+const SOCRATA_ENTRIES = (… { socrata?: … }).socrata ?? [];
+const ARCGIS_ENTRIES  = (… { arcgis?:  … }).arcgis  ?? [];
+const CKAN_ENTRIES    = (… { ckan?:    … }).ckan    ?? [];
+const CSV_ENTRIES     = (… { csv?:     … }).csv     ?? [];
+const CARTO_ENTRIES   = (… { carto?:   … }).carto   ?? [];
+```
+
+There is no `opendatasoft` binding and no `opendatasoftForZip()` call; `grep -rni opendatasoft
+--include=*.ts` over the function directory returns **zero** hits (the grep is proven live — the same
+pattern's `ods` substring matches `index.ts:136`, so it was reading the files). The registry's own
+`_opendatasoft_readme` states this outright: *"the connector is NOT BUILT YET — sources/ has no
+opendatasoft.ts and index.ts makes no opendatasoftForZip() call, so NOTHING READS THIS ARRAY at
+runtime."*
+
+So `shelby-county-building-permits` is dormant **by design**, not by defect — it is staged data
+awaiting an additive connector. **Every "183 entries" figure in Rounds 1–4 and in
+`docs/source-inventory.md` is a count of declared entries, of which 182 are on a live code path.**
+No finding changes; the denominator does.
