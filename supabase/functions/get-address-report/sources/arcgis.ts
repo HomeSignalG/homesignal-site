@@ -847,6 +847,13 @@ function isoDay(v: unknown): string | null {
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
   const md = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (md) return `${md[3]}-${md[1].padStart(2, "0")}-${md[2].padStart(2, "0")}`;
+  // YEAR-first slash form, e.g. "2023/01/03". Unambiguous (a 4-digit leading group can never
+  // be a month or day) and disjoint from the two patterns above, so this only ever turns a
+  // null into a date. Two live sources publish it as a STRING column and every row was being
+  // silently dropped: virginia-beach-building-permits (IssueDate) and anaheim-land-use-cases
+  // (Application_Received). docs/accuracy-audit-2026-08.md §H1.
+  const ymd = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  if (ymd) return `${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}`;
   if (/^\d{13}$/.test(s)) { const d = new Date(Number(s)); if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10); }
   return null;
 }

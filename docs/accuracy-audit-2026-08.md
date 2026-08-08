@@ -788,3 +788,116 @@ closed and excludes it), so this is the only visibility config drift has.
 - **Whether an entry's chosen `status_raw` column is the best one available** on the layer. That
   needs a live field-list probe per entry (the same gap `registry-type-path-coherence` records).
 - **Per-record correctness of any status** — only the mapping from a status value to a band.
+
+---
+
+# §H — The undated 32, probed live. Correction first.
+
+## H0. The classification in the ruling does not match the data — checking before acting
+
+The ruling partitioned the undated set as **12 mechanical + 4 date-semantics + 4 genuinely
+undated = 20**. That partition is not from any measurement in this audit, and two of its named
+entries do not exist:
+
+| named | checked | result |
+|---|---|---|
+| `tampa` | substring scan of `jurisdiction-registry.json` | **0 occurrences.** Tampa was a Florida candidate **rejected at smoke** (the city's WAF 403s Supabase edge-runtime egress) — it was never wired, has no records, and so cannot be undated. |
+| `mecklenburg` | same scan | **1 occurrence — as a `coverage.county` on `charlotte-land-dev-commercial-projects`**, not an entry id. That entry is fully dated: 19,853 rows, 19,853 dated. |
+| `delaware-county-pa … "entered"` | registry | it declares **no** `file_date` and **no** `decision_date`; there is no `entered` mapping. |
+| `colorado-springs … "decided"` | live field list | the layer publishes **no date-like field at all** — nothing to label `decided`. |
+| control | `loudoun` | 5 occurrences — the scan reads the file. |
+
+The real set is **32 entries + 1 null-registry group** (the five TX TDLR/TABS filings on 78617,
+which are not registry-driven). Enumerated and probed rather than partitioned by assumption.
+
+## H1. The one genuine mechanical fix — a date parser that could not read a published format
+
+`isoDay()` in `sources/arcgis.ts` and `sources/socrata.ts` accepted `YYYY-MM-DD`, `M/D/YYYY`,
+epoch ms and 13-digit epoch strings. It did **not** accept the year-first slash form. Live receipts
+(pg_net, 2026-08-08, `?f=json` field lists then real rows):
+
+```
+virginia-beach … /query?outFields=IssueDate,ApplicationDate,FinalDate
+  → {"IssueDate":"2023/01/03","ApplicationDate":"2023/01/01","FinalDate":"2023/04/27"}   [String]
+anaheim       … /query?outFields=Application_Received,City_Council_Date
+  → {"Application_Received":"2008/08/19","City_Council_Date":" "}                        [String]
+```
+
+Both entries declare the correct column. The source publishes a real date, the registry names it,
+and the parser dropped every row — the exact shape the ruling describes. **One added regex, in two
+files, strictly disjoint from the existing patterns** (a 4-digit leading group can never match
+`M/D/YYYY`), so it can only turn a null into a date. Pinned by
+`test/iso-day-year-first-slash.test.mjs`, which drives the shipped source, covers every prior form
+to prove none moved, and fails when the new branch is removed. Suite **91/91 green**.
+
+Expected recovery, to be measured against these null counts after deploy + re-cache:
+
+| entry | undated now | pages |
+|---|---:|---:|
+| `virginia-beach-building-permits` | 14,109 | 9 |
+| `anaheim-land-use-cases` | 796 | 7 |
+
+**`ckan` / `csv` / `carto` were checked and are not affected** — their `isoDay` uses `new Date()`,
+which already accepts the form.
+
+## H2. Loudoun is NOT a mechanical fix — the source publishes no day
+
+Loudoun (45,618 records / 18 pages) was the ruling's headline case. Its layer carries exactly two
+date-like fields, both `esriFieldTypeString`, and the live values are:
+
+```
+{"YEAR_ISSUED":"2011","MONTH_ISSUED":"JUNE"}
+```
+
+**Year and month NAME — no day.** There is no column to map. Composing the two would not help
+(`column_map` arrays JOIN values, they do not fall back — the UDOT standing answer), and turning
+`2011` + `JUNE` into a rendered date would require inventing a day, which is the one thing this
+tracker never does. The registry's `YEAR_ISSUED` mapping is not wrong so much as unusable at the
+granularity the page needs. Recorded positively; not fixed.
+
+## H3. The rest of the 32, by why they are undated
+
+**Probed live (`?f=json`), so the absence is a finding rather than an assumption:**
+
+| entry | rows | what the layer actually publishes | verdict |
+|---|---:|---|---|
+| `colorado-springs-planning-applications` | 3,702 | **no date-like field at all** | source publishes no date; undated is correct |
+| `fort-collins-building-permits` | 810 | no date field (`B1_APPL_STATUS` only) | source publishes no date; undated is correct |
+| `nvdot-project-boundaries` | 2,928 | only `Data_Collection_Date` — when the GIS layer was collected, not a project date | source publishes no project date; undated is correct |
+| `delaware-county-pa-subdivisions-land-developments` | 5,243 | `Year` (Integer) | year granularity only; undated is correct |
+| `akdot-stip-24-27` | 909 | `STIP_Year`, `Year_24`…`Year_27` | programme year only; undated is correct |
+| `adot-tip-fy2026-2030` | 685 | `TOTAL_YEAR` | programme year only; undated is correct |
+| `loudoun-county-residential-permits` | 45,618 | `YEAR_ISSUED` + `MONTH_ISSUED` (see §H2) | year + month only; undated is correct |
+| `hdot-active-design-projects` | 1,848 | **21 programme-milestone date fields** (`awarddate`, `bid_open_date`, `ntpdate`, `actual_advertise_date`, `construction_date`, …) | **NOT undated — belongs to date-semantics piece (b) as `scheduled`** |
+
+**The remaining 22 entries are a different thing entirely and must not be batched with the above.**
+Their mapping *works*; a minority of source rows simply carry no value — `topeka` 4,668 undated of
+84,077 (5.5%), `savannah` 741 of 3,550, `little-rock` 420 of 48,951, `canyon-county` 294,
+`kenton-county` 158, `clark-county-active-projects` 139, `irving` 77, `austin-zoning-cases` 67,
+`louisville` 48, and 13 more in single or double digits. **No config or code change can recover a
+value the publisher did not publish**, and treating these as "mechanical fixes" would mean
+inventing dates. Left as-is, deliberately.
+
+## H4. `hdot` and the four `decided` cases fold into date-semantics, per Ruling 2
+
+Mapping `hdot`'s `awarddate` (or any of its 20 siblings) into the current unlabelled slot would
+relocate the ambiguity exactly as the ruling says — a programme milestone reading as a filing date.
+It is therefore piece (b) work with `file_date_kind: "scheduled"`, not a mechanical fix, and is not
+wired here. Same for the substitution cases already stamped `decided` in Round 6
+(`anne-arundel` ×2, `dallas-specific-use-permits`).
+
+## H5. COVERAGE STATEMENT ABOUT THIS AUDIT ITSELF
+
+**Rounds §A–§C read configuration. A materializer substitution is structurally invisible to that
+instrument** — the transformation happens in `app_refresh_zip`, downstream of every field those
+rounds inspected, so no amount of care reading `jurisdiction-registry.json` could have surfaced it.
+§F2 found the first instance only because it compared a rendered date against a cached one; §G1
+found the other eight only because it compared config against the table for every entry.
+
+Concretely, reading config alone: could not see that 39,110 records on 390 pages render a decision
+date in the filing slot; could not see that three entries declare a `file_date` column that fires
+on no row; could not see that 49,884 records carry no coordinates. All three needed the table.
+
+**Any future check of this system that reads only the registry should say so in its own report.**
+An audit that read only config and says so is honest; one that read only config and implies
+completeness is not.
