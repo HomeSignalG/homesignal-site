@@ -8884,26 +8884,38 @@ the first deliverable is the measured overlap, not a wire.
 
 ## SETTLED — sources that publish no usable date (founder ruling, 2026-08-08)
 
+> 🛑 **READ THIS BEFORE TREATING ANY NULL DATE COUNT AS A BACKLOG.** These entries' records render
+> undated **because that is correct**, not because a refresh is pending. **59,895 records — 69% of
+> every undated development record in production — are in this class.** A null count here is a
+> finished state. It sent two separate investigations down a dead end before it was written down;
+> the whole point of the positive wording below is that a future session finds a DECISION, not a
+> gap. If you are about to re-probe one of these, don't: read its receipt and move on.
+
 **These are decisions, not open questions. Do not re-investigate; do not "fix" them.** Each was
 probed live via `pg_net` against the layer's own `?f=json` field list on 2026-08-08, and the
 verdict is stated positively so a future session finds an answer rather than a gap. Full working:
 `docs/accuracy-audit-2026-08.md` §H3.
 
-| entry | what the layer publishes | verdict |
-|---|---|---|
-| `colorado-springs-planning-applications` | no date-like field of any kind | **The source publishes no date; undated is correct.** |
-| `fort-collins-building-permits` | no date field (only `B1_APPL_STATUS`) | **The source publishes no date; undated is correct.** |
-| `nvdot-project-boundaries` | only `Data_Collection_Date` — when the GIS layer was collected, not a project milestone | **The source publishes no project date; undated is correct.** |
-| `delaware-county-pa-subdivisions-land-developments` | `Year` (Integer) | **Year granularity only; undated is correct.** A year is not a date and must not be rendered as one. |
-| `akdot-stip-24-27` | `STIP_Year`, `Year_24`…`Year_27` | **Programme year only; undated is correct.** |
-| `adot-tip-fy2026-2030` | `TOTAL_YEAR` (Integer) | **Programme year only; undated is correct.** |
-| `loudoun-county-residential-permits` | `YEAR_ISSUED` = `"2011"` and `MONTH_ISSUED` = `"JUNE"` — both String, **no day** | **Year + month only; undated is correct.** Composing the two would require inventing a day. (`column_map` arrays JOIN values, they do not fall back — the UDOT standing answer — so there is no config route either.) |
+| entry | records | pages | what the layer publishes (live `?f=json` + real rows, 2026-08-08) | verdict — POSITIVE |
+|---|---:|---:|---|---|
+| `loudoun-county-residential-permits` | 45,618 | 18 | `YEAR_ISSUED` = `"2011"` and `MONTH_ISSUED` = `"JUNE"` — both String, **no day** | **The source publishes year and month only; undated is correct.** Composing the two would require inventing a day. Re-cached through the deployed post-fix engine 2026-08-08 13:44:39Z: ZIP 20129 → 49 sites, ZIP 20130 → 6 sites, **0 with a `file_date` on either**. |
+| `delaware-county-pa-subdivisions-land-developments` | 5,243 | 40 | `Year` (Integer) | **The source publishes a year only; undated is correct.** A year is not a date and must not be rendered as one. |
+| `colorado-springs-planning-applications` | 3,702 | 29 | **no date-like field of any kind** | **The source publishes no date; undated is correct.** |
+| `nvdot-project-boundaries` | 2,928 | 139 | only `Data_Collection_Date` — when the GIS layer was collected, not a project milestone | **The source publishes no project date; undated is correct.** 2 pages refreshed through the fixed engine: null count unchanged at 2,928. |
+| `akdot-stip-24-27` | 909 | 28 | `STIP_Year` (SmallInteger), `Year_24`…`Year_27` | **The source publishes a programme year only; undated is correct.** |
+| `fort-collins-building-permits` | 810 | 5 | no date field (only `B1_APPL_STATUS`) | **The source publishes no date; undated is correct.** |
+| `adot-tip-fy2026-2030` | 685 | 181 | `TOTAL_YEAR` (Integer) | **The source publishes a programme year only; undated is correct.** 7 pages refreshed through the fixed engine: null count unchanged at 685. |
+| **total** | **59,895** | | | |
+
 
 **Not on this list, and why:**
-- `hdot-active-design-projects` publishes **21 programme-milestone date fields** (`awarddate`,
-  `bid_open_date`, `ntpdate`, `actual_advertise_date`, `construction_date`, …). It is **not**
-  undated — it is a `file_date_kind: "scheduled"` case for date-semantics piece (b). Wiring one of
-  those into today's unlabelled date slot would relocate the ambiguity, not fix it.
+- **`hdot-active-design-projects` (1,848 records, 85 pages) — POSITIVE receipt: the source
+  publishes dates, but only PROGRAMME MILESTONES; its records are undated pending date-semantics
+  classification, NOT pending a refresh.** The layer carries **21** date fields (`awarddate`,
+  `bid_open_date`, `ntpdate`, `actual_advertise_date`, `construction_date`, `nepaapprovaldate`, …),
+  all `esriFieldTypeString`. It is a `file_date_kind: "scheduled"` case for piece (b). Wiring any of
+  them into today's unlabelled date slot would relocate the ambiguity, not fix it — so do not "fix"
+  this by mapping one. **Do not re-probe it as a gap.**
 - The ~22 entries with a *minority* of undated rows (`topeka` 4,668 of 84,077, `savannah` 741 of
   3,550, `little-rock` 420 of 48,951, …) have a **working** mapping; those individual source rows
   carry no value. Nothing in config or code can recover a value the publisher did not publish.

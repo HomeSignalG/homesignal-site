@@ -11,6 +11,54 @@
 
 ---
 
+# ⭐ HEADLINE FINDING — the undated count conflated "we failed to read" with "there is nothing to read"
+
+**69% of the undated records were never a backlog.** Of **86,749** development records rendering with
+no date, **59,895 come from sources that publish no day-granularity date at all.** No refresh, no
+config change and no parser fix can recover them, because there is nothing to recover — and
+producing a date would mean inventing one, which is the single thing this tracker never does.
+
+| class | records | share | recoverable? |
+|---|---:|---:|---|
+| **the source publishes no usable date** — 7 entries | **59,895** | **69.0%** | **No. Undated is the correct output.** |
+| **programme-milestone dates only** — `hdot-active-design-projects` | 1,848 | 2.1% | Not by a date fix — date-semantics piece (b), `scheduled` |
+| **the parser could not read a published format** — 2 entries | 14,905 | 17.2% | **Yes** — the isoDay fix; 10,490 recovered so far |
+| **working mapping, minority of source rows blank** — 22 entries | ~10,101 | 11.6% | No. The publisher did not publish those values. |
+
+**The worked case.** `loudoun-county-residential-permits` is 45,618 records — more than half the
+total, and the one that looked most like a backlog. Its layer publishes exactly two date-like
+fields, both `esriFieldTypeString`, and the live values are `YEAR_ISSUED = "2011"` and
+`MONTH_ISSUED = "JUNE"`. A year and a month name. There is no day. Re-cached through the **deployed
+post-fix engine** at 13:44:39Z, ZIP 20129 returned 49 Loudoun sites and ZIP 20130 returned 6 — **0
+with a `file_date` on either**. That is the correct output, not a gap.
+
+## The control that makes this trustworthy
+
+The proof is not that nothing changed — it is that **a refresh through the FIXED engine changed
+nothing, on pages that demonstrably refreshed.** After the 12:58:34Z deploy these entries had pages
+re-cached through the new code, and their null counts are byte-identical before and after:
+
+| entry | pages refreshed since deploy | null before | null after |
+|---|---:|---:|---:|
+| `adot-tip-fy2026-2030` | 7 | 685 | **685** |
+| `mdot-sha-project-portal` | 4 | 30 | **30** |
+| `dallas-specific-use-permits` | 12 | 3 | **3** |
+| `nvdot-project-boundaries` | 2 | 2,928 | **2,928** |
+| `fdot-active-construction-projects` | 2 | 25 | **25** |
+
+Meanwhile the two entries the fix targets moved on the same code: `anaheim-land-use-cases`
+**796 → 0** (7 of 7 pages), `virginia-beach-building-permits` **14,109 → 4,415** (8 of 9 pages).
+Same engine, same run, opposite results — which is what separates "nothing to read" from "failed to
+read."
+
+**Every entry in the no-date class carries a POSITIVE receipt** in `docs/source-registry.md`
+("source publishes year/month only; undated is correct", and the equivalent for each), so no future
+session reads its null count as a queue. That conflation cost two separate investigations.
+
+Full working: §H2, §H3, §H6, §H7.
+
+---
+
 ## A. FINDINGS, ranked by how many residents see the error
 
 ### A1 🔴 `nyc-dob-permit-issuance` — 82.7% of records fall outside their own declared window · **202 pages**
@@ -1080,9 +1128,14 @@ the *source publishes no usable date* set (§H3), recorded as settled in `docs/s
 
 | class | records | recoverable by the isoDay fix? |
 |---|---:|---|
-| source publishes no day-granularity date (loudoun, delaware-county-pa, colorado-springs, nvdot, hdot, akdot, adot, fort-collins) | **61,743** | **no** — nothing to map |
+| source publishes no day-granularity date (loudoun 45,618 · delaware-county-pa 5,243 · colorado-springs 3,702 · nvdot 2,928 · akdot 909 · fort-collins 810 · adot 685) | **59,895** | **no** — nothing to map |
+| programme-milestone dates only (`hdot-active-design-projects`) | 1,848 | **no** — date-semantics piece (b), `scheduled` |
 | parser could not read a published format (virginia-beach, anaheim) | 14,905 | **yes** — 10,490 recovered so far |
 | working mapping, minority of source rows carry no value (topeka, savannah, little-rock, canyon, kenton, clark, irving, austin-zoning, louisville, + 13 more) | ~10,101 | **no** — the publisher did not publish them |
+
+⚠️ **`hdot` is broken out deliberately** — an earlier draft folded it into the no-date class at
+61,743. It is not the same thing: hdot publishes 21 real date fields, all programme milestones, so
+its records are undated only until piece (b) classifies them.
 
 ## Re-measure, per entry (null before → null now, and pages refreshed since the 12:58:34Z deploy)
 
@@ -1114,3 +1167,86 @@ independent confirmation of the classification.
 ⚠️ **`topeka-building-permits` is not recovering.** Its null count is unchanged at 4,668 and **0 of
 its 23 pages have refreshed since the deploy**. It never had zero dates — 79,420 of its 84,088 rows
 were already dated — so nothing about it changed; it is in the third class above.
+
+---
+
+# §H8 — There is a THIRD gap: re-cached is not materialized. And 23451's blocker is not payload size.
+
+Two corrections to §H6/§H7, both found by checking the cache rather than the table.
+
+## H8.1 `23456` was never a WORKER_RESOURCE_LIMIT case — its CACHE was already fixed
+
+Its `development_reports` row was refreshed by the nightly rolling job at **13:30Z** (post-deploy)
+and **all 2,302 of its Virginia Beach sites carry a `file_date`**, ranging 2026-01-02 → 2026-07-31.
+`app_projects` showed 0 dated purely because the row had not been re-materialized. One
+`app_refresh_zip('23456')` moved it to **1,957 / 1,957 dated**. The 546 I recorded for it came from
+an *extra manual fire* that raced the nightly job — a self-inflicted error, not the page's state.
+
+## H8.2 The general form — 1,532 ZIPs currently have a cache newer than their table
+
+```
+zips where development_reports.refreshed_at > max(app_projects.created_at):  1,532
+  … of those, lagging by more than 5 minutes:                                1,519
+  oldest such refresh:                                        2026-08-08 05:45Z
+```
+
+The mechanism, from `cron.job`:
+
+| job | schedule | what it updates |
+|---|---|---|
+| `dev-reports-rolling-refresh` → `dev_refresh_tick()` | **every 15 min** | `development_reports` (the cache) |
+| `app-content-refresh` → `app_refresh_batch(1500)` | **hourly, :40** | `app_projects` (what the page reads) — **1,500 ZIPs per hour** |
+
+At 12,722 pages and 1,500/hour, a full materialization sweep takes **~8.5 hours**, while the cache
+re-refreshes every 15 minutes. `dev_refresh_collect()` does **not** call `app_refresh_zip` — the two
+halves are independent jobs.
+
+**So the propagation chain is three stages, not two: merged → deployed → re-cached → materialized.**
+Measuring a fix from `app_projects` understates it by up to ~8.5 hours, and the understatement is
+invisible unless you compare `refreshed_at` against the table. This is the same shape as
+merged-is-not-deployed, one level further down, and it is now written down.
+
+## H8.3 `23451`'s blocker is the GEOCODER, not payload size — the options, measured
+
+Cached row sizes for all nine Virginia Beach pages are **0.02–0.28 MB** — nowhere near any size
+ceiling (the cache-wide high-water mark is Cleveland 44127 at 5.98 MB). Payload size is not the
+constraint. The cost is **geocoding**: the entry sets `geocode_assemble: true` and the layer carries
+**no coordinate columns at all**, so every record's `StreetAddress` goes through the geocoder.
+
+| ZIP | VB sites | addresses geocoded | row size | outcome |
+|---|---:|---:|---:|---|
+| 23451 | 2,605 | **2,458** | 0.28 MB | **546 WORKER_RESOURCE_LIMIT** ×2 |
+| 23456 | 2,302 | 1,957 | 0.26 MB | succeeded via the nightly job |
+| 23454 | 2,176 | 2,032 | 0.24 MB | succeeded |
+| 23452 | 2,070 | 1,996 | 0.23 MB | succeeded |
+
+23451 is the largest geocode load in the set and the only failure — but 23454 succeeded at 2,032,
+so the threshold is marginal rather than a hard wall.
+
+**The options, in order of how little they change:**
+
+1. **Retry as the geocode cache warms — no config change at all.** `public.geocodes` holds 98,033
+   cached results and the eight successful VB pages just added thousands of Virginia Beach
+   addresses. A later attempt does strictly less work than the ones that failed. **Recommended
+   first, because it changes nothing residents see.** (Fired again at the time of writing.)
+2. **`out_fields` projection** (additive, default-off, already exists). Reduces parse work, not
+   geocode work — so on the measured evidence this is unlikely to be decisive here.
+3. **`page_size`** (same). Fewer, larger fetches; also not the bottleneck.
+4. **Narrow `recency_days` from 365.** Halving the window roughly halves the geocode load and would
+   almost certainly clear it — but it **removes records residents currently see**, so it is a
+   founder call, not a mechanical fix.
+5. **Find a Virginia Beach layer that publishes coordinates**, eliminating the geocoder entirely.
+   Highest value, highest effort, and a new-source decision.
+
+**Nothing in 2–5 is applied.** 23451 remains on its 2026-08-03 (pre-fix) cache vintage, 2,458
+records undated, pending option 1 or a ruling.
+
+## H8.4 Recoverable class — final standing
+
+| entry | undated before | undated now | dated now | pages complete |
+|---|---:|---:|---:|---|
+| `anaheim-land-use-cases` | 796 | **0** | 796 | 7 of 7 |
+| `virginia-beach-building-permits` | 14,109 | **2,458** | 11,651 | **8 of 9** |
+| **total** | **14,905** | **2,458** | **12,447** | **15 of 16** |
+
+**12,447 of 14,905 recovered — 83.5%.** The entire remainder is one page, `23451`.
