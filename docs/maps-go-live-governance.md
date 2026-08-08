@@ -2769,3 +2769,37 @@ resumed: `f72ae4c` (pushed 21:47Z, during the outage) had its `pull_request` run
 check runs 33 minutes after that, so its event did not survive. Checking `runs?per_page=N` for any
 **non-`workflow_dispatch`** event is the cheap test — dispatch runs are created through the API and
 keep working throughout, so counting all runs hides the outage entirely.
+
+---
+
+## Rule 17 — when a status WORD and a DATE disagree about whether something happened, the DATE is the better evidence
+
+**A lifecycle bucket derived from a word alone is an unverified claim.** Status vocabularies are
+written by permit clerks for permit clerks; they say what stage a *file* is at, not what exists on
+the ground. A date says an event occurred. When the two disagree, prefer the date, and treat any
+bucket that rests on a word with no corroborating date as provisional.
+
+**Two failure directions, both real:**
+
+- **Word says built, nothing was.** `stamford-major-developments` mapped the verbatim status
+  `Under Construction` to `operating` — the "built" band — so 47 records on 9 pages told residents a
+  project was finished while its own status said it was still going up. Fixed 2026-08-08 by moving
+  that one value to `approved`. *(This was the ONLY instance cache-wide: a scan of every entry's
+  `status_to_bucket` for an authorization/in-flight word mapped to `operating` returned exactly
+  one.)*
+- **Word says not-yet, a date says otherwise.** `phoenix-building-permits` maps `OPEN` to
+  `proposed`, and **43,054 of those records on 77 pages carry the city's own `PER_ISSUE_DATE`** — an
+  issued permit displayed as merely proposed (`docs/accuracy-audit-2026-08.md` §C2). Same class,
+  opposite direction.
+
+**The control to run, and the honest outcome when it cannot be run.** Before trusting or fixing a
+word-derived bucket, check whether the affected records carry a completion / issue / C-of-O date
+that should override it. On Stamford this control was run and came back **unavailable, not clean**:
+`decision_date` is populated on **0 of 47** `Under Construction` records — and on **0 of 84**
+`Completed` records too, so the source publishes no completion date at all. The word was the only
+evidence available, and it said not-built. **Record "the control could not be applied" rather than
+implying it passed.**
+
+**What this does NOT license.** Do not infer a bucket from a date the source did not publish, and do
+not let a date override a word that agrees with it. This is a tie-breaker for contradictions, not a
+new inference path — the anti-fabrication directive is unchanged.
