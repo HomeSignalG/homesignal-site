@@ -286,3 +286,79 @@ was nothing to close — but the entries should not be recorded as retired, beca
 10,692 records on 37 pages today. (`subdivision-activity` carries records back to **1989-03-29** and
 1,999 undated rows; `commercial-site-plans` back to **2000-05-23** with 1,177 undated — both already
 counted in §A3.)
+
+---
+
+# ROUND 3 (2026-08-08) — three corrections, the owed 183-entry scan, and the UI label answer
+
+## E1. Three ruled items do not match production. Measured in BOTH surfaces this time.
+
+| claim | measured `app_projects` | measured `development_reports.sites` |
+|---|---|---|
+| *"Delaware County DOES NOT APPEAR in app_projects — its 74,957 future records are in development_reports only"* | **appears: 5,243 records / 40 pages · 0 future · 5,243 undated** | **5,243 rows · 0 future · 5,243 undated** |
+| *"Anne Arundel is closed — 0 rows, retirement already took effect"* | `subdivision-activity` **7,148 / 37 pages**, `commercial-site-plans` **3,544 / 37 pages** | 7,148 and 3,544 |
+| *"champaign 9999 … plus CTDOT's 1900"* | CTDOT oldest = **1998-09-16** | oldest = **1998-09-16** |
+
+- **Delaware County has no future records in either surface, and no `74,957` anywhere.** The entry
+  maps **no `file_date` at all** (`"file_date": null`, `status_const: "Submitted for county review"`),
+  which is why all 5,243 rows are undated. **The ruling "filter to bid dates at or before today"
+  has nothing to operate on** — there are no bid dates. It cannot be executed as written.
+- **Anne Arundel is live**, second measurement. 10,692 records on 37 pages. Not retired.
+- **CTDOT has no 1900 sentinel.**
+
+## E2. Class 2 splits — one is a real defect, the other is Class 1
+
+| entry | `file_date` mapped to | verdict |
+|---|---|---|
+| `bentonville-catalyst-permits` | **`ISSUED`** | ⚠️ **REAL DEFECT (Class 2).** An issue date cannot be in the future, yet 1,427 of 31,632 records are, out to 2026-12-06 on 9 pages. Either the publisher emits future ISSUED values or the column carries something else. **Needs a live probe of the source to tell which — not done.** |
+| `lexington-row-permits` | **`EstimatedStartDate`** | ✅ **RECLASSIFY to Class 1.** The column is explicitly an *estimated start*. The 251 future records are the field working correctly in the wrong slot — identical to FDOT's `StartDate`, not a permit ledger with impossible dates. |
+
+## E3. Class 1 — what the UI actually renders (and it is not "submitted")
+
+**The development record card renders a bare, unlabelled date.** `homesignalmap.html:2228`:
+
+```js
+"<div class='fdate'>" + esc(s.start_date ? fmtDate(s.start_date) : (s.status_text||"")) + "</div>"
+```
+
+`fmtDate` emits `"Jul 5, 2026"` — no "Submitted", no "Filed", no qualifier of any kind.
+
+**So the stated concern — *"a resident reading 'submitted' against a 2042 date"* — is not what the
+page shows.** The word does not appear beside the date. ⚠️ **The underlying problem is real but is
+mislabelling by OMISSION:** there is exactly one date slot and no semantic label, so a 2042 scheduled
+start and a 2026 filing date occupy the identical position with nothing to distinguish them. The UI
+**cannot** tell them apart, because it was never given the meaning to render.
+
+One place does frame records as filed: page copy at line 440, *"Filed with a specific address in
+this ZIP"*.
+
+✅ **A countdown risk was checked and does NOT exist.** `friendlyDeadline()` (which renders
+*"closes in N days"*) is driven by **`s.meeting_date`**, not the permit date — `homesignalmap.html:1532`.
+A 2042 DOT date cannot surface as a deadline countdown.
+
+## E4. The owed scan — ALL 183 entries, `count(DISTINCT source_ref)` vs `count(*)`
+
+**Complete.** 175 entries carry records; **33 have more than one distinct URL, 142 have exactly one.**
+
+- **No entry declaring `record_url_precision: "record"` appears among the 142.** The lowest
+  distinct-URL count among record-precision entries is 30. **0 defects of the ruled class.**
+- ⚠️ **NEW FINDING — five entries UNDER-claim their precision.** They serve genuinely per-record
+  URLs but declare no precision at all:
+
+| entry | records | distinct URLs | ratio | declared |
+|---|---:|---:|---:|---|
+| `columbus-building-permits` | 14,497 | 14,497 | **1.0000** | unset |
+| `seattle-building-permits` | 5,836 | 5,836 | **1.0000** | unset |
+| `tacoma-accela-permits` | 5,245 | 5,245 | **1.0000** | unset |
+| `seattle-land-use-permits` | 326 | 326 | **1.0000** | unset |
+| `cincinnati-building-permits` | 2,965 | 2,876 | 0.9700 | unset |
+
+Harmless to residents — the links work — but the precision field misdescribes them, which is the
+same class of drift in the opposite direction.
+
+## E5. FDOT precision — still nothing to fix
+
+Re-ruled as *"fix the precision as ruled."* The entry declares `"record_url_precision": "dataset"`,
+which is correct for one shared URL. **There is no incorrect precision claim to fix.** FDOT's real
+defect remains the `StartDate` → `file_date` mapping (§D1), and its 445 future records do belong in
+Class 1 — as now does `lexington-row-permits`.
