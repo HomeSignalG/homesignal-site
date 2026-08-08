@@ -468,3 +468,141 @@ independently revertible; only (c) alters what residents read.
 precedes permit-issued), but it means a permit whose literal status reads `APPROVED` displays as
 **proposed**. Flagged, not adjudicated — it is exactly the §C class-2 shape and needs the full
 status × decision-date crosstab across all 183 entries rather than a single opportunistic look.
+
+---
+
+# Round 5 — CONFIG vs TABLE: what the registry declares against what `app_projects` contains
+
+**Ruling that ordered this pass (2026-08-08):** *"Every accuracy check in this audit has read config…
+Before §C, run one pass comparing what the registry DECLARES against what `app_projects` actually
+CONTAINS, per entry: which fields are populated in the table but null or absent in config, and which
+are declared but empty in the table. Report every divergence. That is one query shape and it answers
+whether Anne Arundel is unique or the first of several. State it plainly in the audit doc either
+way."*
+
+## G0. Stating it plainly: what Rounds 1–4 actually read
+
+Rounds 1–4 mixed two instruments and did not label which was which. **§A1/§A2/§A3/§A5/§A6 read the
+`development_reports.sites` cache** (real per-record values). **§D1/§D2/§E2/§E4 read
+`jurisdiction-registry.json` only** — they establish what an entry *declares*, and they cannot
+establish what a resident sees. §F2 (Anne Arundel) was the first check to compare the two, and it
+found a defect that config alone could not show. This round is that comparison run over **all 183
+entries**.
+
+**Instrument scope, so its silence is legible.** The pass reads
+`public.app_projects where record_kind = 'development'` — **2,826,146 rows across 175 distinct
+`registry_id` values** (positive control: 175 of the registry's 183 entries appear; the other 8 are
+dormant, listed in G4). Facility rows (`record_kind='facility'`, 217,761) are excluded because their
+`registry_id` is the EPA FRS per-facility id, not a jurisdiction entry — an ungrouped query over the
+whole table returns 114,902 distinct values and answers a different question.
+
+## G1. Divergence A — populated in the table, NOT declared in config
+
+The materializer's date expression, quoted verbatim from the live `app_refresh_zip` definition
+(`pg_get_functiondef`):
+
+```
+coalesce(el->>'file_date', el->>'decision_date')  →  app_projects.submitted_at
+```
+
+**So any record with no filing date silently renders its DECISION date in the filing slot.** This is
+systemic in the materializer, not an entry-level mistake — and it is invisible to every config-only
+check.
+
+Measured cache-wide over all ten ZIP shards (`left(zip,1)` = 0-9, so coverage is complete and the
+per-shard ZIP sets are disjoint), counting sites with **no `file_date` and a non-empty
+`decision_date`**:
+
+| entry | records substituted | pages | declares `file_date`? |
+|---|---:|---:|---|
+| `dallas-specific-use-permits` | **30,975** | **164** | no — declares `decision_date: EFFECTIVEDATE` only |
+| `anne-arundel-subdivision-activity` | 5,149 | 37 | no — `decision_date: FN_APV_DT` |
+| `anne-arundel-commercial-site-plans` | 2,367 | 37 | no — `decision_date: FN_APV_DT` |
+| `fdot-active-construction-projects` | 577 | 160 | yes (`StartDate`) — these rows lack it |
+| `austin-subdivision-cases` | 19 | 10 | yes |
+| `denton-county-dev-permits` | 7 | 6 | yes |
+| `austin-site-plan-cases` | 6 | 6 | yes |
+| `charlotte-land-dev-commercial-projects` | 5 | 5 | yes |
+| `columbia-mo-capital-projects` | 5 | 5 | yes |
+| **total** | **39,110** | **390 distinct pages** | |
+
+**Answer to the question the ruling posed: Anne Arundel is NOT unique — and it is not even the
+largest case.** `dallas-specific-use-permits` is the same defect at **2.9× the record count and 4.4×
+the page count**, and it was not visible in any prior round. Cache receipt for Dallas, over the ZIPs
+it appears on: `has_file_date 0 · has_decision_date 401 · decision range 2009-03-27 → 2026-05-27`.
+
+The five small entries (577 / 19 / 7 / 6 / 5 / 5) are a *different* shape: they declare a filing date
+and it is simply missing on a minority of rows, which then fall through to the decision date. Same
+visible consequence, per-row rather than per-entry.
+
+## G2. Divergence B — declared in config, ZERO in the table (the mapping never fires)
+
+Three entries declare a `file_date` column that produces a value on **no row anywhere**. This is the
+Burlington `out_fields` failure shape: config that looks complete, passes every unit test, and
+silently yields nothing.
+
+| entry | declares `column_map.file_date` | rows | dated | pages |
+|---|---|---:|---:|---:|
+| `loudoun-county-residential-permits` | `YEAR_ISSUED` | 45,618 | **0** | 18 |
+| `virginia-beach-building-permits` | `IssueDate` | 14,109 | **0** | 9 |
+| `anaheim-land-use-cases` | `Application_Received` | 796 | **0** | 7 |
+| **total** | | **60,523** | **0** | **~32** |
+
+These are **new findings** — not reported in Rounds 1–4, and not reachable from config, which reads
+as correct in all three. Every one of those 60,523 records renders with no date at all.
+
+The seven entries that declare no `file_date` **and** carry no dates are consistent, not divergent:
+`adot-tip-fy2026-2030`, `akdot-stip-24-27`, `colorado-springs-planning-applications`,
+`delaware-county-pa-subdivisions-land-developments`, `fort-collins-building-permits`,
+`hdot-active-design-projects`, `nvdot-project-boundaries`. They declare nothing and produce nothing.
+
+## G3. Divergence C — records that can never render as a pin
+
+| entry | rows | with coordinates | pages |
+|---|---:|---:|---:|
+| `little-rock-permits` | 48,951 | **0** | 14 |
+| `bozeman-building-permits` | 933 | **0** | 2 |
+
+**49,884 records on 16 pages carry no lat/lng at all** — they list, but the 2D / satellite / focus
+views cannot place them. Also new; no prior round measured coordinate presence per entry.
+
+Partial coordinate loss (records present, some unplaceable):
+
+| entry | rows | missing coords | share |
+|---|---:|---:|---:|
+| `gilbert-energov-permits` | 1,036 | 284 | 27.4% |
+| `overland-park-building-permits` | 159,401 | 8,233 | 5.2% |
+| `san-marcos-planning-cases` | 318 | 6 | 1.9% |
+| `wisdot-highway-program-6yr` | 1,822 | 4 | 0.2% |
+| `hdot-active-design-projects` | 1,848 | 15 | 0.8% |
+| `bellevue-permits` | 348 | 2 | 0.6% |
+| `anne-arundel-commercial-site-plans` | 3,544 | 2 | 0.1% |
+| `adot-tip-fy2026-2030` | 685 | 1 | 0.1% |
+
+## G4. Divergence D — declared entries with no rows at all (dormant)
+
+Eight of the 183 entries produce zero rows in `app_projects`:
+`austin-issued-construction-permits`, `harris-county-permits`, `harris-county-plats`,
+`houston-plat-applications`, `montgomery-county-commercial-permits`,
+`montgomery-county-demolition-permits`, `san-antonio-prelim-plan-review`,
+`shelby-county-building-permits`. This matches the WIRED table in `docs/source-inventory.md`
+(175 with records / 8 dormant) and the Harris/Houston pair is the already-recorded
+"correctly wired, no modelled ZIP surface" case. Positive control on the same query:
+`phoenix-building-permits` 95,614 and `austin-subdivision-cases` 4,515 both return non-zero.
+
+## G5. What came back CLEAN in this pass
+
+- **`status` and `type` are populated on 100% of all 2,826,146 development rows** — every entry, no
+  exceptions. There is no entry whose status or use-type silently vanishes in materialization.
+- **No entry has rows in the table without a `registry_id`** except five records on ZIP 78617, which
+  are the TX TDLR/TABS filings (`tdlr.texas.gov/TABS/…`). TABS is not a registry-driven source, so a
+  null `registry_id` there is correct, not a gap.
+- The remaining 163 entries show `dated = rows` and `coords = rows` (or within the small margins in
+  G3), i.e. config and table agree.
+
+## G6. What this round does NOT cover
+
+It compares **presence**, not **correctness**: it can prove a declared column produced nothing, and
+that a value arrived from a field config never named, but it cannot tell whether a populated value is
+the *right* one. §A1 (nyc-dob out-of-window), §D1 (FDOT `StartDate`) and §E2 (lexington
+`EstimatedStartDate`) are that other class, and §C is still owed.
