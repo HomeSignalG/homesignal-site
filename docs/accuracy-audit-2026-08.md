@@ -57,6 +57,31 @@ session reads its null count as a queue. That conflation cost two separate inves
 
 Full working: §H2, §H3, §H6, §H7.
 
+# ⭐ SECOND HEADLINE — `dallas-specific-use-permits` renders a DECISION date in the filing slot on 164 pages
+
+Separate finding, separate fix path — it belongs with the **date-semantics** work, not with the
+undated-records work above.
+
+`app_refresh_zip` fills the resident-facing date from `coalesce(file_date, decision_date)`. Three
+entries declare **no** `file_date`, so every one of their records renders the date a case was
+*decided* in the position that reads as when it was *filed*:
+
+| entry | records | pages | what the date actually is |
+|---|---:|---:|---|
+| **`dallas-specific-use-permits`** | **30,975** | **164** | `EFFECTIVEDATE` — cache range 2009-03-27 → 2026-05-27 |
+| `anne-arundel-subdivision-activity` | 5,149 | 37 | `FN_APV_DT` (final approval) |
+| `anne-arundel-commercial-site-plans` | 2,367 | 37 | `FN_APV_DT` |
+| + 6 entries where only a minority of rows fall through | 619 | ~192 | mixed |
+| **total** | **39,110** | **390 distinct pages** | |
+
+**Dallas is 2.9× Anne Arundel's record count and 4.4× its page count** — the largest instance by a
+wide margin, and it was invisible until the config-vs-table pass, because nothing in the registry
+declares the substitution. It is already stamped `date_kind = 'decided'` in production (Round 6), so
+the fact is now recorded in the data; what remains is piece (c), rendering the label. Until then a
+Dallas resident reads a decision date as a filing date on 164 pages.
+
+Full working: §G1, §F2, §C3.
+
 ---
 
 ## A. FINDINGS, ranked by how many residents see the error
@@ -1250,3 +1275,59 @@ records undated, pending option 1 or a ruling.
 | **total** | **14,905** | **2,458** | **12,447** | **15 of 16** |
 
 **12,447 of 14,905 recovered — 83.5%.** The entire remainder is one page, `23451`.
+
+---
+
+# §H9 — 23451: option 1 is EXHAUSTED. Options 2–5 with measured tradeoffs.
+
+**The warm-cache retry failed.** Third attempt, response `24081` at **2026-08-08 14:06:15Z**, again
+`546 WORKER_RESOURCE_LIMIT` — after eight other Virginia Beach pages had already warmed
+`public.geocodes` (98,033 rows). So "retry until the geocode cache carries it" is closed: the page
+does not clear on repetition. `23451`'s cache remains at its **2026-08-03 15:30Z** vintage with
+**0 of 2,605 VB sites carrying a `file_date`** — genuinely pre-fix, not materialization lag.
+
+**Measured facts the options have to work against.** Row size is not the constraint (0.28 MB against
+a cache-wide high-water mark of 5.98 MB). The layer publishes **no coordinate columns**, the entry is
+`geocode_assemble: true`, and **2,458 addresses** must go through the geocoder — the largest load in
+the set. 23454 succeeded at 2,032, so the ceiling sits somewhere in 2,032–2,458.
+
+| # | option | what it changes | measured effect | what residents lose |
+|---|---|---|---|---|
+| 2 | **`out_fields` projection** | additive, default-off, already shipped | layer has **17 fields, 6 mapped**; declared width 34,720 chars/row → a projection cuts roughly **2/3 of transfer and parse** | **nothing** |
+| 3 | **`page_size`** | additive, default-off, already shipped | fewer, larger fetches | **nothing** |
+| 4 | **narrow `recency_days` 365 → 180** | one registry value | VB's real span is only 2026-01-02 → 2026-07-31, so 365 barely binds: **9,848 of 11,651 (84.5%) are already inside 180 days**. Cuts ~15.5% → ~2,077 geocodes on 23451 — *marginally* under 23454's successful 2,032 | **~381 records on this page, ~1,803 across the entry** |
+| 4b | **narrow to 90 days** | one registry value | 4,744 of 11,651 (40.7%) survive → ~1,008 geocodes, comfortably clear | **59% of every VB record** |
+| 5 | **find a VB layer that publishes coordinates** | new source | removes the geocoder entirely; the only option that fixes the cause | **nothing** — but not probed yet, so unverified |
+
+**Recommendation, and the honest caveat.** Try **2 + 3 together first**: they are the only levers that
+cost residents nothing, they are already-shipped default-off options, and a 2/3 cut in parse work is
+the largest no-loss saving available. **But the bottleneck measured here is geocoding, not parsing**,
+so they may not be decisive — which is exactly why 4 and 4b are on the table and are a founder call:
+they buy headroom by deleting records residents currently see. **Option 5 is the only one that
+removes the cause**, and it has not been probed.
+
+**Nothing applied.** `23451` stays on its pre-fix vintage, 2,458 records undated, pending a ruling.
+
+---
+
+# §C — STATUS: DELIVERED (merged in #651, not a pending item)
+
+Recorded here because it has been asked for three times. §C and §C6 are complete and in this
+document above:
+
+- **§C1** — statuses asserting an unhappened event: **ZERO**, with positive controls proving the
+  detector fires (264 dead-state values, **all** mapped to `exclude`; 196 pending-family values,
+  **none** to built/operating).
+- **§C2** — the defect runs the other way: **Phoenix `OPEN` renders 43,054 records on 77 pages as
+  *Proposed* while carrying the city's own `PER_ISSUE_DATE`**, plus 4 entries mapping a bare
+  `Approved` to `proposed` while 78 map it to `approved`.
+- **§C3** — `decision_date` holds three different things across 59 declaring entries: 5 map a
+  status-change timestamp, 7 map an end/expiry date.
+- **§C6** — 42 entries carry 280 dead map keys; **0 unmapped live values, 0 case-fold-only matches**,
+  so no entry is in the drafted-from-assumption-twice state.
+
+**§C6 deliberately did NOT sub-classify the 280 dead keys.** Splitting them into "plausible vocabulary
+the source simply has not emitted lately" versus "values that cannot exist on this layer" requires a
+**live per-entry status enumeration** — the registry cannot answer it and neither can the table, since
+a dead key produces no rows by definition. That is a further pass (42 live probes), not a
+re-reading of what is already measured, and it is not claimed as done.
