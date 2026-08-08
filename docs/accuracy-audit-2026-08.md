@@ -1473,3 +1473,111 @@ Stated so the coverage claim is honest — these are unrun, not clean:
 5. **Live HTTP verification of `record_url`.** The distinct-URL scan was **structural only** — no URL was fetched.
 6. **Pages marked covered while empty, or honest-empty while records exist.**
 7. **The instrument bias, stated in §H5:** §A–§C read configuration, and a materializer substitution is structurally invisible to that instrument. Any future check that reads only the registry must say so in its own report.
+
+---
+
+# §L — VB 23451: the `max_rows` measurement, and why 15,000 does not bite
+
+Measured live against the layer **in the connector's own scope** (`Zip='<zip>' AND IssueDate >= '2025/08/08'` — the entry's `recency_days: 365`), so these are the row counts the connector actually pulls:
+
+| ZIP | rows the source publishes IN SCOPE | outcome |
+|---|---:|---|
+| **23451** | **4,262** | **`546 WORKER_RESOURCE_LIMIT` ×3** |
+| 23456 | 3,882 | succeeded |
+| 23454 | 3,618 | succeeded |
+| 23452 | 3,313 | succeeded |
+| 23464 | 2,800 | succeeded |
+
+*(23451 all-time, outside the window, is 16,037 — the connector never fetches that.)*
+
+**The largest payload that succeeded is 3,882 rows. 23451 is 4,262 — only 9.8% above it.** That
+narrow margin is consistent with everything else observed: the ceiling is not a cliff, it sits
+between those two numbers.
+
+## Where 15,000 sits — it has no effect
+
+`max_rows` defaults to **20,000** and caps rows pulled per dataset. **23451 pulls 4,262.** A cap of
+15,000 is **3.5× above the payload that fails**, so it would never engage; the entry would behave
+byte-identically and 23451 would fail a fourth time for the same reason. It was not applied.
+
+## ⚠️ For a cap to bite it MUST truncate real records — back to the founder
+
+To get 23451 under the largest known success it would have to be set at **≤ 3,882**, discarding at
+least **380 of the 4,262 records (8.9%)** the publisher lists for that ZIP — and, being a per-dataset
+cap, it would apply to **every Virginia Beach page**, silently trimming 23456 (3,882) at the boundary
+too. That is the "a cap that truncates real records is a different decision" case, so it is not
+applied and comes back to you.
+
+**What the truncation guard does and does not give you.** It surfaces a `truncated` entry in
+`dev_refresh_source_failures` naming the cap and the fetched count, so the hit is visible rather than
+silent — but it is **visible to an operator reading a failures table, not to a resident reading the
+page**. The page shows a shorter list with no indication anything was dropped.
+
+## Option 2 status — applied, one attempt, result pending
+
+`out_fields` projection shipped for `virginia-beach-building-permits` (6 mapped columns of 17;
+34,720 declared chars/row → ~2/3 less transfer and parse), merged and deployed. The single ruled
+attempt on 23451 was fired and **had not returned when this was written** — it sits behind the
+rolling job's queue, with **no `546` recorded in the window**. Per the ruling this is the one
+attempt; if it comes back `546`, that is the fourth failure and confirmation, and the decision above
+is the live one.
+
+---
+
+# §M — Date semantics piece (b): the CLASSIFICATION LIST
+
+**⚠️ First, a correction to my own scope estimate.** §F3 said "the ~15 non-filing entries." That
+counted only entries where a defect had already been found. Classifying by each entry's declared
+`file_date` **column name** across all 172 entries that declare one:
+
+| what the column name says the date IS | entries |
+|---|---:|
+| **`issued`** — an issue/permit date | **69** |
+| `filed` — application/submission/receipt | 60 |
+| **`scheduled` / `estimated`** — a start, award, letting or completion date | **9** |
+| **UNRESOLVED from the name alone** | **34** |
+
+**112 of 172 entries are NOT `filed`** by their own column's name — 7× my estimate. Every one of them
+currently carries the `filed` default stamped by piece (a), which is why piece (c) must not ship
+before this pass.
+
+## The 9 `scheduled` / `estimated`
+
+`columbia-mo-capital-projects` `project_start_date` · **`fdot-active-construction-projects` `StartDate`**
+(the §D1 confirmed defect) · `iowa-dot-bid-projects` `CONTRACT_AWARDED` ·
+`lake-county-il-construction-program` `Start_Date` · **`lexington-row-permits` `EstimatedStartDate`**
+(§E2) · `mdot-sha-project-portal` `Estimated_Project_Start_Year` ·
+`vtrans-project-locations` `ExpectedConstructionStart` · `wisdot-highway-program-6yr` `LET_DATE` ·
+`wsdot-project-delivery-plan-complete` `OperComplete`
+
+## The 34 UNRESOLVED — these need a decision or a probe, not a guess
+
+The column name does not say what the date means. Reading them, they fall into recognisable shapes,
+but **shape is a lead, not a fact** (claims discipline rule 1) — none of these is classified here:
+
+- **Meeting / hearing dates, which are neither filed nor issued:** `clv-planning-cases` `MTG_DATE` ·
+  `summit-county-oh-planning-commission-items` `MeetingDate` · `boone-county-ky-planning-board-actions`
+  `ACTIONDATE` · `clarksville-montgomery-*` `ACTION_DAT`
+- **Advertisement / obligation dates on DOT programmes:** `ctdot-project-work-areas` `CurrentADVdate` ·
+  `wsdot-project-delivery-plan-{proposed,under-construction}` `AdDate` · `mdot-stip-projects`
+  `PHASE_SCHD_OBLG_DATE` · `maine-dot-public-projects` `conbegin_forecast` · `massdot-highway-projects`
+  `From_Date` · `nj-stip-projects` `PROJ_RECD` · `aldot-*` `SELECTED_DT`
+- **A DECISION date already, used in the filing slot:** `stamford-major-developments`
+  `USER_Approval_Date` · `champaign-il-special-use-permits` `Effective_` ·
+  `lee-county-fl-development-orders` `STATUS_DATE`
+- **A last-updated timestamp, not an event:** `txdot-projects-info-all` `LAST_PROJ_UPDATE_DT` ·
+  `butler-county-ks-permits` / `cook-county-il-highway-construction-program` `CreationDate`
+- **Ambiguous local names:** `PERMIT_DAT` (chattanooga ×2, kenton) · `PRMT_DATE` (murfreesboro) ·
+  `ZC_DATE` · `DATE_` · `Date` · `Year` · `InDate` / `INDATE` / `Entry_Date` / `DATE_RCVD` /
+  `PROJ_RECD` (probably filed) · `ISSDTTM` (probably issued) · `PER_ENT_DATE` (Phoenix — permit
+  *entered*, probably filed)
+
+## What piece (b) actually costs, honestly
+
+- **9 `scheduled` + the 3 already-stamped `decided` entries: cheap.** Self-describing names, two of
+  them already proven defects. Ship as registry edits.
+- **69 `issued`: cheap but not free.** Names are self-describing, but a spot-check against the live
+  layer is warranted before relabelling 69 entries at once.
+- **34 UNRESOLVED: the real work.** Each needs a live field-list probe plus a judgment call, and
+  several (`MTG_DATE`, `LAST_PROJ_UPDATE_DT`, `USER_Approval_Date`) may be the *wrong column* rather
+  than a mislabelled one — which is a different fix.
