@@ -2803,3 +2803,29 @@ implying it passed.**
 **What this does NOT license.** Do not infer a bucket from a date the source did not publish, and do
 not let a date override a word that agrees with it. This is a tie-breaker for contradictions, not a
 new inference path — the anti-fabrication directive is unchanged.
+
+### Rule 17a — a control with no data is REFUSED, never counted as clean
+
+Rule 17 tells you to check a word-derived bucket against a date. **When that check finds no dates to
+check against, the correct output is "could not be applied" — not "passed."** A control run over an
+empty column produces success-shaped output while attesting to nothing; counting it as clean is the
+vacuous-invariant failure, and it is worse than not running the control at all, because it converts
+absence of evidence into a recorded pass.
+
+**The worked case (2026-08-08, the first time this was refused rather than quietly counted).**
+Checking `stamford-major-developments`' 47 `Under Construction` records for a completion date that
+might legitimately justify the `operating` bucket:
+
+```
+Under Construction   n=47   decision_date populated: 0
+Completed            n=84   decision_date populated: 0     ← the control's own control
+```
+
+The second line is what makes the refusal defensible rather than a guess: **the source publishes no
+completion date on ANY record**, including the ones it calls `Completed`. So the control is
+unavailable for this source, full stop — the word was the only evidence available, and it said
+not-built. The fix shipped on the word; the control was recorded as **UNAVAILABLE**.
+
+**Always pair a control with a positive case.** If the field you are testing is empty on the records
+you suspect, check whether it is populated on records you do *not* suspect. If it is empty there
+too, the instrument is dark and must say so.

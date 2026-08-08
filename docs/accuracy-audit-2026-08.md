@@ -251,6 +251,30 @@ Also not run: **pages marked covered while empty, or honest-empty while records 
 Nothing in this document should be read as evidence they are clean — they were not examined. Each
 needs roughly 183 live probes and is a separate pass.
 
+> ⚠️ **SUPERSEDED AND CORRECTED 2026-08-08 — read this before quoting the paragraph above.**
+>
+> **(a) Three of the four are no longer "not started."** §C, §C6 and §H ran them. Only class 1
+> (`type_source` — is it the publisher's land-use field or a workflow field?) remains unrun.
+>
+> **(b) The class NAMES above are not findings of this audit and must not be cited as such.**
+> "The DeKalb / Overland Park class", "the Prince George's class" and "the WSDOT class" were
+> shorthand labels, not measured defects in those entries — and the first one is now known to be
+> **wrong**:
+>
+> | entry | what was measured, 2026-08-08 |
+> |---|---|
+> | `dekalb-county-building-permits` | **correct.** `Closed → operating` (164,424 rows / 59 pages), `Issued → approved` (124,156), `Open → proposed` (1,151). No inversion. |
+> | `overland-park-building-permits` | **correct.** `Complete/Finaled` + `TCO → operating` (112,168 / 38 pages), `Issued → approved` (47,234). No inversion. |
+> | `prince-georges-county-permits` | a 184-row `status_const` entry — it has no `status_to_bucket` vocabulary at all, so it cannot hold a lifecycle-mapping defect. |
+> | `wsdot-project-delivery-plan-*` | appears in this audit only in the §F3 *scheduled-kind* table. No status-vs-date defect was measured in it. |
+>
+> **The sentence "the two worst historical defects (DeKalb, Prince George's)" is retracted.**
+> Neither is a defect in production today. The one real lifecycle inversion found cache-wide was
+> `stamford-major-developments` (`Under Construction → operating`, 47 records / 9 pages), now
+> fixed. Rule 17 in `docs/maps-go-live-governance.md` cites **only** Stamford and Phoenix — the two
+> cases actually measured — and was checked for this: it contains no WSDOT or Prince George's
+> reference.
+
 ---
 
 # ROUND 2 (2026-08-08) — FDOT, the national distinct-URL check, and the national future-date check
@@ -1331,3 +1355,63 @@ the source simply has not emitted lately" versus "values that cannot exist on th
 **live per-entry status enumeration** — the registry cannot answer it and neither can the table, since
 a dead key produces no rows by definition. That is a further pass (42 live probes), not a
 re-reading of what is already measured, and it is not claimed as done.
+
+---
+
+# §I — The four two-stage `APPROVED` entries fold into date-semantics piece (b)
+
+**Ruled 2026-08-08: the bucket is defensible, the WORD is misleading, so the fix is the LABEL.**
+Not a `status_to_bucket` change. Recorded here so piece (b) picks them up with the rest.
+
+**The evidence, and why it is decisive.** In each of the four, `APPROVED` and `ISSUED` coexist in
+the same corpus as two distinct populations, with `APPROVED` small and upstream and `ISSUED` large
+and downstream — the signature of a two-stage permit system where plan approval precedes permit
+issuance:
+
+| entry | `APPROVED` → proposed | `ISSUED` → approved | finaled-family → operating |
+|---|---:|---:|---:|
+| `missoula-addresses-with-permits` | 2,052 | 16,433 | 38,114 |
+| `bentonville-catalyst-permits` | 45 | 9,904 | 21,662 |
+| `columbia-mo-permits` | 24 | 3,512 | 901 |
+| `cincinnati-building-permits` | 3 | 1,570 | 505 |
+| **total** | **2,124** | **31,419** | **61,182** |
+
+A single-stage reading would have moved 2,124 records from `proposed` to `approved` and collapsed a
+real distinction the publisher draws. The resident-facing problem is narrower and different: the
+page says **"Proposed"** where the source says **`APPROVED`**, and those two words disagree even
+though the band is right. That is a labelling problem, identical in shape to rendering a decision
+date in a filing slot.
+
+**Piece (b) scope, updated.** Alongside the ~15 non-filing `file_date_kind` entries, piece (b) now
+also owns: a way to show a two-stage source's own verbatim stage word without moving its lifecycle
+band. Until then, four entries display `Proposed` on records their publisher calls approved.
+
+**Not shipped, deliberately.** No registry change was made to any of the four.
+
+---
+
+# §J — Stamford lifecycle fix: shipped state as of 2026-08-08 15:0xZ (NOT complete)
+
+| | |
+|---|---|
+| registry change | `Under Construction`: `operating` → `approved` (PR #653, squash `9f84e7c`) |
+| deployed | `deploy-edge-functions` on the merged sha, green |
+| verified pre-persist | every `Under Construction` record came back from the **deployed** engine as `bucket: approved` on all 9 pages that answered |
+| re-cached + materialized | 9 of 10 Stamford ZIPs |
+| **flipped** | **43 of 47 records, on 8 pages** — `06807 · 06820 · 06870 · 06878 · 06901 · 06902 · 06905 · 06906` |
+| **still wrong** | **4 records on `06907`**, whose cache is still `2026-08-08 02:30Z` (pre-change) |
+
+`06907`'s refresh did not return before this was written — it sits behind the rolling job's queue,
+not behind a `546` or any error. The nightly `dev_refresh_tick` will carry it, and the hourly
+`app_refresh_batch` will materialize it (§H8.2 — the cache and the table are separate jobs, so
+expect the page to trail the cache by up to ~8.5 h even after the refresh lands).
+
+**Do not report this fix as complete until `06907` shows `Under Construction → Approved`.** The
+check is one query:
+
+```sql
+select btrim(stage), status, count(*) from public.app_projects
+where record_kind='development' and registry_id='stamford-major-developments'
+  and btrim(stage)='Under Construction' group by 1,2;
+-- complete when the only row is (Under Construction, Approved, 47)
+```
