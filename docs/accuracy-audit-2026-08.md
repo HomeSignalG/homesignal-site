@@ -362,3 +362,109 @@ Re-ruled as *"fix the precision as ruled."* The entry declares `"record_url_prec
 which is correct for one shared URL. **There is no incorrect precision claim to fix.** FDOT's real
 defect remains the `StartDate` → `file_date` mapping (§D1), and its 445 future records do belong in
 Class 1 — as now does `lexington-row-permits`.
+
+---
+
+# ROUND 4 (2026-08-08) — Bentonville probed, Anne Arundel restated, and the date-semantics scope
+
+## F1. Bentonville — probed live. **It is a SENTINEL, not a mapping error. Class 2 is now empty.**
+
+Live probe of `.../Catalyst_Planning/FeatureServer/1`:
+
+| probe | result |
+|---|---:|
+| rows in layer | **50,551** |
+| `ISSUED > CURRENT_TIMESTAMP` | **444** |
+
+**The publisher does emit future `ISSUED` values — so the column mapping is correct and this is not
+our defect.** But the five furthest rows answer the question properly:
+
+```
+2026-12-06 | ISSUED  | FLOODPLAIN DEVELOPMENT
+2026-12-06 | FINALED | ELECTRIC RESIDENTIAL      ← finaled, yet "issued" in the future
+2026-12-06 | ISSUED  | NEW RESIDENTIAL
+2026-12-06 | ISSUED  | RIGHT OF WAY
+2026-12-06 | ISSUED  | FLOODPLAIN DEVELOPMENT
+```
+
+**All of them carry the identical date `2026-12-06`, across four unrelated permit types, and one is
+already `FINALED`.** A permit that has been finaled cannot be issued in the future. A single shared
+date spanning unrelated types is a **placeholder**, not genuine future issuance.
+
+**Verdict: Bentonville is Class 3 (sentinel)** — the same family as champaign `9999-09-09` and
+brunswick `2099-02-12`, just less obviously absurd because the value is plausible-looking. Mechanical
+exclusion at source, as ruled for Class 3.
+
+⚖️ **This leaves CLASS 2 EMPTY.** Both original members moved: `lexington` → Class 1
+(`EstimatedStartDate`), `bentonville` → Class 3 (sentinel). **No permit ledger in the registry has a
+genuine impossible-filing-date defect of our making.**
+
+*(Cache/source reconciliation: 444 source rows → 1,427 cached records across 9 pages, ≈3.2×, which is
+the documented 3-mile-circle overlap.)*
+
+## F2. Anne Arundel — the actual defect, restated from scratch
+
+Both entries map **`"file_date": null`** — no filing date is configured at all. Confirmed in the
+cache: **0 of 10,692 rows carry a `file_date`.**
+
+But `app_projects.submitted_at` is populated, and it matches `sites.decision_date` **exactly at both
+ends**:
+
+| | `sites.decision_date` | `app_projects.submitted_at` |
+|---|---|---|
+| `subdivision-activity` (7,148) | 1989-03-29 → 2026-03-10 | **1989-03-29 → 2026-03-10** |
+| `commercial-site-plans` (3,544) | 2000-05-23 → 2026-01-14 | **2000-05-23 → 2026-01-14** |
+
+**So the materializer fills the filing slot from the DECISION date.** A resident sees the date a case
+was *decided* rendered in the position that reads as when it was *filed* — **10,692 records across 37
+pages**, with dates as old as 1989.
+
+**This is the same defect as FDOT's `StartDate`, arriving by a different route:** FDOT puts the wrong
+date in `file_date` by config; Anne Arundel has no `file_date` and the materializer substitutes
+`decision_date`. Coverage: `decision_date` is populated on 5,149 / 2,367 rows, so the remainder are
+undated.
+
+⚠️ **This substitution is invisible in the registry.** Nothing in the entry declares it — it happens
+in the materializer. Any audit reading only config would call these entries undated and clean.
+
+## F3. SCOPE — declare what a date MEANS (reporting before building, as ruled)
+
+**The problem, sized.** One unlabelled `.fdate` slot currently carries at least four different
+meanings: **filed** (most permit ledgers), **issued** (`bentonville` ISSUED), **scheduled/estimated
+start** (`fdot` StartDate, `lexington` EstimatedStartDate), and **decided** (`anne-arundel`, via the
+materializer). Measured exposure for the non-filing meanings alone:
+
+| meaning | entries | records | pages |
+|---|---|---:|---:|
+| scheduled / programme | mdot-stip, ctdot, wisdot, wsdot×3, vtrans, maine-dot, fdot, mdot-sha, columbia-mo-capital, lexington | **~12,000 future-dated of a much larger dated set** | 300+ |
+| decided | anne-arundel ×2 | 10,692 | 37 |
+| issued | bentonville | 31,632 | 11 |
+
+**Proposed shape — three additive pieces, no data change:**
+
+1. **Registry declares the meaning.** One new optional field per entry, e.g.
+   `"file_date_kind": "filed" | "issued" | "scheduled" | "estimated" | "decided"`. Defaults to
+   `"filed"` when absent, which is what the overwhelming majority already are, so **no entry needs
+   editing to keep today's behaviour**.
+2. **Engine passes it through** onto the site object (one field alongside `file_date`), and the
+   materializer stamps it — including stamping `"decided"` where it substitutes `decision_date`,
+   which is the only way that substitution becomes visible.
+3. **Page renders the label** — `.fdate` becomes `"Filed Jul 5, 2026"` / `"Scheduled Jan 2029"` /
+   `"Decided Mar 2026"`.
+
+**Cost and risk.** Piece 1 is config; pieces 2 and 3 are engine + page code, so **gated**. It changes
+what every resident sees on every development record, which argues for shipping the label behind the
+default (`filed`) first and correcting the ~15 non-filing entries in a second pass, so no page
+changes meaning until its entry is explicitly classified.
+
+**Recommended order:** (a) add the field with the `filed` default and stamp it, changing nothing
+visible; (b) classify the ~15 known non-filing entries; (c) turn on rendering. Each step is
+independently revertible; only (c) alters what residents read.
+
+## F4. §C's four unrun classes — status
+
+**Not started.** One partial result arrived incidentally: `bentonville-catalyst-permits` maps
+**`"APPROVED"` → `proposed`** while `"ISSUED"` → `approved`. That is defensible (plan-approved
+precedes permit-issued), but it means a permit whose literal status reads `APPROVED` displays as
+**proposed**. Flagged, not adjudicated — it is exactly the §C class-2 shape and needs the full
+status × decision-date crosstab across all 183 entries rather than a single opportunistic look.
