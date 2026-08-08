@@ -1415,3 +1415,61 @@ where record_kind='development' and registry_id='stamford-major-developments'
   and btrim(stage)='Under Construction' group by 1,2;
 -- complete when the only row is (Under Construction, Approved, 47)
 ```
+
+---
+
+# §K — FINAL STATE (2026-08-08). Read this section first; the rest is working.
+
+## K1. Found and SHIPPED
+
+| # | fix | before | after | where |
+|---|---|---|---|---|
+| 1 | **`isoDay()` could not parse year-first slash dates** — two entries' records rendered undated | `virginia-beach` 14,109 undated · `anaheim` 796 undated | `virginia-beach` **2,458** · `anaheim` **0** — **12,447 of 14,905 recovered (83.5%)** | §H1, §H6 |
+| 2 | **Date semantics piece (a)** — `FileDateKind` on `NormalizedRecord`, stamped by all 5 live connectors, materialized to `app_projects.date_kind` | no record declared what its date meant | **`filed` 2,712,902 · `decided` 39,106 · null 74,310**; the `decided` count reproduced the independent cache-side measurement exactly | Round 6 |
+| 3 | **Stamford lifecycle inversion** — `Under Construction` mapped to the *built* band | 47 records / 9 pages shown as built while under construction | **43 of 47 flipped to `Approved`**; 4 queued (§K3) | §J |
+| 4 | **`champaign-il-special-use-permits` fabricated record precision** — `record_url` mapped to a column that was not a public URL | claimed `record` precision on a non-resolving link | mapping dropped, precision demoted to `dataset` | Round 1 |
+| 5 | **`burlington-vt-*` `out_fields` projection dropped the type column** | records emitted `unclassified` | `PrimaryLUC` restored to both entries; pinned by a projection invariant in `registry-type-path-coherence` | Round 1 |
+
+## K2. Found and correctly LEFT ALONE — with the reason
+
+| finding | size | why nothing was done |
+|---|---:|---|
+| **Sources publishing no day-granularity date** — loudoun, delaware-county-pa, colorado-springs, nvdot, akdot, fort-collins, adot | **59,895 records** | **Undated is the correct output.** Loudoun's layer publishes `YEAR_ISSUED "2011"` + `MONTH_ISSUED "JUNE"`; rendering a date means inventing a day. Positive receipts per entry in `docs/source-registry.md`. |
+| `hdot-active-design-projects` | 1,848 | Publishes 21 **programme-milestone** dates. Mapping one into today's unlabelled slot relocates ambiguity → piece (b) as `scheduled`. |
+| Partial source-side nulls — topeka, savannah, little-rock + 19 more | ~10,101 | Mapping works; the publisher did not publish those values. Nothing can recover them. |
+| **280 dead map keys across 42 entries** | — | Harmless unused lookup branches, and **0 unmapped live values / 0 case-fold-only matches**, so none is compensating for anything. Maintenance signal, not a defect. |
+| **Shared-URL `record_url_precision`** | 22 record-precision entries | The 183-entry distinct-URL scan was **clean**, and one shared URL is exactly what `dataset` means. **There is no incorrect precision claim to fix.** |
+| **Four two-stage `APPROVED` entries** — missoula, bentonville, columbia-mo, cincinnati | 2,124 records | Bucket is defensible, word is misleading → **label, not bucket**. Folded into piece (b). §I |
+| `dekalb-county-building-permits`, `overland-park-building-permits` | 276,592 records | **Measured correct.** Their Operating populations are `Closed` and `Complete/Finaled`+`TCO`; `Issued` already maps to `approved` in both. |
+
+## K3. Still IN FLIGHT — and exactly what completes each
+
+| item | state | what completes it |
+|---|---|---|
+| **Stamford `06907`** — 4 records still showing `Under Construction` as *Operating* | cache still `2026-08-08 02:30Z` (pre-change). **Queued behind the rolling job — not a `546`, not an error.** | `dev_refresh_tick` carries the cache, then `app_refresh_batch` materializes. **Done when** `select btrim(stage), status, count(*) … group by 1,2` returns only `(Under Construction, Approved, 47)`. |
+| **Virginia Beach `23451`** — 2,458 records undated | cache still `2026-08-03 15:30Z`, **0 sites carrying a `file_date`** — genuinely pre-fix. Retry-as-cache-warms **exhausted** (3× `546 WORKER_RESOURCE_LIMIT`). | Needs a founder decision — §K4. |
+
+## K4. Needs a FOUNDER DECISION
+
+1. **Virginia Beach `23451`, options 2–5** (§H9). Blocker is the **geocoder**, not payload size: rows are 0.28 MB, but the layer has no coordinate columns and 2,458 addresses must be geocoded.
+   - **2 + 3 (`out_fields` + `page_size`)** — layer has 17 fields / 6 mapped, 34,720 declared chars per row, so a projection cuts ~2/3 of parse. **Costs residents nothing.** Caveat: the bottleneck is geocoding, so it may not be decisive.
+   - **4 — `recency_days` 365 → 180.** VB's real span is 2026-01-02 → 2026-07-31, so 365 barely binds: 84.5% already sit inside 180 days. Cuts ~15.5% → ~2,077 geocodes, *marginally* under the observed ceiling. **Removes ~381 records here, ~1,803 entry-wide.**
+   - **4b — → 90 days.** Clears comfortably. **Removes 59% of every VB record.**
+   - **5 — find a VB layer that publishes coordinates.** Removes the cause. Not probed.
+2. **Date semantics piece (c) — rendering the label.** The only step that changes what residents read. Until it ships, `dallas-specific-use-permits` shows a decision date as a filing date on **164 pages / 30,975 records**, and Anne Arundel on 37 pages / 7,516.
+3. **Piece (b) classification** — ~15 non-filing entries plus `hdot` (`scheduled`) plus the four two-stage `APPROVED` entries.
+4. **Phoenix `OPEN` → `proposed`** (§C2) — 43,054 records on 77 pages read *Proposed* while carrying the city's own `PER_ISSUE_DATE`. Measured, never ruled.
+5. **13,285 future-dated records across 20 entries / 1,436 pages** (§D3) — DOT programme dates. Ruled Class 1 (not defects) but the display question rides on piece (c).
+6. **49,884 records with no coordinates** — `little-rock-permits` 48,951, `bozeman-building-permits` 933 (§G3). They list but can never render as pins. Never ruled.
+
+## K5. What this audit structurally COULD NOT check
+
+Stated so the coverage claim is honest — these are unrun, not clean:
+
+1. **Whether a `type_map` value is the RIGHT use-type.** `use_type` drives pin shape. This audit checked lifecycle, not classification. Needs a live field list plus a judgment call per entry, **×140 entries with a `type_map`**. The existing unit test covers only the *unreachable*-`type_map` case.
+2. **Whether an entry's `status_raw` column is the best one the layer offers.** Needs a live field list per entry; the registry cannot answer it and neither can the table.
+3. **Dead-key sub-classification** — "vocabulary the source hasn't emitted lately" vs "values that cannot exist" needs **42 live per-entry status enumerations**. A dead key produces no rows by definition, so no amount of DB reading resolves it.
+4. **Per-record correctness of any value.** Everything here is presence, mapping and internal consistency. A record whose title, address or status is simply wrong at the publisher is invisible to every check run.
+5. **Live HTTP verification of `record_url`.** The distinct-URL scan was **structural only** — no URL was fetched.
+6. **Pages marked covered while empty, or honest-empty while records exist.**
+7. **The instrument bias, stated in §H5:** §A–§C read configuration, and a materializer substitution is structurally invisible to that instrument. Any future check that reads only the registry must say so in its own report.
