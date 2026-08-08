@@ -678,3 +678,113 @@ both readings of the substitution are right.
 **What piece (b) must now classify** — with §G1 folded in, the non-`filed` set is larger than §F3
 estimated. `dallas-specific-use-permits` (30,975 records / 164 pages) was not in the §F3 table and
 is the single largest `decided` entry, bigger than Anne Arundel and Bentonville combined.
+
+---
+
+# §C — STATUS × DECISION-DATE, all 182 operative entries
+
+The pass owed since Round 1. Two instruments, both stated so their silence is legible:
+**config** (`status_to_bucket` / `column_map.decision_date` across all 183 declared entries) and
+**live data** (`app_projects`, where `stage` holds the VERBATIM source status and `status` holds the
+lifecycle word a resident reads — **882 distinct (entry, stage, status) combinations** over 175
+entries with records; plus `development_reports.sites` for `decision_date`, read over all ten ZIP
+shards so coverage is complete).
+
+## C1. Statuses asserting an event that has not happened — ZERO, and the detector is proven live
+
+Two failure shapes were checked. Both came back empty, and neither zero is a silent one:
+
+| shape | live result | positive control (proves the class exists and the check can see it) |
+|---|---|---|
+| a **dead** status (denied / withdrawn / void / expired / cancelled / revoked / rejected / refused / abandoned) rendered on a page | **0 records** | **264** such values are declared across the registry — and **all 264 map to `exclude`**, so they can never materialize |
+| a **pending / in-review / submitted** status rendered as built or operating | **0 records** | **196** such values are declared: 182 → `proposed`, 10 → `approved`, 4 → `exclude`; **0 → built/operating** |
+
+The 10 pending-family values mapped to `approved` were read individually — every one is a compound
+status where approval has already happened and something downstream is outstanding
+(`Issued - Amendment Pending`, `CO Pending`, `Pending Inspection`, `Approved, Final Review Pending`,
+`05_Construction (Pending)`, …). Two are pre-issuance but post-approval (`Pending Issuance`,
+`Pending CC Issuance`). None asserts an unhappened approval.
+
+**This is the cleanest result in the whole audit: the fail-closed status gate is doing its job.**
+
+## C2. The real defect class — an APPROVED or ISSUED record displayed as *Proposed*
+
+The lifecycle bands are `proposed` → `approved` → `built/operating`. Two measurements agree that a
+small set of entries land finished-or-approved records in the *first* band.
+
+**(a) The same source word, two different bands.** Of the entries declaring an approval-family
+status, **78 map it to `approved`** and **8 to `proposed`**. Four of the eight are defensible —
+they qualify the approval as a review step (`Plans Approved`, `Approved for Issuance`,
+`Review Approved`, `Revisions Approved`). **Four map the bare, unqualified form:**
+
+| entry | verbatim status | displayed | records | pages |
+|---|---|---|---:|---:|
+| `missoula-addresses-with-permits` | `Approved` | Proposed | 2,052 | 9 |
+| `bentonville-catalyst-permits` | `APPROVED` | Proposed | 45 | 8 |
+| `columbia-mo-permits` | `Approved` | Proposed | 24 | 3 |
+| `cincinnati-building-permits` | `Approved` | Proposed | 3 | 3 |
+| **total** | | | **2,124** | **~23** |
+
+**This resolves the item held from Round 4.** Bentonville's `APPROVED → proposed` is not an
+isolated judgment call; it is one of four entries doing the same thing while 78 do the opposite
+with the same word. The inconsistency is the finding — a resident comparing two ZIP pages sees the
+identical source status in different bands.
+
+**(b) Far larger: records in the `proposed` band that carry a real ISSUE date.** Reading
+`sites.decision_date` (which the connector fills from a per-entry column):
+
+| entry | `decision_date` column | proposed records carrying one | pages |
+|---|---|---:|---:|
+| `phoenix-building-permits` | `PER_ISSUE_DATE` | **43,054** | 77 |
+| `baltimore-county-permits` | `ISSDATE` | 375 | 41 |
+| `slc-planning-petitions` | `IssuedDate` | 538 | 12 |
+
+Phoenix's `OPEN` (a permit entered and issued, not yet finaled) maps to `proposed`, so **43,054
+records on 77 pages read as *Proposed* while carrying the city's own permit-issue date.** By record
+count this is 20× the (a) class and the single largest status-semantics exposure found.
+
+## C3. `decision_date` does not always hold a decision — 12 of 59 entries
+
+**59 entries declare `column_map.decision_date`** across 40 distinct column names. Reading the
+names against what they are:
+
+| what the column actually records | entries | columns |
+|---|---:|---|
+| **a status-change timestamp** (when the status last moved — not a decision) | **5** | `StatusDate` (charlotte), `Status_Date` (fort-worth), `record_status_date` (asheville), `status_date` (austin-site-plan-cases, austin-subdivision-cases) |
+| **a project END / expiry date** | **7** | `EstEndDate` (fdot), `EstimatedEndDate` (lexington), `project_end_date` (columbia-mo-capital), `COMPLETEDATE` (kcmo-development-cases), `completeDate` (minneapolis-ccs), `End_Date` (lake-county-il), `Expiration` (champaign-il) |
+| a genuine decision / issue / approval date | 47 | — |
+
+`decision_date` is not rendered today, so this is latent **except where §G1's substitution reaches
+it**: when a record has no `file_date`, the materializer puts `decision_date` in the filing slot.
+The sharpest case is **`fdot-active-construction-projects` — 577 records on 160 pages whose
+displayed date is an `EstEndDate`, an estimated *completion*, sitting in the position that reads as
+when the project was filed.** Same route for `charlotte` (5), `austin-subdivision-cases` (19),
+`austin-site-plan-cases` (6), `denton` (7) and `columbia-mo-capital-projects` (5).
+
+`columbia-mo-capital-projects` also carries **`decision_date` values from `1969-12-31` to
+`2037-07-15`** — an epoch sentinel and a far-future programme date in the same column. §A2 found
+epoch sentinels in `file_date`; this is the first in `decision_date`.
+
+## C4. Dead map keys — bounded, and deliberately not called a defect
+
+Across the 175 entries with records, **1,206 non-`exclude` status values are declared and 881
+distinct verbatim status values actually appear in live rows** — so **at least ~325 declared values
+match nothing on any page today**. Concentrated in a few entries: `tacoma-accela-permits` (68
+declared / 35 live), `new-orleans-permits` (39 / 9), `asheville-accela-permits` (33 / 15),
+`hartford-building-permits` (25 / 8), `cabarrus-county-plan-reviews` (32 / 15),
+`mesa-building-permits` (21 / 8), `seattle-land-use-permits` (21 / 9).
+
+**This is a maintenance signal, not an error.** A declared value can legitimately be absent because
+the entry's `recency_days` window excludes it, because the status is rare, or because the source
+retired it. Nothing here shows a wrong record on a page. It is reported because the opposite
+direction — a live value with no declared key — is impossible by construction (the gate fails
+closed and excludes it), so this is the only visibility config drift has.
+
+## C5. What §C did NOT check
+
+- **Whether a `type_map` value is the *right* use-type.** `use_type` drives pin shape; this pass
+  checked lifecycle, not classification. The existing `registry-type-path-coherence` unit test
+  covers only the unreachable-`type_map` case.
+- **Whether an entry's chosen `status_raw` column is the best one available** on the layer. That
+  needs a live field-list probe per entry (the same gap `registry-type-path-coherence` records).
+- **Per-record correctness of any status** — only the mapping from a status value to a band.
