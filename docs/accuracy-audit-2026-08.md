@@ -990,3 +990,53 @@ rather than read from the live layer. The shape supports that reading: the worst
 `recency_days` window and by the ZIPs HomeSignal covers, so a status that is real but rare, seasonal,
 or retired reads as dead here. The honest claim is the narrow one: **280 declared values do nothing
 today, in 42 entries, and none of them is compensating for an unmapped live value.**
+
+---
+
+# §H6 — The isoDay fix MEASURED (deployed, re-cached, counted against the null baseline)
+
+Shipped in #651 (squash-merged `803031f`), deployed via `deploy-edge-functions` run **31258446921**,
+green at **12:58:34Z**, then the 16 affected ZIP pages re-cached through the live engine and
+re-materialized. Ruling 1 asked for recovery measured per entry against its null count, not assumed:
+
+| entry | undated before | dated after | pages recovered | recovery |
+|---|---:|---:|---|---:|
+| `anaheim-land-use-cases` | 796 | **796** | 7 of 7 | **100%** |
+| `virginia-beach-building-permits` | 14,109 | **9,694** | 7 of 9 | **68.7%** |
+| **total** | **14,905** | **10,490** | 14 of 16 | **70.4%** |
+
+Per-page, `virginia-beach-building-permits`:
+
+| ZIP | records | dated after |
+|---|---:|---:|
+| 23452 | 1,996 | 1,996 |
+| 23454 | 2,032 | 2,032 |
+| 23455 | 1,609 | 1,609 |
+| 23464 | 1,597 | 1,597 |
+| 23462 | 1,504 | 1,504 |
+| 23453 | 804 | 804 |
+| 23457 | 152 | 152 |
+| **23451** | 2,458 | **0** — blocked |
+| **23456** | 1,957 | **0** — blocked |
+
+Every recovered record is stamped `date_kind = 'filed'` (both entries map an application/issue date,
+and neither declares a `file_date_kind` yet), with date ranges that make sense: virginia-beach
+2026-01-02 → 2026-07-31 (its 365-day window), anaheim 2025-07-01 → 2026-07-29 (its `extra_where`
+string-compare window). The 2008 values seen in the raw probe are outside both windows and are
+correctly not fetched.
+
+## The two blocked pages — a real limit, not a flake
+
+`23451` and `23456` (Virginia Beach oceanfront and the large southern ZIP) return **HTTP 546
+`WORKER_RESOURCE_LIMIT`** from the edge function — *"Function failed due to not having enough
+compute resources"* — reproduced **twice each** across separate fires (responses `23071`, `23073`,
+`23074`). They are the two largest VB pages by record count. This is the same CPU-budget class
+recorded for Miami in the FLORIDA WIRE PASS, not a transient cold start (the transient shapes seen
+in the same window — `503 BOOT_ERROR` and a 90 s DNS timeout — recovered on retry; 546 did not).
+
+**Consequence, stated plainly: 4,415 records on 2 pages still render undated, and re-running the
+refresh will not change that.** `23456` currently holds pre-fix output that a warm isolate served
+before the deploy propagated; `23451` never completed at all. Both need a smaller payload — the
+established levers are `out_fields` projection and `page_size` (both already exist, default-off) or
+a narrower `spatial_zip_radius_mi` — which changes what residents see and is therefore a separate,
+gated decision, not part of this mechanical fix. Logged, not worked around.
