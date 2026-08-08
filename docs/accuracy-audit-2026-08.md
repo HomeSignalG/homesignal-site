@@ -901,3 +901,92 @@ on no row; could not see that 49,884 records carry no coordinates. All three nee
 **Any future check of this system that reads only the registry should say so in its own report.**
 An audit that read only config and says so is honest; one that read only config and implies
 completeness is not.
+
+---
+
+# §C6 — MAP KEYS, as its own sub-pass (exact string matching, both directions)
+
+§C4 reported "at least ~325" dead keys from a count subtraction. That was a bound, not a list. This
+sub-pass does the exact per-entry string comparison the ruling asked for, in **both** directions,
+and supersedes the ~325 figure.
+
+**Method.** For each entry: the verbatim non-`exclude` values declared in `status_to_bucket`, against
+the distinct verbatim `app_projects.stage` values that entry actually produced (`stage` carries the
+source status untouched). Three outcomes are distinguished — **dead key** (declared, matches no live
+value even case-insensitively), **case-fold-only** (declared key matches a live value only after
+lowercasing — the drift the connector's `noteCaseFold` path would silently absorb), and **unmapped
+live** (a live value no declared key covers).
+
+**Scope, stated so its silence is legible: 75 entries examined.** `status_const` entries are
+excluded — their `stage` is the constant, not a source vocabulary, so they have no keys to be dead.
+The remaining entries are those whose declared count does not exceed their live count; since the
+unmapped direction measures **zero** (below), declared ≥ live always holds, so declared = live
+implies zero dead keys for those.
+
+## Result
+
+| | count |
+|---|---:|
+| entries with ≥1 dead key | **42** |
+| dead keys, total | **280** |
+| case-fold-only matches | **0** |
+| **unmapped live values** | **0** |
+| **entries with BOTH dead keys and unmapped values** | **0** |
+
+**The ruling's hypothesis is testable and the answer is that it never occurs.** "Dead keys AND
+unmapped values in one entry means it was drafted from assumption twice" — no entry is in that
+state, because the unmapped direction is empty everywhere. That is not luck: the status gate fails
+closed, so a live value can only exist if a declared key already covered it. §C4 asserted this from
+the code; this measures it across 75 entries and finds no exception. The **0 case-fold-only** result
+matters too — it means no declared key is being rescued by case-insensitive matching, so the drift
+the case-fold path exists to absorb is not currently present. (Where a source genuinely publishes
+both cases — `sussex-county-de-conditional-use` emits `Approved` *and* `APPROVED` — both forms are
+declared explicitly.)
+
+## The 42, by dead-key count
+
+| entry | dead | declared | live |
+|---|---:|---:|---:|
+| `tacoma-accela-permits` | 34 | 68 | 35 |
+| `new-orleans-permits` | 30 | 39 | 9 |
+| `asheville-accela-permits` | 18 | 33 | 15 |
+| `cabarrus-county-plan-reviews` | 17 | 32 | 15 |
+| `hartford-building-permits` | 17 | 25 | 8 |
+| `mesa-building-permits` | 13 | 21 | 8 |
+| `seattle-land-use-permits` | 12 | 21 | 9 |
+| `bend-or-permit-applications` | 9 | 15 | 6 |
+| `adams-county-building-permits` | 8 | 18 | 10 |
+| `bellevue-permits` | 8 | 15 | 7 |
+| `fort-worth-development-permits` | 8 | 20 | 12 |
+| `bentonville-catalyst-permits` | 7 | 14 | 7 |
+| `boulder-construction-permits` | 7 | 17 | 10 |
+| `coconino-county-permits` | 7 | 21 | 14 |
+| `columbia-mo-permits` | 7 | 18 | 11 |
+| `forsyth-county-ga-building-permits` | 7 | 15 | 8 |
+| `naperville-building-permits` | 6 | 13 | 7 |
+| `seattle-building-permits` | 6 | 21 | 15 |
+| `anaheim-land-use-cases` | 5 | 13 | 8 |
+| `new-hanover-county-building-permits` | 5 | 17 | 12 |
+| `raleigh-building-permits` | 5 | 14 | 9 |
+| `kcmo-development-cases` | 4 | 13 | 9 |
+| `lee-county-fl-development-orders` | 4 | 13 | 9 |
+| `round-rock-large-development-projects` | 4 | 12 | 8 |
+| `fort-collins-building-permits` | 3 | 12 | 9 |
+| `missoula-addresses-with-permits` | 3 | 15 | 12 |
+| `pierce-county-pals-permits` | 3 | 9 | 6 |
+| `tempe-building-permits` | 3 | 10 | 7 |
+| `durham-building-permits` · `kcmo-building-permits` · `pittsburgh-pli-permits` · `portland-building-permits` · `sussex-county-de-conditional-use` · `tucson-residential-building-permits` | 2 each | | |
+| `arlington-planning-cases` · `austin-zoning-cases` · `charlotte-land-dev-commercial-projects` · `clark-county-active-dev-permits` · `henderson-commercial-permits` · `peoria-az-building-permits` · `san-marcos-planning-cases` · `wake-county-building-permits` | 1 each | | |
+
+## What a dead key does and does not prove
+
+It is **harmless at runtime** — an unused branch in a lookup — which is exactly why it survives, and
+exactly why it is the only visible trace of a mapping drafted from a vendor's documented status list
+rather than read from the live layer. The shape supports that reading: the worst offenders are all
+**Accela/EnerGov-family portals** (`tacoma` 34, `asheville` 18, `new-orleans` 30, `hartford` 17,
+`cabarrus` 17), whose published status vocabularies are far larger than any one jurisdiction uses.
+
+**But a dead key is not proof of assumption.** Each entry's live vocabulary is bounded by its
+`recency_days` window and by the ZIPs HomeSignal covers, so a status that is real but rare, seasonal,
+or retired reads as dead here. The honest claim is the narrow one: **280 declared values do nothing
+today, in 42 entries, and none of them is compensating for an unmapped live value.**
