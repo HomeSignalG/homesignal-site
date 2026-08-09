@@ -73,9 +73,23 @@
   .qcell.on .qs{color:var(--green)}
   .ihint{font-size:11px;color:var(--ink-3);margin:11px 0 0;line-height:1.45}
   .specs.tight .row{padding:6px 0;font-size:12.5px}
-  /* "Who's behind it" — the party's town, subordinate to the name it qualifies */
-  .specs .row b .pmeta{font-weight:400;color:var(--ink-3);font-size:11.5px}
   .specs .row b{text-align:right}
+  /* ── "Who's behind it": role → entity, with the verified parent BENEATH its
+        subsidiary. The parent never occupies the entity's own line — lineage is
+        preserved visually as well as in the data. ── */
+  .plist .prow{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;
+    align-items:baseline;padding:9px 0;border-bottom:1px dashed var(--line)}
+  .plist .prow:last-child{border-bottom:none}
+  .plist .prole{font-size:12.5px;color:var(--ink-3)}
+  .plist .pname{font-size:12.5px;color:var(--ink);text-align:right}
+  .plist .pname b{color:var(--ink)}
+  /* the town and the parent are SUB-LINES of the entity, each on its own right-aligned
+     row, so a long name never pushes them into a ragged wrap mid-sentence */
+  .plist .pmeta{display:block;margin-top:2px;font-weight:400;color:var(--ink-3);font-size:11.5px}
+  .plist .pparent{display:block;margin-top:4px;font-size:11.5px;color:var(--ink-2)}
+  .plist .pparent .pplab{color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;
+    font-size:10px;font-weight:700;margin-right:5px}
+  .plist .pparent.none{color:var(--ink-3);font-style:italic}
   /* Sources & verification — the metadata sits behind a disclosure so the card stays compact */
   .srcdet{margin-top:12px;border-top:1px solid var(--line-2);padding-top:10px}
   .srcdet > summary{font-size:12px;font-weight:600;color:var(--green);cursor:pointer;list-style:none;
@@ -931,17 +945,15 @@ HS.onReady(async function () {
     // the record names nobody, rather than rendering an empty shell.
     // Only the party's NAME and its city/state are shown; the full mailing address and
     // phone stay in the record (same restraint the property page already applies).
-    var parties = Array.isArray(it.parties) ? it.parties.filter(function (p) { return p && p.name; }) : [];
+    var parties = HS.parties.list(it);
     var whoHTML = '';
     if (parties.length) {
-      whoHTML = '<div class="isec"><h4>Who\'s behind it</h4><div class="specs tight">'
-        + parties.map(function (p) {
-            var where = cityState(p.address);
-            return '<div class="row"><span>' + HS.esc(p.role || 'On the filing') + '</span>'
-              + '<b>' + HS.esc(p.name) + (where ? ' <span class="pmeta">' + HS.esc(where) + '</span>' : '') + '</b></div>';
-          }).join('')
-        + '</div><p class="ihint">Names and roles exactly as filed. We show a role only when the '
-        + 'record names it — we never infer a developer, operator or parent company.</p></div>';
+      whoHTML = '<div class="isec"><h4>Who\'s behind it</h4><div class="plist">'
+        + HS.parties.rowsHTML(parties)
+        + '</div><p class="ihint">Names and roles exactly as filed. A role appears only when the '
+        + 'record names it, and a parent company only when an authoritative corporate record '
+        + 'establishes it — we never infer one from shared people, shared investors, a similar '
+        + 'name or news coverage.</p></div>';
     }
 
     var whyHTML = '<div class="isec"><h4>Why this matters</h4>' + HS.whyQaHTML(wd) + '</div>';
@@ -989,6 +1001,15 @@ HS.onReady(async function () {
     // so the primary card is not buried in provenance. Every line below is read from the
     // record's own `provenance` object — nothing is derived, and an absent key prints no row.
     var pv = (it.provenance && typeof it.provenance === 'object') ? it.provenance : {};
+    // A verified parent relationship is a separately-sourced claim, so it carries its own
+    // citation here rather than riding on the filing's. No verified parent -> no rows.
+    var parentRows = HS.parties.evidenceRows(parties)
+      .map(function (r) {
+        var v = r.url
+          ? '<a href="' + HS.esc(r.url) + '" target="_blank" rel="noopener">' + HS.esc(r.value) + ' ▸</a>'
+          : HS.esc(r.value);
+        return '<div class="row"><span>' + HS.esc(r.label) + '</span><b>' + v + '</b></div>';
+      }).join('');
     var srcRows = [
       ['Source', pv.src || pv.jurisdiction],
       ['Jurisdiction', (pv.src && pv.jurisdiction) ? pv.jurisdiction : ''],
@@ -1004,8 +1025,8 @@ HS.onReady(async function () {
     var evHTML = '<div class="isec"><h4>Sources &amp; verification</h4><div class="doact">' + evParts + '</div>'
       + '<p class="ihint">Every item on this map traces to a public record — HomeSignal reports the fact and the link, never a verdict.'
       + (it.approx ? ' Some details are still preliminary while county records sync — the official record is the source of truth.' : '') + '</p>'
-      + (srcRows ? '<details class="srcdet"><summary>Where this came from</summary>'
-          + '<div class="specs tight">' + srcRows + '</div></details>' : '')
+      + ((srcRows || parentRows) ? '<details class="srcdet"><summary>Where this came from</summary>'
+          + '<div class="specs tight">' + srcRows + parentRows + '</div></details>' : '')
       + '</div>';
 
     // ── 6) Public Participation (actions for the same matched hearing that
@@ -1057,15 +1078,9 @@ HS.onReady(async function () {
     return HS.fmtDate(/^\d{4}-\d{2}-\d{2}$/.test(s) ? s + 'T12:00:00' : s,
                       { year: 'numeric', month: 'long', day: 'numeric' });
   }
-  // "…, FREMONT, California 94555" -> "Fremont, California". The full mailing address and
-  // phone stay in the record: a party's town is orientation, their postal address is not.
-  // Returns '' when the string has no recognisable city/state tail — never a guess.
-  function cityState(addr) {
-    var m = /,\s*([A-Za-z .'-]+),\s*([A-Za-z .]{2,})\b[^,]*$/.exec(String(addr || ''));
-    if (!m) return '';
-    var city = m[1].trim().replace(/\S+/g, function (w) { return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); });
-    return city + ', ' + m[2].trim();
-  }
+  // (party name/role/parent/place rendering lives in lib/templates.js::HS.parties, so the
+  //  identity contract is unit-testable and reusable by development.html)
+
   // Plain-language readings of the two source-quality keys the engine stamps. An
   // unrecognised value prints no row rather than being echoed raw at a resident.
   var URL_PRECISION = {

@@ -148,3 +148,74 @@ comment on function public.app_site_parties(jsonb) is
 --   address    508/508 development rows       stage      508/508 development rows
 --   provenance 537/537 rows                   parties      5/508 (the TABS filings)
 --   start_date   5/508                        scope_text   5/508
+
+-- ============================================================================
+-- PART 2 — Parent Company as a first-class relationship
+-- Applied 2026-08-09 as migrations:
+--   company_parent_relationship_model
+--   app_refresh_zip_attach_parents
+--
+-- WHAT ALREADY EXISTED, measured before writing anything:
+--   select table_name, column_name from information_schema.columns
+--    where table_schema='public' and column_name ilike '%parent%';
+--     -> communities.parent_id                      (ZIP -> city -> county; not corporate)
+--        company_esg_matches.parent_company_id/_name
+--   select count(*), count(parent_company_id), count(parent_company_name),
+--          count(*) filter (where match_confidence='verified')
+--     from public.company_esg_matches;               -> 4, 0, 0, 0
+--   CONCLUSION: HomeSignal holds NO verified corporate parent relationship. The model
+--   below is therefore fully wired and populates ZERO parents. That is the correct
+--   outcome for this task, not an incomplete one.
+--
+-- THE IDENTITY MODEL (roles stay distinct; nothing collapses to one company field):
+--   Property / Facility
+--     -> Property Owner  -> Parent Company (verified only)
+--     -> Developer       -> Parent Company (verified only)
+--     -> Applicant
+--     -> Operator        -> Parent Company (verified only)
+--     -> Contact / Filed By / Design Firm
+--
+-- LINEAGE IS NEVER COLLAPSED. app_attach_parents() ADDS a `parent` object beside the
+-- party's own `role` and `name`; no code path can replace an operating entity with its
+-- holding company. "Operator: ABC Operations LLC" keeps its row and gains
+-- "Parent company: ABC Holdings, Inc." beneath it.
+--
+-- THE EVIDENCE BAR IS A CONSTRAINT, NOT A CONVENTION.
+--   * company_parents_no_unverified_parent  — an unverified row cannot hold a parent
+--     NAME at all. A candidate lives in `notes`, where no renderer or join reads it.
+--   * company_parents_verified_needs_evidence — 'verified' requires parent_name +
+--     parent_key + evidence_source + evidence_url + retrieved_at.
+--   * company_parents_not_self — a company cannot be its own parent.
+--   Shared founders / executives / investors, similar names, news co-occurrence and
+--   "same corporate ecosystem" are not evidence and have NO column that accepts them.
+--   An inferred parent is unstorable, not merely discouraged.
+--
+--   Probed live 2026-08-09, all four (three rejections + one acceptance as the positive
+--   control that proves the rejections are real):
+--     unverified row + parent name         -> check_violation  REJECTED
+--     verified with no source/url/date     -> check_violation  REJECTED
+--     company as its own parent            -> check_violation  REJECTED
+--     verified + source + url + retrieved  -> ACCEPTED (probe rows then deleted; 0 left)
+--
+-- NAME KEYING: app_company_key() normalises case/punctuation/whitespace ONLY. Corporate
+-- suffixes are KEPT, so 'neuralink' and 'neuralink corporation' are DISTINCT keys —
+-- merging them would infer a relationship from name similarity, the exact thing the
+-- brief forbids. ('River Bottoms Ranch LLC' and 'RIVER BOTTOMS RANCH LLC' DO share a key:
+-- that is case, not similarity.)
+--
+-- FUTURE COMPANY-LEVEL DATASETS join public.v_app_project_companies, which yields both
+-- halves per (project, role, company): `company_key` for the direct company, and
+-- `parent_key` populated ONLY where parent_verification = 'verified'. Anything inherited
+-- through that edge must be labelled parent-company information — the edge itself carries
+-- attribution:'parent_company' for exactly that purpose.
+--
+-- SEEDED STATE (78617): the four parent-eligible companies are registered with
+-- verification='not_yet_asked' and a note recording what was checked and what it
+-- returned. "Not yet asked" is a valid and required provenance value; writing
+-- 'searched_none_found' would claim a lookup nobody performed.
+--   neuralink · neuralink corporation · river bottoms ranch · river bottoms ranch llc
+--
+-- NOT DONE, deliberately: no external corporate-registry research, no SEC/state-SOS
+-- lookups, no parent inference from the shared-phone link the pipeline already records
+-- between River Bottoms Ranch and Neuralink filings. A shared phone is a shared phone.
+-- ============================================================================

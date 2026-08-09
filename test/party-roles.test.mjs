@@ -63,6 +63,95 @@ test('a record with no parties falls back to the legacy single field, unchanged'
   assert.doesNotMatch(know, /Owner on file/);
 });
 
+// ── Parent Company as a first-class relationship ────────────────────────────
+// The evidence bar lives in two independent places: the DB cannot STORE an unverified
+// parent (company_parents CHECK constraints, probed live), and the renderer will not
+// SHOW one. These pin the second gate.
+const P = () => HS.parties;
+
+test('a verified parent renders BESIDE its subsidiary, never instead of it', () => {
+  const rows = P().rowsHTML([{
+    role: 'Operator', name: 'ABC Operations LLC',
+    parent: { verification: 'verified', name: 'ABC Holdings, Inc.',
+              source: 'SEC EDGAR 10-K Exhibit 21', url: 'https://www.sec.gov/x',
+              attribution: 'parent_company' }
+  }]);
+  assert.match(rows, /Operator/, 'the role survives');
+  assert.match(rows, /ABC Operations LLC/, 'the direct operating entity survives');
+  assert.match(rows, /Parent company/);
+  assert.match(rows, /ABC Holdings, Inc\./);
+  // Lineage: the subsidiary must appear BEFORE the parent, i.e. the parent is a
+  // sub-line of the entity's row and has not replaced it.
+  assert.ok(rows.indexOf('ABC Operations LLC') < rows.indexOf('ABC Holdings'),
+    'the parent renders beneath the subsidiary, not in its place');
+
+  const ev = P().evidenceRows([{
+    role: 'Operator', name: 'ABC Operations LLC',
+    parent: { verification: 'verified', name: 'ABC Holdings, Inc.',
+              source: 'SEC EDGAR 10-K Exhibit 21', url: 'https://www.sec.gov/x' }
+  }]);
+  assert.strictEqual(ev.length, 1, 'a verified parent carries its own citation');
+  assert.match(ev[0].value, /SEC EDGAR/, 'the citation names the authoritative source');
+});
+
+test('an UNVERIFIED parent is never shown, however it is dressed up', () => {
+  // Each of these is a shape a careless upstream write could produce. None may render
+  // a company name: shared people, similar names and "commonly associated" are not
+  // evidence, and the renderer must not be the place that decides otherwise.
+  const badParents = [
+    { verification: 'unverified_candidate', name: 'Inferred Holdings, Inc.' },
+    { verification: 'not_yet_asked', name: 'Guessed Parent Co' },
+    { verification: 'searched_none_found', name: 'Should Not Exist LLC' },
+    { name: 'No Verification Field At All' },
+    { verification: 'verified' },                       // verified but nameless
+    { verification: 'VERIFIED', name: 'Wrong Case Ltd' } // fail closed on vocabulary
+  ];
+  for (const parent of badParents) {
+    const rows = P().rowsHTML([{ role: 'Owner', name: 'Real Operating LLC', parent }]);
+    assert.match(rows, /Not yet verified/,
+      'unverified reads "Not yet verified": ' + JSON.stringify(parent));
+    if (parent.name) {
+      assert.ok(rows.indexOf(parent.name) === -1,
+        'the unverified name must not appear anywhere: ' + parent.name);
+    }
+    assert.strictEqual(P().evidenceRows([{ role: 'Owner', name: 'Real Operating LLC', parent }]).length, 0,
+      'an unverified parent contributes no evidence row');
+  }
+});
+
+test('only Owner / Developer / Operator can carry a parent', () => {
+  for (const role of ['Owner', 'Developer', 'Operator']) {
+    assert.ok(P().parentEligible(role), role + ' is parent-eligible');
+    assert.match(P().rowsHTML([{ role, name: 'X LLC' }]), /Parent company/,
+      role + ' shows the parent state');
+  }
+  // People and service providers on the filing are not the entity behind the property,
+  // so they get no parent line at all — not even "Not yet verified".
+  for (const role of ['Contact', 'Filed By', 'Design Firm']) {
+    assert.ok(!P().parentEligible(role), role + ' is not parent-eligible');
+    assert.doesNotMatch(P().rowsHTML([{ role, name: 'Someone' }]), /Parent company/,
+      role + ' gets no parent line');
+  }
+});
+
+test('the role model keeps the five relationships distinct', () => {
+  for (const role of ['Owner', 'Developer', 'Applicant', 'Operator']) {
+    assert.ok(P().ROLES.indexOf(role) !== -1, role + ' is a supported role');
+  }
+  // Four distinct companies on one property must render as four distinct rows —
+  // never merged into one generic company field.
+  const rows = P().rowsHTML([
+    { role: 'Owner',     name: 'Landco LLC' },
+    { role: 'Developer', name: 'Buildco Inc' },
+    { role: 'Applicant', name: 'Permitco' },
+    { role: 'Operator',  name: 'Runco LLC' }
+  ]);
+  for (const n of ['Landco LLC', 'Buildco Inc', 'Permitco', 'Runco LLC']) {
+    assert.ok(rows.indexOf(n) !== -1, n + ' keeps its own row');
+  }
+  assert.strictEqual((rows.match(/class="prow"/g) || []).length, 4, 'four roles, four rows');
+});
+
 test('an empty or malformed parties array fabricates nothing', () => {
   for (const bad of [[], null, 'Neuralink', [{ name: 'No role' }], [{ role: 'Owner' }]]) {
     const row = Object.assign({}, tabsRow, { parties: bad, developer: undefined });

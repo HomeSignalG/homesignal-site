@@ -686,6 +686,27 @@ legal/framing change not covered by the one-time sign-off.
   *(What it replaced: `developer = coalesce(owner, src)` rendered under the single label
   "Developer / applicant" — for a TABS filing that value is the owner, for an EPA facility
   it is the source string. Pinned by `test/party-roles.test.mjs`.)*
+- **PARENT COMPANY IS A SEPARATE, SEPARATELY-EVIDENCED FACT — AND IT IS UNSTORABLE
+  WITHOUT EVIDENCE (2026-08-09).** `public.company_parents` records child → parent, and
+  three CHECK constraints make the rule structural rather than conventional: an
+  **unverified row cannot hold a parent NAME at all** (a candidate lives in `notes`, where
+  no renderer or join reads it), `verified` requires
+  `parent_name + parent_key + evidence_source + evidence_url + retrieved_at`, and a company
+  cannot be its own parent. **Shared founders, executives or investors, similar names, news
+  co-occurrence and "same corporate ecosystem" are not evidence and have no column that
+  accepts them.** All four gates probed live (three rejections + one acceptance as the
+  positive control). `lib/templates.js::HS.parties.parent()` is the independent second gate
+  at render time. **Lineage is never collapsed:** `app_attach_parents()` ADDS a `parent`
+  object beside the party's own role and name — an operating entity is never replaced by
+  its holding company. **`app_company_key()` keeps corporate suffixes**, so "Neuralink" and
+  "Neuralink Corporation" stay distinct keys; merging them would infer a relationship from
+  name similarity. Future company-level datasets (ESG, EPA corporate history, OSHA,
+  developer track record) join **`public.v_app_project_companies`** — direct company via
+  `company_key`, parent via `parent_key` **only** where `parent_verification='verified'`,
+  and anything inherited through that edge must be labelled parent-company information
+  (the edge carries `attribution:'parent_company'` for exactly that). Measured
+  2026-08-09: **zero verified parents exist in HomeSignal data** — the only parent columns
+  in the schema are `company_esg_matches.parent_company_id/_name`, 0 of 4 rows populated.
 - **A MATERIALISER THAT READS ONE CONNECTOR'S KEY NAMES SILENTLY DROPS EVERY OTHER
   CONNECTOR'S DATA (2026-08-09).** `app_refresh_zip` read `bucket` / `status_raw` only —
   ArcGIS spellings — so all five Del Valle TABS filings lost their lifecycle (rendered as
