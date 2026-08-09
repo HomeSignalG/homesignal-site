@@ -2373,3 +2373,66 @@ corpus-wide ~20/hour, which is proportionate to TxDOT's 5.2% share of pages — 
 lagging relative to the corpus; the corpus is lagging.** Consistent with the timeout/FRS chain, but
 consistent with several other explanations too, and one entry is not a test. **Recorded as
 unestablished.**
+
+---
+
+# §X — `issued` spot-checks, batch 1: the 69 derived independently, and the biggest one is not `issued` at all
+
+## X1. The 69 reproduce from the registry, not from a remembered figure
+
+Derived fresh: every entry with a `file_date` column whose name matches `issu|iss_?d|permit_?dat|coodt`
+and which does not already declare a kind. **The count comes back at exactly 69**, spread across all
+five bound platforms (socrata 9, arcgis 55, ckan 3, csv 1, carto 1) — an independent reproduction of
+a figure that had been carried across several passes.
+
+## X2. Batch 1 — the four whose column names are NOT plainly self-describing
+
+| entry | column | verdict |
+|---|---|---|
+| **`loudoun-county-residential-permits`** | `YEAR_ISSUED` | 🔴 **NOT `issued` — there is no date. Drop the mapping.** |
+| `savannah-commercial-building-permits` | `IssuedDate_DATE` | 🟢 PASS |
+| `bend-or-permit-applications` | `IssueDate` | 🟢 PASS |
+| `denver-commercial-construction-permits` | `DATE_ISSUED` | ⏳ re-probe needed (my `outFields` guess was invalid — HTTP 400 `'outFields' parameter is invalid`, my error, not the layer's) |
+
+### 🔴 Loudoun — the largest entry in the undated population, and it is a §H3 drop
+
+The complete field roster (live, `?f=json`) carries **`MONTH_ISSUED:String`** and
+**`YEAR_ISSUED:String`** and **no `esriFieldTypeDate` field anywhere**. The county publishes
+month-and-year granularity only.
+
+So `YEAR_ISSUED` is a 4-character year, `isoDay('2011')` returns null (already pinned in
+`test/iso-day-year-first-slash.test.mjs`), and **all 45,618 records / 18 pages render undated** —
+which is exactly what §A3 measured without knowing why. It is **the single largest entry in the
+86,749-record undated population.**
+
+It cannot be labelled `issued`, because a label describes a date and there is no date. Combining
+the two columns is not a repair either: `column_map` arrays **JOIN** values rather than falling
+back (established standing answer), so `["MONTH_ISSUED","YEAR_ISSUED"]` yields `"April 2011"`, which
+`isoDay` also cannot parse — and month granularity would require inventing a day. **Correct outcome
+is the sheridan/butler treatment: drop the `file_date` mapping with a positive receipt.** It removes
+nothing a resident can see, because nothing renders today.
+
+### 🟢 Savannah — the odd name is the publisher's own date-typed twin
+
+The layer publishes **both** `IssuedDate:String` and `IssuedDate_DATE:Date` (and the same pair for
+`FinalizedDate`). The registry maps the **`_DATE`** variant — the typed one — which is the correct
+choice of the two. `issued` confirmed.
+
+### 🟢 Bend — correct despite the layer being named "Permit_Applications_Point"
+
+Live rows pair `IssueDate` with `StatusDesc`: `1786101295000` = **2026-08-09** with
+`"Permit(s) Issued"`, and three more the same shape within minutes of each other. It is a genuine,
+current permit-issue timestamp; the layer name describes the case type, not the column. `issued`
+confirmed.
+
+⚠️ **Incidental find, logged not fixed:** ordering `IssueDate DESC` returns
+`2013379200000` = **2033-10-11** on a `Closed` application — a future date. The entry carries
+`recency_days: 365`, which filters `>= cutoff` and therefore does **not** exclude future dates. Same
+class as the national future-date scan; recorded, not actioned in this pass.
+
+## X3. Where batch 1 leaves the count
+
+**38 of 170 entries declare a kind.** Of the 69 `issued` candidates: **2 confirmed** (savannah,
+bend), **1 reclassified as a drop** (loudoun), **1 needs a re-probe** (denver), **65 not yet
+checked**. Nothing has been relabelled in the registry yet — the confirmations are recorded here
+first, and ship as one batch once the platform sweep is done.
