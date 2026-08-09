@@ -1,0 +1,116 @@
+{
+  "_readme": [
+    "REVIEWED COMPANY ALIAS REGISTRY for the ESG / Sustainability company layer.",
+    "This file is DATA, not code — adding a company is a registry entry, never an engine change.",
+    "",
+    "WHY A REGISTRY INSTEAD OF FREE-TEXT EXTRACTION: EPA FRS facility names are SITE names, not",
+    "company names. Measured against live app_projects 2026-08-09 (98,059 distinct facility names),",
+    "a naive contains-match produces confident, wrong attributions:",
+    "  • 'ALPHABET GARDEN CHILDCARE-TREATMENT PLANT 1' is a childcare centre, not Alphabet Inc.",
+    "  • 'PG&E TESLA SUBSTATION' is a PG&E substation in Tesla, CALIFORNIA — not Tesla Motors.",
+    "  • 'WALMART C/O TESLA ENERGY' names two companies at once.",
+    "Each of those is handled below and pinned by test/esg-normalize.test.mjs.",
+    "",
+    "FIELDS",
+    "  company_key     stable internal key; the join key to company_esg_matches.company_id",
+    "  canonical_name  the resident-facing company name",
+    "  wikirate_name   the name QUERIED against WikiRate when it differs from canonical_name",
+    "  parent_key      company_key of the parent, used for the parent-company fallback",
+    "  site_patterns   whole-token phrases that identify this company in a facility name",
+    "  deny_patterns   phrases that DISQUALIFY this entry even on a site_pattern hit",
+    "",
+    "MATCH RULES (supabase/functions/esg-refresh/normalize.ts)",
+    "  • patterns match on WHOLE TOKENS, so 'amazon' never fires on 'AMAZONIA'.",
+    "  • two entries claiming one facility = AMBIGUOUS = held, never displayed.",
+    "  • a WikiRate substring hit is never sufficient — the normalized CORE must be equal."
+  ],
+  "_verified": "2026-08-09 — every wikirate_id below was read live from wikirate.org via pg_net (Company.json?filter[name]=…). Answer counts are from Answer.json?filter[company_id]=<id>&limit=200.",
+  "companies": [
+    {
+      "company_key": "spacex",
+      "canonical_name": "Space Exploration Technologies Corporation (SpaceX)",
+      "site_patterns": ["spacex", "space exploration technologies"],
+      "_receipts": "wikirate id 2618023, sole candidate for filter[name]=SpaceX. 200/200 sampled answers are World Benchmarking Alliance; max year 2025."
+    },
+    {
+      "company_key": "tesla",
+      "canonical_name": "Tesla Motors",
+      "site_patterns": ["tesla"],
+      "deny_patterns": ["pg and e", "pge", "walmart"],
+      "_receipts": "wikirate id 6273 ('Tesla Motors' — WikiRate has no 'Tesla, Inc.' card). filter[name]=Tesla also returns TESLA MOTORS AUSTRALIA/ENGINEERING/LIMITED; 'Tesla Motors' is the unique EXACT hit so the tier order resolves it. deny 'pg and e' guards the live facility 'PG&E TESLA SUBSTATION' (Tesla, CA is a place); deny 'walmart' guards 'WALMART C/O TESLA ENERGY'."
+    },
+    {
+      "company_key": "amazon",
+      "canonical_name": "Amazon.com, Inc.",
+      "site_patterns": ["amazon", "amazon com", "amazon com services"],
+      "_receipts": "wikirate id 11708. filter[name]=Amazon returns 7 Brazilian 'Amazonia' companies as substring noise; all are rejected by the core-equality rule, and whole-token matching keeps 'amazon' from firing on 'AMAZONIA' in the first place."
+    },
+    {
+      "company_key": "microsoft",
+      "canonical_name": "Microsoft Corporation",
+      "site_patterns": ["microsoft"],
+      "_receipts": "wikirate id 7354. filter[name]=Microsoft returns 8 candidates incl. 'Microsoft Corporation (WA, United States)' (id 19849376) — that is a HIGH-tier near-miss on core ('microsoft corporation wa united states' ≠ 'microsoft'), so it does not tie with the EXACT hit."
+    },
+    {
+      "company_key": "alphabet",
+      "canonical_name": "Alphabet Inc",
+      "site_patterns": ["alphabet inc"],
+      "deny_patterns": ["alphabet garden"],
+      "_receipts": "wikirate id 2271567. Bare 'alphabet' is deliberately NOT a site_pattern — the live facility 'ALPHABET GARDEN CHILDCARE-TREATMENT PLANT 1' would match it. Alphabet's own facilities are branded GOOGLE, which the google entry carries."
+    },
+    {
+      "company_key": "google",
+      "canonical_name": "Google Inc.",
+      "parent_key": "alphabet",
+      "site_patterns": ["google"],
+      "_receipts": "wikirate id 8994. Google Inc. carries 0 World Benchmarking Alliance answers of 200 sampled while its parent Alphabet Inc carries 186 — this is the parent-company fallback case, and WBA data shown for a Google facility must be labelled 'Alphabet Inc (parent company)'."
+    },
+    {
+      "company_key": "meta",
+      "canonical_name": "Meta Platforms Inc.",
+      "site_patterns": ["meta platforms", "facebook"],
+      "_receipts": "wikirate id 33817, sole candidate. Bare 'meta' is deliberately NOT a pattern — it is a common word and a common trade-name fragment; requiring 'meta platforms' avoids a whole class of false friends."
+    },
+    {
+      "company_key": "equinix",
+      "canonical_name": "Equinix Inc.",
+      "site_patterns": ["equinix"],
+      "_receipts": "wikirate id 2271449. filter[name]=Equinix returns 4 foreign subsidiaries; none is core-equal to 'Equinix Inc.' so the EXACT hit stands alone."
+    },
+    {
+      "company_key": "digital-realty",
+      "canonical_name": "Digital Realty Trust Inc",
+      "site_patterns": ["digital realty"],
+      "_receipts": "wikirate id 2615821, sole candidate for filter[name]=Digital Realty."
+    },
+
+    {
+      "_section": "DEL VALLE PILOT (78617) — the companies actually named on mapped records there.",
+      "_note": "These are registered so the pilot inventory records a real ATTEMPT with an auditable outcome, rather than silently omitting the record. Several are expected to HOLD; a hold is a result, not a gap."
+    },
+    {
+      "company_key": "neuralink",
+      "canonical_name": "Neuralink Corporation",
+      "site_patterns": ["neuralink"],
+      "_receipts": "Named as the owner on 2 TDLR TABS records in 78617 (ATX1 New Construction TABS2024022676; ATX1 Third Floor Tenant Improvement TABS2026011928). WikiRate filter[name]=Neuralink returned ZERO items 2026-08-09 — positive control: the same endpoint returned 1 item for Republic Services and 5 for BFI. Expected outcome: no match, ESG unavailable."
+    },
+    {
+      "company_key": "river-bottoms-ranch",
+      "canonical_name": "River Bottoms Ranch LLC",
+      "site_patterns": ["river bottoms ranch", "river bottoms"],
+      "_receipts": "Named as the owner on 3 TDLR TABS records in 78617 (River Bottoms Ranch Barn 2; Barn 2 ACT Office; Histology Lab). WikiRate filter[name]=River Bottoms returned ZERO items 2026-08-09 (same positive control as neuralink). A private ranch entity; expected outcome: no match."
+    },
+    {
+      "company_key": "bfi-waste-systems-tx",
+      "canonical_name": "BFI Waste Systems of Texas LP",
+      "site_patterns": ["bfi waste systems of texas", "bfi waste systems", "bfi"],
+      "_receipts": "Two EPA FRS facilities in 78617 (BFI WASTE SYSTEMS OF TEXAS LP registry 110005052085; BFI RECYCLING CENTER MANOR registry 110033390104). ⚠️ DELIBERATELY NO parent_key. BFI is widely understood to have become part of Republic Services, and Republic Services IS on WikiRate (id 48817, 186 WBA answers) — but that parent relationship is NOT SOURCED ANYWHERE WE READ: Republic Services' own WikiRate alias list is [\"REPUBLIC SVS\",\"republic services\",\"republicservices\"] with no BFI entry, and filter[name]=BFI returns only false friends (University of Applied Sciences BFI Vienna, bfinance, FABFIL SRL, BFIM LIMITED, FabFit Apparels). Attaching Republic Services' ESG here on unsourced corporate lineage is exactly the wrong-company attribution this layer forbids. Expected outcome: HOLD. To resolve it, source the lineage (e.g. an SEC EDGAR subsidiary exhibit) — a founder decision, logged in docs/esg-company-layer.md §7."
+    },
+    {
+      "company_key": "txi-garfield",
+      "canonical_name": "TXI - Garfield Sand & Gravel",
+      "site_patterns": ["txi garfield sand and gravel", "txi"],
+      "_receipts": "Two EPA FRS facilities in 78617 (registry 110070182593, 110070376640). ⚠️ DELIBERATELY NO parent_key, same reasoning as bfi-waste-systems-tx: WikiRate filter[name]=TXI returns ZERO and filter[name]=Texas Industries returns ZERO, while Martin Marietta Materials (id 2262988, 186 WBA answers) lists only [\"Martin Marietta Materials, Inc.\"] as its alias — no TXI, no Texas Industries. Expected outcome: HOLD."
+    }
+  ]
+}

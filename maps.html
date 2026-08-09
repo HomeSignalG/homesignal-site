@@ -601,7 +601,11 @@ HS.onReady(async function () {
       + '<p class="lead">' + HS.esc(line) + '</p>'
       + (interp && interp.caveat ? '<p class="sowhat">' + HS.esc(interp.caveat) + '</p>' : '')
       + (specs ? '<div class="specs tight" style="margin-top:12px">' + specs + '</div>' : '')
+      + esgChipHTML(f)
       + '</div>'
+      // Facility-level environmental fact (EPA/TCEQ, above) and COMPANY-level sustainability
+      // (below) are deliberately separate blocks with their own headings — never merged.
+      + esgSectionHTML(f)
       + '<div class="isec"><button class="btn primary" onclick="location.href=\'development.html?id=' + encodeURIComponent(f.id) + '\'">Open the full facility record ▸</button></div>';
     var back = panel.querySelector('#infoBack');
     back.onclick = function () { panel.classList.remove('idetail'); clearSelection(); };
@@ -867,6 +871,52 @@ HS.onReady(async function () {
 
   // The 6-section project information panel (Sprint-1 spec). Every field renders only
   // from the real record; anything the record doesn't state is said to be absent, never guessed.
+  // ── Company ESG / Sustainability section (docs/esg-company-layer.md) ──────────────
+  // Rendered in the DETAIL view only. The map card gets one line (esgChipHTML) because a
+  // glance surface is where company data is most easily mistaken for facility data.
+  // Interpretation lives in HS.esg (lib/templates.js) so this page never re-decides what
+  // is displayable — it only lays it out.
+  function esgSectionHTML(row) {
+    var e = HS.esg.of(row);
+    if (!e) {
+      // Honest absence. NEVER a zero: "0" would read as "this company scores zero".
+      return '<div class="isec"><h4>Company ESG / Sustainability</h4>'
+        + '<p class="ihint" style="margin-top:0">' + HS.esc(HS.esg.UNAVAILABLE) + ' — we could not confidently identify '
+        + 'the company behind this record in an open sustainability dataset. HomeSignal shows nothing rather than risk '
+        + 'attaching the wrong company\'s record.</p></div>';
+    }
+    var prov = HS.esg.provenance(row);
+    var score = HS.esg.scoreLine(row);
+    var html = '<div class="isec"><h4>' + HS.esc(HS.esg.heading(row)) + '</h4>'
+      + '<div class="specs tight"><div class="row"><span>Company</span><b>' + HS.esc(e.company_name) + '</b></div>'
+      + (e.match_confidence === 'parent' && e.parent_company_name
+          ? '<div class="row"><span>Reported under</span><b>' + HS.esc(e.parent_company_name) + ' (parent company)</b></div>' : '')
+      + '<div class="row"><span>Role on this record</span><b>' + HS.esc(({ developer: 'Developer', operator: 'Site operator', owner: 'Owner', parent: 'Parent company' })[e.role] || 'Associated company') + '</b></div>'
+      + (prov.reporting_year ? '<div class="row"><span>Most recent reporting year</span><b>' + HS.esc(prov.reporting_year) + '</b></div>' : '')
+      + (score ? '<div class="row"><span>Overall score</span><b>' + HS.esc(score) + '</b></div>' : '')
+      + '</div>'
+      + '<p class="ihint">' + HS.esc(HS.esg.framing(row)) + '</p>';
+    HS.esg.sections(row).forEach(function (s) {
+      html += '<div style="margin-top:12px"><div style="font-size:12px;font-weight:700;color:var(--ink-3)">' + HS.esc(s.label) + '</div>'
+        + s.rows.map(function (m) {
+            return '<div class="row"><span>' + HS.esc(m.label) + '</span><b>' + HS.esc(m.value) + '</b></div>';
+          }).join('') + '</div>';
+    });
+    html += '<p class="ihint" style="margin-top:12px"><strong>' + HS.esc(HS.esg.SCOPE_NOTE) + '</strong></p>'
+      + '<p class="ihint">Source: ' + HS.esc(prov.sources.join(', '))
+      + (prov.matched_name ? ' · matched as “' + HS.esc(prov.matched_name) + '”' : '')
+      + '. ' + HS.esc(prov.attribution)
+      + (prov.url ? ' <a href="' + HS.esc(prov.url) + '" target="_blank" rel="noopener">View the company record ▸</a>' : '') + '</p>'
+      + '</div>';
+    return html;
+  }
+  // The one-line map-card indicator. Active when matched, explicit when not.
+  function esgChipHTML(row) {
+    var c = HS.esg.chip(row);
+    return '<div class="ihint" style="margin-top:6px;opacity:' + (c.available ? '1' : '.7') + '">'
+      + (c.available ? '🏢 ' : '') + HS.esc(c.text) + '</div>';
+  }
+
   function renderDetail(it) {
     var mk = HS.resolveMarker(it);
     var title = it.name || it.title || 'Project';
@@ -964,7 +1014,8 @@ HS.onReady(async function () {
     panel.classList.add('idetail');
     var backLabel = opts.view === 'changed' ? '← Recent changes' : '← All nearby projects';
     panel.innerHTML = '<button class="backbtn" id="infoBack" aria-label="Back to the list">' + backLabel + '</button>'
-      + summaryHTML + whyHTML + qolHTML + knowHTML + unknownHTML + timelineHTML + evHTML + partHTML;
+      + summaryHTML + whyHTML + qolHTML + knowHTML + unknownHTML + timelineHTML + evHTML
+      + esgSectionHTML(it) + partHTML;
     var back = panel.querySelector('#infoBack');
     back.onclick = function () {
       panel.classList.remove('idetail'); clearSelection();
