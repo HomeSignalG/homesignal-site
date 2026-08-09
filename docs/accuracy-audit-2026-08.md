@@ -2806,3 +2806,137 @@ outage) and san-diego (deferred fetch) — were closed inside this session.
 
 **Piece (c) — rendering the label — is now unblocked** for the first time: every entry that emits a
 date either declares a kind or inherits the default deliberately.
+
+---
+
+# §AA — PROPOSAL (not built): piece (c), rendering the date label
+
+Approved to design, not to implement. This is the only remaining piece of the date-semantics work
+that is **resident-visible**, so it gets the same design pass the EPA probe got.
+
+## AA1. It is not "add a label" — the label is already there, and it is already wrong
+
+The single most important correction to my own earlier framing of piece (c). Four resident-facing
+render paths touch a development record's date, and **three of them already assert what the date
+means, hardcoded**:
+
+| file:line | current code | what it says |
+|---|---|---|
+| `lib/map.js:712` | `lines.push('Filed with the county ' + fmt(p.submitted_at))` | "Filed with the county <date>" |
+| `lib/why.js:78` | `'The record lists it as "' + it.stage + '" — filed ' + fmtLong(it.submitted_at)` | "… — filed <date>" |
+| `lib/why.js:104` | `know.push('County application filed ' + fmtLong(it.submitted_at))` | "County application filed <date>" |
+| `development.html:151` | `title: 'Filed with the county'` | timeline row heading |
+| `maps.html:760` | bare `submitted_at` slice | *(the only unlabelled one)* |
+
+So piece (c) **corrects an assertion that is already being made**, on every record, regardless of
+what its date actually is.
+
+**It is already visibly self-contradictory on live pages.** Real rows, read from `app_projects`:
+
+| entry | ZIP | record | `stage` | date | rendered today |
+|---|---|---|---|---|---|
+| `detroit-building-permits` | 48212 | Alteration | **Issued** | 2026-08-07 | "**Filed with the county** August 7, 2026" |
+| `cleveland-issued-building-permits` | 44106 | Building Permits | **Issued** | 2026-08-01 | "**Filed with the county** August 1, 2026" |
+
+The page says *filed* in one line and *Issued* in the next, about the same record.
+
+## AA2. Before / after on the three representative cases
+
+**(a) An `issued` entry — `detroit-building-permits`, ZIP 48212, 2026-08-07**
+
+- before: `Filed with the county August 7, 2026` · `County application filed August 7, 2026`
+- after: `Permit issued August 7, 2026` · `Permit issued August 7, 2026`
+
+**(b) An entry inheriting the `filed` default — `seattle-building-permits`, ZIP 98109, 2026-08-05**
+(its column is `applieddate`, stage `Awaiting Information`)
+
+- before: `Filed with the county August 5, 2026`
+- after: **identical — zero delta.** The default renders the text that is there today.
+
+**(c) A Stamford-shape entry — `cleveland-issued-building-permits`, ZIP 44106, 2026-08-01**
+(maps `ISSUE_DATE`; the layer also publishes `FILE_DATE` and `PROJECT_FILE_DATE`, which we do not use)
+
+- before: `Filed with the county August 1, 2026`
+- after: `Permit issued August 1, 2026`
+
+The existence of a filing column **changes nothing here** — the label describes the column in
+service, and that is the whole point of the Stamford ruling. No column switch, no date change.
+
+## AA3. Every kind in play and its exact label text
+
+Proposed copy, designed to read correctly in all four contexts (each renders as `<label> <date>`):
+
+| kind | entries | label text | note |
+|---|---:|---|---|
+| `filed` | 7 explicit **+ 63 inherited** | **Filed with the county** | today's text, unchanged |
+| `issued` | 74 | **Permit issued** | |
+| `decided` | 6 | **Decision recorded** | |
+| `scheduled` | 8 | **Scheduled** | routinely a FUTURE date |
+| `estimated` | 4 | **Estimated** | publisher-labelled forecast |
+| `awarded` | 4 | **Contract awarded** | |
+| `completed` | 1 | **Completed** | |
+| `hearing` | 2 | **Public hearing** | |
+| *(null — no date)* | 31 entries | *nothing rendered* | unchanged: no date, no label |
+
+Implementation shape: **one shared `HS.dateKindLabel(kind)` in `lib/`**, consumed by all four paths,
+**defaulting to "Filed with the county" on null/unknown** so an unrecognised value fails safe to
+today's behaviour rather than rendering blank or raw.
+
+## AA4. Confirmation of scope — label only
+
+It changes **only the words next to the date**. It does not change:
+
+- the date itself (`submitted_at` is untouched),
+- which records appear (no filter reads `date_kind`),
+- ordering (sorting is on `submitted_at`, in `lib/data.js:172` and `development.html:67`),
+- bucket / status / marker colour / map placement.
+
+⚠️ **One adjacent decision I am NOT taking unilaterally:** `lib/map.js`'s **"NEW" badge** fires when
+`submitted_at` is within 30 days, and its sentence is the "Filed with the county" line. Correcting
+the sentence leaves the badge meaning *"recently dated"* rather than *"recently filed"*. Options:
+keep the badge as-is (it already means "recent activity"), or narrow it to `filed`-kind records
+only. **Needs a ruling; it is a semantics change, not a copy change.**
+
+## AA5. 🔴 Where the label could claim more than the source supports
+
+**Risk A — the 63 entries inheriting the default are UNVERIFIED, and would sit beside 106 verified
+ones.** Their text does not change, but their *standing* does: once neighbouring records carry
+specific, swept labels, an unswept default reads as equally confirmed. **Recommendation: sweep the
+63 before shipping (c).** The method is now proven and cheap — two instruments, ~10 entries a batch,
+and the whole 68 took one session.
+
+**Risk B — `decided` is a SUBSTITUTION, not a source column.** Those 39,106 records
+(9 entries, 390 pages) get a date only because the materializer coalesces `file_date →
+decision_date`; they carry **no filing date at all**. "Decision recorded" is truthful about the date,
+but the page will stop implying a filing date it never had. Honest, and a real change in what is
+implied. Example: `dallas-specific-use-permits`, ZIP 75116, "Electrical substation", 2026-06-24 —
+today reads "Filed with the county", would read "Decision recorded".
+
+**Risk C — `scheduled` and `estimated` are FUTURE-DATED by design.** "Scheduled June 2027" next to
+"Permit issued August 2026" is correct but invites reading a forecast as a commitment. The copy
+should stay bare (no "will"), which the proposed text does.
+
+**Risk D — THE BLOCKER. The labels cannot be correct until the re-cache runs, and shipping (c)
+first would make things WORSE.** Measured in `app_projects` right now:
+
+| `date_kind` | records | pages | entries |
+|---|---:|---:|---:|
+| `filed` | **2,714,393** | 6,359 | 164 |
+| *(null — no date)* | 71,921 | 760 | 31 |
+| `decided` | 39,106 | 390 | 9 |
+| `awarded` | 70 | 2 | 1 |
+
+**The 68 new `issued` declarations appear in none of those numbers.** `date_kind` is written by
+`app_refresh_zip` at materialization time, so a declaration only reaches a page when that page
+re-caches — and the refresh is **paused behind the EPA outage**. Shipping (c) today would render
+"Filed with the county" *more prominently and more authoritatively* on ~2.7 M records that are
+actually issue dates. **Piece (c) must ship AFTER the re-cache has propagated, not before.**
+
+## AA6. Recommended order
+
+1. EPA recovers → un-pause the refresh → repair the 1,722 facilities pages.
+2. Re-cache propagates the 106 declarations into `app_projects.date_kind`.
+3. Sweep the remaining 63 defaults (Risk A).
+4. **Then** ship piece (c) as its own PR, with the "NEW" badge ruling (AA4) settled first.
+
+Steps 1–2 are prerequisites, not preferences: without them the label is confidently wrong.
