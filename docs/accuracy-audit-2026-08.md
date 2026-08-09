@@ -2436,3 +2436,61 @@ class as the national future-date scan; recorded, not actioned in this pass.
 bend), **1 reclassified as a drop** (loudoun), **1 needs a re-probe** (denver), **65 not yet
 checked**. Nothing has been relabelled in the registry yet — the confirmations are recorded here
 first, and ship as one batch once the platform sweep is done.
+
+---
+
+# §Y — The class rule, and loudoun applied under it
+
+## Y1. The rule (founder grant, 2026-08-09)
+
+> **A source publishing no usable event date gets its `file_date` mapping dropped with a positive
+> receipt** — applied without asking, on two conditions:
+>
+> 1. **Report each entry's measured before-count and `with_date` count**, so *"no visible delta"* is
+>    proven per entry rather than inherited from the class.
+> 2. **Any entry where `with_date` > 0 is OUTSIDE the rule** and goes to the founder.
+
+Condition 2 is what keeps the rule from becoming a licence: it draws the line exactly between a
+*false* date (sheridan — 6,492 of 6,492 dated, every one `1970-01-01`, so the drop **is** visible and
+was ruled on individually) and *no* date (loudoun — 0 of 45,618 dated, so the drop is invisible).
+The rule covers only the second kind.
+
+## Y2. `loudoun-county-residential-permits` — applied
+
+**Before-state, measured against `app_projects` immediately before the edit:**
+
+| | |
+|---|---:|
+| records | **45,618** |
+| pages | **18** |
+| `with_a_date` (`submitted_at` not null) | **0** |
+| `with_a_kind` (`date_kind` not null) | **0** |
+
+`with_date = 0`, so the entry is inside the rule. **Zero visible delta** — every record already
+rendered undated. What changes is that the config stops claiming a date the county does not publish.
+
+**Why no date exists.** The complete live field roster carries `MONTH_ISSUED:String` and
+`YEAR_ISSUED:String` and **no `esriFieldTypeDate` field anywhere**. `YEAR_ISSUED` is a 4-character
+string year; `isoDay('2011')` returns null (pinned in `test/iso-day-year-first-slash.test.mjs`).
+
+**Not remappable, and the note says so explicitly.** `column_map` arrays JOIN values rather than
+falling back, so `["MONTH_ISSUED","YEAR_ISSUED"]` yields `"April 2011"` — also unparseable — and
+month granularity would require inventing a day.
+
+`incremental_field` stays `YEAR_ISSUED` for freshness probing, the same treatment sheridan received.
+
+**This was the largest single entry in the 86,749-record undated population** (§A3). The change is
+one key removed from one entry, asserted programmatically: the whole-registry diff is exactly
+`column_map` + `_receipts` on `loudoun-county-residential-permits` and nothing else. Suite 91/91.
+
+## Y3. Running tally under the rule
+
+| entry | records | pages | `with_date` before | action |
+|---|---:|---:|---:|---|
+| `sheridan-county-building-permits` | 6,492 | 12 | **6,492** (all `1970-01-01`) | dropped — **individually ruled**, outside the class rule by condition 2 |
+| `butler-county-ks-permits` | 1,216 | 16 | (system timestamp) | dropped — individually ruled |
+| `cook-county-il-highway-construction-program` | 403 | 127 | (load batch) | dropped — individually ruled |
+| **`loudoun-county-residential-permits`** | **45,618** | **18** | **0** | **dropped under the class rule** |
+
+Anything further the `issued` sweep turns up is applied the same way, with its own before-count, and
+anything with `with_date > 0` stops and goes to the founder.
