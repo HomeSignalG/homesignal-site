@@ -1855,3 +1855,584 @@ those close.
 ⚠️ **Nothing in §R is deployed yet.** Registry edits only, 91/91 green. Each needs the full TxDOT
 sequence — merge, deploy, re-cache, measure after-state against prediction — before any of it can be
 called done.
+
+---
+
+# §S — The three value probes close (montgomery is NOT a fourth wrong column), and the re-cache pipeline is measured to be the real blocker
+
+§R merged as PR #656 (squash `3344689`) and deployed from `main` at **2026-08-09 19:51:52Z**
+(`deploy-edge-functions` run 31332765014, success; edge-function **version 197**). The measurement
+half of that ruling could not be completed, for a reason that is itself the largest finding of this
+pass and is documented in §S2.
+
+## S1. The three value probes — all three resolved, and the one flagged as a fourth wrong column is not
+
+The founder's flag was that `montgomery-county-pa-act247-proposals` "offers `Received_Date` against
+the `Entry_Date` in use, which may be a fourth wrong column" — the same shape as TxDOT and MassDOT.
+It is not, and the probe is decisive rather than suggestive: **the two columns are the same event.**
+
+| entry | verdict | kind | the receipt (live, 2026-08-09) |
+|---|---|---|---|
+| `montgomery-county-pa-act247-proposals` | **correct column — NOT a fourth wrong column** | `filed` | `Entry_Date` is `Received_Date` truncated to midnight on **8 of 8** newest rows: `1785888000000` = 2026-08-05 vs `"8/5/2026 1:54:17 PM"`; `1785715200000` = 2026-08-03 vs `"8/3/2026 6:12:25 PM"`; `1785369600000` = 2026-07-30 vs `"7/30/2026 12:00:00 AM"`; `1785110400000` = 2026-07-27 vs `"7/27/2026 3:27:37 PM"` |
+| `desoto-county-permits` | **correct column** | `issued` | `Date` is the date-typed rendering of Accela's own `AISSDT` (B1 issue date): `AISSDT 20180629.0 → Date 1530230400000` = 2018-06-29, `AISSDT 20180628.0 → Date 1530144000000` = 2018-06-28 |
+| `weld-county-site-plan-review` | **correct column** | `decided` | complete `PER_STATUS` vocabulary is 3 values summing to the layer's 434 rows — `Recorded` 432, `" Recorded"` 1, `" "` 1 — and only `Recorded` is mapped, so every emitted record is a recorded plan; `DATE_` sits beside `RECP_NUM` and lags the case vintage (`SPR15-0017` / `RECP_NUM 4215393` → `DATE_` 2016-06-29) |
+
+**Why the montgomery result is not just a negative.** `Entry_Date` is also the *better* of the two
+columns, which is the opposite of the TxDOT/MassDOT pattern where the unused column was better:
+it is `esriFieldTypeDate`, while `Received_Date` is a `String(50)` whose values are
+format-inconsistent inside one column — its min is `"01/02/2007"` and its max
+`"9/9/2022 3:09:09 PM"`, i.e. a lexicographic pair that is not a range at all. Population is a
+statistical tie (7,198 vs 7,201). **Standing answer: an unused date column beside the one in service
+is a lead, not a defect — three of the five leads this audit chased turned out to be wrong columns
+and this one did not. Compare the VALUES on the same rows before concluding either way.**
+
+**Positive control on the montgomery probe (Rule 13).** The probe's scope had to be shown to be the
+connector's. Production's oldest is **2021-08-09** against the entry's `recency_days: 1825`
+measured from 2026-08-09 = **2021-08-10** (one day, timezone), and production's newest,
+**2026-08-05**, is the layer's own maximum. The window is enforced, on this column.
+
+**Correction carried into the desoto record.** Its production reading of "0 records in the last 30
+days" is **not** a truncation on our side — the layer's own `max(Date)` is 2026-06-30 over 5,616
+rows with `Date` populated on 100% of them, and production carries the identical
+2015-01-09 → 2026-06-30 range. That is the source's freshness, and the entry is correct.
+
+**Left open, deliberately:** weld's production floor is the Excel-zero sentinel `1899-12-30` on a
+handful of rows (§A2). That is a source-side null rendered as a date and needs a **value-level**
+filter, not a column change — a code change, so it is recorded, not taken.
+
+**State of the classification: 38 of 170 entries now declare an explicit kind.** Every entry the
+audit flagged as ambiguous is resolved. What remains is the **69 `issued`** spot-checks and then
+piece (c).
+
+## S2. 🔴 THE RE-CACHE PIPELINE IS DELIVERING ~2% OF WHAT IT FIRES — this is why no after-state could be measured
+
+The §R after-state was to be measured on 779 pages (massdot 624 · cook-county 127 · butler 16 ·
+sheridan 12). All 779 were queued into `dev_refresh_targets` and the first 120 fired. **None
+landed.** Measured over the last 40 minutes, across both the 15-minute cron tick and my own batch:
+
+| fired at | fired | HTTP 200 | 503 `BOOT_ERROR` | client timeout at exactly 90,000 ms |
+|---|---:|---:|---:|---:|
+| 19:45 (cron `dev_refresh_tick`) | 250 | **0** | 55 | 195 |
+| 19:53 (this session, `dev_refresh_fire_targets(120)`) | 120 | **0** | 16 | 104 |
+
+**370 fired, 0 collected.** Two independent causes, both measured, neither caused by the §R deploy:
+
+1. **Our client gives up before the server finishes.** `dev_refresh_fire_targets` and
+   `dev_refresh_fire_batch` hard-code a **90,000 ms** pg_net timeout. The edge function's own logs
+   show ZIP reports completing with **`status_code 200` at 100–155 s** (and `504` past ~150 s), on
+   the *pre-deploy* version 196. So a run that SUCCEEDS server-side is discarded client-side and
+   never reaches `dev_refresh_collect`. That is 299 of the 370.
+2. **Concurrency-driven load shedding.** 250 + 120 invocations each holding a worker for ~150 s
+   exceeds what the edge runtime will spin up; it then answers `503 {"code":"BOOT_ERROR"}` after
+   ~10.5 s. That is 71 of the 370.
+
+**Isolated positive control — the deploy is exonerated and the runtime is confirmed.** A single
+request, fired alone with a 120 s budget, did **not** return `BOOT_ERROR`: it ran and timed out —
+`Timeout of 120000 ms reached … HTTP Request/Response time: 119963.721000 ms`. The function boots;
+one ZIP simply takes longer than the pipeline allows it. (The 503s also began in the cron batch
+fired at 19:45, **six minutes before** the 19:51:52Z deploy, and version 196 was logging 200s at
+19:47 — so the failure predates version 197 in both directions.)
+
+**Independent cross-instrument confirmation, and the number that matters.** Counting from the cache
+itself rather than from the fires — `development_reports.refreshed_at` per hour over the last ten
+hours: **30, 27, 27, 21, 28, 23, 19, 17, 16, 19**. Against ~1,000 fires per hour (250 × four ticks),
+that is a **~2.3% collection rate**, and it has been that way all day, not just during this pass.
+
+**What that rate implies, stated so nobody re-derives it:**
+
+- the 779 §R pages need **~39 hours** of wall clock, not a long tail of minutes;
+- a full 12,722-ZIP sweep needs **~26 days**, so the "hourly materializer, 8.5 h sweep" mental model
+  is wrong at the *cache* layer even though it is right at the *table* layer;
+- **this is why TxDOT is still at ~2 of 666 pages** two days after its fix deployed — measured
+  cache-wide right now: 27,193 records / 666 pages, of which **27,113 are still dated (99.7%)** and
+  1,730 still fall in the last 30 days, both of which are the OLD column's signature. The fix is
+  live and correct on the pages that re-cached; the rest have not been reached.
+
+**Not fixed here, and this is the one thing that needs a decision.** Raising the pg_net timeout past
+the engine's real runtime (and lowering the batch so the runtime stops shedding) is a change to two
+`SECURITY DEFINER` functions behind a scheduled job. It changes no resident-visible content — only
+whether a refresh that already succeeded gets stored — but it is a code change to a scheduled path,
+so it stops here for a ruling. **Every remaining after-state measurement in this audit is blocked
+behind it**, including §R's, TxDOT's remaining 664 pages, Stamford `06907` and Virginia Beach
+`23451`.
+
+---
+
+# §T — 🔴 FOUND WHILE MEASURING §R: the EPA facilities layer is being ERASED page by page, and the rolling refresh is what is erasing it
+
+This was not what the pass was looking for. It surfaced because §R's after-state had to be measured
+from a fresh engine response rather than from the cache, and that response carried
+**`facilities: 0` against a cached 40** on ZIP 82801 (Sheridan WY).
+
+## T1. The instrument, and why the correlation is with TIME and not geography
+
+`development_reports`, every row, grouped by the day it was last refreshed:
+
+| refreshed on | pages | `facilities = 0` | % |
+|---|---:|---:|---:|
+| 2026-08-02 → 08-06 | 17 | 0 | 0.0% |
+| 2026-08-07 | 2,133 | 155 | 7.3% |
+| 2026-08-08 | 10,086 | 1,081 | 10.7% |
+| **2026-08-09** | **486** | **486** | **100.0%** |
+
+**Every page refreshed today came back with zero EPA facilities — 486 of 486.** Cache-wide the
+count now stands at **1,722 pages of 12,722 at `facilities = 0`**, and *all* of them were refreshed
+2026-08-07 or later; not one page refreshed before 08-07 is affected. A geographic explanation is
+ruled out by inspection of the list: it includes **downtown Atlanta 30312, downtown San Jose 95113
+and 95112, Cleveland 44112, Arlington TX 76013** — dense urban cores, several of which the
+`facilities > 0` population held a real count for as recently as yesterday (82801 was **40** on
+2026-08-08 and **0** on the fresh response today).
+
+## T2. Why a transient upstream failure reaches the cache at all
+
+`dev_refresh_collect`'s transient-safe guard refuses a write on two conditions: *both* dimensions
+zero, or *development* zero. **There is no facilities-only guard.** So a page with real development
+records and a failed EPA fetch — which is every page carrying a permit source — is written straight
+through with its facilities zeroed. That is precisely the class engine v13 was built to prevent
+("NEVER treat an FRS non-200 / error / parse-fail as 0 facilities"); v13 hardened the *fetch*, and
+this is the *write* path, which was never given the same rule.
+
+## T3. Action taken, and what it is not
+
+**`dev-reports-rolling-refresh` (pg_cron job 14) is PAUSED** (`cron.alter_job(14, active := false)`,
+verified `active = false`). It was destroying the facilities layer at the refresh rate — 486 pages
+today. Pausing changes nothing a resident sees, is reversible with one flag, and only stops further
+overwrites; the corruption already written is *not* undone by it. `app-content-refresh` (job 13) is
+deliberately left running — it mirrors, it does not fetch.
+
+⚠️ **This has a second effect that must be stated plainly: the §R re-cache cannot run while the job
+is paused.** Stopping an active data loss took priority over completing a measurement. Both need the
+same decision.
+
+## T4. Cause established — EPA's own service is down, and that is the whole point
+
+The exact endpoint the engine calls (`index.ts:265`,
+`ofmpub.epa.gov/frs_public2/frs_rest_services.get_facilities`) was probed directly for downtown
+Atlanta, at both the engine's starting radius and its backed-off radius:
+
+```
+search_radius=3 → HTTP 502  <title>502 Proxy Error</title> … "received an invalid response from an upstream server"
+search_radius=1 → HTTP 502  (identical)
+```
+
+So the zeros are **EPA's outage, not our fetch**. `frsFacilities()` retries a transient 5xx exactly
+as v13 requires, exhausts, and returns `[]` — and from there nothing downstream can tell
+*"EPA could not be read"* from *"EPA has nothing here."* `dev_refresh_collect` writes the zero.
+
+*(Two earlier probes against `data.epa.gov/efservice/...` returned HTTP 500 "The query could not be
+parsed" — that was my URL syntax on a different EPA API, not evidence about FRS, and it is recorded
+here so it is not miscounted as a third failure.)*
+
+**This is the audit's own rule turned on the pipeline: an instrument must prove it ran before its
+silence counts as evidence.** A failed read is being recorded as a measured absence, on pages that
+make a factual claim about named real facilities.
+
+**Recovery is available and cheap once EPA is back** — the 1,722 pages are identified by
+`counts->>'facilities' = '0'` and can be re-fetched — but re-running the refresh before FRS answers
+would extend the damage rather than repair it. The durable fix is a facilities-dimension rule in
+`dev_refresh_collect` mirroring the development one, plus an explicit "source unavailable" signal
+from the engine so the guard can distinguish the two cases. Both are code changes on a scheduled
+path, so both wait for a ruling.
+
+---
+
+# §U — Three rulings reconciled: one applied, two do not survive their own premise
+
+Standing instruction: *"Any figure I give you is unverified until you reconcile it."* All three were
+measured before anything was applied. **Weld is applied. Montgomery and desoto are not**, because in
+both cases the measurement that the ruling rests on does not reproduce, and acting would have
+introduced the exact defect the ruling was trying to remove.
+
+## U1. MONTGOMERY — "ship Received_Date" is NOT applied
+
+**Ruling's premise:** *"3,632 of 6,126 have Received_Date strictly earlier than Entry_Date and none
+later, which proves Entry_Date is a data-entry timestamp rather than a filing date."*
+
+**Measured — full population, all 7,198 rows carrying an `Entry_Date`** (4 pages of 2,000, ordered
+`Entry_Date ASC` so the sample is biased OLD, the opposite of the 8-newest probe that produced the
+first §S1 reading; `Received_Date` parsed on 7,194 of 7,198):
+
+| relation | rows |
+|---|---:|
+| `Received_Date` **same day** as `Entry_Date` | **7,173** (99.7%) |
+| `Received_Date` strictly **earlier** | **14** |
+| `Received_Date` strictly **later** | **7** |
+
+Median lag **0 days**, mean **−0.97 days**, max 71. The population is **7,198**, not 6,126.
+
+**Rule 13 — the same comparison inside the CONNECTOR's own scope** (`recency_days: 1825`), since
+a probe whose scope differs from the connector's answers a different question. Of the **1,399**
+in-window rows: **same day 1,375**, earlier **14**, later **6**. All 14 of the earlier rows are
+inside the window and are 1.0% of it. The conclusion is the same in both scopes.
+
+Every element of the premise inverts: 14 earlier rather than 3,632, and later is 7 rather than none.
+`Entry_Date` does not lag receipt — it *is* receipt, to the day, on 99.7% of the record. The earlier
+finding was drawn from the 8 newest rows and is now confirmed against the whole population from the
+opposite end. `filed` stands and the column is unchanged.
+
+**This is not the TxDOT/MassDOT shape.** There the unused column was *better* — TxDOT's
+`ACTUAL_LET_DATE` recovered real history back to 2015, MassDOT's `ScheduledAdDate` a 1992–2050 span.
+Here the unused column is **worse**: a `String(50)` whose values are format-inconsistent inside the
+one column (min `"01/02/2007"`, max `"9/9/2022 3:09:09 PM"` — lexicographic, not a range), against a
+proper `esriFieldTypeDate`. Shipping it would have degraded 6,144 live records to correct nothing.
+
+**Standing answer: an unused date column beside the one in service is a LEAD. Compare the values on
+the same rows before concluding either way — three of the five leads this audit chased were real
+wrong columns and two were not.**
+
+## U2. DESOTO — "drop it" is NOT applied
+
+**Ruling's premise:** *"Every record on 2004-06-30 and 2004-08-05 is a load artifact, and both dates
+predating the county's own 2005 GIS launch is the decisive control."*
+
+**Measured, three independent ways:**
+
+1. **Those dates do not exist.** `where Date <= DATE '2006-01-01'` → **`{"count":0}`**. There is no
+   pre-2006 record in the layer at all, so there is nothing of that shape to be an artifact.
+2. **The distribution is a working ledger, not a load.** Complete `Year` histogram, summing exactly
+   to the layer's 5,616 rows (positive control): 2015 **358** · 2016 378 · 2017 479 · 2018 505 ·
+   2019 530 · 2020 689 · 2021 553 · 2022 555 · 2023 461 · 2024 477 · 2025 415 · 2026 **216**. No
+   missing year, no spike.
+3. **No day carries a pile-up.** Grouped by `Date`, ordered by count desc, the busiest single day in
+   eleven years is **20 records** (2019-09-10), then 17, 15, 13. A load artifact is hundreds or
+   thousands on one day — this is a county's daily permit traffic.
+
+And the column's meaning is positively established, not merely un-refuted: `Date` is the date-typed
+rendering of Accela's own `AISSDT` (B1 issue date), matching to the day on distinct values
+(`20180629.0 → 2018-06-29`, `20180628.0 → 2018-06-28`). **This is not sheridan's class.** Sheridan
+had min = max = `1970-01-01` on 100% of 6,492 records — a single impossible value everywhere.
+Desoto has a real eleven-year distribution. Dropping it would delete a true date from 7,105 live
+records. `issued` stands.
+
+## U3. WELD — applied as ruled, with the measurement recorded
+
+`filed` is now declared explicitly rather than inherited from the default. The column is not in
+question and is not changed.
+
+Two things recorded so neither is lost. The ruling's *"100% populated"* is **96.3%** — `DATE_` is
+populated on 416 of the 432 emitted rows (it is correctly the layer's *sole* date field, and the
+span is plausible, as the ruling says). And the evidence I measured points to `decided` rather than
+`filed`: the layer is entirely **recorded** plans (complete `PER_STATUS` = 3 values summing to its
+434 rows, only `Recorded` mapped) and `DATE_` sits beside `RECP_NUM`, lagging the case vintage the
+way a recording does. `filed` stands per the ruling; reopening is the founder's call.
+
+## U4. A partially re-cached entry looks exactly like a partially broken one — the completion query is the only way to tell
+
+TxDOT reads **oldest 2015-12-17** (the fix, working) and **1,730 records in the last 30 days** (the
+old column's signature) *at the same time*. Neither reading is wrong and neither is sufficient: the
+two coexist for as long as the rollout takes, and at the current refresh rate that is weeks. Judge
+the state with the completion query, never with the entry's own date range:
+
+```sql
+-- per entry: how many of its pages have re-cached since ITS fix deployed
+with pages as (
+  select registry_id, zip from public.app_projects
+   where record_kind='development' and registry_id = :entry group by 1,2)
+select count(*) as pages_total,
+       count(*) filter (where d.refreshed_at >= :deployed_at) as pages_recached
+  from pages g join public.development_reports d on d.zip = g.zip;
+```
+
+Measured now (txdot deployed 2026-08-09 15:32:54Z, the four §R entries 19:51:52Z):
+
+| entry | pages | re-cached since its deploy |
+|---|---:|---:|
+| `txdot-projects-info-all` | 666 | **23** |
+| `massdot-highway-projects` | 624 | **0** |
+| `cook-county-il-highway-construction-program` | 127 | **0** |
+| `butler-county-ks-permits` | 16 | **0** |
+| `sheridan-county-building-permits` | 12 | **0** |
+
+**Nothing from §R has reached a resident.** Sheridan's fix is verified *engine-side only* — a fresh
+response through the deployed function returned 2,477 sheridan records with 0 carrying a `file_date`
+— and that response was deliberately **not** persisted, because it also carried `facilities: 0`
+against a cached 40 (§T). Correction to a figure quoted back at me: the TxDOT completion count is
+**23 of 666**, not 4 of 662; sheridan's **0 of 12** is right.
+
+---
+
+# §V — The facilities guard, the timeout, and what recovering the 1,722 pages actually needs
+
+## V1. The guard is BUILT and LIVE — with one deliberate difference from the instruction
+
+The instruction was: *"refuse a write that takes a page's facility count from >0 to 0 when the
+source reports a fetch failure."* The first half is implemented exactly. **The second half cannot
+be, and that is worth knowing rather than quietly approximating:**
+
+- `dev_failed_sources(j)` — the existing per-source failure detector — reads only the **registry
+  connector reports** (`arcgis_reports`, `socrata_reports`, `carto_reports`, `ckan_reports`,
+  `csv_reports`) and matches `quarantined[].reason like 'fetch failed:%'`.
+- **FRS is not a registry source.** It is the national EPA floor, fetched by `frsFacilities()`
+  (`index.ts:277`), and the payload carries **no report for it at all**. On total failure the
+  function returns `[]` — byte-identical to a genuinely empty rural area. **There is no fetch-failure
+  signal to condition on.**
+
+So the shipped guard is the **count-based** form: a straight port of the existing development
+clause onto the facilities dimension.
+
+```sql
+    and not (
+      d.refreshed_at >= now() - interval '7 days'
+      and coalesce((j->'counts'->>'facilities')::int, 0) = 0
+      and coalesce((d.counts->>'facilities')::int, 0) > 0
+    );
+```
+
+**One deliberate difference from the development clause it was ported from: no `explained`
+escape.** `explained` means a *retired registry source* stopped being reported, which can
+legitimately explain a development drop. FRS is not a registry source, so it could never explain a
+facilities drop — carrying the clause across would have opened a hole. Omitting it is strictly more
+conservative.
+
+**The release valve is inherited and is the reason this does not freeze a genuine zero forever.** A
+refused write does not update `refreshed_at`, so the row ages; after 7 days of consistently zero
+responses the `refreshed_at >= now() - interval '7 days'` test goes false and a real zero writes
+through. A transient outage is absorbed; a real delisting still lands, one week late.
+
+Applied as migration `dev_refresh_collect_facilities_guard`, patched textually from the function's
+own live definition with the development clause asserted verbatim first, so a ~130-line body could
+not drift by transcription. Verified in the deployed body: facilities clause present, development
+clause survived.
+
+**The precise version, not built:** have the engine emit an `frs_report` carrying an explicit
+`ok:false` on exhaustion, and refuse on *that* rather than on the count. It distinguishes "EPA
+unreadable" from "genuinely zero", so a real zero lands immediately instead of after 7 days. That is
+an engine change plus a second collect change, and the count-based guard stops the loss today
+without it.
+
+## V2. The 90 s timeout is raised to 180 s — set from measurement
+
+`dev_refresh_fire_targets` and `dev_refresh_fire_batch` both carried a hard-coded 90,000 ms pg_net
+timeout. Both now read 180,000 ms (migration `dev_refresh_fire_timeout_180s`; the `90000` literal
+was asserted present before patching, and both functions verified after — `has_180s` true,
+`still_has_90s` false).
+
+**Why 180 and not a round bigger number.** The longest observed *success* in the edge logs is
+**152,656 ms**, and Supabase's own gateway begins returning **504 at ~150–154 s** — so the platform
+itself will not deliver a response beyond roughly that point. 180 s sits above both. Waiting longer
+cannot buy a response that will never arrive.
+
+⚠️ **Whether this fixes the collection rate is a HYPOTHESIS and is labelled as one.** 299 of the 370
+observed failures were client timeouts at exactly 90,000 ms, but the other **71 were `503
+BOOT_ERROR` load-shedding**, which a longer timeout does not address — it may even worsen it, since
+each in-flight request now holds a slot for twice as long. The before-figure is fixed and already
+measured (**19–30 ZIPs/hour, ~2.3% of ~1,000 fired**). The after-figure requires the cron running,
+and is **not yet measured**. Batch size is deliberately left at 250 so the timeout change is tested
+alone rather than confounded with a second variable.
+
+## V3. Recovering the 1,722 — what it needs, and what is measured vs reasoned
+
+**EPA FRS is still down.** Re-probed 2026-08-09 20:30Z, three points, the exact endpoint the engine
+calls: Atlanta `502 Proxy Error`, Sheridan `502 Proxy Error`, San Jose *"Failure when receiving data
+from the peer"*. **Nothing can be recovered until EPA answers** — a re-cache during the outage
+returns zero again, and now correctly gets refused, so it repairs nothing.
+
+**How far the loss has already travelled** — measured, because "cached" and "what a resident reads"
+are different tables:
+
+| | pages |
+|---|---:|
+| zeroed in the `development_reports` cache | **1,722** |
+| of those, already zeroed in `app_projects` (**a resident sees no facilities**) | **1,488** |
+| of those, still showing facilities in `app_projects` (materializer not yet caught up) | **234** |
+
+`app-content-refresh` (job 13) is deliberately left running. It will propagate the remaining 234
+within the hour, which is a real if marginal harm — but pausing it would freeze content
+materialization across all 12,722 pages to protect a state that is repairable anyway. Recorded as a
+choice, not an oversight.
+
+**What recovery then requires — and the honest labelling of each claim:**
+
+1. *(measured)* EPA FRS answering again. Not yet.
+2. *(reasoned from the code, NOT yet verified end-to-end)* a plain re-cache of the 1,722 should
+   restore them. The new guard blocks only `>0 → 0`; a `0 → >0` write is not blocked by it or by
+   either pre-existing clause, and `sites` is replaced wholesale so the facility objects rebuild
+   from FRS. **This has not been proven on a live page, because it cannot be until EPA is up.** The
+   proof to run then is one page: re-cache 82801 and confirm it returns to 40.
+3. *(reasoned)* `app_projects` follows within the hour with no extra step, since job 13 mirrors the
+   cache.
+
+The 1,722 are addressable exactly — `where (counts->>'facilities')::int = 0` — so no bookkeeping is
+needed beyond re-firing that set.
+
+## V4. ⚠️ CORRECTION TO §S2's OWN FRAMING — the 90 s timeout was probably NOT the binding constraint
+
+The instruction was to *test* the "timeout explains the slow rollout" hypothesis rather than assume
+it. Testing it turned up evidence against my own framing, from data already in hand:
+
+**The same 90 s timeout was in force on 2026-08-08, when 10,086 pages were refreshed in one day.**
+Today, with that same timeout, the figure is 486. A constant cannot explain a variable. Whatever
+collapsed the collection rate changed *on 08-09* — and the thing that changed on 08-09 is EPA FRS.
+
+**The mechanism is in `frsFacilities()` (`index.ts:277`) and it is not subtle.** On failure it walks
+**7 radii × 3 attempts**, each `fetch` carrying a 30-second `AbortSignal.timeout`. During an outage
+every one of those 21 attempts must burn before the function returns `[]`. That is far more than the
+platform's own ~150 s ceiling — so during an FRS outage a ZIP report spends its entire budget inside
+the EPA retry ladder and is then killed by the gateway.
+
+**Directly observed, twice, in this pass:** the guard's own control fire on 82801 returned
+**HTTP 504** at 20:33Z; the same ZIP returned **200 in under 240 s** an hour earlier. Nothing about
+that page changed in between except how far FRS had degraded.
+
+So the ordering is likely the reverse of what §S2 implied: **the FRS outage inflates the runtime,
+the inflated runtime blows the timeout, and the blown timeout collapses the collection rate.** The
+10,086-vs-486 comparison is the strongest single piece of evidence and it needs no further probe.
+
+**This does not make the 180 s change wrong** — a client timeout below the platform's own 150 s
+cutoff was throwing away genuine successes regardless, and it is correct as defence in depth. But it
+does mean **it should not be expected to restore the collection rate on its own while FRS is down**,
+and the honest prediction is that the rate stays depressed until EPA answers. The before/after
+measurement should therefore be read against FRS's state, not in isolation.
+
+**Consequence for the guard control:** the live positive control for the new facilities guard could
+NOT be completed — the control fire returned 504, so there was no response for
+`dev_refresh_collect` to accept or refuse. **The guard is verified structurally (present in the
+deployed body, development clause intact) but NOT yet exercised against a real zeroing response.**
+Recorded as unexercised rather than as passed.
+
+---
+
+# §W — Guard trigger breadth, a founder-side Rule 17a instance, and the timeout experiment
+
+## W1. The guard's trigger is deliberately BROADER than the instruction, and that is why it works
+
+Recorded as a correction to the ruling, in the founder's words: *"its trigger is broader than mine:
+any 0-facility payload where the page has cached facilities, not only a reported fetch failure,
+because the connector swallows the error."*
+
+That is the shipped behaviour and the reason it catches the real case. `frsFacilities()` returns
+`[]` on total failure — byte-identical to a genuinely empty rural area — and FRS is not a registry
+source, so `dev_failed_sources()` (which reads only the connector reports) never sees it. **A
+failure-conditioned guard would have refused nothing during the outage that motivated it.**
+
+Both migrations are now parked at **`docs/dev-refresh-guard-migration.sql`** with their anchors,
+their verification queries and the release-valve note.
+
+## W2. 🔎 A founder-side instance of Rule 17a — the vacuous invariant, caught only by implausibility
+
+Recorded because it is the same defect class the audit exists to catch, and the catch was weak:
+
+> *"I filtered on `s->>'record_kind'` inside the `sites` JSON where that field does not exist, got
+> all 12,722 back, and nearly reported it. Caught it only because the number was implausible, which
+> is the weakest possible control."*
+
+**`record_kind` is a column on `app_projects`, not a key inside `development_reports.sites`.**
+A JSON `->>` on an absent key yields NULL, the predicate matches nothing, and — depending on how it
+is written — the filter silently degrades to no filter at all. The query ran, returned rows, and
+attested to nothing.
+
+**The generalisation, which is the point:** *a filter on a field that does not exist does not error
+— it returns a number.* Implausibility is the last line of defence, not a control, and it only works
+when the operator already knows roughly what the answer should be. The control that would have
+caught it in one step is the one Rule 17a already requires: **pair the query with a positive case
+whose answer you know.** Here, `select count(*) from app_projects where record_kind='facility'`
+returning a number far below 12,722 would have exposed the vacuous filter immediately.
+
+**Cache-side figures are the better instrument for this defect** and are what §T/§V use:
+`development_reports.counts->>'facilities'` is the value actually written, one row per page, with no
+join and no JSON-key assumption. The `app_projects` side is downstream of the materializer and lags
+it.
+
+## W3. The timeout experiment — design, and why a clean "after" is not available today
+
+The instruction is to measure the collection rate before and after rather than assume the fix works.
+
+**Before (fixed, already measured, needs no re-run):** `development_reports.refreshed_at` per hour
+across ten hours on 2026-08-09 — **30, 27, 27, 21, 28, 23, 19, 17, 16, 19** — against ~1,000 fires
+per hour, a **~2.3%** collection rate.
+
+**The confound, stated up front rather than discovered afterwards:** EPA FRS is down, and §V4
+established that an FRS outage inflates the engine's runtime past the platform's own ~150 s ceiling
+(7 radii × 3 attempts × 30 s inside `frsFacilities`). While that holds, a fire returns **504 from
+the gateway** rather than a client timeout — a different failure with the same collection outcome.
+So an "after" measured now measures the outage, not the fix.
+
+**What the raise does change, and it is worth stating precisely:** at 90 s the pipeline could not
+collect a response the engine took 100–152.7 s to produce, *even when the engine was healthy*. That
+is the structural deficit — a client that gives up before its own server finishes. At 180 s the
+binding constraint moves off our timeout and onto the platform's 150 s ceiling, which is where it
+belongs.
+
+⚠️ **On "2.3% is the design":** measured against a fact that cuts the other way — **the same 90 s
+timeout was in force on 2026-08-08, when 10,086 pages refreshed in one day.** So the pipeline *did*
+collect its own work when the engine ran under 90 s. The deficit is real and structural, but it is
+**latent**: it binds only once the engine crosses 90 s, which is what the FRS outage caused. Both
+statements are true and the distinction decides what to expect after EPA recovers.
+
+## W4. Whether the timeout deficit explains §R's zero pages — NOT yet established, and mostly not needed
+
+The hypothesis is explicitly not asserted. What is measured: §R deployed at **19:51:52Z** and the
+refresh was paused at approximately **20:07Z**. Exactly **one** cron tick (20:00) fell in that
+window, and it fired into an already-collapsed pipeline. **§R's 0-of-624 / 0-of-127 / 0-of-16 /
+0-of-12 is therefore explained by elapsed time alone** — about fifteen minutes — before the timeout
+deficit needs to be invoked at all.
+
+TxDOT is the only entry with a long enough exposure to test the chain against (deployed 15:32:54Z,
+**23 of 666** re-cached in the ~4.5 hours before the pause). That is ~5 pages/hour against a
+corpus-wide ~20/hour, which is proportionate to TxDOT's 5.2% share of pages — i.e. **TxDOT is not
+lagging relative to the corpus; the corpus is lagging.** Consistent with the timeout/FRS chain, but
+consistent with several other explanations too, and one entry is not a test. **Recorded as
+unestablished.**
+
+---
+
+# §X — `issued` spot-checks, batch 1: the 69 derived independently, and the biggest one is not `issued` at all
+
+## X1. The 69 reproduce from the registry, not from a remembered figure
+
+Derived fresh: every entry with a `file_date` column whose name matches `issu|iss_?d|permit_?dat|coodt`
+and which does not already declare a kind. **The count comes back at exactly 69**, spread across all
+five bound platforms (socrata 9, arcgis 55, ckan 3, csv 1, carto 1) — an independent reproduction of
+a figure that had been carried across several passes.
+
+## X2. Batch 1 — the four whose column names are NOT plainly self-describing
+
+| entry | column | verdict |
+|---|---|---|
+| **`loudoun-county-residential-permits`** | `YEAR_ISSUED` | 🔴 **NOT `issued` — there is no date. Drop the mapping.** |
+| `savannah-commercial-building-permits` | `IssuedDate_DATE` | 🟢 PASS |
+| `bend-or-permit-applications` | `IssueDate` | 🟢 PASS |
+| `denver-commercial-construction-permits` | `DATE_ISSUED` | ⏳ re-probe needed (my `outFields` guess was invalid — HTTP 400 `'outFields' parameter is invalid`, my error, not the layer's) |
+
+### 🔴 Loudoun — the largest entry in the undated population, and it is a §H3 drop
+
+The complete field roster (live, `?f=json`) carries **`MONTH_ISSUED:String`** and
+**`YEAR_ISSUED:String`** and **no `esriFieldTypeDate` field anywhere**. The county publishes
+month-and-year granularity only.
+
+So `YEAR_ISSUED` is a 4-character year, `isoDay('2011')` returns null (already pinned in
+`test/iso-day-year-first-slash.test.mjs`), and **all 45,618 records / 18 pages render undated** —
+which is exactly what §A3 measured without knowing why. It is **the single largest entry in the
+86,749-record undated population.**
+
+It cannot be labelled `issued`, because a label describes a date and there is no date. Combining
+the two columns is not a repair either: `column_map` arrays **JOIN** values rather than falling
+back (established standing answer), so `["MONTH_ISSUED","YEAR_ISSUED"]` yields `"April 2011"`, which
+`isoDay` also cannot parse — and month granularity would require inventing a day. **Correct outcome
+is the sheridan/butler treatment: drop the `file_date` mapping with a positive receipt.** It removes
+nothing a resident can see, because nothing renders today.
+
+### 🟢 Savannah — the odd name is the publisher's own date-typed twin
+
+The layer publishes **both** `IssuedDate:String` and `IssuedDate_DATE:Date` (and the same pair for
+`FinalizedDate`). The registry maps the **`_DATE`** variant — the typed one — which is the correct
+choice of the two. `issued` confirmed.
+
+### 🟢 Bend — correct despite the layer being named "Permit_Applications_Point"
+
+Live rows pair `IssueDate` with `StatusDesc`: `1786101295000` = **2026-08-09** with
+`"Permit(s) Issued"`, and three more the same shape within minutes of each other. It is a genuine,
+current permit-issue timestamp; the layer name describes the case type, not the column. `issued`
+confirmed.
+
+⚠️ **Incidental find, logged not fixed:** ordering `IssueDate DESC` returns
+`2013379200000` = **2033-10-11** on a `Closed` application — a future date. The entry carries
+`recency_days: 365`, which filters `>= cutoff` and therefore does **not** exclude future dates. Same
+class as the national future-date scan; recorded, not actioned in this pass.
+
+## X3. Where batch 1 leaves the count
+
+**38 of 170 entries declare a kind.** Of the 69 `issued` candidates: **2 confirmed** (savannah,
+bend), **1 reclassified as a drop** (loudoun), **1 needs a re-probe** (denver), **65 not yet
+checked**. Nothing has been relabelled in the registry yet — the confirmations are recorded here
+first, and ship as one batch once the platform sweep is done.
