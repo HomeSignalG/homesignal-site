@@ -117,6 +117,30 @@
   .srcdet .evnote{margin:4px 0 0;font-size:11.5px;line-height:1.45;color:var(--ink-3)}
   .srcdet .evnote.standalone{margin-top:10px;padding-top:9px;border-top:1px solid var(--line-2)}
   .srcdet .evlink{display:inline-block;margin-top:6px;font-size:11.5px;color:var(--green)}
+  /* Company track record. Deliberately typographic — no colour rating, no badge scale:
+     a green/amber/red chip here would be the company grade this feature must not create. */
+  .trind{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px}
+  .trind .trbit{padding:1px 7px;border:1px solid var(--line-2);border-radius:999px;
+    font-size:11px;color:var(--ink-2)}
+  .trsec{padding:9px 0;border-top:1px dashed var(--line)}
+  .trsec:first-of-type{border-top:none}
+  .trsec h5{margin:0 0 5px;font-size:12px;font-weight:700;color:var(--ink)}
+  .trsec h6{margin:0 0 3px;font-size:11.5px;font-weight:700;color:var(--ink-2)}
+  .trlist{margin:4px 0 0;padding-left:16px;font-size:12px;color:var(--ink-2);line-height:1.5}
+  .trlist.tight{margin-top:2px}
+  .trlist .trh{display:block}
+  .trlist .trt,.trfac .trt{color:var(--ink-3);font-size:11.5px}
+  .trfac{margin:0;font-size:12px;color:var(--ink-2)}
+  .trnone{margin:2px 0 0;font-size:12px;color:var(--ink-3);font-style:italic}
+  .trchk{margin:5px 0 0;font-size:11px;color:var(--ink-3)}
+  .trnote{margin:2px 0 4px;font-size:11px;color:var(--ink-3);line-height:1.45}
+  .trparent{margin-top:8px;padding-left:11px;border-left:2px solid var(--line-2)}
+  .trdet > summary{font-size:12px;font-weight:600;color:var(--green);cursor:pointer;list-style:none;
+    display:flex;align-items:center;gap:6px;padding:2px 0}
+  .trdet > summary::-webkit-details-marker{display:none}
+  .trdet > summary::before{content:"▸";font-size:10px;transition:transform .12s ease}
+  .trdet[open] > summary::before{transform:rotate(90deg)}
+  .trdet > summary:focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:4px}
   /* narrow screens: the disclosure's own label/value rows stack so a long agency name and
      a long record description never collide in two half-width columns */
   @media(max-width:700px){
@@ -326,6 +350,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js"></script>
+<script src="lib/track-record.js"></script>
 <script src="lib/impact.js"></script>
 <script src="lib/why.js"></script>
 <script src="lib/map.js?v=20260720b"></script>
@@ -662,6 +687,31 @@ HS.onReady(async function () {
       evidence: HS.parties.evidenceEntries(all)
     };
   }
+  // Company & developer track record. Rendered as a placeholder first and filled when the
+  // per-record read returns, so opening a card is never blocked on it. The section is
+  // REMOVED, not left empty, when the record has no track-record data — an empty
+  // "Company track record" heading reads as "we looked and they are clean".
+  function mountTrackRecord(it) {
+    var host = document.getElementById('trackHost');
+    if (!host || !it || !it.id || !HS.track) return;
+    HS.data.trackRecord(it.id, it).then(function (tr) {
+      var live = document.getElementById('trackHost');
+      if (!live || live !== host) return;            // the panel moved on while we waited
+      if (!tr || !HS.track.availability(tr).any) { host.remove(); return; }
+      // Surface level stays a one-line indicator; the substance sits behind the disclosure,
+      // so the card keeps answering "what is this / who's behind it" first.
+      host.innerHTML = '<h4>Company track record</h4>'
+        + HS.track.indicatorHTML(tr)
+        + '<details class="trdet"><summary>View track record</summary>'
+        + HS.track.detailHTML(tr) + '</details>'
+        + '<p class="ihint">Public records as the agencies recorded them, with their own dates and '
+        + 'their own categories. HomeSignal does not score or rate companies, and does not treat '
+        + 'an absence of records as a finding.</p>';
+      var det = live.closest('.idetail') && live.closest('.idetail').querySelector('.srcdet .trev');
+      if (det) det.innerHTML = evidenceRowsHTML(HS.track.evidenceEntries(tr));
+    }).catch(function () { var live = document.getElementById('trackHost'); if (live) live.remove(); });
+  }
+
   // The disclosure: one block per relationship, with the agency, the document, the dates and
   // the link. Consumer fields only — no record ids, no internal state strings.
   function evidenceRowsHTML(entries) {
@@ -708,12 +758,14 @@ HS.onReady(async function () {
       + (specs ? '<div class="specs tight" style="margin-top:12px">' + specs + '</div>' : '')
       + '</div>'
       + who.html
+      + '<div class="isec" id="trackHost"></div>'
       + (evRows ? '<details class="srcdet"><summary>Sources &amp; verification</summary>'
-          + evRows + '</details>' : '')
+          + evRows + '<div class="trev"></div></details>' : '')
       + '<div class="isec"><button class="btn primary" onclick="location.href=\'development.html?id=' + encodeURIComponent(f.id) + '\'">Open the full facility record ▸</button></div>';
     var back = panel.querySelector('#infoBack');
     back.onclick = function () { panel.classList.remove('idetail'); clearSelection(); };
     back.focus({ preventScroll: true });
+    mountTrackRecord(f);
   }
 
   function applyDeepId(items) {
@@ -1146,6 +1198,7 @@ HS.onReady(async function () {
       var again = panel.querySelector('[data-pin]'); if (again) again.focus({ preventScroll: true });
     };
     back.focus({ preventScroll: true });   // detail opened: focus starts at the way back
+    mountTrackRecord(it);
   }
 
   // A calendar day the record states, rendered as a day. HS.fmtDate parses a bare

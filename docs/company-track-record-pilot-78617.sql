@@ -1,0 +1,83 @@
+-- ═══════════════════════════════════════════════════════════════════════════════════════
+-- COMPANY & DEVELOPER TRACK RECORD — Del Valle / ZIP 78617 pilot. DDL + method of record.
+-- Applied 2026-08-09 as migrations:
+--   company_track_record_pilot_schema
+--   track_record_checks_and_rejections
+--   app_project_track_record_reader
+-- Sits downstream of the identity layer; performs NO company matching of its own.
+--
+-- ── THE LINKAGE THAT MAKES THIS SAFE ───────────────────────────────────────────────────
+-- Company → facilities → enforcement is an UNBROKEN CHAIN OF AGENCY IDENTIFIERS:
+--
+--     TCEQ customer number (CN)  →  regulated entity numbers (RN)  →  NOV / NOE records
+--
+-- Not one step is a name match. That matters because the same pilot proved name matching
+-- fails here in three separate ways (see REJECTIONS below).
+--
+-- ── WHAT WAS TESTED, AND WHAT SURVIVED ─────────────────────────────────────────────────
+-- EPA ECHO ....... USEFUL at FACILITY level only. p_frs / p_fn / p_st / p_zip all work
+--                  (verified against the whole-database row count as a control: no params
+--                  = 5,661,255 rows; p_zip=78617 = 251). It separates the classes that must
+--                  not be collapsed — for ZIP 78617: 12 inspections, 1 significant violation,
+--                  2 current violations, 5 formal enforcement actions, $74,487 penalties.
+--                  It has NO owner/operator parameter, so it cannot answer "other facilities
+--                  of this company".
+-- EPA FRS ........ USEFUL for facility identity. Confirmed it publishes NO owner or operator
+--                  column at all (frs_facility_site carries primary_name and a null
+--                  parent_registry_id) — the operator question is a STATE question.
+-- ECHO cases ..... NOT USED. Every documented-looking defendant parameter (p_def_name,
+--                  p_defendant, p_dfn, p_case_name) was ignored — each returned the full
+--                  310,451-row count, i.e. no filter applied. Not integrated rather than
+--                  guessed at.
+-- TCEQ Central Registry .. THE KEY SOURCE. princ_legal_name + customer number (CN) give the
+--                  responsible party per regulated entity, and a CN query returns every
+--                  facility that customer is affiliated with.
+-- TCEQ NOV / NOE . USEFUL, and keyed on the RN identifier — this is the company track record.
+-- TCEQ Administrative Orders / Civil Judgments .. PARTIALLY USED. Keyed on a free-text
+--                  respondent_name with NO identifier, so admitted only on an EXACT legal-name
+--                  match and recorded at HIGH_CONFIDENCE, never VERIFIED.
+-- OSHA ........... REJECTED for company attribution, with receipts. The establishment search
+--                  works and returns inspection date, type, scope, SIC/NAICS and a violation
+--                  count — but "Establishment Name" is free text written by the inspector,
+--                  with no company identifier. A TX search for "Martin Marietta" returns
+--                  five establishments — Port Arthur Ready Mix, Cement Treated Materials,
+--                  "Martin Marietta Materials Llc", Wintergreen Ready Mix, and
+--                  "Martin Marietta Materials, Inc." — and NOT ONE of them is the resolved
+--                  operator, Martin Marietta Materials Southwest, LLC. Attributing any of
+--                  them would be pure name matching. HS.track.availability() therefore
+--                  hard-codes safety:false so no safety claim can ever be rendered.
+-- TRI / RCRAInfo / GHGRP .. Reachable through Envirofacts but NOT integrated: nothing in the
+--                  Del Valle validation set has records in them, and adding a database because
+--                  it exists is what the brief forbids.
+--
+-- ── REJECTIONS (recorded in public.company_match_rejections) ───────────────────────────
+-- 1. "MARTIN MARIETTA MATERIALS SOUTHWEST, INC." — a 2016 TCEQ administrative order, $650.
+--    An INC. where the resolved operator is an LLC. One character class apart, a different
+--    legal entity. Left unattributed.
+-- 2. "Tesla, Inc." — TWO different customer numbers (CN604905919, CN606291615) carry the
+--    identical legal name, plus CN604563775 for "TESLA MOTORS TX, INC.", so a name lookup
+--    cannot choose. Moot anyway: Tesla holds NO resolved role on any 78617 record. "Giga
+--    Texas" appears only inside a FACILITY NAME, and that facility's resolved operator is
+--    Ward & Burke Tunneling Inc — the same shape as the TXI/Garfield lesson.
+-- 3. BFI Waste Systems of Texas, LP — the identity layer leaves the operator UNRESOLVED, so
+--    there is no company to build a track record for. Facility-level records were still
+--    checked directly and returned nothing.
+--
+-- ── MEASURED, 2026-08-09 ───────────────────────────────────────────────────────────────
+-- 9 companies resolved by the identity layer · 9 searched · 2 with direct-company records
+-- 1 verified parent with records · 665 other facilities linked by identifier (154 Martin
+-- Marietta Materials Southwest, LLC + 511 TXI Operations, LP) · 89 parent facilities
+-- 5 companies with no records found · 3 rejections · 6 facilities checked
+-- 61 events: 59 identifier-linked (VERIFIED) + 2 exact-name-matched (HIGH_CONFIDENCE)
+-- 0 facility-specific events — the clicked Garfield facility is CLEAN OF RECORDS in the
+--   datasets checked, which is stated as "no records found in the sources checked" and
+--   never as "no violations".
+--
+-- ── COUNTS THAT MUST NEVER BE COLLAPSED ────────────────────────────────────────────────
+-- Martin Marietta Materials Southwest, LLC: 12 notices of violation at 11 facilities
+-- (2021–2026) · 10 notices of enforcement at 7 facilities (2014–2025) · 1 administrative
+-- order (2021, $6,750 assessed). Those are three different things. The agency's own
+-- violation tallies on those records sum to 23 and 17 respectively — a FOURTH number, and
+-- deliberately not shown as "23 violations", because it counts cited violations inside
+-- notices, not notices.
+-- ═══════════════════════════════════════════════════════════════════════════════════════

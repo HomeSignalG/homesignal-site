@@ -686,6 +686,36 @@ legal/framing change not covered by the one-time sign-off.
   *(What it replaced: `developer = coalesce(owner, src)` rendered under the single label
   "Developer / applicant" — for a TABS filing that value is the owner, for an EPA facility
   it is the source string. Pinned by `test/party-roles.test.mjs`.)*
+- **A COMPANY TRACK RECORD IS BUILT FROM AN UNBROKEN CHAIN OF AGENCY IDENTIFIERS, NEVER A
+  NAME (2026-08-09).** `company_facilities` / `company_track_events` follow
+  **TCEQ customer number (CN) → regulated entity numbers (RN) → NOV/NOE records**; not one
+  step is a name match. `attribution` is NOT NULL and constrained to
+  `facility` / `direct_company` / `parent_company`, so no event can be stored without saying
+  which of the three it is, and the parent's history is never merged into the subsidiary's.
+  Measured for 78617: **665 facilities linked by identifier** (154 Martin Marietta Materials
+  Southwest, LLC + 511 TXI Operations, LP) and **89 parent facilities**, 61 events of which
+  **59 are identifier-linked and 2 exact-name-matched**.
+  - ⛔ **OSHA CANNOT ATTRIBUTE A COMPANY — DO NOT WIRE IT.** The establishment search works and
+    returns date/type/scope/violation count, but "Establishment Name" is free text with no
+    company identifier. A TX search for "Martin Marietta" returns Port Arthur Ready Mix,
+    Cement Treated Materials, "Martin Marietta Materials Llc", Wintergreen Ready Mix and
+    "Martin Marietta Materials, Inc." — **none of which is the resolved operator**.
+    `HS.track.availability()` hard-codes `safety:false` so a safety claim cannot be rendered.
+  - **NEVER COLLAPSE RECORD CLASSES.** An inspection, a notice of violation, a notice of
+    enforcement, an administrative order and a penalty are five different things, and the
+    violations *cited inside* a notice are a sixth number. The UI counts one class at a time
+    and shows no total; pinned by `test/track-record.test.mjs`.
+  - **"No records found in the sources checked" ≠ "no violations" ≠ "not yet checked."**
+    `track_record_checks` records what was actually queried, so the third state is
+    distinguishable from the second. Both wordings are pinned by tests.
+  - Full method, the tested-and-rejected sources, and the three recorded rejections:
+    **`docs/company-track-record-pilot-78617.sql`**.
+- ⚠️ **AN ECHO/AGENCY QUERY PARAMETER THAT IS IGNORED LOOKS EXACTLY LIKE A BROAD SEARCH
+  (2026-08-09).** `case_rest_services.get_cases` returned the identical 310,451-row count for
+  `p_def_name`, `p_defendant`, `p_dfn` and `p_case_name` — every one silently ignored. The
+  control that works: call the endpoint with NO parameters, keep that row count, and only
+  believe a parameter that moves it (`get_facilities` no-params = 5,661,255 → `p_zip=78617`
+  = 251). ECHO's `metadata` endpoint lists RESULT columns only, never query parameters.
 - **A COMPANY ROLE COMES FROM A SOURCE THAT STATES IT — A FACILITY'S NAME IS NOT A SOURCE
   (2026-08-09).** `public.property_company_roles` resolves Property Owner / Developer /
   Applicant / Operator per record, each with `verification` ∈ `VERIFIED` / `HIGH_CONFIDENCE`
