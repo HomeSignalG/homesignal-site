@@ -9225,6 +9225,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "scheduled",
       "spatial_zip_radius_mi": 3,
       "status_const": "approved",
       "status_to_bucket": {
@@ -9504,6 +9505,7 @@
         "lng": "__lng",
         "case_number": "RequestID"
       },
+      "file_date_kind": "estimated",
       "use_type_const": "Roads & infrastructure",
       "status_to_bucket": {
         "proposed": [
@@ -10817,6 +10819,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "scheduled",
       "status_to_bucket": {
         "proposed": [
           "Proposed",
@@ -11144,6 +11147,7 @@
         "lng": "__lng",
         "case_number": "ProjectNumber"
       },
+      "file_date_kind": "estimated",
       "use_type_const": "Utility",
       "status_to_bucket": {
         "proposed": [],
@@ -11615,6 +11619,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "scheduled",
       "use_type_const": "Utility",
       "status_const": "Programmed in WisDOT's 6-Year Highway Improvement Program — contract not yet let",
       "status_to_bucket": {
@@ -11656,6 +11661,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "estimated",
       "use_type_const": "Utility",
       "status_to_bucket": {
         "proposed": [

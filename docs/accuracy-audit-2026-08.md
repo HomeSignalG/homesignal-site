@@ -1581,3 +1581,58 @@ but **shape is a lead, not a fact** (claims discipline rule 1) — none of these
 - **34 UNRESOLVED: the real work.** Each needs a live field-list probe plus a judgment call, and
   several (`MTG_DATE`, `LAST_PROJ_UPDATE_DT`, `USER_Approval_Date`) may be the *wrong column* rather
   than a mislabelled one — which is a different fix.
+
+---
+
+# §N — Piece (b), first tranche SHIPPED + the wrong-column probe results
+
+## N1. The 6 `scheduled` / `estimated` entries — shipped, each with future-date evidence
+
+Classified on a **corroborating instrument, not the column name**: a filing date cannot be in the
+future, so future-dated records prove the column is a plan, not a filing.
+
+| entry | `file_date` column | kind | future-dated | latest date |
+|---|---|---|---:|---|
+| `wisdot-highway-program-6yr` | `LET_DATE` | `scheduled` | **1,785 / 1,822 = 98.0%** | 2032-02-10 |
+| `vtrans-project-locations` | `ExpectedConstructionStart` | `estimated` | **398 / 414 = 96.1%** | 2032-12-21 |
+| `columbia-mo-capital-projects` | `project_start_date` | `scheduled` | 180 = 12.5% | 2029-10-01 |
+| `fdot-active-construction-projects` | `StartDate` | `scheduled` | 445 = 10.2% | 2029-01-23 |
+| `mdot-sha-project-portal` | `Estimated_Project_Start_Year` | `estimated` | 31 = 3.9% | 2029-04-01 |
+| `lexington-row-permits` | `EstimatedStartDate` | `estimated` | 262 = 3.0% | 2026-10-05 |
+
+Registry-only, additive, byte-identical round-trip asserted; `file-date-kind` test now reports
+**6 entries declare an explicit kind**; suite 91/91 green.
+
+## N2. Three of the nine were NOT shipped — and why
+
+- **`lake-county-il-construction-program` (`Start_Date`)** — the name says scheduled but the
+  instrument is silent: **0 future-dated of 80, latest 2026-08-01**. Name-only is not evidence
+  (claims discipline rule 1). Held.
+- **`iowa-dot-bid-projects` (`CONTRACT_AWARDED`)** and
+  **`wsdot-project-delivery-plan-complete` (`OperComplete`)** — both are **past events with no member
+  in the vocabulary**. `FileDateKind` is `filed | issued | scheduled | estimated | decided`; there is
+  no `awarded` and no `completed`. ⚠️ **This is a vocabulary gap, and extending the type is a code
+  change — a founder decision, not a registry edit.**
+
+## N3. The three already-stamped `decided` entries need NO registry edit
+
+`dallas-specific-use-permits` and `anne-arundel-{subdivision-activity,commercial-site-plans}` declare
+**no** `file_date`, so `file_date_kind` never applies to them. The materializer already stamps
+`'decided'` on the substitution path — verified in production: `date_kind='decided'` on **39,106
+records / 390 pages / 9 entries**. Nothing to ship.
+
+## N4. WRONG COLUMN vs MISLABELLED — the split, from 5 live field-list probes
+
+The more serious class is real, and it has a clear signature: **does the layer offer a better date?**
+
+| entry | date fields the layer offers | verdict |
+|---|---|---|
+| **`txdot-projects-info-all`** | **15**, incl. `DSGN_START_ACTL_DT`, `ACTUAL_LET_DATE`, `CNSTR_WKBG_DT`, `PROJ_ESTMTD_LET_D`, `COMMISSION_AWARD_OF_CONTRACT` | 🔴 **WRONG COLUMN.** `LAST_PROJ_UPDATE_DT` is a record-touch timestamp, chosen over five real event dates. **27,060 records on 666 pages** — the widest page footprint of any entry in the registry — carry a "when we last edited this row" date in the filing slot. |
+| `clv-planning-cases` | **1** — `MTG_DATE` only | 🟡 **Vocabulary gap, not a wrong column.** The layer publishes no filing date at all; a hearing date is the only date available, and `FileDateKind` has no `hearing` member. |
+| `summit-county-oh-planning-commission-items` | **1** — `MeetingDate` only | 🟡 Same as above. |
+| `kenton-county-devtracking-permits` | 2 — `PERMIT_DAT`, `EDIT_DATE` | 🟢 Fine. `PERMIT_DAT` is the only substantive date; `EDIT_DATE` would be worse. |
+| `new-castle-county-permits` | 6 — `ISSDTTM`, `APDTTM`, `COODTTM`, `TMPCOODTTM`, + 2 system | 🟢 **Correctly chosen** — `ISSDTTM` is the issue date, picked over approval and C-of-O. **Counts as a PASS for the 69-`issued` spot-check.** |
+
+**Split so far: 1 wrong column · 2 vocabulary gaps · 2 correct.** The remaining 29 unresolved entries
+need the same probe each. **`txdot` is the finding to carry forward** — a wrong column is a different
+and worse defect than a wrong label, because no amount of labelling fixes it.
