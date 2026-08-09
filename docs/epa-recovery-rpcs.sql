@@ -1,0 +1,36 @@
+-- Parked copy of migration `epa_recovery_rpcs`, applied to qwnnmljucajnexpxdgxr 2026-08-09,
+-- per CLAUDE.md §1 row 3. Design + ruling: docs/proposals/epa-recovery-autonomy.md.
+-- The definitive text is the applied migration; this is the reproducible record.
+--
+-- ⚠️ WHY THERE IS A TOKEN, and why it is NOT a service-role key.
+-- Supabase's ANON key ships in the browser — it is public. Granting anon EXECUTE on a function
+-- that un-pauses a cron job and fires re-caches would hand that button to anyone on the internet.
+-- So the read-only status RPC is open, and both WRITE RPCs require a shared token whose SHA-256
+-- lives in a table no client can read (RLS on, no policy). The "no service-role key, ever" rule
+-- is preserved and strengthened: the anon key ALONE cannot write.
+--
+-- ARMING IT (founder only — never generate this value in a chat transcript):
+--   update public.epa_recovery_config
+--      set token_sha256 = encode(extensions.digest('<your-token>','sha256'),'hex'),
+--          updated_at = now()
+--    where id = 1;
+-- and set the SAME value as the GitHub Actions secret EPA_RECOVERY_TOKEN.
+-- Leaving token_sha256 NULL is the disarmed state: both writers raise and nothing can run.
+--
+-- GATES, PROVEN LIVE 2026-08-09 with a valid token so the gate was the thing under test:
+--   epa_recovery_repair  → "the 82801 proof has not passed — refusing to repair (this is the hard gate)"
+--   epa_recovery_step2   → "EPA has not recovered on the latest resolved probe — refusing to start step 2"
+--   and with NO token configured, both → "EPA recovery is not armed: no token configured (fail-closed)"
+--
+-- See the applied migration for the full bodies:
+--   public.epa_recovery_config        single-row config; token hash + expected_82801_facilities (40)
+--   public.epa_recovery_runs          audit trail: proof_fired / proof_checked / repair
+--   public.epa_recovery_auth(text)    internal; fails closed; revoked from anon/authenticated
+--   public.epa_recovery_probe_state() READ-ONLY status; open to anon; no token
+--   public.epa_recovery_step2(text)   un-pause + fire the 82801 proof; refuses unless EPA is ok
+--   public.epa_recovery_proof_check(text)  harvest; RE-PAUSES the refresh when the proof fails
+--   public.epa_recovery_repair(text,int)   refuses unless a PASSED proof row exists; batch 1..200
+--
+-- The proof compares 82801's facilities to expected_82801_facilities using >=, not =: FRS may
+-- legitimately have gained facilities since the 2026-08-08 measurement of 40, and a stricter
+-- equality test would fail on a healthy source.
