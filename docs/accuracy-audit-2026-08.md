@@ -2148,3 +2148,109 @@ response through the deployed function returned 2,477 sheridan records with 0 ca
 — and that response was deliberately **not** persisted, because it also carried `facilities: 0`
 against a cached 40 (§T). Correction to a figure quoted back at me: the TxDOT completion count is
 **23 of 666**, not 4 of 662; sheridan's **0 of 12** is right.
+
+---
+
+# §V — The facilities guard, the timeout, and what recovering the 1,722 pages actually needs
+
+## V1. The guard is BUILT and LIVE — with one deliberate difference from the instruction
+
+The instruction was: *"refuse a write that takes a page's facility count from >0 to 0 when the
+source reports a fetch failure."* The first half is implemented exactly. **The second half cannot
+be, and that is worth knowing rather than quietly approximating:**
+
+- `dev_failed_sources(j)` — the existing per-source failure detector — reads only the **registry
+  connector reports** (`arcgis_reports`, `socrata_reports`, `carto_reports`, `ckan_reports`,
+  `csv_reports`) and matches `quarantined[].reason like 'fetch failed:%'`.
+- **FRS is not a registry source.** It is the national EPA floor, fetched by `frsFacilities()`
+  (`index.ts:277`), and the payload carries **no report for it at all**. On total failure the
+  function returns `[]` — byte-identical to a genuinely empty rural area. **There is no fetch-failure
+  signal to condition on.**
+
+So the shipped guard is the **count-based** form: a straight port of the existing development
+clause onto the facilities dimension.
+
+```sql
+    and not (
+      d.refreshed_at >= now() - interval '7 days'
+      and coalesce((j->'counts'->>'facilities')::int, 0) = 0
+      and coalesce((d.counts->>'facilities')::int, 0) > 0
+    );
+```
+
+**One deliberate difference from the development clause it was ported from: no `explained`
+escape.** `explained` means a *retired registry source* stopped being reported, which can
+legitimately explain a development drop. FRS is not a registry source, so it could never explain a
+facilities drop — carrying the clause across would have opened a hole. Omitting it is strictly more
+conservative.
+
+**The release valve is inherited and is the reason this does not freeze a genuine zero forever.** A
+refused write does not update `refreshed_at`, so the row ages; after 7 days of consistently zero
+responses the `refreshed_at >= now() - interval '7 days'` test goes false and a real zero writes
+through. A transient outage is absorbed; a real delisting still lands, one week late.
+
+Applied as migration `dev_refresh_collect_facilities_guard`, patched textually from the function's
+own live definition with the development clause asserted verbatim first, so a ~130-line body could
+not drift by transcription. Verified in the deployed body: facilities clause present, development
+clause survived.
+
+**The precise version, not built:** have the engine emit an `frs_report` carrying an explicit
+`ok:false` on exhaustion, and refuse on *that* rather than on the count. It distinguishes "EPA
+unreadable" from "genuinely zero", so a real zero lands immediately instead of after 7 days. That is
+an engine change plus a second collect change, and the count-based guard stops the loss today
+without it.
+
+## V2. The 90 s timeout is raised to 180 s — set from measurement
+
+`dev_refresh_fire_targets` and `dev_refresh_fire_batch` both carried a hard-coded 90,000 ms pg_net
+timeout. Both now read 180,000 ms (migration `dev_refresh_fire_timeout_180s`; the `90000` literal
+was asserted present before patching, and both functions verified after — `has_180s` true,
+`still_has_90s` false).
+
+**Why 180 and not a round bigger number.** The longest observed *success* in the edge logs is
+**152,656 ms**, and Supabase's own gateway begins returning **504 at ~150–154 s** — so the platform
+itself will not deliver a response beyond roughly that point. 180 s sits above both. Waiting longer
+cannot buy a response that will never arrive.
+
+⚠️ **Whether this fixes the collection rate is a HYPOTHESIS and is labelled as one.** 299 of the 370
+observed failures were client timeouts at exactly 90,000 ms, but the other **71 were `503
+BOOT_ERROR` load-shedding**, which a longer timeout does not address — it may even worsen it, since
+each in-flight request now holds a slot for twice as long. The before-figure is fixed and already
+measured (**19–30 ZIPs/hour, ~2.3% of ~1,000 fired**). The after-figure requires the cron running,
+and is **not yet measured**. Batch size is deliberately left at 250 so the timeout change is tested
+alone rather than confounded with a second variable.
+
+## V3. Recovering the 1,722 — what it needs, and what is measured vs reasoned
+
+**EPA FRS is still down.** Re-probed 2026-08-09 20:30Z, three points, the exact endpoint the engine
+calls: Atlanta `502 Proxy Error`, Sheridan `502 Proxy Error`, San Jose *"Failure when receiving data
+from the peer"*. **Nothing can be recovered until EPA answers** — a re-cache during the outage
+returns zero again, and now correctly gets refused, so it repairs nothing.
+
+**How far the loss has already travelled** — measured, because "cached" and "what a resident reads"
+are different tables:
+
+| | pages |
+|---|---:|
+| zeroed in the `development_reports` cache | **1,722** |
+| of those, already zeroed in `app_projects` (**a resident sees no facilities**) | **1,488** |
+| of those, still showing facilities in `app_projects` (materializer not yet caught up) | **234** |
+
+`app-content-refresh` (job 13) is deliberately left running. It will propagate the remaining 234
+within the hour, which is a real if marginal harm — but pausing it would freeze content
+materialization across all 12,722 pages to protect a state that is repairable anyway. Recorded as a
+choice, not an oversight.
+
+**What recovery then requires — and the honest labelling of each claim:**
+
+1. *(measured)* EPA FRS answering again. Not yet.
+2. *(reasoned from the code, NOT yet verified end-to-end)* a plain re-cache of the 1,722 should
+   restore them. The new guard blocks only `>0 → 0`; a `0 → >0` write is not blocked by it or by
+   either pre-existing clause, and `sites` is replaced wholesale so the facility objects rebuild
+   from FRS. **This has not been proven on a live page, because it cannot be until EPA is up.** The
+   proof to run then is one page: re-cache 82801 and confirm it returns to 40.
+3. *(reasoned)* `app_projects` follows within the hour with no extra step, since job 13 mirrors the
+   cache.
+
+The 1,722 are addressable exactly — `where (counts->>'facilities')::int = 0` — so no bookkeeping is
+needed beyond re-firing that set.
