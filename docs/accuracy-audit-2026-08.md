@@ -2033,3 +2033,113 @@ would extend the damage rather than repair it. The durable fix is a facilities-d
 `dev_refresh_collect` mirroring the development one, plus an explicit "source unavailable" signal
 from the engine so the guard can distinguish the two cases. Both are code changes on a scheduled
 path, so both wait for a ruling.
+
+---
+
+# §U — Three rulings reconciled: one applied, two do not survive their own premise
+
+Standing instruction: *"Any figure I give you is unverified until you reconcile it."* All three were
+measured before anything was applied. **Weld is applied. Montgomery and desoto are not**, because in
+both cases the measurement that the ruling rests on does not reproduce, and acting would have
+introduced the exact defect the ruling was trying to remove.
+
+## U1. MONTGOMERY — "ship Received_Date" is NOT applied
+
+**Ruling's premise:** *"3,632 of 6,126 have Received_Date strictly earlier than Entry_Date and none
+later, which proves Entry_Date is a data-entry timestamp rather than a filing date."*
+
+**Measured — full population, all 7,198 rows carrying an `Entry_Date`** (4 pages of 2,000, ordered
+`Entry_Date ASC` so the sample is biased OLD, the opposite of the 8-newest probe that produced the
+first §S1 reading; `Received_Date` parsed on 7,194 of 7,198):
+
+| relation | rows |
+|---|---:|
+| `Received_Date` **same day** as `Entry_Date` | **7,173** (99.7%) |
+| `Received_Date` strictly **earlier** | **14** |
+| `Received_Date` strictly **later** | **7** |
+
+Median lag **0 days**, mean **−0.97 days**, max 71. The population is **7,198**, not 6,126.
+
+Every element of the premise inverts: 14 earlier rather than 3,632, and later is 7 rather than none.
+`Entry_Date` does not lag receipt — it *is* receipt, to the day, on 99.7% of the record. The earlier
+finding was drawn from the 8 newest rows and is now confirmed against the whole population from the
+opposite end. `filed` stands and the column is unchanged.
+
+**This is not the TxDOT/MassDOT shape.** There the unused column was *better* — TxDOT's
+`ACTUAL_LET_DATE` recovered real history back to 2015, MassDOT's `ScheduledAdDate` a 1992–2050 span.
+Here the unused column is **worse**: a `String(50)` whose values are format-inconsistent inside the
+one column (min `"01/02/2007"`, max `"9/9/2022 3:09:09 PM"` — lexicographic, not a range), against a
+proper `esriFieldTypeDate`. Shipping it would have degraded 6,144 live records to correct nothing.
+
+**Standing answer: an unused date column beside the one in service is a LEAD. Compare the values on
+the same rows before concluding either way — three of the five leads this audit chased were real
+wrong columns and two were not.**
+
+## U2. DESOTO — "drop it" is NOT applied
+
+**Ruling's premise:** *"Every record on 2004-06-30 and 2004-08-05 is a load artifact, and both dates
+predating the county's own 2005 GIS launch is the decisive control."*
+
+**Measured, three independent ways:**
+
+1. **Those dates do not exist.** `where Date <= DATE '2006-01-01'` → **`{"count":0}`**. There is no
+   pre-2006 record in the layer at all, so there is nothing of that shape to be an artifact.
+2. **The distribution is a working ledger, not a load.** Complete `Year` histogram, summing exactly
+   to the layer's 5,616 rows (positive control): 2015 **358** · 2016 378 · 2017 479 · 2018 505 ·
+   2019 530 · 2020 689 · 2021 553 · 2022 555 · 2023 461 · 2024 477 · 2025 415 · 2026 **216**. No
+   missing year, no spike.
+3. **No day carries a pile-up.** Grouped by `Date`, ordered by count desc, the busiest single day in
+   eleven years is **20 records** (2019-09-10), then 17, 15, 13. A load artifact is hundreds or
+   thousands on one day — this is a county's daily permit traffic.
+
+And the column's meaning is positively established, not merely un-refuted: `Date` is the date-typed
+rendering of Accela's own `AISSDT` (B1 issue date), matching to the day on distinct values
+(`20180629.0 → 2018-06-29`, `20180628.0 → 2018-06-28`). **This is not sheridan's class.** Sheridan
+had min = max = `1970-01-01` on 100% of 6,492 records — a single impossible value everywhere.
+Desoto has a real eleven-year distribution. Dropping it would delete a true date from 7,105 live
+records. `issued` stands.
+
+## U3. WELD — applied as ruled, with the measurement recorded
+
+`filed` is now declared explicitly rather than inherited from the default. The column is not in
+question and is not changed.
+
+Two things recorded so neither is lost. The ruling's *"100% populated"* is **96.3%** — `DATE_` is
+populated on 416 of the 432 emitted rows (it is correctly the layer's *sole* date field, and the
+span is plausible, as the ruling says). And the evidence I measured points to `decided` rather than
+`filed`: the layer is entirely **recorded** plans (complete `PER_STATUS` = 3 values summing to its
+434 rows, only `Recorded` mapped) and `DATE_` sits beside `RECP_NUM`, lagging the case vintage the
+way a recording does. `filed` stands per the ruling; reopening is the founder's call.
+
+## U4. A partially re-cached entry looks exactly like a partially broken one — the completion query is the only way to tell
+
+TxDOT reads **oldest 2015-12-17** (the fix, working) and **1,730 records in the last 30 days** (the
+old column's signature) *at the same time*. Neither reading is wrong and neither is sufficient: the
+two coexist for as long as the rollout takes, and at the current refresh rate that is weeks. Judge
+the state with the completion query, never with the entry's own date range:
+
+```sql
+-- per entry: how many of its pages have re-cached since ITS fix deployed
+with pages as (
+  select registry_id, zip from public.app_projects
+   where record_kind='development' and registry_id = :entry group by 1,2)
+select count(*) as pages_total,
+       count(*) filter (where d.refreshed_at >= :deployed_at) as pages_recached
+  from pages g join public.development_reports d on d.zip = g.zip;
+```
+
+Measured now (txdot deployed 2026-08-09 15:32:54Z, the four §R entries 19:51:52Z):
+
+| entry | pages | re-cached since its deploy |
+|---|---:|---:|
+| `txdot-projects-info-all` | 666 | **23** |
+| `massdot-highway-projects` | 624 | **0** |
+| `cook-county-il-highway-construction-program` | 127 | **0** |
+| `butler-county-ks-permits` | 16 | **0** |
+| `sheridan-county-building-permits` | 12 | **0** |
+
+**Nothing from §R has reached a resident.** Sheridan's fix is verified *engine-side only* — a fresh
+response through the deployed function returned 2,477 sheridan records with 0 carrying a `file_date`
+— and that response was deliberately **not** persisted, because it also carried `facilities: 0`
+against a cached 40 (§T). Correction to a figure quoted back at me: the TxDOT completion count is
+**23 of 666**, not 4 of 662; sheridan's **0 of 12** is right.
