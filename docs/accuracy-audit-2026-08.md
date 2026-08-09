@@ -2254,3 +2254,38 @@ choice, not an oversight.
 
 The 1,722 are addressable exactly — `where (counts->>'facilities')::int = 0` — so no bookkeeping is
 needed beyond re-firing that set.
+
+## V4. ⚠️ CORRECTION TO §S2's OWN FRAMING — the 90 s timeout was probably NOT the binding constraint
+
+The instruction was to *test* the "timeout explains the slow rollout" hypothesis rather than assume
+it. Testing it turned up evidence against my own framing, from data already in hand:
+
+**The same 90 s timeout was in force on 2026-08-08, when 10,086 pages were refreshed in one day.**
+Today, with that same timeout, the figure is 486. A constant cannot explain a variable. Whatever
+collapsed the collection rate changed *on 08-09* — and the thing that changed on 08-09 is EPA FRS.
+
+**The mechanism is in `frsFacilities()` (`index.ts:277`) and it is not subtle.** On failure it walks
+**7 radii × 3 attempts**, each `fetch` carrying a 30-second `AbortSignal.timeout`. During an outage
+every one of those 21 attempts must burn before the function returns `[]`. That is far more than the
+platform's own ~150 s ceiling — so during an FRS outage a ZIP report spends its entire budget inside
+the EPA retry ladder and is then killed by the gateway.
+
+**Directly observed, twice, in this pass:** the guard's own control fire on 82801 returned
+**HTTP 504** at 20:33Z; the same ZIP returned **200 in under 240 s** an hour earlier. Nothing about
+that page changed in between except how far FRS had degraded.
+
+So the ordering is likely the reverse of what §S2 implied: **the FRS outage inflates the runtime,
+the inflated runtime blows the timeout, and the blown timeout collapses the collection rate.** The
+10,086-vs-486 comparison is the strongest single piece of evidence and it needs no further probe.
+
+**This does not make the 180 s change wrong** — a client timeout below the platform's own 150 s
+cutoff was throwing away genuine successes regardless, and it is correct as defence in depth. But it
+does mean **it should not be expected to restore the collection rate on its own while FRS is down**,
+and the honest prediction is that the rate stays depressed until EPA answers. The before/after
+measurement should therefore be read against FRS's state, not in isolation.
+
+**Consequence for the guard control:** the live positive control for the new facilities guard could
+NOT be completed — the control fire returned 504, so there was no response for
+`dev_refresh_collect` to accept or refuse. **The guard is verified structurally (present in the
+deployed body, development clause intact) but NOT yet exercised against a real zeroing response.**
+Recorded as unexercised rather than as passed.
