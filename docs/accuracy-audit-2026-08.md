@@ -2289,3 +2289,87 @@ NOT be completed — the control fire returned 504, so there was no response for
 `dev_refresh_collect` to accept or refuse. **The guard is verified structurally (present in the
 deployed body, development clause intact) but NOT yet exercised against a real zeroing response.**
 Recorded as unexercised rather than as passed.
+
+---
+
+# §W — Guard trigger breadth, a founder-side Rule 17a instance, and the timeout experiment
+
+## W1. The guard's trigger is deliberately BROADER than the instruction, and that is why it works
+
+Recorded as a correction to the ruling, in the founder's words: *"its trigger is broader than mine:
+any 0-facility payload where the page has cached facilities, not only a reported fetch failure,
+because the connector swallows the error."*
+
+That is the shipped behaviour and the reason it catches the real case. `frsFacilities()` returns
+`[]` on total failure — byte-identical to a genuinely empty rural area — and FRS is not a registry
+source, so `dev_failed_sources()` (which reads only the connector reports) never sees it. **A
+failure-conditioned guard would have refused nothing during the outage that motivated it.**
+
+Both migrations are now parked at **`docs/dev-refresh-guard-migration.sql`** with their anchors,
+their verification queries and the release-valve note.
+
+## W2. 🔎 A founder-side instance of Rule 17a — the vacuous invariant, caught only by implausibility
+
+Recorded because it is the same defect class the audit exists to catch, and the catch was weak:
+
+> *"I filtered on `s->>'record_kind'` inside the `sites` JSON where that field does not exist, got
+> all 12,722 back, and nearly reported it. Caught it only because the number was implausible, which
+> is the weakest possible control."*
+
+**`record_kind` is a column on `app_projects`, not a key inside `development_reports.sites`.**
+A JSON `->>` on an absent key yields NULL, the predicate matches nothing, and — depending on how it
+is written — the filter silently degrades to no filter at all. The query ran, returned rows, and
+attested to nothing.
+
+**The generalisation, which is the point:** *a filter on a field that does not exist does not error
+— it returns a number.* Implausibility is the last line of defence, not a control, and it only works
+when the operator already knows roughly what the answer should be. The control that would have
+caught it in one step is the one Rule 17a already requires: **pair the query with a positive case
+whose answer you know.** Here, `select count(*) from app_projects where record_kind='facility'`
+returning a number far below 12,722 would have exposed the vacuous filter immediately.
+
+**Cache-side figures are the better instrument for this defect** and are what §T/§V use:
+`development_reports.counts->>'facilities'` is the value actually written, one row per page, with no
+join and no JSON-key assumption. The `app_projects` side is downstream of the materializer and lags
+it.
+
+## W3. The timeout experiment — design, and why a clean "after" is not available today
+
+The instruction is to measure the collection rate before and after rather than assume the fix works.
+
+**Before (fixed, already measured, needs no re-run):** `development_reports.refreshed_at` per hour
+across ten hours on 2026-08-09 — **30, 27, 27, 21, 28, 23, 19, 17, 16, 19** — against ~1,000 fires
+per hour, a **~2.3%** collection rate.
+
+**The confound, stated up front rather than discovered afterwards:** EPA FRS is down, and §V4
+established that an FRS outage inflates the engine's runtime past the platform's own ~150 s ceiling
+(7 radii × 3 attempts × 30 s inside `frsFacilities`). While that holds, a fire returns **504 from
+the gateway** rather than a client timeout — a different failure with the same collection outcome.
+So an "after" measured now measures the outage, not the fix.
+
+**What the raise does change, and it is worth stating precisely:** at 90 s the pipeline could not
+collect a response the engine took 100–152.7 s to produce, *even when the engine was healthy*. That
+is the structural deficit — a client that gives up before its own server finishes. At 180 s the
+binding constraint moves off our timeout and onto the platform's 150 s ceiling, which is where it
+belongs.
+
+⚠️ **On "2.3% is the design":** measured against a fact that cuts the other way — **the same 90 s
+timeout was in force on 2026-08-08, when 10,086 pages refreshed in one day.** So the pipeline *did*
+collect its own work when the engine ran under 90 s. The deficit is real and structural, but it is
+**latent**: it binds only once the engine crosses 90 s, which is what the FRS outage caused. Both
+statements are true and the distinction decides what to expect after EPA recovers.
+
+## W4. Whether the timeout deficit explains §R's zero pages — NOT yet established, and mostly not needed
+
+The hypothesis is explicitly not asserted. What is measured: §R deployed at **19:51:52Z** and the
+refresh was paused at approximately **20:07Z**. Exactly **one** cron tick (20:00) fell in that
+window, and it fired into an already-collapsed pipeline. **§R's 0-of-624 / 0-of-127 / 0-of-16 /
+0-of-12 is therefore explained by elapsed time alone** — about fifteen minutes — before the timeout
+deficit needs to be invoked at all.
+
+TxDOT is the only entry with a long enough exposure to test the chain against (deployed 15:32:54Z,
+**23 of 666** re-cached in the ~4.5 hours before the pause). That is ~5 pages/hour against a
+corpus-wide ~20/hour, which is proportionate to TxDOT's 5.2% share of pages — i.e. **TxDOT is not
+lagging relative to the corpus; the corpus is lagging.** Consistent with the timeout/FRS chain, but
+consistent with several other explanations too, and one entry is not a test. **Recorded as
+unestablished.**
