@@ -82,9 +82,21 @@ HS.onReady(async function () {
       }
       page.innerHTML =
         '<div class="ph"><div class="eyebrow">Development</div><h1>What\'s being built — and how it impacts you</h1>'
-        + '<p>' + HS.tpl.qolImpactScoreBrand + ' - Ranks nearby developments by their potential impact on your quality of life.</p></div>'
+        // The page subtitle used to promise the Quality of Life Impact Score™ "ranks
+        // nearby developments by their potential impact on your quality of life". The
+        // stored score is a lifecycle constant and is now suppressed (lib/impact.js),
+        // so the promise goes with it: this line describes what the list actually is.
+        + '<p>' + (HS.impactScoreDisplayable && HS.impactScoreDisplayable()
+            ? HS.tpl.qolImpactScoreBrand + ' - Ranks nearby developments by their potential impact on your quality of life.'
+            : 'Every permit, planning case and filing on the public record near you — each one linked to its official source.')
+        + '</p></div>'
         + '<div class="toolbar toolbar--lead"><div class="seg" id="devSort">'
-        + seg('impact','Impact on me') + seg('status','Status') + seg('distance','Distance') + seg('newest','Newest')
+        // "Impact on me" named a ranking the data cannot support: the sort key is the
+        // lifecycle constant, so it orders Proposed (72) above Operating (45). The sort
+        // KEY is unchanged (deep links and sanitizeSort still resolve 'impact'); only
+        // the label now says what the ordering actually does.
+        + seg('impact', (HS.impactScoreDisplayable && HS.impactScoreDisplayable()) ? 'Impact on me' : 'Earliest stage')
+        + seg('status','Status') + seg('distance','Distance') + seg('newest','Newest')
         + '</div><div class="sp"></div>'
         + '<button class="fpill" id="devDataBtn">⊞ Table view</button></div>'
         + body
@@ -117,11 +129,17 @@ HS.onReady(async function () {
       var on = !state2.dataView && (state2.lens === 2 ? (k === 'distance') : (state2.sort === k));
       return '<button class="' + (on ? 'on' : '') + '" data-sort="' + k + '">' + label + '</button>';
     }
+    // The score COLUMN is dropped entirely while the score is suppressed — a header with
+    // 500 blank cells under it is the table-shaped version of an orphan label. Status and
+    // Stage stay, so the factual lifecycle the reader came for is still in the table.
     function dataTable(a){
-      return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th><th>Distance</th><th>' + HS.tpl.qolImpactScoreBrand + '</th></tr></thead><tbody>'
+      var showScore = !!(HS.impactScoreDisplayable && HS.impactScoreDisplayable());
+      return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th><th>Distance</th>'
+        + (showScore ? '<th>' + HS.tpl.qolImpactScoreBrand + '</th>' : '') + '</tr></thead><tbody>'
         + a.map(function(p){ return '<tr onclick="location.href=\'development.html?id=' + p.id + '\'" onkeydown="if(event.key===\'Enter\')location.href=\'development.html?id=' + p.id + '\'" tabindex="0" style="cursor:pointer">'
           + '<td><b>' + HS.esc(p.name) + '</b></td><td>' + HS.esc(p.type) + '</td><td>' + HS.esc(p.status) + '</td>'
-          + '<td>' + HS.esc(p.stage||'') + '</td><td>' + HS.esc(p.dist||'') + '</td><td>' + HS.esc((HS.impactScoreValue && HS.impactScoreValue(p.impact_score)) || '') + '</td></tr>'; }).join('')
+          + '<td>' + HS.esc(p.stage||'') + '</td><td>' + HS.esc(p.dist||'') + '</td>'
+          + (showScore ? '<td>' + HS.esc(HS.impactScoreValue(p.impact_score) || '') + '</td>' : '') + '</tr>'; }).join('')
         + '</tbody></table>';
     }
     function wire() {

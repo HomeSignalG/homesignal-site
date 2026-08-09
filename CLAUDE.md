@@ -716,6 +716,27 @@ legal/framing change not covered by the one-time sign-off.
   cannot disagree. **When wiring a new connector, check which key names it actually emits
   against the materialiser — a green pipeline that writes NULL is the failure mode.**
   Full delta + receipts: `docs/app-projects-identity-provenance-migration.sql`.
+- **THE QUALITY OF LIFE IMPACT SCORE™ IS A LIFECYCLE CONSTANT AND IS GATED OFF
+  (2026-08-09).** Its entire input is one string: `app_refresh_zip` writes
+  `proposed→72, approved/built→55, else 45` for development rows and a literal `30` for
+  facilities. No distance, size, capacity, emissions, releases, waste, water, noise or
+  enforcement history — and `impact_dimensions`, the only sourced impact field, is
+  populated on **0 of 3,027,784 rows** and is not read by the score at all. Displayed as
+  "Score: 72 | High" it reads as a measurement and ranks a **proposed** project above an
+  **operating** one. `HS.SHOW_LIFECYCLE_ONLY_SCORE=false` / `HS.IMPACT_SCORE_METHOD=
+  'lifecycle_constant'` in `lib/impact.js` suppress it on every surface through the one
+  `HS.impactScoreValue()` gate; **the computation is preserved intact as
+  `HS.impactScoreRaw()`** and flipping either flag restores the display with no other
+  edit. **Do not re-enable it, and do not invent a replacement score, until a sourced
+  methodology exists.** Pinned by `test/impact-copy.test.mjs`.
+- **A GENERATED SENTENCE IS COPY, NOT A CONCATENATION (2026-08-09).** The card's impact
+  line was `'A ' + status + ' ' + type`, which shipped *"A operating industrial is on the
+  public record near you"* — wrong article, an adjective used as a noun, and the reader's
+  location asserted. `HS.recordSentence()` is now the one formatter: lifecycle word from
+  the same resolver the pin uses (so copy and pin can't contradict), noun quoted from the
+  record's own type text (a generic bucket stays generic — nothing is promoted into a
+  "data center"), article computed from the phrase, and no lifecycle evidence means no
+  adjective rather than "A unknown …".
 - **AN ALWAYS-EMPTY UI SECTION IS A FALSE POSITIVE, NOT A PLACEHOLDER (2026-08-09).**
   `impact_dimensions` is populated on 0 of 3,027,784 rows, so the quality-of-life grid
   printed five cells reading "Not noted in the public record" on every project — a block

@@ -31,26 +31,35 @@ test('devCard renders Impact line below title', () => {
   assert.match(page, /qolImpactScoreBrand/, 'development table column uses shared branded label');
 });
 
-test('impactRating and impactScoreValue use stored impact_score', () => {
+// UPDATED 2026-08-09. These two tests pinned the Quality of Life Impact Score™ being
+// DISPLAYED. It is now suppressed, because its only input is a lifecycle constant
+// (Proposed=72, Approved/built=55, else 45, facility=30) and showing that under a
+// measurement's name misrepresents it. The computation itself is unchanged and is
+// asserted below through impactScoreRaw; the suppression contract lives in
+// test/impact-copy.test.mjs.
+test('the score computation is intact behind the suppression gate', () => {
   assert.strictEqual(HS.impactRating(72), 'High');
   assert.strictEqual(HS.impactRating(55), 'Medium');
   assert.strictEqual(HS.impactRating(34), 'Low');
   assert.strictEqual(HS.impactRating(null), null);
-  assert.strictEqual(HS.impactScoreValue(72), '72 | High');
+  assert.strictEqual(HS.impactScoreRaw(72), '72 | High', 'computation preserved');
+  assert.strictEqual(HS.impactScoreRaw(null), '');
+  assert.strictEqual(HS.impactScoreValue(72), '', 'display gated off');
   assert.strictEqual(HS.impactScoreValue(null), '');
 });
 
-test('devCard renders QoL score line between impact and sowhat', () => {
+test('devCard shows the impact line and NO score line while the score is gated', () => {
   const p = projects[0];
   const html = HS.tpl.devCard(p);
   const impactIdx = html.indexOf('Impact:');
-  const scoreIdx = html.indexOf('Quality of Life Impact Score<sup>™</sup>:');
   const sowhatIdx = html.indexOf('On the record:');
   const altSowhatIdx = html.indexOf('How it impacts you:');
   const recordIdx = sowhatIdx >= 0 ? sowhatIdx : altSowhatIdx;
-  assert.ok(impactIdx >= 0 && scoreIdx > impactIdx, 'score line follows impact line');
-  assert.ok(recordIdx > scoreIdx, 'score line precedes on-the-record section');
-  assert.match(html, /Quality of Life Impact Score<sup>™<\/sup>:<\/b> 88 \| High/, 'seed flagship shows score and rating on one line');
+  assert.ok(impactIdx >= 0, 'impact line renders');
+  assert.ok(recordIdx > impactIdx, 'on-the-record section follows the impact line');
+  assert.doesNotMatch(html, /Quality of Life Impact Score/,
+    'the lifecycle-constant score is not presented as a measurement');
+  assert.doesNotMatch(html, /88 \| High/, 'seed flagship score is not rendered');
 });
 
 test('projectImpact is deterministic and length-bounded for seed projects', () => {
