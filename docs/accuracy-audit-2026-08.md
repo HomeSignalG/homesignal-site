@@ -2940,3 +2940,46 @@ actually issue dates. **Piece (c) must ship AFTER the re-cache has propagated, n
 4. **Then** ship piece (c) as its own PR, with the "NEW" badge ruling (AA4) settled first.
 
 Steps 1–2 are prerequisites, not preferences: without them the label is confidently wrong.
+
+---
+
+# §AB — Piece (c): rulings recorded, nothing built
+
+Founder rulings, 2026-08-09. **No code was written for any of this** — it is recorded so the next
+session inherits the decision instead of re-deriving it.
+
+## AB1. The sequence is a GATE, not a preference
+
+Accepted as proposed in §AA6, and the reason it is a gate is measured (§AA5 Risk D, independently
+reproduced by the founder against `app_projects` scoped to `record_kind='development'`): `filed`
+**2,714,393** · null **71,921** · `decided` **39,106** · `awarded` **70**. **`date_kind` carries no
+`issued`, `scheduled`, `estimated`, `hearing` or `completed` value at all today** — so piece (c)
+shipped now would render the wrong label, confidently, on ~2.7 M records.
+
+1. **Wait for EPA recovery** — the probe stays on its own cron; no manual polling.
+2. **Un-pause the refresh, repair the 1,722 facility pages.**
+3. **Confirm the re-cache propagates the 106 declarations into `date_kind`.**
+4. **Sweep the remaining 63 inherited-default entries.**
+5. **Then, and only then, ship piece (c) as its own PR.**
+
+**Nothing fires early.** Not (c), not the badge, not the un-pause, until step 1 actually happens.
+
+## AB2. The "NEW" badge — RULED: narrow it to `filed`-kind records only
+
+`lib/map.js:712` fires a **NEW** badge whenever `submitted_at` is inside a 30-day window, and prints
+*"Filed with the county <date>"*. Ruling, in the founder's words:
+
+> *"A badge that says 'recently filed' should mean recently filed — once other kinds exist,
+> 'recently issued' or 'recently decided' isn't the same signal and shouldn't share the same badge
+> text."*
+
+So the badge gate narrows from *"has a recent date"* to *"has a recent **filing** date"*. **Build it
+as part of the piece (c) PR, not before** — on its own it would silently remove NEW badges from
+records whose labels have not yet been corrected, which is the §AA5 Risk D failure in the opposite
+direction.
+
+⚠️ **Consequence to size before building, not after:** every record whose kind is not `filed` loses
+its NEW badge. With the sweep complete that is **74 `issued` + 8 `scheduled` + 6 `decided` + 4
+`awarded` + 4 `estimated` + 2 `hearing` + 1 `completed` = 99 entries** of the 169 that carry a date.
+The badge becomes rarer and more meaningful, which is the intent — but the drop should be **measured
+and reported** in the piece (c) PR rather than discovered on the page.
