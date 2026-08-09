@@ -2060,6 +2060,11 @@ first §S1 reading; `Received_Date` parsed on 7,194 of 7,198):
 
 Median lag **0 days**, mean **−0.97 days**, max 71. The population is **7,198**, not 6,126.
 
+**Rule 13 — the same comparison inside the CONNECTOR's own scope** (`recency_days: 1825`), since
+a probe whose scope differs from the connector's answers a different question. Of the **1,399**
+in-window rows: **same day 1,375**, earlier **14**, later **6**. All 14 of the earlier rows are
+inside the window and are 1.0% of it. The conclusion is the same in both scopes.
+
 Every element of the premise inverts: 14 earlier rather than 3,632, and later is 7 rather than none.
 `Entry_Date` does not lag receipt — it *is* receipt, to the day, on 99.7% of the record. The earlier
 finding was drawn from the 8 newest rows and is now confirmed against the whole population from the
