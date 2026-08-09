@@ -717,7 +717,13 @@ HS.onReady(async function () {
           + HS.esc(mk.typeLabel || it.type || it.category || '') + (st ? ' · ' + st : '') + (it.dist ? ' · ' + HS.esc(it.dist) : '') + '</span>'
           + '<h3>' + HS.esc(it.name || it.title) + '</h3>'
           + HS.tpl.devImpactBlock(it)
-          + '<p class="sowhat">' + HS.esc(it.sowhat || it.plain_language || '') + '</p></div>';
+          // The lens line above already reads "DEVELOPMENT · PROPOSED · 1.3 MI". When the
+          // generated summary is only "Development · proposed" it repeats that and adds
+          // nothing, so the caption is dropped. Any summary carrying a further fact — a
+          // size, an investment, a named owner, or the filing's own scope text — renders.
+          + (HS.tpl.summaryAddsNothing(it) ? ''
+             : '<p class="sowhat">' + HS.esc(it.sowhat || it.plain_language || '') + '</p>')
+          + '</div>';
       }).join('');
     // Area-wide notices — real records, no map letter, whole-area (never plotted at a fake point).
     if (area.length) {

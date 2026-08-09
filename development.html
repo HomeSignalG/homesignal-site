@@ -52,7 +52,7 @@ HS.onReady(async function () {
   function renderList() {
     var state2 = {
       lens: HS.sanitizeLens ? HS.sanitizeLens(initLens) : 0,
-      sort: HS.sanitizeSort ? HS.sanitizeSort(initSort) : 'impact',
+      sort: HS.sanitizeSort ? HS.sanitizeSort(initSort) : 'lifecycle',
       dataView: false
     };
     function sorted() {
@@ -61,12 +61,18 @@ HS.onReady(async function () {
         a.sort(function(x,y){ return (x.type>y.type?1:x.type<y.type?-1:0) || (HS.devStatusSortRank(x)-HS.devStatusSortRank(y)); });
       } else if (state2.lens === 2 || state2.sort === 'distance') {
         a.sort(function(x,y){return (x.distance_mi||9e9)-(y.distance_mi||9e9);});
-      } else if (state2.sort === 'status') {
-        a.sort(function(x,y){return HS.devStatusSortRank(x)-HS.devStatusSortRank(y);});
       } else if (state2.sort === 'newest') {
         a.sort(function(x,y){return new Date(y.submitted_at)-new Date(x.submitted_at);});
       } else {
-        a.sort(function(x,y){return (y.impact_score||0)-(x.impact_score||0);});
+        // 'lifecycle' — the default, and the only remaining earliest-first sort.
+        // It replaces the old 'impact' branch, which ordered by impact_score: a
+        // lifecycle constant, so it produced this same ordering while its name and its
+        // "Impact on me" label claimed a calculation that does not exist. The separate
+        // 'status' button ran devStatusSortRank already and was a duplicate of this;
+        // sanitizeSort now folds both keys onto 'lifecycle'. Ties keep the incoming
+        // order (submitted_at desc, id) — Array.prototype.sort is stable — so the
+        // result is deterministic.
+        a.sort(function(x,y){return HS.devStatusSortRank(x)-HS.devStatusSortRank(y);});
       }
       return a;
     }
@@ -91,12 +97,12 @@ HS.onReady(async function () {
             : 'Every permit, planning case and filing on the public record near you — each one linked to its official source.')
         + '</p></div>'
         + '<div class="toolbar toolbar--lead"><div class="seg" id="devSort">'
-        // "Impact on me" named a ranking the data cannot support: the sort key is the
-        // lifecycle constant, so it orders Proposed (72) above Operating (45). The sort
-        // KEY is unchanged (deep links and sanitizeSort still resolve 'impact'); only
-        // the label now says what the ordering actually does.
-        + seg('impact', (HS.impactScoreDisplayable && HS.impactScoreDisplayable()) ? 'Impact on me' : 'Earliest stage')
-        + seg('status','Status') + seg('distance','Distance') + seg('newest','Newest')
+        // One lifecycle control, reading the real normalized status. It replaces the
+        // former "Impact on me" (key 'impact', ordered by the lifecycle constant) and
+        // the separate "Status" button, which ran the same devStatusSortRank ranking —
+        // two buttons, one ordering, one of them named after a calculation that never
+        // existed. ?sort=impact and ?sort=status still resolve here via sanitizeSort.
+        + seg('lifecycle','Lifecycle stage') + seg('distance','Distance') + seg('newest','Newest')
         + '</div><div class="sp"></div>'
         + '<button class="fpill" id="devDataBtn">⊞ Table view</button></div>'
         + body

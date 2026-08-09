@@ -35,31 +35,54 @@ HS.onReady(async function () {
   var S = HS.state, home = S.activeProperty;
   var c = await HS.data.community(S.zip);
   var projects = await HS.data.projects(S.zip, home);
-  var flagship = projects.slice().sort(function(a,b){return (b.impact_score||0)-(a.impact_score||0);})[0];
+  // Which record this report previews. WAS `max(impact_score)` — a lifecycle constant,
+  // so it picked an arbitrary Proposed record and called it the ZIP's flagship. The rule
+  // is now most-recently-filed with a stable tie-break; see HS.featuredProject in
+  // lib/templates.js for why recency and not magnitude.
+  var featured = HS.featuredProject(projects);
   var today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
 
   var reports = [
     { icon:'⌂', t: (home?home.address:'Your home') + ' — Property Intelligence Report', d:'Score, nearby projects, risk & value outlook · updated today', type:'Property' },
-    { icon:'◍', t: c.zip + ' — Community Snapshot', d:'What\'s changing across ' + c.name + ' · updated today', type:'Community' },
-    { icon:'◈', t: flagship.name + ' — Impact Analysis', d:'Full project impact, timeline & recommended actions · ' + today, type:'Project' },
-    { icon:'✉', t:'Your Weekly Briefing — ' + today, d:'The changes that mattered near you this week', type:'Briefing' }
+    { icon:'◍', t: c.zip + ' — Community Snapshot', d:'What\'s changing across ' + c.name + ' · updated today', type:'Community' }
   ];
+  // A ZIP with no development records has nothing to feature. The old code read
+  // `flagship.name` off `[0]` of an empty array and threw; the row is now simply absent.
+  // "Impact Analysis" also claimed an analysis the record does not contain — the row is
+  // named for what the selection rule actually establishes: the most recent filing.
+  if (featured) {
+    reports.push({ icon:'◈', t: featured.name + ' — Recent Development', d:'Most recently filed near you · timeline, official record & how to weigh in · ' + today, type:'Project' });
+  }
+  reports.push({ icon:'✉', t:'Your Weekly Briefing — ' + today, d:'The changes that mattered near you this week', type:'Briefing' });
   document.getElementById('repList').innerHTML = reports.map(function (r) {
     return '<div class="rrow"><div class="ricon">' + r.icon + '</div><div class="rmain"><div class="rt">' + HS.esc(r.t) + '</div>'
       + '<div class="rd">' + HS.esc(r.d) + '</div></div><span class="rtype">' + HS.esc(r.type) + '</span></div>';
   }).join('');
 
-  // rendered preview = flagship project impact analysis (on the fly)
-  HS.shareUrlOverride = HS_CONFIG.BASE_URL + '/development.html?id=' + flagship.id;
+  // rendered preview = the most recently filed development record (on the fly)
+  if (!featured) {
+    document.getElementById('repDoc').innerHTML =
+      '<div class="dhead"><div class="dk">Recent development · preview</div>'
+      + '<h3>No development records on file for this ZIP yet</h3>'
+      + '<div class="dm">Permit and planning filings appear here as soon as they reach the public record.</div></div>';
+    return;
+  }
+  HS.shareUrlOverride = HS_CONFIG.BASE_URL + '/development.html?id=' + featured.id;
+  // The "Impact on this property" section rendered impactChips(impact_dimensions), which
+  // is populated on 0 of 3,027,784 rows — an empty <div class="impacts"> under a heading
+  // that promises an assessment. It renders only when the record actually flags one.
+  var featChips = HS.tpl.impactChips(featured.impact_dimensions);
   document.getElementById('repDoc').innerHTML =
-    '<div class="dhead"><div class="dk">Project impact analysis · preview</div><h3>' + HS.esc(flagship.name) + '</h3>'
+    '<div class="dhead"><div class="dk">Recent development · preview</div><h3>' + HS.esc(featured.name) + '</h3>'
     + '<div class="dm">Prepared for ' + ((HS.isSample && HS.isSample()) ? HS.esc(c.name) + ' — (Sample Zip Code)' : (home ? HS.esc(home.address) : HS.esc(c.name)) + ' · ' + HS.esc(c.city) + ', ' + HS.esc(c.state) + ' ' + HS.esc(c.zip)) + ' · ' + today + '</div>'
     + '<button class="inlinebtn" style="margin-top:14px" onclick="HS.openModal(\'shareModal\')">⤴ Share this report</button></div>'
     + '<div class="dbody">'
-    + '<div class="dsec"><h4>Bottom line</h4><p>' + HS.esc(flagship.sowhat||'') + '</p></div>'
-    + '<div class="dsec"><h4>Impact on this property</h4><div class="impacts">' + HS.tpl.impactChips(flagship.impact_dimensions) + '</div></div>'
+    + '<div class="dsec"><h4>On the record</h4><p>' + HS.esc(featured.sowhat||'') + '</p></div>'
+    + (featChips ? '<div class="dsec"><h4>Impact on this property</h4><div class="impacts">' + featChips + '</div></div>' : '')
     + '<div class="dsec"><h4>Recommended actions</h4><p>1 · Submit a public comment before the hearing.&nbsp;&nbsp;2 · Add the hearing to your calendar.&nbsp;&nbsp;3 · Follow the project for permit and vote updates.</p></div>'
-    + '<div class="dsec"><h4>Sources</h4><p>' + HS.esc(flagship.source_ref) + ' · HomeSignal impact model. All public records.</p></div>'
+    // "HomeSignal impact model" named a model that does not exist — the preview is the
+    // public record and nothing else.
+    + '<div class="dsec"><h4>Sources</h4><p>' + HS.esc(featured.source_ref) + ' · public record.</p></div>'
     + '</div>';
 });
 </script>

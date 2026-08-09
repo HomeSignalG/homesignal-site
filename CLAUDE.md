@@ -729,6 +729,16 @@ legal/framing change not covered by the one-time sign-off.
   `HS.impactScoreRaw()`** and flipping either flag restores the display with no other
   edit. **Do not re-enable it, and do not invent a replacement score, until a sourced
   methodology exists.** Pinned by `test/impact-copy.test.mjs`.
+  **Its two hidden RANKING dependencies are also gone (2026-08-09).** `reports.html` chose
+  its "flagship" by `max(impact_score)` — now `HS.featuredProject()`, **most recently filed
+  + stable id tie-break**, labelled "Recent Development" because recency is all it
+  establishes (no magnitude field is rankable: `size` 5 of 3,027,784 rows, `investment` 5,
+  `jobs` 0, no acreage/capacity column). The development sort key `impact` — which read the
+  constant and so duplicated the separate `status` control — is folded into one canonical
+  **`lifecycle`** key reading `devStatusSortRank()`; `impact`/`status`/`stage` survive as
+  aliases in `sanitizeSort` so deep links resolve. **No user-visible or ranking use of the
+  score remains**; the only live reads left are the suppression gate itself, the preserved
+  computation, and tests. Pinned by `test/lifecycle-selection.test.mjs`.
 - **A GENERATED SENTENCE IS COPY, NOT A CONCATENATION (2026-08-09).** The card's impact
   line was `'A ' + status + ' ' + type`, which shipped *"A operating industrial is on the
   public record near you"* — wrong article, an adjective used as a noun, and the reader's

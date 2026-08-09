@@ -84,8 +84,17 @@
       }
       return HS.pageHref('alerts.html', { zip, category: 'Government & civic' });
     };
+    // Canonical key is 'lifecycle'; 'impact'/'stage'/'status' are legacy aliases so old
+    // deep links keep resolving. See lib/view-zip.js for why 'impact' had to go: it read
+    // the lifecycle-constant impact_score, not any impact calculation.
+    // Null prototype — a literal answers ['__proto__'] with Object.prototype, which is
+    // truthy, so ?sort=__proto__ would escape the whitelist.
+    var SORT_ALIAS = Object.assign(Object.create(null), {
+      lifecycle: 'lifecycle', stage: 'lifecycle', status: 'lifecycle',
+      impact: 'lifecycle', distance: 'distance', newest: 'newest'
+    });
     HS.sanitizeSort = function (s) {
-      return ({ impact: 1, status: 1, distance: 1, newest: 1 })[s] ? s : 'impact';
+      return typeof SORT_ALIAS[s] === 'string' ? SORT_ALIAS[s] : 'lifecycle';
     };
     var DEV_STATUS_RANK = { 'Proposed': 0, 'On file': 0, 'Decided': 1, 'Approved': 2, 'Active': 3, 'Operating': 4, 'Built': 4 };
     var DEV_REVIEW_STAGE = /\breview\b|in review|under review|hearing|submitt|pending/;

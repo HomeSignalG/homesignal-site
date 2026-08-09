@@ -59,7 +59,7 @@ HS.onReady(async function () {
           + '<h3>' + HS.esc(pr.name) + '</h3>'
           + HS.tpl.devImpactBlock(pr)
           + '<p class="sowhat"><b>Effect on this home:</b> ' + HS.esc(pr.sowhat||'') + '</p>'
-          + '<div class="impacts">' + HS.tpl.impactChips(pr.impact_dimensions) + '</div></div>';
+          + HS.tpl.impactsBlock(pr.impact_dimensions) + '</div>';
       }).join('')
     + '</div>'
     + '<div class="block"><h2 class="bt">Environmental risk for this parcel</h2><div class="riskgrid">' + risk + '</div>'
