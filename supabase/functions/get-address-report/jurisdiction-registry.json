@@ -4667,6 +4667,7 @@
         "lng": "__lng",
         "case_number": "FolderNumber"
       },
+      "file_date_kind": "filed",
       "type_map": {
         "Planned Development": "Development",
         "Specific Use Permit": "Development",
@@ -4724,6 +4725,7 @@
         "lng": "__lng",
         "case_number": "FOLDERSEQUENCE"
       },
+      "file_date_kind": "filed",
       "type_map": {
         "Single-Family": "Residential",
         "Residential": "Residential",
@@ -5356,6 +5358,7 @@
         "lng": "__lng",
         "case_number": "CASE_NMBR"
       },
+      "file_date_kind": "filed",
       "status_to_bucket": {
         "proposed": [],
         "approved": [
@@ -6188,6 +6191,7 @@
         "lng": "__lng",
         "case_number": "PER_NUM"
       },
+      "file_date_kind": "filed",
       "type_map": {
         "ABANDON, CLOSE OR PLACE TANK TEMP O/S": "Industrial",
         "ANNUAL FACILITIES PERMIT": "Development",
@@ -7224,6 +7228,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "issued",
       "spatial_zip_radius_mi": 5,
       "type_map": {
         "Residential": "Residential",
@@ -8342,6 +8347,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "issued",
       "spatial_zip_radius_mi": 5,
       "type_map": {
         "SFD DEVEL": "Residential",
@@ -8568,6 +8574,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "issued",
       "spatial_zip_radius_mi": 5,
       "type_map": {
         "Residential": "Residential",
@@ -9553,6 +9560,7 @@
         "case_number": "FILENUMBER",
         "record_url": "HTMLLINK"
       },
+      "file_date_kind": "decided",
       "use_type_const": "Development",
       "status_to_bucket": {
         "proposed": [],
@@ -9674,6 +9682,7 @@
         "lng": "__lng",
         "case_number": "GISLINK"
       },
+      "file_date_kind": "issued",
       "type_map": {
         "101": "Residential",
         "102": "Residential",
@@ -9715,6 +9724,7 @@
         "lng": "__lng",
         "case_number": "PERMIT_NUM"
       },
+      "file_date_kind": "issued",
       "type_map": {
         "Residential": "Residential",
         "Non-Residential": "Development"
@@ -9758,6 +9768,7 @@
         "lng": "__lng",
         "case_number": "CASENO"
       },
+      "file_date_kind": "decided",
       "use_type_const": "Development",
       "status_to_bucket": {
         "proposed": [],
@@ -9798,6 +9809,7 @@
         "lng": "__lng",
         "case_number": "CASENO"
       },
+      "file_date_kind": "decided",
       "use_type_const": "Development",
       "status_to_bucket": {
         "proposed": [],
@@ -9975,6 +9987,7 @@
         "lng": "__lng",
         "case_number": "USER_ZB_application__"
       },
+      "file_date_kind": "decided",
       "type_map": {
         "New Construction": "Development",
         "Adaptive Reuse / Conversion": "Development",
@@ -10558,6 +10571,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "filed",
       "spatial_zip_radius_mi": 3,
       "status_const": "Submitted for county planning review",
       "status_to_bucket": {
@@ -10946,6 +10960,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "decided",
       "status_to_bucket": {
         "proposed": [],
         "approved": [],
@@ -10984,6 +10999,7 @@
         "lng": "__lng",
         "case_number": "JOBNET_ID"
       },
+      "file_date_kind": "scheduled",
       "use_type_const": "Utility",
       "status_to_bucket": {
         "proposed": [
@@ -11028,6 +11044,7 @@
         "lng": "__lng",
         "case_number": "UPC"
       },
+      "file_date_kind": "filed",
       "status_const": "Programmed",
       "use_type_const": "Utility",
       "status_to_bucket": {
@@ -11066,6 +11083,7 @@
         "lng": "__lng",
         "case_number": "pin"
       },
+      "file_date_kind": "estimated",
       "use_type_const": "Utility",
       "status_to_bucket": {
         "proposed": [
@@ -11331,6 +11349,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "scheduled",
       "use_type_const": "Utility",
       "status_to_bucket": {
         "proposed": [
@@ -11382,6 +11401,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "awarded",
       "use_type_const": "Utility",
       "status_to_bucket": {
         "proposed": [],
@@ -11425,6 +11445,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "awarded",
       "use_type_const": "Utility",
       "status_to_bucket": {
         "proposed": [],
@@ -11464,6 +11485,7 @@
         "lat": "Latitude",
         "lng": "Longitude"
       },
+      "file_date_kind": "scheduled",
       "use_type_const": "Utility",
       "status_const": "Not Yet Advertised",
       "status_to_bucket": {
@@ -11504,6 +11526,7 @@
         "lat": "Latitude",
         "lng": "Longitude"
       },
+      "file_date_kind": "scheduled",
       "use_type_const": "Utility",
       "status_const": "Advertised, Not Yet Complete",
       "status_to_bucket": {

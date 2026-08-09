@@ -1708,3 +1708,70 @@ carries the widened vocabulary and rejects anything outside it; suite 91/91 gree
 1 `awarded`, 1 `completed`, 1 `awarded` (txdot). The 3 substitution entries are stamped `decided` by
 the materializer without config. Remaining: **69 `issued`** (spot-check first — 1 of 1 passed so far)
 and **29 unresolved** (one probe each; 1 wrong column, 2 vocabulary gaps, 2 correct so far).
+
+---
+
+# §Q — The 31 unresolved, probed. 23 classified, 5 flagged as WRONG COLUMN or worse.
+
+**Every one of the 31 is ArcGIS.** All 31 field lists pulled live via `pg_net` (HTTP 200 on all 24
+fired this pass; the other 7 were probed earlier or classified from production evidence). The test
+is the one that found TxDOT: **does the layer offer a better date?** — corroborated against
+production date distributions, never against a column name.
+
+## Q1. Classified and SHIPPED — 23 entries
+
+**Column confirmed correct, label was the defect (12):**
+
+| entry | column | date fields the layer offers | kind |
+|---|---|---|---|
+| `aldot-atrip-ii-projects` | `SELECTED_DT` | `SELECTED_DT`, `Year_Text` | `awarded` |
+| `aldot-rebuild-alabama-grant-projects` | `SELECTED_DT` | same | `awarded` |
+| `boone-county-ky-planning-board-actions` | `ACTIONDATE` | `ACTIONDATE`, `BRDACTION` | `decided` |
+| `champaign-il-special-use-permits` | `Effective_` | `Effective_`, `Expiration`, `Site_Visit` | `decided` |
+| `chattanooga-building-permits` | `PERMIT_DAT` | `PERMIT_DAT`, `PERMIT_YEAR` | `issued` |
+| `chattanooga-permits-archive` | `PERMIT_DAT` | same | `issued` |
+| `murfreesboro-building-permits` | `PRMT_DATE` | `PRMT_DATE`, `PRMT_YEAR` | `issued` |
+| `kenton-county-devtracking-permits` | `PERMIT_DAT` | `PERMIT_DAT`, `EDIT_DATE` | `issued` |
+| `new-castle-county-permits` | `ISSDTTM` | `ISSDTTM`, `APDTTM`, `COODTTM`, `TMPCOODTTM` | `issued` |
+| `clarksville-montgomery-final-subdivisions` | `ACTION_DAT` | `ACTION_DAT`, `DATE`, `RPC_ACTION` | `decided` |
+| `clarksville-montgomery-preliminary-subdivisions` | `ACTION_DAT` | same | `decided` |
+| `stamford-major-developments` | `USER_Approval_Date` | + 5 more (see Q2) | `decided` |
+
+**Programme dates, proven by future-dated records in production (5):**
+
+| entry | future-dated | latest | kind |
+|---|---:|---|---|
+| `wsdot-project-delivery-plan-proposed` | **731 / 731 = 100%** | 2042-07-07 | `scheduled` |
+| `mdot-stip-projects` | **5,467 / 7,410 = 73.8%** | 2029-09-28 | `scheduled` |
+| `maine-dot-public-projects` | **243 / 444 = 54.7%** | 2031-01-13 | `estimated` |
+| `ctdot-project-work-areas` | 2,308 / 22,774 = 10.1% | 2030-10-09 | `scheduled` |
+| `wsdot-project-delivery-plan-under-construction` | 8 / 966 | 2026-08-03 | `scheduled` (same `AdDate` column as the 100%-future sibling) |
+
+**Confirmed `filed` — the layer offers an issue/approval date and the mapped column is correctly the
+intake date (6):** `arlington-permit-applications` (`InDate`), `arlington-planning-cases` (`INDATE`,
+over `ISSUEDATE`/`FINALDATE`), `fort-worth-zoning-cases` (`ZC_DATE`, over `DATE_APPRO`),
+`nj-stip-projects` (`PROJ_RECD`, over `AWARD_DATE`), `phoenix-building-permits` (`PER_ENT_DATE`,
+over `PER_ISSUE_DATE`), `york-county-pa-planning-subdivisions` (`DATE_RCVD`, over
+`CREATE_DATE`/`MODIFY_DATE`). Declared explicitly so it is recorded rather than defaulted.
+
+## Q2. 🔴 FIVE FLAGGED — these need a decision, and two are TxDOT again
+
+| # | entry | records / pages | what the probe found | why it is not a label fix |
+|---|---|---:|---|---|
+| 1 | **`cook-county-il-highway-construction-program`** | 403 / 127 | uses `CreationDate`; **the layer also offers `start`** | **WRONG COLUMN — a second TxDOT.** `CreationDate` is the ArcGIS row-creation field. Production corroborates: every date sits in a 10-week band, **2026-04-14 → 2026-06-25**, on a construction programme — that is a GIS load batch, not a schedule. |
+| 2 | **`massdot-highway-projects`** | **92,315 / 624** | uses `From_Date`; the layer offers **`bidOpenedDate`, `ntpDate`, `ScheduledAdDate`, `PrcApprovedDate`, `completeDateApproved`, `ReadinessDate`** | **WRONG COLUMN — a third TxDOT, and the largest.** `From_Date`/`To_Date` read as a validity range, not an event. Floor is a suspiciously round **2023-01-01**, and **0 records in the last 30 days** on a live state programme. |
+| 3 | **`sheridan-county-building-permits`** | 6,492 / 12 | the layer publishes **`Year` and nothing else** | **No usable date exists.** The current mapping renders **all 6,492 records as `1970-01-01`** (min = max = 1970-01-01 in production — the §A2 epoch sentinel). The honest fix is to drop the mapping so they render undated, which **removes a date from every record** — beyond error correction, so it stops here. |
+| 4 | **`butler-county-ks-permits`** | 1,216 / 15 | uses `CreationDate`; the layer offers **only `CreationDate`, `EditDate`, `soilprofile`** | **Wrong column with NO alternative.** Both candidates are system timestamps. Production: floor **2026-01-08** with **no `recency_days` window** — the TxDOT signature — but there is nothing better to move to. Dropping the date is the only honest fix; same call as #3. |
+| 5 | **`stamford-major-developments`** | 347 / 10 | uses `USER_Approval_Date`; the layer also offers **`USER_ZB_application__`, `USER_FIL_received`, `USER_Shared_received`** | Labelled `decided` in Q1, which is now truthful. But a **filing** column exists and would fit the slot better. Column change = what residents see moves; flagged rather than taken. |
+
+**Two more needing a value probe before classification** (name is genuinely ambiguous, no better
+column obviously offered): `desoto-county-permits` (`Date`, 7,105 records) and
+`weld-county-site-plan-review` (`DATE_`, 592 records; production floor is the `1899-12-30` epoch
+sentinel). `lee-county-fl-development-orders` (`STATUS_DATE`) and
+`montgomery-county-pa-act247-proposals` (`Entry_Date` vs the layer's own `Received_Date`) are the
+same shape.
+
+## Q3. Running total
+
+**34 of 172 entries now declare an explicit kind** (11 before this pass + 23 here). Remaining:
+**69 `issued`** (spot-checks below) and **8 unresolved** — 5 flagged above, 3 awaiting a value probe.
