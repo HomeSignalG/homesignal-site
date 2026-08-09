@@ -1955,3 +1955,64 @@ whether a refresh that already succeeded gets stored — but it is a code change
 so it stops here for a ruling. **Every remaining after-state measurement in this audit is blocked
 behind it**, including §R's, TxDOT's remaining 664 pages, Stamford `06907` and Virginia Beach
 `23451`.
+
+---
+
+# §T — 🔴 FOUND WHILE MEASURING §R: the EPA facilities layer is being ERASED page by page, and the rolling refresh is what is erasing it
+
+This was not what the pass was looking for. It surfaced because §R's after-state had to be measured
+from a fresh engine response rather than from the cache, and that response carried
+**`facilities: 0` against a cached 40** on ZIP 82801 (Sheridan WY).
+
+## T1. The instrument, and why the correlation is with TIME and not geography
+
+`development_reports`, every row, grouped by the day it was last refreshed:
+
+| refreshed on | pages | `facilities = 0` | % |
+|---|---:|---:|---:|
+| 2026-08-02 → 08-06 | 17 | 0 | 0.0% |
+| 2026-08-07 | 2,133 | 155 | 7.3% |
+| 2026-08-08 | 10,086 | 1,081 | 10.7% |
+| **2026-08-09** | **486** | **486** | **100.0%** |
+
+**Every page refreshed today came back with zero EPA facilities — 486 of 486.** Cache-wide the
+count now stands at **1,722 pages of 12,722 at `facilities = 0`**, and *all* of them were refreshed
+2026-08-07 or later; not one page refreshed before 08-07 is affected. A geographic explanation is
+ruled out by inspection of the list: it includes **downtown Atlanta 30312, downtown San Jose 95113
+and 95112, Cleveland 44112, Arlington TX 76013** — dense urban cores, several of which the
+`facilities > 0` population held a real count for as recently as yesterday (82801 was **40** on
+2026-08-08 and **0** on the fresh response today).
+
+## T2. Why a transient upstream failure reaches the cache at all
+
+`dev_refresh_collect`'s transient-safe guard refuses a write on two conditions: *both* dimensions
+zero, or *development* zero. **There is no facilities-only guard.** So a page with real development
+records and a failed EPA fetch — which is every page carrying a permit source — is written straight
+through with its facilities zeroed. That is precisely the class engine v13 was built to prevent
+("NEVER treat an FRS non-200 / error / parse-fail as 0 facilities"); v13 hardened the *fetch*, and
+this is the *write* path, which was never given the same rule.
+
+## T3. Action taken, and what it is not
+
+**`dev-reports-rolling-refresh` (pg_cron job 14) is PAUSED** (`cron.alter_job(14, active := false)`,
+verified `active = false`). It was destroying the facilities layer at the refresh rate — 486 pages
+today. Pausing changes nothing a resident sees, is reversible with one flag, and only stops further
+overwrites; the corruption already written is *not* undone by it. `app-content-refresh` (job 13) is
+deliberately left running — it mirrors, it does not fetch.
+
+⚠️ **This has a second effect that must be stated plainly: the §R re-cache cannot run while the job
+is paused.** Stopping an active data loss took priority over completing a measurement. Both need the
+same decision.
+
+## T4. What is NOT yet established
+
+Whether the zeros are EPA's outage or ours. A direct probe of the exact endpoint the engine calls
+(`ofmpub.epa.gov/frs_public2/frs_rest_services.get_facilities`) was fired and had not returned by
+the time of this report — **which is itself weak evidence in the same direction, and is recorded as
+unreturned rather than as a result.** The distinction matters for the remedy, not for the finding:
+either way the *write* path is wrong, because a source that cannot be read must never be recorded
+as a source that returned nothing.
+
+**Recovery is available and cheap once the cause is known** — the 1,722 pages are identified by
+`counts->>'facilities' = '0'` and can be re-fetched — but re-running the refresh before the fetch is
+trusted would extend the damage rather than repair it.
