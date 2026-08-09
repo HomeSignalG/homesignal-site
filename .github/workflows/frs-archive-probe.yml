@@ -9,13 +9,13 @@
 # Delete this workflow once the question is settled.
 name: frs-archive-probe
 
+# Push-triggered on this research branch only: GitHub registers workflow_dispatch solely
+# from the default branch, and this probe is not worth a change to main.
 on:
+  push:
+    branches: [claude/maps-property-card-audit-8jbt0t]
+    paths: ['.github/workflows/frs-archive-probe.yml']
   workflow_dispatch:
-    inputs:
-      national:
-        description: 'Also inspect national_combined.zip (large)'
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -91,8 +91,7 @@ jobs:
             unzip -p tx.zip "$f" | grep -i 'MARTIN MARIETTA MATERIALS SOUTHWEST' | head -10 || echo '(none)'
           done
 
-      - name: 5 — national archive (optional)
-        if: ${{ inputs.national }}
+      - name: 5 — national archive
         run: |
           set -euo pipefail
           curl -sS -L --fail --retry 2 -o nat.zip https://ordsext.epa.gov/FLA/www3/state_files/national_combined.zip
