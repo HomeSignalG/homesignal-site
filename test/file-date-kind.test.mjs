@@ -19,7 +19,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const srcDir = join(root, 'supabase/functions/get-address-report/sources');
 const registryPath = join(root, 'supabase/functions/get-address-report/jurisdiction-registry.json');
 
-const KINDS = ['filed', 'issued', 'scheduled', 'estimated', 'decided'];
+const KINDS = ['filed', 'issued', 'scheduled', 'estimated', 'decided', 'awarded', 'completed', 'hearing'];
 // The five platform arrays index.ts actually binds. `opendatasoft` is staged data with no
 // connector (the registry's own _opendatasoft_readme says so), so it has nothing to emit.
 const LIVE_CONNECTORS = ['arcgis', 'socrata', 'ckan', 'csv', 'carto'];

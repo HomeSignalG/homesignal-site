@@ -147,7 +147,15 @@ export interface SocrataRegistryEntry {
  *  meaning is now declared per registry entry instead of inferred by the reader. Absent ⇒
  *  "filed", which is what the overwhelming majority of permit ledgers already are — so no
  *  entry needs editing to keep today's behaviour. See docs/accuracy-audit-2026-08.md §F3. */
-export type FileDateKind = "filed" | "issued" | "scheduled" | "estimated" | "decided";
+export type FileDateKind =
+  | "filed"      // an application / submission / receipt date
+  | "issued"     // a permit-issue date
+  | "scheduled"  // a planned programme date (letting, start) — routinely in the future
+  | "estimated"  // a forecast the publisher labels as such
+  | "decided"    // an approval / effective / final-action date
+  | "awarded"    // a contract-award date — a past event, not an application
+  | "completed"  // an operationally-complete date
+  | "hearing";   // a meeting / hearing date — the ONLY date some planning layers publish
 
 /** Normalized internal record — the brief's shape, carried through to development_reports.sites.
  *  `type` is the LIFECYCLE bucket the page renders (built|approved|proposed); the mapped source
