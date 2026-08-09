@@ -677,6 +677,30 @@ legal/framing change not covered by the one-time sign-off.
   `homesignalmap.html?zip=<zip>` per `development_reports` row (alongside the community pages), so
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 
+- **A ROLE WORD COMES FROM THE SOURCE, NEVER FROM A NEIGHBOURING FIELD (2026-08-09).**
+  `app_projects.parties` is `[{role,name,address?,phone?}]`, built by `app_site_parties()`
+  from the filing's OWN labelled blocks — TDLR TABS says OWNER / CONTACT / filed by /
+  DESIGN FIRM, so those are the four roles written. **Developer, Applicant, Operator and
+  Parent Company are supported role words that no wired source states, so they are never
+  written.** Adding one means finding a source that STATES it, not widening the builder.
+  *(What it replaced: `developer = coalesce(owner, src)` rendered under the single label
+  "Developer / applicant" — for a TABS filing that value is the owner, for an EPA facility
+  it is the source string. Pinned by `test/party-roles.test.mjs`.)*
+- **A MATERIALISER THAT READS ONE CONNECTOR'S KEY NAMES SILENTLY DROPS EVERY OTHER
+  CONNECTOR'S DATA (2026-08-09).** `app_refresh_zip` read `bucket` / `status_raw` only —
+  ArcGIS spellings — so all five Del Valle TABS filings lost their lifecycle (rendered as
+  the grey "On file" pin though the record says built), their status words, and their
+  dates. Lifecycle now reads `bucket` **then** `type`, the same evidence order
+  `lib/map.js::trackerSiteItem` already used, so the signed-in card and the public tracker
+  cannot disagree. **When wiring a new connector, check which key names it actually emits
+  against the materialiser — a green pipeline that writes NULL is the failure mode.**
+  Full delta + receipts: `docs/app-projects-identity-provenance-migration.sql`.
+- **AN ALWAYS-EMPTY UI SECTION IS A FALSE POSITIVE, NOT A PLACEHOLDER (2026-08-09).**
+  `impact_dimensions` is populated on 0 of 3,027,784 rows, so the quality-of-life grid
+  printed five cells reading "Not noted in the public record" on every project — a block
+  that looks like an assessment and reports nothing. It now renders ONLY when the record
+  flags something. Same rule for any tile whose data is universally absent.
+
 ### Status
 - 🟢 **PHOENIX BUILDING PERMITS wired — `phoenix-building-permits` (arcgis, registry 86 → 87);
   Maricopa development pages 40 → 97** (DB-verified 2026-07-28). The City of Phoenix Planning &

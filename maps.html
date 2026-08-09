@@ -73,6 +73,18 @@
   .qcell.on .qs{color:var(--green)}
   .ihint{font-size:11px;color:var(--ink-3);margin:11px 0 0;line-height:1.45}
   .specs.tight .row{padding:6px 0;font-size:12.5px}
+  /* "Who's behind it" — the party's town, subordinate to the name it qualifies */
+  .specs .row b .pmeta{font-weight:400;color:var(--ink-3);font-size:11.5px}
+  .specs .row b{text-align:right}
+  /* Sources & verification — the metadata sits behind a disclosure so the card stays compact */
+  .srcdet{margin-top:12px;border-top:1px solid var(--line-2);padding-top:10px}
+  .srcdet > summary{font-size:12px;font-weight:600;color:var(--green);cursor:pointer;list-style:none;
+    display:inline-flex;align-items:center;gap:6px}
+  .srcdet > summary::-webkit-details-marker{display:none}
+  .srcdet > summary::before{content:"▸";font-size:10px;transition:transform .12s ease}
+  .srcdet[open] > summary::before{transform:rotate(90deg)}
+  .srcdet > summary:focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:4px}
+  .srcdet .specs{margin-top:9px}
   .partcard{border:1px solid #f0dcbd;background:var(--amber-tint);border-radius:11px;padding:13px 14px;margin-bottom:11px}
   .partcard .pt{font-size:13.5px;font-weight:700;color:var(--ink)}
   .partcard .pd{font-size:12px;color:var(--ink-2);margin-top:3px}
@@ -876,9 +888,19 @@ HS.onReady(async function () {
       : status === 'Approved' ? 'appr' : status === 'Proposed' ? 'prop' : '';
     var summary = it.sowhat || it.plain_language || 'On file with the county — see the official record below.';
 
-    // ── 1) Project Summary
-    var specs = [['Developer / applicant', it.developer], ['Size', it.size], ['Investment', it.investment],
-      ['Jobs', it.jobs], ['Stage', it.stage], ['Distance', it.dist]]
+    // ── 1) PROJECT / DEVELOPMENT — what the record says about the project itself.
+    // Corporate roles moved OUT of here into their own "Who's behind it" section: the
+    // old single row was labelled "Developer / applicant" while the value was whatever
+    // `developer` happened to hold — for a TDLR filing that is the OWNER, and for an EPA
+    // facility it is the SOURCE STRING. One label standing in for three different roles
+    // is a misattribution, so the label now comes from the source's own role word.
+    // `stage` is the source's OWN status words ("Inspection Complete", "CC Pending");
+    // it only earns a row when it says something the normalized status doesn't.
+    var stageRow = (it.stage && String(it.stage).toLowerCase() !== String(status).toLowerCase()) ? it.stage : '';
+    var specs = [['Address', it.address], ['Status as filed', stageRow],
+      ['Size', it.size], ['Investment', it.investment], ['Jobs', it.jobs],
+      ['Start date', fmtDay(it.start_date)], ['End date', fmtDay(it.end_date)],
+      ['Distance', it.dist]]
       .filter(function (r) { return r[1]; })
       .map(function (r) { return '<div class="row"><span>' + HS.esc(r[0]) + '</span><b>' + HS.esc(r[1]) + '</b></div>'; }).join('');
     var summaryHTML = '<div class="isum">'
@@ -900,26 +922,57 @@ HS.onReady(async function () {
       radiusMi: opts.radiusMi,
       meeting: wMtg
     });
+    // ── 1b) WHO'S BEHIND IT — one row per role the SOURCE ITSELF names.
+    // `parties` is [{role,name,address?,phone?}] built by app_site_parties() from the
+    // filing's own labelled blocks (TDLR: OWNER / CONTACT / filed by / DESIGN FIRM).
+    // Developer, Applicant, Operator and Parent Company are supported role words that
+    // no wired source states today, so they simply never appear — an absent role is
+    // absent, never filled from a neighbouring one. The section itself is omitted when
+    // the record names nobody, rather than rendering an empty shell.
+    // Only the party's NAME and its city/state are shown; the full mailing address and
+    // phone stay in the record (same restraint the property page already applies).
+    var parties = Array.isArray(it.parties) ? it.parties.filter(function (p) { return p && p.name; }) : [];
+    var whoHTML = '';
+    if (parties.length) {
+      whoHTML = '<div class="isec"><h4>Who\'s behind it</h4><div class="specs tight">'
+        + parties.map(function (p) {
+            var where = cityState(p.address);
+            return '<div class="row"><span>' + HS.esc(p.role || 'On the filing') + '</span>'
+              + '<b>' + HS.esc(p.name) + (where ? ' <span class="pmeta">' + HS.esc(where) + '</span>' : '') + '</b></div>';
+          }).join('')
+        + '</div><p class="ihint">Names and roles exactly as filed. We show a role only when the '
+        + 'record names it — we never infer a developer, operator or parent company.</p></div>';
+    }
+
     var whyHTML = '<div class="isec"><h4>Why this matters</h4>' + HS.whyQaHTML(wd) + '</div>';
     var knowHTML = '<div class="isec"><h4>What we know</h4>' + HS.whyKnowHTML(wd) + '</div>';
     var unknownHTML = '<div class="isec"><h4>What we don\'t know yet</h4>' + HS.whyUnknownHTML(wd) + '</div>';
 
     // ── 3) Potential Quality of Life Impacts (Air / Water / Soil / Noise / Light)
+    // GATED (2026-08-09): the grid renders ONLY when the record actually flags something.
+    // `impact_dimensions` is empty on every stored row, so an ungated grid printed five
+    // cells reading "Not noted in the public record" on every project — a section that
+    // looks like a measurement and reports nothing. An empty section is worse than no
+    // section: it implies the five lenses were assessed and came back clear. When a
+    // record does carry dimensions the block is byte-identical to before.
     var q = HS.qolOf(it);
-    var qolHTML = '<div class="isec"><h4>Potential quality-of-life impacts</h4><div class="qolgrid">'
-      + HS.QOL.map(function (cat) {
-          var dim = q[cat], on = !!dim;
-          var sub = on ? (HS.esc(dim.label || cat) + (dim.dir === 'down' ? ' ↓' : ' ↑')) : 'Not noted in the public record';
-          return '<div class="qcell' + (on ? ' on' : '') + '"><div class="qn"><span class="qd"></span>' + cat + '</div><div class="qs">' + sub + '</div></div>';
-        }).join('')
-      + '</div>';
     // Other recorded effects that aren't one of the five QoL lenses (traffic, tax base, value…)
     var others = (it.impact_dimensions || it.impacts || []).filter(function (d) { return !anyQol(d); });
-    if (others.length) qolHTML += '<div style="margin-top:11px">' + HS.tpl.impactChips(others) + '</div>';
     var anyFlagged = Object.keys(q).length;
-    qolHTML += '<p class="ihint">' + (anyFlagged
-      ? 'These are the impacts this project\'s own public record calls out — a quick read, not the fine print. The official record has the specifics.'
-      : 'This project\'s public record doesn\'t call out quality-of-life impacts yet. We only show what\'s actually on file — we never guess from the project type.') + '</p></div>';
+    var qolHTML = '';
+    if (anyFlagged || others.length) {
+      qolHTML = '<div class="isec"><h4>Potential quality-of-life impacts</h4><div class="qolgrid">'
+        + HS.QOL.map(function (cat) {
+            var dim = q[cat], on = !!dim;
+            var sub = on ? (HS.esc(dim.label || cat) + (dim.dir === 'down' ? ' ↓' : ' ↑')) : 'Not noted in the public record';
+            return '<div class="qcell' + (on ? ' on' : '') + '"><div class="qn"><span class="qd"></span>' + cat + '</div><div class="qs">' + sub + '</div></div>';
+          }).join('')
+        + '</div>';
+      if (others.length) qolHTML += '<div style="margin-top:11px">' + HS.tpl.impactChips(others) + '</div>';
+      qolHTML += '<p class="ihint">' + (anyFlagged
+        ? 'These are the impacts this project\'s own public record calls out — a quick read, not the fine print. The official record has the specifics.'
+        : 'This project\'s public record doesn\'t call out quality-of-life impacts yet. We only show what\'s actually on file — we never guess from the project type.') + '</p></div>';
+    }
 
     // ── 4) Timeline
     var thread = buildTimeline(it);
@@ -932,9 +985,28 @@ HS.onReady(async function () {
     var full = pinHref(it);
     if (full && !full.ext) evParts += '<button class="btn" onclick="location.href=\'' + HS.esc(full.url) + '\'">See the full project page →</button>';
     if (!evParts) evParts = '<p class="ihint">This item doesn\'t link to an online record yet — it was reported through an official feed that doesn\'t publish a web page for it.</p>';
-    var evHTML = '<div class="isec"><h4>Evidence</h4><div class="doact">' + evParts + '</div>'
+    // The link stays on the surface; the METADATA that backs it sits behind a disclosure,
+    // so the primary card is not buried in provenance. Every line below is read from the
+    // record's own `provenance` object — nothing is derived, and an absent key prints no row.
+    var pv = (it.provenance && typeof it.provenance === 'object') ? it.provenance : {};
+    var srcRows = [
+      ['Source', pv.src || pv.jurisdiction],
+      ['Jurisdiction', (pv.src && pv.jurisdiction) ? pv.jurisdiction : ''],
+      ['Case / filing no.', pv.case_number],
+      ['Filed', it.submitted_at ? (fmtDay(it.submitted_at) + (it.date_kind ? ' (' + it.date_kind + ')' : '')) : ''],
+      ['Record link points to', URL_PRECISION[pv.url_precision] || ''],
+      ['Location precision', GEO_PRECISION[pv.geo_precision] || ''],
+      ['Feed', pv.source_class],
+      ['Last refreshed', pv.refreshed_at ? fmtDay(String(pv.refreshed_at).slice(0, 10)) : ''],
+      ['Pipeline', pv.source_vintage]
+    ].filter(function (r) { return r[1]; })
+     .map(function (r) { return '<div class="row"><span>' + HS.esc(r[0]) + '</span><b>' + HS.esc(r[1]) + '</b></div>'; }).join('');
+    var evHTML = '<div class="isec"><h4>Sources &amp; verification</h4><div class="doact">' + evParts + '</div>'
       + '<p class="ihint">Every item on this map traces to a public record — HomeSignal reports the fact and the link, never a verdict.'
-      + (it.approx ? ' Some details are still preliminary while county records sync — the official record is the source of truth.' : '') + '</p></div>';
+      + (it.approx ? ' Some details are still preliminary while county records sync — the official record is the source of truth.' : '') + '</p>'
+      + (srcRows ? '<details class="srcdet"><summary>Where this came from</summary>'
+          + '<div class="specs tight">' + srcRows + '</div></details>' : '')
+      + '</div>';
 
     // ── 6) Public Participation (actions for the same matched hearing that
     // answered "Can I still participate?" above — one source, no drift).
@@ -964,7 +1036,7 @@ HS.onReady(async function () {
     panel.classList.add('idetail');
     var backLabel = opts.view === 'changed' ? '← Recent changes' : '← All nearby projects';
     panel.innerHTML = '<button class="backbtn" id="infoBack" aria-label="Back to the list">' + backLabel + '</button>'
-      + summaryHTML + whyHTML + qolHTML + knowHTML + unknownHTML + timelineHTML + evHTML + partHTML;
+      + summaryHTML + whoHTML + whyHTML + qolHTML + knowHTML + unknownHTML + timelineHTML + evHTML + partHTML;
     var back = panel.querySelector('#infoBack');
     back.onclick = function () {
       panel.classList.remove('idetail'); clearSelection();
@@ -974,11 +1046,47 @@ HS.onReady(async function () {
     back.focus({ preventScroll: true });   // detail opened: focus starts at the way back
   }
 
+  // A calendar day the record states, rendered as a day. HS.fmtDate parses a bare
+  // "YYYY-MM-DD" as UTC midnight and then formats it in the reader's zone, which shows
+  // the previous day west of Greenwich; anchoring at noon makes the printed day equal
+  // the filed day in every zone. Local to this panel — HS.fmtDate itself is shared with
+  // pages outside this change and is left alone.
+  function fmtDay(v) {
+    if (!v) return '';
+    var s = String(v);
+    return HS.fmtDate(/^\d{4}-\d{2}-\d{2}$/.test(s) ? s + 'T12:00:00' : s,
+                      { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+  // "…, FREMONT, California 94555" -> "Fremont, California". The full mailing address and
+  // phone stay in the record: a party's town is orientation, their postal address is not.
+  // Returns '' when the string has no recognisable city/state tail — never a guess.
+  function cityState(addr) {
+    var m = /,\s*([A-Za-z .'-]+),\s*([A-Za-z .]{2,})\b[^,]*$/.exec(String(addr || ''));
+    if (!m) return '';
+    var city = m[1].trim().replace(/\S+/g, function (w) { return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); });
+    return city + ', ' + m[2].trim();
+  }
+  // Plain-language readings of the two source-quality keys the engine stamps. An
+  // unrecognised value prints no row rather than being echoed raw at a resident.
+  var URL_PRECISION = {
+    record:  'this exact filing',
+    dataset: 'the agency’s record search (no per-filing page published)'
+  };
+  var GEO_PRECISION = {
+    point:        'the filed parcel location',
+    jurisdiction: 'the whole jurisdiction — not a street address'
+  };
+
   // Timeline milestones derived ONLY from real dates on the record + a matched hearing.
   function buildTimeline(it) {
     var out = [];
     if (it.submitted_at) out.push({ date: HS.fmtDate(it.submitted_at, { year: 'numeric', month: 'long', day: 'numeric' }), title: 'Filed with the county', link: 'this filing is what put it on your map' });
     else if (it.occurred_at) out.push({ date: HS.fmtDate(it.occurred_at, { year: 'numeric', month: 'long', day: 'numeric' }), title: 'Recorded', link: '' });
+    // Project start/end as the SOURCE states them — never inferred from the filing date,
+    // and deliberately worded "on file" because a stated end date is what the record
+    // claims, not an independent confirmation that the work finished.
+    if (it.start_date) out.push({ date: fmtDay(it.start_date), title: 'Project start on file', link: '' });
+    if (it.end_date) out.push({ date: fmtDay(it.end_date), title: 'Project end on file', link: '' });
     if (it.stage) out.push({ date: it.status ? it.status : 'Current', title: it.stage, link: '' });
     var mtg = HS.bestMeeting(meetings, it.id);   // soonest UPCOMING first, else latest held
     if (mtg) {
