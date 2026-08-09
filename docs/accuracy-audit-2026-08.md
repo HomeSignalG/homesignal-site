@@ -1855,3 +1855,103 @@ those close.
 ⚠️ **Nothing in §R is deployed yet.** Registry edits only, 91/91 green. Each needs the full TxDOT
 sequence — merge, deploy, re-cache, measure after-state against prediction — before any of it can be
 called done.
+
+---
+
+# §S — The three value probes close (montgomery is NOT a fourth wrong column), and the re-cache pipeline is measured to be the real blocker
+
+§R merged as PR #656 (squash `3344689`) and deployed from `main` at **2026-08-09 19:51:52Z**
+(`deploy-edge-functions` run 31332765014, success; edge-function **version 197**). The measurement
+half of that ruling could not be completed, for a reason that is itself the largest finding of this
+pass and is documented in §S2.
+
+## S1. The three value probes — all three resolved, and the one flagged as a fourth wrong column is not
+
+The founder's flag was that `montgomery-county-pa-act247-proposals` "offers `Received_Date` against
+the `Entry_Date` in use, which may be a fourth wrong column" — the same shape as TxDOT and MassDOT.
+It is not, and the probe is decisive rather than suggestive: **the two columns are the same event.**
+
+| entry | verdict | kind | the receipt (live, 2026-08-09) |
+|---|---|---|---|
+| `montgomery-county-pa-act247-proposals` | **correct column — NOT a fourth wrong column** | `filed` | `Entry_Date` is `Received_Date` truncated to midnight on **8 of 8** newest rows: `1785888000000` = 2026-08-05 vs `"8/5/2026 1:54:17 PM"`; `1785715200000` = 2026-08-03 vs `"8/3/2026 6:12:25 PM"`; `1785369600000` = 2026-07-30 vs `"7/30/2026 12:00:00 AM"`; `1785110400000` = 2026-07-27 vs `"7/27/2026 3:27:37 PM"` |
+| `desoto-county-permits` | **correct column** | `issued` | `Date` is the date-typed rendering of Accela's own `AISSDT` (B1 issue date): `AISSDT 20180629.0 → Date 1530230400000` = 2018-06-29, `AISSDT 20180628.0 → Date 1530144000000` = 2018-06-28 |
+| `weld-county-site-plan-review` | **correct column** | `decided` | complete `PER_STATUS` vocabulary is 3 values summing to the layer's 434 rows — `Recorded` 432, `" Recorded"` 1, `" "` 1 — and only `Recorded` is mapped, so every emitted record is a recorded plan; `DATE_` sits beside `RECP_NUM` and lags the case vintage (`SPR15-0017` / `RECP_NUM 4215393` → `DATE_` 2016-06-29) |
+
+**Why the montgomery result is not just a negative.** `Entry_Date` is also the *better* of the two
+columns, which is the opposite of the TxDOT/MassDOT pattern where the unused column was better:
+it is `esriFieldTypeDate`, while `Received_Date` is a `String(50)` whose values are
+format-inconsistent inside one column — its min is `"01/02/2007"` and its max
+`"9/9/2022 3:09:09 PM"`, i.e. a lexicographic pair that is not a range at all. Population is a
+statistical tie (7,198 vs 7,201). **Standing answer: an unused date column beside the one in service
+is a lead, not a defect — three of the five leads this audit chased turned out to be wrong columns
+and this one did not. Compare the VALUES on the same rows before concluding either way.**
+
+**Positive control on the montgomery probe (Rule 13).** The probe's scope had to be shown to be the
+connector's. Production's oldest is **2021-08-09** against the entry's `recency_days: 1825`
+measured from 2026-08-09 = **2021-08-10** (one day, timezone), and production's newest,
+**2026-08-05**, is the layer's own maximum. The window is enforced, on this column.
+
+**Correction carried into the desoto record.** Its production reading of "0 records in the last 30
+days" is **not** a truncation on our side — the layer's own `max(Date)` is 2026-06-30 over 5,616
+rows with `Date` populated on 100% of them, and production carries the identical
+2015-01-09 → 2026-06-30 range. That is the source's freshness, and the entry is correct.
+
+**Left open, deliberately:** weld's production floor is the Excel-zero sentinel `1899-12-30` on a
+handful of rows (§A2). That is a source-side null rendered as a date and needs a **value-level**
+filter, not a column change — a code change, so it is recorded, not taken.
+
+**State of the classification: 38 of 170 entries now declare an explicit kind.** Every entry the
+audit flagged as ambiguous is resolved. What remains is the **69 `issued`** spot-checks and then
+piece (c).
+
+## S2. 🔴 THE RE-CACHE PIPELINE IS DELIVERING ~2% OF WHAT IT FIRES — this is why no after-state could be measured
+
+The §R after-state was to be measured on 779 pages (massdot 624 · cook-county 127 · butler 16 ·
+sheridan 12). All 779 were queued into `dev_refresh_targets` and the first 120 fired. **None
+landed.** Measured over the last 40 minutes, across both the 15-minute cron tick and my own batch:
+
+| fired at | fired | HTTP 200 | 503 `BOOT_ERROR` | client timeout at exactly 90,000 ms |
+|---|---:|---:|---:|---:|
+| 19:45 (cron `dev_refresh_tick`) | 250 | **0** | 55 | 195 |
+| 19:53 (this session, `dev_refresh_fire_targets(120)`) | 120 | **0** | 16 | 104 |
+
+**370 fired, 0 collected.** Two independent causes, both measured, neither caused by the §R deploy:
+
+1. **Our client gives up before the server finishes.** `dev_refresh_fire_targets` and
+   `dev_refresh_fire_batch` hard-code a **90,000 ms** pg_net timeout. The edge function's own logs
+   show ZIP reports completing with **`status_code 200` at 100–155 s** (and `504` past ~150 s), on
+   the *pre-deploy* version 196. So a run that SUCCEEDS server-side is discarded client-side and
+   never reaches `dev_refresh_collect`. That is 299 of the 370.
+2. **Concurrency-driven load shedding.** 250 + 120 invocations each holding a worker for ~150 s
+   exceeds what the edge runtime will spin up; it then answers `503 {"code":"BOOT_ERROR"}` after
+   ~10.5 s. That is 71 of the 370.
+
+**Isolated positive control — the deploy is exonerated and the runtime is confirmed.** A single
+request, fired alone with a 120 s budget, did **not** return `BOOT_ERROR`: it ran and timed out —
+`Timeout of 120000 ms reached … HTTP Request/Response time: 119963.721000 ms`. The function boots;
+one ZIP simply takes longer than the pipeline allows it. (The 503s also began in the cron batch
+fired at 19:45, **six minutes before** the 19:51:52Z deploy, and version 196 was logging 200s at
+19:47 — so the failure predates version 197 in both directions.)
+
+**Independent cross-instrument confirmation, and the number that matters.** Counting from the cache
+itself rather than from the fires — `development_reports.refreshed_at` per hour over the last ten
+hours: **30, 27, 27, 21, 28, 23, 19, 17, 16, 19**. Against ~1,000 fires per hour (250 × four ticks),
+that is a **~2.3% collection rate**, and it has been that way all day, not just during this pass.
+
+**What that rate implies, stated so nobody re-derives it:**
+
+- the 779 §R pages need **~39 hours** of wall clock, not a long tail of minutes;
+- a full 12,722-ZIP sweep needs **~26 days**, so the "hourly materializer, 8.5 h sweep" mental model
+  is wrong at the *cache* layer even though it is right at the *table* layer;
+- **this is why TxDOT is still at ~2 of 666 pages** two days after its fix deployed — measured
+  cache-wide right now: 27,193 records / 666 pages, of which **27,113 are still dated (99.7%)** and
+  1,730 still fall in the last 30 days, both of which are the OLD column's signature. The fix is
+  live and correct on the pages that re-cached; the rest have not been reached.
+
+**Not fixed here, and this is the one thing that needs a decision.** Raising the pg_net timeout past
+the engine's real runtime (and lowering the batch so the runtime stops shedding) is a change to two
+`SECURITY DEFINER` functions behind a scheduled job. It changes no resident-visible content — only
+whether a refresh that already succeeded gets stored — but it is a code change to a scheduled path,
+so it stops here for a ruling. **Every remaining after-state measurement in this audit is blocked
+behind it**, including §R's, TxDOT's remaining 664 pages, Stamford `06907` and Virginia Beach
+`23451`.
