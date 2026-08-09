@@ -1,0 +1,100 @@
+# RESEARCH PROBE — read-only. Answers one question: does EPA's FRS *combined* download
+# contain an organization / company-affiliation file that Envirofacts and the ECHO REST
+# surfaces do not expose?
+#
+# Writes nothing, commits nothing, touches no HomeSignal data. It exists because the build
+# sandbox has no egress to ordsext.epa.gov and pg_net returns content as TEXT, which mangles
+# a ZIP's binary central directory. A runner can hold the bytes intact.
+#
+# Delete this workflow once the question is settled.
+name: frs-archive-probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      national:
+        description: 'Also inspect national_combined.zip (large)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Fetch the Texas combined archive
+        run: |
+          set -euo pipefail
+          URL=https://ordsext.epa.gov/FLA/www3/state_files/state_combined_tx.zip
+          echo "::group::download"
+          curl -sS -L --fail --retry 3 --retry-delay 5 -o tx.zip "$URL"
+          ls -la tx.zip
+          file tx.zip || true
+          echo "::endgroup::"
+
+      - name: 1 — FULL archive file list
+        run: |
+          set -euo pipefail
+          echo "===== unzip -l state_combined_tx.zip ====="
+          unzip -l tx.zip
+          echo
+          echo "===== entries matching the terms of interest ====="
+          unzip -Z1 tx.zip | grep -iE 'ORGANIZATION|AFFILIAT|OWNER|OPERATOR|CONTACT|ALTERNATIVE_NAME|FACILITY|PROGRAM|PARENT' \
+            || echo '(no entry matched any term)'
+
+      - name: 2 — header + sample of every candidate affiliation file
+        run: |
+          set -euo pipefail
+          CANDS=$(unzip -Z1 tx.zip | grep -iE 'ORGANIZATION|AFFILIAT|OWNER|OPERATOR|CONTACT|PARENT' || true)
+          if [ -z "$CANDS" ]; then echo 'NO ORGANIZATION/AFFILIATION-LIKE ENTRY IN THE ARCHIVE'; exit 0; fi
+          for f in $CANDS; do
+            echo "########## $f"
+            echo "--- header ---"
+            unzip -p tx.zip "$f" | head -1
+            echo "--- first 3 data rows ---"
+            unzip -p tx.zip "$f" | sed -n '2,4p'
+            echo "--- row count ---"
+            unzip -p tx.zip "$f" | wc -l
+            echo
+          done
+
+      - name: 3 — Del Valle test, FRS 110070182593 (TXI - Garfield Sand & Gravel)
+        run: |
+          set -euo pipefail
+          CANDS=$(unzip -Z1 tx.zip | grep -iE 'ORGANIZATION|AFFILIAT|OWNER|OPERATOR|PARENT' || true)
+          [ -z "$CANDS" ] && { echo 'skipped — no affiliation file'; exit 0; }
+          for f in $CANDS; do
+            echo "########## $f"
+            unzip -p tx.zip "$f" | head -1
+            # positive control first: prove the grep finds a registry id that must be present
+            echo "--- control: any row for a known Del Valle FRS id present at all? ---"
+            unzip -p tx.zip "$f" | grep -c '110070376640' || true
+            echo "--- rows for 110070182593 ---"
+            unzip -p tx.zip "$f" | grep '110070182593' || echo '(no rows)'
+          done
+
+      - name: 4 — reverse lookup, Martin Marietta company -> FRS ids
+        run: |
+          set -euo pipefail
+          CANDS=$(unzip -Z1 tx.zip | grep -iE 'ORGANIZATION|AFFILIAT|OWNER|OPERATOR|PARENT' || true)
+          [ -z "$CANDS" ] && { echo 'skipped — no affiliation file'; exit 0; }
+          for f in $CANDS; do
+            echo "########## $f"
+            echo "--- distinct MARTIN MARIETTA org-name spellings ---"
+            unzip -p tx.zip "$f" | grep -i 'MARTIN MARIETTA' | cut -c1-220 | sort -u | head -40
+            echo "--- row count for MARTIN MARIETTA ---"
+            unzip -p tx.zip "$f" | grep -ci 'MARTIN MARIETTA' || true
+            echo "--- exact 'MARTIN MARIETTA MATERIALS SOUTHWEST' rows ---"
+            unzip -p tx.zip "$f" | grep -i 'MARTIN MARIETTA MATERIALS SOUTHWEST' | head -10 || echo '(none)'
+          done
+
+      - name: 5 — national archive (optional)
+        if: ${{ inputs.national }}
+        run: |
+          set -euo pipefail
+          curl -sS -L --fail --retry 2 -o nat.zip https://ordsext.epa.gov/FLA/www3/state_files/national_combined.zip
+          ls -la nat.zip
+          unzip -l nat.zip
