@@ -2494,3 +2494,315 @@ one key removed from one entry, asserted programmatically: the whole-registry di
 
 Anything further the `issued` sweep turns up is applied the same way, with its own before-count, and
 anything with `with_date > 0` stops and goes to the founder.
+
+---
+
+## Y4. `issued` sweep, batch 2 — platform representatives
+
+Purpose: satisfy *"spot-checks across every platform before relabelling"* rather than sampling one
+platform and generalising.
+
+| platform | entry | column | verdict |
+|---|---|---|---|
+| arcgis | `denver-commercial-construction-permits` | `DATE_ISSUED` | 🟢 **PASS** |
+| carto | `philadelphia-li-permits` | `permitissuedate` | 🟢 **PASS** |
+| socrata | `buffalo-building-permits` | `issued` | ⏳ pending — my column guesses were wrong twice, so the schema is being read rather than guessed a third time |
+| ckan | `allegheny-county-asbestos-permits` | `permit_issue_date` | ⛔ **BLOCKED — upstream `502 Bad Gateway` from WPRDC**, not a query error |
+| csv | `san-diego-approved-permits` | `APPROVAL_ISSUE_DATE` | ⏳ not probed — a 15 MB file fetch; deferred rather than spent |
+
+**Denver — PASS, and the judgment is worth recording.** The layer publishes five date columns:
+`DATE_ISSUED:Date`, `DATE_RECEIVED:Date`, `FINAL_DATE:Date`, `CANCEL:Date`,
+`DATE_CO_ISSUED:String`. The registry maps `DATE_ISSUED`, which is genuinely the issue date, so the
+label is right. `DATE_RECEIVED` — a filing date — exists and would fit the slot differently. That is
+**the Stamford shape**, on which the standing ruling is *leave it*: moving to it changes what
+residents see **without correcting an error**. Recorded as a product option, not a defect.
+
+**Philadelphia — PASS.** Live rows pair `permitissuedate` `2026-08-08T19:59:48Z` with
+`status: "Issued"`, current to the day before the probe.
+
+**Allegheny — the blocker is upstream and is logged as an outage, not a finding.** WPRDC's CKAN
+returned `502 Bad Gateway` (nginx). Nothing can be concluded about the column; the check did not run
+and is recorded as not-run rather than as a pass.
+
+**Sweep tally: 4 confirmed** (savannah, bend, denver, philadelphia), **1 reclassified and dropped**
+(loudoun), **1 blocked upstream** (allegheny), **2 pending** (buffalo, san-diego), **61 not yet
+checked**. Nothing relabelled in the registry yet — confirmations ship as one batch when the sweep
+closes.
+
+## Y5. EPA FRS — four consecutive checks, still down
+
+| time (UTC) | Sheridan point | Atlanta point |
+|---|---|---|
+| 20:30 | `502 Proxy Error` | `502 Proxy Error` |
+| 20:52 | timeout at 45,000 ms | `502 Proxy Error` |
+| ~20:58 | "Failure when receiving data from the peer" | timeout at 45,000 ms |
+| ~21:02 | `502 Proxy Error` | — |
+
+**Recovered: 0 of 1,722, measured.** The refresh stays paused, and the single-page proof on 82801
+(expect facilities to return to 40) runs first when EPA answers.
+
+## Y6. `issued` sweep, batch 3 — 10 arcgis entries, all PASS
+
+Method, which is what makes the remaining 51 affordable: fetch each layer's field roster (`?f=json`)
+once and extract only the `esriFieldTypeDate*` field names. That answers both questions at once —
+does the mapped column exist and is it date-typed, and is there a competing filing column — without
+pulling rows.
+
+All ten returned HTTP 200, and in every one the mapped column **exists and is date-typed**:
+
+| entry | mapped | date-typed fields in the layer | verdict |
+|---|---|---|---|
+| `denver-residential-construction-permits` | `DATE_ISSUED` | `DATE_ISSUED`, `FINAL_DATE`, `CANCEL`, `DATE_RECEIVED` | 🟢 PASS ⚑ |
+| `minneapolis-ccs-permits` | `issueDate` | `issueDate`, `completeDate` | 🟢 PASS |
+| `detroit-building-permits` | `issued_date` | `submitted_date`, `issued_date` | 🟢 PASS ⚑ |
+| `detroit-trades-permits` | `issued_date` | `issued_date` | 🟢 PASS — sole date |
+| `detroit-demolition-permits` | `issued_date` | `issued_date` | 🟢 PASS — sole date |
+| `independence-twp-construction-permits` | `Date_Issued` | `Date_Issued`, `Date_Time_Completed` | 🟢 PASS |
+| `scottsdale-building-permits` | `IssueDate` | `IssueDate` | 🟢 PASS — sole date |
+| `columbus-building-permits` | `ISSUED_DT` | `ISSUED_DT`, `LAST_STATUS_DT` | 🟢 PASS |
+| `cleveland-issued-building-permits` | `ISSUE_DATE` | `FILE_DATE`, `ISSUE_DATE`, `PROJECT_FILE_DATE` | 🟢 PASS ⚑ |
+| `nashville-building-permits-issued` | `Date_Issued` | `Date_Entered`, `Date_Issued` | 🟢 PASS ⚑ |
+
+**⚑ = a filing column exists alongside** (`DATE_RECEIVED`, `submitted_date`, `FILE_DATE` /
+`PROJECT_FILE_DATE`, `Date_Entered`). Four of the ten. **None is a defect** — the label matches the
+column in service, which is what this sweep tests. Moving to the filing column would change what
+residents see without correcting an error: **the Stamford shape, standing ruling is leave it.**
+Logged so a later product decision has the list ready.
+
+**Sweep tally: 15 confirmed, 1 reclassified and dropped, 1 blocked upstream, 1 deferred, 51
+unchecked.** Still nothing relabelled — the batch ships when the sweep closes.
+
+---
+
+# §Z — PROPOSAL (not built): a scheduled EPA FRS probe with a queryable history
+
+Manual polling is stopped. This is the replacement, proposed for a ruling before anything is built.
+
+## Z1. Mechanism — pg_cron + pg_net, not an Edge Function and not a GitHub Action
+
+| option | why not / why |
+|---|---|
+| **pg_cron + pg_net** | **Recommended.** It is the pattern already in this repo (`dev_refresh_fire` / `dev_refresh_collect`), needs no deploy, no secret and no runner, and Postgres has egress even when the sandbox does not. |
+| Supabase Edge Function on a schedule | Needs a deploy, and would put an availability probe *behind* the same edge runtime whose `BOOT_ERROR` load-shedding and ~150 s gateway ceiling we just spent this pass diagnosing. A probe should not share a failure domain with the thing it is probing. |
+| GitHub Action | Needs a scheduled workflow plus a service-role secret to write results back, and GitHub drops scheduled runs on these repos (recorded in the ingest repo's own notes). Highest lift, least reliable. |
+
+## Z2. Where the results go — a dedicated table, and an honest answer about reuse
+
+Reusing `dev_refresh_source_failures` was floated as the lower-lift path. **It is not actually
+lower-lift, and it distorts the table.** Its shape is
+`zip NOT NULL, registry_id NOT NULL, reason NOT NULL, cached_records NOT NULL, blocked_update NOT
+NULL, seen_at, kind, detail` — every row means *"source X failed for page Y"*. An availability probe
+has **no zip and no cached_records**, so reuse means inserting placeholder values into two NOT NULL
+columns and reading them back forever knowing they are fake. Both options cost exactly one
+migration, so the "lower lift" is only lower by one new object.
+
+**Recommended:**
+
+```sql
+create table public.epa_frs_probes (
+  id          bigserial primary key,
+  probed_at   timestamptz not null default now(),
+  target      text        not null,          -- 'sheridan-rural' | 'atlanta-dense'
+  lat         double precision not null,
+  lng         double precision not null,
+  radius_mi   numeric     not null,
+  status_code integer,                        -- null when the request never completed
+  ok          boolean     not null,           -- 200 AND a parseable Results payload
+  error_msg   text,                           -- pg_net's own text on timeout / peer failure
+  request_id  bigint                          -- net._http_response id, for the raw body
+);
+```
+
+`ok` is deliberately **not** `status_code = 200`: FRS answers 200 with a `Results.Error` body on a
+process-limit refusal, so a status-only probe would report healthy during exactly the condition that
+zeroes pages.
+
+If you prefer no new table, the fallback is `dev_refresh_source_failures` with
+`registry_id='epa-frs'`, `kind='epa_probe'`, `zip='-'`, `cached_records=0` — it works, and the two
+placeholder columns are the cost.
+
+## Z3. Two targets, not one — and why that is a design point rather than caution
+
+- **`sheridan-rural`** — 44.7973 / −106.9562, radius 3 mi.
+- **`atlanta-dense`** — 33.7490 / −84.3760, radius 1 mi.
+
+FRS's failure mode is **density-dependent**: engine v13 exists because the process limit bites in
+dense areas and not rural ones. A single rural probe can read healthy while every dense page still
+returns nothing. Two points cost one extra request and cover both regimes.
+
+## Z4. Interval — every 15 minutes
+
+96 fires/day × 2 targets = 192 rows/day, and the probe is two GETs. Faster buys nothing: the 1,722
+page repair takes hours once it starts, so a 15-minute detection delay is noise against it. Slower
+risks EPA recovering and going down again inside one window, unobserved. Aligned to `*/15` off the
+paused refresh tick.
+
+## Z5. What it explicitly does NOT do
+
+**It does not un-pause the refresh, and it does not fire the 82801 proof.** It only records. Resuming
+stays a human decision, and the single-page proof stays queued behind your call — the probe's job is
+to make the moment EPA recovers *visible and timestamped*, not to act on it.
+
+Retention: prune rows older than 90 days, or leave it — at 192 rows/day the table is trivial.
+
+**Nothing above is built.** Awaiting a ruling on: mechanism, dedicated table vs reuse, and interval.
+
+## Z6. BUILT and running — first rows landed
+
+Applied as migration `epa_frs_probe_scheduled`; parked at **`docs/epa-frs-probe-migration.sql`**.
+Preconditions verified rather than assumed: **pg_cron 1.6.4** and **pg_net 0.20.3** are both already
+installed, so "no deploy, no secret, no runner" is accurate.
+
+pg_cron job **`epa-frs-probe`**, `*/15 * * * *`. The first tick was run by hand so the history starts
+now rather than at the next quarter hour, and a second tick harvested it:
+
+| id | probed_at (UTC) | target | status_code | ok | resolved_at |
+|---:|---|---|---:|---|---|
+| 1 | 2026-08-09 21:46:17 | `sheridan-rural` | **502** | false | 21:46:39 |
+| 2 | 2026-08-09 21:46:17 | `atlanta-dense` | **502** | false | 21:46:39 |
+
+**EPA FRS is still down, and it is now on the record instead of in a chat message.**
+
+Two reads worth keeping:
+
+```sql
+select * from public.epa_frs_probes order by id desc limit 20;          -- recent history
+select * from public.epa_frs_probes where ok order by probed_at limit 1; -- the FIRST recovery
+```
+
+Design points that survived into the build: `ok` is fail-closed and text-matched (never jsonb-cast —
+FRS emits invalid JSON, the v13 defect, so a cast would throw on exactly the payloads being
+observed); harvesting is keyed on `request_id`, so a late response is picked up by a later tick
+rather than lost; RLS is ON with no policy, which denies anon while leaving the service role
+unaffected — the opposite case to `development_reports`, which the page reads.
+
+**It does not un-pause the refresh and does not fire the 82801 proof.**
+
+## Y7. `issued` sweep, batch 4 — 10 arcgis entries: 9 PASS, 1 pending
+
+| entry | mapped | date-typed fields in the layer | verdict |
+|---|---|---|---|
+| `portland-building-permits` | `ISSUEDATE` | `INDATE`, `ISSUEDATE` | 🟢 PASS ⚑ |
+| `miami-building-permits` | `IssuedDate` | `BuildingFinalLastInspDate`, `FirstSubmissionDate`, `IssuedDate`, `PlanAcceptedDate`, `PlanCreatedDate`, `Statusdate` | 🟢 PASS ⚑ |
+| `tempe-building-permits` | `IssuedDate` | `AppliedDateDtm`, `IssuedDateDtm`, `CompletedDateDtm`, `StatusDateDtm`, `ExpiresDateDtm`, `COIssuedDateDtm`, `VoidDateDtm` | 🟢 PASS ⚑ |
+| `kcmo-building-permits` | `USER_Issue_Date` | `USER_Issue_Date` | 🟢 PASS — sole date |
+| `gilbert-energov-permits` | `IssuedDate` | `IssuedDate`, `ApplyDate`, `FinalDate` | 🟢 PASS ⚑ |
+| `arlington-issued-permits` | `ISSUEDATE` | `ImportDate`, `ISSUEDATE`, `FINALDATE`, `InDate` | 🟢 PASS ⚑ |
+| `harris-county-permits` | `ISSUEDDATE` | `PROJECTSUBMITDATE`, `ISSUEDDATE`, `DATECREATED` | 🟢 PASS ⚑ |
+| `kent-county-de-building-permits` | `IssueDate` | `AppDate`, `IssueDate`, `CODate`, `BuildingPlansFirstReview`, `FinanceFirstReview`, `ZoningFirstReview`, `YearDate` | 🟢 PASS ⚑ |
+| `frisco-active-building-permits` | `Issued_Date` | *(none date-typed)* | 🟢 PASS — **known STRING date** |
+| **`hartford-building-permits`** | `DateIssued` | *(none date-typed)* | ⏳ **PENDING — needs a value probe** |
+
+**Frisco's empty result is expected, not a finding.** Its `Issued_Date` is a STRING in `M/D/YYYY`,
+already documented (it is why the entry deliberately carries no `recency_days`, since that emits a
+`DATE` literal — the Anaheim standing answer), and `isoDay()` parses that form. Recorded so the null
+is not re-investigated.
+
+**Hartford is genuinely open.** Same empty result, but with no documented string-date precedent, so
+`DateIssued` is either a string this pipeline parses (frisco's case, benign) or one it does not
+(loudoun's case, which would mean the entry emits no dates at all). **That distinction needs a value
+probe and the entry stays unclassified until it has one.**
+
+⚑ = a filing column exists alongside — **7 of 10 this batch** (`INDATE`, `FirstSubmissionDate`,
+`AppliedDateDtm`, `ApplyDate`, `InDate`, `PROJECTSUBMITDATE`, `AppDate`). Same as batch 3: not
+defects, the Stamford shape, logged for a possible later product decision.
+
+**Sweep tally: 24 confirmed, 1 reclassified and dropped, 1 blocked upstream, 1 deferred, 1 pending a
+value probe, 41 unchecked.**
+
+---
+
+# §Y8 — THE `issued` SWEEP IS CLOSED: all 68 checked, all 68 confirmed, batch shipped
+
+Run to completion in one session. **68 entries carried an issue-shaped `file_date` mapping; all 68
+are confirmed and now declare `file_date_kind: "issued"`.** Nothing required a ruling; nothing fell
+into the drop class beyond loudoun (§Y2).
+
+## Y8.1. The two instruments, and why both were needed
+
+1. **Field roster** (`?f=json` / one row / CKAN `fields`) — does the mapped column exist, is it the
+   issue-named one, and is a competing filing column present.
+2. **Production emission** — `count(submitted_at)` per `registry_id` in `app_projects`. This is the
+   stronger of the two and it was run **once over all 68 at once**: it answers *does the mapped
+   column actually produce a date*, which is the question the loudoun case turned on.
+
+The roster alone would have produced **six false alarms**. Six entries returned *no* `esriFieldTypeDate`
+field — `virginia-beach`, `brunswick-county`, `little-rock`, `spokane-county`, `worcester`,
+`centre-county-pa` (plus `frisco` and `hartford`) — which looks exactly like loudoun. Every one is a
+**string date the pipeline parses**, proven by the production instrument showing them dated. Roster
+absence is not date absence.
+
+## Y8.2. Production emission across all 68 — only 7 have any gap, and none is at zero
+
+| entry | records | dated | undated | % |
+|---|---:|---:|---:|---:|
+| `topeka-building-permits` | 84,098 | 79,420 | 4,678 | 94.4 |
+| `savannah-commercial-building-permits` | 3,550 | 2,809 | 741 | 79.1 |
+| `little-rock-permits` | 48,937 | 48,531 | 406 | 99.2 |
+| `canyon-county-building-permits` | 5,672 | 5,377 | 295 | 94.8 |
+| `bozeman-building-permits` | 934 | 735 | 199 | 78.7 |
+| `louisville-active-construction-permits` | 14,265 | 14,217 | 48 | 99.7 |
+| `frisco-active-building-permits` | 1,019 | 1,016 | 3 | 99.7 |
+
+**The other 61 are 100% dated.** No entry is at 0%, so **there is no second loudoun.** The partial
+gaps are source-side and are themselves corroborating: an *issue*-date column is legitimately null on
+a permit not yet issued, whereas a filing date would be populated on every row. `hartford` was
+resolved this way without a fresh probe — **3,644 of 3,644 dated (100%)**, over a 2025-08-07 →
+2026-08-07 span that matches its own `recency_days: 365` window.
+
+## Y8.3. Batches, verdicts, and the notable resolutions
+
+| batch | platform | n | result |
+|---|---|---:|---|
+| 1–2 | mixed | 5 | savannah, bend, denver-commercial, philadelphia, buffalo — PASS |
+| 3 | arcgis | 10 | all PASS |
+| 4 | arcgis | 10 | all PASS (hartford resolved from production) |
+| 5 | arcgis | 11 | all PASS |
+| 6 | arcgis | 10 | all PASS |
+| 7 | arcgis | 10 | all PASS |
+| — | socrata | 9 | all PASS |
+| — | ckan | 3 | all PASS |
+| — | csv | 1 | PASS |
+| — | carto | 1 | PASS |
+
+- **`nyc-dobnow-approved-permits` — an absence that needed a positive control.** A one-row fetch
+  showed `issued_date` missing, because **Socrata omits null fields from JSON output**. The control:
+  `$where=issued_date IS NOT NULL&$order=issued_date DESC` → `"2026-08-07T00:00:00.000"`. The column
+  is present and current. *Standing answer: a missing key in a Socrata row is not a missing column.*
+- **`allegheny-county-asbestos-permits` — UNBLOCKED and closed.** WPRDC's `502 Bad Gateway`
+  cleared mid-sweep (noticed because a later request returned a proper JSON 404 instead of a gateway
+  error). Its CKAN field metadata carries the publisher's own note: `permit_issue_date`, type `date`,
+  *"Permit Issue Date"*. `pittsburgh-pli-permits` likewise: `issue_date`, type `date`, *"The date
+  that the permit was issued."*
+- **`san-diego-approved-permits` — closed without the 15 MB fetch.** A **ranged GET**
+  (`Range: bytes=0-1200` → HTTP 206) returned the header row. `APPROVAL_ISSUE_DATE` sits in an
+  explicit family — `APPROVAL_CREATE_DATE`, `APPROVAL_ISSUE_DATE`, `APPROVAL_CLOSE_DATE`,
+  `APPROVAL_EXPIRE_DATE` — so it is unambiguously the issue date and not the creation date, and the
+  file is `approvals_issued_2026_datasd.csv`. *Standing answer: a published CSV can be spot-checked
+  with a Range request; do not fetch the whole file to read its header.*
+- **`bentonville-catalyst-permits`** — its roster is the full two-stage set (`APPLIED`, `APPROVED`,
+  `ISSUED`, `FINALED`, `EXPIRED`) and the entry maps `ISSUED`. Correct.
+
+## Y8.4. The filing-column tally — a product list, not a defect list
+
+**~24 of the 68** publish a filing/application column alongside the issue column in service
+(`DATE_RECEIVED`, `submitted_date`, `FILE_DATE`, `Date_Entered`, `INDATE`, `AppliedDateDtm`,
+`ApplyDate`, `InDate`, `PROJECTSUBMITDATE`, `AppDate`, `APPLICATION_DATE`, `BP_ReceivedDate`,
+`received_date`, `application_start_date`, `APPROVAL_CREATE_DATE`, …). **None is a defect** — the
+label matches the column in service, which is what this sweep tests. Switching would change what
+residents see without correcting an error: **the Stamford shape, standing ruling "leave it."**
+Recorded so a future product decision has the list ready.
+
+## Y8.5. State after shipping
+
+**106 of 169 entries with a `file_date` mapping now declare an explicit kind** — `issued` 74,
+`scheduled` 8, `filed` 7, `decided` 6, `awarded` 4, `estimated` 4, `hearing` 2, `completed` 1. The
+remaining 63 inherit the documented `"filed"` default. The registry edit is **strictly additive**,
+asserted programmatically: 0 keys removed, 0 values altered, the only new key is `file_date_kind`,
+on exactly 68 entries. Suite 91/91.
+
+**Exceptions in the final tally: none.** Both entries carried as exceptions — allegheny (upstream
+outage) and san-diego (deferred fetch) — were closed inside this session.
+
+**Piece (c) — rendering the label — is now unblocked** for the first time: every entry that emits a
+date either declares a kind or inherits the default deliberately.
