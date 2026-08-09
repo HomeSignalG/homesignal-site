@@ -70,12 +70,13 @@ test('a record with no parties falls back to the legacy single field, unchanged'
 const P = () => HS.parties;
 
 test('a verified parent renders BESIDE its subsidiary, never instead of it', () => {
-  const rows = P().rowsHTML([{
-    role: 'Operator', name: 'ABC Operations LLC',
+  const rows = P().groupsHTML({ identity: [{
+    role: 'Operator', name: 'ABC Operations LLC', verification: 'VERIFIED',
+    source: 'SEC EDGAR 10-K Exhibit 21', url: 'https://www.sec.gov/x',
     parent: { verification: 'verified', name: 'ABC Holdings, Inc.',
               source: 'SEC EDGAR 10-K Exhibit 21', url: 'https://www.sec.gov/x',
               attribution: 'parent_company' }
-  }]);
+  }] });
   assert.match(rows, /Operator/, 'the role survives');
   assert.match(rows, /ABC Operations LLC/, 'the direct operating entity survives');
   assert.match(rows, /Parent company/);
@@ -85,13 +86,15 @@ test('a verified parent renders BESIDE its subsidiary, never instead of it', () 
   assert.ok(rows.indexOf('ABC Operations LLC') < rows.indexOf('ABC Holdings'),
     'the parent renders beneath the subsidiary, not in its place');
 
-  const ev = P().evidenceRows([{
+  const ev = P().evidenceEntries([{
     role: 'Operator', name: 'ABC Operations LLC',
     parent: { verification: 'verified', name: 'ABC Holdings, Inc.',
               source: 'SEC EDGAR 10-K Exhibit 21', url: 'https://www.sec.gov/x' }
   }]);
   assert.strictEqual(ev.length, 1, 'a verified parent carries its own citation');
-  assert.match(ev[0].value, /SEC EDGAR/, 'the citation names the authoritative source');
+  assert.match(ev[0].document, /SEC EDGAR/, 'the citation names the authoritative source');
+  assert.match(ev[0].role, /^Parent company of operator$/,
+    'the disclosure says WHICH relationship the parent belongs to');
 });
 
 test('an UNVERIFIED parent is never shown, however it is dressed up', () => {
@@ -107,30 +110,49 @@ test('an UNVERIFIED parent is never shown, however it is dressed up', () => {
     { verification: 'VERIFIED', name: 'Wrong Case Ltd' } // fail closed on vocabulary
   ];
   for (const parent of badParents) {
-    const rows = P().rowsHTML([{ role: 'Owner', name: 'Real Operating LLC', parent }]);
-    assert.match(rows, /Not yet verified/,
-      'unverified reads "Not yet verified": ' + JSON.stringify(parent));
+    const rows = P().entityHTML({ role: 'Owner', name: 'Real Operating LLC', parent });
+    // The card no longer prints a parent line at all unless one is verified — repeating
+    // "not yet verified" under every company is the clutter the UX pass removed. The open
+    // question is still stated, once, in Sources & verification.
+    assert.doesNotMatch(rows, /Parent company/,
+      'no parent line without verification: ' + JSON.stringify(parent));
     if (parent.name) {
       assert.ok(rows.indexOf(parent.name) === -1,
         'the unverified name must not appear anywhere: ' + parent.name);
     }
-    assert.strictEqual(P().evidenceRows([{ role: 'Owner', name: 'Real Operating LLC', parent }]).length, 0,
-      'an unverified parent contributes no evidence row');
+    const ev = P().evidenceEntries([{ role: 'Owner', name: 'Real Operating LLC', parent }]);
+    assert.strictEqual(ev.length, 0,
+      'an as-filed party with no source of its own contributes no evidence entry');
+    const sourced = P().evidenceEntries([{
+      role: 'Owner', name: 'Real Operating LLC', verification: 'HIGH_CONFIDENCE',
+      source: 'TDLR TABS owner block', url: 'https://example.gov/x', parent }]);
+    const parentEntry = sourced.find(e => /^Parent company of/.test(e.role));
+    assert.ok(parentEntry, 'the open parent question is stated in the disclosure');
+    assert.strictEqual(parentEntry.status, 'Not yet verified');
+    if (parent.name) {
+      assert.ok(JSON.stringify(sourced).indexOf(parent.name) === -1,
+        'not even the disclosure names an unverified candidate: ' + parent.name);
+    }
   }
 });
 
 test('only Owner / Developer / Operator can carry a parent', () => {
   for (const role of ['Owner', 'Developer', 'Operator']) {
     assert.ok(P().parentEligible(role), role + ' is parent-eligible');
-    assert.match(P().rowsHTML([{ role, name: 'X LLC' }]), /Parent company/,
-      role + ' shows the parent state');
+    assert.match(P().evidenceEntries([{ role, name: 'X LLC', verification: 'HIGH_CONFIDENCE',
+        source: 'TDLR TABS owner block', url: 'https://example.gov/x' }])
+      .map(e => e.role).join('|'), /Parent company of/,
+      role + ' has its parent state stated in the disclosure');
   }
   // People and service providers on the filing are not the entity behind the property,
   // so they get no parent line at all — not even "Not yet verified".
   for (const role of ['Contact', 'Filed By', 'Design Firm']) {
     assert.ok(!P().parentEligible(role), role + ' is not parent-eligible');
-    assert.doesNotMatch(P().rowsHTML([{ role, name: 'Someone' }]), /Parent company/,
+    assert.doesNotMatch(P().entityHTML({ role, name: 'Someone' }), /Parent company/,
       role + ' gets no parent line');
+    assert.doesNotMatch(P().evidenceEntries([{ role, name: 'Someone', verification: 'HIGH_CONFIDENCE',
+        source: 'TDLR TABS', url: 'https://example.gov/x' }]).map(e => e.role).join('|'),
+      /Parent company of/, role + ' is not asked the parent question in the disclosure either');
   }
 });
 
@@ -140,12 +162,12 @@ test('the role model keeps the five relationships distinct', () => {
   }
   // Four distinct companies on one property must render as four distinct rows —
   // never merged into one generic company field.
-  const rows = P().rowsHTML([
+  const rows = P().groupsHTML({ parties: [
     { role: 'Owner',     name: 'Landco LLC' },
     { role: 'Developer', name: 'Buildco Inc' },
     { role: 'Applicant', name: 'Permitco' },
     { role: 'Operator',  name: 'Runco LLC' }
-  ]);
+  ] });
   for (const n of ['Landco LLC', 'Buildco Inc', 'Permitco', 'Runco LLC']) {
     assert.ok(rows.indexOf(n) !== -1, n + ' keeps its own row');
   }

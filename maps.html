@@ -77,26 +77,54 @@
   /* ── "Who's behind it": role → entity, with the verified parent BENEATH its
         subsidiary. The parent never occupies the entity's own line — lineage is
         preserved visually as well as in the data. ── */
-  .plist .prow{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;
-    align-items:baseline;padding:9px 0;border-bottom:1px dashed var(--line)}
+  /* Stacked, not a two-column label/value grid: an entity is a small hierarchy (name →
+     evidence line → parent), and right-aligning that against a left-aligned role label
+     detaches the "↳" from what it points at. Role heading, then the companies beneath it. */
+  .plist .prow{display:block;padding:9px 0;border-bottom:1px dashed var(--line)}
   .plist .prow:last-child{border-bottom:none}
-  .plist .prole{font-size:12.5px;color:var(--ink-3)}
-  .plist .pname{font-size:12.5px;color:var(--ink);text-align:right}
+  .plist .prole{display:block;margin-bottom:5px;font-size:10px;font-weight:700;
+    letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+  .plist .pname{font-size:12.5px;color:var(--ink)}
   .plist .pname b{color:var(--ink)}
   /* the town and the parent are SUB-LINES of the entity, each on its own right-aligned
      row, so a long name never pushes them into a ragged wrap mid-sentence */
   .plist .pmeta{display:block;margin-top:2px;font-weight:400;color:var(--ink-3);font-size:11.5px}
-  .plist .pparent{display:block;margin-top:4px;font-size:11.5px;color:var(--ink-2)}
-  .plist .pparent .pplab{color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;
-    font-size:10px;font-weight:700;margin-right:5px}
-  .plist .pparent.none{color:var(--ink-3);font-style:italic}
-  /* How well the role itself is established, said in words rather than a colour alone */
+  .plist .pparent{display:block;margin-top:4px;padding-left:14px;text-indent:-14px;
+    font-size:11.5px;color:var(--ink-2)}
+  /* several entities can share one role (a regulator may list two responsible parties),
+     so the role is the row and each entity is a block inside it */
+  .plist .pents{display:block}
+  .plist .pent{display:block}
+  .plist .pent + .pent{margin-top:9px;padding-top:9px;border-top:1px dotted var(--line)}
+  .plist .pname{display:block}
+  /* the evidence line is deliberately plain language — the internal state never appears */
+  .plist .pev{display:block;margin-top:2px;font-size:11.5px;color:var(--ink-3)}
+  .plist .pev.unverified{font-style:italic}
   .plist .pver{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;
-    font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    font-size:10px;font-weight:700;letter-spacing:.04em;
     border:1px solid var(--line-2);color:var(--ink-3);vertical-align:1px;white-space:nowrap}
-  .plist .pver.vverified{color:var(--green);border-color:var(--green)}
-  .plist .psub{margin:10px 0 0;font-size:10px;font-weight:700;letter-spacing:.06em;
-    text-transform:uppercase;color:var(--ink-3)}
+  .plist .pver.verified{color:var(--green);border-color:var(--green)}
+  .plist .pparent .parr{color:var(--ink-3)}
+  .plist .pempty{margin:0;padding:4px 0;font-size:12.5px;color:var(--ink-3)}
+  /* Sources & verification — one block per relationship */
+  .srcdet .evb{padding:10px 0;border-bottom:1px dashed var(--line)}
+  .srcdet .evb:last-of-type{border-bottom:none}
+  .srcdet .evh{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+  .srcdet .evn{margin-top:2px;font-size:12.5px;color:var(--ink)}
+  .srcdet .evn .pver{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;
+    font-size:10px;font-weight:700;border:1px solid var(--line-2);color:var(--ink-3);white-space:nowrap}
+  .srcdet .evn .pver.verified{color:var(--green);border-color:var(--green)}
+  .srcdet .evnote{margin:4px 0 0;font-size:11.5px;line-height:1.45;color:var(--ink-3)}
+  .srcdet .evnote.standalone{margin-top:10px;padding-top:9px;border-top:1px solid var(--line-2)}
+  .srcdet .evlink{display:inline-block;margin-top:6px;font-size:11.5px;color:var(--green)}
+  /* narrow screens: the disclosure's own label/value rows stack so a long agency name and
+     a long record description never collide in two half-width columns */
+  @media(max-width:700px){
+    /* .specs .row is flex/space-between; at this width the agency name and the record
+       description have no room side by side, so the value drops under its label. */
+    .srcdet .evb .specs .row{display:block}
+    .srcdet .evb .specs .row b{display:block;margin-top:1px;text-align:left}
+  }
   /* Sources & verification — the metadata sits behind a disclosure so the card stays compact */
   .srcdet{margin-top:12px;border-top:1px solid var(--line-2);padding-top:10px}
   .srcdet > summary{font-size:12px;font-weight:600;color:var(--green);cursor:pointer;list-style:none;
@@ -623,31 +651,42 @@ HS.onReady(async function () {
   // development detail and the facility detail. Two copies would eventually disagree about
   // who a record belongs to, and a facility is exactly where the answer matters most — the
   // regulator's operator for "TXI - Garfield Sand & Gravel" is a Martin Marietta entity.
-  // Returns {html, evidence:[{label,value,url}]}; empty html when nobody is named.
+  // Returns {html, evidence:[entry]}; the html is always present — a record with no party
+  // information says so in one line rather than vanishing, so the reader can tell "we have
+  // not found this yet" apart from "this section does not apply".
   function whoSection(it) {
-    var resolved = HS.parties.identity(it);
-    var filed = HS.parties.filed(it);
-    var all = resolved.concat(filed);
-    if (!all.length) return { html: '', evidence: [] };
+    var all = HS.parties.identity(it).concat(HS.parties.filed(it));
     return {
-      html: '<div class="isec"><h4>Who\'s behind it</h4><div class="plist">'
-        + HS.parties.rowsHTML(resolved)
-        + (resolved.length && filed.length ? '<div class="psub">Also named on the filing</div>' : '')
-        + HS.parties.rowsHTML(filed)
-        + '</div><p class="ihint">Names and roles exactly as the record states them. A role appears '
-        + 'only when a source names it — never read off the site\'s name — and a parent company only '
-        + 'when an authoritative corporate record establishes it. We never infer one from shared '
-        + 'people, shared investors, a similar name or news coverage.</p></div>',
-      evidence: HS.parties.evidenceRows(all)
+      html: '<div class="isec"><h4>Who\'s behind this property</h4><div class="plist">'
+        + HS.parties.groupsHTML(it) + '</div></div>',
+      evidence: HS.parties.evidenceEntries(all)
     };
   }
-  function evidenceRowsHTML(rows) {
-    return (rows || []).map(function (r) {
-      var v = r.url
-        ? '<a href="' + HS.esc(r.url) + '" target="_blank" rel="noopener">' + HS.esc(r.value) + ' ▸</a>'
-        : HS.esc(r.value);
-      return '<div class="row"><span>' + HS.esc(r.label) + '</span><b>' + v + '</b></div>';
+  // The disclosure: one block per relationship, with the agency, the document, the dates and
+  // the link. Consumer fields only — no record ids, no internal state strings.
+  function evidenceRowsHTML(entries) {
+    if (!entries || !entries.length) return '';
+    var anyReported = entries.some(function (e) { return e.status === 'Reported'; });
+    var blocks = entries.map(function (e) {
+      // fmtDay, not HS.fmtDate: the shared formatter drops the year ("Jul 28"), and a
+      // filing date without a year is useless for judging how current a relationship is.
+      var meta = [['Source', e.org], ['Record', e.document],
+                  ['Filing date', fmtDay(e.filed)],
+                  ['Checked', fmtDay(String(e.retrieved || '').slice(0, 10))]]
+        .filter(function (r) { return r[1]; })
+        .map(function (r) { return '<div class="row"><span>' + HS.esc(r[0]) + '</span><b>' + HS.esc(r[1]) + '</b></div>'; })
+        .join('');
+      return '<div class="evb"><div class="evh">' + HS.esc(e.role) + '</div>'
+        + '<div class="evn"><b>' + HS.esc(e.entity) + '</b>'
+        + (e.status ? ' <span class="pver ' + HS.esc(e.tone) + '">' + (e.tone === 'verified' ? '✓ ' : '') + HS.esc(e.status) + '</span>' : '')
+        + '</div>'
+        + (e.note ? '<p class="evnote">' + HS.esc(e.note) + '</p>' : '')
+        + (meta ? '<div class="specs tight">' + meta + '</div>' : '')
+        + (e.url ? '<a class="evlink" href="' + HS.esc(e.url) + '" target="_blank" rel="noopener">View the source record ▸</a>' : '')
+        + '</div>';
     }).join('');
+    return blocks
+      + (anyReported ? '<p class="evnote standalone">' + HS.esc(HS.parties.REPORTED_EXPLAINER) + '</p>' : '');
   }
 
   function renderFacilityDetail(f, letter) {
@@ -669,8 +708,8 @@ HS.onReady(async function () {
       + (specs ? '<div class="specs tight" style="margin-top:12px">' + specs + '</div>' : '')
       + '</div>'
       + who.html
-      + (evRows ? '<details class="srcdet"><summary>Where this came from</summary>'
-          + '<div class="specs tight">' + evRows + '</div></details>' : '')
+      + (evRows ? '<details class="srcdet"><summary>Sources &amp; verification</summary>'
+          + evRows + '</details>' : '')
       + '<div class="isec"><button class="btn primary" onclick="location.href=\'development.html?id=' + encodeURIComponent(f.id) + '\'">Open the full facility record ▸</button></div>';
     var back = panel.querySelector('#infoBack');
     back.onclick = function () { panel.classList.remove('idetail'); clearSelection(); };
@@ -1067,7 +1106,8 @@ HS.onReady(async function () {
       + '<p class="ihint">Every item on this map traces to a public record — HomeSignal reports the fact and the link, never a verdict.'
       + (it.approx ? ' Some details are still preliminary while county records sync — the official record is the source of truth.' : '') + '</p>'
       + ((srcRows || parentRows) ? '<details class="srcdet"><summary>Where this came from</summary>'
-          + '<div class="specs tight">' + srcRows + parentRows + '</div></details>' : '')
+          + (srcRows ? '<div class="specs tight">' + srcRows + '</div>' : '')
+          + parentRows + '</details>' : '')
       + '</div>';
 
     // ── 6) Public Participation (actions for the same matched hearing that
