@@ -1775,3 +1775,83 @@ same shape.
 
 **34 of 172 entries now declare an explicit kind** (11 before this pass + 23 here). Remaining:
 **69 `issued`** (spot-checks below) and **8 unresolved** — 5 flagged above, 3 awaiting a value probe.
+
+---
+
+# §R — The two wrong columns fixed, the two false dates dropped, and a correction to §Q
+
+## R1. `massdot-highway-projects` — the largest wrong column yet (92,315 records / 624 pages)
+
+Population measured live on every candidate over the layer's 24,045 rows **before** choosing:
+
+| column | populated | share | note |
+|---|---:|---:|---|
+| `From_Date` ← was in use | 24,045 | **100%** | paired with a `To_Date` that is **0 of 24,045** |
+| `ReadinessDate` | 13,161 | 54.7% | `M/D/YYYY` string; vague meaning |
+| **`ScheduledAdDate`** ← **chosen** | **13,020** | **54.2%** | ISO string, real span **1992-12-31 → 2050-10-02** |
+| `PrcApprovedDate` | 12,862 | 53.5% | |
+| `bidOpenedDate` | 5,174 | 21.5% | |
+| `completeDateApproved` | 5,081 | 21.1% | |
+| `ntpDate` | 5,037 | 21.0% | |
+| `To_Date` | **0** | 0% | |
+
+**`From_Date` with an entirely empty `To_Date` is a record-validity range, not a project event** —
+and production agrees: a round **2023-01-01** floor and **0 records in the last 30 days** on a live
+state programme. Live min/max on `From_Date` confirms the floor exactly (epoch ms 1672531200000 =
+2023-01-01).
+
+Chose `ScheduledAdDate` over `ReadinessDate` on **meaning at a statistical tie** (13,020 vs 13,161).
+Its 1992→2050 span is a real programme history; `From_Date`'s is a bulk-set floor. It is an
+**ISO-format STRING** and this entry has **no `recency_days`**, so there is no DATE-literal
+lexicographic hazard (the nyc-dob defect class). `date_kind: "scheduled"`.
+
+**~46% of records will become undated. That is intended**, per the TxDOT precedent, and it is
+recorded in the entry's `_receipts` with a do-not-revert.
+
+## R2. ⚠️ CORRECTION TO §Q — Cook County's `start` is NOT a usable column
+
+§Q flagged `cook-county-il-highway-construction-program` as a wrong column *and named `start` as the
+better one*. **Measuring before applying disproved that.** A live min/max probe on `start` returned:
+
+```
+{"a": "Fall 2025", "b": "Summer 2026"}
+```
+
+**Season strings.** `isoDay()` cannot parse them, so `start` would emit nothing. The layer's only
+other dates are `CreationDate` and `EditDate` — both ArcGIS system timestamps, and `CreationDate`'s
+403 records all sit inside one 10-week band (2026-04-14 → 2026-06-25), a load batch.
+
+**So Cook County is not a wrong-column fix, it is a drop:** the source publishes **no parseable event
+date**. Mapping removed, positive receipt recorded. *This is exactly why the ruling's "measure
+population on all candidates" step exists — the §Q flag would have shipped a column that produces
+zero records.*
+
+## R3. Two false dates dropped (founder ruling)
+
+| entry | records / pages | what was being shown | why dropping is error-correction |
+|---|---:|---|---|
+| `sheridan-county-building-permits` | 6,492 / 12 | **`1970-01-01` on every record** — min = max in production, the Unix epoch from an integer `Year` coerced to a timestamp | the layer publishes `Year` and **nothing else**. A false date removed, not a date removed. |
+| `butler-county-ks-permits` | 1,216 / 15 | `CreationDate`, the ArcGIS row-creation field | the layer offers only `CreationDate`, `EditDate`, `soilprofile` — **no event date exists**. Floor 2026-01-08 with 116 in the last 30 days and no recency window: a load batch. |
+
+Both carry a positive receipt — *"the source publishes no event date; undated is correct"* — with an
+explicit do-not-remap, in the same form as §H3.
+
+## R4. `stamford-major-developments` — left alone, per ruling
+
+`decided` is truthful and now declared. The layer does offer filing columns
+(`USER_ZB_application__`, `USER_FIL_received`, `USER_Shared_received`); moving to one changes what
+residents see **without correcting an error**, so it is recorded here as a future product option and
+not taken inside a remediation pass.
+
+## R5. State after this pass
+
+**35 of 170 entries declare an explicit kind** (172 declared a `file_date` before this pass; 2 have
+now had the mapping dropped, so the denominator moves to 170, and `massdot` joins the classified
+set). Still open: **69 `issued`** (spot-checks not started), **3 needing a value probe** (`desoto`
+`Date`, `weld-county` `DATE_`, `montgomery-county-pa` `Entry_Date` vs the layer's own
+`Received_Date` — a possible fourth wrong column), and **piece (c)**, which stays blocked until
+those close.
+
+⚠️ **Nothing in §R is deployed yet.** Registry edits only, 91/91 green. Each needs the full TxDOT
+sequence — merge, deploy, re-cache, measure after-state against prediction — before any of it can be
+called done.
