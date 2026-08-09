@@ -90,6 +90,13 @@
   .plist .pparent .pplab{color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;
     font-size:10px;font-weight:700;margin-right:5px}
   .plist .pparent.none{color:var(--ink-3);font-style:italic}
+  /* How well the role itself is established, said in words rather than a colour alone */
+  .plist .pver{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;
+    font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    border:1px solid var(--line-2);color:var(--ink-3);vertical-align:1px;white-space:nowrap}
+  .plist .pver.vverified{color:var(--green);border-color:var(--green)}
+  .plist .psub{margin:10px 0 0;font-size:10px;font-weight:700;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ink-3)}
   /* Sources & verification — the metadata sits behind a disclosure so the card stays compact */
   .srcdet{margin-top:12px;border-top:1px solid var(--line-2);padding-top:10px}
   .srcdet > summary{font-size:12px;font-weight:600;color:var(--green);cursor:pointer;list-style:none;
@@ -612,11 +619,44 @@ HS.onReady(async function () {
     openPanel();
     var p = document.getElementById('infoPanel'); if (p) p.scrollTop = 0;
   }
+  // ONE builder for the corporate-roles section and its citations, used by BOTH the
+  // development detail and the facility detail. Two copies would eventually disagree about
+  // who a record belongs to, and a facility is exactly where the answer matters most — the
+  // regulator's operator for "TXI - Garfield Sand & Gravel" is a Martin Marietta entity.
+  // Returns {html, evidence:[{label,value,url}]}; empty html when nobody is named.
+  function whoSection(it) {
+    var resolved = HS.parties.identity(it);
+    var filed = HS.parties.filed(it);
+    var all = resolved.concat(filed);
+    if (!all.length) return { html: '', evidence: [] };
+    return {
+      html: '<div class="isec"><h4>Who\'s behind it</h4><div class="plist">'
+        + HS.parties.rowsHTML(resolved)
+        + (resolved.length && filed.length ? '<div class="psub">Also named on the filing</div>' : '')
+        + HS.parties.rowsHTML(filed)
+        + '</div><p class="ihint">Names and roles exactly as the record states them. A role appears '
+        + 'only when a source names it — never read off the site\'s name — and a parent company only '
+        + 'when an authoritative corporate record establishes it. We never infer one from shared '
+        + 'people, shared investors, a similar name or news coverage.</p></div>',
+      evidence: HS.parties.evidenceRows(all)
+    };
+  }
+  function evidenceRowsHTML(rows) {
+    return (rows || []).map(function (r) {
+      var v = r.url
+        ? '<a href="' + HS.esc(r.url) + '" target="_blank" rel="noopener">' + HS.esc(r.value) + ' ▸</a>'
+        : HS.esc(r.value);
+      return '<div class="row"><span>' + HS.esc(r.label) + '</span><b>' + v + '</b></div>';
+    }).join('');
+  }
+
   function renderFacilityDetail(f, letter) {
     var panel = document.getElementById('infoPanel');
     panel.classList.add('idetail');
     var interp = HS.fac.interpret(f.facility_env || null);
     var line = interp ? interp.line : 'Permit status not yet confirmed — open the facility record.';
+    var who = whoSection(f);
+    var evRows = evidenceRowsHTML(who.evidence);
     var specs = [['EPA registry ID', f.registry_id], ['Distance', f.dist]]
       .filter(function (r) { return r[1]; })
       .map(function (r) { return '<div class="row"><span>' + HS.esc(r[0]) + '</span><b>' + HS.esc(r[1]) + '</b></div>'; }).join('');
@@ -628,6 +668,9 @@ HS.onReady(async function () {
       + (interp && interp.caveat ? '<p class="sowhat">' + HS.esc(interp.caveat) + '</p>' : '')
       + (specs ? '<div class="specs tight" style="margin-top:12px">' + specs + '</div>' : '')
       + '</div>'
+      + who.html
+      + (evRows ? '<details class="srcdet"><summary>Where this came from</summary>'
+          + '<div class="specs tight">' + evRows + '</div></details>' : '')
       + '<div class="isec"><button class="btn primary" onclick="location.href=\'development.html?id=' + encodeURIComponent(f.id) + '\'">Open the full facility record ▸</button></div>';
     var back = panel.querySelector('#infoBack');
     back.onclick = function () { panel.classList.remove('idetail'); clearSelection(); };
@@ -951,16 +994,13 @@ HS.onReady(async function () {
     // the record names nobody, rather than rendering an empty shell.
     // Only the party's NAME and its city/state are shown; the full mailing address and
     // phone stay in the record (same restraint the property page already applies).
-    var parties = HS.parties.list(it);
-    var whoHTML = '';
-    if (parties.length) {
-      whoHTML = '<div class="isec"><h4>Who\'s behind it</h4><div class="plist">'
-        + HS.parties.rowsHTML(parties)
-        + '</div><p class="ihint">Names and roles exactly as filed. A role appears only when the '
-        + 'record names it, and a parent company only when an authoritative corporate record '
-        + 'establishes it — we never infer one from shared people, shared investors, a similar '
-        + 'name or news coverage.</p></div>';
-    }
+    // Resolved roles come first: Property Owner / Developer / Applicant / Operator, each
+    // from a source that STATES that role for this record (a county or state filing, or a
+    // regulator's own responsible-party register). A facility's NAME is never one of those
+    // sources — "TXI - Garfield Sand & Gravel" is operated by a Martin Marietta entity, and
+    // reading the operator off the sign would have got it wrong.
+    var who = whoSection(it);
+    var whoHTML = who.html;
 
     var whyHTML = '<div class="isec"><h4>Why this matters</h4>' + HS.whyQaHTML(wd) + '</div>';
     var knowHTML = '<div class="isec"><h4>What we know</h4>' + HS.whyKnowHTML(wd) + '</div>';
@@ -1007,15 +1047,10 @@ HS.onReady(async function () {
     // so the primary card is not buried in provenance. Every line below is read from the
     // record's own `provenance` object — nothing is derived, and an absent key prints no row.
     var pv = (it.provenance && typeof it.provenance === 'object') ? it.provenance : {};
-    // A verified parent relationship is a separately-sourced claim, so it carries its own
-    // citation here rather than riding on the filing's. No verified parent -> no rows.
-    var parentRows = HS.parties.evidenceRows(parties)
-      .map(function (r) {
-        var v = r.url
-          ? '<a href="' + HS.esc(r.url) + '" target="_blank" rel="noopener">' + HS.esc(r.value) + ' ▸</a>'
-          : HS.esc(r.value);
-        return '<div class="row"><span>' + HS.esc(r.label) + '</span><b>' + v + '</b></div>';
-      }).join('');
+    // A resolved role and a verified parent are each separately-sourced claims, so they
+    // carry their own citations here rather than riding on the filing's. Nothing resolved
+    // and nothing verified -> no rows.
+    var parentRows = evidenceRowsHTML(who.evidence);
     var srcRows = [
       ['Source', pv.src || pv.jurisdiction],
       ['Jurisdiction', (pv.src && pv.jurisdiction) ? pv.jurisdiction : ''],

@@ -686,6 +686,34 @@ legal/framing change not covered by the one-time sign-off.
   *(What it replaced: `developer = coalesce(owner, src)` rendered under the single label
   "Developer / applicant" — for a TABS filing that value is the owner, for an EPA facility
   it is the source string. Pinned by `test/party-roles.test.mjs`.)*
+- **A COMPANY ROLE COMES FROM A SOURCE THAT STATES IT — A FACILITY'S NAME IS NOT A SOURCE
+  (2026-08-09).** `public.property_company_roles` resolves Property Owner / Developer /
+  Applicant / Operator per record, each with `verification` ∈ `VERIFIED` / `HIGH_CONFIDENCE`
+  / `UNRESOLVED` and a CHECK that makes an uncited claim unstorable. The operator of
+  **`TXI - GARFIELD SAND & GRAVEL`** is **Martin Marietta Materials Southwest, LLC** — TCEQ
+  Central Registry's own `princ_legal_name` for regulated entity RN106540172 — so reading
+  "TXI" off the sign would have named the wrong company. **EPA FRS publishes no owner or
+  operator column at all** (probed: `frs_facility_site` for registry 110070182593 carries
+  `primary_name` and a null `parent_registry_id`, nothing more), so the operator question is
+  answered by the STATE registry, never by FRS.
+  - ⚠️ **TCEQ leaves SUPERSEDED affiliations open-ended (`affil_end_dt = 3000-12-31`), so a
+    bulk import invents operators.** 13 of 78617's 29 facilities name-match a TCEQ entity,
+    but a naive read returns **5 "operators" for SAND HILL ENERGY CENTER** — City of Austin
+    dba Austin Energy plus **three construction contractors** (Austin Commercial, LP;
+    Laughlin-Thyssen, Ltd.; TIC - The Industrial Company). Admit an affiliation only when it
+    is unambiguous: exactly ONE open affiliation outside the construction-stormwater
+    (`STORM`) program, whose permittee is the builder and not the facility's operator.
+  - **The two detail panels share ONE builder.** `renderFacilityDetail` is a separate
+    renderer from `renderDetail` and originally had no roles section, which hid the pilot's
+    strongest result on the very record type where it matters most. Both now call
+    `whoSection()`; pinned by `test/company-identity.test.mjs`.
+  - Full DDL, coverage numbers and the per-hold receipts: **`docs/company-identity-pilot-78617.sql`**.
+- ⚠️ **AN EDGAR `forms=` FILTER TAKES ROOT FORM TYPES, NOT FILE TYPES — `forms=EX-21` RETURNS
+  A FALSE ZERO (2026-08-09).** `"Texas Industries" ciks=0000916076 forms=EX-21` returned 0
+  hits and was nearly reported as "no subsidiary exhibit exists"; without the filter the same
+  query returns **198**, including the EX-21.01 exhibits. EX-21 is a `file_type` inside a
+  `10-K` root form. Any EDGAR zero needs a positive control from the same endpoint before it
+  becomes a claim.
 - **PARENT COMPANY IS A SEPARATE, SEPARATELY-EVIDENCED FACT — AND IT IS UNSTORABLE
   WITHOUT EVIDENCE (2026-08-09).** `public.company_parents` records child → parent, and
   three CHECK constraints make the rule structural rather than conventional: an
