@@ -4667,6 +4667,7 @@
         "lng": "__lng",
         "case_number": "FolderNumber"
       },
+      "file_date_kind": "filed",
       "type_map": {
         "Planned Development": "Development",
         "Specific Use Permit": "Development",
@@ -4724,6 +4725,7 @@
         "lng": "__lng",
         "case_number": "FOLDERSEQUENCE"
       },
+      "file_date_kind": "filed",
       "type_map": {
         "Single-Family": "Residential",
         "Residential": "Residential",
@@ -5356,6 +5358,7 @@
         "lng": "__lng",
         "case_number": "CASE_NMBR"
       },
+      "file_date_kind": "filed",
       "status_to_bucket": {
         "proposed": [],
         "approved": [
@@ -6188,6 +6191,7 @@
         "lng": "__lng",
         "case_number": "PER_NUM"
       },
+      "file_date_kind": "filed",
       "type_map": {
         "ABANDON, CLOSE OR PLACE TANK TEMP O/S": "Industrial",
         "ANNUAL FACILITIES PERMIT": "Development",
@@ -7224,6 +7228,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "issued",
       "spatial_zip_radius_mi": 5,
       "type_map": {
         "Residential": "Residential",
@@ -8342,6 +8347,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "issued",
       "spatial_zip_radius_mi": 5,
       "type_map": {
         "SFD DEVEL": "Residential",
@@ -8568,6 +8574,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "issued",
       "spatial_zip_radius_mi": 5,
       "type_map": {
         "Residential": "Residential",
@@ -8906,7 +8913,6 @@
           "ADDFULL"
         ],
         "type_source": "Type_of_Bu",
-        "file_date": "Year",
         "address": "ADDFULL",
         "case_number": "Permit_Num",
         "lat": "Lat",
@@ -8942,7 +8948,7 @@
       },
       "incremental_field": "Year",
       "record_url_precision": "dataset",
-      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). KNOWN LIMITATION, recorded rather than papered over: Type_of_Bu is FREE TEXT, not a controlled vocabulary — the groupBy returns hundreds of values, 285 of the 363 parsed occur exactly once, with inconsistent casing and leading spaces (' single family dwelling', ' garage', 'Change of Use - Oil field service business'), and the response was still truncated. A COMPLETE type_map is therefore impossible. Only unambiguous high-frequency values are mapped (keys stored TRIMMED, which also merges the leading-space variants); the long tail fails closed to use_type 'unclassified' rather than be invented. Records still emit with their own coordinates and record_url. NO recency_days: Year is an INTEGER year, not a Date column. No ZIP -> spatial."
+      "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output — recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket — arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). KNOWN LIMITATION, recorded rather than papered over: Type_of_Bu is FREE TEXT, not a controlled vocabulary — the groupBy returns hundreds of values, 285 of the 363 parsed occur exactly once, with inconsistent casing and leading spaces (' single family dwelling', ' garage', 'Change of Use - Oil field service business'), and the response was still truncated. A COMPLETE type_map is therefore impossible. Only unambiguous high-frequency values are mapped (keys stored TRIMMED, which also merges the leading-space variants); the long tail fails closed to use_type 'unclassified' rather than be invented. Records still emit with their own coordinates and record_url. NO recency_days: Year is an INTEGER year, not a Date column. No ZIP -> spatial. || DATE MAPPING DROPPED 2026-08-09 (founder ruling): file_date was 'Year', an INTEGER year coerced to a timestamp — production showed min = max = 1970-01-01 across ALL 6,492 records on 12 pages, i.e. the Unix epoch, telling every resident the permit is from 1970. The layer publishes 'Year' and NO other date field (live ?f=json, 2026-08-09). POSITIVE RECEIPT: the source publishes Year only; UNDATED IS CORRECT. This is a FALSE date removed, not a date removed. Do not remap."
     },
     {
       "registry_id": "albuquerque-building-permits",
@@ -9079,7 +9085,6 @@
           "jobsite_address"
         ],
         "status_raw": "open_closed",
-        "file_date": "CreationDate",
         "address": "jobsite_address",
         "case_number": "permitid",
         "lat": "__lat",
@@ -9105,7 +9110,7 @@
       },
       "spatial_zip_radius_mi": 5,
       "record_url_precision": "dataset",
-      "_receipts": "2026-07-28 Phase 4 recon (recon-fetch runs 30384902474 / 30385163406 / 30385461375): Butler County KS 'Permits_Premium' FeatureServer layer 0. FRESH — CreationDate min 2026-01-08, max 2026-07-28 (today), 911 rows, esriGeometryPoint in wkid 4326, so records place by their OWN per-parcel points. STATUS VOCABULARY IS COMPLETE — 9 verbatim open_closed values + 1 null summing to EXACTLY 911: Issued 449 + Final Inspection 235 -> approved · Submitted 99 + Inspector Review 35 + In Review/Requested Info 7 + In Review 1 -> proposed · Closed 51 + Completed (Cert. of Occupancy) 17 + Completed (Cert. of Completion) 16 -> operating; the 1 null fails closed (blank status -> excluded + counted). NO type_map ON PURPOSE — the Phase 4 packet's premise (buildingpermit / solarpermit / buildingsiteonlypermit as boolean type flags) DOES NOT HOLD against live data: a groupBy over all three fields returns exactly ONE combination, {buildingpermit:'No', buildingsiteonlypermit:'No', solarpermit:'No'}, n=911, i.e. 100% of rows. Their field ALIASES read 'Building Permit Complete' / 'Solar Permit Complete' / 'Building Site Only Permit Complete' — they are workflow-completion checkboxes defaulted to 'No', never permit-type flags, so any type_map over them would classify every record identically and carry no information. The only other candidate, `zoning` (16 verbatim values summing to 911 — RURAL RESIDENTIAL DISTRICT 363, AGRICULTURAL DISTRICT 40 192, AGRICULTURAL DISTRICT 80 133, URBAN JURISDICTION 126 …), is the PARCEL's zoning district, not the permit's use, so mapping it would invent a classification the source never states. Every record is therefore use_type:'unclassified' (logged) — the fail-closed outcome, not a guess. NO ZIP SCOPING COLUMN: the only ZIP field is cama_zip, the CAMA landowner's MAILING zip (ZIP+4 and frequently out of state — 01801 MA, 15317 PA, 30068 GA observed), NOT the jobsite -> spatial_zip_radius_mi 5 around the ZIP centroid, the county-wide-entry default. SPATIAL SMOKE (run 30385461375): an envelope query around a sampled jobsite returns features with real Butler County points (lat 37.67-37.76, lng -96.83 to -96.92) and live open_closed values. record_url: `parcel_data` is populated on 911/911 rows but is THE SAME layer-root URL on every record (https://ww1.bucoks.com/bucogis1/rest/services/PublicOutreach/Parcels_Data_BldgLL_Condos/FeatureServer/0/), not a per-record link — mapping it would present a generic URL as the record's own, so it is left unmapped and the entry falls back to dataset precision. Coverage gated to KS/Butler. *** GEOMETRY FIX 2026-08-05: same defect as pierce-county-pals-permits, found in the same audit. Mapped neither lat/lng nor __lat/__lng, so only 13.2% of its 1,194 cached records carried a point (158, all from the GEOCODE path on jobsite_address). The layer is esriGeometryPoint and serves real {x,y} (probed: -96.828399522615783, 37.766194160918808, in Butler County KS). 1,036 records listed and never pinned. ***"
+      "_receipts": "2026-07-28 Phase 4 recon (recon-fetch runs 30384902474 / 30385163406 / 30385461375): Butler County KS 'Permits_Premium' FeatureServer layer 0. FRESH — CreationDate min 2026-01-08, max 2026-07-28 (today), 911 rows, esriGeometryPoint in wkid 4326, so records place by their OWN per-parcel points. STATUS VOCABULARY IS COMPLETE — 9 verbatim open_closed values + 1 null summing to EXACTLY 911: Issued 449 + Final Inspection 235 -> approved · Submitted 99 + Inspector Review 35 + In Review/Requested Info 7 + In Review 1 -> proposed · Closed 51 + Completed (Cert. of Occupancy) 17 + Completed (Cert. of Completion) 16 -> operating; the 1 null fails closed (blank status -> excluded + counted). NO type_map ON PURPOSE — the Phase 4 packet's premise (buildingpermit / solarpermit / buildingsiteonlypermit as boolean type flags) DOES NOT HOLD against live data: a groupBy over all three fields returns exactly ONE combination, {buildingpermit:'No', buildingsiteonlypermit:'No', solarpermit:'No'}, n=911, i.e. 100% of rows. Their field ALIASES read 'Building Permit Complete' / 'Solar Permit Complete' / 'Building Site Only Permit Complete' — they are workflow-completion checkboxes defaulted to 'No', never permit-type flags, so any type_map over them would classify every record identically and carry no information. The only other candidate, `zoning` (16 verbatim values summing to 911 — RURAL RESIDENTIAL DISTRICT 363, AGRICULTURAL DISTRICT 40 192, AGRICULTURAL DISTRICT 80 133, URBAN JURISDICTION 126 …), is the PARCEL's zoning district, not the permit's use, so mapping it would invent a classification the source never states. Every record is therefore use_type:'unclassified' (logged) — the fail-closed outcome, not a guess. NO ZIP SCOPING COLUMN: the only ZIP field is cama_zip, the CAMA landowner's MAILING zip (ZIP+4 and frequently out of state — 01801 MA, 15317 PA, 30068 GA observed), NOT the jobsite -> spatial_zip_radius_mi 5 around the ZIP centroid, the county-wide-entry default. SPATIAL SMOKE (run 30385461375): an envelope query around a sampled jobsite returns features with real Butler County points (lat 37.67-37.76, lng -96.83 to -96.92) and live open_closed values. record_url: `parcel_data` is populated on 911/911 rows but is THE SAME layer-root URL on every record (https://ww1.bucoks.com/bucogis1/rest/services/PublicOutreach/Parcels_Data_BldgLL_Condos/FeatureServer/0/), not a per-record link — mapping it would present a generic URL as the record's own, so it is left unmapped and the entry falls back to dataset precision. Coverage gated to KS/Butler. *** GEOMETRY FIX 2026-08-05: same defect as pierce-county-pals-permits, found in the same audit. Mapped neither lat/lng nor __lat/__lng, so only 13.2% of its 1,194 cached records carried a point (158, all from the GEOCODE path on jobsite_address). The layer is esriGeometryPoint and serves real {x,y} (probed: -96.828399522615783, 37.766194160918808, in Butler County KS). 1,036 records listed and never pinned. *** || DATE MAPPING DROPPED 2026-08-09 (founder ruling): file_date was 'CreationDate', the ArcGIS ROW-CREATION system field — not a permit event. The layer offers only CreationDate, EditDate and soilprofile (live ?f=json, 2026-08-09); both date fields are system timestamps and neither is an event date. Production corroborates a load batch rather than permit activity: floor 2026-01-08 with 116 records in the last 30 days and NO recency_days window — the Cook County signature at smaller scale. POSITIVE RECEIPT: the source publishes no event date; UNDATED IS CORRECT. Do not remap to EditDate."
     },
     {
       "registry_id": "sussex-county-de-conditional-use",
@@ -9261,11 +9266,12 @@
         ],
         "status_raw": "Status",
         "type_source": "Proj_Type",
-        "file_date": "From_Date",
+        "file_date": "ScheduledAdDate",
         "case_number": "Project",
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "scheduled",
       "spatial_zip_radius_mi": 3,
       "type_map": {
         "Hwy Reconstr - No Added Capacity": "Utility",
@@ -9339,7 +9345,7 @@
       },
       "incremental_field": "From_Date",
       "record_url_precision": "dataset",
-      "_receipts": "2026-07-31 MA STATEWIDE wire, second of the state-DOT sweep (after fdot-active-construction-projects, which took FL from 6.4% to 68.7% -- +275 pages from ONE entry vs +22 for a county). MA had 574 dark pages of 627, the largest single prize remaining. Layer: MassDOT's own server, Projects/HighwayProjects, ONE layer id 0, 24,045 rows, POLYLINE (rides featurePoint()'s path-midpoint), linear-referenced (Route_ID/From_Measure/To_Measure). BOTH VOCABULARIES ENUMERATED LIVE AND COMPLETE -- each groupBy sums to EXACTLY 24,045 with exceededTransferLimit:false, the positive control. Unlike FDOT this layer has REAL status and type columns, so it gets real maps rather than constants. Status: DESIGN 8,392 -> proposed; CONSTRUCTION 1,489 -> approved; COMPLETE 3,603 -> operating. Proj_Type: 56 values mapped verbatim, all -> Utility, matching the UDOT/TxDOT/NDOT precedent where every highway project type maps to Utility. DELIBERATELY UNMAPPED, FAIL CLOSED: Status null (10,561 rows, 44%), Proj_Type null (10,666), 'Unsure' (112) and the empty string (31). THE 44% NULL STATUS WAS CHASED TO GROUND -- do not re-open. Probed both candidate rescue columns scoped to exactly the null-Status rows; both enumerations sum to exactly 10,561. constructionStatus is ENTIRELY EMPTY there (10,334 null + 227 empty string). DesignStatus is populated on only 230 of 10,561 (2.2%), and its values (Initial 164, PNF 39, Tabled 23, Denied 3, Approved 1) are pre-application states that would need their own mapping for ~200 rows. The gap is in MassDOT's data, not in the column choice, so Status stays status_raw and ~13,484 rows publish. More_Info exists per row but its populated-ness was NOT measured, so precision stays 'dataset'. NOT YET DEPLOYED OR MEASURED: run the envelope pre-check against dark MA ZIPs, then deploy (CONFIRM THE VERSION INCREMENTS -- a dispatched deploy silently did not land during the FL wire), fire, collect, MATERIALIZE via app_refresh_zip, and measure from app_projects."
+      "_receipts": "2026-07-31 MA STATEWIDE wire, second of the state-DOT sweep (after fdot-active-construction-projects, which took FL from 6.4% to 68.7% -- +275 pages from ONE entry vs +22 for a county). MA had 574 dark pages of 627, the largest single prize remaining. Layer: MassDOT's own server, Projects/HighwayProjects, ONE layer id 0, 24,045 rows, POLYLINE (rides featurePoint()'s path-midpoint), linear-referenced (Route_ID/From_Measure/To_Measure). BOTH VOCABULARIES ENUMERATED LIVE AND COMPLETE -- each groupBy sums to EXACTLY 24,045 with exceededTransferLimit:false, the positive control. Unlike FDOT this layer has REAL status and type columns, so it gets real maps rather than constants. Status: DESIGN 8,392 -> proposed; CONSTRUCTION 1,489 -> approved; COMPLETE 3,603 -> operating. Proj_Type: 56 values mapped verbatim, all -> Utility, matching the UDOT/TxDOT/NDOT precedent where every highway project type maps to Utility. DELIBERATELY UNMAPPED, FAIL CLOSED: Status null (10,561 rows, 44%), Proj_Type null (10,666), 'Unsure' (112) and the empty string (31). THE 44% NULL STATUS WAS CHASED TO GROUND -- do not re-open. Probed both candidate rescue columns scoped to exactly the null-Status rows; both enumerations sum to exactly 10,561. constructionStatus is ENTIRELY EMPTY there (10,334 null + 227 empty string). DesignStatus is populated on only 230 of 10,561 (2.2%), and its values (Initial 164, PNF 39, Tabled 23, Denied 3, Approved 1) are pre-application states that would need their own mapping for ~200 rows. The gap is in MassDOT's data, not in the column choice, so Status stays status_raw and ~13,484 rows publish. More_Info exists per row but its populated-ness was NOT measured, so precision stays 'dataset'. NOT YET DEPLOYED OR MEASURED: run the envelope pre-check against dark MA ZIPs, then deploy (CONFIRM THE VERSION INCREMENTS -- a dispatched deploy silently did not land during the FL wire), fire, collect, MATERIALIZE via app_refresh_zip, and measure from app_projects. || DATE COLUMN CORRECTED 2026-08-09 (founder ruling): file_date was 'From_Date', which with an entirely EMPTY 'To_Date' (0 of 24,045) reads as a record-validity range, not a project event. Production tell: a round 2023-01-01 floor and ZERO records in the last 30 days across 92,315 records / 624 pages on a live state programme. Live population over 24,045 rows: From_Date 24,045 (100%) · ReadinessDate 13,161 · ScheduledAdDate 13,020 · PrcApprovedDate 12,862 · bidOpenedDate 5,174 · completeDateApproved 5,081 · ntpDate 5,037 · To_Date 0. CHOSE ScheduledAdDate: essentially tied with ReadinessDate on population (13,020 vs 13,161) but self-describing, and its real span is 1992-12-31 to 2050-10-02 versus From_Date's bulk-set 2023-01-01 floor. It is an ISO-format STRING; recency_days is absent on this entry, so no DATE-literal/lexicographic hazard. ⚠️ ~46% of records will become UNDATED — INTENDED, same call as txdot: an honest absence beats a bulk-set range date. Do not revert to From_Date for coverage."
     },
     {
       "registry_id": "charlotte-land-dev-commercial-projects",
@@ -9553,6 +9559,7 @@
         "case_number": "FILENUMBER",
         "record_url": "HTMLLINK"
       },
+      "file_date_kind": "decided",
       "use_type_const": "Development",
       "status_to_bucket": {
         "proposed": [],
@@ -9674,6 +9681,7 @@
         "lng": "__lng",
         "case_number": "GISLINK"
       },
+      "file_date_kind": "issued",
       "type_map": {
         "101": "Residential",
         "102": "Residential",
@@ -9715,6 +9723,7 @@
         "lng": "__lng",
         "case_number": "PERMIT_NUM"
       },
+      "file_date_kind": "issued",
       "type_map": {
         "Residential": "Residential",
         "Non-Residential": "Development"
@@ -9758,6 +9767,7 @@
         "lng": "__lng",
         "case_number": "CASENO"
       },
+      "file_date_kind": "decided",
       "use_type_const": "Development",
       "status_to_bucket": {
         "proposed": [],
@@ -9798,6 +9808,7 @@
         "lng": "__lng",
         "case_number": "CASENO"
       },
+      "file_date_kind": "decided",
       "use_type_const": "Development",
       "status_to_bucket": {
         "proposed": [],
@@ -9975,6 +9986,7 @@
         "lng": "__lng",
         "case_number": "USER_ZB_application__"
       },
+      "file_date_kind": "decided",
       "type_map": {
         "New Construction": "Development",
         "Adaptive Reuse / Conversion": "Development",
@@ -10558,6 +10570,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "filed",
       "spatial_zip_radius_mi": 3,
       "status_const": "Submitted for county planning review",
       "status_to_bucket": {
@@ -10862,7 +10875,6 @@
           "STREET1",
           "Limits"
         ],
-        "file_date": "CreationDate",
         "address": "Limits",
         "lat": "__lat",
         "lng": "__lng"
@@ -10879,7 +10891,7 @@
       "use_type_const": "Roads & Infrastructure",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
-      "_receipts": "2026-08-05 ILLINOIS PASS. Suburban Cook was the single largest dark block in the state -- 85 of 216 pages, the residue after chicago-building-permits covers the city. Config only. Cook County's own Department of Transportation and Highways 2026 construction program: 70 polyline projects on services2.arcgis.com (a host already proven reachable by dozens of live entries -- the section 0 corollary applied deliberately, so no wire-and-see is needed). MEASURED LIFT IS THE LARGEST IN ILLINOIS: 78 of the 85 dark Cook pages, because a county-wide highway program spreads across the whole suburban ring where a city permit ledger cannot. THE DATE QUESTION IS THE WHOLE DECISION, AND IT IS NOT NO_TEMPORAL_FIELD. The obvious timing field, `start`, is a SEASON STRING -- its seven values are Spring 2024 / Summer 2024 / Spring 2025 / Summer 2025 / Fall 2025 / Spring 2026 / Summer 2026, populated 70 of 70 but unparseable by any date literal, the Anaheim/Program_Year class. The layer nonetheless carries a REAL esriFieldTypeDate: CreationDate, populated 70 of 70 and spanning 2026-04-14 to 2026-06-25 -- entirely inside the program year the service is named for. That is an honest file_date meaning 'when this project entered the 2026 construction program', and it is the UDOT precedent exactly (created_dt chosen on live non-null counts). A layer with a fully-populated real date field is NOT the seventh disqualifier; NO_TEMPORAL_FIELD means there are NO dates, and here there is one on every row. STATUS IS A CONST IN THE SOURCE'S OWN LANGUAGE: there is no status column, and the honest statement is membership of the published program, so status_const is 'In the 2026 county construction program' -> approved (funded and scheduled, not asserted complete). Understating is the honest direction. use_type_const 'Roads & Infrastructure' -- a verified member of the CLOSED lib/map.js TYPE_EXACT vocabulary (it maps to cat('infrastructure')), checked in the file rather than assumed. Neither candidate type column is usable: `Scope` is free text (70/70 populated but groupBy returns nothing enumerable) and `travel` is traffic-impact prose with bare URLs mixed into the values ('Lane Closures, Lane Restrictions' 59, but also 'Please see https://www.ccdotholdorchardroad.com/'). record_url_precision 'dataset': `travel` carries a URL on a handful of rows but is a mixed traffic-impact field, not a per-record link column, so templating one would be guessing. ANNUAL SERVICES ARE SEPARATE PROGRAMS, NOT A UNION AND ITS PARTS. Cook publishes DOTH Construction Projects 2024, 2025 (service PrjLine2025) and 2026 as three distinct services. Only 2026 is wired -- the current program. They are not a superset/subset pair, so the union rule does not apply; wiring the older two would add historical road work, which is a separate decision. Layer id is 6, not 0 (preserveLayerIds true again -- third instance). COVERAGE CEILING: these are COUNTY highway projects. Municipal street work by Cook's 130+ suburbs is not in this layer, and the city of Chicago's own work is not either. 78 pages is what a county road program reaches, not county-wide development coverage."
+      "_receipts": "2026-08-05 ILLINOIS PASS. Suburban Cook was the single largest dark block in the state -- 85 of 216 pages, the residue after chicago-building-permits covers the city. Config only. Cook County's own Department of Transportation and Highways 2026 construction program: 70 polyline projects on services2.arcgis.com (a host already proven reachable by dozens of live entries -- the section 0 corollary applied deliberately, so no wire-and-see is needed). MEASURED LIFT IS THE LARGEST IN ILLINOIS: 78 of the 85 dark Cook pages, because a county-wide highway program spreads across the whole suburban ring where a city permit ledger cannot. THE DATE QUESTION IS THE WHOLE DECISION, AND IT IS NOT NO_TEMPORAL_FIELD. The obvious timing field, `start`, is a SEASON STRING -- its seven values are Spring 2024 / Summer 2024 / Spring 2025 / Summer 2025 / Fall 2025 / Spring 2026 / Summer 2026, populated 70 of 70 but unparseable by any date literal, the Anaheim/Program_Year class. The layer nonetheless carries a REAL esriFieldTypeDate: CreationDate, populated 70 of 70 and spanning 2026-04-14 to 2026-06-25 -- entirely inside the program year the service is named for. That is an honest file_date meaning 'when this project entered the 2026 construction program', and it is the UDOT precedent exactly (created_dt chosen on live non-null counts). A layer with a fully-populated real date field is NOT the seventh disqualifier; NO_TEMPORAL_FIELD means there are NO dates, and here there is one on every row. STATUS IS A CONST IN THE SOURCE'S OWN LANGUAGE: there is no status column, and the honest statement is membership of the published program, so status_const is 'In the 2026 county construction program' -> approved (funded and scheduled, not asserted complete). Understating is the honest direction. use_type_const 'Roads & Infrastructure' -- a verified member of the CLOSED lib/map.js TYPE_EXACT vocabulary (it maps to cat('infrastructure')), checked in the file rather than assumed. Neither candidate type column is usable: `Scope` is free text (70/70 populated but groupBy returns nothing enumerable) and `travel` is traffic-impact prose with bare URLs mixed into the values ('Lane Closures, Lane Restrictions' 59, but also 'Please see https://www.ccdotholdorchardroad.com/'). record_url_precision 'dataset': `travel` carries a URL on a handful of rows but is a mixed traffic-impact field, not a per-record link column, so templating one would be guessing. ANNUAL SERVICES ARE SEPARATE PROGRAMS, NOT A UNION AND ITS PARTS. Cook publishes DOTH Construction Projects 2024, 2025 (service PrjLine2025) and 2026 as three distinct services. Only 2026 is wired -- the current program. They are not a superset/subset pair, so the union rule does not apply; wiring the older two would add historical road work, which is a separate decision. Layer id is 6, not 0 (preserveLayerIds true again -- third instance). COVERAGE CEILING: these are COUNTY highway projects. Municipal street work by Cook's 130+ suburbs is not in this layer, and the city of Chicago's own work is not either. 78 pages is what a county road program reaches, not county-wide development coverage. || DATE MAPPING DROPPED 2026-08-09: file_date was 'CreationDate', the ArcGIS ROW-CREATION system field — production showed all 403 records inside a single 10-week band (2026-04-14 to 2026-06-25), a GIS load batch rather than a construction schedule. ⚠️ CORRECTION TO THIS AUDIT'S OWN §Q FLAG: 'start' was named as the better column and it is NOT usable — a live probe returned 'Fall 2025' / 'Summer 2026', SEASON STRINGS that isoDay() cannot parse. The layer's only other dates are CreationDate and EditDate, both system timestamps. POSITIVE RECEIPT: the source publishes no parseable event date; UNDATED IS CORRECT. Do not remap to 'start'."
     },
     {
       "registry_id": "lake-county-il-construction-program",
@@ -10946,6 +10958,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "decided",
       "status_to_bucket": {
         "proposed": [],
         "approved": [],
@@ -10984,6 +10997,7 @@
         "lng": "__lng",
         "case_number": "JOBNET_ID"
       },
+      "file_date_kind": "scheduled",
       "use_type_const": "Utility",
       "status_to_bucket": {
         "proposed": [
@@ -11028,6 +11042,7 @@
         "lng": "__lng",
         "case_number": "UPC"
       },
+      "file_date_kind": "filed",
       "status_const": "Programmed",
       "use_type_const": "Utility",
       "status_to_bucket": {
@@ -11066,6 +11081,7 @@
         "lng": "__lng",
         "case_number": "pin"
       },
+      "file_date_kind": "estimated",
       "use_type_const": "Utility",
       "status_to_bucket": {
         "proposed": [
@@ -11331,6 +11347,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "scheduled",
       "use_type_const": "Utility",
       "status_to_bucket": {
         "proposed": [
@@ -11382,6 +11399,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "awarded",
       "use_type_const": "Utility",
       "status_to_bucket": {
         "proposed": [],
@@ -11425,6 +11443,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "awarded",
       "use_type_const": "Utility",
       "status_to_bucket": {
         "proposed": [],
@@ -11464,6 +11483,7 @@
         "lat": "Latitude",
         "lng": "Longitude"
       },
+      "file_date_kind": "scheduled",
       "use_type_const": "Utility",
       "status_const": "Not Yet Advertised",
       "status_to_bucket": {
@@ -11504,6 +11524,7 @@
         "lat": "Latitude",
         "lng": "Longitude"
       },
+      "file_date_kind": "scheduled",
       "use_type_const": "Utility",
       "status_const": "Advertised, Not Yet Complete",
       "status_to_bucket": {
