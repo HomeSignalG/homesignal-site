@@ -4936,6 +4936,7 @@
         "lng": "__lng",
         "case_number": "CASE_"
       },
+      "file_date_kind": "hearing",
       "status_to_bucket": {
         "proposed": [
           "Scheduled"
@@ -5151,7 +5152,7 @@
         ],
         "status_raw": "PROJ_STG",
         "type_source": "PROJ_CLASS",
-        "file_date": "LAST_PROJ_UPDATE_DT",
+        "file_date": "ACTUAL_LET_DATE",
         "address": [
           "LIMITS_FROM",
           "LIMITS_TO"
@@ -5160,6 +5161,7 @@
         "lng": "__lng",
         "case_number": "CONTROL_SECT_JOB"
       },
+      "file_date_kind": "awarded",
       "type_map": {
         "Bicycle Infrastructure Improvements": "Utility",
         "Bridge Maintenance": "Utility",
@@ -10665,6 +10667,7 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "file_date_kind": "hearing",
       "status_const": "Submitted for county review",
       "status_to_bucket": {
         "proposed": [
@@ -11105,6 +11108,7 @@
         "lng": "__lng",
         "case_number": "PROJECT_NUMBER"
       },
+      "file_date_kind": "awarded",
       "use_type_const": "Utility",
       "status_to_bucket": {
         "proposed": [
@@ -11540,6 +11544,7 @@
         "lat": "Latitude",
         "lng": "Longitude"
       },
+      "file_date_kind": "completed",
       "use_type_const": "Utility",
       "status_const": "Operationally Complete",
       "status_to_bucket": {

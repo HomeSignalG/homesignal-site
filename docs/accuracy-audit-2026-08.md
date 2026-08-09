@@ -1636,3 +1636,75 @@ The more serious class is real, and it has a clear signature: **does the layer o
 **Split so far: 1 wrong column · 2 vocabulary gaps · 2 correct.** The remaining 29 unresolved entries
 need the same probe each. **`txdot` is the finding to carry forward** — a wrong column is a different
 and worse defect than a wrong label, because no amount of labelling fixes it.
+
+---
+
+# §O — TxDOT column fix + the vocabulary extension
+
+## O1. Population measured on ALL candidates before choosing (85,460 rows in the layer)
+
+| column | populated | share | what it is |
+|---|---:|---:|---|
+| `LAST_PROJ_UPDATE_DT` ← **was in use** | 85,460 | **100%** | when the row was last touched — not a project event |
+| `PROJ_ESTMTD_LET_D` | 85,437 | 99.97% | *estimated* letting date — a forecast |
+| **`ACTUAL_LET_DATE`** ← **chosen** | **51,488** | **60.2%** | the contract actually went out to bid |
+| `CNSTR_NTPD_DT` | 14,035 | 16.4% | notice to proceed |
+| `CNSTR_WKBG_DT` | 13,830 | 16.2% | construction work began |
+| `COMMISSION_AWARD_OF_CONTRACT` | 11,902 | 13.9% | commission award |
+| `DSGN_START_ACTL_DT` | 11,272 | 13.2% | design start |
+| `CNST_EST_CMPLT_DT` | 3,337 | 3.9% | estimated completion |
+
+**Chosen: `ACTUAL_LET_DATE`**, per the ruling's own test — of the two candidates named
+(`ACTUAL_LET_DATE`, `CNSTR_WKBG_DT`) it is **3.7× better populated** (60.2% vs 16.2%) and is a real
+past event a resident can act on.
+
+⚠️ **Two things to overrule with if you disagree.**
+1. **`date_kind` is `awarded`, and that is the NEAREST member rather than an exact one.** TxDOT
+   distinguishes *letting* (bids opened, `ACTUAL_LET_DATE`) from *commission award*
+   (`COMMISSION_AWARD_OF_CONTRACT`, a separate column). The vocabulary has no `let`. `awarded` is
+   the closest true statement; adding TxDOT-specific jargon to a national vocabulary is worse.
+2. **`PROJ_ESTMTD_LET_D` would date 99.97% of records instead of 60.2%** — but it is a forecast, and
+   for the 51,488 projects already let it would show an *estimate* in place of the real date. Not
+   chosen; flagged because it is the only way to keep near-universal coverage.
+
+## O2. Before → after, so the fix is visible
+
+| | before (production now) | after (predicted from the live layer) |
+|---|---|---|
+| records | 27,193 on 666 pages | unchanged |
+| **dated** | **27,193 (100%)** | **~60% — roughly 10,900 records become UNDATED** |
+| oldest | **2024-03-01** ← a 2-year floor on a highway programme | the real letting history, decades deep |
+| newest | 2026-08-07 | — |
+| **dated in the last 30 days** | **1,846** ← TxDOT does not file 1,846 projects a month | should collapse to the real letting cadence |
+
+**Trading a wrong date on 10,900 records for an honest absence is the intended outcome**, and it is
+the same call as §H3: a record with no date beats a record with a date that means something else.
+The 2024-03-01 floor is the proof the old column was a touch timestamp — it is when TxDOT's system
+started stamping updates, not when Texas started building roads.
+
+*(After-state is predicted, not measured: the fix needs a deploy plus a re-cache of 666 pages.
+Measure it with the same query before reporting it as done.)*
+
+## O3. Vocabulary extended — `awarded`, `completed`, `hearing`
+
+`FileDateKind` is now `filed | issued | scheduled | estimated | decided | awarded | completed |
+hearing` (`sources/socrata.ts`), with the three new members documented inline. Code change,
+approved. It unblocks four entries immediately:
+
+| entry | column | kind |
+|---|---|---|
+| `iowa-dot-bid-projects` | `CONTRACT_AWARDED` | `awarded` |
+| `wsdot-project-delivery-plan-complete` | `OperComplete` | `completed` |
+| `clv-planning-cases` | `MTG_DATE` | `hearing` |
+| `summit-county-oh-planning-commission-items` | `MeetingDate` | `hearing` |
+
+For the two `hearing` entries this is the whole fix: their layers publish **exactly one date** and it
+is the meeting date, so the label — not the column — was the defect. `test/file-date-kind.test.mjs`
+carries the widened vocabulary and rejects anything outside it; suite 91/91 green.
+
+## O4. Running total for piece (b)
+
+**11 of 172 entries now declare an explicit kind**: 3 `scheduled`, 3 `estimated`, 2 `hearing`,
+1 `awarded`, 1 `completed`, 1 `awarded` (txdot). The 3 substitution entries are stamped `decided` by
+the materializer without config. Remaining: **69 `issued`** (spot-check first — 1 of 1 passed so far)
+and **29 unresolved** (one probe each; 1 wrong column, 2 vocabulary gaps, 2 correct so far).
