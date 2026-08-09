@@ -2004,15 +2004,32 @@ deliberately left running — it mirrors, it does not fetch.
 is paused.** Stopping an active data loss took priority over completing a measurement. Both need the
 same decision.
 
-## T4. What is NOT yet established
+## T4. Cause established — EPA's own service is down, and that is the whole point
 
-Whether the zeros are EPA's outage or ours. A direct probe of the exact endpoint the engine calls
-(`ofmpub.epa.gov/frs_public2/frs_rest_services.get_facilities`) was fired and had not returned by
-the time of this report — **which is itself weak evidence in the same direction, and is recorded as
-unreturned rather than as a result.** The distinction matters for the remedy, not for the finding:
-either way the *write* path is wrong, because a source that cannot be read must never be recorded
-as a source that returned nothing.
+The exact endpoint the engine calls (`index.ts:265`,
+`ofmpub.epa.gov/frs_public2/frs_rest_services.get_facilities`) was probed directly for downtown
+Atlanta, at both the engine's starting radius and its backed-off radius:
 
-**Recovery is available and cheap once the cause is known** — the 1,722 pages are identified by
-`counts->>'facilities' = '0'` and can be re-fetched — but re-running the refresh before the fetch is
-trusted would extend the damage rather than repair it.
+```
+search_radius=3 → HTTP 502  <title>502 Proxy Error</title> … "received an invalid response from an upstream server"
+search_radius=1 → HTTP 502  (identical)
+```
+
+So the zeros are **EPA's outage, not our fetch**. `frsFacilities()` retries a transient 5xx exactly
+as v13 requires, exhausts, and returns `[]` — and from there nothing downstream can tell
+*"EPA could not be read"* from *"EPA has nothing here."* `dev_refresh_collect` writes the zero.
+
+*(Two earlier probes against `data.epa.gov/efservice/...` returned HTTP 500 "The query could not be
+parsed" — that was my URL syntax on a different EPA API, not evidence about FRS, and it is recorded
+here so it is not miscounted as a third failure.)*
+
+**This is the audit's own rule turned on the pipeline: an instrument must prove it ran before its
+silence counts as evidence.** A failed read is being recorded as a measured absence, on pages that
+make a factual claim about named real facilities.
+
+**Recovery is available and cheap once EPA is back** — the 1,722 pages are identified by
+`counts->>'facilities' = '0'` and can be re-fetched — but re-running the refresh before FRS answers
+would extend the damage rather than repair it. The durable fix is a facilities-dimension rule in
+`dev_refresh_collect` mirroring the development one, plus an explicit "source unavailable" signal
+from the engine so the guard can distinguish the two cases. Both are code changes on a scheduled
+path, so both wait for a ruling.
