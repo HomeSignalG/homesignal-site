@@ -518,6 +518,7 @@ HS.onReady(function(){
   // home — no "this address" pin until the resident searches (development-tracker §0/§3).
   var ZIP_MODE = false, ZIP_CODE = null, HOME_ANCHOR = false;
   var ZIP_COUNTY = null, FACILITIES_ONLY = false;   // drives the honest facilities-only coverage note
+  var FAC_UNAVAILABLE = false;                     // EPA read failed for this snapshot (count unknown, not 0)
   // SEO policy — NATIONWIDE SUBSTANCE GATE (founder-approved 2026-07-14, PLAN.md §11
   // threshold c): index a ZIP page only when the materializer stamped
   // app_community_meta.indexable for this ZIP (pass AND dev-backed OR >=3 facilities —
@@ -912,6 +913,18 @@ HS.onReady(function(){
   // async county lookup in loadZip() (sets ZIP_COUNTY) — whichever lands last paints the final text.
   function updateCovNote(){
     var el = $("covNote"); if(!el) return;
+    // Takes precedence: a page cannot simultaneously be "showing facilities but no planning items"
+    // and "unable to show facilities at all". Says only what is certainly true of every flagged
+    // page — the read failed — rather than claiming facilities exist, which we cannot prove
+    // per-page. Clears itself once a refresh stores a real count (server-side flag).
+    if(FAC_UNAVAILABLE){
+      el.textContent = "EPA's facility service could not be reached when this page was last "
+        + "updated, so the facility count for this area is unavailable rather than zero. Planning "
+        + "and permit records below are unaffected. This page updates automatically once EPA "
+        + "responds again.";
+      el.style.display = "";
+      return;
+    }
     if(!FACILITIES_ONLY){ el.style.display = "none"; el.textContent = ""; return; }
     var where = ZIP_COUNTY ? (ZIP_COUNTY + " County") : "this area";
     el.textContent = "Showing EPA-registered facilities for this ZIP. Local planning-hearing and "
@@ -1053,14 +1066,15 @@ HS.onReady(function(){
     if(_addr){ _addr.placeholder = "Enter your street address for a precise view"; }
     status("Loading development records for ZIP " + zip + " …");
     var url = SUPABASE_URL + "/rest/v1/development_reports?zip=eq." + encodeURIComponent(zip) +
-              "&select=zip,home_lat,home_lng,counts,sites,paywall,refreshed_at&limit=1";
+              "&select=zip,home_lat,home_lng,counts,sites,paywall,refreshed_at,facilities_unavailable&limit=1";
     fetch(url, { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } })
       .then(function(r){ return r.ok ? r.json() : []; })
       .then(function(rows){
         if(rows && rows.length){
           var row = rows[0];
           render({ address:"ZIP "+zip, home:{ lat:row.home_lat, lng:row.home_lng },
-                   counts:row.counts||{}, sites:row.sites||[], paywall:!!row.paywall, updated:row.refreshed_at });
+                   counts:row.counts||{}, sites:row.sites||[], paywall:!!row.paywall, updated:row.refreshed_at,
+                   facUnavailable:!!row.facilities_unavailable });
         } else {
           // No cached row yet → still a valid, empty page. Empty is valid (never fabricated), not an error.
           window.__HS_SITES = [];
@@ -1138,7 +1152,12 @@ HS.onReady(function(){
     $("freshLine").textContent = ZIP_MODE
       ? (data.updated ? "Updated " + fmtDate(data.updated) : "")
       : "Live results · fetched just now";
-    $("cFac").textContent  = (data.counts && data.counts.facilities)   != null ? data.counts.facilities   : fac.length;
+    // FACILITIES: when the EPA read FAILED for this snapshot the count is UNKNOWN, not zero.
+    // Rendering "0" there is a factual claim we cannot support, so show an em-dash and let
+    // updateCovNote() say why. A genuinely-empty ZIP is NOT flagged and still shows a true 0.
+    FAC_UNAVAILABLE = ZIP_MODE && !!data.facUnavailable;
+    $("cFac").textContent  = FAC_UNAVAILABLE ? "\u2014"
+      : ((data.counts && data.counts.facilities) != null ? data.counts.facilities : fac.length);
     // cDev is the PROPOSED counter (its tile reads "New projects proposed nearby") — it must equal the
     // orange Proposed rail. Read counts.proposed (a projection of the same array); fall back to prop.length.
     $("cDev").textContent  = (data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length;
@@ -1167,7 +1186,7 @@ HS.onReady(function(){
     // coverage note so "0 planning items" doesn't read as "nothing is happening here."
     var devCount = (data.counts && data.counts.development) != null ? data.counts.development : dev.length;
     var facCount = (data.counts && data.counts.facilities)  != null ? data.counts.facilities  : fac.length;
-    FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0;
+    FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0 && !FAC_UNAVAILABLE;
     updateCovNote();
 
     // ZIP mode: auto-frame to fit every cached record (loadZip seeds a fixed 3 mi, which can cull
