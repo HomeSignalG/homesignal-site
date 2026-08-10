@@ -31,8 +31,8 @@ name: epa-recovery-watch
 
 on:
   workflow_dispatch:
-  # schedule:
-  #   - cron: '17 * * * *'      # hourly, off the :00 rush — UNCOMMENT TO ENABLE
+schedule:
+    - cron: '17 * * * *'
 
 concurrency:
   group: epa-recovery
