@@ -1,10 +1,11 @@
-# RESEARCH PROBE — read-only. Round 3: settle ONE thing.
-# Round 2 reported that FRS 110070182593 (TXI - Garfield Sand & Gravel) is absent from
-# TX_FACILITY_FILE.CSV. That was an ANCHORED grep, so before reporting "absent" it has to be
-# ruled out that the anchor, not the data, produced the zero. Envirofacts returns this
-# registry id with state TEXAS, so the two sources disagree and one of them is being misread.
+# RESEARCH PROBE — read-only. Round 4, final: print the actual organization rows for the
+# Del Valle facilities. Round 3 corrected a false zero of my own making (REGISTRY_ID is the
+# SECOND column of TX_FACILITY_FILE — the first is FRS_FACILITY_DETAIL_REPORT_URL — so the
+# anchored grep in round 2 could never match) and surfaced two facilities worth reading in
+# full: a second Martin-Marietta-named FRS record at the same Garfield address, and two
+# organization rows for the BFI facility whose operator the identity layer left unresolved.
 #
-# Writes nothing, commits nothing. Delete when settled.
+# Writes nothing, commits nothing. Delete after this.
 name: frs-archive-probe
 
 on:
@@ -17,7 +18,7 @@ permissions:
   contents: read
 
 jobs:
-  garfield:
+  delvalle:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -26,31 +27,63 @@ jobs:
           set -euo pipefail
           curl -sS -L --fail --retry 3 -o tx.zip \
             https://ordsext.epa.gov/FLA/www3/state_files/state_combined_tx.zip
-          unzip -o -q tx.zip TX_FACILITY_FILE.CSV TX_ORGANIZATION_FILE.CSV
+          unzip -o -q tx.zip TX_ORGANIZATION_FILE.CSV
 
-      - name: Is the anchor the problem, or is the facility really absent?
+      - name: Organization rows for every FRS facility at 3901 Norwood Ln, Del Valle
         run: |
           set -euo pipefail
-          echo '--- header + first data row of TX_FACILITY_FILE ---'
-          head -2 TX_FACILITY_FILE.CSV | cut -c1-200
-          echo
-          CTRL=$(sed -n '2p' TX_FACILITY_FILE.CSV | cut -d'"' -f2)
-          echo "POSITIVE CONTROL registry id taken from row 2: $CTRL"
-          echo -n '  anchored   : '; grep -c "^\"$CTRL\"" TX_FACILITY_FILE.CSV || true
-          echo -n '  unanchored : '; grep -c "$CTRL" TX_FACILITY_FILE.CSV || true
-          echo
-          for ID in 110070182593 110070376640 110005052085 110071708120; do
-            echo "=== $ID ==="
-            echo -n '  FACILITY  anchored   : '; grep -c "^\"$ID\"" TX_FACILITY_FILE.CSV || true
-            echo -n '  FACILITY  unanchored : '; grep -c "$ID" TX_FACILITY_FILE.CSV || true
-            echo -n '  ORG       unanchored : '; grep -c "$ID" TX_ORGANIZATION_FILE.CSV || true
-          done
+          python3 - <<'PY'
+          import csv
+          csv.field_size_limit(10_000_000)
+          TARGETS = {
+            '110070182593': 'TXI - GARFIELD SAND & GRAVEL   (the record the pilot resolves)',
+            '110070376640': 'TXI - GARFIELD SAND & GRAVEL PLANT',
+            '110071427904': 'MM - GARFIELD S&G              (same address, MM-named)',
+            '110034344494': 'CEMEX CONSTRUCTION MATERIALS LP (same address)',
+            '110070171250': 'AGGREGATE HAULERS DEL VALLE     (same address)',
+            '110005052085': 'BFI WASTE SYSTEMS OF TEXAS LP   (operator UNRESOLVED in the pilot)',
+            '110071708120': 'GIGA TEXAS OFFSITE WASTEWATER INTERCEPTOR',
+          }
+          keep = {k: [] for k in TARGETS}
+          with open('TX_ORGANIZATION_FILE.CSV', newline='', encoding='utf-8', errors='replace') as fh:
+              r = csv.reader(fh); hdr = next(r)
+              i = {h: n for n, h in enumerate(hdr)}
+              for row in r:
+                  rid = row[i['REGISTRY_ID']]
+                  if rid in keep:
+                      keep[rid].append(row)
+          for rid, label in TARGETS.items():
+              print(f'===== {rid}  {label}')
+              if not keep[rid]:
+                  print('   NO ORGANIZATION ROWS')
+              for row in keep[rid]:
+                  print('   {:<16} {:<22} {:<38} start={:<10} end={:<10} duns={:<10} ein={}'.format(
+                      row[i['PGM_SYS_ACRNM']], row[i['AFFILIATION_TYPE']], row[i['ORG_NAME']][:38],
+                      row[i['START_DATE']] or '-', row[i['END_DATE']] or '-',
+                      row[i['DUNS_NUMBER']] or '-', row[i['EIN']] or '-'))
+              print()
+          PY
 
-      - name: What DOES the extract say about Norwood Ln / Garfield?
+      - name: Reverse lookup by the two Southwest spellings
         run: |
           set -euo pipefail
-          echo '--- facility rows mentioning GARFIELD SAND ---'
-          grep -i 'GARFIELD SAND' TX_FACILITY_FILE.CSV | cut -c1-260 | head -10 || echo '(none)'
-          echo
-          echo '--- facility rows on NORWOOD LN in DEL VALLE ---'
-          grep -i 'NORWOOD' TX_FACILITY_FILE.CSV | grep -i 'DEL VALLE' | cut -c1-260 | head -10 || echo '(none)'
+          python3 - <<'PY'
+          import csv, collections
+          csv.field_size_limit(10_000_000)
+          want = {'MARTIN MARIETTA MATERIALS SOUTHWEST LLC', 'MARTIN MARIETTA MATERIALS SOUTHWEST LTD'}
+          ids = collections.defaultdict(set); roles = collections.Counter()
+          with open('TX_ORGANIZATION_FILE.CSV', newline='', encoding='utf-8', errors='replace') as fh:
+              r = csv.reader(fh); hdr = next(r); i = {h: n for n, h in enumerate(hdr)}
+              for row in r:
+                  nm = row[i['ORG_NAME']].strip().upper()
+                  if nm in want:
+                      ids[nm].add(row[i['REGISTRY_ID']])
+                      roles[(nm, row[i['AFFILIATION_TYPE']])] += 1
+          for nm in sorted(want):
+              print(f'{nm}: {len(ids[nm])} distinct FRS registry ids')
+          both = ids['MARTIN MARIETTA MATERIALS SOUTHWEST LLC'] & ids['MARTIN MARIETTA MATERIALS SOUTHWEST LTD']
+          print(f'facilities carrying BOTH spellings: {len(both)}')
+          print()
+          for (nm, role), n in sorted(roles.items()):
+              print(f'  {n:>4}  {role:<20} {nm}')
+          PY
