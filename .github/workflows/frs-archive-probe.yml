@@ -1,9 +1,10 @@
-# RESEARCH PROBE — read-only. Round 2: the archive question is settled
-# (TX_ORGANIZATION_FILE.CSV exists, with AFFILIATION_TYPE / DUNS_NUMBER / EIN / dates).
-# This round measures the thing the classification actually hinges on: COVERAGE and whether
-# the organization identity is identifier-grade or name-grade.
+# RESEARCH PROBE — read-only. Round 3: settle ONE thing.
+# Round 2 reported that FRS 110070182593 (TXI - Garfield Sand & Gravel) is absent from
+# TX_FACILITY_FILE.CSV. That was an ANCHORED grep, so before reporting "absent" it has to be
+# ruled out that the anchor, not the data, produced the zero. Envirofacts returns this
+# registry id with state TEXAS, so the two sources disagree and one of them is being misread.
 #
-# Writes nothing, commits nothing, touches no HomeSignal data. Delete when settled.
+# Writes nothing, commits nothing. Delete when settled.
 name: frs-archive-probe
 
 on:
@@ -16,86 +17,40 @@ permissions:
   contents: read
 
 jobs:
-  coverage:
+  garfield:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
-      - name: Fetch the Texas combined archive
+      - name: Fetch and extract
         run: |
           set -euo pipefail
-          curl -sS -L --fail --retry 3 --retry-delay 5 \
-            -o tx.zip https://ordsext.epa.gov/FLA/www3/state_files/state_combined_tx.zip
-          ls -la tx.zip
+          curl -sS -L --fail --retry 3 -o tx.zip \
+            https://ordsext.epa.gov/FLA/www3/state_files/state_combined_tx.zip
+          unzip -o -q tx.zip TX_FACILITY_FILE.CSV TX_ORGANIZATION_FILE.CSV
 
-      - name: Measure coverage, affiliation vocabulary, and identifier population
+      - name: Is the anchor the problem, or is the facility really absent?
         run: |
           set -euo pipefail
-          unzip -o -q tx.zip TX_ORGANIZATION_FILE.CSV TX_FACILITY_FILE.CSV
-          python3 - <<'PY'
-          import csv, collections
-          csv.field_size_limit(10_000_000)
+          echo '--- header + first data row of TX_FACILITY_FILE ---'
+          head -2 TX_FACILITY_FILE.CSV | cut -c1-200
+          echo
+          CTRL=$(sed -n '2p' TX_FACILITY_FILE.CSV | cut -d'"' -f2)
+          echo "POSITIVE CONTROL registry id taken from row 2: $CTRL"
+          echo -n '  anchored   : '; grep -c "^\"$CTRL\"" TX_FACILITY_FILE.CSV || true
+          echo -n '  unanchored : '; grep -c "$CTRL" TX_FACILITY_FILE.CSV || true
+          echo
+          for ID in 110070182593 110070376640 110005052085 110071708120; do
+            echo "=== $ID ==="
+            echo -n '  FACILITY  anchored   : '; grep -c "^\"$ID\"" TX_FACILITY_FILE.CSV || true
+            echo -n '  FACILITY  unanchored : '; grep -c "$ID" TX_FACILITY_FILE.CSV || true
+            echo -n '  ORG       unanchored : '; grep -c "$ID" TX_ORGANIZATION_FILE.CSV || true
+          done
 
-          def col(path, wanted):
-              with open(path, newline='', encoding='utf-8', errors='replace') as fh:
-                  r = csv.reader(fh)
-                  hdr = next(r)
-                  idx = {h: i for i, h in enumerate(hdr)}
-                  for row in r:
-                      if len(row) <= max(idx[w] for w in wanted): continue
-                      yield {w: row[idx[w]] for w in wanted}
-
-          fac_ids = set()
-          for row in col('TX_FACILITY_FILE.CSV', ['REGISTRY_ID']):
-              fac_ids.add(row['REGISTRY_ID'])
-          print(f'TX_FACILITY_FILE distinct REGISTRY_ID .......... {len(fac_ids):,}')
-
-          org_ids = set()
-          aff = collections.Counter(); prog = collections.Counter()
-          duns = ein = sbid = startd = endd = rows = 0
-          mm_sw = collections.Counter(); mm_sw_ids = set()
-          for row in col('TX_ORGANIZATION_FILE.CSV',
-                         ['REGISTRY_ID','AFFILIATION_TYPE','PGM_SYS_ACRNM','ORG_NAME',
-                          'DUNS_NUMBER','EIN','STATE_BUSINESS_ID','START_DATE','END_DATE']):
-              rows += 1
-              org_ids.add(row['REGISTRY_ID'])
-              aff[row['AFFILIATION_TYPE']] += 1
-              prog[row['PGM_SYS_ACRNM']] += 1
-              if row['DUNS_NUMBER'].strip(): duns += 1
-              if row['EIN'].strip(): ein += 1
-              if row['STATE_BUSINESS_ID'].strip(): sbid += 1
-              if row['START_DATE'].strip(): startd += 1
-              if row['END_DATE'].strip(): endd += 1
-              n = row['ORG_NAME'].upper()
-              if 'MARTIN MARIETTA' in n:
-                  mm_sw[row['ORG_NAME']] += 1
-                  mm_sw_ids.add(row['REGISTRY_ID'])
-
-          print(f'TX_ORGANIZATION_FILE rows ...................... {rows:,}')
-          print(f'TX_ORGANIZATION_FILE distinct REGISTRY_ID ...... {len(org_ids):,}')
-          covered = len(fac_ids & org_ids)
-          print(f'FACILITIES WITH >=1 ORGANIZATION ROW ........... {covered:,} '
-                f'({100.0*covered/max(len(fac_ids),1):.1f}% of TX FRS facilities)')
-          print()
-          print('--- AFFILIATION_TYPE vocabulary (all values) ---')
-          for k, v in aff.most_common(): print(f'  {v:>9,}  {k or "(empty)"}')
-          print()
-          print('--- program system supplying the affiliation ---')
-          for k, v in prog.most_common(12): print(f'  {v:>9,}  {k or "(empty)"}')
-          print()
-          print('--- identifier / date population (share of rows) ---')
-          for label, n in [('DUNS_NUMBER', duns), ('EIN', ein), ('STATE_BUSINESS_ID', sbid),
-                           ('START_DATE', startd), ('END_DATE', endd)]:
-              print(f'  {label:<20} {n:>9,}  {100.0*n/max(rows,1):5.1f}%')
-          print()
-          print('--- every MARTIN MARIETTA ORG_NAME spelling in TX ---')
-          for k, v in mm_sw.most_common(): print(f'  {v:>5}  {k}')
-          print(f'  distinct REGISTRY_IDs across all spellings: {len(mm_sw_ids)}')
-          PY
-
-      - name: Is the Del Valle facility in the FACILITY file at all?
+      - name: What DOES the extract say about Norwood Ln / Garfield?
         run: |
           set -euo pipefail
-          echo '--- 110070182593 in TX_FACILITY_FILE (control for the zero) ---'
-          grep -c '^"110070182593"' TX_FACILITY_FILE.CSV || echo 0
-          echo '--- 110070182593 in TX_ORGANIZATION_FILE ---'
-          grep -c '^"110070182593"' TX_ORGANIZATION_FILE.CSV || echo 0
+          echo '--- facility rows mentioning GARFIELD SAND ---'
+          grep -i 'GARFIELD SAND' TX_FACILITY_FILE.CSV | cut -c1-260 | head -10 || echo '(none)'
+          echo
+          echo '--- facility rows on NORWOOD LN in DEL VALLE ---'
+          grep -i 'NORWOOD' TX_FACILITY_FILE.CSV | grep -i 'DEL VALLE' | cut -c1-260 | head -10 || echo '(none)'
