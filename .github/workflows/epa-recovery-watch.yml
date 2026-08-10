@@ -1,0 +1,135 @@
+name: epa-recovery-watch
+
+# Watches for EPA FRS recovery and, only then, runs the already-approved 5-step gate.
+#
+# ⛔ THE SCHEDULE IS DELIBERATELY COMMENTED OUT, AND THAT IS ENFORCED, NOT MERELY DOCUMENTED.
+#    test/epa-recovery-arming.test.mjs (inside the offline suite the `unit` check gates on every
+#    PR) FAILS if `schedule:` is uncommented without a committed `.github/epa-recovery-armed`
+#    marker. Arming is therefore a deliberate TWO-PART act — uncomment the schedule AND add the
+#    marker — and neither half does anything on its own. Verified by running the check against a
+#    temporarily-uncommented copy: it failed, then passed again once restored.
+#
+# WHAT IT CAN AND CANNOT DO — enforced structurally, not by wording:
+#   • PERMISSIONS, IN FULL: `contents: read` + `issues: write`. There is no write token for code —
+#     it cannot commit, push, or ship piece (c), the NEW badge change, or the 63-entry sweep. Its
+#     ONLY write scope is `issues: write`, used solely to open the report issue. Both scopes are
+#     PINNED by test/epa-recovery-arming.test.mjs: adding a third fails CI until that test is
+#     edited, which forces the new scope to be stated rather than discovered.
+#   • No service-role key. It holds the PUBLIC anon key plus a per-function token, and can call
+#     exactly four epa_recovery_* RPCs. Arbitrary SQL is not reachable from here.
+#   • The 82801 proof is enforced by the DATABASE: epa_recovery_repair() raises unless a PASSED
+#     proof row exists, and epa_recovery_proof_check() RE-PAUSES the refresh on failure. Proven
+#     live, 2026-08-09, with a valid token so the gate was the thing being tested:
+#       repair → "the 82801 proof has not passed — refusing to repair (this is the hard gate)"
+#       step2  → "EPA has not recovered on the latest resolved probe — refusing to start step 2"
+#   • No model anywhere in the write path. curl and jq only.
+#
+# COST: the `gate` job is one HTTP request — no checkout, no node. Comparable jobs on this repo
+# measure 11–17 s, so it bills the 1-minute minimum. Hourly = ~24 billed min/day, and the final
+# step DISABLES this workflow once recovery has run, so the true cost is ~1 minute per hour of
+# remaining outage plus one recovery run, then zero.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+
+concurrency:
+  group: epa-recovery
+  cancel-in-progress: false
+
+permissions:
+  contents: read      # no write token, by design
+  issues: write       # its only write: the report issue
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5          # bounded: verify-geocodes burned 11 consecutive 6-hour cancellations
+    outputs:
+      recovered: ${{ steps.check.outputs.recovered }}
+      state: ${{ steps.check.outputs.state }}
+    steps:
+      - id: check
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          state=$(curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/epa_recovery_probe_state" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H 'Content-Type: application/json' -d '{}')
+          echo "state: $state"
+          echo "state=$state" >> "$GITHUB_OUTPUT"
+          echo "recovered=$(printf '%s' "$state" | jq -r '.ok // false')" >> "$GITHUB_OUTPUT"
+
+  recover:
+    needs: gate
+    if: needs.gate.outputs.recovered == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      TOKEN: ${{ secrets.EPA_RECOVERY_TOKEN }}
+    steps:
+      - name: Step 2a — un-pause the refresh and fire the 82801 proof
+        run: |
+          set -euo pipefail
+          rpc() { curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/$1" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H 'Content-Type: application/json' -d "$2"; }
+          rpc epa_recovery_step2 "{\"_token\":\"$TOKEN\"}" | tee step2.json
+          jq -e '.fired == true' step2.json > /dev/null
+
+      - name: Step 2b — harvest the proof (the engine takes 100–155 s per ZIP)
+        id: proof
+        run: |
+          set -euo pipefail
+          rpc() { curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/$1" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H 'Content-Type: application/json' -d "$2"; }
+          for i in $(seq 1 12); do            # up to ~6 min, then give up rather than hold a runner
+            sleep 30
+            out=$(rpc epa_recovery_proof_check "{\"_token\":\"$TOKEN\"}")
+            echo "attempt $i: $out"
+            if [ "$(printf '%s' "$out" | jq -r '.proof_pending')" = "false" ]; then
+              printf '%s' "$out" > proof.json
+              echo "passed=$(printf '%s' "$out" | jq -r '.proof_passed')" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo '{"proof_pending":true}' > proof.json
+          echo "passed=pending" >> "$GITHUB_OUTPUT"
+
+      - name: Step 3 — repair a bounded batch, ONLY if the proof passed
+        if: steps.proof.outputs.passed == 'true'
+        run: |
+          set -euo pipefail
+          # The RPC refuses anyway if the proof did not pass; this `if:` just avoids a noisy failure.
+          # Bounded batch on purpose: the full repair takes hours at the measured collection rate,
+          # and a runner must not sit waiting for it. Later scheduled runs continue the work.
+          curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/epa_recovery_repair" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H 'Content-Type: application/json' \
+            -d "{\"_token\":\"$TOKEN\",\"_batch\":60}" | tee repair.json
+
+      - name: Report to the founder
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          p=$(cat proof.json 2>/dev/null || echo '{}')
+          r=$(cat repair.json 2>/dev/null || echo '{}')
+          passed=$(printf '%s' "$p" | jq -r '.proof_passed // "pending"')
+          title="EPA recovery: 82801 proof $passed"
+          body=$(printf 'Gate state: %s\n\nProof: %s\n\nRepair: %s\n\nStill GATED and untouched by this run: piece (c), the NEW badge change, the 63-entry sweep.' \
+                  "${{ needs.gate.outputs.state }}" "$p" "$r")
+          gh issue create --title "$title" --body "$body" --repo "$GITHUB_REPOSITORY" || true
+
+      - name: Disable the schedule now that recovery has run
+        if: steps.proof.outputs.passed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow disable epa-recovery-watch || true
