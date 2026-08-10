@@ -679,12 +679,17 @@ HS.onReady(async function () {
   // Returns {html, evidence:[entry]}; the html is always present — a record with no party
   // information says so in one line rather than vanishing, so the reader can tell "we have
   // not found this yet" apart from "this section does not apply".
+  // The FRS affiliations ride alongside: their CURRENT rows are already merged into
+  // groupsHTML by the template layer, their FORMER rows render as a separate history
+  // section (never as a current role), and every one of them is cited in the disclosure
+  // with its full provenance.
   function whoSection(it) {
     var all = HS.parties.identity(it).concat(HS.parties.filed(it));
     return {
       html: '<div class="isec"><h4>Who\'s behind this property</h4><div class="plist">'
-        + HS.parties.groupsHTML(it) + '</div></div>',
-      evidence: HS.parties.evidenceEntries(all)
+        + HS.parties.groupsHTML(it) + '</div></div>'
+        + HS.parties.historyHTML(it),
+      evidence: HS.parties.evidenceEntries(all).concat(HS.parties.frsEvidenceEntries(it))
     };
   }
   // Company & developer track record. Rendered as a placeholder first and filled when the

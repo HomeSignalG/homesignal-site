@@ -774,6 +774,51 @@ legal/framing change not covered by the one-time sign-off.
   cannot disagree. **When wiring a new connector, check which key names it actually emits
   against the materialiser — a green pipeline that writes NULL is the failure mode.**
   Full delta + receipts: `docs/app-projects-identity-provenance-migration.sql`.
+- **A COMPLEMENTARY SOURCE IS RANKED, NEVER MERGED — EPA FRS ORGANIZATION AFFILIATIONS
+  (2026-08-10).** FRS publishes owner/operator/parent affiliations, but it identifies the
+  organization by **NAME** (no CN, no RN; DUNS on 7 of 40 Del Valle rows), so it sits at
+  tier 3 of a **named ordered vocabulary** — `identifier_backed` > `authoritative_filing` >
+  `frs_affiliation` > `candidate`, ordered by `public.evidence_tier_rank()`. **A rank
+  function, deliberately not a numeric score**: arbitration needs order, and nothing can
+  average or display an order. An FRS row is always **Reported**, never Verified, and
+  **can never make a parent verified** (0 did; the only verified parent in the database is
+  still Martin Marietta, from SEC EX-21.01).
+  - **Arbitration is per (project, role) and has three outcomes, all retained:** displayable ·
+    `agrees` (a stronger source names the SAME company — shown ONCE, cited as corroboration,
+    never printed twice) · `conflict` (a stronger source names a DIFFERENT company — kept in
+    `public.identity_conflicts`, RLS on with **no public select policy**, and never put to the
+    reader as an open contradiction). Del Valle: 18 displayed, 2 agree, 4 conflict.
+  - ⚠️ **AN ORGANIZATION FILE STILL CONTAINS PEOPLE.** `TX_ORGANIZATION_FILE.CSV` carries
+    "JUDY TORRES ROMAN" as an OWNER/OPERATOR. `frs_looks_like_organization()` requires a
+    corporate/government/trade token and **fails closed**, so a private individual can never
+    be published as a facility's owner.
+  - ⚠️ **THE DEDUPE KEY MUST INCLUDE `interest_type` AND `duns_number`.** A key without them
+    collapsed **6 of 41** rows — the same company reported by the same program under two
+    interest types is two facts, not a duplicate, and the survivor looks complete.
+  - **FRS `OWNER` is `Facility Owner`, never `Property Owner`** — it is an affiliation to a
+    regulated facility, not a deed to the parcel. **`CONTRACTOR` is not an operator**
+    (the same error the TCEQ construction-stormwater rows would have caused), and
+    **`POTENTIALLY RESPONSIBLE PARTY` is a CERCLA term of art** — as an identity role it
+    would be an accusation. All **39** affiliation types are classified explicitly; nothing
+    defaults.
+  - **A missing `END_DATE` is not evidence of "current"** (3 of 40 rows carry one). Date
+    wording is `recorded from <date>` — never "since", never "present" — and FORMER roles
+    render in their own history section, never as a current role.
+  - **CONTAINMENT IS THE POINT, and it is proven by grepping `pg_get_functiondef`:**
+    `app_project_track_record`, `app_site_parties`, `app_attach_parents` and
+    `app_refresh_zip` read FRS **NO**; only `app_project_frs_identity` reads it. So an
+    FRS-**named** company cannot pull facilities or enforcement events into a track record —
+    that path is CN → RN → NOV/NOE and a name match is not one. FRS wrote **0** rows into
+    `property_company_roles`.
+  - **Known limitation, recorded not fixed:** four OWNER name variants on one registry id
+    (AUSTIN ENERGY · CITY OF AUSTIN · CITY OF AUSTIN DBA AUSTIN ENERGY · "CITY OF AUSTIN,
+    AUSTIN ENERGY") all display, because collapsing them would be exactly the
+    over-normalization that keeps "SOUTHWEST, LLC" and "SOUTHWEST, LTD" distinct. Resolving
+    it needs an identifier, not a fuzzier match.
+  - Full DDL, the 39-value classification, per-control receipts and the measurement:
+    **`docs/frs-org-affiliation-pilot-78617.sql`**. Pinned by
+    `test/frs-org-affiliation.test.mjs` (fixtures in `test/fixtures/frs-78617.mjs`, shared
+    with the render harness so the proof and the page read the same records).
 - **THE QUALITY OF LIFE IMPACT SCORE™ IS A LIFECYCLE CONSTANT AND IS GATED OFF
   (2026-08-09).** Its entire input is one string: `app_refresh_zip` writes
   `proposed→72, approved/built→55, else 45` for development rows and a literal `30` for
