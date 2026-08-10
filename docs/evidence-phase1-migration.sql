@@ -1,0 +1,118 @@
+-- ============================================================================
+-- MULTI-SOURCE EVIDENCE — PHASE 1 (SQL OF RECORD)
+-- Applied 2026-08-10 to project qwnnmljucajnexpxdgxr as four migrations:
+--   evidence_phase1_core_foundation
+--   evidence_phase1_rls_and_vocabulary
+--   evidence_phase1_read_model  (+ _enum_labels)
+--   evidence_phase1_del_valle_pilot_ingest / _tdlr_projects_and_bridge
+--   evidence_phase1_fix_cross_source_org_merge
+--
+-- ADDITIVE ONLY. Everything lives in the `evidence` schema except ONE function,
+-- public.ev_parcel_report(). No existing table, view, function or read path was
+-- altered. No production page reads any of this.
+-- ============================================================================
+
+create schema if not exists evidence;
+
+-- ── enums ────────────────────────────────────────────────────────────────────
+-- entity_kind      parcel | development | facility | organization | instrument
+-- uniqueness_scope global | state | county | authority_dataset
+-- currency_basis   point_in_time | as_of_certified_roll | continuously_updated | unknown
+-- evidence_class   recorded_instrument | authoritative_filing | authoritative_roll
+--                  | identifier_backed | source_reported | resolved_by_match | derived
+-- authority_class  authoritative | official_secondary | republished | third_party | unknown
+-- fact_kind        source | normalized | resolved | derived
+-- claim_status     active | superseded_by_source | retracted_by_source | rejected_by_homesignal
+-- check_status     success | success_empty | source_error | unavailable | partial | not_checked
+--                  ^ §26: a failed fetch is a recorded state, never an absent fact.
+
+-- ── SOURCE LAYER ─────────────────────────────────────────────────────────────
+-- ev_source, ev_source_coverage, ev_source_capability
+-- ev_source_authority(source_id, predicate, authority_class)
+--     Authority is per (source, predicate). This is what lets TDLR be authoritative
+--     about its own filing while never outranking TCAD about who owns the land —
+--     without deleting either claim.
+-- ev_source_role_map(source_id, source_vocab_field, source_vocab_value, predicate)
+--     THE ROLE-COLLAPSE FIX AS DATA. 'OWNER block' -> project_owner_as_filed;
+--     'ownerName' -> property_owner_of_record. Adding a source adds rows here,
+--     never new predicates.
+
+-- ── RAW PRESERVATION (§6) ────────────────────────────────────────────────────
+-- ev_source_record(source_record_id, source_id, source_record_key, url, http_status,
+--                  retrieved_at, parser_version, payload_hash, payload jsonb,
+--                  payload_storage, as_of, superseded_by)
+--     Every claim FKs to exactly one source_record. A source correction is a NEW
+--     record + superseded_by; claims flip status. Nothing is deleted.
+-- ev_source_check(...)  every attempt, including the ones that found nothing.
+
+-- ── IDENTITY (§4) ────────────────────────────────────────────────────────────
+-- ev_entity(entity_id uuid pk, kind, jurisdiction_state, jurisdiction_county)
+--     Surrogate key. A source identifier is NEVER the primary key.
+-- ev_identifier_type(id_type pk, identifies_kind, issuing_authority,
+--                    uniqueness_scope, scope_state, scope_county, normalizer)
+--     'tcad.prop_id' is county-scoped to TX/Travis and identifies a PARCEL.
+--     'epa.frs_registry_id' is global and identifies a FACILITY.
+-- ev_entity_identifier(entity_id, entity_kind, id_type, id_value,
+--                      id_value_normalized, source_record_id, is_primary, status)
+--     UNIQUE (id_type, id_value_normalized) WHERE status='active'
+--     Scope lives in the TYPE, so PROP_ID 292354 in another county is a different
+--     id_type and cannot collide. There is no global "APN".
+--     TRIGGER ev_identifier_kind_guard: an id_type whose identifies_kind does not
+--     match the entity's kind raises — a cross-kind false join is impossible.
+-- ev_entity_resolution(entity_a, entity_b, kind, basis, evidence_url, decided_by)
+--     Rows are NEVER merged. 'not_same_entity' is a first-class outcome.
+
+-- ── TYPED CORES (thin) ───────────────────────────────────────────────────────
+-- ev_parcel, ev_organization, ev_development, ev_facility, ev_recorded_instrument
+--     Deliberately hold almost nothing. Even an organization's NAME is a claim.
+
+-- ── EVIDENCE (§7) ────────────────────────────────────────────────────────────
+-- ev_predicate(key pk, domain, consumer_label, definition, explicit_non_meaning,
+--              object_kind, version)
+--     Carries the EXPLICIT NON-MEANING. project_owner_as_filed is documented as
+--     "NOT evidence of land ownership" in the database itself.
+-- ev_claim(claim_id, source_record_id NOT NULL, subject_entity_id, subject_kind,
+--          predicate, object_entity_id | object_value, object_unit,
+--          source_predicate_raw NOT NULL, source_object_raw,
+--          valid_from, valid_to, currency_basis, as_of, observed_at,
+--          evidence_class, authority_class, fact_kind, status, status_reason)
+--     CHECK ev_claim_one_object: exactly one of object_entity_id / object_value.
+--     source_predicate_raw is NOT NULL — you may not write a claim without
+--     recording what the source actually called the relationship.
+-- ev_claim_relation(claim_a, claim_b, kind)  corroborates | contradicts | supersedes
+-- ev_claim_geometry(claim_id pk, geom geometry(MultiPolygon,4326))
+-- ev_display_precedence(predicate, authority_class, evidence_class, rank)
+--     §22 — precedence is DATA. Storage never arbitrates; display does, at read time.
+-- ev_legacy_property_report_link(report_address, parcel_entity_id, basis, evidence_class)
+--     §18 — the non-destructive bridge. property_reports stays address-keyed and
+--     unmodified; address is NOT the parcel entity's key.
+
+-- ── SCALAR FACTS: DESIGN CHOICE (§7) ─────────────────────────────────────────
+-- Acreage / legal description / values are stored as CLAIMS WITH LITERAL OBJECTS
+-- (object_value + object_unit), not as entity columns and not as a separate
+-- observation table. Three reasons:
+--   1. every scalar carries the same provenance as every relationship — one path;
+--   2. value history is temporal for free (one claim per year via as_of), so no
+--      number is ever overwritten;
+--   3. a second source contributing the same fact needs no schema change, and the
+--      two claims coexist rather than one clobbering the other. Proven live: TCAD
+--      publishes BOTH legalAcreage 36.4740 and landInfo.sizeAcres 28.4940 — two
+--      different measurements, both retained, distinguished by source_predicate_raw.
+
+-- ── SECURITY (§29) ───────────────────────────────────────────────────────────
+-- The `evidence` schema is NOT in Supabase's exposed-schema list, so PostgREST
+-- cannot reach it with the anon key at all. RLS is additionally ENABLED on all 22
+-- tables with NO policies (deny by default), and USAGE on the schema is revoked
+-- from anon/authenticated. Raw payloads — which contain owner mailing addresses —
+-- are therefore unreachable from any browser client.
+-- The only read path is public.ev_parcel_report(id_type, id_value), SECURITY
+-- DEFINER, EXECUTE revoked from anon/authenticated, which selects owner NAME only
+-- and never mailing data (§27).
+
+-- ── CONSUMER READ MODEL (§23) ────────────────────────────────────────────────
+-- public.ev_parcel_report(_id_type text, _id_value text) returns jsonb
+--   Takes a SOURCE identifier, never a UUID, an address or a company name.
+--   Returns: jurisdiction, identifiers[], property{}, ownership[], value_history[],
+--            development[], deed_references[], sources_checked[].
+--   Emits NO internal UUID and NO enum token — evidence.ev_label() maps each enum
+--   to plain English once, so no frontend ever learns the vocabulary.
