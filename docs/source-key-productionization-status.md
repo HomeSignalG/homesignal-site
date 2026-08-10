@@ -239,3 +239,167 @@ Recommended order:
 4. **Then** the multi-source evidence architecture and the TCAD parcel adapter.
 
 Items 2 and 3 do **not** block item 4. Item 1 does.
+
+---
+
+# PART 2 — Productionization executed (2026-08-10, later same day)
+
+Founder approval received for the ten authorized actions. This part supersedes Part 1's status
+table: **the code is now merged and deployed.** The re-cache is **halted mid-flight, deliberately,
+with nothing written** — see §17.
+
+## 13. Merge — done, and proven to contain only the reviewed work
+
+| Step | Receipt |
+|---|---|
+| PR | **#661**, `unit-tests` run **31423062071** → `completed success` |
+| Squash-merged to `main` | **`988c929`** "Stable app_projects source key + identity_fields repair (Brunswick, NYC DOB NOW) (#661)" |
+| Merge contains ONLY the intended work | `git diff --stat HEAD origin/main` → **empty output**. `main`'s tree is byte-identical to the reviewed branch head `65ce47e`. Not an eyeballed diff — an assertion that the trees are equal. |
+| Runtime surface of the merge | 2 files: `sources/arcgis.ts`, `sources/socrata.ts` (+35/−1 each, symmetric) and `jurisdiction-registry.json` (+9/−0). Everything else is docs/tests. |
+
+## 14. Deploy — done, and verified in the deployed artifact (not inferred from a green workflow)
+
+`deploy-edge-functions.yml` dispatched **from `main`**, run **31423300551** → `completed success`.
+
+A successful workflow is not evidence of a deployed behaviour, so the artifact itself was read:
+
+| Check | Result |
+|---|---|
+| Deployed version | **197 → 198** (`updated_at` 1786305135261 → 1786389427530) |
+| Artifact size | 1,161,752 → **1,192,953** bytes |
+| `identityFromFields` occurrences | **4** (was 0) |
+| `identity_fields` occurrences | **8** (was 0) |
+| arcgis call site | `` arcgis:${entry.registry_id}:${identityFromFields(row, entry.identity_fields) ?? caseNo ?? rowId(row) ?? title} `` |
+| socrata call site | `` socrata:${entry.domain}:${entry.dataset_id}:${identityFromFields(row, entry.identity_fields) ?? caseNo ?? rowId(row) ?? title} `` |
+| Display fields preserved | `"case_number": "PermitNumber"` and `"case_number": "job_filing_number"` both still present |
+
+## 15. Target ZIP sets — re-derived from the live cache, correcting two earlier numbers
+
+| Source | ZIPs | Cached records |
+|---|---|---|
+| `brunswick-county-permits` | **14** | 155,319 |
+| `nyc-dobnow-approved-permits` | **214** | 62,591 |
+
+**214, not 213 and not the brief's ~245.** The brief's 245 was the borough *page* expansion count
+(a different set); the 213 in Part 1 was measured at the `app_projects` layer, which excludes a ZIP
+cached but not materialized. The authoritative set for a re-cache is the cache itself. Total **228**.
+
+## 16. BEFORE measurement (over `dev_sites_deduped`, the view the materializer itself reads)
+
+| Source | ZIPs | Records | Distinct keys | Dup groups | Excess rows | Worst group | Keyless |
+|---|---|---|---|---|---|---|---|
+| `brunswick-county-permits` | 14 | 155,319 | **1,007** | 794 | 154,312 | **3,664** | 0 |
+| `nyc-dobnow-approved-permits` | 214 | 62,591 | 43,529 | 10,605 | 19,062 | 20 | 0 |
+
+Brunswick's 155,319 records collapsing onto 1,007 keys is the Class A defect exactly as diagnosed.
+
+## 17. ⛔ RE-CACHE HALTED — EPA FRS is returning zero facilities right now
+
+**Nothing was written. `dev_refresh_collect()` was never called.**
+
+### What was observed
+
+14 Brunswick ZIPs were fired through `net.http_post`: **4 × 200, 10 × 504** (gateway timeout on the
+heaviest pages — 28452 alone returns 14.62 MB / 15,689 records). Every one of the four 200s carried
+**`facilities: 0`**, including two ZIPs with cached facilities (28436 cached 2, 28456 cached 5).
+
+Five NYC ZIPs were then fired as an independent test. All **200**, all with development counts
+intact and slightly *increased* (937→953, 368→375, 1124→1130, 446→452, 470→514 — new permits since
+the last cache, so the engine and the permit connectors are healthy), and **all with
+`facilities: 0`** — including 11373 (18 cached) and 11214 (7 cached).
+
+That is a 9-ZIP, 2-state measurement with its own positive control: the same responses prove the
+fetch path works, so the empty dimension is FRS specifically.
+
+### The instrument that looked like evidence and was not
+
+`public.epa_frs_probes` shows every probe since 18:45 UTC failing with
+`Failure when receiving data from the peer`. That is **not** usable evidence: the probe has
+**178 rows and has NEVER once reported `ok=true`** (`count(*) filter (where ok)` → **0**,
+`max(probed_at) filter (where ok)` → NULL). A monitor that has never been green cannot
+distinguish "the source is down" from "the monitor is broken." The FRS conclusion above rests on
+the nine live engine responses, not on this probe. **The probe itself is a defect to fix**, logged
+here, not repaired in this session.
+
+### Why this stops the re-cache rather than slowing it
+
+`dev_refresh_collect()`'s transient-safe guard refuses any write where the cached row is fresher
+than 7 days, the response reports 0 facilities, and the cached row has facilities > 0. Measured
+against the real target set:
+
+| | ZIPs |
+|---|---|
+| Targets | **228** |
+| Would be **blocked** by the guard | **183 (80%)** |
+| Writable (already 0 cached facilities) | 45 |
+| Stale enough for the guard to be off | 0 |
+
+So proceeding has exactly two outcomes, and both are wrong:
+
+1. **Collect normally** → only 45 of 228 ZIPs (20%) re-key. The corpus lands in a mixed state,
+   and the BEFORE→AFTER this session exists to produce would be measured over a fifth of the
+   target set while being reported as the repair's result. That is a misleading number, not a
+   partial one.
+2. **Bypass the guard** → EPA facility records are wiped from **183 live production pages** to
+   work around an unrelated upstream outage. That is the "would risk destroying data — STOP and
+   report before executing" case in the brief, and the guard exists precisely to prevent it.
+
+**Neither was done.** The nine responses will age out of the 20-minute collection window and have
+no effect.
+
+### Production state, verified after halting
+
+| Check | Value |
+|---|---|
+| Target ZIPs written this session | **0** (`refreshed_at` range still 2026-08-07 15:45 → 2026-08-09 18:15) |
+| `dev_refresh_targets` queue | **779 rows, 779 unfired, 0 consumed** — untouched |
+| `property_company_roles` / `project_facility_refs` / `identity_conflicts` | 66 / 33 / 4 — unchanged |
+| Orphaned evidence rows | **0** |
+| TDLR/TABS records at 78617 | **5** — intact |
+| `app_projects` | 3,027,773 (`source_seq > 1`: 19,334) — unchanged |
+| Safety gate, re-checked at halt | `evidence_on_rekey_rows` = **0** |
+
+**`dev_refresh_fire_targets()` was deliberately not used.** It claims `where fired_at is null
+order by zip limit _batch` from the *shared* queue, which currently holds **779 unrelated unfired
+ZIPs** (0 overlap with the Brunswick set) — calling it would have swept ZIPs the approval did not
+cover. Requests were fired directly for exactly the target ZIPs instead.
+
+### To resume (no re-derivation needed)
+
+1. Confirm FRS is answering: fire one ZIP with a known non-zero cached facility count (e.g. 11373,
+   cached 18) and read `counts.facilities` from the response **without** collecting.
+2. Re-fire the 228 targets **in batches of ≤5** — 10 of 14 Brunswick ZIPs 504'd at concurrency 14,
+   and 28452 needs its own request.
+3. `select public.dev_refresh_collect();` within 20 minutes of each batch.
+4. Re-materialize via `app_refresh_zip()`, then re-run §16's query for the AFTER column.
+5. Two consecutive refreshes of one Brunswick + one NYC ZIP to prove `app_projects.id` stability.
+
+## 18. Full test suite — green, and proven to have run
+
+`node scripts/run-unit-tests.mjs` → **All 94 unit test file(s) passed (mode=all)**, 1,863
+assertions. `--offline` → 87 files passed.
+
+Silence is not evidence, so both new suites were confirmed to have actually executed:
+`source-key-quality.test.mjs` printed all **22** named assertions, including the controls
+(`control: the old case_number field IS identical on both rows`, `control: work_permit ALONE is
+also identical on all 8`) and `exactly the two audited entries declare identity_fields (found:
+nyc-dobnow-approved-permits, brunswick-county-permits)`.
+
+## 19. `desoto-county-permits` — read-only, CONFIRMED next Class A (not repaired, per instruction)
+
+| Metric | Value |
+|---|---|
+| Records / ZIPs | 7,105 / 10 |
+| Distinct `source_key` | 1,565 |
+| **Distinct `case_number`** | **3** |
+| Duplicate groups / excess rows | 26 / 4,439 |
+| Worst group | **1,081** |
+
+The three values are `CM1`, `MH1`, `RS1` (plus nulls) — permit **type codes**, not identifiers, so
+`source_id` becomes `arcgis:desoto-county-permits:RS1` for a thousand distinct permits. Rows whose
+`case_number` is null fall through to `rowId(row)` (e.g. `arcgis:desoto-county-permits:4499`),
+which is why 1,565 keys exist rather than 3. Same shape as Brunswick, one tenth the volume.
+
+**This also corrects Part 1 §12's guess** that the offending field was `APBTP` with "~4,465 rows":
+the measured excess is **4,439** and the collapse is visible in `case_number`. Not repaired here —
+the approval explicitly excluded it.
