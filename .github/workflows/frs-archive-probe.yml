@@ -1,16 +1,11 @@
-# RESEARCH PROBE — read-only. Answers one question: does EPA's FRS *combined* download
-# contain an organization / company-affiliation file that Envirofacts and the ECHO REST
-# surfaces do not expose?
+# RESEARCH PROBE — read-only. Round 2: the archive question is settled
+# (TX_ORGANIZATION_FILE.CSV exists, with AFFILIATION_TYPE / DUNS_NUMBER / EIN / dates).
+# This round measures the thing the classification actually hinges on: COVERAGE and whether
+# the organization identity is identifier-grade or name-grade.
 #
-# Writes nothing, commits nothing, touches no HomeSignal data. It exists because the build
-# sandbox has no egress to ordsext.epa.gov and pg_net returns content as TEXT, which mangles
-# a ZIP's binary central directory. A runner can hold the bytes intact.
-#
-# Delete this workflow once the question is settled.
+# Writes nothing, commits nothing, touches no HomeSignal data. Delete when settled.
 name: frs-archive-probe
 
-# Push-triggered on this research branch only: GitHub registers workflow_dispatch solely
-# from the default branch, and this probe is not worth a change to main.
 on:
   push:
     branches: [claude/maps-property-card-audit-8jbt0t]
@@ -21,79 +16,86 @@ permissions:
   contents: read
 
 jobs:
-  probe:
+  coverage:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Fetch the Texas combined archive
         run: |
           set -euo pipefail
-          URL=https://ordsext.epa.gov/FLA/www3/state_files/state_combined_tx.zip
-          echo "::group::download"
-          curl -sS -L --fail --retry 3 --retry-delay 5 -o tx.zip "$URL"
+          curl -sS -L --fail --retry 3 --retry-delay 5 \
+            -o tx.zip https://ordsext.epa.gov/FLA/www3/state_files/state_combined_tx.zip
           ls -la tx.zip
-          file tx.zip || true
-          echo "::endgroup::"
 
-      - name: 1 — FULL archive file list
+      - name: Measure coverage, affiliation vocabulary, and identifier population
         run: |
           set -euo pipefail
-          echo "===== unzip -l state_combined_tx.zip ====="
-          unzip -l tx.zip
-          echo
-          echo "===== entries matching the terms of interest ====="
-          unzip -Z1 tx.zip | grep -iE 'ORGANIZATION|AFFILIAT|OWNER|OPERATOR|CONTACT|ALTERNATIVE_NAME|FACILITY|PROGRAM|PARENT' \
-            || echo '(no entry matched any term)'
+          unzip -o -q tx.zip TX_ORGANIZATION_FILE.CSV TX_FACILITY_FILE.CSV
+          python3 - <<'PY'
+          import csv, collections
+          csv.field_size_limit(10_000_000)
 
-      - name: 2 — header + sample of every candidate affiliation file
+          def col(path, wanted):
+              with open(path, newline='', encoding='utf-8', errors='replace') as fh:
+                  r = csv.reader(fh)
+                  hdr = next(r)
+                  idx = {h: i for i, h in enumerate(hdr)}
+                  for row in r:
+                      if len(row) <= max(idx[w] for w in wanted): continue
+                      yield {w: row[idx[w]] for w in wanted}
+
+          fac_ids = set()
+          for row in col('TX_FACILITY_FILE.CSV', ['REGISTRY_ID']):
+              fac_ids.add(row['REGISTRY_ID'])
+          print(f'TX_FACILITY_FILE distinct REGISTRY_ID .......... {len(fac_ids):,}')
+
+          org_ids = set()
+          aff = collections.Counter(); prog = collections.Counter()
+          duns = ein = sbid = startd = endd = rows = 0
+          mm_sw = collections.Counter(); mm_sw_ids = set()
+          for row in col('TX_ORGANIZATION_FILE.CSV',
+                         ['REGISTRY_ID','AFFILIATION_TYPE','PGM_SYS_ACRNM','ORG_NAME',
+                          'DUNS_NUMBER','EIN','STATE_BUSINESS_ID','START_DATE','END_DATE']):
+              rows += 1
+              org_ids.add(row['REGISTRY_ID'])
+              aff[row['AFFILIATION_TYPE']] += 1
+              prog[row['PGM_SYS_ACRNM']] += 1
+              if row['DUNS_NUMBER'].strip(): duns += 1
+              if row['EIN'].strip(): ein += 1
+              if row['STATE_BUSINESS_ID'].strip(): sbid += 1
+              if row['START_DATE'].strip(): startd += 1
+              if row['END_DATE'].strip(): endd += 1
+              n = row['ORG_NAME'].upper()
+              if 'MARTIN MARIETTA' in n:
+                  mm_sw[row['ORG_NAME']] += 1
+                  mm_sw_ids.add(row['REGISTRY_ID'])
+
+          print(f'TX_ORGANIZATION_FILE rows ...................... {rows:,}')
+          print(f'TX_ORGANIZATION_FILE distinct REGISTRY_ID ...... {len(org_ids):,}')
+          covered = len(fac_ids & org_ids)
+          print(f'FACILITIES WITH >=1 ORGANIZATION ROW ........... {covered:,} '
+                f'({100.0*covered/max(len(fac_ids),1):.1f}% of TX FRS facilities)')
+          print()
+          print('--- AFFILIATION_TYPE vocabulary (all values) ---')
+          for k, v in aff.most_common(): print(f'  {v:>9,}  {k or "(empty)"}')
+          print()
+          print('--- program system supplying the affiliation ---')
+          for k, v in prog.most_common(12): print(f'  {v:>9,}  {k or "(empty)"}')
+          print()
+          print('--- identifier / date population (share of rows) ---')
+          for label, n in [('DUNS_NUMBER', duns), ('EIN', ein), ('STATE_BUSINESS_ID', sbid),
+                           ('START_DATE', startd), ('END_DATE', endd)]:
+              print(f'  {label:<20} {n:>9,}  {100.0*n/max(rows,1):5.1f}%')
+          print()
+          print('--- every MARTIN MARIETTA ORG_NAME spelling in TX ---')
+          for k, v in mm_sw.most_common(): print(f'  {v:>5}  {k}')
+          print(f'  distinct REGISTRY_IDs across all spellings: {len(mm_sw_ids)}')
+          PY
+
+      - name: Is the Del Valle facility in the FACILITY file at all?
         run: |
           set -euo pipefail
-          CANDS=$(unzip -Z1 tx.zip | grep -iE 'ORGANIZATION|AFFILIAT|OWNER|OPERATOR|CONTACT|PARENT' || true)
-          if [ -z "$CANDS" ]; then echo 'NO ORGANIZATION/AFFILIATION-LIKE ENTRY IN THE ARCHIVE'; exit 0; fi
-          for f in $CANDS; do
-            echo "########## $f"
-            echo "--- header ---"
-            unzip -p tx.zip "$f" | head -1
-            echo "--- first 3 data rows ---"
-            unzip -p tx.zip "$f" | sed -n '2,4p'
-            echo "--- row count ---"
-            unzip -p tx.zip "$f" | wc -l
-            echo
-          done
-
-      - name: 3 — Del Valle test, FRS 110070182593 (TXI - Garfield Sand & Gravel)
-        run: |
-          set -euo pipefail
-          CANDS=$(unzip -Z1 tx.zip | grep -iE 'ORGANIZATION|AFFILIAT|OWNER|OPERATOR|PARENT' || true)
-          [ -z "$CANDS" ] && { echo 'skipped — no affiliation file'; exit 0; }
-          for f in $CANDS; do
-            echo "########## $f"
-            unzip -p tx.zip "$f" | head -1
-            # positive control first: prove the grep finds a registry id that must be present
-            echo "--- control: any row for a known Del Valle FRS id present at all? ---"
-            unzip -p tx.zip "$f" | grep -c '110070376640' || true
-            echo "--- rows for 110070182593 ---"
-            unzip -p tx.zip "$f" | grep '110070182593' || echo '(no rows)'
-          done
-
-      - name: 4 — reverse lookup, Martin Marietta company -> FRS ids
-        run: |
-          set -euo pipefail
-          CANDS=$(unzip -Z1 tx.zip | grep -iE 'ORGANIZATION|AFFILIAT|OWNER|OPERATOR|PARENT' || true)
-          [ -z "$CANDS" ] && { echo 'skipped — no affiliation file'; exit 0; }
-          for f in $CANDS; do
-            echo "########## $f"
-            echo "--- distinct MARTIN MARIETTA org-name spellings ---"
-            unzip -p tx.zip "$f" | grep -i 'MARTIN MARIETTA' | cut -c1-220 | sort -u | head -40
-            echo "--- row count for MARTIN MARIETTA ---"
-            unzip -p tx.zip "$f" | grep -ci 'MARTIN MARIETTA' || true
-            echo "--- exact 'MARTIN MARIETTA MATERIALS SOUTHWEST' rows ---"
-            unzip -p tx.zip "$f" | grep -i 'MARTIN MARIETTA MATERIALS SOUTHWEST' | head -10 || echo '(none)'
-          done
-
-      - name: 5 — national archive
-        run: |
-          set -euo pipefail
-          curl -sS -L --fail --retry 2 -o nat.zip https://ordsext.epa.gov/FLA/www3/state_files/national_combined.zip
-          ls -la nat.zip
-          unzip -l nat.zip
+          echo '--- 110070182593 in TX_FACILITY_FILE (control for the zero) ---'
+          grep -c '^"110070182593"' TX_FACILITY_FILE.CSV || echo 0
+          echo '--- 110070182593 in TX_ORGANIZATION_FILE ---'
+          grep -c '^"110070182593"' TX_ORGANIZATION_FILE.CSV || echo 0
