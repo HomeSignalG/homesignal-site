@@ -141,6 +141,28 @@
   .trdet > summary::before{content:"▸";font-size:10px;transition:transform .12s ease}
   .trdet[open] > summary::before{transform:rotate(90deg)}
   .trdet > summary:focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:4px}
+  /* Company sustainability — one availability line on the surface, the substance inside the
+     same disclosure as the rest of the track record, in its own block. No score, no colour
+     scale, no meter: there is nothing here to rank. */
+  .susind{display:flex;align-items:center;gap:6px;margin:0 0 8px;font-size:12px;color:var(--ink-2)}
+  .susdot{width:6px;height:6px;border-radius:50%;background:var(--ink-3);flex:0 0 auto}
+  .sussec{padding:9px 0;border-top:1px dashed var(--line)}
+  .sussec h5{margin:0 0 5px;font-size:12px;font-weight:700;color:var(--ink)}
+  .susmeta{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}
+  .susmeta .row{display:flex;justify-content:space-between;gap:14px;font-size:11.5px}
+  .susmeta .row span{color:var(--ink-3)}
+  .susmeta .row b{font-weight:600;text-align:right}
+  .suslist{margin:4px 0 0;padding:0;list-style:none;font-size:12px;color:var(--ink-2)}
+  .suslist li{padding:5px 0;border-top:1px solid var(--line)}
+  .suslist li:first-child{border-top:none}
+  .sustopic{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3)}
+  .suslabel{display:block;line-height:1.4}
+  .susval{display:block;font-weight:600;color:var(--ink)}
+  .susyr{font-weight:400;color:var(--ink-3)}
+  @media(max-width:700px){
+    .susmeta .row{display:block}
+    .susmeta .row b{display:block;text-align:left;margin-top:1px}
+  }
   /* narrow screens: the disclosure's own label/value rows stack so a long agency name and
      a long record description never collide in two half-width columns */
   @media(max-width:700px){
@@ -351,6 +373,7 @@
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js"></script>
 <script src="lib/track-record.js"></script>
+<script src="lib/sustainability.js"></script>
 <script src="lib/impact.js"></script>
 <script src="lib/why.js"></script>
 <script src="lib/map.js?v=20260720b"></script>
@@ -699,22 +722,42 @@ HS.onReady(async function () {
   function mountTrackRecord(it) {
     var host = document.getElementById('trackHost');
     if (!host || !it || !it.id || !HS.track) return;
+    // Company sustainability is a FOURTH evidence class inside the track record, alongside
+    // environmental compliance / safety / other facilities — and it is kept in its own block:
+    // a benchmark disclosure and a regulator's notice of violation are different kinds of fact
+    // and must not be mixed into one list.
+    var sus = (HS.sustain && HS.sustain.detailHTML(it)) || '';
+    var susInd = (HS.sustain && HS.sustain.indicatorHTML(it)) || '';
+    var susEv = (HS.sustain && HS.sustain.evidenceEntries(it)) || [];
     HS.data.trackRecord(it.id, it).then(function (tr) {
       var live = document.getElementById('trackHost');
       if (!live || live !== host) return;            // the panel moved on while we waited
-      if (!tr || !HS.track.availability(tr).any) { host.remove(); return; }
+      var hasTrack = tr && HS.track.availability(tr).any;
+      if (!hasTrack && !sus) { host.remove(); return; }
       // Surface level stays a one-line indicator; the substance sits behind the disclosure,
       // so the card keeps answering "what is this / who's behind it" first.
       host.innerHTML = '<h4>Company track record</h4>'
-        + HS.track.indicatorHTML(tr)
+        + (hasTrack ? HS.track.indicatorHTML(tr) : '')
+        + susInd
         + '<details class="trdet"><summary>View track record</summary>'
-        + HS.track.detailHTML(tr) + '</details>'
+        + (hasTrack ? HS.track.detailHTML(tr) : '') + sus + '</details>'
         + '<p class="ihint">Public records as the agencies recorded them, with their own dates and '
         + 'their own categories. HomeSignal does not score or rate companies, and does not treat '
         + 'an absence of records as a finding.</p>';
       var det = live.closest('.idetail') && live.closest('.idetail').querySelector('.srcdet .trev');
-      if (det) det.innerHTML = evidenceRowsHTML(HS.track.evidenceEntries(tr));
-    }).catch(function () { var live = document.getElementById('trackHost'); if (live) live.remove(); });
+      if (det) {
+        det.innerHTML = evidenceRowsHTML((hasTrack ? HS.track.evidenceEntries(tr) : []).concat(susEv));
+      }
+    }).catch(function () {
+      // A failed track-record read must not take the sustainability block down with it.
+      var live = document.getElementById('trackHost');
+      if (!live) return;
+      if (!sus) { live.remove(); return; }
+      live.innerHTML = '<h4>Company track record</h4>' + susInd
+        + '<details class="trdet"><summary>View track record</summary>' + sus + '</details>';
+      var det2 = live.closest('.idetail') && live.closest('.idetail').querySelector('.srcdet .trev');
+      if (det2) det2.innerHTML = evidenceRowsHTML(susEv);
+    });
   }
 
   // The disclosure: one block per relationship, with the agency, the document, the dates and

@@ -819,6 +819,44 @@ legal/framing change not covered by the one-time sign-off.
     **`docs/frs-org-affiliation-pilot-78617.sql`**. Pinned by
     `test/frs-org-affiliation.test.mjs` (fixtures in `test/fixtures/frs-78617.mjs`, shared
     with the render harness so the proof and the page read the same records).
+- **ESG IS A DOWNSTREAM CONSUMER OF THE IDENTITY GRAPH — IT NEVER DECIDES WHO OWNS ANYTHING
+  (2026-08-10).** The sustainability layer's only legal input is `public.v_esg_eligible_company`,
+  derived from `property_company_roles` + `app_project_frs_identity` + `company_parents`. It
+  cannot add a row there, and `lib/sustainability.js` contains no fetch, no matcher and no
+  parent logic. **Identity flows one way: HomeSignal identity → ESG lookup, never the reverse.**
+  - **What the paused pilot got wrong, so nobody rebuilds it:** it searched WikiRate for
+    **facility names** (`txi-garfield`, `bfi-waste-systems-tx` — Garfield's operator is Martin
+    Marietta Materials Southwest, LLC) and walked its own **truncation cascade**
+    (`TXI - Garfield Sand & Gravel` → … → `txi`) until something came back. Both deleted.
+    `parent_company_id`/`parent_company_name` were dropped from `company_esg_matches` (identity
+    duplicated inside ESG), and `match_confidence='parent'` was removed — **an attribution filed
+    as a confidence is how a parent's record comes to read as the subsidiary's.**
+  - **Recall may be widened; ACCEPTANCE may not.** Two deterministic queries per company (exact
+    name, then punctuation/legal-suffix stripped — applied once, never iterated); a candidate is
+    accepted only on `app_company_key` equality with the FULL identity name, on the card's name
+    or a **declared alias**.
+  - ⚠️ **WRONG-QUERY ZERO — WikiRate's `filter[name]` rejects the legal suffix.**
+    `Martin Marietta Materials` → 1 item; `Martin Marietta Materials, Inc.` → **0**. The first
+    pass returned "no data" for all 22 eligible companies and looked clean. Any ESG zero needs a
+    positive control from a company known to be present.
+  - **A NUMERIC NEEDS A UNIT, READ FROM THE SOURCE.** WikiRate publishes `unit` on the metric
+    card: `Commons+Greenhouse Gas Emissions Scope 1` → *"metric tonnes of CO2 eq"*;
+    `World Benchmarking Alliance+Air Pollution` → unit card present, **no content**. So
+    **"Air Pollution: 0.0"** — a sub-score with no published scale that reads as a catastrophic
+    measurement — can never render. **No overall score, letter, colour or average is ever
+    computed** (the same rule as the Quality of Life score below).
+  - **Disclosure ≠ performance.** `kind` is stored, and a disclosure "No" renders as
+    **"Not reported in this benchmark"** — never as a claim about how the company performs.
+  - **Parent data is labelled as the parent's**, carries *"not a measurement of this individual
+    facility"*, and only a `verification='verified'` parent is ever queried. An FRS
+    `PARENT OWNER` candidate is not eligible and inherits nothing.
+  - **Four availability states stay distinct and none is a zero:** identity unresolved (say
+    nothing — never "ESG data unavailable") · not yet checked · checked with no data · available.
+  - **Del Valle result, measured 2026-08-10:** 21 eligible direct companies + 1 verified parent ·
+    22 searched (35 queries) · **0 direct matches, 1 parent match** · 6 displayable indicators ·
+    21 checked-no-data · 0 ambiguous · 2 records gained an indicator. Full method, the discarded
+    components and the limitations (answer pagination truncated at 1,200 by a WikiRate 403):
+    **`docs/esg-downstream-of-identity-pilot-78617.sql`**. Pinned by `test/sustainability.test.mjs`.
 - **THE QUALITY OF LIFE IMPACT SCORE™ IS A LIFECYCLE CONSTANT AND IS GATED OFF
   (2026-08-09).** Its entire input is one string: `app_refresh_zip` writes
   `proposed→72, approved/built→55, else 45` for development rows and a literal `30` for

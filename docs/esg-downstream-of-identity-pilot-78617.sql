@@ -1,0 +1,170 @@
+-- ============================================================================================
+-- Company Sustainability Record — ESG RE-INTEGRATED AS A DOWNSTREAM CONSUMER OF IDENTITY
+-- Del Valle / ZIP 78617 pilot only. Applied 2026-08-10. SQL of record (docs/*.sql are parked).
+--
+-- The paused ESG pilot searched WikiRate for FACILITY names and walked its own truncation
+-- cascade until something came back. Identity resolution now lives upstream, so the ESG layer's
+-- only legal input is v_esg_eligible_company. Identity flows one way:
+--     HomeSignal identity -> ESG lookup.        Never: ESG result -> HomeSignal identity.
+-- ============================================================================================
+
+
+-- ── 1. WHAT THE PAUSED PILOT HAD, AND WHAT HAPPENED TO IT ───────────────────────────────────
+-- REUSED, unchanged in shape:
+--   company_esg_raw          every WikiRate response, kept verbatim (the audit trail that lets
+--                            a later session re-decide a match without re-querying)
+--   company_match_rejections an ambiguous WikiRate candidate is the same class of event as an
+--                            ambiguous TCEQ candidate; one reviewable place, no new table
+--   the WikiRate endpoint     https://wikirate.org/Company.json?filter[name]=…&limit=N
+--   the HOLD instinct         a candidate that is not exactly right is rejected, not softened
+--
+-- DISCARDED, because it performed identity work that now belongs upstream:
+--   the 4 stored matches      company_id 'txi-garfield' / 'bfi-waste-systems-tx' are FACILITY
+--                             names, not companies. Garfield's operator is Martin Marietta
+--                             Materials Southwest, LLC — searching the sign on the gate was the
+--                             whole defect. Deleted, superseded by company_key-anchored rows.
+--   the truncation cascade    'TXI - Garfield Sand & Gravel' -> 'txi garfield sand and gravel'
+--                             -> 'txi garfield sand' -> 'txi'. ESG fuzzy matching. Gone.
+--   company_esg_matches.parent_company_id / parent_company_name
+--                             identity duplicated inside the ESG subsystem; 0 of 4 rows
+--                             populated. DROPPED — parentage lives in company_parents only.
+--   match_confidence = 'parent'
+--                             an ATTRIBUTION filed as a CONFIDENCE. That conflation is exactly
+--                             how a parent's record comes to read as the subsidiary's. The
+--                             vocabulary is now exact|ambiguous|none|error, and attribution is
+--                             its own NOT-NULL-in-spirit column with its own CHECK.
+--   company_esg_data          shape presumes a rating model (overall_score + E/S/G buckets).
+--                             WikiRate publishes no defensible overall score for these
+--                             companies and HomeSignal may not compute one. Left in place,
+--                             unwritten (0 rows), superseded by company_esg_indicators.
+
+
+-- ── 2. THE ONE LEGAL INPUT ──────────────────────────────────────────────────────────────────
+-- v_esg_eligible_company. Derived from property_company_roles + app_project_frs_identity +
+-- company_parents. The ESG subsystem cannot add a row to it; there is no name-search path in.
+--
+--   direct company    role in (Property Owner, Facility Owner, Developer, Operator)
+--                     AND verification in (VERIFIED, HIGH_CONFIDENCE)
+--                     AND evidence_tier in (identifier_backed, authoritative_filing)
+--                  OR an FRS current row the arbitration left displayable (frs_affiliation)
+--   parent company    company_parents.verification = 'verified'. Nothing else. An FRS
+--                     PARENT OWNER candidate never reaches company_parents as verified, and an
+--                     unverified row cannot even hold a parent NAME (existing CHECK).
+--
+-- Applicant is deliberately NOT eligible in this pilot (brief §2 makes it conditional). 78617
+-- has no Applicant rows, so the decision costs nothing here and is recorded rather than
+-- silently assumed. Filed By / Design Firm / Contact are not roles in property_company_roles
+-- at all; the role filter is belt and braces.
+
+
+-- ── 3. THE MATCH RULE ───────────────────────────────────────────────────────────────────────
+-- RECALL is generous; ACCEPTANCE is exact. Two deterministic queries per identity — the exact
+-- company name, and the name with punctuation and legal-form suffixes removed (esg_search_token,
+-- applied ONCE, not iterated). A candidate is accepted only when its WikiRate card name or one
+-- of its DECLARED aliases is app_company_key-equal to the FULL identity name — the same
+-- normalizer the identity graph uses, so "SOUTHWEST, LLC" and "SOUTHWEST, LTD" stay different
+-- companies. Two key-equal candidates, or candidates with none key-equal, is a REJECTION.
+--
+-- ⚠️ WRONG-QUERY ZERO, CAUGHT BY A POSITIVE CONTROL — the finding worth keeping.
+-- The first pass sent the exact identity name only and returned checked_no_data for all 22
+-- eligible companies, including Martin Marietta Materials, Inc., which a manual probe had
+-- already shown IS on WikiRate (card 2262988, declared alias "Martin Marietta Materials, Inc.").
+-- WikiRate's filter[name] does not tolerate the legal suffix or the punctuation:
+--     filter[name]=Martin Marietta Materials        -> 1 item
+--     filter[name]=Martin Marietta Materials, Inc.  -> 0 items
+-- A clean-looking sweep of zeros was a query defect. Any future ESG zero needs the same control.
+
+
+-- ── 4. WHAT MAY BE DISPLAYED ────────────────────────────────────────────────────────────────
+-- Three gates, in order, in esg_load_indicators():
+--   1. esg_indicator_catalog        an ALLOWLIST of curated homeowner-relevant metrics. A
+--                                   metric nobody curated is not shown — which is how the
+--                                   benchmark's hundreds of governance and supply-chain
+--                                   indicators stay off a property card.
+--   2. the value must be a value    'Unknown' / '' / 'NA' / 'Not applicable' is not data.
+--   3. a NUMERIC needs a UNIT       read from WikiRate's own metric card, not guessed.
+--
+-- Gate 3, probed live 2026-08-10 — the receipt that makes it a rule and not a hunch:
+--   Commons+Greenhouse Gas Emissions Scope 1 -> unit "metric tonnes of CO2 eq", value type Number
+--   World Benchmarking Alliance+Air Pollution -> unit card exists, NO content, no value type
+-- So "Air Pollution: 0.0" — a WBA sub-score whose scale is unpublished, and which reads as a
+-- catastrophic measurement — can never render. Nor can "Atmosphere: 2.4997500249975".
+--
+-- NO SYNTHETIC SCORE. No 0-100, no letter, no colour, no average of unrelated metrics. Individual
+-- indicators only, each with its own metric, value, year, link and attribution.
+--
+-- DISCLOSURE vs PERFORMANCE is a stored column (kind), because the wording depends on it. A
+-- disclosure "No" renders as "Not reported in this benchmark" — the benchmark did not find a
+-- disclosure. It is NOT a claim that the company performs badly.
+--
+-- DELIBERATELY EXCLUDED from the catalogue, with the reason:
+--   Global Reporting Initiative+Environmental Fines, GRI 307-1 — a real environmental figure,
+--   but it is a company's own disclosure ABOUT violations, and the Company Track Record already
+--   carries actual government enforcement records. Brief §19 forbids intermingling the two
+--   evidence classes, and a self-reported fines total sitting next to TCEQ notices of violation
+--   would blur exactly that line.
+
+
+-- ── 5. CONTAINMENT ──────────────────────────────────────────────────────────────────────────
+-- app_project_sustainability() builds its company list from property_company_roles and
+-- app_project_frs_identity(), then LEFT JOINs the ESG tables on company_key. A company with no
+-- ESG row still appears (with lookup_status), and an ESG row with no matching identity appears
+-- nowhere. The ESG layer wrote 0 rows to property_company_roles and 0 to company_parents.
+
+
+-- ── 6. PILOT MEASUREMENT (78617, run 2026-08-10) ────────────────────────────────────────────
+--   Eligible direct companies ................................ 21
+--   Eligible verified parents ................................  1   (Martin Marietta Materials, Inc.)
+--   Companies searched ....................................... 22   (35 WikiRate queries)
+--   Direct companies matched .................................  0
+--   Parents matched ..........................................  1
+--   Companies with displayable sustainability data ...........  1
+--   Displayable indicators ...................................  6   (3 GHG performance + 3 disclosure)
+--   Checked, no usable data .................................. 21
+--   Ambiguous candidates rejected ............................  0
+--   Raw WikiRate responses preserved ......................... 35
+--   Del Valle records gaining a sustainability indicator .....  2   (the two TXI - Garfield facilities,
+--                                                                    via the verified parent)
+--
+--   THE VALIDATION SET
+--   Martin Marietta / Garfield  direct Martin Marietta Materials Southwest, LLC -> no WikiRate
+--                               record; verified parent Martin Marietta Materials, Inc. ->
+--                               matched, 6 indicators, rendered as PARENT-COMPANY information
+--                               with the "not a measurement of this individual facility" note.
+--   Neuralink / ATX1            resolved Property Owner, queried "Neuralink Corporation" and
+--                               "Neuralink" -> 0 candidates. Checked-no-data. No parent inferred
+--                               (company_parents holds an unverified_candidate row with a NULL
+--                               parent name, which cannot be displayed or inherited from).
+--   River Bottoms Ranch         same outcome. No record manufactured.
+--   BFI                         both direct companies are FRS-Reported and WERE queried under
+--                               the pilot eligibility rule; both checked-no-data. Republic
+--                               Services is NOT inferred as parent — FRS does not state it.
+--   Tesla / Giga Texas          NOT searched. The Giga Texas offsite wastewater record resolves
+--                               to Ward & Burke Tunneling Inc; Tesla is not a resolved role on
+--                               any 78617 record, so no Tesla ESG is attached to a facility
+--                               whose NAME merely contains "Giga Texas".
+--
+--   FRS-REPORTED ELIGIBILITY, decided explicitly (brief §18):
+--     VERIFIED direct company                        -> eligible
+--     Reported direct company from an authoritative
+--       government affiliation (incl. FRS)           -> eligible, and the UI keeps saying
+--                                                       "Reported"; an ESG lookup never upgrades
+--                                                       an identity's certainty
+--     UNRESOLVED candidate                           -> not eligible, never queried
+
+
+-- ── 7. KNOWN LIMITATIONS — recorded, not fixed ──────────────────────────────────────────────
+-- (a) ANSWER PAGINATION STOPPED AT 1,200. Martin Marietta's answer list is paged 200 at a time;
+--     offsets 0-1000 all returned full pages, so there are more. Attempting offsets 1200+ got
+--     HTTP 403 from WikiRate (rate limiting, still 403 after a 30 s pause). Six of the nine
+--     catalogue metrics were found inside the first 1,200; the remainder of the list is UNREAD.
+--     This is a truncation and is stated rather than presented as completeness.
+-- (b) esg_metric_meta has 9 rows; the SBTi metric card fetch did not return, so that metric has
+--     no stored unit. It is categorical, so gate 3 does not apply and it displays correctly —
+--     but a numeric metric in that state would be suppressed, which is the fail-closed direction.
+-- (c) The Del Valle pilot produced exactly ONE match, and it is a parent. The re-integration is
+--     therefore proven on the parent path with live data and on the direct path only by a
+--     synthetic fixture. That is the honest state; it is not evidence the direct path is broken.
+-- (d) Four near-identical City of Austin name variants are separate eligible companies (the FRS
+--     limitation recorded in docs/frs-org-affiliation-pilot-78617.sql §8a). Each was queried
+--     separately; all returned nothing, so the duplication cost four queries and no display.
