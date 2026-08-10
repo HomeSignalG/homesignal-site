@@ -63,6 +63,22 @@ if (!existsSync(WF)) {
     }
   }
 
+  // 3. YAML must actually PARSE — specifically, no flow mapping containing a ${{ }} expression.
+  //     GitHub rejected this workflow with "error in your yaml syntax on line 118" because two
+  //     steps used `env: { GH_TOKEN: ${{ github.token }} }`. In a YAML flow mapping the braces of
+  //     ${{ ... }} are flow indicators, so the `}}` closes the mapping early and the parse dies.
+  //     This test previously pinned permissions and arming but never looked at syntax, so it could
+  //     not have caught it — the failure reached GitHub instead. The repo has no YAML parser
+  //     dependency (vanilla, no package.json), so this pins the exact incompatible construct
+  //     rather than parsing: use block form for any env/with holding an expression.
+  lines.forEach((l, i) => {
+    if (/^\s*[a-z-]+:\s*\{.*\$\{\{/.test(l)) {
+      failures.push(`line ${i + 1}: flow mapping contains a \${{ }} expression — `
+        + `YAML reads its braces as flow indicators and the parse fails. Use block form:\n`
+        + `    ${l.trim().split(':')[0]}:\n      KEY: \${{ ... }}`);
+    }
+  });
+
   // 3. no write-path escalation
   if (/contents:\s*write/.test(src)) failures.push('contents: write must never appear here');
   if (/SERVICE_ROLE|service_role/i.test(src)) failures.push('no service-role key in this workflow');
@@ -75,5 +91,11 @@ if (failures.length) {
   console.error(failures.map((f) => `FAIL — ${f}`).join('\n'));
   process.exit(1);
 }
-console.log('epa-recovery-watch: schedule disarmed + no marker, permissions exactly '
-  + '[contents: read, issues: write], no service-role key, no model key.');
+// Report the state actually observed. The previous line was a hardcoded "schedule disarmed +
+// no marker", which stayed green and became FALSE the moment the founder armed it — a success
+// message that misdescribes reality is the same defect class this whole audit is about.
+const src = readFileSync(WF, 'utf8');
+const live = /^\s*-\s*cron:/m.test(src) && existsSync(MARKER);
+console.log(`epa-recovery-watch: ${live ? 'ARMED (schedule active + marker present)' : 'disarmed'}`
+  + ', permissions exactly [contents: read, issues: write], no flow-mapping ${{ }} syntax,'
+  + ' no service-role key, no model key.');

@@ -116,7 +116,8 @@ jobs:
 
       - name: Report to the founder
         if: always()
-        env: { GH_TOKEN: ${{ github.token }} }
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           p=$(cat proof.json 2>/dev/null || echo '{}')
@@ -129,5 +130,6 @@ jobs:
 
       - name: Disable the schedule now that recovery has run
         if: steps.proof.outputs.passed == 'true'
-        env: { GH_TOKEN: ${{ github.token }} }
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: gh workflow disable epa-recovery-watch || true
