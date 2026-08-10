@@ -91,6 +91,10 @@ export interface SocrataRegistryEntry {
   zip_numeric?: boolean;
   /** e.g. "https://…/{case_number}". Used only when column_map.record_url is absent. */
   record_url_template?: string;
+  /** Columns whose values (joined with "|") form the source_id record segment,
+   *  INSTEAD of case_number. Use when the case-number column is not a record
+   *  identifier. Fails closed: any missing/empty field falls back to case_number. */
+  identity_fields?: string[];
   record_url_precision?: "record" | "dataset";
   /** false → the entry is NOT run in ZIP-aggregate mode (reserved for the per-address property
    *  page). Default true. Used for high-volume, geocode-heavy datasets (e.g. individual building
@@ -485,7 +489,7 @@ async function normalizeRow(
   }
 
   const rec: NormalizedRecord = {
-    source_id: `socrata:${entry.domain}:${entry.dataset_id}:${caseNo ?? rowId(row) ?? title}`,
+    source_id: `socrata:${entry.domain}:${entry.dataset_id}:${identityFromFields(row, entry.identity_fields) ?? caseNo ?? rowId(row) ?? title}`,
     source_class: "socrata",
     source_registry_id: entry.registry_id,
     jurisdiction: entry.jurisdiction,
@@ -841,6 +845,35 @@ function fillTemplate(tpl: string, row: Record<string, unknown>, caseNo: string 
     const v = row[key];
     return v == null ? "" : String(v);
   });
+}
+
+/**
+ * ADDITIVE, default-off. When a registry entry declares `identity_fields`, the source_id's
+ * record segment is built from those columns instead of case_number.
+ *
+ * WHY THIS EXISTS (measured 2026-08-10): case_number serves DISPLAY, and on some layers the
+ * column that reads like a case number is not a record identifier. Brunswick County's
+ * `PermitNumber` is a per-project SEQUENCE — value "1000" appears 57,543 times across
+ * different projects and addresses — so every one of those records derived the same
+ * source_id. Overloading case_number to fix identity would corrupt the displayed case
+ * number instead; identity and presentation are separated here on purpose.
+ *
+ * FAIL CLOSED: every declared field must be present and non-empty. If any is missing the
+ * function returns null and the caller falls back to the existing case_number/rowId ladder,
+ * so a schema drift degrades to today's behaviour rather than silently minting a key like
+ * "|1|" that would collide across unrelated records.
+ */
+export function identityFromFields(row: Record<string, unknown>, fields?: string[]): string | null {
+  if (!fields?.length) return null;
+  const parts: string[] = [];
+  for (const f of fields) {
+    const v = row[f];
+    if (v == null) return null;
+    const s = String(v).trim();
+    if (s === "") return null;
+    parts.push(s);
+  }
+  return parts.join("|");
 }
 
 function rowId(row: Record<string, unknown>): string | null {
