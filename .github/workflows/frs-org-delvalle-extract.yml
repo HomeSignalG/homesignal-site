@@ -1,0 +1,73 @@
+# One-shot extraction for the Del Valle FRS organization-affiliation pilot (ZIP 78617).
+#
+# Pulls the Texas combined FRS download and emits ONLY the organization rows for the 29 FRS
+# registry ids HomeSignal already holds for 78617, as JSON, plus the same-address controls.
+# The national file is NOT touched. CONTACT_FILE is NOT extracted — it is named individuals.
+#
+# Read-only: prints to the job log, writes nothing back. Delete after the pilot loads.
+name: frs-org-delvalle-extract
+
+on:
+  push:
+    branches: [claude/maps-property-card-audit-8jbt0t]
+    paths: ['.github/workflows/frs-org-delvalle-extract.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Fetch Texas combined and extract ONLY the organization file
+        run: |
+          set -euo pipefail
+          curl -sS -L --fail --retry 3 -o tx.zip \
+            https://ordsext.epa.gov/FLA/www3/state_files/state_combined_tx.zip
+          unzip -o -q tx.zip TX_ORGANIZATION_FILE.CSV
+          ls -la TX_ORGANIZATION_FILE.CSV
+
+      - name: Emit Del Valle organization rows as JSON
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import csv, json
+          csv.field_size_limit(10_000_000)
+
+          # The 29 FRS ids HomeSignal holds for 78617, plus three same-address controls that
+          # are NOT in the pilot's facility set (they must never bleed into a Garfield card).
+          PILOT = """110005052085,110005079495,110008975804,110012255175,110033390104,
+          110033793465,110033828918,110034291059,110039703611,110056361743,110070171250,
+          110070182593,110070191525,110070363763,110070366263,110070376640,110070735758,
+          110071144283,110071161706,110071299543,110071346495,110071347034,110071425575,
+          110071443381,110071657336,110071708120,110071895462,110071945553,110072130517"""
+          PILOT = {x.strip() for x in PILOT.replace('\n', '').split(',') if x.strip()}
+          CONTROLS = {'110034344494': 'CEMEX CONSTRUCTION MATERIALS LP (same address as Garfield)',
+                      '110071427904': 'MM - GARFIELD S&G (same address as Garfield)'}
+          want = PILOT | set(CONTROLS)
+
+          KEEP = ['REGISTRY_ID','PGM_SYS_ACRNM','PGM_SYS_ID','INTEREST_TYPE','AFFILIATION_TYPE',
+                  'START_DATE','END_DATE','ORG_NAME','ORG_TYPE','DUNS_NUMBER','EIN',
+                  'STATE_BUSINESS_ID','CITY_NAME','STATE_CODE']
+          out = []
+          with open('TX_ORGANIZATION_FILE.CSV', newline='', encoding='utf-8', errors='replace') as fh:
+              r = csv.reader(fh); hdr = next(r)
+              i = {h: n for n, h in enumerate(hdr)}
+              for row in r:
+                  if row[i['REGISTRY_ID']] in want:
+                      out.append({k: row[i[k]] for k in KEEP})
+
+          print('PILOT_FACILITIES_CHECKED', len(PILOT))
+          print('CONTROL_FACILITIES_CHECKED', len(CONTROLS))
+          hit = {o['REGISTRY_ID'] for o in out}
+          print('FACILITIES_WITH_ORG_ROWS', len(hit & PILOT), 'of', len(PILOT))
+          print('FACILITIES_WITHOUT_ORG_ROWS', len(PILOT - hit))
+          print('ROWS', len(out))
+          print('WITHOUT_LIST', ','.join(sorted(PILOT - hit)))
+          print('CONTROLS_WITH_ROWS', ','.join(sorted(hit & set(CONTROLS))))
+          print('---JSON-BEGIN---')
+          print(json.dumps(out, separators=(',', ':')))
+          print('---JSON-END---')
+          PY
