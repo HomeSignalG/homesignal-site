@@ -165,3 +165,66 @@ create schema if not exists evidence;
 --      state = 'single_source' otherwise — a historical deed chain is NOT a conflict.
 --   4. `supporting` always returns EVERY candidate claim. Resolution never deletes.
 -- No score of any kind is produced (§19).
+
+-- ============================================================================
+-- PHASE 3 ADDITIONS (2026-08-10) — Denver, CO jurisdiction-independence proof.
+-- Migrations: evidence_phase3_denver_sources_and_adapter,
+--             evidence_phase3_adapter_helpers,
+--             evidence_phase3_generalize_read_model
+--
+-- NO new core table. NO new predicate. Denver reused all 21 Phase 1/2 predicates.
+-- ============================================================================
+
+-- ── new identifier types (jurisdiction-scoped, §7) ──────────────────────────
+-- denver.schednum      parcel      | Denver Assessor      | scope county CO/Denver
+-- denver.reception_num instrument  | Denver Clerk+Recorder| scope county CO/Denver
+-- The same digit string under tcad.prop_id is a DIFFERENT parcel: uniqueness lives in
+-- the id_type, so a Denver SCHEDNUM can never collide with a Travis PROP_ID.
+
+-- ── new sources ─────────────────────────────────────────────────────────────
+-- denver_assessor_parcels        City and County of Denver Assessor, ArcGIS, first-party,
+--                                authoritative for owner/situs/legal/area/class/value/geometry.
+-- denver_odc_sales_transfers     Denver's real property sales and transfers index. Carries the
+--                                Clerk and Recorder RECEPTION NUMBER, recording date, document
+--                                type, and grantor/grantee AS RECORDED.
+--                                Classified authority_class='official_secondary', NOT
+--                                'authoritative': the publisher is the Assessor, not the Clerk
+--                                and Recorder, which remains the system of record. It is also a
+--                                SUBSET (87,862 rows) of all recordings, not a complete index.
+
+-- ── authority stays PREDICATE-SPECIFIC ──────────────────────────────────────
+-- The transfers index is official_secondary for grantee/grantor/instrument-type/recording-date
+-- and for conveyed_by_instrument. It is deliberately given NO authority over
+-- property_owner_of_record: a grantee is not an owner.
+-- ev_display_precedence ranks: clerk recorded_instrument 10 < assessment roll 20 <
+-- county-published recording index 30.
+
+-- ── parcel <-> instrument linkage: DIRECT ───────────────────────────────────
+-- The transfers rows publish PARID alongside RECEPTION_NUM, so the link is
+-- evidence_class='identifier_backed' with source_predicate_raw='PARID' — the strongest class,
+-- not an address match. Join rule: SCHEDNUM = lpad(PARID::text, 13, '0'), VALIDATED by control
+-- (transfers PARID 225333015000 resolved to exactly one parcel SCHEDNUM '0225333015000').
+
+-- ── idempotent adapter ──────────────────────────────────────────────────────
+-- evidence.ev_ingest_denver_parcel(parcel_json, instr_json, parcel_url, instr_url)
+--   Find-or-create on every entity, keyed on the AUTHORITATIVE identifier; source records
+--   de-duplicated on (source_id, source_record_key, payload_hash); claims guarded by existence
+--   checks. Proven: three consecutive runs left 26 entities / 135 claims / 11 source records /
+--   15 identifiers / 2 geometries unchanged.
+-- evidence.ev_find_or_create_org(name, source_id, source_record, field)
+--   Organizations are SOURCE-SCOPED. Two sources naming the same string get two entities;
+--   sameness is only ever an evidenced ev_entity_resolution row, never an implicit join.
+--   This is why 'DENVER HEALTH AND HOSPITAL AUTHORITY' (2026 grantor) and
+--   'DENVER HEALTH AND HOSPITALAUTHORITY' (2017 grantee) are NOT merged.
+
+-- ── read-model fix (NOT a core-schema change) ───────────────────────────────
+-- Phase 1's deed section hardcoded id_type='travis.instrument_no' — county-specific parsing,
+-- which surfaced as instrument_number:null on the first Denver read. Replaced with
+-- evidence.ev_instrument_number(), which resolves via identifier_type.identifies_kind =
+-- 'instrument'. Added public.ev_recorded_instruments() returning number, document type,
+-- recording date, grantor[], grantee[], and the parcel-link basis + evidence class.
+-- public.ev_current_owner() now also walks parcel -> conveyed_by_instrument -> instrument ->
+-- grantee, so an assessment roll and a recording index can corroborate ACROSS entity kinds.
+-- Both functions are SECURITY DEFINER with EXECUTE revoked from anon/authenticated.
+-- Owner MAILING address (OWNER_ADDRESS_LINE1/CITY/STATE/ZIP) is present in the raw Denver
+-- payload and is deliberately never promoted to a claim and never returned by any read.
