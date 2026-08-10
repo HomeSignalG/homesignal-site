@@ -752,6 +752,11 @@
         "case_number": "job_filing_number",
         "zip": "zip_code"
       },
+      "identity_fields": [
+        "work_permit",
+        "sequence_number",
+        "work_type"
+      ],
       "file_date_kind": "issued",
       "status_to_bucket": {
         "proposed": [],
@@ -6925,6 +6930,10 @@
         "lat": "__lat",
         "lng": "__lng"
       },
+      "identity_fields": [
+        "ProjectNumber",
+        "PermitNumber"
+      ],
       "file_date_kind": "issued",
       "spatial_zip_radius_mi": 5,
       "type_map": {
