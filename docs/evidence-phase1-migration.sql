@@ -116,3 +116,52 @@ create schema if not exists evidence;
 --            development[], deed_references[], sources_checked[].
 --   Emits NO internal UUID and NO enum token — evidence.ev_label() maps each enum
 --   to plain English once, so no frontend ever learns the vocabulary.
+
+-- ============================================================================
+-- PHASE 2 ADDITIONS (2026-08-10) — Travis County Clerk registration +
+-- ownership resolution. Migration: evidence_phase2_clerk_source_and_ownership_resolution
+--
+-- ⛔ THE CLERK ADAPTER WAS NOT BUILT. Both official access paths prohibit
+-- automated retrieval, with receipts:
+--   * www.tccsearch.org/robots.txt  →  "User-agent: ClaudeBot / Disallow: /"
+--                                      "Content-Signal: search=yes,ai-train=no,use=reference"
+--     and the site returns HTTP 403 behind a Cloudflare challenge.
+--   * travis.tx.publicsearch.us/robots.txt → "Allow: /$" + "Disallow: /"
+--     no public API (every /api/* path 404s), results gated behind sign-in /
+--     Kofile "timed access".
+-- Nothing was scraped. Zero Clerk claims exist.
+-- ============================================================================
+
+-- ── new predicates: a deed party is NOT an owner ─────────────────────────────
+-- grantee_on_recorded_instrument — "NOT automatically the current owner. A later
+--   instrument may have conveyed the property onward."
+-- grantor_on_recorded_instrument — "NOT 'former owner'. Being a grantor on one
+--   instrument does not establish that the party ever held, or has since lost, title."
+-- has_instrument_type, has_recording_date
+
+-- ── ev_source 'travis_county_clerk' ──────────────────────────────────────────
+--   access_mode = 'not_machine_accessible', status = 'blocked_by_source_terms'
+--   AUTHORITATIVE for recorded instruments (outranks the appraisal roll for owner
+--   of record); explicitly NOT authoritative for values, acreage or classification.
+--   Authority + role map + precedence are declared NOW so a licensed feed slots in
+--   with no schema change. Declaring authority is not the same as holding evidence.
+
+-- ── ev_source_check: 4 rows, status 'unavailable' ────────────────────────────
+--   One per TCAD-reported instrument (2008006779TR, 2010122587TR, 2012114190TR,
+--   2021024697), each recording WHAT was attempted and WHY it failed.
+--   'unavailable' is explicitly NOT "the instrument does not exist".
+
+-- ── public.ev_current_owner(id_type, id_value) ───────────────────────────────
+-- MINIMUM ownership-resolution policy (§18), documented rather than hardcoded:
+--   1. Candidates are ownership-BEARING claims only: property_owner_of_record and
+--      grantee_on_recorded_instrument.
+--   2. Winner = latest `as_of`; ties broken by ev_display_precedence rank.
+--      RECENCY FIRST — so an older recorded deed does NOT override a newer assessor
+--      roll. "Clerk always wins" is deliberately not implemented.
+--   3. state = 'disagreement' when another claim shares the winner's period AND
+--      rank but names a different party. Both survive; neither is deleted.
+--      state = 'corroborated_by_independent_county_records' only when more than one
+--      SOURCE names the same party in the same period.
+--      state = 'single_source' otherwise — a historical deed chain is NOT a conflict.
+--   4. `supporting` always returns EVERY candidate claim. Resolution never deletes.
+-- No score of any kind is produced (§19).
