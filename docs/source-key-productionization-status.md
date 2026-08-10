@@ -403,3 +403,131 @@ which is why 1,565 keys exist rather than 3. Same shape as Brunswick, one tenth 
 **This also corrects Part 1 §12's guess** that the offending field was `APBTP` with "~4,465 rows":
 the measured excess is **4,439** and the collapse is visible in `case_number`. Not repaired here —
 the approval explicitly excluded it.
+
+---
+
+# PART 3 — EPA FRS diagnostic (2026-08-10). Re-cache still blocked; **FRS HEALTH GATE = FAIL**
+
+Part 2 halted the re-cache on a suspected FRS problem. This part diagnoses it properly and
+**corrects two of Part 2's own conclusions.**
+
+## 20. Root cause: EPA FRS is degraded upstream. HomeSignal is not broken.
+
+The FRS path in `supabase/functions/get-address-report/index.ts`:
+
+| | |
+|---|---|
+| Endpoint | `https://ofmpub.epa.gov/frs_public2/frs_rest_services.get_facilities` (`frsAt`, line 265) |
+| Method / params | GET · `latitude83`, `longitude83`, `search_radius`, `output=JSON` |
+| Timeout | 30 s (`AbortSignal.timeout(30000)`) |
+| Back-off | `frsFacilities`: radii `[3,2,1.5,1,0.5,0.25]` × 3 attempts each; `status>=500` and parse/network errors are transient (retry), `Results.Error` is the process limit (shrink) |
+| Parser | `Results.FRSFacility ?? Results.Facilities ?? FRSFacility`; reads `RegistryId`, `FacilityName`, `Latitude83`, `Longitude83` |
+| Failure output | after all radii × attempts → `[]` → `counts.facilities = 0` |
+
+**Every candidate cause was tested against the live service, not assumed:**
+
+| Hypothesis | Verdict | Receipt |
+|---|---|---|
+| E. Endpoint dead / moved | **NO** | `?registry_id=110019451886&output=JSON` → **HTTP 200**, 346 bytes, returns `ALLIED SANITATION 73 PLACE FACILITY` — a facility already in 11373's cache |
+| E. Schema changed | **NO** | that 200 payload has `RegistryId`, `FacilityName`, `Latitude83`, `Longitude83`; `Results.FRSFacility` is an `array`. Every field the parser reads is present and correctly typed |
+| D/F/H. Parser / filter / swallowed exception | **NO** | the parser is never reached — the transport fails first |
+| G. Coordinate or radius bug | **NO** | facility `110019451886` lives at 40.736805/−73.889595, **0.64 mi** from the 11373 centroid (40.7351/−73.8776) — inside even the smallest back-off radius, and the same query returned all 18 on 2026-08-08 |
+| A. Genuinely empty area | **NO** | 11373 has 18 cached FRS sites, 11214 has 7, with registry IDs |
+| **B/C. Upstream request failure / timeout** | **YES** | see below |
+
+**The measurement.** Six non-spatial and six spatial requests fired together, identical shapes:
+
+| Request shape | Attempts | HTTP 200 | HTTP 502 | Transport failure |
+|---|---:|---:|---:|---:|
+| non-spatial (`registry_id`) | 6 | **3** (all 3 carried `FRSFacility`) | 3 | 0 |
+| spatial (`latitude83`+`longitude83`+`search_radius`) | 6 | **0** | 4 | 2 |
+
+A confirming battery of 8 more spatial requests across both control centroids: **0 × 200, 8 × 502.**
+
+The 502s are `<title>502 Proxy Error</title>` from **EPA's own proxy**, and the transport failures are
+`Failure when receiving data from the peer` and `Timeout of 30000 ms reached … (DNS 72 ms, TCP/SSL
+handshake 601 ms, HTTP Request/Response 29,327 ms)` — DNS resolves, TLS completes, then EPA never
+delivers a body. `https://api.github.com/zen` → 200 from the same pg_net worker, so egress is fine.
+
+**Conclusion: EPA FRS is intermittently failing, and the spatial search — the only shape HomeSignal
+uses — is failing far harder than non-spatial (0/17 vs 4/8 today).** Per the standing instruction,
+this is *not* coded around: zero is not treated as valid, and no re-cache proceeds.
+
+## 21. ⚠️ CORRECTION — Part 2 called `epa_frs_probes` a broken instrument. It is not.
+
+Part 2 §17 asserted the probe "has never been green, so a monitor that has never been green cannot
+distinguish a dead source from a dead monitor," and logged it as a defect. **That was wrong, and the
+error was reasoning from the absence of a green row without checking the window it covers.**
+
+`select min(probed_at), max(probed_at) from public.epa_frs_probes` → **2026-08-09 21:46 →
+2026-08-10 20:00**. The table is ~22 hours old. Across all **182** rows: **0 × HTTP 200, 8 × 502,
+171 transport failures, 2 unresolved.** The probe fired every time, received real HTTP status codes
+back (the 502s prove the requests reached EPA's proxy), and recorded failure correctly on every one.
+
+**It has never been green because FRS's spatial endpoint has not returned 200 once since the probe
+was created.** The monitor is reporting a real, continuous ~22-hour outage. It was working.
+
+That also means the FRS finding in Part 2 was *right for a reason Part 2 dismissed* — and the
+independent nine-ZIP engine measurement it fell back on happened to agree.
+
+### Two genuine design gaps remain (not repaired — see below)
+
+1. **No known-positive control.** Both probe targets are spatial. Today proves the two shapes fail
+   independently, so a non-spatial `registry_id=110019451886` control would separate *"FRS is down"*
+   from *"FRS's spatial search is down"* — a distinction that changes the remediation.
+2. **`ok` conflates healthy-and-empty with failure.** The predicate is
+   `status_code=200 AND content LIKE '%"Results"%' AND content NOT LIKE '%"Error"%'`, so a genuinely
+   empty area returning an `Error`-shaped "no facilities found" would be recorded as not-ok.
+
+**Not fixed in this session, deliberately.** Phase 8 authorized a monitor repair conditioned on the
+monitor being invalid; that premise is now disproven, the monitor is functioning, and the remaining
+items are design improvements rather than the incident. Changing a `SECURITY DEFINER` production
+function mid-incident to fix something that is currently working is not the minimum safe action.
+The exact change is specified above and needs only a go-ahead.
+
+## 22. ⚠️ CORRECTION — "the spatial search specifically hangs" was concluded from n=1
+
+Mid-diagnostic, one round showed the non-spatial lookup at 200 while spatial timed out, and the
+working conclusion became "spatial only." The very next round returned **502 on all four requests,
+including the same non-spatial lookup that had just succeeded.** Both shapes are degraded; spatial
+is merely much worse. The n=6/n=8 batteries above replaced the n=1 inference.
+
+## 23. FRS HEALTH GATE = **FAIL**
+
+| Control | Cached facilities | Cache vintage | Fresh spatial result |
+|---|---:|---|---|
+| 11373 (centroid 40.7351/−73.8776) | **18** | 2026-08-08 11:15 UTC | 0 — no 200 in any attempt |
+| 11214 (centroid 40.6016/−73.9968) | **7** | 2026-08-08 19:00 UTC | 0 — no 200 in any attempt |
+
+Registry-ID overlap between cached and fresh: **0 of 25**, because no fresh spatial response ever
+arrived. The gate requires a nonzero fresh count *and* registry-ID overlap. Neither is achievable
+while the upstream is failing.
+
+**Phases 11–18 (re-fire, collect, re-materialize, BEFORE→AFTER, two-refresh stability, evidence
+integrity) are therefore not executed.** They are gated on Phase 9 by the brief's own ordering.
+
+## 24. Production state at the end of this session — unchanged, again
+
+| Check | Value |
+|---|---|
+| Cache rows written in the last 6 h | **0** |
+| `dev_refresh_collect()` calls | **0** |
+| `dev_refresh_targets` consumed | **0** (779 unrelated rows still untouched) |
+| `property_company_roles` / `project_facility_refs` / `identity_conflicts` | **66 / 33 / 4** |
+| Del Valle 78617 TABS records | **5** |
+| Phase 10 safety gate `evidence_on_rekey_rows` | **0** |
+| Transient-safe guard | untouched |
+
+Every request in this diagnostic was a **read** — `net.http_get` against EPA, plus SELECTs. No write
+path was invoked.
+
+## 25. Resume trigger (unchanged from Part 2, now with a cheap gate)
+
+Poll one spatial request and require **HTTP 200**:
+
+```
+select net.http_get('https://ofmpub.epa.gov/frs_public2/frs_rest_services.get_facilities?latitude83=40.735100&longitude83=-73.877600&search_radius=3&output=JSON','{}'::jsonb,'{}'::jsonb,30000);
+```
+
+When that returns 200 **and** the payload contains registry id `110019451886`, the health gate
+passes; then run Part 2 §17's resume steps (batches of ≤5, `28452` alone, collect within 20 min).
