@@ -2,14 +2,19 @@ name: epa-recovery-watch
 
 # Watches for EPA FRS recovery and, only then, runs the already-approved 5-step gate.
 #
-# ⛔ THE SCHEDULE IS DELIBERATELY COMMENTED OUT. This file is committed so the founder can read
-#    the real thing rather than a description, and it can be exercised by hand via
-#    workflow_dispatch. Uncommenting the `schedule:` block is what enables it — that is the
-#    approval step, and it is a one-line change reviewable on its own.
+# ⛔ THE SCHEDULE IS DELIBERATELY COMMENTED OUT, AND THAT IS ENFORCED, NOT MERELY DOCUMENTED.
+#    test/epa-recovery-arming.test.mjs (inside the offline suite the `unit` check gates on every
+#    PR) FAILS if `schedule:` is uncommented without a committed `.github/epa-recovery-armed`
+#    marker. Arming is therefore a deliberate TWO-PART act — uncomment the schedule AND add the
+#    marker — and neither half does anything on its own. Verified by running the check against a
+#    temporarily-uncommented copy: it failed, then passed again once restored.
 #
 # WHAT IT CAN AND CANNOT DO — enforced structurally, not by wording:
-#   • `permissions: contents: read` — NO write token. It cannot commit, push, or ship piece (c),
-#     the NEW badge change, or the 63-entry sweep, whatever else happens.
+#   • PERMISSIONS, IN FULL: `contents: read` + `issues: write`. There is no write token for code —
+#     it cannot commit, push, or ship piece (c), the NEW badge change, or the 63-entry sweep. Its
+#     ONLY write scope is `issues: write`, used solely to open the report issue. Both scopes are
+#     PINNED by test/epa-recovery-arming.test.mjs: adding a third fails CI until that test is
+#     edited, which forces the new scope to be stated rather than discovered.
 #   • No service-role key. It holds the PUBLIC anon key plus a per-function token, and can call
 #     exactly four epa_recovery_* RPCs. Arbitrary SQL is not reachable from here.
 #   • The 82801 proof is enforced by the DATABASE: epa_recovery_repair() raises unless a PASSED
