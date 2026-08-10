@@ -233,3 +233,93 @@ test('a disclosure "No" is worded as "not reported", never as poor performance',
   assert.ok(!/>No</.test(html), 'a bare "No" must not render as the value');
   assert.match(html, /it is not a measurement of how the company performs/);
 });
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Added by the Williamson County coverage-validation pilot (2026-08-10). Everything below
+// pins a state or a defect the SECOND geography surfaced and Del Valle never reached.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+// A company WikiRate has never heard of, and a company whose lookup could not be completed,
+// are different answers and must stay so. Williamson produced 30 of the first and, before the
+// retry loop, 41 requests of the second.
+const NO_MATCH = {
+  id: 'proj-nomatch', name: 'Longhorn Disposal site',
+  sustainability: { companies: [
+    { role: 'Operator', source: 'WikiRate', attribution: 'direct_company',
+      company_name: 'LONGHORN DISPOSAL, INC.', identity_tier: 'identifier_backed',
+      identity_verification: 'HIGH_CONFIDENCE', lookup_status: 'checked_no_data',
+      parent_of_name: null, external_company_name: null, indicators: [] } ] }
+};
+const REJECTED = {
+  id: 'proj-rejected', name: 'Cypress Semiconductor site',
+  sustainability: { companies: [
+    { role: 'Operator', source: 'WikiRate', attribution: 'direct_company',
+      company_name: 'CYPRESS SEMICONDUCTOR CORPORATION', identity_tier: 'identifier_backed',
+      identity_verification: 'HIGH_CONFIDENCE', lookup_status: 'ambiguous_rejected',
+      parent_of_name: null, external_company_name: null, indicators: [] } ] }
+};
+const INCOMPLETE = {
+  id: 'proj-incomplete', name: 'Timed-out lookup',
+  sustainability: { companies: [
+    { role: 'Operator', source: 'WikiRate', attribution: 'direct_company',
+      company_name: 'SPAWGLASS CONTRACTORS, INC.', identity_tier: 'identifier_backed',
+      identity_verification: 'HIGH_CONFIDENCE', lookup_status: 'error',
+      parent_of_name: null, external_company_name: null, indicators: [] } ] }
+};
+const MATCHED_EMPTY = {
+  id: 'proj-matched-empty', name: 'Matched but nothing displayable',
+  sustainability: { companies: [
+    { role: 'Operator', source: 'WikiRate', attribution: 'direct_company',
+      company_name: 'Example Matched Co.', identity_tier: 'identifier_backed',
+      identity_verification: 'VERIFIED', lookup_status: 'matched',
+      parent_of_name: null, external_company_name: 'Example Matched', indicators: [] } ] }
+};
+
+test('no-match, matched-with-nothing, rejected and incomplete are four different states', () => {
+  // They must never collapse into one "no ESG data" bucket — the reason we found nothing is
+  // the whole output of a coverage pilot.
+  const states = [NO_MATCH, MATCHED_EMPTY, REJECTED, INCOMPLETE]
+    .map(r => S.direct(r)[0].lookup_status);
+  assert.deepEqual(states, ['checked_no_data', 'matched', 'ambiguous_rejected', 'error']);
+  assert.equal(new Set(states).size, 4);
+  // None of them displays anything, and none of them displays a zero.
+  [NO_MATCH, MATCHED_EMPTY, REJECTED, INCOMPLETE].forEach(r => {
+    assert.equal(S.indicatorHTML(r), '');
+    assert.equal(S.detailHTML(r), '');
+    assert.equal(S.withData(r).length, 0);
+  });
+});
+
+test('an incomplete lookup is never rendered as "no data found"', () => {
+  // A timeout means we did not finish looking. Saying "no sustainability data found in the
+  // sources checked" would assert a search concluded when it did not.
+  const c = S.direct(INCOMPLETE)[0];
+  assert.equal(c.lookup_status, 'error');
+  assert.notEqual(S.STATE_LINE.no_data, S.STATE_LINE.not_checked);
+  assert.ok(!/No sustainability data found/.test(S.detailHTML(INCOMPLETE)));
+  assert.ok(!/no other sustainability information exists/i.test(
+    Object.values(S.STATE_LINE).join(' ')));
+});
+
+test('a rejected WikiRate candidate never becomes a company on the card', () => {
+  // WikiRate offered "Cypress Semiconductor" and "Southland (Cambodia) Co. Ltd."; neither is
+  // key-equal to the resolved identity, so neither may appear anywhere.
+  const html = S.detailHTML(REJECTED) + S.indicatorHTML(REJECTED)
+    + JSON.stringify(S.evidenceEntries(REJECTED));
+  assert.ok(!/Cypress Semiconductor</.test(html));
+  assert.ok(!/Southland/.test(html));
+  assert.equal(S.direct(REJECTED)[0].external_company_name, null,
+    'a rejected candidate leaves no external name on the identity');
+});
+
+test('direct and parent statistics stay separately addressable', () => {
+  // The renderer must never let a parent match be counted as direct coverage. The two lists
+  // are disjoint by construction, and the first-level wording differs.
+  const both = { id: 'both', sustainability: { companies:
+    S.direct(NO_MATCH).concat(S.parents(GARFIELD)) } };
+  assert.equal(S.direct(both).length, 1);
+  assert.equal(S.parents(both).length, 1);
+  assert.equal(S.direct(both).filter(c => S.parents(both).includes(c)).length, 0);
+  // Only the parent has data, so the card says parent-company — not "company".
+  assert.equal(textOf(S.indicatorHTML(both)), 'Parent-company sustainability information available');
+});

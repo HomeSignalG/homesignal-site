@@ -857,6 +857,36 @@ legal/framing change not covered by the one-time sign-off.
     21 checked-no-data · 0 ambiguous · 2 records gained an indicator. Full method, the discarded
     components and the limitations (answer pagination truncated at 1,200 by a WikiRate 403):
     **`docs/esg-downstream-of-identity-pilot-78617.sql`**. Pinned by `test/sustainability.test.mjs`.
+  - 🔴 **COVERAGE VALIDATED IN A SECOND GEOGRAPHY — WIKIRATE HAS 0/54 DIRECT-COMPANY MATCHES
+    (2026-08-10).** Williamson County TX was selected on regulator data alone (highest count of
+    distinct TCEQ heavy-industry operators among modelled TX counties, Travis excluded), then
+    resolved with the SAME identifier-backed rule: 9,617 affiliation rows → 314 unambiguous
+    entities → **33 direct companies**, 0 verified parents. Result: **0 matched**, 30 no
+    candidate, 3 rejected, **0 displayable indicators**. Combined with Del Valle the
+    direct-company match rate is **0 / 54 = 0%**; the only displayable data anywhere is the 6
+    indicators from one verified public-company parent. **Decision: C — parent-heavy source**,
+    provisional on n=1. Full method and the rates: **`docs/sustainability-coverage-validation-williamson.sql`**.
+    - **The gap is structural, not a matching failure.** The operators HomeSignal resolves are
+      septic services, quarries, electroplating shops, landfills, a rural electric co-op, a
+      church. WikiRate's corpus is large listed multinationals. And where a listed operator's
+      card DOES exist — Cypress Semiconductor, 123 answers — it holds **zero environmental
+      metrics**, so the one near-miss the acceptance rule rejected would have displayed nothing.
+    - ⚠️ **UNDER LOAD WIKIRATE TIMES OUT RATHER THAN 403-ing.** 41 of 59 requests at 5-per-6s
+      simply hung to the 25 s client timeout — no 403 at all, unlike Del Valle's 10-concurrent
+      burst. A timeout recorded as `checked_no_data` is 41 clean-looking wrong zeros; the
+      collector now maps any failed request to `error` (incomplete) and `esg_lookup_retry()`
+      re-fires only failures. All 41 succeeded on retry.
+    - ⚠️ **`alias` can be JSON `null`, and `coalesce(c->'alias','[]')` does not rescue it** —
+      `->` returns the jsonb value null, not SQL NULL, so `jsonb_array_elements_text` raises
+      `22023 cannot extract elements from a scalar` and the WHOLE collect aborts. Guard on
+      `jsonb_typeof(...) = 'array'`. Del Valle never hit it; one alias-less card breaks a county.
+    - ⚠️ **The identifier-backed identity path is CENTRAL-TEXAS-ONLY today.** The TCEQ Central
+      Registry Socrata extract covers 3 regions (13 San Antonio · 11 Austin · 9 Waco); Dallas
+      75201 returns 31 rows and Houston is absent. A Gulf-Coast refinery ZIP — the obvious place
+      to find public-company operators — could not be used.
+    - ⚠️ **A Socrata group-by capped at its own `$limit` silently mis-ranks.** The all-operator
+      aggregate returned exactly 400 rows and read Dallas/El Paso as 0; only the industrial
+      aggregate (213 rows, under the limit) was complete, and only it was used to rank.
 - **THE QUALITY OF LIFE IMPACT SCORE™ IS A LIFECYCLE CONSTANT AND IS GATED OFF
   (2026-08-09).** Its entire input is one string: `app_refresh_zip` writes
   `proposed→72, approved/built→55, else 45` for development rows and a literal `30` for

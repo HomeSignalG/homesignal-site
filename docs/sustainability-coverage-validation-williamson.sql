@@ -1,0 +1,174 @@
+-- ============================================================================================
+-- COMPANY SUSTAINABILITY COVERAGE VALIDATION PILOT — Williamson County, TX
+-- Run 2026-08-10. Research/measurement record. SQL of record (docs/*.sql are parked).
+--
+-- THE QUESTION: after Del Valle returned 0 direct-company matches out of 21, is the problem
+--   (A) Del Valle happens to hold companies WikiRate does not cover, or
+--   (B) WikiRate coverage is generally too sparse for HomeSignal?
+-- A second, independently selected geography answers it.
+-- ============================================================================================
+
+
+-- ── 1. GEOGRAPHY SELECTION — the criteria, declared and applied BEFORE any WikiRate call ────
+-- Blocker found first: the ESG eligibility view had exactly ONE zip in it (78617). HomeSignal's
+-- identity graph did not exist anywhere else, so a second geography required running the
+-- IDENTITY resolver there first — upstream, with the same rule, before ESG saw anything.
+--
+-- Selection was made on regulator data only:
+--   1. universe   = every modelled Texas ZIP (668 level='zip' community rows)
+--   2. rank       = distinct TCEQ ORGANIZATION operators with an OPEN, non-construction-
+--                   stormwater affiliation whose regulated entity carries a heavy-industry
+--                   NAICS (21 · 22 · 31-33 · 486 · 562 · 4247)
+--   3. exclusion  = Travis County, so the validation is independent of the Del Valle pilot
+--   4. unit       = one county (the brief permits a county or a bounded ZIP group)
+--   Result: Williamson 38 · Comal 30 · Hays 28 · Burnet 8 · Bastrop 5.  -> WILLIAMSON COUNTY,
+--   25 modelled ZIPs, 462 EPA facilities.
+--
+-- ⚠️ SCOPE LIMIT OF THE IDENTITY SOURCE, found during selection and material to any scaling
+-- plan: the TCEQ Central Registry Socrata extract (msah-s2rv, 659,004 rows) covers only THREE
+-- TCEQ regions — 13 San Antonio (314,719), 11 Austin (196,465), 9 Waco (147,820). Dallas 75201
+-- returns 31 rows; Houston and DFW are absent. The identifier-backed identity path is
+-- Central-Texas-only today, which is why a Gulf-Coast refinery ZIP (the obvious place to find
+-- public-company operators) could not be used.
+--
+-- ⚠️ A TRUNCATED AGGREGATE NEARLY MIS-RANKED THE COUNTIES. The all-operator group-by returned
+-- exactly 400 rows — the $limit — so low-count ZIPs were silently absent and Dallas/El Paso
+-- read as 0. The industrial group-by returned 213 rows, under the limit, and is therefore
+-- complete; the ranking above uses only that one. Always check a Socrata group-by against its
+-- own $limit before ranking on it.
+
+
+-- ── 2. IDENTITY RESOLUTION (upstream; nothing here reads WikiRate) ──────────────────────────
+-- Same identifier-backed rule as Del Valle, generalised into tceq_operators_fire /
+-- tceq_operators_collect + tceq_resolved_operators. THE UNAMBIGUITY RULE is unchanged: a
+-- regulated entity resolves to an operator only when it has EXACTLY ONE open, non-STORM,
+-- ORGANIZATION affiliation, because TCEQ leaves superseded affiliations open-ended.
+--   9,617 affiliation rows staged across 25 ZIPs
+--     348 regulated entities with an open non-STORM ORGANIZATION affiliation
+--     314 unambiguous -> 281 distinct operators
+--      34 REJECTED as ambiguous (tceq_rejected_entities)
+-- SAMPLE, both criteria name-blind and declared before any WikiRate contact:
+--   slice A  operators on a heavy-industry NAICS (the same prefixes that ranked the counties)
+--   slice B  the 15 operators with the most distinct regulated entities in the county
+--   union = 53 regulated entities -> 33 distinct direct companies, 12 ZIPs, 10 NAICS groups
+-- 5 of the resolved roles matched a HomeSignal facility record by name and carry a project_id;
+-- the rest are company-level only, and property-level coverage is reported separately below.
+
+
+-- ── 3. WIKIRATE RESULT — 33 direct companies, ZERO matches ──────────────────────────────────
+--   matched ................................  0
+--   checked_no_data (no candidate at all) .. 30
+--   ambiguous_rejected .....................  3
+--   lookup incomplete ......................  0   (after retries; see §5)
+--   displayable indicators .................  0
+--   verified parents eligible ..............  0   (company_parents holds no row for any of the
+--                                                  33 — verifying a parent needs SEC EX-21 work
+--                                                  that has not been done for these companies)
+--
+-- THE THREE REJECTIONS, each a different lesson:
+--   CYPRESS SEMICONDUCTOR CORPORATION -> WikiRate "Cypress Semiconductor", declared alias
+--     "CYPRESS SEMICONDUCTOR CORP". A GENUINE near-miss: the suffix-stripped search token found
+--     the right company, but TCEQ writes CORPORATION and WikiRate writes CORP, so neither the
+--     name nor the alias is key-equal. Acceptance held, and it cost a true positive.
+--     ⓘ AND IT COST NOTHING IN PRACTICE. Probed as research (no match stored): that card has
+--     123 answers and **ZERO** environmental ones — 2020WoB, Good Jobs First, SEC financials,
+--     minerals sourcing, SDG disclosure counts. 0 of the 9 catalogue metrics.
+--   Mid-America Apartments, L.P. -> WikiRate "Mid-America Apartments" (no alias). A DIFFERENT
+--     legal entity: the operating partnership is not the parent REIT, and collapsing them is
+--     exactly the over-normalization the LLC/LTD rule forbids. Probed: 1 answer, 0 environmental.
+--   Southland Corp -> WikiRate "Southland (Cambodia) Co. Ltd." A FALSE POSITIVE AVOIDED. This
+--     is the acceptance rule earning its keep.
+--
+-- WHAT THE 30 NO-MATCH COMPANIES ARE — the gap analysis that matters more than the count:
+--   septic and drain services · solid-waste landfill and haulers · dimension-stone quarries ·
+--   electroplating and anodizing shops · asphalt-mixture plants · machine shops · cabinet
+--   manufacturing · a rural electric cooperative · auto repair and oil-change shops · a
+--   convenience-store fuel operator · a church. These are private, local operators. WikiRate's
+--   corpus is large listed multinationals. The mismatch is structural, not incidental.
+
+
+-- ── 4. INDICATOR QUALITY — nothing new to classify, and that is the finding ─────────────────
+-- Useful/displayable ................ 0
+-- Valid but low homeowner value ..... 0
+-- Suppressed ........................ 0
+-- No accepted company means no indicators to classify. The Del Valle parent match remains the
+-- only source of displayable indicators anywhere: 6 (3 GHG performance with published units,
+-- 3 environmental disclosures).
+
+
+-- ── 5. PAGINATION AND RATE LIMIT — measured, not designed around ────────────────────────────
+-- Company searches: 33 companies -> 59 requests (exact name, plus the suffix-stripped token
+-- where it differs), issued 5 at a time with a 6-second pause.
+--   first pass ....... 18 of 59 returned 200; **41 hung and hit the 25 s client timeout**
+--   retries .......... 41, issued 4 at a time with a 10-second pause -> all 41 returned 200
+--   final ............ 59/59 = 200, 0 HTTP 403
+-- ⚠️ NEW BEHAVIOUR, different from Del Valle. Del Valle's 10-concurrent burst produced HTTP
+-- 403 for every request and stayed 403 for at least 30 s. Williamson's gentler 5-per-6s pattern
+-- produced NO 403 at all — instead WikiRate simply stopped responding and the requests timed
+-- out. **A timeout is not "no data".** Left uncorrected, those 41 would have been recorded as
+-- 41 clean zeros, which is the same shape of wrong answer as the Del Valle suffix bug.
+-- The collector now maps a failed request to lookup_status='error' (incomplete), never to
+-- checked_no_data, and esg_lookup_retry() re-fires only the failures.
+-- Answer pagination: not exercised here — no company matched, so no answer set was paged.
+-- Del Valle's limit stands unchanged and unresolved: 1,200 answers retrieved for Martin
+-- Marietta, HTTP 403 at offset 1200+, remainder UNREAD.
+
+
+-- ── 6. BUG FOUND BY THE WIDER DATASET, documented before it was fixed ───────────────────────
+-- esg_collect_company_search() ABORTED on the Williamson result set:
+--     ERROR: 22023 cannot extract elements from a scalar
+-- WikiRate emits `alias` as JSON **null** on some cards ("Mid-America Apartments"), not as an
+-- absent key. `coalesce(c->'alias','[]'::jsonb)` does not rescue that — `c->'alias'` returns the
+-- jsonb value null rather than SQL NULL, so coalesce keeps it and jsonb_array_elements_text
+-- raises. Del Valle never hit it because its single candidate card carried an array.
+-- Fixed by guarding on jsonb_typeof(...) = 'array'. Any geography with an alias-less card would
+-- have failed the whole collect, not just that company.
+
+
+-- ── 7. COMPARISON, AND THE RATES ────────────────────────────────────────────────────────────
+--   metric                                   Del Valle   Williamson   combined
+--   eligible direct companies                       21           33         54
+--   verified parents eligible                        1            0          1
+--   entities searched                               22           33         55
+--   direct-company matches                           0            0          0
+--   direct companies with displayable data           0            0          0
+--   parent matches                                   1            0          1
+--   no company match                                21           30         51
+--   matched but no useful indicators                 0            0          0
+--   ambiguous / rejected                             0            3          3
+--   incomplete lookups (final)                       0            0          0
+--   displayable indicators                           6            0          6
+--   properties with DIRECT-company data              0            0          0
+--   properties with PARENT-ONLY data                 2            0          2
+--
+--   Direct-company match rate .............. 0 / 54 = 0.0%
+--   Direct-company displayable-data rate ... 0 / 54 = 0.0%
+--   Parent-company match rate .............. 1 / 1 = 100%  (n = 1; not a rate yet)
+--   Property coverage ...................... 2 properties, ALL parent-only, 0 direct
+-- Direct and parent are never added together: the one property class that gains anything gains
+-- it through a corporate parent, and is classified as parent-only coverage.
+
+
+-- ── 8. DECISION: C — PARENT-HEAVY SOURCE (provisional on n=1) ───────────────────────────────
+-- A (scale candidate) is ruled out: 0 direct matches in 54 companies across two independently
+--   selected Central Texas geographies.
+-- D (not worth scaling) is not supported: the one verified public-company parent produced 6
+--   genuinely useful indicators, including three GHG figures with units published by the source.
+-- B (useful enrichment) overstates it: 2 properties gained anything, and neither gained
+--   anything about the company actually operating on the site.
+-- C fits what was measured — WikiRate is useful exactly where a VERIFIED PUBLIC-COMPANY PARENT
+--   exists — but it rests on a single parent, so it is provisional.
+--
+-- WHAT WOULD MOVE THE CLASSIFICATION, stated so the next pilot is decidable rather than
+-- another sweep of zeros:
+--   -> B or A  if a geography whose operators are themselves large listed companies produces
+--              direct matches WITH environmental metrics. The Cypress probe is evidence against
+--              this: a listed operator's card existed and held no environmental data at all.
+--   -> D       if verifying more parents (SEC EX-21, the only path that has ever worked) yields
+--              parents whose WikiRate cards are as environmentally empty as Cypress's.
+-- The cheapest next measurement is therefore NOT another geography. It is: verify parents for
+-- 10-15 already-resolved operators via SEC EX-21, then measure how many of those parents carry
+-- catalogue-eligible environmental metrics. That tests the C hypothesis directly.
+--
+-- NOT DONE, deliberately: no national ingestion, no scheduled WikiRate queries, no second
+-- provider, no relaxation of the acceptance rule, no change to identity rules, no ESG score.
