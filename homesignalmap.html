@@ -350,6 +350,7 @@
             <div class="mk3tip" id="mk3tip"></div>
             <div class="mk3info" id="mk3info"></div>
             <div id="map"><div id="mapInner"></div></div>
+            <div id="hsEvidenceCard" class="hs-ev-mount" hidden></div>
             <div class="mapgl" id="mapgl"></div>
             <div class="map3d" id="map3d">
               <div class="hud3d">
@@ -468,6 +469,96 @@
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js"></script>
 <script src="lib/map.js?v=20260720b"></script>
+
+<style>
+/* Evidence property card (Phase 4 pilot). Scoped under .hs-ev-card only. */
+.hs-ev-mount{margin:12px 0}
+.hs-ev-card{background:#fff;border:1px solid #e3e6ea;border-radius:12px;padding:16px 18px;
+  font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1c2126;max-width:720px}
+.hs-ev-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  border-bottom:1px solid #eef1f4;padding-bottom:10px;margin-bottom:4px;flex-wrap:wrap}
+.hs-ev-title{font-size:16px;font-weight:650;margin:0}
+.hs-ev-juris{font-size:12px;color:#67717c}
+.hs-ev-sec{padding:12px 0;border-bottom:1px solid #f2f4f6}
+.hs-ev-sec:last-child{border-bottom:0;padding-bottom:0}
+.hs-ev-h{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#67717c;margin:0 0 6px}
+.hs-ev-h4{font-size:12px;margin:12px 0 4px;color:#3a4249}
+.hs-ev-lede{font-size:16px;font-weight:600;margin:0 0 8px}
+.hs-ev-owner{font-size:17px;font-weight:650;margin:0 0 6px}
+.hs-ev-status{margin:0 0 6px}
+.hs-ev-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+  border-radius:999px;padding:3px 10px;border:1px solid}
+.hs-ev-badge--ok{background:#eef8f1;border-color:#bfe3cb;color:#1c6b3a}
+.hs-ev-badge--info{background:#eef3fa;border-color:#c9d9ef;color:#274b7d}
+.hs-ev-badge--warn{background:#fdf3e7;border-color:#f0d4ab;color:#8a5312}
+.hs-ev-badge--muted{background:#f4f5f7;border-color:#dfe3e8;color:#5b646d}
+.hs-ev-caveat{font-size:12px;color:#67717c;margin:4px 0 0}
+.hs-ev-warn{font-size:13px;color:#8a5312;background:#fdf3e7;border:1px solid #f0d4ab;
+  border-radius:8px;padding:8px 10px;margin:8px 0 0}
+.hs-ev-note{font-size:12.5px;color:#4a535c;background:#f7f9fb;border:1px solid #e6ebf0;
+  border-radius:8px;padding:8px 10px;margin:0 0 10px}
+.hs-ev-dl{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;margin:0}
+.hs-ev-dl dt{color:#67717c;font-size:12.5px}
+.hs-ev-dl dd{margin:0;font-size:13.5px}
+.hs-ev-legal{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
+  word-break:break-word;color:#3a4249}
+.hs-ev-list{list-style:none;margin:0;padding:0}
+.hs-ev-item{padding:9px 0;border-top:1px solid #f2f4f6}
+.hs-ev-item:first-child{border-top:0}
+.hs-ev-item-head{display:flex;gap:10px;align-items:baseline}
+.hs-ev-yr{font-variant-numeric:tabular-nums;font-weight:650;color:#1c2126;min-width:3.2em}
+.hs-ev-doc{font-weight:600}
+.hs-ev-parties{margin:3px 0 0 0;font-size:13.5px}
+.hs-ev-role{display:inline-block;min-width:5.4em;color:#67717c;font-size:12px}
+.hs-ev-meta{font-size:12px;color:#67717c;margin-top:3px}
+.hs-ev-dim{color:#7b848d;font-size:12.5px}
+.hs-ev-more{margin-top:8px}
+.hs-ev-more>summary{cursor:pointer;font-size:12.5px;color:#274b7d;font-weight:600;padding:2px 0}
+.hs-ev-more>summary:focus-visible{outline:2px solid #274b7d;outline-offset:2px;border-radius:4px}
+.hs-ev-more-body{padding:8px 0 2px}
+.hs-ev-srclist{list-style:none;margin:0;padding:0;font-size:12.5px;color:#3a4249}
+.hs-ev-srclist li{padding:5px 0;border-top:1px solid #f2f4f6}
+.hs-ev-srclist li:first-child{border-top:0}
+.hs-ev-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (max-width:430px){
+  .hs-ev-card{padding:13px 14px;border-radius:10px}
+  .hs-ev-dl{grid-template-columns:1fr;gap:0 0}
+  .hs-ev-dl dt{margin-top:6px}
+  .hs-ev-role{min-width:0;display:block}
+  .hs-ev-item-head{flex-wrap:wrap;gap:4px}
+}
+</style>
+<script>
+/* PHASE 4 FEATURE FLAG — default OFF for every property.
+ * The card renders only when the resolved parcel is on the server-side pilot allowlist
+ * (evidence.ev_pilot_parcel). The RPC itself returns {pilot_enabled:false} for anything
+ * else, so the flag cannot be bypassed from the browser. HS_EVIDENCE_CARD is a local
+ * kill-switch for instant rollback; the allowlist is the real control.
+ */
+window.HS_EVIDENCE_CARD = (window.HS_EVIDENCE_CARD !== false);
+(function () {
+  function mount(html) {
+    var el = document.getElementById('hsEvidenceCard');
+    if (!el) return;
+    if (!html) { el.hidden = true; el.innerHTML = ''; return; }
+    el.innerHTML = html; el.hidden = false;
+  }
+  // ONE normalized RPC. No county-specific parsing, no evidence-table reads.
+  window.hsLoadEvidenceCard = function (idType, idValue) {
+    if (!window.HS_EVIDENCE_CARD) { mount(''); return Promise.resolve(null); }
+    var c = window.hsClient || (window.HS && window.HS.client);
+    if (!c || !idType || !idValue) { mount(''); return Promise.resolve(null); }
+    return c.rpc('ev_property_card', { _id_type: idType, _id_value: idValue })
+      .then(function (r) {
+        var card = r && r.data;
+        mount(card ? window.HS.EvidenceCard.render(card) : '');
+        return card;
+      })
+      .catch(function () { mount(''); return null; });   // never block the legacy page
+  };
+})();
+</script>
+<script src="evidence-card.js"></script>
 <script src="shell.js"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected

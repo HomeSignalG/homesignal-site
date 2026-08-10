@@ -1,0 +1,187 @@
+{
+ "found": true,
+ "pilot_enabled": true,
+ "jurisdiction": "Travis County, TX",
+ "sources": [
+  {
+   "name": "City of Austin GIS \u2014 TCAD parcel republication",
+   "agency": "City of Austin"
+  },
+  {
+   "name": "Texas Department of Licensing and Regulation \u2014 TABS",
+   "agency": "TDLR"
+  },
+  {
+   "name": "Travis Central Appraisal District",
+   "agency": "Travis Central Appraisal District"
+  }
+ ],
+ "property": {
+  "situs": "2200 CALDWELL LN, TX 78617",
+  "acreage": {
+   "unit": "acres",
+   "value": "36.4740",
+   "source": "Travis Central Appraisal District",
+   "measurement": "legalAcreage"
+  },
+  "acreage_alternates": [
+   {
+    "unit": "acres",
+    "value": "28.4940",
+    "source": "Travis Central Appraisal District",
+    "measurement": "landInfo.sizeAcres"
+   }
+  ],
+  "identifiers": [
+   {
+    "label": "TCAD Property ID",
+    "value": "292354",
+    "primary": true,
+    "issued_by": "Travis Central Appraisal District"
+   },
+   {
+    "label": "TCAD Geographic ID",
+    "value": "0315600221",
+    "primary": false,
+    "issued_by": "Travis Central Appraisal District"
+   }
+  ],
+  "classification": [
+   "E1"
+  ],
+  "legal_description": "ABS 18 NAVARRO J A ACR 36.474"
+ },
+ "ownership": {
+  "as_of": "2026-01-01",
+  "owner": "RIVER BOTTOMS RANCH LLC",
+  "status": "Reported by one county source",
+  "status_kind": "reported",
+  "role_label": "Property owner of record",
+  "role_means": "The owner of the land as carried by the authoritative land-records source for the jurisdiction (appraisal roll or recorded deed).",
+  "role_caveat": "NOT the project filer, NOT the operator, NOT the parent company.",
+  "supporting": [
+   {
+    "as_of": "2026-01-01",
+    "party": "RIVER BOTTOMS RANCH LLC",
+    "source": "Travis Central Appraisal District",
+    "evidence": "authoritative appraisal roll",
+    "predicate": "property_owner_of_record",
+    "retrieved_at": "2026-08-10T21:02:17.646923+00:00",
+    "source_record_key": "292354"
+   }
+  ]
+ },
+ "unavailable_sources": [
+  {
+   "source": "Travis County Clerk \u2014 Official Public Records",
+   "last_checked": "2026-08-10"
+  }
+ ],
+ "recorded_instruments_note": "Instrument references reported by the appraisal district. County recorder records are not available through HomeSignal's automated sources.",
+ "recorded_instruments": [
+  {
+   "instrument_number": "2021024697",
+   "document_type": null,
+   "recording_date": "2021-02-03",
+   "grantor": null,
+   "grantee": null,
+   "parties_available": false,
+   "independently_recorded": false,
+   "reported_by": "Travis Central Appraisal District",
+   "detail": {
+    "parcel_link_basis": "deeds[].instrumentNum",
+    "parcel_link_evidence": "reported by another source",
+    "caveat": "A reference REPORTED BY an appraisal source is not the recorded instrument itself."
+   }
+  },
+  {
+   "instrument_number": "2012114190TR",
+   "document_type": null,
+   "recording_date": "2012-07-13",
+   "grantor": null,
+   "grantee": null,
+   "parties_available": false,
+   "independently_recorded": false,
+   "reported_by": "Travis Central Appraisal District",
+   "detail": {
+    "parcel_link_basis": "deeds[].instrumentNum",
+    "parcel_link_evidence": "reported by another source"
+   }
+  },
+  {
+   "instrument_number": "2010122587TR",
+   "document_type": null,
+   "recording_date": "2010-08-23",
+   "grantor": null,
+   "grantee": null,
+   "parties_available": false,
+   "independently_recorded": false,
+   "reported_by": "Travis Central Appraisal District",
+   "detail": {
+    "parcel_link_basis": "deeds[].instrumentNum",
+    "parcel_link_evidence": "reported by another source"
+   }
+  },
+  {
+   "instrument_number": "2008006779TR",
+   "document_type": null,
+   "recording_date": null,
+   "grantor": null,
+   "grantee": null,
+   "parties_available": false,
+   "independently_recorded": false,
+   "reported_by": "Travis Central Appraisal District",
+   "detail": {
+    "parcel_link_basis": "deeds[].instrumentNum",
+    "parcel_link_evidence": "reported by another source"
+   }
+  }
+ ],
+ "development": [
+  {
+   "project_number": "TABS2023006449",
+   "project_name": "Building F",
+   "project_owner_as_filed": "River Bottoms Ranch LLC",
+   "owner_role_label": "Project owner (as filed)",
+   "owner_role_caveat": "NOT evidence of land ownership. A filer may name a tenant, an affiliate, or a trade name.",
+   "source": "Texas Department of Licensing and Regulation \u2014 TABS",
+   "link_note": "Linked to this parcel by resolved by authoritative parcel/address match"
+  },
+  {
+   "project_number": "TABS2023006483",
+   "project_name": "River Bottoms Ranch",
+   "project_owner_as_filed": "River Bottoms Ranch",
+   "owner_role_label": "Project owner (as filed)",
+   "owner_role_caveat": "NOT evidence of land ownership. A filer may name a tenant, an affiliate, or a trade name.",
+   "source": "Texas Department of Licensing and Regulation \u2014 TABS",
+   "link_note": "Linked to this parcel by resolved by authoritative parcel/address match"
+  },
+  {
+   "project_number": "TABS2024016698",
+   "project_name": "Bldg 8 Phase 2",
+   "project_owner_as_filed": "RIVER BOTTOMS RANCH LLC",
+   "owner_role_label": "Project owner (as filed)",
+   "owner_role_caveat": "NOT evidence of land ownership. A filer may name a tenant, an affiliate, or a trade name.",
+   "source": "Texas Department of Licensing and Regulation \u2014 TABS",
+   "link_note": "Linked to this parcel by resolved by authoritative parcel/address match"
+  },
+  {
+   "project_number": "TABS2024022676",
+   "project_name": "ATX1",
+   "project_owner_as_filed": "Neuralink",
+   "owner_role_label": "Project owner (as filed)",
+   "owner_role_caveat": "NOT evidence of land ownership. A filer may name a tenant, an affiliate, or a trade name.",
+   "source": "Texas Department of Licensing and Regulation \u2014 TABS",
+   "link_note": "Linked to this parcel by resolved by authoritative parcel/address match"
+  },
+  {
+   "project_number": "TABS2026011928",
+   "project_name": "ATX1",
+   "project_owner_as_filed": "Neuralink Corporation",
+   "owner_role_label": "Project owner (as filed)",
+   "owner_role_caveat": "NOT evidence of land ownership. A filer may name a tenant, an affiliate, or a trade name.",
+   "source": "Texas Department of Licensing and Regulation \u2014 TABS",
+   "link_note": "Linked to this parcel by resolved by authoritative parcel/address match"
+  }
+ ]
+}

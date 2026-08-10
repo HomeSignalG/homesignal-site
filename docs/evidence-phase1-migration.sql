@@ -228,3 +228,23 @@ create schema if not exists evidence;
 -- Both functions are SECURITY DEFINER with EXECUTE revoked from anon/authenticated.
 -- Owner MAILING address (OWNER_ADDRESS_LINE1/CITY/STATE/ZIP) is present in the raw Denver
 -- payload and is deliberately never promoted to a claim and never returned by any read.
+
+-- ============================================================================
+-- PHASE 4 ADDITIONS (2026-08-10) — consumer property card, feature-flagged pilot.
+-- Migration: evidence_phase4_pilot_flag_and_card_rpc
+-- ============================================================================
+-- evidence.ev_pilot_parcel(id_type, id_value, enabled)  — the allowlist is DATA, keyed on
+--   the AUTHORITATIVE identifier, never an address. Two rows: tcad.prop_id 292354 and
+--   denver.schednum 0015300060000. RLS on, revoked from anon.
+-- public.ev_property_card(id_type, id_value) — the ONE RPC the browser calls. Returns
+--   {pilot_enabled:false} for anything not on the allowlist, so the flag cannot be
+--   bypassed client-side. EXECUTE granted to anon; ev_parcel_report / ev_current_owner /
+--   ev_recorded_instruments remain revoked from anon.
+-- evidence.ev_area_rank(basis) — §11 acreage arbitration, DECLARED not guessed:
+--   'legalAcreage' and 'LAND_AREA' rank 1 (the parcel's own area);
+--   'landInfo.sizeAcres' ranks 5 (an appraisal land-segment size, NOT the parcel).
+--   The loser is retained and shown as "Other reported measurement", never substituted.
+-- evidence.ev_doc_type_label(source, code) — SW/WD/QC/PS expanded using Denver's OWN
+--   published convention (its ASAL_INSTR field reads e.g. "SW: SPECIAL WARRANTY").
+-- Consumer status vocabulary is mapped in the RPC, so no internal enum ever reaches the
+-- browser: corroborated / reported / disagree / unknown.
