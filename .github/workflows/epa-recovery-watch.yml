@@ -31,7 +31,7 @@ name: epa-recovery-watch
 
 on:
   workflow_dispatch:
-schedule:
+  schedule:
     - cron: '17 * * * *'
 
 concurrency:
