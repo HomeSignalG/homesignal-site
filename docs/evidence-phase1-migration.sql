@@ -1515,3 +1515,76 @@ create schema if not exists evidence;
 -- basis, then for an off-vocabulary basis — until it used the real term
 -- 'corporate_family_verified_parent'. That is the identity discipline working: an identity
 -- claim cannot be inserted without stating a recognised basis, not even by a test.
+
+-- ============================================================================
+-- PHASE 9E — COMPLETE. FINAL MEASURED STATE (all values read from the database).
+--
+-- CORPUS: 6,077 / 6,077 accounted for. 6,073 native_text + 4 corrupt_unsupported.
+--   0 missing, 0 OCR-required, 0 OCR successes, 0 extraction failures, 0 permanent HTTP
+--   failures. 80,564,928 characters extracted. Run 31533598204, 71 minutes.
+--   THE 4, WITH RECEIPTS: 33-10857, 33-10979, 34-97381, 33-11184 carry a RELATIVE landing
+--   path as doc_url instead of a PDF. First pass: acquisition_failed ("ValueError: unknown
+--   url type") — visible, never skipped. The work-list view was corrected to absolutise
+--   such hrefs and the 4 were RETRIED: all now HTTP 200 with magic bytes b'\n\n<!D' — they
+--   are HTML landing pages, recorded corrupt_unsupported.
+--   ⚠️ AND THE OBVIOUS RECOVERY WOULD HAVE FABRICATED. Phase 9D established that an AP
+--   landing page carries exactly ONE .pdf link, so following it looks like the fix. On
+--   33-10857 that single link is /files/ocoo01-excess-pers-prop-guidance.pdf — the SEC's
+--   "Excess Personal Property Guidance" from the site FOOTER. Following it would have
+--   staged an unrelated document as this order's text. The page carries the release number
+--   but NO order language and NO body container, and is not a 404: these 4 orders have no
+--   obtainable text. Presence intact, detail permanently unavailable.
+--   LR CORPUS: 2,795 / 2,795 body_extracted, 0 failures, 7,462,433 characters.
+--
+-- FOOTER REPAIR: 3,244 of 8,872 rows changed (152 footer + 3,092 intra-row). After:
+--   'Return to top' 0 · 'SEC homepage' 0 · 'See Also:' 0 · 'Release No.' 0 · 'File Number' 0.
+--   Presence completeness UNCHANGED at 8,872 (6,077 AP + 2,795 LR).
+--
+-- DOCUMENT ROLE: substantive 5,252 · procedural 756 · unclassified 65 (counted as neither).
+-- POSTURE: settled/final 3,723 · instituted 1,118 · final order 417 · initial decision 308 ·
+--   dismissed 18 · default 14 · not stated 475.
+-- EVIDENTIARY: without admitting or denying 2,870 · SEC findings 1,280 · admissions 615 ·
+--   allegations 201 · adjudicated 3 · not stated 1,104.
+-- STATUTES: 60,679 citations across 5,918 documents (expressly stated only).
+-- MONEY (four buckets, never summed): civil penalty 1,710 · disgorgement 1,077 ·
+--   prejudgment interest 734 · other relief 244 — all 'stated_with_amount'.
+-- SANCTIONS: cease-and-desist 2,755 · bar 1,258 · censure 1,166 · revocation 795 ·
+--   undertakings 855 · suspension 455 · monitor/consultant 178 · registration action 63.
+-- PAIRS: 46/46 resolved — same_underlying_matter 22 · same_respondent_unrelated 23 ·
+--   related_but_distinct 1 · unresolved 0.
+-- DOCKETS: 38 from AP (22 civil, 16 criminal) · 49 from LR (43 civil, 6 criminal).
+--   4 civ->cv normalisations · 22 criminal dockets held categorically apart.
+-- MATTERS: 7,357 before cross-corpus dedup -> 7,335 after (22 merges).
+-- ENTITY SCAN: 0 direct · 0 verified-parent · 0 unresolved · 37 no_match. 0/36 HOLDS.
+--
+-- ⚠️ THREE MORE ATTRIBUTION DEFECTS IN THE MONEY EXTRACTOR, ALL FOUND BY WATCHING COUNTS
+-- MOVE THE WRONG WAY — recorded because each would have shipped silently:
+--   (a) Re-running normalisation over the full corpus REVERTED every money bucket, because
+--       the corrected logic lived in a follow-up UPDATE rather than inside
+--       ev_normalize_sec_doc. A correction outside the function it corrects is not a fix;
+--       it is a step someone must remember. Folded in.
+--   (b) A trailing-relief guard dropped disgorgement-with-amount from 1,172 to 90 — it was
+--       rejecting the NORMAL "disgorgement of $178,750 and prejudgment interest of $19,576",
+--       where the second relief carries its own figure. The discriminator is whether another
+--       '$' follows: no further figure -> the trailing relief owns this amount (reject);
+--       a further figure -> it owns the next one (accept). A guard that is too aggressive
+--       invents absences exactly as readily as a missing guard invents amounts.
+--   (c) ev_money_from_phrase took the MAX figure in the phrase, which was safe only while
+--       the phrase ended at the amount. With trailing context it picked another relief's
+--       larger number; documents where disgorgement equalled prejudgment interest rose to
+--       97. Now takes the FIRST figure, with an explicit exception for the two-form
+--       restatement "$40 million ($40,000,000)". Final dg = pj collisions: 0.
+--   Controls that hold: 33-10334 dg 178,750.00 / pj 19,576.06 · IC-33534 cp 40,000,000 /
+--   dg 48,473,242 · 33-11023 dg 4,924,275 · 34-98118 dg NULL (its figure is interest).
+--
+-- F1-F12 (13 tests incl. F10b/F10c): ALL PASS. F7 measured merges 22 -> 21 and matter count
+--   7,335 -> 7,336, delta exactly 1. Residue after rollback: 0 across six tables, against a
+--   6,077-row positive control.
+-- IDEMPOTENCE: second full pipeline run — all 15 tracked fields byte-identical, including
+--   pdf/text/LR body hashes, docket, pair, class and normalisation content hashes.
+--   0 change receipts (no source document changed under us).
+-- PERFORMANCE: public.ev_track_record executes in 61.2 ms (planning 0.045 ms,
+--   buffers 2,487 shared hit / 81 read).
+-- SECURITY: 0 references to sec.gov in any shipped HTML/JS. stage_sec_pdf, stage_sec_lr_body,
+--   sec_pdf_work_list, sec_lr_work_list, sec_pdf_representative_set and ev_track_record are
+--   all anon EXECUTE/SELECT false, service_role true.
