@@ -924,3 +924,118 @@ create schema if not exists evidence;
 --   3. Respondent extraction is the index's own respondents string; per-document role parsing
 --      (defendant vs officer vs adviser) is not built, because no pilot entity matched.
 --   4. 34 organisations have no SEC identity — mostly municipal or private, correctly so.
+
+-- ============================================================================
+-- PHASE 9C (2026-08-11) — SEC ADMINISTRATIVE PROCEEDINGS CORPUS.
+-- Migrations: evidence_phase9c_ap_corpus, _ap_fire_window, _ap_driver,
+--   _ap_month_pagination2, _crosscorpus_and_availability
+-- Phase 9A/9B architecture unchanged. Phase 9B's litigation-release corpus untouched.
+--
+-- ── 1. THE COMPLETENESS INSTRUMENT HAD TO CHANGE, AND IT GOT STRONGER ─────────────────
+-- 9B proved completeness by contiguity of one LR-NNNNN sequence plus per-number gap fill.
+-- NEITHER transfers to administrative proceedings:
+--   * a row carries per-ACT release numbers (34-106046, IA-6988 — often several on one row)
+--     which interleave with thousands of NON-enforcement releases, so no usable contiguity;
+--   * the File Number (3-22112) identifies the PROCEEDING, not the document, and one file
+--     number legitimately spans many documents (one here spans 14);
+--   * there is no per-file-number endpoint — /litigation/apdocuments/ap-3-22112.htm and
+--     /administrative-proceedings/3-22112 both 404, and ?fileNumber= is IGNORED exactly as
+--     ?search= was in 9B (it returns the default unfiltered page).
+-- What the index does support is ?year=YYYY&month=M, and a month returns its ENTIRE set in ONE
+-- request. A self-bounding query has no pagination boundary to lose rows across — which is
+-- precisely the failure that cost 9B four live releases. Completeness is therefore proven PER
+-- MONTH: every month fetched 200, and every month proven un-truncated by returning fewer rows
+-- than the page limit. A month AT the limit is never assumed complete.
+--
+-- ── 2. COVERAGE, WITH RECEIPTS (evidence.v_sec_ap_coverage) ───────────────────────────
+--   coverage            2017-04-03 .. 2026-08-11   (pinned to 9B's window so the two corpora
+--                       answer for the SAME period; a combined SEC statement over mismatched
+--                       windows would be a lie of composition)
+--   months expected     113      months complete 113      months incomplete 0
+--   months at limit     0        unexplained gaps 0
+--   documents           6,077    distinct matters (file numbers) 4,562
+--   Acts represented    33, 34, IA, IC
+--
+-- THE TRUNCATION GUARD EARNED ITS KEEP. 11 months came back at EXACTLY 100 rows — the page
+-- limit — and were refused as complete rather than accepted. They are mostly SEPTEMBER, the
+-- SEC's fiscal year-end and its heaviest month for instituting proceedings. Each was paginated
+-- until its final page returned under the limit. Without the guard those 11 months would have
+-- silently lost every proceeding past the hundredth.
+--
+-- RECEIPT DEFECT FOUND AND FIXED: ev_sec_fire_ap_month cleared `note` on every re-fire, wiping
+-- the 'AT THE PAGE LIMIT' marker the collector had written, so the coverage view reported
+-- months_at_limit = 0 while 11 months were in exactly that state. is_complete stayed false
+-- (months_missing carried it) so nothing unsafe shipped, but a receipt that loses its own reason
+-- is a bad receipt. The view now derives the condition from rows_found, which no re-fire erases.
+--
+-- ── 3. WHAT WAS ACQUIRED, AND WHAT WAS NOT ───────────────────────────────────────────
+-- ACQUIRED: the complete administrative-proceedings INDEX — per row, the publish date, the
+--   SEC-labelled respondents string, the File Number, every release number on the row, and the
+--   order document URL. 6,077 respondent strings extracted, 0 rows dropped.
+-- NOT ACQUIRED: the CONTENTS of the order documents. They are PDFs whose text is FlateDecode-
+--   compressed and not extractable in this environment (the .htm variant 503s). Therefore
+--   Phase 9C does NOT deliver order-level event types (cease-and-desist vs bar vs suspension vs
+--   censure), monetary relief, or findings-versus-allegations language. Those remain unbuilt,
+--   and are reported as zero-extracted rather than as zero-existing.
+-- Respondent composition, by a STATED HEURISTIC on the name string (not an authoritative role
+--   field): 3,677 carry a corporate marker, 2,400 do not. The SEC's index gives respondents, not
+--   roles; per-party role (issuer, adviser, broker-dealer, officer) lives in the documents.
+--
+-- ── 4. MATTERS VS DOCUMENTS ──────────────────────────────────────────────────────────
+-- 673 file numbers carry more than one document; the largest carries 14
+--   (file 3-20003: 33-10841, 34-90700, 34-92205, 34-93711, 34-94525, 34-96665, 34-97008,
+--    34-97855, 34-99255, 34-99779, 34-100153, 34-100668, 34-102304, 34-104233).
+-- Counted as documents that is 6,077; counted as matters it is 4,562. The File Number is what
+-- makes the difference, and it is the SEC's own identifier — not one we invented.
+--
+-- ── 5. CROSS-CORPUS (§7) — CANDIDATES, DELIBERATELY NOT MERGED ────────────────────────
+-- 50 respondent strings appear in BOTH corpora; 46 pairs fall within 365 days. Every one is
+-- stored in evidence.ev_sec_cross_corpus_candidate as 'possible_same_matter' and NOTHING is
+-- merged, because §7 forbids merging on name and date and the administrative order that would
+-- confirm or refute the link is an unreadable PDF. The clearest example is genuine and arose
+-- unprompted: LR-24050 (2018-02-15) and IA-4857 (2018-02-22), file 3-18377, both
+-- "Commonwealth Advisors, Inc. and Walter A. Morales" — one week apart, the classic
+-- civil-action-then-follow-on-bar pattern. It is recorded as a candidate, not a merge.
+--
+-- ── 6. THE HOMESIGNAL ENTITY SCAN ────────────────────────────────────────────────────
+-- All 36 organisations scanned against the complete corpus with a generous token match:
+--   direct-company matches 0 · verified-parent matches 0 · unresolved 0 · no match 36.
+-- The positive control on the same scan returned 330. The only near-miss is again
+-- "Commonwealth Advisors, Inc. and Walter A. Morales" surfacing for the token "morales" —
+-- a different party from T. MORALES COMPANY, L.L.C., and the similar-name negative control
+-- appearing in real data rather than in a fixture, now in BOTH corpora.
+--
+-- ── 7. AVAILABILITY (§11) — TWO QUESTIONS, ANSWERED SEPARATELY ────────────────────────
+--   SEC Litigation Releases        checked_no_records   (9B, unchanged)
+--   SEC Administrative Proceedings checked_no_records   (9C, earned here)
+-- Each carries its own scope note. Neither is a statement about nonpublic matters, about
+-- periods outside 2017-04 .. 2026-08, or about ALJ initial decisions — which returned 0 rows
+-- from its index and remains a SEPARATE, UNCHECKED source.
+--
+-- ── 8. MUTATIONS (applied, measured, rolled back) ────────────────────────────────────
+--   BASE  ap_complete=true 113/113 · 6,077 docs · 4,562 matters · LR and AP both checked_no_records
+--   M1 remove a month              -> is_complete FALSE, months 113 -> 112
+--   M2 rescan while incomplete     -> availability INCOMPLETE, never checked_no_records
+--   M3 remove the entity binding   -> 0 direct identity rows; attribution impossible
+--   M4 similar-name decoy          -> 0 hits
+--   M5 remove a cross-corpus link  -> candidates 46 -> 45 (matter count would inflate)
+--   M6 demote the verified parent  -> inherited parent block 4 -> 0
+--   Post-rollback: ap_complete=true, 6,077 docs, 46 candidates, 1 active CIK, 1 parent_company
+--   claim, LR corpus still 2,795, Garfield still 0/49/4.
+--
+-- ── 9. IDEMPOTENCE / PERFORMANCE / COMPATIBILITY ─────────────────────────────────────
+-- Every routine re-run: documents 6,077 · matters 4,562 · months 113/113 · candidates 46 ·
+-- identity map 37 · source checks 37 · entities 170 · claims 732 — all identical.
+-- Entity Track Record latency is UNCHANGED at 33.8 ms / 2,778 buffers despite adding 6,077
+-- documents, because the corpus is scanned at INGEST and never at read. No Property Card
+-- request makes a live SEC call.
+-- Legacy md5s unchanged (company_track_events 9d501d16…, property_company_roles b3923c90…);
+-- Phase 9B's litigation-release corpus still 2,795 releases; Garfield still 0/49/4.
+--
+-- ── 10. REMAINING SEC GAPS ───────────────────────────────────────────────────────────
+--   1. Order-document contents are unread (PDF): no event types, no monetary relief, no
+--      findings-vs-allegations language from administrative orders.
+--   2. ALJ initial decisions: index returned 0 rows; unchecked, and reported as such.
+--   3. Coverage starts 2017-04; earlier matters are outside the window and say so.
+--   4. 46 cross-corpus pairs remain candidates pending document-level confirmation.
+--   5. MSHA was NOT ingested, per instruction — still a future-phase candidate only.
