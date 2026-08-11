@@ -4,6 +4,11 @@
 `homesignalmap.html?addr=2200%20CALDWELL%20LN%2C%20DEL%20VALLE%2C%20TX%2078617`.** Single subject.
 See §4 for exactly what it can and cannot support, because the answer constrains two modules.
 
+**Where this is going (founder, 2026-08-11), so the pilot is built toward it:** every dot on the map
+resolves to a property card (**§14.2**), and the card's data becomes the input to the quality-of-life
+score (**§14.3**). Both are read carefully in those sections — each has one measured blocker, and the
+score has a failure mode that a number hides better than a badge does.
+
 **Status:** ready to hand to a build session **now**. The four founder decisions in §1 each have a
 stated safe default, so an unanswered one changes what the card *says* but never blocks the build.
 Only two things halt it, both in §14.
@@ -1005,6 +1010,112 @@ once (1) lands, which makes the ring vary meaningfully by place.
 - **Do not canonicalize addresses in the page** to unblock the key. One normalizer, engine-side.
 - **Do not let one parcel become several cards.** If the key is ambiguous, render the parcel as
   unresolved and say so.
+
+---
+
+## 14.2 EVERY DOT ON THE MAP GETS A CARD (founder, 2026-08-11)
+
+The target: a resident can open **any** dot on the map and get a property card. Measured on
+2026-08-11, that requires solving two different identity problems, because the map has two kinds of
+dot and neither is card-ready.
+
+| Dot class | Count in 44127 | Address today | Card key needed |
+|---|---|---|---|
+| **Development** (permits, planning) | 5,344 | raw `address` on 5,342; **`canonical_addr` on 0** | engine-emitted `canonical_addr` |
+| **Facility** (EPA FRS) | 40 | **no address field at all** — keys are `registry_id`, `lat`, `lng`, `src`, `env`, `viol` | the **EPA registry ID** |
+
+So:
+
+1. **Development dots need the engine to canonicalize.** The address is already there; it is just raw.
+   This is the §14.1 prerequisite and it is now the top blocking item for the product goal, not a
+   nice-to-have.
+2. **Facility dots need a second identity path.** They carry no address, so no amount of address work
+   reaches them. Their natural key is the one the agency already assigns — the FRS registry ID — so the
+   card should accept `?frs=<registry_id>` alongside `?addr=`, and render a **facility** record rather
+   than claiming a parcel. **Tying a facility to a parcel needs county GIS / cadastral data**, which is
+   unwired (§0.0.1), so until then a facility card is honestly about the facility.
+
+### Many dots, one card — aggregate, never fragment
+
+Cleveland's 5,344 development dots resolve to **3,415 addresses** (≈1.6 dots per address); Del Valle's
+5 filings resolve to **1**. "Every dot has a card" therefore means **every dot RESOLVES to a card**,
+and several dots legitimately share one.
+
+**One card per parcel, showing every record on it.** That aggregation is the card's whole value — it is
+what turns five separate permits into "here is what has happened at this address." One card per *dot*
+would fragment the parcel into five thin cards and destroy the thing being built.
+
+**Area-scope dots are the exception and must stay one.** A jurisdiction-wide notice has no parcel and
+no honest point; it must not be given a parcel card. Route it to the area/community surface instead.
+
+---
+
+## 14.3 THE CARD AS THE INPUT TO A QUALITY-OF-LIFE SCORE (founder, 2026-08-11)
+
+**The intent:** the card's data becomes the basis of the quality-of-life score. That is a coherent
+architecture — the card is the per-parcel evidence assembly, so it is the right input. Two measurements
+and one hard constraint before it is built.
+
+### What the score can draw on today
+
+| Input | Available? |
+|---|---|
+| Permit activity — count, recency, type, distance | **Yes, nationally** (3M `app_projects` rows, ~20 states of permit feeds) |
+| Regulated-facility proximity | **Yes, nationally** (EPA FRS floor) |
+| ECHO violation signals | Thin — facility-level, only where a facility matched |
+| **Air / Water / Soil / Noise / Light** — the five QoL lenses | **No.** `impact_dimensions` was **empty on 0 of 1,000 sampled `app_projects` rows** |
+| Hazards, notices, enforcement, ownership, sustainability | No — no adapter (§0.0.1) |
+
+**That last row corrects `CLAUDE.md`**, which says *"Soil/Noise/Light rarely carry data yet, so those
+act as UI-only today"* — implying Air and Water do carry data. Measured: **no dimension of any kind on
+any sampled row**, so the Quality-of-Life lens on `maps.html` is UI-only across all five. *(1,000 rows
+of 3M, unordered — re-measure the full distribution before relying on it.)*
+
+So a score built today would in practice be **construction activity + industrial proximity**. That is a
+real, defensible signal. It is **not** quality of life in the five-lens sense, and naming it that would
+overclaim by a wide margin.
+
+### THE TRAP — and it is the same trap the card was built to avoid, one level up
+
+**A score computed over mostly-unchecked data measures our ingestion coverage, not the place.**
+
+Two identical houses, one in Travis County and one in Wayne County, would score differently — not
+because the neighbourhoods differ, but because TCEQ is wired in Texas and nothing equivalent is wired
+in Michigan. That is a coverage artifact wearing the costume of a neighbourhood difference, and unlike
+an empty module it is **invisible**: a number gives the resident nothing to notice.
+
+Three requirements that follow directly:
+
+1. **The score needs its own coverage state.** *"We can't score this yet"* must be a valid, visible
+   output, and must be distinguishable from *"this scores low."* This is exactly the
+   `not_checked`-vs-zero rule the card already enforces, applied to the score — and a numeric output is
+   far better at hiding the difference than a badge is, so the discipline has to be stricter, not
+   looser.
+2. **Never compare scores across jurisdictions until the inputs are equally covered.** A leaderboard,
+   a percentile, a colour scale, or "better than 80% of nearby homes" is a coverage ranking today, not
+   a quality ranking.
+3. **Keep the score and Data Completeness visibly separate.** Completeness measures *our research*;
+   the score would purport to measure *the place*. Conflating them makes both meaningless — and note
+   that the approved disclaimer (*"not a rating, score, or prediction"*) is a statement about the
+   completeness module. **If the card starts carrying a score, that disclaimer must be re-scoped** so
+   it does not appear to disclaim the score it sits next to.
+
+### Sequence, and what the pilot should do now
+
+The order that produces a defensible score is **feeds → card → score**, and the pilot is at step two.
+Concretely: `canonical_addr` from every connector (§14.1) unlocks every dot having a card (§14.2);
+cards populated across jurisdictions produce comparable inputs; only then does a score mean something
+about a place rather than about us.
+
+**For this build: change nothing about scoring.** Keep the completeness module unweighted and
+score-free, keep the disclaimer as approved, and treat the score as the next phase. The one thing worth
+doing now is making the card's data **structured enough to score later** — every rendered fact carrying
+its source, date and state, which is already the design.
+
+Also worth noting so it is not mistaken for a blocker: the prototype already contains score *surfaces*
+(`community_score`, `component_scores`, the property score ring in `property.html`) fed entirely from
+`seed/delvalle.js`. Those are design placeholders, not a live scoring model, and they should not be
+wired to real data until the constraints above are met.
 
 ---
 
