@@ -1274,3 +1274,78 @@ create schema if not exists evidence;
 -- changed is that the mechanism to resolve them is now identified and evidenced rather than
 -- hypothesised, and both halves are reachable. Resolution itself requires the LR landing
 -- pages to be acquired and their dockets extracted — additive, not yet done, NOT claimed.
+
+-- ============================================================================
+-- PHASE 9E ITEM 2 — INDEX PARSER REPAIRED AT SOURCE. BLAST RADIUS WAS 21x LARGER
+-- THAN THE 152 ROWS ORIGINALLY MEASURED: 3,244 of 8,872 rows carried foreign text.
+--
+-- ── ROOT CAUSE (proven on a minimal control, not inferred) ───────────────────────────
+-- PostgreSQL determines greediness for the WHOLE regular expression from the FIRST
+-- quantifier that has a preference. In the collectors' capture
+--     'release-view__respondents''><a href=''[^'']+''>(.*?)</a>'
+-- the first quantifier is [^']+ (GREEDY), so the (.*?) that LOOKS lazy is evaluated
+-- GREEDILY and runs to the LAST </a> available to it.
+--   Control over  X<a href='u'>NAME</a>MIDDLE<a>junk</a> :
+--     'X<a href=''[^'']+''>(.*?)</a>'  -> "NAME</a>MIDDLE<a>junk"   (greedy — the defect)
+--     'X<a href=''u''>(.*?)</a>'       -> "NAME"                    (lazy once the greedy
+--                                                                     prefix is removed)
+-- ⚠️ This bit my own MEASUREMENT too: a control written as '<a [^>]*>(.*?)</a>' is ALSO
+-- greedy ([^>]* is the first quantifier), and it reported "3,142 anchors contain nested
+-- markup" — which would have meant [^<]* truncates real respondent names. Rewriting the
+-- control with a lazy FIRST quantifier ([^']+?) gave the truth: over all 8,887 anchors,
+-- 8,887 matched (positive control), 0 contain nested markup, and 0 differ from the
+-- character-class capture, max length 844 both ways. The instrument had the same bug as
+-- the code it was auditing.
+--
+-- ── WHY THE DAMAGE WAS BOTH BIGGER AND SMALLER THAN IT LOOKED ────────────────────────
+-- Two distinct spill patterns, one cause:
+--   152 rows  — the LAST row of each index page. The collectors split page HTML on the row
+--               delimiter, so the final element is "last row + the rest of the document";
+--               its last </a> lives in the site footer. Measured on the 2017-04 AP page:
+--               fragments 57-59 are 1,223-1,683 bytes, fragment 60 is 13,647 and is the
+--               only one containing the footer. The greedy capture took 11,847 characters.
+--   3,092 rows — EVERY other row whose own cell contains a later </a>: the row's "Release
+--               No.", "File Number:" and "See Also:" links bled into respondents_text.
+--               e.g. LR-26434 stored "Global Research Analyst Settlement Release No.
+--               LR-26434 See Also: Notice - Bear Stearns , Notice - JP Morgan , ..."
+--               (600 chars) where the respondent is "Global Research Analyst Settlement"
+--               (34 chars).
+-- The brief's 152 was correct for footer contamination specifically; it was not the extent
+-- of the defect. Reparsing EVERY row — not only the suspected ones — is what surfaced it.
+--
+-- ── THE FIX: TWO INDEPENDENT DEFENCES, NO VOCABULARY ANYWHERE ────────────────────────
+--   evidence.ev_sec_row_bound(row_html)        truncate a row at its own </tr>
+--   evidence.ev_sec_row_respondents(row_html)  capture with [^<]*, which cannot cross a
+--                                              tag boundary however greediness resolves
+-- No footer word, nav label or "See Also" string is named in the parser. It stops at the
+-- structural boundary it should always have stopped at. Both collectors — ev_sec_collect_ap
+-- (administrative proceedings) and ev_sec_collect_pages (litigation releases) — now call
+-- the SAME extractor, so acquisition and repair cannot drift apart.
+--
+-- ⚠️ A SECOND WRONG-SHAPE ZERO, CAUGHT BY A CONTROL. The first reparse was written against
+-- the LR key (an href containing lr|ap|ia|ic-#####). AP hrefs look like
+-- /files/litigation/admin/2017/34-80365.pdf and contain no such token, so the reparse
+-- matched ZERO AP rows while returning 2,794 — a plausible-looking number against an
+-- 8,872-row corpus, and in fact the LR corpus alone. AP identity comes from the row's
+-- "Release No." subfield, and the two indexes have separate collectors. Had this not been
+-- checked against per-index totals, the repair would have fixed 27 of the 152 footer rows
+-- and reported success.
+--
+-- ── MEASURED OUTCOME (reparsed from the ORIGINAL page HTML, still in net._http_response
+--    for all 153 pages — no re-fetch, so the comparison is against the exact bytes the
+--    first parse saw) ────────────────────────────────────────────────────────────────
+--   rows reparsed        8,868      changed        3,244      unchanged   5,624
+--   had footer before      152      new text NULL      0
+--   NEGATIVE controls, after:  'Return to top' 0 · 'SEC homepage' 0 · 'Sign up for email
+--     updates' 0 · 'See Also:' 0 · 'Release No.' 0 · 'File Number' 0
+--   POSITIVE controls, after:  8,872 rows total (6,077 AP + 2,795 LR) — UNCHANGED, so
+--     Phase 9C presence completeness is untouched; 0 rows with empty respondents_text.
+--   Control row 34-80365 now reads exactly:
+--     "International Building Concepts Ltd. (n/k/a Home Builders International Inc.)
+--      RXBAZAAR, Inc. Victory Park Acquisition Corp. I Worldwide Data, Inc."
+--
+-- ── THE 4 ROWS NOT REPARSED, ACCOUNTED FOR (no document silently disappears) ─────────
+-- LR-24702, LR-25408, LR-25605, LR-26552 — the Phase 9B gap-fill rows, carrying page_no
+-- -1 and the placeholder "(respondents not parsed from detail page)". They were recovered
+-- by release number, not from an index page, so there is no page HTML to reparse. None is
+-- contaminated. 8,868 reparsed + 4 gap-fill = 8,872.
