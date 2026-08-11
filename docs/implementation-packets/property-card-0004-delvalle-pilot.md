@@ -915,6 +915,99 @@ to stop, delete the module, or wait.
 
 ---
 
+## 14.1 FROM PILOT TO PRODUCTION — what fills the slots at 12,722 ZIPs, and what stops it
+
+Asked before scaling, answered by measurement on 2026-08-11. **The short answer is that the empty
+placeholders are not the binding constraint — the address key is.**
+
+### The card count is not 12,770; it is closer to a million
+
+The card is keyed per **address**, not per ZIP, so "add it to every ZIP page" is the wrong unit.
+Distinct addresses in a single cached ZIP row, measured:
+
+| ZIP | sites | distinct addresses |
+|---|---|---|
+| 44127 Cleveland | 5,384 | **3,415** |
+| 85003 Phoenix | 3,635 | **1,315** |
+| 10025 New York | 780 | **388** |
+| 78617 Del Valle | 537 | **324** |
+| 48226 Detroit | 820 | **233** |
+
+Across 12,722 cached ZIPs that is **hundreds of thousands to low millions of addresses**, against
+`property_reports`' **1 row today**. Sizing, cache cost and refresh cadence should be planned against
+that number, not against 12,770. *(Five ZIPs sampled — measure the full distribution before
+committing.)*
+
+### The blocker: only ONE adapter emits a usable key
+
+`canonical_addr` exists on **exactly 5 site records in the entire cache** — the Del Valle TABS
+filings. Every other connector (arcgis · socrata · ckan · csv · carto) writes a **raw, unnormalized
+`address`** string instead, and some records carry no address at all (checked ZIPs 58771, 70447,
+95444, 11952, 29579: zero of either).
+
+A raw address cannot be the key. `canonicalAddr()` is engine-side and singular by design, so keying
+on the raw string would mint **a separate card per spelling of the same parcel** — one parcel, several
+thin cards, none authoritative. Canonicalizing in the page would make it a second normalizer, which is
+how a page and a cache come to disagree about which row is "this property".
+
+**This was a live defect in the shipped card and is now fixed:** `HS.card.keyOf` accepted
+`rec.address` as a fallback. It no longer does — a raw address is available through
+`HS.card.rawAddressOf()` for **display** ("this record is about 2165 E 89TH ST") while the parcel
+renders as unresolved, which is the truth.
+
+**So the production prerequisite is not a feed. It is:** the engine emitting `canonical_addr` on every
+site it writes, from every connector — plus `canonical_addr` carried onto `app_projects` so the Maps
+link does not need a whole-ZIP read (§5). Until then the card is reachable for Texas TDLR filings and
+honestly unresolved everywhere else.
+
+### What actually fills each module at national scale
+
+| Module | At scale | Why |
+|---|---|---|
+| **Development** | **Real, nearly everywhere** | 3M `app_projects` rows; permit feeds live in ~20 states. This is the module that works |
+| **Facilities & Regulatory** | **Real in most ZIPs** | EPA FRS is the national floor |
+| **Entity Track Record** | **"Not checked" outside Texas** | TCEQ is Texas-only; ECHO is facility-level and only where a facility matched. All five agency rows empty elsewhere |
+| **Parent Company** | "No confirmed parent" almost everywhere | 8 rows, 1 verified, read by hand from an SEC exhibit |
+| **Property & Ownership** | Parcel half "not checked" everywhere | no assessor adapter in any state |
+| **Recorded Instruments · Hazards · Meetings · Sustainability** | "Not checked" everywhere | no adapter anywhere |
+
+So a typical non-Texas card is **one real module, one partial, and ten "not checked"**. That is honest,
+and it is also thin — which raises two consequences worth deciding before rollout rather than after.
+
+### Three consequences of scale, each with an existing answer
+
+**1. `not_applicable` becomes necessary.** Listing "TCEQ" on a Michigan property as *not checked*
+implies we intend to check it. We do not — it does not apply. At national scale the source list must
+resolve **per jurisdiction**, exactly as `jurisdiction-registry.json`'s coverage gate already does for
+permits and as `source_coverage` is designed to do (Part 30). My deferral of `not_applicable` was right
+for a single-state pilot and **wrong for production**; add it with the jurisdiction resolver, not
+before.
+
+**2. Thin cards must not be crawlable.** This repo already solved this problem for ZIP pages: the
+**substance gate** stamped 327 pass-plus-substance pages indexable and left 23 thin plus 11 empty ones
+noindexed (`CLAUDE.md`). A card with one filing and eleven "not checked" modules is the same class of
+page and should ride the same gate. `property-card.html` ships `noindex` today, which is the correct
+default — the decision is what would ever earn indexing, and "has real content in ≥2 modules" is the
+obvious candidate.
+
+**3. The completeness donut stops being about the property.** If every non-Texas card shows the same
+ten-grey / two-green ring, it tells a resident nothing about *their* address and everything about
+HomeSignal's coverage. Options, none of them scoring: label it plainly as coverage of our research
+(already the disclaimer's wording), or scope it to the sources that **apply** in that jurisdiction
+once (1) lands, which makes the ring vary meaningfully by place.
+
+### What NOT to do at scale
+
+- **Do not fill a slot to make the card look complete.** The rollout multiplies every fabrication by
+  a million pages.
+- **Do not delete modules that are empty nationally.** The feeds are coming and the slot is the
+  labelled gap; deleting it turns a future feed into a UI change (§0.0).
+- **Do not canonicalize addresses in the page** to unblock the key. One normalizer, engine-side.
+- **Do not let one parcel become several cards.** If the key is ambiguous, render the parcel as
+  unresolved and say so.
+
+---
+
 ## 15. Required final report
 
 Answer the draft's §1–§29 report sections, plus:

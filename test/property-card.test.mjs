@@ -199,6 +199,17 @@ test('identity is the engine key or nothing — the page never invents one', () 
   assert.strictEqual(C.keyOf({ name: 'Some project', zip: '78617', lat: 30.1, lng: -97.6 }), null);
   assert.strictEqual(C.keyOf({ canonical_addr: '   ' }), null);
   assert.strictEqual(C.keyOf(null), null);
+
+  // A RAW address is never a key. Measured 2026-08-11: canonical_addr exists on 5 site records
+  // cache-wide, while raw `address` exists on thousands per dense ZIP (Cleveland 44127: 3,415
+  // distinct). Keying on the raw string would mint a separate card per spelling of one parcel.
+  const raw = { address: '2165 E 89TH ST, CLEVELAND, OH, 44106', lat: 41.5, lng: -81.6 };
+  assert.strictEqual(C.keyOf(raw), null, 'a raw address must never become the card key');
+  assert.strictEqual(C.rawAddressOf(raw), '2165 E 89TH ST, CLEVELAND, OH, 44106',
+    'the raw address is still available to DISPLAY, so the card can say which building it is');
+  // Once a canonical key exists, the raw fallback stops offering itself — there is one key.
+  assert.strictEqual(C.rawAddressOf({ canonical_addr: 'A', address: 'B' }), null);
+  assert.strictEqual(C.rawAddressOf({}), null);
 });
 
 test('APPROVED COPY (founder 2026-08-11) is one sentence, plain, and never reassuring', () => {
