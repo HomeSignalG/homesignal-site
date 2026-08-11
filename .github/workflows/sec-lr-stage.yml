@@ -1,0 +1,56 @@
+name: sec-lr-stage
+
+# PHASE 9E item 3 — acquire Litigation Release landing-page BODIES.
+#
+# The other half of the cross-corpus join. AP order text carries a district court and a
+# docket number but NEVER cites a Litigation Release number (measured: 0 of 77 staged
+# orders), and ev_sec_release stores only a respondent name and a landing URL for the LR
+# side. The LR landing page carries the release body — unlike the AP landing page, which
+# Phase 9D correctly found to be a stub.
+#
+# Same contract as the PDF path: acquire and apply a STRUCTURAL boundary; never interpret.
+# The body is the Drupal field--name-body container bounded by the page's <footer>
+# landmark. Sidebar navigation is outside that container and is never read as release
+# evidence. The staging RPC REFUSES a body containing page chrome — a leak means the
+# boundary is wrong and must be fixed at source, not cleaned afterwards.
+#
+# Write surface is one typed RPC (public.stage_sec_lr_body), read surface one view
+# (public.sec_lr_work_list), both service_role only. Not scheduled; never runs during page
+# rendering.
+
+on:
+  push:
+    branches:
+      - claude/phase-8-enforcement-attribution-nm2wwg
+    paths:
+      - '.github/workflows/sec-lr-stage.yml'
+      - 'scripts/sec-lr-stage.py'
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'optional cap on releases processed'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  stage-lr:
+    runs-on: ubuntu-latest
+    # 2,795 releases at ~0.4s politeness delay plus fetch is ~25-35 min. Sized to the work
+    # with headroom, never inheriting GitHub's 6-hour default.
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Acquire LR bodies
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RUNNER_JOB: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          LIMIT="${{ github.event.inputs.limit || '' }}"
+          ARGS=""
+          if [ -n "$LIMIT" ]; then ARGS="--limit $LIMIT"; fi
+          python3 scripts/sec-lr-stage.py $ARGS
