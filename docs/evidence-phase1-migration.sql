@@ -459,3 +459,197 @@ create schema if not exists evidence;
 --     'tic the industrial company' and 't morales company l l c' (the conflict losers, which
 --     the legacy view suppresses and the evidence layer keeps as competing claims) and
 --     'cemex inc' (real FRS affiliation, no rendered page row).
+
+-- ============================================================================
+-- PHASE 8 (2026-08-11) — REGULATORY / ENFORCEMENT TRACK RECORD, WITH ATTRIBUTION.
+-- Migrations: evidence_phase8_regulatory_event_kind,
+--   evidence_phase8_regulatory_vocabulary, evidence_phase8_ingest_regulatory_events,
+--   evidence_phase8_source_availability, evidence_phase8_facility_location_facts,
+--   evidence_phase8_track_record_read_model,
+--   evidence_phase8_attribution_class_follows_weakest_link,
+--   evidence_phase8_track_record_basis_wording,
+--   evidence_phase8_org_subject_sees_own_record,
+--   evidence_phase8_bind_customer_numbers_idempotent,
+--   evidence_phase8_read_model_vocabulary_leak, evidence_phase8_identifier_entity_index
+-- Scope: ZIP 78617 / Del Valle only. No existing consumer read path changed.
+--
+-- THE GOVERNING RULE:
+--   FACILITY RECORD != DIRECT-COMPANY RECORD != PARENT-COMPANY RECORD.
+-- It is enforced by VOCABULARY, not by discipline: each level is a DIFFERENT PREDICATE
+-- (event_occurred_at_facility · direct_company_regulatory_event ·
+--  verified_parent_regulatory_event · unresolved_regulatory_event), so a query for one
+-- level cannot return another, and a future consumer cannot collapse them by accident.
+--
+-- BASELINE RE-MEASURED BEFORE ANY WRITE (Phase 7's reported figures, all confirmed live):
+--   entities 84 · claims 250 · identifiers 59 · source records 109 · outcomes 74 ·
+--   resolutions 4 · claim relations 4 · legacy app-project links 29 · frs_org_affiliations 41 ·
+--   company_parents 8 (1 verified) · Republic Services as a parent 0 ·
+--   facility_located_on_parcel 0. Nothing had drifted.
+--
+-- ── SOURCE INVENTORY (measured, not assumed) ────────────────────────────────────────
+-- public.company_track_events   61 rows — THE ONLY enforcement-event corpus HomeSignal holds.
+--   3 TCEQ datasets: Notices of Violation (mwzi-gyw7, keyed rn_number), Notices of
+--   Enforcement (rua3-iswk, keyed rn), enforcement orders (u66a-qggj, keyed case_no).
+--   61 rows -> 53 DISTINCT AGENCY EVENTS: 8 events appear twice because the same agency
+--   record was stored once as a direct-company row and once as a parent-company row.
+--   status: 0 of 61 non-null. penalty: 2 of 61. agencies: TCEQ only. RNs: 33 distinct.
+-- public.company_facilities     754 rows = 89 + 154 + 511, exactly the three company CNs.
+--   EVERY event RN is present here for its own company_key (0 missing) — which is what makes
+--   the company link agency-derived rather than a name search.
+-- public.track_record_checks    17 rows — the availability record (§26).
+-- public.echo_violation_counts  3 rows, 0 with count>0, and NONE of the 3 registry ids is a
+--   Del Valle facility. HomeSignal therefore holds ZERO EPA enforcement events for any pilot
+--   facility. (n_live_tup reported 0 for this table; the real count is 3. An estimate is not
+--   a count — the CLAUDE.md rule, and it mattered here.)
+-- public.tceq_affiliations_raw  9,617 rows but for WILLIAMSON-COUNTY ZIPs; 78617 is absent.
+--   Out of pilot scope. POSITIVE CONTROL on that query: CN600125157 returns 16 rows and
+--   CN606114726 returns 7, so the zero for CN600134696 is a real absence, not a broken filter.
+-- public.tceq_resolved_operators 53 rows — also Williamson ZIPs. Not Del Valle.
+-- public.app_environmental_risk  0 rows, and flood/wildfire/heat is not regulatory data.
+-- No OSHA data. No TRI enforcement data. Nothing was created for a source that has no rows.
+--
+-- ── THE MIGRATION (61 rows, fully accounted for) ────────────────────────────────────
+--   claim_created  direct_company_regulatory_event   49
+--   claim_created  verified_parent_regulatory_event  12
+--   accounting: 49 + 12 = 61. 0 unmapped_role, 0 silently dropped.
+--   facility_not_stated 2 (the two enforcement orders — see below)
+-- Evidence classes: 48 identifier_backed (TXI 26, MMM Southwest 22) ·
+--   13 resolved_by_match (MMM Inc's 12, plus MMM Southwest's one order).
+-- Entities 84 -> 170 (+53 regulatory_event, +33 facility). Identifiers 59 -> 146.
+-- Source records 109 -> 257 (53 agency event records + 61 attribution + 1 CN binding +
+--   33 facility-location). Claims 250 -> 731. Claim relations 4 -> 6. Source checks 23.
+--
+-- THE CLASS FOLLOWS THE WEAKEST LINK — the correction that mattered most. The chain is
+--   agency: event -> RN | agency: CN -> RN | HomeSignal: CN -> which organisation.
+-- Attribution was first written identifier_backed whenever the agency tied the CN to the
+-- event's RN. That reads the chain one link short: for Martin Marietta Materials, Inc. the
+-- last link is a LEGAL-NAME lookup, so all 12 parent claims are resolved_by_match. Without
+-- this, a name resolution silently acquires the authority of an agency identifier.
+--
+-- THE PARENT'S CUSTOMER NUMBER IS NAME-RESOLVED, AND SAYS SO. CN600134696 has no
+-- first-party row anywhere in this database. It is bound to Martin Marietta Materials, Inc.
+-- by evidence.ev_legal_name_key (Phase 7's exact key — case- and punctuation-insensitive,
+-- strips NOTHING, so suffixes stay load-bearing), cited to a source registered as NOT
+-- first-party, and stored is_primary=false. The same rule REFUSED to bind Cinco J., Inc.:
+-- two organisations share that legal name, so it was recorded 'attribution_unresolved'
+-- rather than guessed. The gate fired on real data without being aimed at anything.
+--
+-- ORDERS ARE ATTRIBUTED BY CASE NUMBER, NEVER BY RESPONDENT NAME ALONE, AND CARRY NO
+-- INVENTED LOCATION. The 2 enforcement orders name no facility. No facility was inferred
+-- from the sibling notice, so neither carries event_occurred_at_facility and both are
+-- recorded 'facility_not_stated'; the read model prints "The source record names no facility".
+--
+-- §18 CROSS-SOURCE DUPLICATES ARE RELATED, NEVER MERGED. The case number is deliberately
+-- NOT an identifier type: making it one would force UNIQUE(id_type,id_value) to merge a
+-- Notice of Enforcement with the Order that resolves it. It is a LITERAL claim, and 2
+-- ev_claim_relation kind='same_enforcement_case' rows tie the pairs
+-- (2019-0475-WR-E, 2020-1571-EAQ-E). Both events remain distinct entities — verified.
+-- Nothing was ever deduplicated on company name, date, penalty or facility name.
+--
+-- §21 ONE EVENT IS COUNTED ONCE, AND THE OTHER PATHS ARE DISCLOSED. De-duplication happens
+-- twice: at STORAGE (two legacy rows for one agency record collapse to one source record and
+-- one event entity) and at READ (an event reachable by several paths is placed in the
+-- STRONGEST section, and carries "also_reachable_as" so nothing is hidden). This is why
+-- Garfield's parent section shows 4 and not 12: 8 of the parent's 12 events are the same
+-- agency records already listed under the direct company.
+--
+-- ── GARFIELD (RN106540172) — THE THREE LEVELS, NEVER BLENDED ────────────────────────
+--   THIS FACILITY                    0
+--   DIRECT COMPANY — OTHER FACILITIES 49  (TXI Operations, LP 26 · MMM Southwest 23)
+--   VERIFIED PARENT                   4  (Martin Marietta Materials, Inc.; 8 more of its 12
+--                                        are already shown as direct-company events)
+--   UNRESOLVED                        0
+-- The facility zero is a MEASURED absence, not silence: both TCEQ datasets were queried by
+-- RN106540172 and returned 0, recorded as checked_no_records with the query basis and URL.
+-- Every one of the 49 says happened_at_this_facility=false and names its own facility, e.g.
+-- "Another facility — HUNTER FACILITY, NEW BRAUNFELS, TX". The word "violation at this
+-- property" is not constructible from this output.
+-- Penalties are reported PER LEVEL and never summed across levels:
+--   direct_company $6,750 over 49 events 2010-10-08..2026-06-24 (1 event carries a penalty)
+--   verified_parent  $875 over  4 events 2011-01-27..2022-05-06 (1 event carries a penalty)
+--
+-- ── BFI (FRS 110005052085) — REPUBLIC SERVICES IS **NOT** INHERITED ─────────────────
+--   0 / 0 / 0. direct-company eligibility FALSE: the FRS operator "BFI WASTE SYSTEMS OF
+--   TEXAS LP" and owner "BROWNING-FERRIS INDUSTRIES INC" are NAME-ONLY organisations with no
+--   customer number, so no company track record is attributable at all. Parent eligibility
+--   FALSE. No Republic Services entity exists in the graph and none was created.
+--   MUTATION-PROVEN, not merely observed: inserting a parent_company_candidate from the BFI
+--   operator to a synthetic "Republic Services, Inc." left the parent count at 0 and
+--   parent_eligible false. Rolled back; 0 claims and 0 Republic-named organisations remain.
+--
+-- ── CEMEX (FRS 110034344494 / RN104315775) — ISOLATED BY IDENTIFIER ─────────────────
+--   0 / 0 / 0, and all three expected sources report not_checked. "CEMEX INC." is a
+--   name-only FRS organisation with no CN, so nothing attaches. No event from any other
+--   CEMEX-named entity, and none from the facility sharing its address, reached it.
+--
+-- ── §15 THE FOUR ABSENCE STATES ARE DISTINCT, IN ONE SUBJECT ────────────────────────
+--   Ward & Burke's RN111954798: TCEQ NOV = checked_no_records (asked, nothing found),
+--   TCEQ NOE = not_checked (never asked). Same facility, same page, two different states.
+--   CEMEX = not_checked on all three. Garfield = checked_no_records on both.
+--   ECHO is 'incomplete' by construction wherever it was run: its result counts FACILITIES
+--   matched, not violations, so a hit of 1 can never be rendered as "no violations".
+--   unresolved_identity is a third, separate state (BFI/CEMEX: eligibility false with reason).
+--
+-- ── §23/§24 THE PROPERTY GRAPH STOPS HONESTLY ──────────────────────────────────────
+--   facility_located_on_parcel is still 0. Parcel 292354 and development TABS2026011928
+--   (ATX1) each return 0 / 0 / 0 with an explicit graph_stop: "no facility is proven to be
+--   located on this parcel ... A nearby or same-address facility was NOT attached. Proximity
+--   is not location." Neuralink Corporation keeps its 2 project_owner_as_filed claims, has 0
+--   operator/owner/customer claims, and 0 regulatory events. Track record does not cross the
+--   missing edge, and the missing edge was not manufactured to let it.
+--   The same-address pair proves the isolation is structural: FRS 110070182593 and
+--   RN106540172 share an exact name AND address (3901 NORWOOD LN STE 1) and remain two
+--   entities with a 'candidate' resolution between them.
+--
+-- ── TEMPORAL (§16) ─────────────────────────────────────────────────────────────────
+--   These TCEQ datasets publish NO status field (0 of 61 rows) and no closure date. No
+--   status claim was written, so nothing downstream can read a status we never had. The read
+--   model states neither "currently violating" nor "resolved", and says so in the payload.
+--
+-- ── IDEMPOTENCE (§27) — run 1 vs run 2, every object identical ──────────────────────
+--   source records 257/257 · regulatory_event entities 53/53 · claims 731/731 ·
+--   claim relations 6/6 · facility-event links 51/51 · company-event links 61/61 ·
+--   identifiers 146/146 · entities 170/170 · outcomes 138/138 · Garfield still 0/49/4.
+--   Run 2 FAILED THE FIRST TIME — ev_bind_legacy_customer_numbers recorded its
+--   "could not bind" outcome with an unguarded INSERT and hit ev_migration_outcome_uniq,
+--   aborting the whole re-ingest. Found only because the migration was actually run twice.
+--
+-- ── SECURITY (§28) ─────────────────────────────────────────────────────────────────
+--   evidence RLS 27/27 tables, 0 policies (deny by default) · anon and authenticated have
+--   NO USAGE on the schema · public.ev_track_record is REVOKED from public/anon/authenticated
+--   (Phase 8 is not wired to any UI) · Phase 7's ev_facility_card grant is untouched.
+--   The RPC emits no raw payload, no attribution_note, no UUID and no schema vocabulary —
+--   the field name "weaker_than_identifier_backed" was caught spelling an internal token in
+--   the payload and renamed to "weaker_than_agency_identifiers".
+--
+-- ── PERFORMANCE (§29) ──────────────────────────────────────────────────────────────
+--   One call returns every section; there is no per-event query. Garfield (the heaviest,
+--   53 events) 213 ms / 5,305 shared hits / 70,599 bytes; BFI 22 ms / 3,035 bytes; parcel
+--   292354 2,910 bytes. Added index ev_entity_identifier(entity_id,id_type) WHERE active.
+--   Known cost: the read model resolves each event's scalar facts with correlated subqueries
+--   over a CTE, which is fine at 731 claims and will not scale — Phase 9 should replace it
+--   with a single grouped join before this is wired to a page.
+--
+-- ── BACKWARD COMPATIBILITY (§30) — before/after md5, unchanged ─────────────────────
+--   property_company_roles 66  b3923c901be5923d7f47d0d0f5dc89c3
+--   project_facility_refs  33  ade204ec6037025a291bec43dbf55b0b
+--   identity_conflicts      4  25269d6f4b3dd885d50cdc64350206a7
+--   company_parents         8  e951809e3dd5e640ba810b1d04cf2eac
+--   company_track_events   61  9d501d166d52a5c9198a7be2e4c07c82
+--   company_facilities 754 · track_record_checks 17 · app_projects 3,027,773 ·
+--   development_reports 12,722 — all unchanged. Phase 8 wrote to no legacy table.
+--
+-- ── MUTATION TESTS (applied, measured, rolled back) ────────────────────────────────
+--   M1 BFI given a parent_company_candidate -> Republic Services: parent count stays 0,
+--      parent_eligible stays false.
+--   M2 the ONE verified parent_company demoted to a candidate: Garfield 0/49/4 -> 0/49/0.
+--      The parent section is gated by verification and by nothing else.
+--   M3 MMM Southwest's tceq.cn withdrawn: Garfield direct 49 -> 26 (TXI only), companies
+--      listed 2 -> 1. Attribution runs through the identifier, not the company name.
+--   Post-rollback control: 1 parent_company, 3 candidates, 0 MUTATION claims, 0
+--   Republic-named organisations, 4 active tceq.cn, 170 entities, 731 claims, Garfield 0/49/4.
+--
+-- ── WHAT PHASE 8 DID NOT DO ────────────────────────────────────────────────────────
+--   No score of any kind. No ESG. No WikiRate. No UI change. No new parent researched. No
+--   fuzzy matching. No nationwide migration. No change to the FRS recovery lane, MassDOT or
+--   DeSoto. No EPA enforcement events exist to migrate, so none were invented.
