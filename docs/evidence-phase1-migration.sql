@@ -1044,6 +1044,76 @@ create schema if not exists evidence;
 --      documents exist, they are simply PDF-only. A 503 is not evidence of absence, and it should
 --      not have been recorded as if it were.
 --   2. ALJ initial decisions: index returned 0 rows; unchecked, and reported as such.
+--      ⚠️ SUPERSEDED IN PART BY PHASE 9D: this section's claim that "HTML variants definitively
+--      return 404" is WRONG. A canonical HTML page exists at
+--      /enforcement-litigation/administrative-proceedings/<release-no> (200, three eras). It is
+--      a STUB carrying no order text, so the PDF-only conclusion stands — but see the Phase 9D
+--      block for the corrected basis.
 --   3. Coverage starts 2017-04; earlier matters are outside the window and say so.
 --   4. 46 cross-corpus pairs remain candidates pending document-level confirmation.
 --   5. MSHA was NOT ingested, per instruction — still a future-phase candidate only.
+
+-- ============================================================================
+-- PHASE 9D (2026-08-11) — SEC ADMINISTRATIVE ORDER PDF EXTRACTION.
+-- OUTCOME: BLOCKED IN THIS ENVIRONMENT. NO EXTRACTION WAS PERFORMED, NO DATA WAS WRITTEN,
+-- AND NOTHING FROM PHASES 8-9C WAS CHANGED except one Phase 9C receipt corrected below.
+-- Phase 9D's substantive requirements (§4-§8: procedural posture, findings vs allegations,
+-- statutes, monetary relief, non-monetary sanctions) all depend on reading the order text.
+-- The order text could not be obtained. Rather than produce a partial or inferred extraction,
+-- nothing was written.
+--
+-- ── A GENUINE PHASE 9C DEFECT, FOUND AND CORRECTED ───────────────────────────────────
+-- Phase 9C recorded: "administrative order documents are PDF-only; HTML variants definitively
+-- return 404." THE SECOND HALF IS WRONG. An HTML page DOES exist, at the canonical path that
+-- mirrors the litigation-release pattern 9B had already proven working:
+--     https://www.sec.gov/enforcement-litigation/administrative-proceedings/<release-no>
+-- Verified 200 across three eras: 34-106074 (2026), ia-4857 (2018), 34-80365 (2017).
+-- In 9C I tested only the LEGACY paths (/litigation/admin/YYYY/<rel>.htm) and the file-number
+-- path, got 404s, and generalised from them. The canonical pattern — the one I had already
+-- used successfully for litigation releases in 9B — was never tried. That is the same class of
+-- error as testing one URL shape and concluding a source does not exist.
+-- THE CONCLUSION SURVIVES, for a different reason than recorded: the page is a STUB. Measured
+-- on 34-106074 — 66,436 bytes, of which the respondent name appears 3 times (title and heading),
+-- the file number 0 times, "Release No" 0 times, "cease-and-desist" 0 times, and exactly ONE
+-- .pdf link. There is no order text, no structured metadata and no cross-reference to a
+-- litigation release. So administrative order CONTENT is still PDF-only.
+-- ⚠️ A near-miss worth recording: an early keyword probe on that page reported
+-- "cease-and-desist|respondent|disgorgement" as TRUE and I nearly took it as proof the HTML
+-- carried the order. It did not — "respondent" occurs at byte 41,042 inside the SIDEBAR NAV
+-- ("Information for Respondents in Administrative Proceedings"), and "cease-and-desist" does
+-- not occur at all. A match is a lead, not a fact; the position had to be read.
+--
+-- ── WHY THE PDFs CANNOT BE READ HERE — THREE INDEPENDENT RECEIPTS ────────────────────
+-- 1. pg_net DESTROYS PDF BINARY. net._http_response.content is a TEXT column; a PDF's first
+--    NUL/invalid-UTF-8 byte truncates it. Measured against each response's own Content-Length:
+--        34-106074.pdf     444 stored of 126,786 declared =  0.35% retained
+--        ia-4857.pdf     1,433 stored of  89,991 declared =  1.59% retained
+--        34-80365.pdf      747 stored of 104,929 declared =  0.71% retained
+--    The bytes are gone before any parser could run. This is not a parsing problem.
+-- 2. THE SANDBOX CANNOT FETCH THEM. Direct egress to sec.gov returns CONNECT tunnel 403 from
+--    the agent proxy — an ORGANISATION POLICY DENIAL. The proxy's own README states such
+--    denials must be reported, not retried or worked around. So it was reported, not evaded.
+-- 3. NO TEXT ALTERNATIVE EXISTS. Legacy .htm paths 404 (three patterns, two eras). The
+--    canonical HTML page is a stub (above). Drupal's JSON:API at /jsonapi returns 404.
+--
+-- ── WHAT WOULD UNBLOCK PHASE 9D (unchanged scope, one capability) ────────────────────
+-- Any ONE of:
+--   a. a runner with egress to sec.gov that can fetch the PDF and run a text extractor
+--      (pdftotext / pdf.js), writing text + hash + provenance back — this is the same
+--      "verification runs on a GitHub runner" pattern the ingest repo already uses for
+--      government sources the sandbox cannot reach;
+--   b. a Supabase Edge Function fetching the PDF and extracting text server-side, which has
+--      egress today and is where get-address-report already runs;
+--   c. a bytea-capable HTTP path in Postgres so the PDF survives storage intact.
+-- None of these is a schema or architecture change to the evidence graph; Phase 9D's design
+-- (source PDF -> text -> provenance -> matter -> materialize -> serve locally) stands ready.
+--
+-- ── WHAT REMAINS TRUE AFTER 9D ───────────────────────────────────────────────────────
+-- Phase 9C's PRESENCE/ABSENCE coverage is untouched and still fully defensible:
+--   administrative proceedings 113/113 months, 6,077 documents, 4,562 matters,
+--   2017-04-03 .. 2026-08-11, 0 unexplained gaps, HomeSignal entity scan 0/36.
+--   litigation releases 2,795, complete. Garfield 0/49/4.
+-- DETAIL coverage is 0 of 6,077 documents — and Phase 9C's split of PRESENCE coverage from
+-- DETAIL coverage is exactly what lets that be stated without invalidating anything.
+-- The 46 cross-corpus candidate pairs remain candidates: resolving them needs the order text,
+-- and the landing pages carry no cross-reference to resolve them from.
