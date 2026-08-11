@@ -52,7 +52,10 @@ CONTROLS = [
     {
         "release_ref": "IA-4857",
         "url": "https://www.sec.gov/files/litigation/admin/2018/ia-4857.pdf",
-        "file_number": None,  # not captured by the 9C index parse for this row
+        # Corrected: this was recorded as None when the table was built, which was my
+        # omission, not a data gap. ev_sec_release.file_number is '3-18377' and the PDF's
+        # own caption reads "ADMINISTRATIVE PROCEEDING File No. 3-18377".
+        "file_number": "3-18377",
         "publish_date": "2018-02-22",
         "pgnet_retained": 1433,
         "pgnet_declared": 89991,

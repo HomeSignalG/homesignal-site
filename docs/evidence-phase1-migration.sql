@@ -1117,3 +1117,85 @@ create schema if not exists evidence;
 -- DETAIL coverage is exactly what lets that be stated without invalidating anything.
 -- The 46 cross-corpus candidate pairs remain candidates: resolving them needs the order text,
 -- and the landing pages carry no cross-reference to resolve them from.
+
+-- ============================================================================
+-- PHASE 9E (2026-08-11) — §2 BINARY-INTEGRITY GATE: PASSED. 9D's blocker is lifted.
+-- The capability 9D said it needed ("a runner with egress to sec.gov that can fetch the PDF
+-- and run a text extractor") now exists as .github/workflows/sec-pdf-gate.yml +
+-- scripts/sec-pdf-gate.py. The gate ACQUIRES AND PROVES ONLY. It writes nothing, reads no
+-- secrets (permissions: contents: read — the minimum write capability for a proof is zero),
+-- is not scheduled, and never runs during page rendering (§18). Interpretation does not
+-- happen on the runner (§5).
+--
+-- ── THE THREE 9D BLOCKING CONTROLS, MEASURED (run 31532416261, job 93915400112) ──────
+--   release      HTTP  downloaded == declared      pages  text chars  bytes vs pg_net
+--   34-106074    200   126,786 == 126,786 bytes      2      2,369        285.6x
+--   IA-4857      200    89,991 ==  89,991 bytes      3      6,432         62.8x
+--   34-80365     200   104,929 == 104,929 bytes      4      8,314        140.5x
+-- All three: %PDF- magic, pdfinfo rc=0, pdftotext rc=0, native text (1,184 / 2,144 / 2,078
+-- chars per page — none is an image scan), and the full caption block recovered.
+-- SHA-256 (document identity, for §14 change detection):
+--   34-106074  c8f771c1eb0068b381099ccaf1e0819ef9fcdf6ca8b3daa0cb37f96487c125ef
+--   IA-4857    ca1595dcd58d963b63042d75a325c209f1474fa4bfeb116ac842e4a780de77b8
+--   34-80365   e1639ce8bdc8f2e53e560f1948ffe03dea4d0cc210f47ac869aac4d4b629f544
+--
+-- ── A DEFECT IN MY OWN GATE, CAUGHT BY RUNNING IT (run 31532143841 -> 31532416261) ───
+-- Run 1 reported FAIL on 34-106074 and IA-4857 while passing all six substantive checks on
+-- both. The instrument was wrong, not the documents: it compared extracted TEXT CHARACTERS
+-- against pg_net's RETAINED BYTES and required 10x. That ratio tracks how compressed a PDF
+-- is, not whether the bytes survived — 34-106074 is a 2-page order inside a 126,786-byte
+-- file (fonts and embedded objects dominate), so it yields 2,369 chars = 5.3x.
+-- A threshold that fails a document six other checks just proved intact is measuring the
+-- wrong pair. Replaced by two checks that each measure what they name:
+--   binary_survived_vs_pgnet   BYTES vs BYTES (285.6x / 62.8x / 140.5x)
+--   order_text_recovered       the caption block, which pg_net cannot reach AT ALL
+--
+-- ── AND THE SECOND HALF IS NOW MEASURED, NOT ASSUMED ─────────────────────────────────
+-- "The runner recovers more text" understates it. Re-probed all three through pg_net on
+-- 2026-08-11 (net._http_response id 55807 / 55808 / 55809), reproducing 9D's byte figures
+-- exactly (0.35% / 1.59% / 0.71% retained) and then reading the fragments' CONTENT:
+--   'SECURITIES AND EXCHANGE COMMISSION'  false, false, false
+--   'In the Matter of'                    false, false, false
+--   'ORDER INSTITUTING'                   false, false, false
+-- 34-106074's 444 retained bytes are literally
+--   '%PDF-1.6 ... 92 0 obj <</Linearized 1/L 119955/O 94/E 111714/N 2/T 119625 ...'
+-- — the header and linearisation dictionary, truncated before any content stream. So pg_net
+-- recovers ZERO order text, not "a little". The runner recovers the ONLY text. That is a
+-- category change, and it is what the gate now asserts.
+--
+-- ── SUBSTANTIVE FINDING #1: AN AP DOCUMENT IS NOT NECESSARILY AN ENFORCEMENT ACTION ──
+-- Control 34-106074 (Zymergen Inc., 2026-08-11) is an "ORDER APPOINTING TAX ADMINISTRATOR"
+-- for a distribution fund. Measured census over its extracted text:
+--   ORDER INSTITUTING 0 · cease-and-desist 0 · willfully violated 0 · disgorgement 0
+--   civil money penalt 0 · Respondent 1 (the caption) · ADMINISTRATIVE PROCEEDING 3
+-- It carries NO findings, NO violation, NO sanction and NO respondent conduct. It is a
+-- docket event inside a proceeding that already concluded. This is direct evidence for the
+-- §12 matter-vs-procedural-event separation: counting AP DOCUMENTS as enforcement actions
+-- would inflate a company's record with its own case's administrative housekeeping.
+-- The distinction must be drawn from the ORDER TEXT, not from index presence.
+--
+-- ── SUBSTANTIVE FINDING #2: A REAL 9B/9C PARSER DEFECT — FOOTER ABSORPTION ───────────
+-- The extracted caption for 34-80365 named four respondents cleanly; its ev_sec_release
+-- respondents_text names the same four AND THEN continues "... 1 to 59 of 59 items Return
+-- to top SEC homepage About the SEC Budget & Performance Careers ... Sign up for email
+-- updates". The last item on each index page absorbed the page footer. Measured, exactly:
+--   administrative_proceedings  125 rows on 125 of 125 pages
+--   litigation_releases          27 rows on  27 of  29 pages
+--   152 of 8,872 rows (1.7%) — EXACTLY ONE PER PAGE, so it is a boundary bug, not noise.
+-- WHAT IT DOES NOT AFFECT: presence/absence coverage. release_ref, publish_date, doc_url and
+-- file_number are correct on these rows (34-80365 carries doc_url .../2017/34-80365.pdf and
+-- file_number 3-17897; the PDF's own text confirms both). Phase 9C's 113/113-month
+-- completeness and the 6,077 count stand unchanged.
+-- WHAT IT DOES AFFECT: §11 entity matching, which reads respondents_text. 152 rows carry
+-- ~700 characters of SEC site chrome that a name matcher can hit ("Careers", "Contracts",
+-- "Data", "Ombuds"). Any §11 match against those rows is suspect until this is repaired.
+-- THE REPAIR PATH IS NOW AVAILABLE AND IS THE RIGHT ONE: for any document whose PDF has been
+-- staged, THE ORDER'S OWN CAPTION IS AUTHORITATIVE OVER THE INDEX'S respondents_text. The
+-- index is a finding aid; the order is the record.
+-- ⚠️ NOT YET REPAIRED — logged with its measurement, not silently worked around.
+--
+-- ── ALSO CORRECTED HERE ──────────────────────────────────────────────────────────────
+-- The gate's control table initially recorded IA-4857 as having no file number. That was my
+-- omission in building the table, not a gap in the data: ev_sec_release.file_number is
+-- '3-18377' and the PDF's own caption reads "ADMINISTRATIVE PROCEEDING File No. 3-18377".
+-- 146 of 6,077 AP rows do have a NULL file_number; IA-4857 is not one of them.
