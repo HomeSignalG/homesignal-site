@@ -310,3 +310,39 @@ create schema if not exists evidence;
 --   Returns routable + has_evidence + development_coverage ∈ {modeled, not_yet_available}.
 --   §13: an unmodeled ZIP has UNKNOWN development coverage and must never render as a
 --   verified negative ("no development found").
+
+-- ============================================================================
+-- PHASE 7 part 1 (2026-08-10) — facility/company VOCABULARY + DECLARATIVE ROLE MAPS.
+-- Migration: evidence_phase7_facility_predicates_and_role_maps
+-- SEMANTICS ONLY: 0 facility entities, 0 new claims. Data migration NOT performed.
+-- ============================================================================
+-- New predicates (each with an explicit does_not_mean):
+--   facility_owner            NOT the property owner of record / deed owner / parcel owner
+--   operates_facility         NOT the parcel owner, project owner as filed, or parent
+--   former_operator           NOT current; a missing end date does NOT make a role current
+--   regulated_customer_of     a regulator's responsible CUSTOMER, not automatically operator
+--   parent_company            VERIFIED corporate parentage only
+--   parent_company_candidate  never display, never track-record or ESG inheritance
+--   facility_located_on_parcel  proximity is NOT location
+-- New identifier types: tceq.rn (facility, TX), tceq.cn (organization, TX), sec.cik (org).
+--   The kind guard therefore rejects a TCEQ RN on an organization and a CN on a facility.
+--
+-- ev_source_role_map gained `excluded boolean` + a CHECK that a row is either mapped or
+-- explicitly excluded. An exclusion is a RECORDED DECISION, not a missing row.
+-- Measured mapping over all 6 live FRS affiliation types (0 unhandled):
+--   OPERATOR        -> operates_facility
+--   OWNER           -> facility_owner            (never property_owner_of_record)
+--   OWNER/OPERATOR  -> facility_owner            (+ operates_facility from ONE source record)
+--   PARENT OWNER    -> parent_company_candidate  (never parent_company)
+--   BILLING CONTACT -> EXCLUDED                  (not a role; contact data must not surface)
+--   MAILING ADDRESS -> EXCLUDED                  (not a role; address data must not surface)
+-- Verified: 0 non-SEC sources may map to parent_company.
+--
+-- Predicate-specific authority (no universal trust score):
+--   tceq_central_registry  regulated_customer_of authoritative · operates_facility official_secondary
+--   epa_frs_affiliations   facility_owner / operates_facility official_secondary;
+--                          parent_company_candidate third_party
+--   sec_exhibit21          parent_company authoritative
+-- Precedence for operates_facility: TCEQ identifier-backed 10/20 < FRS name-based 40 —
+-- so an identifier-backed state relationship outranks a name-based federal affiliation
+-- for the same predicate, and neither deletes the other.
