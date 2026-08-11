@@ -1657,3 +1657,54 @@ create schema if not exists evidence;
 --   prejudgment int   734 -> 1,071   (defect 1, mainly)
 --   other relief      244 ->   245
 --   disgorgement == prejudgment interest collisions: 0
+
+-- ============================================================================
+-- PHASE 9F COMPLETE — GOLDEN SUITE GREEN. Money ownership is now a STRUCTURAL rule.
+--
+-- ── THE REWRITE (§1): evidence.ev_bind_money ────────────────────────────────────────
+-- Heuristics (first / largest / nearest / within-N-chars) are gone. An amount binds to the
+-- relief it is grammatically attached to, in the orientations the corpus actually contains:
+--   C  parenthesised restatement   "civil money penalty ... $40 million ($40,000,000)"
+--   A  amount then relief          "$20,102 in disgorgement" · "a $320,000 civil penalty"
+--   B  relief then amount          "disgorgement of $178,750"
+-- C binds first, then A, then B for amounts not already bound; each amount binds ONCE.
+-- ⛔ "million" IS NOT MULTIPLIED — 33-10371 prints "$3,315,727.64 million in disgorgement",
+--    an SEC typo; only an explicit parenthesised restatement overrides the literal token.
+-- ⛔ AMBIGUITY IS REPORTED, NOT GUESSED: if two DIFFERENT amounts bind to one relief the
+--    state is 'ambiguous_ownership' with NO amount. 33-10334 orders two penalties
+--    ($198,326.06 and $80,000.00) against different respondents; every previous version
+--    silently reported the first as "the document's penalty".
+-- Cents are exact end to end: the token is captured whole and cast straight to numeric.
+--
+-- ── SIX OF MY OWN FIXTURES WERE WRONG, AND THAT IS THE FINDING ──────────────────────
+-- Expectations for 33-10334, 33-10371, 33-11023, 33-11363, 34-98118 and IC-33534 had been
+-- taken from the EXTRACTOR's output rather than the orders. Re-read against the text:
+--   33-10371 "ordered to pay $3,315,727.64 million in disgorgement, $515,188.59 in
+--            prejudgment interest, and a $320,000 civil penalty" — I had called $515,188.59
+--            DISGORGEMENT; the order calls it interest.
+--   33-11363 "$20,102 in disgorgement, $8,924 in prejudgment interest, and a $60,000 civil
+--            money penalty" — I had expected disgorgement to have no amount.
+--   33-11023 two disgorgements ($4,924,275 / $105,103) and two interest figures
+--            ($272,366 / $13,099): multi-respondent, correctly ambiguous.
+--   34-98118 three penalties ($750,000 / $25,000 / $10,000): ambiguous; disgorgement is
+--            $187,740, which the old extractor missed by landing on a "deemed satisfied"
+--            sentence.
+-- The fixtures were corrected against the documents; the code was not bent to fit them.
+--
+-- ── SUITE ───────────────────────────────────────────────────────────────────────────
+-- 17 golden documents · 81 field-level assertions · 25 auxiliary assertions
+-- (statute 6 · sanction 7 · relation 5 · entity 5 · parser-boundary 2) = 106 assertions,
+-- ALL PASSING. M1..M8 ALL CAUGHT, 0 gaps, every mutation rolled back with clean state
+-- verified (M7 residue 0, direct matches 0, tax_administrator is_substantive false,
+-- 21-cr-04587 still criminal, footer pollution 0).
+--
+-- ── FINAL MONETARY VALUES (the trustworthy ones; 9E's were not) ─────────────────────
+--   civil penalty  2,087 with amount · 368 ambiguous · 864 stated without amount
+--   disgorgement     923 with amount · 170 ambiguous
+--   prejudgment      872 with amount · 264 ambiguous
+--   other relief     253 with amount
+--   all three buckets in one document: 512 · documents carrying cents: 993
+-- Non-money invariants unchanged: substantive 5,252 · procedural 756 · pairs 46 ·
+-- merges 22 · footer 0 · entity 0/0/0.
+-- Idempotence: second full pass byte-identical across money, sanctions, statutes, roles,
+-- semantics, pairs and entity attribution.
