@@ -1,6 +1,10 @@
 # PROPERTY CARD 0004 — Del Valle / 78617 pilot build brief
 
-**Status:** ready to hand to a build session, **after** the three founder decisions in §1 are answered.
+**Pilot subject (founder, 2026-08-11): `2200 CALDWELL LN, DEL VALLE, TX 78617` — this address, live at
+`homesignalmap.html?addr=2200%20CALDWELL%20LN%2C%20DEL%20VALLE%2C%20TX%2078617`.** Single subject.
+See §4 for exactly what it can and cannot support, because the answer constrains two modules.
+
+**Status:** ready to hand to a build session, **after** the four founder decisions in §1 are answered.
 **Supersedes** the first draft of this brief. Every premise below was measured against the live
 database on **2026-08-11**, not inferred from documentation — the queries and their results are
 inline, because six premises in the draft were false and one of them would have stopped the build.
@@ -79,6 +83,34 @@ word-ban (§8) is necessary but is not the same thing as sign-off.
 **Decide:** does the existing one-time sign-off cover aggregated, entity-attributed enforcement
 totals, or is a new review required? **Treat "unclear" as a stop.**
 
+### Q4 — Named individuals and phone numbers (found live, 2026-08-11)
+
+The pilot row carries **personal data on every filing**, and **the live dossier is rendering it
+today**. Measured from `property_reports.sites[]`:
+
+```
+owner_phone       (813) 758-6679 · (813) 758-9100 · (707) 803-1177
+contact_name      Scott Padilla · Kristin Lorentzen
+filed_by          Jeff Gutknecht · Brian Conklin · Kristin Lorentzen
+design_firm_phone / design_firm_addr / owner_addr   — all populated
+```
+
+The live page's entity graph is built out of exactly these fields — the screenshots show connection
+labels reading *"same phone (813) 758-6679"*, *"same contact: Gutknecht"*, *"same contact: Padilla"*,
+with the individuals named again in the evidence list beneath.
+
+This is Part 29 **Q6**: *"Are named individual filers (`filed_by`, `Contact`) shown on the consumer
+card? **Recommend: no by default** — public record, but a privacy/product call, not an engineering
+one."* Still open. The draft brief's §23 says do not expose phone numbers or contacts — which means
+**the new card must not do what the live dossier already does.**
+
+**Decide:** (a) card shows neither individuals nor phone numbers, and connections are described
+without naming the shared attribute's value ("two filings share a contact" rather than "same
+contact: Gutknecht"); or (b) it matches the existing dossier. Recommend (a).
+
+Whichever is chosen, **the inconsistency between the two surfaces is itself a bug to file** — one
+page cannot treat a phone number as consumer-safe while the other treats it as private.
+
 ---
 
 ## 2. What already exists — DO NOT REBUILD IT
@@ -132,7 +164,35 @@ property_reports  -> exactly 1 row, site-wide
 | `companies` | 45 | Keeps `neuralink` and `neuralink corporation` as **separate rows**, noting *"NOT merged … no source states the equivalence"* |
 | `tx_parcels` · `app_environmental_risk` · `echo_violation_counts` · `identity_conflicts` | 0 · 0 · 0 · 0 | empty |
 
-### For 2200 Caldwell Ln specifically
+### The pilot row's five filings, in full
+
+Read from `property_reports.sites[]` on 2026-08-11. **This is the entire dataset for the pilot
+address** — build against these values, do not re-derive them.
+
+| Project | Filed | Label | Owner **as filed** | Status **as filed** |
+|---|---|---|---|---|
+| `TABS2023006483` | 2022-12-27 | Histology Lab | River Bottoms Ranch | Project Closed |
+| `TABS2023006449` | 2023-01-09 | River Bottoms Ranch Barn 2 | River Bottoms Ranch LLC | Inspection Complete |
+| `TABS2024016698` | 2024-04-30 | Barn 2 ACT Office | RIVER BOTTOMS RANCH LLC | Inspection Complete |
+| `TABS2024022676` | 2024-07-15 | ATX1 New Construction | Neuralink | Review Complete |
+| `TABS2026011928` | 2026-03-02 | ATX1 — Third Floor Tenant Improvement | Neuralink Corporation | Review Complete |
+
+Derived totals, which the live dossier already displays and the card may reuse: **5 filings ·
+$27,900,000 total filed cost · 174,717 sq ft filed · 4 distinct owner strings** (`River Bottoms Ranch
+LLC` / `River Bottoms Ranch` / `Neuralink` / `Neuralink Corporation`; the fifth filing's
+`RIVER BOTTOMS RANCH LLC` collapses case-insensitively). Every filing carries a `record_url` to
+`tdlr.texas.gov/TABS/Projects/<project_no>`.
+
+**`sites[]` holds 5 records and zero of them are federal/registry records** (`counts.federal = 0`, no
+`registry_id`, no `env` payload on any site). That is decisive for the track-record modules: there is
+no facility at this address for EPA ECHO or the TCEQ Central Registry to key on, so those rows are
+`not_checked` at the property level.
+
+**Fields in `sites[]` that must never reach the screen** (§23): `owner_phone`, `owner_phone_norm`,
+`owner_addr`, `contact_name`, `filed_by`, `design_firm_phone`, `design_firm_addr`, plus the internal
+`needs_review`, `match_type`, `matched_address`, `geocode_source`, `rel_rule`, `layer`, `e`, `n`.
+
+### Track record for the pilot entities specifically
 
 ```
 company_track_events WHERE company_key ~ neuralink|river   ->  []          (zero events)
@@ -151,38 +211,80 @@ $163,750" is unobtainable. Do not treat this as a build failure.
 
 ---
 
-## 4. TWO PILOT SUBJECTS — this is the important change
+## 4. THE PILOT SUBJECT — 2200 Caldwell Ln, and what it constrains
 
-Caldwell alone cannot validate the two modules the draft calls most important. Use both:
+**Decided (founder, 2026-08-11): 2200 Caldwell Ln is the pilot subject.** Build the card for this
+address. The consequences below are not objections — they are the scope the build has to be honest
+about, and they belong in the final report.
 
-### Subject A — 2200 Caldwell Ln (honest absence)
+### What Caldwell proves
 
-Proves the state machinery: a receipted `checked_empty`, a `not_checked` that never renders zero, an
-absent parent, an unresolved parcel, and five real filings with owner-as-filed semantics.
+Everything about the *state machinery*, which is the hard and novel part:
 
-### Subject B — TXI Garfield Sand & Gravel (the intelligence path)
+- a **receipted `checked_empty`** — TCEQ Central Registry, checked 2026-08-09, `result_count = 0`,
+  with `query_basis` and `source_url` to show for it
+- a **`not_checked` that never renders a zero** — EPA ECHO, OSHA, SEC, State/Local
+- an **absent parent** rendering as "No verified parent company established"
+- an **unresolved parcel** — every TCAD field "Not checked", with owner-of-record never borrowing an
+  owner-as-filed value
+- **five real filings** with correct owner-as-filed, status-as-filed and per-record links
+- a genuinely rich **connected-entities** graph (§4.2)
 
-**Verified present in the pilot geography and already a pin on the Del Valle map today:**
+### What Caldwell cannot prove, and what to do about it
 
-```
-app_projects (zip=78617, record_kind=facility)
-  "TXI - GARFIELD SAND & GRAVEL"        registry_id 110070182593
-  "TXI - GARFIELD SAND & GRAVEL PLANT"  registry_id 110070376640
-project_facility_refs -> TCEQ_RN RN106540172 (addr 3901 NORWOOD LN STE 1), RN106164668 (3901 NORWOOD LN)
-property_company_roles (zip 78617) -> Operator: txi operations lp, martin marietta materials southwest llc
-                                      verification VERIFIED, evidence_tier identifier_backed
-company_track_events -> 49 direct + 12 parent-attributed TCEQ events
-company_parents -> martin marietta materials southwest llc -> martin marietta materials inc  (verified, SEC EX-21.01)
-```
+`company_track_events` returns **zero rows** for these entities, so **Entity Track Record and Parent
+Company Track Record ship with no measured events**. Their count/summary/intelligence-sentence paths
+will be exercised only in their empty and not-checked branches. The modules are correct but untested
+in the state that matters commercially.
 
-Subject B is the **only** subject in 78617 that can populate Entity Track Record, Parent Company
-Track Record, and Regulatory Records with real data. Without it, those two modules ship untested.
+Two ways to close that, both cheap, neither expanding the pilot:
 
-**Note the identity consequence:** Subject B has **no `property_reports` row** (there is exactly one,
-for Caldwell). The card is currently keyed by canonical address. Subject B must therefore be
-reachable by **facility identity** (`registry_id` / TCEQ RN), or a `property_reports` row must be
-generated for 3901 Norwood Ln. **Decide which, and say so in the report** — do not silently invent an
-address key.
+1. **Preferred — fixture-test the populated path.** Drive the same code with the real Martin Marietta
+   / TXI rows through the localhost-gated `window.__HS_CARD_OVERRIDE` hook, and assert in
+   `test/property-card*.test.mjs` that 49 direct events, 12 parent-attributed events, 157 summed
+   violations and a `penalty_amount` present on only 2 of 61 rows render correctly. No new pilot
+   surface, no new route, real data shapes.
+2. **Optional — a second validation subject, not a second pilot.** `TXI - GARFIELD SAND & GRAVEL`
+   (EPA FRS `110070182593`) is already a facility pin on the Del Valle map, with TCEQ `RN106540172`
+   at 3901 Norwood Ln, `Operator` roles for `txi operations lp` and
+   `martin marietta materials southwest llc` (both `VERIFIED` / `identifier_backed`), and a verified
+   parent edge to `martin marietta materials inc` sourced to SEC Exhibit 21.01. It has **no
+   `property_reports` row**, so reaching it needs facility-identity entry or a generated row — which
+   is why it is optional and explicitly out of scope unless the founder asks for it.
+
+**Do not** populate Caldwell's track record from Martin Marietta / TXI data to make the module look
+alive. Those entities have no relationship to this property, and asserting one would be the exact
+false-join the whole card exists to prevent.
+
+### 4.2 Connected entities — the module with real content
+
+The live dossier already computes this client-side from `sites[]`, and it is the richest thing the
+pilot has after the filings. The gate it uses is good and must be preserved: a connection is drawn
+only when a shared attribute appears on **≥2 distinct records AND ≥2 distinct entity names**.
+
+Measured for the pilot: **4 owner strings, 3 of which participate in connections**, linked by a
+shared owner phone across `TABS2023006449` / `TABS2024016698` / `TABS2024022676`, and by a shared
+filer/contact across `TABS2023006449` / `TABS2023006483` / `TABS2024016698` and
+`TABS2023006483` / `TABS2024022676`.
+
+Two constraints:
+
+- **Q4 applies here.** The card must not label a connection with the personal value that produced it.
+  "Two filings share an owner phone number" carries the same evidentiary weight as printing the
+  number, without publishing it.
+- **Keep the existing caveat verbatim** — the live page's *"These are facts from the filings — a
+  connection means two records share a detail, not a verdict on any operator"* is exactly right and
+  should not be reworded.
+
+### 4.3 A live copy defect to fix while you are here
+
+The production dossier's header currently reads **"4 owners of record"** for what are four
+TDLR-filed owner strings. That is the precise conflation this card is built to prevent, live today.
+`companies` in the database is more careful than the page — it keeps `neuralink` and
+`neuralink corporation` as separate rows, noting *"NOT merged … no source states the equivalence."*
+
+Fix the header copy to **"4 owners as filed"** (or similar) in the same change, and note it in the
+report. It is a two-word fix to a factual claim.
 
 ---
 
@@ -306,8 +408,11 @@ these corrections:
 - **Recorded Instruments.** No recorder adapter, and **no TCAD instrument references exist as data**
   (deed `2021024697` is prose-only). The draft's "display the TCAD-reported instrument references"
   is unbuildable — render `not_checked` with the source limitation.
-- **Regulatory Records.** The event list from `company_track_events`. Empty for Caldwell, rich for
-  Subject B. Do not duplicate it inside Entity Track Record.
+- **Connected entities.** Real content for the pilot — see §4.2 for the ≥2-records/≥2-names gate,
+  the Q4 constraint on labelling connections with personal values, and the caveat copy to preserve.
+- **Regulatory Records.** The event list from `company_track_events`. **Empty for the pilot address**
+  — render the empty state, do not borrow another entity's events. Exercise the populated path by
+  fixture (§4). Do not duplicate the event list inside Entity Track Record.
 - **Sources & Verification.** Add `source_vintage` and `retrieved_at`/`checked_at` where the row
   carries them. Never expose internal enum strings.
 - **Data Completeness.** Already built, no percentage. Keep the disclaimer exactly as shipped.
@@ -346,9 +451,10 @@ metric and its state) for assertions.
 ## 11. Feature flag — probably unnecessary
 
 The draft asks for server-side pilot eligibility. There is no flag mechanism to reuse, and the card
-is **already self-gating**: it can only render what is cached, and `property_reports` has one row.
-Prefer that over building a flag. If Subject B needs facility-keyed entry, gate on
-"a pilot subject resolves" rather than on a hard-coded ZIP — and never on a hard-coded address.
+is **already self-gating**: it can only render what is cached, and `property_reports` has exactly one
+row — the pilot address. Prefer that over building a flag. Gate on "a cached property record
+resolves", never on a hard-coded address or ZIP, so the card widens by cache population rather than
+by a code change.
 
 ---
 
@@ -365,6 +471,13 @@ The draft's §33 list is good. Add:
 - `neuralink` and `neuralink corporation` are not merged into one entity
 - the state vocabulary has no module-local additions
 - no intelligence sentence claims a review period the data does not carry
+- **no personal field from `sites[]` reaches the rendered card** — assert on the literal pilot values
+  (`(813) 758-6679`, `(813) 758-9100`, `(707) 803-1177`, `Gutknecht`, `Padilla`, `Conklin`,
+  `Lorentzen`, `owner_addr`, `design_firm_addr`). A test that asserts the *absence* of these exact
+  strings cannot be satisfied by a refactor that reintroduces them under a new label
+- **no internal field leaks**: `needs_review`, `match_type`, `matched_address`, `geocode_source`,
+  `rel_rule`, `layer`, `e`, `n`
+- a connection is described without printing the personal value that produced it (§4.2)
 
 Then run `node scripts/run-unit-tests.mjs --offline --min-files=75`. **Use Node ≥ 22.18** — on 22.14
 fifteen suites fail on TypeScript type-stripping alone and it looks like your change broke them.
@@ -389,9 +502,11 @@ diverge deliberately — and say which.
 Stop and report rather than infer if: a parent relationship is not verified · a pilot `project_id`
 does not resolve · TCAD data is required to fill a module · SEC or OSHA data is required · a hazard
 source is required · a notice cannot be property-linked · a facility or entity cannot be tied to the
-parcel · the layout requires exposing private fields (`property_company_roles.notes` and
-`company_track_events.attribution_note` are internal-sounding — review before surfacing) · legal
-sign-off for aggregated enforcement is unclear · performance needs the unbuilt claim layer.
+parcel · **a module can only be filled by rendering a personal field** (Q4 unanswered, or the only
+way to describe a connection is to publish the phone number or filer's name) · internal-sounding
+fields would have to be surfaced (`property_company_roles.notes`,
+`company_track_events.attribution_note`) · legal sign-off for aggregated enforcement is unclear ·
+performance needs the unbuilt claim layer.
 
 **Do not fabricate content to complete a screenshot.**
 
@@ -402,16 +517,19 @@ sign-off for aggregated enforcement is unclear · performance needs the unbuilt 
 Answer the draft's §1–§29 report sections, plus:
 
 - **Which founder decisions (§1) were answered, and by whom.** An unanswered gate is a stop.
-- **Both pilot subjects**, with the actual state of every agency row for each.
+- **The state of every agency row for the pilot address**, with the receipt behind each.
+- **How the populated track-record path was exercised** (§4) — by fixture, or not at all.
 - **The join-path preflight result**, and whether this build should wait for `6a92a41`.
 - **The layout option chosen** (§7) and what it cost.
-- **The `homesignalmap.html?addr=` duplication decision** (§13).
+- **The `homesignalmap.html?addr=` duplication decision** (§13), and whether the
+  "4 owners of record" header copy was fixed (§4.3).
 - **Measured counts re-run**, since the audit doc's numbers have already drifted.
 
 Then answer explicitly:
 
-**A.** Map → Quick View → View Full Property Card → Back to Map, cleanly, both subjects?
-**B.** Is Entity Track Record first and most prominent — and does it show real events for Subject B?
+**A.** Map → Quick View → View Full Property Card → Back to Map, cleanly?
+**B.** Is Entity Track Record first and most prominent — and is its empty state honest rather than
+reassuring?
 **C.** Are direct and verified-parent histories completely separate, by `attribution`?
 **D.** Is missing/unavailable/not-checked visibly distinct from a measured zero, **including for a
 broken join**?
@@ -419,5 +537,8 @@ broken join**?
 **F.** Is Data Completeness transparent without a score?
 **G.** Are property owner, project owner as filed, operator, and parent kept distinct?
 **H.** Did non-pilot users retain the existing experience, with every named verifier still green?
+**I.** Is every personal field absent from the rendered card — no phone number, no named filer or
+contact, no mailing address — and no internal field (`needs_review`, `match_type`, `geocode_source`,
+`rel_rule`) leaked?
 
 Do not expand beyond Del Valle. Do not start scoring. **STOP FOR REVIEW.**
