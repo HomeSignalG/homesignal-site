@@ -623,8 +623,7 @@ HS.onReady(async function () {
   // filing isn't tied to a parcel yet" is itself an answer the card has to be able to give.
   function cardCTA(it) {
     return HS.card.ctaHTML({
-      zip: S.zip, id: it && it.id, place: deepPlace || null,
-      addr: HS.card.keyOf(it), kind: (it && it._facility) ? 'facility' : null
+      zip: S.zip, id: it && it.id, place: deepPlace || null, addr: HS.card.keyOf(it)
     });
   }
   // A folded section: collapsed by default so the panel reads as a quick view, but present
