@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>HomeSignal — Property Card</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<link rel="stylesheet" href="app.css">
+<style>
+  /* ── PROPERTY CARD (page-scoped; app.css untouched) ────────────────────────────
+     The full card a resident reaches from the Maps slide-in. Two columns: the
+     information sections on the left, the parcel/activity rail on the right, one
+     tab strip over both. Every card states the research state of its own source,
+     so the layout has to give that badge a permanent, predictable place. */
+  .pcpage{max-width:1320px}
+
+  /* state colours — ONE definition, consumed by badges, dots and the donut */
+  .pcpage{
+    --pct-verified:var(--green-2); --pct-reported:var(--green);
+    --pct-checked-empty:#8cc2a4; --pct-conflicting:var(--violet);
+    --pct-unresolved:#9b8fd0; --pct-partial:var(--amber);
+    --pct-in-progress:var(--blue); --pct-not-checked:#b6c1ba;
+    --pct-unavailable:#d98324; --pct-access-restricted:var(--red);
+  }
+
+  /* ── header ── */
+  .pchead{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:18px 20px 0;box-shadow:var(--shadow-sm);margin-bottom:16px}
+  .pcback{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;
+    color:var(--ink-2);text-decoration:none;margin-bottom:12px}
+  .pcback:hover{color:var(--green)}
+  .pctitle{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .pctitle h1{font-size:26px;letter-spacing:-.02em;margin:0}
+  .pcbadge{display:inline-flex;align-items:center;font:700 10px/1 var(--font);letter-spacing:.09em;
+    text-transform:uppercase;color:var(--green);background:var(--green-tint);border:1px solid #cbe7d5;
+    border-radius:6px;padding:6px 9px;margin-top:6px}
+  .pctitle .sp{flex:1}
+  .pcacts{display:flex;align-items:center;gap:8px}
+  .pcsub{font-size:14px;color:var(--ink-2);margin:5px 0 0}
+  .pcmeta{display:flex;flex-wrap:wrap;gap:8px;margin:13px 0 0}
+  .pcchip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);
+    background:#f7f9f7;border:1px solid var(--line);border-radius:999px;padding:5px 11px}
+  .pcchip b{color:var(--ink);font-weight:600}
+  .pcchip.flag{background:var(--green-tint);border-color:#cbe7d5;color:var(--green)}
+  .pcchip.none{color:var(--ink-3)}
+
+  /* ── tab strip ── */
+  .pctabs{display:flex;gap:2px;overflow-x:auto;margin:16px -20px 0;padding:0 20px;
+    border-top:1px solid var(--line-2)}
+  .pctabs button{background:none;border:none;border-bottom:2px solid transparent;
+    padding:12px 12px 11px;font:600 13px/1 var(--font);color:var(--ink-2);white-space:nowrap}
+  .pctabs button:hover{color:var(--ink)}
+  .pctabs button[aria-selected="true"]{color:var(--green);border-bottom-color:var(--green)}
+  .pctabs button:focus-visible{outline:2px solid var(--green);outline-offset:-2px;border-radius:6px}
+
+  /* ── body grid ── */
+  .pcbody{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+  .pcmain{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+  .pcmain > .pcsec.wide{grid-column:1 / -1}
+  .pcrail{display:flex;flex-direction:column;gap:14px}
+  @media(max-width:1100px){ .pcbody{grid-template-columns:minmax(0,1fr)} }
+  @media(max-width:820px){ .pcmain{grid-template-columns:minmax(0,1fr)} }
+
+  /* ── one section card ── */
+  .pcsec{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:15px 17px 16px;box-shadow:var(--shadow-sm)}
+  .pcsec[hidden]{display:none}
+  .pcsh{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+  .pcsh h2{font:700 11.5px/1.3 var(--font);letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-3);margin:0}
+  .pcsh .sp{flex:1}
+  .pcsh a{font-size:12px;font-weight:600;color:var(--green);text-decoration:none;white-space:nowrap}
+  .pcsh a:hover{text-decoration:underline}
+  .pcsec p{font-size:12.5px;line-height:1.55;color:var(--ink-2);margin:0}
+  .pcsec p + p{margin-top:8px}
+
+  /* ── state badge ── */
+  .pcst{display:inline-flex;align-items:center;gap:5px;font:700 9.5px/1 var(--font);
+    letter-spacing:.07em;text-transform:uppercase;border-radius:5px;padding:4px 7px;
+    border:1px solid transparent;white-space:nowrap}
+  .pcst::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+  .pcst.t-ok{color:var(--green);background:var(--green-tint);border-color:#cbe7d5}
+  .pcst.t-clear{color:#4e8c6c;background:#f1f8f4;border-color:#d8ebe0}
+  .pcst.t-partial{color:var(--amber);background:var(--amber-tint);border-color:#f0dcbd}
+  .pcst.t-work{color:var(--blue);background:var(--blue-tint);border-color:#cfe2ef}
+  .pcst.t-none{color:#77857d;background:#f4f6f4;border-color:var(--line)}
+  .pcst.t-down{color:#a9631a;background:#fdf2e4;border-color:#f0dcbd}
+  .pcst.t-blocked{color:var(--red);background:var(--red-tint);border-color:#f2d3d0}
+  .pcst.t-flag{color:var(--violet);background:#f0eefa;border-color:#dcd6f2}
+
+  /* ── the per-source track-record grid ── */
+  .pcsrcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:11px}
+  .pcsrc{border:1px solid var(--line);border-radius:11px;padding:11px 12px;background:#fcfdfc}
+  .pcsrc .sn{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--ink)}
+  .pcsrc .sb{margin-top:8px}
+  .pcmetrics{display:flex;gap:9px;margin-top:10px;padding-top:9px;border-top:1px solid var(--line-2)}
+  .pcmetric{flex:1;min-width:0}
+  .pcmetric .mv{font-size:16px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+  .pcmetric .mv.na{color:var(--ink-3);font-weight:600}
+  .pcmetric .ml{font-size:10px;line-height:1.3;color:var(--ink-3);margin-top:1px}
+  .pcsrc .sd{font-size:11.5px;line-height:1.5;color:var(--ink-2);margin-top:9px}
+
+  /* ── fact rows ── */
+  .pcrows{display:flex;flex-direction:column}
+  .pcrow{display:flex;gap:12px;justify-content:space-between;align-items:baseline;
+    font-size:12.5px;padding:7px 0;border-bottom:1px solid var(--line-2)}
+  .pcrow:last-child{border-bottom:none}
+  .pcrow > span{color:var(--ink-2);flex:none;max-width:56%}
+  .pcrow > b{font-weight:600;color:var(--ink);text-align:right;min-width:0;word-break:break-word}
+  .pcrow > b.na{color:var(--ink-3);font-weight:500}
+  .pcprov{font-size:10.5px;color:var(--ink-3);margin-top:2px;line-height:1.45}
+  .pcprov a{color:var(--green)}
+
+  /* ── explainer / note blocks ── */
+  .pcnote{display:flex;gap:9px;background:#f7f9f7;border:1px solid var(--line);border-radius:11px;
+    padding:11px 12px;margin-top:12px}
+  .pcnote .ni{color:var(--blue);font-size:13px;line-height:1.3;flex:none}
+  .pcnote p{font-size:11.5px;line-height:1.55;color:var(--ink-2);margin:0}
+  .pcnote p b{color:var(--ink)}
+
+  /* ── record list ── */
+  .pcrec{display:flex;gap:11px;padding:10px 0;border-bottom:1px solid var(--line-2)}
+  .pcrec:last-child{border-bottom:none}
+  .pcrec .rd{font-size:11px;color:var(--ink-3);width:74px;flex:none;line-height:1.5}
+  .pcrec .rt{font-size:12.5px;font-weight:600;color:var(--ink);line-height:1.4}
+  .pcrec .rs{font-size:11.5px;color:var(--ink-2);margin-top:2px;line-height:1.5}
+  .pcrec a{color:var(--green)}
+
+  /* ── completeness ── */
+  .pccomp{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .pcdonut{flex:none}
+  .pcdn{font:700 19px/1 var(--font);fill:var(--ink)}
+  .pcdl{font:600 10px/1 var(--font);fill:var(--ink-3);letter-spacing:.04em;text-transform:uppercase}
+  .pclegend{flex:1;min-width:180px;display:flex;flex-direction:column;gap:5px}
+  .pclrow{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ink-2)}
+  .pclrow i{width:9px;height:9px;border-radius:50%;flex:none}
+  .pclrow b{margin-left:auto;color:var(--ink);font-weight:700}
+
+  /* ── footer ── */
+  .pcfoot{display:flex;gap:9px;align-items:flex-start;margin:18px 0 0;padding:13px 15px;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px}
+  .pcfoot p{font-size:11.5px;line-height:1.6;color:var(--ink-2);margin:0}
+  .pcfoot .fi{color:var(--ink-3);flex:none}
+
+  /* ── empty / error ── */
+  .pcempty{background:var(--panel);border:1px dashed var(--line);border-radius:14px;
+    padding:26px 22px;text-align:center}
+  .pcempty .et{font-size:15px;font-weight:700;margin-bottom:7px}
+  .pcempty p{font-size:13px;color:var(--ink-2);line-height:1.6;margin:0 auto;max-width:520px}
+  .pcform{display:flex;gap:8px;justify-content:center;margin-top:15px;flex-wrap:wrap}
+  .pcform input{border:1px solid var(--line);background:#f7f9f7;border-radius:9px;
+    padding:9px 13px;font-size:13px;color:var(--ink);min-width:min(340px,80vw)}
+
+  .skl{height:11px;border-radius:6px;background:linear-gradient(90deg,var(--line-2) 25%,#f7f9f7 45%,var(--line-2) 65%);
+    background-size:200% 100%;animation:hsShimmer 1.3s linear infinite;margin-bottom:9px}
+  .skl.w40{width:40%} .skl.w70{width:70%} .skl.hd{height:16px;width:46%;margin:2px 0 16px}
+  @keyframes hsShimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+  @media(prefers-reduced-motion:reduce){ .skl{animation:none} }
+</style>
+</head>
+<body data-nav="maps">
+<template id="hs-content">
+  <div class="page pcpage" id="pcPage">
+    <div class="skl hd"></div>
+    <div class="pcsec"><div class="skl w40"></div><div class="skl"></div><div class="skl w70"></div></div>
+  </div>
+</template>
+
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="lib/data.js"></script>
+<script src="lib/topic-prefs.js"></script>
+<script src="lib/templates.js"></script>
+<script src="lib/property-card.js"></script>
+<script src="shell.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════════════════════════════
+// THE FULL PROPERTY CARD — one dynamic page, many properties, keyed by the ENGINE'S
+// canonical address string (?addr=…), the same key homesignalmap.html?addr= and
+// property_reports already use. Reached from the Maps slide-in's top link.
+//
+// WHAT THIS PAGE IS FOR. A resident asking "what is on record at this address?" gets one
+// answer per source, and each answer says which of these it is: we looked and found records ·
+// we looked and found none · we have not looked · we tried and the source failed · the source
+// refuses access. Those five are different facts. The whole layout exists to keep them
+// visibly different, which is why every card carries a state badge and why counts route
+// through HS.card.metricText — the one function allowed to print a number.
+//
+// THE INVARIANTS (all enforced by test/property-card.test.mjs):
+//   1. NOTHING IS INVENTED. Every rendered value comes off the cached engine row. A field
+//      the row does not state renders as "Not checked", never as a default, a zero, or a dash
+//      standing in for "fine".
+//   2. A SOURCE WE HAVE NOT QUERIED NEVER RENDERS A COUNT. Not 0, not "none" — the em-dash
+//      plus "Not checked". A zero next to an unread source reads as "clean", which is exactly
+//      the defect PR #662 repaired on the ZIP page.
+//   3. OWNER OF RECORD AND OWNER AS FILED ARE SEPARATE LINES. A permit's "property owner"
+//      field is what an applicant wrote on a filing; the owner of record comes from the county
+//      appraisal district. No adapter reads the appraisal district today, so that line says so
+//      rather than borrowing the filed value (docs/multi-source-evidence-architecture.md
+//      Part 25 — this is the specific confusion the card is built not to repeat).
+//   4. NO SCORE. The completeness donut counts sources by research state. It is not weighted,
+//      has no percentage headline, and the footer says plainly that it is not a rating.
+// ══════════════════════════════════════════════════════════════════════════════════
+HS.onReady(async function () {
+  var qs = new URLSearchParams(location.search);
+  var C = HS.card, page = document.getElementById('pcPage');
+  var esc = HS.esc;
+  if (qs.get('place')) HS.selectProperty(qs.get('place'));
+  var S = HS.state;
+  var zip = qs.get('zip');
+  if (!zip || !/^\d{5}$/.test(zip)) zip = S.zip;
+  var recId = qs.get('id');
+  var addr = (qs.get('addr') || '').trim();
+
+  // ── identity resolution ───────────────────────────────────────────────────────
+  // Preferred: the caller already knows the canonical address. Fallback: the caller knows
+  // WHICH RECORD was clicked, so resolve the address from the engine's own cached site for
+  // that record (lib/data.js::canonicalAddrFor). Neither path guesses: an unresolved parcel
+  // renders as an unresolved parcel.
+  var rec = null, row = null, loadFailed = false;
+  try {
+    if (!addr && recId) {
+      var projects = await HS.data.projects(zip);
+      var facilities = await HS.data.facilities(zip);
+      rec = HS.data.project(recId, projects) || HS.data.project(recId, facilities);
+      addr = (await HS.data.canonicalAddrFor(zip, rec)) || '';
+    }
+    if (addr) row = await HS.data.propertyReport(addr);
+  } catch (e) {
+    console.warn('[property-card] load failed', e);
+    loadFailed = true;
+  }
+
+  if (loadFailed) { renderProblem('The property record can’t be loaded right now.',
+    'This is a read failure on our side, not a statement about the property. Nothing about this '
+    + 'address should be inferred from it. Reload to try again.'); return; }
+  if (!addr) { renderUnresolved(); return; }
+
+  render(row, addr);
+
+  // ══ RENDER ════════════════════════════════════════════════════════════════════
+  function render(row, addr) {
+    row = row || {};
+    var recs = (row.sites || []).filter(function (s) { return s && (s.record_url || s.url); });
+    var filings = recs.filter(function (s) { return !!s.project_no; });
+    var federal = recs.filter(function (s) { return !s.project_no; });
+    var parcel = row.parcel || null;                 // present only once an assessor source is wired
+    var checked = checkedIndex(row.sources_checked);
+    var sources = buildSources(row, recs, filings, federal, checked);
+    var byId = {}; sources.forEach(function (s) { byId[s.id] = s; });
+
+    document.title = addr + ' — property card — HomeSignal';
+
+    var html = headHTML(row, addr, recs, filings, parcel)
+      + '<div class="pcbody"><div class="pcmain">'
+      + entityTrackHTML(byId, recs)
+      + parentTrackHTML(row)
+      + hazardsHTML(byId, row)
+      + meetingsHTML(byId, row, zip)
+      + sustainabilityHTML(byId)
+      + instrumentsHTML(byId, row)
+      + regulatoryHTML(byId, recs)
+      + facilitiesHTML(byId, federal)
+      + sourcesHTML(sources)
+      + completenessHTML(sources)
+      + '</div><div class="pcrail">'
+      + ownershipHTML(byId, row, parcel, filings, addr)
+      + developmentHTML(byId, filings, row, addr)
+      + '</div></div>'
+      + footHTML(row);
+    page.innerHTML = html;
+    wire(row, addr, recs);
+  }
+
+  // ── header ────────────────────────────────────────────────────────────────────
+  function headHTML(row, addr, recs, filings, parcel) {
+    var place = [row.county ? row.county + ' County' : '', row.state, row.zip].filter(Boolean).join(' · ');
+    var locLine = (row.zip || row.state || row.county)
+      ? place
+      : 'Location details are not on the cached record for this address.';
+    // Parcel identifiers come from a county appraisal district. None is wired, so the chips
+    // say "not checked" instead of borrowing an identifier off a permit filing.
+    var chips = [];
+    if (parcel && parcel.acreage != null) chips.push(chip('Acreage', parcel.acreage + ' acres'));
+    if (parcel && parcel.property_id) chips.push(chip('Property ID', parcel.property_id));
+    if (parcel && parcel.geographic_id) chips.push(chip('Geographic ID', parcel.geographic_id));
+    if (!chips.length) chips.push('<span class="pcchip none">Parcel identifiers — not checked</span>');
+    if (filings.length) {
+      chips.push('<span class="pcchip flag">' + filings.length + ' development filing'
+        + (filings.length === 1 ? '' : 's') + ' on record</span>');
+    }
+    if (row.refreshed_at) {
+      chips.push('<span class="pcchip">Record read <b>'
+        + esc(HS.fmtDate(row.refreshed_at, { year: 'numeric', month: 'short', day: 'numeric' })) + '</b></span>');
+    }
+    return '<div class="pchead">'
+      + '<a class="pcback" href="' + esc(HS.pageHref('maps.html', { zip: zip, id: recId || null })) + '">← Back to the map</a>'
+      + '<div class="pctitle"><h1>' + esc(addr) + '</h1>'
+      + '<span class="pcbadge">Property card</span><span class="sp"></span>'
+      + '<div class="pcacts">'
+      + '<button class="btn primary" id="pcSave" type="button">Save property</button>'
+      + '<button class="btn" id="pcExport" type="button">Export</button>'
+      + '<a class="btn" href="' + esc(HS.pageHref('maps.html', { zip: zip, id: recId || null })) + '">View on map →</a>'
+      + '</div></div>'
+      + '<p class="pcsub">' + esc(locLine) + '</p>'
+      + '<div class="pcmeta">' + chips.join('') + '</div>'
+      + tabsHTML() + '</div>';
+  }
+  function chip(label, value) {
+    return '<span class="pcchip">' + esc(label) + ' <b>' + esc(value) + '</b></span>';
+  }
+  function tabsHTML() {
+    return '<div class="pctabs" id="pcTabs" role="tablist" aria-label="Property card sections">'
+      + C.TABS.map(function (t, i) {
+          return '<button role="tab" data-tab="' + esc(t.id) + '" id="pctab-' + esc(t.id) + '"'
+            + ' aria-selected="' + (i === 0 ? 'true' : 'false') + '">' + esc(t.label) + '</button>';
+        }).join('') + '</div>';
+  }
+
+  // ── section shell ─────────────────────────────────────────────────────────────
+  // Every section is looked up in HS.card.SECTIONS, so a section cannot exist here under a
+  // title or tab the declared structure (and the tests) don't know about.
+  function sec(id, opts, body) {
+    var d = C.SECTIONS.filter(function (s) { return s.id === id; })[0];
+    if (!d) { console.warn('[property-card] undeclared section', id); return ''; }
+    opts = opts || {};
+    return '<section class="pcsec' + (opts.wide ? ' wide' : '') + '" data-sec="' + esc(id) + '"'
+      + ' data-tab="' + esc(d.tab) + '" aria-labelledby="pch-' + esc(id) + '">'
+      + '<div class="pcsh"><h2 id="pch-' + esc(id) + '">' + esc(d.title) + '</h2>'
+      + '<span class="sp"></span>'
+      + (opts.state !== undefined ? C.badgeHTML(opts.state, { short: true }) : '')
+      + (opts.link ? '<a href="' + esc(opts.link.href) + '">' + esc(opts.link.label) + '</a>' : '')
+      + '</div>' + body + '</section>';
+  }
+  function row2(label, value, opts) {
+    opts = opts || {};
+    var na = value == null || value === '' || value === C.NO_VALUE;
+    return '<div class="pcrow"><span>' + esc(label) + '</span>'
+      + '<b' + (na ? ' class="na"' : '') + '>' + esc(na ? (opts.absent || 'Not checked') : value) + '</b></div>';
+  }
+  function note(text) {
+    return '<div class="pcnote"><span class="ni" aria-hidden="true">◈</span><p>' + text + '</p></div>';
+  }
+
+  // ── source registry ───────────────────────────────────────────────────────────
+  // The sources this card reports on. Each row's STATE is derived below from the cached
+  // engine row only — never from a default. An entry whose adapter does not exist yet is
+  // `not_checked`, which is the truthful answer and the one the founder's rule requires.
+  function checkedIndex(list) {
+    var idx = {};
+    (list || []).forEach(function (c) {
+      if (c && c.src) idx[String(c.src).toLowerCase()] = c.result || '';
+    });
+    return idx;
+  }
+  function namedChecked(checked, patterns) {
+    var keys = Object.keys(checked);
+    for (var i = 0; i < keys.length; i++) {
+      for (var j = 0; j < patterns.length; j++) if (patterns[j].test(keys[i])) return keys[i];
+    }
+    return null;
+  }
+  function buildSources(row, recs, filings, federal, checked) {
+    var epaRecs = recs.filter(function (s) { return s.env && s.env.epa; });
+    var tceqRecs = recs.filter(function (s) { return s.env && s.env.tceq; });
+    var frsRecs = recs.filter(function (s) { return s.registry_id; });
+    // A source that returned records is `verified` for federal/state registries (they are
+    // registers of record) and `reported` for permit filings (the filing is the evidence,
+    // and its own fields are as-filed values). Present in sources_checked ⇒ we queried it
+    // and it was empty. Neither ⇒ we did not query it.
+    function st(hit, patterns, fallback) {
+      if (hit) return hit;
+      if (namedChecked(checked, patterns)) return 'checked_empty';
+      return fallback || 'not_checked';
+    }
+    return [
+      { id: 'assessor', short: 'County assessor', label: 'County appraisal district / assessor',
+        authority: 'Register of record for parcel identity, acreage and owner of record',
+        state: st(row.parcel ? 'verified' : null, [/appraisal|assessor|tcad|parcel/]),
+        detail: row.parcel ? 'Parcel record read.'
+          : 'No appraisal-district adapter is wired yet, so parcel identity, acreage and the owner '
+            + 'of record have not been read for this address.' },
+      { id: 'recorder', short: 'County recorder', label: 'County recorder / clerk (deeds, liens, easements)',
+        authority: 'Register of record for recorded instruments',
+        state: st((row.instruments || []).length ? 'verified' : null, [/recorder|county clerk|deed/]),
+        detail: (row.instruments || []).length ? (row.instruments || []).length + ' recorded instrument(s) read.'
+          : 'No recorder adapter is wired yet. Deeds, liens and easements at this address have not been read.' },
+      { id: 'permits', short: 'Permit filings', label: 'State & local permit filings',
+        authority: 'Authoritative filing — values are as filed by the applicant',
+        state: st(filings.length ? 'reported' : null, [/tdlr|tabs|permit|planning/]),
+        count: filings.length,
+        detail: filings.length ? filings.length + ' filing(s) at this address, each linked to its own record.'
+          : 'No permit filing is cached at this address.' },
+      { id: 'epa_frs', short: 'EPA FRS', label: 'EPA Facility Registry Service',
+        authority: 'Federal registry of regulated facilities',
+        state: st(frsRecs.length ? 'verified' : null, [/frs|facility registry/]),
+        count: frsRecs.length,
+        detail: frsRecs.length ? frsRecs.length + ' registered facility record(s) geo-matched near this address.'
+          : 'No EPA-registered facility is cached at this address.' },
+      { id: 'epa_echo', short: 'EPA / ECHO', label: 'EPA ECHO compliance & enforcement',
+        authority: 'Federal enforcement record',
+        state: st(epaRecs.length ? 'verified' : null, [/echo|epa/]),
+        detail: epaRecs.length ? 'Compliance summaries were read for ' + epaRecs.length + ' facility record(s).'
+          : 'No ECHO compliance summary is cached for entities connected to this property.' },
+      { id: 'state_env', short: 'State environmental', label: 'State environmental regulator (e.g. TCEQ Central Registry)',
+        authority: 'State register of regulated entities',
+        state: st(tceqRecs.length ? 'verified' : null, [/tceq|state environmental|central registry/]),
+        detail: tceqRecs.length ? 'State registry programs were read for ' + tceqRecs.length + ' facility record(s).'
+          : 'No state environmental registry entry is cached for this address.' },
+      { id: 'osha', short: 'OSHA', label: 'OSHA inspections & violations',
+        authority: 'Federal workplace-safety enforcement record',
+        state: st(null, [/osha/]),
+        detail: 'OSHA has not been queried for entities connected to this property. This is a gap in our '
+          + 'research, not a finding about any employer.' },
+      { id: 'sec', short: 'SEC', label: 'SEC filings & enforcement',
+        authority: 'Federal securities filings and enforcement matters',
+        state: st(null, [/sec|edgar/]),
+        detail: 'SEC filings and enforcement matters have not been queried for entities connected to this property.' },
+      { id: 'state_local', short: 'State / local', label: 'State & local enforcement records',
+        authority: 'State and local enforcement records, by jurisdiction',
+        state: st(null, [/state.?local|county enforcement/]),
+        detail: 'State and local enforcement records beyond the environmental registry above have not been queried.' },
+      { id: 'hazards', short: 'Natural hazards', label: 'FEMA flood, wildfire & heat layers',
+        authority: 'Federal and state hazard mapping',
+        state: st(null, [/fema|flood|wildfire|hazard/]),
+        detail: 'Hazard layers are mapped per area, not per parcel, and no parcel-level hazard read exists for '
+          + 'this address yet.' },
+      { id: 'meetings', short: 'Meetings & notices', label: 'Public meeting agendas & official notices',
+        authority: 'First-party agendas and notices published by the governing body',
+        state: st((row.related || []).length ? 'verified' : null, [/meeting|agenda|notice|pmn/]),
+        detail: (row.related || []).length
+          ? (row.related || []).length + ' notice or agenda item is cached against this address.'
+          : 'Notices and agendas are matched at the ZIP and county level today; none is matched to this '
+            + 'specific address.' },
+      { id: 'sustain', short: 'Sustainability', label: 'Sustainability & ESG disclosures',
+        authority: 'Company-reported disclosures and third-party datasets',
+        state: st((row.sustainability || []).length ? 'reported' : null, [/wikirate|esg|sustainab/]),
+        detail: 'Disclosures are keyed to a company, and no company at this address has been resolved to a '
+          + 'disclosure record.' }
+    ];
+  }
+
+  // ── ENTITY TRACK RECORD ───────────────────────────────────────────────────────
+  // Five sources, each with its own state and its own three counts. The counts are the point
+  // of the section, and every one of them goes through HS.card.metricText, so an unqueried or
+  // failed source shows an em-dash. There is no code path here that prints 0 for a source
+  // whose state is not a checked state.
+  function entityTrackHTML(byId, recs) {
+    var order = ['epa_echo', 'state_env', 'osha', 'sec', 'state_local'];
+    var cells = order.map(function (id) {
+      var s = byId[id]; if (!s) return '';
+      var m = trackMetrics(id, s.state, recs);
+      return '<div class="pcsrc"><div class="sn">' + esc(s.short) + '</div>'
+        + '<div class="sb">' + C.badgeHTML(s.state) + '</div>'
+        + '<div class="pcmetrics">'
+        + metric(m.violations, 'Violations')
+        + metric(m.actions, 'Enforcement actions')
+        + metric(m.penalties, 'Penalties')
+        + '</div><div class="sd">' + esc(s.detail) + '</div></div>';
+    }).join('');
+    return sec('entity-track-record', {
+      wide: true,
+      state: C.rollup(order.map(function (id) { return byId[id] && byId[id].state; })),
+      link: { href: '#sources', label: 'See every source →' }
+    }, '<div class="pcsrcs">' + cells + '</div>'
+      + note('<b>What the records show.</b> Regulatory events above relate to entities connected to this '
+        + 'property through facilities, ownership, or filings — they may describe activity at other '
+        + 'locations, and they do not establish that anything happened at this address. A source marked '
+        + '“not checked” is a gap in our research and says nothing at all about the entity.'));
+  }
+  function metric(text, label) {
+    var na = text === C.NO_VALUE;
+    return '<div class="pcmetric"><div class="mv' + (na ? ' na' : '') + '">' + esc(text) + '</div>'
+      + '<div class="ml">' + esc(label) + '</div></div>';
+  }
+  /**
+   * The three track-record counts for one source. Only ECHO and the state registry carry real
+   * cached facts today (engine v19 stamps them onto site.env), and even there a count is
+   * emitted only when the engine actually stored a number — `penalties` is absent from every
+   * cached row we have, so it renders as an em-dash rather than as zero dollars.
+   */
+  function trackMetrics(id, state, recs) {
+    var out = { violations: C.NO_VALUE, actions: C.NO_VALUE, penalties: C.NO_VALUE };
+    if (!C.isCountable(state)) return out;
+    if (id === 'epa_echo') {
+      var viol = 0, acts = 0, pen = null, sawAct = false;
+      recs.forEach(function (s) {
+        var e = s.env && s.env.epa; if (!e) return;
+        viol += (e.in_violation || []).length;
+        if (e.action_year != null) { acts += 1; sawAct = true; }
+        if (typeof e.penalties === 'number' && isFinite(e.penalties)) pen = (pen || 0) + e.penalties;
+      });
+      out.violations = C.metricText(state, viol);
+      out.actions = C.metricText(state, sawAct ? acts : NaN);
+      out.penalties = C.metricText(state, pen == null ? NaN : pen);
+      return out;
+    }
+    if (id === 'state_env') {
+      var programs = 0;
+      recs.forEach(function (s) {
+        var t = s.env && s.env.tceq; if (!t) return;
+        programs += (t.programs || []).length;
+      });
+      // The state registry lists PROGRAMS a site is enrolled in, not violations. Reporting an
+      // enrollment count under "Violations" would be a category error, so violations and
+      // penalties stay em-dashes and the enrolment count rides in the detail line instead.
+      out.actions = C.metricText(state, programs);
+      return out;
+    }
+    return out;
+  }
+
+  // ── PARENT COMPANY TRACK RECORD ───────────────────────────────────────────────
+  function parentTrackHTML(row) {
+    var parents = (row && row.parents) || [];
+    var state = parents.length ? 'verified' : 'not_checked';
+    return sec('parent-track-record', { state: state },
+      '<p>' + (parents.length
+        ? esc(parents.length + ' verified parent relationship(s) apply to entities at this address.')
+        : 'No verified parent company has been established for the entities connected to this property.')
+      + '</p>'
+      + note('A parent company’s history is only ever shown here when a <b>published, verified</b> '
+        + 'ownership relationship authorises it. An unverified name match is never promoted to '
+        + '“parent company”, so this card stays empty rather than attaching one company’s record '
+        + 'to another.'));
+  }
+
+  // ── PROPERTY & OWNERSHIP ──────────────────────────────────────────────────────
+  // The section Part 25 is specifically about: OWNER OF RECORD (appraisal district) and OWNER
+  // AS FILED (a permit applicant's own entry) are two different claims, and the card renders
+  // them as two separate lines. Neither is allowed to stand in for the other.
+  function ownershipHTML(byId, row, parcel, filings, addr) {
+    var filedOwners = {}, filedList = [];
+    filings.forEach(function (s) {
+      if (!s.owner) return;
+      var k = String(s.owner).toLowerCase();
+      if (!filedOwners[k]) { filedOwners[k] = 1; filedList.push({ name: s.owner, no: s.project_no, url: s.record_url || s.url }); }
+    });
+    var body = '<div class="pcrows">'
+      + row2('Address', addr)
+      + row2('County', row.county ? row.county + ' County' : null)
+      + row2('State / ZIP', [row.state, row.zip].filter(Boolean).join(' ') || null)
+      + row2('Acreage', parcel && parcel.acreage != null ? parcel.acreage + ' acres' : null)
+      + row2('Property ID', parcel && parcel.property_id)
+      + row2('Geographic ID', parcel && parcel.geographic_id)
+      + row2('Owner of record', parcel && parcel.owner_of_record)
+      + '</div>';
+    if (filedList.length) {
+      body += '<div class="pcsh" style="margin:14px 0 8px"><h2>Owner as filed on a permit</h2></div>'
+        + '<div class="pcrows">' + filedList.map(function (o) {
+            return '<div class="pcrow"><span>' + esc(o.name) + '</span><b>'
+              + (o.url ? '<a href="' + esc(o.url) + '" target="_blank" rel="noopener">'
+                  + esc(o.no || 'record') + ' ▸</a>' : esc(o.no || '—')) + '</b></div>';
+          }).join('') + '</div>';
+    }
+    body += note('<b>Owner of record</b> comes from the county appraisal district and is the register of '
+      + 'record for who owns the land. <b>Owner as filed</b> is what an applicant wrote on a permit — it is '
+      + 'often a different company, and it is never used to fill in the owner of record.');
+    return sec('property-ownership', {
+      state: C.rollup([byId.assessor && byId.assessor.state, filings.length ? 'reported' : 'not_checked'])
+    }, body);
+  }
+
+  // ── DEVELOPMENT / PROJECT ACTIVITY ────────────────────────────────────────────
+  function developmentHTML(byId, filings, row, addr) {
+    var s = byId.permits;
+    var body;
+    if (filings.length) {
+      var sorted = filings.slice().sort(function (a, b) {
+        return String(b.start_date || '').localeCompare(String(a.start_date || ''));
+      });
+      body = sorted.slice(0, 6).map(function (f) {
+        return '<div class="pcrec"><div class="rd">'
+          + esc(f.start_date ? HS.fmtDate(f.start_date, { year: 'numeric', month: 'short', day: 'numeric' }) : 'Undated')
+          + '</div><div style="flex:1"><div class="rt">' + esc(f.label || f.project_no || 'Filing') + '</div>'
+          + '<div class="rs">' + [f.project_no, f.owner ? 'owner as filed: ' + f.owner : '',
+              f.status_text ? 'status as filed: ' + f.status_text : ''].filter(Boolean).map(esc).join(' · ')
+          + (f.record_url || f.url ? ' · <a href="' + esc(f.record_url || f.url) + '" target="_blank" rel="noopener">official record ▸</a>' : '')
+          + '</div></div></div>';
+      }).join('');
+      if (sorted.length > 6) {
+        body += '<p class="pcprov">' + esc(sorted.length - 6) + ' further filing(s) at this address — '
+          + '<a href="' + esc('homesignalmap.html?addr=' + encodeURIComponent(addr)) + '">see the full filing history →</a></p>';
+      }
+    } else {
+      body = '<p>' + esc(s.detail) + '</p>';
+    }
+    return sec('development-activity', {
+      state: s.state,
+      link: { href: HS.pageHref('maps.html', { zip: zip }), label: 'On the map →' }
+    }, body);
+  }
+
+  // ── FACILITIES & REGULATORY CONNECTIONS ───────────────────────────────────────
+  function facilitiesHTML(byId, federal) {
+    var s = byId.epa_frs;
+    var body = federal.length
+      ? federal.slice(0, 5).map(function (f) {
+          return '<div class="pcrec"><div class="rd">' + esc(f.src || 'Registry') + '</div>'
+            + '<div style="flex:1"><div class="rt">' + esc(f.label || 'Facility record') + '</div>'
+            + '<div class="rs">' + [f.registry_id ? 'EPA registry ID ' + f.registry_id : '',
+                f.tceq_rn ? 'state RN ' + f.tceq_rn : ''].filter(Boolean).map(esc).join(' · ')
+            + (f.record_url || f.url ? ' · <a href="' + esc(f.record_url || f.url) + '" target="_blank" rel="noopener">official record ▸</a>' : '')
+            + '</div></div></div>';
+        }).join('')
+      : '<p>' + esc(s.detail) + '</p>';
+    body += '<p class="pcprov">Environmental records are geo-matched to a facility, not to this parcel.</p>';
+    return sec('facility-connections', {
+      state: C.rollup([s.state, byId.epa_echo && byId.epa_echo.state, byId.state_env && byId.state_env.state])
+    }, body);
+  }
+
+  // ── NATURAL HAZARDS ───────────────────────────────────────────────────────────
+  function hazardsHTML(byId, row) {
+    var s = byId.hazards;
+    var haz = (row && row.hazards) || null;
+    var rows = ['Flood', 'Wildfire', 'Extreme heat', 'Severe weather'].map(function (k) {
+      var v = haz ? haz[k.toLowerCase().replace(/\s+/g, '_')] : null;
+      return row2(k, v && v.label);
+    }).join('');
+    return sec('natural-hazards', { state: s.state },
+      '<div class="pcrows">' + rows + '</div>'
+      + '<p class="pcprov">' + esc(s.detail) + '</p>');
+  }
+
+  // ── PUBLIC MEETINGS & NOTICES ─────────────────────────────────────────────────
+  function meetingsHTML(byId, row, zip) {
+    var s = byId.meetings;
+    var items = (row.related || []);
+    var body = items.length
+      ? items.slice(0, 5).map(function (it) {
+          return '<div class="pcrec"><div class="rd">'
+            + esc(it.date ? HS.fmtDate(it.date, { year: 'numeric', month: 'short', day: 'numeric' }) : '')
+            + '</div><div style="flex:1"><div class="rt">' + esc(it.title || '') + '</div>'
+            + (it.url ? '<div class="rs"><a href="' + esc(it.url) + '" target="_blank" rel="noopener">official notice ▸</a></div>' : '')
+            + '</div></div>';
+        }).join('')
+      : '<p>' + esc(s.detail) + '</p>';
+    return sec('meetings-notices', {
+      state: s.state,
+      link: zip ? { href: HS.pageHref('community.html', { zip: zip }), label: 'Area notices →' } : null
+    }, body);
+  }
+
+  // ── SUSTAINABILITY DISCLOSURES ────────────────────────────────────────────────
+  function sustainabilityHTML(byId) {
+    var s = byId.sustain;
+    var rows = ['Third-party ratings', 'Company-reported metrics', 'ESG / sustainability filings']
+      .map(function (k) { return row2(k, null); }).join('');
+    return sec('sustainability', { state: s.state },
+      '<div class="pcrows">' + rows + '</div>'
+      + '<p class="pcprov">' + esc(s.detail) + '</p>');
+  }
+
+  // ── RECORDED INSTRUMENTS ──────────────────────────────────────────────────────
+  function instrumentsHTML(byId, row) {
+    var s = byId.recorder;
+    var inst = (row.instruments || []);
+    var body = inst.length
+      ? inst.slice(0, 6).map(function (i) {
+          return '<div class="pcrec"><div class="rd">' + esc(i.recorded_at || '') + '</div>'
+            + '<div style="flex:1"><div class="rt">' + esc(i.kind || 'Instrument') + '</div>'
+            + '<div class="rs">' + esc(i.instrument_no || '')
+            + (i.record_url ? ' · <a href="' + esc(i.record_url) + '" target="_blank" rel="noopener">official record ▸</a>' : '')
+            + '</div></div></div>';
+        }).join('')
+      : '<p>' + esc(s.detail) + '</p>';
+    return sec('recorded-instruments', { state: s.state }, body);
+  }
+
+  // ── REGULATORY RECORDS ────────────────────────────────────────────────────────
+  // The records UNDERNEATH the track-record summaries: what each environmental source
+  // actually holds for the facilities matched near this address.
+  function regulatoryHTML(byId, recs) {
+    var epa = recs.filter(function (s) { return s.env && s.env.epa; });
+    var tceq = recs.filter(function (s) { return s.env && s.env.tceq; });
+    var programs = {};
+    tceq.forEach(function (s) { ((s.env.tceq || {}).programs || []).forEach(function (p) { programs[p] = 1; }); });
+    var progList = Object.keys(programs);
+    // Counts route through the same gate as every other number on the card: a source we did
+    // not query renders an em-dash, and a source we queried that returned nothing renders a
+    // real 0. row2 flags the em-dash as absent for us, so the two cases stay visibly apart.
+    var body = '<div class="pcrows">'
+      + row2('Facilities with a compliance summary', C.metricText(byId.epa_echo.state, epa.length))
+      + row2('State registry programs on record', C.metricText(byId.state_env.state, progList.length))
+      + '</div>';
+    if (progList.length) {
+      body += '<p class="pcprov">Programs on record: ' + esc(progList.join(', ')) + '.</p>';
+    }
+    return sec('regulatory-records', {
+      state: C.rollup([byId.epa_echo && byId.epa_echo.state, byId.state_env && byId.state_env.state])
+    }, body);
+  }
+
+  // ── SOURCES & VERIFICATION ────────────────────────────────────────────────────
+  function sourcesHTML(sources) {
+    var body = '<div class="pcrows">' + sources.map(function (s) {
+      return '<div class="pcrow"><span>' + esc(s.label) + '</span><b>' + C.badgeHTML(s.state, { short: true }) + '</b></div>';
+    }).join('') + '</div>'
+      + '<p class="pcprov">Each row is one source and the state of our own check on it — not a judgement '
+      + 'about this property. “Not checked” means we have not queried that source for this address.</p>';
+    return sec('sources-verification', { wide: true, state: C.rollup(sources.map(function (s) { return s.state; })) }, body);
+  }
+
+  // ── DATA COMPLETENESS ─────────────────────────────────────────────────────────
+  function completenessHTML(sources) {
+    var counts = C.completeness(sources);
+    var legend = C.DONUT_ORDER.filter(function (k) { return counts.byState[k]; }).map(function (k) {
+      return '<div class="pclrow"><i style="background:var(--pct-' + k.replace(/_/g, '-') + ')"></i>'
+        + esc(C.STATES[k].label) + '<b>' + counts.byState[k] + '</b></div>';
+    }).join('');
+    return sec('data-completeness', { wide: true }, '<div class="pccomp">'
+      + C.donutSVG(counts, { aria: 'Coverage by information category' })
+      + '<div class="pclegend">' + legend + '</div></div>'
+      + '<p class="pcprov">Counted by source, unweighted. A source we have not read counts the same as a '
+      + 'source that returned nothing — the badge, not the total, is what tells them apart.</p>');
+  }
+
+  // ── footer ────────────────────────────────────────────────────────────────────
+  function footHTML(row) {
+    return '<div class="pcfoot"><span class="fi" aria-hidden="true">ⓘ</span><p>' + esc(C.DISCLAIMER)
+      + (row && row.refreshed_at ? ' Read from the public record on '
+          + esc(HS.fmtDate(row.refreshed_at, { year: 'numeric', month: 'long', day: 'numeric' })) + '.' : '')
+      + '</p></div>';
+  }
+
+  // ── honest non-render states ──────────────────────────────────────────────────
+  function renderProblem(title, body) {
+    page.innerHTML = '<div class="pcempty"><div class="et">' + esc(title) + '</div><p>' + esc(body) + '</p></div>';
+  }
+  // No canonical address: the record the resident clicked carries no engine-emitted address,
+  // so there is no parcel to key a card to. Saying so — and offering the address lookup — is
+  // the answer; picking a nearby address would be a fabricated join.
+  function renderUnresolved() {
+    document.title = 'Property card — HomeSignal';
+    page.innerHTML = '<div class="pcempty"><div class="et">This record isn’t tied to a parcel yet</div>'
+      + '<p>The filing you opened doesn’t carry an address we can resolve to a parcel, so there is no '
+      + 'property card to show for it. That is a gap in the source record, not a finding about the '
+      + 'property. Enter the address to look it up directly.</p>'
+      + '<form class="pcform" id="pcLookup"><input name="addr" placeholder="e.g. 2200 CALDWELL LN, DEL VALLE, TX 78617" '
+      + 'aria-label="Property address"><button class="btn primary" type="submit">Open card</button></form>'
+      + '<p class="pcprov" style="margin-top:12px"><a href="' + esc(HS.pageHref('maps.html', { zip: zip })) + '">← Back to the map</a></p></div>';
+    var f = document.getElementById('pcLookup');
+    if (f) f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var v = (f.addr.value || '').trim();
+      if (v) location.href = C.href({ addr: v, zip: zip });
+    });
+  }
+
+  // ── wiring ────────────────────────────────────────────────────────────────────
+  function wire(row, addr, recs) {
+    var tabs = document.getElementById('pcTabs');
+    var secs = [].slice.call(page.querySelectorAll('[data-sec]'));
+    function showTab(id) {
+      secs.forEach(function (el) {
+        el.hidden = !(id === 'overview' || el.getAttribute('data-tab') === id);
+      });
+      [].forEach.call(tabs.querySelectorAll('button'), function (b) {
+        b.setAttribute('aria-selected', b.getAttribute('data-tab') === id ? 'true' : 'false');
+      });
+    }
+    if (tabs) {
+      tabs.addEventListener('click', function (e) {
+        var b = e.target.closest ? e.target.closest('button[data-tab]') : null;
+        if (b) showTab(b.getAttribute('data-tab'));
+      });
+      var fromHash = function () {
+        var h = (location.hash || '').replace('#', '');
+        showTab(C.TABS.some(function (t) { return t.id === h; }) ? h : 'overview');
+      };
+      window.addEventListener('hashchange', fromHash);
+      fromHash();
+    }
+    // Saving is honest about not existing yet — the same posture the address dossier's
+    // "Watch this address" button takes. A button that pretends to save is worse than none.
+    var save = document.getElementById('pcSave');
+    if (save) save.addEventListener('click', function () {
+      if (HS.requireAuth && !HS.requireAuth('save this property')) return;
+      save.disabled = true; save.textContent = 'Saved properties aren’t live yet';
+    });
+    var ex = document.getElementById('pcExport');
+    if (ex) ex.addEventListener('click', function () {
+      location.href = 'homesignalmap.html?addr=' + encodeURIComponent(addr);
+    });
+    // Live-verification hook, mirroring window.__HS_MAP on the map page: the state of every
+    // source, so CI can assert that no unchecked source ever rendered a count.
+    window.__HS_CARD = {
+      addr: addr, zip: row && row.zip, cached: !!(row && row.address),
+      records: (recs || []).length,
+      sources: [].slice.call(page.querySelectorAll('[data-sec]')).map(function (el) {
+        return { id: el.getAttribute('data-sec'), tab: el.getAttribute('data-tab') };
+      })
+    };
+  }
+});
+</script>
+</body>
+</html>

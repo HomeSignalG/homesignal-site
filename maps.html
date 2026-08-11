@@ -79,6 +79,35 @@
   .idetail .doact{margin-top:2px}
   @media(max-width:900px){ .fmenu{right:auto;left:0} }
 
+  /* ── the link OUT of the slide-in and into the full property card ──
+     The panel is a quick view by design: it answers "what is this and should I care"
+     in a glance, and everything deeper — ownership, entity track record, hazards,
+     recorded instruments, and every source we have NOT checked — lives on the full
+     card. That link is therefore the first thing in the panel, not a footer. */
+  .pccta{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:center;
+    text-decoration:none;margin-bottom:12px;background:var(--green-tint);border:1px solid #cbe7d5;
+    border-radius:12px;padding:12px 14px;box-shadow:var(--shadow-sm);
+    transition:background .12s ease,border-color .12s ease}
+  .pccta:hover{background:#dff0e6;border-color:#b6dcc5}
+  .pccta:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+  .pccta .pcct{grid-column:1;grid-row:1;font-size:13.5px;font-weight:700;color:var(--green-deep)}
+  .pccta .pccs{grid-column:1;grid-row:2;font-size:11.5px;color:var(--ink-2);line-height:1.4;word-break:break-word}
+  .pccta .pcca{grid-column:2;grid-row:1 / span 2;color:var(--green);font-size:16px;font-weight:700}
+
+  /* ── quick-view compaction: the deep sections collapse so the panel stays small ──
+     Collapsed, not removed. Every fact the panel used to show is still one click away
+     (and still in the DOM), so nothing a resident could previously read has been taken
+     from them — the panel just stops being a page-length scroll. */
+  .isec.fold{padding:0}
+  .isec.fold > summary{list-style:none;cursor:pointer;padding:13px 18px;display:flex;align-items:center;gap:8px;
+    font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3)}
+  .isec.fold > summary::-webkit-details-marker{display:none}
+  .isec.fold > summary::after{content:"▾";margin-left:auto;font-size:11px;color:var(--ink-3);transition:transform .12s ease}
+  .isec.fold[open] > summary::after{transform:rotate(180deg)}
+  .isec.fold > summary:hover{color:var(--ink)}
+  .isec.fold > summary:focus-visible{outline:2px solid var(--green);outline-offset:-2px;border-radius:12px}
+  .isec.fold > .foldbody{padding:0 18px 15px}
+
   /* ── Sprint-2 polish: readability & rhythm ── */
   .ph p{line-height:1.55;max-width:640px}
   .listhead{color:var(--ink-2);line-height:1.5}
@@ -267,6 +296,7 @@
 <script src="lib/templates.js"></script>
 <script src="lib/impact.js"></script>
 <script src="lib/why.js"></script>
+<script src="lib/property-card.js"></script>
 <script src="lib/map.js?v=20260720b"></script>
 <script src="shell.js"></script>
 <script>
@@ -586,6 +616,24 @@ HS.onReady(async function () {
     openPanel();
     var p = document.getElementById('infoPanel'); if (p) p.scrollTop = 0;
   }
+  // The slide-in is a QUICK VIEW. Its first element is the way out of it: the link to the
+  // full property card, where ownership, entity track record, hazards, recorded instruments
+  // and every source we have NOT checked are laid out source by source. Rendered for every
+  // record the panel can open — including ones whose parcel is unresolved, because "this
+  // filing isn't tied to a parcel yet" is itself an answer the card has to be able to give.
+  function cardCTA(it) {
+    return HS.card.ctaHTML({
+      zip: S.zip, id: it && it.id, place: deepPlace || null,
+      addr: HS.card.keyOf(it), kind: (it && it._facility) ? 'facility' : null
+    });
+  }
+  // A folded section: collapsed by default so the panel reads as a quick view, but present
+  // in the DOM and one click from open — nothing a resident could read before is removed.
+  function fold(title, body) {
+    return '<details class="isec fold"><summary>' + HS.esc(title) + '</summary>'
+      + '<div class="foldbody">' + body + '</div></details>';
+  }
+
   function renderFacilityDetail(f, letter) {
     var panel = document.getElementById('infoPanel');
     panel.classList.add('idetail');
@@ -595,6 +643,7 @@ HS.onReady(async function () {
       .filter(function (r) { return r[1]; })
       .map(function (r) { return '<div class="row"><span>' + HS.esc(r[0]) + '</span><b>' + HS.esc(r[1]) + '</b></div>'; }).join('');
     panel.innerHTML = '<button class="backbtn" id="infoBack" aria-label="Back to the list">← All nearby projects</button>'
+      + cardCTA(f)
       + '<div class="isum">'
       + '<span class="lens"><span class="letter" style="background:' + HS.markerRegistry.facilityHex + ';color:#fff;font-weight:700;border-radius:5px;padding:1px 6px;font-size:11px">' + HS.esc(letter || f._letter || '■') + '</span>&nbsp; Regulated facility' + (f.dist ? ' · ' + HS.esc(f.dist) : '') + '</span>'
       + '<h2>' + HS.esc(f.name || 'Regulated facility') + '</h2>'
@@ -901,12 +950,12 @@ HS.onReady(async function () {
       meeting: wMtg
     });
     var whyHTML = '<div class="isec"><h4>Why this matters</h4>' + HS.whyQaHTML(wd) + '</div>';
-    var knowHTML = '<div class="isec"><h4>What we know</h4>' + HS.whyKnowHTML(wd) + '</div>';
-    var unknownHTML = '<div class="isec"><h4>What we don\'t know yet</h4>' + HS.whyUnknownHTML(wd) + '</div>';
+    var knowHTML = fold('What we know', HS.whyKnowHTML(wd));
+    var unknownHTML = fold('What we don\'t know yet', HS.whyUnknownHTML(wd));
 
     // ── 3) Potential Quality of Life Impacts (Air / Water / Soil / Noise / Light)
     var q = HS.qolOf(it);
-    var qolHTML = '<div class="isec"><h4>Potential quality-of-life impacts</h4><div class="qolgrid">'
+    var qolHTML = '<div class="qolgrid">'
       + HS.QOL.map(function (cat) {
           var dim = q[cat], on = !!dim;
           var sub = on ? (HS.esc(dim.label || cat) + (dim.dir === 'down' ? ' ↓' : ' ↑')) : 'Not noted in the public record';
@@ -919,12 +968,14 @@ HS.onReady(async function () {
     var anyFlagged = Object.keys(q).length;
     qolHTML += '<p class="ihint">' + (anyFlagged
       ? 'These are the impacts this project\'s own public record calls out — a quick read, not the fine print. The official record has the specifics.'
-      : 'This project\'s public record doesn\'t call out quality-of-life impacts yet. We only show what\'s actually on file — we never guess from the project type.') + '</p></div>';
+      : 'This project\'s public record doesn\'t call out quality-of-life impacts yet. We only show what\'s actually on file — we never guess from the project type.') + '</p>';
+    qolHTML = fold('Potential quality-of-life impacts', qolHTML);
 
     // ── 4) Timeline
     var thread = buildTimeline(it);
-    var timelineHTML = '<div class="isec"><h4>Timeline</h4>'
-      + (thread.length ? '<div class="thread">' + HS.tpl.thread(thread) + '</div>' : '<p class="ihint">No dated steps on the public record yet — the timeline fills in as the county publishes them.</p>') + '</div>';
+    var timelineHTML = fold('Timeline',
+      thread.length ? '<div class="thread">' + HS.tpl.thread(thread) + '</div>'
+                    : '<p class="ihint">No dated steps on the public record yet — the timeline fills in as the county publishes them.</p>');
 
     // ── 5) Evidence
     var evParts = '';
@@ -964,6 +1015,7 @@ HS.onReady(async function () {
     panel.classList.add('idetail');
     var backLabel = opts.view === 'changed' ? '← Recent changes' : '← All nearby projects';
     panel.innerHTML = '<button class="backbtn" id="infoBack" aria-label="Back to the list">' + backLabel + '</button>'
+      + cardCTA(it)
       + summaryHTML + whyHTML + qolHTML + knowHTML + unknownHTML + timelineHTML + evHTML + partHTML;
     var back = panel.querySelector('#infoBack');
     back.onclick = function () {
