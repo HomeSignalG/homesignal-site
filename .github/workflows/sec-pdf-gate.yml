@@ -1,0 +1,56 @@
+name: sec-pdf-gate
+
+# PHASE 9E §2 — THE BINARY-INTEGRITY GATE, AND NOTHING ELSE.
+#
+# Phase 9D proved the sandbox cannot read an SEC administrative order:
+#   * pg_net's net._http_response.content is TEXT, so a PDF truncates at its first
+#     invalid-UTF-8 byte — measured 444 / 1,433 / 747 bytes retained of 126,786 /
+#     89,991 / 104,929 declared (0.35% / 1.59% / 0.71%);
+#   * direct sandbox egress to sec.gov is an ORGANISATION POLICY DENIAL (CONNECT 403),
+#     which is reported, never worked around.
+# This workflow is the sanctioned alternative: a GitHub runner, which has ordinary
+# egress, fetching the same three documents and proving the bytes survive intact.
+#
+# WHAT THIS JOB DOES NOT DO — deliberately, per §5 and §17:
+#   * it writes NOTHING to the database (no secrets are referenced at all, so the
+#     minimum write capability here is zero);
+#   * it does not interpret, classify or normalise any order — the runner acquires and
+#     extracts; interpretation happens later, in the DB, from staged text;
+#   * it is not scheduled and is not called during page rendering (§18).
+#
+# Receipts print to the JOB LOG, which is the readable channel from the sandbox
+# (artifacts are not readable here). The job FAILS if any control fails: an instrument
+# must prove it ran before its silence counts as evidence.
+
+on:
+  push:
+    branches:
+      - claude/phase-8-enforcement-attribution-nm2wwg
+    paths:
+      - '.github/workflows/sec-pdf-gate.yml'
+      - 'scripts/sec-pdf-gate.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    # Three documents, fetched politely with a pause between them. Measured runs are
+    # well under a minute; the bound exists so a hung fetch cannot inherit GitHub's
+    # 6-hour default (the verify-geocodes lesson).
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install poppler-utils (pdftotext, pdfinfo)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+          pdftotext -v 2>&1 | head -2
+          pdfinfo -v 2>&1 | head -2
+
+      - name: Run the three Phase 9D blocking controls
+        run: python3 scripts/sec-pdf-gate.py
