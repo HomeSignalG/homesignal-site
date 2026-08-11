@@ -1,3 +1,8 @@
 
 # Personal Claude Code overrides (permissions); never committed
 .claude/settings.local.json
+
+# Python bytecode from local syntax checks (python3 -m py_compile) on the Phase 9E
+# runner scripts. Build artifacts, never source — the runner compiles its own.
+__pycache__/
+*.pyc
