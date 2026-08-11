@@ -1466,3 +1466,52 @@ create schema if not exists evidence;
 -- Residue after rollback: pdf_document 0 · pdf_text 0 · pdf_change 0 · docket_ref 0,
 -- against a 3,349-row positive control proving those zeros mean "cleaned", not "empty".
 -- F6 and F7 depend on the matter model and pair resolution and are recorded separately.
+
+-- ============================================================================
+-- PHASE 9E ITEM 8 — HOMESIGNAL ENTITY SCAN RE-RUN AFTER THE PARSER REPAIR, AND F6/F7.
+--
+-- ── WHY THE RE-RUN WAS MANDATORY ─────────────────────────────────────────────────────
+-- Phase 9C matched a TWO-TOKEN PREFIX of each organisation's name against
+-- respondents_text — the field that carried up to 11,847 characters of site chrome on
+-- 3,244 rows. Chrome contains "Careers", "Contracts", "Data", "Ombuds"; a token-prefix
+-- match against it could have matched NAVIGATION rather than a respondent.
+--
+-- ── THE NEW MATCHER: NO FUZZY ATTRIBUTION ────────────────────────────────────────────
+-- evidence.ev_sec_entity_rescan, reusing Phase 8/9A's ev_legal_name_key (case, punctuation
+-- and whitespace only — corporate suffixes are NOT stripped, so "Martin Marietta Materials,
+-- Inc." and "Martin Marietta Materials Southwest, LLC" stay different legal persons).
+-- Evidence kinds: exact_legal_name (whole string, or a whole delimiter-separated element of
+-- a multi-respondent caption) · cik cited in order text · verified_parent reported
+-- SEPARATELY. A substring, a token prefix, or name-and-date proximity is not evidence.
+--
+-- ── RESULT: 0/36 HOLDS, AND NOW ON A STRICTER TEST ───────────────────────────────────
+--   direct_match 0 · verified_parent_match 0 · unresolved 0 · no_match 37 (37 name
+--   variants across the 36 organisations).
+-- The identity landscape explains it: 34 name variants carry relationship 'none' with no
+-- SEC registrant identity at all; the only SEC registrant among them is Martin Marietta
+-- Materials (2 direct variants + 1 corporate-family member).
+-- ⚠️ A ZERO IS ONLY EVIDENCE WITH A CONTROL. Three were run:
+--   POSITIVE — real respondent strings taken from the corpus match themselves exactly:
+--     "Lynch, John T., Jr." 2 hits · "Joel Corenman" 1 · "Galena Biopharma, Inc. and
+--     Mark J. Ahn" 1. The matcher works.
+--   ELEMENT  — "Galena Biopharma, Inc." matches as one element of a multi-respondent
+--     caption: 1 hit.
+--   NEGATIVE — the bare substring "Galena" matches 0. No fuzzy attribution.
+--   And "Martin Marietta Materials, Inc." is exactly 0 in 8,872 repaired rows — the real
+--   answer, not a broken query.
+-- NOTHING FROM PHASE 9C CHANGED as a result: the 0/36 outcome is unchanged, reached by a
+-- narrower and better-controlled method over corrected data.
+--
+-- ── F6 / F7 (the two tests that needed the matter model) ─────────────────────────────
+--   F6 PASS — a synthetic corporate-family identity whose legal name exactly matches a real
+--     order files as verified_parent_match = 1, while direct_match total = 0 and that name
+--     filed as direct = 0. Parent history is excluded from direct-company totals.
+--   F7 PASS — deleting ONE proven LR/AP merge moved merges 6 -> 5 and the matter count
+--     7,351 -> 7,352: delta exactly 1, predictably.
+-- Both rolled back; residue afterwards: identity_map fixture rows 0, ZZ-F6 scan rows 0,
+-- merges restored to 6, identity map back to 37.
+--
+-- ⚠️ Worth recording: the F6 fixture was REFUSED TWICE by the schema — first for a NULL
+-- basis, then for an off-vocabulary basis — until it used the real term
+-- 'corporate_family_verified_parent'. That is the identity discipline working: an identity
+-- claim cannot be inserted without stating a recognised basis, not even by a test.
