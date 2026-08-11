@@ -201,6 +201,69 @@ test('identity is the engine key or nothing — the page never invents one', () 
   assert.strictEqual(C.keyOf(null), null);
 });
 
+test('APPROVED COPY (founder 2026-08-11) is one sentence, plain, and never reassuring', () => {
+  // Approved copy lives in code so it cannot be retyped and drift. What drifts is always the
+  // guard: "we haven't looked" quietly becoming something a resident reads as "nothing to find".
+  const strings = [];
+  const walk = (v) => {
+    if (typeof v === 'string') strings.push(v);
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') Object.values(v).forEach(walk);
+  };
+  walk(C.COPY);
+  assert.ok(strings.length >= 30, `expected a full library, found ${strings.length} strings`);
+
+  for (const s of strings) {
+    // 1. ONE SENTENCE. A second sentence belongs in the receipt, not the module.
+    const body = s.replace(/<[^>]+>/g, 'X');
+    assert.doesNotMatch(body, /[.!?]\s+\S/, `not one sentence: "${s}"`);
+    assert.match(s, /[.!?]$/, `no terminal punctuation: "${s}"`);
+
+    // 2. NO INTERNAL VOCABULARY — residents do not say "entity".
+    for (const w of C.INTERNAL_WORDS) {
+      assert.doesNotMatch(s.toLowerCase(), new RegExp('\\b' + w + '\\b'),
+        `internal word "${w}" in resident copy: "${s}"`);
+    }
+
+    // 3. NEVER FAVOURABLE ABOUT AN ABSENCE — the rule forbids the CLAIM, not the letters.
+    // "this isn't a clean record or a bad one" contains "clean record" while explicitly refusing
+    // the reassuring reading, so a substring ban would outlaw the honest sentence and permit a
+    // reworded dishonest one. Negated occurrences pass; asserted ones do not.
+    const low = s.toLowerCase();
+    for (const w of C.FORBIDDEN_COPY) {
+      let i = low.indexOf(w);
+      while (i !== -1) {
+        const before = low.slice(Math.max(0, i - 20), i);
+        const negated = /\b(isn[’']?t|is not|are not|aren[’']?t|not|never|no|neither)\b\s*(a|an|the)?\s*$/.test(before);
+        assert.ok(negated, `asserts "${w}" about an absence: "${s}"`);
+        i = low.indexOf(w, i + 1);
+      }
+    }
+  }
+
+  // The guards that must survive any future rewrite, asserted on meaning rather than wording.
+  assert.match(C.say(C.COPY.source.not_checked), /haven[’']t checked/i);
+  assert.match(C.say(C.COPY.source.not_checked), /can[’']t tell you either way/i,
+    'the not-checked line must say we cannot answer, not merely that we have not looked');
+  assert.match(C.say(C.COPY.source.unavailable), /unknown rather than empty/i,
+    'a failed read must stay distinct from a measured zero');
+  assert.match(C.say(C.COPY.module.floodNotRead), /isn[’']t a sign it sits outside a flood zone/i,
+    'an unchecked hazard must not read as an absence of hazard');
+  assert.match(C.COPY.module.ownerAsFiledCaveat, /often a different company/i);
+  assert.match(C.COPY.module.trackRecordAttribution, /other locations/i,
+    'the track record must say events may not have happened at this address');
+  assert.match(C.COPY.page[0], /not that there[’']s nothing to find/i,
+    'the page explainer must refuse the "blank means clear" reading');
+
+  // say() fills placeholders and refuses to invent a sentence for a key that does not exist.
+  assert.strictEqual(C.say(['<X> shows <n> <thing>.'], { X: 'OSHA', n: 3, thing: 'violations' }),
+    'OSHA shows 3 violations.');
+  assert.strictEqual(C.say(C.COPY.source.not_checked, { X: 'OSHA' }, 1),
+    C.COPY.source.not_checked[1], 'the alternative can be selected by index');
+  assert.strictEqual(C.say(undefined), '', 'a missing string yields nothing, never an improvisation');
+  assert.strictEqual(C.say(C.COPY.module.nonexistent), '');
+});
+
 test('links and the slide-in CTA point at the card and carry only real params', () => {
   assert.strictEqual(C.href({}), 'property-card.html');
   assert.strictEqual(C.href({ zip: '78617' }), 'property-card.html?zip=78617');

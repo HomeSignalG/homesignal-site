@@ -38,6 +38,8 @@
   .pctitle .sp{flex:1}
   .pcacts{display:flex;align-items:center;gap:8px}
   .pcsub{font-size:14px;color:var(--ink-2);margin:5px 0 0}
+  .pcblank{font-size:12.5px;line-height:1.55;color:var(--ink-2);margin:12px 0 0;padding:9px 12px;
+    background:#f7f9f7;border:1px solid var(--line);border-radius:10px}
   .pcmeta{display:flex;flex-wrap:wrap;gap:8px;margin:13px 0 0}
   .pcchip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);
     background:#f7f9f7;border:1px solid var(--line);border-radius:999px;padding:5px 11px}
@@ -321,6 +323,10 @@ HS.onReady(async function () {
       + '</div></div>'
       + '<p class="pcsub">' + esc(locLine) + '</p>'
       + '<div class="pcmeta">' + chips.join('') + '</div>'
+      // Said ONCE, near the top. Most sections on this card are blank, and twelve separate
+      // apologies read worse than one honest line — without it a mostly-empty card looks broken
+      // rather than candid, which is the misreading the whole design is built to prevent.
+      + '<p class="pcblank">' + esc(C.COPY.page[0]) + '</p>'
       + tabsHTML() + '</div>';
   }
   function chip(label, value) {
@@ -394,49 +400,46 @@ HS.onReady(async function () {
       { id: 'assessor', short: 'County assessor', label: 'County appraisal district / assessor',
         authority: 'Register of record for parcel identity, acreage and owner of record',
         state: st(row.parcel ? 'verified' : null, [/appraisal|assessor|tcad|parcel/]),
-        detail: row.parcel ? 'Parcel record read.'
-          : 'No appraisal-district adapter is wired yet, so parcel identity, acreage and the owner '
-            + 'of record have not been read for this address.' },
+        detail: row.parcel ? 'Parcel record read.' : C.say(C.COPY.module.parcelNotRead) },
       { id: 'recorder', short: 'County recorder', label: 'County recorder / clerk (deeds, liens, easements)',
         authority: 'Register of record for recorded instruments',
         state: st((row.instruments || []).length ? 'verified' : null, [/recorder|county clerk|deed/]),
         detail: (row.instruments || []).length ? (row.instruments || []).length + ' recorded instrument(s) read.'
-          : 'No recorder adapter is wired yet. Deeds, liens and easements at this address have not been read.' },
+          : C.say(C.COPY.module.instrumentsUnavailable) },
       { id: 'permits', short: 'Permit filings', label: 'State & local permit filings',
         authority: 'Authoritative filing — values are as filed by the applicant',
         state: st(filings.length ? 'reported' : null, [/tdlr|tabs|permit|planning/]),
         count: filings.length,
-        detail: filings.length ? filings.length + ' filing(s) at this address, each linked to its own record.'
-          : 'No permit filing is cached at this address.' },
+        detail: filings.length ? C.say(C.COPY.module.developmentFound, { n: filings.length })
+          : C.say(C.COPY.module.developmentEmpty) },
       { id: 'epa_frs', short: 'EPA FRS', label: 'EPA Facility Registry Service',
         authority: 'Federal registry of regulated facilities',
         state: st(frsRecs.length ? 'verified' : null, [/frs|facility registry/]),
         count: frsRecs.length,
         detail: frsRecs.length ? frsRecs.length + ' registered facility record(s) geo-matched near this address.'
-          : 'No EPA-registered facility is cached at this address.' },
+          : C.say(C.COPY.module.facilityNoneHere) },
       { id: 'epa_echo', short: 'EPA / ECHO', label: 'EPA ECHO compliance & enforcement',
         authority: 'Federal enforcement record',
         state: st(epaRecs.length ? 'verified' : null, [/echo|epa/]),
         detail: epaRecs.length ? 'Compliance summaries were read for ' + epaRecs.length + ' facility record(s).'
-          : 'No ECHO compliance summary is cached for entities connected to this property.' },
+          : C.say(C.COPY.source.not_checked, { X: 'EPA / ECHO' }) },
       { id: 'state_env', short: 'State environmental', label: 'State environmental regulator (e.g. TCEQ Central Registry)',
-        authority: 'State register of regulated entities',
+        authority: 'State register of regulated sites',
         state: st(tceqRecs.length ? 'verified' : null, [/tceq|state environmental|central registry/]),
         detail: tceqRecs.length ? 'State registry programs were read for ' + tceqRecs.length + ' facility record(s).'
-          : 'No state environmental registry entry is cached for this address.' },
+          : C.say(C.COPY.source.not_checked, { X: 'the state environmental registry' }) },
       { id: 'osha', short: 'OSHA', label: 'OSHA inspections & violations',
         authority: 'Federal workplace-safety enforcement record',
         state: st(null, [/osha/]),
-        detail: 'OSHA has not been queried for entities connected to this property. This is a gap in our '
-          + 'research, not a finding about any employer.' },
+        detail: C.say(C.COPY.source.not_checked, { X: 'OSHA' }) },
       { id: 'sec', short: 'SEC', label: 'SEC filings & enforcement',
         authority: 'Federal securities filings and enforcement matters',
         state: st(null, [/sec|edgar/]),
-        detail: 'SEC filings and enforcement matters have not been queried for entities connected to this property.' },
+        detail: C.say(C.COPY.source.not_checked, { X: 'the SEC' }) },
       { id: 'state_local', short: 'State / local', label: 'State & local enforcement records',
         authority: 'State and local enforcement records, by jurisdiction',
         state: st(null, [/state.?local|county enforcement/]),
-        detail: 'State and local enforcement records beyond the environmental registry above have not been queried.' },
+        detail: C.say(C.COPY.source.not_checked, { X: 'state and local enforcement records' }) },
       // One label, four perils, FOUR DIFFERENT AGENCIES — and only flood has a chosen source.
       // FEMA publishes the National Flood Hazard Layer and nothing else here; naming it for
       // wildfire, heat or severe weather would be fabricated provenance, so the label names the
@@ -444,21 +447,17 @@ HS.onReady(async function () {
       { id: 'hazards', short: 'Natural hazards', label: 'Flood, wildfire, heat & severe-weather hazard layers',
         authority: 'Federal and state hazard mapping, per peril (flood: FEMA NFHL; other perils: source not yet selected)',
         state: st(null, [/fema|flood|wildfire|hazard|heat|severe/]),
-        detail: 'Hazard layers are mapped per area, not per parcel, and no parcel-level hazard read exists for '
-          + 'this address yet. Flood would come from FEMA; wildfire, extreme heat and severe weather have no '
-          + 'source selected.' },
+        detail: C.say(C.COPY.module.floodNotRead) },
       { id: 'meetings', short: 'Meetings & notices', label: 'Public meeting agendas & official notices',
         authority: 'First-party agendas and notices published by the governing body',
         state: st((row.related || []).length ? 'verified' : null, [/meeting|agenda|notice|pmn/]),
         detail: (row.related || []).length
           ? (row.related || []).length + ' notice or agenda item is cached against this address.'
-          : 'Notices and agendas are matched at the ZIP and county level today; none is matched to this '
-            + 'specific address.' },
+          : C.say(C.COPY.module.meetingsNotLinked) },
       { id: 'sustain', short: 'Sustainability', label: 'Sustainability & ESG disclosures',
         authority: 'Company-reported disclosures and third-party datasets',
         state: st((row.sustainability || []).length ? 'reported' : null, [/wikirate|esg|sustainab/]),
-        detail: 'Disclosures are keyed to a company, and no company at this address has been resolved to a '
-          + 'disclosure record.' }
+        detail: C.say(C.COPY.module.sustainabilityNone) }
     ];
   }
 
@@ -482,10 +481,7 @@ HS.onReady(async function () {
       state: C.rollup(order.map(function (id) { return byId[id] && byId[id].state; })),
       link: { href: '#sources', label: 'See every source →' }
     }, '<div class="pcsrcs">' + cells + '</div>'
-      + note('<b>What the records show.</b> Regulatory events above relate to entities connected to this '
-        + 'property through facilities, ownership, or filings — they may describe activity at other '
-        + 'locations, and they do not establish that anything happened at this address. A source marked '
-        + '“not checked” is a gap in our research and says nothing at all about the entity.'));
+      + note('<b>What the records show.</b> ' + esc(C.COPY.module.trackRecordAttribution)));
   }
   function metric(text, label) {
     var na = text === C.NO_VALUE;
@@ -556,8 +552,8 @@ HS.onReady(async function () {
     var state = parents.length ? 'verified' : 'not_checked';
     return sec('parent-track-record', { state: state },
       '<p>' + (parents.length
-        ? esc(parents.length + ' verified parent relationship(s) apply to entities at this address.')
-        : 'No verified parent company has been established for the entities connected to this property.')
+        ? esc(parents.length + ' confirmed parent relationship(s) apply to the companies here.')
+        : esc(C.say(C.COPY.module.parentNone)))
       + '</p>'
       + note('A parent company’s history is only ever shown here when a <b>published, verified</b> '
         + 'ownership relationship authorises it. An unverified name match is never promoted to '
@@ -593,9 +589,7 @@ HS.onReady(async function () {
                   + esc(o.no || 'record') + ' ▸</a>' : esc(o.no || '—')) + '</b></div>';
           }).join('') + '</div>';
     }
-    body += note('<b>Owner of record</b> comes from the county appraisal district and is the register of '
-      + 'record for who owns the land. <b>Owner as filed</b> is what an applicant wrote on a permit — it is '
-      + 'often a different company, and it is never used to fill in the owner of record.');
+    body += note('<b>Owner as filed.</b> ' + esc(C.COPY.module.ownerAsFiledCaveat));
     return sec('property-ownership', {
       state: C.rollup([byId.assessor && byId.assessor.state, filings.length ? 'reported' : 'not_checked'])
     }, body);
@@ -644,7 +638,7 @@ HS.onReady(async function () {
             + '</div></div></div>';
         }).join('')
       : '<p>' + esc(s.detail) + '</p>';
-    body += '<p class="pcprov">Environmental records are geo-matched to a facility, not to this parcel.</p>';
+    body += '<p class="pcprov">' + esc(C.COPY.module.facilityNoParcelLink) + '</p>';
     return sec('facility-connections', {
       state: C.rollup([s.state, byId.epa_echo && byId.epa_echo.state, byId.state_env && byId.state_env.state])
     }, body);
@@ -737,8 +731,7 @@ HS.onReady(async function () {
     var body = '<div class="pcrows">' + sources.map(function (s) {
       return '<div class="pcrow"><span>' + esc(s.label) + '</span><b>' + C.badgeHTML(s.state, { short: true }) + '</b></div>';
     }).join('') + '</div>'
-      + '<p class="pcprov">Each row is one source and the state of our own check on it — not a judgement '
-      + 'about this property. “Not checked” means we have not queried that source for this address.</p>';
+      + '<p class="pcprov">' + esc(C.COPY.page[1]) + '</p>';
     return sec('sources-verification', { wide: true, state: C.rollup(sources.map(function (s) { return s.state; })) }, body);
   }
 

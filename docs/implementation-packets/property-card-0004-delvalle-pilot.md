@@ -563,6 +563,25 @@ particular number is not among them.
 
 ## 6.2 THE COPY LIBRARY — what the resident actually reads
 
+> ### ✅ APPROVED VERBATIM — founder, 2026-08-11
+>
+> **These strings now live in code, at `HS.card.COPY` in `lib/property-card.js`, and are pinned by
+> `test/property-card.test.mjs`. Use them from there — do not retype them from this document, and do
+> not reword them.** Approved copy that has to be retyped drifts on first contact, and what drifts is
+> always the guard: *"we haven't looked"* quietly becoming something a resident reads as *"there's
+> nothing to find."*
+>
+> The table below is the human-readable index of what is in `HS.card.COPY`. If the two ever disagree,
+> **the code is authoritative** and this document is the bug.
+>
+> Adding a string is allowed; changing an approved one is a founder decision. Any new string must pass
+> the same three gates the test enforces: one sentence, no internal vocabulary, never favourable about
+> an absence.
+>
+> **Already applied to the shipped card.** `property-card.html` now renders these strings, replacing
+> the wording written before approval — which used "entities connected to this property" and "has not
+> been queried" and would have violated the approved vocabulary on day one.
+
 **Missing data is never a blocker.** Pick the state from §6.1, then pick a sentence from below.
 Alternatives are interchangeable in meaning — choose by length and context, do not stop to ask.
 
@@ -822,9 +841,14 @@ The draft's §33 list is good. Add:
   `penalty_amount` of null produces a sentence saying records were returned but no penalty figure
 - none of the forbidden empty-state phrases (§6.1) appears anywhere in the rendered card: no
   "No violations", "None", "Clean", "No known issues", "Compliant", "No risk"
-- **no internal vocabulary reaches the resident-facing copy** (§6.2) — assert the rendered card
-  contains none of: "entity", "dataset", "coverage", "attribution", "queried", "result_count",
-  "not applicable", "regulatory event". Those belong in the receipt, not the module
+- **no internal vocabulary reaches the explanatory sentences** — assert over `HS.card.COPY`, not over
+  the whole page. Two things legitimately contain these words and must not be "fixed": the design's
+  own section title **"Entity Track Record"**, and the approved disclaimer's **"source coverage"**.
+  The rule stops jargon leaking into a sentence a homeowner must parse; it does not purge a
+  vocabulary from the page
+- **the forbidden-copy check tests the CLAIM, not the letters** — "this isn't a clean record or a bad
+  one" contains "clean record" while refusing the reassuring reading, so a substring ban would outlaw
+  the honest sentence and pass a reworded dishonest one. Allow negated occurrences, fail asserted ones
 - **the page-level explainer is present** — a card where most sections are blank must say once, near
   the top, that blank means unchecked rather than clear
 

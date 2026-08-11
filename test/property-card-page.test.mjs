@@ -171,8 +171,19 @@ need(/row2\('Owner of record', parcel && parcel\.owner_of_record\)/.test(card),
   'owner of record is not read from the parcel record alone');
 need(/Owner as filed on a permit/.test(card),
   'the filed owner is not labelled as filed, so it could be read as the owner of record');
-need(/it is never used to fill in the owner of record/.test(card),
-  'the card does not explain why the two owner lines can differ');
+// The card must EXPLAIN why the two owner lines can differ, in the founder-approved words —
+// asserted against HS.card.COPY rather than a hand-typed copy of it, so approved wording and
+// rendered wording cannot drift apart.
+need(/C\.COPY\.module\.ownerAsFiledCaveat/.test(card),
+  'the ownership module does not render the approved owner-as-filed caveat');
+need(/often a different company from whoever owns the land/.test(HS.card.COPY.module.ownerAsFiledCaveat),
+  'the approved caveat no longer explains that the two owners can differ');
+// The one-sentence rule cost this caveat its "and we never substitute one for the other" clause.
+// That guarantee is therefore enforced where it actually binds — in code, asserted above — and
+// restated in the receipt, never left to the module's single line to carry alone.
+need(/owner of record comes from the county appraisal district/i.test(card)
+  || /parcelNotRead/.test(card),
+  'nothing on the card says where the owner of record would come from');
 need(!/owner_of_record[^\n]*\|\|[^\n]*\bowner\b/.test(card),
   'owner of record falls back to a filing’s owner field — the exact conflation Part 25 forbids');
 
