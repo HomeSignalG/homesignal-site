@@ -1,0 +1,75 @@
+name: sec-pdf-stage
+
+# PHASE 9E §5/§6/§13 — acquire SEC order PDFs and land them in STAGING.
+#
+# Runs only after the §2 binary-integrity gate passed (run 31532416261): all three 9D
+# blocking controls fetched byte-exact against Content-Length, opened, and yielded native
+# text, while pg_net retains 0.35-1.59% of the same files and ZERO order text.
+#
+# THE RUNNER ACQUIRES. IT DOES NOT INTERPRET (§5). Its entire write surface is one typed
+# RPC, public.stage_sec_pdf, which has no parameter capable of expressing a posture, a
+# statute, a sanction, a monetary amount or an entity link — those are derived later, in
+# the database, from the staged text, so the derivation can be re-run and audited against a
+# stored artifact instead of a network fetch nobody can replay.
+#
+# Its entire read surface is public.sec_pdf_work_list / public.sec_pdf_representative_set,
+# which carry fetch instructions and nothing else — no internal ids, no predicate
+# vocabulary, no entity or claim data (§21). Both objects, and the RPC, are granted to
+# service_role only and revoked from public/anon/authenticated (verified: anon EXECUTE
+# false, anon SELECT false).
+#
+# Not scheduled, and never invoked during page rendering (§18).
+
+on:
+  push:
+    branches:
+      - claude/phase-8-enforcement-attribution-nm2wwg
+    paths:
+      - '.github/workflows/sec-pdf-stage.yml'
+      - 'scripts/sec-pdf-stage.py'
+  workflow_dispatch:
+    inputs:
+      set:
+        description: 'representative (77 docs) or corpus (all unstaged)'
+        required: true
+        default: representative
+      limit:
+        description: 'optional cap on documents processed'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    # Sized to the WORK, not to the last run that happened to fit — the ingest repo's
+    # lesson, where a 60-minute bound silently truncated the newest endpoints of a 125-item
+    # pass and still presented as partial success. At the measured ~0.4s politeness delay
+    # plus fetch and extraction, the representative set (77 docs) is ~2 min and the full
+    # 6,077-document corpus is ~75-90 min. 300 leaves headroom for slow responses without
+    # inheriting GitHub's 6-hour default.
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install poppler-utils
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+          pdftotext -v 2>&1 | head -1
+
+      - name: Acquire and stage
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RUNNER_JOB: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          SET="${{ github.event.inputs.set || 'representative' }}"
+          LIMIT="${{ github.event.inputs.limit || '' }}"
+          ARGS="--set $SET"
+          if [ -n "$LIMIT" ]; then ARGS="$ARGS --limit $LIMIT"; fi
+          python3 scripts/sec-pdf-stage.py $ARGS
