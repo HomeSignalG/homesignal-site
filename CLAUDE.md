@@ -1379,6 +1379,42 @@ legal/framing change not covered by the one-time sign-off.
 
 ---
 
+## 7.1 The property card (`property-card.html`) — READ `docs/property-card-redesign.md` FIRST
+
+The full card a resident reaches from the **first element** of the Maps slide-in
+(`maps.html` → `#infoSlide` → "View the full property card"). The panel is a quick view; the card
+answers *what is on record at this address, source by source, and what have we not looked at*.
+**Read `docs/property-card-redesign.md` before touching either surface** — it is the layout of
+record and it names the defect each rule prevents.
+
+The three things that must not be re-derived or relaxed:
+
+- **`HS.card.metricText(state, n)` is the ONLY function allowed to print a number** on either
+  surface. `not_checked` / `unavailable` / `access_restricted` / `in_progress` / `partial` render
+  an em-dash — **never `0`**. A zero next to a source nobody queried reads as *clean*, which is
+  the defect PR #662 repaired on the ZIP page (a failed EPA read had rendered as zero facilities
+  across 1,722 pages). It runs both ways: `checked_empty` **is** countable, so a source we queried
+  that returned nothing renders a real `0` — printing "unavailable" over a correct zero is a new
+  inaccuracy, not a fix (the ruling in `test/facilities-unavailable-copy.test.mjs`).
+- **The state vocabulary lives in `lib/property-card.js`, shared by both surfaces.** Part 12's
+  seven states plus `partial` / `in_progress` / `access_restricted`. `HS.card.state()` **fails
+  closed**: an unrecognized value returns `null`, never the nearest plausible state — every state
+  is a claim about what we did, so guessing one fabricates provenance.
+- **Owner of record and owner as filed are two lines from two sources, and neither substitutes
+  for the other** (architecture doc Part 25). No assessor adapter exists, so owner of record says
+  *Not checked* rather than borrowing the value an applicant typed on a permit. There is no
+  `owner_of_record || …owner` fallback, and a test asserts there never is.
+
+Keyed by the **engine's canonical address** (`?addr=`), the same key `property_reports` and
+`homesignalmap.html?addr=` use — one normalizer, engine-side. `app_projects` carries no address,
+so a Maps click resolves via the ZIP's `development_reports` row matched on `record_url`; an
+unresolved parcel renders as an unresolved parcel, never a guessed address. Offline gates:
+`test/property-card.test.mjs` + `test/property-card-page.test.mjs`. The **rendered live page is
+unverified** (declared in `scripts/lib/surface-banner.mjs`); `window.__HS_CARD` exists for that
+verifier when it is written.
+
+---
+
 ## 8. Source adapters (`get-address-report` enrichment sources)
 
 The `get-address-report` edge function pulls from multiple public-record sources.

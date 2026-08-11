@@ -122,14 +122,29 @@ need(/role="tablist"/.test(card) && /role="tab"/.test(card) && /aria-selected/.t
 
 // ── 6. THE GATE, on the page: no count reaches the screen except through metricText ──
 need(/C\.metricText\(/.test(card), 'the card page never calls HS.card.metricText — nothing is gated');
-// Every track-record metric goes through it, including the ones that are always absent today.
-need(/out\.violations = C\.metricText\(/.test(card)
-  && /out\.actions = C\.metricText\(/.test(card)
-  && /out\.penalties = C\.metricText\(/.test(card),
-  'a track-record metric bypasses the metricText gate');
-need(/if \(!C\.isCountable\(state\)\) return out;/.test(card),
-  'trackMetrics does not return early for a non-countable state — it would compute counts for a '
-  + 'source that was never queried');
+// Every track-record metric goes through it. trackMetrics starts all three values at the
+// em-dash and only ever overwrites one via metricText, so there is no assignment that could
+// place a raw number in a metric slot.
+const tm = (card.match(/function trackMetrics\(id, state, recs\) \{[\s\S]*?\n  \}/) || [''])[0];
+need(tm.length > 200, 'trackMetrics could not be located to audit');
+need(/vals = \[C\.NO_VALUE, C\.NO_VALUE, C\.NO_VALUE\]/.test(tm),
+  'trackMetrics does not start every metric at the absent marker');
+[...tm.matchAll(/vals\[\d\] = ([^;]+);/g)].forEach((m) => {
+  need(/C\.metricText\(/.test(m[1]) || /C\.NO_VALUE/.test(m[1]) || /Number\(vals\[/.test(m[1]),
+    `trackMetrics assigns a metric without the metricText gate: vals[..] = ${m[1].trim()}`);
+});
+need(/C\.isCountable\(state\) && id === 'epa_echo'/.test(tm),
+  'trackMetrics computes ECHO counts without first checking the state is countable — it would '
+  + 'count for a source that was never queried');
+// A measured zero MUST still render as 0, or the card lies in the other direction.
+need(/state === 'checked_empty'[\s\S]{0,220}C\.metricText\(state, 0\)/.test(tm),
+  'a checked-but-empty source does not render its real, measured 0');
+// Each source labels what IT counts: a state registry's programme enrolments must never be
+// displayed under "Enforcement actions".
+need(/var TRACK_METRICS = \{/.test(card), 'track-record metric labels are not per-source');
+need(/state_env:\s*\['Programs on record'/.test(card),
+  'the state registry’s enrolment count is not labelled as programmes — under an enforcement '
+  + 'label it reads as an accusation the record does not make');
 // The two regulatory counts are the ones most tempting to interpolate raw.
 need(/row2\('Facilities with a compliance summary', C\.metricText\(/.test(card),
   'the compliance-summary count is not routed through metricText');
