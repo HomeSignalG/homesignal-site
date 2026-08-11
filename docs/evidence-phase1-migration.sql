@@ -1424,3 +1424,45 @@ create schema if not exists evidence;
 -- Measured over 2,698 normalised documents (corpus still loading; final counts in the
 -- Phase 9E report): civil penalty stated with amount 594 · disgorgement 553 ·
 -- statutes extracted on 2,637 documents, mean 9.4 citations · extraction_failed 0.
+
+-- ============================================================================
+-- PHASE 9E ITEMS 5 + 9 — PAIR RESOLUTION AND THE F-SERIES FAILURE TESTS.
+--
+-- ── ITEM 5: the 46 pairs now resolve on IDENTIFIER evidence ──────────────────────────
+-- evidence.ev_sec_pair_disposition, four dispositions reconciling to exactly 46:
+--   same_underlying_matter     both sides cite the SAME normalised CIVIL docket
+--   related_but_distinct       both cite civil dockets and they DIFFER
+--   same_respondent_unrelated  at most one side cites a civil docket, no cross-reference
+--   unresolved                 a side's text/body is not yet acquired — NOT resolved on
+--                              name and date, which is what created the candidates
+-- ⛔ The docket join is restricted to case_type='civil' IN THE JOIN, so a shared criminal
+-- docket can never produce a merge.
+-- First run (LR body corpus still loading): 6 same_underlying_matter · 9
+-- same_respondent_unrelated · 31 unresolved = 46. Proven merges, each on a shared docket:
+--   LR-23879/IA-4727 16-cv-03399 · LR-23930/34-83056 17-cv-06813 · LR-23954/34-81741
+--   17-cv-02953 · LR-24050/IA-4857 12-cv-00700 · LR-24120/34-83056 17-cv-06813 ·
+--   LR-24414/34-85277 18-cv-00320
+-- Note 34-83056 legitimately answers TWO pairs (LR-23930 and LR-24120) on the same docket —
+-- one administrative order can correspond to several litigation releases.
+--
+-- ── ITEM 9: F1..F12, all mutations rolled back, ZERO residue ─────────────────────────
+-- evidence.ev_phase9e_failure_tests(). Measured results:
+--   F1   PASS  lost SEC access -> acquisition_failed / http=403, text rows 0 (never a zero
+--              that looks like "no records")
+--   F2   PASS  126,786 declared vs 444 downloaded -> acquisition_failed, not a short doc
+--   F3   PASS  empty extraction -> ocr_required; a false native_text claim RAISES
+--   F4   PASS  a failed PDF leaves index presence intact (34-80365 still 1 row); only
+--              DETAIL coverage drops — the 9C presence/detail split doing its job
+--   F5   PASS  "disgorgement, prejudgment interest, and a civil monetary penalty totaling
+--              $88,780,861" -> stated_without_amount in BOTH buckets, amount NULL
+--   F8   PASS  same URL + new hash -> outcome text_changed, 1 change receipt, text
+--              superseded OLD->NEW
+--   F10  PASS  21-civ-04587 == 21-cv-04587 (one civil case)
+--   F10b PASS  3:25-cv-01653-X == 3:25-cv-01653 (suffix is not a second case)
+--   F10c PASS  one document citing both dockets yields 1 civil + 1 criminal row, apart
+--   F11  PASS  21-cr-04587 <> 21-cv-04587 even at identical year and sequence
+--   F12  PASS  tax-administrator order -> role tax_administrator_appointment,
+--              is_substantive false
+-- Residue after rollback: pdf_document 0 · pdf_text 0 · pdf_change 0 · docket_ref 0,
+-- against a 3,349-row positive control proving those zeros mean "cleaned", not "empty".
+-- F6 and F7 depend on the matter model and pair resolution and are recorded separately.
