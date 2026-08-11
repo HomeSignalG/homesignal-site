@@ -1349,3 +1349,78 @@ create schema if not exists evidence;
 -- -1 and the placeholder "(respondents not parsed from detail page)". They were recovered
 -- by release number, not from an index page, so there is no page HTML to reparse. None is
 -- contaminated. 8,868 reparsed + 4 gap-fill = 8,872.
+
+-- ============================================================================
+-- PHASE 9E ITEMS 4, 6, 7 — DOCKET IDENTITY, DOCUMENT ROLE, SUBSTANTIVE NORMALIZATION.
+--
+-- ── ITEM 4: NORMALISED FEDERAL DOCKET (evidence.ev_normalize_docket) ─────────────────
+-- Normalised form  <yy>-<type>-<seq padded to 5>. Verified on every form the brief names:
+--   3:25-cv-01653    -> 25-cv-01653  civil   (office 3 preserved separately)
+--   3:25-cv-01653-X  -> 25-cv-01653  civil   (judge-initial suffix dropped)
+--   21-civ-04587     -> 21-cv-04587  civil   (civ folded to cv)
+--   21-cv-04587      -> 21-cv-04587  civil
+--   1:23-cv-4587     -> 23-cv-04587  civil   (sequence zero-padded)
+--   21-CIV-04587     -> 21-cv-04587  civil   (case-insensitive)
+--   21-cr-00203      -> 21-cr-00203  CRIMINAL
+--   2:19-mc-00012    -> 19-mc-00012  unknown (miscellaneous docket, not civil, not criminal)
+--   'no docket here' -> NULL         unknown
+-- PRESERVED, never folded: raw_docket, office, court (only where the document states it —
+-- never inferred from the office number), source_ref, extraction_basis.
+-- ⛔ THE CRIMINAL SEPARATION IS STRUCTURAL, NOT A FILTER: the case type is carried INSIDE
+-- the normalised string, so '21-cr-00203' can never equal '21-cv-04587' under any equality
+-- test, and it is ALSO a column. A DOJ prosecution of the same person can therefore never
+-- merge into an SEC civil matter. (LR-25151 reports both: SEC v. Heckler 21-civ-04587 and
+-- United States v. Heckler 21-cr-00203, 63 months in prison.)
+--
+-- ── ITEM 6: DOCUMENT ROLE — an AP document is NOT automatically an enforcement event ──
+-- Vocabulary is DATA (evidence.ev_sec_doc_role_vocab), every value carrying does_not_mean.
+-- Classification is per-DOCUMENT and does not touch the matter: a housekeeping document
+-- still proves its matter EXISTS, it just is not a new enforcement event.
+-- Measured over the first 2,523 staged documents (first-match-wins, most specific first):
+--   SUBSTANTIVE 2,226 — settled_order 1,332 · order_instituting_proceedings 453 ·
+--     order_making_findings 213 · initial_decision 137 · rule_102e_suspension 51 ·
+--     cease_and_desist_order 40
+--   PROCEDURAL    235 — fair_fund_or_distribution 96 · tax_administrator_appointment 49 ·
+--     corrected_or_amended_order 41 · extension_or_scheduling 34 · other_procedural 15
+--   unclassified   31 — NOT counted as either. 'unclassified' means classification has not
+--     been performed, never "procedural"; counting it either way would be the inflation
+--     this item exists to prevent, in the other direction.
+-- The vocabulary was EXTENDED FROM THE CORPUS, not assumed: reading the unmatched captions
+-- surfaced ORDER OF FORTHWITH SUSPENSION (Rule 102(e)(2)), EXTENSION ORDER, ORDER
+-- ESTABLISHING A FAIR FUND and ORDER GRANTING MOTION TO EXTEND TIME — four real forms the
+-- brief's example list did not contain, exactly as it warned.
+--
+-- ── ITEM 7: SUBSTANTIVE NORMALIZATION ────────────────────────────────────────────────
+-- "not stated" and "extraction failed" are DIFFERENT VALUES and never collapse. Relief
+-- carries three positive states, so a missing figure is never read as a missing relief:
+--   not_stated · stated_without_amount · stated_with_amount   (+ extraction_failed)
+--
+-- ⚠️ TWO DEFECTS IN MY OWN EXTRACTOR, BOTH FOUND BY READING VALUES, NOT COUNTS.
+-- 1. FIRST-MENTION CAPTURE. The extractor took the first occurrence of each relief keyword.
+--    SEC orders name the relief in a summary sentence BEFORE the operative paragraph that
+--    carries the figure, so amounts read NULL while the counts looked entirely plausible:
+--      IC-33534 disgorgement NULL, though the order says "disgorgement of $48,473,242"
+--      33-10334 disgorgement NULL, though the order says "disgorgement of $178,750"
+--    Fixed by preferring the occurrence that carries a figure. Measured residue afterwards:
+--    15 documents of 553 still fell back; a tighter "keyword -> short connector -> amount"
+--    primary pattern closed all 15. Now 0 documents contain 'disgorgement of $' while
+--    reporting stated_without_amount.
+-- 2. COMBINED TOTALS POPULATING INDIVIDUAL BUCKETS — the double-count this phase's
+--    four-bucket rule exists to prevent, present in real data before any test caught it.
+--    After fix 1, IC-33534 reported disgorgement 88,780,861 AND prejudgment interest
+--    88,780,861 — the same figure twice — from
+--      "disgorgement, prejudgment interest, and a civil monetary penalty totaling $88,780,861"
+--    RULE ADDED: an amount is attributable to a relief type only when NO OTHER relief type
+--    is named between that keyword and the figure, and never from a phrase carrying
+--    totaling / in total / combined / collectively. Such a document is
+--    stated_without_amount for each bucket — the relief IS ordered (true) and the
+--    per-bucket figure is NOT stated here (also true). IC-33534 now reads disgorgement
+--    48,473,242 and prejudgment interest 307,619, matching its text exactly.
+-- ✅ A LOOK-ALIKE THAT IS NOT A DEFECT: 40 documents state a civil penalty EQUAL to
+--    disgorgement. Reading the raw phrases shows two separate attributed statements
+--    ("civil money penalty of $15,141.97" and "disgorgement of $15,141.97") — SEC commonly
+--    sets a penalty equal to disgorgement. Left as measured; not deduplicated.
+--
+-- Measured over 2,698 normalised documents (corpus still loading; final counts in the
+-- Phase 9E report): civil penalty stated with amount 594 · disgorgement 553 ·
+-- statutes extracted on 2,637 documents, mean 9.4 citations · extraction_failed 0.
