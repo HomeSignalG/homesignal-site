@@ -18,6 +18,90 @@
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js"></script>
 <script src="lib/impact.js"></script>
+
+<style>
+/* Evidence discovery teaser (Phase 5). Scoped; no legacy selector is touched. */
+.hs-ev-teaser{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  background:#f7f9fb;border:1px solid #e3e9ef;border-left:3px solid #3f7fb0;border-radius:10px;
+  padding:10px 12px;margin:0 0 10px;font:13.5px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.hs-ev-teaser-txt{flex:1 1 220px;min-width:0}
+.hs-ev-teaser strong{font-size:13.5px}
+.hs-ev-open{flex:0 0 auto;background:#fff;border:1px solid #c9d9ef;color:#274b7d;font-weight:650;
+  font-size:13px;border-radius:8px;padding:7px 12px;cursor:pointer}
+.hs-ev-open:hover{background:#eef3fa}
+.hs-ev-open:focus-visible{outline:2px solid #274b7d;outline-offset:2px}
+.hs-ev-panel{flex:1 1 100%;margin-top:10px}
+.hs-ev-panel .hs-ev-card{max-width:none}
+@media (max-width:430px){
+  .hs-ev-teaser{gap:8px;padding:10px}
+  .hs-ev-open{width:100%;text-align:center}
+}
+</style>
+<script>
+/* PHASE 5 — community discovery. Same RPC, same renderer, same server-side pilot gate.
+ * ONE batched availability call per page; the full card is fetched ONLY on user intent.
+ */
+window.HS_EVIDENCE_CARD = (window.HS_EVIDENCE_CARD !== false);
+(function () {
+  var loaded = {};   // id_value -> true, so a re-open never refetches
+
+  function client() { return window.hsClient || (window.HS && window.HS.client); }
+
+  window.hsEvidenceTeasers = function (zip, mountEl) {
+    if (!window.HS_EVIDENCE_CARD || !mountEl || !zip) return Promise.resolve([]);
+    var c = client();
+    if (!c) return Promise.resolve([]);
+    // ONE call for the whole page. Non-pilot ZIPs return [] and nothing is rendered:
+    // no heading, no placeholder, no second request.
+    return c.rpc('ev_evidence_available', { _zip: String(zip) })
+      .then(function (r) {
+        var rows = (r && r.data) || [];
+        if (!rows.length) return [];
+        mountEl.innerHTML =
+          '<div class="groupHead"><span class="gd" style="background:#3f7fb0"></span> Property records'
+          + ' <span class="gc">— county land records for properties in this ZIP</span></div>'
+          + rows.map(window.HS.EvidenceCard.renderTeaser).join('');
+        mountEl.hidden = false;
+        return rows;
+      })
+      .catch(function () { return []; });   // never block the community page
+  };
+
+  // Lazy full-card load, delegated so it survives any re-render of the feed.
+  document.addEventListener('click', function (e) {
+    var btn = e.target && e.target.closest && e.target.closest('.hs-ev-open');
+    if (!btn) return;
+    var idType = btn.getAttribute('data-ev-idtype'), idValue = btn.getAttribute('data-ev-idvalue');
+    var panel = document.getElementById('hs-ev-panel-' + idValue);
+    if (!panel) return;
+    if (!panel.hidden) {                       // collapse
+      panel.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+      btn.textContent = 'View property records';
+      return;
+    }
+    var show = function () {
+      panel.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      btn.textContent = 'Hide property records';
+      panel.setAttribute('tabindex', '-1');
+      panel.focus({ preventScroll: true });    // §17 focus follows disclosure
+    };
+    if (loaded[idValue]) { show(); return; }
+    var c = client();
+    if (!c) return;
+    btn.disabled = true; btn.textContent = 'Loading…';
+    c.rpc('ev_property_card', { _id_type: idType, _id_value: idValue })
+      .then(function (r) {
+        var card = r && r.data;
+        panel.innerHTML = card ? window.HS.EvidenceCard.render(card) : '';
+        loaded[idValue] = true; btn.disabled = false; show();
+      })
+      .catch(function () { btn.disabled = false; btn.textContent = 'View property records'; });
+  });
+})();
+</script>
+<script src="evidence-card.js"></script>
 <script src="shell.js"></script>
 <script>
 HS.onReady(async function () {
@@ -56,6 +140,12 @@ HS.onReady(async function () {
     page.innerHTML = '<div class="ph"><div class="eyebrow">Communities</div><h1>' + HS.esc(zip) + ' isn\'t covered yet</h1>'
       + '<p>We\'re not tracking this ZIP yet — request it and we\'ll email you when it goes live.</p>'
       + '<button class="inlinebtn" style="margin-top:12px" onclick="HS.openLoc()">Request this community →</button></div>';
+
+  // PHASE 5 — one batched evidence-availability call for the whole page.
+  // Renders nothing (and issues no further request) when this ZIP has no pilot parcel.
+  if (window.hsEvidenceTeasers) {
+    window.hsEvidenceTeasers(zip, document.getElementById('hsEvidenceZip'));
+  }
     return;
   }
   if (status !== 'pass') {
@@ -149,6 +239,7 @@ HS.onReady(async function () {
           + HS.tpl.devImpactBlock(p)
           + '<p class="sowhat"><b>' + (p.sowhat_factual ? 'On the record:' : 'How it impacts you:') + '</b> ' + HS.esc(p.sowhat||'') + '</p></div>';
       }).join('') : '<div class="quiet" style="margin-bottom:10px;font-size:12.5px">No permit or planning records on file for this ZIP yet — the regulated-facility record below is the current public-record floor.</div>')
+    + '<div id="hsEvidenceZip" hidden></div>'
     + facHtml
     + '<div class="groupHead"><span class="gd water"></span> Environment &amp; utilities <span class="gc">— ' + envChanges.length + ' change' + (envChanges.length===1?'':'s') + '</span></div>'
     + (envChanges.length ? envChanges.slice(0,2).map(function(ch){ return HS.tpl.miniCard(ch, ch.category); }).join('') : '<div class="quiet" style="margin-bottom:10px;font-size:12.5px">No environment or utility notices on file for this ZIP yet.</div>')

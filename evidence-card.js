@@ -232,6 +232,38 @@
     return '<section class="hs-ev-sec">' + disclosure('Sources & verification', body) + '</section>';
   }
 
+
+  // §5/§6/§11 COMPACT DISCOVERY TEASER — 1-2 lines plus one action, never the full card.
+  // Same module as the full card, so there is exactly ONE renderer and one vocabulary.
+  var DOMAIN_WORDS = {
+    ownership: 'ownership', instruments: 'recorded instruments',
+    property: 'parcel details', development: 'related filings'
+  };
+  function renderTeaser(entry) {
+    if (!entry || entry.evidence_available !== true) return '';
+    // 'property' is implied by the heading and 'ownership' by the "Owner of record" prefix,
+    // so neither is repeated in the list.
+    var doms = (entry.evidence_domains || [])
+                 .filter(function (d) { return d !== 'property' && d !== 'ownership'; })
+                 .map(function (d) { return DOMAIN_WORDS[d] || d; });
+    var hasOwner = (entry.evidence_domains || []).indexOf('ownership') > -1;
+    // Concrete wording — never a bare "Data available" badge.
+    var what = (hasOwner ? 'Owner of record' : 'Parcel details')
+             + (doms.length ? ', ' + doms.join(' and ') : '') + ' on file.';
+    var idAttr = 'data-ev-idtype="' + esc(entry.id_type) + '" data-ev-idvalue="' + esc(entry.id_value) + '"';
+    return '<div class="hs-ev-teaser" ' + idAttr + '>' +
+      '<div class="hs-ev-teaser-txt">' +
+        '<strong>Property records available</strong>' +
+        (entry.label ? ' <span class="hs-ev-dim">· ' + esc(titleish(entry.label)) + '</span>' : '') +
+        '<div class="hs-ev-dim">' + esc(what) + '</div>' +
+      '</div>' +
+      '<button type="button" class="hs-ev-open" ' + idAttr +
+        ' aria-expanded="false" aria-controls="hs-ev-panel-' + esc(entry.id_value) + '">' +
+        'View property records</button>' +
+      '<div class="hs-ev-panel" id="hs-ev-panel-' + esc(entry.id_value) + '" hidden></div>' +
+      '</div>';
+  }
+
   function render(card) {
     if (!card || card.pilot_enabled !== true) return '';   // §22 default OFF
     if (card.found !== true) return '';
@@ -247,7 +279,7 @@
     return h + '</div>';
   }
 
-  var api = { render: render, _titleish: titleish, _badge: badge };
+  var api = { render: render, renderTeaser: renderTeaser, _titleish: titleish, _badge: badge };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.HS = global.HS || {};
   global.HS.EvidenceCard = api;

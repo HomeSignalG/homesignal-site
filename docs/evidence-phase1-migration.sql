@@ -248,3 +248,22 @@ create schema if not exists evidence;
 --   published convention (its ASAL_INSTR field reads e.g. "SW: SPECIAL WARRANTY").
 -- Consumer status vocabulary is mapped in the RPC, so no internal enum ever reaches the
 -- browser: corroborated / reported / disagree / unknown.
+
+-- ============================================================================
+-- PHASE 5 ADDITIONS (2026-08-10) — community.html discovery. Migration:
+-- evidence_phase5_batch_availability. No new renderer, no new card RPC, no new flag.
+-- ============================================================================
+-- public.ev_evidence_available(zip) — ONE batched call per community page.
+--   Returns [{id_type, id_value, label, evidence_available, evidence_domains,
+--             linked_case_numbers}]. Deliberately GENERIC: it never returns
+--   is_tcad_pilot / is_denver_pilot, and the frontend never learns WHY evidence exists.
+--   Gated by the SAME evidence.ev_pilot_parcel allowlist — a non-pilot ZIP gets [] and
+--   the page issues no further request and renders no heading.
+--   linked_case_numbers lets a feed card be matched to a parcel by FILING NUMBER, never
+--   by address or company name.
+-- DISCOVERY ZIP IS DERIVED, NOT EVIDENCE: nearest modeled ZIP centroid to the parcel's
+--   own authoritative geometry. It decides only where a teaser may appear, never enters a
+--   claim, and is never shown as a fact. Measured: Del Valle -> 78617 (exact);
+--   Denver 18581 E 50th Ave -> 80239, because its true ZIP 80249 is NOT modeled
+--   (0 rows in development_reports) — an honest nearest-neighbour fallback, ~4 mi.
+-- The full card still comes from public.ev_property_card() and loads only on user intent.
