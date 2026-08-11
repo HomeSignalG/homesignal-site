@@ -2983,3 +2983,81 @@ its NEW badge. With the sweep complete that is **74 `issued` + 8 `scheduled` + 6
 `awarded` + 4 `estimated` + 2 `hearing` + 1 `completed` = 99 entries** of the 169 that carry a date.
 The badge becomes rarer and more meaningful, which is the intent — but the drop should be **measured
 and reported** in the piece (c) PR rather than discovered on the page.
+
+---
+
+# §AC — The facilities guard becomes EPA-probe-aware, and the refresh is un-paused
+
+Applied 2026-08-11 as migration `dev_refresh_collect_epa_probe_guard`. Parked SQL:
+`docs/dev-refresh-epa-probe-guard.sql`. Offline guard: `test/dev-refresh-epa-probe-guard.test.mjs`.
+
+## AC1. Why the naive un-pause was rejected
+
+Two defects in the 2026-08-09 age-based guard, both found by the pre-flight rather than by
+reasoning about it:
+
+1. **The age cliff.** The facilities refusal was keyed on `d.refreshed_at >= now() - interval
+   '7 days'`. A refused write does not update `refreshed_at`, so a blocked row **ages toward the
+   boundary and then loses its protection**. Measured with FRS returning 502/503:
+
+   | crosses 7 days | rows | of which carry facilities |
+   |---|---|---|
+   | already past (08-02 → 08-06) | 17 | 17 |
+   | ~2026-08-14 (the 08-07 batch) | 2,133 | **1,978** |
+   | ~2026-08-15 (the 08-08 batch) | 10,086 | **9,005** |
+
+   An un-paused refresh would have written `facilities = 0` to ~11,000 pages on schedule.
+
+2. **The flag was write-only-false.** `dev_refresh_collect` is the *only* function in the database
+   that references `facilities_unavailable`, and inside it the flag was only ever set to `false`.
+   The 486 flagged pages were stamped by a one-time repair. A zeroing write during the outage would
+   therefore have rendered "0 EPA facilities" instead of "unavailable" — the claim #662 exists to
+   prevent.
+
+Query of record for (2): `select p.proname from pg_proc p join pg_namespace n on n.oid =
+p.pronamespace where n.nspname='public' and p.prokind='f' and pg_get_functiondef(p.oid) ilike
+'%facilities_unavailable%'` → exactly one row, `dev_refresh_collect`.
+
+## AC2. What changed
+
+* The facilities clause is now `(not epa_ok or d.refreshed_at >= now() - interval '7 days')`.
+  **Deliberate deviation from "replace the age predicate": the age test is kept and OR-ed, not
+  swapped out.** It is what absorbs a transient FRS flake landing between two 15-minute probes —
+  the class that once read Box Elder 23 → 18 on a single 502. Strictly more conservative than
+  either test alone, and nothing freezes permanently: once EPA is healthy the probe test is false
+  and the original release valve still applies, so a genuinely delisted page ages past 7 days and
+  its real zero writes through.
+* `epa_ok` is read once per collect from `epa_frs_probes` (latest **resolved** probe), wrapped in
+  `coalesce(…, false)`. Fail-closed: `false`, NULL, no resolved probe, or an empty table all mean
+  "EPA is failing", i.e. refuse to zero.
+* `facilities_unavailable` finally has a set-true path: payload `> 0` → `false` · payload `= 0` and
+  EPA failing → `true` · payload `= 0` and EPA healthy → `false`. Server-derived; the client still
+  never infers it from a count (`test/facilities-unavailable-copy.test.mjs`).
+* Untouched: both development-dimension clauses, the both-dimensions-zero clause, and the
+  per-source `blocked` refusal. No `explained` escape on the facilities clause — `explained` means a
+  retired *registry source*, and FRS is not one, so it could never explain a facilities drop.
+
+## AC3. Both directions, proven before the cron was touched
+
+Evaluated as a matrix over the shipped expressions (live probe read returned `epa_ok = false`):
+
+| case | write allowed | flag written |
+|---|---|---|
+| EPA down · fresh · fac>0 → 0 | **refused** | — |
+| EPA down · **old** · fac>0 → 0 (the cliff) | **refused** | — |
+| EPA down · fresh · fac>0 → fac>0 | allowed | false |
+| EPA down · old · fac>0 → fac>0 | allowed | false |
+| EPA down · cached 0 · payload 0 | allowed | **true** |
+| EPA ok · fresh · fac>0 → 0 (transient) | **refused** | — |
+| EPA ok · old · fac>0 → 0 (real delisting) | allowed | false |
+| EPA ok · fac>0 → fac>0 | allowed | false |
+
+A guard that only ever blocked would freeze every honestly-emptied page forever; rows 3, 4, 5 and 7
+are what prove it does not.
+
+## AC4. Known and accepted
+
+The Montgomery #663 fix still lands on only **4 of 38** pages (56 of 1,675 records) while EPA is
+down — the whole-row refusal is unchanged, and advancing development while preserving cached
+facilities is a partial-write design that is deliberately out of scope. The other 34 pages land when
+FRS returns.
