@@ -44,6 +44,23 @@ ok(/order by p\.probed_at desc/.test(sql) && /limit 1/.test(sql),
 ok(/\(not epa_ok or d\.refreshed_at >= now\(\) - interval ''7 days''\)/.test(sql),
   'facilities clause is (probe-failing OR row-fresh) — reverting to age-only fails here');
 
+// ── the probe must AND ALL TARGETS, never "whichever resolved last" ───────────
+// epa_frs_probe_tick() fires two points on purpose (sheridan-rural r=3,
+// atlanta-dense r=1) because FRS fails density-dependently. A single-row read is
+// harmless during a total outage and load-bearing at RECOVERY: rural answers first,
+// epa_ok flips true, and every dense page past 7 days writes a zero with the flag
+// false. That is the regression this block exists to catch.
+ok(/distinct on \(target\)/.test(sql),
+  'the probe read takes the LATEST ROW PER TARGET, not the latest row overall');
+ok(/bool_and\(t\.ok\)/.test(sql),
+  'EVERY target must be healthy — bool_and across targets, not any-one-target');
+ok(/count\(\*\) > 0/.test(sql),
+  'an empty probe set is NOT health — count(*) > 0 is required before bool_and');
+ok(/max\(t\.resolved_at\) > now\(\) - interval ''60 minutes''/.test(sql),
+  'a STALE signal is refused — without the bound, a stopped job 16 would OPEN the guard');
+ok(!/order by p\.probed_at desc\\n'/.test(sql) || /single-target probe read not found verbatim/.test(sql),
+  'the single-target read survives only as the step-2 anchor being replaced, never as the shipped form');
+
 // ── fail-closed: every degenerate probe state means "EPA is failing" ───────────
 ok(/select coalesce\(/.test(sql) && /\bfalse\)\\n'/.test(sql) && /into epa_ok/.test(sql),
   'the probe read is select coalesce(..., false) into epa_ok — NULL / no rows / empty table all read as failing');
@@ -59,8 +76,8 @@ ok(/else false/.test(sql),
 // ── the clauses this migration must NOT touch ─────────────────────────────────
 // The migration must edit EXACTLY the three things it claims to. A fourth replace()
 // — or a silent rewrite of the development / both-zero / blocked clauses — fails here.
-ok((sql.match(/nd := replace\(src, anchor, repl\);/g) || []).length === 3,
-  'the migration performs exactly three textual replacements, no more');
+ok((sql.match(/nd := replace\(src, anchor, repl\);/g) || []).length === 4,
+  'the file performs exactly four textual replacements — three in step 1, one in step 2');
 ok(/LEFT UNCHANGED ON PURPOSE[\s\S]*development-dimension clauses[\s\S]*both-dimensions-zero clause[\s\S]*`blocked` refusal/.test(sql),
   'the migration names the clauses it does not touch: development, both-zero, and the per-source blocked refusal');
 ok(/no `explained` escape is added to the facilities clause/i.test(sql) ||
@@ -68,10 +85,14 @@ ok(/no `explained` escape is added to the facilities clause/i.test(sql) ||
   'no `explained` escape is introduced on the facilities clause (FRS is not a registry source)');
 
 // ── every edit is anchor-asserted, never a blind restatement of the body ──────
-ok((sql.match(/refusing to patch blind/g) || []).length >= 3,
+ok((sql.match(/refusing to patch blind/g) || []).length >= 4,
   'all three textual edits assert their anchor verbatim before replacing it');
 ok(/pg_get_functiondef/.test(sql),
   'the body is read from the live catalog, not transcribed from memory');
+
+// ── the known residual stays written down, so recovery does not rediscover it ─
+ok(/NATIONAL PROXY/.test(sql) && /frs_report/.test(sql),
+  'the two-point-proxy residual and its durable fix (per-page frs_report) are recorded in the SQL of record');
 
 // ── the client must still never infer the flag from a count ───────────────────
 ok(/facilities_unavailable/.test(copyTest),

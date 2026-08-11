@@ -114,3 +114,79 @@ end $do$;
 -- `explained` escape is added to the facilities clause — `explained` means a
 -- RETIRED REGISTRY SOURCE stopped being reported, and FRS is not a registry
 -- source, so it could never legitimately explain a facilities drop.
+
+-- ============================================================================
+-- STEP 2 — the probe read must AND ALL TARGETS and refuse a STALE signal.
+-- Applied 2026-08-11 as migration `dev_refresh_collect_epa_probe_both_targets`,
+-- minutes after step 1 and before #664 merged. Step 1 above is left as applied
+-- so this file replays the real sequence; running the file top to bottom
+-- produces the final state.
+--
+-- DEFECT IN STEP 1. It read ONE row — `order by probed_at desc limit 1` — which
+-- takes whichever target resolved most recently and discards the other.
+-- `epa_frs_probe_tick()` fires TWO points on purpose, because FRS fails
+-- density-dependently: `sheridan-rural` (44.7973 / -106.9562, r=3) and
+-- `atlanta-dense` (33.7490 / -84.3760, r=1). Harmless during a total outage
+-- (0 of 382 resolved probes OK), load-bearing at RECOVERY: if the rural point
+-- answers first, epa_ok flips true while dense pages are still failing, every
+-- dense page past 7 days makes both sides of the OR false, and the zero writes
+-- through with the flag FALSE. Silent zeros at scale, at the one moment nobody
+-- is watching.
+--
+-- STALENESS BOUND. Without it epa_ok holds whatever the probe last said,
+-- indefinitely — so if job 16 ever stops, the guard OPENS rather than closes.
+-- An instrument must prove it RAN before its silence counts as evidence.
+-- ============================================================================
+
+do $do$
+declare src text; nd text; anchor text; repl text;
+begin
+  select pg_get_functiondef(p.oid) into src
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'dev_refresh_collect';
+  if src is null then raise exception 'dev_refresh_collect not found'; end if;
+
+  anchor := E'  -- EPA FRS health, read once per collect from the probe cron (job 16).\n'
+         || E'  -- FAIL-CLOSED: false / NULL / no resolved probe all mean "failing".\n'
+         || E'  select coalesce(\n'
+         || E'           (select p.ok from public.epa_frs_probes p\n'
+         || E'             where p.resolved_at is not null\n'
+         || E'             order by p.probed_at desc\n'
+         || E'             limit 1),\n'
+         || E'           false)\n'
+         || E'    into epa_ok;';
+  if position(anchor in src) = 0 then
+    raise exception 'single-target probe read not found verbatim — refusing to patch blind';
+  end if;
+
+  repl := E'  -- EPA FRS health, read once per collect from the probe cron (job 16).\n'
+       || E'  -- EVERY target must be healthy, not whichever resolved last. epa_frs_probe_tick()\n'
+       || E'  -- fires two points on purpose because FRS fails density-dependently\n'
+       || E'  -- (sheridan-rural r=3, atlanta-dense r=1). A last-row read would flip epa_ok true\n'
+       || E'  -- the moment the rural point recovered, while dense pages were still failing.\n'
+       || E'  -- STALENESS BOUND: a signal older than 60 minutes is NOT evidence of health. Without\n'
+       || E'  -- it, epa_ok would hold whatever the probe last said indefinitely, so a stopped job 16\n'
+       || E'  -- would OPEN the guard instead of closing it.\n'
+       || E'  -- FAIL-CLOSED: no rows, any false, or a stale newest all resolve to false.\n'
+       || E'  select coalesce(\n'
+       || E'           (select count(*) > 0\n'
+       || E'                   and bool_and(t.ok)\n'
+       || E'                   and max(t.resolved_at) > now() - interval ''60 minutes''\n'
+       || E'              from (select distinct on (target) target, ok, resolved_at\n'
+       || E'                      from public.epa_frs_probes\n'
+       || E'                     where resolved_at is not null\n'
+       || E'                     order by target, probed_at desc) t),\n'
+       || E'           false)\n'
+       || E'    into epa_ok;';
+
+  nd := replace(src, anchor, repl);
+  if nd = src then raise exception 'probe read patch produced no change'; end if;
+  execute nd;
+end $do$;
+
+-- RESIDUAL, LOGGED NOT BUILT: two probe points are a NATIONAL PROXY. A partial
+-- FRS recovery that answers Sheridan and Atlanta while failing elsewhere still
+-- gets through. The durable fix is the one docs/accuracy-audit-2026-08.md §V2
+-- names and deliberately does not build: have the engine emit an `frs_report`
+-- carrying ok:false on retry exhaustion, and refuse on that PER-PAGE evidence
+-- instead of on a global proxy.
