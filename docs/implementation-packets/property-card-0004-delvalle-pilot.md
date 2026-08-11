@@ -27,9 +27,12 @@ here almost verbatim. What is corrected:
 | display TCAD owner of record, Property ID 292354, Geographic ID 0315600221, acreage 36.474, class E1 | **None of it exists as data.** `tx_parcels` = 0 rows. Those values appear only as prose in `docs/multi-source-evidence-architecture.md`, each marked `[NOT IN SYSTEM]`. "E1" appears nowhere at all |
 | "Phase 7 found no defensible facility-on-parcel claim" | The **conclusion is correct** (`parcel_id` is null on all 66 `property_company_roles` rows), but it is not from a "Phase 7" — Part 31 Phase 7 is the unstarted TCAD/Clerk adapter work |
 
-**Table counts have also drifted from the architecture audit.** `identity_conflicts` is 0 today (audit
-said 39); `echo_violation_counts` is 0 (audit said 3). **Re-measure before relying on any count in
-that document.**
+**Counts in the documentation have drifted, and the docs disagree with each other.** Measured today:
+`identity_conflicts` is **0**, where the audit's Part 19 row says 4. `echo_violation_counts` is **0**,
+which matches Part 19 but contradicts `CLAUDE.md`, which says *"near-empty (3 rows, 0 with
+violations)"*. **Re-measure every count before relying on it, and cite the measurement, not the
+document.** (Two numbers in an earlier revision of this brief were themselves wrong — 39 is
+`frs_affiliation_role_map`, not `identity_conflicts` — which is the hazard, first-hand.)
 
 ---
 
@@ -115,9 +118,9 @@ page cannot treat a phone number as consumer-safe while the other treats it as p
 
 ## 2. What already exists — DO NOT REBUILD IT
 
-`property-card.html`, `lib/property-card.js`, and `docs/property-card-redesign.md` already ship (see
-the branch/PR that added them). **Read `docs/property-card-redesign.md` in full before writing
-anything.** Already built and tested:
+`property-card.html`, `lib/property-card.js`, and `docs/property-card-redesign.md` already ship (added
+in **PR #666**, `cursor/property-card-redesign-80bc`). **Read `docs/property-card-redesign.md` in full
+before writing anything.** Already built and tested:
 
 - The full-card layout: header, meta chips, the eight-tab strip, the two-column body with the
   ownership/development rail, the completeness ring, the footer disclaimer.
@@ -200,10 +203,30 @@ track_record_checks  WHERE subject ~ neuralink|river        ->  4 rows,
     all agency=TCEQ, dataset="Central Registry", subject_kind="company", result_count=0
 ```
 
-**So the honest Caldwell card is:** TCEQ = *Checked — no records found* (a receipted zero, checked
-2026-08-09, with `query_basis` and `source_url`) · EPA FRS = *Checked — no records found* at the
-address · EPA ECHO, OSHA, SEC, State/Local = *Not checked* · 5 real TDLR filings · everything else
-*Not checked*.
+### ⚠ Read the dataset, not just the agency — the TCEQ row is `partial`, not `checked_empty`
+
+The four TCEQ check rows are all `dataset = "Central Registry"`. That is a **registry-presence**
+query: *does this company have regulated entities on file?* Answer: none.
+
+TCEQ's **enforcement** datasets are checked in the same table — `Notices of Violation` (4 rows) and
+`Notices of Enforcement` (2 rows) — but every one of those has `subject_kind = 'facility'` and belongs
+to a TXI facility. **TCEQ enforcement has never been checked for the pilot companies.**
+
+So a single row reading "TCEQ — Checked, no records found" would assert an enforcement check that did
+not happen. The honest rendering is either:
+
+- **`partial`** on the TCEQ row, with the sub-detail naming which dataset was checked and which was
+  not, or
+- two rows: *TCEQ Central Registry — checked, no records found* and *TCEQ enforcement — not checked*.
+
+**This is the pilot's one live example of `partial`**, and it is the case that proves the state earns
+its place in the vocabulary. Derive per-agency state from **(agency, dataset)**, never from agency
+alone — an agency with several datasets is `partial` when only some were queried.
+
+**So the honest Caldwell card is:** TCEQ = ***Partial*** (Central Registry checked and empty on
+2026-08-09 with `query_basis` and `source_url`; enforcement not checked) · EPA FRS = *Checked — no
+records found* at the address · EPA ECHO, OSHA, SEC, State/Local = *Not checked* · 5 real TDLR
+filings · everything else *Not checked*.
 
 **Ten of twelve modules will read "Not checked," and the flagship Entity Track Record will contain
 zero measured events.** That is the correct output, and the draft's illustrative "14 violations /
@@ -223,6 +246,8 @@ Everything about the *state machinery*, which is the hard and novel part:
 
 - a **receipted `checked_empty`** — TCEQ Central Registry, checked 2026-08-09, `result_count = 0`,
   with `query_basis` and `source_url` to show for it
+- a **real `partial`** — the same agency's enforcement datasets were never queried, so the TCEQ row
+  cannot claim a clean enforcement check (§3)
 - a **`not_checked` that never renders a zero** — EPA ECHO, OSHA, SEC, State/Local
 - an **absent parent** rendering as "No verified parent company established"
 - an **unresolved parcel** — every TCAD field "Not checked", with owner-of-record never borrowing an
@@ -309,11 +334,14 @@ current card does, and it is why every agency reads "Not checked").
                       └─────────────────────────────────────────────────────────┘
 ```
 
-Per-agency state is derived from `track_record_checks` joined on `subject_key`/`subject_kind`:
+State is derived from `track_record_checks` joined on `subject_key`/`subject_kind`, **per (agency,
+dataset)** — not per agency, for the reason in §3:
 
 - a check row with `result_count > 0` → **records found**
-- a check row with `result_count = 0` → **checked, no records found** (this is what Caldwell has)
+- a check row with `result_count = 0` → **checked, no records found**
 - **no check row at all** → **not checked** (Part 12's definition: row absent *is* the state)
+- some of an agency's datasets checked and others not → **partial** (this is what Caldwell's TCEQ row
+  is, and it is why the agency-level rollup must be computed from dataset-level states)
 
 Counts come from `company_track_events`, split by `attribution` (`direct_company` vs
 `parent_company`) so the two modules never mix. **`penalty_amount` is null on 59 of 61 rows** — the
@@ -323,14 +351,19 @@ penalty metric must render an em-dash for those, not `$0`.
 
 `property_company_roles.project_id` and `project_facility_refs.project_id` are **`app_projects.id`**,
 which `app_refresh_zip` regenerates by delete-and-insert. The stable-key fix is Part 31 Phase 0 and
-is **not merged**. I verified all 5 Property Owner rows and 3 facility refs resolve **today**:
+is **not merged**. All 5 Property Owner rows and the 3 facility refs sampled resolve **today**
+(2026-08-11):
 
 ```
 487a359b… -> TXI - GARFIELD SAND & GRAVEL        (78617)
 1faf7b33… -> TXI - GARFIELD SAND & GRAVEL PLANT  (78617)
+d0e48fdd… -> BFI RECYCLING CENTER MANOR          (78617)
 <5 roles>  -> River Bottoms Ranch Barn 2 / Barn 2 ACT Office / ATX1 Third Floor TI /
               ATX1 New Construction / Histology Lab   (all 78617)
 ```
+
+Sampled, not exhaustive — 3 of 33 `project_facility_refs` were checked. The preflight below must
+cover every row the pilot actually reads.
 
 They can break on the **next ZIP refresh**. Requirements:
 
@@ -386,9 +419,11 @@ Do not half-build (b) and leave the verifier asserting (a).
 Keep the draft's §9, §10, §12, §13, §14, §19, §21, §26, §29 **as written** — they are correct. Apply
 these corrections:
 
-- **Entity Track Record.** Read the join path in §5, not `sources_checked`. Split direct from parent
-  by `attribution`. Render the receipt behind a disclosure: `query_basis`, `checked_at`, `source_url`
-  from `track_record_checks` — that receipt is what makes "checked, no records found" believable.
+- **Entity Track Record.** Read the join path in §5, not `sources_checked`. State is per **(agency,
+  dataset)** and the agency row is a rollup of those (§3) — the pilot's TCEQ row is `partial`, not a
+  clean empty. Split direct from parent by `attribution`. Render the receipt behind a disclosure:
+  `query_basis`, `checked_at`, `source_url` from `track_record_checks` — that receipt is what makes
+  "checked, no records found" believable, and it is also what shows *which dataset* was checked.
 - **Parent Company.** Only `company_parents.verification = 'verified'`. The `unverified_candidate`
   row is marked "HOLD" in the data; honour it. For Caldwell the answer is
   **"No verified parent company established."**
@@ -463,6 +498,10 @@ by a code change.
 The draft's §33 list is good. Add:
 
 - an orphaned `project_id` renders `unavailable`, **never** `checked_empty`
+- **an agency with one dataset checked and another unchecked renders `partial`, never
+  `checked_empty`** — assert this on the pilot's real TCEQ rows (Central Registry empty, enforcement
+  absent), because the naive agency-level rollup produces a clean-looking "no records found" that
+  claims an enforcement check nobody ran
 - `penalty_amount = null` renders an em-dash, never `$0`
 - a `checked_empty` from `track_record_checks` renders a real `0` **and** exposes its receipt
 - `attribution='parent_company'` events never appear in the direct-entity counts, and vice versa
