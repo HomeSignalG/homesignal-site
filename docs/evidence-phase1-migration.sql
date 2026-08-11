@@ -1588,3 +1588,72 @@ create schema if not exists evidence;
 -- SECURITY: 0 references to sec.gov in any shipped HTML/JS. stage_sec_pdf, stage_sec_lr_body,
 --   sec_pdf_work_list, sec_lr_work_list, sec_pdf_representative_set and ev_track_record are
 --   all anon EXECUTE/SELECT false, service_role true.
+
+-- ============================================================================
+-- PHASE 9F — SEC EXTRACTION REGRESSION HARDENING. STATUS: NOT GREEN. 5 assertions failing.
+--
+-- The golden-fixture suite was built and it WORKED: it found five real defects in the
+-- Phase 9E money extractor, two of which I introduced while fixing the others. That is the
+-- suite doing its job. It is not yet a lock, because 5 of 81 assertions currently fail.
+--
+-- OBJECTS: evidence.ev_sec_golden_fixture (17 documents, expectations verified against each
+-- order's own text), evidence.ev_phase9f_check_fixtures() (field-by-field, never aggregate),
+-- evidence.ev_phase9f_mutations() (M1..M8).
+--
+-- ── FIVE DEFECTS FOUND BY FIXTURE-BUILDING ──────────────────────────────────────────
+-- 1. PHRASE SELECTION IGNORED OWNERSHIP. ev_relief_phrase returned the FIRST occurrence;
+--    ownership was judged afterwards. IC-33534 therefore reported prejudgment interest NULL
+--    from the combined-total sentence, although the order states "prejudgment interest of
+--    $307,619" later. Fixed: choose the first candidate that PASSES ownership.
+-- 2. TRAILING GUARD TOO COARSE (introduced by fix 1). 34-98118 regressed to 28,104 — its
+--    INTEREST figure — because an unrelated later '$' satisfied the guard. Narrowed to
+--    "does the FOLLOWING relief have its own figure".
+-- 3. CAPTURE GROUPS IN THE GUARD PATTERN (introduced by fix 2). substring(x from pat ||
+--    '(.{0,40})') returns the FIRST group, and pat itself had groups — so the guard read the
+--    keyword instead of the text after it and rejected every following-relief case.
+--    Non-capturing groups throughout.
+-- 4. "civil penalty" vs "civil MONEY penalty". Both the extraction keyword and all guards
+--    knew only the longer form. MEASURED: 857 documents use ONLY the bare form (their
+--    penalties were never extracted), and 624 interest phrases + 914 disgorgement phrases
+--    contain it (so the guard could not see a neighbouring penalty). Widened to
+--    'civil (?:money |monetary )?penalt'. Civil penalties 1,710 -> 2,212.
+-- 5. AN AMOUNT BINDS TO A FOLLOWING RELIEF. 33-11363: "disgorgement, $8,924 in prejudgment
+--    interest, and a $60,000 civil penalty" read disgorgement = 8,924. Added: "$X in|of|as
+--    <other relief>" means X is that relief's.
+--
+-- ⚠️ AND A FIXTURE OF MINE WAS WRONG. 33-10339's expected civil_penalty_state was written as
+-- 'not_stated' by copying the EXTRACTOR's output rather than reading the order, which is the
+-- circular expectation this phase forbids. The order says "civil penalty." with no figure,
+-- so 'stated_without_amount' is correct. The fixture was corrected, not the code.
+--
+-- ── STILL FAILING (5 of 81), NOT WORKED AROUND ──────────────────────────────────────
+--   33-11363  civil_penalty_amount expected 60000, actual NULL
+--   33-11363  civil_penalty_state  expected stated_with_amount, actual stated_without_amount
+--   33-11363  prejudgment_interest_amount expected 8924, actual NULL
+--   33-11363  prejudgment_interest_state  expected stated_with_amount, actual stated_without_amount
+--   33-10371  disgorgement_amount expected 515188.59, actual 515188 (cents lost)
+-- Defect 5's binding rule is correct for the disgorgement bucket but over-fires on the
+-- penalty and interest buckets of the same sentence, and a phrase-window change dropped the
+-- cents on 33-10371. These are recorded as FAILING rather than by relaxing the expectations
+-- to match the code — the expectations are what the documents say.
+--
+-- ── MUTATIONS (M1..M8) ──────────────────────────────────────────────────────────────
+--   M1 max-amount-instead-of-local   NOT CAUGHT at first — a genuine gap in the fixture set,
+--                                    closed by adding 33-11363, whose largest phrase amount
+--                                    ($60,000) and nearest amount ($8,924) are BOTH wrong
+--   M2 reject-relief-if-another-follows   CAUGHT (9 assertions)
+--   M3 capture-adjacent-amount            CAUGHT (4)
+--   M5 tax-administrator-as-substantive   CAUGHT (5, incl. 34-100066.is_substantive)
+--   M6 criminal-docket-as-civil           CAUGHT (21-cr-04587 -> 21-cv-04587)
+--   M8 without-admitting-as-admission     CAUGHT (7 documents corrupted)
+--   M4 (footer absorption) and M7 (parent money folded into direct) are covered by the
+--   existing Phase 9E tests (F9 offline, F6 in-database) and were not re-implemented here.
+--
+-- ── CORPUS AFTER 9F CORRECTIONS (invariants that MOVED, with reasons above) ──────────
+--   AP 6,077 · native 6,073 · unavailable detail 4 · LR 2,795 · footer pollution 0
+--   pairs 46 · merges 22 · related_but_distinct 1 · unrelated 23 · unresolved 0
+--   civil penalties 1,710 -> 2,212   (defect 4: bare "civil penalty" form)
+--   disgorgement    1,077 -> 1,107   (defects 1,2,3,5)
+--   prejudgment int   734 -> 1,071   (defect 1, mainly)
+--   other relief      244 ->   245
+--   disgorgement == prejudgment interest collisions: 0
