@@ -267,3 +267,46 @@ create schema if not exists evidence;
 --   Denver 18581 E 50th Ave -> 80239, because its true ZIP 80249 is NOT modeled
 --   (0 rows in development_reports) — an honest nearest-neighbour fallback, ~4 mi.
 -- The full card still comes from public.ev_property_card() and loads only on user intent.
+
+-- ============================================================================
+-- PHASE 6 ADDITIONS (2026-08-10) — authoritative ZIP placement. Migrations:
+-- evidence_phase6_authoritative_zip_assignment, evidence_phase6_evidence_only_zip_routing
+-- ============================================================================
+-- AUDIT: HomeSignal has NO ZIP/ZCTA polygon table. The only geometry tables are
+--   evidence.ev_claim_geometry (2 parcel polygons) and public.resolved_project_parcels
+--   (0 rows). So parcel-polygon vs ZIP-polygon containment could not be answered locally.
+--   Containment is therefore answered by the boundary authority itself — the US Census
+--   geocoder geographies endpoint — computed ONCE per parcel and stored, never per page
+--   and never per feed card.
+-- ⚠️ ZCTA IS NOT A USPS ZIP. A ZIP Code Tabulation Area is the Census Bureau's areal
+--   approximation of a USPS delivery ZIP. Correct for "which community geography contains
+--   this parcel"; it is never labelled "USPS verified".
+--
+-- PREDICATES (§9 — the two ZIPs stay separate facts, so they can corroborate):
+--   located_in_zip    spatial containment, authoritative, fact_kind='resolved'
+--   has_reported_zip  the ZIP the property source itself printed in its situs string
+--
+-- METHOD: ST_PointOnSurface of the parcel's OWN authoritative polygon (deterministic, and
+--   guaranteed to lie inside the polygon) resolved against the boundary authority.
+--   Boundary vintage stored on every claim (Census2020_Current). Recomputable.
+-- CROSS-BOUNDARY RULE (§7): the ZCTA containing the representative point wins. It is
+--   deterministic and never depends on row order. Area-overlap weighting is not possible
+--   without a local ZIP polygon table and is NOT silently approximated.
+-- FALLBACK HIERARCHY (§24), validated against the real pilot data:
+--   1. located_in_zip   (both pilots have it)
+--   2. has_reported_zip (Travis only — Denver's SITUS_ZIP is null, so none was invented)
+--   3. otherwise unresolved. No nearest-neighbour tier at any level.
+--
+-- nearest-modeled-centroid is GONE as a placement rule. A parcel with no assignment is
+--   simply not discoverable, rather than shown in a neighbouring ZIP as if that were fact.
+--
+-- MEASURED: Denver 0015300060000 -> ZCTA 80249 (was 80239). Travis 292354 -> ZCTA 78617
+--   (unchanged control). ev_evidence_available('80239') now returns 0.
+--
+-- EVIDENCE-ONLY ZIP (§11): 80249 became routable as PURE DATA — one communities row, like
+--   every other ZIP page. NO development_reports row is fabricated and no
+--   app_community_meta is invented.
+-- public.ev_zip_is_routable(zip) — GENERIC routability. No ZIP is named in code.
+--   Returns routable + has_evidence + development_coverage ∈ {modeled, not_yet_available}.
+--   §13: an unmodeled ZIP has UNKNOWN development coverage and must never render as a
+--   verified negative ("no development found").

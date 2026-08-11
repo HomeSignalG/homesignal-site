@@ -31,6 +31,7 @@
 .hs-ev-open:hover{background:#eef3fa}
 .hs-ev-open:focus-visible{outline:2px solid #274b7d;outline-offset:2px}
 .hs-ev-panel{flex:1 1 100%;margin-top:10px}
+.hs-ev-cov{font-size:12.5px;color:#67717c;background:#fff;border:1px dashed #dfe3e8;border-radius:8px;padding:8px 10px;margin:0 0 10px}
 .hs-ev-panel .hs-ev-card{max-width:none}
 @media (max-width:430px){
   .hs-ev-teaser{gap:8px;padding:10px}
@@ -53,16 +54,29 @@ window.HS_EVIDENCE_CARD = (window.HS_EVIDENCE_CARD !== false);
     if (!c) return Promise.resolve([]);
     // ONE call for the whole page. Non-pilot ZIPs return [] and nothing is rendered:
     // no heading, no placeholder, no second request.
-    return c.rpc('ev_evidence_available', { _zip: String(zip) })
-      .then(function (r) {
+    // One batched call still: routability carries both the availability rows and the
+    // coverage state, so no extra round trip is introduced.
+    return c.rpc('ev_zip_is_routable', { _zip: String(zip) })
+      .then(function (rt) {
+        var info = (rt && rt.data) || {};
+        var cov = info.development_coverage;
+        if (!info.has_evidence) return [];
+        return c.rpc('ev_evidence_available', { _zip: String(zip) }).then(function (r) {
         var rows = (r && r.data) || [];
         if (!rows.length) return [];
         mountEl.innerHTML =
           '<div class="groupHead"><span class="gd" style="background:#3f7fb0"></span> Property records'
           + ' <span class="gc">— county land records for properties in this ZIP</span></div>'
-          + rows.map(window.HS.EvidenceCard.renderTeaser).join('');
+          + rows.map(window.HS.EvidenceCard.renderTeaser).join('')
+          // §13 A ZIP the development pipeline has never modeled has UNKNOWN coverage.
+          // Never render that as "we checked and found nothing."
+          + (cov === 'not_yet_available'
+              ? '<p class="hs-ev-cov">Development coverage is not yet available for this ZIP. '
+                + 'That is different from having checked development sources and found nothing.</p>'
+              : '');
         mountEl.hidden = false;
         return rows;
+        });
       })
       .catch(function () { return []; });   // never block the community page
   };
