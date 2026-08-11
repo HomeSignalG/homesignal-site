@@ -487,6 +487,65 @@ is a real timestamp; TABS filings carry dates). Otherwise say nothing about the 
 
 ---
 
+## 6.1 THE DECISION TABLE — what to render when you cannot populate something
+
+**Use this for every empty slot.** Work down the questions in order and take the first that applies.
+`<X>` is the source name as a resident would recognise it.
+
+| # | Ask | Then the state is | Metric renders | Sentence pattern |
+|---|---|---|---|---|
+| 1 | Did a read we performed **fail** (HTTP error, timeout, parse failure)? | `unavailable` | `—` | "The `<X>` source was unavailable during the latest check, so its records are unknown." |
+| 2 | Does the source **exist but refuse** automated access (403, login wall, robots restriction)? | `access_restricted` | `—` | "`<X>` does not permit automated access, so its records cannot be read." |
+| 3 | Is the **join broken** — a `project_id` or `company_key` that no longer resolves (§5)? | `unavailable` | `—` | "This property's link to `<X>` could not be resolved, so its records are unknown." **Never `checked_empty`.** |
+| 4 | Is the source **being built** and genuinely not queryable yet, on the record? | `in_progress` | `—` | "`<X>` is being connected and is not queryable yet. No result is implied." Only if a **written** commitment exists — otherwise use row 6. |
+| 5 | Were **some of the source's datasets** checked and others not (§3)? | `partial` | `—` at agency level; real values per checked dataset | "`<X>` records are partially available: `<dataset A>` was checked, `<dataset B>` was not. Coverage is incomplete." |
+| 6 | **No check exists at all** for this source and subject? | `not_checked` | `—` | "`<X>` records have not been checked for this property. This is a gap in our research, not a finding." |
+| 7 | Was it checked and did it return **nothing**? | `checked_empty` | **real `0`** | "No `<X>` records were identified for this property in the source checked." Show the receipt: `checked_at`, `query_basis`, `source_url`. |
+| 8 | Did it return records, from a **register of record**? | `verified` | real values | "`<X>` records show `<n>` `<thing>` associated with `<subject>`." |
+| 9 | Did it return records that are **as-filed assertions** (a permit, an application)? | `reported` | real values | "`<n>` `<thing>` as filed with `<X>`. Values are as stated by the filer." |
+| 10 | Do **two sources contradict** each other? | `conflicting` | both values, both attributed | "`<X>` and `<Y>` disagree on `<field>`. Both are shown with their sources." Never silently pick one. |
+| 11 | Do records exist but **resolve to no single answer**? | `unresolved` | `—` | "`<X>` records exist but do not resolve to one answer, so none is presented as the answer." |
+
+### The two cases the state vocabulary does NOT cover
+
+These are a **different axis** from coverage, and conflating them with `not_checked` is a factual
+error — it claims we failed to look at something we did in fact read.
+
+**(a) A field the record does not state.** We have the record; the record is silent on this field.
+`CLAUDE.md` §8 is explicit: *"A field the source page doesn't state is not on the site object. Never
+default, never infer, never interpolate."*
+
+- Render **"Not stated on the record"** (or omit the row entirely), **never "Not checked"**.
+- **Exclude it from Data Completeness.** A field a source chose not to publish is not a gap in our
+  research, and counting it as one would misstate our coverage in the pessimistic direction.
+- **The pilot has exactly one instance**, measured: `contact_name` is absent on `TABS2023006449` and
+  `TABS2024016698` and present on the other three. Every other field is populated on all five
+  filings — so the pilot is a *weak* test of this rule, and the one gap it does have is in a field
+  **Q4 excludes from the card anyway**.
+- That makes the rule forward-looking rather than pilot-proven: it will bite the moment a source with
+  patchy fields lands (a TCAD parcel with no classification, a recorder instrument with no date).
+  Cover it by fixture rather than pretending the pilot exercises it.
+
+**(b) A metric that is not derivable from records we do have.** The source returned records, but this
+particular number is not among them.
+
+- The gate already handles the value: `HS.card.metricText('verified', NaN)` → `—`.
+- **But an em-dash beside "Penalties" reads as zero to a careless reader**, so it needs words:
+  "`<X>` returned records but no penalty figure." The pilot's live case is exactly this —
+  `penalty_amount` is null on 59 of 61 `company_track_events` rows.
+
+### Copy that is forbidden in every empty state
+
+Never render, for anything that was not actually checked and found empty: **"No violations"** ·
+**"None"** · **"Clean"** · **"0"** · **"No known issues"** · **"Compliant"** · **"No risk"** ·
+**"Up to date"** · a green tick · a reassuring colour.
+
+The rule behind all of them: **absence of evidence renders as absence of evidence.** A resident must
+never be able to read "we have not looked" as "there is nothing to find" — and every phrase above
+invites exactly that read.
+
+---
+
 ## 7. Layout — decide before building, do not discover during
 
 The draft prescribed a persistent map at 25–30% beside a card at 70–75%. **That conflicts with a
@@ -609,6 +668,13 @@ The draft's §33 list is good. Add:
 - **no internal field leaks**: `needs_review`, `match_type`, `matched_address`, `geocode_source`,
   `rel_rule`, `layer`, `e`, `n`
 - a connection is described without printing the personal value that produced it (§4.2)
+- **a field absent from a record we DO have renders "Not stated on the record", not "Not checked"**,
+  and does not count toward Data Completeness (§6.1 case a). The pilot's only real instance is a field
+  Q4 excludes, so **assert this by fixture**, not against the pilot row
+- **a non-derivable metric carries words, not just an em-dash** (§6.1 case b) — assert that a
+  `penalty_amount` of null produces a sentence saying records were returned but no penalty figure
+- none of the forbidden empty-state phrases (§6.1) appears anywhere in the rendered card: no
+  "No violations", "None", "Clean", "No known issues", "Compliant", "No risk"
 
 Then run `node scripts/run-unit-tests.mjs --offline --min-files=75`. **Use Node ≥ 22.18** — on 22.14
 fifteen suites fail on TypeScript type-stripping alone and it looks like your change broke them.
