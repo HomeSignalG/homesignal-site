@@ -1199,3 +1199,78 @@ create schema if not exists evidence;
 -- omission in building the table, not a gap in the data: ev_sec_release.file_number is
 -- '3-18377' and the PDF's own caption reads "ADMINISTRATIVE PROCEEDING File No. 3-18377".
 -- 146 of 6,077 AP rows do have a NULL file_number; IA-4857 is not one of them.
+
+-- ============================================================================
+-- PHASE 9E §6/§10 — WHAT THE ORDER TEXT ACTUALLY SAYS, MEASURED ON 77 STAGED DOCUMENTS.
+-- Representative set: 77 distinct documents (36 stratified across release-type x year for
+-- 2017-2026, 41 AP orders behind all 46 §10 pairs), 77/77 native_text, 0 acquisition
+-- failures, 1,058,621 characters. Defined as the view public.sec_pdf_representative_set so
+-- the sample is reproducible rather than a hand-copied list.
+--
+-- ── §7/§8/§9 LANGUAGE CENSUS (77 docs) — the basis for any normalisation rule ─────────
+--   ORDER INSTITUTING ...            53    MAKING FINDINGS             67
+--   NOTICE OF HEARING                 3    Offer of Settlement         20
+--   without admitting or denying     38    "consented to the entry"     1
+--   ordering clause                  72    willfully violated           9
+--   cease-and-desist                 23    disgorgement                58
+--   civil money penalty              18    prejudgment interest        14
+--   Rule 102(e)                       8    Section 12(j)                3
+--   bar or suspension                49    Fair Fund / distribution    10
+-- Note "consented to the entry" appears ONCE in 77 while "without admitting or denying"
+-- appears 38 times: settlement posture must be detected on the SECOND phrase, not the
+-- first. A rule fitted to the phrase a lawyer expects would have found 1 of 38 settlements.
+--
+-- ── §10: THE RESOLUTION MECHANISM IS THE DOCKET, NOT THE LITIGATION RELEASE NUMBER ───
+-- The obvious plan — read the AP order, find the Litigation Release it cites — DOES NOT
+-- WORK, and the measurement says so unambiguously:
+--     "Litigation Release" appears in 0 of 77 documents, and 0 of the 41 pair orders.
+-- What the 41 pair orders DO carry:
+--     United States District Court   41/41      "SEC v. ..." caption   25/41
+--     Final Judgment                 27/41      injunction entered     32/41
+--     the label "Civil Action No"     3/41
+-- So the join key is the CASE — court + docket number — recovered from the order's prose,
+-- not from a label. Worked end to end on a real pair:
+--     AP  34-103479 : "... Markan, Civil Action Number [3:25-cv-01653-X], in the United
+--                      States District Court for the ..."
+--     LR  26337     : "Securities and Exchange Commission v. Rajesh Markan, No.
+--                      3:25-cv-01653 (N.D. Tex. filed June 27, 2025)"
+-- Same case, differing only by the judge-initial suffix. THAT is an identifier match, and
+-- it is what §7's ban on merging by name-and-date was protecting against.
+--
+-- ── AND THE LITIGATION-RELEASE SIDE IS AVAILABLE, WHICH 9D DID NOT ESTABLISH ─────────
+-- ev_sec_release carries NO doc_url for litigation releases and no docket — only a name and
+-- a landing URL. But an LR LANDING PAGE IS NOT A STUB. This is an asymmetry, and it is the
+-- opposite of what 9D found for administrative proceedings:
+--     AP landing page (34-106074) — 66,436 bytes, NO order text, one .pdf link. A stub.
+--     LR landing page (LR-26337)  — 66,677 bytes, and at byte 51,817 the RELEASE BODY:
+--       "Litigation Release No. 26337 / June 27, 2025 | Securities and Exchange Commission
+--        v. Rajesh Markan, No. 3:25-cv-01653 (N.D. Tex. filed June 27, 2025) | SEC Charges
+--        Former Registered Representative ..."
+-- The byte offset was READ, not assumed — 9D's near-miss was a keyword that matched inside
+-- sidebar navigation, and a boolean would have repeated it. LR pages are HTML, so pg_net
+-- carries them intact; the PDF problem does not apply to this half at all.
+--
+-- ⚠️ A FALSE NEGATIVE I ALMOST RECORDED AS A FACT, CAUGHT BY READING THE BODY ─────────
+-- A docket regex written as \d{1,2}:\d{2}-cv-\d+ returned NOTHING for LR-25151, and the
+-- honest-looking conclusion was "this pair carries no docket and stays unresolved." The
+-- page actually reads:
+--     "Securities and Exchange Commission v. George Heckler, No. 21-civ-04587 (D.N.J. ...)"
+-- SEC writes the same docket as BOTH '21-cv-04587' and '21-civ-04587' — and the paired AP
+-- order IA-5737 uses the 'cv' spelling for the identical case. The pattern's zero was a
+-- property of my pattern, not of the corpus. Any docket normaliser must fold cv/civ, drop
+-- the judge-initial suffix, and be validated against a positive control before a zero from
+-- it is allowed to mean "absent".
+--
+-- ── A DISTINCTION THAT MUST NOT COLLAPSE (found in the same page) ────────────────────
+-- LR-25151 reports TWO cases: "Securities and Exchange Commission v. George Heckler,
+-- No. 21-civ-04587" AND "United States v. George Heckler, 21-cr-00203 ... sentenced ... to
+-- 63 months in prison." The criminal prosecution is the DOJ's, not the SEC's. A criminal
+-- sentence is not an SEC enforcement outcome and must never be folded into one, exactly as
+-- an investigation is never a violation. The docket suffix is the discriminator: -cr- is a
+-- criminal case, -cv-/-civ- is the civil action the SEC brought.
+--
+-- ── STATUS OF §10 AS OF THIS WRITING ─────────────────────────────────────────────────
+-- The 46 pairs remain UNRESOLVED and still carry status 'possible_same_matter'. What has
+-- changed is that the mechanism to resolve them is now identified and evidenced rather than
+-- hypothesised, and both halves are reachable. Resolution itself requires the LR landing
+-- pages to be acquired and their dockets extracted — additive, not yet done, NOT claimed.
