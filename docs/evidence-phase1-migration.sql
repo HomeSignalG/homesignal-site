@@ -973,7 +973,7 @@ create schema if not exists evidence;
 --   SEC-labelled respondents string, the File Number, every release number on the row, and the
 --   order document URL. 6,077 respondent strings extracted, 0 rows dropped.
 -- NOT ACQUIRED: the CONTENTS of the order documents. They are PDFs whose text is FlateDecode-
---   compressed and not extractable in this environment (the .htm variant 503s). Therefore
+--   compressed and not extractable in this environment. Therefore
 --   Phase 9C does NOT deliver order-level event types (cease-and-desist vs bar vs suspension vs
 --   censure), monetary relief, or findings-versus-allegations language. Those remain unbuilt,
 --   and are reported as zero-extracted rather than as zero-existing.
@@ -1033,8 +1033,16 @@ create schema if not exists evidence;
 -- Phase 9B's litigation-release corpus still 2,795 releases; Garfield still 0/49/4.
 --
 -- ── 10. REMAINING SEC GAPS ───────────────────────────────────────────────────────────
---   1. Order-document contents are unread (PDF): no event types, no monetary relief, no
---      findings-vs-allegations language from administrative orders.
+--   1. Order-document contents are unread: SEC administrative orders are PDF-ONLY. So there are
+--      no event types, no monetary relief, and no findings-vs-allegations language from them.
+--      CORRECTION TO THIS RECORD (re-verified after Phase 9C shipped): an earlier line said the
+--      .htm variant "503s". That was a TRANSIENT status read once and written down as though it
+--      were the answer. Re-probed, the real result is a stable 404 across three URL patterns and
+--      two eras — /litigation/admin/2018/ia-4857.htm, /litigation/admin/2026/34-106074.htm and
+--      /litigation/admin/2017/34-80365.htm all 404 — while the corresponding .pdf returns 200.
+--      The conclusion is unchanged and now rests on a positive control instead of one 503: the
+--      documents exist, they are simply PDF-only. A 503 is not evidence of absence, and it should
+--      not have been recorded as if it were.
 --   2. ALJ initial decisions: index returned 0 rows; unchecked, and reported as such.
 --   3. Coverage starts 2017-04; earlier matters are outside the window and say so.
 --   4. 46 cross-corpus pairs remain candidates pending document-level confirmation.
