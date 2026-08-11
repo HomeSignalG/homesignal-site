@@ -566,14 +566,18 @@ particular number is not among them.
 **Missing data is never a blocker.** Pick the state from §6.1, then pick a sentence from below.
 Alternatives are interchangeable in meaning — choose by length and context, do not stop to ask.
 
-**These are USER-FACING, so they are written for a homeowner, not for an auditor.** Two registers,
-both required:
+**These are USER-FACING, so they are written for a homeowner, not for an auditor.** Two registers:
 
-- **Plain line** — what shows in the module. Short, human, second person where it helps. The
-  resident's real question is *"what does this mean for me?"*, and for an unchecked source the honest
-  answer is **"we haven't looked here yet, so we can't tell you either way."** Say that.
-- **Receipt** — the precise version, behind the disclosure / in Sources & Verification, carrying the
-  date, the dataset and the link. This is where the auditor's language belongs.
+- **Plain line — ONE SENTENCE.** What shows in the module. The resident's real question is *"what does
+  this mean for me?"*, and for an unchecked source the honest answer is *"we haven't looked here yet,
+  so we can't tell you either way."*
+- **Receipt** — the precise version, behind the disclosure and in Sources & Verification, carrying the
+  date, the dataset and the link. The auditor's language belongs here.
+
+**The one-sentence rule is a hard constraint, not a style note.** A module carries a label, a badge and
+a line; a second sentence turns a scannable card into a wall, and doubles the length of a page that is
+mostly empty states. **If a state needs two sentences to be honest, the second belongs in the
+receipt.** Every string below is one sentence — keep it that way when adding any.
 
 Words to keep out of the plain line: *entity · dataset · coverage · attribution · records identified ·
 absence · queried · verified parent · regulatory event · not applicable.* Say **"the companies named
@@ -581,89 +585,86 @@ on filings here"**, not "the entities connected to this property".
 
 ### The page-level explainer — write this once, near the top
 
-On the pilot card most sections are blank, and twelve separate apologies read worse than one honest
-sentence. Lead with it:
+Most sections on the pilot card are blank, and twelve separate apologies read worse than one honest
+line:
 
-1. "Blank sections mean we haven't checked that source yet — not that there's nothing to find. We'd
-   rather show you the gap than guess."
-2. "Where we haven't looked, we say so. An empty section is a gap in our research, not an all-clear."
+1. "Blank sections mean we haven't checked that source yet — not that there's nothing to find."
+2. "Where we haven't looked, we say so — an empty section is a gap in our research, not an all-clear."
 
 ### Entity Track Record — agency row
 
 | State | Plain line (pick one) | Receipt |
 |---|---|---|
-| **Not checked** | (1) "We haven't checked `<X>` yet for the companies named on filings here — so we can't tell you either way." · (2) "Not checked yet. This isn't a clean record or a bad one; we just haven't looked here." · (3) "We don't have `<X>` records for this property yet." | "`<X>` has not been queried for `<company>`. No `source_check` row exists." |
-| **Checked, nothing found** | (1) "We searched `<X>` on `<date>` and found nothing for the companies named here." · (2) "We looked, and `<X>` had no records for these companies." | "`<X>` `<dataset>` queried `<date>`, `result_count` 0. Basis: `<query_basis>`. Source: `<url>`." |
-| **Partly checked** | (1) "We've searched part of `<X>` — one of its lists came back empty. We haven't searched its `<other>` records yet, so this isn't the full picture." · (2) "Partly checked. One `<X>` list was empty; another we haven't searched." | "`<X>`: `<dataset A>` queried `<date>`, 0 results; `<dataset B>` not queried." |
-| **Couldn't reach it** | (1) "We tried to check `<X>` and couldn't reach it. For now this is unknown, not empty — we'll try again." · (2) "`<X>` didn't respond last time we checked." | "`<X>` read failed `<date>`: `<error>`. Not recorded as empty." |
-| **Blocked** | (1) "`<X>` is public, but it blocks automated searches — so we can't read it for you." · (2) "This source won't let software search it, so we can't show what's in it." | "`<X>` returned `<status>` to automated retrieval. Access restricted, not empty." |
-| **Being connected** | "We're connecting `<X>` now. It isn't searchable yet." | "`<X>` ingestion in progress. No result implied." |
-| **Link broken** | "We couldn't match this property to its record in `<X>`, so we can't tell you what's there." | "Join unresolved: `<key>` did not resolve. Rendered unavailable, not empty." |
-| **Records found** | (1) "`<X>` shows `<n>` `<thing>` for companies named on filings here." · (2) "`<n>` `<thing>` on record with `<X>`." | "`<n>` `<thing>`, `<X>` `<dataset>`, retrieved `<date>`. Per-event detail below." |
-| **As filed** | "`<n>` `<thing>`, as the applicant described them. We show what was filed, not our own assessment." | "`<n>` records, evidence tier: authoritative filing. Values as filed, not corroborated." |
+| **Not checked** | (1) "We haven't checked `<X>` yet for the companies named on filings here, so we can't tell you either way." · (2) "Not checked yet — this isn't a clean record or a bad one, just one we haven't looked at." | "`<X>` not queried for `<company>`; no check on record." |
+| **Checked, nothing found** | (1) "We searched `<X>` on `<date>` and found nothing for the companies named here." · (2) "We looked, and `<X>` had no records for these companies." | "`<X>` `<dataset>` queried `<date>`, `result_count` 0, basis `<query_basis>`, source `<url>`." |
+| **Partly checked** | (1) "We've searched one `<X>` list and it was empty, but haven't searched its `<other>` records yet." · (2) "Only part of `<X>` has been searched, so this isn't the full picture." | "`<X>`: `<dataset A>` queried `<date>`, 0 results; `<dataset B>` not queried." |
+| **Couldn't reach it** | (1) "We tried to check `<X>` and couldn't reach it, so this is unknown rather than empty." · (2) "`<X>` didn't respond when we last checked." | "`<X>` read failed `<date>`: `<error>`; not recorded as empty." |
+| **Blocked** | (1) "`<X>` is public but blocks automated searches, so we can't read it for you." · (2) "This source won't let software search it, so we can't show what's in it." | "`<X>` returned `<status>` to automated retrieval; access restricted, not empty." |
+| **Being connected** | "We're connecting `<X>` now, so it isn't searchable yet." | "`<X>` ingestion in progress; no result implied." |
+| **Link broken** | "We couldn't match this property to its record in `<X>`, so we can't tell you what's there." | "Join unresolved: `<key>` did not resolve; rendered unavailable, not empty." |
+| **Records found** | (1) "`<X>` shows `<n>` `<thing>` for companies named on filings here." · (2) "`<n>` `<thing>` are on record with `<X>`." | "`<n>` `<thing>`, `<X>` `<dataset>`, retrieved `<date>`; per-event detail below." |
+| **As filed** | "`<n>` `<thing>`, as the applicant described them on the filing." | "`<n>` records, evidence tier authoritative filing; values as filed, not corroborated." |
 
 **Attribution line, always shown with this module:** "These records may involve other locations these
-companies are connected to — not necessarily anything that happened at this address."
+companies are connected to, not necessarily anything at this address."
 
 ### Parent Company
 
-- **None confirmed** — (1) "We haven't confirmed a parent company for the companies here. A similar
-  name or a shared address isn't enough for us to link them." · (2) "No confirmed parent company. We
+- **None confirmed** — (1) "We haven't confirmed a parent company for the companies here, and a similar
+  name or shared address isn't enough for us to link them." · (2) "No confirmed parent company — we
   only show one when a public document proves the link."
 - **A possibility on file, unconfirmed** — "We've seen a possible parent company but haven't confirmed
-  it, so we're not showing its history here."
-- *Receipt:* "No `company_parents` row with `verification='verified'`. Candidate rows are held and not
-  promoted."
+  it, so we're not showing its history."
+- *Receipt:* "No verified parent relationship on record; candidate rows are held, not promoted."
 
 ### Property & Ownership
 
 - **County records not read** — (1) "We haven't read the county's property records for this address
-  yet, so the owner on record, the acreage and the parcel numbers aren't here." · (2) "The owner on
-  record comes from the county appraisal district. We haven't connected to it yet."
+  yet, so the owner on record, acreage and parcel numbers aren't here." · (2) "The owner on record
+  comes from the county appraisal district, which we haven't connected to yet."
 - **The filing is silent** — (1) "The filing doesn't say." · (2) "Not on the record."
-- **Owner-as-filed caveat, always** — "This is the owner the applicant wrote on the permit. It's often
-  a different company from whoever owns the land, and we never use one to fill in the other."
+- **Owner-as-filed caveat, always** — "This is the owner the applicant wrote on the permit, which is
+  often a different company from whoever owns the land."
 
 ### Development / Project Activity
 
-- **Records found** — "`<n>` permits have been filed at this address. Each one links to the official
+- **Records found** — "`<n>` permits have been filed at this address, each linked to its official
   record."
 - **Empty** — "No permits have been filed at this address in the records we searched."
 
 ### Facilities & Regulatory Connections
 
 - **Nothing at this address** — "There's no regulated facility at this address in the records we
-  searched. The facilities on the map are nearby ones — they aren't part of this property."
+  searched — the ones on the map are nearby, not part of this property."
 - **Connections, but nothing tied to the parcel** — "We found regulatory connections to companies
-  linked to this property. We haven't tied any facility to this parcel itself."
+  linked to this property, but haven't tied any facility to this parcel itself."
 
 ### Natural Hazards — per peril
 
-- **Flood, not read** — "We haven't checked flood maps for this parcel. That doesn't mean it's outside
-  a flood zone — we just haven't looked yet."
+- **Flood, not read** — "We haven't checked flood maps for this parcel, so this isn't a sign it sits
+  outside a flood zone."
 - **No source chosen for this peril** — (1) "We don't have a `<peril>` source yet, so this hasn't been
   checked." · (2) "`<peril>` isn't covered by anything we read yet."
 
 ### Public Meetings & Notices
 
-- **Not linked to addresses yet** — (1) "We track meetings and notices for this ZIP and county, but we
-  can't tie them to a single address yet." · (2) "Nothing here is matched to this address specifically.
-  Notices for the area are on your community page."
+- **Not linked to addresses yet** — (1) "We track meetings and notices for this ZIP and county but
+  can't tie them to a single address yet." · (2) "Nothing here is matched to this address specifically,
+  though area notices are on your community page."
 
 ### Sustainability Disclosures
 
 - **Nothing matched** — "We haven't matched any sustainability reporting to the companies here."
-- **Caveat, always** — "These are figures companies publish about themselves — not regulators'
+- **Caveat, always** — "These are figures companies publish about themselves, not regulators'
   findings."
 
 ### Recorded Instruments
 
 - **Can't search it** — (1) "We can't search this county's deed records automatically yet, so deeds,
-  liens and easements aren't here." · (2) "County recorder records are not currently available through
-  HomeSignal's automated sources for this property." *(the draft brief's §18 wording — the more formal
-  of the two; either is acceptable)*
+  liens and easements aren't here." · (2) "County recorder records aren't available through our
+  automated sources for this property." *(the draft brief's §18 wording, trimmed to one sentence)*
 - **If appraisal-district references land** — "Instrument references as reported by the county
-  appraisal district. These aren't verified deed records."
+  appraisal district, which aren't verified deed records."
 
 ### Regulatory Records
 
@@ -671,9 +672,8 @@ companies are connected to — not necessarily anything that happened at this ad
 
 ### Connected Entities
 
-- **Links found** — "`<n>` companies named on filings here share a detail with one another. Sharing a
-  detail means two records match — it doesn't mean the companies are the same, and it isn't a finding
-  about any of them."
+- **Links found** — "`<n>` companies named on filings here share a detail with one another, which means
+  two records match rather than that the companies are the same."
 - **None** — "No filing here shares a detail with another."
 
 ### A number we don't have
