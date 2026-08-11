@@ -3061,3 +3061,40 @@ The Montgomery #663 fix still lands on only **4 of 38** pages (56 of 1,675 recor
 down — the whole-row refusal is unchanged, and advancing development while preserving cached
 facilities is a partial-write design that is deliberately out of scope. The other 34 pages land when
 FRS returns.
+
+## AC5. The refusal path is now EXERCISED, not just structurally verified
+
+§V left the original facilities guard "verified structurally but NOT yet exercised against a real
+zeroing response." That note is now closed, with receipts from the first two ticks after the
+un-pause (2026-08-11 21:15Z and 21:45Z).
+
+**The cohort.** `dev_refresh_fire_batch` fires oldest-first, so the 17 rows refreshed before
+2026-08-07 — every one of them carrying facilities — were necessarily in the first batches.
+
+**What the responses actually carried.** Joining `net._http_response` (status 200, `mode=zip`) to
+those 17 ZIPs:
+
+| measure | result |
+|---|---|
+| rows in cohort | 17 |
+| returned a 200 whose payload had `facilities = 0` | **17** |
+| still stamped with their pre-outage `refreshed_at` | **17** |
+| still hold their cached facilities | **17** |
+| outside the OLD age-based guard (`refreshed_at` older than 7 days) | **15** |
+| …of those, saved *only* by the new probe-aware clause | **15** |
+| EPA facility records preserved on those 15 rows | **204** |
+
+Every one of the 17 was offered a real zeroing write and refused it. Two of them (57104, 57105,
+refreshed 2026-08-06) were still inside the 7-day window, so the old guard would have caught those
+as well — **the other 15 were past it, and the age-only guard would have written their zeros
+through.** That is the cliff, observed rather than predicted, two days before it was due.
+
+**A clean single case.** 43082 (Westerville OH) — cached facilities 9, development 4, last
+refreshed 2026-08-02 22:30Z, i.e. 9 days old. Its 21:15Z response carried `facilities 0,
+development 0`. Both the both-dimensions-zero clause and the development clause are age-gated and
+were therefore false for it; the probe-aware facilities clause is the only thing that refused the
+write.
+
+**The other half already held.** The same two ticks wrote 8 rows — all zero-facility pages carrying
+development records — and stamped all 8 `facilities_unavailable = true`, so Change B's set-true path
+is exercised on live traffic too. Refusal and write are both proven against production.
