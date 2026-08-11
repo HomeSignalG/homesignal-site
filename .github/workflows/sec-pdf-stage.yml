@@ -68,7 +68,11 @@ jobs:
           RUNNER_JOB: ${{ github.run_id }}
         run: |
           set -euo pipefail
-          SET="${{ github.event.inputs.set || 'representative' }}"
+          # Default flipped representative -> corpus on 2026-08-11, after the representative
+          # set came back 77/77 native_text, 0 acquisition failures, 1,058,621 characters.
+          # Corpus mode is resumable by construction (the work list filters already_staged),
+          # so a re-fire costs only the documents that are still missing.
+          SET="${{ github.event.inputs.set || 'corpus' }}"
           LIMIT="${{ github.event.inputs.limit || '' }}"
           ARGS="--set $SET"
           if [ -n "$LIMIT" ]; then ARGS="$ARGS --limit $LIMIT"; fi
