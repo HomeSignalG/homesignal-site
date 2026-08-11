@@ -346,3 +346,116 @@ create schema if not exists evidence;
 -- Precedence for operates_facility: TCEQ identifier-backed 10/20 < FRS name-based 40 —
 -- so an identifier-backed state relationship outranks a name-based federal affiliation
 -- for the same predicate, and neither deletes the other.
+
+-- ============================================================================
+-- PHASE 7 part 2 (2026-08-11) — the Del Valle FACILITY / OPERATOR / PARENT migration.
+-- Migrations: evidence_phase7_migration_foundation,
+--   evidence_phase7_ingest_frs_affiliations, evidence_phase7_ingest_tceq_del_valle,
+--   evidence_phase7_zip_facilities_parent_and_conflicts,
+--   evidence_phase7_facility_read_model, evidence_phase7_map_former_operator
+-- Scope: ZIP 78617 / Del Valle only. No existing consumer read path changed.
+-- ============================================================================
+-- ORDER OF OPERATIONS (§: raw row -> source record -> identifiers/entities -> claims):
+--   every claim below cites an ev_source_record that was written first, and every entity
+--   was created from an AGENCY-ASSIGNED IDENTIFIER — never from a facility name, a street
+--   address, a company name, or coordinates.
+--
+-- THE MIGRATION HARD-CODES NO SOURCE SEMANTICS. Each row is joined to
+-- evidence.ev_source_role_map; a value with no map row raises outcome 'unmapped_role'
+-- rather than being dropped. ev_source_role_map_uniq now includes the predicate, so ONE
+-- source value can license MORE THAN ONE predicate — which is how FRS OWNER/OPERATOR emits
+-- both facility_owner and operates_facility while citing ONE source record.
+--
+-- MEASURED — all 41 frs_org_affiliations rows accounted for, none silently dropped:
+--   claim_created              38   (facility_owner 17 · operates_facility 21)
+--   excluded_by_role_map        6   (1 BILLING CONTACT + 5 MAILING ADDRESS)
+--   withheld_not_organization   2   (ONE row, JUDY TORRES ROMAN, x its 2 mapped predicates)
+--   candidate_only              3   (PARENT OWNER -> parent_company_candidate)
+--   row accounting: 31 role rows + 6 excluded + 1 withheld + 3 parent = 41
+--
+-- ORGANISATION GATE — FAIL CLOSED. evidence.ev_is_organization_name() requires POSITIVE
+--   evidence of an organisation (a legal form, a governmental form, or a business-activity
+--   word, from the evidence.ev_org_name_token table). Absence of a personal-name pattern is
+--   NOT treated as evidence of a company. JUDY TORRES ROMAN therefore produced no entity and
+--   no claim. Verified: 'NATIONAL ENERGY PRODUCTION', 'PERWEZ MOHEET, ACTING DIRECTOR' and
+--   'JUDY TORRES ROMAN' appear in ZERO claims; positive controls 'CITY OF AUSTIN',
+--   'TIC - THE INDUSTRIAL COMPANY' and 'CEMEX INC.' do appear.
+-- EXCLUDED ROWS CARRY NO PAYLOAD. A BILLING CONTACT / MAILING ADDRESS row gets an
+--   ev_source_record with payload NULL and a note saying why, so the exclusion is provable
+--   without copying contact or mailing data into the evidence schema at all.
+--
+-- FACILITY IDENTITY:
+--   epa.frs_registry_id  30 facilities (12 carrying affiliation rows + 18 more rendered on
+--                        the 78617 page; CEMEX 110034344494 has affiliations but no page row)
+--   tceq.rn              10 identifiers -> 4 TCEQ-only facilities + 6 attached to FRS facilities
+--   34 facility entities total.
+-- FRS -> TCEQ RECONCILIATION IS IDENTIFIER-BACKED OR IT DOES NOT HAPPEN. A tceq.rn is
+--   attached to an FRS facility only when that registry id declares EXACTLY ONE TX-TCEQ ACR
+--   program id. Two registry ids declare three RNs each (110008975804, 110039703611) and were
+--   recorded as 'skipped_ambiguous' — picking one would have been a guess.
+-- NAME/ADDRESS LINKS ARE CANDIDATES, NEVER MERGES. The legacy project_facility_refs rows
+--   whose basis is "exact facility name AND exact address" became 3
+--   ev_entity_resolution kind='same_facility_candidate' rows with status='candidate'. The
+--   entities stay separate. The 4th (RN101723195) has no TCEQ source record in the pilot and
+--   is recorded as outcome 'resolution_candidate' so "no match" is distinguishable from
+--   "never looked at".
+--
+-- TCEQ — 14 claims, ALL regulated_customer_of, 0 operates_facility.
+--   The legacy property_company_roles rows label these "Operator". TCEQ states an affiliated
+--   CUSTOMER, so the role map's predicate governs and the legacy label does not. Where the
+--   row carries both a CN and an RN the claim is identifier_backed; where it carries neither
+--   (a name match inside a ZIP-scoped query) the claim is kept but classed resolved_by_match,
+--   so precedence can never rank it above an identifier-backed statement.
+--   FRS absence never weakened TCEQ: the 3 Del Valle TCEQ facilities have no FRS counterpart
+--   and are full first-class facilities on their tceq.rn alone.
+--
+-- PARENT — exactly ONE parent_company claim in the whole graph:
+--   Martin Marietta Materials Southwest, LLC -> Martin Marietta Materials, Inc.
+--   (SEC EX-21.01, accession 0001193125-26-059193, as of 2025-12-31; parent carries sec.cik
+--   0000916076). The 7 non-verified company_parents rows are outcome 'candidate_only' and
+--   produced no claim. Republic Services was NOT created as a parent. The FRS PARENT OWNER
+--   rows produced 3 parent_company_candidate claims, which the card renders under
+--   "possible_parents" as "Reported, not verified".
+--   THE ONE PERMITTED CROSS-SOURCE ORGANISATION BINDING: an SEC Exhibit 21 entry is bound to
+--   an organisation already in the graph by evidence.ev_legal_name_key — case- and
+--   punctuation-insensitive, but NOTHING is stripped, so corporate suffixes are load-bearing
+--   ("River Bottoms Ranch" and "River Bottoms Ranch LLC" can never bind). Every binding is
+--   written down as ev_entity_resolution kind='sec_parent_of_named_subsidiary'. 1 binding made.
+--
+-- COMPETING CLAIMS BOTH SURVIVE. All 4 legacy identity_conflicts rows became
+--   ev_claim_relation kind='competing_role_claim' pairs. Neither claim is deleted or
+--   suppressed in storage; ev_display_precedence decides what is shown.
+--
+-- THE CHAIN STOPS HONESTLY. facility_located_on_parcel claims: 0. The Del Valle FRS
+--   facilities carry no parcel identifier, and proximity is not location, so parcel ->
+--   development -> facility is UNRESOLVED and is left that way. Measured: 5 occurs_on_parcel
+--   claims on TCAD 292354 (2200 Caldwell), 0 of the TDLR developments carries an FRS
+--   reference, ATX1 (TABS2026011928) project owner as filed = Neuralink Corporation with no
+--   parent. The chain that DOES complete is facility -> regulated party -> verified parent:
+--   RN106540172 -> Martin Marietta Materials Southwest, LLC -> Martin Marietta Materials, Inc.
+--
+-- HISTORICAL ROLES: no FORMER OPERATOR row exists in the live data, so FORMER OPERATOR is
+--   mapped and exercised by a SYNTHETIC fixture that is ROLLED BACK. Proven: the card renders
+--   role "Former operator", since 1990-01-01, until 1999-12-31, current=false. Post-rollback
+--   control: frs_org_affiliations back to 41 rows, 0 claims naming the fixture company.
+--
+-- READ MODEL: public.ev_facility_card(id_type, id_value) — SECURITY DEFINER, granted to anon.
+--   Returns consumer labels only: no enum names, no tier ranks, no source/claim UUIDs, no
+--   pilot flags, and no contact or mailing data (which never became claims). Roles are
+--   de-duplicated to the strongest claim per (role, party) while both claims remain stored.
+--
+-- IDEMPOTENCE — every ingest re-run in a fresh statement, before/after identical:
+--   entities 84 · claims 250 · identifiers 59 · source records 109 · outcomes 74 ·
+--   resolutions 4 · claim relations 4 · legacy app-project links 29 · 0 new facilities.
+--
+-- DOWNSTREAM PROOFS (identifier-backed, no name search):
+--   Track record — facility RN106540172 -> its regulated-party CNs -> company_track_events:
+--     CN600125157 (TXI Operations, LP) 26 events 2010-10-08..2026-03-27;
+--     CN606114726 (Martin Marietta Materials Southwest, LLC) 23 events 2014-09-02..2026-06-24.
+--     Control: 61 events exist in total and NONE is keyed to a Del Valle RN — the track record
+--     is a COMPANY record, reachable only through the organisation, never the facility.
+--   ESG eligibility — the evidence graph is a strict SUPERSET of v_esg_eligible_company for
+--     78617: all 22 legacy companies are reachable (0 lost), plus 3 the legacy view drops —
+--     'tic the industrial company' and 't morales company l l c' (the conflict losers, which
+--     the legacy view suppresses and the evidence layer keeps as competing claims) and
+--     'cemex inc' (real FRS affiliation, no rendered page row).
