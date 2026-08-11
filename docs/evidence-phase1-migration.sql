@@ -653,3 +653,171 @@ create schema if not exists evidence;
 --   No score of any kind. No ESG. No WikiRate. No UI change. No new parent researched. No
 --   fuzzy matching. No nationwide migration. No change to the FRS recovery lane, MassDOT or
 --   DeSoto. No EPA enforcement events exist to migrate, so none were invented.
+
+-- ============================================================================
+-- PHASE 9A (2026-08-11) — SEC ENFORCEMENT + PUBLICLY DISCLOSED INVESTIGATIONS.
+-- Migrations: evidence_phase9a_regulatory_matter_kind, _sec_vocabulary,
+--   _sec_probe_record, _sec_availability_and_identity,
+--   _track_record_setbased_and_sec, _parent_history_and_respondent,
+--   _matter_spans_event_classes, _sec_sections_respect_attribution_level,
+--   _sec_ingest_function
+-- The Phase 8 attribution model is EXTENDED, NOT REDESIGNED: SEC records reuse the same four
+-- levels and the same predicates. SEC matters are ENTITY-level, so event_occurred_at_facility
+-- is absent on every one of them — a facility link would require authoritative evidence tying
+-- the conduct to that facility, and association with a property is not that evidence.
+--
+-- BASELINE BEFORE 9A: entities 170 · claims 731 · identifiers 146 · source records 257 ·
+--   source checks 23 · claim relations 6 · outcomes 138 · predicates 43 · Garfield 0/49/4 ·
+--   exactly ONE entity carrying a CIK (Martin Marietta Materials, Inc., 0000916076).
+--
+-- ── EGRESS ─────────────────────────────────────────────────────────────────────────────
+-- The sandbox cannot reach sec.gov (proxy CONNECT 403). Acquisition ran through pg_net from
+-- Postgres, the workaround already established for this repo. It works: data.sec.gov returned
+-- HTTP 200 / 159,542 bytes for CIK 0000916076.
+--
+-- ── WHAT WAS ACQUIRED, AND WHAT COULD NOT BE ──────────────────────────────────────────
+-- 12 probes are recorded in evidence.ev_sec_probe with URL, HTTP status, hit count and verdict.
+--   ACQUIRED  data.sec.gov submissions — registrant identity confirmed by CIK:
+--             MARTIN MARIETTA MATERIALS INC, ticker MLM. Stored as an identity claim, NOT as a
+--             regulatory event: being a registrant is a status and must never enter an
+--             enforcement count.
+--   ACQUIRED  EDGAR full-text search, the company's own filings, for investigation language.
+--   REJECTED  SEC litigation releases and administrative proceedings CANNOT be searched by
+--             entity. The list pages IGNORE the search parameter — proven, not assumed: the
+--             request returned the default unfiltered first page, 100 release links, ZERO
+--             mentions of the company. SEC ENFORCEMENT IS THEREFORE RECORDED not_checked FOR
+--             EVERY ENTITY. It is not zero, and the read model never says it is.
+--   REJECTED  search.sec.gov returned no response at all (recorded, not silently dropped).
+--   REJECTED  litigation-releases RSS: HTTP 404.
+--
+-- ── THE INVESTIGATION FINDING, AND WHY A COUNT WAS NOT ENOUGH ──────────────────────────
+-- "SEC investigation" restricted to 10-K/10-Q/8-K returned ONE hit. Reading it disproved it:
+-- accession 0000950157-18-001227, exhibit EX-10.1, is an employment agreement whose
+-- whistleblower clause says the employee may cooperate "in an SEC investigation or proceeding
+-- without notifying the Company". That is boilerplate about employee rights, not a disclosure
+-- that this company is under investigation. Recorded as lead_only_not_evidence; NOTHING was
+-- ingested from it. Wells Notice 0 · "subpoena from the SEC" 0 · "formal order of
+-- investigation" 0 · "cease-and-desist" 0 · "enforcement action" 0.
+-- POSITIVE CONTROLS RAN ON THE SAME INDEX AND RETURNED 30 AND 82, so those zeros are real
+-- absences rather than a broken query. An earlier round of the identical queries returned
+-- HTTP 500 INCLUDING the control; those were recorded unavailable and re-run, never as zeros.
+-- ONE OPEN LEAD, DELIBERATELY NOT CHARACTERISED: "civil penalty" returns 62 hits in primary
+-- filings. They were not read document by document, so they are evidence of nothing and were
+-- not ingested. Recorded as a lead.
+--
+-- ── RESULT FOR THE PILOT ───────────────────────────────────────────────────────────────
+-- SEC matters 0 · procedural events 0 · enforcement 0 · disclosed investigations 0 ·
+-- Wells Notices 0 · monetary relief 0 in every one of the four separate buckets ·
+-- entities matched by CIK 1 · matched by weaker means 0 · unresolved 0.
+-- The pilot's one SEC registrant has no publicly disclosed SEC investigation that the sources
+-- checked can identify, and its SEC ENFORCEMENT STATUS IS UNKNOWN because no first-party
+-- entity-scoped enforcement search exists. Both are stated as such.
+--
+-- ── VOCABULARY (semantics as data, each value carrying its own does_not_mean) ──────────
+-- evidence.ev_event_type_vocab 11 types · evidence.ev_status_vocab 10 statuses ·
+-- 8 new predicates (51 total) · 5 SEC identifier types · 6 SEC sources.
+-- The types are NOT collapsed into a generic "SEC violation": enforcement action, administrative
+-- proceeding, final order, federal court judgment, trading suspension, disclosed investigation,
+-- subpoena, inquiry, WELLS NOTICE, investigation concluded, registrant identity.
+--   sec_investigation_disclosed  does_not_mean: NOT a violation, NOT a charge, NOT an
+--     enforcement action, NOT a finding of wrongdoing. Many investigations close with no action.
+--   sec_wells_notice             does_not_mean: NOT an SEC violation, NOT a finding, NOT a
+--     charge, NOT a final enforcement action. It is a STAFF INTENTION TO RECOMMEND.
+--   sec_investigation_concluded  does_not_mean: NOT an exoneration — the SEC states expressly
+--     that closing an investigation must not be construed as a finding that no violation occurred.
+--
+-- ── MONEY IS NEVER BLENDED ─────────────────────────────────────────────────────────────
+-- civil_money_penalty · disgorgement · prejudgment_interest · other_monetary_relief are four
+-- separate predicates and four separate output buckets. Nothing adds them together, and no
+-- amount is called a "fine".
+--
+-- ── MATTERS VS DOCUMENTS (§9) ──────────────────────────────────────────────────────────
+-- A regulatory_matter is a first-class entity identified by the agency's own file or civil
+-- action number; procedural records attach with event_part_of_matter. A matter's procedural
+-- history SPANS CLASSES — the investigation and Wells Notice that precede an enforcement
+-- matter are procedural events OF THAT MATTER — while the investigation-class records stay
+-- listed in their own section, because §5 forbids destroying a Wells Notice by folding it into
+-- the later enforcement event.
+--
+-- ── CONTROLS, PROVEN ON A SYNTHETIC FIXTURE THAT IS ROLLED BACK ────────────────────────
+-- No pilot entity has an SEC enforcement matter, so the enforcement paths were exercised with a
+-- fixture (the Phase 7 rolled-back-fixture precedent) rather than by inventing stored evidence.
+-- One matter, five procedural records, a verified parent with its OWN separate matter, and a
+-- similarly-named decoy company. Measured:
+--   A/G  subsidiary view: matters 1 (NOT 5) · procedural events 5 ·
+--        breakdown 3 enforcement + 2 investigation · civil penalty 2,500,000 ·
+--        disgorgement 1,000,000 · prejudgment interest 150,000 — three separate figures.
+--   B/C  investigations section 2 (disclosure + Wells Notice), never counted as enforcement.
+--   §7   respondent_named_by_agency = "Testco Subsidiary LLC" rides on the matter.
+--   D    viewing the PARENT: own matters 1 / penalty 750,000 / parent-block 0 — the
+--        SUBSIDIARY's matter never became the parent's record.
+--   E    the similarly-named company: 0 matters, 0 investigations.
+--   F    the real pilot entity is the no-public-record control (see the sentence below).
+--
+-- ── DEFECT FOUND BY THE FIXTURE, NOT BY INSPECTION ─────────────────────────────────────
+-- The first fixture run reported the subsidiary as "2 SEC matters, civil penalties $3,250,000".
+-- It had silently added the VERIFIED PARENT's own $750,000 matter into the subsidiary's totals —
+-- exactly the blending §7 forbids, and exactly the sentence §7 names as the wrong answer. Cause:
+-- the SEC sections aggregated every SEC event in scope regardless of attribution level, while
+-- the environmental sections had always been split by level. Fixed: SEC matters now carry a
+-- level rank, an entity's own matters and its parent's matters are separate blocks, and the
+-- parent block carries its own caveat and is excluded from the headline totals.
+--
+-- ── MUTATION TESTS (applied, measured, rolled back) ────────────────────────────────────
+--   M1 verified parent edge demoted to a candidate -> inherited parent block 1 -> 0.
+--   M2 event_part_of_matter links retracted -> matters 1 -> 3, i.e. the matter relationship is
+--      the only thing preventing one matter from reading as several. (3, not 5: the two
+--      investigation-class records are not enforcement matters and remain in their own section.)
+--   M3 the respondent's CIK withdrawn -> the subject no longer resolves at all; no attribution.
+--   Post-rollback control: 0 fixture identifiers, 0 fixture source records, 0 regulatory_matter
+--   entities, 1 parent_company claim, Garfield 0/49/4.
+--
+-- ── §11 THE SENTENCE, GENERATED ONLY FROM WHAT THE EVIDENCE SUPPORTS ───────────────────
+-- For the pilot registrant the read model emits exactly:
+--   "No publicly disclosed SEC investigation was identified in the sources checked. This is not
+--    a finding that no investigation exists — SEC investigations are frequently nonpublic."
+-- It does NOT emit "No SEC investigations", and there is no code path that can.
+--
+-- ── §12 DATA COMPLETENESS, PER QUESTION ────────────────────────────────────────────────
+--   SEC public investigation disclosures  no_public_disclosure_identified
+--   SEC enforcement (litigation releases) not_checked
+--   SEC enforcement (admin proceedings)   not_checked
+--   TCEQ enforcement                      checked_no_records / checked_with_records per facility
+--   EPA enforcement                       not_checked
+-- The absence WORDING is carried as data on the expectation row, so an SEC absence cannot
+-- render with the environmental phrasing by accident.
+--
+-- ── §16 PERFORMANCE: MEASURED BEFORE AND AFTER, AND IT IMPROVED ────────────────────────
+-- The Phase 8 read model resolved each event's scalar facts with correlated subqueries over a
+-- CTE. Replaced with grouped set-based maps (factmap / idmap / notemap) built once per call.
+--   Garfield (53 events): 205.4 ms / 5,289 shared hits  ->  36.8 ms / 3,111 shared hits
+--   BFI:                   21.9 ms / 2,356              ->  27.3 ms / 2,529
+-- 5.6x faster on the heavy path WHILE ADDING the SEC sections. BFI is ~5 ms slower because the
+-- payload now also answers the SEC availability questions; that is new work, not a regression
+-- in the old work, and it is reported rather than hidden.
+--
+-- ── IDEMPOTENCE (§15) — ingest run twice, every object identical ───────────────────────
+--   entities 170/170 · claims 732/732 · identifiers 146/146 · source records 258/258 ·
+--   source checks 33/33 · claim relations 6/6 · outcomes 138/138 · Garfield 0/49/4.
+--
+-- ── SECURITY (§15) ─────────────────────────────────────────────────────────────────────
+--   evidence RLS 30/30 tables, 0 policies · anon/authenticated have NO USAGE ·
+--   public.ev_track_record REVOKED from public/anon/authenticated · Phase 7's ev_facility_card
+--   grant untouched · the payload carries no raw source payload, no UUID and no schema enum.
+--
+-- ── BACKWARD COMPATIBILITY — before/after md5 identical to the Phase 8 baseline ────────
+--   property_company_roles b3923c901be5923d7f47d0d0f5dc89c3 · project_facility_refs
+--   ade204ec6037025a291bec43dbf55b0b · identity_conflicts 25269d6f4b3dd885d50cdc64350206a7 ·
+--   company_parents e951809e3dd5e640ba810b1d04cf2eac · company_track_events
+--   9d501d166d52a5c9198a7be2e4c07c82. Garfield's TCEQ answer is still 0/49/4. No legacy table
+--   was modified. SEC events are partitioned out of the environmental sections BY AGENCY, so an
+--   environmental section can never absorb a securities matter or vice versa.
+--
+-- ── EVIDENCE GAPS, STATED PLAINLY ──────────────────────────────────────────────────────
+--   1. SEC enforcement is UNCHECKED for every entity — no first-party entity-scoped search
+--      exists. Closing it needs a crawl of the SEC's release corpus, which Phase 9A did not do
+--      because a partial crawl would produce an unreliable zero, which is worse than not_checked.
+--   2. EDGAR full-text search starts in 2001; it cannot speak to earlier disclosure.
+--   3. The 62 "civil penalty" hits are an unexamined lead.
+--   4. Only ONE pilot entity carries a CIK, so real SEC coverage is one company deep.
+--   5. Nothing was scored, weighted, or combined with TCEQ. That is deliberate.
