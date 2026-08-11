@@ -821,3 +821,106 @@ create schema if not exists evidence;
 --   3. The 62 "civil penalty" hits are an unexamined lead.
 --   4. Only ONE pilot entity carries a CIK, so real SEC coverage is one company deep.
 --   5. Nothing was scored, weighted, or combined with TCEQ. That is deliberate.
+
+-- ============================================================================
+-- PHASE 9B (2026-08-11) — SEC IDENTITY COVERAGE + A COMPLETENESS-PROVEN ENFORCEMENT CORPUS.
+-- Migrations: evidence_phase9b_sec_corpus_tables, _corpus_parser_fix,
+--   _collect_failure_branch_fix2, _fire_timeout, _parser_release_ref_from_url,
+--   _gap_resolution, _gap_title_parse_fix, _identity_and_availability, _enforcement_checks
+-- Solves the two blockers Phase 9A left: SEC enforcement was not_checked for every entity, and
+-- only one organisation carried a CIK. The Phase 9A architecture is unchanged.
+--
+-- ── A. THE ANSWER TO "NO ENTITY-SCOPED SEARCH" IS NOT TO SEARCH PER ENTITY ─────────────
+-- Phase 9A proved SEC publishes no entity-scoped enforcement search. Phase 9B acquires the
+-- WHOLE INDEX once, materializes it, and answers entity questions locally. The Property Card
+-- never issues a live SEC request.
+-- The index is enumerable and self-describing: 100 rows/page, each row carrying a publish date,
+-- an SEC-labelled respondents string (the site's own class is release-view__respondents), the
+-- release number, and links to the underlying complaints and judgments.
+--
+-- ── B. COVERAGE, WITH RECEIPTS (evidence.v_sec_corpus_coverage) ────────────────────────
+--   index                litigation_releases
+--   coverage             2017-04-13 .. 2026-08-10   (LR-23803 .. LR-26606)
+--   pages acquired       28        pages failed 0
+--   releases held        2,795
+--   confirmed never published  9   (fetched individually, HTTP 404)
+--   recovered by gap fill      4
+--   unresolved numbers         0
+--   COMPLETENESS IDENTITY  2,795 held + 9 never-published = 2,804 = the exact span. is_complete.
+--
+-- ── THREE DEFECTS THE ACQUISITION FOUND IN ITSELF ─────────────────────────────────────
+-- 1. SILENT ROW DROP. The parser took the release number from the row's "Release No." subfield
+--    and DISCARDED any row lacking one — ~2.5 rows per page, 64 real matters across 25 pages,
+--    including LR-26606, which is NEWER than the maximum the corpus claimed to hold. Those rows
+--    are ordinary enforcement matters. Fixed by taking the number from the DETAIL URL, which
+--    every row carries and which is the agency's own canonical path.
+-- 2. PAGINATION IS NOT COMPLETENESS. A date-ordered paginated list can drop rows between
+--    fetches. Proven, not theorised: LR-25605 (SEC v. Cooper J. Morgen, 2023-01-04) is live at
+--    its own URL and pagination never returned it. Four such releases were recovered.
+--    Completeness is therefore established per RELEASE NUMBER, never per page: each missing
+--    number is fetched individually, 200 recovers it and 404 proves it was never published.
+-- 3. THE FAILURE BRANCH HAD NEVER RUN. The collector's non-200 path carried an ambiguous column
+--    reference and only executed the first time a page actually failed — after ten successful
+--    pages. That branch is load-bearing, because it is what makes a failed fetch degrade
+--    coverage instead of quietly leaving a page uncounted. (9 pages died in DNS at pg_net's
+--    5 s default; the timeout is now 20 s and batches are small.)
+--
+-- ── C. IDENTITY COVERAGE ──────────────────────────────────────────────────────────────
+-- 37 organisation name-rows evaluated (36 distinct entities):
+--   already bound by identifier        2 rows  -> Martin Marietta Materials, Inc. CIK 0000916076
+--   corporate-family (verified parent) 1 row   -> Martin Marietta Materials Southwest, LLC,
+--                                                 recorded as FAMILY, never as its own SEC identity
+--   no SEC registrant identified      34 rows
+--   ambiguous (multiple registrants)   0 rows
+-- Matching is EXACT legal-name key against the SEC's own registrant index
+-- (company_tickers.json, 10,387 registrants). Fuzzy similarity is never used. Most of the
+-- remainder are municipal bodies, private LLCs and a private company — genuinely not registrants.
+-- REJECTED SOURCE, with its defect recorded: browse-edgar's atom company search returns CIKs but
+-- its company NAMES come back as unrendered Perl references — entry title="ARRAY(0x557db278f648)",
+-- company-info name="ARRAY(0x...)". That is a defect in the SEC feed itself. Without names,
+-- exact-name binding is impossible and binding on the search string would be fuzzy matching.
+--
+-- ── D. THE ENFORCEMENT RESULT ─────────────────────────────────────────────────────────
+-- Every HomeSignal organisation was scanned against the complete corpus with a generous token
+-- match. ZERO matched. The positive control on the same scan returned 21. The only near-miss is
+-- LR-24050 "Commonwealth Advisors, Inc. and Walter A. Morales" surfacing for the token "morales"
+-- — a different party entirely, and the similar-name negative control appearing unprompted in
+-- real data rather than in a fixture.
+-- SEC enforcement for CIK 0000916076 is therefore now checked_no_records — earned, not asserted:
+-- absent from a corpus in which every release number in the window is either held locally or
+-- proven never published. The recorded note states its own limits: nothing outside the window,
+-- nothing nonpublic, and administrative proceedings remain a SEPARATE unchecked question.
+--
+-- ── E. THE 62 "CIVIL PENALTY" HITS — ALL RESOLVED, NONE AN SEC MATTER ─────────────────
+-- 59 are EX-95 exhibits: Mine Safety Disclosures under Dodd-Frank section 1503, reporting MSHA
+-- citations and the civil penalties MSHA proposes under the Federal Mine Safety and Health Act.
+-- The remaining 3 (two 2011 10-Qs and one EX-99.01) were FETCHED AND READ; all three carry the
+-- same Mine Act sentence: "Whenever MSHA issues a citation or order, it also generally proposes
+-- a civil penalty". Zero of the 62 concern the SEC. Nothing was ingested from them.
+-- SIDE FINDING: this registrant files quarterly structured MSHA mine-safety data. That is a real
+-- regulatory feed for a quarry operator and a Phase 9C candidate — it is not an SEC record.
+--
+-- ── F. MUTATIONS (applied, measured, rolled back) ─────────────────────────────────────
+--   BASE corpus complete=true, 2,795 releases, SEC availability = checked_no_records
+--   M1 drop one acquired page      -> is_complete FALSE, releases 2,795 -> 2,695
+--   M2 rescan while incomplete     -> availability degrades to INCOMPLETE, never to a zero
+--   M3 withdraw the CIK            -> 0 active SEC identifiers, track record stops resolving
+--   M4 demote the verified parent  -> corporate-family mappings 1 -> 0
+--   Post-rollback: complete=true, 2,795 releases, 37 identity rows, 1 corporate-family,
+--   1 active CIK, 1 parent_company claim, 0 MUTATION markers, Garfield still 0/49/4.
+--
+-- ── G. IDEMPOTENCE / PERFORMANCE / COMPATIBILITY ──────────────────────────────────────
+-- Every routine re-run: releases 2,795 · pages 28 · gaps 13 · identity map 37 · source checks 36
+-- · entities 170 · claims 732 · identifiers 146 · source records 258 — all identical.
+-- Serving is local: the SEC-registrant track record answers in 32.6 ms / 2,778 buffers with no
+-- outbound request. Acquisition (28 index pages + 13 gap probes + identity + scan) ran in
+-- batches through pg_net; the Property Card request path performs none of it.
+-- Legacy md5s unchanged (company_track_events 9d501d16…, property_company_roles b3923c90…),
+-- Garfield still 0/49/4, and no Phase 8 or Phase 9A result moved.
+--
+-- ── REMAINING GAPS ────────────────────────────────────────────────────────────────────
+--   1. Administrative proceedings are NOT yet acquired — still not_checked, deliberately.
+--   2. Coverage starts 2017-04-13; earlier matters are outside the window and say so.
+--   3. Respondent extraction is the index's own respondents string; per-document role parsing
+--      (defendant vs officer vs adviser) is not built, because no pilot entity matched.
+--   4. 34 organisations have no SEC identity — mostly municipal or private, correctly so.
