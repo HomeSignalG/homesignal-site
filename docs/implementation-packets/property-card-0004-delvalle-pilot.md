@@ -4,7 +4,9 @@
 `homesignalmap.html?addr=2200%20CALDWELL%20LN%2C%20DEL%20VALLE%2C%20TX%2078617`.** Single subject.
 See §4 for exactly what it can and cannot support, because the answer constrains two modules.
 
-**Status:** ready to hand to a build session, **after** the four founder decisions in §1 are answered.
+**Status:** ready to hand to a build session **now**. The four founder decisions in §1 each have a
+stated safe default, so an unanswered one changes what the card *says* but never blocks the build.
+Only two things halt it, both in §14.
 **Supersedes** the first draft of this brief. Every premise below was measured against the live
 database on **2026-08-11**, not inferred from documentation — the queries and their results are
 inline, because six premises in the draft were false and one of them would have stopped the build.
@@ -128,10 +130,19 @@ document.** (Two numbers in an earlier revision of this brief were themselves wr
 
 ---
 
-## 1. FOUNDER DECISIONS — answer these before writing code
+## 1. FOUNDER DECISIONS — with a safe default for each, so none of them blocks you
 
-These are gates, not preferences. Two of them change what the card *says*, and one changes what it
-*is*. Do not resolve them by inference.
+These change what the card *says*, so they need a real answer eventually. **None of them stops the
+build.** Each has a default below that is honest and reversible; take it, flag it in the report, and
+keep moving. Do not resolve one by *inference* (guessing what the founder would want and acting as if
+it were decided) — that is different from taking the stated default, which is explicitly authorised.
+
+| | Decision | **Default if unanswered** |
+|---|---|---|
+| **Q1** | The five `role='Property Owner'` rows | Do not use them for owner-of-record. Render owner-of-record `not_checked`; show them only under "Owner as filed". |
+| **Q2** | Ship Property & Ownership with no owner of record? | **Already answered by §0.0** — ship it, with every slot rendering its coverage state. Never defer a module for being empty. |
+| **Q3** | Legal sign-off for aggregated enforcement totals | Build the module; the pilot has zero events so no total ships. Flag as outstanding. |
+| **Q4** | Named individuals and phone numbers | Show neither. Describe connections without printing the value (§6.2). |
 
 ### Q1 — The five "Property Owner" rows
 
@@ -160,10 +171,15 @@ Doing neither means the module is built on an unresolved semantic.
 No appraisal-district adapter exists, so **every parcel field renders "Not checked"**: owner of
 record, acreage, Property ID, Geographic ID, classification. The module is honest but empty.
 
-**Decide:** ship it empty (proves the honest-state rendering, which is the product thesis), or defer
-the module until the TCAD adapter lands (Part 29 Q3 recommends TCAD first). Note that
-`docs/source-key-productionization-status.md` line 225 says plainly: *"Do not start TCAD / the
-evidence architecture until `6a92a41` is merged and deployed."* That commit is still unmerged.
+**Answered by §0.0: ship it.** Every module and slot in 0004 is built now and renders its coverage
+state. Deferring a module because it is empty destroys the coverage claim and turns a future feed into
+a UI change. The only open part is whether to *say* an appraisal-district connection is planned —
+say it only if there is a written commitment, per §6.1 row 4.
+
+Note for sequencing, not for blocking: `docs/source-key-productionization-status.md` line 225 says
+*"Do not start TCAD / the evidence architecture until `6a92a41` is merged and deployed."* That commit
+is still unmerged — which affects when the TCAD **adapter** can be built, not whether the card renders
+its slots today.
 
 ### Q3 — Legal sign-off for aggregated enforcement against named companies
 
@@ -176,7 +192,11 @@ and its verified parent** is a materially larger legal surface than a facility c
 word-ban (§8) is necessary but is not the same thing as sign-off.
 
 **Decide:** does the existing one-time sign-off cover aggregated, entity-attributed enforcement
-totals, or is a new review required? **Treat "unclear" as a stop.**
+totals, or is a new review required?
+
+**This does not block the pilot build.** The pilot entities have zero events, so there is no
+aggregated total to ship — build the module, render its empty state, and flag Q3 as outstanding. It
+becomes a stop only at the moment a real total would be displayed (see §14).
 
 ### Q4 — Named individuals and phone numbers (found live, 2026-08-11)
 
@@ -201,7 +221,12 @@ one."* Still open. The draft brief's §23 says do not expose phone numbers or co
 
 **Decide:** (a) card shows neither individuals nor phone numbers, and connections are described
 without naming the shared attribute's value ("two filings share a contact" rather than "same
-contact: Gutknecht"); or (b) it matches the existing dossier. Recommend (a).
+contact: Gutknecht"); (b) it matches the existing dossier; or (c) the value is masked
+(`(813) 758-••••`) or held behind a disclosure, which still lets a reader confirm two records match
+without publishing a reachable number.
+
+**Default if unanswered: (a).** Build it that way, flag it, do not wait — §6.2's Connected Entities
+copy is already written for it.
 
 Whichever is chosen, **the inconsistency between the two surfaces is itself a bug to file** — one
 page cannot treat a phone number as consumer-safe while the other treats it as private.
@@ -534,6 +559,121 @@ particular number is not among them.
   "`<X>` returned records but no penalty figure." The pilot's live case is exactly this —
   `penalty_amount` is null on 59 of 61 `company_track_events` rows.
 
+---
+
+## 6.2 THE COPY LIBRARY — select, do not compose, and never stop
+
+**Missing data is never a blocker.** Pick the state from §6.1, then pick a sentence from below. Each
+slot has two or three alternatives so you can choose by length and context; they are interchangeable
+in meaning. Substitute `<X>` = source name, `<n>` = a gated count, `<date>` = a real `checked_at`,
+`<dataset>` = the dataset actually queried. **Do not invent new wording when one of these fits, and
+do not stop to ask which to use.**
+
+### Entity Track Record — agency row
+
+- **Not checked** — (1) "`<X>` has not been checked for the entities connected to this property. This
+  is a gap in our research, not a finding about any company." · (2) "We have not queried `<X>` for
+  this property. Nothing should be concluded from its absence here." · (3) "`<X>` is not yet connected
+  to HomeSignal for this property."
+- **Checked, no records** — (1) "`<X>` was checked on `<date>` and returned no records for the
+  entities connected to this property." · (2) "No `<X>` records were identified for these entities in
+  the dataset checked (`<dataset>`, `<date>`)."
+- **Partial** — (1) "`<X>` is partially checked: `<dataset>` was queried on `<date>` and returned
+  nothing; other `<X>` datasets have not been queried. Coverage is incomplete." · (2) "Part of `<X>`
+  has been checked for this property. Its enforcement records have not been, so this row is not a
+  complete picture."
+- **Source unavailable** — (1) "The `<X>` source could not be reached during the latest check, so its
+  records are unknown." · (2) "`<X>` did not respond when last queried. We do not know what it holds
+  for this property."
+- **Access restricted** — (1) "`<X>` does not permit automated access, so its records cannot be read
+  here." · (2) "`<X>` is public but blocks automated retrieval, so HomeSignal cannot report its
+  contents."
+- **In progress** — "`<X>` is being connected and is not queryable yet. No result is implied."
+- **Broken link** — "This property's link to `<X>` could not be resolved, so its records are unknown.
+  This is not a report of an absence."
+- **Records found** — (1) "`<X>` records show `<n>` `<thing>` associated with entities connected to
+  this property." · (2) "`<n>` `<thing>` are on record with `<X>` for entities connected to this
+  property."
+- **As filed** — "`<n>` `<thing>` as filed with `<X>`. Values are as stated by the filer and are not
+  independently verified."
+
+### Parent Company Track Record
+
+- **No verified parent** — (1) "No verified parent company has been established for the entities
+  connected to this property." · (2) "We have not established a verified parent company for these
+  entities. A similar name, a shared address, or shared officers is not treated as verification."
+- **Unverified candidate on record** — "A possible parent company has been recorded but is not
+  verified, so no parent history is shown here."
+
+### Property & Ownership
+
+- **Parcel not read** — (1) "Parcel records for this address have not been read. Acreage, property
+  identifiers and the owner of record come from the county appraisal district, which is not yet
+  connected." · (2) "The county appraisal district has not been queried for this address, so the
+  owner of record is not known here."
+- **Field the record does not state** — (1) "Not stated on the record." · (2) "The filing does not
+  state this."
+- **Owner-as-filed caveat** (always, when filed owners are shown) — "Owner as filed is what an
+  applicant stated on a permit. It is often a different company from the owner of record and is not
+  used in place of it."
+
+### Development / Project Activity
+
+- **Records found** — "`<n>` filings are on record at this address, each linked to its official
+  record. Owner and status are shown as filed."
+- **Empty** — "No permit filing is on record at this address in the sources checked."
+
+### Facilities & Regulatory Connections
+
+- **No facility at the address** — "No regulated facility is on record at this address in the sources
+  checked. Facilities shown on the map are nearby and are not attributed to this property."
+- **Connections but no parcel link** — "Regulatory connections have been identified for entities
+  associated with this property. No facility has been tied to this parcel."
+
+### Natural Hazards — per peril
+
+- **Flood, not read** — "Flood mapping has not been read for this parcel. This is not a statement
+  that the parcel sits outside a mapped flood area."
+- **Peril with no source selected** — (1) "No source has been selected for `<peril>` yet, so it has
+  not been checked." · (2) "`<peril>` is not yet covered by a source HomeSignal reads."
+
+### Public Meetings & Notices
+
+- **Not property-linked** — (1) "Meetings and notices are matched at ZIP and county level today, and
+  none is matched to this specific address." · (2) "We have not yet linked notices and agendas to
+  individual properties. Area notices for this ZIP are on the community page."
+
+### Sustainability Disclosures
+
+- **Not matched** — "No sustainability disclosure has been matched to a company connected to this
+  property."
+- **Caveat** (always) — "Sustainability disclosures are company-reported and are not regulatory
+  findings."
+
+### Recorded Instruments
+
+- **Not available** — "County recorder records are not currently available through HomeSignal's
+  automated sources for this property." *(from the draft brief §18 — keep this wording)*
+- **TCAD-reported references, if they ever land** — "Instrument references reported by the county
+  appraisal district. These are not independently verified deed records."
+
+### Regulatory Records
+
+- **Empty** — "No individual regulatory event is on record for the entities connected to this
+  property in the sources checked."
+
+### Connected Entities
+
+- **Links found** — "`<n>` entities named on filings at this address share a detail with one another.
+  A shared detail means two records match — not that the entities are the same, and not a finding
+  about any of them."
+- **None** — "No filing at this address shares a detail with another filing."
+
+### Metric that cannot be derived
+
+- "`<X>` returned records but no `<metric>` figure." *(the pilot's live case: `penalty_amount` is null
+  on 59 of 61 events)*
+
 ### Copy that is forbidden in every empty state
 
 Never render, for anything that was not actually checked and found empty: **"No violations"** ·
@@ -696,16 +836,46 @@ diverge deliberately — and say which.
 
 ## 14. Stop conditions
 
-Stop and report rather than infer if: a parent relationship is not verified · a pilot `project_id`
-does not resolve · TCAD data is required to fill a module · SEC or OSHA data is required · a hazard
-source is required · a notice cannot be property-linked · a facility or entity cannot be tied to the
-parcel · **a module can only be filled by rendering a personal field** (Q4 unanswered, or the only
-way to describe a connection is to publish the phone number or filer's name) · internal-sounding
-fields would have to be surfaced (`property_company_roles.notes`,
-`company_track_events.attribution_note`) · legal sign-off for aggregated enforcement is unclear ·
-performance needs the unbuilt claim layer.
+### MISSING DATA IS NOT A STOP. Ever.
 
-**Do not fabricate content to complete a screenshot.**
+Most of this card has no data, and that is the expected result — ten of twelve modules will read
+"not checked" for the pilot. **If you are about to stop because a source is empty, unwired, failed,
+or refuses access, you have misread this brief.** Choose the state from §6.1, choose a sentence from
+§6.2, log it in the report, and keep going. This is the repo's existing posture, stated in
+`CLAUDE.md` §8: *"Quarantine, don't stop. … A run with quarantined records is a success; the
+quarantine log is the only human follow-up."*
+
+**Never a stop — handle it and continue:**
+
+no TCAD · no recorder · no OSHA · no SEC · no hazard source · no property-linked notices · no
+sustainability match · no verified parent · zero events for the pilot entities · a source that failed
+or 403s · a field a record does not state · a metric that is not derivable · a broken join · a module
+that ends up entirely empty · the mockup showing a number the data cannot support.
+
+A **broken join** in particular is not a stop: render `unavailable`, log it in the preflight, carry on.
+
+### The three things that ARE a stop
+
+Each is a case where continuing means **asserting something the evidence does not support**, which no
+amount of careful copy can fix.
+
+1. **A false join.** Anything that would tie a fact to this property without evidence: wiring
+   `role='Property Owner'` into owner-of-record (Q1), tying a facility or entity to the parcel when
+   `parcel_id` is null, or populating the pilot's track record from Martin Marietta / TXI events.
+   Stop, because the output would be a fabrication rather than a gap.
+2. **Personal data with Q4 unanswered**, where the only way to render a module is to publish a phone
+   number or a named individual. If Q4 is answered, follow it and do not stop. If it is not, render
+   the module *without* the personal value (§6.2 gives the wording) and flag it — only stop if that is
+   genuinely impossible.
+3. **Legal sign-off unclear (Q3) at the moment you would ship an aggregated enforcement total against
+   a named company.** For the pilot this almost certainly never triggers — there are zero events — so
+   it should not block the build. It bites when the fixture work or a real feed produces totals.
+
+Everything else: **decide, document, continue.** A build that finishes with a long list of honest gaps
+is the intended outcome. A build that stalls on module one is not.
+
+**Do not fabricate content to complete a screenshot** — and do not treat an empty module as a reason
+to stop, delete the module, or wait.
 
 ---
 
@@ -713,7 +883,9 @@ performance needs the unbuilt claim layer.
 
 Answer the draft's §1–§29 report sections, plus:
 
-- **Which founder decisions (§1) were answered, and by whom.** An unanswered gate is a stop.
+- **Which founder decisions (§1) were answered, and by whom** — and for any left open, what you did
+  instead. An unanswered gate is something to **flag and route around** (§14), not to stop on; only
+  Q4-with-no-alternative and Q3-at-the-point-of-shipping-a-total actually halt the build.
 - **The state of every agency row for the pilot address**, with the receipt behind each.
 - **How the populated track-record path was exercised** (§4) — by fixture, or not at all.
 - **The join-path preflight result**, and whether this build should wait for `6a92a41`.
