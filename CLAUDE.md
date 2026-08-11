@@ -86,6 +86,22 @@ exists to prevent it. **"Not yet asked" is a valid and required value.** If a so
 read, record what was attempted, what was found, and why it failed (naming the document and its
 id), rather than implying an answer.
 
+### After a squash merge, reset the designated branch — do not re-merge the stale tip
+
+**After a PR is squash-merged, reset the designated branch to `origin/main` with
+`--force-with-lease` and commit forward from there.** The precondition is checked, never assumed:
+`git diff origin/main origin/<branch>` must be empty AND no file may exist on the branch that is
+not on `main`. If either check fails, STOP and ask — the branch holds unmerged work. If the lease
+itself refuses the push, stop and report; never escalate to a plain `--force`.
+
+*Why:* squash-merging orphans the push branch every time, so the next commit can only reach the
+remote by force-push or by re-importing dead history. The alternative — merging the stale tip back
+in to avoid a force-push — puts already-squashed commits into the next PR's commit list, which
+happened in #665: the diff was correct (two files) but the commit list carried six, including
+#663's and #664's already-shipped work. A reviewer reading that list sees work that already landed.
+A verified force-push that discards provably-redundant history beats knowingly repeating a known
+error.
+
 ---
 
 ## Maps / ingest go-live — READ THE GOVERNANCE DOC FIRST
