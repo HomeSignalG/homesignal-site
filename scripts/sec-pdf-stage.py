@@ -223,6 +223,13 @@ def process(row):
 
 def main():
     ap = argparse.ArgumentParser()
+    # RETRY PASS (2026-08-11): the first full corpus run left 4 documents at
+    # acquisition_failed because their index href is a RELATIVE landing path
+    # ('/enforcement-litigation/administrative-proceedings/33-10857') rather than a PDF URL,
+    # so urllib raised "unknown url type". public.sec_pdf_work_list now absolutises such
+    # hrefs, and those 4 are still !already_staged, so re-firing corpus mode retries exactly
+    # them and nothing else. If a landing page returns HTML rather than a PDF the magic-byte
+    # check records corrupt_unsupported — honest, and still never a silent zero.
     ap.add_argument("--set", dest="which", choices=["representative", "corpus"], required=True)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--shard", default="")
