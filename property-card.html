@@ -437,11 +437,16 @@ HS.onReady(async function () {
         authority: 'State and local enforcement records, by jurisdiction',
         state: st(null, [/state.?local|county enforcement/]),
         detail: 'State and local enforcement records beyond the environmental registry above have not been queried.' },
-      { id: 'hazards', short: 'Natural hazards', label: 'FEMA flood, wildfire & heat layers',
-        authority: 'Federal and state hazard mapping',
-        state: st(null, [/fema|flood|wildfire|hazard/]),
+      // One label, four perils, FOUR DIFFERENT AGENCIES — and only flood has a chosen source.
+      // FEMA publishes the National Flood Hazard Layer and nothing else here; naming it for
+      // wildfire, heat or severe weather would be fabricated provenance, so the label names the
+      // hazard class rather than borrowing an agency that does not publish it.
+      { id: 'hazards', short: 'Natural hazards', label: 'Flood, wildfire, heat & severe-weather hazard layers',
+        authority: 'Federal and state hazard mapping, per peril (flood: FEMA NFHL; other perils: source not yet selected)',
+        state: st(null, [/fema|flood|wildfire|hazard|heat|severe/]),
         detail: 'Hazard layers are mapped per area, not per parcel, and no parcel-level hazard read exists for '
-          + 'this address yet.' },
+          + 'this address yet. Flood would come from FEMA; wildfire, extreme heat and severe weather have no '
+          + 'source selected.' },
       { id: 'meetings', short: 'Meetings & notices', label: 'Public meeting agendas & official notices',
         authority: 'First-party agendas and notices published by the governing body',
         state: st((row.related || []).length ? 'verified' : null, [/meeting|agenda|notice|pmn/]),

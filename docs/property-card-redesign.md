@@ -150,7 +150,7 @@ complete:
 | County appraisal district / assessor | `not_checked` | no adapter — Part 29 Q3 |
 | County recorder / clerk | `not_checked` | no adapter — Part 29 Q3 |
 | OSHA · SEC · state/local enforcement | `not_checked` | no adapter |
-| FEMA flood / wildfire / heat | `not_checked` | `app_environmental_risk` is empty (Part 29, open question) |
+| Flood / wildfire / heat / severe weather | `not_checked` | `app_environmental_risk` is empty (Part 29, open question). **Four perils, four different agencies** — FEMA publishes flood (NFHL) and nothing else here; the other three have no source selected, so none may be named |
 | Public meetings & notices | `not_checked` at property level | matched per ZIP/county today; the section links to the community page |
 | Sustainability / ESG | `not_checked` | keyed to a company; no company here is resolved to a disclosure |
 

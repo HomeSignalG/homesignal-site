@@ -11,6 +11,98 @@ inline, because six premises in the draft were false and one of them would have 
 
 ---
 
+## 0.0 THE GOVERNING PRINCIPLE — the screenshot is a design target, not a data target
+
+**Build the card to look like Property Card 0004. Build every module and every slot in it, now.
+Then render the correct coverage state in any slot the data does not support.**
+
+The mockup's numbers, parent company, violations, penalties, hazards and notices are **presentation
+placeholders**. They are what the card will look like *when the feeds land*. They are not a
+description of what exists today, and none of them may be reproduced as a measured value. Where the
+mockup shows a figure and the data does not support one, the slot renders `not_checked` / `partial` /
+`unavailable` — never the mockup's number, never a substitute drawn from a different source, never a
+zero standing in for "fine".
+
+Both halves of that sentence are load-bearing, and the second is the one most likely to be dropped:
+
+- **Do not fabricate to match the design.** An empty module is the correct output.
+- **Do not delete a module because it is empty.** The feeds are coming. Every unsupported slot is a
+  labelled gap that a resident can see we know about, and a place a future feed drops into as a
+  **data change, not a UI change** — which is exactly the property the read model is designed to have
+  (architecture doc Part 25 and Part 26: *"UI: **No change.** `property_card` gains a field"*).
+
+Consequences to hold onto while building:
+
+1. **Every module in 0004 ships in this build**, including the ones that will be entirely
+   "not checked" for the pilot: Natural Hazards, Public Meetings & Notices, Sustainability, Recorded
+   Instruments, Parent Company Track Record, and the parcel half of Property & Ownership.
+2. **Every slot inside a module ships too** — the four hazard perils, the three sustainability rows,
+   the five agency rows, the parcel identifier fields. A slot that is absent today cannot be
+   distinguished by a resident from a slot we never intend to fill.
+3. **Data Completeness enumerates the full intended source set**, not just the wired ones. A coverage
+   view that omits what it has not checked is not a coverage view.
+4. **Add a regression that the slots survive emptiness.** A future cleanup pass that removes a module
+   "because it renders nothing" would silently destroy the coverage claim. Assert every declared
+   section and every agency row is present on the pilot address *even though most are `not_checked`*.
+5. When a feed lands, the acceptance test is that **only the state and the values changed** — no new
+   section, no new tab, no layout edit.
+
+### 0.0.1 The full feed inventory — every slot, and what will fill it
+
+Built from the draft brief's §7/§11/§13/§15/§16/§17/§20/§22 lists **plus** the architecture doc's
+Part 30 source inventory and `CLAUDE.md` §8 counts buckets, because the draft's list was not complete
+either. **Every row is a slot in the card.** Status is measured, 2026-08-11.
+
+| Feed | Slot it fills | Status today |
+|---|---|---|
+| **County appraisal district (TCAD)** | Property & Ownership: owner of record, acreage, Property ID, Geographic ID, classification, legal description | none — Part 29 Q3 |
+| **County recorder / clerk** | Recorded Instruments: deeds, liens, easements | none |
+| **County tax office** | Property & Ownership: tax account, exemptions — a *different* office from the appraisal district | none |
+| **County GIS / cadastral** | parcel geometry — the thing that would finally permit a facility-on-parcel or entity-on-parcel claim (`parcel_id` is null on all 66 role rows) | none |
+| **State business registry** | entity identity: `companies.legal_name`, `entity_type`, `jurisdiction` — **all NULL today** | none |
+| **TDLR / TABS** | Development / Project Activity | **LIVE** — the pilot's 5 filings |
+| **County permit portals · planning · zoning** | Development; zoning cases feed Meetings & Notices | partly live via `jurisdiction-registry.json` |
+| **EPA FRS** | Facilities & Regulatory Connections | **LIVE** |
+| **EPA ECHO** | Entity Track Record → EPA row; Regulatory Records | facility-level via engine v19; **not at entity level** |
+| **EPA TRI** | Regulatory Records: toxic releases | none |
+| **EPA RCRAInfo** | Regulatory Records: hazardous-waste handler | none |
+| **EPA NPDES · GHGRP · SEMS** | Regulatory Records | none |
+| **APHIS · FAA · NRC** | Facilities: federally licensed sites | none |
+| **TCEQ Central Registry** | Facilities; entity presence | **LIVE** — company-level checks exist, and are empty for the pilot |
+| **TCEQ Notices of Violation / Notices of Enforcement** | Entity Track Record → TCEQ row; Regulatory Records | facility-level rows exist, **none for the pilot entities — this is the `partial` in §3** |
+| **Other state regulators · CARB · AQMDs** | Entity Track Record → State/Local row | none |
+| **OSHA** | Entity Track Record → OSHA row (violations, inspections, penalties) | none — `docs/source-registry.md` says RESEARCH |
+| **SEC enforcement + administrative proceedings** | Entity Track Record → SEC row | none |
+| **SEC investigation disclosures** (Wells notices, subpoenas, open investigations) | Entity Track Record → SEC row, **kept a separate component** — draft §22 lists it separately and §26 forbids calling any of it a "violation" | none |
+| **SEC EX-21 subsidiary exhibits** | Parent Company Track Record — this is the *verification* source, distinct from SEC enforcement | **manual only** — 1 verified edge, read by hand |
+| **FRS org affiliations · TCEQ RN↔CN affiliations** | Facility/company relationships — the graph every track-record join depends on | **LIVE** — 33 `project_facility_refs`, 66 `property_company_roles` |
+| **State / local enforcement records** | Entity Track Record → State/Local row | none |
+| **FEMA NFHL** | Natural Hazards → **Flood only** | none |
+| **Wildfire hazard source** | Natural Hazards → Wildfire | none, **and no source has been chosen** |
+| **Extreme-heat source** | Natural Hazards → Extreme Heat | none, **no source chosen** |
+| **Severe-weather source** (NOAA/NWS the obvious candidate) | Natural Hazards → Severe Weather | none, **no source chosen** |
+| **Property-linked meetings & notices** — planning-commission hearings · zoning cases · public-comment periods · environmental notices · permit hearings · annexation notices · road/utility proceedings · tax/incentive hearings | Public Meetings & Notices | **area-level only** (community pages, PMN/Granicus/Legistar/CivicClerk/iQM2/CivicPlus adapters). **No property linkage exists** |
+| **WikiRate · company-reported metrics · ESG filings** | Sustainability Disclosures | `company_esg_matches` 55 rows, **none resolved to a pilot company** |
+| **Census** | draft §20 lists it under Sources & Verification but **never says what it is for** | none — **ask before building a slot for it** (§0.0.2) |
+
+**⚠ FEMA covers flood, and nothing else.** FEMA publishes the National Flood Hazard Layer; it does
+not publish wildfire, extreme-heat or severe-weather layers. Anything in this repo labelling the
+hazard module "FEMA flood, wildfire & heat" is a misattribution — the only FEMA reference in the
+codebase is `msc.fema.gov`, attached to flood. Wildfire, heat and severe weather each need their own
+source **chosen**, and until one is, naming an agency for them would be fabricated provenance.
+
+### 0.0.2 Two feeds that need a definition before they need a slot
+
+- **Census.** The draft lists it as a source but assigns it no field. Without a stated purpose a slot
+  for it cannot be honest about what it would contain. **Ask what it is for** (parcel demographics?
+  ZCTA geography? the ZIP↔county crosswalk already pinned to `zipcodes` v3.0.0?) before rendering it.
+- **"Regulated customer / entity"** (draft §13). This appears to mean the TCEQ customer number (CN)
+  as distinct from the regulated-entity number (RN) — the RN↔CN affiliation is what
+  `property_company_roles` Operator rows are built from. Confirm the reading before labelling it for
+  residents; "customer" is agency jargon that will not survive contact with a homeowner.
+
+---
+
 ## 0. Read this first — how this brief differs from the draft
 
 The draft was right about *judgement* and wrong about *inventory*. Its rules on attribution, parent
