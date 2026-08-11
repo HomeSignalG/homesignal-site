@@ -8,8 +8,8 @@ Fetch the three Phase 9D blocking controls on a GitHub runner and prove, per doc
   3. the PDF opens (magic bytes + pdfinfo exit 0), page count recorded
   4. SHA-256 recorded
   5. text extraction succeeds (pdftotext exit 0, non-empty)
-  6. extracted text is MATERIALLY larger than the pg_net-truncated payload Phase 9D
-     measured — the whole point of moving acquisition to a runner
+  6. the binary survived where pg_net destroyed it — measured BYTES vs BYTES, and the
+     order text pg_net could not reach is now recovered
   7. known substantive language from the order is present
 
 Required markers are kept to what must appear in any SEC order PDF (the Commission
@@ -88,10 +88,24 @@ CENSUS_TERMS = [
     "IT IS HEREBY ORDERED",
 ]
 
-# A runner-extracted order must be enormously larger than the handful of bytes pg_net
-# kept. 10x is a deliberately loose floor: the point is to prove a category change, and
-# the measured ratio is printed either way.
-MIN_RATIO_VS_PGNET = 10.0
+# CORRECTED AFTER RUN 1 (31532143841). The first version of this gate compared extracted
+# TEXT CHARACTERS against pg_net's RETAINED BYTES and required 10x. That is the wrong pair:
+# the ratio tracks how compressed a PDF is, not whether the bytes survived. 34-106074 is a
+# 2-page order inside a 126,786-byte file (fonts and embedded objects dominate), so it
+# yields only 2,369 chars — 5.3x — and the gate failed a document it had just proven intact
+# in six other checks. The instrument was wrong, not the document.
+#
+# Two checks replace it, each measuring the thing it names:
+#   * BYTES vs BYTES — the integrity claim. Measured on the three controls:
+#     126,786/444 = 285.6x · 89,991/1,433 = 62.8x · 104,929/747 = 140.5x.
+#   * ORDER TEXT RECOVERED — the capability claim, which is the one that actually matters.
+#     Re-measured through pg_net on 2026-08-11 (req 55807/55808/55809), all three fragments
+#     contain ZERO order text: 'SECURITIES AND EXCHANGE COMMISSION' false, 'In the Matter of'
+#     false, 'ORDER INSTITUTING' false; 34-106074's 444 bytes are literally
+#     '%PDF-1.6 ... /Linearized 1/L 119955/O 94 ...' — the header and linearisation dict,
+#     truncated before any content stream. So the runner does not merely recover MORE text;
+#     it recovers the ONLY text. That is a category change, and it is what these two assert.
+MIN_BYTE_RATIO_VS_PGNET = 50.0
 
 
 def fetch(url):
@@ -183,13 +197,25 @@ def check_one(c):
     add("native_text_not_image_scan", chars_per_page >= 200,
         f"{chars_per_page:,.1f} chars/page ({'native text' if chars_per_page >= 200 else 'looks like an image scan -> OCR branch'})")
 
-    # ---- 6. materially larger than the pg_net payload ------------------------------
-    ratio = len(text) / c["pgnet_retained"] if c["pgnet_retained"] else 0
+    # ---- 6a. the binary survived — BYTES vs BYTES ----------------------------------
+    byte_ratio = downloaded / c["pgnet_retained"] if c["pgnet_retained"] else 0
     facts["pgnet_retained"] = c["pgnet_retained"]
-    facts["ratio_vs_pgnet"] = round(ratio, 1)
-    add("materially_larger_than_pgnet", ratio >= MIN_RATIO_VS_PGNET,
-        f"{len(text):,} extracted chars vs {c['pgnet_retained']:,} bytes pg_net retained = {ratio:,.1f}x "
+    facts["byte_ratio_vs_pgnet"] = round(byte_ratio, 1)
+    facts["text_chars_per_pgnet_byte"] = round(len(text) / c["pgnet_retained"], 1) if c["pgnet_retained"] else None
+    add("binary_survived_vs_pgnet", byte_ratio >= MIN_BYTE_RATIO_VS_PGNET,
+        f"{downloaded:,} bytes intact vs {c['pgnet_retained']:,} pg_net retained = {byte_ratio:,.1f}x "
         f"(pg_net kept {100.0 * c['pgnet_retained'] / c['pgnet_declared']:.2f}% of {c['pgnet_declared']:,} declared)")
+
+    # ---- 6b. the order text pg_net could not reach is now recovered ----------------
+    # pg_net's fragment provably carries none of these (measured, see the constant above),
+    # so their presence here is the capability the runner adds, not a nicety.
+    flat_pre = re.sub(r"\s+", " ", text)
+    caption_ok = "In the Matter of" in flat_pre and "UNITED STATES OF AMERICA" in flat_pre.upper()
+    facts["caption_recovered"] = caption_ok
+    add("order_text_recovered", caption_ok,
+        "caption block recovered ('UNITED STATES OF AMERICA' + 'In the Matter of') — "
+        "pg_net's fragment contains neither"
+        if caption_ok else "caption block NOT found in extracted text")
 
     # ---- 7. known substantive language --------------------------------------------
     flat = re.sub(r"\s+", " ", text)
@@ -258,7 +284,7 @@ def main():
               f"{f.get('downloaded_bytes', 0):>9,} bytes  "
               f"{str(f.get('page_count')):>4} pp  "
               f"{f.get('text_chars', 0):>8,} chars  "
-              f"{f.get('ratio_vs_pgnet', 0):>8,.1f}x pg_net")
+              f"{f.get('byte_ratio_vs_pgnet', 0):>7,.1f}x pg_net bytes")
     print()
     if all_pass:
         print("GATE PASSED — all three controls prove binary integrity on the runner.")
