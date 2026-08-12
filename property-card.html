@@ -13,7 +13,7 @@
      information sections on the left, the parcel/activity rail on the right, one
      tab strip over both. Every card states the research state of its own source,
      so the layout has to give that badge a permanent, predictable place. */
-  .pcpage{max-width:1320px}
+  .pcpage{max-width:1400px}
 
   /* state colours — ONE definition, consumed by badges, dots and the donut */
   .pcpage{
@@ -57,7 +57,7 @@
   .pctabs button:focus-visible{outline:2px solid var(--green);outline-offset:-2px;border-radius:6px}
 
   /* ── body grid ── */
-  .pcbody{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+  .pcbody{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
   .pcmain{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
   .pcmain > .pcsec.wide{grid-column:1 / -1}
   .pcrail{display:flex;flex-direction:column;gap:14px}
@@ -78,9 +78,10 @@
   .pcsec p + p{margin-top:8px}
 
   /* ── state badge ── */
-  .pcst{display:inline-flex;align-items:center;gap:5px;font:700 9.5px/1 var(--font);
-    letter-spacing:.07em;text-transform:uppercase;border-radius:5px;padding:4px 7px;
-    border:1px solid transparent;white-space:nowrap}
+  .pcst{display:inline-flex;align-items:center;gap:5px;font:700 9.5px/1.25 var(--font);
+    letter-spacing:.06em;text-transform:uppercase;border-radius:5px;padding:4px 7px;
+    border:1px solid transparent;white-space:normal;max-width:100%;overflow-wrap:break-word}
+  .pcsrc .pcst{font-size:9px;padding:3px 6px}
   .pcst::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
   .pcst.t-ok{color:var(--green);background:var(--green-tint);border-color:#cbe7d5}
   .pcst.t-clear{color:#4e8c6c;background:#f1f8f4;border-color:#d8ebe0}
@@ -92,18 +93,32 @@
   .pcst.t-flag{color:var(--violet);background:#f0eefa;border-color:#dcd6f2}
 
   /* ── the per-source track-record grid ── */
-  .pcsrcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:11px}
-  .pcsrc{border:1px solid var(--line);border-radius:11px;padding:11px 12px;background:#fcfdfc}
-  .pcsrc .sn{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--ink)}
-  .pcsrc .sb{margin-top:8px}
-  /* Metrics read as label→value ROWS, not three cramped columns: "Enforcement actions" is a
-     two-word label and a 55px column shredded it into "Enforcement / actions" mid-phrase. */
-  .pcmetrics{display:flex;flex-direction:column;margin-top:10px;padding-top:6px;border-top:1px solid var(--line-2)}
-  .pcmetric{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:3px 0}
-  .pcmetric .ml{font-size:11px;line-height:1.35;color:var(--ink-3);min-width:0}
-  .pcmetric .mv{font-size:14px;font-weight:700;letter-spacing:-.01em;color:var(--ink);flex:none}
+  /* FIVE AGENCIES, ONE ROW — the approved design puts EPA/ECHO, TCEQ, OSHA, SEC and State/Local
+     side by side. An auto-fit grid wrapped the fifth onto a line of its own, which reads as two
+     groups and implies a distinction the design does not make. Fixed five columns; it collapses
+     deliberately only when there is genuinely no room. */
+  .pcsrcs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
+  @media(max-width:1180px){ .pcsrcs{grid-template-columns:repeat(3,minmax(0,1fr))} }
+  @media(max-width:760px){ .pcsrcs{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @media(max-width:460px){ .pcsrcs{grid-template-columns:minmax(0,1fr)} }
+  .pcsrc{border:1px solid var(--line);border-radius:11px;padding:10px 11px;background:#fcfdfc;min-width:0}
+  .pcsrc .sn{font-size:12px;font-weight:700;color:var(--ink);line-height:1.3;word-break:break-word}
+  .pcsrc .sb{margin-top:7px}
+  /* Metrics are COLUMNS, as the design draws them: a small wrapping label over its value, one
+     column per metric the source actually has (2 for SEC and State/Local, 3 elsewhere). */
+  /* METRICS AS LABEL→VALUE ROWS, inside a five-across agency grid.
+     The mockup draws these as three columns, and at five agencies in one row that is not
+     implementable: the column is 39px and the word "Enforcement" needs 54px, so columns either
+     collide or get shredded into "Violatio/ns". Rows give every label the full card width, keep
+     every word intact, and adapt to the 2- and 3-metric sources without padding. The founder's
+     instruction was one row of agencies; this preserves that and the vocabulary. */
+  .pcmetrics{display:flex;flex-direction:column;margin-top:8px;padding-top:7px;border-top:1px solid var(--line-2)}
+  .pcmetric{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:2.5px 0;min-width:0}
+  .pcmetric .ml{font-size:9.5px;line-height:1.3;color:var(--ink-3);font-weight:500;
+    overflow-wrap:normal;word-break:normal;hyphens:none;min-width:0}
+  .pcmetric .mv{font-size:13px;font-weight:700;letter-spacing:-.01em;color:var(--ink);flex:none}
   .pcmetric .mv.na{color:var(--ink-3);font-weight:600}
-  .pcrecent{font-size:11px;color:var(--ink-3);margin-top:9px;padding-top:8px;border-top:1px solid var(--line-2)}
+  .pcrecent{font-size:10.5px;color:var(--ink-3);margin-top:9px;padding-top:8px;border-top:1px solid var(--line-2)}
   .pcrecent b{color:var(--ink-2);font-weight:600}
   .pcsrc .sd{font-size:11.5px;line-height:1.5;color:var(--ink-2);margin-top:9px}
 
@@ -477,10 +492,11 @@ HS.onReady(async function () {
     var cells = order.map(function (id) {
       var s = byId[id]; if (!s) return '';
       return '<div class="pcsrc"><div class="sn">' + esc(s.short) + '</div>'
-        + '<div class="sb">' + C.badgeHTML(s.state) + '</div>'
-        + '<div class="pcmetrics">'
-        + trackMetrics(id, s.state, recs).map(function (m) { return metric(m.text, m.label); }).join('')
-        + '</div>'
+        + '<div class="sb">' + C.badgeHTML(s.state, { module: 'entity-track-record' }) + '</div>'
+        + (function (ms) {
+            return '<div class="pcmetrics m' + ms.length + '">'
+              + ms.map(function (m) { return metric(m.text, m.label); }).join('') + '</div>';
+          })(trackMetrics(id, s.state, recs))
         + '<div class="pcrecent">Most recent: <b>' + esc(mostRecent(s.state, s.recent)) + '</b></div>'
         + '<div class="sd">' + esc(s.detail) + '</div></div>';
     }).join('');
