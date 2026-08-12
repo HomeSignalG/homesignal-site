@@ -2,10 +2,46 @@
    INVISIBLE to the user: no UI, no personal info. Writes one row per event to the
    Supabase `events` table (INSERT-only for the browser; see docs/events-setup.sql).
 
-   Never throws and never blocks the UI — if the table/grant isn't set up yet, or the
-   network fails, the event is silently dropped. Reuses the page's window.hsClient. */
+   Never throws and never blocks the UI. When an event can't be written it is still
+   dropped (no retry/queue here — deliberate), but the drop is now COUNTED per-path in
+   a durable localStorage tally so the undercount is measurable instead of guessed.
+   Read it in any browser console:  hsEventDrops()
+     -> { client_not_ready, insert_error, exception, total, since }
+   NOTE: this tally is PER-BROWSER (localStorage). Cross-visitor aggregation needs a
+   server sink (a count beacon or a `dropped_before` column) — intentionally deferred.
+   Reuses the page's window.hsClient. */
 (function () {
   'use strict';
+
+  // ---- drop accounting -----------------------------------------------------
+  // Each silent-drop path below bumps one bucket so we can size the loss rather
+  // than confirm-it-exists. Durable across reloads; every access is wrapped so the
+  // accounting can never itself throw or block a log call.
+  var DROP_KEY = 'hs_evt_drops';
+  // total    = drops counted on this browser (all paths, all time).
+  // reported = of those, how many have already been flushed onto a successful
+  //            insert via events.dropped_before. (total - reported) = still-pending.
+  var drops = { client_not_ready: 0, insert_error: 0, exception: 0, total: 0, reported: 0, since: null };
+  try {
+    var saved = JSON.parse(localStorage.getItem(DROP_KEY) || 'null');
+    if (saved && typeof saved === 'object') {
+      ['client_not_ready', 'insert_error', 'exception', 'total', 'reported'].forEach(function (k) {
+        if (typeof saved[k] === 'number') drops[k] = saved[k];
+      });
+      drops.since = saved.since || null;
+    }
+  } catch (e) {}
+  function saveDrops() { try { localStorage.setItem(DROP_KEY, JSON.stringify(drops)); } catch (e) {} }
+  function bumpDrop(path) {
+    try {
+      if (!drops.since) drops.since = new Date().toISOString();
+      drops[path] = (drops[path] || 0) + 1;
+      drops.total += 1;
+      saveDrops();
+    } catch (e) { /* accounting must never break logging */ }
+  }
+  // Queryable surface — returns a snapshot copy so a caller can't mutate the tally.
+  window.hsEventDrops = function () { var o = {}; for (var k in drops) o[k] = drops[k]; return o; };
 
   function sessionId() {
     try {
@@ -42,7 +78,7 @@
   window.hsLogEvent = function (eventType, payload) {
     try {
       var c = window.hsClient;
-      if (!c || typeof c.from !== 'function') return; // client not ready -> drop silently
+      if (!c || typeof c.from !== 'function') { bumpDrop('client_not_ready'); return; } // client not ready -> counted drop
       var row = {
         session_id: sessionId(),
         event_type: String(eventType || '').slice(0, 64),
@@ -53,8 +89,24 @@
         alert_id: (payload && payload.alert_id) || null,
         zip_code: currentZip(payload)
       };
+      // Flush this browser's still-pending silent-drop count onto the row, so the
+      // undercount is queryable server-side in events.dropped_before (0 = measured
+      // no-drops; N = N flushed). Advance `reported` optimistically so concurrent
+      // inserts don't double-report; roll it back if THIS insert fails so the count
+      // rides the next successful row instead of being lost.
+      var pending = Math.max(0, drops.total - drops.reported);
+      row.dropped_before = pending;
+      if (pending) { drops.reported += pending; saveDrops(); }
       var q = c.from('events').insert([row]);
-      if (q && typeof q.then === 'function') q.then(function () {}, function () {});
-    } catch (e) { /* never surface analytics errors */ }
+      // insert() RESOLVES with {error} on RLS/constraint/4xx and only REJECTS on a
+      // network failure — treat both as a failed insert.
+      function onInsertFail() {
+        if (pending) { drops.reported -= pending; saveDrops(); } // un-report so it re-flushes
+        bumpDrop('insert_error');
+      }
+      if (q && typeof q.then === 'function') {
+        q.then(function (r) { if (r && r.error) onInsertFail(); }, onInsertFail);
+      }
+    } catch (e) { bumpDrop('exception'); } // sync throw building/sending the row -> counted drop
   };
 })();
