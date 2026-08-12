@@ -1,0 +1,5 @@
+layer,records_processed,records_materialized,records_displayed,records_excluded,success_rate
+development,98278,50951,50951,47327,0.518
+facility,88432,88432,88432,0,1.000
+government_notice,314,314,0,314,0.000
+meeting,timeline_by_design,timeline_by_design,0,all,0.000
