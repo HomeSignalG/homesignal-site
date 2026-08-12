@@ -348,9 +348,12 @@ HS.onReady(async function () {
       + '<div class="pctitle"><h1>' + esc(addr) + '</h1>'
       + '<span class="pcbadge">Property card</span><span class="sp"></span>'
       + '<div class="pcacts">'
+      // No "View on map" here. It resolved to the SAME url as "← Back to the map" above, so it was
+      // duplicate navigation dressed as a second action — and under the design's persistent map
+      // rail it is redundant a second way, since the map is already on screen. If that layout
+      // lands, the rail should centre itself on the open parcel rather than earn back a button.
       + '<button class="btn primary" id="pcSave" type="button">Save property</button>'
       + '<button class="btn" id="pcExport" type="button">Export</button>'
-      + '<a class="btn" href="' + esc(HS.pageHref('maps.html', { zip: zip, id: recId || null })) + '">View on map →</a>'
       + '</div></div>'
       + '<p class="pcsub">' + esc(locLine) + '</p>'
       + '<div class="pcmeta">' + chips.join('') + '</div>'
