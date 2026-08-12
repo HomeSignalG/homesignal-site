@@ -1395,6 +1395,32 @@ legal/framing change not covered by the one-time sign-off.
 
 ---
 
+## 7.2 Government Source Archive (`gov-archive.html`) — the archive lives in the INGEST repo
+
+Preserved government evidence — DOJ, FinCEN, OFAC, SEC, EPA, OSHA, PHMSA, FERC and the rest — plus
+the log of how it was acquired. **Read `docs/government-source-archive.md` before touching
+anything near it**, and the full contract at
+`homesignal-ingest/docs/government-source-integration-contract.md`.
+
+Three things that must not be relaxed:
+
+- **A new government source is an ADAPTER, never a new architecture.** No parallel archive table,
+  no parallel acquisition log, no second storage bucket, no duplicate entity model, and **no new
+  Property Card module** — FinCEN is a *source feeding* Entity Track Record, not a module.
+- **`gov-archive.html` is internal.** Allowlisted through `dashboard_admins`, noindex, in
+  `robots.txt`, absent from `partials/shell.html`. Every read is a `gov_archive_*` SECURITY DEFINER
+  RPC and **no archive table has an `anon`/`authenticated` grant**, so there is no direct read to
+  enable by accident. Privileged writes are service-role and server-side.
+- **A document disappearing from a government website is `REMOVED_FROM_SOURCE`.** It is not
+  vacated, rescinded or reversed; those require an affirmative government document and the database
+  raises if one is set without naming it. The archived copy and the original URL both survive.
+
+The archive is the INGESTION layer. `gov_actions` is the full-fidelity record; Entity Track Record
+renders a projection of it, joined through `v_gov_action_attribution`, which exposes **verified
+resolutions only**. An action belongs to the entity the government document named.
+
+---
+
 ## 8. Source adapters (`get-address-report` enrichment sources)
 
 The `get-address-report` edge function pulls from multiple public-record sources.
