@@ -196,9 +196,12 @@ checked. No deployed flow can render injected data.
 
 ## 8. What the card is not
 
-* **Not a score.** The completeness donut counts sources by research state. No weighting, no
-  percentage headline, no grade. A source we have not read counts the same as a source that
-  returned nothing — *the badge, not the total, is what tells them apart*.
+* **A coverage percentage, not a score.** The completeness ring shows *how much of the record we
+  have read* — `50%`, with `6 of 12 sources fully read` beside it (founder, 2026-08-12). The
+  percentage may never appear without that denominator, `partial` is deliberately not counted as
+  read (half credit would be a weight), and `0 of 0` renders an em-dash rather than `0%`. It says
+  nothing about the property, which is what the disclaimer states and what makes showing a number
+  here safe at all. It is **not** the quality-of-life score, and must never be presented as one.
 * **Not a verdict.** Regulatory events relate to entities connected to the property through
   facilities, ownership or filings. They may describe activity at other locations and do not
   establish that anything happened at this address. Environmental records are geo-matched to a

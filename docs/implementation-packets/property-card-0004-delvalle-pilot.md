@@ -787,7 +787,16 @@ these corrections:
   fixture (§4). Do not duplicate the event list inside Entity Track Record.
 - **Sources & Verification.** Add `source_vintage` and `retrieved_at`/`checked_at` where the row
   carries them. Never expose internal enum strings.
-- **Data Completeness.** Already built, no percentage. Keep the disclaimer exactly as shipped.
+- **Data Completeness.** **A PERCENTAGE, with its x-of-y beside it** (founder, 2026-08-12 — this
+  reverses the draft brief's §21 "no numeric completeness percentage"). Shipped: `50%` in the ring,
+  `6 of 12 sources fully read` next to it. Three rules hold it honest and all three are tested:
+  the figure is built by `HS.card.completenessText()` so it **can never render without its
+  denominator**; `read` means we got an answer (records *or* a measured nothing) while **`partial` is
+  not read**, because half credit would be a weight this module must not invent — and the card says
+  so in words rather than hiding it in the number; and **0 of 0 is an em-dash, not 0%**, since a zero
+  over an empty denominator reads as a finding. Keep the disclaimer exactly as approved — it is the
+  only reason a percentage is safe here, because it states that this measures our research and is not
+  a rating of the property. **Note for the pilot: today's address renders 0%**, which is accurate.
 
 ---
 
@@ -1172,9 +1181,12 @@ schema slot rather than a data source today. *(1,000 of 3M rows, unordered — r
 planning against it.)* This corrects `CLAUDE.md`, which reads as though only Soil/Noise/Light are
 unpopulated.
 
-**Nothing about scoring changes in this build:** the completeness module stays unweighted and
-score-free and the approved disclaimer stays as approved. If the card later carries a score, that
-disclaimer needs re-scoping so it does not appear to disclaim the score sitting next to it.
+**Data completeness is a percentage (founder, 2026-08-12) and that is NOT the quality-of-life
+score.** They must never be conflated: completeness measures *how much of the record we have read*,
+the QoL score would purport to measure *the place*. The approved disclaimer distinguishes them today
+because it scopes itself to completeness — **if the card later carries a QoL score, that disclaimer
+must be re-scoped**, or it will appear to disclaim the score sitting beside it. Nothing else about
+scoring changes in this build.
 
 ---
 
