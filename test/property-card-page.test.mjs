@@ -161,6 +161,31 @@ need(!/id === 'state_env'/.test(tm),
 need(/ENROLMENTS/.test(card) || /enrolment/i.test(tm),
   'nothing records WHY the state registry writes no metric, so a future edit will add one back');
 
+// ── 6a. the two track-record modules SHARE one renderer ───────────────────────
+// Founder: Parent Company Track Record must have exactly the same layout as Entity Track Record.
+// Guaranteed by sharing the renderer, not by copying it — a copy holds them in sync exactly until
+// the first edit to either.
+need(/function agencyGridHTML\(rows\)/.test(card), 'there is no shared agency-grid renderer');
+need((card.match(/agencyGridHTML\(/g) || []).length >= 3,
+  'the agency grid is not called by BOTH track-record modules');
+need(/function trackAgencies\(\) \{ return \['epa_echo', 'state_env', 'osha', 'sec', 'state_local'\]; \}/.test(card),
+  'the five agencies are not declared once for both modules');
+// A `var` here would be undefined when render() draws the first card — this file has been bitten
+// by that hoisting trap twice, so pin the function form.
+need(!/var TRACK_AGENCIES/.test(card),
+  'the agency list is a `var` declared after render() runs, so it will be undefined at draw time');
+// With no confirmed parent the grid must NOT be drawn: five "not checked" agency rows imply a
+// parent exists that we merely have not looked into (draft brief §10).
+need(/if \(!parents\.length\) \{[\s\S]{0,220}parentNone/.test(card),
+  'the no-parent state draws the agency grid instead of saying no parent is confirmed');
+need(/p\.verification === 'verified'/.test(card),
+  'an unverified parent candidate can reach the parent module');
+// Fallback copy must MATCH the state, or a checked-empty source renders "CHECKED · 0 · 0 · 0"
+// above the words "we haven't checked this yet".
+need(/function sourceLine\(state, X, when\)/.test(card), 'there is no state-matched copy fallback');
+need(/if \(k === 'unavailable'\) return C\.say\(C\.COPY\.source\.unavailable/.test(card),
+  'sourceLine does not map unavailable to its own approved sentence');
+
 // ── 6b. one state machine, many approved labels ───────────────────────────────
 // The design says the same state five different ways. Each module may RELABEL a state; none may
 // invent one, or the five vocabularies become five state machines that disagree at the edges.
@@ -236,10 +261,17 @@ need(!/owner_of_record[^\n]*\|\|[^\n]*\bowner\b/.test(card),
 
 // ── 9. the footer refuses the "this is a grade" reading ───────────────────────
 need(/C\.DISCLAIMER/.test(card), 'the card does not render the shared disclaimer');
-need(/Counted by source, unweighted/.test(card),
-  'the completeness section does not say it is unweighted');
-need(!/percent complete|% complete|completeness score/i.test(card),
-  'the card presents completeness as a score — it is a count of sources by research state');
+// Completeness is a PERCENTAGE (founder, 2026-08-12), shown with its x-of-y. The guard is no
+// longer "no number" — it is that the number never appears without its denominator, and that it
+// is framed as our research rather than as a verdict on the property.
+need(/C\.completenessText\(counts\)/.test(card),
+  'the completeness figure is not built through completenessText, which is what pairs it with its basis');
+need(/class="pcbasis">' \+ esc\(txt\.basis\)/.test(card),
+  'the x-of-y basis line is not rendered beside the percentage');
+need(/how much of the record we have read, not a judgement about the/.test(card),
+  'the completeness section does not say the percentage is about our research, not the property');
+need(/Partly-read sources are listed separately and are not counted as read/.test(card),
+  'the section does not disclose that partly-read sources are excluded from the numerator');
 
 if (failures.length) {
   console.error(failures.map((f) => `FAIL — ${f}`).join('\n'));

@@ -161,9 +161,10 @@
   /* ── completeness ── */
   .pccomp{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
   .pcdonut{flex:none}
-  .pcdn{font:700 19px/1 var(--font);fill:var(--ink)}
+  .pcdn{font:700 20px/1 var(--font);fill:var(--ink)}
   .pcdl{font:600 10px/1 var(--font);fill:var(--ink-3);letter-spacing:.04em;text-transform:uppercase}
   .pclegend{flex:1;min-width:180px;display:flex;flex-direction:column;gap:5px}
+  .pcbasis{font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:4px}
   .pclrow{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ink-2)}
   .pclrow i{width:9px;height:9px;border-radius:50%;flex:none}
   .pclrow b{margin-left:auto;color:var(--ink);font-weight:700}
@@ -502,19 +503,43 @@ HS.onReady(async function () {
   // of the section, and every one of them goes through HS.card.metricText, so an unqueried or
   // failed source shows an em-dash. There is no code path here that prints 0 for a source
   // whose state is not a checked state.
+  // The five agencies both track-record modules report on, in the design's order.
+  //
+  // A FUNCTION, not a `var` — render() runs earlier in this body, so a `var` here is still
+  // undefined when the first card draws. This is the second time that trap has bitten in this
+  // file (see trackMetricLabels); declarations hoist, the values assigned to them do not.
+  function trackAgencies() { return ['epa_echo', 'state_env', 'osha', 'sec', 'state_local']; }
+
+  /**
+   * THE ONE agency-grid renderer, shared by Entity Track Record and Parent Company Track Record.
+   *
+   * Shared deliberately rather than copied: the two modules must be identical in layout, and the
+   * only way to guarantee that as either changes is for there to be one renderer. Copying it would
+   * hold them in sync exactly until the first edit.
+   *
+   * `rows` is [{ short, state, metrics:[{label,text}], recent, detail }] — so the caller decides
+   * WHOSE record is being shown (the direct companies, or a verified parent) while the layout,
+   * the badge vocabulary and the metric gate stay common.
+   */
+  function agencyGridHTML(rows) {
+    return '<div class="pcsrcs">' + rows.map(function (r) {
+      return '<div class="pcsrc"><div class="sn">' + esc(r.short) + '</div>'
+        + '<div class="sb">' + C.badgeHTML(r.state, { module: 'entity-track-record' }) + '</div>'
+        + '<div class="pcmetrics m' + r.metrics.length + '">'
+        + r.metrics.map(function (m) { return metric(m.text, m.label); }).join('')
+        + '</div>'
+        + '<div class="pcrecent">Most recent: <b>' + esc(mostRecent(r.state, r.recent)) + '</b></div>'
+        + '<div class="sd">' + esc(r.detail) + '</div></div>';
+    }).join('') + '</div>';
+  }
+
   function entityTrackHTML(byId, recs) {
-    var order = ['epa_echo', 'state_env', 'osha', 'sec', 'state_local'];
-    var cells = order.map(function (id) {
-      var s = byId[id]; if (!s) return '';
-      return '<div class="pcsrc"><div class="sn">' + esc(s.short) + '</div>'
-        + '<div class="sb">' + C.badgeHTML(s.state, { module: 'entity-track-record' }) + '</div>'
-        + (function (ms) {
-            return '<div class="pcmetrics m' + ms.length + '">'
-              + ms.map(function (m) { return metric(m.text, m.label); }).join('') + '</div>';
-          })(trackMetrics(id, s.state, recs))
-        + '<div class="pcrecent">Most recent: <b>' + esc(mostRecent(s.state, s.recent)) + '</b></div>'
-        + '<div class="sd">' + esc(s.detail) + '</div></div>';
-    }).join('');
+    var cells = agencyGridHTML(trackAgencies().filter(function (id) { return byId[id]; }).map(function (id) {
+      var s = byId[id];
+      return { short: s.short, state: s.state, recent: s.recent, detail: s.detail,
+        metrics: trackMetrics(id, s.state, recs) };
+    }));
+    var order = trackAgencies();
     return sec('entity-track-record', {
       wide: true,
       info: C.COPY.module.trackRecordAttribution,
@@ -524,7 +549,7 @@ HS.onReady(async function () {
     // attribution itself is not deleted — it rides on the section's info affordance, because the
     // claim it guards against ("these events happened at this address") is one the module can
     // still invite. C.COPY.module.trackRecordAttribution remains the single source of that wording.
-    }, '<div class="pcsrcs">' + cells + '</div>');
+    }, cells);
   }
   /**
    * "Most recent" is a DATE WITH A STATE, not a nullable date — the design shows four distinct
@@ -609,18 +634,72 @@ HS.onReady(async function () {
   }
 
   // ── PARENT COMPANY TRACK RECORD ───────────────────────────────────────────────
+  // Same layout as Entity Track Record, by sharing its renderer — the five agencies, the same
+  // badges, the same metric gate. What differs is only WHOSE record it is.
+  //
+  // With NO confirmed parent there is no subject to report on, so the grid is not drawn: five
+  // agency rows reading "not checked" would imply a parent exists that we simply have not looked
+  // into. That is the draft brief's §10 rule — say "no verified parent company established", and
+  // never invent one from a similar name, a shared address or shared officers.
   function parentTrackHTML(row) {
-    var parents = (row && row.parents) || [];
-    var state = parents.length ? 'verified' : 'not_checked';
-    return sec('parent-track-record', { state: state },
-      '<p>' + (parents.length
-        ? esc(parents.length + ' confirmed parent relationship(s) apply to the companies here.')
-        : esc(C.say(C.COPY.module.parentNone)))
-      + '</p>'
-      + note('A parent company’s history is only ever shown here when a <b>published, verified</b> '
-        + 'ownership relationship authorises it. An unverified name match is never promoted to '
-        + '“parent company”, so this card stays empty rather than attaching one company’s record '
-        + 'to another.'));
+    var parents = ((row && row.parents) || []).filter(function (p) {
+      return !p.verification || p.verification === 'verified';
+    });
+    if (!parents.length) {
+      return sec('parent-track-record', { state: 'not_checked' },
+        '<p>' + esc(C.say(C.COPY.module.parentNone)) + '</p>');
+    }
+    // Per-agency state for the parent comes from the read model when it carries one; absent that,
+    // a confirmed parent whose agencies have not been checked is exactly `not_checked`.
+    var track = (row && row.parent_track) || {};
+    var rows = trackAgencies().map(function (id) {
+      var t = track[id] || {};
+      var st = C.state(t.state);
+      var labels = trackMetricLabels(id);
+      return {
+        short: agencyShort(id), state: st, recent: t.recent,
+        metrics: labels.map(function (label, i) {
+          return { label: label, text: C.metricText(st, t.counts ? t.counts[i] : undefined) };
+        }),
+        detail: t.detail || sourceLine(st, agencyShort(id), t.recent)
+      };
+    });
+    var names = parents.map(function (p) { return p.name || p.parent_name; }).filter(Boolean);
+    return sec('parent-track-record', { wide: true, state: C.rollup(rows.map(function (r) { return r.state; })),
+      info: C.COPY.module.trackRecordAttribution },
+      '<div class="pcrows" style="margin-bottom:12px">'
+      + names.map(function (n, i) {
+          var p = parents[i] || {};
+          return '<div class="pcrow"><span>Confirmed parent</span><b>' + esc(n)
+            + (p.evidence_url ? ' <a href="' + esc(p.evidence_url) + '" target="_blank" rel="noopener">evidence \u25B8</a>' : '')
+            + '</b></div>';
+        }).join('')
+      + '</div>'
+      + agencyGridHTML(rows));
+  }
+  /**
+   * The approved sentence for a state. Without this, a fallback of "not checked" got attached to
+   * every state, so a checked-and-empty source rendered a CHECKED badge and three real zeros above
+   * the words "we haven't checked this yet" — the two halves of the card contradicting each other.
+   * Returns '' for states whose metrics already say it, rather than inventing a line.
+   */
+  function sourceLine(state, X, when) {
+    var k = C.state(state);
+    if (k === 'checked_empty') {
+      return when ? C.say(C.COPY.source.checked_empty, { X: X, date: HS.fmtDate(when, { year: 'numeric', month: 'long', day: 'numeric' }) })
+                  : C.say(C.COPY.source.checked_empty, { X: X }, 1);
+    }
+    if (k === 'unavailable') return C.say(C.COPY.source.unavailable, { X: X });
+    if (k === 'access_restricted') return C.say(C.COPY.source.access_restricted, { X: X });
+    if (k === 'in_progress') return C.say(C.COPY.source.in_progress, { X: X });
+    if (k === 'partial') return C.say(C.COPY.source.partial, { X: X }, 1);
+    if (k === 'verified' || k === 'reported') return '';
+    return C.say(C.COPY.source.not_checked, { X: X });
+  }
+  /** The agency's short label, from the one place the source list defines it. */
+  function agencyShort(id) {
+    return ({ epa_echo: 'EPA / ECHO', state_env: 'State environmental', osha: 'OSHA',
+      sec: 'SEC', state_local: 'State / local' })[id] || id;
   }
 
   // ── PROPERTY & OWNERSHIP ──────────────────────────────────────────────────────
@@ -831,11 +910,16 @@ HS.onReady(async function () {
       return '<div class="pclrow"><i style="background:var(--pct-' + k.replace(/_/g, '-') + ')"></i>'
         + esc(C.STATES[k].label) + '<b>' + counts.byState[k] + '</b></div>';
     }).join('');
+    var txt = C.completenessText(counts);
     return sec('data-completeness', { wide: true }, '<div class="pccomp">'
-      + C.donutSVG(counts, { aria: 'Coverage by information category' })
-      + '<div class="pclegend">' + legend + '</div></div>'
-      + '<p class="pcprov">Counted by source, unweighted. A source we have not read counts the same as a '
-      + 'source that returned nothing — the badge, not the total, is what tells them apart.</p>');
+      + C.donutSVG(counts, { aria: 'Share of sources read for this property' })
+      + '<div class="pclegend">'
+      + '<div class="pcbasis">' + esc(txt.basis) + '</div>'
+      + legend + '</div></div>'
+      // The percentage never travels without its denominator: an unexplained figure invites the
+      // reader to supply their own, and it is never "sources we have read".
+      + '<p class="pcprov">This is how much of the record we have read, not a judgement about the '
+      + 'property. Partly-read sources are listed separately and are not counted as read.</p>');
   }
 
   // ── footer ────────────────────────────────────────────────────────────────────

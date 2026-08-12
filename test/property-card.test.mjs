@@ -119,7 +119,11 @@ test('section rollup reports the weakest thing true of the section', () => {
   assert.strictEqual(C.metricText(C.rollup(['verified', 'clean']), 0), C.NO_VALUE);
 });
 
-test('completeness counts sources by state and never scores them', () => {
+test('completeness reports a percentage AND the fraction that explains it', () => {
+  // Founder decision 2026-08-12: completeness is a percentage, shown with its x-of-y. That
+  // reverses the draft brief's "no numeric percentage" rule and is safe for one reason only —
+  // the approved disclaimer says this measures OUR RESEARCH, not the property. The guards below
+  // are what keep that true.
   const rows = [{ state: 'verified' }, { state: 'verified' }, { state: 'not_checked' },
     { state: 'checked_empty' }, { state: 'unavailable' }, { state: 'clean' }];
   const c = C.completeness(rows);
@@ -129,8 +133,30 @@ test('completeness counts sources by state and never scores them', () => {
   assert.strictEqual(c.byState.unavailable, 1);
   assert.strictEqual(c.unrecognized, 1, 'an unreadable state is counted as unreadable, not as a state');
   assert.ok(!('clean' in c.byState));
-  // There is deliberately no percentage, grade, or weight anywhere in the result.
-  assert.deepStrictEqual(Object.keys(c).sort(), ['byState', 'total', 'unrecognized']);
+
+  // READ = we got an answer out of the source, records or a measured nothing. 3 of 6 -> 50%.
+  assert.strictEqual(c.read, 3);
+  assert.strictEqual(c.pct, 50);
+
+  // `partial` is NOT read. Half credit would be a WEIGHT, which is the one thing this module must
+  // not invent — and it would hide the shortfall inside the number instead of listing it.
+  const p = C.completeness([{ state: 'verified' }, { state: 'partial' }]);
+  assert.strictEqual(p.read, 1);
+  assert.strictEqual(p.pct, 50, 'a partly-read source counts as not read, not as half');
+
+  // 0 of 0 is not 0%. An empty denominator with a 0% reads as a finding.
+  const empty = C.completeness([]);
+  assert.strictEqual(empty.pct, null);
+  assert.strictEqual(C.completenessText(empty).pct, C.NO_VALUE);
+
+  // THE PERCENTAGE NEVER TRAVELS ALONE. An unexplained figure invites the reader to supply their
+  // own denominator, and the one they imagine is never "sources we have read".
+  const t = C.completenessText(c);
+  assert.strictEqual(t.pct, '50%');
+  assert.match(t.basis, /3 of 6 sources fully read/);
+  assert.match(C.completenessText(p).basis, /1 partly read/,
+    'a partly-read source must be named in the basis, since it is missing from the numerator');
+  assert.ok(t.basis.includes('of ' + c.total), 'the basis must state the denominator');
 });
 
 test('the donut is inline SVG, sums to its own total, and is honest when empty', () => {
@@ -151,9 +177,11 @@ test('the donut is inline SVG, sums to its own total, and is honest when empty',
   // 1 verified + 2 not_checked, in DONUT_ORDER: verified first, then not_checked (twice as long).
   assert.ok(Number(arcs[1][1]) > Number(arcs[0][1]));
 
+  assert.match(svg, /class="pcdn">33%</, 'the ring centre carries the percentage');
   const empty = C.donutSVG(C.completeness([]));
   assert.doesNotMatch(empty, /stroke-dasharray/, 'nothing to count draws no slice');
-  assert.match(empty, new RegExp(C.NO_VALUE), 'an empty donut shows an em-dash, not 0 or 100%');
+  assert.match(empty, new RegExp(C.NO_VALUE), 'an empty donut shows an em-dash, not 0% or 100%');
+  assert.doesNotMatch(empty, /0%/, 'an empty denominator must never render 0%');
 });
 
 test('the declared structure is the one the page renders against', () => {
