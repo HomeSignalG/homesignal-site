@@ -75,8 +75,20 @@ need(/script-src 'self' 'unsafe-inline' https:\/\/cdn\.jsdelivr\.net;/.test(csp)
   'the card page CSP does not restrict script-src to self + jsDelivr');
 need(/connect-src[^;]*qwnnmljucajnexpxdgxr\.supabase\.co/.test(csp),
   'the card page CSP does not allow the Supabase read it needs');
-need(!/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/(maplibre|leaflet|chart)/i.test(card),
-  'the card page pulls a map or chart library — the donut is inline SVG by CSP rule');
+// CHART libraries stay banned — the donut is hand-rolled inline SVG because the CSP allows
+// script-src self + jsDelivr only, and a charting dependency would be both unloadable and a
+// second opinion about how coverage is drawn. A MAP library is different: the context rail needs
+// real tiles, maps.html already ships maplibre from the same origin, and reusing it is what stops
+// this page growing a second way to draw a facility.
+need(!/cdn\.jsdelivr\.net\/npm\/(chart|d3|plotly|highcharts|apexcharts)/i.test(card),
+  'the card page pulls a charting library — the donut is inline SVG by CSP rule');
+need(/donutSVG/.test(lib) && /<svg class="pcdonut"/.test(lib),
+  'the completeness ring is no longer hand-rolled inline SVG');
+// The rail reuses the map page's marker registry rather than restyling facilities here.
+need(/HS\.markerSVG\(/.test(card) && /HS\.markerRegistry\.facilityHex/.test(card),
+  'the rail draws its own facility markers instead of reusing lib/map.js — two drawings of one fact');
+need(/maps\.html remains the one interactive map surface/.test(card),
+  'nothing records that the rail is deliberately read-only');
 
 // ── 4. it reads the real cache, and only through the shared accessors ───────────
 need(/propertyReport\(addr\)/.test(data) && /from\('property_reports'\)/.test(data),

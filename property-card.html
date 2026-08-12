@@ -5,15 +5,51 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>HomeSignal — Property Card</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com https://cdn.jsdelivr.net; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://*.tile.openstreetmap.org https://cdn.jsdelivr.net; form-action 'self'">
 <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
   /* ── PROPERTY CARD (page-scoped; app.css untouched) ────────────────────────────
      The full card a resident reaches from the Maps slide-in. Two columns: the
      information sections on the left, the parcel/activity rail on the right, one
      tab strip over both. Every card states the research state of its own source,
      so the layout has to give that badge a permanent, predictable place. */
-  .pcpage{max-width:1400px}
+  .pcpage{max-width:1560px}
+
+  /* ── THE CONTEXT RAIL (0004's left column) ──────────────────────────────────────
+     The map stays visible beside the record, so a resident never loses where the
+     property is while reading what is on it. It lives HERE rather than inside
+     maps.html: putting the card into the map page would change the one-panel
+     slide-over invariant that scripts/verify-maps-live.mjs asserts on production. */
+  .pcshell{display:grid;grid-template-columns:minmax(260px,26%) minmax(0,1fr);gap:16px;align-items:start}
+  .pcrail{position:sticky;top:16px;display:flex;flex-direction:column;gap:12px}
+  .pcmapwrap{position:relative;border:1px solid var(--line);border-radius:14px;overflow:hidden;
+    background:#e4eadd;box-shadow:var(--shadow-sm)}
+  #pcMap{width:100%;height:300px}
+  .pcmehere{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;
+    background:rgba(255,255,255,.92);box-shadow:0 0 0 2px var(--green),0 2px 6px rgba(16,33,28,.35)}
+  .pcmapnote{position:absolute;left:10px;bottom:10px;z-index:2;background:rgba(255,255,255,.94);
+    border:1px solid var(--line);border-radius:8px;padding:5px 9px;font-size:10.5px;color:var(--ink-2)}
+  .pcwhere{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:9px 11px;font-size:12.5px;font-weight:600;color:var(--ink)}
+  .pcwhere .pin{color:var(--green)}
+  .pcrailcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:12px 13px;box-shadow:var(--shadow-sm)}
+  .pcrailcard h4{font:700 10.5px/1.3 var(--font);letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-3);margin:0 0 8px}
+  .pcrailcard .rn{font-size:13px;font-weight:700;color:var(--ink);line-height:1.3}
+  .pcrailcard .rd{font-size:11.5px;color:var(--ink-2);line-height:1.5;margin-top:4px}
+  .pcrailcard .rrow{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;
+    padding:5px 0;border-top:1px solid var(--line-2);color:var(--ink-2)}
+  .pcrailcard .rrow b{color:var(--ink);font-weight:600;text-align:right}
+  .pcrailcard .btn{width:100%;margin-top:10px;justify-content:center}
+  @media(max-width:1040px){
+    /* At narrow widths the map does NOT survive as a thin column — it goes full width above
+       the record, and the record takes the whole page (0004's mobile rule). */
+    .pcshell{grid-template-columns:minmax(0,1fr)}
+    .pcrail{position:static;flex-direction:column}
+    #pcMap{height:220px}
+  }
 
   /* state colours — ONE definition, consumed by badges, dots and the donut */
   .pcpage{
@@ -222,6 +258,8 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="lib/map.js?v=20260720b"></script>
 <script src="lib/property-card.js"></script>
 <script src="shell.js"></script>
 <script>
@@ -316,6 +354,7 @@ HS.onReady(async function () {
     document.title = addr + ' — property card — HomeSignal';
 
     var html = headHTML(row, addr, recs, filings, parcel)
+      + '<div class="pcshell"><aside class="pcrail" id="pcRail"></aside><div class="pccard">'
       + '<div class="pcbody"><div class="pcmain">'
       + entityTrackHTML(row, byId, recs)
       + hazardsHTML(byId, row)
@@ -330,8 +369,10 @@ HS.onReady(async function () {
       + ownershipHTML(byId, row, parcel, filings, addr)
       + developmentHTML(byId, filings, row, addr)
       + '</div></div>'
-      + footHTML(row);
+      + footHTML(row)
+      + '</div></div>';
     page.innerHTML = html;
+    renderRail(row, addr);
     wire(row, addr, recs);
   }
 
@@ -990,6 +1031,111 @@ HS.onReady(async function () {
       + (row && row.refreshed_at ? ' Read from the public record on '
           + esc(HS.fmtDate(row.refreshed_at, { year: 'numeric', month: 'long', day: 'numeric' })) + '.' : '')
       + '</p></div>';
+  }
+
+  // ── THE CONTEXT RAIL ──────────────────────────────────────────────────────────
+  // Where the property is, and what regulated activity sits near it. Deliberately a SMALL,
+  // read-only map: maps.html remains the one interactive map surface, and this reuses its data
+  // (HS.data.facilities) and its marker registry (lib/map.js) rather than growing a second
+  // opinion about how a facility is drawn.
+  //
+  // NEVER-FAKED: the point plotted here is the PROPERTY's own geocode from the cached record. It
+  // is not "your home" — the card is about an address the resident is reading, not one they own —
+  // and no marker is drawn at all when the record carries no coordinates.
+  async function renderRail(row, addr) {
+    var rail = document.getElementById('pcRail'); if (!rail) return;
+    var here = (row && row.lat != null && row.lng != null) ? { lat: row.lat, lng: row.lng } : null;
+
+    var facs = [];
+    try {
+      facs = await HS.data.facilities(zip);
+      if (here && HS.withDistance) facs = HS.withDistance(facs.slice(), here);
+      facs = facs.filter(function (f) { return f.lat != null && f.lng != null; })
+        .sort(function (a, b) { return (a.distance_mi || 9e9) - (b.distance_mi || 9e9); });
+    } catch (e) { facs = []; }
+
+    var nearest = facs[0] || null;
+    rail.innerHTML =
+      '<div class="pcwhere"><span class="pin" aria-hidden="true">◉</span> ' + esc(addr) + '</div>'
+      + '<div class="pcmapwrap"><div id="pcMap" role="img" aria-label="'
+        + esc('Map of ' + addr + (facs.length ? ' and ' + facs.length + ' nearby regulated facilities' : ''))
+        + '"></div>'
+        + (here ? '' : '<div class="pcmapnote">' + esc('No map point is on the cached record for this address.') + '</div>')
+      + '</div>'
+      + nearbyFacilityHTML(nearest)
+      + connectionsRailHTML(facs);
+
+    if (here && window.maplibregl) drawRailMap(here, facs);
+  }
+
+  /** The nearby-facility card from the design — explicitly NEARBY, never attributed here. */
+  function nearbyFacilityHTML(f) {
+    if (!f) return '';
+    var interp = (HS.fac && HS.fac.interpret) ? HS.fac.interpret(f.facility_env || null) : null;
+    return '<div class="pcrailcard"><h4>Nearby regulated facility'
+      + (f.dist ? ' · ' + esc(f.dist) : '') + '</h4>'
+      + '<div class="rn">' + esc(f.name || 'Regulated facility') + '</div>'
+      + '<div class="rd">' + esc(interp ? interp.line : 'Permit status not yet confirmed — open the facility record.') + '</div>'
+      + (f.registry_id ? '<div class="rrow"><span>EPA registry ID</span><b>' + esc(f.registry_id) + '</b></div>' : '')
+      + '<a class="btn" href="' + esc(HS.pageHref('development.html', { zip: zip, id: f.id })) + '">Quick view details</a>'
+      + '</div>';
+  }
+
+  /** Facilities & regulatory connections, as a rail summary rather than a second module. */
+  function connectionsRailHTML(facs) {
+    return '<div class="pcrailcard"><h4>Facilities &amp; regulatory connections</h4>'
+      + '<div class="rd">' + esc(facs.length
+          ? facs.length + ' regulated ' + (facs.length === 1 ? 'facility is' : 'facilities are')
+            + ' on record near this address. None is attributed to this property.'
+          : C.COPY.module.facilityNoneHere) + '</div>'
+      + '<a class="btn" href="' + esc(HS.pageHref('maps.html', { zip: zip })) + '">View all connections</a>'
+      + '</div>';
+  }
+
+  // A raster MapLibre map, same sources and the same marker registry the map page uses — so a
+  // facility is the same shape and colour in both places rather than two drawings of one fact.
+  function drawRailMap(here, facs) {
+    var map;
+    try {
+      map = new maplibregl.Map({
+        container: 'pcMap', center: [here.lng, here.lat], zoom: 12.4,
+        attributionControl: { compact: true },
+        style: { version: 8, sources: {
+          osm: { type: 'raster', tileSize: 256, attribution: '© OpenStreetMap',
+            tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'] } },
+          layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#e4eadd' } },
+                   { id: 'osm', type: 'raster', source: 'osm' }] }
+      });
+    } catch (e) { console.warn('[property-card] rail map unavailable', e); return; }
+    map.on('error', function () { /* a tile failure degrades the rail, never the record */ });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    map.on('load', function () {
+      facs.slice(0, 24).forEach(function (f) {
+        var el = document.createElement('div');
+        el.innerHTML = HS.markerSVG('square', HS.markerRegistry.facilityHex, '', 13);
+        el.title = f.name + (f.dist ? ' · ' + f.dist : '');
+        new maplibregl.Marker({ element: el }).setLngLat([f.lng, f.lat]).addTo(map);
+      });
+      // The subject of the card has to be findable among two dozen neighbours, so it gets a white
+      // ring rather than just a colour — the facilities are context, this is what the page is about.
+      var home = document.createElement('div');
+      home.className = 'pcmehere';
+      home.innerHTML = HS.markerSVG('circle', HS.markerRegistry.statusHex.operating || '#1f9d5c', '', 16);
+      home.title = 'This property';
+      new maplibregl.Marker({ element: home }).setLngLat([here.lng, here.lat]).addTo(map);
+
+      // Frame the property WITH what surrounds it. Centring on the point at a fixed zoom drew a
+      // map of one pin and hid the 25 facilities the rail had just plotted — the context rail
+      // showing no context. Bounded by the nearest few, so the scale is set by the data.
+      var near = facs.slice(0, 8);
+      if (near.length) {
+        var bb = new maplibregl.LngLatBounds([here.lng, here.lat], [here.lng, here.lat]);
+        near.forEach(function (f) { bb.extend([f.lng, f.lat]); });
+        try { map.fitBounds(bb, { padding: 34, maxZoom: 13.5, duration: 0 }); } catch (e) {}
+      }
+    });
   }
 
   // ── honest non-render states ──────────────────────────────────────────────────
