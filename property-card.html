@@ -72,6 +72,9 @@
   .pcsh h2{font:700 11.5px/1.3 var(--font);letter-spacing:.06em;text-transform:uppercase;
     color:var(--ink-3);margin:0}
   .pcsh .sp{flex:1}
+  .pcinfo{border:none;background:none;padding:0 0 0 2px;color:var(--ink-3);font-size:12px;line-height:1}
+  .pcinfo:hover{color:var(--green)}
+  .pcinfo:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:4px}
   .pcsh a{font-size:12px;font-weight:600;color:var(--green);text-decoration:none;white-space:nowrap}
   .pcsh a:hover{text-decoration:underline}
   .pcsec p{font-size:12.5px;line-height:1.55;color:var(--ink-2);margin:0}
@@ -371,6 +374,8 @@ HS.onReady(async function () {
     return '<section class="pcsec' + (opts.wide ? ' wide' : '') + '" data-sec="' + esc(id) + '"'
       + ' data-tab="' + esc(d.tab) + '" aria-labelledby="pch-' + esc(id) + '">'
       + '<div class="pcsh"><h2 id="pch-' + esc(id) + '">' + esc(d.title) + '</h2>'
+      + (opts.info ? '<button class="pcinfo" type="button" aria-label="' + esc(opts.info)
+          + '" title="' + esc(opts.info) + '">\u24D8</button>' : '')
       + '<span class="sp"></span>'
       + (opts.state !== undefined ? C.badgeHTML(opts.state, { module: id, short: true }) : '')
       + (opts.link ? '<a href="' + esc(opts.link.href) + '">' + esc(opts.link.label) + '</a>' : '')
@@ -502,10 +507,14 @@ HS.onReady(async function () {
     }).join('');
     return sec('entity-track-record', {
       wide: true,
+      info: C.COPY.module.trackRecordAttribution,
       state: C.rollup(order.map(function (id) { return byId[id] && byId[id].state; })),
       link: { href: '#sources', label: 'See every source →' }
-    }, '<div class="pcsrcs">' + cells + '</div>'
-      + note('<b>What the records show.</b> ' + esc(C.COPY.module.trackRecordAttribution)));
+    // The "What the records show" box is removed from the module body (founder, 2026-08-12). The
+    // attribution itself is not deleted — it rides on the section's info affordance, because the
+    // claim it guards against ("these events happened at this address") is one the module can
+    // still invite. C.COPY.module.trackRecordAttribution remains the single source of that wording.
+    }, '<div class="pcsrcs">' + cells + '</div>');
   }
   /**
    * "Most recent" is a DATE WITH A STATE, not a nullable date — the design shows four distinct

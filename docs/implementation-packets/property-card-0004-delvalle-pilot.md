@@ -639,8 +639,13 @@ line:
 | **Records found** | (1) "`<X>` shows `<n>` `<thing>` for companies named on filings here." · (2) "`<n>` `<thing>` are on record with `<X>`." | "`<n>` `<thing>`, `<X>` `<dataset>`, retrieved `<date>`; per-event detail below." |
 | **As filed** | "`<n>` `<thing>`, as the applicant described them on the filing." | "`<n>` records, evidence tier authoritative filing; values as filed, not corroborated." |
 
-**Attribution line, always shown with this module:** "These records may involve other locations these
-companies are connected to, not necessarily anything at this address."
+**Attribution line (founder, 2026-08-12): removed from the module body, kept on the section's info
+affordance.** The wording is unchanged and still lives in `HS.card.COPY.module.trackRecordAttribution`:
+"These records may involve other locations these companies are connected to, not necessarily anything
+at this address." It is retained because the misreading it guards against — *these events happened at
+this address* — is one the module can still invite, and because the draft brief's §9 required it. If it
+should not appear at all, delete the `info:` option on the section rather than the string, so the
+wording survives for the "How completeness works" explainer.
 
 ### Parent Company
 
