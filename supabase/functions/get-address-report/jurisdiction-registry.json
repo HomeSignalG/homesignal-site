@@ -12170,6 +12170,103 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-12 OK statewide wire — the first source of any kind for Oklahoma, which was 0/197 record-backed. DISCOVERY BY ENUMERATION, and the obvious candidate was a DECOY: OKDOT_GIS publishes 'Active_Projects' (item 7246c39524524e3589b6bd4ef77925c6, 569 rows, described as the 8-Year Construction Workplan), which is DEAD — layer metadata gives dataLastEditDate 1495461327086 = 2017-05-22, nine years stale. REJECTED under the STALE disqualifier. The live layer was recovered by walking the org's own Web Map items -> operationalLayers (the Frisco precedent): 'Current 8-Year Work Plan (2026-2033)' (item 4212170505aa4a4f81764a145e55eb55, modified 2026-07-29) carries 'Work Plan Roadways' at this service_url. AGO-hosted on services6.arcgis.com, which governance section 0 records as materially lower edge-egress risk than a city-hosted server. LIVENESS: 1,524 rows; PROGRAM_FED_YR spans 2026-2036 (FY2026 178, FY2027 222, FY2028 123 ... FY2036 19), so the plan is forward-looking and current even though dataLastEditDate is 2025-10-07 — the work plan is republished annually, so that is publication cadence, not staleness. Geometry esriGeometryPolyline: rides the shipped featurePoint() centroid path, and column_map.lat/lng are __lat/__lng WITHOUT WHICH every record silently lands on the ZIP centroid at scope 'area' (the Sussex/Weld defect). TYPE — THE FIRST THREE CANDIDATES WERE ALL OPAQUE AND WERE REJECTED FOR IT: WORKPLAN_PROJ_TYPE enumerates completely (3=746, 1=393, 2=385 = exactly 1,524) but its values are the bare integers 1/2/3; C_IMPROVEMENT_TYPE is likewise opaque (04=370, 16=335, 43=330 ...); C_PROJECT_TYPE is single letters (S=1516, R=2, J=1, X=1). The standing grant bars opaque-coded values, so type_source is T_PROJ_WORK_DESC, whose values are SELF-DESCRIBING code:LABEL strings. TWO-STAGE PROBE (Rule 4): groupBy returned 23 values summing to EXACTLY 1,524 (the layer row count — positive control), and returnDistinctValues independently returned 23. All 23 mapped, 0 unclassified. Every one names state-highway construction and maps to 'Utility' (the txdot/nvdot precedent), EXCEPT '46:MONEY ONLY' (8 rows), an accounting line naming no physical work — it takes the generic member 'Development' rather than asserting infrastructure. STATUS — the layer publishes NO status column, so status_const supplies it. In sources/arcgis.ts a status_const is the RAW STATUS VALUE resolved through status_to_bucket (NOT the bucket itself — that is the socrata semantic, and confusing the two is what produced san-antonio-prelim-plan-review's silent zero), so the constant is mapped: proposed ['Programmed']. The word is the PUBLISHER'S OWN — its web map is titled 'ODOT Programmed Project Map' and the layer carries PROGRAM_FED_YR / I_PROGRAM_CATEGORY — chosen over the bucket-name 'proposed' because test/status-const-must-be-mapped.test.mjs ratchets against bucket-named constants: a constant should DESCRIBE the record, not name our internal bucket. Programmed work-plan items are future work, hence the proposed bucket. DATE — DELIBERATELY UNMAPPED. The layer offers no event date: T_LET_DATE_YEAR/MONTH are split strings and NULL on out-year projects (verified on a sampled FY2034 row), PROGRAM_FED_YR is a fiscal-year integer, and T_INITIATED_/T_COMM_ACT_ are likewise split month/year. Composing a date from parts is not something column_map supports (arrays JOIN, they do not fall back — the UDOT standing answer), so UNDATED IS CORRECT here, exactly as founder-ruled for butler-county-ks-permits on 2026-08-09. record_url_precision 'dataset': no per-record URL column exists and templating one would be guessing; dataset_url is the publisher's own AGO item page. spatial_zip_radius_mi 3 matches txdot-projects-info-all, the closest analogue (statewide DOT polyline); if OK page coverage proves thin, 5 is the nvdot-project-boundaries precedent."
+    },
+    {
+      "registry_id": "idot-annual-program-construction",
+      "platform": "arcgis",
+      "service_url": "https://services2.arcgis.com/aIrBD8yn1TDTEXoz/arcgis/rest/services/Annual_Highway_Improvement_Program/FeatureServer/2",
+      "dataset_url": "https://services2.arcgis.com/aIrBD8yn1TDTEXoz/arcgis/rest/services/Annual_Highway_Improvement_Program/FeatureServer/2",
+      "jurisdiction": "Illinois Department of Transportation",
+      "coverage": [
+        {
+          "state": "IL"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Route1",
+          "Location"
+        ],
+        "type_source": "ProjectTam",
+        "address": [
+          "Location"
+        ],
+        "case_number": "PPSProject",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "Rehabilitation - Pavements": "Utility",
+        "Preservation - Pavements": "Utility",
+        "Reconstruction - Pavements": "Utility",
+        "Initial Construction - Pavements": "Utility",
+        "Maintenance - Pavements": "Utility",
+        "Miscellaneous Improvements": "Development",
+        "Preservation - Bridges": "Utility",
+        "Initial Construction - Bridges": "Utility",
+        "Reconstruction - Bridges": "Utility",
+        "Safety": "Utility"
+      },
+      "status_const": "Proposed Improvement",
+      "status_to_bucket": {
+        "proposed": [
+          "Proposed Improvement"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-12 IL statewide wire. IDOT's Annual Highway Improvement Program — the service description calls it 'the Proposed Improvements for Illinois'. AGO-hosted on services2.arcgis.com/aIrBD8yn1TDTEXoz (owner IDOTAdmin), which governance section 0 records as materially lower edge-egress risk than a self-hosted server. REJECTED ALONGSIDE, with receipts, so neither is re-probed: (1) Road_Construction_Public/FeatureServer/2 looked far better on paper — 743 rows, dataLastEditDate 2026-08-12 (same day), and a rich schema carrying Status, StartDate, Contractor and ContractValue — but MEASURED it fails twice: `Status` is NULL on ALL 743 rows, and `ConstructionType` is NULL on 716 of 743 (96.4%) with the surviving 27 being free text ('Memorial Day Parade', 'Bridge paiinting', 'Reconstruct of US 30 w/ width restrictions EB & WB'). That is Rule 6 data absence plus Rule 5 free text, and the parade entry gives away that it is a traveler-restriction feed, not a development source. (2) MYP_Test (Multi-Year Improvement Program) splits FY2026 and FY2027-2031 across six layers and carries 'Test' in its service name; left for a later pass. TYPE: ProjectTam, self-describing, two-stage probed (Rule 4) — groupBy and returnDistinctValues agree on the value count and the groupBy sums EXACTLY to the layer row count, which is the positive control. 0 NULLs, 0 unclassified. All values are state-highway construction -> Utility (the txdot/nvdot/okdot precedent) except 'Miscellaneous Improvements', which names no specific work and takes the generic member 'Development'. STATUS: the layers publish no status column, so status_const supplies it. In sources/arcgis.ts status_const is the RAW STATUS VALUE resolved through status_to_bucket (not the bucket itself — the socrata semantic, whose confusion produced san-antonio-prelim-plan-review's silent zero), so it is mapped: proposed ['Proposed Improvement']. The phrase is the PUBLISHER'S OWN, from the service description, and is used rather than the bare bucket name 'proposed' because test/status-const-must-be-mapped.test.mjs ratchets against bucket-named constants — a constant should describe the record. DATE: DELIBERATELY UNMAPPED. The layer carries no date field of any kind (full field list: EstimatedC, Improvem_1/2/3, Location, OBJECTID, PPSProject, ProjectTam, RecordType, Route1/2/3, Shape). UNDATED IS CORRECT, as founder-ruled for butler-county-ks-permits 2026-08-09 and applied to okdot-workplan-roadways the same day as this. dataLastEditDate 2025-10-01 is the ANNUAL publication cadence, not staleness — the program is republished each year, the same reasoning recorded for OKDOT. record_url_precision 'dataset': no per-record URL column exists; templating one would be guessing. spatial_zip_radius_mi 3 matches txdot-projects-info-all and okdot-workplan-roadways, the closest analogues. IL already had 256/474 pages via chicago-building-permits and the two county highway programs; this entry is aimed at the 218 dark pages, which are overwhelmingly non-Cook. THIS ENTRY: layer 2 'Construction', esriGeometryPolyline (rides the shipped featurePoint() centroid path), 726 rows. ProjectTam enumerates to 10 values summing to EXACTLY 726: Rehabilitation - Pavements 389, Preservation - Pavements 175, Reconstruction - Pavements 97, Initial Construction - Pavements 36, Maintenance - Pavements 10, Miscellaneous Improvements 9, Preservation - Bridges 6, Initial Construction - Bridges 2, Reconstruction - Bridges 1, Safety 1; returnDistinctValues independently returned 10. column_map lat/lng are __lat/__lng, without which every record silently lands on the ZIP centroid at scope 'area' (the Sussex/Weld defect)."
+    },
+    {
+      "registry_id": "idot-annual-program-bridges",
+      "platform": "arcgis",
+      "service_url": "https://services2.arcgis.com/aIrBD8yn1TDTEXoz/arcgis/rest/services/Annual_Highway_Improvement_Program/FeatureServer/0",
+      "dataset_url": "https://services2.arcgis.com/aIrBD8yn1TDTEXoz/arcgis/rest/services/Annual_Highway_Improvement_Program/FeatureServer/0",
+      "jurisdiction": "Illinois Department of Transportation",
+      "coverage": [
+        {
+          "state": "IL"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Route1",
+          "Location"
+        ],
+        "type_source": "ProjectTam",
+        "address": [
+          "Location"
+        ],
+        "case_number": "PPSProject",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "Preservation - Bridges": "Utility",
+        "Reconstruction - Bridges": "Utility",
+        "Rehabilitation - Bridges": "Utility",
+        "Rehabilitation - Pavements": "Utility",
+        "Reconstruction - Pavements": "Utility",
+        "Miscellaneous Improvements": "Development",
+        "Maintenance - Bridges": "Utility",
+        "Safety": "Utility",
+        "Initial Construction - Bridges": "Utility"
+      },
+      "status_const": "Proposed Improvement",
+      "status_to_bucket": {
+        "proposed": [
+          "Proposed Improvement"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-12 IL statewide wire. IDOT's Annual Highway Improvement Program — the service description calls it 'the Proposed Improvements for Illinois'. AGO-hosted on services2.arcgis.com/aIrBD8yn1TDTEXoz (owner IDOTAdmin), which governance section 0 records as materially lower edge-egress risk than a self-hosted server. REJECTED ALONGSIDE, with receipts, so neither is re-probed: (1) Road_Construction_Public/FeatureServer/2 looked far better on paper — 743 rows, dataLastEditDate 2026-08-12 (same day), and a rich schema carrying Status, StartDate, Contractor and ContractValue — but MEASURED it fails twice: `Status` is NULL on ALL 743 rows, and `ConstructionType` is NULL on 716 of 743 (96.4%) with the surviving 27 being free text ('Memorial Day Parade', 'Bridge paiinting', 'Reconstruct of US 30 w/ width restrictions EB & WB'). That is Rule 6 data absence plus Rule 5 free text, and the parade entry gives away that it is a traveler-restriction feed, not a development source. (2) MYP_Test (Multi-Year Improvement Program) splits FY2026 and FY2027-2031 across six layers and carries 'Test' in its service name; left for a later pass. TYPE: ProjectTam, self-describing, two-stage probed (Rule 4) — groupBy and returnDistinctValues agree on the value count and the groupBy sums EXACTLY to the layer row count, which is the positive control. 0 NULLs, 0 unclassified. All values are state-highway construction -> Utility (the txdot/nvdot/okdot precedent) except 'Miscellaneous Improvements', which names no specific work and takes the generic member 'Development'. STATUS: the layers publish no status column, so status_const supplies it. In sources/arcgis.ts status_const is the RAW STATUS VALUE resolved through status_to_bucket (not the bucket itself — the socrata semantic, whose confusion produced san-antonio-prelim-plan-review's silent zero), so it is mapped: proposed ['Proposed Improvement']. The phrase is the PUBLISHER'S OWN, from the service description, and is used rather than the bare bucket name 'proposed' because test/status-const-must-be-mapped.test.mjs ratchets against bucket-named constants — a constant should describe the record. DATE: DELIBERATELY UNMAPPED. The layer carries no date field of any kind (full field list: EstimatedC, Improvem_1/2/3, Location, OBJECTID, PPSProject, ProjectTam, RecordType, Route1/2/3, Shape). UNDATED IS CORRECT, as founder-ruled for butler-county-ks-permits 2026-08-09 and applied to okdot-workplan-roadways the same day as this. dataLastEditDate 2025-10-01 is the ANNUAL publication cadence, not staleness — the program is republished each year, the same reasoning recorded for OKDOT. record_url_precision 'dataset': no per-record URL column exists; templating one would be guessing. spatial_zip_radius_mi 3 matches txdot-projects-info-all and okdot-workplan-roadways, the closest analogues. IL already had 256/474 pages via chicago-building-permits and the two county highway programs; this entry is aimed at the 218 dark pages, which are overwhelmingly non-Cook. THIS ENTRY: layer 0 'Bridge Improvement', esriGeometryPoint (records place by their OWN points), 1,106 rows. ProjectTam enumerates to 9 values summing to EXACTLY 1,106: Preservation - Bridges 831, Reconstruction - Bridges 155, Rehabilitation - Bridges 36, Rehabilitation - Pavements 35, Reconstruction - Pavements 17, Miscellaneous Improvements 12, Maintenance - Bridges 9, Safety 6, Initial Construction - Bridges 5."
     }
   ],
   "ckan": [
