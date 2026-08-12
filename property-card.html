@@ -103,6 +103,8 @@
   .pcmetric .ml{font-size:11px;line-height:1.35;color:var(--ink-3);min-width:0}
   .pcmetric .mv{font-size:14px;font-weight:700;letter-spacing:-.01em;color:var(--ink);flex:none}
   .pcmetric .mv.na{color:var(--ink-3);font-weight:600}
+  .pcrecent{font-size:11px;color:var(--ink-3);margin-top:9px;padding-top:8px;border-top:1px solid var(--line-2)}
+  .pcrecent b{color:var(--ink-2);font-weight:600}
   .pcsrc .sd{font-size:11.5px;line-height:1.5;color:var(--ink-2);margin-top:9px}
 
   /* ── fact rows ── */
@@ -304,8 +306,12 @@ HS.onReady(async function () {
     if (parcel && parcel.property_id) chips.push(chip('Property ID', parcel.property_id));
     if (parcel && parcel.geographic_id) chips.push(chip('Geographic ID', parcel.geographic_id));
     if (!chips.length) chips.push('<span class="pcchip none">Parcel identifiers — not checked</span>');
+    if (parcel && parcel.property_class) chips.push(chip('Property class', parcel.property_class));
+    // DERIVED, not a source field: a boolean over whether any development filing exists. The pilot
+    // can render this today, which makes it the one header chip that is not "not checked".
     if (filings.length) {
-      chips.push('<span class="pcchip flag">' + filings.length + ' development filing'
+      chips.push('<span class="pcchip flag">Development activity detected</span>');
+      chips.push('<span class="pcchip">' + filings.length + ' filing'
         + (filings.length === 1 ? '' : 's') + ' on record</span>');
     }
     if (row.refreshed_at) {
@@ -351,7 +357,7 @@ HS.onReady(async function () {
       + ' data-tab="' + esc(d.tab) + '" aria-labelledby="pch-' + esc(id) + '">'
       + '<div class="pcsh"><h2 id="pch-' + esc(id) + '">' + esc(d.title) + '</h2>'
       + '<span class="sp"></span>'
-      + (opts.state !== undefined ? C.badgeHTML(opts.state, { short: true }) : '')
+      + (opts.state !== undefined ? C.badgeHTML(opts.state, { module: id, short: true }) : '')
       + (opts.link ? '<a href="' + esc(opts.link.href) + '">' + esc(opts.link.label) + '</a>' : '')
       + '</div>' + body + '</section>';
   }
@@ -474,7 +480,9 @@ HS.onReady(async function () {
         + '<div class="sb">' + C.badgeHTML(s.state) + '</div>'
         + '<div class="pcmetrics">'
         + trackMetrics(id, s.state, recs).map(function (m) { return metric(m.text, m.label); }).join('')
-        + '</div><div class="sd">' + esc(s.detail) + '</div></div>';
+        + '</div>'
+        + '<div class="pcrecent">Most recent: <b>' + esc(mostRecent(s.state, s.recent)) + '</b></div>'
+        + '<div class="sd">' + esc(s.detail) + '</div></div>';
     }).join('');
     return sec('entity-track-record', {
       wide: true,
@@ -482,6 +490,20 @@ HS.onReady(async function () {
       link: { href: '#sources', label: 'See every source →' }
     }, '<div class="pcsrcs">' + cells + '</div>'
       + note('<b>What the records show.</b> ' + esc(C.COPY.module.trackRecordAttribution)));
+  }
+  /**
+   * "Most recent" is a DATE WITH A STATE, not a nullable date — the design shows four distinct
+   * answers (Not available / Not applicable / Not checked / In progress) and they mean different
+   * things. A real date renders only when the source supplied one.
+   */
+  function mostRecent(state, when) {
+    if (when) return HS.fmtDate(when, { year: 'numeric', month: 'short', day: 'numeric' });
+    var k = C.state(state);
+    if (k === 'not_checked') return 'Not checked';
+    if (k === 'in_progress') return 'In progress';
+    if (k === 'unavailable' || k === 'access_restricted') return 'Not available';
+    if (k === 'checked_empty') return 'Not applicable';
+    return 'Not available';
   }
   function metric(text, label) {
     var na = text === C.NO_VALUE;
@@ -497,13 +519,21 @@ HS.onReady(async function () {
   // A function, not a `var` map: render() runs before this point in the body, so a `var`
   // assignment here is still undefined when the first card is drawn. Declarations hoist; the
   // values they are assigned do not.
+  // ARITY MATTERS, not just wording: the approved design gives EPA/ECHO and TCEQ three columns,
+  // OSHA three DIFFERENT ones, and SEC and State/Local only TWO. A source renders the metrics it
+  // can have — padding every source to three em-dashes invents a gap the source does not have.
+  //
+  // TCEQ carries enforcement terms because the agency publishes Notices of Violation and Notices
+  // of Enforcement. Its Central Registry is a separate PRESENCE dataset, and the gap between the
+  // two is what makes the pilot's TCEQ row `partial` rather than a clean empty — the presence
+  // check ran, the enforcement checks did not.
   function trackMetricLabels(id) {
     var TRACK_METRICS = {
       epa_echo:    ['Violations', 'Enforcement actions', 'Penalties'],
-      state_env:   ['Programs on record', 'Violations', 'Penalties'],
-      osha:        ['Violations', 'Inspections', 'Penalties'],
-      sec:         ['Enforcement matters', 'Filings', 'Penalties'],
-      state_local: ['Violations', 'Enforcement actions', 'Penalties']
+      state_env:   ['Violations', 'Enforcement actions', 'Penalties'],
+      osha:        ['Inspections', 'Violations', 'Penalties'],
+      sec:         ['Enforcement matters', 'Penalties'],
+      state_local: ['Records', 'Penalties']
     };
     return TRACK_METRICS[id] || ['Violations', 'Enforcement actions', 'Penalties'];
   }
@@ -515,12 +545,12 @@ HS.onReady(async function () {
    */
   function trackMetrics(id, state, recs) {
     var labels = trackMetricLabels(id);
-    var vals = [C.NO_VALUE, C.NO_VALUE, C.NO_VALUE];
+    var vals = labels.map(function () { return C.NO_VALUE; });
     // The flip side of the gate, and just as load-bearing: a source we DID query that returned
     // nothing has a real, measured zero, and printing an em-dash over it would be a new
     // inaccuracy in the opposite direction — the ruling behind test/facilities-unavailable-copy.
     if (state === 'checked_empty') {
-      vals = [C.metricText(state, 0), C.metricText(state, 0), C.metricText(state, 0)];
+      vals = labels.map(function () { return C.metricText(state, 0); });
     } else if (C.isCountable(state) && id === 'epa_echo') {
       var viol = 0, acts = 0, pen = null, sawAct = false;
       recs.forEach(function (s) {
@@ -535,14 +565,11 @@ HS.onReady(async function () {
       // Formatting happens AFTER the gate, never instead of it: a penalty figure can only be
       // dressed up once metricText has already decided it is allowed on the screen at all.
       if (vals[2] !== C.NO_VALUE) vals[2] = '$' + Number(vals[2]).toLocaleString();
-    } else if (C.isCountable(state) && id === 'state_env') {
-      var programs = 0;
-      recs.forEach(function (s) {
-        var t = s.env && s.env.tceq; if (!t) return;
-        programs += (t.programs || []).length;
-      });
-      vals[0] = C.metricText(state, programs);   // enrolments, under their own label
     }
+    // NOTE the deliberate absence of a state_env branch: the cached TCEQ payload holds PROGRAM
+    // ENROLMENTS (Central Registry), and an enrolment is not a violation or an enforcement action.
+    // Writing that count into either slot would read as an accusation the record does not make, so
+    // the enrolment count rides in the module's detail line and these metrics stay unstated.
     return labels.map(function (label, i) { return { label: label, text: vals[i] }; });
   }
 
@@ -579,6 +606,7 @@ HS.onReady(async function () {
       + row2('Acreage', parcel && parcel.acreage != null ? parcel.acreage + ' acres' : null)
       + row2('Property ID', parcel && parcel.property_id)
       + row2('Geographic ID', parcel && parcel.geographic_id)
+      + row2('Property class', parcel && parcel.property_class)
       + row2('Owner of record', parcel && parcel.owner_of_record)
       + '</div>';
     if (filedList.length) {
@@ -638,7 +666,14 @@ HS.onReady(async function () {
             + '</div></div></div>';
         }).join('')
       : '<p>' + esc(s.detail) + '</p>';
-    body += '<p class="pcprov">' + esc(C.COPY.module.facilityNoParcelLink) + '</p>';
+    body += '<div class="pcrows" style="margin-top:10px">'
+      + ['epa_frs', 'state_env'].map(function (id) {
+          var src = byId[id]; if (!src) return '';
+          return '<div class="pcrow"><span>' + esc(src.short) + '</span><b>'
+            + C.badgeHTML(src.state, { module: 'facility-connections' }) + '</b></div>';
+        }).join('')
+      + '</div>'
+      + '<p class="pcprov">' + esc(C.COPY.module.facilityNoParcelLink) + '</p>';
     return sec('facility-connections', {
       state: C.rollup([s.state, byId.epa_echo && byId.epa_echo.state, byId.state_env && byId.state_env.state])
     }, body);
@@ -680,7 +715,10 @@ HS.onReady(async function () {
   function sustainabilityHTML(byId) {
     var s = byId.sustain;
     var rows = ['Third-party ratings', 'Company-reported metrics', 'ESG / sustainability filings']
-      .map(function (k) { return row2(k, null); }).join('');
+      .map(function (k) {
+        return '<div class="pcrow"><span>' + esc(k) + '</span><b>'
+          + C.badgeHTML(s.state, { module: 'sustainability' }) + '</b></div>';
+      }).join('');
     return sec('sustainability', { state: s.state },
       '<div class="pcrows">' + rows + '</div>'
       + '<p class="pcprov">' + esc(s.detail) + '</p>');
@@ -691,7 +729,10 @@ HS.onReady(async function () {
     var s = byId.recorder;
     var inst = (row.instruments || []);
     var body = inst.length
-      ? inst.slice(0, 6).map(function (i) {
+      ? '<p class="pcprov">' + esc(inst.length + ' instrument reference'
+          + (inst.length === 1 ? '' : 's') + (row.instruments_source ? ' reported by ' + row.instruments_source : ''))
+        + '</p>'
+        + inst.slice(0, 6).map(function (i) {
           return '<div class="pcrec"><div class="rd">' + esc(i.recorded_at || '') + '</div>'
             + '<div style="flex:1"><div class="rt">' + esc(i.kind || 'Instrument') + '</div>'
             + '<div class="rs">' + esc(i.instrument_no || '')
@@ -714,7 +755,16 @@ HS.onReady(async function () {
     // Counts route through the same gate as every other number on the card: a source we did
     // not query renders an em-dash, and a source we queried that returned nothing renders a
     // real 0. row2 flags the em-dash as absent for us, so the two cases stay visibly apart.
-    var body = '<div class="pcrows">'
+    // The design lists the SOURCES behind the track record, each with its availability. Same
+    // states as everywhere else, relabelled in this module's vocabulary.
+    var order = ['epa_echo', 'state_env', 'osha', 'sec', 'state_local', 'permits', 'recorder'];
+    var body = '<div class="pcrows">' + order.map(function (id) {
+      var src = byId[id]; if (!src) return '';
+      return '<div class="pcrow"><span>' + esc(src.short) + '</span><b>'
+        + C.badgeHTML(src.state, { module: 'regulatory-records' }) + '</b></div>';
+    }).join('') + '</div>'
+      + '<p class="pcprov">' + esc('Underlying official records that support the track-record summaries.') + '</p>'
+      + '<div class="pcrows" style="margin-top:6px">'
       + row2('Facilities with a compliance summary', C.metricText(byId.epa_echo.state, epa.length))
       + row2('State registry programs on record', C.metricText(byId.state_env.state, progList.length))
       + '</div>';

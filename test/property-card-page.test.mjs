@@ -127,8 +127,17 @@ need(/C\.metricText\(/.test(card), 'the card page never calls HS.card.metricText
 // place a raw number in a metric slot.
 const tm = (card.match(/function trackMetrics\(id, state, recs\) \{[\s\S]*?\n  \}/) || [''])[0];
 need(tm.length > 200, 'trackMetrics could not be located to audit');
-need(/vals = \[C\.NO_VALUE, C\.NO_VALUE, C\.NO_VALUE\]/.test(tm),
+need(/vals = labels\.map\(function \(\) \{ return C\.NO_VALUE; \}\)/.test(tm),
   'trackMetrics does not start every metric at the absent marker');
+// Arity comes from the source, not from a hardcoded three. The approved design gives SEC and
+// State/Local two columns; padding them to three invents a gap those sources do not have.
+need(/sec:\s*\['Enforcement matters', 'Penalties'\]/.test(card)
+  && /state_local:\s*\['Records', 'Penalties'\]/.test(card),
+  'per-source metric arity does not match the approved design (SEC and State/Local have two)');
+need(/osha:\s*\['Inspections', 'Violations', 'Penalties'\]/.test(card),
+  'OSHA does not carry its own metric set from the design');
+need(/labels\.map\(function \(\) \{ return C\.metricText\(state, 0\); \}\)/.test(tm),
+  'the checked-empty path pads to a fixed three instead of the source\u2019s own arity');
 [...tm.matchAll(/vals\[\d\] = ([^;]+);/g)].forEach((m) => {
   need(/C\.metricText\(/.test(m[1]) || /C\.NO_VALUE/.test(m[1]) || /Number\(vals\[/.test(m[1]),
     `trackMetrics assigns a metric without the metricText gate: vals[..] = ${m[1].trim()}`);
@@ -142,9 +151,37 @@ need(/state === 'checked_empty'[\s\S]{0,220}C\.metricText\(state, 0\)/.test(tm),
 // Each source labels what IT counts: a state registry's programme enrolments must never be
 // displayed under "Enforcement actions".
 need(/var TRACK_METRICS = \{/.test(card), 'track-record metric labels are not per-source');
-need(/state_env:\s*\['Programs on record'/.test(card),
-  'the state registry’s enrolment count is not labelled as programmes — under an enforcement '
-  + 'label it reads as an accusation the record does not make');
+// The enrolment problem is now solved more strongly than by relabelling. The cached TCEQ payload
+// holds Central Registry PROGRAM ENROLMENTS, and an enrolment is neither a violation nor an
+// enforcement action — so trackMetrics has NO state_env branch at all and writes no metric for it,
+// rather than writing a count under a softer label. Assert the absence, since that is the guarantee.
+need(!/id === 'state_env'/.test(tm),
+  'trackMetrics writes a metric for the state registry — its cached payload is programme '
+  + 'enrolments, which under any enforcement label reads as an accusation the record does not make');
+need(/ENROLMENTS/.test(card) || /enrolment/i.test(tm),
+  'nothing records WHY the state registry writes no metric, so a future edit will add one back');
+
+// ── 6b. one state machine, many approved labels ───────────────────────────────
+// The design says the same state five different ways. Each module may RELABEL a state; none may
+// invent one, or the five vocabularies become five state machines that disagree at the edges.
+need(/C\.badgeHTML\(opts\.state, \{ module: id, short: true \}\)/.test(card),
+  'section badges do not relabel per module, so the design\u2019s own wording cannot appear');
+need(/const MODULE_LABELS = \{/.test(lib), 'per-module labels are not declared in the shared lib');
+need(/card\.moduleLabel = function/.test(lib), 'there is no single relabelling entry point');
+for (const [mod, label] of [['regulatory-records', 'Data available'],
+  ['facility-connections', 'Connections found'], ['sustainability', 'Pilot only']]) {
+  need(new RegExp("'" + mod + "'[\\s\\S]{0,400}?" + label).test(lib),
+    `the design's "${label}" wording is missing for ${mod}`);
+}
+// A relabel must not become a new state: every label maps onto a declared state key.
+{
+  const block = (lib.match(/const MODULE_LABELS = \{[\s\S]*?\n  \};/) || [''])[0];
+  for (const m of block.matchAll(/(\w+):\s*'[^']+'/g)) {
+    const key = m[1];
+    if (['regulatory-records', 'facility-connections', 'sustainability', 'entity-track-record'].includes(key)) continue;
+    need(!!HS.card.STATES[key], `MODULE_LABELS relabels "${key}", which is not a declared state`);
+  }
+}
 // The two regulatory counts are the ones most tempting to interpolate raw.
 need(/row2\('Facilities with a compliance summary', C\.metricText\(/.test(card),
   'the compliance-summary count is not routed through metricText');

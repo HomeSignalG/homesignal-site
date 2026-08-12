@@ -345,6 +345,16 @@ not happen. The honest rendering is either:
 its place in the vocabulary. Derive per-agency state from **(agency, dataset)**, never from agency
 alone — an agency with several datasets is `partial` when only some were queried.
 
+**The visible symptom this rule prevents, seen in a render (2026-08-11):** with the derivation still
+keyed on agency alone, the TCEQ card shows the badge **"Checked — records found"** above **three
+em-dashes**. It is technically honest — registry records were read, no enforcement counts exist — but
+to a resident it reads as a contradiction, and it quietly implies enforcement was among what got
+checked. Under the (agency, dataset) rule the same data renders as **`partial`** with the datasets
+named, which says the true thing plainly. The current card derives state from
+`property_reports.sources_checked` and the `env` payloads and so **does not implement this yet**;
+wiring `track_record_checks` (§5) is what fixes it, and this is the first thing to check once it is
+wired.
+
 **So the honest Caldwell card is:** TCEQ = ***Partial*** (Central Registry checked and empty on
 2026-08-09 with `query_basis` and `source_url`; enforcement not checked) · EPA FRS = *Checked — no
 records found* at the address · EPA ECHO, OSHA, SEC, State/Local = *Not checked* · 5 real TDLR
