@@ -735,8 +735,15 @@ HS.onReady(async function () {
    * things. A real date renders only when a source supplied one.
    */
   function mostRecent(state, when) {
-    if (when) return HS.fmtDate(when, { year: 'numeric', month: 'short', day: 'numeric' });
     var k = C.state(state);
+    // "Most recent" means the most recent RECORD, so a date may render only for a state that
+    // actually has records. A read model passing us the time we last TRIED — which is the only
+    // date a failed or empty check has — would print "Most recent: Aug 12, 2026" beside a source
+    // we could not reach, reading as a finding dated today. Same shape as the metricText gate:
+    // the state decides whether the value may be shown at all.
+    if (when && (k === 'verified' || k === 'reported' || k === 'conflicting')) {
+      return HS.fmtDate(when, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
     if (k === 'not_checked') return 'Not checked';
     if (k === 'in_progress') return 'In progress';
     if (k === 'unavailable' || k === 'access_restricted') return 'Not available';

@@ -70,8 +70,11 @@ const fixture = {
       relationship_verification: 'not_yet_asked', evidence_class: 'authoritative_filing',
       relationship_source: 'Permit TABS2026011928',
       formed_date: '2026-02-10',
-      track: { fincen: { state: 'checked_empty', found_n: 0 },
-        epa_echo: { state: 'checked_empty', found_n: 0 } } },
+      // `recent` is deliberately the date we LAST TRIED, which is what a check row can supply.
+      // It must not surface as "Most recent", because that means the most recent RECORD.
+      track: { fincen: { state: 'checked_empty', found_n: 0, recent: '2026-08-12T00:00:00Z' },
+        epa_echo: { state: 'checked_empty', found_n: 0 },
+        sec: { state: 'unavailable', recent: '2026-08-12T00:00:00Z' } } },
     { id: 'ent-2', name: PARENT, role: 'parent',
       relationship_kind: 'parent_company', relationship_verification: 'verified',
       relationship_source: 'SEC EX-21.01 to the FY2025 Form 10-K',
@@ -191,6 +194,13 @@ ok(/1 further record names this company/.test(parentText),
   'a record we hold but have not verified is folded into the verified count, or dropped');
 // A newly formed company must not read like a thirty-year clean record.
 ok(/formed/i.test(projectText), 'a known formation date is not rendered');
+// "Most recent" is the most recent RECORD. A source we could not reach, and a source we read that
+// held nothing, have no most-recent record — only a date we last tried, which must not surface as
+// one. Both rows carry that date in the fixture and neither may print it.
+ok(!/Most recent: *Aug 12, 2026/.test(projectText),
+  'the date we last TRIED a source rendered as "Most recent", dating a finding to today');
+ok(/Most recent: *Not applicable/.test(projectText) && /Most recent: *Not available/.test(projectText),
+  'a checked-and-empty source and an unreachable one do not state why they have no recent record');
 
 // ── 4. ATTRIBUTION — the record is INSIDE the parent's group and nowhere else ──────
 ok(/Parent company \u2014 FinCEN Enforcement Action/.test(parentText),

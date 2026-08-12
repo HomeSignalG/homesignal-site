@@ -817,8 +817,43 @@ Entities → Track Record Records → Source Agency / Source Document.`
 | Role | Renders | Gate |
 |---|---|---|
 | `project_entity` | **always**, even with nothing on it — its lack of records is the answer a resident came for | none |
-| `parent` | only when a parent exists | relationship must be verified |
-| `related` | operator · developer · property owner · subsidiary · affiliate · management company | **verified relationship AND a stated role**. A corporate relative that merely shares ownership is excluded — a list of every affiliate is not information about this property |
+| `parent` | only when a parent exists | **verified relationship that names its source** |
+| `related` | operator · developer · property owner · subsidiary · affiliate · management company | **verified, sourced relationship AND a stated material role in this project**. A corporate relative that merely shares ownership is excluded — a list of every affiliate is not information about this property |
+
+**Correction, 2026-08-12 (later build).** The table above shipped as documentation before it shipped
+as code: only `related` was actually filtered. `parent` was ungated, so **an unverified parent would
+have rendered its enforcement history against this property.** The gate is now one function,
+`HS.card.entityGate(entity, role)`, applied in three places that must agree — the shared library, the
+page, and the SQL read function — and asserted in `test/property-card-page.test.mjs`. It returns a
+REASON as well as a verdict, because the reason is itself something the card says out loud rather
+than a silent omission:
+
+| Reason | What the card says |
+|---|---|
+| `none` | *"No confirmed parent company — we only show one when a public document proves the link."* |
+| `candidate` / `unsourced` | *"We've seen a possible parent company but haven't confirmed it, so we're not showing its history."* |
+| `not_material` | *"We show another company here only when a public document shows what part it plays in this project."* |
+| `kind_mismatch` | nothing renders — a `subsidiary` cannot appear as a controlling company |
+
+### Relationships are first-class, with a kind, a verification and a source
+
+`HS.card.RELATIONSHIP_KINDS` declares nine, and each one's `group` decides which entity group renders
+it — so the **layout follows the data** instead of a hardcoded list of parent synonyms:
+
+| group | kinds |
+|---|---|
+| `parent` | `parent_company` · `controlling_company` · `ultimate_owner` |
+| `related` | `operator` · `developer` · `property_owner` · `management_company` · `subsidiary`\* · `affiliate`\* |
+
+\* marked `corporate_family`. Not a special case in the gate — they fail the same `material_role`
+requirement every related kind faces. The flag exists so the exclusion is legible rather than
+incidental: an ownership chart is not a part in this project.
+
+`HS.card.VERIFICATION` is `not_yet_asked · unverified_candidate · verified` — **the vocabulary the
+database already enforces on `company_parents`**, reused verbatim so the card and the store cannot
+come to mean different things by "verified". `HS.card.EVIDENCE_CLASSES` carries the architecture
+doc's Part 4.4 ladder alongside it, because *whose evidence* and *have we verified it* are different
+questions: a permit filing is authoritative about what was filed and about nothing else.
 
 ### Agencies are data
 
@@ -836,14 +871,63 @@ relationship_to_property · parent_or_subsidiary_relationship · action_date · 
 violation_category · violation_summary · penalty_amount · action_status · source_url ·
 source_document_url · source_document_title · verification_status · confidence_score · retrieved_at`.
 
+`confidence_score` is **carried and never rendered.** Sources and resolvers emit one, and dropping it
+on ingest would throw away work somebody upstream did — but it reaches no screen and no arbitration
+consumes it. Part 29 **Q8** settles confidence as categorical, permanently, because a number invites
+arithmetic across incommensurable evidence. `verification_status` is the field the card reads.
+`HS.card.UNRENDERED_FIELDS` declares this and a test asserts it.
+
 ### ATTRIBUTION — the rule the grouping exists to enforce
 
 `HS.card.recordsFor(records, entity)` is the gate. A record is displayed under the legal entity the
-**source document names**, matched on the resolved entity id or an **exact** case-insensitive legal
-name. **A near name match is never accepted** — "Greenland Energy LLC" and "Greenland Energy Holdings
+**source document names**. Matching is on the exact legal name, **verified** former names,
+**verified** d/b/a names, and known identifiers — the list the brief specifies, and nothing wider.
+**A near name match is never accepted** — "Greenland Energy LLC" and "Greenland Energy Holdings
 LLC" are different companies until a source says otherwise, and guessing is how a subsidiary's fine
-lands on a parent's record. Tested both ways, including the case that matters: a parent's FinCEN
-action must never appear under the project LLC.
+lands on a parent's record. An **unverified alias is refused**: it is somebody's guess that two
+companies are one company, and matching on it is the automatic merge the model forbids. Where the
+resolver has already spoken *and this entity carries an identifier to answer with*, its answer wins —
+falling back to a name there would let a resolved record be re-attributed by the very guess the
+resolution replaced. Tested both ways, including the case that matters: a parent's FinCEN action must
+never appear under the project LLC.
+
+#### Search scope is not attribution scope
+
+The brief asks for two things that sound contradictory and are not: match records against *verified
+subsidiaries and verified parent companies*, **and** attribute every record to the entity the
+document names. Those are two questions, so they are two functions:
+
+| | Answers | Corporate family in scope? |
+|---|---|---|
+| `HS.card.lookupTargets(entities)` | **what do we search for?** | **yes**, when verified — a resident is entitled to a controlling company's record, so a confirmed parent is worth querying |
+| `HS.card.recordsFor(records, entity)` | **where does a result go?** | **never** — the family widens the search and never the attribution |
+
+Collapsing them into one function is exactly how a subsidiary's fine ends up on a parent's record:
+the search was correct, the filing was correct, and the attribution in between was assumed. Each
+target carries a `via` tag naming the entity it came from, so a result is filed back under the
+company the document names rather than under whichever query happened to find it. An **unconfirmed**
+parent is not searched for at all — that is how a suspicion acquires a record.
+
+### The records themselves, not only their counts
+
+Counts alone left a resident able to see that a parent had three FinCEN matters and unable to see
+what any of them were. Each record now renders under the required heading —
+**`Parent company — FinCEN Enforcement Action`**, the relationship leading, because that is what
+stops a parent's matter reading as something the company at this address did — followed by the matter
+number, issue, penalty, status and a link to the source document. Four guards, all tested:
+
+1. A record whose source never called it an enforcement action **is not called one**: a missing
+   `record_type` yields the agency alone. That is the single most consequential word on the card.
+2. An **unstated penalty says "the record doesn't say", never `$0`** — the same rule `metricText()`
+   enforces for counts, for the same reason.
+3. A sparse matter **names what it is silent on in one line** rather than seven identical ones — the
+   same density answer as the unchecked-agency line, for the same reason. **Penalty is exempt** and
+   always keeps its own row, because silence there is the field a reader is likeliest to fill in as
+   zero.
+4. The **per-entity summary line** is the required contrast, and both halves count `verified` records
+   only so they are comparable: *"No verified enforcement records found in currently connected
+   HomeSignal sources."* directly above *"3 verified enforcement records found."* Records we hold but
+   have not verified are counted apart, in their own sentence, and never folded into either.
 
 **A property-level check is not an entity-level check.** Entity rows are driven by
 `entity.track[agency]` only. Populating them from the address-level state would show three companies
@@ -876,6 +960,81 @@ Matching must support exact legal name · former legal names · DBA names · ver
 verified parents · known entity identifiers. **Never merge on name similarity alone**, and every
 parent/subsidiary relationship carries a source and a verification status — which is why the group
 header renders the relationship, its source and (where present) a link to the document.
+
+### The store — `docs/property-card-entity-track-record.sql`
+
+Parked and applied manually, same convention as the other `docs/*.sql`. Idempotent. **RLS enabled on
+every table, anon `SELECT` only** — 21 tables in this project shipped with RLS disabled and nothing
+here adds a 22nd.
+
+| Table | Holds |
+|---|---|
+| `track_source_agency` | the agency registry; `agency_id` mirrors `HS.card.AGENCIES[].id`. **FinCEN is a row here**, which is what "a source, not a module" means structurally |
+| `track_entity` | thin: the name as the establishing source wrote it, `company_key` kept as an alternate key, and a formation date |
+| `track_entity_identifier` | `sec.cik` · `ein` · `lei` · `tceq.cn` …, each with the authority that issued it |
+| `track_entity_alias` | former names and d/b/a names, each with **its own** verification |
+| `track_entity_relationship` | parent / controlling / related edges, with kind, verification, source and `material_role` |
+| `property_track_entity` | address → entity → group, keyed on the engine's canonical address |
+| `track_record_event` | the source-agnostic record — columns are exactly `HS.card.ENFORCEMENT_FIELDS` |
+| `track_source_check` | one row per (entity, agency) we actually queried. **No row = not checked**; `found_n = 0` with `status = 'ok'` = a measured zero |
+
+Two CHECKs carry rules the card depends on and cannot enforce for itself: a **verified relationship
+or alias cannot exist without a source** — the same shape of constraint `company_parents` already
+uses to make a parent name storable only on a verified row.
+
+The read function `property_card_entity_track(address)` returns
+`{ entities, enforcement_records }` and **applies the group gates itself**, so an unverified parent
+cannot reach a caller that forgets to check. It emits verified aliases only, and never emits
+`confidence_score`.
+
+**Nothing here is a fourth parallel truth.** §19 disposition is written into the file header:
+`companies` (45) → `track_entity`, `company_parents` (8) → `track_entity_relationship` with its
+vocabulary verbatim, `company_aliases` (0) → `track_entity_alias`, `company_track_events` (61) →
+`track_record_event`, `track_record_checks` (17) → `track_source_check`. Backfill, compare
+row-for-row, then retire — do not duplicate.
+
+### Three read outcomes, not two
+
+`HS.data.entityTrackRecord(addr)` returns **`ok` / `absent` / `error`**:
+
+| | Means | The card renders |
+|---|---|---|
+| `ok` | we read the store | whatever it holds |
+| `absent` | the store is not installed (PostgREST `PGRST202`, Postgres `42883`) | `not_checked` — nobody has looked |
+| `error` | we tried and failed | **`unavailable`** — we do not know |
+
+Collapsing `error` into `absent` renders an outage as a gap in our research, which is PR #662's
+defect wearing a different hat. A test asserts the two stay apart in the accessor and in
+`agencyRows()`.
+
+### THE PILOT AS BUILT — Del Valle, measured
+
+No read model is installed for this address, so `entities` is empty and the module derives the
+project entities from the **OWNER block of the five TDLR filings**, which is the only entity evidence
+the pilot actually holds. Derived rows are marked `evidence_class: 'authoritative_filing'`,
+`as_filed: true` and `relationship_verification: 'not_yet_asked'` — so nothing derived can pass the
+parent or related gate, or read as a company we have verified anything about.
+
+| | Rendered |
+|---|---|
+| Project entity | **four** — `River Bottoms Ranch` · `River Bottoms Ranch LLC` · `Neuralink` · `Neuralink Corporation`, each linked to the permit that names it. (`RIVER BOTTOMS RANCH LLC` collapses case-insensitively; nothing else collapses.) |
+| Parent / controlling | none — the disclosure line, not an empty group |
+| Related | none |
+| Every agency, every entity | `not checked`, named in one compact line per entity |
+| Each entity's summary | *"No verified enforcement records found in currently connected HomeSignal sources."* |
+
+"Neuralink" and "Neuralink Corporation" stay **two companies**, exactly as `companies` holds them
+today, and the card says why: *"These names are listed separately because nothing we have read shows
+they are the same company."* That is the no-automatic-merge rule made visible rather than merely
+obeyed — and it is the one place the pilot demonstrates the resolution discipline, since it has no
+aliases and no identifiers to demonstrate it with.
+
+**The populated path is exercised by fixture**, in a real browser:
+`test/property-card-entity-render.test.mjs` drives a verified parent carrying three FinCEN matters
+through the page's localhost-gated override and asserts the thing only a rendered document can
+answer — the parent's action is *inside* the parent's group, and its matter number appears nowhere
+near the project LLC. This closes the §15 report question "how the populated track-record path was
+exercised", which the previous build had to answer with "not at all".
 
 ---
 

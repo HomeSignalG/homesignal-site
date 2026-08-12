@@ -1405,6 +1405,30 @@ The three things that must not be re-derived or relaxed:
   *Not checked* rather than borrowing the value an applicant typed on a permit. There is no
   `owner_of_record || …owner` fallback, and a test asserts there never is.
 
+**ENTITY TRACK RECORD is ONE module with entity groups.** There is no FinCEN card and no Parent
+Company Track Record card, and there must not be: a parent is a different *company*, not a
+different kind of fact, and FinCEN is a *source*. Three rules hold it together, all in
+`lib/property-card.js` and all tested:
+
+- **`HS.card.entityGate(entity, role)` is the only group gate**, and the page, the tests and
+  `property_card_entity_track()` all apply it. A parent renders only on a **verified relationship
+  that names its source**; a related company additionally needs a stated **material role in this
+  project**. Sharing a corporate parent is not a role. This gate was documented before it was
+  implemented once already — the parent group shipped ungated — so if you touch it, check all
+  three callers.
+- **Search scope is not attribution scope.** `lookupTargets()` takes the verified corporate family
+  into scope because a controlling company's record is worth finding; `recordsFor()` never does,
+  because a record belongs to the entity the **source document names**. Collapsing them is how a
+  subsidiary's fine lands on a parent. Matching admits verified former names and verified d/b/a
+  names; an unverified alias is refused.
+- **Agencies and relationship kinds are DATA** (`HS.card.AGENCIES`, `HS.card.RELATIONSHIP_KINDS`).
+  Adding an agency is one entry — never a new module. Each declares its own metrics, because
+  agencies count different things.
+
+Store: `docs/property-card-entity-track-record.sql` (parked, RLS on, anon-select only), read by
+`HS.data.entityTrackRecord()`, which returns **ok / absent / error** — a store we could not read is
+`unavailable`, never `not_checked`.
+
 Keyed by the **engine's canonical address** (`?addr=`), the same key `property_reports` and
 `homesignalmap.html?addr=` use — one normalizer, engine-side. `app_projects` carries no address,
 so a Maps click resolves via the ZIP's `development_reports` row matched on `record_url`; an

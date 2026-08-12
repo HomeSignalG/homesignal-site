@@ -114,6 +114,95 @@ anywhere on the page, because that one-character convenience is the whole defect
 
 ---
 
+## 4a. Entity Track Record — the hierarchy, and who each record belongs to
+
+**There is no FinCEN module and no Parent Company Track Record module.** A parent is not a
+different *kind* of information about a property — it is a different *company* — and FinCEN is a
+*source*, not a category. Both live inside the one Entity Track Record module, which renders:
+
+```
+Property
+  → Project entity              always renders; its lack of records is the answer
+  → Parent / controlling entity verified + sourced relationship only
+  → Related entity              verified + sourced + a stated material role here
+      → per-agency track record → the records themselves → source agency / document
+```
+
+### The three vocabularies, all declared in `lib/property-card.js`
+
+| Registry | Holds | Adding one costs |
+|---|---|---|
+| `HS.card.AGENCIES` | EPA/ECHO · state environmental · OSHA · SEC · FinCEN · DOJ · OFAC · state/local, each with **its own metrics** | one entry — no module, no card, no layout edit |
+| `HS.card.RELATIONSHIP_KINDS` | nine kinds, each declaring the entity `group` it renders in | one entry |
+| `HS.card.ENFORCEMENT_FIELDS` | the source-agnostic record contract, mirrored column-for-column by `track_record_event` | — |
+
+Each agency declares its own metric labels and arity, because agencies count different things —
+OSHA has inspections, FinCEN has matters. Forcing them into one triple is how a programme
+enrolment ends up displayed as an enforcement action.
+
+### `HS.card.entityGate(entity, role)` — one gate, three callers
+
+The page, the tests and the SQL read function all apply the same rule, and the reason each is
+worth enforcing rather than trusting:
+
+* **A parent renders only on a `verified` relationship that names a `relationship_source`.** An
+  unsourced parent is a rumour, and a rumour rendered beside a fine becomes a fact the moment a
+  reader sees it. `track_entity_relationship` has a CHECK to match.
+* **A related company additionally needs a `material_role`** — what part it plays *in this
+  project*, from a document. `subsidiary` and `affiliate` are marked `corporate_family`: an
+  ownership chart is not a role, and a list of every affiliate is not information about this
+  property.
+* **The project entity is never gated.** Its absence of records is what a resident came for.
+
+Withholding is **disclosed, not silent**: "no confirmed parent", "a possible parent we haven't
+confirmed" and "a company whose part here isn't documented" are three different sentences.
+
+### Search scope is not attribution scope
+
+Two questions, deliberately two functions:
+
+| | Answers | Corporate family in scope? |
+|---|---|---|
+| `HS.card.lookupTargets(entities)` | **what do we search for?** | **yes**, when verified — a resident is entitled to a controlling company's record |
+| `HS.card.recordsFor(records, entity)` | **where does a result go?** | **never** — under the entity the source document names, and no other |
+
+Collapsing them is precisely how a subsidiary's fine lands on a parent's record: the search
+correct, the filing correct, the attribution assumed. Matching admits the exact legal name,
+**verified** former names, **verified** d/b/a names and known identifiers. An unverified alias is
+refused — it is somebody's guess that two companies are one company, and acting on it is the
+automatic merge on a similar name that the model forbids. "Greenland Energy LLC" and "Greenland
+Energy Holdings LLC" stay two companies.
+
+### The record on the page
+
+Each record renders under the heading **`Parent company — FinCEN Enforcement Action`**: the
+relationship leads, because that is what stops a parent's matter reading as something the company
+at this address did. Then the matter number, issue, penalty, status and a link to the source
+document. Four guards:
+
+1. A record whose source never called it an enforcement action **is not called one** — a missing
+   `record_type` yields the agency alone.
+2. An **unstated penalty says the record doesn't say, never `$0`** — the same rule
+   `metricText()` enforces for counts, for the same reason.
+3. A sparse matter **names what it is silent on in one line**, not seven identical ones. Penalty
+   is exempt and always keeps its own row.
+4. `confidence_score` is carried by the contract and the store and **reaches no screen**
+   (architecture doc Part 7.3 / Q8 — confidence is categorical, permanently).
+
+### The store, and the third read outcome
+
+`docs/property-card-entity-track-record.sql` (parked, applied manually, RLS on, anon-select only)
+holds the hierarchy and is read by `HS.data.entityTrackRecord()`, which returns **`ok` / `absent` /
+`error`**. A store that is not installed and a store we failed to read are different facts: the
+first means nobody has looked, the second means we do not know. A failed read renders
+`unavailable`, never `not_checked`.
+
+**Del Valle today:** no read model is installed, so the project entities come off the OWNER block
+of the five TDLR filings — *as filed*, `relationship_verification: 'not_yet_asked'`, each linked to
+its permit. The four owner spellings stay four companies and the card says why.
+
+---
+
 ## 5. Identity — how a card is keyed
 
 The key is the **engine's canonical address string**, the same key `property_reports` and

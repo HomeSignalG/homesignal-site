@@ -385,7 +385,11 @@ entities as (
                    when c.status = 'in_progress' then 'in_progress'
                    else 'partial' end,
         'found_n', c.found_n,
-        'recent',  c.checked_at))
+        -- NO `recent` HERE. The card's "Most recent" means the most recent RECORD, and the only
+        -- date a check row has is when we last TRIED. Emitting checked_at would print
+        -- "Most recent: <today>" beside a source we could not reach. Where records exist the card
+        -- derives the date from their own action_date.
+        'checked_at', c.checked_at))
       from public.track_source_check c
       where c.entity_id = e.entity_id), '{}'::jsonb)
   ) order by case x.entity_role when 'project_entity' then 1 when 'parent' then 2 else 3 end,
