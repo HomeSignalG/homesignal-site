@@ -190,6 +190,16 @@ need(/row2\('State registry programs on record', C\.metricText\(/.test(card),
 // A hardcoded zero anywhere in a rendered string is the shape of the bug: search for one.
 need(!/>0</.test(card.replace(/<circle[^>]*>/g, '')), 'the card page renders a literal 0 into markup');
 
+// Sources & Verification is the PROVENANCE module and must never collapse two states into one
+// badge. With { short: true }, `verified` and `checked_empty` both render "Checked", so a source
+// that returned records looked identical to one that returned nothing.
+need(/var body = '<div class="pcrows">' \+ sources\.map\(function \(s\) \{[\s\S]{0,200}?C\.badgeHTML\(s\.state\)/.test(card),
+  'the sources list uses short badge labels, which renders verified and checked-empty identically');
+need(HS.card.STATES.verified.short === HS.card.STATES.checked_empty.short,
+  'this guard assumes the two SHORT labels collide — if they no longer do, relax it');
+need(HS.card.STATES.verified.label !== HS.card.STATES.checked_empty.label,
+  'the FULL labels must stay distinct, or nothing can tell the two states apart');
+
 // ── 7. the honest states the page must be able to express ──────────────────────
 need(/renderUnresolved/.test(card) && /isn’t tied to a parcel yet/.test(card),
   'the card cannot say "this record has no resolvable parcel" — it would have to guess one');

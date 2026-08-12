@@ -135,6 +135,13 @@
   .pcrow > b.na{color:var(--ink-3);font-weight:500}
   .pcprov{font-size:10.5px;color:var(--ink-3);margin-top:2px;line-height:1.45}
   .pcprov a{color:var(--green)}
+  /* Links inside modules inherit the card's own affordance, not the browser default. The record
+     links were rendering blue-and-underlined, which read as foreign to the card and competed with
+     the green used for every other action on the page. */
+  .pcsec a{color:var(--green);text-decoration:none;border-bottom:1px solid rgba(21,122,73,.28)}
+  .pcsec a:hover{border-bottom-color:var(--green)}
+  .pcsec a:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:3px}
+  .pcrow > b a{white-space:nowrap}
 
   /* ── explainer / note blocks ── */
   .pcnote{display:flex;gap:9px;background:#f7f9f7;border:1px solid var(--line);border-radius:11px;
@@ -803,8 +810,12 @@ HS.onReady(async function () {
 
   // ── SOURCES & VERIFICATION ────────────────────────────────────────────────────
   function sourcesHTML(sources) {
+    // FULL labels here, never the short ones. This is the provenance module, and it is the one
+    // place the distinction matters most: with `short`, `verified` and `checked_empty` both render
+    // as "Checked", so a source that returned records and a source that returned nothing became
+    // the same badge — the exact collapse the card exists to prevent.
     var body = '<div class="pcrows">' + sources.map(function (s) {
-      return '<div class="pcrow"><span>' + esc(s.label) + '</span><b>' + C.badgeHTML(s.state, { short: true }) + '</b></div>';
+      return '<div class="pcrow"><span>' + esc(s.label) + '</span><b>' + C.badgeHTML(s.state) + '</b></div>';
     }).join('') + '</div>'
       + '<p class="pcprov">' + esc(C.COPY.page[1]) + '</p>';
     return sec('sources-verification', { wide: true, state: C.rollup(sources.map(function (s) { return s.state; })) }, body);
