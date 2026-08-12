@@ -776,6 +776,86 @@ these corrections:
 
 ---
 
+## 8.1 WHAT THE DESIGN REQUIRES AS DATA — read off the mockup, field by field
+
+Re-read against the approved design, these are fields the card must carry that the module list above
+does not name. Each is a data requirement, not a styling choice.
+
+### Per-agency fields in Entity Track Record
+
+- **"Most recent"** — a date per agency, with its own state. The design shows all four honest values:
+  *Not available · Not applicable · Not checked · In progress*. So it is not a nullable date; it is a
+  **stated field with a state**, exactly like a metric.
+- **"Period covered"** — the window a check spans. **Nothing records this today** (§6), so it renders
+  as unstated until a source supplies it. Do not synthesize it from `checked_at`.
+- **Metric sets vary per agency, in count and in label.** The design shows three columns for EPA/ECHO
+  and TCEQ, three different ones for OSHA (*Inspections · Violations · Penalties*), and **two** for SEC
+  (*Enforcement Matters · Penalties*) and State/Local (*Records · Penalties*). `trackMetricLabels()`
+  already models per-source labels — extend it to a per-source **arity** so a source renders only the
+  metrics it can have, rather than padding to three with em-dashes.
+
+### One state machine, many design labels
+
+The mockup uses **five different vocabularies** for what is one underlying state, which is how the
+labels drift apart if each module owns its own:
+
+| Module in the design | Labels it shows | Maps to |
+|---|---|---|
+| Entity Track Record | PARTIAL · CHECKED · NOT CHECKED · IN PROGRESS | `partial` · `checked_empty`/`verified` · `not_checked` · `in_progress` |
+| Regulatory Records | Data available · Partial · Not checked · In progress · Not available | `verified` · `partial` · `not_checked` · `in_progress` · `unavailable` |
+| Facilities & Regulatory | Affiliations found · Connections found · Unresolved | `verified` · `verified` · `unresolved` |
+| Sustainability | Pilot only · Not checked | `in_progress` · `not_checked` |
+| Sources & Verification | status icons (✓ / ✗ / ⊙) | the same states, rendered as icon **plus text** |
+
+**Requirement: render every one of these from `HS.card.STATES`, mapping the design's label per
+module.** Add the label as a per-module display string on the state; never as a second state. The
+design's words are approved and should appear — the machinery behind them must be singular.
+
+**"Pilot only"** is worth calling out: it is a real product state meaning *wired for one place, not
+nationally*. Map it to `in_progress` unless it needs its own entry, and if it gets one, add it to
+`HS.card.STATES` with a test rather than as a module-local string.
+
+**Icons must carry text.** The Sources & Verification column is icon-and-colour in the mockup; state
+may never be colour-only (accessibility, and the draft brief's §31).
+
+### Every module has a detail surface
+
+The design puts a **"View all … →"** link on twelve modules — *entity record · property details ·
+project activity · connections · hazards details · meetings & notices · sustainability details · all
+instruments · all records · all sources*, plus **"How completeness works →"**. Two consequences:
+
+1. **The tab strip is the detail surface for most of them** — Overview is the digest, and each tab is
+   the module's full view. Wire the links to tabs rather than inventing routes (draft §6: *"do not
+   create unnecessary route complexity"*).
+2. **"How completeness works" is a real explainer**, not a tooltip. It is where the state vocabulary
+   gets defined for residents, and it is the honest home for the sentence the module itself is too
+   small to carry.
+
+### Header and module fields the design names explicitly
+
+- **Header chips:** acreage · Property ID · Geographic ID · *"Development activity detected"*. The
+  first three are appraisal-district fields (unwired); the fourth is **derived** — a boolean over
+  whether any development filing exists, which the pilot can render today.
+- **Property & Ownership adds `Property Class`** (`E1` in the mockup) to the field list in §11 of the
+  draft — another appraisal-district field, so another "not checked" slot to build.
+- **Development / Project Activity** carries, per project: project name · *Project owner as filed* ·
+  Status · **Source** (`TDLR (TABS)`) · **Filed date**. The pilot has all five for all five filings.
+- **Recorded Instruments** shows a **count** plus **`Source: TCAD`** plus the source-limitation line —
+  so the module needs a count field and a source attribution, not just a list.
+- **"NEW" badges** on Natural Hazards, Public Meetings & Notices and Sustainability are a launch
+  affordance for newly added modules; they say nothing about data state and must not be confused with
+  one.
+
+### The nearby-facility card is a separate object from the property card
+
+The mockup's left rail shows *"Nearby regulated facility · 1.3 mi"* with a name, a permit-status line,
+an **EPA Registry ID** and a **"Quick view details"** button. That is the facility identity path from
+§14.2 appearing in the design: keyed on the registry ID, distance-qualified, and deliberately not
+presented as part of the property. Keep the wording **"Nearby"** and keep it visually outside the
+property card's own modules.
+
+---
+
 ## 9. Performance — the real budget
 
 There is no property-card RPC and one cannot be built without the claim layer. The honest budget:
@@ -1050,72 +1130,36 @@ no honest point; it must not be given a parcel card. Route it to the area/commun
 
 ---
 
-## 14.3 THE CARD AS THE INPUT TO A QUALITY-OF-LIFE SCORE (founder, 2026-08-11)
+## 14.3 THE CARD IS THE DATA ASSEMBLY LAYER FOR THE SCORE — architecture only
 
-**The intent:** the card's data becomes the basis of the quality-of-life score. That is a coherent
-architecture — the card is the per-parcel evidence assembly, so it is the right input. Two measurements
-and one hard constraint before it is built.
+The quality-of-life score is a later, separate build and **its feasibility is not this brief's
+question.** What is this brief's question is that the card must assemble the data in a shape a scoring
+model can consume without re-deriving anything. Three architectural requirements:
 
-### What the score can draw on today
+1. **Every rendered fact carries its provenance as structured data, not as prose.** The shape is
+   already specified in the architecture doc Part 21: `{ value, source, source_url, retrieved_at,
+   evidence_class, state }` per field. Build to it now even where the value is absent, so a consumer
+   reads a field's state rather than parsing a sentence.
+2. **The state travels with the value.** A score consumer must be able to tell a measured zero from an
+   unchecked source from a failed read **programmatically** — the same distinction the UI makes with a
+   badge. `HS.card.STATES` is that vocabulary; do not emit a bare number anywhere a state could be
+   attached to it.
+3. **Expose the assembled payload, don't make the model re-scrape the DOM.** `window.__HS_CARD`
+   already carries the per-section and per-metric state for verification; keep it authoritative and
+   complete enough to be the read interface, and prefer a `property_card`-shaped payload (Part 21)
+   once the read model exists.
 
-| Input | Available? |
-|---|---|
-| Permit activity — count, recency, type, distance | **Yes, nationally** (3M `app_projects` rows, ~20 states of permit feeds) |
-| Regulated-facility proximity | **Yes, nationally** (EPA FRS floor) |
-| ECHO violation signals | Thin — facility-level, only where a facility matched |
-| **Air / Water / Soil / Noise / Light** — the five QoL lenses | **No.** `impact_dimensions` was **empty on 0 of 1,000 sampled `app_projects` rows** |
-| Hazards, notices, enforcement, ownership, sustainability | No — no adapter (§0.0.1) |
+One data-state fact the score work will need, measured 2026-08-11 and recorded here because it is
+easy to assume otherwise: `impact_dimensions` — the field carrying the Air / Water / Soil / Noise /
+Light dimensions — was **empty on 0 of 1,000 sampled `app_projects` rows**. The column exists and the
+`maps.html` Quality-of-Life filter reads it, but nothing populates it, so those five dimensions are a
+schema slot rather than a data source today. *(1,000 of 3M rows, unordered — re-measure before
+planning against it.)* This corrects `CLAUDE.md`, which reads as though only Soil/Noise/Light are
+unpopulated.
 
-**That last row corrects `CLAUDE.md`**, which says *"Soil/Noise/Light rarely carry data yet, so those
-act as UI-only today"* — implying Air and Water do carry data. Measured: **no dimension of any kind on
-any sampled row**, so the Quality-of-Life lens on `maps.html` is UI-only across all five. *(1,000 rows
-of 3M, unordered — re-measure the full distribution before relying on it.)*
-
-So a score built today would in practice be **construction activity + industrial proximity**. That is a
-real, defensible signal. It is **not** quality of life in the five-lens sense, and naming it that would
-overclaim by a wide margin.
-
-### THE TRAP — and it is the same trap the card was built to avoid, one level up
-
-**A score computed over mostly-unchecked data measures our ingestion coverage, not the place.**
-
-Two identical houses, one in Travis County and one in Wayne County, would score differently — not
-because the neighbourhoods differ, but because TCEQ is wired in Texas and nothing equivalent is wired
-in Michigan. That is a coverage artifact wearing the costume of a neighbourhood difference, and unlike
-an empty module it is **invisible**: a number gives the resident nothing to notice.
-
-Three requirements that follow directly:
-
-1. **The score needs its own coverage state.** *"We can't score this yet"* must be a valid, visible
-   output, and must be distinguishable from *"this scores low."* This is exactly the
-   `not_checked`-vs-zero rule the card already enforces, applied to the score — and a numeric output is
-   far better at hiding the difference than a badge is, so the discipline has to be stricter, not
-   looser.
-2. **Never compare scores across jurisdictions until the inputs are equally covered.** A leaderboard,
-   a percentile, a colour scale, or "better than 80% of nearby homes" is a coverage ranking today, not
-   a quality ranking.
-3. **Keep the score and Data Completeness visibly separate.** Completeness measures *our research*;
-   the score would purport to measure *the place*. Conflating them makes both meaningless — and note
-   that the approved disclaimer (*"not a rating, score, or prediction"*) is a statement about the
-   completeness module. **If the card starts carrying a score, that disclaimer must be re-scoped** so
-   it does not appear to disclaim the score it sits next to.
-
-### Sequence, and what the pilot should do now
-
-The order that produces a defensible score is **feeds → card → score**, and the pilot is at step two.
-Concretely: `canonical_addr` from every connector (§14.1) unlocks every dot having a card (§14.2);
-cards populated across jurisdictions produce comparable inputs; only then does a score mean something
-about a place rather than about us.
-
-**For this build: change nothing about scoring.** Keep the completeness module unweighted and
-score-free, keep the disclaimer as approved, and treat the score as the next phase. The one thing worth
-doing now is making the card's data **structured enough to score later** — every rendered fact carrying
-its source, date and state, which is already the design.
-
-Also worth noting so it is not mistaken for a blocker: the prototype already contains score *surfaces*
-(`community_score`, `component_scores`, the property score ring in `property.html`) fed entirely from
-`seed/delvalle.js`. Those are design placeholders, not a live scoring model, and they should not be
-wired to real data until the constraints above are met.
+**Nothing about scoring changes in this build:** the completeness module stays unweighted and
+score-free and the approved disclaimer stays as approved. If the card later carries a score, that
+disclaimer needs re-scoping so it does not appear to disclaim the score sitting next to it.
 
 ---
 
