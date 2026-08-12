@@ -507,6 +507,60 @@ They can break on the **next ZIP refresh**. Requirements:
 
 ---
 
+## 5.2 THE ENFORCEMENT DATA LAYER ALREADY EXISTS — read it, do not build it
+
+**Landed on `main` while this branch was open: the Government Source Archive.** DOJ · FinCEN · OFAC ·
+SEC · EPA · OSHA · PHMSA · FERC, with an acquisition log, preserved artifacts, provenance, structured
+records and entity resolution. Read `docs/government-source-archive.md` and
+`homesignal-ingest/docs/government-source-integration-contract.md` **before writing any adapter** —
+there is nothing to build here, only to render.
+
+It independently reached the same conclusions this brief did, and its own table names the join:
+
+| Archive | Property Card |
+|---|---|
+| `gov_actions` | the enforcement record in Entity Track Record |
+| `source_registry.card_agency_id` | the agency badge — **`HS.card.AGENCIES[].id`** |
+| `gov_subject_resolutions` where `verification='verified'` | **`matched_entity_id`** |
+| `source_documents.original_url` | "View original government source" |
+| `source_documents.archive_storage_key` | "View HomeSignal archived copy" |
+
+**Read attribution through `v_gov_action_attribution`, which joins verified resolutions only.** An
+action belongs to `gov_actions.named_entity` — the entity the government document named. A verified
+subsidiary did not commit it and an unverified relationship carries it nowhere. That is
+`HS.card.recordsFor()`'s rule, arrived at twice.
+
+### ⚠ The one gap: there is no public read path
+
+**No archive table has a grant for `anon` or `authenticated`.** Every read goes through a
+`gov_archive_*` SECURITY DEFINER RPC, and `gov-archive.html` is admin-allowlisted. The property card
+is a **public, anon-key page** — so it cannot read `gov_actions` or `v_gov_action_attribution` as
+things stand, and that is deliberate, not an oversight to route around.
+
+**The pilot build's first real task is therefore a public projection**: a `SECURITY DEFINER` RPC
+returning, for one property, the consumer-safe subset of `v_gov_action_attribution` shaped as
+`HS.card.ENFORCEMENT_FIELDS`. Do not grant `anon` on the archive tables to shortcut it, and do not
+put a service-role key in the browser.
+
+### Two rules from the archive that the card now honours
+
+1. **Never `$0` for a penalty the record does not state.** A checked-and-empty source has a real
+   count of **0** and an **unstated** penalty — there is no record to state one. Implemented and
+   tested; monetary metrics are detected by label.
+2. **A disappearance is a fact about the website.** `REMOVED_FROM_SOURCE` / `SOURCE_UNAVAILABLE` may
+   be inferred from an absence; `SUPERSEDED` / `VACATED` / `RESCINDED` require an affirmative
+   government document. `HS.card.ACTION_STATUS` encodes the split and `statusNeedsDocument()` gates
+   it, so no copy can let the first read as the second. The approved line is: *"This is no longer on
+   the agency's website; our archived copy is still here."*
+
+### Still to wire
+
+`archive_storage_key` is on the record contract but the card renders no "View HomeSignal archived
+copy" link yet — that is a per-record affordance for the enforcement detail, alongside the agency's
+own URL. Both links, always: the original because it is authoritative, ours because it survives.
+
+---
+
 ## 6. ONE state vocabulary — not three
 
 The draft invented three different lists (§15, §17, §21), none matching, and introduced

@@ -12260,6 +12260,7 @@
         "RES": "Development"
       },
       "status_to_bucket": {
+        "proposed": [],
         "approved": [
           "Active - Issued",
           "Approved - Renovation",

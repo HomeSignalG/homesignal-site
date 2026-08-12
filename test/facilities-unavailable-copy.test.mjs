@@ -28,8 +28,12 @@ if (!/\$\("cFac"\)\.textContent\s*=\s*FAC_UNAVAILABLE\s*\?\s*"\\u2014"/.test(src
   failures.push('#cFac does not render an em-dash when the EPA read failed');
 }
 // the note must exist and must take precedence over the facilities-only note
-if (!/EPA's facility service could not be reached/.test(src)) {
+if (!/EPA's facility service has been unreachable since/.test(src)) {
   failures.push('the honest-unavailable note copy is missing');
+}
+if (!/cannot be confirmed/.test(src)) {
+  failures.push('the note must say the count CANNOT BE CONFIRMED — the only claim true of every '
+    + 'flagged page regardless of which day it was last refreshed');
 }
 if (!/unavailable rather than zero/.test(src)) {
   failures.push('the note must name the distinction it exists to make: unavailable, not zero');
@@ -37,6 +41,22 @@ if (!/unavailable rather than zero/.test(src)) {
 if (!/if\(FAC_UNAVAILABLE\)\{[\s\S]{0,600}?return;\s*\}\s*\n\s*if\(!FACILITIES_ONLY\)/.test(src)) {
   failures.push('the unavailable note does not take precedence over the facilities-only note');
 }
+// THE REJECTED CAUSAL CLAIM: the note must not say anything about what happened at THIS page's
+// last update. "could not be reached when this page was last updated" was true of the 486 pages
+// refreshed 2026-08-09 (EPA failed 486 of 486 that day) and FALSE of the older zero cohorts — EPA
+// answered for 1,978 of 2,133 pages on 08-07 and 9,005 of 10,086 on 08-08. With the flag extended
+// to all 1,722, per-page causal wording would be a false explanation replacing a false zero.
+{
+  const note = (src.match(/if\(FAC_UNAVAILABLE\)\{([\s\S]*?)return;\s*\}/) || [])[1] || '';
+  if (!note) {
+    failures.push('could not locate the FAC_UNAVAILABLE note block — the wording guard did not run, '
+      + 'which is not the same as passing');
+  } else if (/last updated?/i.test(note)) {
+    failures.push('the unavailable note makes a claim about this page\'s last update; only "FRS is '
+      + 'unreachable now, so the count cannot be confirmed" is true of all 1,722 flagged pages');
+  }
+}
+
 // THE REJECTED INFERENCE: nothing may conclude "outage" from a zero count.
 if (/FAC_UNAVAILABLE\s*=\s*[^;]*facilities\s*===?\s*0/.test(src)
     || /FAC_UNAVAILABLE\s*=\s*[^;]*facCount\s*===?\s*0/.test(src)) {

@@ -147,8 +147,15 @@ need(/C\.metricText\(/.test(card), 'the card page never calls HS.card.metricText
       `agencyRows assigns a metric outside the gate: ${m[1].trim()}`);
   }
   // A measured empty has REAL zeros, or the badge says "Checked" over a row of em-dashes.
-  need(/if \(!counts && C\.state\(st\) === 'checked_empty'\) counts = \[0, 0\];/.test(ar),
-    'a checked-but-empty source does not render its measured zeros');
+  // A checked-empty source has a real COUNT of zero — and no penalty figure, because with no
+  // records there is no record stating one. That split is the archive's own rule
+  // (docs/government-source-archive.md, "Do not render $0 for a penalty the record does not state").
+  need(/if \(!counts && C\.state\(st\) === 'checked_empty'\) counts = \[0, null\];/.test(ar),
+    'a checked-but-empty source does not render its measured zero count');
+  need(/var money = \/penalt\|fine\|relief\|disgorge\/i\.test\(label\);/.test(ar),
+    'monetary metrics are not distinguished, so an empty source renders $0 in penalties');
+  need(/if \(money && \(n === null \|\| n === 0\) && C\.state\(st\) === 'checked_empty'\) n = undefined;/.test(ar),
+    'an empty source still renders a $0 penalty — forbidden by the archive contract');
   // A PROPERTY-level check is not an ENTITY-level check. Populating entity rows from the
   // address-level state would attribute research we never performed to each company.
   need(/entity\.track && entity\.track\[a\.id\]/.test(ar),

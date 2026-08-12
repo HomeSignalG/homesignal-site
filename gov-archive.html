@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<title>HomeSignal — Government Source Archive</title>
+<meta name="description" content="HomeSignal internal government source archive.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+/* ============================================================================
+   GOVERNMENT SOURCE ARCHIVE — internal operator surface.
+
+   INTERNAL ONLY. This page never appears in navigation, is noindex, is
+   disallowed in robots.txt, and ships with ZERO data: every row on it arrives
+   from a SECURITY DEFINER RPC that checks the dashboard_admins allowlist first.
+   Raw archive browsing is not a public surface, and public Property Cards
+   receive structured facts through the existing presentation path instead.
+
+   Deliberately standalone rather than shell-native, matching acquisition.html:
+   the app shell carries resident navigation and a signed-out experience, neither
+   of which belongs on an operator tool.
+
+   THE ONE DISTINCTION THIS UI EXISTS TO MAKE VISIBLE. A government URL is
+   PROVENANCE — where the document came from, and where it may no longer be. The
+   HomeSignal archive is PRESERVATION — the bytes we hold, whatever the agency
+   does next. They are not the same thing and they never share a control here.
+   ============================================================================ */
+:root{--bg:#f4f6f4;--panel:#ffffff;--panel2:#f7f9f7;--line:#e4e8e4;--ink:#16211c;
+--muted:#4a5a52;--accent:#157a49;--real:#1f9d5c;--persist:#c47a1a;--pending:#83918a;
+--red:#c23b34;--violet:#5b4bb5;--shadow-sm:0 1px 2px rgba(16,33,28,.06);}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+header.top{padding:22px 26px;border-bottom:1px solid var(--line);background:var(--panel)}
+header.top h1{margin:0;font-size:20px;letter-spacing:.2px}
+header.top .meta{color:var(--muted);font-size:12.5px;margin-top:6px;max-width:900px}
+.wrap{padding:22px 26px;max-width:1500px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:18px;box-shadow:var(--shadow-sm)}
+.card h3{margin:0 0 4px;font-size:15px}
+.card .sub{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-weight:700;color:var(--muted);font-size:11px;letter-spacing:.05em;
+   text-transform:uppercase;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tbody tr.clickable{cursor:pointer}
+tbody tr.clickable:hover{background:var(--panel2)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;word-break:break-all}
+.pill{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+      padding:3px 7px;border-radius:5px;border:1px solid transparent;white-space:nowrap}
+.p-ok{color:var(--real);background:#eaf6ef;border-color:#cbe7d5}
+.p-warn{color:var(--persist);background:#fdf2e4;border-color:#f0dcbd}
+.p-bad{color:var(--red);background:#fdeceb;border-color:#f2d3d0}
+.p-none{color:#77857d;background:#f4f6f4;border-color:var(--line)}
+.p-info{color:var(--violet);background:#f0eefa;border-color:#dcd6f2}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.filters input,.filters select{background:var(--panel2);border:1px solid var(--line);border-radius:7px;
+  padding:7px 9px;font-size:12.5px;color:var(--ink);min-width:130px}
+.filters input:focus,.filters select:focus{outline:none;border-color:var(--accent)}
+.btn{background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer}
+.btn.secondary{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn:disabled{opacity:.55;cursor:default}
+.empty{color:var(--muted);font-size:12.5px;padding:14px 2px}
+.kv{display:grid;grid-template-columns:190px 1fr;gap:6px 14px;font-size:12.5px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;word-break:break-word}
+.kv dd.absent{color:var(--pending);font-style:italic}
+/* THE TWO CONTROLS. Different colour, different label, different explanation —
+   because a single "view" button would hide which one the operator just used. */
+.srcbtns{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 4px}
+.srcbtn{display:block;border-radius:9px;padding:11px 14px;text-decoration:none;border:1px solid var(--line);min-width:250px}
+.srcbtn b{display:block;font-size:13px;margin-bottom:2px}
+.srcbtn span{display:block;font-size:11.5px;color:var(--muted);line-height:1.45}
+.srcbtn.gov{background:#f7f9f7;border-color:var(--line)}
+.srcbtn.gov b{color:var(--ink)}
+.srcbtn.hs{background:#eaf6ef;border-color:#cbe7d5}
+.srcbtn.hs b{color:var(--accent)}
+.srcbtn.disabled{opacity:.55;pointer-events:none}
+.tl{list-style:none;margin:10px 0 0;padding:0;border-left:2px solid var(--line);margin-left:6px}
+.tl li{position:relative;padding:0 0 12px 16px}
+.tl li::before{content:"";position:absolute;left:-5px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--pending)}
+.tl li.ev-ARCHIVED::before{background:var(--real)}
+.tl li.ev-CONTENT_CHANGED::before{background:var(--persist)}
+.tl li.ev-REMOVED_FROM_SOURCE::before,.tl li.ev-SOURCE_UNAVAILABLE::before{background:var(--red)}
+.tl li.ev-DISPOSITION_RECORDED::before{background:var(--violet)}
+.tl .when{font-size:11.5px;color:var(--muted)}
+.tl .what{font-size:12.5px}
+.crumb{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+.crumb a{color:var(--accent);cursor:pointer;font-weight:600;text-decoration:none}
+.note{font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);
+      border-radius:9px;padding:10px 12px;line-height:1.55;margin-top:12px}
+#gate{min-height:80vh;display:flex;align-items:center;justify-content:center;padding:40px 20px}
+.gate-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:34px 30px;max-width:440px;width:100%;text-align:center;box-shadow:var(--shadow-sm)}
+.gate-card h2{margin:0 0 8px;font-size:19px}
+.gate-card p{color:var(--muted);font-size:13px;margin:0 0 18px;line-height:1.6}
+.gate-btn{background:var(--accent);color:#fff;border:none;padding:11px 22px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+.gate-btn.secondary{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.gate-loading{color:var(--muted);font-size:14px;padding:8px}
+.auth-overlay{display:none;position:fixed;inset:0;background:rgba(16,33,28,.45);z-index:2000;align-items:center;justify-content:center}
+.auth-modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;width:100%;max-width:380px;margin:16px;position:relative}
+.auth-modal h2{margin:0 0 4px;font-size:19px}
+.auth-sub{color:var(--muted);font-size:13px;margin-bottom:16px}
+.auth-input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px 13px;font-size:14px;color:var(--ink);margin-bottom:10px}
+.auth-input:focus{outline:none;border-color:var(--accent)}
+.auth-submit{width:100%;background:var(--accent);color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+.auth-submit:disabled{opacity:.6;cursor:default}
+.auth-msg{font-size:13px;margin-top:12px;min-height:1em;color:var(--accent)}
+.auth-close{position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;line-height:1;color:var(--muted);cursor:pointer}
+.auth-toggle{font-size:13px;color:var(--muted);margin-top:14px;text-align:center}
+.auth-toggle a{color:var(--accent);cursor:pointer;font-weight:600}
+</style>
+</head>
+<body>
+
+<div id="gate"><div class="gate-card" id="gate-card"><div class="gate-loading">Loading…</div></div></div>
+
+<div id="ga-root" style="display:none">
+  <header class="top">
+    <h1>HomeSignal — Government Source Archive</h1>
+    <div class="meta">Preserved government evidence, and the record of how it was acquired.
+      The government URL is <b>provenance</b>; the HomeSignal archive is <b>preservation</b> — a
+      document vanishing from an agency website changes the first and not the second.</div>
+  </header>
+  <div class="wrap" id="ga-body"></div>
+</div>
+
+<div id="auth-overlay" class="auth-overlay">
+  <div class="auth-modal">
+    <button class="auth-close" id="auth-close">&times;</button>
+    <h2>Log in</h2>
+    <p class="auth-sub" id="auth-sub">Enter your email and we'll send you a code &mdash; no password needed.</p>
+    <input type="email" id="auth-email" class="auth-input" placeholder="Email address" autocomplete="email" aria-label="Email address">
+    <input type="text" id="auth-code" class="auth-input" placeholder="Enter your code" inputmode="numeric" maxlength="8" autocomplete="one-time-code" style="display:none;letter-spacing:6px;text-align:center;font-size:18px;" aria-label="Enter your code">
+    <button id="auth-submit" class="auth-submit">Send me a code</button>
+    <div id="auth-msg" class="auth-msg"></div>
+    <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><a id="auth-back-link">Use a different email</a></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ============================================================================
+// Auth (email OTP). Identical mechanism to acquisition.html — the same anon key,
+// the same allowlist, one way in. A second auth mechanism for a second operator
+// page is a second thing to remember to revoke.
+// ============================================================================
+(function(){
+  var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
+  var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
+  var client = window.supabase.createClient(SB_URL, SB_ANON);
+  window.hsClient = client; window.hsUser = null;
+  var step = 'email', pendingEmail = '';
+  function $(id){ return document.getElementById(id); }
+  function showMsg(t,e){ var m=$('auth-msg'); m.textContent=t||''; m.style.color=e?'#c23b34':'var(--accent)'; }
+  function setStep(s){
+    step = s;
+    if (s==='code'){
+      $('auth-sub').textContent='We emailed a code to '+pendingEmail+'. Enter it below.';
+      $('auth-email').style.display='none'; $('auth-code').style.display='block';
+      $('auth-submit').textContent='Verify & continue'; $('auth-back-wrap').style.display='block';
+      setTimeout(function(){ $('auth-code').focus(); },50);
+    } else {
+      $('auth-sub').innerHTML="Enter your email and we'll send you a code &mdash; no password needed.";
+      $('auth-email').style.display='block'; $('auth-code').style.display='none'; $('auth-code').value='';
+      $('auth-submit').textContent='Send me a code'; $('auth-back-wrap').style.display='none';
+      setTimeout(function(){ $('auth-email').focus(); },50);
+    }
+  }
+  function openAuth(){ pendingEmail=''; $('auth-email').value=''; showMsg('',false); setStep('email'); $('auth-overlay').style.display='flex'; }
+  function closeAuth(){ $('auth-overlay').style.display='none'; }
+  window.hsOpenAuth = openAuth;
+  async function sendCode(){
+    var email=($('auth-email').value||'').trim();
+    if(!email||email.indexOf('@')===-1){ showMsg('Please enter a valid email address.',true); return; }
+    $('auth-submit').disabled=true; showMsg('Sending your code…',false);
+    try{ var r=await client.auth.signInWithOtp({ email:email, options:{ shouldCreateUser:true } });
+      if(r.error){ showMsg(r.error.message,true); } else { pendingEmail=email; setStep('code'); showMsg('',false); }
+    }catch(e){ showMsg('Something went wrong — please try again.',true); }
+    $('auth-submit').disabled=false;
+  }
+  async function verifyCode(){
+    var code=($('auth-code').value||'').trim();
+    if(code.length<4){ showMsg('Enter the code from your email.',true); return; }
+    $('auth-submit').disabled=true; showMsg('Checking…',false);
+    try{ var r=await client.auth.verifyOtp({ email:pendingEmail, token:code, type:'email' });
+      if(r.error){ showMsg(r.error.message,true); $('auth-submit').disabled=false; return; } closeAuth();
+    }catch(e){ showMsg('Something went wrong — please try again.',true); }
+    $('auth-submit').disabled=false;
+  }
+  function submitAuth(){ if(step==='code') verifyCode(); else sendCode(); }
+  function onSession(session){
+    window.hsUser=(session&&session.user)?session.user:null;
+    if(typeof window.hsOnAuthChange==='function'){ try{ window.hsOnAuthChange(); }catch(e){} }
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    $('auth-close').addEventListener('click', closeAuth);
+    $('auth-submit').addEventListener('click', submitAuth);
+    $('auth-email').addEventListener('keydown', function(e){ if(e.key==='Enter') submitAuth(); });
+    $('auth-code').addEventListener('keydown', function(e){ if(e.key==='Enter') submitAuth(); });
+    $('auth-back-link').addEventListener('click', function(e){ e.preventDefault(); showMsg('',false); setStep('email'); });
+    $('auth-overlay').addEventListener('click', function(e){ if(e.target===$('auth-overlay')) closeAuth(); });
+    client.auth.getSession().then(function(res){ onSession(res.data.session); });
+    client.auth.onAuthStateChange(function(evt, session){ onSession(session); });
+  });
+})();
+</script>
+
+<script>
+// ============================================================================
+// The archive views. Every read is one of the gov_archive_* RPCs, each of which
+// raises 42501 for a caller who is not on the allowlist — so this page holds no
+// data of its own and no table grant exists that could leak one.
+// ============================================================================
+(function(){
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  var body = null;
+
+  // ---- honest absence -------------------------------------------------------
+  // A dash, not a zero, and not a blank cell. A "0" next to a source we have
+  // never run reads as "nothing to find", which is the same misreading the
+  // Property Card's metric gate exists to prevent — on a page whose whole job is
+  // to say what we have and have not acquired, it would be worse.
+  var DASH = '\u2014';
+  function n(v){ return (typeof v === 'number' && isFinite(v)) ? String(v) : DASH; }
+  function txt(v){ var s = (v == null || v === '') ? '' : String(v); return s || DASH; }
+  function when(v){
+    if(!v) return DASH;
+    var d = new Date(v);
+    if(isNaN(d.getTime())) return DASH;
+    return d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'})
+      + ' ' + d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+  }
+  function day(v){
+    if(!v) return DASH;
+    var d = new Date(v);
+    return isNaN(d.getTime()) ? DASH
+      : d.toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
+  }
+  // An unstated penalty is not $0. The database stores null and this renders the
+  // dash; writing "$0" here would invent a finding the record does not make.
+  function money(v){
+    return (typeof v === 'number' && isFinite(v)) ? '$' + v.toLocaleString() : DASH;
+  }
+  function bytes(v){
+    if(typeof v !== 'number' || !isFinite(v)) return DASH;
+    if(v < 1024) return v + ' B';
+    if(v < 1048576) return (v/1024).toFixed(1) + ' KB';
+    return (v/1048576).toFixed(1) + ' MB';
+  }
+
+  var RUN_TONE = { SUCCESS:'p-ok', PARTIAL_SUCCESS:'p-warn', FAILED:'p-bad', RUNNING:'p-info' };
+  // REMOVED_FROM_SOURCE is amber, not red: the document is gone from the agency's
+  // site and we still hold it. Red is reserved for the states that mean we do not
+  // know, or that the action itself was undone by a later document.
+  var SRC_TONE = { ACTIVE:'p-ok', MODIFIED:'p-warn', REMOVED_FROM_SOURCE:'p-warn',
+    SOURCE_UNAVAILABLE:'p-bad', SUPERSEDED:'p-info', VACATED:'p-info', RESCINDED:'p-info',
+    UNKNOWN:'p-none' };
+  function pill(value, tones){
+    if(!value) return '<span class="pill p-none">' + DASH + '</span>';
+    return '<span class="pill ' + (tones[value] || 'p-none') + '">' + esc(value) + '</span>';
+  }
+
+  async function rpc(name, args){
+    var r = await window.hsClient.rpc(name, args || {});
+    if(r.error) throw r.error;
+    return r.data;
+  }
+
+  // ---- gate -----------------------------------------------------------------
+  function gate(html){
+    $('ga-root').style.display='none'; $('gate').style.display='flex'; $('gate-card').innerHTML=html;
+  }
+  function loginState(){
+    gate('<h2>Sign in</h2><p>The Government Source Archive is an internal HomeSignal tool.</p>'
+      + '<button class="gate-btn" id="g-login">Log in</button>');
+    $('g-login').addEventListener('click', function(){ if(window.hsOpenAuth) window.hsOpenAuth(); });
+  }
+  function noAccess(email){
+    gate('<h2>No access</h2><p>The account <strong>' + esc(email) + '</strong> isn’t on the archive '
+      + 'allowlist. Ask the team to add you.</p>'
+      + '<button class="gate-btn secondary" id="g-out">Log out</button>');
+    $('g-out').addEventListener('click', function(){ window.hsClient.auth.signOut(); });
+  }
+  function errState(message){
+    gate('<h2>Couldn’t load</h2><p>' + esc(message || 'Something went wrong reaching the archive.')
+      + ' This is a read failure on our side — it says nothing about what the archive holds.</p>'
+      + '<button class="gate-btn" id="g-retry">Retry</button>');
+    $('g-retry').addEventListener('click', route);
+  }
+  function loading(){ gate('<div class="gate-loading">Loading the archive…</div>'); }
+  function show(){ $('gate').style.display='none'; $('ga-root').style.display='block'; }
+  function denied(err){
+    var m = String((err && err.message) || '').toLowerCase();
+    return (err && err.code === '42501') || m.indexOf('not authorized') !== -1
+      || m.indexOf('permission') !== -1;
+  }
+
+  // ---- routing --------------------------------------------------------------
+  // Hash routing rather than paths, because this is one static file on Pages and
+  // a deep link an operator can paste into an issue is worth more than pretty URLs.
+  function params(){
+    var h = (location.hash || '').replace(/^#/, '');
+    var out = {};
+    h.split('&').forEach(function(part){
+      var i = part.indexOf('=');
+      if(i > 0) out[decodeURIComponent(part.slice(0,i))] = decodeURIComponent(part.slice(i+1));
+    });
+    return out;
+  }
+  function go(hash){ location.hash = hash; }
+  window.addEventListener('hashchange', route);
+  window.hsOnAuthChange = route;
+
+  async function route(){
+    if(!window.hsUser){ loginState(); return; }
+    var p = params();
+    loading();
+    try{
+      if(p.record) { await renderRecord(p.record); }
+      else if(p.run) { await renderRun(p.run); }
+      else if(p.view === 'runs') { await renderRuns(p); }
+      else { await renderOverview(); }
+      show();
+    }catch(err){
+      if(denied(err)){ noAccess(window.hsUser.email); return; }
+      errState(err && err.message);
+    }
+  }
+
+  // ---- 1. source overview ---------------------------------------------------
+  async function renderOverview(){
+    var data = await rpc('gov_archive_overview');
+    var sources = (data && data.sources) || [];
+    var rows = sources.map(function(s){
+      return '<tr class="clickable" data-src="' + esc(s.source_id) + '">'
+        + '<td><b>' + esc(s.agency_name || s.agency_code) + '</b><div class="mono">' + esc(s.source_id) + '</div></td>'
+        + '<td>' + esc(txt(s.program_name)) + '</td>'
+        + '<td>' + pill(s.connection_status === 'connected' ? 'CONNECTED'
+            : String(s.connection_status || '').toUpperCase(),
+            { CONNECTED:'p-ok', FIXTURE:'p-info', IN_PROGRESS:'p-warn',
+              NOT_CONNECTED:'p-none', ACCESS_RESTRICTED:'p-bad', RETIRED:'p-none' }) + '</td>'
+        + '<td>' + esc(when(s.last_run_at)) + '</td>'
+        + '<td>' + pill(s.last_run_status, RUN_TONE) + '</td>'
+        + '<td>' + esc(when(s.last_success_at)) + '</td>'
+        + '<td class="num">' + esc(n(s.records)) + '</td>'
+        + '<td class="num">' + esc(n(s.records_new_last_run)) + '</td>'
+        + '<td class="num">' + esc(n(s.records_modified_last_run)) + '</td>'
+        + '<td class="num">' + esc(n(s.records_removed_from_source)) + '</td>'
+        + '<td class="num">' + esc(n(s.documents_archived)) + '</td>'
+        + '<td class="num">' + (s.open_failures
+            ? '<span class="pill p-bad">' + esc(n(s.open_failures)) + '</span>' : esc(n(s.open_failures))) + '</td>'
+        + '</tr>';
+    }).join('');
+
+    body.innerHTML =
+      '<div class="card"><h3>Sources</h3>'
+      + '<p class="sub">One row per agency <b>program</b>. An agency publishes many programs on '
+      + 'different schedules and in different formats, and a run log keyed on the agency alone '
+      + 'cannot say which of them failed.</p>'
+      + (sources.length
+        ? '<table><thead><tr><th>Agency</th><th>Program</th><th>Status</th><th>Last run</th>'
+          + '<th>Result</th><th>Last success</th><th>Records</th><th>New</th><th>Modified</th>'
+          + '<th>Removed from source</th><th>Documents</th><th>Failures</th></tr></thead>'
+          + '<tbody>' + rows + '</tbody></table>'
+        : '<div class="empty">No sources are registered yet.</div>')
+      + '<div class="note"><b>Removed from source</b> counts documents that are no longer published '
+      + 'at their government URL. It does <b>not</b> mean those actions were vacated, rescinded or '
+      + 'reversed — the archived copies remain, and a status implying a legal outcome requires an '
+      + 'affirmative government document.</div>'
+      + '</div>'
+      + filterCard()
+      + '<div class="card"><h3>Recent acquisition runs</h3>'
+      + '<p class="sub">The Acquisition Log records the <b>operation</b> — what we did, what we '
+      + 'counted, what broke. It holds no government content.</p>'
+      + '<div id="ga-runs"><div class="empty">Loading…</div></div></div>';
+
+    [].forEach.call(body.querySelectorAll('tr[data-src]'), function(tr){
+      tr.addEventListener('click', function(){
+        go('view=runs&source=' + encodeURIComponent(tr.getAttribute('data-src')));
+      });
+    });
+    wireFilters();
+    await paintRuns(document.getElementById('ga-runs'), {});
+  }
+
+  // ---- 2. filtering ---------------------------------------------------------
+  function filterCard(){
+    return '<div class="card"><h3>Find a record</h3>'
+      + '<p class="sub">Filter by agency, program, date, run status, source status, record type, '
+      + 'entity, or the agency\u2019s own record id.</p>'
+      + '<div class="filters">'
+      + '<input id="f-source" placeholder="Source id (doj.corporate-crime)">'
+      + '<input id="f-agency" placeholder="Agency (doj)">'
+      + '<select id="f-status"><option value="">Any source status</option>'
+      +   ['ACTIVE','MODIFIED','REMOVED_FROM_SOURCE','SOURCE_UNAVAILABLE','SUPERSEDED','VACATED','RESCINDED','UNKNOWN']
+            .map(function(s){ return '<option>' + s + '</option>'; }).join('')
+      + '</select>'
+      + '<input id="f-type" placeholder="Record type">'
+      + '<input id="f-entity" placeholder="Named entity">'
+      + '<input id="f-record" placeholder="Source record id">'
+      + '<input id="f-from" type="date" aria-label="Action date from">'
+      + '<input id="f-to" type="date" aria-label="Action date to">'
+      + '<button class="btn" id="f-go">Search</button>'
+      + '<button class="btn secondary" id="f-clear">Clear</button>'
+      + '</div><div id="ga-results"><div class="empty">Enter a filter and search, or leave them '
+      + 'blank to list everything.</div></div></div>';
+  }
+  function wireFilters(){
+    $('f-go').addEventListener('click', runSearch);
+    $('f-clear').addEventListener('click', function(){
+      ['f-source','f-agency','f-status','f-type','f-entity','f-record','f-from','f-to']
+        .forEach(function(id){ $(id).value = ''; });
+      $('ga-results').innerHTML = '<div class="empty">Filters cleared.</div>';
+    });
+  }
+  function val(id){ var v = ($(id).value || '').trim(); return v || null; }
+  async function runSearch(){
+    var target = $('ga-results');
+    target.innerHTML = '<div class="empty">Searching…</div>';
+    try{
+      var data = await rpc('gov_archive_records', {
+        p_source_id: val('f-source'), p_agency: val('f-agency'),
+        p_source_status: val('f-status'), p_record_type: val('f-type'),
+        p_entity: val('f-entity'), p_source_record_id: val('f-record'),
+        p_from: val('f-from'), p_to: val('f-to'), p_limit: 100, p_offset: 0
+      });
+      var rows = (data && data.rows) || [];
+      if(!rows.length){
+        // "Nothing matched your filters" — never "there are no records". The
+        // difference is the whole point of an archive nobody has finished filling.
+        target.innerHTML = '<div class="empty">No records matched these filters. That is a '
+          + 'statement about the filters and about what we have acquired so far — not about what '
+          + 'the agencies hold.</div>';
+        return;
+      }
+      target.innerHTML = '<p class="sub">' + esc(n(data.total)) + ' matching, showing '
+        + esc(String(rows.length)) + '.</p>'
+        + '<table><thead><tr><th>Agency</th><th>Record id</th><th>Named entity</th><th>Type</th>'
+        + '<th>Action date</th><th>Matter / case</th><th>Penalty</th><th>Source status</th>'
+        + '<th>Versions</th></tr></thead><tbody>'
+        + rows.map(function(r){
+            return '<tr class="clickable" data-id="' + esc(r.id) + '">'
+              + '<td><span class="mono">' + esc(r.source_id) + '</span></td>'
+              + '<td class="mono">' + esc(txt(r.source_record_id)) + '</td>'
+              + '<td><b>' + esc(txt(r.named_entity)) + '</b></td>'
+              + '<td>' + esc(txt(r.record_type)) + '</td>'
+              + '<td>' + esc(day(r.action_date)) + '</td>'
+              + '<td>' + esc(txt(r.matter_number || r.case_number || r.docket_number)) + '</td>'
+              + '<td class="num">' + esc(money(r.penalty_amount)) + '</td>'
+              + '<td>' + pill(r.source_status, SRC_TONE) + '</td>'
+              + '<td class="num">' + esc(n(r.document_versions)) + '</td></tr>';
+          }).join('')
+        + '</tbody></table>';
+      [].forEach.call(target.querySelectorAll('tr[data-id]'), function(tr){
+        tr.addEventListener('click', function(){ go('record=' + encodeURIComponent(tr.getAttribute('data-id'))); });
+      });
+    }catch(err){
+      if(denied(err)){ noAccess(window.hsUser.email); return; }
+      target.innerHTML = '<div class="empty">Search failed: ' + esc(err.message || '') + '</div>';
+    }
+  }
+
+  // ---- 3. record detail -----------------------------------------------------
+  async function renderRecord(actionId){
+    var data = await rpc('gov_archive_record', { p_action_id: actionId });
+    if(!data || !data.action){
+      body.innerHTML = crumb() + '<div class="card"><div class="empty">No such record.</div></div>';
+      wireCrumb(); return;
+    }
+    var a = data.action, subject = data.subject, docs = data.documents || [];
+    var current = docs[0] || null;
+
+    body.innerHTML = crumb()
+      + '<div class="card"><h3>Government source</h3>'
+      + '<dl class="kv">'
+      + kv('Agency', a.source_agency) + kv('Program', a.source_program)
+      + kv('Source record id', a.source_record_id, true)
+      + kv('Named entity', a.named_entity)
+      + kv('Record type', a.record_type) + kv('Action type', a.action_type)
+      + kv('Action date', day(a.action_date))
+      + kv('Case / matter / docket',
+          [a.case_number, a.matter_number, a.docket_number].filter(Boolean).join(' · '))
+      + kv('Jurisdiction', [a.jurisdiction, a.court].filter(Boolean).join(' · '))
+      + kv('Violation category', a.violation_category)
+      + kv('Disposition', a.disposition)
+      + '<dt>Penalty</dt><dd' + (a.penalty_amount == null ? ' class="absent"' : '') + '>'
+        + esc(a.penalty_amount == null ? 'The record does not state one' : money(a.penalty_amount))
+        + '</dd>'
+      + '<dt>Current source status</dt><dd>' + pill(a.source_status, SRC_TONE) + '</dd>'
+      + '</dl>'
+      // WHAT THE GOVERNMENT NAMED, and how it typed it. Shown because a facility
+      // that has been silently promoted to a company is invisible unless the kind
+      // is on the page next to it.
+      + (subject
+        ? '<h3 style="margin-top:18px">Subject, as the source typed it</h3><dl class="kv">'
+          + kv('Kind', subject.subject_kind) + kv('Name', subject.subject_name)
+          + kv('Source key', subject.source_subject_key, true)
+          + kv('Address as stated', subject.address_text) + '</dl>'
+          + resolutionsHTML(data.resolutions || [])
+        : '')
+      + '</div>'
+      + provenanceHTML(current)
+      + versionsHTML(docs)
+      + timelineHTML(data.timeline || [], data.dispositions || []);
+    wireCrumb();
+    wireArchiveLinks();
+  }
+
+  function kv(label, value, mono){
+    var absent = (value == null || value === '');
+    return '<dt>' + esc(label) + '</dt><dd class="' + (absent ? 'absent ' : '')
+      + (mono ? 'mono' : '') + '">' + esc(absent ? 'Not stated' : value) + '</dd>';
+  }
+
+  function resolutionsHTML(list){
+    if(!list.length){
+      return '<div class="note">No HomeSignal entity has been resolved for this subject. The '
+        + 'record is complete and citable without one — an unresolved government action is a real '
+        + 'state, not a gap to fill with a guess.</div>';
+    }
+    return '<table style="margin-top:10px"><thead><tr><th>Resolved to</th><th>Kind</th>'
+      + '<th>Basis</th><th>Verification</th><th>Evidence</th></tr></thead><tbody>'
+      + list.map(function(r){
+          return '<tr><td>' + esc(txt(r.target_name || r.target_id)) + '</td>'
+            + '<td>' + esc(txt(r.target_kind)) + '</td>'
+            + '<td>' + esc(txt(r.match_basis)) + '</td>'
+            + '<td>' + pill(String(r.verification || '').toUpperCase(),
+                { VERIFIED:'p-ok', UNVERIFIED_CANDIDATE:'p-warn', NOT_YET_ASKED:'p-none', REJECTED:'p-bad' })
+            + '</td><td>' + esc(txt(r.evidence_source)) + '</td></tr>';
+        }).join('')
+      + '</tbody></table>'
+      + '<div class="note">Only a <b>verified</b> resolution attributes this action to a HomeSignal '
+      + 'entity. A candidate is kept on the record so it can be settled later, and carries nothing '
+      + 'downstream. The action itself belongs to the entity the government document named.</div>';
+  }
+
+  // ---- provenance vs preservation, as two different controls ----------------
+  function provenanceHTML(doc){
+    if(!doc){
+      return '<div class="card"><h3>Provenance</h3>'
+        + '<div class="empty">No document has been archived for this record.</div></div>';
+    }
+    var removed = doc.source_status === 'REMOVED_FROM_SOURCE'
+      || doc.source_status === 'SOURCE_UNAVAILABLE';
+    return '<div class="card"><h3>Provenance</h3>'
+      + '<dl class="kv">'
+      + kv('Original government URL', doc.original_url, true)
+      + kv('Original filename', doc.original_filename, true)
+      + kv('First retrieved', when(doc.first_retrieved_at))
+      + kv('Last verified', when(doc.last_verified_at))
+      + kv('Published by the agency', day(doc.source_published_at))
+      + kv('SHA-256', doc.sha256, true)
+      + kv('Archived file', doc.archive_storage_key, true)
+      + kv('Type / size', [doc.mime_type, bytes(doc.file_size_bytes)].filter(Boolean).join(' · '))
+      + '</dl>'
+      + '<div class="srcbtns">'
+      + '<a class="srcbtn gov' + (removed ? ' disabled' : '') + '" target="_blank" rel="noopener" '
+        + 'href="' + esc(doc.original_url || '#') + '">'
+        + '<b>View original government source ' + (removed ? '(no longer published)' : '\u2197') + '</b>'
+        + '<span>The agency\u2019s own page. This is provenance — it may change or disappear.</span></a>'
+      + '<a class="srcbtn hs" href="#" data-doc="' + esc(doc.id) + '">'
+        + '<b>View HomeSignal archived copy \u2193</b>'
+        + '<span>The bytes we preserved, hashed and unchanged since we fetched them.</span></a>'
+      + '</div>'
+      + (removed
+        ? '<div class="note">This document is no longer published at its government URL. The '
+          + 'archived copy above is unaffected, and this says <b>nothing</b> about whether the '
+          + 'action was vacated, rescinded or reversed — those require an affirmative government '
+          + 'document and none has been recorded.</div>'
+        : '')
+      + '</div>';
+  }
+
+  function versionsHTML(docs){
+    if(docs.length < 1) return '';
+    return '<div class="card"><h3>Document versions</h3>'
+      + '<p class="sub">Every version we have ever held. Changed bytes are preserved <b>beside</b> '
+      + 'the previous version, never over it.</p>'
+      + '<table><thead><tr><th>Version</th><th>SHA-256</th><th>Size</th><th>First retrieved</th>'
+      + '<th>Last verified</th><th>Status</th><th>Archived copy</th></tr></thead><tbody>'
+      + docs.map(function(d){
+          return '<tr><td class="num">' + esc(n(d.content_version)) + '</td>'
+            + '<td class="mono">' + esc(String(d.sha256 || '').slice(0, 16)) + '\u2026</td>'
+            + '<td class="num">' + esc(bytes(d.file_size_bytes)) + '</td>'
+            + '<td>' + esc(when(d.first_retrieved_at)) + '</td>'
+            + '<td>' + esc(when(d.last_verified_at)) + '</td>'
+            + '<td>' + pill(d.source_status, SRC_TONE) + '</td>'
+            + '<td><a href="#" data-doc="' + esc(d.id) + '">Open \u2193</a></td></tr>';
+        }).join('')
+      + '</tbody></table></div>';
+  }
+
+  function timelineHTML(events, dispositions){
+    var items = events.map(function(e){
+      return { at: e.observed_at, kind: e.event,
+        what: eventLabel(e), note: e.note };
+    }).concat((dispositions || []).map(function(d){
+      return { at: d.effective_date, kind: 'DISPOSITION_RECORDED',
+        what: 'A later government document ' + String(d.relation || 'affects') + ' this action',
+        note: d.evidence_url || null };
+    }));
+    items.sort(function(a,b){ return String(a.at || '').localeCompare(String(b.at || '')); });
+    if(!items.length) return '';
+    return '<div class="card"><h3>History</h3>'
+      + '<p class="sub">Nothing here replaces anything above it. Each entry is what we observed, '
+      + 'when we observed it.</p><ul class="tl">'
+      + items.map(function(i){
+          return '<li class="ev-' + esc(i.kind) + '"><div class="when">' + esc(day(i.at)) + '</div>'
+            + '<div class="what">' + esc(i.what) + '</div>'
+            + (i.note ? '<div class="when">' + esc(i.note) + '</div>' : '') + '</li>';
+        }).join('')
+      + '</ul></div>';
+  }
+  function eventLabel(e){
+    var map = {
+      ARCHIVED: 'First acquired and archived',
+      REVERIFIED: 'Checked again — unchanged',
+      CONTENT_CHANGED: 'Government source modified; a new version was preserved',
+      SUPERSEDED_BY_VERSION: 'Superseded by a newer version',
+      REMOVED_FROM_SOURCE: 'No longer published at the government URL',
+      SOURCE_UNAVAILABLE: 'The source could not be reached',
+      DISPOSITION_RECORDED: 'A later disposition was recorded',
+      STATUS_CORRECTED: 'Status corrected'
+    };
+    return map[e.event] || e.event;
+  }
+
+  // A signed URL is minted from the OPERATOR'S OWN session against the storage
+  // policy. The service-role key is not involved and never reaches this page.
+  function wireArchiveLinks(){
+    [].forEach.call(body.querySelectorAll('[data-doc]'), function(el){
+      el.addEventListener('click', async function(ev){
+        ev.preventDefault();
+        var id = el.getAttribute('data-doc');
+        try{
+          var info = await rpc('gov_archive_document_key', { p_document_id: id });
+          if(!info || !info.archive_storage_key) throw new Error('no archived copy recorded');
+          var r = await window.hsClient.storage.from(info.bucket)
+            .createSignedUrl(info.archive_storage_key, 300);
+          if(r.error) throw r.error;
+          window.open(r.data.signedUrl, '_blank', 'noopener');
+        }catch(err){
+          alert('Could not open the archived copy: ' + ((err && err.message) || 'unknown error'));
+        }
+      });
+    });
+  }
+
+  // ---- 4. runs --------------------------------------------------------------
+  async function renderRuns(p){
+    body.innerHTML = crumb() + '<div class="card"><h3>Acquisition runs'
+      + (p.source ? ' \u2014 <span class="mono">' + esc(p.source) + '</span>' : '') + '</h3>'
+      + '<p class="sub">One row per run of one source. The log records the operation only.</p>'
+      + '<div id="ga-runs"><div class="empty">Loading…</div></div></div>';
+    wireCrumb();
+    await paintRuns(document.getElementById('ga-runs'), { p_source_id: p.source || null, p_limit: 50 });
+  }
+
+  async function paintRuns(target, args){
+    if(!target) return;
+    var runs = await rpc('gov_archive_runs', args || {});
+    if(!runs || !runs.length){
+      target.innerHTML = '<div class="empty">No acquisition runs recorded yet.</div>';
+      return;
+    }
+    target.innerHTML = '<table><thead><tr><th>Started</th><th>Source</th><th>Type</th><th>Status</th>'
+      + '<th>Duration</th><th>Discovered</th><th>New</th><th>Modified</th><th>Unchanged</th>'
+      + '<th>Removed</th><th>Files kept</th><th>Duplicates</th><th>Failures</th></tr></thead><tbody>'
+      + runs.map(function(r){
+          return '<tr class="clickable" data-run="' + esc(r.acquisition_run_id) + '">'
+            + '<td>' + esc(when(r.started_at)) + '</td>'
+            + '<td class="mono">' + esc(r.source_id) + '</td>'
+            + '<td>' + esc(txt(r.run_type)) + '</td>'
+            + '<td>' + pill(r.status, RUN_TONE) + '</td>'
+            + '<td class="num">' + esc(duration(r.duration_seconds)) + '</td>'
+            + '<td class="num">' + esc(n(r.records_discovered)) + '</td>'
+            + '<td class="num">' + esc(n(r.records_new)) + '</td>'
+            + '<td class="num">' + esc(n(r.records_modified)) + '</td>'
+            + '<td class="num">' + esc(n(r.records_unchanged)) + '</td>'
+            + '<td class="num">' + esc(n(r.records_removed_from_source)) + '</td>'
+            + '<td class="num">' + esc(n(r.documents_preserved)) + '</td>'
+            + '<td class="num">' + esc(n(r.duplicate_documents_detected)) + '</td>'
+            + '<td class="num">' + (r.error_count
+                ? '<span class="pill p-bad">' + esc(n(r.error_count)) + '</span>' : esc(n(r.error_count))) + '</td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table>';
+    [].forEach.call(target.querySelectorAll('tr[data-run]'), function(tr){
+      tr.addEventListener('click', function(){ go('run=' + encodeURIComponent(tr.getAttribute('data-run'))); });
+    });
+  }
+  function duration(seconds){
+    if(typeof seconds !== 'number' || !isFinite(seconds)) return DASH;
+    if(seconds < 60) return seconds.toFixed(1) + 's';
+    if(seconds < 3600) return Math.round(seconds / 60) + 'm';
+    return (seconds / 3600).toFixed(1) + 'h';
+  }
+
+  // ---- 5. run detail --------------------------------------------------------
+  async function renderRun(runId){
+    var data = await rpc('gov_archive_run', { p_run_id: runId });
+    if(!data || !data.run){
+      body.innerHTML = crumb() + '<div class="card"><div class="empty">No such run.</div></div>';
+      wireCrumb(); return;
+    }
+    var r = data.run, errs = data.errors || [], docs = data.documents || [];
+    body.innerHTML = crumb()
+      + '<div class="card"><h3>Acquisition run</h3>'
+      + '<dl class="kv">'
+      + kv('Source', r.source_id, true)
+      + kv('Agency / program', [r.source_agency, r.source_program].filter(Boolean).join(' / '))
+      + kv('Run id', r.acquisition_run_id, true)
+      + kv('Run type', r.run_type)
+      + kv('Started', when(r.started_at)) + kv('Completed', when(r.completed_at))
+      + kv('Duration', duration(r.duration_seconds))
+      + '<dt>Status</dt><dd>' + pill(r.status, RUN_TONE) + '</dd>'
+      + kv('Parser version', r.parser_version, true)
+      + kv('Code version', r.code_version, true)
+      + kv('Notes', r.notes)
+      + '</dl>'
+      + '<table style="margin-top:14px"><thead><tr><th>Discovered</th><th>New</th><th>Modified</th>'
+      + '<th>Unchanged</th><th>Removed from source</th><th>Documents seen</th><th>Files preserved</th>'
+      + '<th>Duplicates</th><th>Hash changes</th><th>Documents failed</th></tr></thead><tbody><tr>'
+      + ['records_discovered','records_new','records_modified','records_unchanged',
+         'records_removed_from_source','documents_discovered','documents_preserved',
+         'duplicate_documents_detected','content_hash_changes','documents_failed']
+          .map(function(k){ return '<td class="num">' + esc(n(r[k])) + '</td>'; }).join('')
+      + '</tr></tbody></table>'
+      + (Array.isArray(r.warnings) && r.warnings.length
+        ? '<div class="note"><b>Warnings</b><br>' + r.warnings.map(function(w){
+            return esc((w && w.message) || JSON.stringify(w)); }).join('<br>') + '</div>'
+        : '')
+      + '</div>'
+      + '<div class="card"><h3>Acquisition errors</h3>'
+      + '<p class="sub">A government record we failed to acquire is recorded here rather than '
+      + 'discarded \u2014 an unrecorded failure is indistinguishable from an absence of records.</p>'
+      + (errs.length
+        ? '<table><thead><tr><th>When</th><th>Type</th><th>HTTP</th><th>Record</th><th>URL</th>'
+          + '<th>Retryable</th><th>Message</th><th>Resolved</th></tr></thead><tbody>'
+          + errs.map(function(e){
+              return '<tr><td>' + esc(when(e.occurred_at)) + '</td>'
+                + '<td>' + esc(txt(e.error_type)) + '</td>'
+                + '<td class="num">' + esc(n(e.http_status)) + '</td>'
+                + '<td class="mono">' + esc(txt(e.source_record_id)) + '</td>'
+                + '<td class="mono">' + esc(txt(e.source_url)) + '</td>'
+                + '<td>' + (e.retryable ? '<span class="pill p-warn">Retryable</span>'
+                    : '<span class="pill p-none">No</span>') + '</td>'
+                + '<td>' + esc(txt(e.error_message)) + '</td>'
+                + '<td>' + esc(e.resolved_at ? when(e.resolved_at) : 'Open') + '</td></tr>';
+            }).join('')
+          + '</tbody></table>'
+        : '<div class="empty">No failures were recorded for this run.</div>')
+      + '</div>'
+      + (docs.length
+        ? '<div class="card"><h3>Documents preserved by this run</h3>'
+          + '<table><thead><tr><th>Record</th><th>Version</th><th>SHA-256</th><th>Archive key</th>'
+          + '</tr></thead><tbody>'
+          + docs.map(function(d){
+              return '<tr><td class="mono">' + esc(txt(d.source_record_id)) + '</td>'
+                + '<td class="num">' + esc(n(d.content_version)) + '</td>'
+                + '<td class="mono">' + esc(String(d.sha256 || '').slice(0, 16)) + '\u2026</td>'
+                + '<td class="mono">' + esc(txt(d.archive_storage_key)) + '</td></tr>';
+            }).join('')
+          + '</tbody></table></div>'
+        : '');
+    wireCrumb();
+  }
+
+  function crumb(){ return '<div class="crumb"><a id="ga-home">\u2190 Archive overview</a></div>'; }
+  function wireCrumb(){
+    var el = $('ga-home');
+    if(el) el.addEventListener('click', function(){ go(''); });
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    body = $('ga-body');
+    route();
+  });
+})();
+</script>
+</body>
+</html>

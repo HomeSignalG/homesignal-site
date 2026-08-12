@@ -915,13 +915,22 @@ HS.onReady(function(){
     var el = $("covNote"); if(!el) return;
     // Takes precedence: a page cannot simultaneously be "showing facilities but no planning items"
     // and "unable to show facilities at all". Says only what is certainly true of every flagged
-    // page — the read failed — rather than claiming facilities exist, which we cannot prove
-    // per-page. Clears itself once a refresh stores a real count (server-side flag).
+    // page — FRS is unreachable NOW, so the count cannot be confirmed — rather than claiming
+    // facilities exist, which we cannot prove per-page. Clears itself once a refresh stores a real
+    // count (server-side flag).
+    //
+    // The wording deliberately makes NO claim about what happened at this page's last update. The
+    // earlier "could not be reached when this page was last updated" was true of the 486 pages
+    // refreshed on 08-09 (EPA failed 486 of 486 that day) and FALSE of the older zero cohorts: EPA
+    // was answering on 08-07 (1,978 of 2,133 came back with facilities) and 08-08 (9,005 of
+    // 10,086). Extending the old text to all 1,722 would have traded a false zero for a false
+    // explanation. Anything cohort-specific belongs in the flag, not in this string.
     if(FAC_UNAVAILABLE){
-      el.textContent = "EPA's facility service could not be reached when this page was last "
-        + "updated, so the facility count for this area is unavailable rather than zero. Planning "
-        + "and permit records below are unaffected. This page updates automatically once EPA "
-        + "responds again.";
+      el.textContent = "EPA's facility service has been unreachable since 2026-08-09, so the "
+        + "facility count for this area cannot be confirmed and is shown as "
+        + "unavailable rather than zero. "
+        + "Planning and permit records below are unaffected. This page updates automatically "
+        + "once EPA responds again.";
       el.style.display = "";
       return;
     }

@@ -56,6 +56,17 @@ jobs:
               headers={
                   "Authorization": f"Bearer {os.environ['SUPABASE_ACCESS_TOKEN']}",
                   "Content-Type": "application/json",
+                  "Accept": "application/json",
+                  # WITHOUT THIS HEADER THE REQUEST NEVER REACHES SUPABASE, and this
+                  # workflow has been failing on it since 2026-07-21. api.supabase.com
+                  # sits behind Cloudflare, which rejects Python's default
+                  # "Python-urllib/3.x" signature with HTTP 403 "error code: 1010"
+                  # BEFORE authentication — so it presents exactly like a bad token
+                  # and is not one. Measured 2026-08-12, same request and a
+                  # deliberately invalid token: default UA -> 403/1010; explicit UA
+                  # -> 401 "JWT could not be decoded", i.e. it got through.
+                  # Do not remove it as an apparently pointless header.
+                  "User-Agent": "HomeSignal-db-sql/1.0 (+https://homesignal.net)",
               },
               method="POST",
           )

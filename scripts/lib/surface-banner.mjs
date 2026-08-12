@@ -131,6 +131,14 @@ export const UNVERIFIED_SURFACES = [
   'index.html       — app_community_meta (isCovered), app_changes',
   'maps.html        — app_projects, app_changes, meetings, facilities',
   'reports.html     — app_projects',
+  // Internal operator surface, allowlisted. A live verifier would need an
+  // allowlisted test account, which is a founder call — same residual as
+  // acquisition.html and property.html's signed-in half. Offline coverage:
+  // test/gov-archive-admin.test.mjs pins the contract, and the archive's own
+  // guarantees are gated in homesignal-ingest (tests/test_gov_archive.py and
+  // tests/gov_archive_scenarios.sql).
+  'gov-archive.html — source_registry, acquisition_runs, acquisition_errors, '
+    + 'source_documents, gov_actions (all via gated gov_archive_* RPCs)',
 ];
 
 /** PARTIALLY covered surfaces — a verifier exists but does NOT cover the whole page.

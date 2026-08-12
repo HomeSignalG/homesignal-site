@@ -16,6 +16,7 @@ Disallow: /development.html
 Disallow: /my-alerts.html
 Disallow: /unsubscribe.html
 Disallow: /acquisition.html
+Disallow: /gov-archive.html
 Disallow: /homesignalphase1_13.html
 
 Sitemap: https://homesignal.net/sitemap.xml

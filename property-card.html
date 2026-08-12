@@ -638,15 +638,21 @@ HS.onReady(async function () {
       // A source we queried that returned nothing has MEASURED ZEROS, not unstated metrics —
       // otherwise the badge says "Checked" above a row of em-dashes and the card contradicts
       // itself. This is the same both-directions rule the gate enforces.
-      if (!counts && C.state(st) === 'checked_empty') counts = [0, 0];
+      if (!counts && C.state(st) === 'checked_empty') counts = [0, null];
       var labels = a.metrics;
       var vals = labels.map(function (label, i) {
         // Counts are positional per agency: [primary count, penalties] for the enforcement
         // sources. Anything we did not compute stays unstated rather than defaulting to 0.
+        // A MONETARY metric is never zero just because a source was empty. `gov_actions`' rule
+        // (docs/government-source-archive.md, "Do not"): never render $0 for a penalty the record
+        // does not state. With no records there is no record to state one, so it stays unstated
+        // while the COUNT beside it is a real, measured 0.
+        var money = /penalt|fine|relief|disgorge/i.test(label);
         var n = counts
           ? (i === labels.length - 1 ? counts[1]
              : (i === 0 ? counts[0] : (C.state(st) === 'checked_empty' ? 0 : undefined)))
           : undefined;
+        if (money && (n === null || n === 0) && C.state(st) === 'checked_empty') n = undefined;
         var text = C.metricText(st, typeof n === 'number' ? n : undefined);
         if (i === labels.length - 1 && text !== C.NO_VALUE && /penalt/i.test(label)) {
           text = '$' + Number(text).toLocaleString();
