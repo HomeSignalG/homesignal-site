@@ -800,6 +800,85 @@ these corrections:
 
 ---
 
+## 8.0 ENTITY TRACK RECORD — ONE module, grouped by entity (founder, 2026-08-12)
+
+**Parent Company Track Record is no longer a module.** It is an entity **group** inside Entity Track
+Record. `HS.card.SECTIONS` is therefore 11, not 12, and there is deliberately **no FinCEN module** —
+FinCEN is a source feeding this one. Two modules invited the reading that a parent's conduct is a
+separate category of fact about the property; one module with labelled groups says the true thing.
+
+### The hierarchy the module renders
+
+`Property → Property Entity → Entity Relationships → Parent / Controlling Entity → Related Material
+Entities → Track Record Records → Source Agency / Source Document.`
+
+`HS.card.ENTITY_ROLES` declares the groups and their order:
+
+| Role | Renders | Gate |
+|---|---|---|
+| `project_entity` | **always**, even with nothing on it — its lack of records is the answer a resident came for | none |
+| `parent` | only when a parent exists | relationship must be verified |
+| `related` | operator · developer · property owner · subsidiary · affiliate · management company | **verified relationship AND a stated role**. A corporate relative that merely shares ownership is excluded — a list of every affiliate is not information about this property |
+
+### Agencies are data
+
+`HS.card.AGENCIES` declares eight today — EPA/ECHO · state environmental · OSHA · SEC · **FinCEN** ·
+**DOJ** · **OFAC** · state/local. **Adding one is an entry in that list and nothing else:** no module,
+no card, no layout edit. Each declares its own `metrics`, because agencies count different things
+(OSHA has inspections, FinCEN has matters), and forcing them into one triple is how a programme
+enrolment ends up displayed as an enforcement action.
+
+### The record contract
+
+`HS.card.ENFORCEMENT_FIELDS` is source-agnostic and carries the full FinCEN field set:
+`source_agency · source_name · record_type · entity_name · matched_entity_id · entity_role ·
+relationship_to_property · parent_or_subsidiary_relationship · action_date · matter_number ·
+violation_category · violation_summary · penalty_amount · action_status · source_url ·
+source_document_url · source_document_title · verification_status · confidence_score · retrieved_at`.
+
+### ATTRIBUTION — the rule the grouping exists to enforce
+
+`HS.card.recordsFor(records, entity)` is the gate. A record is displayed under the legal entity the
+**source document names**, matched on the resolved entity id or an **exact** case-insensitive legal
+name. **A near name match is never accepted** — "Greenland Energy LLC" and "Greenland Energy Holdings
+LLC" are different companies until a source says otherwise, and guessing is how a subsidiary's fine
+lands on a parent's record. Tested both ways, including the case that matters: a parent's FinCEN
+action must never appear under the project LLC.
+
+**A property-level check is not an entity-level check.** Entity rows are driven by
+`entity.track[agency]` only. Populating them from the address-level state would show three companies
+each reading "Checked · 0 · 0" off a single query we ran once for the address — attributing research
+we never performed. Absent an entity-level check the honest state is `not_checked`, and a test asserts
+the property-level state cannot leak in.
+
+### Empty states
+
+Never "no violations". The required sentence is
+**"No verified enforcement records found in currently connected HomeSignal sources."** — it names
+*where we looked*, so nothing-found cannot read as nothing-exists. Where a formation date is known the
+group also shows **"Company formed <date>, so there is little history to find either way."**, so a
+company incorporated last quarter does not read like a thirty-year clean record. *(The spec's wording
+was "Entity formed"; "Company" says the same thing to a homeowner and keeps the
+internal-vocabulary ban intact.)*
+
+### One density decision, disclosed
+
+Eight agencies across three groups is 24 cards, and on the pilot 22 of them say "not checked" in the
+same sentence. Repeating one paragraph twenty-two times does not make the gap clearer — it buries the
+two findings that matter. So **agencies with something to report get a card; the rest are named in one
+compact line** per group. Every unchecked agency is still *named*, so a resident can see we have not
+looked at DOJ; it is listed rather than carded. That is a density decision, not a disclosure one —
+nothing is hidden and nothing is implied to be clean.
+
+### Entity resolution — backend contract
+
+Matching must support exact legal name · former legal names · DBA names · verified subsidiaries ·
+verified parents · known entity identifiers. **Never merge on name similarity alone**, and every
+parent/subsidiary relationship carries a source and a verification status — which is why the group
+header renders the relationship, its source and (where present) a link to the document.
+
+---
+
 ## 8.1 WHAT THE DESIGN REQUIRES AS DATA — read off the mockup, field by field
 
 Re-read against the approved design, these are fields the card must carry that the module list above

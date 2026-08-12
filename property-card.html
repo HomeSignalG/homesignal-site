@@ -100,10 +100,27 @@
      side by side. An auto-fit grid wrapped the fifth onto a line of its own, which reads as two
      groups and implies a distinction the design does not make. Fixed five columns; it collapses
      deliberately only when there is genuinely no room. */
-  .pcsrcs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
+  /* EIGHT agencies now (SEC · EPA · OSHA · FinCEN · DOJ · OFAC · state environmental ·
+     state/local), so a single row is no longer possible. Four across is the compromise: an even
+     4x2 block per entity, never the ragged 5+3 that reads as two groups and implies a
+     distinction between the agencies that does not exist. */
+  .pcsrcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px}
   @media(max-width:1180px){ .pcsrcs{grid-template-columns:repeat(3,minmax(0,1fr))} }
   @media(max-width:760px){ .pcsrcs{grid-template-columns:repeat(2,minmax(0,1fr))} }
   @media(max-width:460px){ .pcsrcs{grid-template-columns:minmax(0,1fr)} }
+
+  /* entity groups inside Entity Track Record */
+  .pceGroup + .pceGroup{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+  .pceHead{margin-bottom:10px}
+  .pceHead h3{font-size:15px;letter-spacing:-.01em;margin:0 0 4px}
+  .pceMeta{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}
+  .pcerole{font:700 9.5px/1 var(--font);letter-spacing:.07em;text-transform:uppercase;
+    color:var(--green);background:var(--green-tint);border:1px solid #cbe7d5;border-radius:5px;padding:4px 7px}
+  .pceRel{font-size:11.5px;color:var(--ink-2)}
+  .pceRel b{color:var(--ink);font-weight:600}
+  .pcunchecked{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:9px;
+    padding:9px 11px;background:#f7f9f7;border:1px solid var(--line);border-radius:10px;
+    font-size:11.5px;color:var(--ink-2);line-height:1.5}
   .pcsrc{border:1px solid var(--line);border-radius:11px;padding:10px 11px;background:#fcfdfc;min-width:0}
   .pcsrc .sn{font-size:12px;font-weight:700;color:var(--ink);line-height:1.3;word-break:break-word}
   .pcsrc .sb{margin-top:7px}
@@ -300,8 +317,7 @@ HS.onReady(async function () {
 
     var html = headHTML(row, addr, recs, filings, parcel)
       + '<div class="pcbody"><div class="pcmain">'
-      + entityTrackHTML(byId, recs)
-      + parentTrackHTML(row)
+      + entityTrackHTML(row, byId, recs)
       + hazardsHTML(byId, row)
       + meetingsHTML(byId, row, zip)
       + sustainabilityHTML(byId)
@@ -503,58 +519,124 @@ HS.onReady(async function () {
   // of the section, and every one of them goes through HS.card.metricText, so an unqueried or
   // failed source shows an em-dash. There is no code path here that prints 0 for a source
   // whose state is not a checked state.
-  // The five agencies both track-record modules report on, in the design's order.
+  // ── ENTITY TRACK RECORD ───────────────────────────────────────────────────────
+  // ONE module, grouped by ENTITY. A parent company is not a different kind of information about
+  // this property — it is a different company — so it is a labelled group here rather than a
+  // module of its own. The order a resident needs is: who is the entity, what role does it have
+  // here, who controls it, and whose record is each event.
   //
-  // A FUNCTION, not a `var` — render() runs earlier in this body, so a `var` here is still
-  // undefined when the first card draws. This is the second time that trap has bitten in this
-  // file (see trackMetricLabels); declarations hoist, the values assigned to them do not.
-  function trackAgencies() { return ['epa_echo', 'state_env', 'osha', 'sec', 'state_local']; }
+  // THE RULE THE GROUPING EXISTS TO ENFORCE: an enforcement action is displayed under the legal
+  // entity the SOURCE DOCUMENT names. A parent's FinCEN action never appears under the project
+  // LLC, and the project LLC's EPA violation never appears under the parent. HS.card.recordsFor()
+  // is the gate; the visible grouping is what makes the attribution legible.
+  function entityGroupsOf(row, byId, recs) {
+    var declared = (row && row.entities) || [];
+    var records = (row && row.enforcement_records) || [];
+    var groups = [];
+
+    C.ENTITY_ROLES.forEach(function (role) {
+      var ents = declared.filter(function (e) { return (e.role || 'project_entity') === role.id; });
+
+      // A RELATED entity is shown only when its relationship to the property is verified. An
+      // unverified relationship means we do not know it belongs on this card, and a corporate
+      // relative that merely shares ownership is not information about this property.
+      if (role.gated) {
+        ents = ents.filter(function (e) {
+          return e.relationship_verification === 'verified' && !!e.relationship_label;
+        });
+      }
+
+      if (!ents.length) {
+        // The project entity's group always renders: its lack of records is the answer a resident
+        // came for. The others simply do not exist, and inventing an empty group for a parent we
+        // have not confirmed would imply one exists.
+        if (role.required) {
+          groups.push({ role: role, entity: null, agencies: agencyRows(null, byId, recs, records) });
+        }
+        return;
+      }
+      ents.forEach(function (e) {
+        groups.push({ role: role, entity: e, agencies: agencyRows(e, byId, recs, records) });
+      });
+    });
+    return groups;
+  }
 
   /**
-   * THE ONE agency-grid renderer, shared by Entity Track Record and Parent Company Track Record.
-   *
-   * Shared deliberately rather than copied: the two modules must be identical in layout, and the
-   * only way to guarantee that as either changes is for there to be one renderer. Copying it would
-   * hold them in sync exactly until the first edit.
-   *
-   * `rows` is [{ short, state, metrics:[{label,text}], recent, detail }] — so the caller decides
-   * WHOSE record is being shown (the direct companies, or a verified parent) while the layout,
-   * the badge vocabulary and the metric gate stay common.
+   * The per-agency rows for ONE entity. Every declared agency appears, including the ones with no
+   * adapter: omitting DOJ would leave a resident unable to tell that we have not checked it, and
+   * the whole point of the module is that gaps are visible rather than absent.
    */
-  function agencyGridHTML(rows) {
-    return '<div class="pcsrcs">' + rows.map(function (r) {
-      return '<div class="pcsrc"><div class="sn">' + esc(r.short) + '</div>'
-        + '<div class="sb">' + C.badgeHTML(r.state, { module: 'entity-track-record' }) + '</div>'
-        + '<div class="pcmetrics m' + r.metrics.length + '">'
-        + r.metrics.map(function (m) { return metric(m.text, m.label); }).join('')
-        + '</div>'
-        + '<div class="pcrecent">Most recent: <b>' + esc(mostRecent(r.state, r.recent)) + '</b></div>'
-        + '<div class="sd">' + esc(r.detail) + '</div></div>';
-    }).join('') + '</div>';
+  function agencyRows(entity, byId, recs, allRecords) {
+    var mine = entity ? C.recordsFor(allRecords, entity) : [];
+    return C.AGENCIES.map(function (a) {
+      var forAgency = mine.filter(function (r) {
+        return String(r.source_agency || '').toLowerCase() === a.id
+          || String(r.source_agency || '').toUpperCase() === a.short.toUpperCase();
+      });
+      // A record we hold is `reported` at minimum — the source document is the evidence — and
+      // `verified` when the record itself says its verification passed.
+      var st, counts = null, recent = null, detail = null;
+      if (forAgency.length) {
+        st = forAgency.every(function (r) { return r.verification_status === 'verified'; }) ? 'verified' : 'reported';
+        counts = [forAgency.length, sumPenalties(forAgency)];
+        recent = forAgency.map(function (r) { return r.action_date; }).filter(Boolean).sort().pop();
+        detail = enforcementLine(a, forAgency);
+      } else if (entity && entity.track && entity.track[a.id]) {
+        // ENTITY-LEVEL checks only. A property-level check ("we queried OSHA for this address")
+        // is NOT a check of each company named on the filings, and presenting it as one would
+        // attribute research we never did — three entities each showing "Checked · 0 · 0" off a
+        // single address-level query. Absent an entity-level check, the honest state is that we
+        // have not checked this source for this company.
+        st = C.state(entity.track[a.id].state);
+        recent = entity.track[a.id].recent;
+        detail = entity.track[a.id].detail || null;
+      } else {
+        st = 'not_checked';
+      }
+      // A source we queried that returned nothing has MEASURED ZEROS, not unstated metrics —
+      // otherwise the badge says "Checked" above a row of em-dashes and the card contradicts
+      // itself. This is the same both-directions rule the gate enforces.
+      if (!counts && C.state(st) === 'checked_empty') counts = [0, 0];
+      var labels = a.metrics;
+      var vals = labels.map(function (label, i) {
+        // Counts are positional per agency: [primary count, penalties] for the enforcement
+        // sources. Anything we did not compute stays unstated rather than defaulting to 0.
+        var n = counts
+          ? (i === labels.length - 1 ? counts[1]
+             : (i === 0 ? counts[0] : (C.state(st) === 'checked_empty' ? 0 : undefined)))
+          : undefined;
+        var text = C.metricText(st, typeof n === 'number' ? n : undefined);
+        if (i === labels.length - 1 && text !== C.NO_VALUE && /penalt/i.test(label)) {
+          text = '$' + Number(text).toLocaleString();
+        }
+        return { label: label, text: text };
+      });
+      return { id: a.id, short: a.short, state: st, metrics: vals, recent: recent,
+        detail: detail || sourceLine(st, a.short, recent) || C.COPY.module.noEnforcement,
+        records: forAgency };
+    });
+  }
+  function sumPenalties(rows) {
+    var t = null;
+    rows.forEach(function (r) {
+      if (typeof r.penalty_amount === 'number' && isFinite(r.penalty_amount)) t = (t || 0) + r.penalty_amount;
+    });
+    return t;
+  }
+  /** One deterministic sentence from the fields the records actually carry. */
+  function enforcementLine(a, rows) {
+    var kinds = {};
+    rows.forEach(function (r) { if (r.violation_category) kinds[r.violation_category] = 1; });
+    var k = Object.keys(kinds);
+    return rows.length + ' ' + (rows.length === 1 ? 'record' : 'records') + ' on file with ' + a.short
+      + (k.length ? ', covering ' + k.slice(0, 2).join(' and ') : '') + '.';
   }
 
-  function entityTrackHTML(byId, recs) {
-    var cells = agencyGridHTML(trackAgencies().filter(function (id) { return byId[id]; }).map(function (id) {
-      var s = byId[id];
-      return { short: s.short, state: s.state, recent: s.recent, detail: s.detail,
-        metrics: trackMetrics(id, s.state, recs) };
-    }));
-    var order = trackAgencies();
-    return sec('entity-track-record', {
-      wide: true,
-      info: C.COPY.module.trackRecordAttribution,
-      state: C.rollup(order.map(function (id) { return byId[id] && byId[id].state; })),
-      link: { href: '#sources', label: 'See every source →' }
-    // The "What the records show" box is removed from the module body (founder, 2026-08-12). The
-    // attribution itself is not deleted — it rides on the section's info affordance, because the
-    // claim it guards against ("these events happened at this address") is one the module can
-    // still invite. C.COPY.module.trackRecordAttribution remains the single source of that wording.
-    }, cells);
-  }
   /**
    * "Most recent" is a DATE WITH A STATE, not a nullable date — the design shows four distinct
    * answers (Not available / Not applicable / Not checked / In progress) and they mean different
-   * things. A real date renders only when the source supplied one.
+   * things. A real date renders only when a source supplied one.
    */
   function mostRecent(state, when) {
     if (when) return HS.fmtDate(when, { year: 'numeric', month: 'short', day: 'numeric' });
@@ -570,125 +652,15 @@ HS.onReady(async function () {
     return '<div class="pcmetric"><div class="ml">' + esc(label) + '</div>'
       + '<div class="mv' + (na ? ' na' : '') + '">' + esc(text) + '</div></div>';
   }
-  // Each source counts what IT counts. Forcing every source into one Violations / Enforcement
-  // actions / Penalties triple is how a state registry's PROGRAM ENROLMENTS end up displayed as
-  // enforcement actions — a category error that reads as an accusation. So the labels come from
-  // the source, and a metric the source has no analogue for stays an em-dash rather than being
-  // filled with the nearest available number.
-  //
-  // A function, not a `var` map: render() runs before this point in the body, so a `var`
-  // assignment here is still undefined when the first card is drawn. Declarations hoist; the
-  // values they are assigned do not.
-  // ARITY MATTERS, not just wording: the approved design gives EPA/ECHO and TCEQ three columns,
-  // OSHA three DIFFERENT ones, and SEC and State/Local only TWO. A source renders the metrics it
-  // can have — padding every source to three em-dashes invents a gap the source does not have.
-  //
-  // TCEQ carries enforcement terms because the agency publishes Notices of Violation and Notices
-  // of Enforcement. Its Central Registry is a separate PRESENCE dataset, and the gap between the
-  // two is what makes the pilot's TCEQ row `partial` rather than a clean empty — the presence
-  // check ran, the enforcement checks did not.
-  function trackMetricLabels(id) {
-    var TRACK_METRICS = {
-      epa_echo:    ['Violations', 'Enforcement actions', 'Penalties'],
-      state_env:   ['Violations', 'Enforcement actions', 'Penalties'],
-      osha:        ['Inspections', 'Violations', 'Penalties'],
-      sec:         ['Enforcement matters', 'Penalties'],
-      state_local: ['Records', 'Penalties']
-    };
-    return TRACK_METRICS[id] || ['Violations', 'Enforcement actions', 'Penalties'];
-  }
-  /**
-   * The counts for one track-record source, as [{label, text}]. Only ECHO and the state registry
-   * carry real cached facts today (engine v19 stamps them onto site.env), and even there a number
-   * is emitted only when the engine actually stored one — `penalties` is absent from every cached
-   * row we have, so it renders as an em-dash rather than as zero dollars.
-   */
-  function trackMetrics(id, state, recs) {
-    var labels = trackMetricLabels(id);
-    var vals = labels.map(function () { return C.NO_VALUE; });
-    // The flip side of the gate, and just as load-bearing: a source we DID query that returned
-    // nothing has a real, measured zero, and printing an em-dash over it would be a new
-    // inaccuracy in the opposite direction — the ruling behind test/facilities-unavailable-copy.
-    if (state === 'checked_empty') {
-      vals = labels.map(function () { return C.metricText(state, 0); });
-    } else if (C.isCountable(state) && id === 'epa_echo') {
-      var viol = 0, acts = 0, pen = null, sawAct = false;
-      recs.forEach(function (s) {
-        var e = s.env && s.env.epa; if (!e) return;
-        viol += (e.in_violation || []).length;
-        if (e.action_year != null) { acts += 1; sawAct = true; }
-        if (typeof e.penalties === 'number' && isFinite(e.penalties)) pen = (pen || 0) + e.penalties;
-      });
-      vals[0] = C.metricText(state, viol);
-      vals[1] = C.metricText(state, sawAct ? acts : NaN);
-      vals[2] = C.metricText(state, pen == null ? NaN : pen);
-      // Formatting happens AFTER the gate, never instead of it: a penalty figure can only be
-      // dressed up once metricText has already decided it is allowed on the screen at all.
-      if (vals[2] !== C.NO_VALUE) vals[2] = '$' + Number(vals[2]).toLocaleString();
-    }
-    // NOTE the deliberate absence of a state_env branch: the cached TCEQ payload holds PROGRAM
-    // ENROLMENTS (Central Registry), and an enrolment is not a violation or an enforcement action.
-    // Writing that count into either slot would read as an accusation the record does not make, so
-    // the enrolment count rides in the module's detail line and these metrics stay unstated.
-    return labels.map(function (label, i) { return { label: label, text: vals[i] }; });
-  }
-
-  // ── PARENT COMPANY TRACK RECORD ───────────────────────────────────────────────
-  // Same layout as Entity Track Record, by sharing its renderer — the five agencies, the same
-  // badges, the same metric gate. What differs is only WHOSE record it is.
-  //
-  // With NO confirmed parent there is no subject to report on, so the grid is not drawn: five
-  // agency rows reading "not checked" would imply a parent exists that we simply have not looked
-  // into. That is the draft brief's §10 rule — say "no verified parent company established", and
-  // never invent one from a similar name, a shared address or shared officers.
-  function parentTrackHTML(row) {
-    var parents = ((row && row.parents) || []).filter(function (p) {
-      return !p.verification || p.verification === 'verified';
-    });
-    if (!parents.length) {
-      return sec('parent-track-record', { state: 'not_checked' },
-        '<p>' + esc(C.say(C.COPY.module.parentNone)) + '</p>');
-    }
-    // Per-agency state for the parent comes from the read model when it carries one; absent that,
-    // a confirmed parent whose agencies have not been checked is exactly `not_checked`.
-    var track = (row && row.parent_track) || {};
-    var rows = trackAgencies().map(function (id) {
-      var t = track[id] || {};
-      var st = C.state(t.state);
-      var labels = trackMetricLabels(id);
-      return {
-        short: agencyShort(id), state: st, recent: t.recent,
-        metrics: labels.map(function (label, i) {
-          return { label: label, text: C.metricText(st, t.counts ? t.counts[i] : undefined) };
-        }),
-        detail: t.detail || sourceLine(st, agencyShort(id), t.recent)
-      };
-    });
-    var names = parents.map(function (p) { return p.name || p.parent_name; }).filter(Boolean);
-    return sec('parent-track-record', { wide: true, state: C.rollup(rows.map(function (r) { return r.state; })),
-      info: C.COPY.module.trackRecordAttribution },
-      '<div class="pcrows" style="margin-bottom:12px">'
-      + names.map(function (n, i) {
-          var p = parents[i] || {};
-          return '<div class="pcrow"><span>Confirmed parent</span><b>' + esc(n)
-            + (p.evidence_url ? ' <a href="' + esc(p.evidence_url) + '" target="_blank" rel="noopener">evidence \u25B8</a>' : '')
-            + '</b></div>';
-        }).join('')
-      + '</div>'
-      + agencyGridHTML(rows));
-  }
   /**
    * The approved sentence for a state. Without this, a fallback of "not checked" got attached to
    * every state, so a checked-and-empty source rendered a CHECKED badge and three real zeros above
    * the words "we haven't checked this yet" — the two halves of the card contradicting each other.
-   * Returns '' for states whose metrics already say it, rather than inventing a line.
+   * Returns '' for states whose own numbers already say it.
    */
   function sourceLine(state, X, when) {
     var k = C.state(state);
-    if (k === 'checked_empty') {
-      return when ? C.say(C.COPY.source.checked_empty, { X: X, date: HS.fmtDate(when, { year: 'numeric', month: 'long', day: 'numeric' }) })
-                  : C.say(C.COPY.source.checked_empty, { X: X }, 1);
-    }
+    if (k === 'checked_empty') return C.COPY.module.noEnforcement;
     if (k === 'unavailable') return C.say(C.COPY.source.unavailable, { X: X });
     if (k === 'access_restricted') return C.say(C.COPY.source.access_restricted, { X: X });
     if (k === 'in_progress') return C.say(C.COPY.source.in_progress, { X: X });
@@ -696,10 +668,86 @@ HS.onReady(async function () {
     if (k === 'verified' || k === 'reported') return '';
     return C.say(C.COPY.source.not_checked, { X: X });
   }
-  /** The agency's short label, from the one place the source list defines it. */
-  function agencyShort(id) {
-    return ({ epa_echo: 'EPA / ECHO', state_env: 'State environmental', osha: 'OSHA',
-      sec: 'SEC', state_local: 'State / local' })[id] || id;
+
+  /**
+   * THE ONE agency-grid renderer, shared by every entity group.
+   * Shared rather than copied: the groups must be identical in layout, and one renderer is the
+   * only way that survives the next edit to either.
+   */
+  /**
+   * Agencies WITH something to report get a card; the rest are named in one compact line.
+   *
+   * Why: eight agencies across three entity groups is 24 cards, and on the pilot 22 of them say
+   * "not checked" in the same sentence. Repeating one paragraph twenty-two times does not make the
+   * gap clearer, it makes the module unreadable and buries the two findings that matter.
+   *
+   * The coverage rule still holds — every unchecked agency is still NAMED, so a resident can see
+   * we have not looked at DOJ. It is listed rather than given a card, which is a density decision,
+   * not a disclosure one. Nothing is hidden and nothing is implied to be clean.
+   */
+  function agencySplitHTML(rows) {
+    var shown = rows.filter(function (r) { return C.state(r.state) !== 'not_checked'; });
+    var unchecked = rows.filter(function (r) { return C.state(r.state) === 'not_checked'; });
+    var out = '';
+    if (shown.length) out += agencyGridHTML(shown);
+    if (unchecked.length) {
+      out += '<div class="pcunchecked">'
+        + '<span class="pcst t-none">Not checked</span> '
+        + unchecked.map(function (r) { return esc(r.short); }).join(' · ')
+        + (shown.length ? '' : ' — ' + esc(C.COPY.module.noEnforcement))
+        + '</div>';
+    }
+    return out;
+  }
+
+  function agencyGridHTML(rows) {
+    return '<div class="pcsrcs">' + rows.map(function (r) {
+      return '<div class="pcsrc"><div class="sn">' + esc(r.short) + '</div>'
+        + '<div class="sb">' + C.badgeHTML(r.state, { module: 'entity-track-record' }) + '</div>'
+        + '<div class="pcmetrics m' + r.metrics.length + '">'
+        + r.metrics.map(function (m) { return metric(m.text, m.label); }).join('')
+        + '</div>'
+        + '<div class="pcrecent">Most recent: <b>' + esc(mostRecent(r.state, r.recent)) + '</b></div>'
+        + '<div class="sd">' + esc(r.detail) + '</div></div>';
+    }).join('') + '</div>';
+  }
+
+  /** The entity header: who it is, its role here, who says so, and how new it is. */
+  function entityHeadHTML(group) {
+    var e = group.entity, role = group.role;
+    var name = e ? (e.name || 'Entity not named on the record') : 'Not yet identified';
+    var bits = [];
+    bits.push('<span class="pcerole">' + esc(role.label) + '</span>');
+    if (e && e.relationship_label && role.id !== 'project_entity') {
+      bits.push('<span class="pceRel">Relationship: <b>' + esc(e.relationship_label) + '</b></span>');
+    }
+    if (e && e.relationship_source) {
+      bits.push('<span class="pceRel">Source: ' + (e.relationship_source_url
+        ? '<a href="' + esc(e.relationship_source_url) + '" target="_blank" rel="noopener">' + esc(e.relationship_source) + '</a>'
+        : esc(e.relationship_source)) + '</span>');
+    }
+    if (e && e.formed_date) {
+      bits.push('<span class="pceRel">' + esc(C.say(C.COPY.module.entityFormed, {
+        date: HS.fmtDate(e.formed_date, { year: 'numeric', month: 'long', day: 'numeric' }) })) + '</span>');
+    }
+    return '<div class="pceGroup"><div class="pceHead"><h3>' + esc(name) + '</h3>'
+      + '<div class="pceMeta">' + bits.join('') + '</div></div>';
+  }
+
+  function entityTrackHTML(row, byId, recs) {
+    var groups = entityGroupsOf(row, byId, recs);
+    var body = groups.map(function (g) {
+      return entityHeadHTML(g) + agencySplitHTML(g.agencies) + '</div>';
+    }).join('');
+    var allStates = groups.reduce(function (acc, g) {
+      return acc.concat(g.agencies.map(function (a) { return a.state; }));
+    }, []);
+    return sec('entity-track-record', {
+      wide: true,
+      info: C.COPY.module.trackRecordAttribution,
+      state: C.rollup(allStates),
+      link: { href: '#sources', label: 'See every source →' }
+    }, body);
   }
 
   // ── PROPERTY & OWNERSHIP ──────────────────────────────────────────────────────

@@ -186,6 +186,7 @@ test('the donut is inline SVG, sums to its own total, and is honest when empty',
 
 test('the declared structure is the one the page renders against', () => {
   assert.ok(C.TABS.length >= 8);
+  assert.ok(C.SECTIONS.length >= 11, `expected the declared sections, found ${C.SECTIONS.length}`);
   assert.strictEqual(C.TABS[0].id, 'overview', 'Overview is the first tab and the digest of all sections');
   const tabIds = C.TABS.map((t) => t.id);
   assert.strictEqual(new Set(tabIds).size, tabIds.length, 'tab ids are unique');
@@ -202,10 +203,14 @@ test('the declared structure is the one the page renders against', () => {
     assert.ok(C.SECTIONS.some((s) => s.tab === t), `tab "${t}" owns no section`);
   });
   // The sections the redesign is specifically about.
-  ['entity-track-record', 'parent-track-record', 'property-ownership', 'development-activity',
+  ['entity-track-record', 'property-ownership', 'development-activity',
     'facility-connections', 'natural-hazards', 'meetings-notices', 'sustainability',
     'recorded-instruments', 'regulatory-records', 'sources-verification', 'data-completeness']
     .forEach((id) => assert.ok(secIds.includes(id), `section "${id}" is missing`));
+  // The parent is an ENTITY GROUP inside Entity Track Record, not a module. Two modules invited
+  // the reading that a parent's conduct is a separate category of fact about the property.
+  assert.ok(!secIds.includes('parent-track-record'),
+    'Parent Company Track Record must not be a section of its own');
 });
 
 test('the disclaimer refuses the reading the layout invites', () => {

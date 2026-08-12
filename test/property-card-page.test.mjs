@@ -96,7 +96,9 @@ need(/record_url \|\| s\.url\) === url/.test(data),
 
 // ── 5. every declared section is rendered, under its declared tab ───────────────
 const declared = HS.card.SECTIONS;
-need(declared.length >= 12, `HS.card.SECTIONS holds ${declared.length} sections — expected at least 12`);
+// Eleven, not twelve: Parent Company Track Record became an entity GROUP inside Entity Track
+// Record rather than a module of its own (founder, 2026-08-12).
+need(declared.length >= 11, `HS.card.SECTIONS holds ${declared.length} sections — expected at least 11`);
 declared.forEach((s) => {
   need(new RegExp("sec\\('" + s.id + "'").test(card),
     `section "${s.id}" is declared but never rendered by property-card.html`);
@@ -122,108 +124,103 @@ need(/role="tablist"/.test(card) && /role="tab"/.test(card) && /aria-selected/.t
 
 // ── 6. THE GATE, on the page: no count reaches the screen except through metricText ──
 need(/C\.metricText\(/.test(card), 'the card page never calls HS.card.metricText — nothing is gated');
-// Every track-record metric goes through it. trackMetrics starts all three values at the
-// em-dash and only ever overwrites one via metricText, so there is no assignment that could
-// place a raw number in a metric slot.
-const tm = (card.match(/function trackMetrics\(id, state, recs\) \{[\s\S]*?\n  \}/) || [''])[0];
-need(tm.length > 200, 'trackMetrics could not be located to audit');
-need(/vals = labels\.map\(function \(\) \{ return C\.NO_VALUE; \}\)/.test(tm),
-  'trackMetrics does not start every metric at the absent marker');
-// Arity comes from the source, not from a hardcoded three. The approved design gives SEC and
-// State/Local two columns; padding them to three invents a gap those sources do not have.
-need(/sec:\s*\['Enforcement matters', 'Penalties'\]/.test(card)
-  && /state_local:\s*\['Records', 'Penalties'\]/.test(card),
-  'per-source metric arity does not match the approved design (SEC and State/Local have two)');
-need(/osha:\s*\['Inspections', 'Violations', 'Penalties'\]/.test(card),
-  'OSHA does not carry its own metric set from the design');
-need(/labels\.map\(function \(\) \{ return C\.metricText\(state, 0\); \}\)/.test(tm),
-  'the checked-empty path pads to a fixed three instead of the source\u2019s own arity');
-[...tm.matchAll(/vals\[\d\] = ([^;]+);/g)].forEach((m) => {
-  need(/C\.metricText\(/.test(m[1]) || /C\.NO_VALUE/.test(m[1]) || /Number\(vals\[/.test(m[1]),
-    `trackMetrics assigns a metric without the metricText gate: vals[..] = ${m[1].trim()}`);
-});
-need(/C\.isCountable\(state\) && id === 'epa_echo'/.test(tm),
-  'trackMetrics computes ECHO counts without first checking the state is countable — it would '
-  + 'count for a source that was never queried');
-// A measured zero MUST still render as 0, or the card lies in the other direction.
-need(/state === 'checked_empty'[\s\S]{0,220}C\.metricText\(state, 0\)/.test(tm),
-  'a checked-but-empty source does not render its real, measured 0');
-// Each source labels what IT counts: a state registry's programme enrolments must never be
-// displayed under "Enforcement actions".
-need(/var TRACK_METRICS = \{/.test(card), 'track-record metric labels are not per-source');
-// The enrolment problem is now solved more strongly than by relabelling. The cached TCEQ payload
-// holds Central Registry PROGRAM ENROLMENTS, and an enrolment is neither a violation nor an
-// enforcement action — so trackMetrics has NO state_env branch at all and writes no metric for it,
-// rather than writing a count under a softer label. Assert the absence, since that is the guarantee.
-need(!/id === 'state_env'/.test(tm),
-  'trackMetrics writes a metric for the state registry — its cached payload is programme '
-  + 'enrolments, which under any enforcement label reads as an accusation the record does not make');
-need(/ENROLMENTS/.test(card) || /enrolment/i.test(tm),
-  'nothing records WHY the state registry writes no metric, so a future edit will add one back');
-
-// ── 6a. the two track-record modules SHARE one renderer ───────────────────────
-// Founder: Parent Company Track Record must have exactly the same layout as Entity Track Record.
-// Guaranteed by sharing the renderer, not by copying it — a copy holds them in sync exactly until
-// the first edit to either.
-need(/function agencyGridHTML\(rows\)/.test(card), 'there is no shared agency-grid renderer');
-need((card.match(/agencyGridHTML\(/g) || []).length >= 3,
-  'the agency grid is not called by BOTH track-record modules');
-need(/function trackAgencies\(\) \{ return \['epa_echo', 'state_env', 'osha', 'sec', 'state_local'\]; \}/.test(card),
-  'the five agencies are not declared once for both modules');
-// A `var` here would be undefined when render() draws the first card — this file has been bitten
-// by that hoisting trap twice, so pin the function form.
-need(!/var TRACK_AGENCIES/.test(card),
-  'the agency list is a `var` declared after render() runs, so it will be undefined at draw time');
-// With no confirmed parent the grid must NOT be drawn: five "not checked" agency rows imply a
-// parent exists that we merely have not looked into (draft brief §10).
-need(/if \(!parents\.length\) \{[\s\S]{0,220}parentNone/.test(card),
-  'the no-parent state draws the agency grid instead of saying no parent is confirmed');
-need(/p\.verification === 'verified'/.test(card),
-  'an unverified parent candidate can reach the parent module');
-// Fallback copy must MATCH the state, or a checked-empty source renders "CHECKED · 0 · 0 · 0"
-// above the words "we haven't checked this yet".
-need(/function sourceLine\(state, X, when\)/.test(card), 'there is no state-matched copy fallback');
-need(/if \(k === 'unavailable'\) return C\.say\(C\.COPY\.source\.unavailable/.test(card),
-  'sourceLine does not map unavailable to its own approved sentence');
-
-// ── 6b. one state machine, many approved labels ───────────────────────────────
-// The design says the same state five different ways. Each module may RELABEL a state; none may
-// invent one, or the five vocabularies become five state machines that disagree at the edges.
-need(/C\.badgeHTML\(opts\.state, \{ module: id, short: true \}\)/.test(card),
-  'section badges do not relabel per module, so the design\u2019s own wording cannot appear');
-need(/const MODULE_LABELS = \{/.test(lib), 'per-module labels are not declared in the shared lib');
-need(/card\.moduleLabel = function/.test(lib), 'there is no single relabelling entry point');
-for (const [mod, label] of [['regulatory-records', 'Data available'],
-  ['facility-connections', 'Connections found'], ['sustainability', 'Pilot only']]) {
-  need(new RegExp("'" + mod + "'[\\s\\S]{0,400}?" + label).test(lib),
-    `the design's "${label}" wording is missing for ${mod}`);
-}
-// A relabel must not become a new state: every label maps onto a declared state key.
 {
-  const block = (lib.match(/const MODULE_LABELS = \{[\s\S]*?\n  \};/) || [''])[0];
-  for (const m of block.matchAll(/(\w+):\s*'[^']+'/g)) {
-    const key = m[1];
-    if (['regulatory-records', 'facility-connections', 'sustainability', 'entity-track-record'].includes(key)) continue;
-    need(!!HS.card.STATES[key], `MODULE_LABELS relabels "${key}", which is not a declared state`);
+  const ar = (card.match(/function agencyRows\(entity, byId, recs, allRecords\) \{[\s\S]*?\n  \}/) || [''])[0];
+  need(ar.length > 400, 'agencyRows could not be located to audit');
+  need(/C\.metricText\(st,/.test(ar), 'agency metrics are not routed through the gate');
+  // Every value assigned to a metric must come from metricText or be a currency format applied
+  // AFTER it — never a raw number interpolated into the row.
+  for (const m of ar.matchAll(/text = ([^;]+);/g)) {
+    need(/C\.metricText\(/.test(m[1]) || /Number\(text\)/.test(m[1]),
+      `agencyRows assigns a metric outside the gate: ${m[1].trim()}`);
   }
+  // A measured empty has REAL zeros, or the badge says "Checked" over a row of em-dashes.
+  need(/if \(!counts && C\.state\(st\) === 'checked_empty'\) counts = \[0, 0\];/.test(ar),
+    'a checked-but-empty source does not render its measured zeros');
+  // A PROPERTY-level check is not an ENTITY-level check. Populating entity rows from the
+  // address-level state would attribute research we never performed to each company.
+  need(/entity\.track && entity\.track\[a\.id\]/.test(ar),
+    'entity agency rows are not driven by entity-level checks');
+  need(!/byId\[a\.id\]\.state/.test(ar),
+    'a property-level check state leaks into the per-entity rows, attributing a query we ran once '
+    + 'for the address to every company named on it');
 }
-// The two regulatory counts are the ones most tempting to interpolate raw.
-need(/row2\('Facilities with a compliance summary', C\.metricText\(/.test(card),
-  'the compliance-summary count is not routed through metricText');
-need(/row2\('State registry programs on record', C\.metricText\(/.test(card),
-  'the state-programs count is not routed through metricText');
-// A hardcoded zero anywhere in a rendered string is the shape of the bug: search for one.
-need(!/>0</.test(card.replace(/<circle[^>]*>/g, '')), 'the card page renders a literal 0 into markup');
 
-// Sources & Verification is the PROVENANCE module and must never collapse two states into one
-// badge. With { short: true }, `verified` and `checked_empty` both render "Checked", so a source
-// that returned records looked identical to one that returned nothing.
-need(/var body = '<div class="pcrows">' \+ sources\.map\(function \(s\) \{[\s\S]{0,200}?C\.badgeHTML\(s\.state\)/.test(card),
-  'the sources list uses short badge labels, which renders verified and checked-empty identically');
-need(HS.card.STATES.verified.short === HS.card.STATES.checked_empty.short,
-  'this guard assumes the two SHORT labels collide — if they no longer do, relax it');
-need(HS.card.STATES.verified.label !== HS.card.STATES.checked_empty.label,
-  'the FULL labels must stay distinct, or nothing can tell the two states apart');
+// ── 6a. agencies are DATA, so a new one is an entry and not a redesign ────────
+need(/card\.AGENCIES = \[/.test(lib), 'the enforcement sources are not a declared registry');
+for (const id of ['sec', 'epa_echo', 'osha', 'fincen', 'doj', 'ofac', 'state_env', 'state_local']) {
+  need(HS.card.AGENCIES.some((a) => a.id === id), `agency "${id}" is not declared`);
+}
+HS.card.AGENCIES.forEach((a) => {
+  need(!!a.short && !!a.label, `${a.id} needs a short and a full label`);
+  need(Array.isArray(a.metrics) && a.metrics.length >= 2,
+    `${a.id} must declare its own metrics — arity and wording differ per agency`);
+});
+// FinCEN is a SOURCE feeding this module, never a module of its own.
+need(!HS.card.SECTIONS.some((s) => /fincen/i.test(s.id) || /fincen/i.test(s.title)),
+  'FinCEN has become its own Property Card module — it is a data source, not a module');
+// The record contract is source-agnostic and carries what attribution needs.
+for (const f of ['source_agency', 'entity_name', 'matched_entity_id', 'entity_role',
+  'relationship_to_property', 'action_date', 'penalty_amount', 'source_document_url',
+  'verification_status']) {
+  need(HS.card.ENFORCEMENT_FIELDS.includes(f), `the enforcement contract is missing "${f}"`);
+}
+
+// ── 6b. ONE module, grouped by entity — the parent is a group, not a card ─────
+need(!HS.card.SECTIONS.some((s) => s.id === 'parent-track-record'),
+  'Parent Company Track Record is still a separate module — it must be an entity group inside '
+  + 'Entity Track Record');
+need(!/parentTrackHTML/.test(card), 'the standalone parent module renderer still exists');
+need(/function entityGroupsOf\(row, byId, recs\)/.test(card), 'there is no entity-group builder');
+need(/card\.ENTITY_ROLES = \[/.test(lib), 'the entity roles are not declared');
+for (const r of ['project_entity', 'parent', 'related']) {
+  need(HS.card.ENTITY_ROLES.some((x) => x.id === r), `entity role "${r}" is not declared`);
+}
+need(HS.card.entityRole('project_entity').required === true,
+  'the project entity group must always render — its lack of records is the answer');
+need(HS.card.entityRole('related').gated === true, 'related entities must be gated');
+need(/role\.gated[\s\S]{0,260}relationship_verification === 'verified'/.test(card),
+  'related entities are shown without a verified relationship to the property');
+need(/if \(role\.required\)/.test(card),
+  'a group with no entity is rendered for every role, which implies a parent exists');
+// ONE renderer for every group, or the layouts diverge on the next edit.
+need(/function agencyGridHTML\(rows\)/.test(card), 'there is no shared agency-grid renderer');
+need((card.match(/agencyGridHTML\(/g) || []).length >= 2,
+  'the agency grid is not shared across entity groups');
+
+// ── 6c. ATTRIBUTION — a record belongs to the entity the source document names ─
+need(/card\.recordsFor = function/.test(lib), 'there is no attribution gate');
+{
+  const parent = { id: 'ent-2', name: 'XYZ Holdings Inc.' };
+  const project = { id: 'ent-1', name: 'Greenland Energy LLC' };
+  const recs = [
+    { source_agency: 'FinCEN', entity_name: 'XYZ Holdings Inc.', matched_entity_id: 'ent-2' },
+    { source_agency: 'EPA / ECHO', entity_name: 'Greenland Energy LLC', matched_entity_id: 'ent-1' }
+  ];
+  need(HS.card.recordsFor(recs, parent).length === 1
+    && HS.card.recordsFor(recs, parent)[0].source_agency === 'FinCEN',
+    'the parent does not receive its own record');
+  need(HS.card.recordsFor(recs, project).length === 1
+    && HS.card.recordsFor(recs, project)[0].source_agency === 'EPA / ECHO',
+    "the project entity does not receive its own record");
+  // THE ONE THAT MATTERS: a parent's enforcement action must never land on the project LLC.
+  need(!HS.card.recordsFor(recs, project).some((r) => r.source_agency === 'FinCEN'),
+    "the parent's FinCEN action is attributed to the project entity — the exact misreading the "
+    + 'entity grouping exists to prevent');
+  // A NEAR name match is never accepted: a sibling or similarly-named company is not this one.
+  need(HS.card.recordsFor(recs, { name: 'Greenland Energy Holdings LLC' }).length === 0,
+    'a similar legal name matched, so one company\u2019s record can land on another');
+  need(HS.card.recordsFor(recs, { name: 'greenland energy llc' }).length === 1,
+    'an exact name match differing only in case failed');
+}
+// The required empty state names where we looked, so "nothing found" cannot read as "nothing exists".
+need(/No verified enforcement records found in currently connected HomeSignal sources\./
+  .test(HS.card.COPY.module.noEnforcement), 'the required empty-state sentence is missing');
+need(/C\.COPY\.module\.noEnforcement/.test(card), 'the card does not render the required empty state');
+need(/formed/i.test(HS.card.COPY.module.entityFormed),
+  'there is no formation-date line, so a company incorporated last quarter reads like a clean '
+  + 'thirty-year record');
+
 
 // ── 7. the honest states the page must be able to express ──────────────────────
 need(/renderUnresolved/.test(card) && /isn’t tied to a parcel yet/.test(card),
