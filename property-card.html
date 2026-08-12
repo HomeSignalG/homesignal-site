@@ -726,6 +726,9 @@ HS.onReady(async function () {
         ? '<a href="' + esc(e.relationship_source_url) + '" target="_blank" rel="noopener">' + esc(e.relationship_source) + '</a>'
         : esc(e.relationship_source)) + '</span>');
     }
+    if (e && e.identity_note) {
+      bits.push('<span class="pceRel">' + esc(e.identity_note) + '</span>');
+    }
     if (e && e.formed_date) {
       bits.push('<span class="pceRel">' + esc(C.say(C.COPY.module.entityFormed, {
         date: HS.fmtDate(e.formed_date, { year: 'numeric', month: 'long', day: 'numeric' }) })) + '</span>');
@@ -742,12 +745,23 @@ HS.onReady(async function () {
     var allStates = groups.reduce(function (acc, g) {
       return acc.concat(g.agencies.map(function (a) { return a.state; }));
     }, []);
+    // Two negatives worth stating, because silence about either invites a wrong assumption.
+    var foot = '';
+    if (row && row.parent_search === 'none_confirmed'
+        && !groups.some(function (g) { return g.role.id === 'parent'; })) {
+      foot += '<p class="pcprov">' + esc(C.COPY.module.parentSearchedNone) + '</p>';
+    }
+    var notConnected = ((row && row.searched_not_connected) || []).filter(Boolean);
+    if (notConnected.length) {
+      foot += '<p class="pcprov">'
+        + esc(C.say(C.COPY.module.searchedNotConnected, { names: notConnected.join(', ') })) + '</p>';
+    }
     return sec('entity-track-record', {
       wide: true,
       info: C.COPY.module.trackRecordAttribution,
       state: C.rollup(allStates),
       link: { href: '#sources', label: 'See every source →' }
-    }, body);
+    }, body + foot);
   }
 
   // ── PROPERTY & OWNERSHIP ──────────────────────────────────────────────────────
