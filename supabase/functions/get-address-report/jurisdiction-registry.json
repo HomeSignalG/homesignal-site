@@ -12108,6 +12108,68 @@
         "UO - Utility Othr": "Utility",
         "UE - Utility Elec": "Utility"
       }
+    },
+    {
+      "registry_id": "okdot-workplan-roadways",
+      "platform": "arcgis",
+      "service_url": "https://services6.arcgis.com/RBtoEUQ2lmN0K3GY/arcgis/rest/services/ODOT_Workplan_Roads_2026to2033/FeatureServer/0",
+      "dataset_url": "https://www.arcgis.com/home/item.html?id=4212170505aa4a4f81764a145e55eb55",
+      "jurisdiction": "Oklahoma Department of Transportation",
+      "coverage": [
+        {
+          "state": "OK"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "T_JP_DESC",
+          "T_PROJ_WORK_DESC"
+        ],
+        "type_source": "T_PROJ_WORK_DESC",
+        "address": [
+          "T_JP_DESC"
+        ],
+        "case_number": "T_PROJECT_ID",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "86:RIGHT OF WAY": "Utility",
+        "91:UTILITIES": "Utility",
+        "07:GRADE,DRAIN,BRIDGE & SURFACE": "Utility",
+        "21:WIDEN & RESURFACE": "Utility",
+        "11:BRIDGE & APPROACHES": "Utility",
+        "39:GRADE, DRAIN & SURFACE": "Utility",
+        "56:WIDEN, RESURFACE & BRIDGE": "Utility",
+        "15:BRIDGE REHABILITATION": "Utility",
+        "18:RESURFACE": "Utility",
+        "76:PAVEMENT REHABILITATION": "Utility",
+        "25:INTERSECT MODIF": "Utility",
+        "06:INTERCHANGE": "Utility",
+        "46:MONEY ONLY": "Development",
+        "45:SAFETY IMPROVEMENT": "Utility",
+        "89:INTERSECTION SAFETY IMPROVEMENT": "Utility",
+        "16:SURFACE": "Utility",
+        "44:BANK PROTECTION": "Utility",
+        "05:GRADE, DRAIN & BRIDGE": "Utility",
+        "32:CROSSING IMPR. & R/R SIGNALS": "Utility",
+        "69:DOWEL BAR RETROFIT & DIAMOND GRIND": "Utility",
+        "73:ENVIRONMENTAL MITIGATION": "Utility",
+        "30:INTERSECTION MOD. & TRAF. SIGNALS": "Utility",
+        "79:RETAINING, VISUAL & SOUND WALLS": "Utility"
+      },
+      "status_const": "Programmed",
+      "status_to_bucket": {
+        "proposed": [
+          "Programmed"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-12 OK statewide wire — the first source of any kind for Oklahoma, which was 0/197 record-backed. DISCOVERY BY ENUMERATION, and the obvious candidate was a DECOY: OKDOT_GIS publishes 'Active_Projects' (item 7246c39524524e3589b6bd4ef77925c6, 569 rows, described as the 8-Year Construction Workplan), which is DEAD — layer metadata gives dataLastEditDate 1495461327086 = 2017-05-22, nine years stale. REJECTED under the STALE disqualifier. The live layer was recovered by walking the org's own Web Map items -> operationalLayers (the Frisco precedent): 'Current 8-Year Work Plan (2026-2033)' (item 4212170505aa4a4f81764a145e55eb55, modified 2026-07-29) carries 'Work Plan Roadways' at this service_url. AGO-hosted on services6.arcgis.com, which governance section 0 records as materially lower edge-egress risk than a city-hosted server. LIVENESS: 1,524 rows; PROGRAM_FED_YR spans 2026-2036 (FY2026 178, FY2027 222, FY2028 123 ... FY2036 19), so the plan is forward-looking and current even though dataLastEditDate is 2025-10-07 — the work plan is republished annually, so that is publication cadence, not staleness. Geometry esriGeometryPolyline: rides the shipped featurePoint() centroid path, and column_map.lat/lng are __lat/__lng WITHOUT WHICH every record silently lands on the ZIP centroid at scope 'area' (the Sussex/Weld defect). TYPE — THE FIRST THREE CANDIDATES WERE ALL OPAQUE AND WERE REJECTED FOR IT: WORKPLAN_PROJ_TYPE enumerates completely (3=746, 1=393, 2=385 = exactly 1,524) but its values are the bare integers 1/2/3; C_IMPROVEMENT_TYPE is likewise opaque (04=370, 16=335, 43=330 ...); C_PROJECT_TYPE is single letters (S=1516, R=2, J=1, X=1). The standing grant bars opaque-coded values, so type_source is T_PROJ_WORK_DESC, whose values are SELF-DESCRIBING code:LABEL strings. TWO-STAGE PROBE (Rule 4): groupBy returned 23 values summing to EXACTLY 1,524 (the layer row count — positive control), and returnDistinctValues independently returned 23. All 23 mapped, 0 unclassified. Every one names state-highway construction and maps to 'Utility' (the txdot/nvdot precedent), EXCEPT '46:MONEY ONLY' (8 rows), an accounting line naming no physical work — it takes the generic member 'Development' rather than asserting infrastructure. STATUS — the layer publishes NO status column, so status_const supplies it. In sources/arcgis.ts a status_const is the RAW STATUS VALUE resolved through status_to_bucket (NOT the bucket itself — that is the socrata semantic, and confusing the two is what produced san-antonio-prelim-plan-review's silent zero), so the constant is mapped: proposed ['Programmed']. The word is the PUBLISHER'S OWN — its web map is titled 'ODOT Programmed Project Map' and the layer carries PROGRAM_FED_YR / I_PROGRAM_CATEGORY — chosen over the bucket-name 'proposed' because test/status-const-must-be-mapped.test.mjs ratchets against bucket-named constants: a constant should DESCRIBE the record, not name our internal bucket. Programmed work-plan items are future work, hence the proposed bucket. DATE — DELIBERATELY UNMAPPED. The layer offers no event date: T_LET_DATE_YEAR/MONTH are split strings and NULL on out-year projects (verified on a sampled FY2034 row), PROGRAM_FED_YR is a fiscal-year integer, and T_INITIATED_/T_COMM_ACT_ are likewise split month/year. Composing a date from parts is not something column_map supports (arrays JOIN, they do not fall back — the UDOT standing answer), so UNDATED IS CORRECT here, exactly as founder-ruled for butler-county-ks-permits on 2026-08-09. record_url_precision 'dataset': no per-record URL column exists and templating one would be guessing; dataset_url is the publisher's own AGO item page. spatial_zip_radius_mi 3 matches txdot-projects-info-all, the closest analogue (statewide DOT polyline); if OK page coverage proves thin, 5 is the nvdot-project-boundaries precedent."
     }
   ],
   "ckan": [
