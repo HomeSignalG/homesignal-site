@@ -118,6 +118,22 @@
     color:var(--green);background:var(--green-tint);border:1px solid #cbe7d5;border-radius:5px;padding:4px 7px}
   .pceRel{font-size:11.5px;color:var(--ink-2)}
   .pceRel b{color:var(--ink);font-weight:600}
+  /* The role heading over a run of entities in the same group — printed once, so four companies
+     in one role read as one section rather than four. */
+  .pceSection{font:700 10px/1 var(--font);letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-2);margin:20px 0 10px}
+  .pcsh + .pceSection{margin-top:2px}
+  .pceSection + .pceGroup{margin-top:0;padding-top:0;border-top:0}
+  /* The per-entity answer, directly under the name: the line that lets a reader compare one
+     company's record against another's without counting badges. */
+  .pceSum{margin:7px 0 0;font-size:12.5px;font-weight:600;color:var(--ink);line-height:1.5}
+  .pceSum.sub{font-weight:400;color:var(--ink-2);font-size:11.5px;margin-top:3px}
+  .pceRecs{margin-top:11px;display:flex;flex-direction:column;gap:10px}
+  .pcerec{border:1px solid var(--line);border-left:3px solid var(--violet);border-radius:11px;
+    padding:11px 13px;background:#fcfdfc}
+  .pcerec h4{margin:0 0 7px;font-size:12.5px;letter-spacing:-.005em}
+  .pcerec .pcrow{padding:5px 0;font-size:11.5px}
+  .pcesilent{margin:7px 0 0;font-size:11px;color:var(--ink-2);line-height:1.5}
   .pcunchecked{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:9px;
     padding:9px 11px;background:#f7f9f7;border:1px solid var(--line);border-radius:10px;
     font-size:11.5px;color:var(--ink-2);line-height:1.5}
@@ -289,7 +305,16 @@ HS.onReady(async function () {
       rec = HS.data.project(recId, projects) || HS.data.project(recId, facilities);
       addr = (await HS.data.canonicalAddrFor(zip, rec)) || '';
     }
-    if (addr) row = await HS.data.propertyReport(addr);
+    if (addr) {
+      row = await HS.data.propertyReport(addr);
+      // The entity hierarchy is its own read: a property report can be cached for an address
+      // whose companies have never been resolved, and the two must not stand in for each other.
+      var track = await HS.data.entityTrackRecord(addr);
+      row = Object.assign({}, row || {}, {
+        entities: track.entities, enforcement_records: track.enforcement_records,
+        entity_track_read: track.status
+      });
+    }
   } catch (e) {
     console.warn('[property-card] load failed', e);
     loadFailed = true;
@@ -529,37 +554,105 @@ HS.onReady(async function () {
   // entity the SOURCE DOCUMENT names. A parent's FinCEN action never appears under the project
   // LLC, and the project LLC's EPA violation never appears under the parent. HS.card.recordsFor()
   // is the gate; the visible grouping is what makes the attribution legible.
-  function entityGroupsOf(row, byId, recs) {
+  /**
+   * The entities this card knows about, in the hierarchy the module renders:
+   * Property → Property Entity → Entity Relationships → Parent / Controlling → Related.
+   *
+   * Declared by the read model when it has been populated for this address. Otherwise DERIVED
+   * from the OWNER block of the permits filed here, which is the only entity evidence the pilot
+   * actually holds — and derived rows are labelled AS FILED and carry
+   * `relationship_verification: 'not_yet_asked'`, so nothing derived can pass the parent or
+   * related gate or read as a company we have confirmed anything about.
+   *
+   * Two filed spellings are collapsed only on an EXACT match. "Neuralink" and "Neuralink
+   * Corporation" stay two rows, because merging them is a claim that they are one company and
+   * no source here makes it — the same rule that keeps them two rows in `companies` today.
+   */
+  function entitiesOf(row, filings) {
     var declared = (row && row.entities) || [];
+    if (declared.length) return declared;
+    var seen = {}, out = [];
+    (filings || []).forEach(function (f) {
+      var raw = f && f.owner ? String(f.owner).trim() : '';
+      var k = raw.toLowerCase();
+      if (!raw || seen[k]) return;
+      seen[k] = 1;
+      out.push({
+        id: null,
+        name: raw,
+        role: 'project_entity',
+        as_filed: true,
+        evidence_class: 'authoritative_filing',
+        relationship_to_property: 'Named as the project owner on a permit filed at this address',
+        relationship_verification: 'not_yet_asked',
+        relationship_source: f.project_no ? 'Permit ' + f.project_no : 'Permit filing',
+        relationship_source_url: f.record_url || f.url || null
+      });
+    });
+    return out;
+  }
+
+  function entityGroupsOf(row, byId, recs) {
+    var filings = (recs || []).filter(function (s) { return !!s.project_no; });
+    var declared = entitiesOf(row, filings);
     var records = (row && row.enforcement_records) || [];
-    var groups = [];
+    var unread = (row && row.entity_track_read) === 'error';
+    var groups = [], notes = [];
 
     C.ENTITY_ROLES.forEach(function (role) {
       var ents = declared.filter(function (e) { return (e.role || 'project_entity') === role.id; });
-
-      // A RELATED entity is shown only when its relationship to the property is verified. An
-      // unverified relationship means we do not know it belongs on this card, and a corporate
-      // relative that merely shares ownership is not information about this property.
-      if (role.gated) {
-        ents = ents.filter(function (e) {
-          return e.relationship_verification === 'verified' && !!e.relationship_label;
-        });
-      }
-
-      if (!ents.length) {
-        // The project entity's group always renders: its lack of records is the answer a resident
-        // came for. The others simply do not exist, and inventing an empty group for a parent we
-        // have not confirmed would imply one exists.
-        if (role.required) {
-          groups.push({ role: role, entity: null, agencies: agencyRows(null, byId, recs, records) });
-        }
-        return;
-      }
+      // ONE gate, declared in HS.card.entityGate and shared with the tests: a parent or a related
+      // company renders only on a VERIFIED, SOURCED relationship, and a related company needs a
+      // stated material role here as well. A corporate relative that merely shares ownership is
+      // not information about this property.
+      var shown = [], blocked = [];
       ents.forEach(function (e) {
-        groups.push({ role: role, entity: e, agencies: agencyRows(e, byId, recs, records) });
+        var g = C.entityGate(e, role);
+        (g.show ? shown : blocked).push({ entity: e, reason: g.reason });
       });
+
+      shown.forEach(function (e) {
+        groups.push({ role: role, entity: e.entity, records: C.recordsFor(records, e.entity),
+          agencies: agencyRows(e.entity, byId, recs, records, unread) });
+      });
+      // The project entity's group always renders: its lack of records is the answer a resident
+      // came for. The others simply do not exist, and inventing an empty group for a parent we
+      // have not confirmed would imply one exists.
+      if (!shown.length && role.required) {
+        groups.push({ role: role, entity: null, records: [],
+          agencies: agencyRows(null, byId, recs, records, unread) });
+      }
+      // WHAT WE WITHHELD AND WHY. "No parent" and "a possible parent we have not confirmed" are
+      // different answers, and silence would render them identical.
+      var n = absenceNote(role, shown, blocked);
+      if (n) notes.push(n);
     });
-    return groups;
+    return { groups: groups, notes: notes };
+  }
+
+  /** The disclosure line for a group that is absent, or for entities the gate held back. */
+  function absenceNote(role, shown, blocked) {
+    if (role.id === 'parent') {
+      if (shown.length) return null;
+      var candidate = blocked.some(function (b) { return b.reason === 'candidate'; });
+      var unsourced = blocked.some(function (b) { return b.reason === 'unsourced'; });
+      if (candidate || unsourced) {
+        return { role: role, text: C.COPY.module.parentCandidate };
+      }
+      return { role: role, text: C.say(C.COPY.module.parentNone) };
+    }
+    if (role.id === 'related' && blocked.length) {
+      // Two different withholdings, two different sentences. "We could not confirm how this
+      // company connects to the property" and "this company is in the same corporate family but
+      // has no stated part in this project" are not the same answer, and one line for both would
+      // make the second sound like a gap in our research rather than a deliberate exclusion.
+      var unknown = blocked.some(function (b) {
+        return b.reason === 'candidate' || b.reason === 'unverified' || b.reason === 'unsourced';
+      });
+      return { role: role, text: unknown ? C.COPY.module.relationshipUnverified
+        : C.COPY.module.relatedWhy };
+    }
+    return null;
   }
 
   /**
@@ -567,7 +660,7 @@ HS.onReady(async function () {
    * adapter: omitting DOJ would leave a resident unable to tell that we have not checked it, and
    * the whole point of the module is that gaps are visible rather than absent.
    */
-  function agencyRows(entity, byId, recs, allRecords) {
+  function agencyRows(entity, byId, recs, allRecords, unread) {
     var mine = entity ? C.recordsFor(allRecords, entity) : [];
     return C.AGENCIES.map(function (a) {
       var forAgency = mine.filter(function (r) {
@@ -592,7 +685,10 @@ HS.onReady(async function () {
         recent = entity.track[a.id].recent;
         detail = entity.track[a.id].detail || null;
       } else {
-        st = 'not_checked';
+        // A FAILED READ IS NOT AN UNCHECKED SOURCE. When the entity store could not be read we do
+        // not know what it holds for this company, and "not checked yet" would assert that nobody
+        // has looked — the same misreading in a different direction as printing a zero.
+        st = unread ? 'unavailable' : 'not_checked';
       }
       // A source we queried that returned nothing has MEASURED ZEROS, not unstated metrics —
       // otherwise the badge says "Checked" above a row of em-dashes and the card contradicts
@@ -691,10 +787,12 @@ HS.onReady(async function () {
     var out = '';
     if (shown.length) out += agencyGridHTML(shown);
     if (unchecked.length) {
+      // The empty-state sentence is NOT repeated here. Each entity already carries it once, on
+      // its own summary line; saying it a second time under a list of source names made the two
+      // read as two different findings about the same company.
       out += '<div class="pcunchecked">'
         + '<span class="pcst t-none">Not checked</span> '
         + unchecked.map(function (r) { return esc(r.short); }).join(' · ')
-        + (shown.length ? '' : ' — ' + esc(C.COPY.module.noEnforcement))
         + '</div>';
     }
     return out;
@@ -712,14 +810,36 @@ HS.onReady(async function () {
     }).join('') + '</div>';
   }
 
-  /** The entity header: who it is, its role here, who says so, and how new it is. */
+  /**
+   * The entity header: who it is, its role here, who controls it, who says so, how new it is,
+   * and — the line a resident actually came for — whether anything is on its record.
+   *
+   * The summary sentence is per ENTITY, not per property, which is what makes the required
+   * distinction legible: a project LLC reading "no verified enforcement records found" directly
+   * above a parent reading "3 verified enforcement records found" is the whole point of grouping.
+   */
   function entityHeadHTML(group) {
     var e = group.entity, role = group.role;
     var name = e ? (e.name || 'Entity not named on the record') : 'Not yet identified';
     var bits = [];
-    bits.push('<span class="pcerole">' + esc(role.label) + '</span>');
-    if (e && e.relationship_label && role.id !== 'project_entity') {
-      bits.push('<span class="pceRel">Relationship: <b>' + esc(e.relationship_label) + '</b></span>');
+    // The GREEN CHIP means one thing only: we confirmed this relationship against a document.
+    // It is not a role label — the group heading above already says the role, and a chip that
+    // merely repeated it would spend the page's one piece of colour on the thing a reader can
+    // already see, instead of on the thing they cannot.
+    if (e && e.relationship_verification === 'verified') {
+      bits.push('<span class="pcerole">Relationship verified</span>');
+    }
+    // A relationship is a kind plus a verification status plus a source. It renders as all three
+    // or the reader cannot tell a confirmed parent from an asserted one.
+    var rel = e && C.relationshipLabel(e, role);
+    if (e && rel && role.id !== 'project_entity') {
+      bits.push('<span class="pceRel">Relationship: <b>' + esc(rel) + '</b></span>');
+    }
+    if (e && e.material_role) {
+      bits.push('<span class="pceRel">Role here: <b>' + esc(e.material_role) + '</b></span>');
+    } else if (e && e.relationship_to_property && role.id === 'project_entity') {
+      bits.push('<span class="pceRel">Role here: <b>' + esc(e.relationship_to_property) + '</b>'
+        + (e.as_filed ? ' (as filed)' : '') + '</span>');
     }
     if (e && e.relationship_source) {
       bits.push('<span class="pceRel">Source: ' + (e.relationship_source_url
@@ -730,15 +850,81 @@ HS.onReady(async function () {
       bits.push('<span class="pceRel">' + esc(C.say(C.COPY.module.entityFormed, {
         date: HS.fmtDate(e.formed_date, { year: 'numeric', month: 'long', day: 'numeric' }) })) + '</span>');
     }
+    var sum = C.entitySummaryText(C.entityRecordSummary(group.records));
     return '<div class="pceGroup"><div class="pceHead"><h3>' + esc(name) + '</h3>'
-      + '<div class="pceMeta">' + bits.join('') + '</div></div>';
+      + '<div class="pceMeta">' + bits.join('') + '</div>'
+      + '<p class="pceSum">' + esc(sum.main) + '</p>'
+      + (sum.extra ? '<p class="pceSum sub">' + esc(sum.extra) + '</p>' : '')
+      + '</div>';
+  }
+
+  /**
+   * ONE record, with the heading that carries the attribution: "Parent Company — FinCEN
+   * Enforcement Action". The relationship leads the line deliberately — it is what stops a
+   * parent's matter being read as something the company at this address did.
+   *
+   * Every field comes off the record. A field the source document does not state says so rather
+   * than being dropped, so nobody reads a silent record as a complete one.
+   */
+  function recordHTML(record, entity, role) {
+    var all = C.recordRows(record).filter(function (r) { return !r.inHeading; });
+    var stated = all.filter(function (r) { return r.value != null && r.value !== ''; });
+    var silent = all.filter(function (r) { return (r.value == null || r.value === '') && !r.always; });
+    var rows = stated.concat(all.filter(function (r) {
+      return r.always && (r.value == null || r.value === '');
+    })).map(function (r) {
+      var v = r.value;
+      if (r.kind === 'date' && v) v = HS.fmtDate(v, { year: 'numeric', month: 'long', day: 'numeric' });
+      var cell = v == null || v === ''
+        ? '<b class="na">' + esc(C.COPY.module.recordNotStated) + '</b>'
+        : (r.href ? '<b><a href="' + esc(r.href) + '" target="_blank" rel="noopener">' + esc(v) + ' ▸</a></b>'
+          : '<b>' + esc(v) + '</b>');
+      return '<div class="pcrow"><span>' + esc(r.label) + '</span>' + cell + '</div>';
+    }).join('');
+    // WHAT THE RECORD IS SILENT ON, named once. A sparse matter was rendering seven identical
+    // "the record doesn't say" lines, which buries the four fields it does state — the same
+    // density problem, and the same answer, as the unchecked agencies above: nothing hidden,
+    // nothing repeated. Penalty is exempt and always keeps its own row, because an absent penalty
+    // is the field a reader is most likely to fill in as zero.
+    return '<article class="pcerec"><h4>' + esc(C.recordHeading(record, entity, role)) + '</h4>'
+      + '<div class="pcrows">' + rows + '</div>'
+      + (silent.length ? '<p class="pcesilent">Not stated in this record: '
+          + silent.map(function (r) { return esc(r.label.toLowerCase()); }).join(' · ') + '.</p>' : '')
+      + '</article>';
+  }
+
+  /** Every record belonging to ONE entity, newest first. */
+  function entityRecordsHTML(group) {
+    if (!group.records.length) return '';
+    var sorted = group.records.slice().sort(function (a, b) {
+      return String(b.action_date || '').localeCompare(String(a.action_date || ''));
+    });
+    var caveat = group.role.id === 'project_entity'
+      ? C.COPY.module.projectAttribution : C.COPY.module.parentAttribution;
+    return '<div class="pceRecs">'
+      + sorted.map(function (r) { return recordHTML(r, group.entity, group.role); }).join('')
+      + '<p class="pcprov">' + esc(caveat) + '</p></div>';
   }
 
   function entityTrackHTML(row, byId, recs) {
-    var groups = entityGroupsOf(row, byId, recs);
-    var body = groups.map(function (g) {
-      return entityHeadHTML(g) + agencySplitHTML(g.agencies) + '</div>';
+    var built = entityGroupsOf(row, byId, recs);
+    var groups = built.groups;
+    var body = groups.map(function (g, i) {
+      var prev = i > 0 ? groups[i - 1].role.id : null;
+      // The role heading is printed once per group of groups, so four project entities read as
+      // four companies in one role rather than as four separate sections.
+      var head = g.role.id !== prev ? '<h3 class="pceSection">' + esc(g.role.heading) + '</h3>' : '';
+      return head + entityHeadHTML(g) + agencySplitHTML(g.agencies) + entityRecordsHTML(g) + '</div>';
     }).join('');
+    // Why two names that look alike are two rows. Said only when it applies.
+    var projects = groups.filter(function (g) { return g.role.id === 'project_entity' && g.entity; });
+    if (projects.length > 1) {
+      body += '<p class="pcprov">' + esc(C.COPY.module.separateCompanies) + '</p>';
+    }
+    body += built.notes.map(function (n) {
+      return '<div class="pcunchecked"><b>' + esc(n.role.heading) + '</b> ' + esc(n.text) + '</div>';
+    }).join('');
+    body += '<p class="pcprov">' + esc(C.COPY.module.lookupScope) + '</p>';
     var allStates = groups.reduce(function (acc, g) {
       return acc.concat(g.agencies.map(function (a) { return a.state; }));
     }, []);
