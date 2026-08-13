@@ -67,9 +67,21 @@ below turned up a second entry that was not a state at all.
     facilities 40, 239 sites, **0 missing `record_url`, 0 missing coordinates** — in range with
     80239 (350) and 80247 (266). Nothing about the sources changed; only the string they compare
     against. That is the proof the gate was the blocker.
-  - ⚠️ **`communities.state` has NO format constraint**, which is what let this sit unnoticed.
-    A `check (length(state) = 2)` would make the class impossible — proposed, NOT applied
-    (schema change, gated).
+  - ✅ **CONSTRAINT ADDED — `communities_state_two_letter`, VALIDATED** (founder-approved;
+    migration `communities_state_two_letter_check`, DDL of record
+    `docs/communities-state-format-migration.sql`).
+    `check (state is not null and state ~ '^[A-Z]{2}$')`. All 13,293 rows across every level
+    already matched, so it went on VALIDATED, not NOT VALID.
+    - **`state is not null` is LOAD-BEARING.** SQL three-valued logic makes the regex evaluate
+      to NULL for a NULL state, NULL is not `false`, and **a CHECK ACCEPTS NULL** — so a bare
+      `check (state ~ ...)` would have let NULL through, and a NULL state strands a page in
+      exactly the same way `'Colorado'` did (neither equals `'CO'`). Same trap the ingest repo
+      recorded on `meetings_category_canonical_utah`. Do not "simplify" that clause away.
+    - **Probed live, all four cases, errors observed rather than inferred** (the RAISE NOTICE
+      version of this probe returned no visible output through MCP — a constraint nobody has
+      tried to violate is not evidence of anything, so each was re-run as a bare statement):
+      `'Colorado'` → **23514 REJECTED** · `NULL` → **23514 REJECTED** · `'co'` → **23514
+      REJECTED** · `'CO'` → **ACCEPTED**. Row restored to `CO`, 13,293 / 13,293 conforming.
 - ⚠️ **The `level=zip` row count is 12,723, not the 12,722 quoted throughout both CLAUDE.md
   files.** One row's difference, so one of the two figures is stale — unresolved, recorded here
   so it is not silently carried forward again.
