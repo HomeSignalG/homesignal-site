@@ -12434,6 +12434,57 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "record",
       "_receipts": "2026-08-13 NEW HAMPSHIRE WIRE (QUEUE zero-states item; NH was 0/247, the largest state at literal zero). DISCOVERY: the layer is NOT findable by ArcGIS Online search. `nhdot.maps.arcgis.com` returns the GENERIC ANONYMOUS PORTAL (portals/self gives id:null, name:null) while `nh.maps.arcgis.com` is the real org 'State of New Hampshire DOT' orgid 22pI3HyqMrW5cmOh -- a 200 on a guessed maps.arcgis.com subdomain is NOT an org. A title search for 'NHDOT' returned 155 items of which ZERO belong to orgid 22pI3HyqMrW5cmOh (all cross-org lookalikes), confirming the lookalike rule quantitatively. The org's own 47 Feature/Map Services contain NO project register, and NH GRANIT (nhgeodata.unh.edu/nhgeodata, folders APB/BE/CAD/CSD/EC/EDP/GG/Hosted/IBM/IWR/LGN/OC/TN/Topical/Utilities) carries only roads, LiDAR and environmental base data. The register was recovered by walking the org's WEB MAP 'Ten Year Plan Map (Revised)' (item 5a9aee5b1aa946d4bbbb5616c9d9a71c) -> operationalLayers -> 'NHDOT Ten Year Projects {2027-2036}' on maps.dot.nh.gov, a host that appears in NO AGO search result (the Frisco precedent). Note gis.dot.nh.gov does NOT resolve (DNS) and www.nh.gov 403s automated fetches; maps.dot.nh.gov is the live host. ROW FILTER IS THE PUBLISHER'S OWN: the web map carries definitionExpression \"IS_TEN_YEAR = 'YES'\", so extra_where reproduces exactly what NHDOT displays on its public Ten Year Plan map -- 340 of the layer's 6,913 rows. That is not our editorial choice; the other 6,573 are the historical project archive. Coverage was MEASURED before choosing: 3-mile envelope counts on 10 NH ZIP centroids spread statewide (03031/03070/03225/03258/03303/03466/03603/03780/03835/03862) returned >=1 record on 10 of 10 under IS_TEN_YEAR='YES' (1-10 records) AND 10 of 10 under the broader INTERNET_DISPLAY='YES' (14-97 records) -- identical page coverage, so the narrow publisher-sanctioned set was taken rather than flooding pages with 5,902 completed historical jobs. `AND (UNMAPPABLE IS NULL OR UNMAPPABLE <> 'YES')` was tested and is a NO-OP here (340 either way), so it is omitted; written null-safe when tested because `UNMAPPABLE <> 'YES'` alone would silently drop NULLs. STATUS: PROJECT_TYPE is a LIFECYCLE field, not a work-type field, and it enumerates COMPLETELY -- Completed 5,902 + Planning 549 + Design 341 + Construction 121 = 6,913 EXACTLY the layer row count (positive control). All four are mapped: Planning/Design -> proposed, Construction -> approved, Completed -> operating. Including Completed follows ctdot-project-work-areas ('06_Completed' -> operating) and wsdot-project-delivery-plan-complete. TYPE: there is NO work-category column (SPECIAL_CODE is null on the sampled rows; PRIMARY_TIER is a road tier integer), so use_type_const 'Utility' -- the same honest-absence choice as mdot-stip, nj-stip, maine-dot, iowa-dot, vtrans, ctdot, aldot, wsdot, adot, wisdot, akdot and hdot. RECORD URL: TYP_PROJECT_SHEETS is a REAL per-record PDF and it DISCRIMINATES -- .../typ_project_sheets/40810.pdf returns %PDF-1.7 (200) while .../99999999.pdf returns 404 (the San Diego test). Populated on 263 of 340; the other 77 fall back to dataset_url with precision downgraded by the connector, which is why record_url_precision is 'record'. PROJECT_PLANS was REJECTED as the record_url even though it is populated on 109 rows and looks per-record (https://maps.dot.nh.gov/reports/plan-inventory/?p=12334): it FAILS the discrimination test -- a real id and ?p=99999999 return the IDENTICAL 1,915-byte SPA shell, so it cannot evidence a specific record. FRESHNESS: max BUILD_DATE 2026-08-12 and max UPDT_DATE 2026-08-07 (one day before wiring) -- actively maintained, unlike the OKDOT Active_Projects layer that was rejected at nine years stale. AD_DATE is the advertise/letting date, populated on 292 of 340 and routinely in the FUTURE (max 2049-10-01), hence file_date_kind 'scheduled' ('a planned programme date (letting, start) -- routinely in the future') and NO recency_days, which would drop the entire forward programme. GEOMETRY: esriGeometryPolyline (wkid 102710/3437), so records pin via the connector's polyline path at the midpoint of the longest path. THIS ENTRY MUST NOT SET return_centroid -- polyline layers hard-reject it (the TxDOT receipt). No ZIP column anywhere -> spatial_zip_radius_mi 3. maxRecordCount 2000. ⚠ EDGE-REACHABILITY IS UNVERIFIED AT WIRE TIME: every probe above is pg_net (Postgres egress), which per docs/maps-go-live-governance.md §0 does NOT prove the Deno edge runtime can reach maps.dot.nh.gov. NH runs a WAF that already answered one malformed probe with an HTTP 200 'Bad Request' page and 403s www.nh.gov. If the deployed function cannot reach this host, this is the Dayton/Tampa/Caltrans class and the entry must be REVERTED, not retried."
+    },
+    {
+      "registry_id": "wvdoh-active-projects",
+      "platform": "arcgis",
+      "service_url": "https://services2.arcgis.com/xLpB90lOmCXYDAWo/arcgis/rest/services/2026_Active_Project/FeatureServer/0",
+      "dataset_url": "https://www.arcgis.com/home/item.html?id=b67eb6f60ee440989ee28fa318c6f58b",
+      "jurisdiction": "West Virginia Division of Highways (WVDOT)",
+      "coverage": [
+        {
+          "state": "WV"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Project_Name",
+          "Work_Code"
+        ],
+        "status_raw": "Proj_Status",
+        "type_source": "Work_Code",
+        "address": [
+          "County"
+        ],
+        "case_number": "Project",
+        "file_date": "Phase_Start_Date",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "scheduled",
+      "status_to_bucket": {
+        "proposed": [
+          "Planned"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "type_map": {
+        "Renovation and Replacement: Roadway": "Utility",
+        "Renovation and Replacement: Bridge": "Utility",
+        "Renovation and Replacement: Natural Disaste": "Utility",
+        "Renovation and Replacement: Other": "Utility",
+        "Improvement: Roadway": "Utility",
+        "Improvement: Bridge": "Utility",
+        "Improvement: Other": "Utility",
+        "System Expansion: Bridge": "Utility",
+        "New Building": "Civic/Public",
+        "Rest Area Maintenance": "Civic/Public"
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-13 WEST VIRGINIA WIRE (QUEUE zero-states item; WV was 0/212, the largest remaining state at literal zero after NH). DISCOVERY -- THE LOOKALIKE TRAP WAS WORSE HERE THAN IN NH: `wv.maps.arcgis.com` resolves to a REAL org that is NOT West Virginia at all -- portals/self returns id HwB9RoolJXJlKJ40 name 'World Vision', a global NGO. `wvdot.maps.arcgis.com` and `wvgis.maps.arcgis.com` both return the GENERIC ANONYMOUS PORTAL (id:null). A 200 on a guessed maps.arcgis.com subdomain proves nothing, and here it would have pointed at another org's data. The real WVDOT AGO org is xLpB90lOmCXYDAWo, reached only via the item records behind the RTP web maps. TWO DECOYS REJECTED. (1) WVDOT's own ArcGIS Server gis.transportation.wv.gov is live and HAS a folder literally named `Projects` -- it holds GIS projects, not construction projects (AADT, Bridge_Restrictions, Fuel_Sites, MS4 stormwater, Road_Names, WV_State_Signs). A folder called Projects is not a project register. (2) The 'Roads to Prosperity' programme, which is what WV's road programme is publicly called and what a search finds, resolves to RTP_Data_2024 (260 rows, PUBLIC, 2024 vintage) while the CURRENT layer the 2025 web map actually draws -- RTP_2025_Data -- is TOKEN-GATED (HTTP 200 carrying {\"error\":{\"code\":499,\"message\":\"Token Required\"}}), the Buffalo restricted-view class. Wiring the searchable public one would have shipped a two-year-old snapshot. WHAT WAS WIRED INSTEAD: `2026_Active_Project` in the same org, access:public, found by enumerating the org scoped (orgid:xLpB90lOmCXYDAWo) rather than by title search. 1,033 rows, esriGeometryPolyline (wkid 26917) -> rides the connector's polyline midpoint path; MUST NOT set return_centroid (polyline layers hard-reject it -- TxDOT receipt). VOCABULARIES, both complete with the sum-to-total positive control (1,033): Work_Code enumerates 10 values summing EXACTLY to 1,033 -- Renovation and Replacement: Roadway 442, Renovation and Replacement: Bridge 415, Renovation and Replacement: Natural Disaste 103, Improvement: Roadway 29, Renovation and Replacement: Other 20, Improvement: Other 17, System Expansion: Bridge 2, Improvement: Bridge 2, Rest Area Maintenance 2, New Building 1. NOTE 'Natural Disaste' is TRUNCATED AT SOURCE -- the field is length 43 and that string is exactly 43 chars -- so it is mapped verbatim including the truncation, never 'corrected' to 'Disaster'. Proj_Status enumerates to a SINGLE value, Planned x 1033 (also the full count). It is mapped as a real status_raw column rather than status_const so that any future value WVDOT adds arrives unmapped and fails closed instead of being silently absorbed. TYPE: unlike most statewide DOT entries this one has a genuine work-category column, so it gets a real type_map rather than use_type_const -- roadway/bridge/disaster work -> Utility, and the two non-roadway classes (New Building 1, Rest Area Maintenance 2) -> Civic/Public on what the publisher's own value says. FRESHNESS: max EditDate 2026-08-10, three days before wiring. Phase_Start_Date runs forward to 2034-10-28, so file_date_kind is 'scheduled' and there is NO recency_days -- a window would delete the forward programme, which is the entire point of the layer. COVERAGE MEASURED BEFORE WIRING: 3-mile envelope counts on 11 WV ZIP centroids spread statewide (24901 3, 25035 4, 25109 7, 25209 3, 25404 8, 25526 12, 25836 6, 25921 4, 26181 0, 26451 10, 26591 7) -- 10 of 11 carry at least one project. RECORD URL: the layer publishes NO per-record URL column and no verified per-project page pattern was found, so record_url_precision is 'dataset' pointing at the publisher's own public AGO item page (Boulder/Philadelphia precedent). Templating one from the Project id would be guessing, and the PROJECT_PLANS lesson from NH is exactly why that is refused without a discrimination test. No ZIP column anywhere -> spatial_zip_radius_mi 3. EDGE REACHABILITY: services2.arcgis.com is Esri-hosted AGO and is already reached by many deployed entries, so this carries none of the self-hosted-WAF risk that NH's maps.dot.nh.gov did."
     }
   ],
   "ckan": [

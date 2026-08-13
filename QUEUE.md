@@ -40,6 +40,51 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-08-13 (later) — NEW HAMPSHIRE: 0 → 207/247 (83.8%). Registry 188 → 189.
+
+`nhdot-ten-year-plan-projects` (#686, merged `6a666a6`, deployed v204). **703 records on 207 ZIP
+pages**, measured on `app_projects` after deploy → re-cache → materialize, with **every one of NH's
+247 ZIPs refreshed at least once**. **Global 7,476 → 7,683 of 12,722 (60.4%).** NH was the largest
+state at literal zero.
+
+⚠️ **THE LAST 19 ZIPs WERE WORTH 16 PAGES — DO NOT ACCEPT THE FIRST PLATEAU.** This state was
+measured and reported at **191/247** when 19 ZIPs still showed unrefreshed. They looked like the
+usual honest-empty tail; they were not. Re-fired into an EMPTY `pg_net` queue they returned records
+and took NH 191 → 207 (77.3% → 83.8%). They had been **blocked, not empty** — the §0h FRS guard
+again. Before calling a state finished, check `refreshed_at` coverage is 100%, not just that the
+page count stopped moving.
+
+🔴 **THE LAYER IS NOT REACHABLE BY SEARCH — both lookalike traps fired.** `nhdot.maps.arcgis.com`
+returns the **generic anonymous portal** (`portals/self` → `id:null`, `name:null`); the real org is
+`nh.maps.arcgis.com`, "State of New Hampshire DOT" `22pI3HyqMrW5cmOh`. A `"NHDOT"` title search
+returned **155 items, ZERO in that org**. The org's own 47 services hold no project register and NH
+GRANIT carries only base data. The register lives on **`maps.dot.nh.gov`**, a host that appears in
+NO search result, recovered only by walking the org's web map "Ten Year Plan Map (Revised)" →
+`operationalLayers` (the Frisco precedent). `gis.dot.nh.gov` does not resolve at all.
+**Had either search been trusted, NH would have been written off as sourceless — which is exactly
+what this file said about NY the day before.**
+
+✅ **SECOND INDEPENDENT CONFIRMATION OF THE STATEWIDE-SOURCE THESIS.** Both zero-coverage states
+wired on one DOT layer landed at or above the predicted ~78%: **OK 154/197 = 78.2%**,
+**NH 207/247 = 83.8%**. The thesis is now measured twice on states it was not fitted to, and NH
+came in ABOVE the split it was derived from.
+
+**Let the publisher choose the row filter.** NHDOT's own web map carries
+`definitionExpression: "IS_TEN_YEAR = 'YES'"` — 340 of the layer's 6,913 rows. Both that and the
+12×-larger `INTERNET_DISPLAY='YES'` (4,086 rows) were measured against 10 statewide ZIP centroids
+BEFORE choosing: **10/10 coverage either way**, so the narrow publisher-sanctioned set won on
+identical coverage without burying pages under 5,902 historical completed jobs. Same pages,
+one-twelfth the noise.
+
+⚠️ **A populated, per-record-LOOKING URL is not evidence.** `PROJECT_PLANS`
+(`…/plan-inventory/?p=12334`) is populated on 109 rows and was REJECTED: a real id and
+`?p=99999999` return the **identical 1,915-byte SPA shell**. `TYP_PROJECT_SHEETS` passes the same
+test (real → `%PDF-1.7` 200, bogus → **404**) and is the `record_url`. Always run the San Diego
+discrimination test before trusting a URL column.
+
+**The 40 remaining dark NH ZIPs have all been refreshed and return ZERO** — outside the DOT layer's
+3-mile reach. Honest under Rule 8; the next NH gain needs a NEW source, not another refresh.
+
 ### 2026-08-13 — FIVE STATEWIDE DOT WIRES. 6,692 → 7,476 Live (+784). Registry 183 → 188.
 
 Measured on `public.app_projects` (`record_kind='development'`, entry complete on both `type_map`
@@ -6685,12 +6730,22 @@ any prior ordering.**
 
 ## 🔴 THE BIGGEST RECOVERABLE BLOCK IS A CATEGORY, NOT A STATE: 7 states at ZERO
 
-⚠️ **UPDATED 2026-08-13 — now SIX states / 893 pages. OK IS DONE (0 → 154/197 = 78.2%)** on a single
-`okdot-workplan-roadways` wire, which makes this section's thesis measured rather than argued. The
-prediction below was "one wire per state, no municipal tier"; that is exactly what OK took.
+⚠️ **UPDATED 2026-08-13 — this block was wrong in TWO ways. It is now THREE states / 448 pages.**
 
-**NH 247 · WV 212 · ~~OK 197~~ · ND 155 · AK 101 · HI 97 · RI 81 = 893 pages remaining, none ever
-probed in this run.**
+**(1) TWO ARE DONE**, both on a single DOT wire and both landing at or above the predicted ~78%:
+**OK 0 → 154/197 (78.2%)** and **NH 0 → 207/247 (83.8%)**. The thesis is now measured twice on
+states it was not fitted to. The prediction was "one wire per state, no municipal tier, no
+per-county fan-out"; that is exactly what both took.
+
+**(2) AK AND HI WERE NEVER AT ZERO — they were listed here in error.** Measured on `app_projects`
+2026-08-13: **AK 28/101**, all 28 pages and all 909 records from `akdot-stip-24-27`; **HI 85/97**,
+all 85 pages and all 1,848 records from `hdot-active-design-projects`. Both entries were already in
+the registry and already emitting. Do NOT hunt a new source for either — HI at 87.6% is one of the
+better-covered states in the system, and AK's gap is a REACH question about an existing entry
+(Alaska ZIPs are enormous and the 3-mile radius is the binding constraint), not a discovery problem.
+
+**~~NH 247~~ · WV 212 · ~~OK 197~~ · ND 155 · ~~AK 101~~ · ~~HI 97~~ · RI 81 = WV + ND + RI = 448
+pages across THREE states genuinely at zero, none ever probed in this run.**
 
 Every one is a **whole-state greenfield**, and the §0c first move has never been tried on any of
 them. On this run's evidence a statewide DOT wire alone took **WI 9.5% → 93.8%** and **MD 39% →
@@ -6728,10 +6783,14 @@ publication gap, unlike NY/IL/OH) · **UT 201** (`candidates_exhausted`). **~967
 
 ## Recommended order for whatever comes next
 
-1. **The zero states — now SIX, 893 pages** (was 7 / 1,090). **OK is done: 0 → 154/197 (78.2%) on
-   one `okdot-workplan-roadways` wire, 2026-08-13**, which is the proof of this item rather than a
-   claim about it. Remaining: **NH 247 · WV 212 · ND 155 · AK 101 · HI 97 · RI 81**. Still the
-   cheapest per page of anything on the board, and the OK result is the yardstick to expect.
+1. **The zero states — now THREE, 448 pages** (was 7 / 1,090). Two are DONE on one wire each,
+   2026-08-13: **OK 0 → 154/197 (78.2%)** and **NH 0 → 207/247 (83.8%)** — the proof of this item
+   rather than a claim about it, and ~78% is the yardstick to expect. **AK and HI were never at
+   zero and are struck from the list** (28/101 and 85/97, both already served by existing registry
+   entries). Genuinely remaining: **WV 212 · ND 155 · RI 81**. Still the cheapest per page on the
+   board. Expect the source to be UNSEARCHABLE — on both wires so far the register sat on a state
+   DOT host that no ArcGIS Online search returned, and was found only by walking a web map's
+   `operationalLayers`.
 2. **Municipal permits for the thin `DOT_ONLY` metros** — Milwaukee, Baltimore, Anne Arundel.
    Moves completeness, which is the half of the scoreboard that has never been worked.
 3. **The 1,125 pages under 5 records nationally** (§0q) — a queue in its own right; worth measuring
