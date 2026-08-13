@@ -40,11 +40,19 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
-### 2026-08-13 (later) — NEW HAMPSHIRE: 0 → 191/247 (77.3%). Registry 188 → 189.
+### 2026-08-13 (later) — NEW HAMPSHIRE: 0 → 207/247 (83.8%). Registry 188 → 189.
 
-`nhdot-ten-year-plan-projects` (#686, merged `6a666a6`, deployed v204). **608 records on 191 ZIP
-pages**, measured on `app_projects` after deploy → re-cache → materialize. **Global 7,476 → 7,667
-of 12,722 (60.3%).** NH was the largest state at literal zero.
+`nhdot-ten-year-plan-projects` (#686, merged `6a666a6`, deployed v204). **703 records on 207 ZIP
+pages**, measured on `app_projects` after deploy → re-cache → materialize, with **every one of NH's
+247 ZIPs refreshed at least once**. **Global 7,476 → 7,683 of 12,722 (60.4%).** NH was the largest
+state at literal zero.
+
+⚠️ **THE LAST 19 ZIPs WERE WORTH 16 PAGES — DO NOT ACCEPT THE FIRST PLATEAU.** This state was
+measured and reported at **191/247** when 19 ZIPs still showed unrefreshed. They looked like the
+usual honest-empty tail; they were not. Re-fired into an EMPTY `pg_net` queue they returned records
+and took NH 191 → 207 (77.3% → 83.8%). They had been **blocked, not empty** — the §0h FRS guard
+again. Before calling a state finished, check `refreshed_at` coverage is 100%, not just that the
+page count stopped moving.
 
 🔴 **THE LAYER IS NOT REACHABLE BY SEARCH — both lookalike traps fired.** `nhdot.maps.arcgis.com`
 returns the **generic anonymous portal** (`portals/self` → `id:null`, `name:null`); the real org is
@@ -57,8 +65,9 @@ NO search result, recovered only by walking the org's web map "Ten Year Plan Map
 what this file said about NY the day before.**
 
 ✅ **SECOND INDEPENDENT CONFIRMATION OF THE STATEWIDE-SOURCE THESIS.** Both zero-coverage states
-wired on one DOT layer landed on the predicted ~78%: **OK 154/197 = 78.2%**, **NH 191/247 = 77.3%**.
-The thesis is now measured twice on states it was not fitted to.
+wired on one DOT layer landed at or above the predicted ~78%: **OK 154/197 = 78.2%**,
+**NH 207/247 = 83.8%**. The thesis is now measured twice on states it was not fitted to, and NH
+came in ABOVE the split it was derived from.
 
 **Let the publisher choose the row filter.** NHDOT's own web map carries
 `definitionExpression: "IS_TEN_YEAR = 'YES'"` — 340 of the layer's 6,913 rows. Both that and the
@@ -73,7 +82,7 @@ one-twelfth the noise.
 test (real → `%PDF-1.7` 200, bogus → **404**) and is the `record_url`. Always run the San Diego
 discrimination test before trusting a URL column.
 
-**The 56 remaining dark NH ZIPs have all been refreshed and return ZERO** — outside the DOT layer's
+**The 40 remaining dark NH ZIPs have all been refreshed and return ZERO** — outside the DOT layer's
 3-mile reach. Honest under Rule 8; the next NH gain needs a NEW source, not another refresh.
 
 ### 2026-08-13 — FIVE STATEWIDE DOT WIRES. 6,692 → 7,476 Live (+784). Registry 183 → 188.
@@ -6723,8 +6732,8 @@ any prior ordering.**
 
 ⚠️ **UPDATED 2026-08-13 — this block was wrong in TWO ways. It is now THREE states / 448 pages.**
 
-**(1) TWO ARE DONE**, both on a single DOT wire and both landing on the predicted ~78%:
-**OK 0 → 154/197 (78.2%)** and **NH 0 → 191/247 (77.3%)**. The thesis is now measured twice on
+**(1) TWO ARE DONE**, both on a single DOT wire and both landing at or above the predicted ~78%:
+**OK 0 → 154/197 (78.2%)** and **NH 0 → 207/247 (83.8%)**. The thesis is now measured twice on
 states it was not fitted to. The prediction was "one wire per state, no municipal tier, no
 per-county fan-out"; that is exactly what both took.
 
@@ -6775,7 +6784,7 @@ publication gap, unlike NY/IL/OH) · **UT 201** (`candidates_exhausted`). **~967
 ## Recommended order for whatever comes next
 
 1. **The zero states — now THREE, 448 pages** (was 7 / 1,090). Two are DONE on one wire each,
-   2026-08-13: **OK 0 → 154/197 (78.2%)** and **NH 0 → 191/247 (77.3%)** — the proof of this item
+   2026-08-13: **OK 0 → 154/197 (78.2%)** and **NH 0 → 207/247 (83.8%)** — the proof of this item
    rather than a claim about it, and ~78% is the yardstick to expect. **AK and HI were never at
    zero and are struck from the list** (28/101 and 85/97, both already served by existing registry
    entries). Genuinely remaining: **WV 212 · ND 155 · RI 81**. Still the cheapest per page on the
