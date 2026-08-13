@@ -111,15 +111,20 @@ update public.epa_outage_repair_2026_08 r
 --   from public.epa_outage_repair_2026_08;
 
 -- ══════════════════════════════════════════════════════════════════════════════════════════════
--- RESULT — first repair pass, 2026-08-13 22:xxZ (ledger receipts, not estimates)
+-- RESULT — first repair pass, 2026-08-13 (ledger receipts, not estimates)
 --
---   damaged identified          515
---   attempted                   250
---   repaired                     28   (facilities value is authoritative again)
---     · restored non-zero        15   — 170 EPA facilities recovered onto live pages
---     · confirmed genuine zero   13   — EPA answered; there is really nothing there
---   still flagged unknown       487
---   FALSE ZEROS REMAINING         0   <- the target metric
+-- THIS IS A SNAPSHOT OF A NUMBER THAT IS STILL CLIMBING. The rolling refresh keeps repairing
+-- rows after this was written, so treat the figures below as a floor and run STEP 4 for the
+-- live count. Two readings, ~10 minutes apart, to make the direction explicit:
+--
+--                            reading 1     reading 2
+--   damaged identified          515           515
+--   attempted                   250           250
+--   repaired                     28            66   (facilities authoritative again)
+--     · restored non-zero        15            38   — 170 → 592 EPA facilities recovered
+--     · confirmed genuine zero   13            28   — EPA answered; nothing is really there
+--   still flagged unknown       487           449
+--   FALSE ZEROS REMAINING         0             0   <- the target metric, at every reading
 --
 -- WHY ONLY 28 OF 250. Not a mechanism failure — EPA itself. Measured across 407 distinct ZIP
 -- reports through the live v23 engine in a 30-minute window:
