@@ -12267,6 +12267,76 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-08-12 IL statewide wire. IDOT's Annual Highway Improvement Program — the service description calls it 'the Proposed Improvements for Illinois'. AGO-hosted on services2.arcgis.com/aIrBD8yn1TDTEXoz (owner IDOTAdmin), which governance section 0 records as materially lower edge-egress risk than a self-hosted server. REJECTED ALONGSIDE, with receipts, so neither is re-probed: (1) Road_Construction_Public/FeatureServer/2 looked far better on paper — 743 rows, dataLastEditDate 2026-08-12 (same day), and a rich schema carrying Status, StartDate, Contractor and ContractValue — but MEASURED it fails twice: `Status` is NULL on ALL 743 rows, and `ConstructionType` is NULL on 716 of 743 (96.4%) with the surviving 27 being free text ('Memorial Day Parade', 'Bridge paiinting', 'Reconstruct of US 30 w/ width restrictions EB & WB'). That is Rule 6 data absence plus Rule 5 free text, and the parade entry gives away that it is a traveler-restriction feed, not a development source. (2) MYP_Test (Multi-Year Improvement Program) splits FY2026 and FY2027-2031 across six layers and carries 'Test' in its service name; left for a later pass. TYPE: ProjectTam, self-describing, two-stage probed (Rule 4) — groupBy and returnDistinctValues agree on the value count and the groupBy sums EXACTLY to the layer row count, which is the positive control. 0 NULLs, 0 unclassified. All values are state-highway construction -> Utility (the txdot/nvdot/okdot precedent) except 'Miscellaneous Improvements', which names no specific work and takes the generic member 'Development'. STATUS: the layers publish no status column, so status_const supplies it. In sources/arcgis.ts status_const is the RAW STATUS VALUE resolved through status_to_bucket (not the bucket itself — the socrata semantic, whose confusion produced san-antonio-prelim-plan-review's silent zero), so it is mapped: proposed ['Proposed Improvement']. The phrase is the PUBLISHER'S OWN, from the service description, and is used rather than the bare bucket name 'proposed' because test/status-const-must-be-mapped.test.mjs ratchets against bucket-named constants — a constant should describe the record. DATE: DELIBERATELY UNMAPPED. The layer carries no date field of any kind (full field list: EstimatedC, Improvem_1/2/3, Location, OBJECTID, PPSProject, ProjectTam, RecordType, Route1/2/3, Shape). UNDATED IS CORRECT, as founder-ruled for butler-county-ks-permits 2026-08-09 and applied to okdot-workplan-roadways the same day as this. dataLastEditDate 2025-10-01 is the ANNUAL publication cadence, not staleness — the program is republished each year, the same reasoning recorded for OKDOT. record_url_precision 'dataset': no per-record URL column exists; templating one would be guessing. spatial_zip_radius_mi 3 matches txdot-projects-info-all and okdot-workplan-roadways, the closest analogues. IL already had 256/474 pages via chicago-building-permits and the two county highway programs; this entry is aimed at the 218 dark pages, which are overwhelmingly non-Cook. THIS ENTRY: layer 0 'Bridge Improvement', esriGeometryPoint (records place by their OWN points), 1,106 rows. ProjectTam enumerates to 9 values summing to EXACTLY 1,106: Preservation - Bridges 831, Reconstruction - Bridges 155, Rehabilitation - Bridges 36, Rehabilitation - Pavements 35, Reconstruction - Pavements 17, Miscellaneous Improvements 12, Maintenance - Bridges 9, Safety 6, Initial Construction - Bridges 5."
+    },
+    {
+      "registry_id": "odot-current-projects",
+      "platform": "arcgis",
+      "service_url": "https://tims.dot.state.oh.us/ags/rest/services/Projects/Current_Projects_Points/MapServer/0",
+      "dataset_url": "https://tims.dot.state.oh.us/ags/rest/services/Projects/Current_Projects_Points/MapServer/0",
+      "jurisdiction": "Ohio Department of Transportation",
+      "coverage": [
+        {
+          "state": "OH"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PROJECT_NME",
+          "PRIMARY_WORK_CATEGORY"
+        ],
+        "status_raw": "PROJECT_STATUS",
+        "type_source": "PRIMARY_WORK_CATEGORY",
+        "file_date": "AWARD_MILESTONE_DT",
+        "address": [
+          "FEATURE_INTERSECT",
+          "COUNTY_NME"
+        ],
+        "case_number": "PID_NBR",
+        "record_url": "PROJECT_PLANS_URL",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "awarded",
+      "type_map": {
+        "Roadway Major Rehab": "Utility",
+        "Bridge Preservation": "Utility",
+        "Roadway Minor Rehab": "Utility",
+        "Add Through Lane(s)": "Utility",
+        "Bridge / Culvert Maintenance": "Utility",
+        "Culvert Preservation": "Utility",
+        "Intersection Improvement (Safety)": "Utility",
+        "Transit": "Utility",
+        "Bridge Expansion": "Utility",
+        "Pavement Maintenance": "Utility",
+        "Geologic Maintenance / Slide Repair": "Utility",
+        "Roadside / Median Improvement (Safety)": "Utility",
+        "Rest Area": "Utility",
+        "Traffic Control Maintenance": "Utility",
+        "Bike Facility": "Utility",
+        "Noise Wall": "Utility",
+        "Interchange Expansion": "Utility",
+        "Shared Use Path": "Utility",
+        "Other Studies/ Tasks": "Development",
+        "Railroad Improvements & Rehabilitation": "Utility",
+        "Roadway Improvement (Safety)": "Utility",
+        "Transport System Mgmt and Ops (TSMO)": "Utility",
+        "Roadway Improvement (Jobs & Commerce)": "Utility",
+        "New Roadway": "Utility"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Filed",
+          "Not Filed"
+        ],
+        "approved": [
+          "Awarded"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "record",
+      "_receipts": "2026-08-12 OH statewide wire. OH was 136/335 record-backed with 199 dark pages and no statewide source. HOST CHOICE, AND IT IS THE RISK ON THIS ENTRY: ODOT's project data lives ONLY on its own TIMS server (tims.dot.state.oh.us), NOT on ArcGIS Online. The ohiodot AGO org was enumerated first per governance section 0 (prefer AGO when both exist, because services*.arcgis.com is proven reachable by dozens of live entries): its only project-ish item is GCAT_UPDATE_2020_2025, nothing usable. So this is a SELF-HOSTED host and section 0 applies in full — a pg_net 200 proves POSTGRES egress, not that the Deno edge runtime can reach it. The Dayton precedent (dayton-oh-capital-improvement-projects, #594, reverted in #595 after 'Connection reset by peer' at Connect on 4 of 4 ZIPs) is the same class and the same state. THE FIRST POST-DEPLOY RE-CACHE IS THE DEPLOY VERIFICATION for this entry: read arcgis_reports[].fetched/emitted, never counts, and REMOVE the entry if the edge cannot connect. SERVER: /ags/rest/services enumerates folders Assets, Boundaries, CrashAnalytics, Environmental, MapViewers, Projects, Roadway_Information, Safety, StandardMaps, TIMS, Utilities; the Projects folder holds All_Project_Points, All_Projects_Linear, Current_Projects_Lines/Points, District_Work_Plan_Lines/Points, Next_4_Fiscal_Years_*, Previous_4_Fiscal_Years_*. LAYER: Current_Projects_Points/MapServer/0, esriGeometryPoint, 1,785 rows. LIVENESS: SOURCE_LAST_UPDATED and COD_LAST_UPDATED both read 1786507200000 = 2026-08-12, the day of wiring. POINTS ONLY, DELIBERATELY: Current_Projects_Lines carries 1,861 rows and is the SAME project set rendered as linework (the folder pairs every product Points/Lines). Wiring both would double-emit, which is the houston-plat-applications layer-0/layer-1 defect that exact-identity dedup cannot catch across two source_registry_ids. STATUS: PROJECT_STATUS two-stage probed (Rule 4) — groupBy returns 3 values summing to EXACTLY 1,785 (Awarded 1,780, Not Filed 3, Filed 2), the row count and therefore the positive control, and returnDistinctValues independently returns 3. Awarded -> approved (the contract is let, construction is committed but not necessarily complete); Filed and Not Filed are pre-award plan-filing states -> proposed. Nothing is unmapped, so no record is dropped under Rule 1. TYPE: PRIMARY_WORK_CATEGORY, self-describing, two-stage probed — 24 values summing to EXACTLY 1,785, returnDistinctValues independently 24, 0 NULLs, 0 unclassified. All are state-highway construction -> Utility (the txdot/nvdot/okdot/idot precedent) except 'Other Studies/ Tasks' (2 rows), which names no physical work and takes the generic member 'Development'. DATE: AWARD_MILESTONE_DT, a real epoch-millisecond date field, with file_date_kind 'awarded' — the same field semantics and the same kind txdot uses for ACTUAL_LET_DATE. This is the FIRST statewide DOT entry wired this session that carries a real event date; OKDOT and IDOT are both correctly undated. RECORD URL: PROJECT_PLANS_URL is genuinely PER-RECORD (contracts.dot.state.oh.us/search.jsp?cabinetId=1002&PID_NUM=<PID_NBR>), so record_url_precision is 'record', not the 'dataset' fallback used for OKDOT and IDOT. spatial_zip_radius_mi 3: the layer has no ZIP column (COUNTY_NME only), matching txdot/okdot/idot."
     }
   ],
   "ckan": [
