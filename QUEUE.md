@@ -40,6 +40,40 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-08-13 — ZERO-STATE LIST RE-MEASURED. ND IS THE ONLY ONE LEFT. ONE TYPO WAS STRANDING A LIVE PAGE.
+
+**Measured on `app_projects`, excluding the 10 incomplete registry entries (the same definition
+0078-0080 used): 7,963 of 12,723 ZIP pages live. Exactly ONE state is at zero — ND (155 pages),
+and ND is a documented REJECTION (no NDDOT project register exists), not a to-do.** Re-measure
+this; do not quote it from memory. The zero-state block has now been wrong three times: AK and HI
+were never at zero, RI was listed as "the last zero state" while it was being wired, and the run
+below turned up a second entry that was not a state at all.
+
+- 🐛 **`Denver (80249)` carried `state = 'Colorado'` — the ONLY one of 12,723 `level=zip`
+  community rows not using the two-letter code.** It surfaced as a phantom one-ZIP "state" with
+  0% coverage in the zero-state query. Consequence was real, not cosmetic: coverage gates and the
+  state seed scripts both key on `communities.state`, so `'Colorado' != 'CO'` excluded the page
+  from every Colorado source AND from the seed that would have cached it — **it had no
+  `development_reports` row at all**, while neighbours 80239 / 80247 carried 350 / 266 records.
+  One live Denver page sat permanently on the facilities floor for a typo.
+  - Fixed by migration **`fix_denver_80249_state_code`** (idempotent — guarded on id, old value,
+    `level` and `zip_codes`, so a re-run is a no-op). After: **0 rows with a non-two-letter
+    state**, CO ZIP rows 140 → 141.
+  - Centroid read from the pinned **`zipcodes` PyPI v3.0.0** (`80249 → 39.7783, -104.7557, Denver,
+    Denver County, CO`), never guessed; it agrees with the community row's own county. Seeded the
+    missing `development_reports` row with it and refreshed.
+  - **Verified after:** 80249 now carries **199 development records from BOTH Denver sources**
+    (`denver-commercial-construction-permits`, `denver-residential-construction-permits`),
+    facilities 40, 239 sites, **0 missing `record_url`, 0 missing coordinates** — in range with
+    80239 (350) and 80247 (266). Nothing about the sources changed; only the string they compare
+    against. That is the proof the gate was the blocker.
+  - ⚠️ **`communities.state` has NO format constraint**, which is what let this sit unnoticed.
+    A `check (length(state) = 2)` would make the class impossible — proposed, NOT applied
+    (schema change, gated).
+- ⚠️ **The `level=zip` row count is 12,723, not the 12,722 quoted throughout both CLAUDE.md
+  files.** One row's difference, so one of the two figures is stale — unresolved, recorded here
+  so it is not silently carried forward again.
+
 ### 2026-08-13 — RHODE ISLAND WIRED AND FULLY ROLLED OUT (#689). WV ROLLOUT FINISHED.
 
 **RI — `ridot-rhode-restore-projects`, registry 162 → 163 arcgis entries, merged `95abd63`,
