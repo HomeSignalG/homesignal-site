@@ -40,6 +40,39 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-08-13 — DECLINED: adding `CLAUDE.md` to a path filter in the INGEST repo. Do not re-propose.
+
+Claude proposed adding root-level `CLAUDE.md` to a workflow path filter in `homesignal-ingest`
+so a check would run on changes to it, reasoning from the site repo's precedent. **Founder
+ruled: leave it.** Recorded here because Claude proposed it wrongly and would otherwise
+propose it again.
+
+- **Why it was wrong.** `homesignal-ingest/.github/workflows/test-local-news-resolver.yml`
+  already carries an explicit ruling in its own header comment: *"PATH-FILTERED ON PURPOSE
+  (audit finding D-9). A docs-only commit does not run this workflow, so `main` can legitimately
+  have a HEAD commit with no test run against it — that is intended, not a gap. … **Do NOT widen
+  it to `**` to make HEAD always show a check: that trades a meaningful signal for a cosmetic
+  one.**"* The proposal was the exact move that comment forbids.
+- **It would also have been an empty check.** That workflow runs the local-news resolver suite,
+  which tests nothing about `CLAUDE.md`. A green result would be success-shaped output attesting
+  to nothing — the failure mode both repos' claims-discipline sections exist to prevent.
+- ⚠️ **THE TWO REPOS ARE NOT ANALOGOUS — this is the error to avoid repeating.** In the SITE
+  repo, branch protection **requires** the `unit` check on every PR, so a `CLAUDE.md`-only PR
+  could never register it and **could never merge**; adding the path unblocked a real deadlock
+  (that is what `CLAUDE.md`'s "Unblocking exception" describes). The INGEST repo has **no such
+  requirement** — PR #318 was `CLAUDE.md`-only, reported `mergeable_state: clean`, ran **zero
+  checks**, and merged without incident. There was no blockage to remove. **Do not carry a
+  site-repo precedent into the ingest repo without checking whether the precondition holds.**
+- **If a check on that file is ever wanted, the honest version is a doc-lint that asserts
+  something real** — e.g. no struck-through line in the `SETTLED` list without an `AMENDED
+  <date>` marker, or no edit to a dated measurement without its date changing. Offered and NOT
+  built (new workflow + script; founder said leave it). It would have caught nothing on
+  2026-08-13 — that amendment satisfies both rules.
+- 📌 **Related and still true:** #318 merged with **zero checks, not green checks**. "No check
+  failed" and "a check passed" are different claims; only the first is available for a doc-only
+  change in that repo. Say which you mean.
+
+
 ### 2026-08-13 — ZERO-STATE LIST RE-MEASURED. ND IS THE ONLY ONE LEFT. ONE TYPO WAS STRANDING A LIVE PAGE.
 
 **Measured on `app_projects`, excluding the 10 incomplete registry entries (the same definition
