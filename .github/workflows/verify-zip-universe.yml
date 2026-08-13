@@ -1,0 +1,48 @@
+name: verify-zip-universe
+
+# The ZIP universe must equal the approved Gold Master registry, exactly — 12,722 ZIPs.
+#
+# Runs where network egress works (GitHub-hosted runner); the build sandbox cannot reach
+# Supabase. Reads only through the public anon key, so it needs no secret.
+#
+# WHY: on 2026-08-11 migration 20260811133957 hardcoded a single-ZIP INSERT into
+# public.communities and created a 12,723rd page (Denver 80249). Nothing caught it for two
+# days. The DB guard (docs/canonical-zip-registry-guard.sql) now makes that creation
+# impossible; this job proves the guard is still installed and still armed, and that no other
+# route (direct service-role write, disabled trigger, restored backup) has moved the universe.
+#
+# Zero-touch: it compares live production against the live canonical_zip_registry, so an
+# approved workbook revision that reseeds the registry is picked up with no code change.
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_zips:
+        description: 'Approved ZIP count (default 12722)'
+        required: false
+        default: ''
+  schedule:
+    - cron: '41 6 * * *'    # daily 06:41 UTC — offset from the other verifiers
+  push:
+    branches: [main]
+    paths:
+      - 'docs/canonical-zip-registry-guard.sql'
+      - 'scripts/verify-zip-universe.mjs'
+      - '.github/workflows/verify-zip-universe.yml'
+      - 'config.js'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # A read-only set comparison over ~38k rows; minutes, not hours. Bounded so it can never
+    # inherit GitHub's 6-hour default the way verify-geocodes did.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Verify the ZIP universe equals the approved Gold Master
+        env:
+          EXPECTED_ZIPS: ${{ github.event.inputs.expected_zips }}
+        run: node scripts/verify-zip-universe.mjs
