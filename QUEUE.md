@@ -40,7 +40,62 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
-### 2026-08-13 — WEST VIRGINIA WIRED (#687). NORTH DAKOTA REJECTED WITH RECEIPTS.
+### 2026-08-13 — RHODE ISLAND WIRED AND FULLY ROLLED OUT (#689). WV ROLLOUT FINISHED.
+
+**RI — `ridot-rhode-restore-projects`, registry 162 → 163 arcgis entries, merged `95abd63`,
+deployed (run 31721009891). ROLLOUT COMPLETE: 81 / 81 ZIP pages LIVE (100%), 4,512 records.**
+Pre-wire control measured on `app_projects` before the deploy: **81 cached, 0 live** — RI carried
+no development record from any source. Source is RIDOT's own RHODE RESTORE (Municipal Roads &
+Bridges Fund) projects-as-points layer, `MRBF_Projects/FeatureServer/0`, 1,380 point rows,
+`lastEditDate` 2026-07-31.
+
+- **Org identity, and two decoys.** `ridot.maps.arcgis.com/sharing/rest/portals/self` →
+  `id JfTJE9T2RFfUZzVx`, `name "Rhode Island Department of Transportation"`, `urlKey RIDOT`.
+  `rigis` and `ridemo` both returned **HTTP 200 with `id: null`, `name: null`** — the generic
+  anonymous portal, per the Michigan standing answer. The org holds 107 services; 105 are
+  per-project tile packages (`SPL_*`/`PL_*`/`PLAT_*`), sweeping routes, condition layers and
+  survey123 forms. Two cross-state training leftovers sit in the org and were ignored
+  ("Environmental Equity in Allegheny County", "DC Embassies"). MRBF is the only register.
+- **Status vocabulary complete, with a positive control.** `groupBy StatusAdmin` → `Approved`
+  = **1,380**, summing exactly to the layer count. 0 unclassified; the other three buckets are
+  declared empty so the lookup fails closed. The separate `Status` column is the APPLICATION
+  state (`Submitted` 1,379 + `Draft` 1 = 1,380, also exact) — bucketing on it would have
+  rendered 1,379 awarded projects as "proposed".
+- ⚠️ **KNOWN LIMIT, recorded not papered over.** `TotalProjectPercentComplete` groups as
+  100 → 876, 0 → 397, 5/90/99 → 17 each, 50 → 6, 75 → 5, null → 13. So **876 of 1,380 are
+  physically COMPLETE** and would ideally read `operating`. The layer publishes no string
+  vocabulary separating complete from underway — the only discriminator is a numeric percent,
+  and `"100"`/`"0"` in `status_to_bucket` is exactly the opaque-coded value the autonomy grant
+  bars. `approved` is true of all 1,380, so it is the honest coarse bucket. This is a known
+  understatement of lifecycle, NOT an unclassified value.
+- **Date column — `Application_Date` REJECTED for `DecisionDate`, and the first read was wrong.**
+  Three same-batch sample rows shared one `Application_Date`, which read as a constant load
+  stamp; the min/max probe disproved that (2023-10-16T14:29:52Z … 2026-07-16T18:39:31Z, it does
+  vary). It is still the wrong column: those values carry **sub-second precision** = system write
+  times, while `DecisionDate` spans 2023-07-10 … 2026-06-09 with **both bounds at exactly
+  00:00:00 UTC** — a human-entered civic date — and is populated on **1,379 / 1,380** (the single
+  null is the one Draft row). `file_date_kind: decided` matches `StatusAdmin: Approved`.
+  *Standing lesson: midnight-alignment vs sub-second precision distinguishes a civic date from a
+  system timestamp when two date columns compete.*
+- **Post-rollout invariants over all 4,512 records: 0 missing `record_url`, 0 missing
+  coordinates, 0 missing status, 1 distinct status, 0 records on a non-RI page.** lat span
+  41.1508…42.0121, lng span −71.8298…−71.1334 — inside the publisher's own declared extent.
+- **Bidirectional gate proof, live receipts.** 02882 → 108/108 emitted · 02886 → 61/61 ·
+  02903 → 147/147, all `unmapped_statuses: []`, `no_record_url: 0`, `geocode_failures: 0`
+  (`fetched == emitted`, exactly as the single-value vocabulary predicts). Controls: 02138
+  (Cambridge MA) fetched ONLY `massdot-highway-projects`; 06010 (Bristol CT) ONLY
+  `hartford-building-permits` + `ctdot-project-work-areas`. RIDOT rode neither.
+- 🔁 **The FRS-guard discard class bit again and the remedy is CONFIRMED to be rate, not retry
+  count.** 17 Providence-metro ZIPs came back **HTTP 200 carrying real records** (02909 → 206,
+  02919 → 163, 02912 → 156, 02907 → 118, 02905 → 116) but with `facilities: 0` against a cached
+  row holding facilities — so `dev_refresh_collect` refused the WHOLE response and discarded the
+  development half with it. Re-firing the SAME ZIPs against the SAME endpoint recovered them in
+  four decreasing waves (17 → 13 → 8 → 4 → 0) purely by waiting for the pg_cron 250-request batch
+  to drain first. Nothing about the source changed. **Do not fire a tail into a full queue.**
+
+**WV — `wvdoh-active-projects`, merged `6d39939`, deployed (run 31715915322). ROLLOUT COMPLETE:
+198 / 212 ZIP pages LIVE (93.4%), 1,262 records, 0 ZIPs left unrefreshed.** Conversion held at
+~91% of refreshed ZIPs landing a record across every batch. Original wire notes below.
 
 **WV — `wvdoh-active-projects`, registry 189 → 190, merged `6d39939`, deployed (run 31715915322).**
 `2026_Active_Project`, 1,033 rows, polyline, max `EditDate` 2026-08-10. Rollout in progress; live
