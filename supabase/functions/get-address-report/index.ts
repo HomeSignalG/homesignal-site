@@ -61,6 +61,7 @@
 // that address — never an assumed check.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { frsFacilities } from "./sources/epa-frs.ts";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import { siteKey, tceqForZip, type TceqCommunityRow, type TceqEntity } from "./sources/tceq-cr.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
@@ -258,36 +259,21 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
   }
   return deduped;
 }
-// One FRS query at a fixed radius; tooBig = FRS process-limit refusal (shrink), transient = retry.
-async function frsAt(lat: number, lng: number, rad: number): Promise<{ ok: boolean; tooBig: boolean; rows: Record<string, unknown>[] }> {
-  const q = new URLSearchParams({ latitude83: lat.toFixed(6), longitude83: lng.toFixed(6), search_radius: String(rad), output: "JSON" });
-  try {
-    const r = await fetch(`https://ofmpub.epa.gov/frs_public2/frs_rest_services.get_facilities?${q}`, { signal: AbortSignal.timeout(30000) });
-    if (r.status >= 500) return { ok: false, tooBig: false, rows: [] };   // transient FRS 5xx
-    const text = await r.text();
-    // Escape any backslash that isn't a valid JSON escape so JSON.parse survives FRS payloads.
-    const data = JSON.parse(text.replace(/\\(?!["\\/bfnrtu])/g, "\\\\")) as Record<string, unknown>;
-    const res = data?.Results as Record<string, unknown> | undefined;
-    if (res?.Error) return { ok: false, tooBig: true, rows: [] };          // process-limit refusal
-    const rows = (res?.FRSFacility ?? res?.Facilities ?? data?.FRSFacility ?? []) as Record<string, unknown>[];
-    return { ok: true, tooBig: false, rows: Array.isArray(rows) ? rows : [] };
-  } catch (_e) { return { ok: false, tooBig: false, rows: [] }; }          // network/parse → transient
-}
-// Radius back-off + transient retry (v12/v13) — never read an FRS failure as "0 facilities".
-async function frsFacilities(lat: number, lng: number, radiusMi: number): Promise<Record<string, unknown>[]> {
-  const radii = [radiusMi, 3, 2, 1.5, 1, 0.5, 0.25].filter((r, i, a) => r <= radiusMi && a.indexOf(r) === i);
-  for (const rad of radii) {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const { ok, tooBig, rows } = await frsAt(lat, lng, rad);
-      if (ok) return rows;      // success (possibly empty — a genuinely empty area)
-      if (tooBig) break;        // result too large → next smaller radius (retry won't help)
-      // else transient → retry the same radius
-    }
-  }
-  return [];
-}
-async function facilitySites(homeLat: number, homeLng: number, radiusMi: number): Promise<Record<string, unknown>[]> {
-  const rows = await frsFacilities(homeLat, homeLng, radiusMi);
+// FRS retrieval now lives in sources/epa-frs.ts (v23) so that "EPA said zero" and "EPA said
+// nothing" are DIFFERENT values instead of the same empty array. Read that file's header for the
+// 2026-08-08→12 outage this split exists to prevent — 515 ZIP pages cached facilities=0 while FRS
+// was refusing every request, and nothing downstream could tell that from a real zero.
+//
+// `epa` rides out in the report body so the CACHE GUARD (dev_refresh_collect) can decide per-ZIP
+// instead of inferring from a global two-point health probe. `raw_rows` vs `kept` is what makes an
+// intentional filter distinguishable from an empty area in the logs (Phase 13 observability).
+async function facilitySites(
+  homeLat: number,
+  homeLng: number,
+  radiusMi: number,
+): Promise<{ sites: Record<string, unknown>[]; epa: Record<string, unknown> }> {
+  const outcome = await frsFacilities(homeLat, homeLng, radiusMi);
+  const rows = outcome.rows;
   const kept: Record<string, unknown>[] = [];
   for (const rr of rows) {
     const lat = Number(rr.Latitude83 ?? rr.FacLat), lng = Number(rr.Longitude83 ?? rr.FacLong);
@@ -301,7 +287,21 @@ async function facilitySites(homeLat: number, homeLng: number, radiusMi: number)
     kept.push({ label: name, e, n, lat, lng, _d: d, scope: "point", type: "built", layer: classifyLayer(name), registry_id: rid, src: rid ? `EPA FRS · registry ${rid}` : "EPA FRS", record_url: rid ? `https://echo.epa.gov/detailed-facility-report?fid=${rid}` : "" });
   }
   kept.sort((a, b) => (a._d as number) - (b._d as number));
-  return kept.slice(0, MAX_FACILITIES).map((f) => { delete f._d; return f; });
+  const sites = kept.slice(0, MAX_FACILITIES).map((f) => { delete f._d; return f; });
+  return {
+    sites,
+    // `ok` describes RETRIEVAL ONLY. It stays true when FRS answered and `looksIndustrial()` then
+    // dropped every row — that is an intentional filter producing a LEGITIMATE zero, not an
+    // outage. (St. Louis 63118: FRS returns real rows at r=1, none of them industrial.)
+    epa: {
+      ok: outcome.ok,
+      radius_used: outcome.radius_used,
+      reason: outcome.reason,
+      attempts: outcome.attempts,
+      raw_rows: rows.length,
+      kept: sites.length,
+    },
+  };
 }
 // Best-effort EPA ECHO violation-count enrichment from the pre-cached table (shared by both
 // modes; read-only). Kept as a fallback under echoEnrich() (the live pull below wins).
@@ -633,7 +633,8 @@ async function handleRequest(req: Request): Promise<Response> {
     const zipRadius = Math.min(Math.max(Number(body.radius_mi) || ZIP_RADIUS_MI, 0.5), MAX_RADIUS_MI);
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const communityIds = await resolveCommunityIds(supabase, zip);
-    const [devRaw, facRaw] = await Promise.all([devSites(supabase, clat, clng, communityIds), facilitySites(clat, clng, zipRadius)]);
+    const [devRaw, facResult] = await Promise.all([devSites(supabase, clat, clng, communityIds), facilitySites(clat, clng, zipRadius)]);
+    const facRaw = facResult.sites;
     await enrichViolations(supabase, facRaw);
     // v19: live EPA ECHO compliance enrichment (real violations/programs, keyed on registry_id).
     await echoEnrich(facRaw, clat, clng, zipRadius);
@@ -846,7 +847,7 @@ async function handleRequest(req: Request): Promise<Response> {
     const envEpa = fac.filter((s) => (s.env as { epa?: unknown } | undefined)?.epa).length;
     const envTceq = fac.filter((s) => (s.env as { tceq?: unknown } | undefined)?.tceq).length;
     // TABS records are development filings → counts.development, never counts.facilities.
-    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, proposed: proposedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, csv_reports: csv.reports, carto_reports: carto.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
+    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, counts: { facilities: fac.length, proposed: proposedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, csv_reports: csv.reports, carto_reports: carto.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
   }
 
   const address = (body.address || "").trim();
@@ -857,7 +858,8 @@ async function handleRequest(req: Request): Promise<Response> {
   try { [lat, lng, matched] = await geocode(address); } catch (e) { return json({ error: String(e instanceof Error ? e.message : e) }, 422, cors); }
   const zipM = matched.match(/\b(\d{5})\b/);
   const communityIds = await resolveCommunityIds(supabase, zipM ? zipM[1] : null);
-  const [dev, fac] = await Promise.all([devSites(supabase, lat, lng, communityIds), facilitySites(lat, lng, radiusMi)]);
+  const [dev, facResult] = await Promise.all([devSites(supabase, lat, lng, communityIds), facilitySites(lat, lng, radiusMi)]);
+  const fac = facResult.sites;
   await enrichViolations(supabase, fac);
   // v19: same environmental-records layer as ZIP mode — live ECHO compliance + TCEQ Central
   // Registry (coverage-gated to TX), geo-matched onto the facilities we already placed.
@@ -883,5 +885,5 @@ async function handleRequest(req: Request): Promise<Response> {
   const access = await accessLevel(req, supabase);
   const sites = access === "full" ? allSites : allSites.slice(0, TEASER_LIMIT);
   const locked = access === "full" ? 0 : Math.max(0, allSites.length - sites.length);
-  return json({ address: matched, home: { lat, lng }, radius_mi: radiusMi, access, paywall: PAYWALL_ENABLED, counts: { facilities: fac.length, proposed: proposedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, note: "Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
+  return json({ address: matched, home: { lat, lng }, radius_mi: radiusMi, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, counts: { facilities: fac.length, proposed: proposedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, note: "Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
 }
