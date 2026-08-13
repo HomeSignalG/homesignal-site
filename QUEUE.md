@@ -82,9 +82,29 @@ below turned up a second entry that was not a state at all.
       tried to violate is not evidence of anything, so each was re-run as a bare statement):
       `'Colorado'` → **23514 REJECTED** · `NULL` → **23514 REJECTED** · `'co'` → **23514
       REJECTED** · `'CO'` → **ACCEPTED**. Row restored to `CO`, 13,293 / 13,293 conforming.
-- ⚠️ **The `level=zip` row count is 12,723, not the 12,722 quoted throughout both CLAUDE.md
-  files.** One row's difference, so one of the two figures is stale — unresolved, recorded here
-  so it is not silently carried forward again.
+- 🛑 **RESOLVED, AND IT IS A FOUNDER DECISION, NOT A DOC TYPO — A ZIP PAGE WAS CREATED, WHICH
+  RULE #0b SAYS NEVER HAPPENS. NUMBER LEFT UNCHANGED PENDING A RULING.**
+  Measured: `level=zip` rows created **before 2026-08-11 = exactly 12,722**; rows created on or
+  after = **exactly 1** — `Denver (80249)`, slug `denver-80249-co`, `created_at`
+  **2026-08-11 13:39:57**. No other row claims 80249, so it is a genuine addition, not a
+  duplicate. **Neither figure was ever wrong: 12,722 was correct when written and became 12,723
+  on 2026-08-11.**
+  - The ingest repo's `CLAUDE.md` Rule #0b lists under **"SETTLED — do not reopen"**:
+    *"12,722 ZIP pages, fixed. No page is ever created."* That number is a **founder ruling, not
+    a statistic**. Editing the docs to 12,723 would launder a departure from the ruling into a
+    documentation fix and quietly ratify page creation as normal. **Do not do that.**
+  - **It is the SAME row as the state typo above.** One off-path insert produced all three
+    symptoms — the count drift, `state='Colorado'`, and the absent `development_reports` row —
+    exactly what a row created outside the per-state seed path looks like (that path sets the
+    two-letter code and caches the ZIP). The DB carries no actor, so who added it and why is
+    **UNVERIFIED and not knowable from here**.
+  - **Two ways this resolves, founder's call:** (a) the row is legitimate → the ruling's number
+    moves to 12,723 and the exception is recorded in Rule #0b, or (b) it should not exist →
+    delete 80249 and restore 12,722. *Claude's recommendation: KEEP it — 80249 is a real Denver
+    ZIP (Green Valley Ranch / DIA), it resolves most-specific, and it now serves 199 real permit
+    records — but that is a settled parameter, so it is not Claude's to change (Rule #0).*
+  - Until ruled: **quote 12,722 as the ruling and 12,723 as the measured row count, and say
+    which you mean.** Do not silently reconcile them.
 
 ### 2026-08-13 — RHODE ISLAND WIRED AND FULLY ROLLED OUT (#689). WV ROLLOUT FINISHED.
 
