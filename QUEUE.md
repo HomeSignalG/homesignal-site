@@ -40,6 +40,55 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-08-13 — THE LEVER IS STATEWIDE DOT SOURCES. INDIANA WIRED (#694): 2 → 190/198.
+
+**The measurement that should drive state selection from here** (on `app_projects`, excluding the
+10 incomplete registry entries): states **with** a statewide DOT source run **79.1% live**
+(6,288/7,945); states with **county-only** sources run **36.2%** (1,675/4,623); ND runs 0% and is a
+documented rejection. That 43-point split is the largest available lever. The 0079 workbook
+predicted 78.0 vs 31.7 from a smaller sample; OK landed 78.2%, NH 83.8%, IN 96.0%.
+
+- **`indot-spms-active-projects`, arcgis 163 → 164, merged `30feb9d7`, deployed (run
+  31740761922). ROLLOUT COMPLETE: 190 / 198 live (96.0%), 2,399 records.** Pre-wire control:
+  198 cached, **2 live**. National **7,963 → 8,151** of 12,723.
+- **Invariants over all 2,399 records: 0 missing `record_url`, 0 missing coordinates, 0 records on
+  a non-Indiana page, exactly 2 statuses** (`Proposed`, `Approved`) — precisely what the 3-value
+  vocabulary predicts. Gate proof: 60601 (Chicago) fetched only `cook-county-*` / `idot-*`.
+- ⚠️ **BOTH OBVIOUS COLUMNS WERE UNUSABLE — check the siblings before rejecting a DOT layer.**
+  `PHASE` is the single opaque letter `'A'` on all 3,966 rows; `WORKCAT` is opaque numeric codes
+  (912, 962, 931, 943, 210 … plus TMS/LTAP/DTP). Either would have been an opaque-coded value (the
+  San Jose `planningpermits30` rejection class). The usable columns are **`PROGRESS`** (Plan 3,288
+  + Const 599 + Let 79 = **exactly 3,966**) and **`WORKDESC`** (133 self-describing values, also
+  exactly 3,966). **This is the SECOND time in one session** the first-choice column was wrong and
+  a sibling was right — RI's `Status` vs `StatusAdmin` was the first. Enumerate every candidate
+  column before writing a source off.
+- 🆕 **STANDING ANSWER — a private AGO org is NOT the generic-portal decoy.** `indot.maps.arcgis.com`
+  and `in.maps.arcgis.com` return `access: private` with **null id, empty name, but a populated
+  `urlKey`**. The Michigan decoy (a nonexistent org) returns **no `urlKey` at all**. Both close off
+  anonymous `orgid:` search, but they are different findings and only one means "no such org".
+- 🆕 **The server path was `/ro/`, not `/arcgis/`** — `gis.indot.in.gov/arcgis/rest/services` 404s.
+  Recovered by walking an unscoped AGO search result (the Frisco pattern). Most AGO hits for "INDOT
+  projects" are **consultant copies** (HNTB `rD2ylXRs80UroD90`, Corradino `zkfscBHttPaQwR4x`) and
+  were rejected on the first-party rule.
+- 📌 **Register DENSITY predicts coverage better than state size.** INDOT publishes 3,966 projects
+  across all 92 counties → 96%. UDOT publishes 358 → UT sits at 35.2% despite having a statewide
+  entry. When choosing the next state, check the row count and county spread first.
+- 🔁 **The FRS-guard discard recurred exactly as documented** — 38, then 19, then 8 ZIPs returned
+  HTTP 200 carrying real records with `facilities: 0`, so the whole response was refused. Re-firing
+  the same ZIPs into a clear queue recovered them each round. **Do not fire a tail into a full
+  queue**; nothing about the source changes.
+- ⚠️ **Check `now()` before calling a queue stalled.** Twice this rollout "no responses yet" was
+  read as a fault when only 1–2 minutes had elapsed — the MCP round-trip is much faster than the
+  wait timers. The DB clock is the instrument; "not yet processed" and "failed" are different states.
+- **NEXT, by dark pages among the 24 county-only states:** MO 176 · SC 162 · OR 148 · KS 141 ·
+  MN 140 · NE 138 · NM 134 · AR 132 · LA 127. ⚠️ **CA is the biggest single prize (360 dark) but
+  Caltrans is a documented edge-runtime blocker** — not a straightforward wire.
+- **Honest ceiling, so nobody plans against a wrong target:** a perfect statewide-DOT sweep of all
+  24 county-only states projects to **≈ +1,982 pages (~9,945 total, 78%)**, NOT 12,723. Rural ZIPs
+  genuinely have no project within the 3-mile radius. Past ~10,000 needs a NEW source class or a
+  radius change (gated — it alters what residents see). Honest-empty remains a correct terminal state.
+
+
 ### 2026-08-13 — DECLINED: adding `CLAUDE.md` to a path filter in the INGEST repo. Do not re-propose.
 
 Claude proposed adding root-level `CLAUDE.md` to a workflow path filter in `homesignal-ingest`
