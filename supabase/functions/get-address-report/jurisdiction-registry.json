@@ -12337,6 +12337,57 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "record",
       "_receipts": "2026-08-12 OH statewide wire. OH was 136/335 record-backed with 199 dark pages and no statewide source. HOST CHOICE, AND IT IS THE RISK ON THIS ENTRY: ODOT's project data lives ONLY on its own TIMS server (tims.dot.state.oh.us), NOT on ArcGIS Online. The ohiodot AGO org was enumerated first per governance section 0 (prefer AGO when both exist, because services*.arcgis.com is proven reachable by dozens of live entries): its only project-ish item is GCAT_UPDATE_2020_2025, nothing usable. So this is a SELF-HOSTED host and section 0 applies in full — a pg_net 200 proves POSTGRES egress, not that the Deno edge runtime can reach it. The Dayton precedent (dayton-oh-capital-improvement-projects, #594, reverted in #595 after 'Connection reset by peer' at Connect on 4 of 4 ZIPs) is the same class and the same state. THE FIRST POST-DEPLOY RE-CACHE IS THE DEPLOY VERIFICATION for this entry: read arcgis_reports[].fetched/emitted, never counts, and REMOVE the entry if the edge cannot connect. SERVER: /ags/rest/services enumerates folders Assets, Boundaries, CrashAnalytics, Environmental, MapViewers, Projects, Roadway_Information, Safety, StandardMaps, TIMS, Utilities; the Projects folder holds All_Project_Points, All_Projects_Linear, Current_Projects_Lines/Points, District_Work_Plan_Lines/Points, Next_4_Fiscal_Years_*, Previous_4_Fiscal_Years_*. LAYER: Current_Projects_Points/MapServer/0, esriGeometryPoint, 1,785 rows. LIVENESS: SOURCE_LAST_UPDATED and COD_LAST_UPDATED both read 1786507200000 = 2026-08-12, the day of wiring. POINTS ONLY, DELIBERATELY: Current_Projects_Lines carries 1,861 rows and is the SAME project set rendered as linework (the folder pairs every product Points/Lines). Wiring both would double-emit, which is the houston-plat-applications layer-0/layer-1 defect that exact-identity dedup cannot catch across two source_registry_ids. STATUS: PROJECT_STATUS two-stage probed (Rule 4) — groupBy returns 3 values summing to EXACTLY 1,785 (Awarded 1,780, Not Filed 3, Filed 2), the row count and therefore the positive control, and returnDistinctValues independently returns 3. Awarded -> approved (the contract is let, construction is committed but not necessarily complete); Filed and Not Filed are pre-award plan-filing states -> proposed. Nothing is unmapped, so no record is dropped under Rule 1. TYPE: PRIMARY_WORK_CATEGORY, self-describing, two-stage probed — 24 values summing to EXACTLY 1,785, returnDistinctValues independently 24, 0 NULLs, 0 unclassified. All are state-highway construction -> Utility (the txdot/nvdot/okdot/idot precedent) except 'Other Studies/ Tasks' (2 rows), which names no physical work and takes the generic member 'Development'. DATE: AWARD_MILESTONE_DT, a real epoch-millisecond date field, with file_date_kind 'awarded' — the same field semantics and the same kind txdot uses for ACTUAL_LET_DATE. This is the FIRST statewide DOT entry wired this session that carries a real event date; OKDOT and IDOT are both correctly undated. RECORD URL: PROJECT_PLANS_URL is genuinely PER-RECORD (contracts.dot.state.oh.us/search.jsp?cabinetId=1002&PID_NUM=<PID_NBR>), so record_url_precision is 'record', not the 'dataset' fallback used for OKDOT and IDOT. spatial_zip_radius_mi 3: the layer has no ZIP column (COUNTY_NME only), matching txdot/okdot/idot."
+    },
+    {
+      "registry_id": "nysdot-capital-program-projects",
+      "platform": "arcgis",
+      "service_url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/0",
+      "dataset_url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/0",
+      "jurisdiction": "New York State Department of Transportation",
+      "coverage": [
+        {
+          "state": "NY"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PublicFriendlyDescription",
+          "WORK_CATEGORY"
+        ],
+        "type_source": "WORK_CATEGORY",
+        "address": [
+          "PublicFriendlyDescription"
+        ],
+        "case_number": "PIN",
+        "record_url": "WEPIURL",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "Corrective Maint": "Utility",
+        "BRIDGE PRESERVATION": "Utility",
+        "PAVEMENT RECONSTRUCTION": "Utility",
+        "OTHER": "Development",
+        "SAFETY": "Utility",
+        "BRIDGE REHABILITATION OR REPLACEMENT": "Utility",
+        "Preventative Maint": "Utility",
+        "PAVEMENT PRESERVATION": "Utility",
+        "Renewal": "Utility",
+        "Rehabilitation": "Utility",
+        "MOBILITY": "Utility"
+      },
+      "status_const": "Capital Program",
+      "status_to_bucket": {
+        "proposed": [
+          "Capital Program"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "record",
+      "_receipts": "2026-08-12 NY statewide wire. NY was 233/764 record-backed — 531 dark pages, the largest single gap in any state. DISCOVERY: NYSDOT does not publish projects on ArcGIS Online (a 594-result AGO search returns MPOs, counties, consultants and survey123 forms, no NYSDOT project service) and its portal is NOT at the /arcgis/ path a host guess would try — gis.dot.ny.gov/arcgis/rest/services 404s. The real portal is /hostingny/, recovered from the service URLs of third-party AGO items that reference NYSDOT layers (columbiacounty1's NYSDOT Structures items). Root gisportalny.dot.ny.gov/hostingny/rest/services (gis.dot.ny.gov/hostingny mirrors it byte-for-byte) enumerates folders Agile, Asset, Environmental, Framework, Geocortex, Hosted, HWP, Maintenance, Projects, Roadways, Safety, Utilities. HWP holds only ExportImage[GPServer]. LAYER: Projects/CapitalProgramProjects/FeatureServer/0 'Project Points', esriGeometryPoint, 2,487 rows. REJECTED ALONGSIDE, with receipts, so neither is re-probed: (1) data.ny.gov 'Transportation Projects in Your Neighborhood' (rz8t-4kmq, 1,937 rows) is the obvious candidate BY NAME and fails NO_GEOGRAPHY outright — its full column list carries no lat, no lng, no ZIP and no address, only a 'region' ('10 LONG ISLAND') and county names buried in prose; same class as the NJ DCA rejection. (2) The NYS Thruway Authority capital-project sets (f9da-b8zj and siblings) are likewise coordinate-less and their active set samples a 2012 project. LAYER CHOICE — ONE LAYER ONLY, DELIBERATELY: the service exposes three point layers and three polygon layers all named 'Project Points'/'Project Polygons'. They are NOT duplicates of each other — PIN 581606 returns 4 rows on layer 0 and 0 rows on layers 1 and 2 — but their relationship is undocumented and layer1+layer2 (1,759+857=2,616) exceeds layer 0 (2,487), so wiring more than one risks the houston-plat-applications double-emit. Layer 0 is wired alone; layers 1-5 are left for a later pass. Note PIN is NOT unique (4 rows share 581606); the engine's dedup identity includes lat/lng so distinct sites survive as distinct records. TYPE — WORK_CATEGORY, self-describing. groupBy returns 12 values summing to EXACTLY 2,487, the layer row count and therefore the positive control: Corrective Maint 462, BRIDGE PRESERVATION 458, PAVEMENT RECONSTRUCTION 346, OTHER 265, SAFETY 259, BRIDGE REHABILITATION OR REPLACEMENT 254, Preventative Maint 208, PAVEMENT PRESERVATION 95, Renewal 87, Rehabilitation 39, MOBILITY 13, and 1 NULL. All 11 non-null values are mapped; the single NULL row renders unclassified, which is cosmetic under Rule 2. All map to Utility (the txdot/nvdot/okdot/idot/odot precedent) except 'OTHER' (265 rows), which names no specific work and takes the generic member 'Development'. ⚠️ RULE 4 STAGE 2 IS UNAVAILABLE ON THIS SERVER, AND THAT IS RECORDED RATHER THAN GLOSSED: returnDistinctValues returns {'error':'Unable to complete operation.'} on this layer, so the verbatim-casing confirmation Rule 4 prescribes cannot be run. The obvious substitute ALSO fails — the server's where-clause comparison is CASE-INSENSITIVE, proven both ways: WORK_CATEGORY='BRIDGE PRESERVATION' and ='Bridge Preservation' both return 458, and ='Corrective Maint' and ='CORRECTIVE MAINT' both return 462. So the mixed casing visible in the vocabulary (SHOUTING vs Title Case, which is what makes this a real Rule 4 case) cannot be confirmed byte-exact by any method this endpoint offers. WHY THAT IS TOLERABLE HERE, SPECIFICALLY: the connector normalises type_map keys with trim + case-fold (buildTypeLookup), so a casing mismatch cannot cause a miss; and type is COSMETIC under Rule 2 — an unmapped type degrades pin shape, it never drops a record. The casing risk would NOT be tolerable on a status map, where a miss is record loss under Rule 1 — and this entry has no status column to expose that. STATUS — no status field exists in the layer, so status_const supplies it, mapped through status_to_bucket because in arcgis.ts the constant is the RAW VALUE: proposed ['Capital Program']. 'Capital Program' is the publisher's own term (the service is CapitalProgramProjects) and is used rather than the bucket name 'proposed' because test/status-const-must-be-mapped.test.mjs ratchets against bucket-named constants. THE proposed BUCKET IS EVIDENCE-BACKED, NOT ASSUMED: ConstructionCompleteDate is in the FUTURE on 2,486 of 2,487 rows, in the past on 1, and NULL on 0 — this layer is forward-looking planned work almost in its entirety. DATE — DELIBERATELY UNMAPPED. The only date is ConstructionCompleteDate, a PLANNED COMPLETION date, which is not a filing, award or issuance event and does not fit any file_date_kind. Mapping a future completion date as file_date would misdate every record. Undated is correct, as founder-ruled for butler-county-ks-permits and applied to okdot-workplan-roadways and the idot pair. RECORD URL: WEPIURL is genuinely per-record (piyn.dot.ny.gov/PublicPIYN/ProjectDetails?pin=<PIN>), so record_url_precision is 'record'. HOST: gisportalny.dot.ny.gov is SELF-HOSTED, so governance section 0 applies exactly as it did for Ohio's TIMS — a pg_net 200 is not proof the Deno edge runtime can connect. THE FIRST POST-DEPLOY RE-CACHE IS THE VERIFICATION: read arcgis_reports[].fetched/emitted, and if the edge cannot connect, REMOVE the entry (the Dayton precedent), do not leave it declaring coverage it cannot serve. spatial_zip_radius_mi 3: no ZIP column, matching txdot/okdot/idot/odot."
     }
   ],
   "ckan": [
