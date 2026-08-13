@@ -82,8 +82,13 @@ below turned up a second entry that was not a state at all.
       tried to violate is not evidence of anything, so each was re-run as a bare statement):
       `'Colorado'` → **23514 REJECTED** · `NULL` → **23514 REJECTED** · `'co'` → **23514
       REJECTED** · `'CO'` → **ACCEPTED**. Row restored to `CO`, 13,293 / 13,293 conforming.
-- 🛑 **RESOLVED, AND IT IS A FOUNDER DECISION, NOT A DOC TYPO — A ZIP PAGE WAS CREATED, WHICH
-  RULE #0b SAYS NEVER HAPPENS. NUMBER LEFT UNCHANGED PENDING A RULING.**
+- ✅ **RULED 2026-08-13 — FOUNDER SAID KEEP IT. The fixed count is now 12,723.** Rule #0b in
+  `homesignal-ingest/CLAUDE.md` was amended in the same session: the old line is struck through,
+  the new count recorded, the 80249 exception named, and the "count is FIXED / pages are not
+  created" half explicitly retained. **The DATED measurements elsewhere in that file
+  (12,722/12,722 on 2026-07-30, etc.) were deliberately NOT rewritten** — they were true on
+  their date and editing a receipt to match a later number falsifies it.
+  Original finding, kept for the record:
   Measured: `level=zip` rows created **before 2026-08-11 = exactly 12,722**; rows created on or
   after = **exactly 1** — `Denver (80249)`, slug `denver-80249-co`, `created_at`
   **2026-08-11 13:39:57**. No other row claims 80249, so it is a genuine addition, not a
@@ -98,13 +103,14 @@ below turned up a second entry that was not a state at all.
     exactly what a row created outside the per-state seed path looks like (that path sets the
     two-letter code and caches the ZIP). The DB carries no actor, so who added it and why is
     **UNVERIFIED and not knowable from here**.
-  - **Two ways this resolves, founder's call:** (a) the row is legitimate → the ruling's number
-    moves to 12,723 and the exception is recorded in Rule #0b, or (b) it should not exist →
-    delete 80249 and restore 12,722. *Claude's recommendation: KEEP it — 80249 is a real Denver
-    ZIP (Green Valley Ranch / DIA), it resolves most-specific, and it now serves 199 real permit
-    records — but that is a settled parameter, so it is not Claude's to change (Rule #0).*
-  - Until ruled: **quote 12,722 as the ruling and 12,723 as the measured row count, and say
-    which you mean.** Do not silently reconcile them.
+  - **RULED: keep the row; the ruling's number moved to 12,723** (option a of the two that were
+    put to the founder). Rule #0b amended accordingly.
+  - **Quote 12,723 from here on.** A pre-2026-08-13 document saying 12,722 is not wrong and does
+    not need correcting — check whether it is a RULING (amend) or a dated MEASUREMENT (leave it).
+  - 📌 **The real lesson is the insert path, not the number.** 80249 was hand-inserted rather than
+    seeded, and that single shortcut produced three separate defects (count drift, malformed
+    `state`, no cached report). **Add pages through the per-state seed path** — it sets the
+    two-letter code and writes the `development_reports` row; a hand-insert does neither.
 
 ### 2026-08-13 — RHODE ISLAND WIRED AND FULLY ROLLED OUT (#689). WV ROLLOUT FINISHED.
 
