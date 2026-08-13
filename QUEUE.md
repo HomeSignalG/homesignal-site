@@ -23,8 +23,11 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## Standing frame
 
-- **Goal (row 380):** 12,722 ZIP pages, 50 states. Live: NV 158 + TX 668 + UT 310 = **1,136**.
-  **8,215 remain** — 5,647 across 34 partial states, 2,568 across 13 untouched.
+- **Goal (row 380):** 12,722 ZIP pages, 50 states. ⚠️ **The original figure on this line
+  (NV 158 + TX 668 + UT 310 = 1,136 live / 8,215 remaining) is the row-380 SEED and is long
+  superseded — do not quote it.** Measured on `app_projects` **2026-08-13: 7,476 live / 12,722
+  (58.8%), 5,246 dark** (workbook 0080). Re-measure with the scoreboard rather than reading either
+  number off this line.
 - **LIVE is not COVERED (row 381).** Texas is the standing example. ⚠️ **The "zero
   `government_notice` sources" half is FALSE as measured 2026-07-30** — see TX-GOV below.
   The principle stands; the number does not. Always report both numbers.
@@ -35,7 +38,47 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ---
 
-## RESUME POINT — read this first (updated 2026-07-31)
+## RESUME POINT — read this first (updated 2026-08-13)
+
+### 2026-08-13 — FIVE STATEWIDE DOT WIRES. 6,692 → 7,476 Live (+784). Registry 183 → 188.
+
+Measured on `public.app_projects` (`record_kind='development'`, entry complete on both `type_map`
+and `status_to_bucket`) — the same definition the scoreboard uses. **7,476 / 12,722 = 58.8%**, up
+from 6,692 (52.6%). Recorded in workbook **0080**.
+
+| state | before | after | entry |
+|---|---|---|---|
+| NY | 233 | **606** (+373) | `nysdot-capital-program-projects` — 5,422 records / 380 pages |
+| IL | 256 | **401** (+145) | `idot-annual-program-bridges` 1,082/123 · `-construction` 481/138 |
+| OK | 0 | **154** (+154) | `okdot-workplan-roadways` — 1,086 records / 154 pages |
+| OH | 136 | **248** (+112) | `odot-current-projects` (TIMS) — 1,232 records / 117 pages |
+
+Control: per-state deltas sum to +784 = the change in the total, and **no state lost a page** (the
+0079 live set is a strict subset of the new one within each of the four states, checked per state).
+PA unchanged at 350.
+
+🔴 **THIS SUPERSEDES THREE STANDING CLOSURES AT THE BOTTOM OF THIS FILE.** The "LARGE AND GENUINELY
+HARD" category said NY had **"no statewide source exists"** — false; NYSDOT publishes one and it was
+the single largest gain of the night. OH ("every county closed on enumeration") and IL were in the
+same category. **A county-by-county enumeration coming back empty is not evidence that the STATE
+publishes nothing** — the two are different registers, and nothing in the earlier passes had looked
+for the state DOT layer. Corrected in place below.
+
+✅ **The statewide-source thesis is now confirmed on a state it was not fitted to.** Workbook 0079
+argued the lever from a split of 78.0% (states with a statewide entry) vs 31.7% (without).
+**Oklahoma had zero registry coverage; after one wire it is 154/197 = 78.2%.** The pre-wire envelope
+projection was 146–156; measured 154.
+
+⚠️ **Envelope projections are CEILINGS, not forecasts.** Projected NY ≥413 / IL 161 / OK 146–156 /
+OH 117; measured +373 / +145 / +154 / +112 — three of four came in **under**. The envelope answers
+"is a project within 3 mi of this centroid", which is necessary but not sufficient for a record to
+land and survive the connector. Aggregate projection 837, actual 784.
+
+**The remaining dark pages in these four states are mostly CONFIRMED empty, not unprocessed.** Of
+~1,150 that started dark, 41 were still unreached at the end (NY 35, IL 3, OK 2, OH 1); the rest
+refreshed successfully and returned zero — outside the DOT layers' 3-mile reach. Honest under Rule 8.
+**The next gain in NY/IL/OH/OK needs a NEW source, not another refresh.**
+
 
 ### THE LOOP — note step 4, which I skipped once and reported a false Live
 
@@ -324,6 +367,40 @@ pre-measure against dark ZIPs → wire → deploy → recache → **materialize*
 ---
 
 ## Ordered items
+
+### 0h. FRS-THROUGHPUT — the refresh has a ceiling, and it is EPA FRS — **MEASURED, FIX OPEN**
+
+- **State:** measured 2026-08-13 during the five-DOT refresh. **No code change made.** The run
+  worked around it; the guard itself is correct and was NOT touched.
+- **The defect:** `dev_refresh_collect`'s transient-safety guard refuses the write when a response
+  reports `facilities=0` against a cached `facilities>0`. Right in intent — it stops a flaky FRS
+  night blanking good pages — but it refuses the **whole response**, so the development records in
+  the same payload are discarded with it. Caught live on ZIP **73003**: the payload carried **5 real
+  OKDOT development records** and `facilities:0` against a cached 8; the entire write was refused.
+- 🔴 **FRS returns zero as a function of OUR OWN FIRING RATE.** Measured three ways in one session:
+
+  | firing rate | responses | `facilities: 0` |
+  |---|---|---|
+  | ~170/min (450-ZIP batches) | 172 | **141 — 82%** |
+  | 30-ZIP control batch | 30 | **5 — 17%** (25 of 30 carried development records) |
+  | 52 ZIPs into an **empty** `pg_net` queue | 52 | **51 collected** |
+
+  **Bigger batches produced FEWER live pages.** Several 450-ZIP rounds barely moved the counter
+  while one 52-ZIP round into a clear pipe landed almost everything.
+- ⚠️ **Consequence for `dev_refresh_fire_batch` — read before tuning it up.** It defaults to
+  `_batch 250` and cron job 14 fires it every 15 min, which is survivable. **Raising that default to
+  "go faster" yields fewer pages, silently**: every response still returns HTTP 200, collect still
+  reports rows collected, and the writes simply stop landing. There is no error to see.
+- **The fix, when it is wanted:** make the guard **per-dimension** — accept the development half of
+  a response whose facilities half is untrustworthy — rather than firing harder. Same shape as the
+  §0 per-source fix: the aggregate refusal is too blunt.
+- **Also observed:** ~**8.4%** of requests returned `503 {"code":"BOOT_ERROR"}` (193 of 2,292 in one
+  45-min window). Those ZIPs get `last_refresh_attempt_at` stamped anyway, so the 20-minute cooldown
+  **locks out work that never happened**. Not fixed; the run used a shorter ad-hoc retry window.
+- **Instrument note, cost a round:** `status_code IS NULL` in `net._http_response` means **NOT YET
+  PROCESSED**, not failed. A stalled queue and a failed request are indistinguishable until you join
+  against `net.http_request_queue` — 63 OK and 69 OH requests were read as a wiring fault when they
+  were merely still queued.
 
 ### 0. FETCH-FAIL-GUARD — a failed fetch collected as an empty success — **FIX (1) DONE**
 - **State:** **DONE and live-proven** (2026-08-03). Migration `dev_refresh_per_source_failure_guard`;
@@ -6608,8 +6685,12 @@ any prior ordering.**
 
 ## 🔴 THE BIGGEST RECOVERABLE BLOCK IS A CATEGORY, NOT A STATE: 7 states at ZERO
 
-**NH 247 · WV 212 · OK 197 · ND 155 · AK 101 · HI 97 · RI 81 = 1,090 pages, none ever probed in
-this run.**
+⚠️ **UPDATED 2026-08-13 — now SIX states / 893 pages. OK IS DONE (0 → 154/197 = 78.2%)** on a single
+`okdot-workplan-roadways` wire, which makes this section's thesis measured rather than argued. The
+prediction below was "one wire per state, no municipal tier"; that is exactly what OK took.
+
+**NH 247 · WV 212 · ~~OK 197~~ · ND 155 · AK 101 · HI 97 · RI 81 = 893 pages remaining, none ever
+probed in this run.**
 
 Every one is a **whole-state greenfield**, and the §0c first move has never been tried on any of
 them. On this run's evidence a statewide DOT wire alone took **WI 9.5% → 93.8%** and **MD 39% →
@@ -6634,15 +6715,23 @@ lit count is one deep city, not a healthy state** (§0s). Their unlock is a stat
 second metro.
 
 **3. LARGE AND GENUINELY HARD — already worked, blocked on structure.**
-**NY 531 dark** (closed `MUNICIPAL_TIER_REQUIRED`; no statewide source exists) · **CA 360**
-(`MUNICIPAL_TIER_REQUIRED`, 7 counties) · **IL 218** · **PA 210** · **OH 199** (every county closed
-on enumeration; Dayton blocked at the edge) · **IN 196** (`NO_DOT_PROJECT_REGISTER` — a publication
-gap, not a wiring problem) · **UT 201** (`candidates_exhausted`). **These 1,915 pages are the ones
-that need a different instrument, not another pass.**
+🔴 **SUPERSEDED IN PART, 2026-08-13 — three of these were NOT blocked on structure.** NY, IL and OH
+were each closed here on a county-level enumeration, and each had a **statewide DOT layer that was
+never looked for**. Wired in one pass: **NY 531 dark → 158** (`nysdot-capital-program-projects`;
+the "no statewide source exists" claim was simply wrong), **IL 218 → 73** (`idot-annual-program-*`),
+**OH 199 → 87** (`odot-current-projects` on TIMS). **Do not read a `MUNICIPAL_TIER_REQUIRED` stamp
+as covering the state register** — the stamp was earned against counties and says nothing about the
+DOT. Remaining in this category, still unworked against a statewide source: **CA 360**
+(`MUNICIPAL_TIER_REQUIRED`, 7 counties — Caltrans is self-hosted, see the edge-egress blocker) ·
+**PA 210** · **IN 196** (`NO_DOT_PROJECT_REGISTER` — INDOT's register was probed and is a genuine
+publication gap, unlike NY/IL/OH) · **UT 201** (`candidates_exhausted`). **~967 pages, not 1,915.**
 
 ## Recommended order for whatever comes next
 
-1. **The 7 zero states** — 1,090 pages, one DOT wire each, cheapest per page and entirely unexplored.
+1. **The zero states — now SIX, 893 pages** (was 7 / 1,090). **OK is done: 0 → 154/197 (78.2%) on
+   one `okdot-workplan-roadways` wire, 2026-08-13**, which is the proof of this item rather than a
+   claim about it. Remaining: **NH 247 · WV 212 · ND 155 · AK 101 · HI 97 · RI 81**. Still the
+   cheapest per page of anything on the board, and the OK result is the yardstick to expect.
 2. **Municipal permits for the thin `DOT_ONLY` metros** — Milwaukee, Baltimore, Anne Arundel.
    Moves completeness, which is the half of the scoreboard that has never been worked.
 3. **The 1,125 pages under 5 records nationally** (§0q) — a queue in its own right; worth measuring
