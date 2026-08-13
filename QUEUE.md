@@ -40,6 +40,43 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-08-13 — WEST VIRGINIA WIRED (#687). NORTH DAKOTA REJECTED WITH RECEIPTS.
+
+**WV — `wvdoh-active-projects`, registry 189 → 190, merged `6d39939`, deployed (run 31715915322).**
+`2026_Active_Project`, 1,033 rows, polyline, max `EditDate` 2026-08-10. Rollout in progress; live
+smoke matched the pre-wire envelope closely (25526 12/12, 26451 10/10, 26181 0/0) with **0 missing
+`record_url`, 0 missing coordinates**. Two decoys rejected first: WVDOT's server has a folder
+literally named `Projects` holding GIS projects (AADT, bridges, stormwater, signs), and the
+publicly-searchable "Roads to Prosperity" layer is the **2024 vintage** while the current one the
+2025 map draws is **token-gated** (499). ⚠️ **`wv.maps.arcgis.com` is a REAL org that is NOT West
+Virginia — it resolves to "World Vision", a global NGO.** A guessed subdomain can point at someone
+else's data entirely, not merely fail.
+
+🛑 **ND — NO STATEWIDE CONSTRUCTION PROJECT REGISTER EXISTS. Stamp `NO_DOT_PROJECT_REGISTER`
+(the INDOT class). Do not re-probe without a new instrument.** Four surfaces enumerated
+2026-08-13, all exhaustively:
+- **NDDOT AGO org `EDijJFsQQwgz8X53`** (the subdomain IS genuine here — "North Dakota Dept. of
+  Transportation" — which is why the rule is *check*, not *assume fake*): **38 services**, all
+  bridges / basemaps / road conditions / crashes / grants. No project register.
+- **NDDOT self-hosted `gis.dot.nd.gov`** (`external` + `ext_ssl`, ~38 services): crashes, speed
+  zones, traffic counts, haul permits, road conditions, bridge inventory. No project register.
+  Note the REST **root listing 404s** while the folders enumerate fine — probe folders, not root.
+- **ND GIS Hub `ndgishub.nd.gov`**: folders are Elevation / Flood / Geoscientific / Imagery /
+  Utilities / Water / Applications — **no transportation folder at all**.
+- **Scoped search** (`orgid:EDijJFsQQwgz8X53 AND (construction OR STIP OR "highway improvement")`):
+  15 hits, every one a bridge layer, StoryMap or grant application.
+
+**The only project-shaped public data is two FUNDING-AWARD layers, and they were MEASURED, not
+guessed:** `Special_Road_Fund_2026_WFL1` (47 points) and `Flex_Fund_Approved_Projects_WFL1` (14).
+Their coordinates were fetched and intersected against all 155 modelled ND ZIP centroids at the
+connector's own 3-mile radius: **SRF lights 7 pages, Flex Fund 4, combined 11 of 155 = 7%.**
+For scale, NH's 340 records lit 207 pages. **NOT WIRED, deliberately** — 7% coverage, no status
+column and no date column (a `status_const` would have to be invented), and single-programme-year
+funding awards rather than a construction programme. Wiring it would put ND on the board at ~11
+pages and make a future session read the state as worked when the actual finding is that the
+register does not exist. `IMPROVE` does enumerate cleanly (20 values summing exactly to 47) if
+anyone later decides 11 pages is worth it.
+
 ### 2026-08-13 (later) — NEW HAMPSHIRE: 0 → 207/247 (83.8%). Registry 188 → 189.
 
 `nhdot-ten-year-plan-projects` (#686, merged `6a666a6`, deployed v204). **703 records on 207 ZIP
