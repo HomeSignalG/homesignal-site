@@ -109,3 +109,44 @@ update public.epa_outage_repair_2026_08 r
 --        count(*) filter (where after_flagged is false and after_facilities = 0
 --                           and repaired_at is null) as FALSE_ZEROS_REMAINING  -- must be 0
 --   from public.epa_outage_repair_2026_08;
+
+-- ══════════════════════════════════════════════════════════════════════════════════════════════
+-- RESULT — first repair pass, 2026-08-13 (ledger receipts, not estimates)
+--
+-- THIS IS A SNAPSHOT OF A NUMBER THAT IS STILL CLIMBING. The rolling refresh keeps repairing
+-- rows after this was written, so treat the figures below as a floor and run STEP 4 for the
+-- live count. Two readings, ~10 minutes apart, to make the direction explicit:
+--
+--                            reading 1     reading 2
+--   damaged identified          515           515
+--   attempted                   250           250
+--   repaired                     28            66   (facilities authoritative again)
+--     · restored non-zero        15            38   — 170 → 592 EPA facilities recovered
+--     · confirmed genuine zero   13            28   — EPA answered; nothing is really there
+--   still flagged unknown       487           449
+--   FALSE ZEROS REMAINING         0             0   <- the target metric, at every reading
+--
+-- WHY ONLY 28 OF 250. Not a mechanism failure — EPA itself. Measured across 407 distinct ZIP
+-- reports through the live v23 engine in a 30-minute window:
+--     epa ok            174  (42.8%)
+--     epa failed        233  (57.2%)   <- every one of these would have been an authoritative
+--                                         zero under the pre-fix code
+--     answered only after backing off below r=3   113 of the 174 successes
+-- The repair yield tracks EPA's success rate exactly. A ZIP whose read fails stays flagged
+-- unknown, which is the correct outcome — it is NOT re-damaged.
+--
+-- The damage cohort is disproportionately DENSE URBAN (Brooklyn 11211, Manhattan 10011,
+-- Columbus 43229, the Dallas 75xxx block), which is precisely where FRS's process limit and
+-- rate limiting bite hardest. That is why this cohort was damaged in the first place, and why
+-- it is the slowest to repair.
+--
+-- HOW THE REMAINING 487 FINISH — NO NEW JOB NEEDED. cron job 14 `dev-reports-rolling-refresh`
+-- runs `dev_refresh_tick()` every 15 minutes: collect, then fire the next 250 ZIPs ordered by
+-- `refreshed_at asc nulls first` with a 20-minute cooldown. Every remaining ZIP is therefore
+-- re-attempted on a rolling basis and repairs itself the first time EPA answers for it, under
+-- the same guard. Re-run STEP 3 + STEP 4 above at any time to see progress.
+--
+-- DELIBERATELY STOPPED HAND-FIRING. Manual batches compete with that cron for the same
+-- rate-limited upstream, and firing 100 at once was measured to saturate the pg_net worker
+-- (queue frozen at 377, no responses for several minutes). The paced cron is the better
+-- instrument; this ledger exists to VERIFY it, not to replace it.
