@@ -40,6 +40,96 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-08-14 — 🚫 OREGON REJECTED. No wireable statewide source. OR stays 52/200 (148 dark).
+
+**The Florida outcome: recon found real candidates and LIVE PROBING rejected every one.** Recorded
+with receipts so no session re-derives this. **Nothing was wired; no registry change.**
+
+- **`2024_2027_STIP_Project_Lines`** (owner `OregonDOTGIS`, modified 2026-04-08, the one current
+  STIP layer) — **REJECTED on two independent grounds.**
+  - **Only 109 rows.** Density is what predicts coverage: INDOT 3,966 → 96%, SCDOT 3,958 → 89%,
+    UDOT 358 → 35%. 109 statewide cannot carry 148 dark pages.
+  - **`ListStatus` IS NOT A STATUS — second instance of the SC standing answer.** Live groupBy,
+    summing to exactly 109: `" "` 25 (blank) · `300` 20 · `Scoping - Full Scoping` 13 · `Low` 11 ·
+    `150` 10 · `Drop - from Scoping List` 7 · `High` 4 · `A` 4 · `B` 4 · `100` 3 · `Medium` 3 ·
+    `No scoping - Already in design (PE)` 2 · `Scoping - Update Prior scoping/estimate` 2 ·
+    `No scoping - Shelf project (PE only)` 1. That is blanks + numeric priority scores + letter
+    grades + priority labels + scoping actions in ONE column — opaque-coded values, barred by the
+    autonomy grant. **A `status_const` workaround is ALSO wrong here**: 7 rows are
+    `Drop - from Scoping List`, so a constant would publish dropped projects as approved.
+  - **Not actually statewide.** `Program` (sums to exactly 109): ARTS 45 · Pres 27 · SSPF 19 ·
+    **`R1 Pres` 9** · Culverts 5 · Ops 4 — Region-1-weighted, and ARTS/SSPF are opaque acronyms.
+- **`ODOT_Traffic_Construction` / `TripCheck_Construction_Data_Upload`** — **22,868 rows, FRESH
+  (`lastEditDate` 2026-08-13), and still REJECTED: it is an EVENT feed, not a project layer.**
+  Fields are `incidentId`, `eventTypeName`, `eventSubTypeName`, `odotSeverityDescript`,
+  `delayInfo`, `incidentDirection`, `startTime`, `tocsEventId` — transient closures and delays.
+  The `development` bucket is "permits, construction filings, planning notices"; every wired DOT
+  entry (UDOT/NDOT/TxDOT/SCDOT) is a PROJECT layer. **Volume is not relevance — 22,868 road-closure
+  advisories on resident pages would misrepresent what the page claims.**
+- **Stale, all rejected on `modified`:** `ODOT_Region1_100_Percent_Projects` 2019-05-31 ·
+  `ODOT_Region1_150_Percent_ARTS_CityWide` 2019-03-22 · `ODOT_Region1_Ops_150_Percent_CountyWide`
+  2018-09-07 · `ODOT_Region1_ARTS` 2018-07-03 · `Region_1_DRAFT_21_24_STIP_Projects_v2` 2021-01-12.
+- **Dead ends:** `gis-odot.opendata.arcgis.com` → 404 "domain record does not exist" ·
+  `gis.odot.state.or.us/arcgis` → HTTP 500 Runtime Error · `/hosting` → 404 ·
+  `navigator.state.or.us` `Projects` folder → imagery basemap + enterprise zones only.
+- 🆕 **STANDING ANSWER — search the OFFICIAL owner account, not the visible one.** Every ODOT layer
+  surfaced by the obvious searches belongs to `daniel.warren_ODOT` (all stale, Region 1). The STIP
+  layer belongs to **`OregonDOTGIS`** (263 items) and appears in NEITHER a `daniel.warren_ODOT`
+  owner search NOR a plain `ODOT` org search. Enumerate owners before concluding a DOT has nothing.
+- 🆕 **The org taxonomy held a 3rd and 4th time.** `odot.maps.arcgis.com` → id/name/urlKey ALL null
+  = **nonexistent** (Michigan decoy). `geo.maps.arcgis.com` → `Oregon ArcGIS Online`,
+  `uUvqNMGPm7axC2dD`, `access: public` = the real org. `kdot.maps.arcgis.com` → `urlKey: "KDOT"`,
+  `access: private` = **private** (INDOT class). Three distinct outcomes, three distinct meanings.
+
+### 2026-08-14 — KANSAS RECON OPEN (141 dark, 30.2%, no statewide source). Next target.
+
+- `kdot.maps.arcgis.com` is a **PRIVATE** org (`urlKey: "KDOT"`) — no anonymous `orgid:` search.
+- `gis.ksdot.gov` → **"Couldn't resolve host name"** (DNS dead).
+- The real owner account is **`KanDOT`** (695 items, e.g. "KDOT reference post markers" modified
+  2025-08-22). Per the Oregon standing answer above, work the owner account. **Not yet resolved.**
+
+### 2026-08-14 — SOUTH CAROLINA WIRED (#709): 30 → 171/192 (89.1%). Statewide-DOT lever, 4th state.
+
+**`scdot-project-viewer-lines`, arcgis 165 → 166, merged `f41a63b`, deployed (run 31808271280).
+ROLLOUT COMPLETE: 171 / 192 live (89.1%), SCDOT on 170 pages / 3,529 records.** Pre-wire control:
+192 cached, **30 live**. National **8,187 → 8,328** of 12,722.
+
+- **Invariants over all 3,529 materialized rows: 0 missing `source_ref`, 0 missing coordinates,
+  0 missing title, 0 missing status, exactly 2 statuses** (`Approved`, `Proposed`), lat
+  32.384–35.175 / lng −82.555 to −78.619 — wholly inside SC. **Gate proof, bidirectional:**
+  `scdot_leaked_outside_sc = 0` cache-wide, and the pre-rollout NC control (28202, Mecklenburg)
+  returned **0** SCDOT records while still serving its own 1,251 Charlotte-sourced sites.
+- **Vocabularies enumerated live, each summing EXACTLY to the layer count (3,958):** `projectact`
+  = Construction 1,892 + Design/Development 1,823 + Pre-Award 243; `projecttyp` = 29
+  self-describing values. 0 unclassified.
+- **No `file_date` — deliberate, not an omission.** `dateofcurr` is the literal string
+  `"Currently Undetermined"`; `con_year`/`row_year` contain `0`. 18 of 192 pre-existing entries
+  already omit it, incl. four other state DOTs.
+- 🆕 **THIRD CONSECUTIVE STATE WHERE THE SERVER PATH WAS THE BLOCKER, NOT THE ORG.** SCDOT lives at
+  `gis.scdot.org/hosting/rest/services/`, not `/arcgis/`; both host guesses 404'd and the real
+  server was recovered by walking a live web map's `operationalLayers` (the Frisco pattern).
+  INDOT was `/ro/`, MoDOT's hosts were DNS-dead. **Walk a web map before writing off a DOT.**
+- 🆕 **STANDING ANSWER — a column named `status*` is not necessarily a status.**
+  `PavementList2027_commission` (429 rows) has `status1` = `""` ×426 and
+  `"Event Located.  Event distance is out of range and has been truncated."` ×3 — an LRS
+  geocoding diagnostic. Rejected. Also rejected with counts: `Announced_Projects_Job_Numbers`
+  (517, economic-development announcements, not roads), `AllProjects`/`existingprojects` (68,
+  interstate-only), `2014_Present_InterstateProjects` (17), `ProjectTracking` (0 rows).
+- 📌 **OPEN FOLLOW-UP — `Project_Viewer_Points` (layer 0, 960 rows, identical schema) deliberately
+  NOT wired.** Prove `projectid` disjointness from Lines first; wiring both without that check is
+  the Houston-plat double-emit class, where one real project is counted twice on every page.
+- ⚠️ **21 of 192 SC ZIPs did not land, and the cause is the FRS ceiling, not SCDOT.** When FRS
+  returns `facilities: 0`, `dev_refresh_collect`'s facilities guard refuses the WHOLE response and
+  discards the real SCDOT records with it. Measured directly: a 35-ZIP batch produced 59 SC
+  responses, **all 59 with development > 0 (4,045 records), 12 refused by that guard**; batches of
+  25 held ~80-92%. They stay on the `refreshed_at` cursor and the hourly cron sweeps them.
+- ⚠️ **METHOD ERROR TO NOT REPEAT — never call `dev_refresh_collect()` and count in the SAME
+  statement.** The scalar subquery reads the pre-collect snapshot, so every batch reported one
+  behind and looked like a stall. Measure in a separate statement.
+- ⚠️ **AND: a background `sleep` does NOT block the next tool call.** Polling straight through
+  five of them produced a fabricated "15 minutes elapsed, CI is hung" reading when the DB clock
+  said 1m53s. **Read the clock before calling anything hung** — third occurrence this session.
+
 ### 2026-08-13 — DENVER 80249 WAS DELETED BY SOMETHING OTHER THAN CLAUDE. RULING REVERTED TO 12,722.
 
 **The count is 12,722 again and Rule #0b is restored verbatim** (ingest repo; the brief 12,723
