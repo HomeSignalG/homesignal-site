@@ -53,6 +53,23 @@ async function rest(path, extraHeaders = {}) {
   return res;
 }
 
+// RPC MUST go over POST. PostgREST serves GET /rpc/… inside a READ-ONLY transaction, and the
+// guard self-test works by attempting INSERTs (each in a subtransaction it always aborts) —
+// under GET every one of them dies with "cannot execute INSERT in a read-only transaction"
+// before the guard is ever consulted. That is how this shipped, and the first live run caught
+// it: the three REJECT cases went red, and the ALLOW case went GREEN on the same error,
+// because it inferred "allowed" from "not blocked". POST here, affirmative pass signals in
+// the function.
+async function rpc(fn) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: { ...HEAD, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (!res.ok) throw new Error(`Supabase rpc failed (${fn}): ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
 // The exact row count, straight from PostgREST's Content-Range. This is the CONTROL for the
 // paginated read below: without it, a keyset page that stops early is indistinguishable from
 // a table that really is that size. That is not hypothetical here — a keyset page once
@@ -146,11 +163,18 @@ async function main() {
   }
 
   // 5 — the guard proves itself, including its own positive control.
-  const selftest = await (await rest('rpc/canonical_zip_guard_selftest', { Prefer: 'return=representation' })).json();
-  check(Array.isArray(selftest) && selftest.length > 0, 'guard self-test returned cases');
+  const selftest = await rpc('canonical_zip_guard_selftest');
+  check(Array.isArray(selftest) && selftest.length >= 5,
+    `guard self-test returned ${Array.isArray(selftest) ? selftest.length : 0} cases (expected >= 5)`);
   for (const c of (selftest || [])) {
     check(c.passed === true, `guard self-test [${c.case_name}] expected ${c.expected}: ${c.detail}`);
   }
+  // An INCONCLUSIVE result is not a pass and not an ordinary failure — it means the test
+  // could not run at all, which must never be reported as "the guard is fine". Named
+  // separately so the log says which of the two happened.
+  const inconclusive = (selftest || []).filter((c) => /INCONCLUSIVE/.test(c.detail || ''));
+  check(inconclusive.length === 0,
+    `guard self-test executed (${inconclusive.length} INCONCLUSIVE case(s))`);
 
   for (const m of ok) console.log(`  PASS  ${m}`);
   if (fail.length) {
