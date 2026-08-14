@@ -150,3 +150,45 @@ update public.epa_outage_repair_2026_08 r
 -- rate-limited upstream, and firing 100 at once was measured to saturate the pg_net worker
 -- (queue frozen at 377, no responses for several minutes). The paced cron is the better
 -- instrument; this ledger exists to VERIFY it, not to replace it.
+
+-- ══════════════════════════════════════════════════════════════════════════════════════════════
+-- SECOND PASS, 2026-08-14 — two findings that change how this repair must be run
+--
+-- Progress: repaired 66 -> 119 of 515. 1,666 EPA facilities recovered. 396 remaining.
+-- FALSE ZEROS REMAINING: 0 at every reading.
+--
+-- ── FINDING 1: BATCH SIZE IS THE WHOLE GAME. Use 25, NOT 75+. ────────────────────────────────
+-- Measured back to back, same cohort, same hour:
+--     batch of 75  ->  10 repaired  (13%),  epa ok 17/64,  avg 15.8 FRS attempts per ZIP
+--     batch of 25  ->  19 repaired  (76%)
+--     batch of 25  ->  24 repaired  (96%)
+-- The mechanism was never the problem. `avg_attempts 15.8` against a ladder maximum of 18
+-- (6 radii x 3 tries) means a failing ZIP re-walks almost the ENTIRE back-off ladder, so a
+-- 75-ZIP batch issues ~1,185 FRS requests. That trips EPA's rate limiter, which causes more
+-- failures, which causes more full-ladder retries. The retry logic AMPLIFIES LOAD ~16x exactly
+-- when the source is least able to take it. Small batches stay under the limiter and the same
+-- code then succeeds 96% of the time.
+--   Corollary: a report whose ladder fully exhausts can exceed the 90 s pg_net timeout, so the
+--   request dies in transport and the attempt is spent for nothing (11 of 75 in one batch).
+--
+-- ── FINDING 2: THE ROLLING REFRESH CANNOT REACH THIS COHORT. HEAD-OF-LINE STARVATION. ────────
+-- An earlier note in this repo said the remaining rows "repair themselves" via cron job 14.
+-- THAT WAS WRONG, and 16 hours of production proved it: between 2026-08-13 22:40Z and
+-- 2026-08-14 14:37Z the cohort went 66 -> 66. Measured: of the 449 then-unrepaired rows,
+-- `attempted_since_last_night` = 0. Not one was retried, while cron 14 ran successfully every
+-- 15 minutes throughout and EPA was healthy 6-8 of 8 probes per hour.
+--
+-- Why: `dev_refresh_fire_batch` selects `order by refreshed_at asc nulls first`. **2,143 rows
+-- sit ahead of this cohort and ALL 2,143 still carry a pre-outage `refreshed_at`** — their
+-- writes keep being refused by a guard, and a refused write never advances `refreshed_at`, so
+-- they return to the head of the queue forever. They are re-fired every cooldown, consume the
+-- entire 250-row budget, and permanently starve everything behind them. The queue is not a
+-- queue; it is a treadmill for its first 2,143 entries.
+--
+-- That starvation is ALSO what limits this repair: cron 14's 250 futile fires every 15 minutes
+-- saturate the pg_net worker (observed: queue pinned at 250-377 with zero completions for
+-- minutes) and rate-limit EPA for the repair batches running beside them.
+--
+-- FIXING THE STARVATION IS OUT OF SCOPE HERE and is a gated change — it alters refresh ordering
+-- for all 12,722 pages. Recorded, not actioned. Until it is fixed, this cohort only drains by
+-- running STEP 1 by hand at batch size 25, ideally when the queue is near-empty.
