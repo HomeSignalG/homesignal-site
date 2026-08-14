@@ -74,6 +74,17 @@ export const SURFACES = {
     tables: ['app_community_meta'],
     capped: true,
   },
+  'verify-zip-universe': {
+    surface: 'n/a — data only (which ZIP pages are allowed to EXIST, not what any page renders)',
+    tables: ['canonical_zip_registry', 'communities', 'app_community_meta', 'development_reports'],
+    capped: false,
+    note: 'Set-equality only: every surface must equal the approved Gold Master registry exactly. '
+        + 'It reads BOTH layers on purpose — the 2026-08-11 drift (Denver 80249) appeared in '
+        + 'communities first, then propagated to the capped materializer AND the uncapped map '
+        + 'cache, so checking one would have missed it in the window that mattered. It says '
+        + 'NOTHING about what any page renders — a ZIP can be correctly present here and still '
+        + 'render badly; that is verify-communities / verify-development territory.',
+  },
   'verify-alerts-page': {
     surface: 'alerts.html',
     tables: ['app_changes', 'alerts'],

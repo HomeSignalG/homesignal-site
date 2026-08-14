@@ -285,7 +285,57 @@ below turned up a second entry that was not a state at all.
       tried to violate is not evidence of anything, so each was re-run as a bare statement):
       `'Colorado'` → **23514 REJECTED** · `NULL` → **23514 REJECTED** · `'co'` → **23514
       REJECTED** · `'CO'` → **ACCEPTED**. Row restored to `CO`, 13,293 / 13,293 conforming.
-- ✅ **RULED 2026-08-13 — FOUNDER SAID KEEP IT. The fixed count is now 12,723.** Rule #0b in
+- ⚖️ **SUPERSEDED LATER THE SAME DAY — 80249 IS REMOVED AND THE COUNT IS 12,722.** The
+  founder issued a later ruling that reverses the "keep it" decision recorded below. Verbatim
+  scope: *"Resolve ZIP 80249 as an unauthorized production-registry drift. Do not add it to
+  the Gold Master simply because the production row exists… The Gold Master registry is the
+  source of truth for which ZIP pages exist. Production must not create or expand the ZIP
+  universe independently."* **Quote 12,722, not 12,723.** The block below is kept for the
+  record; its measurements were right and its conclusion was overruled.
+  - **What the earlier pass got wrong is the ORDER OF AUTHORITY, not the arithmetic.** Both
+    passes measured the same thing correctly. The first concluded the *number* should follow
+    production; the founder ruled the opposite — the *registry* is authoritative and production
+    conforms to it. **A page appearing in the DB is never evidence that it should exist.** That
+    inversion is the whole lesson, and it is why "12,722 is a founder RULING, not a statistic"
+    (recorded below) pointed the right way and was then not followed.
+  - **Root cause, traced to the statement — do not re-investigate.** The DB carries no actor,
+    so the earlier pass recorded the origin as "UNVERIFIED and not knowable from here." It is
+    knowable: `supabase_migrations.schema_migrations` version **`20260811133957`**
+    (`evidence_phase6_evidence_only_zip_routing`) contains a hardcoded
+    `insert into public.communities … 'Denver (80249)' … 'denver-80249-co'`, applied at
+    **13:39:57** — the row's `created_at` to the second. Forensic corroboration: it is a
+    singleton insert alone on its day (every other creation event is a batch of 18–11,791),
+    and it carries the **county `-co` slug convention on a zip-level row** while all 25 sibling
+    Denver ZIP pages use `denver-802xx` from one 2026-07-04 batch.
+  - **`fix_denver_80249_state_code` is what PUBLISHED it.** The state typo was not an unrelated
+    defect — it was the only thing keeping the drift row out of the CO coverage gates.
+    Normalising it to `CO` at 17:50:41 let the materializer publish the page (`indexable=true`,
+    17:51:51) and the maps cache fill it (239 sites, 17:51:19). Fixing a symptom on the
+    assumption the row was legitimate is what turned an inert row into a live indexable page.
+  - **Removed 2026-08-13** from `communities`, `app_community_meta` and `development_reports`,
+    with all three rows archived first into `public.registry_drift_audit`. Dependents were ZERO
+    before removal (subscriptions, alerts, meetings, children, email_events, projects,
+    self_reports, social_posts, users); `sitemap.xml` never contained it.
+  - **Diff proven by fingerprint, not assumption:** production was Gold Master ∪ {80249}
+    exactly — md5(GM)=`af48c604…` (12,722), md5(GM+80249)=`d8416a1e…`, which equalled all three
+    surfaces. After removal all four sets (registry + three surfaces) are 12,722 / `af48c604…`
+    with 0 production-only and 0 registry-only ZIPs.
+  - 🔒 **The hole is closed in the DATABASE** — see `docs/canonical-zip-registry-guard.sql`.
+    The drift arrived through a MIGRATION, so a guard in site JS, an edge function or a seed
+    script could never have caught it; the DB is the only choke point that sees migrations,
+    RPCs, the REST API and manual SQL alike. `public.canonical_zip_registry` (seeded only when
+    the live set matches the Gold Master md5) + `enforce_canonical_zip()` triggers on all three
+    surfaces, **failing closed** — an empty registry rejects every ZIP rather than allowing
+    every ZIP. The guard covers **every level's `zip_codes`**, not just `level='zip'`, because
+    `?zip=` resolves via `zip_codes @> [zip]`, so a ZIP in a county row's array is routable with
+    no ZIP page at all. Regression test `public.canonical_zip_guard_selftest()` +
+    `scripts/verify-zip-universe.mjs` (daily CI).
+  - ⚠️ **The "add pages through the per-state seed path" lesson below is necessary but NOT
+    sufficient** — it would have produced a well-formed row with a valid state code and a cached
+    report, and the universe would still have grown by one, silently. The registry check is the
+    part that actually binds.
+- ~~✅ **RULED 2026-08-13 — FOUNDER SAID KEEP IT. The fixed count is now 12,723.**~~ **(REVERSED
+  — see the superseding ruling directly above.)** Rule #0b in
   `homesignal-ingest/CLAUDE.md` was amended in the same session: the old line is struck through,
   the new count recorded, the 80249 exception named, and the "count is FIXED / pages are not
   created" half explicitly retained. **The DATED measurements elsewhere in that file
