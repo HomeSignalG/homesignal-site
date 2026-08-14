@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>HomeSignal — Property Card</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com https://cdn.jsdelivr.net; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://*.tile.openstreetmap.org https://cdn.jsdelivr.net; form-action 'self'">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+  /* ── PROPERTY CARD (page-scoped; app.css untouched) ────────────────────────────
+     The full card a resident reaches from the Maps slide-in. Two columns: the
+     information sections on the left, the parcel/activity rail on the right, one
+     tab strip over both. Every card states the research state of its own source,
+     so the layout has to give that badge a permanent, predictable place. */
+  .pcpage{max-width:1560px}
+
+  /* ── THE CONTEXT RAIL (0004's left column) ──────────────────────────────────────
+     The map stays visible beside the record, so a resident never loses where the
+     property is while reading what is on it. It lives HERE rather than inside
+     maps.html: putting the card into the map page would change the one-panel
+     slide-over invariant that scripts/verify-maps-live.mjs asserts on production. */
+  .pcshell{display:grid;grid-template-columns:minmax(260px,26%) minmax(0,1fr);gap:16px;align-items:start}
+  .pcrail{position:sticky;top:16px;display:flex;flex-direction:column;gap:12px}
+  .pcmapwrap{position:relative;border:1px solid var(--line);border-radius:14px;overflow:hidden;
+    background:#e4eadd;box-shadow:var(--shadow-sm)}
+  #pcMap{width:100%;height:300px}
+  .pcmehere{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;
+    background:rgba(255,255,255,.92);box-shadow:0 0 0 2px var(--green),0 2px 6px rgba(16,33,28,.35)}
+  .pcmapnote{position:absolute;left:10px;bottom:10px;z-index:2;background:rgba(255,255,255,.94);
+    border:1px solid var(--line);border-radius:8px;padding:5px 9px;font-size:10.5px;color:var(--ink-2)}
+  .pcwhere{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:9px 11px;font-size:12.5px;font-weight:600;color:var(--ink)}
+  .pcwhere .pin{color:var(--green)}
+  .pcrailcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:12px 13px;box-shadow:var(--shadow-sm)}
+  .pcrailcard h4{font:700 10.5px/1.3 var(--font);letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-3);margin:0 0 8px}
+  .pcrailcard .rn{font-size:13px;font-weight:700;color:var(--ink);line-height:1.3}
+  .pcrailcard .rd{font-size:11.5px;color:var(--ink-2);line-height:1.5;margin-top:4px}
+  .pcrailcard .rrow{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;
+    padding:5px 0;border-top:1px solid var(--line-2);color:var(--ink-2)}
+  .pcrailcard .rrow b{color:var(--ink);font-weight:600;text-align:right}
+  .pcrailcard .btn{width:100%;margin-top:10px;justify-content:center}
+  @media(max-width:1040px){
+    /* At narrow widths the map does NOT survive as a thin column — it goes full width above
+       the record, and the record takes the whole page (0004's mobile rule). */
+    .pcshell{grid-template-columns:minmax(0,1fr)}
+    .pcrail{position:static;flex-direction:column}
+    #pcMap{height:220px}
+  }
+
+  /* state colours — ONE definition, consumed by badges, dots and the donut */
+  .pcpage{
+    --pct-verified:var(--green-2); --pct-reported:var(--green);
+    --pct-checked-empty:#8cc2a4; --pct-conflicting:var(--violet);
+    --pct-unresolved:#9b8fd0; --pct-partial:var(--amber);
+    --pct-in-progress:var(--blue); --pct-not-checked:#b6c1ba;
+    --pct-unavailable:#d98324; --pct-access-restricted:var(--red);
+  }
+
+  /* ── header ── */
+  .pchead{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:18px 20px 0;box-shadow:var(--shadow-sm);margin-bottom:16px}
+  .pcback{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;
+    color:var(--ink-2);text-decoration:none;margin-bottom:12px}
+  .pcback:hover{color:var(--green)}
+  .pctitle{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .pctitle h1{font-size:26px;letter-spacing:-.02em;margin:0}
+  .pcbadge{display:inline-flex;align-items:center;font:700 10px/1 var(--font);letter-spacing:.09em;
+    text-transform:uppercase;color:var(--green);background:var(--green-tint);border:1px solid #cbe7d5;
+    border-radius:6px;padding:6px 9px;margin-top:6px}
+  .pctitle .sp{flex:1}
+  .pcacts{display:flex;align-items:center;gap:8px}
+  .pcsub{font-size:14px;color:var(--ink-2);margin:5px 0 0}
+  .pcblank{font-size:12.5px;line-height:1.55;color:var(--ink-2);margin:12px 0 0;padding:9px 12px;
+    background:#f7f9f7;border:1px solid var(--line);border-radius:10px}
+  .pcmeta{display:flex;flex-wrap:wrap;gap:8px;margin:13px 0 0}
+  .pcchip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);
+    background:#f7f9f7;border:1px solid var(--line);border-radius:999px;padding:5px 11px}
+  .pcchip b{color:var(--ink);font-weight:600}
+  .pcchip.flag{background:var(--green-tint);border-color:#cbe7d5;color:var(--green)}
+  .pcchip.none{color:var(--ink-3)}
+
+  /* ── tab strip ── */
+  .pctabs{display:flex;gap:2px;overflow-x:auto;margin:16px -20px 0;padding:0 20px;
+    border-top:1px solid var(--line-2)}
+  .pctabs button{background:none;border:none;border-bottom:2px solid transparent;
+    padding:12px 12px 11px;font:600 13px/1 var(--font);color:var(--ink-2);white-space:nowrap}
+  .pctabs button:hover{color:var(--ink)}
+  .pctabs button[aria-selected="true"]{color:var(--green);border-bottom-color:var(--green)}
+  .pctabs button:focus-visible{outline:2px solid var(--green);outline-offset:-2px;border-radius:6px}
+
+  /* ── body grid ── */
+  .pcbody{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+  .pcmain{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+  .pcmain > .pcsec.wide{grid-column:1 / -1}
+  .pcrail{display:flex;flex-direction:column;gap:14px}
+  @media(max-width:1100px){ .pcbody{grid-template-columns:minmax(0,1fr)} }
+  @media(max-width:820px){ .pcmain{grid-template-columns:minmax(0,1fr)} }
+
+  /* ── one section card ── */
+  .pcsec{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:15px 17px 16px;box-shadow:var(--shadow-sm)}
+  .pcsec[hidden]{display:none}
+  .pcsh{display:flex;align-items:center;gap:9px 10px;flex-wrap:wrap;margin-bottom:12px}
+  .pcsh h2{font:700 11.5px/1.3 var(--font);letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-3);margin:0}
+  .pcsh .sp{flex:1}
+  .pcinfo{border:none;background:none;padding:0 0 0 2px;color:var(--ink-3);font-size:12px;line-height:1}
+  .pcinfo:hover{color:var(--green)}
+  .pcinfo:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:4px}
+  .pcsh a{font-size:12px;font-weight:600;color:var(--green);text-decoration:none;white-space:nowrap}
+  .pcsh a:hover{text-decoration:underline}
+  .pcsec p{font-size:12.5px;line-height:1.55;color:var(--ink-2);margin:0}
+  .pcsec p + p{margin-top:8px}
+
+  /* ── state badge ── */
+  .pcst{display:inline-flex;align-items:center;gap:5px;font:700 9.5px/1.25 var(--font);
+    letter-spacing:.06em;text-transform:uppercase;border-radius:5px;padding:4px 7px;
+    border:1px solid transparent;white-space:normal;max-width:100%;overflow-wrap:break-word}
+  .pcsrc .pcst{font-size:9px;padding:3px 6px}
+  .pcst::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+  .pcst.t-ok{color:var(--green);background:var(--green-tint);border-color:#cbe7d5}
+  .pcst.t-clear{color:#4e8c6c;background:#f1f8f4;border-color:#d8ebe0}
+  .pcst.t-partial{color:var(--amber);background:var(--amber-tint);border-color:#f0dcbd}
+  .pcst.t-work{color:var(--blue);background:var(--blue-tint);border-color:#cfe2ef}
+  .pcst.t-none{color:#77857d;background:#f4f6f4;border-color:var(--line)}
+  .pcst.t-down{color:#a9631a;background:#fdf2e4;border-color:#f0dcbd}
+  .pcst.t-blocked{color:var(--red);background:var(--red-tint);border-color:#f2d3d0}
+  .pcst.t-flag{color:var(--violet);background:#f0eefa;border-color:#dcd6f2}
+
+  /* ── the per-source track-record grid ── */
+  /* FIVE AGENCIES, ONE ROW — the approved design puts EPA/ECHO, TCEQ, OSHA, SEC and State/Local
+     side by side. An auto-fit grid wrapped the fifth onto a line of its own, which reads as two
+     groups and implies a distinction the design does not make. Fixed five columns; it collapses
+     deliberately only when there is genuinely no room. */
+  /* EIGHT agencies now (SEC · EPA · OSHA · FinCEN · DOJ · OFAC · state environmental ·
+     state/local), so a single row is no longer possible. Four across is the compromise: an even
+     4x2 block per entity, never the ragged 5+3 that reads as two groups and implies a
+     distinction between the agencies that does not exist. */
+  .pcsrcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px}
+  @media(max-width:1180px){ .pcsrcs{grid-template-columns:repeat(3,minmax(0,1fr))} }
+  @media(max-width:760px){ .pcsrcs{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @media(max-width:460px){ .pcsrcs{grid-template-columns:minmax(0,1fr)} }
+
+  /* entity groups inside Entity Track Record */
+  .pceGroup + .pceGroup{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+  .pceHead{margin-bottom:10px}
+  .pceHead h3{font-size:15px;letter-spacing:-.01em;margin:0 0 4px}
+  .pceMeta{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}
+  .pcerole{font:700 9.5px/1 var(--font);letter-spacing:.07em;text-transform:uppercase;
+    color:var(--green);background:var(--green-tint);border:1px solid #cbe7d5;border-radius:5px;padding:4px 7px}
+  .pceRel{font-size:11.5px;color:var(--ink-2)}
+  .pceRel b{color:var(--ink);font-weight:600}
+  .pcunchecked{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:9px;
+    padding:9px 11px;background:#f7f9f7;border:1px solid var(--line);border-radius:10px;
+    font-size:11.5px;color:var(--ink-2);line-height:1.5}
+  .pcsrc{border:1px solid var(--line);border-radius:11px;padding:10px 11px;background:#fcfdfc;min-width:0}
+  .pcsrc .sn{font-size:12px;font-weight:700;color:var(--ink);line-height:1.3;word-break:break-word}
+  .pcsrc .sb{margin-top:7px}
+  /* Metrics are COLUMNS, as the design draws them: a small wrapping label over its value, one
+     column per metric the source actually has (2 for SEC and State/Local, 3 elsewhere). */
+  /* METRICS AS LABEL→VALUE ROWS, inside a five-across agency grid.
+     The mockup draws these as three columns, and at five agencies in one row that is not
+     implementable: the column is 39px and the word "Enforcement" needs 54px, so columns either
+     collide or get shredded into "Violatio/ns". Rows give every label the full card width, keep
+     every word intact, and adapt to the 2- and 3-metric sources without padding. The founder's
+     instruction was one row of agencies; this preserves that and the vocabulary. */
+  .pcmetrics{display:flex;flex-direction:column;margin-top:8px;padding-top:7px;border-top:1px solid var(--line-2)}
+  .pcmetric{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:2.5px 0;min-width:0}
+  .pcmetric .ml{font-size:9.5px;line-height:1.3;color:var(--ink-3);font-weight:500;
+    overflow-wrap:normal;word-break:normal;hyphens:none;min-width:0}
+  .pcmetric .mv{font-size:13px;font-weight:700;letter-spacing:-.01em;color:var(--ink);flex:none}
+  .pcmetric .mv.na{color:var(--ink-3);font-weight:600}
+  .pcrecent{font-size:10.5px;color:var(--ink-3);margin-top:9px;padding-top:8px;border-top:1px solid var(--line-2)}
+  .pcrecent b{color:var(--ink-2);font-weight:600}
+  .pcsrc .sd{font-size:11.5px;line-height:1.5;color:var(--ink-2);margin-top:9px}
+
+  /* ── fact rows ── */
+  .pcrows{display:flex;flex-direction:column}
+  .pcrow{display:flex;gap:12px;justify-content:space-between;align-items:baseline;
+    font-size:12.5px;padding:7px 0;border-bottom:1px solid var(--line-2)}
+  .pcrow:last-child{border-bottom:none}
+  .pcrow > span{color:var(--ink-2);flex:none;max-width:56%}
+  .pcrow > b{font-weight:600;color:var(--ink);text-align:right;min-width:0;word-break:break-word}
+  .pcrow > b.na{color:var(--ink-3);font-weight:500}
+  .pcprov{font-size:10.5px;color:var(--ink-3);margin-top:2px;line-height:1.45}
+  .pcprov a{color:var(--green)}
+  /* Links inside modules inherit the card's own affordance, not the browser default. The record
+     links were rendering blue-and-underlined, which read as foreign to the card and competed with
+     the green used for every other action on the page. */
+  .pcsec a{color:var(--green);text-decoration:none;border-bottom:1px solid rgba(21,122,73,.28)}
+  .pcsec a:hover{border-bottom-color:var(--green)}
+  .pcsec a:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:3px}
+  .pcrow > b a{white-space:nowrap}
+
+  /* ── explainer / note blocks ── */
+  .pcnote{display:flex;gap:9px;background:#f7f9f7;border:1px solid var(--line);border-radius:11px;
+    padding:11px 12px;margin-top:12px}
+  .pcnote .ni{color:var(--blue);font-size:13px;line-height:1.3;flex:none}
+  .pcnote p{font-size:11.5px;line-height:1.55;color:var(--ink-2);margin:0}
+  .pcnote p b{color:var(--ink)}
+
+  /* ── record list ── */
+  .pcrec{display:flex;gap:11px;padding:10px 0;border-bottom:1px solid var(--line-2)}
+  .pcrec:last-child{border-bottom:none}
+  .pcrec .rd{font-size:11px;color:var(--ink-3);width:74px;flex:none;line-height:1.5}
+  .pcrec .rt{font-size:12.5px;font-weight:600;color:var(--ink);line-height:1.4}
+  .pcrec .rs{font-size:11.5px;color:var(--ink-2);margin-top:2px;line-height:1.5}
+  .pcrec a{color:var(--green)}
+
+  /* ── completeness ── */
+  .pccomp{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .pcdonut{flex:none}
+  .pcdn{font:700 20px/1 var(--font);fill:var(--ink)}
+  .pcdl{font:600 10px/1 var(--font);fill:var(--ink-3);letter-spacing:.04em;text-transform:uppercase}
+  .pclegend{flex:1;min-width:180px;display:flex;flex-direction:column;gap:5px}
+  .pcbasis{font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:4px}
+  .pclrow{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ink-2)}
+  .pclrow i{width:9px;height:9px;border-radius:50%;flex:none}
+  .pclrow b{margin-left:auto;color:var(--ink);font-weight:700}
+
+  /* ── footer ── */
+  .pcfoot{display:flex;gap:9px;align-items:flex-start;margin:18px 0 0;padding:13px 15px;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px}
+  .pcfoot p{font-size:11.5px;line-height:1.6;color:var(--ink-2);margin:0}
+  .pcfoot .fi{color:var(--ink-3);flex:none}
+
+  /* ── empty / error ── */
+  .pcempty{background:var(--panel);border:1px dashed var(--line);border-radius:14px;
+    padding:26px 22px;text-align:center}
+  .pcempty .et{font-size:15px;font-weight:700;margin-bottom:7px}
+  .pcempty p{font-size:13px;color:var(--ink-2);line-height:1.6;margin:0 auto;max-width:520px}
+  .pcform{display:flex;gap:8px;justify-content:center;margin-top:15px;flex-wrap:wrap}
+  .pcform input{border:1px solid var(--line);background:#f7f9f7;border-radius:9px;
+    padding:9px 13px;font-size:13px;color:var(--ink);min-width:min(340px,80vw)}
+
+  .skl{height:11px;border-radius:6px;background:linear-gradient(90deg,var(--line-2) 25%,#f7f9f7 45%,var(--line-2) 65%);
+    background-size:200% 100%;animation:hsShimmer 1.3s linear infinite;margin-bottom:9px}
+  .skl.w40{width:40%} .skl.w70{width:70%} .skl.hd{height:16px;width:46%;margin:2px 0 16px}
+  @keyframes hsShimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+  @media(prefers-reduced-motion:reduce){ .skl{animation:none} }
+</style>
+</head>
+<body data-nav="maps">
+<template id="hs-content">
+  <div class="page pcpage" id="pcPage">
+    <div class="skl hd"></div>
+    <div class="pcsec"><div class="skl w40"></div><div class="skl"></div><div class="skl w70"></div></div>
+  </div>
+</template>
+
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="lib/data.js"></script>
+<script src="lib/topic-prefs.js"></script>
+<script src="lib/templates.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="lib/map.js?v=20260720b"></script>
+<script src="lib/property-card.js"></script>
+<script src="shell.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════════════════════════════
+// THE FULL PROPERTY CARD — one dynamic page, many properties, keyed by the ENGINE'S
+// canonical address string (?addr=…), the same key homesignalmap.html?addr= and
+// property_reports already use. Reached from the Maps slide-in's top link.
+//
+// WHAT THIS PAGE IS FOR. A resident asking "what is on record at this address?" gets one
+// answer per source, and each answer says which of these it is: we looked and found records ·
+// we looked and found none · we have not looked · we tried and the source failed · the source
+// refuses access. Those five are different facts. The whole layout exists to keep them
+// visibly different, which is why every card carries a state badge and why counts route
+// through HS.card.metricText — the one function allowed to print a number.
+//
+// THE INVARIANTS (all enforced by test/property-card.test.mjs):
+//   1. NOTHING IS INVENTED. Every rendered value comes off the cached engine row. A field
+//      the row does not state renders as "Not checked", never as a default, a zero, or a dash
+//      standing in for "fine".
+//   2. A SOURCE WE HAVE NOT QUERIED NEVER RENDERS A COUNT. Not 0, not "none" — the em-dash
+//      plus "Not checked". A zero next to an unread source reads as "clean", which is exactly
+//      the defect PR #662 repaired on the ZIP page.
+//   3. OWNER OF RECORD AND OWNER AS FILED ARE SEPARATE LINES. A permit's "property owner"
+//      field is what an applicant wrote on a filing; the owner of record comes from the county
+//      appraisal district. No adapter reads the appraisal district today, so that line says so
+//      rather than borrowing the filed value (docs/multi-source-evidence-architecture.md
+//      Part 25 — this is the specific confusion the card is built not to repeat).
+//   4. NO SCORE. The completeness donut counts sources by research state. It is not weighted,
+//      has no percentage headline, and the footer says plainly that it is not a rating.
+// ══════════════════════════════════════════════════════════════════════════════════
+HS.onReady(async function () {
+  var qs = new URLSearchParams(location.search);
+  var C = HS.card, page = document.getElementById('pcPage');
+  var esc = HS.esc;
+  if (qs.get('place')) HS.selectProperty(qs.get('place'));
+  var S = HS.state;
+  var zip = qs.get('zip');
+  if (!zip || !/^\d{5}$/.test(zip)) zip = S.zip;
+  var recId = qs.get('id');
+  var addr = (qs.get('addr') || '').trim();
+
+  // ── identity resolution ───────────────────────────────────────────────────────
+  // Preferred: the caller already knows the canonical address. Fallback: the caller knows
+  // WHICH RECORD was clicked, so resolve the address from the engine's own cached site for
+  // that record (lib/data.js::canonicalAddrFor). Neither path guesses: an unresolved parcel
+  // renders as an unresolved parcel.
+  var rec = null, row = null, loadFailed = false;
+  // Local-override hook for offline RENDER TESTS only — the same mechanism, and the same hard
+  // localhost gate, that homesignalmap.html's property page already uses. It exists because the
+  // states this card is built to distinguish (records found · checked and empty · source
+  // unavailable) cannot all be exercised from one cached row, and a card whose honest-state
+  // rendering is never seen is a card whose honest-state rendering is never checked. Gated so no
+  // deployed flow can render injected data: production always reads the live cache.
+  var isLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  if (isLocal && window.__HS_CARD_OVERRIDE) {
+    row = window.__HS_CARD_OVERRIDE;
+    addr = row.address || addr;
+    render(row, addr);
+    return;
+  }
+  try {
+    if (!addr && recId) {
+      var projects = await HS.data.projects(zip);
+      var facilities = await HS.data.facilities(zip);
+      rec = HS.data.project(recId, projects) || HS.data.project(recId, facilities);
+      addr = (await HS.data.canonicalAddrFor(zip, rec)) || '';
+    }
+    if (addr) row = await HS.data.propertyReport(addr);
+  } catch (e) {
+    console.warn('[property-card] load failed', e);
+    loadFailed = true;
+  }
+
+  if (loadFailed) { renderProblem('The property record can’t be loaded right now.',
+    'This is a read failure on our side, not a statement about the property. Nothing about this '
+    + 'address should be inferred from it. Reload to try again.'); return; }
+  if (!addr) { renderUnresolved(); return; }
+
+  render(row, addr);
+
+  // ══ RENDER ════════════════════════════════════════════════════════════════════
+  function render(row, addr) {
+    row = row || {};
+    var recs = (row.sites || []).filter(function (s) { return s && (s.record_url || s.url); });
+    var filings = recs.filter(function (s) { return !!s.project_no; });
+    var federal = recs.filter(function (s) { return !s.project_no; });
+    var parcel = row.parcel || null;                 // present only once an assessor source is wired
+    var checked = checkedIndex(row.sources_checked);
+    var sources = buildSources(row, recs, filings, federal, checked);
+    var byId = {}; sources.forEach(function (s) { byId[s.id] = s; });
+
+    document.title = addr + ' — property card — HomeSignal';
+
+    var html = headHTML(row, addr, recs, filings, parcel)
+      + '<div class="pcshell"><aside class="pcrail" id="pcRail"></aside><div class="pccard">'
+      + '<div class="pcbody"><div class="pcmain">'
+      + entityTrackHTML(row, byId, recs)
+      + hazardsHTML(byId, row)
+      + meetingsHTML(byId, row, zip)
+      + sustainabilityHTML(byId)
+      + instrumentsHTML(byId, row)
+      + regulatoryHTML(byId, recs)
+      + facilitiesHTML(byId, federal)
+      + sourcesHTML(sources)
+      + completenessHTML(sources)
+      + '</div><div class="pcrail">'
+      + ownershipHTML(byId, row, parcel, filings, addr)
+      + developmentHTML(byId, filings, row, addr)
+      + '</div></div>'
+      + footHTML(row)
+      + '</div></div>';
+    page.innerHTML = html;
+    renderRail(row, addr);
+    wire(row, addr, recs);
+  }
+
+  // ── header ────────────────────────────────────────────────────────────────────
+  function headHTML(row, addr, recs, filings, parcel) {
+    var place = [row.county ? row.county + ' County' : '', row.state, row.zip].filter(Boolean).join(' · ');
+    var locLine = (row.zip || row.state || row.county)
+      ? place
+      : 'Location details are not on the cached record for this address.';
+    // Parcel identifiers come from a county appraisal district. None is wired, so the chips
+    // say "not checked" instead of borrowing an identifier off a permit filing.
+    var chips = [];
+    if (parcel && parcel.acreage != null) chips.push(chip('Acreage', parcel.acreage + ' acres'));
+    if (parcel && parcel.property_id) chips.push(chip('Property ID', parcel.property_id));
+    if (parcel && parcel.geographic_id) chips.push(chip('Geographic ID', parcel.geographic_id));
+    if (!chips.length) chips.push('<span class="pcchip none">Parcel identifiers — not checked</span>');
+    if (parcel && parcel.property_class) chips.push(chip('Property class', parcel.property_class));
+    // DERIVED, not a source field: a boolean over whether any development filing exists. The pilot
+    // can render this today, which makes it the one header chip that is not "not checked".
+    if (filings.length) {
+      chips.push('<span class="pcchip flag">Development activity detected</span>');
+      chips.push('<span class="pcchip">' + filings.length + ' filing'
+        + (filings.length === 1 ? '' : 's') + ' on record</span>');
+    }
+    if (row.refreshed_at) {
+      chips.push('<span class="pcchip">Record read <b>'
+        + esc(HS.fmtDate(row.refreshed_at, { year: 'numeric', month: 'short', day: 'numeric' })) + '</b></span>');
+    }
+    return '<div class="pchead">'
+      + '<a class="pcback" href="' + esc(HS.pageHref('maps.html', { zip: zip, id: recId || null })) + '">← Back to the map</a>'
+      + '<div class="pctitle"><h1>' + esc(addr) + '</h1>'
+      + '<span class="pcbadge">Property card</span><span class="sp"></span>'
+      + '<div class="pcacts">'
+      // No "View on map" here. It resolved to the SAME url as "← Back to the map" above, so it was
+      // duplicate navigation dressed as a second action — and under the design's persistent map
+      // rail it is redundant a second way, since the map is already on screen. If that layout
+      // lands, the rail should centre itself on the open parcel rather than earn back a button.
+      + '<button class="btn primary" id="pcSave" type="button">Save property</button>'
+      + '<button class="btn" id="pcExport" type="button">Export</button>'
+      + '</div></div>'
+      + '<p class="pcsub">' + esc(locLine) + '</p>'
+      + '<div class="pcmeta">' + chips.join('') + '</div>'
+      // Said ONCE, near the top. Most sections on this card are blank, and twelve separate
+      // apologies read worse than one honest line — without it a mostly-empty card looks broken
+      // rather than candid, which is the misreading the whole design is built to prevent.
+      + '<p class="pcblank">' + esc(C.COPY.page[0]) + '</p>'
+      + tabsHTML() + '</div>';
+  }
+  function chip(label, value) {
+    return '<span class="pcchip">' + esc(label) + ' <b>' + esc(value) + '</b></span>';
+  }
+  function tabsHTML() {
+    return '<div class="pctabs" id="pcTabs" role="tablist" aria-label="Property card sections">'
+      + C.TABS.map(function (t, i) {
+          return '<button role="tab" data-tab="' + esc(t.id) + '" id="pctab-' + esc(t.id) + '"'
+            + ' aria-selected="' + (i === 0 ? 'true' : 'false') + '">' + esc(t.label) + '</button>';
+        }).join('') + '</div>';
+  }
+
+  // ── section shell ─────────────────────────────────────────────────────────────
+  // Every section is looked up in HS.card.SECTIONS, so a section cannot exist here under a
+  // title or tab the declared structure (and the tests) don't know about.
+  function sec(id, opts, body) {
+    var d = C.SECTIONS.filter(function (s) { return s.id === id; })[0];
+    if (!d) { console.warn('[property-card] undeclared section', id); return ''; }
+    opts = opts || {};
+    return '<section class="pcsec' + (opts.wide ? ' wide' : '') + '" data-sec="' + esc(id) + '"'
+      + ' data-tab="' + esc(d.tab) + '" aria-labelledby="pch-' + esc(id) + '">'
+      + '<div class="pcsh"><h2 id="pch-' + esc(id) + '">' + esc(d.title) + '</h2>'
+      + (opts.info ? '<button class="pcinfo" type="button" aria-label="' + esc(opts.info)
+          + '" title="' + esc(opts.info) + '">\u24D8</button>' : '')
+      + '<span class="sp"></span>'
+      + (opts.state !== undefined ? C.badgeHTML(opts.state, { module: id, short: true }) : '')
+      + (opts.link ? '<a href="' + esc(opts.link.href) + '">' + esc(opts.link.label) + '</a>' : '')
+      + '</div>' + body + '</section>';
+  }
+  function row2(label, value, opts) {
+    opts = opts || {};
+    var na = value == null || value === '' || value === C.NO_VALUE;
+    return '<div class="pcrow"><span>' + esc(label) + '</span>'
+      + '<b' + (na ? ' class="na"' : '') + '>' + esc(na ? (opts.absent || 'Not checked') : value) + '</b></div>';
+  }
+  function note(text) {
+    return '<div class="pcnote"><span class="ni" aria-hidden="true">◈</span><p>' + text + '</p></div>';
+  }
+
+  // ── source registry ───────────────────────────────────────────────────────────
+  // The sources this card reports on. Each row's STATE is derived below from the cached
+  // engine row only — never from a default. An entry whose adapter does not exist yet is
+  // `not_checked`, which is the truthful answer and the one the founder's rule requires.
+  function checkedIndex(list) {
+    var idx = {};
+    (list || []).forEach(function (c) {
+      if (c && c.src) idx[String(c.src).toLowerCase()] = c.result || '';
+    });
+    return idx;
+  }
+  function namedChecked(checked, patterns) {
+    var keys = Object.keys(checked);
+    for (var i = 0; i < keys.length; i++) {
+      for (var j = 0; j < patterns.length; j++) if (patterns[j].test(keys[i])) return keys[i];
+    }
+    return null;
+  }
+  function buildSources(row, recs, filings, federal, checked) {
+    var epaRecs = recs.filter(function (s) { return s.env && s.env.epa; });
+    var tceqRecs = recs.filter(function (s) { return s.env && s.env.tceq; });
+    var frsRecs = recs.filter(function (s) { return s.registry_id; });
+    // A source that returned records is `verified` for federal/state registries (they are
+    // registers of record) and `reported` for permit filings (the filing is the evidence,
+    // and its own fields are as-filed values). Present in sources_checked ⇒ we queried it
+    // and it was empty. Neither ⇒ we did not query it.
+    function st(hit, patterns, fallback) {
+      if (hit) return hit;
+      if (namedChecked(checked, patterns)) return 'checked_empty';
+      return fallback || 'not_checked';
+    }
+    return [
+      { id: 'assessor', short: 'County assessor', label: 'County appraisal district / assessor',
+        authority: 'Register of record for parcel identity, acreage and owner of record',
+        state: st(row.parcel ? 'verified' : null, [/appraisal|assessor|tcad|parcel/]),
+        detail: row.parcel ? 'Parcel record read.' : C.say(C.COPY.module.parcelNotRead) },
+      { id: 'recorder', short: 'County recorder', label: 'County recorder / clerk (deeds, liens, easements)',
+        authority: 'Register of record for recorded instruments',
+        state: st((row.instruments || []).length ? 'verified' : null, [/recorder|county clerk|deed/]),
+        detail: (row.instruments || []).length ? (row.instruments || []).length + ' recorded instrument(s) read.'
+          : C.say(C.COPY.module.instrumentsUnavailable) },
+      { id: 'permits', short: 'Permit filings', label: 'State & local permit filings',
+        authority: 'Authoritative filing — values are as filed by the applicant',
+        state: st(filings.length ? 'reported' : null, [/tdlr|tabs|permit|planning/]),
+        count: filings.length,
+        detail: filings.length ? C.say(C.COPY.module.developmentFound, { n: filings.length })
+          : C.say(C.COPY.module.developmentEmpty) },
+      { id: 'epa_frs', short: 'EPA FRS', label: 'EPA Facility Registry Service',
+        authority: 'Federal registry of regulated facilities',
+        state: st(frsRecs.length ? 'verified' : null, [/frs|facility registry/]),
+        count: frsRecs.length,
+        detail: frsRecs.length ? frsRecs.length + ' registered facility record(s) geo-matched near this address.'
+          : C.say(C.COPY.module.facilityNoneHere) },
+      { id: 'epa_echo', short: 'EPA / ECHO', label: 'EPA ECHO compliance & enforcement',
+        authority: 'Federal enforcement record',
+        state: st(epaRecs.length ? 'verified' : null, [/echo|epa/]),
+        detail: epaRecs.length ? 'Compliance summaries were read for ' + epaRecs.length + ' facility record(s).'
+          : C.say(C.COPY.source.not_checked, { X: 'EPA / ECHO' }) },
+      { id: 'state_env', short: 'State environmental', label: 'State environmental regulator (e.g. TCEQ Central Registry)',
+        authority: 'State register of regulated sites',
+        state: st(tceqRecs.length ? 'verified' : null, [/tceq|state environmental|central registry/]),
+        detail: tceqRecs.length ? 'State registry programs were read for ' + tceqRecs.length + ' facility record(s).'
+          : C.say(C.COPY.source.not_checked, { X: 'the state environmental registry' }) },
+      { id: 'osha', short: 'OSHA', label: 'OSHA inspections & violations',
+        authority: 'Federal workplace-safety enforcement record',
+        state: st(null, [/osha/]),
+        detail: C.say(C.COPY.source.not_checked, { X: 'OSHA' }) },
+      { id: 'sec', short: 'SEC', label: 'SEC filings & enforcement',
+        authority: 'Federal securities filings and enforcement matters',
+        state: st(null, [/sec|edgar/]),
+        detail: C.say(C.COPY.source.not_checked, { X: 'the SEC' }) },
+      { id: 'state_local', short: 'State / local', label: 'State & local enforcement records',
+        authority: 'State and local enforcement records, by jurisdiction',
+        state: st(null, [/state.?local|county enforcement/]),
+        detail: C.say(C.COPY.source.not_checked, { X: 'state and local enforcement records' }) },
+      // One label, four perils, FOUR DIFFERENT AGENCIES — and only flood has a chosen source.
+      // FEMA publishes the National Flood Hazard Layer and nothing else here; naming it for
+      // wildfire, heat or severe weather would be fabricated provenance, so the label names the
+      // hazard class rather than borrowing an agency that does not publish it.
+      { id: 'hazards', short: 'Natural hazards', label: 'Flood, wildfire, heat & severe-weather hazard layers',
+        authority: 'Federal and state hazard mapping, per peril (flood: FEMA NFHL; other perils: source not yet selected)',
+        state: st(null, [/fema|flood|wildfire|hazard|heat|severe/]),
+        detail: C.say(C.COPY.module.floodNotRead) },
+      { id: 'meetings', short: 'Meetings & notices', label: 'Public meeting agendas & official notices',
+        authority: 'First-party agendas and notices published by the governing body',
+        state: st((row.related || []).length ? 'verified' : null, [/meeting|agenda|notice|pmn/]),
+        detail: (row.related || []).length
+          ? (row.related || []).length + ' notice or agenda item is cached against this address.'
+          : C.say(C.COPY.module.meetingsNotLinked) },
+      { id: 'sustain', short: 'Sustainability', label: 'Sustainability & ESG disclosures',
+        authority: 'Company-reported disclosures and third-party datasets',
+        state: st((row.sustainability || []).length ? 'reported' : null, [/wikirate|esg|sustainab/]),
+        detail: C.say(C.COPY.module.sustainabilityNone) }
+    ];
+  }
+
+  // ── ENTITY TRACK RECORD ───────────────────────────────────────────────────────
+  // Five sources, each with its own state and its own three counts. The counts are the point
+  // of the section, and every one of them goes through HS.card.metricText, so an unqueried or
+  // failed source shows an em-dash. There is no code path here that prints 0 for a source
+  // whose state is not a checked state.
+  // ── ENTITY TRACK RECORD ───────────────────────────────────────────────────────
+  // ONE module, grouped by ENTITY. A parent company is not a different kind of information about
+  // this property — it is a different company — so it is a labelled group here rather than a
+  // module of its own. The order a resident needs is: who is the entity, what role does it have
+  // here, who controls it, and whose record is each event.
+  //
+  // THE RULE THE GROUPING EXISTS TO ENFORCE: an enforcement action is displayed under the legal
+  // entity the SOURCE DOCUMENT names. A parent's FinCEN action never appears under the project
+  // LLC, and the project LLC's EPA violation never appears under the parent. HS.card.recordsFor()
+  // is the gate; the visible grouping is what makes the attribution legible.
+  function entityGroupsOf(row, byId, recs) {
+    var declared = (row && row.entities) || [];
+    var records = (row && row.enforcement_records) || [];
+    var groups = [];
+
+    C.ENTITY_ROLES.forEach(function (role) {
+      var ents = declared.filter(function (e) { return (e.role || 'project_entity') === role.id; });
+
+      // A RELATED entity is shown only when its relationship to the property is verified. An
+      // unverified relationship means we do not know it belongs on this card, and a corporate
+      // relative that merely shares ownership is not information about this property.
+      if (role.gated) {
+        ents = ents.filter(function (e) {
+          return e.relationship_verification === 'verified' && !!e.relationship_label;
+        });
+      }
+
+      if (!ents.length) {
+        // The project entity's group always renders: its lack of records is the answer a resident
+        // came for. The others simply do not exist, and inventing an empty group for a parent we
+        // have not confirmed would imply one exists.
+        if (role.required) {
+          groups.push({ role: role, entity: null, agencies: agencyRows(null, byId, recs, records) });
+        }
+        return;
+      }
+      ents.forEach(function (e) {
+        groups.push({ role: role, entity: e, agencies: agencyRows(e, byId, recs, records) });
+      });
+    });
+    return groups;
+  }
+
+  /**
+   * The per-agency rows for ONE entity. Every declared agency appears, including the ones with no
+   * adapter: omitting DOJ would leave a resident unable to tell that we have not checked it, and
+   * the whole point of the module is that gaps are visible rather than absent.
+   */
+  function agencyRows(entity, byId, recs, allRecords) {
+    var mine = entity ? C.recordsFor(allRecords, entity) : [];
+    return C.AGENCIES.map(function (a) {
+      var forAgency = mine.filter(function (r) {
+        return String(r.source_agency || '').toLowerCase() === a.id
+          || String(r.source_agency || '').toUpperCase() === a.short.toUpperCase();
+      });
+      // A record we hold is `reported` at minimum — the source document is the evidence — and
+      // `verified` when the record itself says its verification passed.
+      var st, counts = null, recent = null, detail = null;
+      if (forAgency.length) {
+        st = forAgency.every(function (r) { return r.verification_status === 'verified'; }) ? 'verified' : 'reported';
+        counts = [forAgency.length, sumPenalties(forAgency)];
+        recent = forAgency.map(function (r) { return r.action_date; }).filter(Boolean).sort().pop();
+        detail = enforcementLine(a, forAgency);
+      } else if (entity && entity.track && entity.track[a.id]) {
+        // ENTITY-LEVEL checks only. A property-level check ("we queried OSHA for this address")
+        // is NOT a check of each company named on the filings, and presenting it as one would
+        // attribute research we never did — three entities each showing "Checked · 0 · 0" off a
+        // single address-level query. Absent an entity-level check, the honest state is that we
+        // have not checked this source for this company.
+        st = C.state(entity.track[a.id].state);
+        recent = entity.track[a.id].recent;
+        detail = entity.track[a.id].detail || null;
+      } else {
+        st = 'not_checked';
+      }
+      // A source we queried that returned nothing has MEASURED ZEROS, not unstated metrics —
+      // otherwise the badge says "Checked" above a row of em-dashes and the card contradicts
+      // itself. This is the same both-directions rule the gate enforces.
+      if (!counts && C.state(st) === 'checked_empty') counts = [0, null];
+      var labels = a.metrics;
+      var vals = labels.map(function (label, i) {
+        // Counts are positional per agency: [primary count, penalties] for the enforcement
+        // sources. Anything we did not compute stays unstated rather than defaulting to 0.
+        // A MONETARY metric is never zero just because a source was empty. `gov_actions`' rule
+        // (docs/government-source-archive.md, "Do not"): never render $0 for a penalty the record
+        // does not state. With no records there is no record to state one, so it stays unstated
+        // while the COUNT beside it is a real, measured 0.
+        var money = /penalt|fine|relief|disgorge/i.test(label);
+        var n = counts
+          ? (i === labels.length - 1 ? counts[1]
+             : (i === 0 ? counts[0] : (C.state(st) === 'checked_empty' ? 0 : undefined)))
+          : undefined;
+        if (money && (n === null || n === 0) && C.state(st) === 'checked_empty') n = undefined;
+        var text = C.metricText(st, typeof n === 'number' ? n : undefined);
+        if (i === labels.length - 1 && text !== C.NO_VALUE && /penalt/i.test(label)) {
+          text = '$' + Number(text).toLocaleString();
+        }
+        return { label: label, text: text };
+      });
+      return { id: a.id, short: a.short, state: st, metrics: vals, recent: recent,
+        detail: detail || sourceLine(st, a.short, recent) || C.COPY.module.noEnforcement,
+        records: forAgency };
+    });
+  }
+  function sumPenalties(rows) {
+    var t = null;
+    rows.forEach(function (r) {
+      if (typeof r.penalty_amount === 'number' && isFinite(r.penalty_amount)) t = (t || 0) + r.penalty_amount;
+    });
+    return t;
+  }
+  /** One deterministic sentence from the fields the records actually carry. */
+  function enforcementLine(a, rows) {
+    var kinds = {};
+    rows.forEach(function (r) { if (r.violation_category) kinds[r.violation_category] = 1; });
+    var k = Object.keys(kinds);
+    return rows.length + ' ' + (rows.length === 1 ? 'record' : 'records') + ' on file with ' + a.short
+      + (k.length ? ', covering ' + k.slice(0, 2).join(' and ') : '') + '.';
+  }
+
+  /**
+   * "Most recent" is a DATE WITH A STATE, not a nullable date — the design shows four distinct
+   * answers (Not available / Not applicable / Not checked / In progress) and they mean different
+   * things. A real date renders only when a source supplied one.
+   */
+  function mostRecent(state, when) {
+    if (when) return HS.fmtDate(when, { year: 'numeric', month: 'short', day: 'numeric' });
+    var k = C.state(state);
+    if (k === 'not_checked') return 'Not checked';
+    if (k === 'in_progress') return 'In progress';
+    if (k === 'unavailable' || k === 'access_restricted') return 'Not available';
+    if (k === 'checked_empty') return 'Not applicable';
+    return 'Not available';
+  }
+  function metric(text, label) {
+    var na = text === C.NO_VALUE;
+    return '<div class="pcmetric"><div class="ml">' + esc(label) + '</div>'
+      + '<div class="mv' + (na ? ' na' : '') + '">' + esc(text) + '</div></div>';
+  }
+  /**
+   * The approved sentence for a state. Without this, a fallback of "not checked" got attached to
+   * every state, so a checked-and-empty source rendered a CHECKED badge and three real zeros above
+   * the words "we haven't checked this yet" — the two halves of the card contradicting each other.
+   * Returns '' for states whose own numbers already say it.
+   */
+  function sourceLine(state, X, when) {
+    var k = C.state(state);
+    if (k === 'checked_empty') return C.COPY.module.noEnforcement;
+    if (k === 'unavailable') return C.say(C.COPY.source.unavailable, { X: X });
+    if (k === 'access_restricted') return C.say(C.COPY.source.access_restricted, { X: X });
+    if (k === 'in_progress') return C.say(C.COPY.source.in_progress, { X: X });
+    if (k === 'partial') return C.say(C.COPY.source.partial, { X: X }, 1);
+    if (k === 'verified' || k === 'reported') return '';
+    return C.say(C.COPY.source.not_checked, { X: X });
+  }
+
+  /**
+   * THE ONE agency-grid renderer, shared by every entity group.
+   * Shared rather than copied: the groups must be identical in layout, and one renderer is the
+   * only way that survives the next edit to either.
+   */
+  /**
+   * Agencies WITH something to report get a card; the rest are named in one compact line.
+   *
+   * Why: eight agencies across three entity groups is 24 cards, and on the pilot 22 of them say
+   * "not checked" in the same sentence. Repeating one paragraph twenty-two times does not make the
+   * gap clearer, it makes the module unreadable and buries the two findings that matter.
+   *
+   * The coverage rule still holds — every unchecked agency is still NAMED, so a resident can see
+   * we have not looked at DOJ. It is listed rather than given a card, which is a density decision,
+   * not a disclosure one. Nothing is hidden and nothing is implied to be clean.
+   */
+  function agencySplitHTML(rows) {
+    var shown = rows.filter(function (r) { return C.state(r.state) !== 'not_checked'; });
+    var unchecked = rows.filter(function (r) { return C.state(r.state) === 'not_checked'; });
+    var out = '';
+    if (shown.length) out += agencyGridHTML(shown);
+    if (unchecked.length) {
+      out += '<div class="pcunchecked">'
+        + '<span class="pcst t-none">Not checked</span> '
+        + unchecked.map(function (r) { return esc(r.short); }).join(' · ')
+        + (shown.length ? '' : ' — ' + esc(C.COPY.module.noEnforcement))
+        + '</div>';
+    }
+    return out;
+  }
+
+  function agencyGridHTML(rows) {
+    return '<div class="pcsrcs">' + rows.map(function (r) {
+      return '<div class="pcsrc"><div class="sn">' + esc(r.short) + '</div>'
+        + '<div class="sb">' + C.badgeHTML(r.state, { module: 'entity-track-record' }) + '</div>'
+        + '<div class="pcmetrics m' + r.metrics.length + '">'
+        + r.metrics.map(function (m) { return metric(m.text, m.label); }).join('')
+        + '</div>'
+        + '<div class="pcrecent">Most recent: <b>' + esc(mostRecent(r.state, r.recent)) + '</b></div>'
+        + '<div class="sd">' + esc(r.detail) + '</div></div>';
+    }).join('') + '</div>';
+  }
+
+  /** The entity header: who it is, its role here, who says so, and how new it is. */
+  function entityHeadHTML(group) {
+    var e = group.entity, role = group.role;
+    var name = e ? (e.name || 'Entity not named on the record') : 'Not yet identified';
+    var bits = [];
+    bits.push('<span class="pcerole">' + esc(role.label) + '</span>');
+    if (e && e.relationship_label && role.id !== 'project_entity') {
+      bits.push('<span class="pceRel">Relationship: <b>' + esc(e.relationship_label) + '</b></span>');
+    }
+    if (e && e.relationship_source) {
+      bits.push('<span class="pceRel">Source: ' + (e.relationship_source_url
+        ? '<a href="' + esc(e.relationship_source_url) + '" target="_blank" rel="noopener">' + esc(e.relationship_source) + '</a>'
+        : esc(e.relationship_source)) + '</span>');
+    }
+    if (e && e.identity_note) {
+      bits.push('<span class="pceRel">' + esc(e.identity_note) + '</span>');
+    }
+    if (e && e.formed_date) {
+      bits.push('<span class="pceRel">' + esc(C.say(C.COPY.module.entityFormed, {
+        date: HS.fmtDate(e.formed_date, { year: 'numeric', month: 'long', day: 'numeric' }) })) + '</span>');
+    }
+    return '<div class="pceGroup"><div class="pceHead"><h3>' + esc(name) + '</h3>'
+      + '<div class="pceMeta">' + bits.join('') + '</div></div>';
+  }
+
+  function entityTrackHTML(row, byId, recs) {
+    var groups = entityGroupsOf(row, byId, recs);
+    var body = groups.map(function (g) {
+      return entityHeadHTML(g) + agencySplitHTML(g.agencies) + '</div>';
+    }).join('');
+    var allStates = groups.reduce(function (acc, g) {
+      return acc.concat(g.agencies.map(function (a) { return a.state; }));
+    }, []);
+    // Two negatives worth stating, because silence about either invites a wrong assumption.
+    var foot = '';
+    if (row && row.parent_search === 'none_confirmed'
+        && !groups.some(function (g) { return g.role.id === 'parent'; })) {
+      foot += '<p class="pcprov">' + esc(C.COPY.module.parentSearchedNone) + '</p>';
+    }
+    var notConnected = ((row && row.searched_not_connected) || []).filter(Boolean);
+    if (notConnected.length) {
+      foot += '<p class="pcprov">'
+        + esc(C.say(C.COPY.module.searchedNotConnected, { names: notConnected.join(', ') })) + '</p>';
+    }
+    return sec('entity-track-record', {
+      wide: true,
+      info: C.COPY.module.trackRecordAttribution,
+      state: C.rollup(allStates),
+      link: { href: '#sources', label: 'See every source →' }
+    }, body + foot);
+  }
+
+  // ── PROPERTY & OWNERSHIP ──────────────────────────────────────────────────────
+  // The section Part 25 is specifically about: OWNER OF RECORD (appraisal district) and OWNER
+  // AS FILED (a permit applicant's own entry) are two different claims, and the card renders
+  // them as two separate lines. Neither is allowed to stand in for the other.
+  function ownershipHTML(byId, row, parcel, filings, addr) {
+    var filedOwners = {}, filedList = [];
+    filings.forEach(function (s) {
+      if (!s.owner) return;
+      var k = String(s.owner).toLowerCase();
+      if (!filedOwners[k]) { filedOwners[k] = 1; filedList.push({ name: s.owner, no: s.project_no, url: s.record_url || s.url }); }
+    });
+    var body = '<div class="pcrows">'
+      + row2('Address', addr)
+      + row2('County', row.county ? row.county + ' County' : null)
+      + row2('State / ZIP', [row.state, row.zip].filter(Boolean).join(' ') || null)
+      + row2('Acreage', parcel && parcel.acreage != null ? parcel.acreage + ' acres' : null)
+      + row2('Property ID', parcel && parcel.property_id)
+      + row2('Geographic ID', parcel && parcel.geographic_id)
+      + row2('Property class', parcel && parcel.property_class)
+      + row2('Owner of record', parcel && parcel.owner_of_record)
+      + '</div>';
+    if (filedList.length) {
+      body += '<div class="pcsh" style="margin:14px 0 8px"><h2>Owner as filed on a permit</h2></div>'
+        + '<div class="pcrows">' + filedList.map(function (o) {
+            return '<div class="pcrow"><span>' + esc(o.name) + '</span><b>'
+              + (o.url ? '<a href="' + esc(o.url) + '" target="_blank" rel="noopener">'
+                  + esc(o.no || 'record') + ' ▸</a>' : esc(o.no || '—')) + '</b></div>';
+          }).join('') + '</div>';
+    }
+    body += note('<b>Owner as filed.</b> ' + esc(C.COPY.module.ownerAsFiledCaveat));
+    return sec('property-ownership', {
+      state: C.rollup([byId.assessor && byId.assessor.state, filings.length ? 'reported' : 'not_checked'])
+    }, body);
+  }
+
+  // ── DEVELOPMENT / PROJECT ACTIVITY ────────────────────────────────────────────
+  function developmentHTML(byId, filings, row, addr) {
+    var s = byId.permits;
+    var body;
+    if (filings.length) {
+      var sorted = filings.slice().sort(function (a, b) {
+        return String(b.start_date || '').localeCompare(String(a.start_date || ''));
+      });
+      body = sorted.slice(0, 6).map(function (f) {
+        return '<div class="pcrec"><div class="rd">'
+          + esc(f.start_date ? HS.fmtDate(f.start_date, { year: 'numeric', month: 'short', day: 'numeric' }) : 'Undated')
+          + '</div><div style="flex:1"><div class="rt">' + esc(f.label || f.project_no || 'Filing') + '</div>'
+          + '<div class="rs">' + [f.project_no, f.owner ? 'owner as filed: ' + f.owner : '',
+              f.status_text ? 'status as filed: ' + f.status_text : ''].filter(Boolean).map(esc).join(' · ')
+          + (f.record_url || f.url ? ' · <a href="' + esc(f.record_url || f.url) + '" target="_blank" rel="noopener">official record ▸</a>' : '')
+          + '</div></div></div>';
+      }).join('');
+      if (sorted.length > 6) {
+        body += '<p class="pcprov">' + esc(sorted.length - 6) + ' further filing(s) at this address — '
+          + '<a href="' + esc('homesignalmap.html?addr=' + encodeURIComponent(addr)) + '">see the full filing history →</a></p>';
+      }
+    } else {
+      body = '<p>' + esc(s.detail) + '</p>';
+    }
+    return sec('development-activity', {
+      state: s.state,
+      link: { href: HS.pageHref('maps.html', { zip: zip }), label: 'On the map →' }
+    }, body);
+  }
+
+  // ── FACILITIES & REGULATORY CONNECTIONS ───────────────────────────────────────
+  function facilitiesHTML(byId, federal) {
+    var s = byId.epa_frs;
+    var body = federal.length
+      ? federal.slice(0, 5).map(function (f) {
+          return '<div class="pcrec"><div class="rd">' + esc(f.src || 'Registry') + '</div>'
+            + '<div style="flex:1"><div class="rt">' + esc(f.label || 'Facility record') + '</div>'
+            + '<div class="rs">' + [f.registry_id ? 'EPA registry ID ' + f.registry_id : '',
+                f.tceq_rn ? 'state RN ' + f.tceq_rn : ''].filter(Boolean).map(esc).join(' · ')
+            + (f.record_url || f.url ? ' · <a href="' + esc(f.record_url || f.url) + '" target="_blank" rel="noopener">official record ▸</a>' : '')
+            + '</div></div></div>';
+        }).join('')
+      : '<p>' + esc(s.detail) + '</p>';
+    body += '<div class="pcrows" style="margin-top:10px">'
+      + ['epa_frs', 'state_env'].map(function (id) {
+          var src = byId[id]; if (!src) return '';
+          return '<div class="pcrow"><span>' + esc(src.short) + '</span><b>'
+            + C.badgeHTML(src.state, { module: 'facility-connections' }) + '</b></div>';
+        }).join('')
+      + '</div>'
+      + '<p class="pcprov">' + esc(C.COPY.module.facilityNoParcelLink) + '</p>';
+    return sec('facility-connections', {
+      state: C.rollup([s.state, byId.epa_echo && byId.epa_echo.state, byId.state_env && byId.state_env.state])
+    }, body);
+  }
+
+  // ── NATURAL HAZARDS ───────────────────────────────────────────────────────────
+  function hazardsHTML(byId, row) {
+    var s = byId.hazards;
+    var haz = (row && row.hazards) || null;
+    var rows = ['Flood', 'Wildfire', 'Extreme heat', 'Severe weather'].map(function (k) {
+      var v = haz ? haz[k.toLowerCase().replace(/\s+/g, '_')] : null;
+      return row2(k, v && v.label);
+    }).join('');
+    return sec('natural-hazards', { state: s.state },
+      '<div class="pcrows">' + rows + '</div>'
+      + '<p class="pcprov">' + esc(s.detail) + '</p>');
+  }
+
+  // ── PUBLIC MEETINGS & NOTICES ─────────────────────────────────────────────────
+  function meetingsHTML(byId, row, zip) {
+    var s = byId.meetings;
+    var items = (row.related || []);
+    var body = items.length
+      ? items.slice(0, 5).map(function (it) {
+          return '<div class="pcrec"><div class="rd">'
+            + esc(it.date ? HS.fmtDate(it.date, { year: 'numeric', month: 'short', day: 'numeric' }) : '')
+            + '</div><div style="flex:1"><div class="rt">' + esc(it.title || '') + '</div>'
+            + (it.url ? '<div class="rs"><a href="' + esc(it.url) + '" target="_blank" rel="noopener">official notice ▸</a></div>' : '')
+            + '</div></div>';
+        }).join('')
+      : '<p>' + esc(s.detail) + '</p>';
+    return sec('meetings-notices', {
+      state: s.state,
+      link: zip ? { href: HS.pageHref('community.html', { zip: zip }), label: 'Area notices →' } : null
+    }, body);
+  }
+
+  // ── SUSTAINABILITY DISCLOSURES ────────────────────────────────────────────────
+  function sustainabilityHTML(byId) {
+    var s = byId.sustain;
+    var rows = ['Third-party ratings', 'Company-reported metrics', 'ESG / sustainability filings']
+      .map(function (k) {
+        return '<div class="pcrow"><span>' + esc(k) + '</span><b>'
+          + C.badgeHTML(s.state, { module: 'sustainability' }) + '</b></div>';
+      }).join('');
+    return sec('sustainability', { state: s.state },
+      '<div class="pcrows">' + rows + '</div>'
+      + '<p class="pcprov">' + esc(s.detail) + '</p>');
+  }
+
+  // ── RECORDED INSTRUMENTS ──────────────────────────────────────────────────────
+  function instrumentsHTML(byId, row) {
+    var s = byId.recorder;
+    var inst = (row.instruments || []);
+    var body = inst.length
+      ? '<p class="pcprov">' + esc(inst.length + ' instrument reference'
+          + (inst.length === 1 ? '' : 's') + (row.instruments_source ? ' reported by ' + row.instruments_source : ''))
+        + '</p>'
+        + inst.slice(0, 6).map(function (i) {
+          return '<div class="pcrec"><div class="rd">' + esc(i.recorded_at || '') + '</div>'
+            + '<div style="flex:1"><div class="rt">' + esc(i.kind || 'Instrument') + '</div>'
+            + '<div class="rs">' + esc(i.instrument_no || '')
+            + (i.record_url ? ' · <a href="' + esc(i.record_url) + '" target="_blank" rel="noopener">official record ▸</a>' : '')
+            + '</div></div></div>';
+        }).join('')
+      : '<p>' + esc(s.detail) + '</p>';
+    return sec('recorded-instruments', { state: s.state }, body);
+  }
+
+  // ── REGULATORY RECORDS ────────────────────────────────────────────────────────
+  // The records UNDERNEATH the track-record summaries: what each environmental source
+  // actually holds for the facilities matched near this address.
+  function regulatoryHTML(byId, recs) {
+    var epa = recs.filter(function (s) { return s.env && s.env.epa; });
+    var tceq = recs.filter(function (s) { return s.env && s.env.tceq; });
+    var programs = {};
+    tceq.forEach(function (s) { ((s.env.tceq || {}).programs || []).forEach(function (p) { programs[p] = 1; }); });
+    var progList = Object.keys(programs);
+    // Counts route through the same gate as every other number on the card: a source we did
+    // not query renders an em-dash, and a source we queried that returned nothing renders a
+    // real 0. row2 flags the em-dash as absent for us, so the two cases stay visibly apart.
+    // The design lists the SOURCES behind the track record, each with its availability. Same
+    // states as everywhere else, relabelled in this module's vocabulary.
+    var order = ['epa_echo', 'state_env', 'osha', 'sec', 'state_local', 'permits', 'recorder'];
+    var body = '<div class="pcrows">' + order.map(function (id) {
+      var src = byId[id]; if (!src) return '';
+      return '<div class="pcrow"><span>' + esc(src.short) + '</span><b>'
+        + C.badgeHTML(src.state, { module: 'regulatory-records' }) + '</b></div>';
+    }).join('') + '</div>'
+      + '<p class="pcprov">' + esc('Underlying official records that support the track-record summaries.') + '</p>'
+      + '<div class="pcrows" style="margin-top:6px">'
+      + row2('Facilities with a compliance summary', C.metricText(byId.epa_echo.state, epa.length))
+      + row2('State registry programs on record', C.metricText(byId.state_env.state, progList.length))
+      + '</div>';
+    if (progList.length) {
+      body += '<p class="pcprov">Programs on record: ' + esc(progList.join(', ')) + '.</p>';
+    }
+    return sec('regulatory-records', {
+      state: C.rollup([byId.epa_echo && byId.epa_echo.state, byId.state_env && byId.state_env.state])
+    }, body);
+  }
+
+  // ── SOURCES & VERIFICATION ────────────────────────────────────────────────────
+  function sourcesHTML(sources) {
+    // FULL labels here, never the short ones. This is the provenance module, and it is the one
+    // place the distinction matters most: with `short`, `verified` and `checked_empty` both render
+    // as "Checked", so a source that returned records and a source that returned nothing became
+    // the same badge — the exact collapse the card exists to prevent.
+    var body = '<div class="pcrows">' + sources.map(function (s) {
+      return '<div class="pcrow"><span>' + esc(s.label) + '</span><b>' + C.badgeHTML(s.state) + '</b></div>';
+    }).join('') + '</div>'
+      + '<p class="pcprov">' + esc(C.COPY.page[1]) + '</p>';
+    return sec('sources-verification', { wide: true, state: C.rollup(sources.map(function (s) { return s.state; })) }, body);
+  }
+
+  // ── DATA COMPLETENESS ─────────────────────────────────────────────────────────
+  function completenessHTML(sources) {
+    var counts = C.completeness(sources);
+    var legend = C.DONUT_ORDER.filter(function (k) { return counts.byState[k]; }).map(function (k) {
+      return '<div class="pclrow"><i style="background:var(--pct-' + k.replace(/_/g, '-') + ')"></i>'
+        + esc(C.STATES[k].label) + '<b>' + counts.byState[k] + '</b></div>';
+    }).join('');
+    var txt = C.completenessText(counts);
+    return sec('data-completeness', { wide: true }, '<div class="pccomp">'
+      + C.donutSVG(counts, { aria: 'Share of sources read for this property' })
+      + '<div class="pclegend">'
+      + '<div class="pcbasis">' + esc(txt.basis) + '</div>'
+      + legend + '</div></div>'
+      // The percentage never travels without its denominator: an unexplained figure invites the
+      // reader to supply their own, and it is never "sources we have read".
+      + '<p class="pcprov">This is how much of the record we have read, not a judgement about the '
+      + 'property. Partly-read sources are listed separately and are not counted as read.</p>');
+  }
+
+  // ── footer ────────────────────────────────────────────────────────────────────
+  function footHTML(row) {
+    return '<div class="pcfoot"><span class="fi" aria-hidden="true">ⓘ</span><p>' + esc(C.DISCLAIMER)
+      + (row && row.refreshed_at ? ' Read from the public record on '
+          + esc(HS.fmtDate(row.refreshed_at, { year: 'numeric', month: 'long', day: 'numeric' })) + '.' : '')
+      + '</p></div>';
+  }
+
+  // ── THE CONTEXT RAIL ──────────────────────────────────────────────────────────
+  // Where the property is, and what regulated activity sits near it. Deliberately a SMALL,
+  // read-only map: maps.html remains the one interactive map surface, and this reuses its data
+  // (HS.data.facilities) and its marker registry (lib/map.js) rather than growing a second
+  // opinion about how a facility is drawn.
+  //
+  // NEVER-FAKED: the point plotted here is the PROPERTY's own geocode from the cached record. It
+  // is not "your home" — the card is about an address the resident is reading, not one they own —
+  // and no marker is drawn at all when the record carries no coordinates.
+  async function renderRail(row, addr) {
+    var rail = document.getElementById('pcRail'); if (!rail) return;
+    var here = (row && row.lat != null && row.lng != null) ? { lat: row.lat, lng: row.lng } : null;
+
+    var facs = [];
+    try {
+      facs = await HS.data.facilities(zip);
+      if (here && HS.withDistance) facs = HS.withDistance(facs.slice(), here);
+      facs = facs.filter(function (f) { return f.lat != null && f.lng != null; })
+        .sort(function (a, b) { return (a.distance_mi || 9e9) - (b.distance_mi || 9e9); });
+    } catch (e) { facs = []; }
+
+    var nearest = facs[0] || null;
+    rail.innerHTML =
+      '<div class="pcwhere"><span class="pin" aria-hidden="true">◉</span> ' + esc(addr) + '</div>'
+      + '<div class="pcmapwrap"><div id="pcMap" role="img" aria-label="'
+        + esc('Map of ' + addr + (facs.length ? ' and ' + facs.length + ' nearby regulated facilities' : ''))
+        + '"></div>'
+        + (here ? '' : '<div class="pcmapnote">' + esc('No map point is on the cached record for this address.') + '</div>')
+      + '</div>'
+      + nearbyFacilityHTML(nearest)
+      + connectionsRailHTML(facs);
+
+    if (here && window.maplibregl) drawRailMap(here, facs);
+  }
+
+  /** The nearby-facility card from the design — explicitly NEARBY, never attributed here. */
+  function nearbyFacilityHTML(f) {
+    if (!f) return '';
+    var interp = (HS.fac && HS.fac.interpret) ? HS.fac.interpret(f.facility_env || null) : null;
+    return '<div class="pcrailcard"><h4>Nearby regulated facility'
+      + (f.dist ? ' · ' + esc(f.dist) : '') + '</h4>'
+      + '<div class="rn">' + esc(f.name || 'Regulated facility') + '</div>'
+      + '<div class="rd">' + esc(interp ? interp.line : 'Permit status not yet confirmed — open the facility record.') + '</div>'
+      + (f.registry_id ? '<div class="rrow"><span>EPA registry ID</span><b>' + esc(f.registry_id) + '</b></div>' : '')
+      + '<a class="btn" href="' + esc(HS.pageHref('development.html', { zip: zip, id: f.id })) + '">Quick view details</a>'
+      + '</div>';
+  }
+
+  /** Facilities & regulatory connections, as a rail summary rather than a second module. */
+  function connectionsRailHTML(facs) {
+    return '<div class="pcrailcard"><h4>Facilities &amp; regulatory connections</h4>'
+      + '<div class="rd">' + esc(facs.length
+          ? facs.length + ' regulated ' + (facs.length === 1 ? 'facility is' : 'facilities are')
+            + ' on record near this address. None is attributed to this property.'
+          : C.COPY.module.facilityNoneHere) + '</div>'
+      + '<a class="btn" href="' + esc(HS.pageHref('maps.html', { zip: zip })) + '">View all connections</a>'
+      + '</div>';
+  }
+
+  // A raster MapLibre map, same sources and the same marker registry the map page uses — so a
+  // facility is the same shape and colour in both places rather than two drawings of one fact.
+  function drawRailMap(here, facs) {
+    var map;
+    try {
+      map = new maplibregl.Map({
+        container: 'pcMap', center: [here.lng, here.lat], zoom: 12.4,
+        attributionControl: { compact: true },
+        style: { version: 8, sources: {
+          osm: { type: 'raster', tileSize: 256, attribution: '© OpenStreetMap',
+            tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'] } },
+          layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#e4eadd' } },
+                   { id: 'osm', type: 'raster', source: 'osm' }] }
+      });
+    } catch (e) { console.warn('[property-card] rail map unavailable', e); return; }
+    map.on('error', function () { /* a tile failure degrades the rail, never the record */ });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    map.on('load', function () {
+      facs.slice(0, 24).forEach(function (f) {
+        var el = document.createElement('div');
+        el.innerHTML = HS.markerSVG('square', HS.markerRegistry.facilityHex, '', 13);
+        el.title = f.name + (f.dist ? ' · ' + f.dist : '');
+        new maplibregl.Marker({ element: el }).setLngLat([f.lng, f.lat]).addTo(map);
+      });
+      // The subject of the card has to be findable among two dozen neighbours, so it gets a white
+      // ring rather than just a colour — the facilities are context, this is what the page is about.
+      var home = document.createElement('div');
+      home.className = 'pcmehere';
+      home.innerHTML = HS.markerSVG('circle', HS.markerRegistry.statusHex.operating || '#1f9d5c', '', 16);
+      home.title = 'This property';
+      new maplibregl.Marker({ element: home }).setLngLat([here.lng, here.lat]).addTo(map);
+
+      // Frame the property WITH what surrounds it. Centring on the point at a fixed zoom drew a
+      // map of one pin and hid the 25 facilities the rail had just plotted — the context rail
+      // showing no context. Bounded by the nearest few, so the scale is set by the data.
+      var near = facs.slice(0, 8);
+      if (near.length) {
+        var bb = new maplibregl.LngLatBounds([here.lng, here.lat], [here.lng, here.lat]);
+        near.forEach(function (f) { bb.extend([f.lng, f.lat]); });
+        try { map.fitBounds(bb, { padding: 34, maxZoom: 13.5, duration: 0 }); } catch (e) {}
+      }
+    });
+  }
+
+  // ── honest non-render states ──────────────────────────────────────────────────
+  function renderProblem(title, body) {
+    page.innerHTML = '<div class="pcempty"><div class="et">' + esc(title) + '</div><p>' + esc(body) + '</p></div>';
+  }
+  // No canonical address: the record the resident clicked carries no engine-emitted address,
+  // so there is no parcel to key a card to. Saying so — and offering the address lookup — is
+  // the answer; picking a nearby address would be a fabricated join.
+  function renderUnresolved() {
+    document.title = 'Property card — HomeSignal';
+    page.innerHTML = '<div class="pcempty"><div class="et">This record isn’t tied to a parcel yet</div>'
+      + '<p>The filing you opened doesn’t carry an address we can resolve to a parcel, so there is no '
+      + 'property card to show for it. That is a gap in the source record, not a finding about the '
+      + 'property. Enter the address to look it up directly.</p>'
+      + '<form class="pcform" id="pcLookup"><input name="addr" placeholder="e.g. 2200 CALDWELL LN, DEL VALLE, TX 78617" '
+      + 'aria-label="Property address"><button class="btn primary" type="submit">Open card</button></form>'
+      + '<p class="pcprov" style="margin-top:12px"><a href="' + esc(HS.pageHref('maps.html', { zip: zip })) + '">← Back to the map</a></p></div>';
+    var f = document.getElementById('pcLookup');
+    if (f) f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var v = (f.addr.value || '').trim();
+      if (v) location.href = C.href({ addr: v, zip: zip });
+    });
+  }
+
+  // ── wiring ────────────────────────────────────────────────────────────────────
+  function wire(row, addr, recs) {
+    var tabs = document.getElementById('pcTabs');
+    var secs = [].slice.call(page.querySelectorAll('[data-sec]'));
+    function showTab(id) {
+      secs.forEach(function (el) {
+        el.hidden = !(id === 'overview' || el.getAttribute('data-tab') === id);
+      });
+      [].forEach.call(tabs.querySelectorAll('button'), function (b) {
+        b.setAttribute('aria-selected', b.getAttribute('data-tab') === id ? 'true' : 'false');
+      });
+    }
+    if (tabs) {
+      tabs.addEventListener('click', function (e) {
+        var b = e.target.closest ? e.target.closest('button[data-tab]') : null;
+        if (b) showTab(b.getAttribute('data-tab'));
+      });
+      var fromHash = function () {
+        var h = (location.hash || '').replace('#', '');
+        showTab(C.TABS.some(function (t) { return t.id === h; }) ? h : 'overview');
+      };
+      window.addEventListener('hashchange', fromHash);
+      fromHash();
+    }
+    // Saving is honest about not existing yet — the same posture the address dossier's
+    // "Watch this address" button takes. A button that pretends to save is worse than none.
+    var save = document.getElementById('pcSave');
+    if (save) save.addEventListener('click', function () {
+      if (HS.requireAuth && !HS.requireAuth('save this property')) return;
+      save.disabled = true; save.textContent = 'Saved properties aren’t live yet';
+    });
+    var ex = document.getElementById('pcExport');
+    if (ex) ex.addEventListener('click', function () {
+      location.href = 'homesignalmap.html?addr=' + encodeURIComponent(addr);
+    });
+    // Live-verification hook, mirroring window.__HS_MAP on the map page. `cached` is the one a
+    // verifier needs most: it separates "this address has a cached record" from "the card
+    // rendered", so a green check can never be read as evidence the cache was populated.
+    window.__HS_CARD = {
+      addr: addr, zip: row && row.zip, cached: !!(row && row.address),
+      records: (recs || []).length,
+      sections: [].slice.call(page.querySelectorAll('[data-sec]')).map(function (el) {
+        return { id: el.getAttribute('data-sec'), tab: el.getAttribute('data-tab') };
+      }),
+      // Every metric actually painted, so a verifier can assert the gate on the LIVE page:
+      // no value here may be a number unless its own badge says the source was checked.
+      metrics: [].slice.call(page.querySelectorAll('.pcsrc')).map(function (el) {
+        return {
+          src: el.querySelector('.sn').textContent,
+          state: el.querySelector('.pcst').textContent,
+          values: [].slice.call(el.querySelectorAll('.pcmetric .mv')).map(function (v) { return v.textContent; })
+        };
+      })
+    };
+  }
+});
+</script>
+</body>
+</html>

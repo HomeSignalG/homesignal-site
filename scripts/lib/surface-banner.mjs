@@ -131,6 +131,12 @@ export const SURFACES = {
 
 /** Surfaces that exist and have NO verifier. This is where the next silent defect lives. */
 export const UNVERIFIED_SURFACES = [
+  // The full property card, reached from the Maps slide-in's top link. Nothing drives it yet.
+  // It ships with the offline gates (test/property-card.test.mjs pins the state vocabulary and
+  // the "no count without a check" rule; test/property-card-page.test.mjs pins the page and the
+  // slide-in link), but those are SOURCE assertions — they say nothing about the rendered live
+  // page. The page exposes window.__HS_CARD for exactly that verifier when it is written.
+  'property-card.html — property_reports, development_reports, app_projects',
   'properties.html  — app_projects, app_changes',
   'today.html       — app_projects, app_changes, meetings',
   'index.html       — app_community_meta (isCovered), app_changes',
