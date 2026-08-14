@@ -205,3 +205,27 @@ update public.epa_outage_repair_2026_08 r
 -- 250 futile requests every 15 minutes (Finding 2), which pins the pg_net worker — observed
 -- three times, queue frozen at 250-377 with zero completions for minutes at a stretch. Repair
 -- batches can only run in the gaps between those fires.
+
+-- ── THIRD PASS, 2026-08-14 (after the fair-ordering fix landed) ──────────────────────────────
+--   repaired 234 of 515 · 3,732 EPA facilities recovered · 281 remaining · FALSE ZEROS: 0
+--
+-- THE FAIR-ORDERING FIX IS WORKING, measured on the population it targets: rows never written
+-- since the outage fell **2,061 -> 1,519 in 90 minutes** (1,250 fired, 685 written in that
+-- window). Before the fix that population had been frozen for days.
+--
+-- ⚠️ NEW INTERACTION, worth knowing before running another manual pass. `dev_refresh_collect`
+-- advances `refreshed_at` even when the EPA read FAILED — the row is still written, just with
+-- facilities 0 and facilities_unavailable = true. Under the new `greatest(refreshed_at,
+-- last_refresh_attempt_at)` ordering that pushes the row to the BACK of the queue. So every
+-- manual repair batch DEPRIORITISES the rows it failed to fix, handing the cron's attention to
+-- other rows for a full cycle.
+--   That is correct fairness — the row genuinely was just tried — but it means the two repair
+--   paths do not compound. Measured: the cohort shows `attempted_since_fix = 0` from the cron
+--   precisely because the manual passes keep marking it as recently touched.
+--   PRACTICAL CONSEQUENCE: pick one path per cohort. Hand-firing is the fast path and is what
+--   drove 66 -> 234; leaving it alone lets the cron reach the cohort within a cycle. Doing both
+--   at once mostly wastes the cron's turn.
+--
+-- CONTENTION IS THE OTHER CEILING, unchanged: cron 14 queues 250 every 15 minutes, and while
+-- that batch drains pg_net returns almost nothing (measured this pass: queue pinned at 281 with
+-- **2 responses in 10 minutes**). Manual batches land only in the gaps between cron fires.
