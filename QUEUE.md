@@ -40,6 +40,54 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-08-14 — 🚫 OREGON REJECTED. No wireable statewide source. OR stays 52/200 (148 dark).
+
+**The Florida outcome: recon found real candidates and LIVE PROBING rejected every one.** Recorded
+with receipts so no session re-derives this. **Nothing was wired; no registry change.**
+
+- **`2024_2027_STIP_Project_Lines`** (owner `OregonDOTGIS`, modified 2026-04-08, the one current
+  STIP layer) — **REJECTED on two independent grounds.**
+  - **Only 109 rows.** Density is what predicts coverage: INDOT 3,966 → 96%, SCDOT 3,958 → 89%,
+    UDOT 358 → 35%. 109 statewide cannot carry 148 dark pages.
+  - **`ListStatus` IS NOT A STATUS — second instance of the SC standing answer.** Live groupBy,
+    summing to exactly 109: `" "` 25 (blank) · `300` 20 · `Scoping - Full Scoping` 13 · `Low` 11 ·
+    `150` 10 · `Drop - from Scoping List` 7 · `High` 4 · `A` 4 · `B` 4 · `100` 3 · `Medium` 3 ·
+    `No scoping - Already in design (PE)` 2 · `Scoping - Update Prior scoping/estimate` 2 ·
+    `No scoping - Shelf project (PE only)` 1. That is blanks + numeric priority scores + letter
+    grades + priority labels + scoping actions in ONE column — opaque-coded values, barred by the
+    autonomy grant. **A `status_const` workaround is ALSO wrong here**: 7 rows are
+    `Drop - from Scoping List`, so a constant would publish dropped projects as approved.
+  - **Not actually statewide.** `Program` (sums to exactly 109): ARTS 45 · Pres 27 · SSPF 19 ·
+    **`R1 Pres` 9** · Culverts 5 · Ops 4 — Region-1-weighted, and ARTS/SSPF are opaque acronyms.
+- **`ODOT_Traffic_Construction` / `TripCheck_Construction_Data_Upload`** — **22,868 rows, FRESH
+  (`lastEditDate` 2026-08-13), and still REJECTED: it is an EVENT feed, not a project layer.**
+  Fields are `incidentId`, `eventTypeName`, `eventSubTypeName`, `odotSeverityDescript`,
+  `delayInfo`, `incidentDirection`, `startTime`, `tocsEventId` — transient closures and delays.
+  The `development` bucket is "permits, construction filings, planning notices"; every wired DOT
+  entry (UDOT/NDOT/TxDOT/SCDOT) is a PROJECT layer. **Volume is not relevance — 22,868 road-closure
+  advisories on resident pages would misrepresent what the page claims.**
+- **Stale, all rejected on `modified`:** `ODOT_Region1_100_Percent_Projects` 2019-05-31 ·
+  `ODOT_Region1_150_Percent_ARTS_CityWide` 2019-03-22 · `ODOT_Region1_Ops_150_Percent_CountyWide`
+  2018-09-07 · `ODOT_Region1_ARTS` 2018-07-03 · `Region_1_DRAFT_21_24_STIP_Projects_v2` 2021-01-12.
+- **Dead ends:** `gis-odot.opendata.arcgis.com` → 404 "domain record does not exist" ·
+  `gis.odot.state.or.us/arcgis` → HTTP 500 Runtime Error · `/hosting` → 404 ·
+  `navigator.state.or.us` `Projects` folder → imagery basemap + enterprise zones only.
+- 🆕 **STANDING ANSWER — search the OFFICIAL owner account, not the visible one.** Every ODOT layer
+  surfaced by the obvious searches belongs to `daniel.warren_ODOT` (all stale, Region 1). The STIP
+  layer belongs to **`OregonDOTGIS`** (263 items) and appears in NEITHER a `daniel.warren_ODOT`
+  owner search NOR a plain `ODOT` org search. Enumerate owners before concluding a DOT has nothing.
+- 🆕 **The org taxonomy held a 3rd and 4th time.** `odot.maps.arcgis.com` → id/name/urlKey ALL null
+  = **nonexistent** (Michigan decoy). `geo.maps.arcgis.com` → `Oregon ArcGIS Online`,
+  `uUvqNMGPm7axC2dD`, `access: public` = the real org. `kdot.maps.arcgis.com` → `urlKey: "KDOT"`,
+  `access: private` = **private** (INDOT class). Three distinct outcomes, three distinct meanings.
+
+### 2026-08-14 — KANSAS RECON OPEN (141 dark, 30.2%, no statewide source). Next target.
+
+- `kdot.maps.arcgis.com` is a **PRIVATE** org (`urlKey: "KDOT"`) — no anonymous `orgid:` search.
+- `gis.ksdot.gov` → **"Couldn't resolve host name"** (DNS dead).
+- The real owner account is **`KanDOT`** (695 items, e.g. "KDOT reference post markers" modified
+  2025-08-22). Per the Oregon standing answer above, work the owner account. **Not yet resolved.**
+
 ### 2026-08-14 — SOUTH CAROLINA WIRED (#709): 30 → 171/192 (89.1%). Statewide-DOT lever, 4th state.
 
 **`scdot-project-viewer-lines`, arcgis 165 → 166, merged `f41a63b`, deployed (run 31808271280).
