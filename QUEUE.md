@@ -40,6 +40,37 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-08-13 — DENVER 80249 WAS DELETED BY SOMETHING OTHER THAN CLAUDE. RULING REVERTED TO 12,722.
+
+**The count is 12,722 again and Rule #0b is restored verbatim** (ingest repo; the brief 12,723
+amendment is reverted, founder instruction). **Nothing here reopens the ruling — it now matches
+the data.** What follows is the episode, so no future session re-derives it.
+
+- **Measured 2026-08-13, late session:** `level=zip` rows **12,723 → 12,722** · the
+  `Denver (80249)` community row (`ac55f889-b265-4a1f-afee-7ffdd289ffd9`) **gone** · rows claiming
+  ZIP 80249 **0** · its `development_reports` row **gone** · CO ZIP rows **141 → 140** · all
+  community rows **13,293 → 13,292**.
+- ⚠️ **CLAUDE DID NOT DELETE IT, AND STILL CANNOT ACCOUNT FOR WHO DID.** The only statements run
+  against that row this session were: `UPDATE state → 'CO'`, `ALTER TABLE ADD CONSTRAINT`, four
+  constraint probes (three rejected by the CHECK, one setting `'CO'`), an `INSERT` into
+  `development_reports`, and `app_refresh_zip('80249')`. None deletes rows, and a CHECK constraint
+  cannot delete. **UNVERIFIED: whether this was a founder action, another session, or a job.**
+- **It was ISOLATED, not a cascade** — checked before concluding: Denver County's parent row is
+  intact, `county_rows` = 549, and exactly **1** orphaned ZIP exists system-wide.
+- 🧹 **OPEN, NOT ACTIONED: 199 orphaned `app_projects` rows for ZIP 80249** remain, for a page with
+  no community row and no cache row. They are unreachable (`?zip=80249` no longer resolves) but
+  they are stale. Deleting them is destructive and was NOT done unasked.
+- 📌 **The durable lessons from this row survive its deletion and are still in force:** the
+  off-seed-path hand-insert caused three separate defects at once (count drift · `state='Colorado'`
+  excluding it from every CO source · no cached report), and the
+  **`communities_state_two_letter` VALIDATED constraint** added because of it stays
+  (`docs/communities-state-format-migration.sql`). **Add pages only through the per-state seed
+  path** — a hand-insert sets neither the state code nor the cache row.
+- ⚠️ **Standing lesson about the source of truth itself: `public.communities` changed underneath
+  an active session.** If a count you measured earlier stops matching, re-measure before building
+  on it — do not assume your own earlier reading still holds.
+
+
 ### 2026-08-13 — THE LEVER IS STATEWIDE DOT SOURCES. INDIANA WIRED (#694): 2 → 190/198.
 
 **The measurement that should drive state selection from here** (on `app_projects`, excluding the
