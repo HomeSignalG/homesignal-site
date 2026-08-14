@@ -192,3 +192,16 @@ update public.epa_outage_repair_2026_08 r
 -- FIXING THE STARVATION IS OUT OF SCOPE HERE and is a gated change — it alters refresh ordering
 -- for all 12,722 pages. Recorded, not actioned. Until it is fixed, this cohort only drains by
 -- running STEP 1 by hand at batch size 25, ideally when the queue is near-empty.
+--
+-- ── SECOND-PASS PROGRESS (2026-08-14, batch size 25 throughout) ──────────────────────────────
+--     start of pass    66 repaired /  449 remaining /   592 facilities recovered
+--     end of pass     214 repaired /  301 remaining / 3,473 facilities recovered
+--     FALSE ZEROS REMAINING: 0 at every single reading.
+--
+-- Per-batch yields, in order: 10/75 · 19/25 · 24/25 · 12/25 · 17/25 · 6/25 · 11/25 · 19/25 ·
+-- 15/25 · 15/25. The 25-batches average ~60% and peak at 96%; the one 75-batch managed 13%.
+--
+-- The pass ends not because the cohort is exhausted but because of CONTENTION: cron 14 fires
+-- 250 futile requests every 15 minutes (Finding 2), which pins the pg_net worker — observed
+-- three times, queue frozen at 250-377 with zero completions for minutes at a stretch. Repair
+-- batches can only run in the gaps between those fires.
