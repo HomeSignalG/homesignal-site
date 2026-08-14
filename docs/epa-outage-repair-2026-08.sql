@@ -229,3 +229,18 @@ update public.epa_outage_repair_2026_08 r
 -- CONTENTION IS THE OTHER CEILING, unchanged: cron 14 queues 250 every 15 minutes, and while
 -- that batch drains pg_net returns almost nothing (measured this pass: queue pinned at 281 with
 -- **2 responses in 10 minutes**). Manual batches land only in the gaps between cron fires.
+
+-- ── FOURTH PASS, 2026-08-14 (post fair-ordering) ─────────────────────────────────────────────
+--   repaired 357 of 515 (69%) · 329 restored non-zero + 28 confirmed genuine zeros
+--   5,310 EPA facilities recovered · 158 remaining · FALSE ZEROS REMAINING: 0
+--
+-- Session arc, for scale: 66 -> 357 repaired, 592 -> 5,310 facilities recovered.
+--
+-- THE FAIR-ORDERING FIX KEEPS DELIVERING on the population it targets. Rows never written since
+-- the outage, sampled across the pass: **2,061 -> 1,519 -> 1,335**. That set had been frozen for
+-- days before the fix; it is now draining on its own.
+--
+-- The remaining 158 are the hard tail — dense-urban ZIPs where FRS's process limit and rate
+-- limiting bite hardest, several with 3+ attempts. They are the reason this cohort was damaged
+-- first and the reason it repairs last. Every one of them renders "—, unavailable"; none states
+-- a false zero.
