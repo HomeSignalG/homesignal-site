@@ -40,6 +40,48 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-08-14 — SOUTH CAROLINA WIRED (#709): 30 → 171/192 (89.1%). Statewide-DOT lever, 4th state.
+
+**`scdot-project-viewer-lines`, arcgis 165 → 166, merged `f41a63b`, deployed (run 31808271280).
+ROLLOUT COMPLETE: 171 / 192 live (89.1%), SCDOT on 170 pages / 3,529 records.** Pre-wire control:
+192 cached, **30 live**. National **8,187 → 8,328** of 12,722.
+
+- **Invariants over all 3,529 materialized rows: 0 missing `source_ref`, 0 missing coordinates,
+  0 missing title, 0 missing status, exactly 2 statuses** (`Approved`, `Proposed`), lat
+  32.384–35.175 / lng −82.555 to −78.619 — wholly inside SC. **Gate proof, bidirectional:**
+  `scdot_leaked_outside_sc = 0` cache-wide, and the pre-rollout NC control (28202, Mecklenburg)
+  returned **0** SCDOT records while still serving its own 1,251 Charlotte-sourced sites.
+- **Vocabularies enumerated live, each summing EXACTLY to the layer count (3,958):** `projectact`
+  = Construction 1,892 + Design/Development 1,823 + Pre-Award 243; `projecttyp` = 29
+  self-describing values. 0 unclassified.
+- **No `file_date` — deliberate, not an omission.** `dateofcurr` is the literal string
+  `"Currently Undetermined"`; `con_year`/`row_year` contain `0`. 18 of 192 pre-existing entries
+  already omit it, incl. four other state DOTs.
+- 🆕 **THIRD CONSECUTIVE STATE WHERE THE SERVER PATH WAS THE BLOCKER, NOT THE ORG.** SCDOT lives at
+  `gis.scdot.org/hosting/rest/services/`, not `/arcgis/`; both host guesses 404'd and the real
+  server was recovered by walking a live web map's `operationalLayers` (the Frisco pattern).
+  INDOT was `/ro/`, MoDOT's hosts were DNS-dead. **Walk a web map before writing off a DOT.**
+- 🆕 **STANDING ANSWER — a column named `status*` is not necessarily a status.**
+  `PavementList2027_commission` (429 rows) has `status1` = `""` ×426 and
+  `"Event Located.  Event distance is out of range and has been truncated."` ×3 — an LRS
+  geocoding diagnostic. Rejected. Also rejected with counts: `Announced_Projects_Job_Numbers`
+  (517, economic-development announcements, not roads), `AllProjects`/`existingprojects` (68,
+  interstate-only), `2014_Present_InterstateProjects` (17), `ProjectTracking` (0 rows).
+- 📌 **OPEN FOLLOW-UP — `Project_Viewer_Points` (layer 0, 960 rows, identical schema) deliberately
+  NOT wired.** Prove `projectid` disjointness from Lines first; wiring both without that check is
+  the Houston-plat double-emit class, where one real project is counted twice on every page.
+- ⚠️ **21 of 192 SC ZIPs did not land, and the cause is the FRS ceiling, not SCDOT.** When FRS
+  returns `facilities: 0`, `dev_refresh_collect`'s facilities guard refuses the WHOLE response and
+  discards the real SCDOT records with it. Measured directly: a 35-ZIP batch produced 59 SC
+  responses, **all 59 with development > 0 (4,045 records), 12 refused by that guard**; batches of
+  25 held ~80-92%. They stay on the `refreshed_at` cursor and the hourly cron sweeps them.
+- ⚠️ **METHOD ERROR TO NOT REPEAT — never call `dev_refresh_collect()` and count in the SAME
+  statement.** The scalar subquery reads the pre-collect snapshot, so every batch reported one
+  behind and looked like a stall. Measure in a separate statement.
+- ⚠️ **AND: a background `sleep` does NOT block the next tool call.** Polling straight through
+  five of them produced a fabricated "15 minutes elapsed, CI is hung" reading when the DB clock
+  said 1m53s. **Read the clock before calling anything hung** — third occurrence this session.
+
 ### 2026-08-13 — DENVER 80249 WAS DELETED BY SOMETHING OTHER THAN CLAUDE. RULING REVERTED TO 12,722.
 
 **The count is 12,722 again and Rule #0b is restored verbatim** (ingest repo; the brief 12,723
