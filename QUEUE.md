@@ -91,6 +91,56 @@ ROLLOUT COMPLETE: 182 / 202 live (90.1%), KDOT on 180 pages / 2,375 records.** P
   KDOT problem. They stay on the `refreshed_at` cursor; the 15-min `dev-reports-rolling-refresh`
   cron sweeps them.
 
+### 2026-08-14 — MINNESOTA WIRED (#716): 34 → 120/174 (69.0%). Statewide-DOT lever, 6th state.
+
+**`mndot-stip-roadway-projects` + `mndot-chip-roadway-projects`, arcgis 167 → 169, merged `5359ba5`,
+deployed (run 31847890869). ROLLOUT PARTIAL BY CHOICE: 120 / 174 live (69.0%), MnDOT on 94 pages /
+596 records.** Pre-wire control: 174 cached, **34 live**. National **8,449 → 8,535** of 12,722.
+
+- **Invariants, per entry: 0 missing `source_ref`, 0 missing coordinates, 0 missing title, 0 missing
+  status.** `mndot-stip-*` 401 rows, single status `Approved`, lat 44.01–45.55 / lng −94.26 to
+  −92.46. `mndot-chip-*` 195 rows, single status `Proposed`, lat 44.03–45.50 / lng −94.31 to −92.49.
+  Both wholly inside Minnesota. **Gate proof, bidirectional:** `leaked = 0` cache-wide, and the
+  pre-rollout Wisconsin controls **54755 + 54739 (Eau Claire) returned 0 MnDOT** while keeping their
+  own 2 and 11 records.
+- 🆕 **TWO ENTRIES BECAUSE DISJOINTNESS WAS PROVEN — the general shape for a multi-layer DOT service.**
+  The 2026-2035 CHIP service carries FOUR project layers (0 CHIP Bridge 500, 13 STIP Bridge 271,
+  22 STIP Roadway 534, 23 CHIP Roadway 431). STIP could easily have been NESTED inside CHIP, which
+  would double-emit every shared project on every page — the `houston-plat-applications` hazard that
+  exact-identity dedup CANNOT catch across two `source_registry_id`s. Live `groupBy Fiscal_Yea`:
+  STIP Roadway = 2026:160 + 2027:149 + 2028:141 + 2029:84 = **534** (sums exactly); CHIP Roadway =
+  2030:54 + 2031:62 + 2032:65 + 2033:84 + 2034:73 + 2035:93 = **431** (sums exactly). **ZERO overlap
+  — MnDOT PARTITIONS the ten-year plan** (STIP = committed years 1-4, CHIP = planned years 5-10).
+  **Test the partition before wiring siblings; never infer it from the names.**
+- ⚠️ **THE UNIT SUITE CAUGHT THE FIRST DRAFT AND IT WAS RIGHT.** Neither layer has a status column,
+  so `status_const` is required (the `detroit-building-permits` pattern). I first used
+  `"Approved"`/`"Proposed"` — and `status-const-must-be-mapped.test.mjs` FAILED on its ratchet:
+  *"no NEW bucket-named constant (known: 14) … now 16"*. A `status_const` must DESCRIBE THE RECORD,
+  not restate the bucket. Corrected to MnDOT's own program terms — **`Programmed`** (STIP → approved)
+  and **`Planned`** (CHIP → proposed) — each resolving through its own `status_to_bucket`. **Without
+  that ratchet the weaker version would have shipped.** 16 pre-existing entries still name a bucket;
+  the ratchet freezes the count rather than fixing them.
+- **No `file_date`, deliberately:** `Fiscal_Yea` is a YEAR (Integer 2026), not a date, and there is
+  no date column — omitted rather than fabricated from a year. `recency_days` absent for the same
+  reason. Column population verified in advance on BOTH layers: `Descriptio` NULL → 0,
+  `SP_Number` NULL → 0. Sample: `ISANTI / 3006-39 / "Rebuild Hwy 95 from Fern St to Fillmore St in
+  Cambridge…" / MN 95`.
+- 🆕 **FIFTH CONSECUTIVE STATE WHERE A GUESSED HOST WAS DEAD** — `gis.dot.state.mn.us` fails DNS.
+  Org is PUBLIC (`qWbGMYB49y8mLbRt`, urlKey `mndot`), but the service was found through the OWNER
+  ACCOUNT **`MnDOT_GIS`** — the `OregonDOTGIS` / `KanDOT` move, now 3 for 3.
+- **Rejected with receipts:** `MnDOT 2020 Construction Projects` (2020-04-30) · `MnDOT 2021
+  Construction Projects` (2023-09-18) · `STIP Bridge/Pavement Projects on Tribal Nations` (2024-05-24
+  AND tribal-scoped, not statewide) · `2025-2034 Capital Highway Investment Plan` (superseded edition).
+- 📌 **OPEN — BRIDGE LAYERS 0 AND 13 (771 rows) NOT WIRED.** The FY partition almost certainly holds
+  for them too, but that is an assumption. Run the same `groupBy Fiscal_Yea` on layers 0 and 13,
+  then wire as two more entries. Would likely add materially to the 54 still-dark MN pages.
+- ⚠️ **ROLLOUT STOPPED DELIBERATELY AT 101/174 REFRESHED, NOT RUN TO EXHAUSTION.** Batch yields ran
+  25 → 11 → 10 → 12 → 11 → 13 → 14 → **+2**. That last figure is a stall: the remaining pool had
+  concentrated into ZIPs the FRS facilities guard keeps refusing, and every further fire is FRS
+  pressure that makes the next refusal more likely while discarding real MnDOT records with the
+  transient zero. Handed to the 15-min `dev-reports-rolling-refresh` cron, which sweeps them on the
+  `refreshed_at` cursor. **Firing harder does not fix an FRS-throughput refusal.**
+
 ### 2026-08-14 — 🚫 OREGON REJECTED. No wireable statewide source. OR stays 52/200 (148 dark).
 
 **The Florida outcome: recon found real candidates and LIVE PROBING rejected every one.** Recorded
