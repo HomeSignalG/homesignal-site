@@ -40,6 +40,57 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-08-14 — KANSAS WIRED (#712): 61 → 182/202 (90.1%). Statewide-DOT lever, 5th state.
+
+**`kdot-wincpms-project-locations`, arcgis 166 → 167, merged `22868af`, deployed (run 31831595244).
+ROLLOUT COMPLETE: 182 / 202 live (90.1%), KDOT on 180 pages / 2,375 records.** Pre-wire control:
+202 cached, **61 live**. National **8,328 → 8,449** of 12,722.
+
+- **Invariants over all 2,375 materialized rows: 0 missing `source_ref`, 0 missing coordinates,
+  0 missing title, 0 missing status**, statuses `Approved`/`Operating`, lat 37.391–39.774 / lng
+  −98.418 to −94.608 — wholly inside Kansas. Dates 2021-08-17 → 2031-10-08, exactly the 1825-day
+  window with future lettings retained. **Gate proof, bidirectional:** `leaked_outside_ks = 0`
+  cache-wide, and the pre-rollout control **64108 (Kansas City MO, Jackson Co) returned 0 KDOT
+  records while keeping its own 785** — a cross-state-line control directly opposite 66101, which
+  took 66. That is the strongest gate receipt to date.
+- **Both vocabularies enumerated live, each summing EXACTLY to 8,297:** `proj_status_cd` = CLOSE
+  5,584 + COMPL 1,358 + ACTIV 1,235 + `CANC ` 112 + `PLAN ` 8; `wtyp_name` = 83 self-describing
+  values. 0 unclassified. ACTIV→approved, PLAN→proposed, COMPL+CLOSE→operating, CANC→exclude.
+- ⚠️ **`CANC ` and `PLAN ` carry upstream char(5) RIGHT-PADDING.** The connector trims both sides,
+  so the mapping uses TRIMMED values — the `harris-county-plats` precedent. Mapping the padded
+  strings would have silently dropped 120 rows into fail-closed.
+- **`recency_days: 1825` MEASURED, not assumed** (the Phoenix discipline). `d_proj_let_date` is a
+  true `esriFieldTypeDate` spanning 2010-03-23 → 2031-12-16. Unwindowed 8,297 · 1825d **2,561** ·
+  1095d 1,712 · 283 NULL let dates dropped. **6,942 of 8,297 rows are finished work (CLOSE+COMPL)
+  reaching back to 2010** — unwindowed, resident pages would fill with decade-old completed
+  roadwork rendered as "operating".
+- **Column population verified IN-WINDOW before mapping** (the arlington/harris-county-permits
+  failure class — config that looks complete and silently emits nothing): `proj_friendly_name`
+  NULL → 0, `d_proj_full_num` NULL → 0, `prdc_friendly_loc_desc` NULL → 0. Sampled rows:
+  `Guardrail End Terminal Updates on US-169 in Anderson Co` / KA-6463-01 / ACTIV.
+- 🆕 **FOURTH CONSECUTIVE STATE WHERE THE SERVER PATH WAS THE BLOCKER.** `gis.ksdot.gov` fails DNS
+  outright; the live server is **`kanplan.ksdot.gov/arcgis_web_adaptor/`**, recovered by searching
+  the OWNER ACCOUNT `KanDOT` (695 items) and reading the item's own `url` field — the same
+  owner-account move that found Oregon's `OregonDOTGIS`. INDOT `/ro/` · MoDOT DNS-dead · SCDOT
+  `/hosting/` · KDOT `kanplan`. **Never conclude a DOT has nothing from a host guess.**
+- ⚠️ **LAYER INDEX IS 2** — `Projects_KHUB/MapServer/0` returns `{"error":{"code":404,"message":
+  "Layer not found"}}`; the `layers` array holds exactly one entry, id 2. Third state running
+  (MoDOT layer 1, SCDOT layer 1). **Read the layers array, never assume 0.**
+- **Rejected siblings with receipts:** `WinCPMS KHUB` (same source, item stale 2023-09-19) ·
+  `Project Strip Maps` (cartographic imagery, not a register) · `SigWorkZone` (signed work zones —
+  transient traffic control, the ODOT TripCheck event-vs-project distinction).
+- 🧹 **PRE-EXISTING, NOT CAUSED BY THIS WIRE — Topeka 66603 is a 5.67 MB cached row**, near the
+  Cleveland 44127 high-water mark (5.98 MB). `topeka-building-permits` supplies **6,100** of its
+  6,126 records; KDOT contributes 26. Levers are `spatial_zip_radius_mi` or an `out_fields`
+  projection, both of which change what residents see — logged, not touched.
+- ⚠️ **`dev_refresh_collect()` now exceeds the 60 s MCP client timeout on large batches.** It
+  COMPLETES server-side; confirm by re-reading the count in a separate statement, never by whether
+  the call returned. (And never call collect + count in ONE statement — the scalar subquery reads
+  the pre-collect snapshot, which reported every SC batch one behind.)
+- **20 ZIPs did not land** — the FRS facilities-guard class recorded under South Carolina, not a
+  KDOT problem. They stay on the `refreshed_at` cursor; the 15-min `dev-reports-rolling-refresh`
+  cron sweeps them.
+
 ### 2026-08-14 — 🚫 OREGON REJECTED. No wireable statewide source. OR stays 52/200 (148 dark).
 
 **The Florida outcome: recon found real candidates and LIVE PROBING rejected every one.** Recorded
