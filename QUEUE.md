@@ -141,6 +141,25 @@ deployed (run 31847890869). ROLLOUT PARTIAL BY CHOICE: 120 / 174 live (69.0%), M
   transient zero. Handed to the 15-min `dev-reports-rolling-refresh` cron, which sweeps them on the
   `refreshed_at` cursor. **Firing harder does not fix an FRS-throughput refusal.**
 
+### 2026-08-15 — ✅ EXECUTED (founder-approved): bethelak cache purge + engine pagination fix (#736), both live-verified
+
+**Purge:** pre-flight re-measured the population at exactly 26 (unchanged), then the one-time
+provenance-scoped update ran: **UPDATE 26** (the stop condition — "anything other than 26" —
+did not trigger). Verification, all green: bethelak provenance anywhere in the cache **0**;
+granicus positive control **295 rows** (the query shape provably still sees sites); per-row
+`counts.civic == remaining civic sites` mismatches **0**; 99551 counts now all-zero; 99559
+kept its 10 legitimate sites (8 AKDOT&PF dev + 2 facilities). Transient-safe guard untouched.
+SQL of record: `docs/bethelak-wrong-body-cache-purge.sql`.
+
+**Pagination (#736, squash-merged `e4c96c1`, checks unit+verify+browser green, 105-file suite):**
+deploy-edge-functions run 31905066054 success (fail-loud exclusion loader green on the same
+run). **The receipt: 87513 re-cached through the live engine (pg_net request 157506, HTTP 200)
+→ civic 100 → 101**, exactly the predicted number (101 qualifying alerts, 101 distinct URLs so
+dedup collapses none). Live spot-check run 31905226787: **99551 tracker = "empty (honest,
+map/coverage note)"** — the purge visible end-to-end on homesignal.net — and **87513 tracker =
+"populated (101 sites)"** — the uncapped read visible live; dev-app honest coverage block on
+both, 0 JS errors, retired-claim tripwire silent.
+
 ### 2026-08-15 — 🔴 FINDING: the app-content-refresh cron has been DEAD since 2026-08-09 (statement timeout, every run)
 
 Found answering "will 87513 re-materialize on its own?" — the answer is **no, nothing will, for
@@ -159,6 +178,60 @@ their last touch for all ~10k untouched ZIPs. Fix direction (GATED, not built): 
 commit incrementally — a procedure with per-ZIP/per-chunk COMMIT, or a much smaller batch sized
 to the statement timeout with the cron cadence raised to compensate. Not attempted without
 approval: it is a production cron + function change.
+
+**PROMOTED 2026-08-15 (founder): top-priority work item, PROPOSE-ONLY until the diagnosis is
+reviewed. Diagnosis complete same day — all four scope points measured:**
+
+**(a) What killed it: per-ZIP cost growth crossing a fixed 120s wall — content growth, not one
+slow ZIP.** The DB-default `statement_timeout` is **120000ms** (the failures' 120s is exactly
+that; `authenticator`/`anon` roles are 8s/3s — irrelevant here, pg_cron runs at DB default).
+The batch's own duration curve walks straight into it: hourly runs averaged **13–20s**
+(07-24→28) → **33s** (07-29) → **44–56s** (07-30→08-05) with maxima 99–116s (08-01→08-08) →
+08-09 half the runs hit 120s → 08-10 onward **every run 120s-failed**. That growth window is
+exactly the content expansion: Gold Master local news live 07-28 (7,168 alerts in 2 days, rows
+in `app_changes` for every covered ZIP), the Government Notices national rollout (761 feeds by
+08-12), and the Maps state passes growing `dev_sites` arrays. Per-ZIP cost measured today
+(clock-timed through the real `app_refresh_zip`): light/empty ZIP **0.11–0.15s**, dense metro
+**0.9s** (55407, 3,035 app rows) to **1.6s** (44127, 5,384 rows). At those costs a 1,500-ZIP
+batch needs **~165s even if all-light and ~390s at the fleet mix** — the 1,500 batch size can
+NEVER fit 120s again, and the curve says per-ZIP cost keeps rising with coverage. No single
+poison ZIP: failure CONTEXTs rotate (`insert app_projects`, `app_changes`,
+`dev_sites_deduped`, deletes) — the timeout lands wherever second 120 falls.
+
+**(b) Proposed design — time-budgeted sweep procedure, per-ZIP COMMIT, fail-visible:**
+a new `procedure app_refresh_sweep(_budget_secs int default 100)` replacing
+`app_refresh_batch(1500)` in cron job 13, cadence `*/15 * * * *`. Per ZIP (oldest-first, same
+candidate union): `BEGIN app_refresh_zip(zip); EXCEPTION WHEN OTHERS → log to
+app_refresh_failures(zip, error, at) END; COMMIT;` then exit the loop when
+`clock_timestamp() - t0 > _budget_secs`. Failure semantics, explicitly: **a failed ZIP is
+committed as a failure ROW (visible), never re-raised (does not block subsequent ZIPs), and the
+ZIP stays oldest-first-eligible so it retries next sweep**; completed ZIPs survive any later
+kill because each committed. The 100s budget guarantees the CALL ends before the 120s wall
+regardless of mix (worst single ZIP overshoot ~1.6s), so the sizing is time-based and immune to
+further growth — throughput degrades gracefully instead of cliffing to zero. Capacity at
+today's mix: ~380 ZIPs/run × 96 runs/day ≈ **36k ZIP-visits/day ≈ 2.8 full national sweeps** —
+the same throughput the healthy 07-25-era job delivered.
+
+**(c) The six-day silence is an instrument defect with a one-line cause:**
+`pipeline_health_tick`'s `materializer` check alerts on `max(app_community_meta.updated_at)`
+age > 6h — and MAX moves whenever ANY ZIP is touched, so the session-driven on-demand
+refreshes kept it green while the sweep was dead (155 consecutive cron failures, zero alerts).
+It measured "something was touched", not "the sweep is alive". Proposed: (1) change the
+`materializer` check to **min-age** — alert when `min(updated_at) < now() - 48h` (the real
+SLO: no ZIP older than ~5 sweep periods); (2) add a `materializer_cron` check that reads
+`cron.job_run_details` for the sweep job and alerts on ≥3 consecutive failures, plus a row
+count from `app_refresh_failures`. Both ride the EXISTING pipeline-health pg_cron+pg_net
+alert path — no new mechanism.
+
+**(d) Backfill: no special machinery.** Backlog measured 2026-08-15: **10,361 of 12,722**
+metas older than the 08-09 sweep death (median age = 08-09). Oldest-first is already the
+order, so the first ~7 hours of a healthy sweep IS the backfill (10,361 ÷ ~1,520/hr ≈ 7h;
+call it 7–9h with heavy-ZIP variance). Notices-covered ZIPs like 87513 need no priority lane:
+they're inside the same 7–9h window, and any specific ZIP can be kicked on demand today (the
+mechanism sessions already use). ETA to fully caught up: **under half a day from the moment
+the procedure ships.**
+
+Awaiting founder review of this diagnosis before building (a-d unchanged as proposed).
 
 ### 2026-08-15 — 🧹 SESSION-HYGIENE RULE: the orphaned-branch pattern (from the coverage-copy revival)
 
