@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. No subject-matter claim is derived.",
-  "registry_entries": 183,
+  "registry_entries": 198,
   "statewide": {
     "AK": [
       {
@@ -58,6 +58,32 @@
         "scope": "statewide"
       }
     ],
+    "IL": [
+      {
+        "id": "idot-annual-program-bridges",
+        "label": "Illinois Department of Transportation",
+        "scope": "statewide"
+      },
+      {
+        "id": "idot-annual-program-construction",
+        "label": "Illinois Department of Transportation",
+        "scope": "statewide"
+      }
+    ],
+    "IN": [
+      {
+        "id": "indot-spms-active-projects",
+        "label": "Indiana Department of Transportation (INDOT)",
+        "scope": "statewide"
+      }
+    ],
+    "KS": [
+      {
+        "id": "kdot-wincpms-project-locations",
+        "label": "Kansas Department of Transportation (KDOT)",
+        "scope": "statewide"
+      }
+    ],
     "MA": [
       {
         "id": "massdot-highway-projects",
@@ -86,6 +112,39 @@
         "scope": "statewide"
       }
     ],
+    "MN": [
+      {
+        "id": "mndot-chip-roadway-projects",
+        "label": "Minnesota Department of Transportation (MnDOT)",
+        "scope": "statewide"
+      },
+      {
+        "id": "mndot-stip-roadway-projects",
+        "label": "Minnesota Department of Transportation (MnDOT)",
+        "scope": "statewide"
+      }
+    ],
+    "MO": [
+      {
+        "id": "modot-stip-locations-accepted",
+        "label": "Missouri Department of Transportation (MoDOT)",
+        "scope": "statewide"
+      }
+    ],
+    "NE": [
+      {
+        "id": "ndot-program-book-segments",
+        "label": "Nebraska Department of Transportation (NDOT)",
+        "scope": "statewide"
+      }
+    ],
+    "NH": [
+      {
+        "id": "nhdot-ten-year-plan-projects",
+        "label": "New Hampshire Department of Transportation",
+        "scope": "statewide"
+      }
+    ],
     "NJ": [
       {
         "id": "nj-stip-projects",
@@ -97,6 +156,41 @@
       {
         "id": "nvdot-project-boundaries",
         "label": "Nevada Department of Transportation",
+        "scope": "statewide"
+      }
+    ],
+    "NY": [
+      {
+        "id": "nysdot-capital-program-projects",
+        "label": "New York State Department of Transportation",
+        "scope": "statewide"
+      }
+    ],
+    "OH": [
+      {
+        "id": "odot-current-projects",
+        "label": "Ohio Department of Transportation",
+        "scope": "statewide"
+      }
+    ],
+    "OK": [
+      {
+        "id": "okdot-workplan-roadways",
+        "label": "Oklahoma Department of Transportation",
+        "scope": "statewide"
+      }
+    ],
+    "RI": [
+      {
+        "id": "ridot-rhode-restore-projects",
+        "label": "Rhode Island Department of Transportation",
+        "scope": "statewide"
+      }
+    ],
+    "SC": [
+      {
+        "id": "scdot-project-viewer-lines",
+        "label": "South Carolina Department of Transportation (SCDOT)",
         "scope": "statewide"
       }
     ],
@@ -142,6 +236,13 @@
       {
         "id": "wisdot-highway-program-6yr",
         "label": "Wisconsin Department of Transportation (WisDOT)",
+        "scope": "statewide"
+      }
+    ],
+    "WV": [
+      {
+        "id": "wvdoh-active-projects",
+        "label": "West Virginia Division of Highways (WVDOT)",
         "scope": "statewide"
       }
     ]
