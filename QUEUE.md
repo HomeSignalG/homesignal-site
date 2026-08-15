@@ -203,9 +203,14 @@ from public.registry_incomplete_entries;
 ```
 
 `sha` must equal `git show origin/main:supabase/functions/get-address-report/jurisdiction-registry.json | sha256sum`
-(deploys are byte-exact from repo source), `shas` must be 1, and `n` > 0 (10 at time of writing;
-a mismatch means the registry changed on main without a redeploy — dispatch
-`deploy-edge-functions` and re-check, don't hand-patch the table).
+(deploys are byte-exact from repo source), `shas` must be 1, and **`n` = 0 is DO-NOT-USE, same
+severity as a sha mismatch** (founder addition, 2026-08-15) — an empty or truncated table makes the
+view silently OVERSTATE Live, so the guard that catches drift must also catch an unloaded table,
+permanently, not just at activation. Any failure — wrong sha, `shas` > 1, or `n` = 0 — means:
+dispatch `deploy-edge-functions` and re-check; never hand-patch the table, and never run Live
+queries against the view until the check passes. (`n` was 10 at time of writing; the number may
+legitimately change as registry entries are completed or added — the sha, not the count, is the
+currency check.)
 
 **SEQUENCING NOTE:** until the migration is applied AND the next deploy runs its loader, the table
 is EMPTY and the view would silently overstate Live. The migration file says so and orders the

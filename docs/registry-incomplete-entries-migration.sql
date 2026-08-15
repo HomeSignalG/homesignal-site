@@ -62,7 +62,11 @@ comment on view public.v_incomplete_registry_entries is
 -- 1. Row count and fingerprint:
 --      select count(*) as n, min(registry_sha256) as sha, max(computed_at) as at
 --        from public.registry_incomplete_entries;
---    n must be >0 (10 at time of writing) and sha must equal the local computation:
+--    n = 0 is DO-NOT-USE, same severity as a sha mismatch (founder rule, 2026-08-15): an
+--    empty or truncated table makes the view silently OVERSTATE Live, so this guard must
+--    catch an unloaded table permanently, not just during activation. n was 10 at time of
+--    writing (the count may legitimately change; the sha is the currency check), and sha
+--    must equal the local computation:
 --      git show origin/main:supabase/functions/get-address-report/jurisdiction-registry.json \
 --        | sha256sum
 --    (deploys are byte-exact from repo source, so main's file hash IS the deployed hash
