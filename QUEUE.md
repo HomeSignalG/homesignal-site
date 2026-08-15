@@ -141,6 +141,76 @@ deployed (run 31847890869). ROLLOUT PARTIAL BY CHOICE: 120 / 174 live (69.0%), M
   transient zero. Handed to the 15-min `dev-reports-rolling-refresh` cron, which sweeps them on the
   `refreshed_at` cursor. **Firing harder does not fix an FRS-throughput refusal.**
 
+### 2026-08-15 — LIVE-METRIC EXCLUSION LIST COMPUTED, NOT TRANSCRIBED. View replaces the inline array.
+
+**The 10-entry "incomplete registry" exclusion list that gates every Live-page count is now
+COMPUTED from the registry JSON and served by one DB view.** It had been hand-maintained here and
+restated inline in every query, with nothing enforcing it (self-flagged 2026-08-15; founder-directed
+fix, propose-then-wire). **No registry entry changed; no metric definition changed** — verified
+before wiring: the computed list matched the hand list EXACTLY, 10/10, zero difference in either
+direction, at registry `76ef18a`.
+
+**THE CRITERIA (canonical; prose here and `scripts/compute-incomplete-registry.mjs` must say the
+same thing — the script alone holding the truth would recreate the single-copy problem):**
+
+```
+incomplete(e) ⇔  NOT hasUseType(e)  OR  NOT hasStatus(e, family)
+hasUseType(e)        ⇔ 'type_map' ∈ e  OR  'use_type_const' ∈ e
+hasStatus(e, family) ⇔ status_to_bucket has ≥1 mapped value
+                       OR (family = 'socrata' AND 'status_const' ∈ e)
+```
+
+- Type half: without either field, `use_type` falls through to keyword guessing for the pin shape
+  (`use_type` is the CLOSED six-value vocabulary, `lib/map.js::TYPE_EXACT`).
+- Status half — **the socrata clause is load-bearing, and its omission was a real near-miss**: the
+  old prose ("complete on both `type_map` and `status_to_bucket`") read naively adds
+  `east-baton-rouge-` / `marin-county-` / `buffalo-` / `prince-georges-county-` building permits,
+  whose all-empty `status_to_bucket` + `status_const` is socrata's SHIPPED IDIOM (the constant IS
+  the bucket). An arcgis `status_const` is a raw value that must resolve through its map —
+  `test/status-const-must-be-mapped.test.mjs` documents the asymmetry and now
+  `test/registry-incomplete-entries.test.mjs` pins these criteria with self-tests (16 checks:
+  stripped entry flagged, socrata-const passes, arcgis same-shape fails, the four real entries
+  stay off the list). The line-662 prose above carries the dated correction.
+
+**THE PLUMBING:** `scripts/compute-incomplete-registry.mjs` (the one computation; `--sql` emits a
+single-transaction full replace) → loader step in `deploy-edge-functions.yml` runs it against the
+exact JSON just deployed and writes `public.registry_incomplete_entries`
+(`registry_id, reason, registry_sha256, computed_at`; RLS ON, public read, loader-only writes) →
+**`public.v_incomplete_registry_entries`** is what everyone reads. DDL of record:
+`docs/registry-incomplete-entries-migration.sql`. **The loader is FAIL-LOUD**: no
+`continue-on-error`, `set -euo pipefail`, non-2xx/SQL error exits 1 — a deploy whose load fails
+shows a RED run, never a silently stale list.
+
+**THE LIVE-METRIC QUERY, from now on (inline id arrays are retired for this metric):**
+
+```sql
+with live as (
+  select distinct p.zip from public.app_projects p
+  where p.record_kind = 'development'
+    and p.registry_id is not null
+    and p.registry_id not in (select registry_id from public.v_incomplete_registry_entries)
+)
+select count(*) from live;  -- per-state: join communities on level='zip', state, zip_codes[1]
+```
+
+**FRESHNESS CHECK — run before trusting the view (a list nobody has verified is the hand list with
+extra steps):**
+
+```sql
+select count(*) n, min(registry_sha256) sha, count(distinct registry_sha256) shas,
+       max(computed_at) at
+from public.registry_incomplete_entries;
+```
+
+`sha` must equal `git show origin/main:supabase/functions/get-address-report/jurisdiction-registry.json | sha256sum`
+(deploys are byte-exact from repo source), `shas` must be 1, and `n` > 0 (10 at time of writing;
+a mismatch means the registry changed on main without a redeploy — dispatch
+`deploy-edge-functions` and re-check, don't hand-patch the table).
+
+**SEQUENCING NOTE:** until the migration is applied AND the next deploy runs its loader, the table
+is EMPTY and the view would silently overstate Live. The migration file says so and orders the
+steps: apply SQL → dispatch deploy → verify freshness → only then switch queries to the view.
+
 ### 2026-08-15 — NEBRASKA WIRED (#728): 36 → 123/174 (70.7%). Statewide-DOT lever, 7th state.
 
 **`ndot-program-book-segments`, arcgis 169 → 170, merged `76ef18a`, deployed (run 31891641193).
@@ -660,7 +730,15 @@ discrimination test before trusting a URL column.
 ### 2026-08-13 — FIVE STATEWIDE DOT WIRES. 6,692 → 7,476 Live (+784). Registry 183 → 188.
 
 Measured on `public.app_projects` (`record_kind='development'`, entry complete on both `type_map`
-and `status_to_bucket`) — the same definition the scoreboard uses. **7,476 / 12,722 = 58.8%**, up
+and `status_to_bucket`) — the same definition the scoreboard uses. *(⚠️ CORRECTED 2026-08-15: as
+written, this parenthetical is underspecified in both halves. Complete = (`type_map` OR
+`use_type_const`) AND (≥1 mapped `status_to_bucket` value OR a socrata `status_const` — socrata's
+constant IS the bucket, no mapping required; an arcgis constant must resolve through its own
+`status_to_bucket`, per `test/status-const-must-be-mapped.test.mjs`). Read naively, the status
+half wrongly flags the four socrata idiom entries — `east-baton-rouge-`, `marin-county-`,
+`buffalo-`, `prince-georges-county-` building permits. The 10-entry list this produced was
+verified correct; the prose was not. Canonical definition + computed list: the 2026-08-15
+"EXCLUSION LIST COMPUTED" entry.)* **7,476 / 12,722 = 58.8%**, up
 from 6,692 (52.6%). Recorded in workbook **0080**.
 
 | state | before | after | entry |

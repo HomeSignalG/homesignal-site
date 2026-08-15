@@ -59,6 +59,54 @@ jobs:
             --project-ref "$SUPABASE_PROJECT_REF" \
             --no-verify-jwt
 
+      # Recompute the live-metric exclusion list FROM the registry JSON just deployed and
+      # full-replace public.registry_incomplete_entries in one transaction. This is the ONLY
+      # writer of that table; every Live-page query reads it via v_incomplete_registry_entries
+      # instead of an inlined array (docs/registry-incomplete-entries-migration.sql).
+      #
+      # FAIL-LOUD BY DESIGN — no continue-on-error, set -euo pipefail, and a non-2xx or SQL
+      # error exits 1: a deploy that succeeds while this step fails must show a RED run,
+      # because the alternative is a silently stale exclusion list that misstates the metric
+      # while every query "works". registry_sha256 rows carry the hash of the exact JSON this
+      # run computed from, so staleness is independently checkable (see the migration file).
+      - name: Recompute + load registry_incomplete_entries (fail-loud)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "--- computed exclusion list:"
+          node scripts/compute-incomplete-registry.mjs
+          node scripts/compute-incomplete-registry.mjs --sql > /tmp/incomplete-load.sql
+          python3 - /tmp/incomplete-load.sql <<'PY'
+          import json, os, sys, urllib.request
+          sql = open(sys.argv[1]).read()
+          req = urllib.request.Request(
+              f"https://api.supabase.com/v1/projects/{os.environ['SUPABASE_PROJECT_REF']}/database/query",
+              data=json.dumps({"query": sql}).encode(),
+              headers={
+                  "Authorization": f"Bearer {os.environ['SUPABASE_ACCESS_TOKEN']}",
+                  "Content-Type": "application/json",
+                  "Accept": "application/json",
+                  # Load-bearing header — api.supabase.com sits behind Cloudflare, which 403s
+                  # Python's default UA (error 1010) BEFORE auth. Documented in db-sql.yml;
+                  # do not remove it as an apparently pointless header.
+                  "User-Agent": "HomeSignal-db-sql/1.0 (+https://homesignal.net)",
+              },
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=120) as r:
+                  body = r.read().decode()
+                  print(f"HTTP {r.status}")
+                  print(body[:4000])
+                  if r.status // 100 != 2:
+                      sys.exit(1)
+          except urllib.error.HTTPError as e:
+              print(f"HTTP {e.code}")
+              print(e.read().decode()[:4000])
+              sys.exit(1)
+          PY
+
       - name: Reminder — repopulate the cache
         run: |
           echo "Deployed. New behavior is live for address mode immediately."
