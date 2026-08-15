@@ -141,6 +141,25 @@ deployed (run 31847890869). ROLLOUT PARTIAL BY CHOICE: 120 / 174 live (69.0%), M
   transient zero. Handed to the 15-min `dev-reports-rolling-refresh` cron, which sweeps them on the
   `refreshed_at` cursor. **Firing harder does not fix an FRS-throughput refusal.**
 
+### 2026-08-15 — 🔴 FINDING: the app-content-refresh cron has been DEAD since 2026-08-09 (statement timeout, every run)
+
+Found answering "will 87513 re-materialize on its own?" — the answer is **no, nothing will, for
+any ZIP, until this is fixed.** The scheduled path exists: pg_cron job 13 `app-content-refresh`
+(hourly at :40) runs `app_refresh_batch(1500)`, oldest-first over every modeled ZIP — a full
+national sweep every ~9 hours when healthy. Measured: **last success 2026-08-09 11:40Z; every
+hourly run since has FAILED on `canceling statement due to statement timeout`** (154 lifetime
+failures, the tail unbroken since 08-09; contexts: `insert into app_projects`, `app_changes`,
+`dev_sites_deduped`). Because `app_refresh_batch` is one plpgsql function = ONE transaction, a
+timeout rolls back the WHOLE batch — each failing run materializes **zero** ZIPs while looking
+like an attempt. Every `app_community_meta.updated_at` newer than 08-09 (2,355 rows) came from
+session-driven explicit `app_refresh_zip` calls (the SC/KS/MN/NE rollouts), which is why the
+breakage stayed invisible: on-demand worked, so the app surface kept moving where anyone was
+looking. Consequence: app pages (maps.html / development.html / app_changes civic) are frozen at
+their last touch for all ~10k untouched ZIPs. Fix direction (GATED, not built): the batch must
+commit incrementally — a procedure with per-ZIP/per-chunk COMMIT, or a much smaller batch sized
+to the statement timeout with the cron cadence raised to compensate. Not attempted without
+approval: it is a production cron + function change.
+
 ### 2026-08-15 — 🧹 SESSION-HYGIENE RULE: the orphaned-branch pattern (from the coverage-copy revival)
 
 **What happened.** The approved coverage-copy build (honest empty-state on `development.html`,
@@ -179,6 +198,17 @@ harness stubbed the fetch path, so the live empty-state load was verified on a G
 it classifies populated / honest-coverage-block / plain-fallback and flags the RETIRED "we check
 continuously" claim as BROKEN if it ever reappears live (a permanent regression tripwire, not a
 one-off probe). Smoke result recorded below this entry when the dispatch completed.
+
+**LIVE SMOKE GREEN 2026-08-15 (run 31902656221, spot-check-shell @ `0b532ce`, ~19:00Z):**
+`99551` → dev-app shell yes · **empty (honest coverage block)** · 0 JS errors; `87513` → same.
+That is the REAL fetch path end-to-end on homesignal.net — live Supabase reads (anon key) for
+community/projects/facilities/changes plus the Pages-served `lib/generated/county-sources.json` —
+not the stubbed render harness. The retired claim did not appear (the checker flags it BROKEN on
+sight, so its absence is asserted, not assumed). Note the tracker column on the same run reads
+`populated (15 / 100 sites)` — that is `homesignalmap.html` reading `development_reports` (EPA
+facilities floor), a different page and rail; no contradiction with the app page's empty state,
+whose gate counts run against `app_projects`/`app_changes` (0/0/0 for both ZIPs, verified). The
+coverage-copy arc is CLOSED: built 08-11 → stranded → revived → reviewed → #733 merged → live.
 
 ### 2026-08-15 — LIVE-METRIC EXCLUSION LIST COMPUTED, NOT TRANSCRIBED. View replaces the inline array.
 

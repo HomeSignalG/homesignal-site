@@ -67,6 +67,7 @@ import { siteKey, tceqForZip, type TceqCommunityRow, type TceqEntity } from "./s
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
 import { censusRung, datasetRung, resolveGeocode, supabaseStore } from "./geocode-cache.ts";
 import { socrataForZip, type SocrataCommunityRow, type SocrataRegistryEntry } from "./sources/socrata.ts";
+import { readAllRows } from "./sources/pg-pages.ts";
 import jurisdictionRegistry from "./jurisdiction-registry.json" with { type: "json" };
 const SOCRATA_ENTRIES = (jurisdictionRegistry as unknown as { socrata?: SocrataRegistryEntry[] }).socrata ?? [];
 import { arcgisForZip, type ArcgisRegistryEntry } from "./sources/arcgis.ts";
@@ -216,7 +217,13 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
   // structured NOTICES (the alerts government_notice pull below) + structured permit/case feeds
   // (socrataForZip / TABS / federal). The ingest meeting feeds stay ACTIVE — those meetings still
   // populate the civic-alerts "Meetings" tile on community.html; they are just not development records.
-  const { data: alerts } = await supabase.from("alerts").select("title,category,agency_name,geographic_reference,source_url,comment_deadline").in("community_id", communityIds).eq("pipeline_type", "government_notice").in("category", DEV_CATEGORIES).order("published_at", { ascending: false }).limit(100);
+  // Range-windowed FULL read (sources/pg-pages.ts) — the old `.limit(100)` here silently
+  // truncated: Taos County stored 101 qualifying notices and rendered 100; Weber County
+  // stored 283. The `.order("id")` tiebreak makes the order total so windows never skip
+  // or repeat, and a window that fails after retry THROWS (report fails; the refresh
+  // layer keeps the previous cached row) instead of the old silent-empty destructure.
+  const alerts = await readAllRows<Record<string, unknown>>(() =>
+    supabase.from("alerts").select("title,category,agency_name,geographic_reference,source_url,comment_deadline").in("community_id", communityIds).eq("pipeline_type", "government_notice").in("category", DEV_CATEGORIES).order("published_at", { ascending: false }).order("id"));
   // AREA (jurisdiction-level) notices have NO trustworthy point — a county/city notice applies
   // county- or city-WIDE, not to one address. The page never trusts these coordinates: all three
   // map views position area items synthetically around the report anchor (homesignalmap.html
@@ -232,7 +239,7 @@ async function devSites(supabase: ReturnType<typeof createClient>, homeLat: numb
   //   record, and — since area coordinates are never displayed — is display-identical everywhere,
   //   Box Elder included. Every rendered fact still comes from the record's source_url.
   const [ae, an] = toEN(homeLat, homeLng, homeLat, homeLng);   // [0,0] — the report anchor
-  for (const a of alerts ?? []) {
+  for (const a of alerts) {
     const title = ((a.title as string) || "").trim();
     const approved = /\b(approved|approves|granted|adopted|entitled|permit issued|issued a permit|under construction|final plat|site plan approv|authoriz|ground ?break|breaks ground|begins construction|construction begins)\b/i.test(title);
     // A DECIDED item (approved OR denied/withdrawn/tabled) is not an open comment opportunity.
