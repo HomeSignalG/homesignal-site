@@ -258,6 +258,27 @@ first ~50 minutes; oldest meta advanced 08-09 03:40 → 06:40. Running ahead of 
 estimate (the oldest ZIPs are light); full-pass staleness curve to be reported when
 `min(updated_at)` crosses into the sweep window.
 
+**✅ BACKFILL COMPLETE 2026-08-15 (DB-verified 23:42Z; founder's independent check confirmed
+first).** Before → after: stale ZIPs **10,361 → 0** of 12,722; `min(updated_at)` **08-09
+03:40 → 08-15 21:30** (every ZIP touched within ~2h); median **08-09 09:40 → today**. Six days
+of backlog cleared in **~2 hours, not the estimated 7–9** — the metro-slowdown inversion was
+absorbed by the time budget without a single failure: **13/13 sweep runs succeeded,
+`app_refresh_failures` 0 rows, 0 escalated** (the ledger and N=5 skip were never needed).
+**The instrument-repair receipt:** `materializer` health check flipped red → green ON ITS OWN
+(`ok=true`, transition logged 23:10Z, detail "oldest … 2.2h ago"); `materializer_sweep` green
+since 21:10Z ("last 3 runs: succeeded,succeeded,succeeded"). **No downstream surge, by
+construction and by measurement:** nothing in the delivery path reads `app_changes`/`app_projects`
+(digest rides ingest-side `alerts`), materialization dispatches no Actions, and `email_deliveries`
+shows **0 sends today and 0 yesterday** — the send path did not move. **Taos two-page divergence
+closed in the direction that matters:** 87513 app-side civic **0 → 55**, so development.html's
+gate counts are non-zero and the honest-empty block correctly yields to real notices. 55 ≠ the
+tracker's 101 by DESIGN, not lag: `app_refresh_zip` applies its own windows/caps (measured in
+its def: `limit 48`, `interval '2 years'`, `interval '14 days'`, …) while the tracker engine
+reads all qualifying notices — the known cross-page definitional seam, not a defect. Arc
+closed: wrong smoke-note attribution → 26 wrong-body cache rows purged → silent truncation
+fixed (#736) → dead materializer diagnosed and replaced (#737); app-side freshness went from
+six days of fiction to fully current in one session.
+
 ### 2026-08-15 — 🧹 SESSION-HYGIENE RULE: the orphaned-branch pattern (from the coverage-copy revival)
 
 **What happened.** The approved coverage-copy build (honest empty-state on `development.html`,
