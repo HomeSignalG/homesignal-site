@@ -141,6 +141,60 @@ deployed (run 31847890869). ROLLOUT PARTIAL BY CHOICE: 120 / 174 live (69.0%), M
   transient zero. Handed to the 15-min `dev-reports-rolling-refresh` cron, which sweeps them on the
   `refreshed_at` cursor. **Firing harder does not fix an FRS-throughput refusal.**
 
+### 2026-08-15 — NEBRASKA WIRED (#728): 36 → 123/174 (70.7%). Statewide-DOT lever, 7th state.
+
+**`ndot-program-book-segments`, arcgis 169 → 170, merged `76ef18a`, deployed (run 31891641193).
+ROLLOUT COMPLETE: 123 / 174 live (70.7%), NDOT on 113 pages / 374 records.** Pre-wire control:
+174 cached, **36 live**. National **8,535 → 8,622** of 12,722.
+
+- **Invariants over all 374 materialized rows: 0 missing `source_ref`, 0 missing coordinates,
+  0 missing title, 0 missing status**, single status `Proposed`, lat 40.59–41.89 / lng −99.49 to
+  −95.91 — wholly inside Nebraska. **Gate proof, bidirectional:** `leaked = 0` cache-wide, and the
+  pre-rollout control **51501 (Council Bluffs IA, Pottawattamie) returned 0 NDOT** while keeping its
+  own 13 — a page directly across the Missouri River from Omaha, which itself took 7.
+- 🆕🚨 **STANDING ANSWER — `ndot.maps.arcgis.com` IS **NEVADA**, NOT NEBRASKA. CONFIRM THE ORG NAME,
+  NEVER THE ACRONYM.** It returns a LIVE, PUBLIC, correctly-configured org: id `9Y4hSlLf13E9S0Eo`,
+  name `Nevada Department of Transportation`, urlKey `NDOT` — and Nevada is ALREADY WIRED here as
+  `nvdot-project-boundaries`. The `_ndor` owner suffix is **also Nevada** (`jsekanovich_ndor` =
+  Nevada Division of Outdoor Recreation). Nebraska's own NDOR account (`munn_ndor`, Nebraska Dept of
+  Roads, the pre-2017 name) holds 4 Grant-Portal items from 2024-10-03 — not projects.
+  **Wiring from either would have published Nevada roadwork on Nebraska pages with clean invariants,
+  a plausible count, and coordinates ~1,200 miles wrong — nothing downstream catches that.** Same
+  class as the Michigan recon's `Kent` hits resolving to DE/RI, but with a live public org behind it.
+- 🆕 **SIXTH CONSECUTIVE STATE WHERE THE SERVER PATH WAS THE BLOCKER — eight dead ends first:**
+  `nebraskadot.maps.arcgis.com` nonexistent (all-null, no urlKey) · `maps.dot.nebraska.gov` DNS-dead ·
+  `gis.ne.gov/portal` HTTP 500 'Application Error' · `gis.ne.gov/arcgis` 404 ·
+  `dot-nebraska.opendata.arcgis.com` no such domain. The live path is **`gis.ne.gov/dot/rest/services/`**,
+  reached by resolving `nebraska.maps.arcgis.com` → org **`State of Nebraska`** (`Sj9eBhzWwOMzQCfI`,
+  PUBLIC), orgid-scoped search → `ProgramBook_NDOT`, then reading the item's own `url` field.
+- ⚠️ **THIS IS THE HOUSTON-PLAT CASE, NOT THE MINNESOTA CASE — AND THEY LOOK IDENTICAL FROM THE
+  OUTSIDE.** One service, two layers, identical field sets: `0` Program Book Points (337, point) and
+  `1` Program Book Segments (558, polyline). Measured live by pulling EVERY `ProjectNo` from both and
+  comparing: Points 130 distinct, Segments 437 distinct, **28 `ProjectNo` values in BOTH**. Not
+  disjoint → wiring both would double-emit those 28 on every page, uncatchable by exact-identity
+  dedup across two `source_registry_id`s. **Only the segment layer is wired.**
+  **ACCEPTED COST, STATED PLAINLY: the 102 `ProjectNo` values unique to the POINTS layer are NOT
+  represented.** The obvious fix — an `extra_where` excluding the 28 shared numbers — was REJECTED
+  because it means hand-transcribing a 28-item list into config (the founder rule against
+  transcribing rather than computing a list). Contrast `mndot-stip/chip-roadway-projects` the day
+  before, where `groupBy Fiscal_Yea` proved a TRUE partition and two entries were safe.
+  **Identical schemas prove nothing either way — run the id-overlap test.**
+- **`status_const: "Programmed"` → `proposed`, deliberately the CONSERVATIVE direction.** No status
+  column exists. `ProgramYear` is `2027` (87 segments / 76 points) and `2028-2032` (261 points;
+  76+261 = 337 exactly), so the large majority is future-year programming — mapping the register to
+  `approved` would overstate NDOT's commitment. `proposed` understates at worst. The constant
+  describes the record rather than restating a bucket (the ratchet that caught the Minnesota draft).
+- **No `file_date`:** `ProgramYear` is a STRING whose second value is the RANGE `"2028-2032"` — not a
+  date, not even a single year. Never fabricated into one; `recency_days` absent for the same reason.
+- **Column population verified on the WIRED layer before mapping:** `ProjectName` NULL → 0,
+  `ProjectNo` NULL → 0, `Hwy` NULL → 0. Real rows: `Giltner East` / NH-80-7(176) / Hamilton /
+  `Crack Seal`; `I-480, 20th-12th Bridge Painting, Omaha`; `O Street to Saunders Ave, Lincoln`.
+  Every string column is heavily RIGHT-PADDED upstream; the connector trims both sides
+  (harris-county-plats precedent). `address` maps `Hwy` ALONE — column_map arrays JOIN, never fall back.
+- **51 ZIPs did not land** — the FRS facilities-guard class, not an NDOT problem. Batch yields ran
+  23 → 10 → 17 → 15 → 12 → 16 → 15 → 14 → 15; they stay on the `refreshed_at` cursor and the 15-min
+  cron sweeps them.
+
 ### 2026-08-14 — 🚫 OREGON REJECTED. No wireable statewide source. OR stays 52/200 (148 dark).
 
 **The Florida outcome: recon found real candidates and LIVE PROBING rejected every one.** Recorded
