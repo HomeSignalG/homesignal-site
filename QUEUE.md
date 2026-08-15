@@ -141,6 +141,36 @@ deployed (run 31847890869). ROLLOUT PARTIAL BY CHOICE: 120 / 174 live (69.0%), M
   transient zero. Handed to the 15-min `dev-reports-rolling-refresh` cron, which sweeps them on the
   `refreshed_at` cursor. **Firing harder does not fix an FRS-throughput refusal.**
 
+### 2026-08-15 — 🧹 SESSION-HYGIENE RULE: the orphaned-branch pattern (from the coverage-copy revival)
+
+**What happened.** The approved coverage-copy build (honest empty-state on `development.html`,
+decision 1, `zipFitRadius` untouched) was fully built and pushed on 2026-08-11 to
+`claude/admiring-hawking-r8x2nl` — 7 files, 3 test suites, commit `4516897` — and then the session
+ended. **No PR was ever opened**, the handoff described the work as "merged-pending on the branch",
+and the approval's explicit condition (before/after renders of Bethel AK 99551 and Taos NM 87513
+for founder review) was **dropped with the session**. The branch sat 36 commits behind while later
+sessions, reading "merged-pending," believed the work was in flight. Found only because the founder
+challenged a "zero occurrences of `HS.coverageCopy`" grep that had been run against `main` alone.
+
+**The rule, in two halves:**
+1. **A handoff that says "pending" must cite the PR number.** No PR number means NOT pending —
+   it means un-opened, and the handoff must say "pushed to `<branch>`, NO PR opened yet" instead.
+   "Merged-pending" with nothing to point at is how work goes invisible.
+2. **Conditions attached to an approval travel with the WORK, not the session.** The
+   before/afters were owed to the founder as a gate on the PR; the session ending does not
+   discharge them. Any revival or continuation inherits the condition verbatim until the founder
+   releases it.
+
+**Revival status (this session, 2026-08-15):** branch rebased onto `main` (`57f0185`) —
+conflict-free; the "EPA-revert test conflicts" concern turned out INVERTED (the branch carries no
+tests `main` deleted; all main-side EPA-repair files survive the rebase untouched).
+`lib/generated/county-sources.json` regenerated against the 198-entry registry via its own
+generator (parity test green) — which changed Bethel's copy to name AKDOT&PF statewide with zero
+copy edits, the self-clearing property demonstrated in the artifact itself. Full 104-file suite
+green. The owed before/afters are COMMITTED at `docs/coverage-copy-before-after/` (4 renders from
+real DB rows, both ZIPs verified all-empty on the three gate counts). **Stopped there per the
+standing condition: no PR until the founder reviews them.**
+
 ### 2026-08-15 — LIVE-METRIC EXCLUSION LIST COMPUTED, NOT TRANSCRIBED. View replaces the inline array.
 
 **The 10-entry "incomplete registry" exclusion list that gates every Live-page count is now
