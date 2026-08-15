@@ -21,6 +21,7 @@
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js"></script>
+<script src="lib/coverage-copy.js"></script>
 <script src="lib/impact.js"></script>
 <script src="lib/why.js"></script>
 <script src="shell.js"></script>
@@ -45,6 +46,40 @@ HS.onReady(async function () {
       + '<p>Your connection may have dropped, or our data service is briefly unavailable. Nothing is wrong with your account.</p></div>'
       + '<button class="btn primary" onclick="location.reload()">Try again</button>';
     return;
+  }
+
+  // HONEST EMPTY STATE. Only paid for when there is nothing to show: a page with records
+  // never runs these reads. The block this produces replaces the old empty-state promise,
+  // which asserted that this area's permit records were under constant review — false on
+  // 443 of the 801 all-empty pages, where no registry entry covers the county at all and
+  // so nothing is being read. Contract + the six bans on this copy: lib/coverage-copy.js.
+  var coverageHTML = '';
+  if (!projects.length && !facilities.length && community) {
+    try {
+      // Civic notices ride a different rail (app_changes) than map markers (app_projects),
+      // and a page with government notices is NOT empty — 20 pages differ on exactly this,
+      // including Pima County AZ and two Utah counties with live hearing notices. Reading
+      // it here is what keeps them out of the block.
+      var civic = await HS.data.changes(S.zip, home);
+      var srcMap = await fetch('lib/generated/county-sources.json')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; });   // fail closed: no map -> name no source
+      var cov = HS.coverageCopy.build({
+        county: community.county, state: community.state,
+        devCount: projects.length, facCount: facilities.length,
+        civicCount: (civic || []).length,
+        facUnavailable: false,
+        map: srcMap
+      });
+      if (cov) {
+        coverageHTML = '<div class="card" style="padding:20px 18px">'
+          + '<h3 style="margin-bottom:10px">' + HS.esc(cov.heading) + '</h3>'
+          + cov.lines.map(function (l) {
+            return '<p class="sowhat" style="margin:0 0 8px"><b>' + HS.esc(l.label) + ':</b> '
+              + HS.esc(l.text) + '</p>';
+          }).join('') + '</div>';
+      }
+    } catch (e) { console.warn('[development] coverage copy skipped', e); }
   }
 
   if (id) { renderDetail(id); } else { renderList(); }
@@ -74,9 +109,13 @@ HS.onReady(async function () {
       var a = sorted();
       var body;
       if (!a.length) {
-        body = '<div class="card" style="text-align:center;padding:26px 18px">'
+        // The old second line here asserted constant review of this area's permit records.
+        // That is unsupportable wherever no registry entry covers the county, so it is gone
+        // from BOTH branches: the rich block when we can name what we draw on, and
+        // otherwise a sentence that states only what the page holds.
+        body = coverageHTML || ('<div class="card" style="text-align:center;padding:26px 18px">'
           + '<h3 style="margin-bottom:6px">Nothing on the public record near here yet</h3>'
-          + '<p class="sowhat" style="margin:0">We check county and permit records for this area continuously — new projects appear here the moment they\'re filed.</p></div>';
+          + '<p class="sowhat" style="margin:0">No permit or planning records for this area.</p></div>');
       } else {
         body = state2.dataView ? dataTable(a) : ('<div class="devgrid">' + a.map(HS.tpl.devCard).join('') + '</div>');
       }
