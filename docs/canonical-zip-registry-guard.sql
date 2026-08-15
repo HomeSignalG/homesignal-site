@@ -137,14 +137,31 @@ create trigger trg_development_reports_canonical_zip
 -- expected path the guard raises; otherwise a deliberate ROLLBACK_MARKER raise aborts it.
 -- A subtransaction that merely "succeeded" would commit with the caller, which is exactly
 -- the failure a test like this must not have.
+--
+-- ⚠️ CALL THIS OVER POST. PostgREST serves GET /rpc/… inside a READ-ONLY transaction, so
+-- every INSERT below dies before the guard is consulted. That is not hypothetical — it is
+-- how this shipped, and the first live CI run (site run 31847764117) caught it:
+--
+--     PASS  guard self-test [in-registry ZIP passes guard] expected ALLOW:
+--           unexpected: cannot execute INSERT in a read-only transaction
+--
+-- The three REJECT cases went red (they require `blocked`), but the POSITIVE CONTROL went
+-- GREEN on the same error, because it inferred "allowed" from "not blocked". A control that
+-- cannot fail is not a control. Two consequences, both encoded below: the control now needs
+-- an AFFIRMATIVE pass-through signal, and a read-only transaction is reported as
+-- INCONCLUSIVE rather than as either a pass or a guard failure — "the test could not run"
+-- and "the guard is broken" must never look the same.
 create or replace function public.canonical_zip_guard_selftest()
 returns table (case_name text, expected text, blocked boolean, passed boolean, detail text)
 language plpgsql
 security definer
 set search_path = public, pg_temp
 as $fn$
-declare _parent uuid; _msg text; _blocked boolean; _detail text;
+declare _parent uuid; _msg text; _blocked boolean; _passed boolean; _detail text; _ro boolean;
 begin
+  -- Prove the transaction can write at all BEFORE interpreting any result below.
+  _ro := (select current_setting('transaction_read_only') = 'on');
+
   select id into _parent from public.communities where level='county' limit 1;
 
   for case_name, expected in
@@ -153,56 +170,71 @@ begin
                           ('development_reports','REJECT')) v(a,b)
   loop
     _blocked := false; _detail := null;
+    if _ro then
+      _detail := 'INCONCLUSIVE — read-only transaction, the insert never reached the guard. '
+              || 'Call this function over POST (PostgREST serves GET read-only).';
+    else
+      begin
+        if case_name = 'communities' then
+          insert into public.communities (name,county,state,zip_codes,level,government_topics,slug,parent_id)
+          values ('SELFTEST 80249','Denver','CO',array['80249'],'zip',array[]::text[],
+                  'selftest-80249-'||gen_random_uuid()::text,_parent);
+        elsif case_name = 'app_community_meta' then
+          insert into public.app_community_meta (zip, community_id, name, county, state)
+          values ('80249', _parent, 'SELFTEST 80249','Denver','CO');
+        else
+          insert into public.development_reports (zip, home_lat, home_lng, counts, sites)
+          values ('80249', 0, 0, '{}'::jsonb, '[]'::jsonb);
+        end if;
+        raise exception 'ROLLBACK_MARKER';
+      exception
+        when check_violation then
+          get stacked diagnostics _msg = message_text;
+          _blocked := true; _detail := _msg;
+        when others then
+          if sqlerrm <> 'ROLLBACK_MARKER' then
+            get stacked diagnostics _msg = message_text;
+            _detail := 'unexpected: ' || _msg;
+          else
+            _detail := 'insert succeeded — GUARD DID NOT FIRE';
+          end if;
+      end;
+    end if;
+    blocked := _blocked; passed := (_blocked and not _ro); detail := _detail;
+    return next;
+  end loop;
+
+  -- POSITIVE CONTROL. Without it, a guard that rejected EVERYTHING would score 3/3 above and
+  -- read as healthy. It must reach an AFFIRMATIVE pass-through signal — "no exception I
+  -- recognised" is not evidence the guard allowed anything.
+  case_name := 'in-registry ZIP passes guard'; expected := 'ALLOW';
+  _blocked := false; _passed := false; _detail := null;
+  if _ro then
+    _detail := 'INCONCLUSIVE — read-only transaction, the insert never reached the guard. '
+            || 'Call this function over POST (PostgREST serves GET read-only).';
+  else
     begin
-      if case_name = 'communities' then
-        insert into public.communities (name,county,state,zip_codes,level,government_topics,slug,parent_id)
-        values ('SELFTEST 80249','Denver','CO',array['80249'],'zip',array[]::text[],
-                'selftest-80249-'||gen_random_uuid()::text,_parent);
-      elsif case_name = 'app_community_meta' then
-        insert into public.app_community_meta (zip, community_id, name, county, state)
-        values ('80249', _parent, 'SELFTEST 80249','Denver','CO');
-      else
-        insert into public.development_reports (zip, home_lat, home_lng, counts, sites)
-        values ('80249', 0, 0, '{}'::jsonb, '[]'::jsonb);
-      end if;
+      insert into public.development_reports (zip, home_lat, home_lng, counts, sites)
+      values ((select zip from public.canonical_zip_registry order by zip limit 1),
+              0, 0, '{}'::jsonb, '[]'::jsonb);
       raise exception 'ROLLBACK_MARKER';
     exception
       when check_violation then
         get stacked diagnostics _msg = message_text;
-        _blocked := true; _detail := _msg;
+        _blocked := true;
+        _detail := 'guard WRONGLY REJECTED an in-registry ZIP: ' || _msg;
+      when unique_violation then
+        _passed := true; _detail := 'reached uniqueness — guard passed it through';
       when others then
-        if sqlerrm <> 'ROLLBACK_MARKER' then
-          get stacked diagnostics _msg = message_text;
-          _detail := 'unexpected: ' || _msg;
+        if sqlerrm = 'ROLLBACK_MARKER' then
+          _passed := true; _detail := 'insert accepted — guard passed it through';
         else
-          _detail := 'insert succeeded — guard did not fire';
+          get stacked diagnostics _msg = message_text;
+          _detail := 'INCONCLUSIVE — ' || _msg || ' (the guard was never reached)';
         end if;
     end;
-    blocked := _blocked; passed := _blocked; detail := _detail;
-    return next;
-  end loop;
-
-  -- POSITIVE CONTROL. Without this, a guard that rejected EVERYTHING would score 3/3 above
-  -- and read as healthy.
-  case_name := 'in-registry ZIP passes guard'; expected := 'ALLOW';
-  _blocked := false; _detail := null;
-  begin
-    insert into public.development_reports (zip, home_lat, home_lng, counts, sites)
-    values ((select zip from public.canonical_zip_registry order by zip limit 1),
-            0, 0, '{}'::jsonb, '[]'::jsonb);
-    raise exception 'ROLLBACK_MARKER';
-  exception
-    when check_violation then
-      get stacked diagnostics _msg = message_text;
-      _blocked := true; _detail := 'guard wrongly rejected an in-registry ZIP: ' || _msg;
-    when unique_violation then
-      _detail := 'reached uniqueness — guard passed it through';
-    when others then
-      if sqlerrm <> 'ROLLBACK_MARKER' then
-        get stacked diagnostics _msg = message_text; _detail := 'unexpected: ' || _msg;
-      else _detail := 'insert accepted — guard passed it through'; end if;
-  end;
-  blocked := _blocked; passed := not _blocked; detail := _detail;
+  end if;
+  blocked := _blocked; passed := _passed; detail := _detail;
   return next;
 
   case_name := 'registry is populated'; expected := '12722';
