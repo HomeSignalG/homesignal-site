@@ -171,6 +171,15 @@ green. The owed before/afters are COMMITTED at `docs/coverage-copy-before-after/
 real DB rows, both ZIPs verified all-empty on the three gate counts). **Stopped there per the
 standing condition: no PR until the founder reviews them.**
 
+**RESOLVED 2026-08-15 — the condition was discharged the right way round.** Founder reviewed and
+approved the before/afters, then **PR #733** was opened (citing this history), checks green
+(unit + browser), **squash-merged as `18c1409`**, Pages deploy green. Live smoke: the render
+harness stubbed the fetch path, so the live empty-state load was verified on a GitHub runner via
+`spot-check-shell.mjs`, extended additively to walk `development.html?zip=` as a third page type —
+it classifies populated / honest-coverage-block / plain-fallback and flags the RETIRED "we check
+continuously" claim as BROKEN if it ever reappears live (a permanent regression tripwire, not a
+one-off probe). Smoke result recorded below this entry when the dispatch completed.
+
 ### 2026-08-15 — LIVE-METRIC EXCLUSION LIST COMPUTED, NOT TRANSCRIBED. View replaces the inline array.
 
 **The 10-entry "incomplete registry" exclusion list that gates every Live-page count is now
