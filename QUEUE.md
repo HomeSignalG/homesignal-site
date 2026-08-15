@@ -244,6 +244,20 @@ full-pass staleness curve reported after ~7–9h. NOTE: the `materializer` min-a
 correctly RED from the moment it ships until the backfill completes — that alert firing during
 catch-up is the instrument working, not a defect.
 
+**SHIPPED AND SWEEPING 2026-08-15 ~20:30Z.** PR #737 merged `c1586cb` (checks green); DB
+applied as two migrations — `app_refresh_sweep` (ledger + procedure) and
+`pipeline_health_materializer_min_age_and_sweep_pulse` (the exact-substring surgery; verified
+after: min-age check in, `materializer_sweep` in, old max-age check gone) — then
+`cron.alter_job(13, '*/15', 'call public.app_refresh_sweep();')` (verified in `cron.job`).
+**First-runs watch (founder protocol), all within design:** runs at 20:30/20:45/21:00/21:15
+all `succeeded` at **100/103/100/100s** — the budget doing exactly its job — committing
+**879 / 105 / 1,194 / 1,023** ZIPs respectively (variance is per-ZIP cost: run 2 hit a heavy
+pocket and throughput degraded gracefully instead of failing — the designed behavior).
+`app_refresh_failures`: **0 rows, 0 escalated.** Backlog burn: 10,361 stale → **7,160** in the
+first ~50 minutes; oldest meta advanced 08-09 03:40 → 06:40. Running ahead of the 7–9h
+estimate (the oldest ZIPs are light); full-pass staleness curve to be reported when
+`min(updated_at)` crosses into the sweep window.
+
 ### 2026-08-15 — 🧹 SESSION-HYGIENE RULE: the orphaned-branch pattern (from the coverage-copy revival)
 
 **What happened.** The approved coverage-copy build (honest empty-state on `development.html`,
