@@ -180,6 +180,17 @@ it classifies populated / honest-coverage-block / plain-fallback and flags the R
 continuously" claim as BROKEN if it ever reappears live (a permanent regression tripwire, not a
 one-off probe). Smoke result recorded below this entry when the dispatch completed.
 
+**LIVE SMOKE GREEN 2026-08-15 (run 31902656221, spot-check-shell @ `0b532ce`, ~19:00Z):**
+`99551` → dev-app shell yes · **empty (honest coverage block)** · 0 JS errors; `87513` → same.
+That is the REAL fetch path end-to-end on homesignal.net — live Supabase reads (anon key) for
+community/projects/facilities/changes plus the Pages-served `lib/generated/county-sources.json` —
+not the stubbed render harness. The retired claim did not appear (the checker flags it BROKEN on
+sight, so its absence is asserted, not assumed). Note the tracker column on the same run reads
+`populated (15 / 100 sites)` — that is `homesignalmap.html` reading `development_reports` (EPA
+facilities floor), a different page and rail; no contradiction with the app page's empty state,
+whose gate counts run against `app_projects`/`app_changes` (0/0/0 for both ZIPs, verified). The
+coverage-copy arc is CLOSED: built 08-11 → stranded → revived → reviewed → #733 merged → live.
+
 ### 2026-08-15 — LIVE-METRIC EXCLUSION LIST COMPUTED, NOT TRANSCRIBED. View replaces the inline array.
 
 **The 10-entry "incomplete registry" exclusion list that gates every Live-page count is now
