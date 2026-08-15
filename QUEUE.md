@@ -141,6 +141,25 @@ deployed (run 31847890869). ROLLOUT PARTIAL BY CHOICE: 120 / 174 live (69.0%), M
   transient zero. Handed to the 15-min `dev-reports-rolling-refresh` cron, which sweeps them on the
   `refreshed_at` cursor. **Firing harder does not fix an FRS-throughput refusal.**
 
+### 2026-08-15 — 🔴 FINDING: the app-content-refresh cron has been DEAD since 2026-08-09 (statement timeout, every run)
+
+Found answering "will 87513 re-materialize on its own?" — the answer is **no, nothing will, for
+any ZIP, until this is fixed.** The scheduled path exists: pg_cron job 13 `app-content-refresh`
+(hourly at :40) runs `app_refresh_batch(1500)`, oldest-first over every modeled ZIP — a full
+national sweep every ~9 hours when healthy. Measured: **last success 2026-08-09 11:40Z; every
+hourly run since has FAILED on `canceling statement due to statement timeout`** (154 lifetime
+failures, the tail unbroken since 08-09; contexts: `insert into app_projects`, `app_changes`,
+`dev_sites_deduped`). Because `app_refresh_batch` is one plpgsql function = ONE transaction, a
+timeout rolls back the WHOLE batch — each failing run materializes **zero** ZIPs while looking
+like an attempt. Every `app_community_meta.updated_at` newer than 08-09 (2,355 rows) came from
+session-driven explicit `app_refresh_zip` calls (the SC/KS/MN/NE rollouts), which is why the
+breakage stayed invisible: on-demand worked, so the app surface kept moving where anyone was
+looking. Consequence: app pages (maps.html / development.html / app_changes civic) are frozen at
+their last touch for all ~10k untouched ZIPs. Fix direction (GATED, not built): the batch must
+commit incrementally — a procedure with per-ZIP/per-chunk COMMIT, or a much smaller batch sized
+to the statement timeout with the cron cadence raised to compensate. Not attempted without
+approval: it is a production cron + function change.
+
 ### 2026-08-15 — 🧹 SESSION-HYGIENE RULE: the orphaned-branch pattern (from the coverage-copy revival)
 
 **What happened.** The approved coverage-copy build (honest empty-state on `development.html`,
