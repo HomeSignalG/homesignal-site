@@ -141,6 +141,135 @@ deployed (run 31847890869). ROLLOUT PARTIAL BY CHOICE: 120 / 174 live (69.0%), M
   transient zero. Handed to the 15-min `dev-reports-rolling-refresh` cron, which sweeps them on the
   `refreshed_at` cursor. **Firing harder does not fix an FRS-throughput refusal.**
 
+### 2026-08-15 — LIVE-METRIC EXCLUSION LIST COMPUTED, NOT TRANSCRIBED. View replaces the inline array.
+
+**The 10-entry "incomplete registry" exclusion list that gates every Live-page count is now
+COMPUTED from the registry JSON and served by one DB view.** It had been hand-maintained here and
+restated inline in every query, with nothing enforcing it (self-flagged 2026-08-15; founder-directed
+fix, propose-then-wire). **No registry entry changed; no metric definition changed** — verified
+before wiring: the computed list matched the hand list EXACTLY, 10/10, zero difference in either
+direction, at registry `76ef18a`.
+
+**THE CRITERIA (canonical; prose here and `scripts/compute-incomplete-registry.mjs` must say the
+same thing — the script alone holding the truth would recreate the single-copy problem):**
+
+```
+incomplete(e) ⇔  NOT hasUseType(e)  OR  NOT hasStatus(e, family)
+hasUseType(e)        ⇔ 'type_map' ∈ e  OR  'use_type_const' ∈ e
+hasStatus(e, family) ⇔ status_to_bucket has ≥1 mapped value
+                       OR (family = 'socrata' AND 'status_const' ∈ e)
+```
+
+- Type half: without either field, `use_type` falls through to keyword guessing for the pin shape
+  (`use_type` is the CLOSED six-value vocabulary, `lib/map.js::TYPE_EXACT`).
+- Status half — **the socrata clause is load-bearing, and its omission was a real near-miss**: the
+  old prose ("complete on both `type_map` and `status_to_bucket`") read naively adds
+  `east-baton-rouge-` / `marin-county-` / `buffalo-` / `prince-georges-county-` building permits,
+  whose all-empty `status_to_bucket` + `status_const` is socrata's SHIPPED IDIOM (the constant IS
+  the bucket). An arcgis `status_const` is a raw value that must resolve through its map —
+  `test/status-const-must-be-mapped.test.mjs` documents the asymmetry and now
+  `test/registry-incomplete-entries.test.mjs` pins these criteria with self-tests (16 checks:
+  stripped entry flagged, socrata-const passes, arcgis same-shape fails, the four real entries
+  stay off the list). The line-662 prose above carries the dated correction.
+
+**THE PLUMBING:** `scripts/compute-incomplete-registry.mjs` (the one computation; `--sql` emits a
+single-transaction full replace) → loader step in `deploy-edge-functions.yml` runs it against the
+exact JSON just deployed and writes `public.registry_incomplete_entries`
+(`registry_id, reason, registry_sha256, computed_at`; RLS ON, public read, loader-only writes) →
+**`public.v_incomplete_registry_entries`** is what everyone reads. DDL of record:
+`docs/registry-incomplete-entries-migration.sql`. **The loader is FAIL-LOUD**: no
+`continue-on-error`, `set -euo pipefail`, non-2xx/SQL error exits 1 — a deploy whose load fails
+shows a RED run, never a silently stale list.
+
+**THE LIVE-METRIC QUERY, from now on (inline id arrays are retired for this metric):**
+
+```sql
+with live as (
+  select distinct p.zip from public.app_projects p
+  where p.record_kind = 'development'
+    and p.registry_id is not null
+    and p.registry_id not in (select registry_id from public.v_incomplete_registry_entries)
+)
+select count(*) from live;  -- per-state: join communities on level='zip', state, zip_codes[1]
+```
+
+**FRESHNESS CHECK — run before trusting the view (a list nobody has verified is the hand list with
+extra steps):**
+
+```sql
+select count(*) n, min(registry_sha256) sha, count(distinct registry_sha256) shas,
+       max(computed_at) at
+from public.registry_incomplete_entries;
+```
+
+`sha` must equal `git show origin/main:supabase/functions/get-address-report/jurisdiction-registry.json | sha256sum`
+(deploys are byte-exact from repo source), `shas` must be 1, and **`n` = 0 is DO-NOT-USE, same
+severity as a sha mismatch** (founder addition, 2026-08-15) — an empty or truncated table makes the
+view silently OVERSTATE Live, so the guard that catches drift must also catch an unloaded table,
+permanently, not just at activation. Any failure — wrong sha, `shas` > 1, or `n` = 0 — means:
+dispatch `deploy-edge-functions` and re-check; never hand-patch the table, and never run Live
+queries against the view until the check passes. (`n` was 10 at time of writing; the number may
+legitimately change as registry entries are completed or added — the sha, not the count, is the
+currency check.)
+
+**SEQUENCING NOTE:** until the migration is applied AND the next deploy runs its loader, the table
+is EMPTY and the view would silently overstate Live. The migration file says so and orders the
+steps: apply SQL → dispatch deploy → verify freshness → only then switch queries to the view.
+
+### 2026-08-15 — NEBRASKA WIRED (#728): 36 → 123/174 (70.7%). Statewide-DOT lever, 7th state.
+
+**`ndot-program-book-segments`, arcgis 169 → 170, merged `76ef18a`, deployed (run 31891641193).
+ROLLOUT COMPLETE: 123 / 174 live (70.7%), NDOT on 113 pages / 374 records.** Pre-wire control:
+174 cached, **36 live**. National **8,535 → 8,622** of 12,722.
+
+- **Invariants over all 374 materialized rows: 0 missing `source_ref`, 0 missing coordinates,
+  0 missing title, 0 missing status**, single status `Proposed`, lat 40.59–41.89 / lng −99.49 to
+  −95.91 — wholly inside Nebraska. **Gate proof, bidirectional:** `leaked = 0` cache-wide, and the
+  pre-rollout control **51501 (Council Bluffs IA, Pottawattamie) returned 0 NDOT** while keeping its
+  own 13 — a page directly across the Missouri River from Omaha, which itself took 7.
+- 🆕🚨 **STANDING ANSWER — `ndot.maps.arcgis.com` IS **NEVADA**, NOT NEBRASKA. CONFIRM THE ORG NAME,
+  NEVER THE ACRONYM.** It returns a LIVE, PUBLIC, correctly-configured org: id `9Y4hSlLf13E9S0Eo`,
+  name `Nevada Department of Transportation`, urlKey `NDOT` — and Nevada is ALREADY WIRED here as
+  `nvdot-project-boundaries`. The `_ndor` owner suffix is **also Nevada** (`jsekanovich_ndor` =
+  Nevada Division of Outdoor Recreation). Nebraska's own NDOR account (`munn_ndor`, Nebraska Dept of
+  Roads, the pre-2017 name) holds 4 Grant-Portal items from 2024-10-03 — not projects.
+  **Wiring from either would have published Nevada roadwork on Nebraska pages with clean invariants,
+  a plausible count, and coordinates ~1,200 miles wrong — nothing downstream catches that.** Same
+  class as the Michigan recon's `Kent` hits resolving to DE/RI, but with a live public org behind it.
+- 🆕 **SIXTH CONSECUTIVE STATE WHERE THE SERVER PATH WAS THE BLOCKER — eight dead ends first:**
+  `nebraskadot.maps.arcgis.com` nonexistent (all-null, no urlKey) · `maps.dot.nebraska.gov` DNS-dead ·
+  `gis.ne.gov/portal` HTTP 500 'Application Error' · `gis.ne.gov/arcgis` 404 ·
+  `dot-nebraska.opendata.arcgis.com` no such domain. The live path is **`gis.ne.gov/dot/rest/services/`**,
+  reached by resolving `nebraska.maps.arcgis.com` → org **`State of Nebraska`** (`Sj9eBhzWwOMzQCfI`,
+  PUBLIC), orgid-scoped search → `ProgramBook_NDOT`, then reading the item's own `url` field.
+- ⚠️ **THIS IS THE HOUSTON-PLAT CASE, NOT THE MINNESOTA CASE — AND THEY LOOK IDENTICAL FROM THE
+  OUTSIDE.** One service, two layers, identical field sets: `0` Program Book Points (337, point) and
+  `1` Program Book Segments (558, polyline). Measured live by pulling EVERY `ProjectNo` from both and
+  comparing: Points 130 distinct, Segments 437 distinct, **28 `ProjectNo` values in BOTH**. Not
+  disjoint → wiring both would double-emit those 28 on every page, uncatchable by exact-identity
+  dedup across two `source_registry_id`s. **Only the segment layer is wired.**
+  **ACCEPTED COST, STATED PLAINLY: the 102 `ProjectNo` values unique to the POINTS layer are NOT
+  represented.** The obvious fix — an `extra_where` excluding the 28 shared numbers — was REJECTED
+  because it means hand-transcribing a 28-item list into config (the founder rule against
+  transcribing rather than computing a list). Contrast `mndot-stip/chip-roadway-projects` the day
+  before, where `groupBy Fiscal_Yea` proved a TRUE partition and two entries were safe.
+  **Identical schemas prove nothing either way — run the id-overlap test.**
+- **`status_const: "Programmed"` → `proposed`, deliberately the CONSERVATIVE direction.** No status
+  column exists. `ProgramYear` is `2027` (87 segments / 76 points) and `2028-2032` (261 points;
+  76+261 = 337 exactly), so the large majority is future-year programming — mapping the register to
+  `approved` would overstate NDOT's commitment. `proposed` understates at worst. The constant
+  describes the record rather than restating a bucket (the ratchet that caught the Minnesota draft).
+- **No `file_date`:** `ProgramYear` is a STRING whose second value is the RANGE `"2028-2032"` — not a
+  date, not even a single year. Never fabricated into one; `recency_days` absent for the same reason.
+- **Column population verified on the WIRED layer before mapping:** `ProjectName` NULL → 0,
+  `ProjectNo` NULL → 0, `Hwy` NULL → 0. Real rows: `Giltner East` / NH-80-7(176) / Hamilton /
+  `Crack Seal`; `I-480, 20th-12th Bridge Painting, Omaha`; `O Street to Saunders Ave, Lincoln`.
+  Every string column is heavily RIGHT-PADDED upstream; the connector trims both sides
+  (harris-county-plats precedent). `address` maps `Hwy` ALONE — column_map arrays JOIN, never fall back.
+- **51 ZIPs did not land** — the FRS facilities-guard class, not an NDOT problem. Batch yields ran
+  23 → 10 → 17 → 15 → 12 → 16 → 15 → 14 → 15; they stay on the `refreshed_at` cursor and the 15-min
+  cron sweeps them.
+
 ### 2026-08-14 — 🚫 OREGON REJECTED. No wireable statewide source. OR stays 52/200 (148 dark).
 
 **The Florida outcome: recon found real candidates and LIVE PROBING rejected every one.** Recorded
@@ -606,7 +735,15 @@ discrimination test before trusting a URL column.
 ### 2026-08-13 — FIVE STATEWIDE DOT WIRES. 6,692 → 7,476 Live (+784). Registry 183 → 188.
 
 Measured on `public.app_projects` (`record_kind='development'`, entry complete on both `type_map`
-and `status_to_bucket`) — the same definition the scoreboard uses. **7,476 / 12,722 = 58.8%**, up
+and `status_to_bucket`) — the same definition the scoreboard uses. *(⚠️ CORRECTED 2026-08-15: as
+written, this parenthetical is underspecified in both halves. Complete = (`type_map` OR
+`use_type_const`) AND (≥1 mapped `status_to_bucket` value OR a socrata `status_const` — socrata's
+constant IS the bucket, no mapping required; an arcgis constant must resolve through its own
+`status_to_bucket`, per `test/status-const-must-be-mapped.test.mjs`). Read naively, the status
+half wrongly flags the four socrata idiom entries — `east-baton-rouge-`, `marin-county-`,
+`buffalo-`, `prince-georges-county-` building permits. The 10-entry list this produced was
+verified correct; the prose was not. Canonical definition + computed list: the 2026-08-15
+"EXCLUSION LIST COMPUTED" entry.)* **7,476 / 12,722 = 58.8%**, up
 from 6,692 (52.6%). Recorded in workbook **0080**.
 
 | state | before | after | entry |
