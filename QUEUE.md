@@ -231,7 +231,18 @@ they're inside the same 7–9h window, and any specific ZIP can be kicked on dem
 mechanism sessions already use). ETA to fully caught up: **under half a day from the moment
 the procedure ships.**
 
-Awaiting founder review of this diagnosis before building (a-d unchanged as proposed).
+**APPROVED 2026-08-15 — diagnosis accepted, fix shipping as specified, with one founder
+addition to the failure semantics: BOUNDED SKIP.** A repeatedly-failing ZIP must not anchor
+oldest-first forever: after **N=5 consecutive failures** its `app_refresh_failures` row is
+flagged `escalated` and the ZIP sorts to the BACK of the sweep queue (still retried when
+budget reaches it; a success clears the row). Escalated count surfaces in the
+`materializer_sweep` health detail, so one pathological ZIP degrades to an alert instead of
+eating budget at the front of every sweep. Migration of record:
+`docs/app-refresh-sweep-migration.sql`. Watch protocol: first 3 cron runs observed live
+(expect ~380 ZIPs/run committed; stop and report on anything unexpected, no live tuning);
+full-pass staleness curve reported after ~7–9h. NOTE: the `materializer` min-age check will be
+correctly RED from the moment it ships until the backfill completes — that alert firing during
+catch-up is the instrument working, not a defect.
 
 ### 2026-08-15 — 🧹 SESSION-HYGIENE RULE: the orphaned-branch pattern (from the coverage-copy revival)
 
