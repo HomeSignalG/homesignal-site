@@ -1,9 +1,13 @@
 // Cross-state shell + populate spot-check (live site, GitHub runner).
 //
-// For each ZIP in $ZIPS (comma-separated), loads BOTH page types on the real site and
-// reports, as a markdown table: does the v13 left-sidebar shell render (present, at the
-// left edge, nav populated), is the page non-blank, and which honest state it shows —
-// populated / coverage-coming / not-covered — flagging anything broken or blank.
+// For each ZIP in $ZIPS (comma-separated), loads THREE page types on the real site —
+// community.html, homesignalmap.html, and the app's development.html — and reports, as a
+// markdown table: does the v13 left-sidebar shell render (present, at the left edge, nav
+// populated), is the page non-blank, and which honest state it shows — populated /
+// coverage-coming / not-covered / honest-empty — flagging anything broken or blank.
+// development.html additionally flags the RETIRED empty-state claim ("We check county and
+// permit records ... continuously") as BROKEN if it ever reappears live (PR #733 removed
+// it; lib/coverage-copy.js is the replacement).
 // Read-only; no assertions change the site. Exit 1 only if a page is BROKEN/blank.
 //
 //   ZIPS="84302,78617,94545" SITE_BASE=https://homesignal.net node scripts/spot-check-shell.mjs
@@ -38,6 +42,11 @@ async function inspect(page, url) {
         coverage: /coverage[^.]*coming|being wired|feeds .*on the way/i.test(text),
         notCovered: /isn'?t covered yet|not tracking this ZIP/i.test(text),
         h1: (document.querySelector('h1') || {}).innerText || '',
+        // development.html empty-state signals (inert on the other two page types):
+        devCards: document.querySelectorAll('.devgrid > *').length,
+        covBlock: /What's on this page, and what isn't/i.test(text),
+        plainEmpty: /No permit or planning records for this area/i.test(text),
+        retiredClaim: /We check county and permit records/i.test(text),
       };
     });
     page.off('pageerror', onErr);
@@ -60,6 +69,15 @@ function classifyDev(st) {
   if (st.sites > 0) return `populated (${st.sites} sites)`;
   return st.hasMap || st.coverage ? 'empty (honest, map/coverage note)' : 'BROKEN (unrecognized state)';
 }
+function classifyDevApp(st) {
+  if (st.failed || st.textLen < 40) return 'BROKEN/blank';
+  // The retired claim reappearing is a regression even on a populated page.
+  if (st.retiredClaim) return 'BROKEN (retired "we check continuously" claim is live)';
+  if (st.devCards > 0) return `populated (${st.devCards} records)`;
+  if (st.covBlock) return 'empty (honest coverage block)';
+  if (st.plainEmpty) return 'empty (honest, plain fallback)';
+  return 'BROKEN (unrecognized state)';
+}
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
@@ -69,21 +87,24 @@ let broken = 0;
 for (const zip of ZIPS) {
   const comm = await inspect(page, `${SITE_BASE}/community.html?zip=${zip}`);
   const dev = await inspect(page, `${SITE_BASE}/homesignalmap.html?zip=${zip}`);
+  const app = await inspect(page, `${SITE_BASE}/development.html?zip=${zip}`);
   const shellOk = (s) => s.failed ? 'FAIL' : (s.shellPresent && s.shellLeft ? 'yes' : 'NO');
   const commClass = classifyComm(comm);
   const devClass = classifyDev(dev);
-  if (/BROKEN|FAIL/.test(commClass) || /BROKEN/.test(devClass) || shellOk(comm) !== 'yes' || shellOk(dev) !== 'yes') broken++;
-  const jsErr = [...(comm.errors || []), ...(dev.errors || [])].filter(e => !/net::|Failed to fetch|Load failed/i.test(e));
+  const appClass = classifyDevApp(app);
+  if (/BROKEN|FAIL/.test(commClass) || /BROKEN/.test(devClass) || /BROKEN/.test(appClass)
+    || shellOk(comm) !== 'yes' || shellOk(dev) !== 'yes' || shellOk(app) !== 'yes') broken++;
+  const jsErr = [...(comm.errors || []), ...(dev.errors || []), ...(app.errors || [])].filter(e => !/net::|Failed to fetch|Load failed/i.test(e));
   rows.push({ zip, commShell: shellOk(comm), commClass, devShell: shellOk(dev), devClass,
-    jsErr: jsErr.length ? jsErr[0].slice(0, 80) : '' });
-  console.log(`${zip}: community[shell=${shellOk(comm)} ${commClass}] tracker[shell=${shellOk(dev)} ${devClass}]${jsErr.length ? ' JSERR ' + jsErr[0].slice(0, 80) : ''}`);
+    appShell: shellOk(app), appClass, jsErr: jsErr.length ? jsErr[0].slice(0, 80) : '' });
+  console.log(`${zip}: community[shell=${shellOk(comm)} ${commClass}] tracker[shell=${shellOk(dev)} ${devClass}] devapp[shell=${shellOk(app)} ${appClass}]${jsErr.length ? ' JSERR ' + jsErr[0].slice(0, 80) : ''}`);
 }
 await browser.close();
 
 const table = [
-  '| ZIP | community shell | community state | tracker shell | tracker state | JS errors |',
-  '|---|---|---|---|---|---|',
-  ...rows.map(r => `| ${r.zip} | ${r.commShell} | ${r.commClass} | ${r.devShell} | ${r.devClass} | ${r.jsErr} |`),
+  '| ZIP | community shell | community state | tracker shell | tracker state | dev-app shell | dev-app state | JS errors |',
+  '|---|---|---|---|---|---|---|---|',
+  ...rows.map(r => `| ${r.zip} | ${r.commShell} | ${r.commClass} | ${r.devShell} | ${r.devClass} | ${r.appShell} | ${r.appClass} | ${r.jsErr} |`),
 ].join('\n');
 console.log('\n' + table);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Shell + populate spot-check\n\n${table}\n`);
