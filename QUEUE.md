@@ -212,6 +212,12 @@ queries against the view until the check passes. (`n` was 10 at time of writing;
 legitimately change as registry entries are completed or added — the sha, not the count, is the
 currency check.)
 
+**KNOWN ASSUMPTION (recorded 2026-08-15):** the loader tracks the DEPLOYED REF — it computes
+from whatever checkout the deploy ran on, so the list always matches the deployed registry. The
+freshness compare-against-`main` therefore only holds while deploys come from `main` (the current
+operating convention). If a branch deploy ever becomes normal practice, the freshness check needs
+revisiting.
+
 **SEQUENCING NOTE:** until the migration is applied AND the next deploy runs its loader, the table
 is EMPTY and the view would silently overstate Live. The migration file says so and orders the
 steps: apply SQL → dispatch deploy → verify freshness → only then switch queries to the view.
