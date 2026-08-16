@@ -141,6 +141,45 @@ deployed (run 31847890869). ROLLOUT PARTIAL BY CHOICE: 120 / 174 live (69.0%), M
   transient zero. Handed to the 15-min `dev-reports-rolling-refresh` cron, which sweeps them on the
   `refreshed_at` cursor. **Firing harder does not fix an FRS-throughput refusal.**
 
+### 2026-08-15 — 🔎 SCOPING: notices/agendas as "proposed development" records — MEASURED, report delivered, NOTHING BUILT
+
+Founder-directed evidence-only investigation. Full report in the session transcript; the numbers
+that gate any future build:
+- **Title yield is ~0.5%, concentrated in ONE feed.** Of 6,238 stored government notices
+  (202 communities), 64 titles (1.0%) match an address-or-case regex, and reading them shreds
+  that to **~33 real development-signal titles: Multnomah County Land Use Planning 27, Spokane
+  County hearing examiner 5, Williams ND 1** — the rest are ordinance numbers, meeting-location
+  addresses, and found-property notices. Meetings titles: 11 of 7,034. `alerts.description`:
+  **0 rows populated >100 chars** (ingest stores title+link only); `geo_lat`: 0.
+- **The substance lives behind source_url, and family determines extractability.** pg_net
+  sampling: Multnomah = 31.5KB HTML with schema.org JSON-LD (headline=address,
+  description=case+type+deadline) AND a labeled "Proposal:" paragraph — richest shape found.
+  Utah PMN = 15.9KB structured HTML (already parsed ingest-side). Granicus AgendaViewer =
+  agenda body inline in HTML. CivicClerk = 1.3KB SPA shell (real data is the OData API the
+  ingest adapter already reads). CivicPlus/CivicWeb/Legistar/eScribe/iQM2 400'd or timed out
+  FROM PG_NET — Rule-13 caveat: the ingest runner fetches these same sources successfully
+  (that is where the rows came from), so the finding is "untested from here", NOT unfetchable;
+  their documents are typically agenda PDFs.
+- **Semantic gap is real and measured in the best case itself:** Multnomah T2-2026-0017's own
+  "Proposal:" text ends *"No development is proposed at this time"* — under a land-use notice.
+  A notice must never masquerade as a permit; vocabulary proposed in the report
+  (notice_of_hearing / comment_window / notice_of_decision + verbatim-quote-only description,
+  does_not_mean rendered on-page).
+- **Overlap with the permit rail: 0 in both samples, for STRUCTURAL reasons** — Spokane's wired
+  source is building permits while its notices are land-use cases (0 of 7,006 rows match the
+  case numbers); Multnomah's notices are unincorporated-county cases while the wired source is
+  City of Portland (0 address matches). Notices cover DIFFERENT records: complementary, not
+  early-duplicate.
+- **Dark-ZIP ceiling: title-borne extraction lights up ZERO of the 806 currently-dark ZIPs**
+  (Multnomah/Spokane ZIPs already have content). Document-level extraction ceiling: **319 of
+  806** dark ZIPs sit in counties with an active notice feed — reachable only via per-family
+  document parsing whose yield is UNMEASURED.
+- **Recommendation (stands until founder rules):** do not build a national layer on these
+  numbers. Phase-0 first — measure agenda-ITEM yield on the two structured families
+  (CivicClerk OData, Granicus agenda HTML) for planning bodies in ~2 counties each, on a
+  runner; build only what that measurement licenses. Multnomah is wireable today as a bespoke
+  high-quality source but lifts 0 dark ZIPs.
+
 ### 2026-08-15 — ✅ EXECUTED (founder-approved): bethelak cache purge + engine pagination fix (#736), both live-verified
 
 **Purge:** pre-flight re-measured the population at exactly 26 (unchanged), then the one-time
