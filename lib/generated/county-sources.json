@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. No subject-matter claim is derived.",
-  "registry_entries": 198,
+  "registry_entries": 199,
   "statewide": {
     "AK": [
       {
@@ -177,6 +177,13 @@
       {
         "id": "okdot-workplan-roadways",
         "label": "Oklahoma Department of Transportation",
+        "scope": "statewide"
+      }
+    ],
+    "PA": [
+      {
+        "id": "penndot-transportation-projects",
+        "label": "Pennsylvania Department of Transportation",
         "scope": "statewide"
       }
     ],
