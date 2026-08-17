@@ -7860,3 +7860,171 @@ table's 210-dark is now 26).
 - **Next levers per the standing order:** CA 360 behind the edge-reachability preflight
   instrument; then the statewide-DOT recon batch (NM/AR/LA/SD/MT/MS/AZ), each checked against
   its rejection stamp first.
+
+## EDGE-REACHABILITY PREFLIGHT BUILT + FIRST STAMP AUDIT RUN — 2 flips, 1 intermittent, 5 hold (2026-08-17)
+
+Founder-approved instrument (rider: ≥3 spaced probes before any stamp moves; mixed = "intermittent",
+a third state). Closes the PennDOT gap: pg_net-based reachability stamps are claims about the WRONG
+client — recon runs on Postgres egress, production on the Deno edge runtime.
+
+**The instrument:** `supabase/functions/edge-probe` (PRs #776/#777/#779, deploy runs 32065779982 +
+post-#779). Fetches ≤10 candidate URLs per call FROM the deployed edge runtime with **fetch-shape
+parity to `sources/arcgis.ts::getWithBackoff`** — byte-identical headers + the identical 30s
+timeout, ENFORCED by `test/edge-probe.test.mjs` (29 assertions; CI-red if probe and connector ever
+drift). Receipt per target: status/ok/elapsed_ms/bytes/content_type/redirected/final_url/
+body_head(600)/error. SSRF fences: https-only, GET-only, no forwarded headers, private/link-local/
+loopback/metadata refused pre-fetch, 64 KB body cap, sequential targets. Suite 107/107.
+- ⚠️ **Two deploy-posture traps found and closed en route, both live-verified:** (1) the deploy
+  workflow passed `--no-verify-jwt` unconditionally (written for the engine) — now conditional
+  (#777); (2) **the deploy CLI PRESERVES a function's stored verify_jwt when the flag is omitted**,
+  so the flag-less redeploy kept `false` from the first deploy — caught by a live no-auth control
+  (request 8471 ran the probe), pinned by `supabase/config.toml` `[functions.edge-probe]
+  verify_jwt = true` (#779, + `supabase/config.toml` added to unit-tests path filters — the
+  CLAUDE.md no-path-filter merge-deadlock case, same remedy). **Post-fix control: no-auth → 401
+  UNAUTHORIZED_NO_AUTH_HEADER (request 8725).** Standing answer: after ANY security-posture deploy,
+  verify the posture with a live negative control — the CLI's flag semantics make "deployed with
+  the right command" insufficient evidence.
+- **Calibration (no verdicts before controls behaved):** positive control gis.penndot lines count →
+  200/1,684ms through the probe (request 7902). ⚠️ **The divergence control found the PennDOT/pg_net
+  400-block has LIFTED** — raw pg_net now 200 `{"count":194354}` (request 7903) on the same host
+  that hard-400'd every pg_net request during the morning recon. **Stateful-host behavior measured
+  same-day — the empirical justification for the ×3 rider.**
+
+**Stamp audit — 8 hosts × 3 rounds ~15 min apart (requests 8156 / 8470 / 8724), verdicts:**
+
+| host (stamp) | r1 / r2 / r3 | verdict |
+|---|---|---|
+| **caltrans-gis.dot.ca.gov** | 200 245ms · 200 245ms · 200 258ms (real services JSON, v11.1) | **REACHABLE 3/3** — but see the stamp-class correction below |
+| **Miami** `services1.arcgis.com/CvuPhqcTQpZPT9qY/Building_Permits_Since_2014` | 200 212ms · 200 223ms · 200 207ms, count 229,637 | **FLIPS → reachable.** The stamped 30–60s/request slow-host condition is GONE (3/3 at ~210ms). → **RE-RECON flag** (Miami-Dade FL pages) |
+| **El Paso** `gis.elpasotexas.gov` NewResidential/1 | 30s timeout · 200 340ms `{"count":42677}` · 200 368ms | **INTERMITTENT** — the third state, all receipts attached. Note the stamped 403 did not reproduce in any round; today it hangs or answers. Not wired on this evidence; re-run the ×3 audit before any wire |
+| Tampa `arcgis.tampagov.net` | 403 Access Denied ×3 (102/143/164ms) | HOLDS |
+| Dayton `maps.daytonohio.gov` | connect error ×3 (~220ms) | HOLDS (TCP-reset class) |
+| Newark `data.ci.newark.nj.us` | 503 ×3 | HOLDS (Cloudflare) |
+| Lehigh `gis.lehighcounty.org` | **HTTP 200 ×3 but the body is the Incapsula JS challenge** | HOLDS — the shape receipt (body_head) catches what status alone would mis-stamp; never judge on status_code |
+| STL RDX `rdx.stldata.org` | 30s timeout ×3 | HOLDS (blackhole) |
+
+- 🔎 **CALTRANS STAMP-CLASS CORRECTION (report headline):** QUEUE's "Caltrans is a documented
+  edge-runtime blocker" line was a DRIFTED SUMMARY — no reachability receipt exists behind it. The
+  real stamp (CALIFORNIA PASS, 2026-08-05) is **`WRONG_RECORD_CLASS`**: the DCAT catalogue was
+  enumerated in full — 69 datasets, ALL asset/network inventory, 0 project layers. The 3/3
+  reachable receipts REMOVE the phantom reachability blocker but do NOT overturn the content
+  verdict: Caltrans still publishes assets, not projects. **The CA 360 path is unchanged —
+  municipal/MPO tier** (MTC rejected on schema: 0 date-typed fields, no status), now with one
+  fewer excuse: no candidate can be dismissed on "edge-blocked" grounds without an edge-probe
+  receipt.
+- **Standing answer (both directions):** a reachability claim about a candidate host — reachable
+  OR blocked — requires an `edge-probe` receipt (≥3 spaced rounds for a verdict). pg_net and
+  GitHub-runner results are supporting evidence about OTHER clients, never the stamp.
+
+## MIAMI RE-RECON COMPLETE — source QUALIFIES; registry entry PROPOSED, awaiting founder review (2026-08-17)
+
+Founder-approved re-recon after the edge-probe stamp audit flipped Miami to reachable (3/3 at
+~210 ms vs the stamped 30–60 s/request; receipts in the stamp-audit section above). Old recon
+treated as EXPIRED and fully re-receipted via pg_net (AGO host, both paths reachable) — and the
+expiry call was right: **the schema changed since the old recon** (the status field is now
+`BuildingPermitStatusDescription`; 41 columns; the old bare `Status` field is gone).
+
+Fresh receipts (pg_net requests 8979–8996, all in `net._http_response`):
+- **Single layer** on `services1.arcgis.com/CvuPhqcTQpZPT9qY/Building_Permits_Since_2014` —
+  no id-overlap question. Point geometry; `Latitude`/`Longitude` columns 100% in scope.
+- **Total 229,637 rows · ScopeofWork vocab 22 values summing EXACTLY to 229,637.** Kept scope
+  (the 4 construction/land-use types, all still verbatim): NEW CONSTRUCTION 50,592 · ADDITION
+  AND REMODELING 12,426 · DEMOLITION 8,586 · PHASED PERMIT 660 = **72,264**; 18 trade/noise
+  values dropped at source (REMODELING/REPAIRS 88,365 still excluded — Boston Short-Form class).
+- **Status vocab IN SCOPE: 5 values summing exactly to 72,264** — Active 9,363 · Final 60,593 ·
+  Revoked 1,255 · Expired 916 · Hold 137; 0 nulls. Buckets (fleet-consistent): Active→approved
+  (Boston Issued precedent) · Final→operating (Boston Closed) · Hold→proposed (Scottsdale ON
+  HOLD) · Expired+Revoked→exclude (Phoenix EXPR/VOID).
+- **type_source = PropertyType — the clean find of the re-recon:** exactly 2 values, Commercial
+  28,075 + Residential 44,189 = 72,264 EXACTLY, both literal members of the closed use_type
+  set → verbatim identity map, 0 unclassified possible. (The old wire had no per-row use class.)
+- **Title (rider-measured):** `["ScopeofWork","WorkItems"]` joined (UDOT pattern). WorkItems
+  72,254/72,264 (99.99%), specific work text ("MULTI-FAMILY (RENTAL)", "BOAT LIFT/DAVITS…|DOCK");
+  ScopeofWork 100% but only 4 generic values — the join gives category + specifics.
+  DeliveryAddress = address (100%). case_number = PermitNumber.
+- **file_date = IssuedDate**: real esriFieldTypeDate, 72,253/72,264 (99.98%), a true past event;
+  DATE-literal recency verified live (365d scope = **11,531 rows citywide**). FirstSubmissionDate
+  REJECTED on measurement — 20,397/72,264 (28.2%), only 299 rows in the last 365d (a legacy
+  backfill, not a live application stream; the Henderson process-start preference inverts here).
+- **Distinct-permit reality: distinct PermitNumber = 72,264 = the scoped row count** — one row
+  per permit, no multiplicity (unlike PennDOT's location-detail rows).
+- **Freshness: max IssuedDate 2026-08-15 · service dataLastEditDate 2026-08-16** — live ledger.
+- ⚠️ **CompanyZip is the CONTRACTOR's ZIP, never usable for site scoping** — spatial 3-mi on the
+  rows' own points (no site-ZIP column).
+
+**Proposed entry** (propose-only; wire on approval): `miami-building-permits`, arcgis, coverage
+`[{FL, Miami-Dade}]`, extra_where = the 4-type ScopeofWork filter, recency_days 365 on IssuedDate,
+`out_fields` projected to the 8 mapped columns (the CPU-hazard fix originally shipped FOR this
+host), spatial_zip_radius_mi 3, record_url dataset-precision (no per-row URL column),
+status/type maps as above. **Gate plan:** unit never-fetches with Broward 33301 (Fort Lauderdale)
+vs Miami 33127 + live bidirectional receipts post-deploy. **Wire-time smoke MUST re-answer the
+ORIGINAL rejection**: a full paged engine fetch on a dense Miami ZIP (33127/33130) within the
+worker budget — the edge-probe's ~210 ms is one request, not a full report; if the budget blows
+again, the stamp re-closes with the new receipt.
+
+**STATE: proposal handed to founder; STOPPED per propose-only.** El Paso stays parked in the
+intermittent bin (re-run its ×3 audit a different day before any recon). CA reclassified:
+municipal/MPO tier, queued behind the DOT recon batch.
+
+## MIAMI RECONCILIATION — ALREADY WIRED AND DELIVERING; approved re-wire HALTED at the duplicate gate (2026-08-17)
+
+The founder-approved Miami wire was **NOT executed**: the pre-commit duplicate assertion found
+`miami-building-permits` **already in the registry** — wired **2026-07-25** by a later pass (nine
+days AFTER the 2026-07-16 rejection this whole thread worked from), with its own receipts and a
+measured volume correction. `docs/source-registry.md`'s "REJECTED AT SMOKE" section was never
+updated; a supersession banner now sits on it.
+
+**Live measurement (the reconciliation): 34,307 cached records across 24 Miami-Dade ZIP pages ·
+0 in `v_incomplete_registry_entries` · 0 `dev_refresh_source_failures` rows in 7 days.** The
+entry is healthy in production. Its config is CONSISTENT with the 2026-08-17 re-recon receipts
+(same 5 verbatim statuses on `BuildingPermitStatusDescription`, same 4-type ScopeofWork scope,
+file_date IssuedDate, recency 365, dataset-precision, contractor-ZIP trap documented) — the fresh
+recon independently re-derived the same source model, which is corroboration, not waste.
+
+- ⚠️ **A duplicate would have been the Houston-plat double-emission class** — one PennDOT-style
+  duplicate entry double-emits every permit across two `source_registry_id`s, uncatchable by
+  exact-identity dedup. The one-entry-per-source assertion (added to the wire script after the
+  PennDOT Lines/Points lesson) is the control that caught it.
+- ⚠️ **The proposed entry would also have REGRESSED a measured fix:** it carried
+  `spatial_zip_radius_mi: 3`; the live entry is **1.5**, corrected 2026-07-25 after ZIP 33130
+  produced a 14,933-record / **13 MB** row at 3 mi (3.7x the dense-metro ceiling). The halt
+  prevented both the duplicate AND the regression.
+- 🔑 **STANDING ANSWER (the miss that caused this):** the re-recon started from the REJECTION
+  STAMP and never ran the §0c/§0j registry grep. **Before ANY recon or proposal on a source,
+  grep the registry for entries on the same host/dataset FIRST** — a rejection stamp in the docs
+  proves a rejection HAPPENED, never that the registry still reflects it; two writers means the
+  docs and the registry drift independently. (The CA pass did this grep; the Miami thread did
+  not.) Corollary for the stamp audit: "Miami flips → re-recon flag" was correct as an
+  INSTRUMENT finding, but the production conclusion was already moot — the flip had been acted
+  on 2026-07-25 by the other writer.
+- **The 2026-08-17 re-recon receipts remain valid and are attached to the record** (QUEUE
+  "MIAMI RE-RECON" above; pg_net 8979–8996). Where they differ from the live entry, they are
+  measured IMPROVEMENT CANDIDATES, not defects — gated (they change what residents see),
+  proposed to the founder separately: (a) `type_source: PropertyType` → Commercial 28,075 /
+  Residential 44,189 = 72,264 exactly, replacing the generic all-Development map (pin shapes
+  gain real use classes); (b) title `[ScopeofWork, WorkItems]` (99.99% specific work text)
+  replacing `[ScopeofWork, DeliveryAddress]`; (c) `Hold` (137 rows) → proposed instead of
+  exclude (the Scottsdale ON HOLD precedent the 07-16 recon itself cited). None wired.
+- Miami-Dade dev-backed footprint today: 24 of the county's modeled ZIPs carry city permits;
+  the rest of the county (Hialeah, Miami Beach, Homestead …) has no first-party source wired —
+  that is the real remaining FL frontier, not the City of Miami.
+
+## MIAMI ENTRY UPGRADED (improvements 1+2) · Hold→proposed REJECTED · FLEET REVIEW LOGGED (2026-08-17)
+
+One reviewed change to the existing `miami-building-permits` entry (founder-approved):
+`type_source` → `PropertyType` with the verbatim two-value identity map (Commercial 28,075 +
+Residential 44,189 = 72,264 exactly — pins gain real use classes) and title →
+`[ScopeofWork, WorkItems]` (99.99% specific work text). Change-set asserted programmatically:
+exactly those fields + the appended receipts note moved; every other entry byte-identical; the
+1.5-mi measured radius untouched. Suite 107/107.
+
+⚖️ **Hold→proposed REJECTED (founder ruling, 2026-08-17): pausing is not proposing.** Recoloring
+a stalled application as a fresh proposal claims motion where there is none. Miami's `Hold`
+(137 rows) stays `exclude`.
+
+📋 **FLEET-REVIEW ITEM (logged, queued — not started): hold/stalled-status semantics, fleet-wide.**
+Audit how EVERY registry entry buckets hold/stalled-type statuses (Scottsdale 'ON HOLD' included —
+it maps to proposed today and is the precedent the rejected Miami change cited; also Orlando's
+Hold/Hardhold→exclude, Henderson/others as found by grep). Decide ONE fleet-wide semantic, with
+the resident-meaning question stated explicitly: **does this pin claim something is moving
+forward when it isn't?** Founder decision at the end; until then no entry's hold-bucketing moves.
