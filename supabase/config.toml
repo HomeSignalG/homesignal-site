@@ -1,0 +1,10 @@
+# Per-function deploy config (read by `supabase functions deploy`).
+# WHY THIS FILE EXISTS: the deploy CLI PRESERVES a function's stored verify_jwt setting
+# when the flag is omitted — edge-probe's first deploy (pre-#777 workflow) stored
+# verify_jwt=false, and the flag-less redeploy kept it. This pins the approved posture
+# explicitly so no deploy-order accident can reopen it. get-address-report keeps its
+# live no-JWT config via the workflow's explicit --no-verify-jwt (flag overrides file).
+project_id = "qwnnmljucajnexpxdgxr"
+
+[functions.edge-probe]
+verify_jwt = true
