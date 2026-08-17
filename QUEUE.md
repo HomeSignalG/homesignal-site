@@ -141,6 +141,33 @@ deployed (run 31847890869). ROLLOUT PARTIAL BY CHOICE: 120 / 174 live (69.0%), M
   transient zero. Handed to the 15-min `dev-reports-rolling-refresh` cron, which sweeps them on the
   `refreshed_at` cursor. **Firing harder does not fix an FRS-throughput refusal.**
 
+### 2026-08-17 — ✅ RESOLVED: the 7 pre-existing ingest test failures were CI-DARK dead tests, already retired on main
+
+The founder's closing question on the Phase-0 thread: were the 7 `tests/test_cutover_box_elder.py`
+failures (observed on clean ingest main in the sandbox) red in CI on main, or sandbox-only?
+**Neither — they were in a third category: genuinely failing everywhere, but invisible to CI.**
+- **No CI ever ran them.** Measured across every ingest workflow: **22 of 57 test files are
+  referenced by a CI workflow** (one via pytest — `test_local_news_topic_matrix.py` — the rest
+  as per-gate direct `python tests/test_X.py` steps); `test_cutover_box_elder.py` has **0
+  references, ever**. So there is no green main run covering them to cite, and no red one
+  either — a green ingest main attested nothing about these tests.
+- **The failures were content-genuine, not environment parity.** Re-run and read: gate G6
+  fails with *"feeds.csv is missing reviewed rows: be-localnews-abc4/cvd/fox13/
+  hjnews-tremonton/ksl/sltrib"* — the tests pinned the pre-Gold-Master Box Elder local-news
+  rows, which were legitimately removed when Local News moved to the registry path. Dead tests
+  asserting a completed one-time cutover state; they would fail identically on any machine.
+- **Already adjudicated and removed on main** — by the other ingest session, before this
+  question was asked: PR #338 ("Deactivate Hampshire + Middlesex MA; **retire the dead
+  cutover**; give Gate 9 CI", commit `c626bac`) deleted the file. Current ingest main has no
+  such tests. **Nothing gates the next merge; no stop-and-fix.**
+- 🧭 **The parity caveat that DOES survive, logged:** ingest CI test coverage is per-gate, not
+  suite-wide — **35 of 57 ingest test files are executed by no workflow**, so the sandbox
+  pytest run is the only place they run, and sandbox failures in that set are invisible to (and
+  unattested by) CI in either direction. When a sandbox test failure appears on clean ingest
+  main, check whether ANY workflow references the file before reasoning about CI state — the
+  instrument-must-prove-it-ran rule, at test-roster scale. Widening CI to the uncovered 35 is
+  the ingest sessions' call, not taken here.
+
 ### 2026-08-17 — 🔎 PHASE 0 COMPLETE: agenda-item yield measured — ZERO on every axis, with named structural causes
 
 **Founder-approved Phase 0 ran to completion (ingest run 31989802553, read-only; instrument PRs
