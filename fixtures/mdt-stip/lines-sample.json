@@ -1,0 +1,144 @@
+{
+ "displayFieldName": "PROJECT_NAME",
+ "fieldAliases": {
+  "OBJECTID": "OBJECTID",
+  "UPN": "Uniform Project Number",
+  "PROJECT_NAME": "Project Name",
+  "SCOPE": "Scope",
+  "ROUTE": "Route",
+  "SIGNED_ROUTE": "Signed Route",
+  "FFY_YEAR": "Federal Fiscal Year (FFY) Year"
+ },
+ "geometryType": "esriGeometryPolyline",
+ "spatialReference": {
+  "wkid": 4326,
+  "latestWkid": 4326
+ },
+ "fields": [
+  {
+   "name": "OBJECTID",
+   "type": "esriFieldTypeOID",
+   "alias": "OBJECTID"
+  },
+  {
+   "name": "UPN",
+   "type": "esriFieldTypeInteger",
+   "alias": "Uniform Project Number"
+  },
+  {
+   "name": "PROJECT_NAME",
+   "type": "esriFieldTypeString",
+   "alias": "Project Name",
+   "length": 1073741822
+  },
+  {
+   "name": "SCOPE",
+   "type": "esriFieldTypeString",
+   "alias": "Scope",
+   "length": 1073741822
+  },
+  {
+   "name": "ROUTE",
+   "type": "esriFieldTypeString",
+   "alias": "Route",
+   "length": 1073741822
+  },
+  {
+   "name": "SIGNED_ROUTE",
+   "type": "esriFieldTypeString",
+   "alias": "Signed Route",
+   "length": 1073741822
+  },
+  {
+   "name": "FFY_YEAR",
+   "type": "esriFieldTypeInteger",
+   "alias": "Federal Fiscal Year (FFY) Year"
+  }
+ ],
+ "features": [
+  {
+   "attributes": {
+    "OBJECTID": 290,
+    "UPN": 9610,
+    "PROJECT_NAME": "SF 179 SHLD WIDEN BELKNAP",
+    "SCOPE": "310 - ROADWAY & ROADSIDE SAFETY IMPROVEMENTS",
+    "ROUTE": "C000006A",
+    "SIGNED_ROUTE": "MT-200",
+    "FFY_YEAR": 2029
+   },
+   "geometry": {
+    "paths": [
+     [
+      [
+       -115.482,
+       47.743
+      ],
+      [
+       -115.427,
+       47.684
+      ],
+      [
+       -115.415,
+       47.68
+      ],
+      [
+       -115.406,
+       47.655
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 291,
+    "UPN": 10352,
+    "PROJECT_NAME": "SF 199 RIVER RD SANDERS CNTY",
+    "SCOPE": "310 - ROADWAY & ROADSIDE SAFETY IMPROVEMENTS",
+    "ROUTE": "C045102A",
+    "SIGNED_ROUTE": "RIVER RD",
+    "FFY_YEAR": 2029
+   },
+   "geometry": {
+    "paths": [
+     [
+      [
+       -115.059,
+       47.529
+      ],
+      [
+       -115.076,
+       47.535
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 292,
+    "UPN": 10342,
+    "PROJECT_NAME": "VANDALIA REST AREA REHAB",
+    "SCOPE": "172 - RESTORATION & REHAB - FACILITIES",
+    "ROUTE": "C000001A",
+    "SIGNED_ROUTE": "US-2",
+    "FFY_YEAR": 2027
+   },
+   "geometry": {
+    "paths": [
+     [
+      [
+       -106.798,
+       48.371
+      ],
+      [
+       -106.79,
+       48.368
+      ]
+     ]
+    ]
+   }
+  }
+ ],
+ "exceededTransferLimit": true
+}

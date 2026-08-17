@@ -8028,3 +8028,82 @@ it maps to proposed today and is the precedent the rejected Miami change cited; 
 Hold/Hardhold→exclude, Henderson/others as found by grep). Decide ONE fleet-wide semantic, with
 the resident-meaning question stated explicitly: **does this pin claim something is moving
 forward when it isn't?** Founder decision at the end; until then no entry's hold-bucketing moves.
+
+## MIAMI UPGRADE SHIPPED AND LIVE-VERIFIED (2026-08-17)
+
+PR #781 squash-merged (`3659393`), engine deployed (run 32074839710 — the first dispatch,
+32074619475, failed on a TRANSIENT `supabase/setup-cli` "rate limit exceeded" resolving
+'latest', before any deploy step; retried clean). **Live receipt, ZIP 33127 through the
+deployed engine (pg_net request 9823): HTTP 200 · 3.1 MB (under the 3.5 MB ceiling — the
+1.5-mi measured radius holding) · 3,145 miami-building-permits records · ALL 3,145 with real
+use classes (Residential/Commercial) · 0 unclassified · 0 missing record_url · 0 missing
+coordinates · titles now ScopeofWork+WorkItems ("NEW CONSTRUCTION LOW VOLTAGE SOUND / SPEAKER
+SYSTEM").** Persisted via dev_refresh_collect; stored row re-verified at 3,145 with-use-class.
+The other 23 Miami-Dade pages pick up the upgraded fields on the nightly refresh, zero-touch.
+Hold stays exclude (founder ruling); the fleet hold-semantics review item stands above.
+
+**Board (founder-set): next = the statewide-DOT recon batch NM / AR / LA / SD / MT / MS / AZ,**
+with registry-grep-first and the edge-probe ×3 preflight in force for every candidate; El Paso
+parked (different-day ×3 audit before recon); CA in the municipal/MPO tier behind the batch.
+
+## DOT RECON BATCH COMPLETE — NM / AR / LA / SD / MT / MS / AZ (2026-08-17, propose-only; NOTHING WIRED)
+
+Registry-grep-first ran before any recon: **no statewide DOT entry exists for any of the six**
+(199 entries; MT/AR/SD/NM/LA/MS carry municipal permit entries only). Edge-probe ×3 preflight
+(requests 10448 / 10705 / 11041, probed 22:43:44Z / 22:49:09Z / 23:04:20Z — rounds 1→2 were
+5.4 min apart because round 2 fired on session resume after the spacer had already elapsed;
+disclosed, results identical in all rounds so no verdict rests on the spacing):
+mt-mdt 200×3 (244/269/184 ms, count 275 every round) · ar-ardot 200×3 (184/340/295 ms, count
+1,384 every round) · sd-dotgis 200×3 · la-dotd 200×3 · **ms-mdot DNS failure ×3**.
+
+- **AZ — ALREADY WIRED, healthy.** `adot-tip-fy2026-2030` predates the batch; 685 records /
+  181 ZIP pages delivering. No action.
+- **MT — PROPOSE-ONLY ENTRY DRAFTED** (`mt-mdt-stip-lines`): MDT STIP "Lines (2026)" layer 1,
+  gis.mtmdt.us (org name receipt: arcgis.com portal dKlvxNSUvl36IGMp = "Montana Department of
+  Transportation"). 275 polylines; SCOPE 26 verbatim values SUM 275 exactly (0 null) → type_map
+  all → Utility; FFY_YEAR 2022–2030 sums 275; NO status/date fields → status_const "Programmed"
+  → proposed (NJ/MnDOT fleet shape), file_date deliberately absent (FFY is forecast — rider).
+  Layer 0 "STIP Points (2026)" = 5 features (2 UPNs shared with lines) — below threshold, logged.
+- **AR — PROPOSE-ONLY ENTRIES DRAFTED ×2** (`ar-ardot-job-status-points` L2 1,384 rows /
+  `ar-ardot-job-status-lines` L3 5,052 rows). **The opaque-code block is RESOLVED with a
+  publisher receipt**: ARDOT's own web map (item 05f0db5beea8448392b11190bd36f06c, owner
+  Thomas.Melton@ardot.gov) carries Arcade expr "MapStatusAliasName": 00=Programmed, 01=Scheduled,
+  02=Under Construction, 03=Completed; the ARDOT dashboard's pie slices agree independently.
+  Not the San-Jose class. Buckets proposed: 01→proposed (letting not yet occurred — conservative,
+  one step past NDOT Programmed), 02→approved (PennDOT/UDOT fleet), 03→operating. Status sums
+  exact both layers (451/199/734=1,384 · 894/567/3,591=5,052); crosstabs with Map_Show exact;
+  extra_where Map_Show=1 (ARDOT's own display curation — status-orthogonal, receipts). FRESH:
+  max Accepted_Date 2026-08-09, max NTP 2026-07-06 (Updated_DT is a dead legacy field, max
+  2019-11-14 — checked and discarded). file_date=Letting_Date (real event; PCPM_Let_Date maxes
+  2029 = forecast, rejected). Type vocab 21 values sums 1,384 (12 null → unclassified).
+  Job_No overlap Points∩Lines = 60 of 660 (600 points-only vs 1,643 lines) — substantially
+  disjoint populations, NOT the Houston subset class; 60 dual-representation jobs disclosed.
+  Titles: Job_Name legible (samples on file). Fields carry NO coded-value domains; legend and
+  renderer labels are the codes themselves — the web-map config was the only decode channel.
+- **SD — PROPOSE-ONLY SHAPE DRAFTED ×7 entries** on dotgis.sd.gov (first-party state domain)
+  STIP/DOT_STIP_Approved layers 0/1/2/3/4/6/9 = Structures 330 · Safety-pt 104 · Constr-Reconstr
+  140 · Resurfacing 199 · Pavement Preservation 430 · Safety-line 153 · RR Crossings 44 = 1,400
+  of 1,466 approved features. No status field, LettingDate/ReadyDate are forecast → status_const
+  "Programmed"→proposed, use_type_const Utility (ImproveDesc is free-text prose — Douglas-NV
+  class — rides in title with LocDesc instead). Partition receipt: 646 distinct ProjectCtrlNbrs,
+  50 in >1 layer — L0+L19=48 (L19 dropped as Houston-subset), L1+L6=2 (disclosed, kept).
+  Dropped and logged (no silent caps): L19 (53), L5 ADA (11), L20 (2), L12/L18/L21 (0 rows),
+  L7/L8 Developmental STIP 2030-2033 (381 — forecast program per rider), L16 "Do Not Map".
+- **NM — STAMPED REJECTION: STALLED.** NMDOT_ESTIP_Project_Locations (owner nmdot, AGO
+  hOpd7wfnKm16p9D9): newest layer "Project Locations 2025" dataLastEditDate = 2023-08-24;
+  program columns end at PRG_2021+PRG_FUTURE; counts 49/79/44; no status field; only forecast
+  FFY fields (rider). Completeness: owner's 10 newest items (through 2026-07-21) contain no
+  replacement register. → nightly reprobe list.
+- **LA — STAMPED REJECTION: register is a Power BI embed.** dotd.la.gov/projects/ embeds
+  app.powerbi.com/view?r=… (iframe receipt) — no queryable per-record API, no record_url.
+  maps.dotd.la.gov/topo carries reference layers only (OpenData = soils/census/GNIS/boundaries;
+  Utilities folder 499 Token Required; FHWAUrbanArea = urban-area polygons). AGO name-search:
+  no register (Mardi Gras Pass maps, signal design zones, bridges gdb). → reprobe list.
+- **MS — STAMPED REJECTION: GIS hostname does not exist.** gis.mdot.ms.gov NXDOMAIN from THREE
+  client classes: edge runtime ×3 rounds, pg_net, sandbox getent — while mdot.ms.gov itself
+  resolves (205.144.237.39), so the agency is alive and the GIS host is gone. AGO name-search
+  ("Mississippi Department of Transportation") returns third-party items only (student/MDEQ);
+  mdot.ms.gov is a React SPA shell (goMDOT) with no crawlable GIS links. → reprobe list.
+
+Proposal JSON parked at scratchpad/dot-batch-proposals.json (session-local); the entries above
+are the record. **Awaiting founder review — no registry edit, no wire, no deploy in this batch.**

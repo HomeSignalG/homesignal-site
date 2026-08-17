@@ -1,0 +1,148 @@
+{
+ "displayFieldName": "PlanName",
+ "fieldAliases": {
+  "OBJECTID": "OBJECTID",
+  "ProjectCtrlNbr": "PCN",
+  "LocDesc": "Location Description",
+  "ImproveDesc": "Improvement Description",
+  "HwyNbr": "Highway",
+  "CountyList": "County",
+  "FiscalYear": "Fiscal Year",
+  "ConstructionYear": "Construction Year"
+ },
+ "geometryType": "esriGeometryPolyline",
+ "spatialReference": {
+  "wkid": 4326,
+  "latestWkid": 4326
+ },
+ "fields": [
+  {
+   "name": "OBJECTID",
+   "type": "esriFieldTypeOID",
+   "alias": "OBJECTID"
+  },
+  {
+   "name": "ProjectCtrlNbr",
+   "type": "esriFieldTypeString",
+   "alias": "PCN",
+   "length": 4
+  },
+  {
+   "name": "LocDesc",
+   "type": "esriFieldTypeString",
+   "alias": "Location Description",
+   "length": 600
+  },
+  {
+   "name": "ImproveDesc",
+   "type": "esriFieldTypeString",
+   "alias": "Improvement Description",
+   "length": 600
+  },
+  {
+   "name": "HwyNbr",
+   "type": "esriFieldTypeString",
+   "alias": "Highway",
+   "length": 6
+  },
+  {
+   "name": "CountyList",
+   "type": "esriFieldTypeString",
+   "alias": "County",
+   "length": 1000
+  },
+  {
+   "name": "FiscalYear",
+   "type": "esriFieldTypeString",
+   "alias": "Fiscal Year",
+   "length": 7
+  },
+  {
+   "name": "ConstructionYear",
+   "type": "esriFieldTypeString",
+   "alias": "Construction Year",
+   "length": 50
+  }
+ ],
+ "features": [
+  {
+   "attributes": {
+    "OBJECTID": 1272518,
+    "ProjectCtrlNbr": "04WQ",
+    "LocDesc": "US18 - Fm the E Jct of SD73 to W of Antelope Road/242 Ave",
+    "ImproveDesc": "Grading, Interim Surfacing",
+    "HwyNbr": "018",
+    "CountyList": "Bennett",
+    "FiscalYear": "2027",
+    "ConstructionYear": "2027"
+   },
+   "geometry": {
+    "paths": [
+     [
+      [
+       -101.505,
+       43.215
+      ],
+      [
+       -101.281,
+       43.215
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 1272528,
+    "ProjectCtrlNbr": "09R4",
+    "LocDesc": "US81, US81 N & S - Fm 23rd St to N of Wilson Rd in Yankton",
+    "ImproveDesc": "AC Surfacing, Curb Ramps, Lighting",
+    "HwyNbr": "081",
+    "CountyList": "Yankton",
+    "FiscalYear": "2029",
+    "ConstructionYear": "2029"
+   },
+   "geometry": {
+    "paths": [
+     [
+      [
+       -97.397,
+       42.894
+      ],
+      [
+       -97.398,
+       42.899
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 1272534,
+    "ProjectCtrlNbr": "09X4",
+    "LocDesc": "US12 - Fm 2.7 W to 1.5 W of the Walworth Co Line",
+    "ImproveDesc": "Grading, AC Surfacing",
+    "HwyNbr": "012",
+    "CountyList": "Corson",
+    "FiscalYear": "2027",
+    "ConstructionYear": "2028"
+   },
+   "geometry": {
+    "paths": [
+     [
+      [
+       -100.515,
+       45.559
+      ],
+      [
+       -100.499,
+       45.568
+      ]
+     ]
+    ]
+   }
+  }
+ ],
+ "exceededTransferLimit": true
+}

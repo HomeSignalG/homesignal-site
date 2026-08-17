@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. No subject-matter claim is derived.",
-  "registry_entries": 199,
+  "registry_entries": 207,
   "statewide": {
     "AK": [
       {
@@ -131,6 +131,13 @@
         "scope": "statewide"
       }
     ],
+    "MT": [
+      {
+        "id": "mt-mdt-stip-lines",
+        "label": "Montana Department of Transportation",
+        "scope": "statewide"
+      }
+    ],
     "NE": [
       {
         "id": "ndot-program-book-segments",
@@ -198,6 +205,43 @@
       {
         "id": "scdot-project-viewer-lines",
         "label": "South Carolina Department of Transportation (SCDOT)",
+        "scope": "statewide"
+      }
+    ],
+    "SD": [
+      {
+        "id": "sd-stip-construction-reconstruction",
+        "label": "South Dakota Department of Transportation",
+        "scope": "statewide"
+      },
+      {
+        "id": "sd-stip-pavement-preservation",
+        "label": "South Dakota Department of Transportation",
+        "scope": "statewide"
+      },
+      {
+        "id": "sd-stip-railroad-crossings",
+        "label": "South Dakota Department of Transportation",
+        "scope": "statewide"
+      },
+      {
+        "id": "sd-stip-resurfacing",
+        "label": "South Dakota Department of Transportation",
+        "scope": "statewide"
+      },
+      {
+        "id": "sd-stip-safety-lines",
+        "label": "South Dakota Department of Transportation",
+        "scope": "statewide"
+      },
+      {
+        "id": "sd-stip-safety-points",
+        "label": "South Dakota Department of Transportation",
+        "scope": "statewide"
+      },
+      {
+        "id": "sd-stip-structures",
+        "label": "South Dakota Department of Transportation",
         "scope": "statewide"
       }
     ],
