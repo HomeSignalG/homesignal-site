@@ -1,0 +1,118 @@
+{
+ "displayFieldName": "PlanName",
+ "fieldAliases": {
+  "OBJECTID": "OBJECTID",
+  "ProjectCtrlNbr": "PCN",
+  "LocDesc": "Location Description",
+  "ImproveDesc": "Improvement Description",
+  "HwyNbr": "Highway",
+  "CountyList": "County",
+  "FiscalYear": "Fiscal Year",
+  "ConstructionYear": "Construction Year"
+ },
+ "geometryType": "esriGeometryPoint",
+ "spatialReference": {
+  "wkid": 4326,
+  "latestWkid": 4326
+ },
+ "fields": [
+  {
+   "name": "OBJECTID",
+   "type": "esriFieldTypeOID",
+   "alias": "OBJECTID"
+  },
+  {
+   "name": "ProjectCtrlNbr",
+   "type": "esriFieldTypeString",
+   "alias": "PCN",
+   "length": 4
+  },
+  {
+   "name": "LocDesc",
+   "type": "esriFieldTypeString",
+   "alias": "Location Description",
+   "length": 600
+  },
+  {
+   "name": "ImproveDesc",
+   "type": "esriFieldTypeString",
+   "alias": "Improvement Description",
+   "length": 600
+  },
+  {
+   "name": "HwyNbr",
+   "type": "esriFieldTypeString",
+   "alias": "Highway",
+   "length": 6
+  },
+  {
+   "name": "CountyList",
+   "type": "esriFieldTypeString",
+   "alias": "County",
+   "length": 1000
+  },
+  {
+   "name": "FiscalYear",
+   "type": "esriFieldTypeString",
+   "alias": "Fiscal Year",
+   "length": 7
+  },
+  {
+   "name": "ConstructionYear",
+   "type": "esriFieldTypeString",
+   "alias": "Construction Year",
+   "length": 50
+  }
+ ],
+ "features": [
+  {
+   "attributes": {
+    "OBJECTID": 3325609,
+    "ProjectCtrlNbr": "0A65",
+    "LocDesc": "Various Locations Throughout the Rapid City Region",
+    "ImproveDesc": "2028 Bridge Deck Treatment",
+    "HwyNbr": null,
+    "CountyList": "Regionwide",
+    "FiscalYear": "2028",
+    "ConstructionYear": "2028"
+   },
+   "geometry": {
+    "x": "NaN",
+    "y": "NaN"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 3325617,
+    "ProjectCtrlNbr": "067J",
+    "LocDesc": "SD34 - Str 0.4 N of Buffalo Co. Line over Campbell Ck",
+    "ImproveDesc": "Replace Str RCBC, Approach Grading",
+    "HwyNbr": "034",
+    "CountyList": "Hyde",
+    "FiscalYear": "2028",
+    "ConstructionYear": "2028"
+   },
+   "geometry": {
+    "x": -99.4415842834429,
+    "y": 44.200430552333174
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 3325631,
+    "ProjectCtrlNbr": "08J1",
+    "LocDesc": "SD42 - 1.2, 1.7, 9.5, 10.4 E of Davidson Co Line over Gidle, N Br 12 Mile, Bloom Ck",
+    "ImproveDesc": "Polymer Chip Seal",
+    "HwyNbr": "042",
+    "CountyList": "Hanson",
+    "FiscalYear": "2026",
+    "ConstructionYear": "2026"
+   },
+   "geometry": {
+    "x": -97.77703179874885,
+    "y": 43.54333450460177
+   }
+  }
+ ],
+ "exceededTransferLimit": true
+}
