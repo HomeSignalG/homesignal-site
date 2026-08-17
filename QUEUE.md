@@ -7860,3 +7860,58 @@ table's 210-dark is now 26).
 - **Next levers per the standing order:** CA 360 behind the edge-reachability preflight
   instrument; then the statewide-DOT recon batch (NM/AR/LA/SD/MT/MS/AZ), each checked against
   its rejection stamp first.
+
+## EDGE-REACHABILITY PREFLIGHT BUILT + FIRST STAMP AUDIT RUN — 2 flips, 1 intermittent, 5 hold (2026-08-17)
+
+Founder-approved instrument (rider: ≥3 spaced probes before any stamp moves; mixed = "intermittent",
+a third state). Closes the PennDOT gap: pg_net-based reachability stamps are claims about the WRONG
+client — recon runs on Postgres egress, production on the Deno edge runtime.
+
+**The instrument:** `supabase/functions/edge-probe` (PRs #776/#777/#779, deploy runs 32065779982 +
+post-#779). Fetches ≤10 candidate URLs per call FROM the deployed edge runtime with **fetch-shape
+parity to `sources/arcgis.ts::getWithBackoff`** — byte-identical headers + the identical 30s
+timeout, ENFORCED by `test/edge-probe.test.mjs` (29 assertions; CI-red if probe and connector ever
+drift). Receipt per target: status/ok/elapsed_ms/bytes/content_type/redirected/final_url/
+body_head(600)/error. SSRF fences: https-only, GET-only, no forwarded headers, private/link-local/
+loopback/metadata refused pre-fetch, 64 KB body cap, sequential targets. Suite 107/107.
+- ⚠️ **Two deploy-posture traps found and closed en route, both live-verified:** (1) the deploy
+  workflow passed `--no-verify-jwt` unconditionally (written for the engine) — now conditional
+  (#777); (2) **the deploy CLI PRESERVES a function's stored verify_jwt when the flag is omitted**,
+  so the flag-less redeploy kept `false` from the first deploy — caught by a live no-auth control
+  (request 8471 ran the probe), pinned by `supabase/config.toml` `[functions.edge-probe]
+  verify_jwt = true` (#779, + `supabase/config.toml` added to unit-tests path filters — the
+  CLAUDE.md no-path-filter merge-deadlock case, same remedy). **Post-fix control: no-auth → 401
+  UNAUTHORIZED_NO_AUTH_HEADER (request 8725).** Standing answer: after ANY security-posture deploy,
+  verify the posture with a live negative control — the CLI's flag semantics make "deployed with
+  the right command" insufficient evidence.
+- **Calibration (no verdicts before controls behaved):** positive control gis.penndot lines count →
+  200/1,684ms through the probe (request 7902). ⚠️ **The divergence control found the PennDOT/pg_net
+  400-block has LIFTED** — raw pg_net now 200 `{"count":194354}` (request 7903) on the same host
+  that hard-400'd every pg_net request during the morning recon. **Stateful-host behavior measured
+  same-day — the empirical justification for the ×3 rider.**
+
+**Stamp audit — 8 hosts × 3 rounds ~15 min apart (requests 8156 / 8470 / 8724), verdicts:**
+
+| host (stamp) | r1 / r2 / r3 | verdict |
+|---|---|---|
+| **caltrans-gis.dot.ca.gov** | 200 245ms · 200 245ms · 200 258ms (real services JSON, v11.1) | **REACHABLE 3/3** — but see the stamp-class correction below |
+| **Miami** `services1.arcgis.com/CvuPhqcTQpZPT9qY/Building_Permits_Since_2014` | 200 212ms · 200 223ms · 200 207ms, count 229,637 | **FLIPS → reachable.** The stamped 30–60s/request slow-host condition is GONE (3/3 at ~210ms). → **RE-RECON flag** (Miami-Dade FL pages) |
+| **El Paso** `gis.elpasotexas.gov` NewResidential/1 | 30s timeout · 200 340ms `{"count":42677}` · 200 368ms | **INTERMITTENT** — the third state, all receipts attached. Note the stamped 403 did not reproduce in any round; today it hangs or answers. Not wired on this evidence; re-run the ×3 audit before any wire |
+| Tampa `arcgis.tampagov.net` | 403 Access Denied ×3 (102/143/164ms) | HOLDS |
+| Dayton `maps.daytonohio.gov` | connect error ×3 (~220ms) | HOLDS (TCP-reset class) |
+| Newark `data.ci.newark.nj.us` | 503 ×3 | HOLDS (Cloudflare) |
+| Lehigh `gis.lehighcounty.org` | **HTTP 200 ×3 but the body is the Incapsula JS challenge** | HOLDS — the shape receipt (body_head) catches what status alone would mis-stamp; never judge on status_code |
+| STL RDX `rdx.stldata.org` | 30s timeout ×3 | HOLDS (blackhole) |
+
+- 🔎 **CALTRANS STAMP-CLASS CORRECTION (report headline):** QUEUE's "Caltrans is a documented
+  edge-runtime blocker" line was a DRIFTED SUMMARY — no reachability receipt exists behind it. The
+  real stamp (CALIFORNIA PASS, 2026-08-05) is **`WRONG_RECORD_CLASS`**: the DCAT catalogue was
+  enumerated in full — 69 datasets, ALL asset/network inventory, 0 project layers. The 3/3
+  reachable receipts REMOVE the phantom reachability blocker but do NOT overturn the content
+  verdict: Caltrans still publishes assets, not projects. **The CA 360 path is unchanged —
+  municipal/MPO tier** (MTC rejected on schema: 0 date-typed fields, no status), now with one
+  fewer excuse: no candidate can be dismissed on "edge-blocked" grounds without an edge-probe
+  receipt.
+- **Standing answer (both directions):** a reachability claim about a candidate host — reachable
+  OR blocked — requires an `edge-probe` receipt (≥3 spaced rounds for a verdict). pg_net and
+  GitHub-runner results are supporting evidence about OTHER clients, never the stamp.
