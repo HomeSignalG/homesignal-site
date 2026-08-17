@@ -7915,3 +7915,53 @@ loopback/metadata refused pre-fetch, 64 KB body cap, sequential targets. Suite 1
 - **Standing answer (both directions):** a reachability claim about a candidate host — reachable
   OR blocked — requires an `edge-probe` receipt (≥3 spaced rounds for a verdict). pg_net and
   GitHub-runner results are supporting evidence about OTHER clients, never the stamp.
+
+## MIAMI RE-RECON COMPLETE — source QUALIFIES; registry entry PROPOSED, awaiting founder review (2026-08-17)
+
+Founder-approved re-recon after the edge-probe stamp audit flipped Miami to reachable (3/3 at
+~210 ms vs the stamped 30–60 s/request; receipts in the stamp-audit section above). Old recon
+treated as EXPIRED and fully re-receipted via pg_net (AGO host, both paths reachable) — and the
+expiry call was right: **the schema changed since the old recon** (the status field is now
+`BuildingPermitStatusDescription`; 41 columns; the old bare `Status` field is gone).
+
+Fresh receipts (pg_net requests 8979–8996, all in `net._http_response`):
+- **Single layer** on `services1.arcgis.com/CvuPhqcTQpZPT9qY/Building_Permits_Since_2014` —
+  no id-overlap question. Point geometry; `Latitude`/`Longitude` columns 100% in scope.
+- **Total 229,637 rows · ScopeofWork vocab 22 values summing EXACTLY to 229,637.** Kept scope
+  (the 4 construction/land-use types, all still verbatim): NEW CONSTRUCTION 50,592 · ADDITION
+  AND REMODELING 12,426 · DEMOLITION 8,586 · PHASED PERMIT 660 = **72,264**; 18 trade/noise
+  values dropped at source (REMODELING/REPAIRS 88,365 still excluded — Boston Short-Form class).
+- **Status vocab IN SCOPE: 5 values summing exactly to 72,264** — Active 9,363 · Final 60,593 ·
+  Revoked 1,255 · Expired 916 · Hold 137; 0 nulls. Buckets (fleet-consistent): Active→approved
+  (Boston Issued precedent) · Final→operating (Boston Closed) · Hold→proposed (Scottsdale ON
+  HOLD) · Expired+Revoked→exclude (Phoenix EXPR/VOID).
+- **type_source = PropertyType — the clean find of the re-recon:** exactly 2 values, Commercial
+  28,075 + Residential 44,189 = 72,264 EXACTLY, both literal members of the closed use_type
+  set → verbatim identity map, 0 unclassified possible. (The old wire had no per-row use class.)
+- **Title (rider-measured):** `["ScopeofWork","WorkItems"]` joined (UDOT pattern). WorkItems
+  72,254/72,264 (99.99%), specific work text ("MULTI-FAMILY (RENTAL)", "BOAT LIFT/DAVITS…|DOCK");
+  ScopeofWork 100% but only 4 generic values — the join gives category + specifics.
+  DeliveryAddress = address (100%). case_number = PermitNumber.
+- **file_date = IssuedDate**: real esriFieldTypeDate, 72,253/72,264 (99.98%), a true past event;
+  DATE-literal recency verified live (365d scope = **11,531 rows citywide**). FirstSubmissionDate
+  REJECTED on measurement — 20,397/72,264 (28.2%), only 299 rows in the last 365d (a legacy
+  backfill, not a live application stream; the Henderson process-start preference inverts here).
+- **Distinct-permit reality: distinct PermitNumber = 72,264 = the scoped row count** — one row
+  per permit, no multiplicity (unlike PennDOT's location-detail rows).
+- **Freshness: max IssuedDate 2026-08-15 · service dataLastEditDate 2026-08-16** — live ledger.
+- ⚠️ **CompanyZip is the CONTRACTOR's ZIP, never usable for site scoping** — spatial 3-mi on the
+  rows' own points (no site-ZIP column).
+
+**Proposed entry** (propose-only; wire on approval): `miami-building-permits`, arcgis, coverage
+`[{FL, Miami-Dade}]`, extra_where = the 4-type ScopeofWork filter, recency_days 365 on IssuedDate,
+`out_fields` projected to the 8 mapped columns (the CPU-hazard fix originally shipped FOR this
+host), spatial_zip_radius_mi 3, record_url dataset-precision (no per-row URL column),
+status/type maps as above. **Gate plan:** unit never-fetches with Broward 33301 (Fort Lauderdale)
+vs Miami 33127 + live bidirectional receipts post-deploy. **Wire-time smoke MUST re-answer the
+ORIGINAL rejection**: a full paged engine fetch on a dense Miami ZIP (33127/33130) within the
+worker budget — the edge-probe's ~210 ms is one request, not a full report; if the budget blows
+again, the stamp re-closes with the new receipt.
+
+**STATE: proposal handed to founder; STOPPED per propose-only.** El Paso stays parked in the
+intermittent bin (re-run its ×3 audit a different day before any recon). CA reclassified:
+municipal/MPO tier, queued behind the DOT recon batch.
