@@ -1,0 +1,42 @@
+[
+  {
+    "id": "pa3-freshness-top1",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectslines/MapServer/0/query?where=1%3D1&outFields=PROJECT_ID%2CLAST_EDITED_DATE%2CPROJECT_CREATION_DATE&orderByFields=LAST_EDITED_DATE%20DESC&resultRecordCount=1&returnGeometry=false&f=json",
+    "print_chars": 900
+  },
+  {
+    "id": "pa3-stage-status-crosstab",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectslines/MapServer/0/query?where=1%3D1&groupByFieldsForStatistics=PROJECT_STAGE%2CPROJECT_STATUS_CODE_DESC&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22OBJECTID%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&returnGeometry=false&f=json",
+    "print_chars": 6000
+  },
+  {
+    "id": "pa3-improvement-vocab-scoped",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectslines/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)&groupByFieldsForStatistics=IMPROVEMENT_TYPE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22OBJECTID%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&returnGeometry=false&f=json",
+    "print_chars": 5000
+  },
+  {
+    "id": "pa3-scoped-count-lines",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectslines/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)&returnCountOnly=true&f=json",
+    "print_chars": 200
+  },
+  {
+    "id": "pa3-scoped-count-points",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)&returnCountOnly=true&f=json",
+    "print_chars": 200
+  },
+  {
+    "id": "pa3-lines-sample-ids",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectslines/MapServer/0/query?where=PROJECT_STAGE%3D%27UNDER%20CONSTRUCTION%27&outFields=PROJECT_ID%2CPROJECT_TITLE%2CRESPONSIBLE_COUNTY_NAME&orderByFields=PROJECT_ID%20ASC&resultRecordCount=6&returnGeometry=false&f=json",
+    "print_chars": 2500
+  },
+  {
+    "id": "pa3-points-sample-attrs",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%3D%27UNDER%20CONSTRUCTION%27&outFields=PROJECT_ID%2CPROJECT_TITLE%2CPROJECT_STATUS_CODE_DESC%2CPROJECT_STAGE%2CRESPONSIBLE_COUNTY_NAME&orderByFields=PROJECT_ID%20ASC&resultRecordCount=6&returnGeometry=true&outSR=4326&f=json",
+    "print_chars": 4000
+  },
+  {
+    "id": "pa3-points-county-vocab",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)&groupByFieldsForStatistics=RESPONSIBLE_COUNTY_NAME&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22OBJECTID%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&returnGeometry=false&f=json",
+    "print_chars": 4000
+  }
+]
