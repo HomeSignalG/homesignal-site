@@ -141,6 +141,44 @@ deployed (run 31847890869). ROLLOUT PARTIAL BY CHOICE: 120 / 174 live (69.0%), M
   transient zero. Handed to the 15-min `dev-reports-rolling-refresh` cron, which sweeps them on the
   `refreshed_at` cursor. **Firing harder does not fix an FRS-throughput refusal.**
 
+### 2026-08-17 — 🔎 PHASE 0 COMPLETE: agenda-item yield measured — ZERO on every axis, with named structural causes
+
+**Founder-approved Phase 0 ran to completion (ingest run 31989802553, read-only; instrument PRs
+#341/#346/#347/#348/#349). County selection was drawn from the dark-ZIP-ceiling population, not
+convenience: the top dark-ZIP contributors per structured family — Granicus: Taos NM (13 dark),
+Fauquier VA (8); CivicClerk: Collier FL (5), Minnehaha SD (3). RESULT: address strings 0 · case
+strings 0 · fenced geocodes 0 · dark-ZIP page-lift 0.** Not one zero is a shrug — each has a
+named cause:
+- **Taos NM (granicus): measured 0.** 101 agendas in the wired RSS, **0 planning-titled** — the
+  feed is the County Commission's; no planning body publishes on it. Extracting from EXISTING
+  feeds yields nothing; a planning-body feed would be new wiring, not extraction.
+- **Fauquier VA (granicus): structurally unreachable.** 48 planning-titled agendas exist — the
+  best cell in the sample — but every document fetch dies on
+  `SSL: CERTIFICATE_VERIFY_FAILED — hostname mismatch, cert not valid for
+  'granicus_production_attachments.s3…'`: the AgendaViewer redirects to a Granicus S3
+  attachments host whose underscored bucket name breaks TLS. Verification correctly refuses and
+  is never bypassed. Vendor-side defect; 0 extractable over verified TLS. (Taos's tenant serves
+  agenda HTML inline; Fauquier's serves S3 PDF attachments — Granicus tenant configs differ,
+  so "Granicus HTML is parseable" is per-tenant, never per-family.)
+- **Collier FL + Minnehaha SD (civicclerk): items not on the public API.** Events reachable
+  (15 each, 5–6 planning-titled) but agenda ITEMS are exposed on none of the OData item
+  endpoints — item content lives behind PublishedFiles (PDFs).
+**Verdict: the 319-dark-ZIP document-extraction ceiling is theoretical.** In the very counties
+that would supply it, the two structured families yield zero machine-readable agenda-item text;
+every remaining path runs through PDF parsing of vendor attachments — a heavier, fuzzier build
+the anti-fabrication rules make expensive, and one nothing measured here justifies. Measured
+payoff chain now complete: titles ≈ 33 records / 0 dark lift → structured agenda items 0 / 0 →
+unmeasured remainder = PDFs. **Recommendation: do not build `land_use_action`.**
+Instrument lessons banked (all self-caught, each its own PR): a workflow secret that doesn't
+exist sets its env var to EMPTY STRING and `.get()` defaults don't fire (#346); **the repo's
+`SUPABASE_WRITE_KEY` is a new-format `sb_` secret key and Supabase's gateway HARD-REFUSES it
+from any browser-looking User-Agent** — `"Forbidden use of secret API key in browser"` —
+ingest.py only works because it sends no UA; never send a Mozilla UA on Supabase REST (#347/#348);
+government-site fetches belong on the shipped `http_get_bytes`, not a private fetcher (#349).
+**Deferred, logged not dropped (unchanged): the Multnomah bespoke wire** (quality add, 0
+coverage lift — queued behind coverage work) **and the full land_use_action build** (was
+contingent on Phase 0's number; that number is 0).
+
 ### 2026-08-15 — 🔎 SCOPING: notices/agendas as "proposed development" records — MEASURED, report delivered, NOTHING BUILT
 
 Founder-directed evidence-only investigation. Full report in the session transcript; the numbers
