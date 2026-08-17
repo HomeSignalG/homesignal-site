@@ -1,0 +1,47 @@
+[
+  {
+    "id": "pa4-points-improvement-vocab",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)&groupByFieldsForStatistics=IMPROVEMENT_TYPE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22OBJECTID%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&returnGeometry=false&f=json",
+    "print_chars": 12000
+  },
+  {
+    "id": "pa4-points-stage-vocab-scoped",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)&groupByFieldsForStatistics=PROJECT_STAGE&outStatistics=%5B%7B%22statisticType%22%3A%22count%22%2C%22onStatisticField%22%3A%22OBJECTID%22%2C%22outStatisticFieldName%22%3A%22n%22%7D%5D&returnGeometry=false&f=json",
+    "print_chars": 1500
+  },
+  {
+    "id": "pa4-points-distinct-projects-scoped",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)&outFields=PROJECT_ID&returnDistinctValues=true&returnCountOnly=true&f=json",
+    "print_chars": 300
+  },
+  {
+    "id": "pa4-lines-distinct-projects-scoped",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectslines/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)&outFields=PROJECT_ID&returnDistinctValues=true&returnCountOnly=true&f=json",
+    "print_chars": 300
+  },
+  {
+    "id": "pa4-points-letdate-pop",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)%20AND%20LET_DATE%20IS%20NOT%20NULL&returnCountOnly=true&f=json",
+    "print_chars": 300
+  },
+  {
+    "id": "pa4-points-ntpdate-pop",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)%20AND%20NTP_DATE%20IS%20NOT%20NULL&returnCountOnly=true&f=json",
+    "print_chars": 300
+  },
+  {
+    "id": "pa4-points-creationdate-pop",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)%20AND%20PROJECT_CREATION_DATE%20IS%20NOT%20NULL&returnCountOnly=true&f=json",
+    "print_chars": 300
+  },
+  {
+    "id": "pa4-points-committeddate-pop",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)%20AND%20POTENTIAL_COMMITTED_DATE%20IS%20NOT%20NULL&returnCountOnly=true&f=json",
+    "print_chars": 300
+  },
+  {
+    "id": "pa4-points-full-sample",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%3D%27IN%20DEVELOPMENT%27&outFields=PROJECT_ID%2CPROJECT_TITLE%2CPROJECT_SHORT_NARRATIVE%2CIMPROVEMENT_TYPE%2CPROJECT_STAGE%2CLET_DATE%2CNTP_DATE%2CPROJECT_CREATION_DATE%2CGEOGRAPHIC_DESCRIPTION%2CMUNICIPALITY_NAMES%2CRESPONSIBLE_COUNTY_NAME%2CPRIMARY_ST_RT_NO&orderByFields=PROJECT_CREATION_DATE%20DESC&resultRecordCount=3&returnGeometry=true&outSR=4326&f=json",
+    "print_chars": 5000
+  }
+]
