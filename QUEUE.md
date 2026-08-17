@@ -7810,3 +7810,53 @@ nothing wired.**
   0 unclassified beyond the 9 documented admin values (751 rows, 3.5%), pins within the PA extent.
 - **STATE: proposal handed to founder; STOPPED at registry-entry stage per the standing
   propose-only instruction. No registry change, no wiring, no deploy.**
+
+## PENNDOT WIRED AND LIVE — penndot-transportation-projects; PA dev-backed 350 → 534 of 560 (2026-08-17)
+
+Founder-approved with two riders, both resolved with receipts before merge:
+
+- **Rider 1 (title field), measured — run 32053833264** (`scripts/recon/pa-penndot-round5.json`):
+  PROJECT_SHORT_NARRATIVE populated **21,607/21,620 in scope (99.94%)** and legible full
+  sentences; PROJECT_TITLE is truncated at 25 chars mid-word BY THE SOURCE (`length:25` —
+  "SR 3001 Kirmar Avenue Eme", "I-80 R.S.REST EBANDWB"). **Wired: PROJECT_SHORT_NARRATIVE**;
+  the 13 null-narrative rows fall back to the PROJECT_ID label (column_map arrays JOIN, never
+  fall back — the truncated title is not used as backfill).
+- **Rider 2 (bucket consistency), resolved — no change:** UNDER CONSTRUCTION → approved matches
+  the statewide-DOT fleet exactly (udot `'Under Construction'` → approved; txdot
+  `'Construction'` → approved; NDOT/IDOT/ODOT/NYSDOT carry no under-construction value).
+
+**Wire:** PR #774 (squash `09448ac`) — registry arcgis 170 → 171 (additivity asserted
+programmatically, 109-line diff), `test/penndot-connector.test.mjs` (42 assertions incl. the
+Camden NJ 08102 never-fetches gate — the Council Bluffs analog — and a registry-wide
+exactly-ONE-PennDOT-entry invariant, since Lines carries the SAME projects),
+`fixtures/penndot/points-sample.json` (captured run 32047475605), `lib/generated/
+county-sources.json` regenerated same-commit (parity gate). `out_fields` projected to the 7
+mapped columns (~90-column MPMS row = the wide-row CPU-hazard class). Full unit suite
+**106/106 green**. Deploy: run 32054722199 (fail-loud registry step green).
+
+**🟢 EDGE-REACHABILITY VERDICT: CLEAR.** The wire-time risk (gis.penndot.pa.gov hard-400s ALL
+pg_net requests) did NOT extend to the edge runtime: first live smoke all 200 —
+19103 Philadelphia **409** penndot records (development 294→703) · 15222 Pittsburgh **359**
+(234→590) · 16801 State College **67** (952→1,019) · **08618 Trenton NJ 0** (live
+bidirectional receipt; Camden County is not modeled, so Mercer NJ — also directly across the
+Delaware — is the live control; the unit test still pins literal Camden 08102).
+
+**Rollout receipts (statewide re-cache, 560 fired + retries, collected via
+`dev_refresh_collect`):** **42,191 penndot records across 464 of 560 PA pages** —
+**0 missing record_url · 0 missing coordinates · 0 non-point · 0 outside the PA bounds ·
+0 bad buckets · 0 missing file_date · 810 unclassified (1.9%, the 9 documented admin
+classes)**. Cache-wide gate: penndot rides PA pages ONLY (0 non-PA), 0 fetch-failure or
+truncation rows for the entry all day. **PA dev-backed pages 350 → 534 of 560** (the gap
+table's 210-dark is now 26).
+
+- ⚠️ **The 86-page tail is EPA-FRS-side, deliberately NOT forced:** the 560-request burst
+  degraded FRS, later responses carried `facilities: 0`, and `dev_refresh_collect`'s
+  transient-safe guard correctly refused to clobber pages holding real cached facility counts
+  (0 penndot fetch failures in any refused response). The guard was NOT bypassed (standing
+  rule); the nightly 09:00 cron + FRS probe gate own the tail. 9 refreshed pages carry 0
+  penndot records — rural honest-empties (Centre County villages, small Allegheny boroughs).
+- The Live-metric (app_projects) propagation rides `app_refresh_sweep` (15-min cadence)
+  zero-touch; no manual materializer action taken.
+- **Next levers per the standing order:** CA 360 behind the edge-reachability preflight
+  instrument; then the statewide-DOT recon batch (NM/AR/LA/SD/MT/MS/AZ), each checked against
+  its rejection stamp first.
