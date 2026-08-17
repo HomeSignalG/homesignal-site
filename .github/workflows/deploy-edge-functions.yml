@@ -53,11 +53,19 @@ jobs:
         run: |
           FN="${{ github.event.inputs.function || 'get-address-report' }}"
           echo "Deploying edge function: $FN → project $SUPABASE_PROJECT_REF"
-          # --no-verify-jwt: get-address-report authenticates via the anon apikey at the gateway and
-          # is called from the browser + pg_net; it has no per-request JWT gate (matches its live config).
-          supabase functions deploy "$FN" \
-            --project-ref "$SUPABASE_PROJECT_REF" \
-            --no-verify-jwt
+          # --no-verify-jwt ONLY for the report engine: it authenticates via the anon apikey at
+          # the gateway and is called from the browser + pg_net with no per-request JWT gate
+          # (matches its live config). Every OTHER function keeps JWT verification ON — the
+          # edge-probe reachability preflight (an arbitrary-URL fetcher) must never deploy as
+          # an unauthenticated open endpoint; its callers pass the public anon key as a Bearer.
+          if [ "$FN" = "get-address-report" ]; then
+            supabase functions deploy "$FN" \
+              --project-ref "$SUPABASE_PROJECT_REF" \
+              --no-verify-jwt
+          else
+            supabase functions deploy "$FN" \
+              --project-ref "$SUPABASE_PROJECT_REF"
+          fi
 
       # Recompute the live-metric exclusion list FROM the registry JSON just deployed and
       # full-replace public.registry_incomplete_entries in one transaction. This is the ONLY
