@@ -1,0 +1,53 @@
+{
+  "_provenance": "Captured verbatim from the live layer via recon-fetch run 32047475605 target pa4-points-full-sample (2026-08-17): transportationprojectspoints/MapServer/0/query where PROJECT_STAGE='IN DEVELOPMENT' orderBy PROJECT_CREATION_DATE DESC resultRecordCount=3 outSR=4326.",
+  "displayFieldName": "PROJECT_ID",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": { "wkid": 4326, "latestWkid": 4326 },
+  "features": [
+    {
+      "attributes": {
+        "PROJECT_ID": 124338,
+        "PROJECT_TITLE": "SR 3001 Kirmar Avenue Eme",
+        "PROJECT_SHORT_NARRATIVE": "Emergency repairs on State Route 3001 (E. Kirmar Avenue) between State Route 2008 (Middle Road) and Maple Street in Newport Township, Luzerne County.",
+        "IMPROVEMENT_TYPE": "Miscellaneous",
+        "PROJECT_STAGE": "IN DEVELOPMENT",
+        "LET_DATE": "20260828",
+        "NTP_DATE": null,
+        "PROJECT_CREATION_DATE": 1783641600000,
+        "MUNICIPALITY_NAMES": "NEWPORT TOWNSHIP",
+        "RESPONSIBLE_COUNTY_NAME": "Luzerne       "
+      },
+      "geometry": { "x": -76.012171164290763, "y": 41.182251730685167 }
+    },
+    {
+      "attributes": {
+        "PROJECT_ID": 124323,
+        "PROJECT_TITLE": "2025 Slide Repairs - SR 2",
+        "PROJECT_SHORT_NARRATIVE": "2025 Slide Repairs - SR 2005 Pre CON Phase Work\nSlide Repair\nWashington County",
+        "IMPROVEMENT_TYPE": "Slides Correction",
+        "PROJECT_STAGE": "IN DEVELOPMENT",
+        "LET_DATE": null,
+        "NTP_DATE": null,
+        "PROJECT_CREATION_DATE": 1782864000000,
+        "MUNICIPALITY_NAMES": "AMWELL TOWNSHIP",
+        "RESPONSIBLE_COUNTY_NAME": "Washington    "
+      },
+      "geometry": { "x": -80.155887398643785, "y": 40.022017955902413 }
+    },
+    {
+      "attributes": {
+        "PROJECT_ID": 124073,
+        "PROJECT_TITLE": "Seward Truss Rehabilitati",
+        "PROJECT_SHORT_NARRATIVE": "Bridge Rehabilitation\nSR 56 over the Conemaugh River\nEast Wheatfield and St. Clair Townships\nIndiana County",
+        "IMPROVEMENT_TYPE": "Bridge Rehabilitation",
+        "PROJECT_STAGE": "IN DEVELOPMENT",
+        "LET_DATE": "20291108",
+        "NTP_DATE": "20291202",
+        "PROJECT_CREATION_DATE": 1776729600000,
+        "MUNICIPALITY_NAMES": "EAST WHEATFIELD TOWNSHIP, ST CLAIR TOWNSHIP",
+        "RESPONSIBLE_COUNTY_NAME": "Indiana       "
+      },
+      "geometry": { "x": -79.026054240014219, "y": 40.419630185907664 }
+    }
+  ]
+}
