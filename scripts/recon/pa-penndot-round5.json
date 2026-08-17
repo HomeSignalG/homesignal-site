@@ -1,0 +1,22 @@
+[
+  {
+    "id": "pa5-narrative-pop",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)%20AND%20PROJECT_SHORT_NARRATIVE%20IS%20NOT%20NULL&returnCountOnly=true&f=json",
+    "print_chars": 300
+  },
+  {
+    "id": "pa5-title-pop",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)%20AND%20PROJECT_TITLE%20IS%20NOT%20NULL&returnCountOnly=true&f=json",
+    "print_chars": 300
+  },
+  {
+    "id": "pa5-legibility-newest",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)&outFields=PROJECT_ID%2CPROJECT_STAGE%2CPROJECT_TITLE%2CPROJECT_SHORT_NARRATIVE&orderByFields=PROJECT_CREATION_DATE%20DESC&resultRecordCount=5&returnGeometry=false&f=json",
+    "print_chars": 6000
+  },
+  {
+    "id": "pa5-legibility-oldest",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=PROJECT_STAGE%20IN%20(%27IN%20DEVELOPMENT%27%2C%27UNDER%20CONSTRUCTION%27%2C%27FUTURE%20DEVELOPMENT%27)&outFields=PROJECT_ID%2CPROJECT_STAGE%2CPROJECT_TITLE%2CPROJECT_SHORT_NARRATIVE&orderByFields=PROJECT_CREATION_DATE%20ASC&resultRecordCount=5&returnGeometry=false&f=json",
+    "print_chars": 6000
+  }
+]

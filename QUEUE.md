@@ -7750,3 +7750,63 @@ publication gap, unlike NY/IL/OH) · **UT 201** (`candidates_exhausted`). **~967
    whether they cluster by state or by source before touching.
 4. **Leave category 3 alone** until there is a new instrument (a vendor adapter, a permit-portal
    family, or the edge-reachability preflight).
+
+## PENNDOT STATEWIDE RECON — COMPLETE; registry entry PROPOSED, awaiting founder review (2026-08-17)
+
+Founder-approved evidence-first recon (owner-account style). Four probe rounds via `recon-fetch.yml`
+(runs 32044964903 / 32046075961 / 32046719205 / 32047475605, target lists committed as
+`scripts/recon/pa-penndot-round{1..4}.json`, PRs #768–#771). **Every receipt below is from those
+job logs.** Outcome: **one qualifying statewide register found — PROPOSE-ONLY handoff delivered;
+nothing wired.**
+
+- **Org name confirmed, never the acronym** (NDOT/Nevada lesson): AGO org `PennShare`
+  (id `jOy9iZUXBy03ojXb`) opens its own description "Introducing PennDOT One Map". The register
+  itself sits on the agency's own server `gis.penndot.pa.gov/gis/rest/services/opendata` — no
+  AGO-hosted mirror exists (185 org feature services paged; only wrong-agency DGS, a Blair County
+  subset, and a May-2023 snapshot).
+- **SUPERSEDES the 2026-07-31 `paprojects` rejection shape**: the old `gis.penndot.gov` …
+  `paprojects` folders bake status into LAYER NAMES (one entry per status layer, `status_const`
+  each). The One Map opendata layers carry status/stage as ATTRIBUTES on a single layer — the
+  normal `status_to_bucket` path, no per-status split.
+- **Two layers, SAME projects — the id-overlap discriminator (Nebraska/Minnesota) says wire ONE.**
+  `transportationprojectslines/MapServer/0` (194,354 polyline rows) and
+  `transportationprojectspoints/MapServer/0` (166,571 point rows) share the full MPMS schema, and
+  on the identical where clause ordered `PROJECT_ID ASC` both heads return the identical six ids
+  (328/333/334/426/516/592, Crawford County bridges, same titles). Wiring both = double-emission
+  (the Houston layer-0/layer-1 class). **Proposed wire target: POINTS** — native
+  `esriGeometryPoint` (no polyline-midpoint approximation), UDOT precedent.
+- **Vocabularies COMPLETE, each summing exactly to its total:** lines PROJECT_STATUS 8 code/desc
+  pairs → 194,354 · lines PROJECT_STAGE 5 values → 194,354 · stage×status crosstab 25 cells →
+  194,354 (proves `N/A` stage = Candidate 25,972 + Incomplete 22,589 dominated — wishlist rows,
+  excluded fail-closed, never guessed) · **points scoped IMPROVEMENT_TYPE 79 values → exactly
+  21,620, 0 nulls**.
+- **Scope**: `PROJECT_STAGE IN ('IN DEVELOPMENT','UNDER CONSTRUCTION','FUTURE DEVELOPMENT')` =
+  21,620 points / 23,598 lines. Buckets: IN DEVELOPMENT + FUTURE DEVELOPMENT → proposed,
+  UNDER CONSTRUCTION → approved; COMPLETED (112,478) and N/A (58,278) excluded at source.
+- **file_date = PROJECT_CREATION_DATE**: real `esriFieldTypeDate`, **100% populated in scope**
+  (21,620/21,620), a true past event. LET_DATE (78.1%) and NTP_DATE (84.9%) are STRINGS
+  (`"20260828"` yyyymmdd) and future-dated on in-development rows — scheduled, i.e. the forecast
+  class the TxDOT 2026-08-08 founder ruling rejects. POTENTIAL_COMMITTED_DATE 35.7%.
+- **Freshness**: top-1 `LAST_EDITED_DATE` = 2026-08-15T05:42Z (probed 08-17) — live register.
+  365-day edit window holds 39,883 line rows.
+- **County spread receipt** (points, in scope, `RESPONSIBLE_COUNTY_NAME` — right-padded, trim
+  precedent): Allegheny 1,968 · Philadelphia 1,312 · Montgomery 1,108 · Delaware 794 · Chester 578
+  · Westmoreland 596 … all 67 PA counties represented.
+- **Known instrument limits, honest**: distinct-PROJECT_ID is UNOBTAINABLE from this ArcGIS 10.91
+  server (unscoped statistics → "Could not access any server machines"; scoped
+  returnDistinctValues+returnCountOnly → 30s abort on points, explicit 400 on lines). Multiplicity
+  documented qualitatively: one row per project-location detail (`PROJECT_LOCATION_DETAIL_PT.FID`).
+  PROJECT_TITLE is truncated to 25 chars BY THE SOURCE (`length:25`);
+  PROJECT_SHORT_NARRATIVE (240) carries the full text.
+- 🔴 **HEADLINE CAVEAT — edge-runtime reachability UNPROVEN**: `gis.penndot.pa.gov` hard-400s ALL
+  pg_net requests ("HTTP Error 400. The request is badly formed", even bare host with browser UA)
+  while the GitHub runner reaches it cleanly. The Supabase edge runtime is a third client class;
+  only a post-deploy smoke on a PA ZIP proves the engine can fetch (worse than the Tampa class,
+  where pg_net worked). If the edge is blocked too: entry quarantines to 0 records (never fake),
+  stamp the rejection, nightly reprobe.
+- **Planned gate proof at wire time**: unit never-fetches test — Camden NJ ZIP (08102) never
+  fetches the layer, Philadelphia (19103) does (the Council Bluffs analog) — plus live
+  bidirectional receipts post-deploy. Invariants: 0 missing record_url, 0 missing coordinates,
+  0 unclassified beyond the 9 documented admin values (751 rows, 3.5%), pins within the PA extent.
+- **STATE: proposal handed to founder; STOPPED at registry-entry stage per the standing
+  propose-only instruction. No registry change, no wiring, no deploy.**
