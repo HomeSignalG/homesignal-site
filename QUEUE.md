@@ -7965,3 +7965,46 @@ again, the stamp re-closes with the new receipt.
 **STATE: proposal handed to founder; STOPPED per propose-only.** El Paso stays parked in the
 intermittent bin (re-run its ×3 audit a different day before any recon). CA reclassified:
 municipal/MPO tier, queued behind the DOT recon batch.
+
+## MIAMI RECONCILIATION — ALREADY WIRED AND DELIVERING; approved re-wire HALTED at the duplicate gate (2026-08-17)
+
+The founder-approved Miami wire was **NOT executed**: the pre-commit duplicate assertion found
+`miami-building-permits` **already in the registry** — wired **2026-07-25** by a later pass (nine
+days AFTER the 2026-07-16 rejection this whole thread worked from), with its own receipts and a
+measured volume correction. `docs/source-registry.md`'s "REJECTED AT SMOKE" section was never
+updated; a supersession banner now sits on it.
+
+**Live measurement (the reconciliation): 34,307 cached records across 24 Miami-Dade ZIP pages ·
+0 in `v_incomplete_registry_entries` · 0 `dev_refresh_source_failures` rows in 7 days.** The
+entry is healthy in production. Its config is CONSISTENT with the 2026-08-17 re-recon receipts
+(same 5 verbatim statuses on `BuildingPermitStatusDescription`, same 4-type ScopeofWork scope,
+file_date IssuedDate, recency 365, dataset-precision, contractor-ZIP trap documented) — the fresh
+recon independently re-derived the same source model, which is corroboration, not waste.
+
+- ⚠️ **A duplicate would have been the Houston-plat double-emission class** — one PennDOT-style
+  duplicate entry double-emits every permit across two `source_registry_id`s, uncatchable by
+  exact-identity dedup. The one-entry-per-source assertion (added to the wire script after the
+  PennDOT Lines/Points lesson) is the control that caught it.
+- ⚠️ **The proposed entry would also have REGRESSED a measured fix:** it carried
+  `spatial_zip_radius_mi: 3`; the live entry is **1.5**, corrected 2026-07-25 after ZIP 33130
+  produced a 14,933-record / **13 MB** row at 3 mi (3.7x the dense-metro ceiling). The halt
+  prevented both the duplicate AND the regression.
+- 🔑 **STANDING ANSWER (the miss that caused this):** the re-recon started from the REJECTION
+  STAMP and never ran the §0c/§0j registry grep. **Before ANY recon or proposal on a source,
+  grep the registry for entries on the same host/dataset FIRST** — a rejection stamp in the docs
+  proves a rejection HAPPENED, never that the registry still reflects it; two writers means the
+  docs and the registry drift independently. (The CA pass did this grep; the Miami thread did
+  not.) Corollary for the stamp audit: "Miami flips → re-recon flag" was correct as an
+  INSTRUMENT finding, but the production conclusion was already moot — the flip had been acted
+  on 2026-07-25 by the other writer.
+- **The 2026-08-17 re-recon receipts remain valid and are attached to the record** (QUEUE
+  "MIAMI RE-RECON" above; pg_net 8979–8996). Where they differ from the live entry, they are
+  measured IMPROVEMENT CANDIDATES, not defects — gated (they change what residents see),
+  proposed to the founder separately: (a) `type_source: PropertyType` → Commercial 28,075 /
+  Residential 44,189 = 72,264 exactly, replacing the generic all-Development map (pin shapes
+  gain real use classes); (b) title `[ScopeofWork, WorkItems]` (99.99% specific work text)
+  replacing `[ScopeofWork, DeliveryAddress]`; (c) `Hold` (137 rows) → proposed instead of
+  exclude (the Scottsdale ON HOLD precedent the 07-16 recon itself cited). None wired.
+- Miami-Dade dev-backed footprint today: 24 of the county's modeled ZIPs carry city permits;
+  the rest of the county (Hialeah, Miami Beach, Homestead …) has no first-party source wired —
+  that is the real remaining FL frontier, not the City of Miami.

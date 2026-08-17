@@ -1591,6 +1591,14 @@ code.** All receipts are live pg_net probes from 2026-07-16 (response ids 1413-1
 nothing wired on training knowledge.
 
 ### REJECTED AT SMOKE — miami-building-permits (ArcGIS, City of Miami)
+> 🔴 **THIS SECTION IS SUPERSEDED — MIAMI IS WIRED AND DELIVERING (found 2026-08-17).** A later
+> pass RE-WIRED this same AGO layer on **2026-07-25** (registry entry `miami-building-permits`,
+> radius 1.5 mi after a measured 13 MB-row volume correction) and this rejection section was
+> never updated. Live measurement 2026-08-17: **34,307 cached records across 24 Miami-Dade ZIP
+> pages, 0 quarantined, 0 fetch failures in 7 days.** The 2026-08-17 edge-probe stamp audit
+> (3 rounds, ~210 ms each) independently confirmed the slow-host condition below is gone.
+> The rejection text is retained as the dated receipt; do not act on it. Full reconciliation:
+> QUEUE.md "MIAMI RECONCILIATION".
 **Wired provisionally, then REJECTED on live-smoke evidence — ENGINE-UNREACHABLE
 WITHIN THE WORKER BUDGET (slow host, not a block).** Five smoke rounds with
 receipts: the layer's host answers Supabase edge-runtime requests ~30-60s per
