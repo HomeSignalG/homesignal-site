@@ -1,0 +1,36 @@
+[
+  {
+    "id": "pa-opendata-root",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata?f=json",
+    "print_chars": 3000
+  },
+  {
+    "id": "pa-lines-meta",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectslines/MapServer/0?f=json",
+    "extract": "\"name\"|editingInfo|geometryType",
+    "extract_context": 900,
+    "extract_max": 3
+  },
+  {
+    "id": "pa-points-meta",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0?f=json",
+    "extract": "editingInfo|geometryType",
+    "extract_context": 900,
+    "extract_max": 2
+  },
+  {
+    "id": "pa-lines-count",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectslines/MapServer/0/query?where=1%3D1&returnCountOnly=true&f=json",
+    "print_chars": 300
+  },
+  {
+    "id": "pa-points-count",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0/query?where=1%3D1&returnCountOnly=true&f=json",
+    "print_chars": 300
+  },
+  {
+    "id": "pa-lines-sample",
+    "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectslines/MapServer/0/query?where=1%3D1&outFields=*&resultRecordCount=2&returnGeometry=false&f=json",
+    "print_chars": 8000
+  }
+]
