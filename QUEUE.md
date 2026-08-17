@@ -8028,3 +8028,20 @@ it maps to proposed today and is the precedent the rejected Miami change cited; 
 Hold/Hardhold→exclude, Henderson/others as found by grep). Decide ONE fleet-wide semantic, with
 the resident-meaning question stated explicitly: **does this pin claim something is moving
 forward when it isn't?** Founder decision at the end; until then no entry's hold-bucketing moves.
+
+## MIAMI UPGRADE SHIPPED AND LIVE-VERIFIED (2026-08-17)
+
+PR #781 squash-merged (`3659393`), engine deployed (run 32074839710 — the first dispatch,
+32074619475, failed on a TRANSIENT `supabase/setup-cli` "rate limit exceeded" resolving
+'latest', before any deploy step; retried clean). **Live receipt, ZIP 33127 through the
+deployed engine (pg_net request 9823): HTTP 200 · 3.1 MB (under the 3.5 MB ceiling — the
+1.5-mi measured radius holding) · 3,145 miami-building-permits records · ALL 3,145 with real
+use classes (Residential/Commercial) · 0 unclassified · 0 missing record_url · 0 missing
+coordinates · titles now ScopeofWork+WorkItems ("NEW CONSTRUCTION LOW VOLTAGE SOUND / SPEAKER
+SYSTEM").** Persisted via dev_refresh_collect; stored row re-verified at 3,145 with-use-class.
+The other 23 Miami-Dade pages pick up the upgraded fields on the nightly refresh, zero-touch.
+Hold stays exclude (founder ruling); the fleet hold-semantics review item stands above.
+
+**Board (founder-set): next = the statewide-DOT recon batch NM / AR / LA / SD / MT / MS / AZ,**
+with registry-grep-first and the edge-probe ×3 preflight in force for every candidate; El Paso
+parked (different-day ×3 audit before recon); CA in the municipal/MPO tier behind the batch.
