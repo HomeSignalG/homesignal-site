@@ -141,6 +141,110 @@ deployed (run 31847890869). ROLLOUT PARTIAL BY CHOICE: 120 / 174 live (69.0%), M
   transient zero. Handed to the 15-min `dev-reports-rolling-refresh` cron, which sweeps them on the
   `refreshed_at` cursor. **Firing harder does not fix an FRS-throughput refusal.**
 
+### 2026-08-17 — ✅ RESOLVED: the 7 pre-existing ingest test failures were CI-DARK dead tests, already retired on main
+
+The founder's closing question on the Phase-0 thread: were the 7 `tests/test_cutover_box_elder.py`
+failures (observed on clean ingest main in the sandbox) red in CI on main, or sandbox-only?
+**Neither — they were in a third category: genuinely failing everywhere, but invisible to CI.**
+- **No CI ever ran them.** Measured across every ingest workflow: **22 of 57 test files are
+  referenced by a CI workflow** (one via pytest — `test_local_news_topic_matrix.py` — the rest
+  as per-gate direct `python tests/test_X.py` steps); `test_cutover_box_elder.py` has **0
+  references, ever**. So there is no green main run covering them to cite, and no red one
+  either — a green ingest main attested nothing about these tests.
+- **The failures were content-genuine, not environment parity.** Re-run and read: gate G6
+  fails with *"feeds.csv is missing reviewed rows: be-localnews-abc4/cvd/fox13/
+  hjnews-tremonton/ksl/sltrib"* — the tests pinned the pre-Gold-Master Box Elder local-news
+  rows, which were legitimately removed when Local News moved to the registry path. Dead tests
+  asserting a completed one-time cutover state; they would fail identically on any machine.
+- **Already adjudicated and removed on main** — by the other ingest session, before this
+  question was asked: PR #338 ("Deactivate Hampshire + Middlesex MA; **retire the dead
+  cutover**; give Gate 9 CI", commit `c626bac`) deleted the file. Current ingest main has no
+  such tests. **Nothing gates the next merge; no stop-and-fix.**
+- 🧭 **The parity caveat that DOES survive, logged:** ingest CI test coverage is per-gate, not
+  suite-wide — **35 of 57 ingest test files are executed by no workflow**, so the sandbox
+  pytest run is the only place they run, and sandbox failures in that set are invisible to (and
+  unattested by) CI in either direction. When a sandbox test failure appears on clean ingest
+  main, check whether ANY workflow references the file before reasoning about CI state — the
+  instrument-must-prove-it-ran rule, at test-roster scale. Widening CI to the uncovered 35 is
+  the ingest sessions' call, not taken here.
+
+### 2026-08-17 — 🔎 PHASE 0 COMPLETE: agenda-item yield measured — ZERO on every axis, with named structural causes
+
+**Founder-approved Phase 0 ran to completion (ingest run 31989802553, read-only; instrument PRs
+#341/#346/#347/#348/#349). County selection was drawn from the dark-ZIP-ceiling population, not
+convenience: the top dark-ZIP contributors per structured family — Granicus: Taos NM (13 dark),
+Fauquier VA (8); CivicClerk: Collier FL (5), Minnehaha SD (3). RESULT: address strings 0 · case
+strings 0 · fenced geocodes 0 · dark-ZIP page-lift 0.** Not one zero is a shrug — each has a
+named cause:
+- **Taos NM (granicus): measured 0.** 101 agendas in the wired RSS, **0 planning-titled** — the
+  feed is the County Commission's; no planning body publishes on it. Extracting from EXISTING
+  feeds yields nothing; a planning-body feed would be new wiring, not extraction.
+- **Fauquier VA (granicus): structurally unreachable.** 48 planning-titled agendas exist — the
+  best cell in the sample — but every document fetch dies on
+  `SSL: CERTIFICATE_VERIFY_FAILED — hostname mismatch, cert not valid for
+  'granicus_production_attachments.s3…'`: the AgendaViewer redirects to a Granicus S3
+  attachments host whose underscored bucket name breaks TLS. Verification correctly refuses and
+  is never bypassed. Vendor-side defect; 0 extractable over verified TLS. (Taos's tenant serves
+  agenda HTML inline; Fauquier's serves S3 PDF attachments — Granicus tenant configs differ,
+  so "Granicus HTML is parseable" is per-tenant, never per-family.)
+- **Collier FL + Minnehaha SD (civicclerk): items not on the public API.** Events reachable
+  (15 each, 5–6 planning-titled) but agenda ITEMS are exposed on none of the OData item
+  endpoints — item content lives behind PublishedFiles (PDFs).
+**Verdict: the 319-dark-ZIP document-extraction ceiling is theoretical.** In the very counties
+that would supply it, the two structured families yield zero machine-readable agenda-item text;
+every remaining path runs through PDF parsing of vendor attachments — a heavier, fuzzier build
+the anti-fabrication rules make expensive, and one nothing measured here justifies. Measured
+payoff chain now complete: titles ≈ 33 records / 0 dark lift → structured agenda items 0 / 0 →
+unmeasured remainder = PDFs. **Recommendation: do not build `land_use_action`.**
+Instrument lessons banked (all self-caught, each its own PR): a workflow secret that doesn't
+exist sets its env var to EMPTY STRING and `.get()` defaults don't fire (#346); **the repo's
+`SUPABASE_WRITE_KEY` is a new-format `sb_` secret key and Supabase's gateway HARD-REFUSES it
+from any browser-looking User-Agent** — `"Forbidden use of secret API key in browser"` —
+ingest.py only works because it sends no UA; never send a Mozilla UA on Supabase REST (#347/#348);
+government-site fetches belong on the shipped `http_get_bytes`, not a private fetcher (#349).
+**Deferred, logged not dropped (unchanged): the Multnomah bespoke wire** (quality add, 0
+coverage lift — queued behind coverage work) **and the full land_use_action build** (was
+contingent on Phase 0's number; that number is 0).
+
+### 2026-08-15 — 🔎 SCOPING: notices/agendas as "proposed development" records — MEASURED, report delivered, NOTHING BUILT
+
+Founder-directed evidence-only investigation. Full report in the session transcript; the numbers
+that gate any future build:
+- **Title yield is ~0.5%, concentrated in ONE feed.** Of 6,238 stored government notices
+  (202 communities), 64 titles (1.0%) match an address-or-case regex, and reading them shreds
+  that to **~33 real development-signal titles: Multnomah County Land Use Planning 27, Spokane
+  County hearing examiner 5, Williams ND 1** — the rest are ordinance numbers, meeting-location
+  addresses, and found-property notices. Meetings titles: 11 of 7,034. `alerts.description`:
+  **0 rows populated >100 chars** (ingest stores title+link only); `geo_lat`: 0.
+- **The substance lives behind source_url, and family determines extractability.** pg_net
+  sampling: Multnomah = 31.5KB HTML with schema.org JSON-LD (headline=address,
+  description=case+type+deadline) AND a labeled "Proposal:" paragraph — richest shape found.
+  Utah PMN = 15.9KB structured HTML (already parsed ingest-side). Granicus AgendaViewer =
+  agenda body inline in HTML. CivicClerk = 1.3KB SPA shell (real data is the OData API the
+  ingest adapter already reads). CivicPlus/CivicWeb/Legistar/eScribe/iQM2 400'd or timed out
+  FROM PG_NET — Rule-13 caveat: the ingest runner fetches these same sources successfully
+  (that is where the rows came from), so the finding is "untested from here", NOT unfetchable;
+  their documents are typically agenda PDFs.
+- **Semantic gap is real and measured in the best case itself:** Multnomah T2-2026-0017's own
+  "Proposal:" text ends *"No development is proposed at this time"* — under a land-use notice.
+  A notice must never masquerade as a permit; vocabulary proposed in the report
+  (notice_of_hearing / comment_window / notice_of_decision + verbatim-quote-only description,
+  does_not_mean rendered on-page).
+- **Overlap with the permit rail: 0 in both samples, for STRUCTURAL reasons** — Spokane's wired
+  source is building permits while its notices are land-use cases (0 of 7,006 rows match the
+  case numbers); Multnomah's notices are unincorporated-county cases while the wired source is
+  City of Portland (0 address matches). Notices cover DIFFERENT records: complementary, not
+  early-duplicate.
+- **Dark-ZIP ceiling: title-borne extraction lights up ZERO of the 806 currently-dark ZIPs**
+  (Multnomah/Spokane ZIPs already have content). Document-level extraction ceiling: **319 of
+  806** dark ZIPs sit in counties with an active notice feed — reachable only via per-family
+  document parsing whose yield is UNMEASURED.
+- **Recommendation (stands until founder rules):** do not build a national layer on these
+  numbers. Phase-0 first — measure agenda-ITEM yield on the two structured families
+  (CivicClerk OData, Granicus agenda HTML) for planning bodies in ~2 counties each, on a
+  runner; build only what that measurement licenses. Multnomah is wireable today as a bespoke
+  high-quality source but lifts 0 dark ZIPs.
+
 ### 2026-08-15 — ✅ EXECUTED (founder-approved): bethelak cache purge + engine pagination fix (#736), both live-verified
 
 **Purge:** pre-flight re-measured the population at exactly 26 (unchanged), then the one-time
@@ -243,6 +347,41 @@ eating budget at the front of every sweep. Migration of record:
 full-pass staleness curve reported after ~7–9h. NOTE: the `materializer` min-age check will be
 correctly RED from the moment it ships until the backfill completes — that alert firing during
 catch-up is the instrument working, not a defect.
+
+**SHIPPED AND SWEEPING 2026-08-15 ~20:30Z.** PR #737 merged `c1586cb` (checks green); DB
+applied as two migrations — `app_refresh_sweep` (ledger + procedure) and
+`pipeline_health_materializer_min_age_and_sweep_pulse` (the exact-substring surgery; verified
+after: min-age check in, `materializer_sweep` in, old max-age check gone) — then
+`cron.alter_job(13, '*/15', 'call public.app_refresh_sweep();')` (verified in `cron.job`).
+**First-runs watch (founder protocol), all within design:** runs at 20:30/20:45/21:00/21:15
+all `succeeded` at **100/103/100/100s** — the budget doing exactly its job — committing
+**879 / 105 / 1,194 / 1,023** ZIPs respectively (variance is per-ZIP cost: run 2 hit a heavy
+pocket and throughput degraded gracefully instead of failing — the designed behavior).
+`app_refresh_failures`: **0 rows, 0 escalated.** Backlog burn: 10,361 stale → **7,160** in the
+first ~50 minutes; oldest meta advanced 08-09 03:40 → 06:40. Running ahead of the 7–9h
+estimate (the oldest ZIPs are light); full-pass staleness curve to be reported when
+`min(updated_at)` crosses into the sweep window.
+
+**✅ BACKFILL COMPLETE 2026-08-15 (DB-verified 23:42Z; founder's independent check confirmed
+first).** Before → after: stale ZIPs **10,361 → 0** of 12,722; `min(updated_at)` **08-09
+03:40 → 08-15 21:30** (every ZIP touched within ~2h); median **08-09 09:40 → today**. Six days
+of backlog cleared in **~2 hours, not the estimated 7–9** — the metro-slowdown inversion was
+absorbed by the time budget without a single failure: **13/13 sweep runs succeeded,
+`app_refresh_failures` 0 rows, 0 escalated** (the ledger and N=5 skip were never needed).
+**The instrument-repair receipt:** `materializer` health check flipped red → green ON ITS OWN
+(`ok=true`, transition logged 23:10Z, detail "oldest … 2.2h ago"); `materializer_sweep` green
+since 21:10Z ("last 3 runs: succeeded,succeeded,succeeded"). **No downstream surge, by
+construction and by measurement:** nothing in the delivery path reads `app_changes`/`app_projects`
+(digest rides ingest-side `alerts`), materialization dispatches no Actions, and `email_deliveries`
+shows **0 sends today and 0 yesterday** — the send path did not move. **Taos two-page divergence
+closed in the direction that matters:** 87513 app-side civic **0 → 55**, so development.html's
+gate counts are non-zero and the honest-empty block correctly yields to real notices. 55 ≠ the
+tracker's 101 by DESIGN, not lag: `app_refresh_zip` applies its own windows/caps (measured in
+its def: `limit 48`, `interval '2 years'`, `interval '14 days'`, …) while the tracker engine
+reads all qualifying notices — the known cross-page definitional seam, not a defect. Arc
+closed: wrong smoke-note attribution → 26 wrong-body cache rows purged → silent truncation
+fixed (#736) → dead materializer diagnosed and replaced (#737); app-side freshness went from
+six days of fiction to fully current in one session.
 
 ### 2026-08-15 — 🧹 SESSION-HYGIENE RULE: the orphaned-branch pattern (from the coverage-copy revival)
 
