@@ -8008,3 +8008,23 @@ recon independently re-derived the same source model, which is corroboration, no
 - Miami-Dade dev-backed footprint today: 24 of the county's modeled ZIPs carry city permits;
   the rest of the county (Hialeah, Miami Beach, Homestead …) has no first-party source wired —
   that is the real remaining FL frontier, not the City of Miami.
+
+## MIAMI ENTRY UPGRADED (improvements 1+2) · Hold→proposed REJECTED · FLEET REVIEW LOGGED (2026-08-17)
+
+One reviewed change to the existing `miami-building-permits` entry (founder-approved):
+`type_source` → `PropertyType` with the verbatim two-value identity map (Commercial 28,075 +
+Residential 44,189 = 72,264 exactly — pins gain real use classes) and title →
+`[ScopeofWork, WorkItems]` (99.99% specific work text). Change-set asserted programmatically:
+exactly those fields + the appended receipts note moved; every other entry byte-identical; the
+1.5-mi measured radius untouched. Suite 107/107.
+
+⚖️ **Hold→proposed REJECTED (founder ruling, 2026-08-17): pausing is not proposing.** Recoloring
+a stalled application as a fresh proposal claims motion where there is none. Miami's `Hold`
+(137 rows) stays `exclude`.
+
+📋 **FLEET-REVIEW ITEM (logged, queued — not started): hold/stalled-status semantics, fleet-wide.**
+Audit how EVERY registry entry buckets hold/stalled-type statuses (Scottsdale 'ON HOLD' included —
+it maps to proposed today and is the precedent the rejected Miami change cited; also Orlando's
+Hold/Hardhold→exclude, Henderson/others as found by grep). Decide ONE fleet-wide semantic, with
+the resident-meaning question stated explicitly: **does this pin claim something is moving
+forward when it isn't?** Founder decision at the end; until then no entry's hold-bucketing moves.
