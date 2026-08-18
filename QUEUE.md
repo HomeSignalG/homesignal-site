@@ -8234,3 +8234,29 @@ were exactly the squashed pair, so the reset proceeded on verified-redundant his
 - **The remaining ~1,028 cached held records sweep via the nightly dev_refresh cron** — its
   transient-safe guard refuses only all-empty responses, never intended contractions, so no
   manual override is needed cache-wide.
+
+## HELD-PIN SWEEP COMPLETE + EL PASO ×3 RE-AUDIT FLIPS TO REACHABLE (2026-08-18)
+
+**1. Held-pin sweep — cache-wide zero.** The founder's "overnight" check ran 23 minutes after
+the fleet-ruling deploy (16:20Z), so the 1,028 remaining held→proposed records across 188
+pages were neither guard refusals nor missed pages — no scheduled pass had run against the
+new registry yet. Diagnosis surfaced an architecture update the QUEUE notes had not recorded:
+the refresh is now a ROLLING 15-minute `dev_refresh_tick()` (cron jobid 14, ~100 pages/tick,
+full-cache cycle ≈ 1.3 days), not the single 09:00 daily fire — organic clearance would have
+taken up to ~2 days. Per "the ruling isn't done until residents stop seeing the pins," the
+188 affected pages were swept directly through the deployed engine in three waves (95 + 100 +
+9; 16 transient failures all recovered on re-fire; upserts guarded against all-empty responses
+only — intended contractions allowed). **Post-sweep: 0 held-status records bucketed proposed
+cache-wide** (Sussex exception: 0 cached Deferred records at present; the config exception
+stands). Tracking table dropped.
+
+**2. El Paso ×3 re-audit (different day, byte-identical URL from the 2026-08-17 audit:
+gis.elpasotexas.gov/arcgis/rest/services/Planning/NewResidential/FeatureServer/1/query
+where=1=1&returnCountOnly).** Prior verdict INTERMITTENT (timeout · 200 340ms · 200 368ms).
+Today, edge-probe requests 30047/30159/30413, probed 16:45 / 17:05:29 / 17:23:55Z:
+**200 in 364 ms · 200 in 430 ms · 200 in 367 ms — count 42,677 IDENTICAL in all three
+rounds. Verdict FLIPS TO REACHABLE; flagged for re-recon** (largest TX prize, 145 pages).
+Per the founder's instruction: no recon, no wire — the re-recon is a separate founder-gated
+step. Note for that recon: the original rejection was a WAF 403 measured in PRODUCTION
+against all 143 ZIPs' real workload — the re-recon must include a budget/load-proving smoke
+(the Miami precedent), not just count probes, before any stamp is rewritten.
