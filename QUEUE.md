@@ -8404,3 +8404,60 @@ items elsewhere. Per-source beats blanket.
 | both | 3,283 (17%) | 3.4 MB | clears comfortably |
 | drop duplicate `url`/`label` | all | ~17.5 MB | **zero** rendered change (engine change) |
 | raise `PAGE_ROWS` / parallelize | all | unchanged | zero content loss; fixes the mechanism |
+
+## ROW-SIZE FOLLOW-UPS (founder, 2026-08-18) — item 1 ANSWERED; 2 and 3 PROPOSED
+
+**Recency and radius trims are NOT APPROVED** (founder): the row size was never the
+constraint, and radius changes what "development near my home" MEANS to a resident — a
+product decision, not a performance lever. Do not propose them again as a size fix.
+
+### 1. ANSWERED — residents get a SLOW page, not a broken one
+The 6,500 ms ambiguity is closed. `spot-check.yml` now takes an optional `settle_ms`
+(default 6500 — every existing caller byte-identical). **At `settle_ms=30000` both
+heaviest ZIPs render COMPLETELY:** 57104 community populated · tracker 19,601 sites ·
+**dev-app 19,584 records**, and 28468 all three populated at 19,546. **19,584 is exactly
+the `app_projects` row count for 57104**, so the full set renders and the complete-flag
+honesty holds — no truncation, no partial prefix. The 60 s run was not needed: 30 s
+already renders. **The earlier "BROKEN" readings were the checker's impatience, not a
+page failure.** ⚠️ Do not restate the earlier finding as "the page is broken."
+
+### 2. PROPOSED (not built) — fix the PAGINATION, and NOT by enlarging PAGE_ROWS
+⛔ **`PAGE_ROWS` CANNOT BE RAISED — and raising it would cause SILENT TRUNCATION REPORTED
+AS COMPLETE.** Measured on `app_projects?zip=eq.57104`: `limit=5000` → **1,000 rows**,
+`limit=25000` → **1,000 rows** (`pgrst.db_max_rows` is unset at the DB level, so the cap
+is service-side and unreachable from page code). `fetchAllPages` stops on
+`data.length < PAGE_ROWS`, so with PAGE_ROWS=5000 the first 1,000-row response reads as a
+short page: the loop returns 1,000 of 19,584 records **with `complete: true`** — exactly
+the failure the flag exists to prevent.
+- **Option A (recommended): one server-side aggregate RPC** returning the ZIP's projects
+  as a single `jsonb` payload. A single row escapes the 1,000-row cap, and that path is
+  already proven at this scale — `development_reports` serves **21,109,900 bytes at HTTP
+  200** and the tracker renders 19,599 sites from it in ONE request. Turns 20 sequential
+  round trips into 1, removes the window-boundary consistency risk, and makes the
+  complete-flag trivially honest. Precedent for the shape: `dev_sites_deduped()`.
+- **Option B: parallel windows.** Learn the total first (`Prefer: count=exact` →
+  `Content-Range`), then issue `ceil(N/1000)` range requests at **concurrency 6** (browser
+  per-origin HTTP/1.1 ceiling). 20 windows → 4 waves. **The termination test MUST become
+  "received exactly N rows"** — under parallelism a short page can no longer distinguish
+  "end of set" from "truncated in the middle". Re-sort by the total order after collection.
+- **Proof required either way:** the 6 heavy ZIPs (57105/57104/57103/28468/28470/28469)
+  populated on all three page types **at the DEFAULT 6,500 ms**, not an indulgent settle ·
+  light controls unchanged (28456 46 kB, 28436, 28420, 84302, 28462 13 MB) · **per-ZIP
+  record-count parity: `app_projects` DB count == records rendered** · a planted-failure
+  offline test proving `complete:false` still throws and never renders a prefix
+  (`HS.fetchAllPages` is already exported for this).
+
+### 3. QUEUED SEPARATELY (not bundled) — fleet-wide field dedup
+`url` is byte-identical to `record_url` and `title` to `label` on **all 19,518** Sioux
+Falls records — **2,634,426 B = 12.5% of that row**, and the pattern is cache-wide across
+3,066 MB. Zero rendered difference. Different blast radius from item 2 (every cached row,
+not one read path), so it needs its own verification: prove equality across EVERY source
+before dropping either field (per-source check, never a spot check), decide which name
+survives, confirm no page/verifier reads the dropped one, re-cache, then compare rendered
+output on a sample.
+
+### 4. LOGGED — `missoula-addresses-with-permits` needs a consistency review
+One of the three heavy sources (62,675 records in the heavy class, 8,238 `proposed`). An
+ADDRESS REGISTRY with permits attached has been a **rejection** reason elsewhere — St.
+Paul's PAULIE ("an address registry, not permits") and DuPage address-points. Either those
+stamps or this wire is inconsistent; check which, with receipts.
