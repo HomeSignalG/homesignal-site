@@ -8163,3 +8163,38 @@ both rows, check the adaptive verifier loaders and the live page's single-row re
 20 MB, then evaluate the Cleveland levers (recency window · `out_fields` projection ·
 `spatial_zip_radius_mi`) per entry — radius changes what residents see, so that lever is a
 founder call. No entry touched yet; review item only.
+
+## AR WIRED AND LIVE — yields_to hook + both entries; 147 pages / 1,896 records (2026-08-18)
+
+PR #784 squash-merged (aa42a5a; unit/browser/verify green — 111-file suite incl. the two new
+test files). Deployed via run 32086334069. Branch reset post-squash (preconditions checked).
+
+- **The hook (sources/yields.ts):** same-report-only, keyed on trimmed case_number equality;
+  a yielding record drops ONLY when the yielded-to entry emitted the same Job_No in the same
+  assembly. **Outage property confirmed in implementation and test-pinned:** an empty/failed
+  Lines fetch leaves the yield set empty and every Points record survives — dual-source
+  absence, never silent point-job loss. Zero declarations = structural no-op (input array
+  returned). `yields_to` declared on the arcgis RegistryEntry interface so the
+  connector-option-surface guard recognizes it (that guard flagged the first draft — the
+  linter working as designed).
+- **Founder-required tests, all green:** overlap job → exactly one survivor, the Lines one
+  (proven twice — synthetic in test/yields-hook.test.mjs AND end-to-end on the real
+  dual-representation Job_No 012289 in test/ardot-connector.test.mjs); points-only survives;
+  Lines-outage → all Points survive; no-yields_to entry provably inert. Plus edge discipline
+  (null case_number never yields; padded keys still match).
+- **Live smoke (deployed engine):** Little Rock 72201 +84 ARDOT records (17 pts + 67 lines,
+  dev 1,324→1,408) · Fayetteville 72701 dev 0→29 · **Memphis TN 38103: 0 ARDOT records — gate
+  holds live.** Across all 113 smoke records: 0 jobs in both sources (the hook working in
+  production), 0 missing record_url, 0 Scheduled rows carrying a date, 0 out-of-AR pins.
+- **Rollout: all 157 modeled AR ZIP pages** (2 smoke + 155 in 2 paced waves of 78/77) +
+  8 cold-start 503 retries (all 200). 118 pages upserted; 40 guard-refused (smaller than
+  cache — transient-safe guard, never bypassed; nightly cron owns them).
+- **Cache-wide receipts:** 147 AR pages / 1,896 ARDOT records (points 281 · lines 1,615);
+  **0 dual-source jobs cache-wide · 0 records on any non-AR page · 0 missing record_url ·
+  0 Scheduled-with-date · 0 out-of-AR pins · 16 unclassified** = the receipted null
+  PCPM_Type_Work_Desc rows (logged, never guessed).
+
+The DOT recon batch is fully closed: AZ already-wired · MT/SD/AR wired and live ·
+NM/LA/MS stamped rejections on the reprobe list. Row-size review item (57104 ~20 MB) queued
+above. Board next: El Paso ×3 re-audit on a different day; CA municipal/MPO tier;
+fleet-wide hold/stalled-status semantics review (founder decision).
