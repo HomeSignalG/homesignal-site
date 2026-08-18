@@ -1,10 +1,15 @@
 name: gate2b-full-inventory-parity
 
-# GATE 2B — full 457-record Del Valle inventory parity across Street / Satellite / Focus.
+# GATE 2B — full Del Valle inventory parity across Street / Satellite / Focus.
 # Runs HERE rather than in the build sandbox because the sandbox has no egress and cannot
 # export the complete live inventory. Read-only: it reads app_projects with the PUBLIC anon
 # key the site already ships, renders the real maps.html in real Chromium, and writes no
 # production data. Manual trigger only.
+#
+# NO ROW COUNT IN THIS COMMENT, DELIBERATELY. It used to read "full 457-record" while the
+# script asserted 517 and production held 540 — three numbers, none of them checkable from
+# here. The inventory size is measured by the run and reported in gate2b-out/gate2b-report.json
+# (step1_export.total); a count restated in a comment can only ever go stale silently.
 
 # NOTE ON TRIGGERS: workflow_dispatch cannot be used yet — the GitHub API only dispatches
 # workflows already registered on the DEFAULT branch, and this file exists only on the

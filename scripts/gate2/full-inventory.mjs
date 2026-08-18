@@ -1,10 +1,32 @@
-// GATE 2B — full 517-record Del Valle inventory parity, Street / Satellite / Focus.
+// GATE 2B — full Del Valle (78617) inventory parity, Street / Satellite / Focus.
 //
 // WHY THIS RUNS IN CI: the build sandbox has no egress, so the complete inventory cannot
 // be exported there. This script runs on a GitHub runner (which does have egress), reads
 // the LIVE app_projects rows for ZIP 78617 with the same PUBLIC anon key the page itself
 // ships, builds the seed through the SAME adapter contract the 39-row run proved, and
 // drives the real maps.html in real Chromium. No production file is modified.
+//
+// ── WHY THERE IS NO EXPECTED ROW COUNT IN THIS FILE ANY MORE ────────────────────────────
+// It used to open `if (RAW.length !== 517) fail(...)`. 517 was a real rebaselined
+// measurement (run 30397067493, 2026-07-28, green). Then production grew — 537 by
+// 2026-08-11, 540 by 2026-08-18 — and the gate died on line 45, 0.55 s in, BEFORE the
+// adapter, BEFORE Chromium, before a single parity comparison. 27 consecutive red runs
+// across 8 days and four branches, and the artifact step said so out loud every time
+// ("No files were found with the provided path: gate2b-out/"). It was not passing when it
+// should have failed; it was failing on arithmetic that had nothing to do with rendering,
+// which is worse, because the parity checks this gate exists for silently stopped running
+// while the gate still looked like it was covering them.
+//
+// The fix is not a new number. Every count here is a RELATION, and a relation is both
+// drift-proof AND a stronger claim than the absolute ever was:
+//   * the adapter must not lose or invent a row      -> ADAPTED.length === RAW.length
+//   * every adapted record must be plotted            -> canonical set === ADAPTED.length
+//   * a filter must hide exactly its own bucket       -> census computed from RAW
+// A literal can only ever say "the inventory is the size it was in July".
+//
+// What survives as an absolute is a FLOOR, not an expectation: a zero-row or wrong-shape
+// read still fails closed, because "the export broke" and "the ZIP is empty" must never be
+// indistinguishable.
 
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
@@ -12,6 +34,8 @@ import { readFileSync, existsSync, statSync, writeFileSync, mkdirSync } from 'no
 import { createHash } from 'node:crypto';
 import { extname, join, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { HS_SEED as FROZEN_SEED, ROWS as FROZEN_ROWS } from './seed78617.mjs';
+import { LIFECYCLE_KEYS, censusOf } from './lifecycle-buckets.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CFG = readFileSync(join(REPO, 'config.js'), 'utf8');
@@ -20,6 +44,13 @@ const ANON = CFG.match(/SUPABASE_ANON_KEY:\s*'([^']+)'/)[1];
 const ZIP = '78617';
 const OUT = join(REPO, 'gate2b-out'); mkdirSync(OUT, { recursive: true });
 const fail = (m) => { console.error('GATE2B FAIL: ' + m); process.exit(1); };
+
+// THE STATUS → LIFECYCLE MAPPING and its fail-closed vocabulary guard live in
+// ./lifecycle-buckets.mjs so the offline unit suite can pin them (this file fetches live data
+// on import and cannot be unit-tested in place). `censusOf` THROWS on an unrecognised status,
+// naming the value; the gate converts that into its own `fail()` so the message shape stays
+// consistent with every other failure here.
+const census = (rows, label) => { try { return censusOf(rows, label); } catch (e) { fail(e.message); } };
 
 // ── STEP 1 — export the full live inventory (keyset-paginated; PostgREST caps at 1000) ──
 async function fetchAll() {
@@ -41,10 +72,21 @@ const FAC = RAW.filter(r => r.record_kind === 'facility');
 const TABS = DEV.filter(r => !r.registry_id);
 const EXPORTED_AT = new Date().toISOString();
 
-// Fail generation unless the inventory is exactly what Gate 2B requires.
-if (RAW.length !== 517) fail(`inventory total ${RAW.length}, expected 517`);
-if (DEV.length !== 488) fail(`development ${DEV.length}, expected 488`);
-if (FAC.length !== 29) fail(`facilities ${FAC.length}, expected 29`);
+// FLOORS, not expectations. These fail on a broken read and pass on a grown inventory.
+// "The export returned nothing" and "this ZIP is genuinely empty" must never look alike.
+if (!RAW.length) fail('inventory read returned 0 rows — a broken export, not an empty ZIP');
+if (!DEV.length) fail('0 development rows — Del Valle has permit records; this is a read fault');
+if (!FAC.length) fail('0 facility rows — Del Valle has EPA facilities; this is a read fault');
+{
+  const kinds = [...new Set(RAW.map(r => r.record_kind))].sort();
+  const unexpected = kinds.filter(k => k !== 'development' && k !== 'facility');
+  if (unexpected.length) fail(`unexpected record_kind(s): ${unexpected.join(', ')} — this gate `
+    + `splits the inventory two ways and cannot classify a third`);
+}
+const LIVE = census(RAW, 'live inventory');   // also runs the fail-closed vocabulary guard
+console.log(`inventory: ${RAW.length} rows (${DEV.length} development, ${FAC.length} facility, `
+  + `${TABS.length} null-registry) · lifecycle ` + LIFECYCLE_KEYS.map(k => `${k} ${LIVE.counts[k]}`).join(' / ')
+  + ` · facility ${LIVE.counts.facility}`);
 
 const idOf = r => r.source_ref || r.name;
 const fixtureSha = createHash('sha256').update(
@@ -65,12 +107,19 @@ const project = (r, i) => ({
 const aDev = DEV.map(project);
 const aFac = FAC.map((r, i) => Object.assign(project(r, 10000 + i), { _facility: true, record_kind: 'facility' }));
 const ADAPTED = aDev.concat(aFac);
-if (ADAPTED.length !== 517) fail(`adapter emitted ${ADAPTED.length}, expected 517`);
-if (new Set(ADAPTED.map(r => r.id)).size !== 517) fail('adapter produced duplicate ids');
+
+// THE RELATION, not a number: the adapter neither loses nor invents a row, whatever the
+// inventory happens to be today.
+if (ADAPTED.length !== RAW.length) fail(`adapter emitted ${ADAPTED.length} from ${RAW.length} input rows`);
+if (new Set(ADAPTED.map(r => r.id)).size !== RAW.length) fail('adapter produced duplicate ids');
 for (const r of ADAPTED) {
   if (!r.id || typeof r.lat !== 'number' || typeof r.lng !== 'number' || !r.source_ref)
     fail('adapted row missing a required source value: ' + JSON.stringify(r).slice(0, 140));
 }
+// EXPECTED_TOTAL is derived once, here, and every later comparison reads it. Nothing
+// downstream restates a literal, so nothing downstream can date.
+const EXPECTED_TOTAL = ADAPTED.length;
+
 // coordinates / evidence / registry identity unchanged by the adapter
 const byId = new Map(RAW.map(r => [idOf(r), r]));
 for (const a of ADAPTED) {
@@ -84,16 +133,23 @@ const adaptedSha = createHash('sha256').update(
   ADAPTED.map(r => [r.record_kind, r.registry_id || '', r.type || '', r.status || '', r.lat, r.lng, r.source_ref || '', r.name || ''].join('|')).sort().join('\n')
 ).digest('hex');
 
-const HS_SEED = {
+const seedFor = (dev, fac) => ({
   community: { zip: ZIP, slug: 'del-valle-78617', name: 'Del Valle (78617)', city: 'Del Valle',
     county: 'Travis', state: 'TX', covered: true, lat: ORIGIN.lat, lng: ORIGIN.lng,
     community_score: null, growth_pressure: 'High', value_trend: null,
     component_scores: {}, civic_activity: null, blurb: '' },
-  demoUser: null, properties: [], projects: aDev, facilities: aFac,
+  demoUser: null, properties: [], projects: dev, facilities: fac,
   changes: [], meetings: [], environmental_risk: {},
   coverage: [{ zip: ZIP, name: 'Del Valle (78617)', covered: true }], topicCategories: [],
-};
-writeFileSync(join(OUT, 'fixture-517.json'), JSON.stringify({ exported_at: EXPORTED_AT, fixture_sha256: fixtureSha, adapted_sha256: adaptedSha, rows: RAW }, null, 1));
+});
+const HS_SEED = seedFor(aDev, aFac);
+// The total rides in the BODY, next to the shas that prove what it was taken from — a count
+// in a filename is a claim nothing can check.
+writeFileSync(join(OUT, 'fixture-inventory.json'), JSON.stringify({
+  exported_at: EXPORTED_AT, zip: ZIP, total: RAW.length, development: DEV.length,
+  facilities: FAC.length, null_registry: TABS.length, lifecycle_census: LIVE.counts,
+  fixture_sha256: fixtureSha, adapted_sha256: adaptedSha, rows: RAW,
+}, null, 1));
 
 // ── STEP 3 — real Chromium against the real seed path ───────────────────────────────────
 const MIME = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json' };
@@ -103,7 +159,6 @@ const srv = createServer((q, s) => {
   s.writeHead(200, { 'content-type': MIME[extname(p)] || 'application/octet-stream' }); s.end(readFileSync(p));
 });
 await new Promise(r => srv.listen(8799, r));
-const SEED_JS = 'window.HS_SEED = ' + JSON.stringify(HS_SEED) + ';\nwindow.__HS_SEED_SOURCE="gate2b-delvalle-78617-full";';
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
 const page = await ctx.newPage();
@@ -111,16 +166,16 @@ const consoleErrors = [], pageErrors = []; let intercepted = false;
 page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
 page.on('pageerror', e => pageErrors.push(String(e)));
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+// The served seed is swapped between passes (live inventory, then the frozen fixture), so it
+// is a mutable cell rather than a closed-over constant.
+let SERVED_SEED = 'window.HS_SEED = ' + JSON.stringify(HS_SEED) + ';\nwindow.__HS_SEED_SOURCE="gate2b-delvalle-78617-full";';
 await ctx.route('**/*', async r => {
   const u = r.request().url();
-  if (u.includes('/seed/delvalle.js')) { intercepted = true; return r.fulfill({ status: 200, contentType: 'application/javascript', body: SEED_JS }); }
+  if (u.includes('/seed/delvalle.js')) { intercepted = true; return r.fulfill({ status: 200, contentType: 'application/javascript', body: SERVED_SEED }); }
   if (/tile\.openstreetmap|arcgisonline|amazonaws/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: PNG });
   if (u.includes('supabase.co')) return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   return r.continue();   // jsDelivr is reachable on a CI runner — real libraries, no stubs
 });
-await page.goto('http://127.0.0.1:8799/maps.html?zip=' + ZIP + '&data=seed', { waitUntil: 'load' });
-for (let i = 0; i < 400; i++) { if (await page.evaluate(() => !!(window.__HS_MAP && window.__HS_MAP.items))) break; await page.waitForTimeout(100); }
-await page.waitForTimeout(1500);
 
 // CANONICAL INVENTORY RECORDER.
 //
@@ -129,46 +184,59 @@ await page.waitForTimeout(1500);
 //     var facs     = facsAllMappable.slice(0, 24);
 //     var restFacs = facsAllMappable.slice(24).map(f => ({...f, _restFacility: true}));
 // The 39-row sample had 6 facilities (6 < 24) so restFacs was empty and the omission was
-// invisible. At full scale 29 > 24, so 5 facilities land in restFacs — plotted by the page
-// (HS.plottedMarkerSet(visible, facs, restFacs); focusExpected = visibleTotal + facs +
-// restFacs) but never counted by the collector. Canonical is visible ∪ facs ∪ restFacs.
-await page.evaluate(() => {
-  const HS = window.HS;
-  const rs = HS.reserveFacilitySlots;
-  HS.reserveFacilitySlots = function (dev, facs) { window.__CANON = { visible: dev || [], facs: facs || [] };
-    const o = rs.apply(this, arguments); window.__LETTERED = o; return o; };
-  const ra = HS.restAfterLetters;
-  if (ra) HS.restAfterLetters = function () { const o = ra.apply(this, arguments); window.__REST = o; return o; };
-  const pm = HS.plottedMarkerSet;
-  if (pm) HS.plottedMarkerSet = function (visible, facs, restFacs) {
-    window.__RESTFACS = restFacs || []; return pm.apply(this, arguments); };
+// invisible. At full scale the facility count exceeds 24, so the tail lands in restFacs —
+// plotted by the page (HS.plottedMarkerSet(visible, facs, restFacs); focusExpected =
+// visibleTotal + facs + restFacs) but never counted by the collector. Canonical is
+// visible ∪ facs ∪ restFacs.
+async function installCanonHooks() {
+  await page.evaluate(() => {
+    const HS = window.HS;
+    const rs = HS.reserveFacilitySlots;
+    HS.reserveFacilitySlots = function (dev, facs) { window.__CANON = { visible: dev || [], facs: facs || [] };
+      const o = rs.apply(this, arguments); window.__LETTERED = o; return o; };
+    const ra = HS.restAfterLetters;
+    if (ra) HS.restAfterLetters = function () { const o = ra.apply(this, arguments); window.__REST = o; return o; };
+    const pm = HS.plottedMarkerSet;
+    if (pm) HS.plottedMarkerSet = function (visible, facs, restFacs) {
+      window.__RESTFACS = restFacs || []; return pm.apply(this, arguments); };
 
-  // ONE definition of the canonical plotted set — used by BOTH the parity collector and the
-  // filter collector so the two can never disagree again. (Gate 2B shipped with the parity
-  // half fixed and the filter half still reading `visible ∪ facs`; every filter row therefore
-  // reported a 452 baseline and a constant +5 removed offset. Harness-only, but a baseline
-  // that does not equal the canonical inventory is not evidence of anything.)
-  //
-  // restFacs prefers the array the page itself passed to plottedMarkerSet. The fallback
-  // (seed facilities − facs) fires ONLY when the hook never ran; an explicitly EMPTY
-  // __RESTFACS is honoured verbatim, so a filter that genuinely hides facilities is reported
-  // as hiding them instead of being papered over by the derivation.
-  window.__canonSet = function () {
-    const C = window.__CANON || { visible: [], facs: [] };
-    const facIds = new Set(C.facs.map(x => x.source_ref || x.name));
-    const derived = ((window.HS_SEED || {}).facilities || []).filter(f => !facIds.has(f.source_ref || f.name));
-    const restFacs = window.__RESTFACS ? window.__RESTFACS : derived;
-    return C.visible.concat(C.facs).concat(restFacs);
-  };
-  window.__canonIds = function () {
-    return window.__canonSet().map(x => (x && (x.source_ref || x.name)) || '?');
-  };
-});
+    // ONE definition of the canonical plotted set — used by BOTH the parity collector and the
+    // filter collector so the two can never disagree again. (Gate 2B shipped once with the
+    // parity half fixed and the filter half still reading `visible ∪ facs`; every filter row
+    // therefore reported a short baseline and a constant removed-count offset. Harness-only,
+    // but a baseline that does not equal the canonical inventory is not evidence of anything.)
+    //
+    // restFacs prefers the array the page itself passed to plottedMarkerSet. The fallback
+    // (seed facilities − facs) fires ONLY when the hook never ran; an explicitly EMPTY
+    // __RESTFACS is honoured verbatim, so a filter that genuinely hides facilities is reported
+    // as hiding them instead of being papered over by the derivation.
+    window.__canonSet = function () {
+      const C = window.__CANON || { visible: [], facs: [] };
+      const facIds = new Set(C.facs.map(x => x.source_ref || x.name));
+      const derived = ((window.HS_SEED || {}).facilities || []).filter(f => !facIds.has(f.source_ref || f.name));
+      const restFacs = window.__RESTFACS ? window.__RESTFACS : derived;
+      return C.visible.concat(C.facs).concat(restFacs);
+    };
+    window.__canonIds = function () {
+      return window.__canonSet().map(x => (x && (x.source_ref || x.name)) || '?');
+    };
+  });
+}
+async function loadSeed(seedObj, tag) {
+  SERVED_SEED = 'window.HS_SEED = ' + JSON.stringify(seedObj) + ';\nwindow.__HS_SEED_SOURCE=' + JSON.stringify(tag) + ';';
+  await page.goto('http://127.0.0.1:8799/maps.html?zip=' + ZIP + '&data=seed', { waitUntil: 'load' });
+  for (let i = 0; i < 400; i++) { if (await page.evaluate(() => !!(window.__HS_MAP && window.__HS_MAP.items))) break; await page.waitForTimeout(100); }
+  await page.waitForTimeout(1500);
+  await installCanonHooks();
+}
+const clickMode = (k) => page.evaluate(m => { const b = document.querySelector('#mapMode button[data-mode="' + m + '"]'); if (b) b.click(); }, k);
+
+await loadSeed(HS_SEED, 'gate2b-delvalle-78617-full');
 
 const MODES = [['street', 'Street'], ['satellite', 'Satellite'], ['impact', 'Focus']];
 const per = {};
 for (const [key, label] of MODES) {
-  await page.evaluate(k => { const b = document.querySelector('#mapMode button[data-mode="' + k + '"]'); if (b) b.click(); }, key);
+  await clickMode(key);
   await page.waitForTimeout(2500);
   per[label] = await page.evaluate(() => {
     const HS = window.HS, C = window.__CANON || { visible: [], facs: [] };
@@ -204,7 +272,7 @@ for (const [key, label] of MODES) {
   await page.screenshot({ path: join(OUT, `gate2b-${key}-full.png`) });
 }
 const [A, B, C] = [per.Street, per.Satellite, per.Focus];
-if (A.total !== 517) {
+if (A.total !== EXPECTED_TOTAL) {
   // Do not just report the count — name the records. The adapted set is the source of
   // truth for what SHOULD be present; whatever it has that the canonical set does not is
   // the exact loss, with the fields that decide inclusion attached.
@@ -213,11 +281,11 @@ if (A.total !== 517) {
     id: r.source_ref || r.name, name: r.name, record_kind: r.record_kind,
     registry_id: r.registry_id, type: r.type, status: r.status, lat: r.lat, lng: r.lng,
   }));
-  const dbg = { canonical: A.total, expected: 517, missing_count: missing.length,
+  const dbg = { canonical: A.total, expected: EXPECTED_TOTAL, missing_count: missing.length,
     visible_len: A.dev, facs_len: A.fac, lettered: A.lettered, rest: A.rest, missing };
   writeFileSync(join(OUT, 'gate2b-missing.json'), JSON.stringify(dbg, null, 1));
   console.log('MISSING RECORD DIAGNOSTIC:\n' + JSON.stringify(dbg, null, 1));
-  fail(`canonical inventory ${A.total}, expected 517 (Street) — see gate2b-missing.json`);
+  fail(`canonical inventory ${A.total}, expected ${EXPECTED_TOTAL} (Street) — see gate2b-missing.json`);
 }
 if (!intercepted) fail('seed was not intercepted');
 
@@ -233,34 +301,36 @@ for (const id of ids) {
 const sameSet = JSON.stringify(ids) === JSON.stringify(Object.keys(iB).sort()) && JSON.stringify(ids) === JSON.stringify(Object.keys(iC).sort());
 
 // ── STEP 7 — filter parity, per mode ────────────────────────────────────────────────────
-// The baseline here is window.__canonSet() — the SAME canonical set the parity collector
-// uses (visible ∪ facs ∪ restFacs = 517). `before`/`restored` must therefore read 517, and
-// `removed_count` is a real count of hidden records rather than a real count plus the 5
-// restFacs the old 452-row window could never see.
+// The baseline is window.__canonSet() — the SAME canonical set the parity collector uses
+// (visible ∪ facs ∪ restFacs), so `before`/`restored` must equal EXPECTED_TOTAL and
+// `removed_count` is a real count of hidden records.
 //
-// EXPECTED (derived from the accepted lifecycle census, not hard-coded guesses):
-//   proposed 38 · approved 326 · operating 148 − 29 facilities = 119 · unknown 5 (the TABS rows)
+// EXPECTED is COMPUTED from the live inventory through STATUS_BUCKET above — never restated
+// as a literal, and never taken from HS.resolveMarker (see the tautology note there).
 // Facilities carry filterKey 'facility', so no lifecycle toggle may remove one.
-const FILTER_EXPECT = { proposed: 38, approved: 326, operating: 119, unknown: 5 };
+const FILTER_EXPECT = Object.fromEntries(LIFECYCLE_KEYS.map(k => [k, LIVE.counts[k]]));
+console.log('filter expectations, derived from the live status census: '
+  + LIFECYCLE_KEYS.map(k => `${k} ${FILTER_EXPECT[k]}`).join(' / '));
 const facIdSet = new Set(A.records.filter(r => r.kind === 'facility').map(r => r.id));
 const filters = {};
-for (const key of ['proposed', 'approved', 'operating', 'unknown']) {
+const untestedBuckets = [];
+for (const key of LIFECYCLE_KEYS) {
   filters[key] = {};
   for (const [mk, ml] of MODES) {
-    await page.evaluate(k => { const b = document.querySelector('#mapMode button[data-mode="' + k + '"]'); if (b) b.click(); }, mk);
+    await clickMode(mk);
     await page.waitForTimeout(1200);
     const before = await page.evaluate(() => window.__canonSet().length);
     await page.evaluate(k => window.HS.setStatusFilter(k, false), key);
-    await page.evaluate(k => { const b = document.querySelector('#mapMode button[data-mode="' + k + '"]'); if (b) b.click(); }, mk === 'street' ? 'satellite' : 'street');
+    await clickMode(mk === 'street' ? 'satellite' : 'street');
     await page.waitForTimeout(500);
-    await page.evaluate(k => { const b = document.querySelector('#mapMode button[data-mode="' + k + '"]'); if (b) b.click(); }, mk);
+    await clickMode(mk);
     await page.waitForTimeout(1400);
     const after = await page.evaluate(() => window.__canonIds());
     if (ml === 'Street') await page.screenshot({ path: join(OUT, `gate2b-filter-${key}-off.png`) });
     await page.evaluate(k => window.HS.setStatusFilter(k, true), key);
-    await page.evaluate(k => { const b = document.querySelector('#mapMode button[data-mode="' + k + '"]'); if (b) b.click(); }, mk === 'street' ? 'satellite' : 'street');
+    await clickMode(mk === 'street' ? 'satellite' : 'street');
     await page.waitForTimeout(400);
-    await page.evaluate(k => { const b = document.querySelector('#mapMode button[data-mode="' + k + '"]'); if (b) b.click(); }, mk);
+    await clickMode(mk);
     await page.waitForTimeout(1200);
     const restored = await page.evaluate(() => window.__canonSet().length);
     const afterSet = new Set(after);
@@ -269,31 +339,87 @@ for (const key of ['proposed', 'approved', 'operating', 'unknown']) {
     filters[key][ml] = { before, after: after.length, restored, removed_count: removed.length,
       removed_tabs: removed.filter(i => i.includes('tdlr.texas.gov')).length,
       removed_facilities: removedFacs,
+      // MEMBERSHIP, not just a count: the removed set must be exactly the records whose own
+      // status buckets to this key. A matching count over the wrong records is not a pass.
+      removed_is_exact_bucket: JSON.stringify(removed) === JSON.stringify(LIVE.ids[key].slice().sort()),
       membership_sha: createHash('sha256').update(removed.join('\n')).digest('hex') };
   }
   const shas = MODES.map(([, l]) => filters[key][l].membership_sha);
   filters[key].identical_across_modes = shas.every(s => s === shas[0]);
   filters[key].expected_removed = FILTER_EXPECT[key];
   filters[key].baseline_is_canonical = MODES.every(([, l]) =>
-    filters[key][l].before === 517 && filters[key][l].restored === 517);
+    filters[key][l].before === EXPECTED_TOTAL && filters[key][l].restored === EXPECTED_TOTAL);
   filters[key].removed_matches_expected = MODES.every(([, l]) =>
     filters[key][l].removed_count === FILTER_EXPECT[key]);
+  filters[key].removed_is_exact_bucket = MODES.every(([, l]) => filters[key][l].removed_is_exact_bucket);
   filters[key].facilities_never_removed = MODES.every(([, l]) => filters[key][l].removed_facilities === 0);
+  // EMPTY-BUCKET HONESTY. `0 === 0` is not a pass — it is the "did not run" and "no match"
+  // pair being indistinguishable, which is the exact trap this repo has a rule about. A
+  // bucket with no records on this ZIP is reported as UNTESTED and covered by the frozen
+  // fixture pass below instead of being quietly scored green here.
+  filters[key].exercised = FILTER_EXPECT[key] > 0;
+  if (!filters[key].exercised) untestedBuckets.push(key);
 }
-// The five TABS rows, and only those, must be what an `unknown` toggle hides.
-filters.unknown.removed_are_exactly_the_tabs =
-  MODES.every(([, l]) => filters.unknown[l].removed_tabs === 5 && filters.unknown[l].removed_count === 5);
+if (untestedBuckets.length) {
+  console.log(`\n⚠ lifecycle bucket(s) with ZERO records on the live inventory: `
+    + `${untestedBuckets.join(', ')} — their toggles are NOT exercised by the live pass. `
+    + `0 removed of 0 expected proves nothing. Covered by the frozen-fixture pass below.`);
+}
+
+// ── STEP 8 — FROZEN FIXTURE PASS: the lifecycle-unknown branch ──────────────────────────
+// `unknown` is a first-class legended state whose entire purpose is to NOT fabricate a fact:
+// lib/map.js:180-184 — "a record whose source states no lifecycle must never be silently
+// promoted to operating/built (that fabricates a fact) nor demoted to proposed."
+//
+// Production currently holds ZERO records in that bucket ZIP-wide and table-wide (the five
+// Del Valle TABS rows moved off 'On file' during 2026-08), so the live pass above cannot
+// exercise it. Retiring the branch because it is momentarily unpopulated is backwards — it
+// matters MOST when rare. So it is proven against scripts/gate2/rows.tsv via seed78617.mjs:
+// 39 rows exported VERBATIM from production (README: "39 PRODUCTION rows exported verbatim
+// from app_projects (zip 78617)"), five of which still carry 'On file'. Frozen input, frozen
+// expectation, no fabrication — the vintage is the point.
+const FROZEN = census(FROZEN_ROWS, 'frozen fixture');
+const frozenUnknownIds = FROZEN.ids.unknown.slice().sort();
+// The fixture must PROVE IT CAN TEST what it is here to test, before it is allowed to pass.
+if (!frozenUnknownIds.length)
+  fail('the frozen fixture carries 0 lifecycle-unknown rows — it can no longer exercise the '
+    + 'branch it exists for. Restore an `On file` row to scripts/gate2/rows.tsv rather than '
+    + 'letting this pass vacuously.');
+await loadSeed(FROZEN_SEED, 'gate2b-frozen-unknown-branch');
+await clickMode('street');
+await page.waitForTimeout(2000);
+const frozenBefore = await page.evaluate(() => window.__canonIds());
+await page.evaluate(() => window.HS.setStatusFilter('unknown', false));
+await clickMode('satellite'); await page.waitForTimeout(500);
+await clickMode('street'); await page.waitForTimeout(1600);
+const frozenAfter = await page.evaluate(() => window.__canonIds());
+await page.screenshot({ path: join(OUT, 'gate2b-frozen-unknown-off.png') });
+await page.evaluate(() => window.HS.setStatusFilter('unknown', true));   // filters persist per session
+const frozenAfterSet = new Set(frozenAfter);
+const frozenRemoved = frozenBefore.filter(i => !frozenAfterSet.has(i)).sort();
+const frozen_pass = {
+  seed_rows: FROZEN_ROWS.length,
+  census: FROZEN.counts,
+  baseline_plotted: frozenBefore.length,
+  baseline_is_full_fixture: frozenBefore.length === FROZEN_ROWS.length,
+  unknown_expected: frozenUnknownIds.length,
+  unknown_removed: frozenRemoved.length,
+  removed_is_exact_bucket: JSON.stringify(frozenRemoved) === JSON.stringify(frozenUnknownIds),
+  removed_all_tabs: frozenRemoved.every(i => i.includes('tdlr.texas.gov')),
+};
+console.log('\nFROZEN FIXTURE (unknown branch): ' + JSON.stringify(frozen_pass));
 
 const tabs = A.records.filter(r => !r.registry_id && r.kind === 'development');
 const facRows = A.records.filter(r => r.kind === 'facility');
 const report = {
   step1_export: { exported_at: EXPORTED_AT, total: RAW.length, development: DEV.length, facilities: FAC.length,
-    tabs: TABS.length, null_registry: RAW.filter(r => !r.registry_id).length, registry_distribution: regDist, fixture_sha256: fixtureSha },
+    tabs: TABS.length, null_registry: RAW.filter(r => !r.registry_id).length, registry_distribution: regDist,
+    lifecycle_census: LIVE.counts, fixture_sha256: fixtureSha },
   step2_adapter: { entered: RAW.length, left: ADAPTED.length, unique_ids: new Set(ADAPTED.map(r => r.id)).size, adapted_sha256: adaptedSha },
   step3_validation: { intercepted, seed_source: 'gate2b-delvalle-78617-full', canonical: A.total,
     dev: A.dev, fac: A.fac, tabs: tabs.length, lettered: A.lettered, rest: A.rest,
     focusExpected: C.focusExpected, focusMarkerCount: C.focusMarkerCount, complete: A.complete,
-    unexplained_loss: 517 - A.total },
+    unexplained_loss: EXPECTED_TOTAL - A.total },
   step5_aggregates: Object.fromEntries(MODES.map(([, l]) => [l, {
     total: per[l].total, dev: per[l].dev, fac: per[l].fac, category: per[l].by_category,
     symbol: per[l].by_symbol, lifecycle: per[l].by_lifecycle, registry: per[l].by_registry,
@@ -308,16 +434,46 @@ const report = {
   facilities_sample: facRows.slice(0, 6).map(f => ({ name: f.name, kind: f.kind, category: f.category, symbol: f.symbol, color: f.color, lifecycle: f.lifecycle })),
   facilities_all_square: facRows.every(f => f.symbol === 'square' && f.category === 'facility'),
   step7_filters: filters,
+  step7_untested_buckets: untestedBuckets,
+  step8_frozen_unknown_branch: frozen_pass,
   console_errors: consoleErrors, page_errors: pageErrors,
 };
 writeFileSync(join(OUT, 'gate2b-report.json'), JSON.stringify(report, null, 1));
 console.log(JSON.stringify(report, null, 1));
 await browser.close(); srv.close();
 
-const hardFail = mism.length || !sameSet || A.total !== 517 || pageErrors.length
+// ── WHAT THE PARITY PASS ACTUALLY FOUND ─────────────────────────────────────────────────
+// Printed on EVERY run, pass or fail. This gate did not execute a parity comparison between
+// 2026-07-28 and this build, so the first green run is also the first real comparison in
+// weeks — and a green result that hides "here is what it saw" would waste exactly the signal
+// the repair exists to restore.
+console.log('\n=== PARITY FINDINGS (Street / Satellite / Focus) ===');
+console.log(`records compared           : ${ids.length}`);
+console.log(`same id set across modes   : ${sameSet}`);
+console.log(`field mismatches           : ${mism.length}`);
+if (mism.length) {
+  const byField = mism.reduce((a, m) => { a[m.field] = (a[m.field] || 0) + 1; return a; }, {});
+  console.log('  by field                 :', JSON.stringify(byField));
+  for (const m of mism.slice(0, 20)) console.log(`  ${m.field.padEnd(10)} ${m.id} :: street=${m.street} satellite=${m.satellite} focus=${m.focus}`);
+}
+console.log(`category histogram (Street): ${JSON.stringify(A.by_category)}`);
+console.log(`symbol histogram   (Street): ${JSON.stringify(A.by_symbol)}`);
+console.log(`lifecycle histogram(Street): ${JSON.stringify(A.by_lifecycle)}`);
+console.log(`fallback-shape records     : ${A.by_fallback['has-reason'] || 0} of ${A.total} (each carries a stated reason)`);
+console.log(`restFacs agrees with page  : ${A.restfac_count_agrees} (harness ${A.rest_facs} vs page ${A.restFacTotal_page})`);
+console.log(`console errors / page errors: ${consoleErrors.length} / ${pageErrors.length}`);
+
+const hardFail = mism.length || !sameSet || A.total !== EXPECTED_TOTAL || pageErrors.length
   || !report.facilities_all_square
-  || Object.values(filters).some(f => !f.identical_across_modes || !f.baseline_is_canonical
-       || !f.removed_matches_expected || !f.facilities_never_removed)
-  || !filters.unknown.removed_are_exactly_the_tabs;
+  // An unexercised bucket is neither passed nor failed here — `exercised` gates the two
+  // count-based assertions so an empty bucket cannot score green, while the structural
+  // assertions (identical across modes, canonical baseline, facilities never removed) still
+  // hold for every bucket.
+  || Object.entries(filters).some(([, f]) => !f.identical_across_modes || !f.baseline_is_canonical
+       || !f.facilities_never_removed
+       || (f.exercised && (!f.removed_matches_expected || !f.removed_is_exact_bucket)))
+  || !frozen_pass.baseline_is_full_fixture
+  || !frozen_pass.removed_is_exact_bucket
+  || !frozen_pass.removed_all_tabs;
 console.log(hardFail ? '\nRESULT: GATE 2 FAIL' : '\nRESULT: GATE 2 FULL-INVENTORY PASS');
 process.exit(hardFail ? 1 : 0);
