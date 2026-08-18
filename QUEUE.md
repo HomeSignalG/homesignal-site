@@ -8260,3 +8260,51 @@ Per the founder's instruction: no recon, no wire — the re-recon is a separate 
 step. Note for that recon: the original rejection was a WAF 403 measured in PRODUCTION
 against all 143 ZIPs' real workload — the re-recon must include a budget/load-proving smoke
 (the Miami precedent), not just count probes, before any stamp is rewritten.
+
+## EL PASO RE-RECON COMPLETE — PROPOSE-ONLY ENTRY DELIVERED, AWAITING FOUNDER (2026-08-18)
+
+Full standing playbook run against `Planning/NewResidential/FeatureServer/1` on
+`gis.elpasotexas.gov` (org receipted by the service's own JSON: serviceDescription
+"new residential building permits", documentInfo keywords "El Paso" — the City of El
+Paso's own ArcGIS Server, v11.3). Registry-grep clean: no TX El Paso entry; the only
+`county: "El Paso"` coverage registry-wide is `colorado-springs-planning-applications`
+(CO — the county-name namesake, which the wire's gate tests must disambiguate).
+Edge-probe 3/3 cited from the same-day audit (requests 30047/30159/30413), not re-run.
+
+**Fresh receipts (all via pg_net, 2026-08-18):**
+- Point layer, WGS84 on request (`outSR=4326`), maxRecordCount 1000, capabilities Query.
+- `B1_APPL_ST` vocabulary, 11 values, sums EXACTLY to 42,677: " " 7,326 · Closed 31,597 ·
+  Inspection 2,485 · Issued 826 · Issue Certificate 357 · Cancelled 46 · Expired 26 ·
+  Completion Application 8 · Pending Review 2 · Revisions Approved 2 · TCO Issued 2.
+  No hold/stall-pattern values. ALL 544 trailing-365d records carry the blank value —
+  the status column stopped being populated (column drift), so it cannot drive buckets.
+- `Record_Typ` vocabulary, 5 values, sums EXACTLY to 42,677: " " 16,771 ·
+  Residential/New/NA 11,647 · New Residential 6,175 · 3rd/Residential/New 5,889 ·
+  New Construction 2,195. In the connector's own 365d window (Rule 13): exactly 3 values
+  summing to 544 (New Residential 492 · 3rd/Residential/New 28 · Residential/New/NA 24),
+  ZERO blanks.
+- Freshness: max `Issued_Dat` 2026-06-30 (≈7-week publication lag — batch loading; live,
+  not stalled), 544 records in the trailing 365d. `REC_DATE` STALLED at 2019-09-26 —
+  rejected as file_date. Live-end sample rows carry real WGS84 geometry inside El Paso
+  (lng −106.33…−106.37, lat 31.69…31.72); `NUMOFUNITS` blank and `JOBVALUE` 0.0 on the
+  samples — not mapped. `Descriptio` blank on the live end (historic values are batch
+  labels like "Sept2019") — rejected as title. `B1_SITUS_Z` holds years, not ZIPs
+  (0 of 42,677 rows LIKE '799%') — spatial 3-mi scoping required. Max 2 rows per
+  `B1_ALT_ID` (distinct-record reality receipted).
+- ⚠️ **The WAF is LIVE and CONTENT-SENSITIVE — demonstrated mid-recon:** a pg_net probe
+  whose where-clause contained `<> ''` was blocked by Cloudflare ("Sorry, you have been
+  blocked", elpasotexas.gov, HTTP 403) while the production query shape (DATE literal +
+  IS NOT NULL) returned 200 the same hour. pg_net reachability remains NOT proof of
+  production reachability; the rollout-as-test gate is the only honest wire-time smoke.
+
+**NewCommercial (`Planning/NewCommercial/MapServer/0`) — stamp RE-CLOSES on fresh
+receipts:** total count 11,322, byte-identical to the 2026-07-25 stamp (zero new rows in
+24 days); the server 400s both orderBy-desc and groupBy-stat probes; the original
+rejection (single blank in-window `Record_Typ` group, 0 non-blank `Descriptio` — no title
+source) stands unrefuted. Not proposed.
+
+**Handoff:** propose-only entry `el-paso-new-residential-permits` delivered to the founder
+with the required stated failure path (post-deploy full paced rollout across all modeled
+El Paso ZIPs IS the WAF test; 403 under load → wire quarantines, stamp re-closes with the
+new receipt, rollout reverses) + Las Cruces NM 88001 and CO/El Paso (80903) never-fetches
+controls. NO registry edit, NO wire — awaiting founder approval.
