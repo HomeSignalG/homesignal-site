@@ -13303,6 +13303,149 @@
    ],
    "record_url_precision": "dataset",
    "_receipts": "2026-08-17 DOT RECON BATCH (founder-approved as proposed, all seven SD entries). SDDOT approved-STIP register on the state's OWN first-party domain dotgis.sd.gov (service STIP/DOT_STIP_Approved). Edge-probe 3/3 (requests 10448/10705/11041 - 267/250/275 ms). Layer IS the category: no status field, LettingDate/ReadyDate are FORECAST scheduling dates -> status_const 'Programmed' -> proposed (nj-stip/mndot-stip fleet shape), file_date DELIBERATELY ABSENT (founder rider: forecast dates rejected). ImproveDesc is free-text prose (Douglas-NV class - receipts show per-year prefixes, embedded CRLF, 'Rip Rap'/'Riprap' variants) -> use_type_const Utility per the 2026-08-03 ruling; ImproveDesc rides in the TITLE with LocDesc (measured: LocDesc 140/140 populated on L2, legible - 'US18 - Fm the E Jct of SD73 to W of Antelope Road/242 Ave'). Partition receipt across 10 non-empty category layers: 646 distinct ProjectCtrlNbrs, 50 in >1 layer - L0+L19=48 (L19 'Local Structure Projects' 53 rows DROPPED as the Houston-subset class), L1+L6=2 (kept, disclosed - point vs line safety representation). Dropped and LOGGED (no silent caps): L19 (53), L5 ADA (11), L20 Local Road Projects (2), L12/L18/L21 (0 rows), L7/L8/L21 Developmental STIP 2030-2033 (381 - forecast program per rider), L13/L14/L15 reference highways, L16 'Do Not Map'. Region-wide rows carry geometry x:'NaN' (string) - featurePoint's finite2 fails them CLOSED to coordinate-less area scope, never a fabricated pin (pinned by the connector test). Gate control: Bismarck ND 58501 never-fetches vs Sioux Falls SD 57104 (test/sd-stip-connector.test.mjs). Fixtures fixtures/sd-stip/*.json (pg_net 11557/11558, outSR=4326). THIS ENTRY: layer 9 'Railroad Crossings', 44 features (point), count receipt pg_net groupBy 2026-08-17."
+  },
+  {
+   "registry_id": "ar-ardot-job-status-points",
+   "platform": "arcgis",
+   "service_url": "https://gis.ardot.gov/referenced/rest/services/ProgramManagement/Job_Status_Web_Application/MapServer/2",
+   "dataset_url": "https://gis.ardot.gov/portal/apps/dashboards/747575e845aa4427aaf9871cceee7e1d",
+   "jurisdiction": "Arkansas Department of Transportation",
+   "coverage": [
+    {
+     "state": "AR"
+    }
+   ],
+   "column_map": {
+    "title": "Job_Name",
+    "status_raw": "PCPM_Status",
+    "type_source": "PCPM_Type_Work_Desc",
+    "file_date": "Letting_Date",
+    "address": "Job_Routes",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "Job_No"
+   },
+   "file_date_kind": "filed",
+   "status_to_bucket": {
+    "proposed": [
+     "01"
+    ],
+    "approved": [
+     "02"
+    ],
+    "operating": [
+     "03"
+    ],
+    "exclude": []
+   },
+   "type_map": {
+    "Structure & Approaches": "Utility",
+    "Miscellaneous": "Utility",
+    "Interchange": "Utility",
+    "Resurfacing": "Utility",
+    "Minor Widening": "Utility",
+    "Safety & Traffic Eng.": "Utility",
+    "Right of Way": "Utility",
+    "Major Widening": "Utility",
+    "Passing Lanes": "Utility",
+    "Base & Surfacing": "Utility",
+    "Rehabilitation": "Utility",
+    "Bridge Rehabilitation": "Utility",
+    "Clearing & Grubbing": "Utility",
+    "Reconstruction": "Utility",
+    "New Location": "Utility",
+    "Enhancement": "Utility",
+    "Study": "Utility",
+    "Slide Repair": "Utility",
+    "RR Crossing": "Utility",
+    "PE Only": "Utility"
+   },
+   "extra_where": "Map_Show = 1",
+   "spatial_zip_radius_mi": 3,
+   "out_fields": [
+    "OBJECTID",
+    "Job_No",
+    "Job_Name",
+    "Job_Routes",
+    "PCPM_Status",
+    "PCPM_Type_Work_Desc",
+    "Map_Show",
+    "Letting_Date"
+   ],
+   "record_url_precision": "dataset",
+   "yields_to": "ar-ardot-job-status-lines",
+   "_receipts": "2026-08-18 AR WIRE (founder-approved option 3: yields_to hook + both entries; Scheduled->proposed bucketing approved). ARDOT Job Status service on the agency's OWN gis.ardot.gov (Enterprise 11.5; owner Thomas.Melton@ardot.gov). Edge-probe 3/3 (requests 10448/10705/11041 - 184/340/295 ms, count 1384 every round). STATUS DECODE RECEIPT - the codes are NOT the San-Jose opaque class: ARDOT's own web map (item 05f0db5beea8448392b11190bd36f06c) Arcade expr 'MapStatusAliasName' decodes 00=Programmed, 01=Scheduled, 02=Under Construction, 03=Completed; the ARDOT dashboard's pie slices (Scheduled/Under Construction/Complete) agree independently. Buckets: 01 Scheduled->proposed (letting not yet occurred - conservative, one step past NDOT Programmed), 02->approved (PennDOT/UDOT fleet), 03->operating (Phoenix DONE precedent). No field domains exist; legend + renderer labels are the codes themselves - the web-map config was the only publisher decode channel. extra_where Map_Show=1 follows ARDOT's OWN display curation (crosstabs sum exactly: points 1384 = 01:363/88 02:163/36 03:380/354 show/hide; lines 5052 = 718/176, 266/301, 1721/1870). FRESH: max Accepted_Date 2026-08-09, max Notice_To_Proceed 2026-07-06, max actual Letting_Date 2026-04-14 (Updated_DT is a DEAD legacy field, max 2019-11-14 - checked and discarded). file_date=Letting_Date (real past event when populated, null stays absent; PCPM_Let_Date maxes 2029 = forecast, rejected per rider). Type vocab: 21 PCPM_Type_Work_Desc values sum 1384 exactly on points (595 Structure & Approaches, 426 Bridge Rehabilitation, 158 Safety & Traffic Eng., 85 Slide Repair, ...); 20 named values -> Utility, 12 nulls -> unclassified (logged, never guessed). Titles: Job_Name legible ('BNSF Railroad Overpass (Marion) (S)'). OVERLAP RESOLUTION: Points and Lines are substantially disjoint job sets (660 vs 1643 distinct Job_Nos, only 60 shared; Block_Overlap is an internal symbology flag, NOT the discriminator - overlap jobs split 44/17 across it, points-only jobs split 429/173 identically). The 60 dual-representation jobs resolve via the yields_to hook (sources/yields.ts): Points yields to Lines on same-Job_No-same-report; a Lines outage degrades to dual-source absence, never silent point-job loss (test-pinned). Gate control: Memphis TN 38103 never-fetches vs Little Rock AR 72201 (test/ardot-connector.test.mjs). Fixtures fixtures/ardot/*.json (pg_net 13087-13090, outSR=4326). THIS ENTRY: layer 2 (Job_Status_Points, esriGeometryPoint, 1,384 rows / 906 in Map_Show=1 scope)."
+  },
+  {
+   "registry_id": "ar-ardot-job-status-lines",
+   "platform": "arcgis",
+   "service_url": "https://gis.ardot.gov/referenced/rest/services/ProgramManagement/Job_Status_Web_Application/MapServer/3",
+   "dataset_url": "https://gis.ardot.gov/portal/apps/dashboards/747575e845aa4427aaf9871cceee7e1d",
+   "jurisdiction": "Arkansas Department of Transportation",
+   "coverage": [
+    {
+     "state": "AR"
+    }
+   ],
+   "column_map": {
+    "title": "Job_Name",
+    "status_raw": "PCPM_Status",
+    "type_source": "PCPM_Type_Work_Desc",
+    "file_date": "Letting_Date",
+    "address": "Job_Routes",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "Job_No"
+   },
+   "file_date_kind": "filed",
+   "status_to_bucket": {
+    "proposed": [
+     "01"
+    ],
+    "approved": [
+     "02"
+    ],
+    "operating": [
+     "03"
+    ],
+    "exclude": []
+   },
+   "type_map": {
+    "Structure & Approaches": "Utility",
+    "Miscellaneous": "Utility",
+    "Interchange": "Utility",
+    "Resurfacing": "Utility",
+    "Minor Widening": "Utility",
+    "Safety & Traffic Eng.": "Utility",
+    "Right of Way": "Utility",
+    "Major Widening": "Utility",
+    "Passing Lanes": "Utility",
+    "Base & Surfacing": "Utility",
+    "Rehabilitation": "Utility",
+    "Bridge Rehabilitation": "Utility",
+    "Clearing & Grubbing": "Utility",
+    "Reconstruction": "Utility",
+    "New Location": "Utility",
+    "Enhancement": "Utility",
+    "Study": "Utility",
+    "Slide Repair": "Utility",
+    "RR Crossing": "Utility",
+    "PE Only": "Utility"
+   },
+   "extra_where": "Map_Show = 1",
+   "spatial_zip_radius_mi": 3,
+   "out_fields": [
+    "OBJECTID",
+    "Job_No",
+    "Job_Name",
+    "Job_Routes",
+    "PCPM_Status",
+    "PCPM_Type_Work_Desc",
+    "Map_Show",
+    "Letting_Date"
+   ],
+   "record_url_precision": "dataset",
+   "_receipts": "2026-08-18 AR WIRE (founder-approved option 3: yields_to hook + both entries; Scheduled->proposed bucketing approved). ARDOT Job Status service on the agency's OWN gis.ardot.gov (Enterprise 11.5; owner Thomas.Melton@ardot.gov). Edge-probe 3/3 (requests 10448/10705/11041 - 184/340/295 ms, count 1384 every round). STATUS DECODE RECEIPT - the codes are NOT the San-Jose opaque class: ARDOT's own web map (item 05f0db5beea8448392b11190bd36f06c) Arcade expr 'MapStatusAliasName' decodes 00=Programmed, 01=Scheduled, 02=Under Construction, 03=Completed; the ARDOT dashboard's pie slices (Scheduled/Under Construction/Complete) agree independently. Buckets: 01 Scheduled->proposed (letting not yet occurred - conservative, one step past NDOT Programmed), 02->approved (PennDOT/UDOT fleet), 03->operating (Phoenix DONE precedent). No field domains exist; legend + renderer labels are the codes themselves - the web-map config was the only publisher decode channel. extra_where Map_Show=1 follows ARDOT's OWN display curation (crosstabs sum exactly: points 1384 = 01:363/88 02:163/36 03:380/354 show/hide; lines 5052 = 718/176, 266/301, 1721/1870). FRESH: max Accepted_Date 2026-08-09, max Notice_To_Proceed 2026-07-06, max actual Letting_Date 2026-04-14 (Updated_DT is a DEAD legacy field, max 2019-11-14 - checked and discarded). file_date=Letting_Date (real past event when populated, null stays absent; PCPM_Let_Date maxes 2029 = forecast, rejected per rider). Type vocab: 21 PCPM_Type_Work_Desc values sum 1384 exactly on points (595 Structure & Approaches, 426 Bridge Rehabilitation, 158 Safety & Traffic Eng., 85 Slide Repair, ...); 20 named values -> Utility, 12 nulls -> unclassified (logged, never guessed). Titles: Job_Name legible ('BNSF Railroad Overpass (Marion) (S)'). OVERLAP RESOLUTION: Points and Lines are substantially disjoint job sets (660 vs 1643 distinct Job_Nos, only 60 shared; Block_Overlap is an internal symbology flag, NOT the discriminator - overlap jobs split 44/17 across it, points-only jobs split 429/173 identically). The 60 dual-representation jobs resolve via the yields_to hook (sources/yields.ts): Points yields to Lines on same-Job_No-same-report; a Lines outage degrades to dual-source absence, never silent point-job loss (test-pinned). Gate control: Memphis TN 38103 never-fetches vs Little Rock AR 72201 (test/ardot-connector.test.mjs). Fixtures fixtures/ardot/*.json (pg_net 13087-13090, outSR=4326). THIS ENTRY: layer 3 (Job_Status_Lines, esriGeometryPolyline via featurePoint midpoint (TxDOT precedent), 5,052 rows / 2,705 in scope)."
   }
  ],
  "ckan": [

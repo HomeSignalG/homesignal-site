@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. No subject-matter claim is derived.",
-  "registry_entries": 207,
+  "registry_entries": 209,
   "statewide": {
     "AK": [
       {
@@ -20,6 +20,18 @@
       {
         "id": "aldot-rebuild-alabama-grant-projects",
         "label": "Alabama Department of Transportation (ALDOT)",
+        "scope": "statewide"
+      }
+    ],
+    "AR": [
+      {
+        "id": "ar-ardot-job-status-lines",
+        "label": "Arkansas Department of Transportation",
+        "scope": "statewide"
+      },
+      {
+        "id": "ar-ardot-job-status-points",
+        "label": "Arkansas Department of Transportation",
         "scope": "statewide"
       }
     ],

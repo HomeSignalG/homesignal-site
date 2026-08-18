@@ -1,0 +1,175 @@
+{
+ "displayFieldName": "Job_Name",
+ "fieldAliases": {
+  "OBJECTID": "OBJECTID",
+  "Job_No": "Job_No",
+  "Job_Name": "Job_Name",
+  "Job_Routes": "Job_Routes",
+  "PCPM_Status": "PCPM_Status",
+  "PCPM_Type_Work_Desc": "PCPM_Type_Work_Desc",
+  "Map_Show": "Map_Show",
+  "Letting_Date": "Letting_Date"
+ },
+ "geometryType": "esriGeometryPolyline",
+ "spatialReference": {
+  "wkid": 4326,
+  "latestWkid": 4326
+ },
+ "fields": [
+  {
+   "name": "OBJECTID",
+   "type": "esriFieldTypeOID",
+   "alias": "OBJECTID"
+  },
+  {
+   "name": "Job_No",
+   "type": "esriFieldTypeString",
+   "alias": "Job_No",
+   "length": 50
+  },
+  {
+   "name": "Job_Name",
+   "type": "esriFieldTypeString",
+   "alias": "Job_Name",
+   "length": 255
+  },
+  {
+   "name": "Job_Routes",
+   "type": "esriFieldTypeString",
+   "alias": "Job_Routes",
+   "length": 255
+  },
+  {
+   "name": "PCPM_Status",
+   "type": "esriFieldTypeString",
+   "alias": "PCPM_Status",
+   "length": 2
+  },
+  {
+   "name": "PCPM_Type_Work_Desc",
+   "type": "esriFieldTypeString",
+   "alias": "PCPM_Type_Work_Desc",
+   "length": 250
+  },
+  {
+   "name": "Map_Show",
+   "type": "esriFieldTypeSmallInteger",
+   "alias": "Map_Show"
+  },
+  {
+   "name": "Letting_Date",
+   "type": "esriFieldTypeDate",
+   "alias": "Letting_Date",
+   "length": 8
+  }
+ ],
+ "features": [
+  {
+   "attributes": {
+    "OBJECTID": 13856441,
+    "Job_No": "090250",
+    "Job_Name": "Washington St. \u2013 East (Hwy. 412) (Siloam Springs) (F)",
+    "Job_Routes": "Hwy. 412",
+    "PCPM_Status": "01",
+    "PCPM_Type_Work_Desc": "Major Widening",
+    "Map_Show": 1,
+    "Letting_Date": null
+   },
+   "geometry": {
+    "paths": [
+     [
+      [
+       -94.537,
+       36.172
+      ],
+      [
+       -94.517,
+       36.181
+      ],
+      [
+       -94.486,
+       36.181
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 13856444,
+    "Job_No": "020660",
+    "Job_Name": "Pulaski Co. Line \u2013 Pine Bluff (S)",
+    "Job_Routes": "Hwy. 365",
+    "PCPM_Status": "03",
+    "PCPM_Type_Work_Desc": "Resurfacing",
+    "Map_Show": 1,
+    "Letting_Date": 1525240800000
+   },
+   "geometry": {
+    "paths": [
+     [
+      [
+       -92.208,
+       34.485
+      ],
+      [
+       -92.206,
+       34.469
+      ],
+      [
+       -92.181,
+       34.439
+      ],
+      [
+       -92.166,
+       34.397
+      ],
+      [
+       -92.166,
+       34.372
+      ],
+      [
+       -92.109,
+       34.317
+      ],
+      [
+       -92.088,
+       34.268
+      ],
+      [
+       -92.07,
+       34.249
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 13856445,
+    "Job_No": "012361",
+    "Job_Name": "Statewide UTBWC Impvts. (2020) (S)",
+    "Job_Routes": "Various",
+    "PCPM_Status": "03",
+    "PCPM_Type_Work_Desc": "Safety & Traffic Eng.",
+    "Map_Show": 1,
+    "Letting_Date": 1604469600000
+   },
+   "geometry": {
+    "paths": [
+     [
+      [
+       -92.498,
+       34.621
+      ],
+      [
+       -92.499,
+       34.619
+      ]
+     ]
+    ]
+   }
+  }
+ ],
+ "exceededTransferLimit": true
+}

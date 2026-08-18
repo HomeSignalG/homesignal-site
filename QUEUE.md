@@ -8107,3 +8107,59 @@ mt-mdt 200×3 (244/269/184 ms, count 275 every round) · ar-ardot 200×3 (184/34
 
 Proposal JSON parked at scratchpad/dot-batch-proposals.json (session-local); the entries above
 are the record. **Awaiting founder review — no registry edit, no wire, no deploy in this batch.**
+
+## MT + SD STIP WIRED AND LIVE — 8 entries, 136 ZIP pages lifted, 759 records (2026-08-18)
+
+PR #783 squash-merged (b3fdcc6, unit/browser/verify all green — 109-file suite; the
+type-const-with-map meta-check correctly rejected the initial MT `type_map`+`use_type_const:
+Utility` pairing and the constant was dropped: 0 null SCOPEs live, a future blank falls to
+unclassified). Deployed via run 32081876989. Designated branch reset post-squash
+(diff-empty + no-branch-only-files preconditions both checked, --force-with-lease).
+
+- **Live smoke (6 ZIPs through the deployed engine, all 200):** Billings 59101 dev 0→7 (all
+  MDT) · Missoula 59801 +10 MDT · Sioux Falls 57104 +24 SD-STIP (proposed 5→29) · Rapid City
+  57701 dev 0→8 · **Bismarck ND 58501 and Williston ND 58801: 0 MT/SD records — bidirectional
+  gate holds live.**
+- **Rollout: all 251 modeled MT/SD ZIP pages re-cached in 4 paced waves (62/62/62/61, ~2 min
+  apart — the PennDOT burst lesson) + 14 cold-start 503 retries (all 200 on retry).**
+  214 pages upserted; **37 responses guard-refused** (smaller than cache — the transient-safe
+  guard, never bypassed; nightly dev_refresh cron owns them). Tracking table dropped.
+- **Cache-wide receipts:** 136 MT/SD pages carry DOT records (MT 46 pages / 145 records ·
+  SD 90 pages / 614 records; every one of the 7 SD entries places records — pavement-pres 205,
+  safety-lines 117, resurfacing 95, structures 79, constr-reconstr 61, safety-pts 33, RR
+  crossings 24). **0 records on any non-MT/SD page. Invariants: 0 missing record_url ·
+  0 non-proposed · 0 unclassified · 0 fabricated file_dates · 0 out-of-region pins · 0 area
+  records** (the SD NaN-geometry region-wide rows can't be returned by the server-side spatial
+  envelope, exactly as designed; the connector test pins the fail-closed path anyway).
+- ⚠️ Pre-existing, not this wire: 57104's cached row is ~20 MB / 19,599 sites (dominated by
+  sioux-falls-building-permits) and 59801 ~16 MB — both beyond the Cleveland 5.98 MB high-water
+  mark. Logged for the row-size review; the adaptive verifier loaders are the mitigation.
+
+**AR HELD (founder), overlap resolution proposed — awaiting pick:**
+1. Dedup answer (from shipped code, index.ts:836-838): the exact-identity key includes
+   lat|lng|source_registry_id, so cross-entry rows for the same Job_No NEVER collapse — wiring
+   both AR layers as-is would double-pin the 60 dual-representation jobs.
+2. Block_Overlap is NOT the discriminator (overlap jobs split 44/17 across it; points-only jobs
+   split 429/173 the same way — it is an internal symbology flag). No server-side predicate
+   exists: ArcGIS layer queries cannot subquery a sibling layer.
+3. **Computed resolution IS expressible at INGEST time (code change, gated):** a registry-declared
+   `yields_to: "ar-ardot-job-status-lines"` on the Points entry + a small assembly hook before
+   dedupeExactPermits — drop a yielding entry's record when the yielded-to entry emitted the same
+   case_number in the same report. Evaluated per-report from live data; no id list (Nebraska-clean);
+   self-updating as ARDOT moves jobs between layers. Effect: 60 dual-pin jobs → 0; the 600
+   points-only and 1,583 lines-only jobs unaffected.
+4. **Nebraska fallback (config-only, pre-authorized by the ruling):** wire Lines alone (5,052
+   rows / 1,643 jobs); accepted loss = the 600 points-only jobs (of 660 in the points layer).
+5. Scheduled → proposed bucketing approved either way (founder).
+
+## ROW-SIZE REVIEW QUEUED — Sioux Falls 57104 at ~20 MB (founder, 2026-08-18)
+
+57104's cached development_reports row is ~20 MB / 19,599 sites — **3.3× the previous
+high-water mark** (Cleveland 44127 at 5.98 MB) — and 59801 Missoula sits at ~16 MB. Both
+PREDATE the DOT wires (the SD-STIP contribution to 57104 is 24 records; the mass is
+`sioux-falls-building-permits` + `missoula-addresses-with-permits`). Understand before it
+becomes the next silent ceiling hit: measure per-source record mass and per-record width on
+both rows, check the adaptive verifier loaders and the live page's single-row read against
+20 MB, then evaluate the Cleveland levers (recency window · `out_fields` projection ·
+`spatial_zip_radius_mi`) per entry — radius changes what residents see, so that lever is a
+founder call. No entry touched yet; review item only.

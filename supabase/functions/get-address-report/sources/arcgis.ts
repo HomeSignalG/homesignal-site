@@ -113,6 +113,16 @@ export interface ArcgisRegistryEntry {
    *  already allow, so mapping AR-1 to Residential would label an electrical substation
    *  "Residential". Constant "Development" is the only non-fabricating option. */
   use_type_const?: string;
+  /** ENGINE-LEVEL option — consumed by sources/yields.ts at report assembly, NOT by this
+   *  connector's fetch path (declared here so the option-surface guard knows it is real).
+   *  Names a sibling entry this entry yields to: a record drops ONLY when the named entry
+   *  emitted the SAME case_number in the SAME report assembly. If the yielded-to fetch
+   *  failed or returned nothing this cycle there is nothing to yield to and every record
+   *  survives — an outage degrades to dual-source absence, never silent record loss.
+   *  Full contract + tests: sources/yields.ts, test/yields-hook.test.mjs. First consumer:
+   *  ar-ardot-job-status-points → ar-ardot-job-status-lines (the 60 dual-representation
+   *  ARDOT jobs). */
+  yields_to?: string;
   /** Optional ZIP-scoping override for layers with NO ZIP column but a ZIP embedded in a text
    *  field (e.g. a full "…, UT 84604" address). A VERBATIM SQL template with a `{zip}` token,
    *  used as the ZIP clause INSTEAD of `{zip_col}='{zip}'` (e.g.
