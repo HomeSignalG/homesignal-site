@@ -8465,3 +8465,84 @@ One of the three heavy sources (62,675 records in the heavy class, 8,238 `propos
 ADDRESS REGISTRY with permits attached has been a **rejection** reason elsewhere — St.
 Paul's PAULIE ("an address registry, not permits") and DuPage address-points. Either those
 stamps or this wire is inconsistent; check which, with receipts.
+
+---
+
+## ITEM 2 SHIPPED AND MEASURED — Option A, the aggregate RPC (2026-08-18)
+
+**Built, merged (#804), deployed, and now MEASURED as a number rather than as a pass/fail
+at a settle deadline (#805).** `HS.data.projects()` / `.facilities()` read a ZIP through
+`public.app_projects_for_zip(p_zip, p_kind)`, which returns the whole set as ONE `jsonb`
+payload; a single row cannot be truncated by the 1,000-row cap.
+
+### The number the fix was worth measuring against
+
+Measured on the live site from a runner, 3 reps per ZIP, run `32190273999`:
+
+| ZIP | median page render (DOM ready → score rail) | rendered / attempts |
+|---|---|---|
+| 57104 Sioux Falls SD (19,544 dev records) | **3,415 ms** | 3 / 3 |
+| 28468 (19,545) | **3,545 ms** | 3 / 3 |
+| 84302 Brigham City (2, light control) | **839 ms** | 3 / 3 |
+
+Read path head to head, both in the SAME live browser against the SAME live DB with the
+SAME public anon key, alternating in a fixed order — the OLD half drives the **shipped**
+`HS.fetchAllPages` helper over the exact pre-change query, so the "before" number is
+measured on this deploy, not remembered from a previous one:
+
+| ZIP | NEW single-payload RPC | OLD 1,000-row windows | delta | rows (new / old) | complete |
+|---|---|---|---|---|---|
+| 57104 | **1,780 ms** | 3,064 ms | **−1,284 ms (−42%)** | 19,544 / 19,544 | true / true |
+| 28468 | **1,735 ms** | 3,053 ms | **−1,318 ms (−43%)** | 19,545 / 19,545 | true / true |
+| 84302 | 55 ms | 56 ms | −1 ms | 2 / 2 | true / true |
+
+**Identical row counts on both paths at every rep** — the speed-up is not bought by a
+shorter read, which is why the counts and the `complete` flag are printed beside every
+timing rather than reported separately.
+
+### The "suspected community.html regression" is WITHDRAWN — it was the instrument
+
+It was reported as *suspected* on n=1 before/after through `spot-check-shell`, whose
+verdict is pass/fail at a fixed settle. On the same deploy, `community.html?zip=57104`
+renders in **3.1–4.5 s, 3 for 3**, less than half the 6,500 ms default it was said to
+fail. ⚠️ **A threshold cannot measure a change whose point is a duration, and near the
+deadline it disagrees with itself run to run.** Nothing was reverted; `lib/data.js` stands
+as merged.
+
+### Security posture — SECURITY INVOKER, a deliberate deviation from "SECURITY DEFINER"
+
+The approval said definer. It was built **invoker**, because definer rights would add
+privilege for zero benefit: `app_projects` has RLS enabled with a single policy
+(`app_projects_read`, SELECT, `{anon,authenticated}`, `USING (true)`), and the page already
+read that table directly with the anon key. The function is `stable`, read-only, takes no
+free-text SQL, pins `search_path = public, pg_temp`, and is `revoke all from public` +
+`grant execute to anon, authenticated`. The sitemap_children lesson applies to anything
+carrying definer rights, so the safest definer function is the one that is not definer.
+
+### What still guards it
+`test/maps-pagination.test.mjs`, 20 assertions: A6 still pins `PAGE_ROWS === 1000` (the
+raise-it trap), and the **planted failure** proves `complete:false` with ZERO rows and
+exactly one retry, with `maps.html`'s `throw new Error('incomplete app_projects read')`
+asserted still present. Full 113-file suite green.
+
+### Instrument added
+`scripts/measure-projects-read.mjs` + dispatch-only `measure-projects-read.yml` — reports
+durations, row counts and the complete flag, distinguishes a timeout and the honest
+can't-load state from mere slowness, writes nothing. Use it, not the settle checker, for
+any future question shaped "did this get faster."
+
+### Proof list, closed at the DEFAULT 6,500 ms settle (not an indulgent one)
+
+Two `spot-check.yml` runs, `SETTLE_MS` left empty so the default applied — **11 ZIPs, 33
+page loads, 0 BROKEN, 0 JS errors**, all three page types populated on every one.
+
+Run `32190472734`: 57104 community populated · tracker 19,601 · **dev-app 19,584** ·
+28468 19,546 / 19,546 · 84302 68 / 24 · 28456 48 / 48 · 28462 13,195 / 13,195.
+Run `32190746918` (the remaining heavy ZIPs + light controls): 57105 19,591 / **19,574** ·
+57103 18,578 / **18,561** · 28470 19,141 / 19,141 · 28469 18,852 / 18,852 · 28436 47 / 47 ·
+28420 857 / 857.
+
+**Record-count parity holds**: 57104's 19,584 dev-app records is exactly its `app_projects`
+development row count, and the light controls are unchanged from their pre-change figures.
+All 6 heavy ZIPs from the proof list now pass at the impatient default — before the fix
+they needed 15 s.
