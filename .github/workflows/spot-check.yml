@@ -11,6 +11,10 @@ on:
       zips:
         description: 'Comma-separated ZIPs to check (e.g. 84302,78617,94545)'
         required: true
+      settle_ms:
+        description: 'Optional: ms to wait for data to settle before reading state (default 6500). Raise it to tell "still loading" apart from "errored" on heavy ZIPs.'
+        required: false
+        default: ''
 
 jobs:
   spot-check:
@@ -30,4 +34,5 @@ jobs:
         env:
           SITE_BASE: https://homesignal.net
           ZIPS: ${{ github.event.inputs.zips }}
+          SETTLE_MS: ${{ github.event.inputs.settle_ms }}
         run: node scripts/spot-check-shell.mjs
