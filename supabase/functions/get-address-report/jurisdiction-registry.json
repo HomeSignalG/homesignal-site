@@ -13448,6 +13448,53 @@
    ],
    "record_url_precision": "dataset",
    "_receipts": "2026-08-18 AR WIRE (founder-approved option 3: yields_to hook + both entries; Scheduled->proposed bucketing approved). ARDOT Job Status service on the agency's OWN gis.ardot.gov (Enterprise 11.5; owner Thomas.Melton@ardot.gov). Edge-probe 3/3 (requests 10448/10705/11041 - 184/340/295 ms, count 1384 every round). STATUS DECODE RECEIPT - the codes are NOT the San-Jose opaque class: ARDOT's own web map (item 05f0db5beea8448392b11190bd36f06c) Arcade expr 'MapStatusAliasName' decodes 00=Programmed, 01=Scheduled, 02=Under Construction, 03=Completed; the ARDOT dashboard's pie slices (Scheduled/Under Construction/Complete) agree independently. Buckets: 01 Scheduled->proposed (letting not yet occurred - conservative, one step past NDOT Programmed), 02->approved (PennDOT/UDOT fleet), 03->operating (Phoenix DONE precedent). No field domains exist; legend + renderer labels are the codes themselves - the web-map config was the only publisher decode channel. extra_where Map_Show=1 follows ARDOT's OWN display curation (crosstabs sum exactly: points 1384 = 01:363/88 02:163/36 03:380/354 show/hide; lines 5052 = 718/176, 266/301, 1721/1870). FRESH: max Accepted_Date 2026-08-09, max Notice_To_Proceed 2026-07-06, max actual Letting_Date 2026-04-14 (Updated_DT is a DEAD legacy field, max 2019-11-14 - checked and discarded). file_date=Letting_Date (real past event when populated, null stays absent; PCPM_Let_Date maxes 2029 = forecast, rejected per rider). Type vocab: 21 PCPM_Type_Work_Desc values sum 1384 exactly on points (595 Structure & Approaches, 426 Bridge Rehabilitation, 158 Safety & Traffic Eng., 85 Slide Repair, ...); 20 named values -> Utility, 12 nulls -> unclassified (logged, never guessed). Titles: Job_Name legible ('BNSF Railroad Overpass (Marion) (S)'). OVERLAP RESOLUTION: Points and Lines are substantially disjoint job sets (660 vs 1643 distinct Job_Nos, only 60 shared; Block_Overlap is an internal symbology flag, NOT the discriminator - overlap jobs split 44/17 across it, points-only jobs split 429/173 identically). The 60 dual-representation jobs resolve via the yields_to hook (sources/yields.ts): Points yields to Lines on same-Job_No-same-report; a Lines outage degrades to dual-source absence, never silent point-job loss (test-pinned). Gate control: Memphis TN 38103 never-fetches vs Little Rock AR 72201 (test/ardot-connector.test.mjs). Fixtures fixtures/ardot/*.json (pg_net 13087-13090, outSR=4326). THIS ENTRY: layer 3 (Job_Status_Lines, esriGeometryPolyline via featurePoint midpoint (TxDOT precedent), 5,052 rows / 2,705 in scope)."
+  },
+  {
+   "registry_id": "el-paso-new-residential-permits",
+   "platform": "arcgis",
+   "jurisdiction": "City of El Paso",
+   "coverage": [
+    {
+     "state": "TX",
+     "county": "El Paso"
+    }
+   ],
+   "service_url": "https://gis.elpasotexas.gov/arcgis/rest/services/Planning/NewResidential/FeatureServer/1",
+   "dataset_url": "https://gis.elpasotexas.gov/arcgis/rest/services/Planning/NewResidential/FeatureServer/1",
+   "column_map": {
+    "title": [
+     "Street_Add",
+     "Record_Typ"
+    ],
+    "status_raw": null,
+    "type_source": "Record_Typ",
+    "file_date": "Issued_Dat",
+    "address": "Street_Add",
+    "lat": "__lat",
+    "lng": "__lng",
+    "case_number": "B1_ALT_ID"
+   },
+   "file_date_kind": "issued",
+   "status_const": "Issued",
+   "status_to_bucket": {
+    "proposed": [],
+    "approved": [
+     "Issued"
+    ],
+    "operating": [],
+    "exclude": []
+   },
+   "type_map": {
+    "New Residential": "Residential",
+    "3rd/Residential/New": "Residential",
+    "Residential/New/NA": "Residential",
+    "New Construction": "Residential"
+   },
+   "extra_where": "Issued_Dat IS NOT NULL",
+   "recency_days": 365,
+   "spatial_zip_radius_mi": 3,
+   "record_url_precision": "dataset",
+   "_receipts": "2026-08-18 re-recon (rejection stamp REWRITTEN under the founder's load gate — the original 2026-07-25 rejection was a WAF 403 under the real 143-ZIP production workload, NOT a schema defect; edge-probe 3/3 200s same day, requests 30047/30159/30413, count 42,677 identical). City of El Paso's own ArcGIS Server v11.3 (serviceDescription 'new residential building permits', keywords 'El Paso'). esriGeometryPoint, WGS84 on request. B1_APPL_ST 11 values sum EXACTLY 42,677 (' ' 7,326 / Closed 31,597 / Inspection 2,485 / Issued 826 / Issue Certificate 357 / Cancelled 46 / Expired 26 / Completion Application 8 / Pending Review 2 / Revisions Approved 2 / TCO Issued 2) but ALL 544 trailing-365d rows carry the blank value — the column stopped being populated, so status_const 'Issued' guarded by Issued_Dat IS NOT NULL (Detroit issuance-ledger pattern; the ledger records issuance -> approved). Record_Typ full-table 5 values sum EXACTLY 42,677; in the connector's own 365d window (Rule 13) exactly 3 values sum EXACTLY 544 (New Residential 492 / 3rd/Residential/New 28 / Residential/New/NA 24), ZERO blanks — all + full-table 'New Construction' -> Residential (the layer is residential by its own service description); a future blank stays unclassified (fails closed). Freshness: max Issued_Dat 2026-06-30 (~7-week batch-load lag; live, not stalled). REC_DATE REJECTED as file_date (stalled 2019-09-26). Descriptio REJECTED as title (blank on the live end; historic values are batch labels like 'Sept2019'). NUMOFUNITS blank + JOBVALUE 0.0 on live samples — unmapped. B1_SITUS_Z holds YEARS not ZIPs (0 of 42,677 LIKE '799%') -> spatial 3-mi scoping; records pin from their own point geometry (live samples lng -106.33..-106.37, lat 31.69..31.72). Max 2 rows per B1_ALT_ID. No per-record URL column and no verified portal pattern -> dataset precision on the layer's own REST endpoint (Boulder precedent). WAF NOTE: Cloudflare on elpasotexas.gov is CONTENT-SENSITIVE — a recon probe containing \"<> ''\" was blocked ('Sorry, you have been blocked') the same hour the production query shape (DATE literal + IS NOT NULL) returned 200; never add quoted-string comparisons to extra_where here. THE STANDING FAILURE PATH: the wire-time smoke is the full paced rollout across all modeled El Paso ZIPs; any HTTP 403 in the run reports -> the wire quarantines, the rejection stamp re-closes with the new receipt, and the rollout reverses (entry removed, redeploy; dev_refresh_collect's retired-source path then sweeps cached records as an EXPLAINED reduction — verify 0 el-paso-new-residential-permits records cache-wide post-reversal)."
   }
  ],
  "ckan": [

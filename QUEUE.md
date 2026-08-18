@@ -8198,3 +8198,113 @@ The DOT recon batch is fully closed: AZ already-wired · MT/SD/AR wired and live
 NM/LA/MS stamped rejections on the reprobe list. Row-size review item (57104 ~20 MB) queued
 above. Board next: El Paso ×3 re-audit on a different day; CA municipal/MPO tier;
 fleet-wide hold/stalled-status semantics review (founder decision).
+
+## FLEET RULING SHIPPED — hold/stalled statuses → EXCLUDE (2026-08-18)
+
+**The principle (founder, durable):** a bucket is a claim to the resident — proposed claims
+"you may still weigh in," approved claims "this is moving." A held/stalled/suspended project
+supports neither; pausing is not proposing, and wrong content is worse than no content.
+
+PR #794 squash-merged (7b20ab9; unit/verify green first pass, browser CANCELLED at 15.3 min
+by the runner — not a test failure — and green on rerun in 4 min). Deployed via run
+32159780146. Branch reset: precondition initially failed on a 2-line diff that proved to be
+main's own sitemap-bot commit (17234d4) landing after the squash — branch-exclusive commits
+were exactly the squashed pair, so the reset proceeded on verified-redundant history.
+
+- **31 raw values flipped proposed→exclude across 28 entries** (survey computed from the
+  registry, blast radius measured from the live cache: **1,044 records were rendering as
+  proposed**, worst kcmo-development-cases 'Review on Hold' 297/55 pages; per-entry receipts
+  in PR #794's table and each entry's `_receipts`).
+- **Named exceptions (per-entry, never per-word):** sussex-county-de-conditional-use
+  `Deferred`/`Defered` stay proposed — hearing-register semantics, a deferred agenda item
+  returns to the board and the comment window is genuinely open; raleigh-building-permits
+  `INACTIVE (INSPECTIONS COMPLETED)` stays operating — completed-inactive. Both rationales
+  live in `_receipts` and in the lint's exceptions list.
+- **The lint (test/stalled-status-bucket.test.mjs):** any hold/stall/suspend/pause/dormant/
+  inactive-pattern raw value bucketed to proposed or approved fails the suite unless the exact
+  (registry_id, raw value) pair is on the reviewed-exceptions list with a written rationale.
+  Self-tests prove planted violations are caught, that exceptions never travel to other
+  entries, and pin the over-flagging direction (Shareholder/Threshold/Withholding pass).
+  Suite 112/112.
+- **Live receipt (KCMO 64154, the biggest blast):** held pins **16 → 0**; proposed **34 → 18**
+  = exactly −16, reconciling the held set; dev total 531 → 514 (−17: the 16 held + one record
+  that moved at the source in the ~19 h since baseline — disclosed). Persisted via a
+  deliberate targeted update (an INTENDED contraction — the wave-upsert `>=` guard is for
+  transients and was not weakened for this; one verified ZIP only).
+- **The remaining ~1,028 cached held records sweep via the nightly dev_refresh cron** — its
+  transient-safe guard refuses only all-empty responses, never intended contractions, so no
+  manual override is needed cache-wide.
+
+## HELD-PIN SWEEP COMPLETE + EL PASO ×3 RE-AUDIT FLIPS TO REACHABLE (2026-08-18)
+
+**1. Held-pin sweep — cache-wide zero.** The founder's "overnight" check ran 23 minutes after
+the fleet-ruling deploy (16:20Z), so the 1,028 remaining held→proposed records across 188
+pages were neither guard refusals nor missed pages — no scheduled pass had run against the
+new registry yet. Diagnosis surfaced an architecture update the QUEUE notes had not recorded:
+the refresh is now a ROLLING 15-minute `dev_refresh_tick()` (cron jobid 14, ~100 pages/tick,
+full-cache cycle ≈ 1.3 days), not the single 09:00 daily fire — organic clearance would have
+taken up to ~2 days. Per "the ruling isn't done until residents stop seeing the pins," the
+188 affected pages were swept directly through the deployed engine in three waves (95 + 100 +
+9; 16 transient failures all recovered on re-fire; upserts guarded against all-empty responses
+only — intended contractions allowed). **Post-sweep: 0 held-status records bucketed proposed
+cache-wide** (Sussex exception: 0 cached Deferred records at present; the config exception
+stands). Tracking table dropped.
+
+**2. El Paso ×3 re-audit (different day, byte-identical URL from the 2026-08-17 audit:
+gis.elpasotexas.gov/arcgis/rest/services/Planning/NewResidential/FeatureServer/1/query
+where=1=1&returnCountOnly).** Prior verdict INTERMITTENT (timeout · 200 340ms · 200 368ms).
+Today, edge-probe requests 30047/30159/30413, probed 16:45 / 17:05:29 / 17:23:55Z:
+**200 in 364 ms · 200 in 430 ms · 200 in 367 ms — count 42,677 IDENTICAL in all three
+rounds. Verdict FLIPS TO REACHABLE; flagged for re-recon** (largest TX prize, 145 pages).
+Per the founder's instruction: no recon, no wire — the re-recon is a separate founder-gated
+step. Note for that recon: the original rejection was a WAF 403 measured in PRODUCTION
+against all 143 ZIPs' real workload — the re-recon must include a budget/load-proving smoke
+(the Miami precedent), not just count probes, before any stamp is rewritten.
+
+## EL PASO RE-RECON COMPLETE — PROPOSE-ONLY ENTRY DELIVERED, AWAITING FOUNDER (2026-08-18)
+
+Full standing playbook run against `Planning/NewResidential/FeatureServer/1` on
+`gis.elpasotexas.gov` (org receipted by the service's own JSON: serviceDescription
+"new residential building permits", documentInfo keywords "El Paso" — the City of El
+Paso's own ArcGIS Server, v11.3). Registry-grep clean: no TX El Paso entry; the only
+`county: "El Paso"` coverage registry-wide is `colorado-springs-planning-applications`
+(CO — the county-name namesake, which the wire's gate tests must disambiguate).
+Edge-probe 3/3 cited from the same-day audit (requests 30047/30159/30413), not re-run.
+
+**Fresh receipts (all via pg_net, 2026-08-18):**
+- Point layer, WGS84 on request (`outSR=4326`), maxRecordCount 1000, capabilities Query.
+- `B1_APPL_ST` vocabulary, 11 values, sums EXACTLY to 42,677: " " 7,326 · Closed 31,597 ·
+  Inspection 2,485 · Issued 826 · Issue Certificate 357 · Cancelled 46 · Expired 26 ·
+  Completion Application 8 · Pending Review 2 · Revisions Approved 2 · TCO Issued 2.
+  No hold/stall-pattern values. ALL 544 trailing-365d records carry the blank value —
+  the status column stopped being populated (column drift), so it cannot drive buckets.
+- `Record_Typ` vocabulary, 5 values, sums EXACTLY to 42,677: " " 16,771 ·
+  Residential/New/NA 11,647 · New Residential 6,175 · 3rd/Residential/New 5,889 ·
+  New Construction 2,195. In the connector's own 365d window (Rule 13): exactly 3 values
+  summing to 544 (New Residential 492 · 3rd/Residential/New 28 · Residential/New/NA 24),
+  ZERO blanks.
+- Freshness: max `Issued_Dat` 2026-06-30 (≈7-week publication lag — batch loading; live,
+  not stalled), 544 records in the trailing 365d. `REC_DATE` STALLED at 2019-09-26 —
+  rejected as file_date. Live-end sample rows carry real WGS84 geometry inside El Paso
+  (lng −106.33…−106.37, lat 31.69…31.72); `NUMOFUNITS` blank and `JOBVALUE` 0.0 on the
+  samples — not mapped. `Descriptio` blank on the live end (historic values are batch
+  labels like "Sept2019") — rejected as title. `B1_SITUS_Z` holds years, not ZIPs
+  (0 of 42,677 rows LIKE '799%') — spatial 3-mi scoping required. Max 2 rows per
+  `B1_ALT_ID` (distinct-record reality receipted).
+- ⚠️ **The WAF is LIVE and CONTENT-SENSITIVE — demonstrated mid-recon:** a pg_net probe
+  whose where-clause contained `<> ''` was blocked by Cloudflare ("Sorry, you have been
+  blocked", elpasotexas.gov, HTTP 403) while the production query shape (DATE literal +
+  IS NOT NULL) returned 200 the same hour. pg_net reachability remains NOT proof of
+  production reachability; the rollout-as-test gate is the only honest wire-time smoke.
+
+**NewCommercial (`Planning/NewCommercial/MapServer/0`) — stamp RE-CLOSES on fresh
+receipts:** total count 11,322, byte-identical to the 2026-07-25 stamp (zero new rows in
+24 days); the server 400s both orderBy-desc and groupBy-stat probes; the original
+rejection (single blank in-window `Record_Typ` group, 0 non-blank `Descriptio` — no title
+source) stands unrefuted. Not proposed.
+
+**Handoff:** propose-only entry `el-paso-new-residential-permits` delivered to the founder
+with the required stated failure path (post-deploy full paced rollout across all modeled
+El Paso ZIPs IS the WAF test; 403 under load → wire quarantines, stamp re-closes with the
+new receipt, rollout reverses) + Las Cruces NM 88001 and CO/El Paso (80903) never-fetches
+controls. NO registry edit, NO wire — awaiting founder approval.
