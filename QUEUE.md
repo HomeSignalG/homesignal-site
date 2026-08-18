@@ -8420,6 +8420,10 @@ the `app_projects` row count for 57104**, so the full set renders and the comple
 honesty holds — no truncation, no partial prefix. The 60 s run was not needed: 30 s
 already renders. **The earlier "BROKEN" readings were the checker's impatience, not a
 page failure.** ⚠️ Do not restate the earlier finding as "the page is broken."
+**NARROWED: `settle_ms=15000` ALSO passes**, both ZIPs, identical counts (19,584 /
+19,546) — so the full render lands **between 6.5 s and 15 s**. That is the number the
+fix is worth measuring against: slow enough to lose a resident (well past the ~3 s
+abandonment point), not broken. 6 ZIPs, 2 counties.
 
 ### 2. PROPOSED (not built) — fix the PAGINATION, and NOT by enlarging PAGE_ROWS
 ⛔ **`PAGE_ROWS` CANNOT BE RAISED — and raising it would cause SILENT TRUNCATION REPORTED
