@@ -8349,3 +8349,58 @@ should expect 89 pages, not 145.
 **NewCommercial stays REJECTED** on fresh receipts (11,322 rows, byte-identical to the
 2026-07-25 count — zero new rows in 24 days; no title source). One elpasotexas.gov entry
 exists registry-wide, asserted in the test.
+
+## ROW-SIZE REVIEW COMPLETE — MEASURED, NO LEVER APPLIED (2026-08-18)
+
+Answers the review queued at line 8155. **Measurement only — nothing was changed.** The
+lever decision is the founder's and is OPEN.
+
+**1. What 57104 is.** 20 MB JSON / 19,599 sites / 1,077 B per site (1,531 kB on disk —
+TOAST compresses 13×, so storage is not the constraint; the wire and the browser are).
+`sioux-falls-building-permits` is **99.8%** of the mass (19,518 records). Width is uniform
+(max 1,107 B) and all 19,518 case numbers are distinct — no duplicate records, the v22
+dedup holds. But the width carries real waste, engine-wide rather than local:
+**`url` is byte-identical to `record_url` and `title` to `label` on all 19,518 rows —
+2,634,426 B = 12.5% of the row**, and fields whose value is CONSTANT across the source
+total **5,679,738 B = 27%**. The volume itself is a config choice: `recency_days: 730` +
+`spatial_zip_radius_mi: 5` + no `extra_where` + no `out_fields`. Window is exact (oldest
+2024-10-07, newest 2026-08-12).
+
+**2. The ceiling, and it is a CLASS.** ⚠️ **The largest cached row is 57105, not 57104.**
+Across 12,722 rows / 3,066 MB: p50 **19 kB** · p95 **986 kB** · p99 **4,535 kB** · max
+**20 MB**. **77 rows exceed the retired 5.98 MB Cleveland mark · 31 exceed 10 MB · 6 are
+≥18 MB · 159 exceed the old 3.5 MB "working ceiling."** **14 registry entries share the
+signature** (radius ≥5 AND recency ≥730 AND no `extra_where`); three of them own the whole
+top 15 — sioux-falls, `brunswick-county-permits` NC, `missoula-addresses-with-permits` MT.
+The other eleven are latent.
+
+**3. BEHAVIOUR AT SIZE — the page does not load, and the cause is NOT the cached row.**
+Server side nothing is near a limit: PostgREST returns the full **21,109,900 bytes with
+HTTP 200** (no truncation), the engine returns 200 with a 19 MB body, and heavy rows
+refresh no worse than the rest (avg age 27.7 h vs 29.6 h). Live runner checks, with
+same-county light controls proving size and not content:
+- **`homesignalmap.html` renders all 19,599 sites at 20 MB** — one request, one cached row.
+- **`community.html` AND `maps.html` both break, reproducibly (2/2).** Both call
+  `HS.data.projects()` → `fetchAllPages` over `app_projects` in **1,000-row windows**, so
+  57104's 19,584 project rows mean **20 SEQUENTIAL round trips** before first render.
+  Boundary is sharp: 57103 renders at **18,561** records; **19,141+ does not**.
+- **Failure mode is NOT silent truncation, by design** — `if (projects.complete === false)
+  throw` refuses to render a partial prefix ("The map can't load right now").
+  ⚠️ **Honest limit of this measurement:** `spot-check-shell.mjs` waits only **6,500 ms**
+  after DOM load, so "BROKEN (unrecognized state)" cannot be distinguished from "still
+  loading at 6.5 s" without a longer-settle probe. Not claimed either way.
+- **Blast radius: 6 ZIPs, 2 counties** — 57105/57104/57103 (Minnehaha SD) and
+  28468/28470/28469 (Brunswick NC). **All 6 are currently `indexable`.** Clean gap: 0 rows
+  between 17 and 18 MB.
+
+**4. Levers, measured on 57104 — FOUNDER'S CALL, NOT APPLIED.** Note `sioux-falls` carries
+**0 `proposed`** records (all issued/completed), but the heavy class carries **26,732**
+(Cabarrus 17,566, Missoula 8,238) — so a FLEET-WIDE trim would cost real comment-window
+items elsewhere. Per-source beats blanket.
+| lever | records kept | row size | resident cost |
+|---|---|---|---|
+| recency 730 → 365 | 10,568 (54%) | 11 MB | loses year-old permits; still above the break |
+| radius 5 → 3 mi | 5,689 (29%) | 5.96 MB | narrows "near me" — changes what the map means |
+| both | 3,283 (17%) | 3.4 MB | clears comfortably |
+| drop duplicate `url`/`label` | all | ~17.5 MB | **zero** rendered change (engine change) |
+| raise `PAGE_ROWS` / parallelize | all | unchanged | zero content loss; fixes the mechanism |
