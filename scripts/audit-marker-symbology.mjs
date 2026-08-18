@@ -43,12 +43,33 @@ const UNIVERSE = [
   ['facility', 'logistics', 'Operating', 24026], ['facility', 'datacenter', 'Operating', 761],
 ];
 
-const STATUS_EXPECT = { Proposed: '#c47a1a', Approved: '#3f7fb0', Operating: '#1f9d5c', 'On file': '#6b7f76' };
+// Status → canonical pin colour. Mirrors lib/map.js::statusTier + STATUS_TIERS, stated here
+// independently so this audit asserts the contract rather than borrowing the implementation.
+//
+// `Active` was added 2026-08-18 with the gate2b vocabulary repair: production's status
+// vocabulary is exactly four values (Operating / Approved / Proposed / Active, 0 NULL), and
+// `Active` buckets to operating (lib/map.js:198 — 'operating' || 'active' || 'built'). It is
+// absent from the UNIVERSE snapshot below only because that snapshot is frozen at 2026-07-24;
+// the live-sample path does see it.
+// `On file` STAYS: it is the legacy TABS vocabulary the frozen UNIVERSE rows still carry, and
+// it is the lifecycle-unknown colour. Both are real; neither is a guess.
+const STATUS_EXPECT = { Proposed: '#c47a1a', Approved: '#3f7fb0', Operating: '#1f9d5c', Active: '#1f9d5c', 'On file': '#6b7f76' };
 const GENERIC_TYPES = new Set(['Development', 'unclassified', 'Trades', 'Land use', 'Civic/Public']);
 
 function auditRow(item, n) {
   const m = HS.resolveMarker(item);
+  // FAIL CLOSED AND NAME THE VALUE. Without this an unrecognised status yields `undefined`,
+  // which silently loses the `m.color === expect` comparison and surfaces only as an
+  // anonymous drop in "every record resolves to its canonical status/facility color" — the
+  // reader is told the colours are wrong, not that the vocabulary moved. Same guard, same
+  // reason, as STATUS_BUCKET in scripts/gate2/full-inventory.mjs.
   const expect = item.record_kind === 'facility' ? FAC : STATUS_EXPECT[item.status];
+  if (expect === undefined) {
+    console.error(`FAIL — unrecognised status ${JSON.stringify(item.status)}: the lifecycle `
+      + `vocabulary moved and this audit will not guess its colour. Add it to STATUS_EXPECT `
+      + `(and check lib/map.js::statusTier agrees).`);
+    process.exit(1);
+  }
   return { m, expect, n, item };
 }
 
