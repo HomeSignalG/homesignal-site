@@ -8308,3 +8308,44 @@ with the required stated failure path (post-deploy full paced rollout across all
 El Paso ZIPs IS the WAF test; 403 under load → wire quarantines, stamp re-closes with the
 new receipt, rollout reverses) + Las Cruces NM 88001 and CO/El Paso (80903) never-fetches
 controls. NO registry edit, NO wire — awaiting founder approval.
+
+## EL PASO WIRED AND LIVE — THE WAF GATE PASSED, STAMP REWRITTEN (2026-08-18)
+
+`el-paso-new-residential-permits` shipped in PR #797 (3 checks green, squash-merged
+`ad11a899`, deploy run 32171225573 green on the merge commit, branch reset clean).
+
+**THE GATE — the rollout WAS the test, and it passed.** The 2026-07-25 rejection was a
+WAF 403 measured across the real production workload, so the smoke had to re-answer
+exactly that. Three paced waves (48 + 48 + 49) across **all 145 modeled El Paso TX ZIPs**
+(the July stamp's "143" was that run's vintage; two pages have been added since), fired
+through `dev_refresh_fire_batch`'s exact production shape:
+- **145 / 145 pages answered · 0 HTTP 403 · 0 `dev_failed_sources` rows naming
+  `el-paso-new-residential-permits`** (the only failure rows in the window were 4
+  whole-report `HTTP 503` cold starts, all recovered on re-fire).
+- The stamp is REWRITTEN, not merely re-opened: the entry stays wired, and the quarantine
+  branch of the failure path was never entered.
+
+**Persisted receipts (cache-level, post-collect):** 89 pages carry **1,925 records /
+221 distinct permits** (adjacent 3-mi circles legitimately repeat a permit across
+neighbouring ZIP pages — Chicago precedent). Across every one of them: **0 missing
+`record_url`, 0 missing coordinates, 0 non-`point` scope, 0 non-`approved` bucket,
+0 unclassified, 0 missing `file_date`.** Pins span lat 31.6627–31.9242 / lng
+−106.6168–−106.2489 (inside El Paso). `file_date` window is EXACT — oldest 2025-08-18,
+newest 2026-06-29, the 365-day boundary.
+**Bidirectional gate proof, live:** 0 el-paso records on any non-El-Paso page cache-wide,
+including the two named controls — Las Cruces NM (88001/88005/88011) and Colorado Springs
+(80903/80904/80906, the registry's OTHER `county: "El Paso"`), both cached, both zero.
+El Paso pages moved dev 9,391 → 11,375 and sites 12,639 → 15,429.
+
+⚠️ **54 of 145 pages have NOT yet persisted their El Paso records (595 pending) — and the
+cause is EPA FRS, not the WAF.** Their responses carry El Paso data and no 403, but
+`facilities` came back 0 while the cached row holds a real count, so
+`dev_refresh_collect`'s transient-safe guard correctly REFUSED the write (24 confirmed on
+that predicate; 2 had no response row; the rest re-fired mid-window). **The guard was not
+bypassed or weakened** — the rolling 15-min `dev_refresh_tick` owns these pages and will
+land them on a healthy FRS cycle. Anyone re-measuring El Paso before that cycle completes
+should expect 89 pages, not 145.
+
+**NewCommercial stays REJECTED** on fresh receipts (11,322 rows, byte-identical to the
+2026-07-25 count — zero new rows in 24 days; no title source). One elpasotexas.gov entry
+exists registry-wide, asserted in the test.
