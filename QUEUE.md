@@ -8546,3 +8546,77 @@ Run `32190746918` (the remaining heavy ZIPs + light controls): 57105 19,591 / **
 development row count, and the light controls are unchanged from their pre-change figures.
 All 6 heavy ZIPs from the proof list now pass at the impatient default — before the fix
 they needed 15 s.
+
+---
+
+## GATE 2B CONSTANT DRIFT — RESOLVED, and the first parity comparison in three weeks (2026-08-18)
+
+**The 517-vs-540 drift is fixed by deriving, not re-baselining** (PR #808). `scripts/gate2/
+full-inventory.mjs` no longer states an inventory size anywhere; the workflow header no longer
+states one either (it had said **457** while the script said 517 and production held 540).
+
+### What the drift actually did
+517 was a real rebaselined measurement (run `30397067493`, 2026-07-28, green). Production grew
+to 537 by 08-11 and 540 by 08-18, and the gate then died on line 45 **0.55 s in** — before the
+adapter, before Chromium, before any parity comparison. **27 consecutive red runs over 8 days
+across four branches**, 25 of them on someone else's PRs, with the artifact step confirming it
+every time (`No files were found with the provided path: gate2b-out/`). Not a false pass — a
+spurious failure that stopped the gate from testing what it exists to test.
+
+### THE PARITY FINDINGS — run `32198178049`, the first execution since 2026-07-28
+```
+records compared           : 540          (previously 521 at best — see the identity bug below)
+same id set across modes   : true
+field mismatches           : 0
+category  (Street): commercial 126 · infrastructure 68 · residential 86 · other 166 · civic 37 · industrial 27 · facility 30
+symbol    (Street): hexagon 126 · diamond 68 · pentagon 86 · circle 166 · cross 37 · triangle 27 · square 30
+lifecycle (Street): approved 338 · operating 153 · proposed 49
+fallback-shape records     : 166 of 540 (each carries a stated reason)
+restFacs agrees with page  : true (harness 6 vs page 6)
+console errors / page errors: 0 / 0
+```
+**ZERO rendering drift.** 8 fields × 540 records × 3 modes compared, 0 mismatches — markers,
+categories, symbols, colours, lifecycle, evidence, filterKey and popup title are identical
+across Street / Satellite / Focus. Category and symbol histograms are 1:1 and both sum to
+exactly 540; lifecycle sums to 540 (operating 153 = 119 dev Operating + 4 dev Active + 30
+facilities, which render lifecycle `operating` but filterKey `facility`).
+- ⚠️ **One observation, NOT a defect: 166 of 540 (30.7%) render as the honest "Other project"
+  circle.** Every one carries a stated `fallbackReason` — nothing is guessed — and it matches
+  the pre-existing universe audit (`FALLBACK:other` is the largest shapeRule there too). It is
+  a classification-coverage observation, not drift and not a regression.
+
+### THE IDENTITY BUG the green run uncovered — pre-existing, now fixed
+The gate keyed on `source_ref || name`, which is **not unique**: at 78617 that collapses 540
+rows to **521 distinct values**, because `txdot-projects-info-all` is `record_url_precision:
+"dataset"` and all **20** of its route segments share ONE url (17 distinct names, 20 distinct
+coordinates). Consequences: 19 adapted rows were compared against a different row's
+coordinates (a false `coordinate drift on SH 130 Install Traffic Signal`), and the parity
+comparison silently ran over **521 records instead of 540** while able to report
+`same_id_set: true`. Fixed with `__gid`, stamped once per row and carried through
+harness → seed → page → collector; `SOURCE_OF` is built positionally; the collector **throws**
+if a plotted record lacks `__gid` (no fallback — a silent one re-collapses the 20 segments and
+reports it as a pass). Rejected: `source_ref|name|lat|lng` — still collides (537 of 540) and is
+circular, keying on the field under verification.
+- ⚠️ **NOT engine v22 dedup identity.** That key is deliberately content-based and keeps
+  `file_date` + `case_number` because its job is deciding whether two SOURCE ROWS are the same
+  real filing. This key's job is the opposite. Do not conflate them.
+- **When the collision began is UNDATABLE with the available instruments** —
+  `app_projects.created_at` is a re-materialization stamp (4 distinct seconds, earliest
+  postdating the 2026-07-28 baseline). Stated plainly rather than estimated.
+
+### The guards now in place
+`censusOf` (in the new `scripts/gate2/lifecycle-buckets.mjs`) FAILS CLOSED on an unrecognised
+status and names it — production's vocabulary is exactly four values (Operating / Approved /
+Proposed / **Active**, 0 NULL), and the 2026-08 move of the five TABS rows off `On file` is what
+this would have caught the day it happened. Empty buckets are reported **UNTESTED**, never
+scored green: `unknown` now holds **zero records ZIP-wide and table-wide**, so it is proven
+instead against the **frozen fixture** (`scripts/gate2/rows.tsv`, 39 verbatim production rows,
+five still carrying `On file`) — and a fixture that loses those rows is a hard failure, not a
+vacuous pass. 25 offline assertions in `test/gate2-lifecycle-buckets.test.mjs` pin all of it,
+including the collision reproduced and the fix demonstrated. Suite 113 → 114 files.
+
+**Left alone as ruled:** `NEAREST_FAC_CAP`, `verify-zip-universe`'s `12722` (the founder's
+policy constant — deriving it from production is what the 80249 ruling forbids),
+`verify-maps-uncap`'s budgets, `delvalle-golden`'s frozen fixture, and `verify-maps-rest-shapes`'
+print-only baseline. `audit-marker-symbology.mjs` folded in the same vocabulary move (`Active`
+added, same fail-closed guard).
