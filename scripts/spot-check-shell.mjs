@@ -17,6 +17,14 @@ import { chromium } from 'playwright';
 const SITE_BASE = process.env.SITE_BASE || 'https://homesignal.net';
 const ZIPS = (process.env.ZIPS || '').split(',').map(s => s.trim()).filter(Boolean);
 if (!ZIPS.length) { console.error('Set ZIPS="12345,67890,..."'); process.exit(2); }
+// SETTLE_MS — how long to let the shell inject and the data queries finish before reading
+// state. DEFAULT 6500 = the historical hardcoded value, so every existing caller is
+// byte-identical. It is configurable because 6.5 s cannot distinguish "the page errored"
+// from "the page is still loading", and on the heaviest ZIPs that distinction is the whole
+// question: community.html/maps.html block on a 1,000-row-windowed read of app_projects
+// (~20 sequential round trips at 19.5k rows). A slow page and a broken page need different
+// fixes, so the probe has to be able to wait longer than the impatience threshold.
+const SETTLE_MS = process.env.SETTLE_MS ? parseInt(process.env.SETTLE_MS, 10) : 6500;
 
 async function inspect(page, url) {
   const errors = [];
@@ -24,7 +32,7 @@ async function inspect(page, url) {
   page.on('pageerror', onErr);
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
-    await page.waitForTimeout(6500); // let the shell inject + data queries settle
+    await page.waitForTimeout(SETTLE_MS); // let the shell inject + data queries settle (SETTLE_MS, default 6500)
     const st = await page.evaluate(() => {
       const side = document.querySelector('.side');
       const nav = document.querySelector('.side .nav a, .nav a');
@@ -47,6 +55,12 @@ async function inspect(page, url) {
         covBlock: /What's on this page, and what isn't/i.test(text),
         plainEmpty: /No permit or planning records for this area/i.test(text),
         retiredClaim: /We check county and permit records/i.test(text),
+        // Distinguishes the HONEST ERROR path (maps.html throws 'incomplete
+        // app_projects read' and renders a can't-load state) from a page that is
+        // merely still loading. Without this, both read as 'unrecognized'.
+        loadFail: /can.?t load right now|couldn.?t load|can.?t load/i.test(text),
+        stillLoading: /loading|Loading/.test(text) && !/\.strip/.test(text),
+        excerpt: text.slice(0, 180).replace(/\s+/g, ' '),
       };
     });
     page.off('pageerror', onErr);
@@ -98,6 +112,15 @@ for (const zip of ZIPS) {
   rows.push({ zip, commShell: shellOk(comm), commClass, devShell: shellOk(dev), devClass,
     appShell: shellOk(app), appClass, jsErr: jsErr.length ? jsErr[0].slice(0, 80) : '' });
   console.log(`${zip}: community[shell=${shellOk(comm)} ${commClass}] tracker[shell=${shellOk(dev)} ${devClass}] devapp[shell=${shellOk(app)} ${appClass}]${jsErr.length ? ' JSERR ' + jsErr[0].slice(0, 80) : ''}`);
+  // DIAGNOSTIC: on any unrecognized state, say WHICH it is — an honest can't-load
+  // error is a different defect from a page still mid-load at the settle deadline.
+  for (const [name, st] of [['community', comm], ['tracker', dev], ['devapp', app]]) {
+    const cls = name === 'community' ? commClass : name === 'tracker' ? devClass : appClass;
+    if (/BROKEN/.test(cls)) {
+      console.log(`    ${zip} ${name}: settle=${SETTLE_MS}ms loadFail=${!!st.loadFail} `
+        + `stillLoading=${!!st.stillLoading} textLen=${st.textLen} :: ${st.excerpt || ''}`);
+    }
+  }
 }
 await browser.close();
 
