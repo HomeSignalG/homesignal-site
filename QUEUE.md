@@ -8530,3 +8530,19 @@ asserted still present. Full 113-file suite green.
 durations, row counts and the complete flag, distinguishes a timeout and the honest
 can't-load state from mere slowness, writes nothing. Use it, not the settle checker, for
 any future question shaped "did this get faster."
+
+### Proof list, closed at the DEFAULT 6,500 ms settle (not an indulgent one)
+
+Two `spot-check.yml` runs, `SETTLE_MS` left empty so the default applied — **11 ZIPs, 33
+page loads, 0 BROKEN, 0 JS errors**, all three page types populated on every one.
+
+Run `32190472734`: 57104 community populated · tracker 19,601 · **dev-app 19,584** ·
+28468 19,546 / 19,546 · 84302 68 / 24 · 28456 48 / 48 · 28462 13,195 / 13,195.
+Run `32190746918` (the remaining heavy ZIPs + light controls): 57105 19,591 / **19,574** ·
+57103 18,578 / **18,561** · 28470 19,141 / 19,141 · 28469 18,852 / 18,852 · 28436 47 / 47 ·
+28420 857 / 857.
+
+**Record-count parity holds**: 57104's 19,584 dev-app records is exactly its `app_projects`
+development row count, and the light controls are unchanged from their pre-change figures.
+All 6 heavy ZIPs from the proof list now pass at the impatient default — before the fix
+they needed 15 s.
