@@ -8151,3 +8151,15 @@ unclassified). Deployed via run 32081876989. Designated branch reset post-squash
 4. **Nebraska fallback (config-only, pre-authorized by the ruling):** wire Lines alone (5,052
    rows / 1,643 jobs); accepted loss = the 600 points-only jobs (of 660 in the points layer).
 5. Scheduled → proposed bucketing approved either way (founder).
+
+## ROW-SIZE REVIEW QUEUED — Sioux Falls 57104 at ~20 MB (founder, 2026-08-18)
+
+57104's cached development_reports row is ~20 MB / 19,599 sites — **3.3× the previous
+high-water mark** (Cleveland 44127 at 5.98 MB) — and 59801 Missoula sits at ~16 MB. Both
+PREDATE the DOT wires (the SD-STIP contribution to 57104 is 24 records; the mass is
+`sioux-falls-building-permits` + `missoula-addresses-with-permits`). Understand before it
+becomes the next silent ceiling hit: measure per-source record mass and per-record width on
+both rows, check the adaptive verifier loaders and the live page's single-row read against
+20 MB, then evaluate the Cleveland levers (recency window · `out_fields` projection ·
+`spatial_zip_radius_mi`) per entry — radius changes what residents see, so that lever is a
+founder call. No entry touched yet; review item only.

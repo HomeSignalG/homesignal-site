@@ -69,6 +69,9 @@ import { censusRung, datasetRung, resolveGeocode, supabaseStore } from "./geocod
 import { socrataForZip, type SocrataCommunityRow, type SocrataRegistryEntry } from "./sources/socrata.ts";
 import { readAllRows } from "./sources/pg-pages.ts";
 import jurisdictionRegistry from "./jurisdiction-registry.json" with { type: "json" };
+import { applyYields, buildYieldsMap } from "./sources/yields.ts";
+// registry_id -> yields_to, built once at module load; empty map ⇒ applyYields is a no-op.
+const YIELDS_MAP = buildYieldsMap(jurisdictionRegistry as Record<string, unknown>);
 const SOCRATA_ENTRIES = (jurisdictionRegistry as unknown as { socrata?: SocrataRegistryEntry[] }).socrata ?? [];
 import { arcgisForZip, type ArcgisRegistryEntry } from "./sources/arcgis.ts";
 import { ckanForZip, type CkanCommunityRow, type CkanRegistryEntry } from "./sources/ckan.ts";
@@ -840,7 +843,15 @@ async function handleRequest(req: Request): Promise<Response> {
       }
       return out;
     };
-    const permitSites = dedupeExactPermits([...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...csvSites, ...cartoSites]);
+    // yields_to (sources/yields.ts): same-report cross-entry overlap resolution — a yielding
+    // entry's record drops only when its yielded-to entry emitted the SAME case_number in THIS
+    // assembly. If the yielded-to fetch failed/returned nothing this cycle, the yield set is
+    // empty and every yielding record survives — an outage degrades to dual-source absence,
+    // never silent point-job loss. No stored id lists; recomputed per report.
+    const permitSites = dedupeExactPermits(applyYields(
+      [...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...csvSites, ...cartoSites],
+      YIELDS_MAP,
+    ));
     const devRecords = [...devReal, ...permitSites];
     const proposedRecords = devRecords.filter((s) => s.type === "proposed");
     const approvedRecords = devRecords.filter((s) => s.type === "approved");

@@ -1,0 +1,117 @@
+{
+ "displayFieldName": "Job_Name",
+ "fieldAliases": {
+  "OBJECTID": "OBJECTID",
+  "Job_No": "Job_No",
+  "Job_Name": "Job_Name",
+  "Job_Routes": "Job_Routes",
+  "PCPM_Status": "PCPM_Status",
+  "PCPM_Type_Work_Desc": "PCPM_Type_Work_Desc",
+  "Map_Show": "Map_Show",
+  "Letting_Date": "Letting_Date"
+ },
+ "geometryType": "esriGeometryPoint",
+ "spatialReference": {
+  "wkid": 4326,
+  "latestWkid": 4326
+ },
+ "fields": [
+  {
+   "name": "OBJECTID",
+   "type": "esriFieldTypeOID",
+   "alias": "OBJECTID"
+  },
+  {
+   "name": "Job_No",
+   "type": "esriFieldTypeString",
+   "alias": "Job_No",
+   "length": 50
+  },
+  {
+   "name": "Job_Name",
+   "type": "esriFieldTypeString",
+   "alias": "Job_Name",
+   "length": 255
+  },
+  {
+   "name": "Job_Routes",
+   "type": "esriFieldTypeString",
+   "alias": "Job_Routes",
+   "length": 255
+  },
+  {
+   "name": "PCPM_Status",
+   "type": "esriFieldTypeString",
+   "alias": "PCPM_Status",
+   "length": 2
+  },
+  {
+   "name": "PCPM_Type_Work_Desc",
+   "type": "esriFieldTypeString",
+   "alias": "PCPM_Type_Work_Desc",
+   "length": 250
+  },
+  {
+   "name": "Map_Show",
+   "type": "esriFieldTypeSmallInteger",
+   "alias": "Map_Show"
+  },
+  {
+   "name": "Letting_Date",
+   "type": "esriFieldTypeDate",
+   "alias": "Letting_Date",
+   "length": 8
+  }
+ ],
+ "features": [
+  {
+   "attributes": {
+    "OBJECTID": 4032013,
+    "Job_No": "BB0401",
+    "Job_Name": "Oklahoma State Line \u2013 East (I-40 & I-540) (Sel. Secs.) (S)",
+    "Job_Routes": "I-40 & I-540",
+    "PCPM_Status": "03",
+    "PCPM_Type_Work_Desc": "Resurfacing",
+    "Map_Show": 1,
+    "Letting_Date": 1540360800000
+   },
+   "geometry": {
+    "x": -94.38493278266712,
+    "y": 35.463681867697865
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 4032015,
+    "Job_No": "090520",
+    "Job_Name": "Hwys. 16 & 74 Slide Repair (Madison & Newton Cos.) (S)",
+    "Job_Routes": "Hwys. 16 & 74",
+    "PCPM_Status": "03",
+    "PCPM_Type_Work_Desc": "Slide Repair",
+    "Map_Show": 1,
+    "Letting_Date": 1528869600000
+   },
+   "geometry": {
+    "x": -93.66366556149354,
+    "y": 35.816975407438186
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 4032016,
+    "Job_No": "110509",
+    "Job_Name": "BNSF Railroad Overpass (Marion) (S)",
+    "Job_Routes": "Hwy. 77",
+    "PCPM_Status": "01",
+    "PCPM_Type_Work_Desc": "Structure & Approaches",
+    "Map_Show": 1,
+    "Letting_Date": null
+   },
+   "geometry": {
+    "x": -90.18391294895879,
+    "y": 35.19974697670844
+   }
+  }
+ ],
+ "exceededTransferLimit": true
+}
