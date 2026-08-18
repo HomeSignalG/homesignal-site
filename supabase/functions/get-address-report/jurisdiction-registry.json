@@ -132,8 +132,7 @@
      "Waiting on Fiscal",
      "Waiting on Legal",
      "Intake Accepted - Fees Due",
-     "Awaiting Update",
-     "Admin Hold"
+     "Awaiting Update"
     ],
     "approved": [
      "Approved",
@@ -155,11 +154,13 @@
      "CC Rejected",
      "Closed",
      "Review Completed",
-     "Inactive"
+     "Inactive",
+     "Admin Hold"
     ]
    },
    "record_url_precision": "record",
-   "incremental_field": "update_date"
+   "incremental_field": "update_date",
+   "_receipts": " 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'Admin Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "austin-site-plan-cases",
@@ -246,8 +247,7 @@
      "Intake Accepted - Fees Due",
      "Formal Intake Accepted - Fees Due",
      "Update Intake Pending - Fees due",
-     "Awaiting Update",
-     "Suspended"
+     "Awaiting Update"
     ],
     "approved": [
      "Approved",
@@ -266,11 +266,13 @@
      "Intake Rejected",
      "Closed",
      "Inactive",
-     "Application Incomplete"
+     "Application Incomplete",
+     "Suspended"
     ]
    },
    "record_url_precision": "record",
-   "incremental_field": "update_date"
+   "incremental_field": "update_date",
+   "_receipts": " 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'Suspended' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "austin-issued-construction-permits",
@@ -306,10 +308,7 @@
     "proposed": [
      "Pending",
      "Pending Permit",
-     "Re Review",
-     "Inactive Pending Revision",
-     "On Hold",
-     "Suspended"
+     "Re Review"
     ],
     "approved": [
      "Active"
@@ -333,7 +332,10 @@
      "Closed",
      "Inactive Contractor",
      "Application Incomplete",
-     "Awaiting Upload"
+     "Awaiting Upload",
+     "Inactive Pending Revision",
+     "On Hold",
+     "Suspended"
     ]
    },
    "record_url_precision": "record",
@@ -341,7 +343,7 @@
    "recency_days": 365,
    "zip_mode": false,
    "_zip_mode_note": "RESERVED FOR THE PER-ADDRESS PROPERTY PAGE (homesignalmap.html?addr=), not the ZIP aggregate. ~85% of rows carry no native coordinates, so ZIP-mode geocoding (1000s of addresses per refresh) would time out the edge function, and 1,300+ individual building permits would swamp the ZIP map. At a single address only that parcel's permits are shown (one geocode). Full status_to_bucket + type_map are kept so the property-page wiring is a pure-data activation (flip zip_mode + call the connector in address mode).",
-   "_receipts": "2026-08-11 RE-CONFIRMED BY DESIGN, NOT A DEFECT. This entry places 0 ZIP-mode records because `zip_mode: false` makes sources/socrata.ts skip it outright (`if (entry.zip_mode === false) continue;`, socrata.ts:273) — the reservation documented in _zip_mode_note, not a misconfiguration. Flipping it would change what residents see on Travis County pages (1,300+ individual building permits added to the ZIP map, plus 1000s of per-refresh geocodes for the ~85% of rows with no native coordinates), so it is left as-is. The Travis pages are already development-backed by austin-zoning-cases (55,933 records across 83 pages, measured 2026-08-11)."
+   "_receipts": "2026-08-11 RE-CONFIRMED BY DESIGN, NOT A DEFECT. This entry places 0 ZIP-mode records because `zip_mode: false` makes sources/socrata.ts skip it outright (`if (entry.zip_mode === false) continue;`, socrata.ts:273) — the reservation documented in _zip_mode_note, not a misconfiguration. Flipping it would change what residents see on Travis County pages (1,300+ individual building permits added to the ZIP map, plus 1000s of per-refresh geocodes for the ~85% of rows with no native coordinates), so it is left as-is. The Travis pages are already development-backed by austin-zoning-cases (55,933 records across 83 pages, measured 2026-08-11). 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'Inactive Pending Revision' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'Suspended' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "seattle-building-permits",
@@ -1311,7 +1313,6 @@
      "Zoning Review",
      "Returned for revision",
      "Materials resubmitted",
-     "Permit Inactive - Awaiting Response",
      "Inspection - Pending",
      "Inspection Required",
      "Plan Review - Mechanical - Completed"
@@ -1357,7 +1358,8 @@
      "Permit not required",
      "Sub-Permit not required",
      "Different Permit Type required",
-     "PERMIT CANCELLED "
+     "PERMIT CANCELLED ",
+     "Permit Inactive - Awaiting Response"
     ]
    },
    "type_map": {
@@ -1371,7 +1373,7 @@
    "spatial_zip_radius_mi": 3,
    "spatial_point_col": "location_1",
    "record_url_precision": "dataset",
-   "_receipts": "2026-07-25 pg_net recon (ids 105023-105031): data.nola.gov Socrata 'Permits' rcm3-fn58; FRESH max issuedate 2026-07-24; 345,113 rows. NO zip column -> spatial within_circle on the location_1 Point (records keep own per-parcel lat/lng, read via dot-path location_1.latitude/longitude). type whitelist keeps New Construction/Renovation (Structural)/Demolition/Accessory Structure, drops trades/solar/roofing/HVAC/electrical at source (extra_where verified live). currentstatus buckets verbatim. No per-record link column -> dataset_url precision (data.nola.gov/d/rcm3-fn58 -> 200). Coverage gated to LA/Orleans (20 modeled ZIP pages). | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 110 distinct currentstatus values (full $group enumeration, ordered alphabetically) — unlike the other sources in this pass New Orleans DOES publish real pre-issuance states, so proposed is populated VERBATIM with the 15 unambiguous pre-issuance values listed. This is the ONE behavior-changing edit in the pass (it admits previously-unmapped records). The long free-text tail ('see 1312173-movg', 'state bldg.no city inspection needed', 'must refile this one EXPIRED', ...) is deliberately left UNMAPPED so it continues to fail closed rather than being guessed into a bucket. | 2026-08-01 coverage extension -> LA Jefferson (Gretna and Metairie sit across the parish line within 3 miles). Config only. Controls 70113 = 181,827 and 70125 = 176,325. 5 of 12 Jefferson ZIPs: 70053 60,672 / 70005 37,917 / 70056 6,622 / 70002 5,987 / 70001 2,075 in envelope -> 335 / 265 / 36 / 42 / 23 stored. Go-live 701 records over 5 pages. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `issuedate` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8.",
+   "_receipts": "2026-07-25 pg_net recon (ids 105023-105031): data.nola.gov Socrata 'Permits' rcm3-fn58; FRESH max issuedate 2026-07-24; 345,113 rows. NO zip column -> spatial within_circle on the location_1 Point (records keep own per-parcel lat/lng, read via dot-path location_1.latitude/longitude). type whitelist keeps New Construction/Renovation (Structural)/Demolition/Accessory Structure, drops trades/solar/roofing/HVAC/electrical at source (extra_where verified live). currentstatus buckets verbatim. No per-record link column -> dataset_url precision (data.nola.gov/d/rcm3-fn58 -> 200). Coverage gated to LA/Orleans (20 modeled ZIP pages). | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 110 distinct currentstatus values (full $group enumeration, ordered alphabetically) — unlike the other sources in this pass New Orleans DOES publish real pre-issuance states, so proposed is populated VERBATIM with the 15 unambiguous pre-issuance values listed. This is the ONE behavior-changing edit in the pass (it admits previously-unmapped records). The long free-text tail ('see 1312173-movg', 'state bldg.no city inspection needed', 'must refile this one EXPIRED', ...) is deliberately left UNMAPPED so it continues to fail closed rather than being guessed into a bucket. | 2026-08-01 coverage extension -> LA Jefferson (Gretna and Metairie sit across the parish line within 3 miles). Config only. Controls 70113 = 181,827 and 70125 = 176,325. 5 of 12 Jefferson ZIPs: 70053 60,672 / 70005 37,917 / 70056 6,622 / 70002 5,987 / 70001 2,075 in envelope -> 335 / 265 / 36 / 42 / 23 stored. Go-live 701 records over 5 pages. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `issuedate` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'Permit Inactive - Awaiting Response' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim.",
    "status_unresolved": [
     {
      "value": "PILING AFFAVDAVIT",
@@ -2031,7 +2033,6 @@
      "Incomplete Submittal",
      "Pending Fees",
      "Pending HCLC Review",
-     "Hold",
      "Appeal",
      "Continued",
      "Corrections Submitted"
@@ -2056,12 +2057,13 @@
      "Closed",
      "Close",
      "Closed By Rule",
-     "Opt-Out"
+     "Opt-Out",
+     "Hold"
     ]
    },
    "incremental_field": "File_Date",
    "recency_days": 365,
-   "_receipts": "Verified live 2026-07-13 via pg_net: City of Fort Worth's own Enterprise server (mapit.fortworthtexas.gov, CIVIC/Permits, CFW_AGOL_ADMIN org item) - a full Accela extract with point geometry, NATIVE Zip_Code column, 28 Current_Status values + 11 Permit_Type values enumerated VERBATIM via groupBy, fresh through File_Date 2026-07-12. Trade permits (Mechanical 120k, Electrical 162k, Plumbing 167k+74k backflow, Urban Forestry) dropped at source via extra_where; 6 construction/design types kept. recency_days=365 keeps a what's-changing view (the layer holds 1M+ historical rows; Finaled 562k -> bucket operating). Discovery note: the city's Socrata portal (data.fortworthtexas.gov) is decommissioned - its catalog entry for 'Development Permits quz7-xnsy' 404s; this Enterprise layer is the live successor. No per-record link -> official REST layer as dataset_url fallback."
+   "_receipts": "Verified live 2026-07-13 via pg_net: City of Fort Worth's own Enterprise server (mapit.fortworthtexas.gov, CIVIC/Permits, CFW_AGOL_ADMIN org item) - a full Accela extract with point geometry, NATIVE Zip_Code column, 28 Current_Status values + 11 Permit_Type values enumerated VERBATIM via groupBy, fresh through File_Date 2026-07-12. Trade permits (Mechanical 120k, Electrical 162k, Plumbing 167k+74k backflow, Urban Forestry) dropped at source via extra_where; 6 construction/design types kept. recency_days=365 keeps a what's-changing view (the layer holds 1M+ historical rows; Finaled 562k -> bucket operating). Discovery note: the city's Socrata portal (data.fortworthtexas.gov) is decommissioned - its catalog entry for 'Development Permits quz7-xnsy' 404s; this Enterprise layer is the live successor. No per-record link -> official REST layer as dataset_url fallback. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "denver-commercial-construction-permits",
@@ -2225,7 +2227,6 @@
      "Received",
      "Received - Online",
      "Approved for Issuance",
-     "On Hold",
      "Pending",
      "Decision Pending",
      "TCO - Payment Pending"
@@ -2247,13 +2248,14 @@
      "Declined - Denied",
      "Enforcement",
      "Code Violation",
-     "Monitoring"
+     "Monitoring",
+     "On Hold"
     ]
    },
    "incremental_field": "AppliedDate",
    "recency_days": 365,
    "record_url_precision": "dataset",
-   "_receipts": "Verified live 2026-07-14 via pg_net: City of Boulder's own AGO org (ePKBjXrBZ2vEEgWd, found via the open-data.bouldercolorado.gov DCAT) - a BLDS-style permit TABLE (no geometry): rows geocode via the full OriginalAddress+City+State (connector's address path, geocode-cache-backed) and carry a NATIVE OriginalZip. Fresh through AppliedDate 2026-07-07 (string ISO dates). 24 StatusCurrent values + 29 PermitType values enumerated VERBATIM via groupBy; trade noise (Mechanical 71549, Electrical 66045, Roofing 28236, Plumbing 28210, ROW 21952, fences/signs/events) dropped at source, keeping the 10 building/demolition/grading types. Per-ZIP active volume ~100-240 rows/yr (80301-80305) - geocoding-manageable; if the first live re-cache times out, flip zip_mode:false (Austin precedent) as the one-field fallback. No per-record public link -> REST layer dataset fallback."
+   "_receipts": "Verified live 2026-07-14 via pg_net: City of Boulder's own AGO org (ePKBjXrBZ2vEEgWd, found via the open-data.bouldercolorado.gov DCAT) - a BLDS-style permit TABLE (no geometry): rows geocode via the full OriginalAddress+City+State (connector's address path, geocode-cache-backed) and carry a NATIVE OriginalZip. Fresh through AppliedDate 2026-07-07 (string ISO dates). 24 StatusCurrent values + 29 PermitType values enumerated VERBATIM via groupBy; trade noise (Mechanical 71549, Electrical 66045, Roofing 28236, Plumbing 28210, ROW 21952, fences/signs/events) dropped at source, keeping the 10 building/demolition/grading types. Per-ZIP active volume ~100-240 rows/yr (80301-80305) - geocoding-manageable; if the first live re-cache times out, flip zip_mode:false (Austin precedent) as the one-field fallback. No per-record public link -> REST layer dataset fallback. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "fort-collins-building-permits",
@@ -2298,7 +2300,6 @@
      "Resubmittal Requested",
      "Applied",
      "Plan Check Fee Due",
-     "LUC Hold",
      "Additional Info Required",
      "Ready to Issue"
     ],
@@ -2311,11 +2312,12 @@
      "Issued TCO"
     ],
     "exclude": [
-     "Revoked"
+     "Revoked",
+     "LUC Hold"
     ]
    },
    "record_url_precision": "record",
-   "_receipts": "Verified live 2026-07-14 via pg_net: City of Fort Collins' own AGO org (dLpFH5mwVvxSN4OE) 'Current Building Permits' layer, found via the successor hub open-data-fcgov.hub.arcgis.com (the old opendata.fcgov.com Socrata portal is DECOMMISSIONED - 503 'This site has moved'). POINT geometry, NATIVE ZIP column, and a PER-RECORD official Accela link (WEB -> accela-aca.fcgov.com CapDetail) = record-precision record_url. A curated CURRENT-permits snapshot (2,177 rows; no date column -> no recency filter; the layer itself is the currency guarantee, Provo CurrentProjects precedent). 14 statuses + 13 types enumerated VERBATIM via groupBy; Stock Plan (647) and General Alteration remodel noise (708) dropped at source, keeping the 10 new-construction/addition/demolition types. 'Issued FF' (1 row) left unmapped on purpose (ambiguous semantics -> connector excludes + surfaces it).",
+   "_receipts": "Verified live 2026-07-14 via pg_net: City of Fort Collins' own AGO org (dLpFH5mwVvxSN4OE) 'Current Building Permits' layer, found via the successor hub open-data-fcgov.hub.arcgis.com (the old opendata.fcgov.com Socrata portal is DECOMMISSIONED - 503 'This site has moved'). POINT geometry, NATIVE ZIP column, and a PER-RECORD official Accela link (WEB -> accela-aca.fcgov.com CapDetail) = record-precision record_url. A curated CURRENT-permits snapshot (2,177 rows; no date column -> no recency filter; the layer itself is the currency guarantee, Provo CurrentProjects precedent). 14 statuses + 13 types enumerated VERBATIM via groupBy; Stock Plan (647) and General Alteration remodel noise (708) dropped at source, keeping the 10 new-construction/addition/demolition types. 'Issued FF' (1 row) left unmapped on purpose (ambiguous semantics -> connector excludes + surfaces it). 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'LUC Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim.",
    "status_unresolved": [
     {
      "value": "Issued FF",
@@ -2420,7 +2422,6 @@
      "Completeness Check",
      "Incomplete",
      "Not Complete",
-     "On Hold",
      "Open",
      "Pending",
      "Ready to Issue",
@@ -2444,7 +2445,8 @@
      "Revoked",
      "Screened Out",
      "Suspended",
-     "Violations"
+     "Violations",
+     "On Hold"
     ]
    },
    "type_map": {
@@ -2486,7 +2488,7 @@
    },
    "extra_where": "PERMITTYPE IN ('BS','BR','BB','BA','BM','BW','BZ','BY','BE','BC','BJ','BV','BH','GD','GJ','GH','GA','GE','LL','LG','LN','LF','LU','LK','LP','LQ','LB','LA','LD','LI','LW','WG','AC','LE','LX')",
    "recency_days": 365,
-   "_receipts": "2026-07-15: max APPLIEDDATE 2026-07-13 (item advertises daily ~6AM refresh); 25 statuses VERBATIM via returnDistinctValues (note 'Suspended' carries trailing whitespace at source - connector trims); native ZIPCODE (98004=27,744 all-time -> 365d window); PERMITTYPE 2-letter CODES whitelisted at source (descriptions carry trailing-space variants, codes do not); type_map keys are TRIMMED PERMITTYPEDESCRIPTION values. No per-record link column -> dataset_url precision. | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 25 PERMITSTATUS values (Closed 313,238 / Expired 50,867 / Issued 22,633 / Canceled 21,930 / Violations 12,996 / Open 6,946 / Not Required 5,953 / Pending 2,860 / ... / 'Suspended ' 1) — every value is already assigned; Closed is deliberately excluded and TCO/Monitoring sit in approved per the existing entry, so no value remains for operating -> []. *** GEOMETRY FIX 2026-08-05 (national §0n sweep): same defect as columbus-building-permits. Layer is a Feature Layer with esriGeometryPoint ('Bellevue_Permit_Data'); 31 of 349 records unpinned, the rest geocoded rather than source-pinned. ***"
+   "_receipts": "2026-07-15: max APPLIEDDATE 2026-07-13 (item advertises daily ~6AM refresh); 25 statuses VERBATIM via returnDistinctValues (note 'Suspended' carries trailing whitespace at source - connector trims); native ZIPCODE (98004=27,744 all-time -> 365d window); PERMITTYPE 2-letter CODES whitelisted at source (descriptions carry trailing-space variants, codes do not); type_map keys are TRIMMED PERMITTYPEDESCRIPTION values. No per-record link column -> dataset_url precision. | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 25 PERMITSTATUS values (Closed 313,238 / Expired 50,867 / Issued 22,633 / Canceled 21,930 / Violations 12,996 / Open 6,946 / Not Required 5,953 / Pending 2,860 / ... / 'Suspended ' 1) — every value is already assigned; Closed is deliberately excluded and TCO/Monitoring sit in approved per the existing entry, so no value remains for operating -> []. *** GEOMETRY FIX 2026-08-05 (national §0n sweep): same defect as columbus-building-permits. Layer is a Feature Layer with esriGeometryPoint ('Bellevue_Permit_Data'); 31 of 349 records unpinned, the rest geocoded rather than source-pinned. *** 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "tacoma-accela-permits",
@@ -2649,7 +2651,6 @@
    "status_to_bucket": {
     "proposed": [
      "Accepted",
-     "Hold",
      "Pending Payment"
     ],
     "approved": [
@@ -2671,7 +2672,8 @@
      "Expired Application",
      "Stopped",
      "Suspended",
-     "Suspended for Fees"
+     "Suspended for Fees",
+     "Hold"
     ]
    },
    "type_map": {
@@ -2732,7 +2734,7 @@
    "extra_where": "applicationType IN ('Construction Commercial','Construction Residential','Accessory Dwelling Unit','Mobile/Manuf Home Park','Commercial Demolition','Residential Demolition','Conditional Use','Conditional Use-Major Amend','Conditional Use-Minor Amend','Land Division','Land Div - Preliminary/BSP','Land Div - Final','Land Div - Amend/Alter','Land Div - BLA','Land Div - Lot Combo/Seg','Land Use Action','Land Use Permit','Land Use Variance','Short plat','Short Plat Alteration','Preliminary Short Plat','Final Short Plat','Preliminary Large Lot','Large Lot','Large Lot Alteration','Large Lot Final','Plat - Major Amendment','Plat - Minor Amendment','Plat Amendment','Planned Development District','Planned Unit Development','Planned/Phased Development','Rezone','Rezone-Major Amendment','Rezone-Minor Amend to Rezone','Site Dev Commercial','Site Dev Residential','Site Development','Site Plan Review','Site Plan Review by Plan Dir','Site Plan Review-Major Amend','Site Plan Review-Minor Amend','Binding Site Plan Review','Alteration of Binding Site Plan','Shoreline Substantial Develop','Shoreline Permit','Civil Infrastructure On-site','Civil Infrastructure Offsite','Grading, Filling & Clearing','Excavation, Filling, Grading, Surface Mines','Residential Site Development','SEPA Review','Environmental Impact Statement')",
    "spatial_zip_radius_mi": 3,
    "recency_days": 365,
-   "_receipts": "2026-07-15: max applicationDate 2026-07-09 (item modified 2026-07-10); 18 statuses + ~250 applicationType values VERBATIM via returnDistinctValues; 53-type development whitelist at source (fire/operational/event noise dropped); per-record PALS link (urlOnlinePermits); siteAddress has NO ZIP + no ZIP column -> spatial_zip_radius_mi 3 (records keep their own PALS XY points, native wkid 2927 served as outSR 4326). *** GEOMETRY FIX 2026-08-05: this entry mapped NEITHER lat/lng nor __lat/__lng, so only 17.3% of its 13,033 cached records carried a point (2,255) - and those 2,255 came from the GEOCODE path on siteAddress, not from the layer. The layer is esriGeometryPoint and serves real {x,y} (probed: -122.60184784163869, 47.241701901638855, in Pierce County), and sources/arcgis.ts sets returnGeometry=true unconditionally and flattens every feature into row.__lat/__lng - which only reach the record if column_map maps them. So 10,778 records listed with a record_url and never pinned, purely from a config omission. Diagnosed by elimination against the two candidate causes (the ADOT __lat/__lng omission vs geocode failure): the layer having point geometry settles it as the former. Source-supplied geometry is never geofenced (v20), so the recovered points are the publisher's own. ***"
+   "_receipts": "2026-07-15: max applicationDate 2026-07-09 (item modified 2026-07-10); 18 statuses + ~250 applicationType values VERBATIM via returnDistinctValues; 53-type development whitelist at source (fire/operational/event noise dropped); per-record PALS link (urlOnlinePermits); siteAddress has NO ZIP + no ZIP column -> spatial_zip_radius_mi 3 (records keep their own PALS XY points, native wkid 2927 served as outSR 4326). *** GEOMETRY FIX 2026-08-05: this entry mapped NEITHER lat/lng nor __lat/__lng, so only 17.3% of its 13,033 cached records carried a point (2,255) - and those 2,255 came from the GEOCODE path on siteAddress, not from the layer. The layer is esriGeometryPoint and serves real {x,y} (probed: -122.60184784163869, 47.241701901638855, in Pierce County), and sources/arcgis.ts sets returnGeometry=true unconditionally and flattens every feature into row.__lat/__lng - which only reach the record if column_map maps them. So 10,778 records listed with a record_url and never pinned, purely from a config omission. Diagnosed by elimination against the two candidate causes (the ADOT __lat/__lng omission vs geocode failure): the layer having point geometry settles it as the former. Source-supplied geometry is never geofenced (v20), so the recovered points are the publisher's own. *** 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "clark-county-active-dev-permits",
@@ -2766,7 +2768,6 @@
     "proposed": [
      "In Review",
      "Applicant Revisions",
-     "On Hold",
      "Findings"
     ],
     "approved": [
@@ -2774,7 +2775,8 @@
     ],
     "operating": [],
     "exclude": [
-     "Decision - Denied"
+     "Decision - Denied",
+     "On Hold"
     ]
    },
    "type_map": {
@@ -2784,7 +2786,7 @@
     "Special Land Use Review": "Development"
    },
    "spatial_zip_radius_mi": 3,
-   "_receipts": "2026-07-15: max Received 2026-05-22 (ACTIVE-cases layer, small + self-pruning -> no recency window); 6 statuses + 4 SpecificType values VERBATIM via returnDistinctValues; per-record PublicNoticeURL (DecisionURL/StaffReportURL also present); no ZIP column -> spatial_zip_radius_mi 3 with own XY points. REAL server path is gis.clark.wa.gov/arcgisfed/ - the /arcgis/ and /gisserver/ roots 404 (the recon 'dead' was a wrong-URL guess); found via org-scoped AGO search (orgid:ylxwjFBdCPBzP16d). | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 5 StatusDescription values (On Hold 58 / In Review 32 / Decision - Approved 19 / Findings 12 / Decision - Denied 1), all mapped — an ACTIVE development-permit layer carries no completed state, so operating:[]. *** GEOMETRY FIX 2026-08-05 (national §0n sweep): same defect. Layer is a Feature Layer with esriGeometryPoint ('ActiveDevelopmentPermits') on the county's own server; 74 of 296 records unpinned (75.0%), the rest geocoded rather than source-pinned. ***"
+   "_receipts": "2026-07-15: max Received 2026-05-22 (ACTIVE-cases layer, small + self-pruning -> no recency window); 6 statuses + 4 SpecificType values VERBATIM via returnDistinctValues; per-record PublicNoticeURL (DecisionURL/StaffReportURL also present); no ZIP column -> spatial_zip_radius_mi 3 with own XY points. REAL server path is gis.clark.wa.gov/arcgisfed/ - the /arcgis/ and /gisserver/ roots 404 (the recon 'dead' was a wrong-URL guess); found via org-scoped AGO search (orgid:ylxwjFBdCPBzP16d). | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 5 StatusDescription values (On Hold 58 / In Review 32 / Decision - Approved 19 / Findings 12 / Decision - Denied 1), all mapped — an ACTIVE development-permit layer carries no completed state, so operating:[]. *** GEOMETRY FIX 2026-08-05 (national §0n sweep): same defect. Layer is a Feature Layer with esriGeometryPoint ('ActiveDevelopmentPermits') on the county's own server; 74 of 296 records unpinned (75.0%), the rest geocoded rather than source-pinned. *** 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "minneapolis-ccs-permits",
@@ -3219,8 +3221,7 @@
    },
    "status_to_bucket": {
     "proposed": [
-     "PENDING",
-     "ON HOLD"
+     "PENDING"
     ],
     "approved": [
      "ACTIVE"
@@ -3231,7 +3232,8 @@
     "exclude": [
      "EXPIRED",
      "WITHDRAWN",
-     "REFUND"
+     "REFUND",
+     "ON HOLD"
     ]
    },
    "spatial_zip_radius_mi": 3,
@@ -3240,7 +3242,7 @@
     "lng": "Longitude"
    },
    "recency_days": 365,
-   "_receipts": "2026-07-16 AZ wire pass. FIRST consumer of the additive arcgis `spatial_latlng_cols` option (attribute-bbox: a geometry-less hosted TABLE whose rows carry per-record Latitude/Longitude COLUMNS - the Detroit-tables cousin; a geometry envelope param is meaningless on a table, so the envelope is AND'd into WHERE; offline unit-tested incl. envelope-mode regression). FRESH: newest IssueDate 2026-07-10 (#324234, live receipt; esriFieldTypeDate -> recency_days DATE literal valid). 7 PermitStatus values VERBATIM (REFUND/EXPIRED/ACTIVE/FINALLED/PENDING/WITHDRAWN/ON HOLD; nulls fail closed): ACTIVE->approved, FINALLED->operating, PENDING+ON HOLD->proposed, rest excluded. ~190 PermitType values enumerated live; kept 70 construction/development classes verbatim (SFR new/addition/remodel, multi-family, commercial new/shell/addition, hotels, churches/schools/care, demolition, foundation-only, guest houses); DROPPED at source: tenant improvements, signs, pools/spas, fences/walls, patio covers/carports, solar, water heaters, minimum-charge trade permits, special events, native-plant/NAOS paperwork. NOTE 'APARTMENTS GREEN' carries trailing whitespace at source (Bellevue-class variant) and is NOT in the keep list - rows of that class surface as excluded-by-extra_where, never guessed. Types /13 Cases + /15 COO same shape (not wired: COO=occupancy noise; Cases=queue). No per-row URL column -> dataset-precision record_url. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `IssueDate` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8."
+   "_receipts": "2026-07-16 AZ wire pass. FIRST consumer of the additive arcgis `spatial_latlng_cols` option (attribute-bbox: a geometry-less hosted TABLE whose rows carry per-record Latitude/Longitude COLUMNS - the Detroit-tables cousin; a geometry envelope param is meaningless on a table, so the envelope is AND'd into WHERE; offline unit-tested incl. envelope-mode regression). FRESH: newest IssueDate 2026-07-10 (#324234, live receipt; esriFieldTypeDate -> recency_days DATE literal valid). 7 PermitStatus values VERBATIM (REFUND/EXPIRED/ACTIVE/FINALLED/PENDING/WITHDRAWN/ON HOLD; nulls fail closed): ACTIVE->approved, FINALLED->operating, PENDING+ON HOLD->proposed, rest excluded. ~190 PermitType values enumerated live; kept 70 construction/development classes verbatim (SFR new/addition/remodel, multi-family, commercial new/shell/addition, hotels, churches/schools/care, demolition, foundation-only, guest houses); DROPPED at source: tenant improvements, signs, pools/spas, fences/walls, patio covers/carports, solar, water heaters, minimum-charge trade permits, special events, native-plant/NAOS paperwork. NOTE 'APARTMENTS GREEN' carries trailing whitespace at source (Bellevue-class variant) and is NOT in the keep list - rows of that class surface as excluded-by-extra_where, never guessed. Types /13 Cases + /15 COO same shape (not wired: COO=occupancy noise; Cases=queue). No per-row URL column -> dataset-precision record_url. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `IssueDate` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'ON HOLD' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "baltimore-county-permits",
@@ -3744,7 +3746,6 @@
      "REVIEW IN PROGRESS",
      "Submitted",
      "Submitted - Online",
-     "On Hold",
      "Delayed Issuance",
      "DETAIL REVIEW COMPLETED",
      "PENDING PICKUP (FINAL REVIEW DONE)",
@@ -3753,12 +3754,13 @@
     "exclude": [
      "Expired-Closed",
      "Review Expired",
-     "Stop Work Order"
+     "Stop Work Order",
+     "On Hold"
     ]
    },
    "recency_days": 365,
    "record_url_precision": "dataset",
-   "_receipts": "2026-07-25 pg_net recon (ids 106379-106400): Raleigh open-data Hub 'Building Permits' AGO FeatureServer; FRESH max issueddate 2026-07-24 (epoch 1784854453000). permittypemapped = ONLY Building/Demolition (no trades noise -> no whitelist; both map Development). statuscurrent 17 values VERBATIM via returnDistinctValues, incl. the double-space 'ACTIVE  (ISSUED)'. Native site-address originalzip + latitude_perm/longitude_perm columns. file_date=applieddate so pre-issuance applications stay visible (Montgomery precedent); decision_date=issueddate. No per-record link column -> dataset(item)-precision. Coverage NC/Wake (39 modeled ZIP pages)."
+   "_receipts": "2026-07-25 pg_net recon (ids 106379-106400): Raleigh open-data Hub 'Building Permits' AGO FeatureServer; FRESH max issueddate 2026-07-24 (epoch 1784854453000). permittypemapped = ONLY Building/Demolition (no trades noise -> no whitelist; both map Development). statuscurrent 17 values VERBATIM via returnDistinctValues, incl. the double-space 'ACTIVE  (ISSUED)'. Native site-address originalzip + latitude_perm/longitude_perm columns. file_date=applieddate so pre-issuance applications stay visible (Montgomery precedent); decision_date=issueddate. No per-record link column -> dataset(item)-precision. Coverage NC/Wake (39 modeled ZIP pages). 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "wake-county-building-permits",
@@ -3806,9 +3808,7 @@
      "In Review",
      "Submitted",
      "Submitted - Online",
-     "Application Incomplete",
-     "On Hold",
-     "On Hold - Customer Action Required"
+     "Application Incomplete"
     ],
     "exclude": [
      "Void",
@@ -3819,13 +3819,15 @@
      "Denied",
      "Stop Work Order",
      "Inactive",
-     "Under Violation"
+     "Under Violation",
+     "On Hold",
+     "On Hold - Customer Action Required"
     ]
    },
    "recency_days": 365,
    "spatial_zip_radius_mi": 3,
    "record_url_precision": "record",
-   "_receipts": "2026-07-25 pg_net recon (ids 106384-106398): Wake County's own AGS (maps.wake.gov Inspections/Building_Permits); FRESH max ISSUE_DATE 2026-07-23 (epoch 1784764800000), 196,060 rows. PERMIT_STATUS 18 values VERBATIM via groupBy counts (Complete 158,292 / Void 11,844 / Withdrawn 9,573 / Expired 7,246 / Issued 7,072 / In Review 1,410 / ...). PERMIT_TYPE 5 values, all real construction (no trades) - all kept. PER-RECORD LINK column -> Tyler EnerGov citizen-access URL (record precision, live sample verified). Geometry NC state-plane reprojected by the connector's outSR=4326 -> __lat/__lng. MAILING_* is the only address block (site-vs-mailing ambiguity) -> spatial_zip_radius_mi scoping on geometry, zip column NOT mapped (never guess). file_date=APPLICATION_DATE keeps pre-issuance applications visible. Coverage NC/Wake (39 modeled ZIP pages)."
+   "_receipts": "2026-07-25 pg_net recon (ids 106384-106398): Wake County's own AGS (maps.wake.gov Inspections/Building_Permits); FRESH max ISSUE_DATE 2026-07-23 (epoch 1784764800000), 196,060 rows. PERMIT_STATUS 18 values VERBATIM via groupBy counts (Complete 158,292 / Void 11,844 / Withdrawn 9,573 / Expired 7,246 / Issued 7,072 / In Review 1,410 / ...). PERMIT_TYPE 5 values, all real construction (no trades) - all kept. PER-RECORD LINK column -> Tyler EnerGov citizen-access URL (record precision, live sample verified). Geometry NC state-plane reprojected by the connector's outSR=4326 -> __lat/__lng. MAILING_* is the only address block (site-vs-mailing ambiguity) -> spatial_zip_radius_mi scoping on geometry, zip column NOT mapped (never guess). file_date=APPLICATION_DATE keeps pre-issuance applications visible. Coverage NC/Wake (39 modeled ZIP pages). 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold - Customer Action Required' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "miami-building-permits",
@@ -4362,8 +4364,7 @@
      "Fees Due",
      "Fees Paid",
      "Revision Fees Due",
-     "Awaiting Customer Attention",
-     "On Hold"
+     "Awaiting Customer Attention"
     ],
     "approved": [
      "Approved",
@@ -4375,14 +4376,15 @@
      "Inspections Complete"
     ],
     "exclude": [
-     "Stop Work Order"
+     "Stop Work Order",
+     "On Hold"
     ]
    },
    "extra_where": "WORKCLASS IN ('Commercial New Building Permit', 'Commercial Addition/Alteration Permit', 'Commercial Model Permit', 'Commercial Care Facility', 'Commercial Demolition Permit', 'Commercial Interior Only Demolition Permit')",
    "recency_days": 730,
    "record_url_precision": "record",
    "incremental_field": "APPLYDATE",
-   "_receipts": "2026-07-27 UT/AZ Maps coverage pass. City of Tucson PDSD commercial building permits — layer 81 of the city's own `PublicMaps/PermitsCode` MapServer (mapdata.tucsonaz.gov, first-party). 4,805 rows (live returnCountOnly). esriGeometryPoint returned wkid 4326 → __lat/__lng (the layer ALSO carries LAT/LON columns; geometry is used because it is guaranteed present). FRESH: max ISSUEDATE 2026-07-24, max APPLYDATE 2026-07-26 (live max-stat receipts). 17 STATUS values VERBATIM via groupBy (Issued 2373 / Inspections 925 / Inspections Complete 363 / Needs Resubmittal 322 / Fees Due 205 / Approved 182 / In Review 175 / Approved - Awaiting Customer Attention 102 / Awaiting Submittal 47 / Submitted 29 / In Revision 26 / Submitted - Online 16 / Fees Paid 14 / Awaiting Customer Attention 12 / Stop Work Order 7 / Revision Fees Due 6 / On Hold 1); 'Inspections' → approved (permit issued, construction being inspected), 'Inspections Complete' → operating, 'Stop Work Order' EXCLUDED (Boston precedent). 10 WORKCLASS values enumerated live (complete domain); kept 6 construction classes verbatim (Commercial New Building 410, Commercial Addition/Alteration 1906, Commercial Demolition 158, Commercial Interior Only Demolition 27, Commercial Model 4, Commercial Care Facility 1 = 2,506 kept); DROPPED at source: Commercial Trade Permit 1989 (trades noise — WA/MN/IL precedent), Commercial Solar 199, Commercial Fence/Wall 94, Commercial Pool/Spa 17. Native 5-digit POSTALCODE over 29 Tucson-area ZIPs (85705 705 / 85719 504 / 85716 399 / 85712 379 / 85711 353 …; 8 null + 8 blank fail closed). file_date = APPLYDATE (populated on every row incl. pre-issuance) so in-review permits stay visible; ISSUEDATE rides as decision_date. recency_days 730 on APPLYDATE — the layer is an OPEN-permit set whose oldest ISSUEDATE is 1998-01-01, so a window is required. record_url = per-record CSS_URL Tyler EnerGov self-service deep link (e.g. .../selfservice#/permit/0000B47A-8464-435B-85C5-2432D2B090CF) → RECORD precision."
+   "_receipts": "2026-07-27 UT/AZ Maps coverage pass. City of Tucson PDSD commercial building permits — layer 81 of the city's own `PublicMaps/PermitsCode` MapServer (mapdata.tucsonaz.gov, first-party). 4,805 rows (live returnCountOnly). esriGeometryPoint returned wkid 4326 → __lat/__lng (the layer ALSO carries LAT/LON columns; geometry is used because it is guaranteed present). FRESH: max ISSUEDATE 2026-07-24, max APPLYDATE 2026-07-26 (live max-stat receipts). 17 STATUS values VERBATIM via groupBy (Issued 2373 / Inspections 925 / Inspections Complete 363 / Needs Resubmittal 322 / Fees Due 205 / Approved 182 / In Review 175 / Approved - Awaiting Customer Attention 102 / Awaiting Submittal 47 / Submitted 29 / In Revision 26 / Submitted - Online 16 / Fees Paid 14 / Awaiting Customer Attention 12 / Stop Work Order 7 / Revision Fees Due 6 / On Hold 1); 'Inspections' → approved (permit issued, construction being inspected), 'Inspections Complete' → operating, 'Stop Work Order' EXCLUDED (Boston precedent). 10 WORKCLASS values enumerated live (complete domain); kept 6 construction classes verbatim (Commercial New Building 410, Commercial Addition/Alteration 1906, Commercial Demolition 158, Commercial Interior Only Demolition 27, Commercial Model 4, Commercial Care Facility 1 = 2,506 kept); DROPPED at source: Commercial Trade Permit 1989 (trades noise — WA/MN/IL precedent), Commercial Solar 199, Commercial Fence/Wall 94, Commercial Pool/Spa 17. Native 5-digit POSTALCODE over 29 Tucson-area ZIPs (85705 705 / 85719 504 / 85716 399 / 85712 379 / 85711 353 …; 8 null + 8 blank fail closed). file_date = APPLYDATE (populated on every row incl. pre-issuance) so in-review permits stay visible; ISSUEDATE rides as decision_date. recency_days 730 on APPLYDATE — the layer is an OPEN-permit set whose oldest ISSUEDATE is 1998-01-01, so a window is required. record_url = per-record CSS_URL Tyler EnerGov self-service deep link (e.g. .../selfservice#/permit/0000B47A-8464-435B-85C5-2432D2B090CF) → RECORD precision. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "tucson-residential-building-permits",
@@ -4432,8 +4434,7 @@
      "Fees Due",
      "Fees Paid",
      "Revision Fees Due",
-     "Awaiting Customer Attention",
-     "On Hold"
+     "Awaiting Customer Attention"
     ],
     "approved": [
      "Approved",
@@ -4445,7 +4446,8 @@
      "Inspections Complete"
     ],
     "exclude": [
-     "Stop Work Order"
+     "Stop Work Order",
+     "On Hold"
     ]
    },
    "extra_where": "WORKCLASS IN ('New Dwelling Permit', 'Residential Addition/Alteration Permit', 'Residential Model Permit', 'Manufactured Home Permit', 'Residential ADU - Casitas', 'Residential Care Facility', 'Residential Demolition Permit', 'Residential Interior Only Demolition Permit')",
@@ -4453,7 +4455,7 @@
    "recency_days": 730,
    "record_url_precision": "record",
    "incremental_field": "APPLYDATE",
-   "_receipts": "2026-07-27 UT/AZ Maps coverage pass. City of Tucson PDSD residential building permits — layer 85, same first-party MapServer as the commercial twin (distinct capability, not a backup). 19,388 rows (live returnCountOnly). esriGeometryPoint wkid 4326 → __lat/__lng. FRESH: max ISSUEDATE 2026-07-24, max APPLYDATE 2026-07-26. 16 STATUS values VERBATIM via groupBy (Issued 11154 / Inspections 4641 / Inspections Complete 1634 / Needs Resubmittal 612 / Fees Due 466 / In Review 304 / Approved 290 / Approved - Awaiting Customer Attention 138 / In Revision 63 / Fees Paid 26 / Submitted 24 / Submitted - Online 19 / Stop Work Order 8 / Revision Fees Due 6 / Awaiting Customer Attention 2 / On Hold 1) — same bucket map as the commercial twin. 14 WORKCLASS values enumerated live (complete domain); kept 8 construction classes verbatim (Residential Addition/Alteration 2470, Residential Model 1429, New Dwelling 957, Manufactured Home 584, Residential Demolition 209, Residential ADU - Casitas 75, Residential Interior Only Demolition 7, Residential Care Facility 3 = 5,734 kept); DROPPED at source: Residential Trade Permit 9417, Residential Solar Permit 2053, Residential Solar App 1349, Residential Pool/Spa 403, Residential Fence/Wall 364, Electrical Reconnect 68. UNLIKE layer 81 this layer has NO POSTALCODE and NO CITY column (verified against the live layer schema) → spatial within-envelope ZIP scoping on the layer's own point geometry (spatial_zip_radius_mi 3, the standard engine ZIP approximation); rows place by their OWN points. file_date = APPLYDATE, recency_days 730 (oldest ISSUEDATE 1997-08-19). record_url = per-record CSS_URL Tyler EnerGov deep link → RECORD precision."
+   "_receipts": "2026-07-27 UT/AZ Maps coverage pass. City of Tucson PDSD residential building permits — layer 85, same first-party MapServer as the commercial twin (distinct capability, not a backup). 19,388 rows (live returnCountOnly). esriGeometryPoint wkid 4326 → __lat/__lng. FRESH: max ISSUEDATE 2026-07-24, max APPLYDATE 2026-07-26. 16 STATUS values VERBATIM via groupBy (Issued 11154 / Inspections 4641 / Inspections Complete 1634 / Needs Resubmittal 612 / Fees Due 466 / In Review 304 / Approved 290 / Approved - Awaiting Customer Attention 138 / In Revision 63 / Fees Paid 26 / Submitted 24 / Submitted - Online 19 / Stop Work Order 8 / Revision Fees Due 6 / Awaiting Customer Attention 2 / On Hold 1) — same bucket map as the commercial twin. 14 WORKCLASS values enumerated live (complete domain); kept 8 construction classes verbatim (Residential Addition/Alteration 2470, Residential Model 1429, New Dwelling 957, Manufactured Home 584, Residential Demolition 209, Residential ADU - Casitas 75, Residential Interior Only Demolition 7, Residential Care Facility 3 = 5,734 kept); DROPPED at source: Residential Trade Permit 9417, Residential Solar Permit 2053, Residential Solar App 1349, Residential Pool/Spa 403, Residential Fence/Wall 364, Electrical Reconnect 68. UNLIKE layer 81 this layer has NO POSTALCODE and NO CITY column (verified against the live layer schema) → spatial within-envelope ZIP scoping on the layer's own point geometry (spatial_zip_radius_mi 3, the standard engine ZIP approximation); rows place by their OWN points. file_date = APPLYDATE, recency_days 730 (oldest ISSUEDATE 1997-08-19). record_url = per-record CSS_URL Tyler EnerGov deep link → RECORD precision. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "gilbert-energov-permits",
@@ -4495,8 +4497,7 @@
      "Under Review",
      "Submitted Online",
      "Application Accepted",
-     "Applied",
-     "Hold"
+     "Applied"
     ],
     "approved": [
      "Issued",
@@ -4512,14 +4513,15 @@
     "exclude": [
      "Cancelled",
      "Expired",
-     "Closed at Conversion"
+     "Closed at Conversion",
+     "Hold"
     ]
    },
    "extra_where": "PermitType IN ('Residential Building', 'Commercial Building', 'Commercial Multi-Family', 'Residential Accessory Structure', 'Demolition Permit')",
    "recency_days": 365,
    "record_url_precision": "dataset",
    "incremental_field": "IssuedDate",
-   "_receipts": "2026-07-27 UT/AZ Maps coverage pass. Town of Gilbert `EnergovPermitData` — layer 3 of the town's own `OD/Growth_Development_Tables_1` MapServer (maps.gilbertaz.gov, first-party; surfaced via the town's ArcGIS Hub DCAT). 214,662 rows (live returnCountOnly) — the largest AZ source wired. Geometry-less TABLE carrying per-record Latitude/Longitude COLUMNS (Scottsdale/Detroit-tables class) AND a native AddressZip → column ZIP scoping, no spatial option needed. FRESH: 362 permits with IssuedDate in 2026-07-01..2026-07-27 (live count — used instead of max(IssuedDate), which returns a FUTURE 2026-08-04 from source data entry and is therefore not a freshness proof). 14 PermitStatus values VERBATIM via groupBy (Finaled 153518 / Cancelled 18416 / Closed at Conversion 13517 / Issued 12230 / Closed 5908 / Expired 4542 / Under Review 1787 / Approved 1683 / Finaled No Inspection Req'd 1207 / Active 757 / Submitted Online 492 / Application Accepted 386 / Hold 194 / Applied 25); 'Closed at Conversion' EXCLUDED (a system-migration artifact, not a real lifecycle state), Cancelled + Expired excluded. PermitType enumerated live over BOTH groupBy orderings (n DESC and n ASC) to defeat $limit truncation (Mesa precedent); kept 5 construction classes verbatim (Residential Building 57686, Commercial Building 16676, Commercial Multi-Family 3985, Residential Accessory Structure 3406, Demolition Permit 562); DROPPED at source: Residential Trades/Fire/Misc 23689, Swimming Pool/Spa 22238, Commercial Trades/Fire/Misc 16228, Engineering - Util Permit 13331, Traffic - Residential/Commercial 13060, Engineering Construction Permit 10617, Plan Change 10137, Deferred Submittal 6230, Sign Permit 3723, and the long agreement/fireworks/lease tail. AddressZip carries dirt (703 blanks; 6-digit typos '985233', '852233') — exact 5-digit match self-excludes them, never guessed. recency_days 365 on IssuedDate (esriFieldTypeDate → DATE literal valid). No per-row URL column → dataset-precision record_url. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `IssuedDate` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8."
+   "_receipts": "2026-07-27 UT/AZ Maps coverage pass. Town of Gilbert `EnergovPermitData` — layer 3 of the town's own `OD/Growth_Development_Tables_1` MapServer (maps.gilbertaz.gov, first-party; surfaced via the town's ArcGIS Hub DCAT). 214,662 rows (live returnCountOnly) — the largest AZ source wired. Geometry-less TABLE carrying per-record Latitude/Longitude COLUMNS (Scottsdale/Detroit-tables class) AND a native AddressZip → column ZIP scoping, no spatial option needed. FRESH: 362 permits with IssuedDate in 2026-07-01..2026-07-27 (live count — used instead of max(IssuedDate), which returns a FUTURE 2026-08-04 from source data entry and is therefore not a freshness proof). 14 PermitStatus values VERBATIM via groupBy (Finaled 153518 / Cancelled 18416 / Closed at Conversion 13517 / Issued 12230 / Closed 5908 / Expired 4542 / Under Review 1787 / Approved 1683 / Finaled No Inspection Req'd 1207 / Active 757 / Submitted Online 492 / Application Accepted 386 / Hold 194 / Applied 25); 'Closed at Conversion' EXCLUDED (a system-migration artifact, not a real lifecycle state), Cancelled + Expired excluded. PermitType enumerated live over BOTH groupBy orderings (n DESC and n ASC) to defeat $limit truncation (Mesa precedent); kept 5 construction classes verbatim (Residential Building 57686, Commercial Building 16676, Commercial Multi-Family 3985, Residential Accessory Structure 3406, Demolition Permit 562); DROPPED at source: Residential Trades/Fire/Misc 23689, Swimming Pool/Spa 22238, Commercial Trades/Fire/Misc 16228, Engineering - Util Permit 13331, Traffic - Residential/Commercial 13060, Engineering Construction Permit 10617, Plan Change 10137, Deferred Submittal 6230, Sign Permit 3723, and the long agreement/fireworks/lease tail. AddressZip carries dirt (703 blanks; 6-digit typos '985233', '852233') — exact 5-digit match self-excludes them, never guessed. recency_days 365 on IssuedDate (esriFieldTypeDate → DATE literal valid). No per-row URL column → dataset-precision record_url. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `IssuedDate` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "casa-grande-active-development-sites",
@@ -5425,22 +5427,22 @@
    },
    "status_to_bucket": {
     "proposed": [
-     "Design",
-     "On Hold"
+     "Design"
     ],
     "approved": [
      "Construction"
     ],
     "operating": [],
     "exclude": [
-     "Archive"
+     "Archive",
+     "On Hold"
     ]
    },
    "extra_where": "PROSTATUS <> 'Archive'",
    "spatial_zip_radius_mi": 3,
    "return_centroid": true,
    "record_url_precision": "dataset",
-   "_receipts": "2026-07-27 POLYGON/POLYLINE GEOMETRY PASS (workbook 0036 row CLC-DP). Clark County NV's own hosted FeatureServer (org MLoS3Qx4BXmDoTIY), 'Active_Projects' layer 0 - county capital projects. geometryType esriGeometryPolygon wkid 4326. THIS IS ONE OF ONLY TWO PROBED LAYERS THAT HONOR returnCentroid, so it is the first consumer of the new opt-in return_centroid flag: the live probe (request 162998) returned centroid {\"x\":-115.15351077017141,\"y\":36.1032081087714} alongside the rings. The connector's own shoelace derivation independently reproduces that value to dx 2.6e-5 / dy 8.2e-6 degrees (~2.9 m) - which is what proves the derived centroid used by the six MapServer-backed polygon sources is the same quantity ArcGIS computes, not an approximation of convenience. 236 rows. 5 PROSTATUS values VERBATIM via groupBy (Archive 80 / Design 74 / Construction 55 / On Hold 21 / null 6) - sums to 236, complete; the 6 nulls fail closed and Archive is dropped both in status_to_bucket and at source in extra_where. Field population live: PRONAME 230/236, PRONUM 222/236, BIDOPEN 222/236, EstConstructionStart 178, NTPDate 99, ConstructionStart 1. BIDOPEN is the file_date - the most-populated REAL project milestone; EditDate (max 2026-07-27, which is the freshness receipt) is editor tracking and is deliberately NOT used as a filing date. PROJADD is 0/236 (entirely null), so there is no address to geocode - the polygon centroid is the only geography, which is exactly what this build adds. TempLink is an INTEGER (live sample: 2126), not a URL, so it is NOT mapped to record_url; record_url_precision 'dataset'. No ZIP column -> spatial_zip_radius_mi 3. No usable type field -> no type_map."
+   "_receipts": "2026-07-27 POLYGON/POLYLINE GEOMETRY PASS (workbook 0036 row CLC-DP). Clark County NV's own hosted FeatureServer (org MLoS3Qx4BXmDoTIY), 'Active_Projects' layer 0 - county capital projects. geometryType esriGeometryPolygon wkid 4326. THIS IS ONE OF ONLY TWO PROBED LAYERS THAT HONOR returnCentroid, so it is the first consumer of the new opt-in return_centroid flag: the live probe (request 162998) returned centroid {\"x\":-115.15351077017141,\"y\":36.1032081087714} alongside the rings. The connector's own shoelace derivation independently reproduces that value to dx 2.6e-5 / dy 8.2e-6 degrees (~2.9 m) - which is what proves the derived centroid used by the six MapServer-backed polygon sources is the same quantity ArcGIS computes, not an approximation of convenience. 236 rows. 5 PROSTATUS values VERBATIM via groupBy (Archive 80 / Design 74 / Construction 55 / On Hold 21 / null 6) - sums to 236, complete; the 6 nulls fail closed and Archive is dropped both in status_to_bucket and at source in extra_where. Field population live: PRONAME 230/236, PRONUM 222/236, BIDOPEN 222/236, EstConstructionStart 178, NTPDate 99, ConstructionStart 1. BIDOPEN is the file_date - the most-populated REAL project milestone; EditDate (max 2026-07-27, which is the freshness receipt) is editor tracking and is deliberately NOT used as a filing date. PROJADD is 0/236 (entirely null), so there is no address to geocode - the polygon centroid is the only geography, which is exactly what this build adds. TempLink is an INTEGER (live sample: 2126), not a URL, so it is NOT mapped to record_url; record_url_precision 'dataset'. No ZIP column -> spatial_zip_radius_mi 3. No usable type field -> no type_map. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "nvdot-project-boundaries",
@@ -6677,8 +6679,7 @@
    },
    "status_to_bucket": {
     "proposed": [
-     "Received",
-     "On Hold"
+     "Received"
     ],
     "approved": [
      "Issued",
@@ -6691,13 +6692,14 @@
     ],
     "exclude": [
      "Void",
-     "Disapproved"
+     "Disapproved",
+     "On Hold"
     ]
    },
    "incremental_field": "ISSUE_DATE",
    "recency_days": 730,
    "record_url_precision": "dataset",
-   "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. TYPE 5 distinct values summing to 90920: RESI/MULTI_FAMILY/MHP -> Residential, NON_RESI -> Commercial. Only TWO use-types exist in the vocabulary, so the packet's 'at least 3 categories' target is not reachable honestly here — the layer genuinely classifies nothing else. STATUS 10 distinct values summing to 91766 (top: \"CO Issued\" 68397 / \"Void\" 13723 / \"Issued\" 7409 / \"Cond. CO Issued\" 1024 / \"Disapproved\" 780) maps to all four buckets. No ZIP column -> spatial. recency_days 730 (10,715 rows carry ISSUE_DATE >= 2024-07-28 of 92,042). | 2026-08-01 coverage extension -> NC Orange (Chapel Hill and Carrboro straddle the Durham/Orange line). Config only. Control 27701 (Durham, live) = 54,216. 3 of 10 Orange ZIPs: 27517 21,988 / 27514 10,604 / 27510 205 in envelope -> 1,996 / 1,044 / 9 stored. Go-live 3,049 records over 3 pages. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUE_DATE` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8."
+   "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. TYPE 5 distinct values summing to 90920: RESI/MULTI_FAMILY/MHP -> Residential, NON_RESI -> Commercial. Only TWO use-types exist in the vocabulary, so the packet's 'at least 3 categories' target is not reachable honestly here — the layer genuinely classifies nothing else. STATUS 10 distinct values summing to 91766 (top: \"CO Issued\" 68397 / \"Void\" 13723 / \"Issued\" 7409 / \"Cond. CO Issued\" 1024 / \"Disapproved\" 780) maps to all four buckets. No ZIP column -> spatial. recency_days 730 (10,715 rows carry ISSUE_DATE >= 2024-07-28 of 92,042). | 2026-08-01 coverage extension -> NC Orange (Chapel Hill and Carrboro straddle the Durham/Orange line). Config only. Control 27701 (Durham, live) = 54,216. 3 of 10 Orange ZIPs: 27517 21,988 / 27514 10,604 / 27510 205 in envelope -> 1,996 / 1,044 / 9 stored. Go-live 3,049 records over 3 pages. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUE_DATE` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "cabarrus-county-plan-reviews",
@@ -6873,7 +6875,6 @@
      "In Review",
      "Certificate Review",
      "Awaiting Payment",
-     "On Hold",
      "Resubmittal Required",
      "Review Approved",
      "Submitted",
@@ -6899,13 +6900,14 @@
      "Revoked",
      "Stop Work Order",
      "Suspended",
-     "Denied"
+     "Denied",
+     "On Hold"
     ]
    },
    "incremental_field": "ISSUE_DATE",
    "recency_days": 730,
    "record_url_precision": "dataset",
-   "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. RECOVERED, not skipped. Every full-table groupBy against this layer ABORTED at the 30s probe timeout across two rounds (482,334 rows) — the vocabularies were obtained by narrowing the scan to ISSUE_DATE > 2025-01-01 (run 30370026584), and the runtime query is ZIP-scoped so it never runs a full-table scan either. TYPE 74 distinct values summing to 35411 (top: \"NHC Residential Trade Permit\" 13360 / \"NHC Residential Building\" 3831 / \"NHC Residential Electrical\" 2747 / \"NHC Commercial Trade Permit\" 1932 / \"NHC Commercial Electrical\" 1895 / \"NHC Commercial Equipment Changeout\" 1129). STATUS 18 distinct values summing to 35411 (top: \"Complete\" 19140 / \"Issued\" 8502 / \"Expired\" 3162 / \"Certificate of Compliance (CC) Issued\" 1654 / \"Certificate of Occupancy (CO) Issued\" 1397 / \"Void\" 1091). Native ZIPCODE plus its own Lat/Lon columns; ZIPCODE='28401' returns 51,232 (run 30370572544) — which is why recency_days 730 is set: 51,232 all-time vs 5,328 in the trailing two years, and max_rows is 20,000. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUE_DATE` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8."
+   "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. RECOVERED, not skipped. Every full-table groupBy against this layer ABORTED at the 30s probe timeout across two rounds (482,334 rows) — the vocabularies were obtained by narrowing the scan to ISSUE_DATE > 2025-01-01 (run 30370026584), and the runtime query is ZIP-scoped so it never runs a full-table scan either. TYPE 74 distinct values summing to 35411 (top: \"NHC Residential Trade Permit\" 13360 / \"NHC Residential Building\" 3831 / \"NHC Residential Electrical\" 2747 / \"NHC Commercial Trade Permit\" 1932 / \"NHC Commercial Electrical\" 1895 / \"NHC Commercial Equipment Changeout\" 1129). STATUS 18 distinct values summing to 35411 (top: \"Complete\" 19140 / \"Issued\" 8502 / \"Expired\" 3162 / \"Certificate of Compliance (CC) Issued\" 1654 / \"Certificate of Occupancy (CO) Issued\" 1397 / \"Void\" 1091). Native ZIPCODE plus its own Lat/Lon columns; ZIPCODE='28401' returns 51,232 (run 30370572544) — which is why recency_days 730 is set: 51,232 all-time vs 5,328 in the trailing two years, and max_rows is 20,000. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUE_DATE` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "brunswick-county-permits",
@@ -6946,7 +6948,6 @@
    },
    "status_to_bucket": {
     "proposed": [
-     "Project Hold",
      "Corrective Action"
     ],
     "approved": [
@@ -6958,13 +6959,14 @@
     "exclude": [
      "Cancel",
      "Denied",
-     "Inactive"
+     "Inactive",
+     "Project Hold"
     ]
    },
    "incremental_field": "DateIssued",
    "recency_days": 730,
    "record_url_precision": "dataset",
-   "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. DELIBERATE FIELD DEVIATION FROM THE PACKET, on evidence. The packet names PermitType/PermitStatus. PermitType is a 224-value inspection-and-fee ledger ('RE-INSPECTION FEE' 22,164, 'CONTRACTOR CHANGE' 8,494) that mostly does not describe a building use, and PermitStatus is 96% the single uninformative value 'Active' (267,495 of 276,775) — bucketing on it would put nearly the whole layer in one band. The same layer publishes ProjectType, a clean 6-value use classifier (\"Residential\" 238287 / \"Commercial\" 35770 / \"Misc Fee\" 1487 / \"Residential Storm Water\" 622 / \"Commercial Storm Water\" 490 / \"Farm Exempt\" 70 / null 0), and PemitProjectStatus (upstream typo preserved verbatim), a real 7-value lifecycle: \"Complete\" 226905 / \"Current\" 27382 / \"Inactive\" 19167 / \"Cancel\" 1717 / \"Denied\" 1263 / \"Project Hold\" 335 / \"Corrective Action\" 6. Both are used instead. No ZIP -> spatial. recency_days 730 (91,704 of 276,775). || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `DateIssued` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8."
+   "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. DELIBERATE FIELD DEVIATION FROM THE PACKET, on evidence. The packet names PermitType/PermitStatus. PermitType is a 224-value inspection-and-fee ledger ('RE-INSPECTION FEE' 22,164, 'CONTRACTOR CHANGE' 8,494) that mostly does not describe a building use, and PermitStatus is 96% the single uninformative value 'Active' (267,495 of 276,775) — bucketing on it would put nearly the whole layer in one band. The same layer publishes ProjectType, a clean 6-value use classifier (\"Residential\" 238287 / \"Commercial\" 35770 / \"Misc Fee\" 1487 / \"Residential Storm Water\" 622 / \"Commercial Storm Water\" 490 / \"Farm Exempt\" 70 / null 0), and PemitProjectStatus (upstream typo preserved verbatim), a real 7-value lifecycle: \"Complete\" 226905 / \"Current\" 27382 / \"Inactive\" 19167 / \"Cancel\" 1717 / \"Denied\" 1263 / \"Project Hold\" 335 / \"Corrective Action\" 6. Both are used instead. No ZIP -> spatial. recency_days 730 (91,704 of 276,775). || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `DateIssued` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'Project Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "dekalb-county-building-permits",
@@ -7105,7 +7107,6 @@
      "Fees Due",
      "Fees Paid",
      "Revision Requested",
-     "On Hold",
      "Released to Planning - Revision Requested",
      "Resubmittal Requested",
      "Revision Received",
@@ -7122,13 +7123,14 @@
      "Expired",
      "Void",
      "Denied",
-     "Withdrawn"
+     "Withdrawn",
+     "On Hold"
     ]
    },
    "incremental_field": "IssueDate",
    "recency_days": 730,
    "record_url_precision": "record",
-   "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. RECORD-PRECISION record_url: the layer carries a per-record 'Link' column. TYPE 6 distinct values summing to 177685 (top: \"Building (Residential)\" 130737 / \"Building (Commercial)\" 25729 / \"Sign Permit\" 10113 / \"LEGACY \" 9885 / \"Grading Stockpiling\" 1170 / \"Film Permit\" 51) — Building (Residential)/Building (Commercial)/Grading Stockpiling map; 'LEGACY' (9,885), Sign Permit and Film Permit fail closed. STATUS 19 distinct values summing to 177685 across all four buckets. No ZIP -> spatial. recency_days 730 bounds a 177,669-row layer over only 4 ZIPs (2,369 rows carry IssueDate >= 2024-07-28). || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `IssueDate` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8."
+   "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. RECORD-PRECISION record_url: the layer carries a per-record 'Link' column. TYPE 6 distinct values summing to 177685 (top: \"Building (Residential)\" 130737 / \"Building (Commercial)\" 25729 / \"Sign Permit\" 10113 / \"LEGACY \" 9885 / \"Grading Stockpiling\" 1170 / \"Film Permit\" 51) — Building (Residential)/Building (Commercial)/Grading Stockpiling map; 'LEGACY' (9,885), Sign Permit and Film Permit fail closed. STATUS 19 distinct values summing to 177685 across all four buckets. No ZIP -> spatial. recency_days 730 bounds a 177,669-row layer over only 4 ZIPs (2,369 rows carry IssueDate >= 2024-07-28). || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `IssueDate` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "savannah-commercial-building-permits",
@@ -7552,7 +7554,6 @@
      "Submitted Online",
      "Application Completeness Check",
      "Plan Review",
-     "On Hold",
      "Initial Screening Process",
      "Awaiting Fee Payment",
      "Requires Re-submit",
@@ -7575,13 +7576,14 @@
      "Expired",
      "Withdrawn",
      "Void",
-     "Disapproved"
+     "Disapproved",
+     "On Hold"
     ]
    },
    "incremental_field": "ISSUE_DATE",
    "recency_days": 730,
    "record_url_precision": "dataset",
-   "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. City of Columbia. Native ZipCode column; ZipCode='65201' returns 14,806 (run 30370572544), which is why recency_days 730 is set (3,189 in the trailing two years, against max_rows 20,000). TYPE 38 distinct values summing to 46528 (top: \"BSD-Right of Way\" 7824 / \"BSD-Mechanical\" 6477 / null 5317 / \"BSD-Electrical\" 4633 / \"BSD-Reroof\" 3400 / \"BSD-Building (Residential New) \" 3068) gives Residential, Commercial, Development and Utility; the BSD- trade permits and Fire operational permits fail closed, as does the NULL type on 5,317 rows. STATUS 23 distinct values summing to 46528. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUE_DATE` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8."
+   "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. City of Columbia. Native ZipCode column; ZipCode='65201' returns 14,806 (run 30370572544), which is why recency_days 730 is set (3,189 in the trailing two years, against max_rows 20,000). TYPE 38 distinct values summing to 46528 (top: \"BSD-Right of Way\" 7824 / \"BSD-Mechanical\" 6477 / null 5317 / \"BSD-Electrical\" 4633 / \"BSD-Reroof\" 3400 / \"BSD-Building (Residential New) \" 3068) gives Residential, Commercial, Development and Utility; the BSD- trade permits and Fire operational permits fail closed, as does the NULL type on 5,317 rows. STATUS 23 distinct values summing to 46528. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUE_DATE` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "overland-park-building-permits",
@@ -7915,7 +7917,6 @@
      "UNDER REVIEW",
      "AWAITING REVISIONS",
      "WAITING ON APPLICANT",
-     "ON HOLD",
      "APPROVED"
     ],
     "approved": [
@@ -7932,13 +7933,14 @@
     "exclude": [
      "EXPIRED",
      "DENIED",
-     "ON HOLD-STOP WORK"
+     "ON HOLD-STOP WORK",
+     "ON HOLD"
     ]
    },
    "incremental_field": "ISSUED",
    "recency_days": 730,
    "record_url_precision": "dataset",
-   "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. City of Bentonville. Both full-table groupBys ABORTED on the first pass (slow host) and succeeded on retry (run 30369593803) — a timeout here is host latency, not an unusable source. TYPE 50 distinct values summing to 50462 (top: \"ELECTRIC RESIDENTIAL\" 8066 / \"MECHANICAL RESIDENTIAL\" 7798 / \"PLUMBING RESIDENTIAL\" 7765 / \"NEW RESIDENTIAL\" 5974 / \"FENCE RESIDENTIAL\" 2869 / \"ELECTRIC COMMERCIAL\" 2289); the vocabulary carries explicit RESIDENTIAL/COMMERCIAL suffixes, and upstream duplicates and typos are preserved VERBATIM as separate keys ('ALTERATION REMODEL COM' and 'ALTERATION REMODEL COMMERCIAL'; 'MECHANICAL COMMERICAL' alongside 'MECHANICAL COMMERCIAL'; 'DEMOLITION- RESIDENTIAL' alongside 'DEMOLITION RESIDENTIAL') because the lookup is an exact match. STATUS 18 distinct values summing to 50477. Own LAT/LON columns. No ZIP -> spatial. recency_days 730 (10,324 of 50,482). || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUED` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8."
+   "_receipts": "2026-07-28 PHASE 1 STANDARD ARCGIS WIRE PASS (docs/implementation-packets/claude_code_phase1_prompt.md). Every vocabulary below is VERBATIM live groupBy output, never guessed — recon-fetch runs 30369196972 / 30369206672 / 30369213992 (round 1), 30369593803 (r2), 30370026584 (r3), 30370252139 (r4), 30370572544 (r5), 30370755906 (r6), 30370939582 (r7). Map keys are the TRIMMED value: sources/arcgis.ts trims both the type value (l.268) and the status value (l.232) before lookup. City of Bentonville. Both full-table groupBys ABORTED on the first pass (slow host) and succeeded on retry (run 30369593803) — a timeout here is host latency, not an unusable source. TYPE 50 distinct values summing to 50462 (top: \"ELECTRIC RESIDENTIAL\" 8066 / \"MECHANICAL RESIDENTIAL\" 7798 / \"PLUMBING RESIDENTIAL\" 7765 / \"NEW RESIDENTIAL\" 5974 / \"FENCE RESIDENTIAL\" 2869 / \"ELECTRIC COMMERCIAL\" 2289); the vocabulary carries explicit RESIDENTIAL/COMMERCIAL suffixes, and upstream duplicates and typos are preserved VERBATIM as separate keys ('ALTERATION REMODEL COM' and 'ALTERATION REMODEL COMMERCIAL'; 'MECHANICAL COMMERICAL' alongside 'MECHANICAL COMMERCIAL'; 'DEMOLITION- RESIDENTIAL' alongside 'DEMOLITION RESIDENTIAL') because the lookup is an exact match. STATUS 18 distinct values summing to 50477. Own LAT/LON columns. No ZIP -> spatial. recency_days 730 (10,324 of 50,482). || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUED` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'ON HOLD' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "adams-county-building-permits",
@@ -9224,7 +9226,7 @@
    "incremental_field": "application_rcvd_date",
    "recency_days": 1825,
    "record_url_precision": "dataset",
-   "_receipts": "2026-07-31 DE/Sussex wire. Sussex is the ONLY dark DE county (22 of 68 DE ZIP pages; Kent 17/17 and New Castle 29/29 already carry their own county source). Layer: Sussex County's OWN enterprise server, Hosted/Conditional_Use_View, 2,566 rows, POLYGON geometry (rides the shipped featurePoint() centroid path). LIVENESS (three-part): name clean; entity = Sussex County DE Planning & Zoning; newest application_rcvd_date 2026-07-27, three days before wiring. STATUS VOCABULARY IS COMPLETE AND VERBATIM: live groupBy on cc_decision returned 16 values summing to EXACTLY 2,566 (positive control), exceededTransferLimit=false. Mapped above verbatim; the connector trims both sides so 'Approved ' folds onto 'Approved'. Deliberately UNMAPPED, fail-closed: null (172) = filed, no Council decision yet, and the value '8/19/2025' (1) = a date typed into the decision field, a publisher data-entry error with no bucketable meaning. Those 173 rows are DROPPED, not guessed. TYPE IS A CONSTANT AND THAT IS THE HONEST CHOICE, NOT A SHORTCUT: proposed_use is the semantically correct column and is FREE TEXT -- 400+ distinct values over 2,566 rows, mostly n=1, with typos ('electrial subsation') and prose ('operate a food truck for a period exceeding three days'). Rule 5 terminal, no type_map exists. current_zoning IS a closed 38-value vocabulary summing to exactly 2,566, and was REJECTED as the type source because it describes the PARCEL, not the PROPOSAL: a conditional use is by definition something the existing zoning does not allow, so AR-1 -> Residential would have labelled an electrical substation 'Residential'. use_type_const 'Development' renders the generic 'Other project' pin and asserts nothing about the use (Phoenix residual-bucket precedent). record_url_precision is 'dataset': the layer carries no per-case URL column and Sussex's case search is not addressable per application_number, so templating one would be guessing. CORRECTION 2026-07-31, same day: the first wire OMITTED column_map.lat/lng, so all 468 emitted records came back scope='area' / geo_precision='jurisdiction' and every one sat on its ZIP centroid instead of its own parcel. The connector flattens each feature's geometry -- here the polygon's shoelace centroid via featurePoint() -- into the synthetic row fields __lat/__lng, and an entry must MAP them ('lat':'__lat','lng':'__lng') exactly as kent-county-de-building-permits and new-castle-county-permits already do. Omitting them is silent: returnGeometry=true is always sent, featurePoint() resolves correctly, and the coordinates are simply never read -- the records still publish, still carry record_url, and still count toward coverage, so nothing fails. Caught by checking scope on the live cached rows rather than trusting the record count.",
+   "_receipts": "2026-07-31 DE/Sussex wire. Sussex is the ONLY dark DE county (22 of 68 DE ZIP pages; Kent 17/17 and New Castle 29/29 already carry their own county source). Layer: Sussex County's OWN enterprise server, Hosted/Conditional_Use_View, 2,566 rows, POLYGON geometry (rides the shipped featurePoint() centroid path). LIVENESS (three-part): name clean; entity = Sussex County DE Planning & Zoning; newest application_rcvd_date 2026-07-27, three days before wiring. STATUS VOCABULARY IS COMPLETE AND VERBATIM: live groupBy on cc_decision returned 16 values summing to EXACTLY 2,566 (positive control), exceededTransferLimit=false. Mapped above verbatim; the connector trims both sides so 'Approved ' folds onto 'Approved'. Deliberately UNMAPPED, fail-closed: null (172) = filed, no Council decision yet, and the value '8/19/2025' (1) = a date typed into the decision field, a publisher data-entry error with no bucketable meaning. Those 173 rows are DROPPED, not guessed. TYPE IS A CONSTANT AND THAT IS THE HONEST CHOICE, NOT A SHORTCUT: proposed_use is the semantically correct column and is FREE TEXT -- 400+ distinct values over 2,566 rows, mostly n=1, with typos ('electrial subsation') and prose ('operate a food truck for a period exceeding three days'). Rule 5 terminal, no type_map exists. current_zoning IS a closed 38-value vocabulary summing to exactly 2,566, and was REJECTED as the type source because it describes the PARCEL, not the PROPOSAL: a conditional use is by definition something the existing zoning does not allow, so AR-1 -> Residential would have labelled an electrical substation 'Residential'. use_type_const 'Development' renders the generic 'Other project' pin and asserts nothing about the use (Phoenix residual-bucket precedent). record_url_precision is 'dataset': the layer carries no per-case URL column and Sussex's case search is not addressable per application_number, so templating one would be guessing. CORRECTION 2026-07-31, same day: the first wire OMITTED column_map.lat/lng, so all 468 emitted records came back scope='area' / geo_precision='jurisdiction' and every one sat on its ZIP centroid instead of its own parcel. The connector flattens each feature's geometry -- here the polygon's shoelace centroid via featurePoint() -- into the synthetic row fields __lat/__lng, and an entry must MAP them ('lat':'__lat','lng':'__lng') exactly as kent-county-de-building-permits and new-castle-county-permits already do. Omitting them is silent: returnGeometry=true is always sent, featurePoint() resolves correctly, and the coordinates are simply never read -- the records still publish, still carry record_url, and still count toward coverage, so nothing fails. Caught by checking scope on the live cached rows rather than trusting the record count. 2026-08-18 FLEET RULING NAMED EXCEPTION: 'Deferred'/'Defered' stay proposed — hearing-register semantics: a deferred agenda item returns to the board and the comment window is genuinely open, so 'you may still weigh in' is true. Per-entry exception (founder, 2026-08-18); the same raw value on a non-hearing register must trip the stalled-status lint.",
    "status_unresolved": [
     {
      "value": "8/19/2025",
@@ -9512,8 +9514,7 @@
      "Application Incomplete",
      "Application Complete",
      "Pending Bldg Permits",
-     "In Review",
-     "Hold Pending Code Enforcement"
+     "In Review"
     ],
     "approved": [
      "Issued",
@@ -9548,14 +9549,15 @@
      "Inactive",
      "Disapproved",
      "Referred to Legal",
-     "DISABLED"
+     "DISABLED",
+     "Hold Pending Code Enforcement"
     ]
    },
    "extra_where": "record_type_type IN ('Residential','Commercial','Stormwater','Right of Way') AND (record_type_category IS NULL OR record_type_category NOT IN ('Electrical','Plumbing','Mechanical','Multi-Trade','Gas Piping','Low Voltage Electrical','Fire Alarm','Sprinkler System','Reroof','Change Out','Refrigeration','Exhaust Hood','Hood Suppression','Like for Like','Repair-Replacement'))",
    "recency_days": 365,
    "spatial_zip_radius_mi": 3,
    "record_url_precision": "dataset",
-   "_receipts": "2026-07-31 NC wire pass, Buncombe. City of Asheville's OWN ArcGIS Server, Permits/AccelaPermitsView layer 2 'Accela Permits View'. 65,438 rows, esriGeometryPoint, FRESH (date_opened max 2026-07-30). HOST FOUND ONLY BY CORRECTING THE URL TWICE: gis.buncombecounty.org is a different (county) server and https://gis.ashevillenc.gov/ARCGIS/... 500s - the real path is /server/, recovered by walking Hub DCAT item b8fdb63db30b42d0875afb617e1551f4 -> its 'url'. THREE vocabularies enumerated live with a positive control, EACH summing to EXACTLY 65,438: record_status 42 values (Finaled 14998, Expired 11806, CO Issued 10420, CC Issued 10249, Issued 6603, Closed 4891, Revoked 1889, Reissued 1461, Plan Check 676, Pending Applicant Action 565, Renewed 423, In Compliance 387, Active 281, Application Received 209, Inspections 208, Denied 118, TCO Issued 90 Days 62, Submittal Required 44, Pending Payment 37, Permit Verification 13, TCO Issued 60 Days 11, Pending 10, Lapsed 10, NULL 9, Pending Inspection 9, Inactive 8, Partial Issued 6, Disapproved 5, Application Incomplete 5, TCC Issued 4, TCO Issued 30 Days 3, Certificate of Compliance 3, TCC Issued 90 Days 2, Approved 2, Referred to Legal 2, Application Complete 2, Pending Bldg Permits 2, Hold Pending Code Enforcement 1, DISABLED 1, Project Closed 1, Final Release 1, In Review 1); record_type_category 56 values; and record_type_type 9 values (Residential 28865, Commercial 19740, Sign 4931, Fire 3550, Event-Temporary Use 3350, Over The Counter 2992, Stormwater 919, Outdoor Vendor 558, Right of Way 533). Bucket sums: proposed 1565 + approved 8993 + operating 41032 + exclude 13839 = 65429, + 9 NULL (fail closed) = 65438. TYPE SOURCE IS record_type_type, NOT record_type_category: category is 'NA' on 22,714 rows (35%, its single largest value) and record_type_group is uniformly 'Permits' (65,438) - both useless. The NA rows are fully typed at record_type_type (Residential 6131 / Sign 4931 / Commercial 4465 / Event 3350 / ...), so 0 unclassified. NOISE DROPPED AT SOURCE via extra_where, following the WA/MN/IL precedent (MI kept trades only because the founder named the Detroit trio): the 5 non-development record_type_type values (Sign 4931, Fire 3550, Event-Temporary Use 3350, Over The Counter 2992, Outdoor Vendor 558 = 15,381) plus 15 trade/minor-repair record_type_category values. Live positive control on the exact filter + 365-day window: 2,280 rows (unfiltered 365-day window is 3,983). *** PRIVACY - THIS IS WHY title IS record_type *** Both record_name AND description carry PRIVATE INDIVIDUALS' NAMES on residential permits ('ECKL, ELIZABETH'; 'BENNETT, ABBY'; description '...FOR SHANE HOLLIFIELD'). Publishing either as a map-pin title would put a resident's name next to their home address on a public page. NEITHER FIELD IS MAPPED. record_type is 0-null (verified: count where record_type IS NULL OR '' = 0 in window) and self-describing across 112 values ('Res: New SFD', 'Com: Demo', 'ROW: Encroachment'), so it is the title. No per-record URL column exists -> dataset precision (Boulder/Philadelphia precedent). No ZIP column -> spatial_zip_radius_mi 3; sample rows carry real Asheville points (35.494/-82.524) and full addresses."
+   "_receipts": "2026-07-31 NC wire pass, Buncombe. City of Asheville's OWN ArcGIS Server, Permits/AccelaPermitsView layer 2 'Accela Permits View'. 65,438 rows, esriGeometryPoint, FRESH (date_opened max 2026-07-30). HOST FOUND ONLY BY CORRECTING THE URL TWICE: gis.buncombecounty.org is a different (county) server and https://gis.ashevillenc.gov/ARCGIS/... 500s - the real path is /server/, recovered by walking Hub DCAT item b8fdb63db30b42d0875afb617e1551f4 -> its 'url'. THREE vocabularies enumerated live with a positive control, EACH summing to EXACTLY 65,438: record_status 42 values (Finaled 14998, Expired 11806, CO Issued 10420, CC Issued 10249, Issued 6603, Closed 4891, Revoked 1889, Reissued 1461, Plan Check 676, Pending Applicant Action 565, Renewed 423, In Compliance 387, Active 281, Application Received 209, Inspections 208, Denied 118, TCO Issued 90 Days 62, Submittal Required 44, Pending Payment 37, Permit Verification 13, TCO Issued 60 Days 11, Pending 10, Lapsed 10, NULL 9, Pending Inspection 9, Inactive 8, Partial Issued 6, Disapproved 5, Application Incomplete 5, TCC Issued 4, TCO Issued 30 Days 3, Certificate of Compliance 3, TCC Issued 90 Days 2, Approved 2, Referred to Legal 2, Application Complete 2, Pending Bldg Permits 2, Hold Pending Code Enforcement 1, DISABLED 1, Project Closed 1, Final Release 1, In Review 1); record_type_category 56 values; and record_type_type 9 values (Residential 28865, Commercial 19740, Sign 4931, Fire 3550, Event-Temporary Use 3350, Over The Counter 2992, Stormwater 919, Outdoor Vendor 558, Right of Way 533). Bucket sums: proposed 1565 + approved 8993 + operating 41032 + exclude 13839 = 65429, + 9 NULL (fail closed) = 65438. TYPE SOURCE IS record_type_type, NOT record_type_category: category is 'NA' on 22,714 rows (35%, its single largest value) and record_type_group is uniformly 'Permits' (65,438) - both useless. The NA rows are fully typed at record_type_type (Residential 6131 / Sign 4931 / Commercial 4465 / Event 3350 / ...), so 0 unclassified. NOISE DROPPED AT SOURCE via extra_where, following the WA/MN/IL precedent (MI kept trades only because the founder named the Detroit trio): the 5 non-development record_type_type values (Sign 4931, Fire 3550, Event-Temporary Use 3350, Over The Counter 2992, Outdoor Vendor 558 = 15,381) plus 15 trade/minor-repair record_type_category values. Live positive control on the exact filter + 365-day window: 2,280 rows (unfiltered 365-day window is 3,983). *** PRIVACY - THIS IS WHY title IS record_type *** Both record_name AND description carry PRIVATE INDIVIDUALS' NAMES on residential permits ('ECKL, ELIZABETH'; 'BENNETT, ABBY'; description '...FOR SHANE HOLLIFIELD'). Publishing either as a map-pin title would put a resident's name next to their home address on a public page. NEITHER FIELD IS MAPPED. record_type is 0-null (verified: count where record_type IS NULL OR '' = 0 in window) and self-describing across 112 values ('Res: New SFD', 'Com: Demo', 'ROW: Encroachment'), so it is the title. No per-record URL column exists -> dataset precision (Boulder/Philadelphia precedent). No ZIP column -> spatial_zip_radius_mi 3; sample rows carry real Asheville points (35.494/-82.524) and full addresses. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'Hold Pending Code Enforcement' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "lexington-row-permits",
@@ -10113,8 +10115,7 @@
     "proposed": [
      "In Review",
      "In Progress",
-     "Fees Due",
-     "On Hold"
+     "Fees Due"
     ],
     "approved": [
      "Issued",
@@ -10129,13 +10130,14 @@
      "Expired",
      "Cancelled",
      "Void",
-     "Stop Work Order"
+     "Stop Work Order",
+     "On Hold"
     ]
    },
    "extra_where": "TYPE NOT IN ('Electrical (Residential)(LEGACY)','Electrical (Commercial)(LEGACY)','Plumbing (Commercial)(LEGACY)','Plumbing (Residential)(LEGACY)','Mechanical (Residential)(LEGACY)','Mechanical (Commercial)(LEGACY)','Building Sprinkler (LEGACY)','Building Tank (LEGACY)','Building Annual Electric Permit (LEGACY)')",
    "recency_days": 1095,
    "record_url_precision": "dataset",
-   "_receipts": "2026-07-31: City of Allentown's OWN AGO account (org WUqVDRuvIiIiH2Pl, owner AllentownPA), layer EnerGov_Permits_Buildings, 5,309 rows, point geometry. FRESH: max ISSUEDATE = 1785369600000 ms = 2026-07-28, three days before wiring. BOTH vocabularies enumerated live and EACH SUMS EXACTLY TO 5,309: STATUSNAME = Issued 2376 + Complete 2175 + Expired 656 + Inspections Complete 28 + Temporary CO 16 + Cancelled 13 + Fees Due 13 + Void 11 + In Review 9 + Stop Work Order 7 + On Hold 3 + In Progress 1 + Fees Paid 1; TYPE = Building 3719 + Residential Building (LEGACY) 286 + Commercial Building (LEGACY) 263 + Electrical (Residential)(LEGACY) 258 + Electrical (Commercial)(LEGACY) 197 + Plumbing (Commercial)(LEGACY) 151 + Plumbing (Residential)(LEGACY) 151 + Mechanical (Residential)(LEGACY) 135 + Building Tank (LEGACY) 62 + Mechanical (Commercial)(LEGACY) 51 + Building Sprinkler (LEGACY) 35 + Building Annual Electric Permit (LEGACY) 1. The 9 LEGACY trade types (1,041 rows) are dropped at source via extra_where, following the WA/MN/IL trades precedent; 4,268 construction rows are kept. use_type comes from TYPE: the dominant value 'Building' (3719) is GENERIC and is therefore written as 'Development', the generic member of the closed TYPE_EXACT vocabulary in lib/map.js -- it is deliberately NOT guessed into Residential/Commercial, because only the two LEGACY values state which. NATIVE ZIP: POSTALCODE is populated ('18104','18103') so column_map.zip is used and NO spatial_zip_radius_mi is needed. Verified real WGS84 coordinates under outSR=4326 (-75.520/40.593, -75.481/40.582 -- Allentown). ISSUEDATE is esriFieldTypeDate so recency_days applies normally. No per-record URL column -> dataset precision on the city's Building Standards page. FOUND BY THE SEARCH INVERSION (title:'Building Permits' AND type:'Feature Service', sorted newest-modified) AFTER a county-name search for Allentown had returned 4,575 results and missed it entirely. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUEDATE` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8."
+   "_receipts": "2026-07-31: City of Allentown's OWN AGO account (org WUqVDRuvIiIiH2Pl, owner AllentownPA), layer EnerGov_Permits_Buildings, 5,309 rows, point geometry. FRESH: max ISSUEDATE = 1785369600000 ms = 2026-07-28, three days before wiring. BOTH vocabularies enumerated live and EACH SUMS EXACTLY TO 5,309: STATUSNAME = Issued 2376 + Complete 2175 + Expired 656 + Inspections Complete 28 + Temporary CO 16 + Cancelled 13 + Fees Due 13 + Void 11 + In Review 9 + Stop Work Order 7 + On Hold 3 + In Progress 1 + Fees Paid 1; TYPE = Building 3719 + Residential Building (LEGACY) 286 + Commercial Building (LEGACY) 263 + Electrical (Residential)(LEGACY) 258 + Electrical (Commercial)(LEGACY) 197 + Plumbing (Commercial)(LEGACY) 151 + Plumbing (Residential)(LEGACY) 151 + Mechanical (Residential)(LEGACY) 135 + Building Tank (LEGACY) 62 + Mechanical (Commercial)(LEGACY) 51 + Building Sprinkler (LEGACY) 35 + Building Annual Electric Permit (LEGACY) 1. The 9 LEGACY trade types (1,041 rows) are dropped at source via extra_where, following the WA/MN/IL trades precedent; 4,268 construction rows are kept. use_type comes from TYPE: the dominant value 'Building' (3719) is GENERIC and is therefore written as 'Development', the generic member of the closed TYPE_EXACT vocabulary in lib/map.js -- it is deliberately NOT guessed into Residential/Commercial, because only the two LEGACY values state which. NATIVE ZIP: POSTALCODE is populated ('18104','18103') so column_map.zip is used and NO spatial_zip_radius_mi is needed. Verified real WGS84 coordinates under outSR=4326 (-75.520/40.593, -75.481/40.582 -- Allentown). ISSUEDATE is esriFieldTypeDate so recency_days applies normally. No per-record URL column -> dataset precision on the city's Building Standards page. FOUND BY THE SEARCH INVERSION (title:'Building Permits' AND type:'Feature Service', sorted newest-modified) AFTER a county-name search for Allentown had returned 4,575 results and missed it entirely. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUEDATE` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "naperville-building-permits",
@@ -10185,8 +10187,7 @@
      "FEES DUE",
      "AWAITING CUSTOMER RESPONSE",
      "SUBMITTED - ONLINE",
-     "SUBMITTED",
-     "On Hold"
+     "SUBMITTED"
     ],
     "approved": [
      "ISSUED",
@@ -10203,13 +10204,14 @@
      "VOID",
      "CANCELLED",
      "EXPIRED",
-     "DENIED"
+     "DENIED",
+     "On Hold"
     ]
    },
    "extra_where": "PERMITTYPE IN ('RESIDENTIAL','COMMERCIAL','TEMPORARY IMPROVEMENTS','GREEN ENERGY')",
    "recency_days": 365,
    "record_url_precision": "dataset",
-   "_receipts": "2026-07-31: City of Naperville's OWN AGO org (rXJ6QApc2sOtl1Pd), layer EPL_BldgPermits, 34,571 rows. GEOMETRY-LESS TABLE -> the Boulder/Anaheim geocode path (native zip + address fields, no lat/lng in column_map), modelled directly on boulder-construction-permits. FRESH AND HIGH-VOLUME: 10,067 rows with ISSUEDATE >= 2025-07-31 (a full year window). BOTH vocabularies enumerated live and EACH SUMS EXACTLY TO 34,571: PERMITSTATUS = ISSUED 14359 + COMPLETE 13886 + VOID 1871 + FEES PAID 1039 + IN REVIEW 685 + FEES DUE 582 + AWAITING CUSTOMER RESPONSE 502 + CANCELLED 489 + FINAL INSPECTION PASSED 445 + EXPIRED 419 + TEMPORARY OCCUPANCY 134 + SUBMITTED - ONLINE 68 + APPROVED 37 + On Hold 22 + SUBMITTED 21 + To Be Issued 11 + DENIED 1; PERMITTYPE = FINANCE DEPARTMENT 7945 + RESIDENTIAL: OTHER IMPROVEMENTS 7660 + DEPARTMENT OF PUBLIC WORKS 3528 + MISCELLANEOUS 3240 + RESIDENTIAL 2564 + TRUCK ROUTE PERMIT 1489 + COMMERCIAL 1446 + SUB-PERMIT 1361 + FIRE DEPARTMENT PERMIT 1084 + SIGN 952 + COMMUNITY SERVICES DEPARTMENT 864 + ELEVATOR 776 + RIGHT-OF-WAY 590 + TELECOMMUNICATIONS 406 + ACCOUNTS PAYABLE 375 + TEMPORARY IMPROVEMENTS 148 + SPECIAL EVENTS 140 + GREEN ENERGY 3. extra_where keeps only the 5 CONSTRUCTION types (11,821 rows) and drops 13 administrative/non-construction types at source -- FINANCE DEPARTMENT and ACCOUNTS PAYABLE are internal accounting records, DEPARTMENT OF PUBLIC WORKS / TRUCK ROUTE / RIGHT-OF-WAY / SPECIAL EVENTS are not building work, and SIGN/ELEVATOR/FIRE/TELECOM follow the established trades-noise precedent. ⚠️ max(ISSUEDATE) returns 20714096083000 ms = the year 2626, a CORRUPT FUTURE DATE -- the third such poisoning this session; the paired windowed count (10,067 in the last year) is what established freshness, not max(). COVERAGE IS TWO COUNTIES because the CITY genuinely straddles them (the frisco-active-building-permits Collin+Denton precedent, not a speculative widening): verified against modelled rows -- 60540/60563/60565/60566/60567 are DuPage and 60564 is Will, and ALL SIX were dark before this. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUEDATE` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8."
+   "_receipts": "2026-07-31: City of Naperville's OWN AGO org (rXJ6QApc2sOtl1Pd), layer EPL_BldgPermits, 34,571 rows. GEOMETRY-LESS TABLE -> the Boulder/Anaheim geocode path (native zip + address fields, no lat/lng in column_map), modelled directly on boulder-construction-permits. FRESH AND HIGH-VOLUME: 10,067 rows with ISSUEDATE >= 2025-07-31 (a full year window). BOTH vocabularies enumerated live and EACH SUMS EXACTLY TO 34,571: PERMITSTATUS = ISSUED 14359 + COMPLETE 13886 + VOID 1871 + FEES PAID 1039 + IN REVIEW 685 + FEES DUE 582 + AWAITING CUSTOMER RESPONSE 502 + CANCELLED 489 + FINAL INSPECTION PASSED 445 + EXPIRED 419 + TEMPORARY OCCUPANCY 134 + SUBMITTED - ONLINE 68 + APPROVED 37 + On Hold 22 + SUBMITTED 21 + To Be Issued 11 + DENIED 1; PERMITTYPE = FINANCE DEPARTMENT 7945 + RESIDENTIAL: OTHER IMPROVEMENTS 7660 + DEPARTMENT OF PUBLIC WORKS 3528 + MISCELLANEOUS 3240 + RESIDENTIAL 2564 + TRUCK ROUTE PERMIT 1489 + COMMERCIAL 1446 + SUB-PERMIT 1361 + FIRE DEPARTMENT PERMIT 1084 + SIGN 952 + COMMUNITY SERVICES DEPARTMENT 864 + ELEVATOR 776 + RIGHT-OF-WAY 590 + TELECOMMUNICATIONS 406 + ACCOUNTS PAYABLE 375 + TEMPORARY IMPROVEMENTS 148 + SPECIAL EVENTS 140 + GREEN ENERGY 3. extra_where keeps only the 5 CONSTRUCTION types (11,821 rows) and drops 13 administrative/non-construction types at source -- FINANCE DEPARTMENT and ACCOUNTS PAYABLE are internal accounting records, DEPARTMENT OF PUBLIC WORKS / TRUCK ROUTE / RIGHT-OF-WAY / SPECIAL EVENTS are not building work, and SIGN/ELEVATOR/FIRE/TELECOM follow the established trades-noise precedent. ⚠️ max(ISSUEDATE) returns 20714096083000 ms = the year 2626, a CORRUPT FUTURE DATE -- the third such poisoning this session; the paired windowed count (10,067 in the last year) is what established freshness, not max(). COVERAGE IS TWO COUNTIES because the CITY genuinely straddles them (the frisco-active-building-permits Collin+Denton precedent, not a speculative widening): verified against modelled rows -- 60540/60563/60565/60566/60567 are DuPage and 60564 is Will, and ALL SIX were dark before this. || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUEDATE` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "peoria-az-building-permits",
@@ -10400,7 +10402,6 @@
      "Returned for Correction",
      "Submittals Incomplete",
      "Pending",
-     "On Hold",
      "Intake Pre-Screen",
      "Revision Correction",
      "Revision Submittals Incomplete",
@@ -10422,13 +10423,14 @@
      "Expired Application",
      "Canceled",
      "Denied",
-     "VOID"
+     "VOID",
+     "On Hold"
     ]
    },
    "spatial_zip_radius_mi": 3,
    "recency_days": 365,
    "record_url_precision": "dataset",
-   "_receipts": "2026-08-01: City of Bend's OWN AGO org (JisFYcK2mIVg9ueP, owner CityofBendOR), layer Permit_Applications_Point/0, item modified 2026-07-31. 164,845 rows, esriGeometryPoint. BOTH vocabularies SUM EXACTLY TO 164,845: StatusDesc (21) = Closed 122795 + Permit(s) Issued 26426 + Expired 6116 + Withdrawn 3192 + Expired Application 2538 + Canceled 1689 + Finaled 832 + Preparing for Issuance 381 + In Plan Check 311 + Returned for Correction 113 + Denied 111 + Submittals Incomplete 76 + VOID 61 + Pending 57 + On Hold 45 + Intake Pre-Screen 31 + Issued 24 + Revision Correction 17 + Revision Submittals Incomplete 12 + Pre-Screen 12 + Complete 6, all 21 bucketed exactly once; BuildingCategory (3) = Other 85957 + Residential 64537 + Commercial/Industrial 14351 = 0 unclassified. 'Other' is GENERIC and is written as 'Development', the generic member of the closed TYPE_EXACT vocabulary in lib/map.js -- never guessed into Residential/Commercial. FRESHNESS REQUIRED THE WINDOWED COUNT, NOT max(): max(IssueDate) returns 2013379200000 ms = 2033-10-08, a CORRUPT FUTURE DATE (the Hawaii-County year-5005 / Naperville-year-2626 class), so the max is a lie. The real freshness receipt is the BOUNDED count -- IssueDate between 2025-08-01 and 2026-08-02 returns 3,853 rows, which is also exactly what recency_days 365 will fetch. NO ZIP COLUMN: the ZIP is embedded in the free-text Address ('2348 NW AWBREY RD 97703'), so spatial_zip_radius_mi 3 is used; records place by their OWN points and no geocoding is involved. Stored spatialReference is wkid 2270 (Oregon South ft) -- irrelevant under outSR=4326; a live sample returned x -121.3169 / y 44.0702 (Bend OR). record_url is dataset precision on the layer's own verified-200 URL because www.bendoregon.gov returns HTTP 403 behind a bot-check interstitial from our egress -- the Peoria precedent. TARGETS 10 DARK PAGES in OR/Deschutes. FOUND BY THE SEARCH INVERSION (title-shape sweep, sorted newest-modified). || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `IssueDate` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8."
+   "_receipts": "2026-08-01: City of Bend's OWN AGO org (JisFYcK2mIVg9ueP, owner CityofBendOR), layer Permit_Applications_Point/0, item modified 2026-07-31. 164,845 rows, esriGeometryPoint. BOTH vocabularies SUM EXACTLY TO 164,845: StatusDesc (21) = Closed 122795 + Permit(s) Issued 26426 + Expired 6116 + Withdrawn 3192 + Expired Application 2538 + Canceled 1689 + Finaled 832 + Preparing for Issuance 381 + In Plan Check 311 + Returned for Correction 113 + Denied 111 + Submittals Incomplete 76 + VOID 61 + Pending 57 + On Hold 45 + Intake Pre-Screen 31 + Issued 24 + Revision Correction 17 + Revision Submittals Incomplete 12 + Pre-Screen 12 + Complete 6, all 21 bucketed exactly once; BuildingCategory (3) = Other 85957 + Residential 64537 + Commercial/Industrial 14351 = 0 unclassified. 'Other' is GENERIC and is written as 'Development', the generic member of the closed TYPE_EXACT vocabulary in lib/map.js -- never guessed into Residential/Commercial. FRESHNESS REQUIRED THE WINDOWED COUNT, NOT max(): max(IssueDate) returns 2013379200000 ms = 2033-10-08, a CORRUPT FUTURE DATE (the Hawaii-County year-5005 / Naperville-year-2626 class), so the max is a lie. The real freshness receipt is the BOUNDED count -- IssueDate between 2025-08-01 and 2026-08-02 returns 3,853 rows, which is also exactly what recency_days 365 will fetch. NO ZIP COLUMN: the ZIP is embedded in the free-text Address ('2348 NW AWBREY RD 97703'), so spatial_zip_radius_mi 3 is used; records place by their OWN points and no geocoding is involved. Stored spatialReference is wkid 2270 (Oregon South ft) -- irrelevant under outSR=4326; a live sample returned x -121.3169 / y 44.0702 (Bend OR). record_url is dataset precision on the layer's own verified-200 URL because www.bendoregon.gov returns HTTP 403 behind a bot-check interstitial from our egress -- the Peoria precedent. TARGETS 10 DARK PAGES in OR/Deschutes. FOUND BY THE SEARCH INVERSION (title-shape sweep, sorted newest-modified). || file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `IssueDate` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'On Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "worcester-building-permits",
@@ -10853,7 +10855,6 @@
    "status_to_bucket": {
     "proposed": [
      "Under Review",
-     "Review on Hold",
      "To Council",
      "To CPC",
      "To BZA",
@@ -10878,14 +10879,15 @@
      "Inactive",
      "Expired",
      "Revoked",
-     "Closed"
+     "Closed",
+     "Review on Hold"
     ]
    },
    "use_type_const": "Development",
    "recency_days": 1825,
    "spatial_zip_radius_mi": 3,
    "record_url_precision": "dataset",
-   "_receipts": "2026-08-05 MISSOURI PASS. The Kansas City metro seam: Jackson 25 dark, Cass 14, Clay 10, Platte 10. Config only. This is the best-formed source found anywhere in Missouri -- the City of Kansas City's full planning-case docket, 23,166 rows, 100% dated (count(APPLICATIONDATE) = 23,166 of 23,166), APPLICATIONDATE spanning 1985-05-03 to 2026-07-31, i.e. FRESH TO WITHIN FOUR DAYS of wiring. Schema carries PLANNUMBER, PLANTYPE, STATUS, APPLICATIONDATE, COMPLETEDATE, PLANNER, DESCRIPTION, LAND_USE, DWELL_UNITS, NON_RES_AREA, LOTS, PROJECTNAME, WORKCLASS and NEXTHEARINGDATE. THE 1825-DAY WINDOW IS LOAD-BEARING AND IT SOLVES THE ONE REAL PROBLEM. Unwindowed, STATUS is 26 values summing exactly to 23,166 but dominated by 'Closed' at 16,370 (71%) -- a terminal state whose OUTCOME is not recorded, so it can support neither an approved nor an operating claim. Inside 1825 days the layer is 2,675 rows and 'Closed' DISAPPEARS ENTIRELY: the windowed vocabulary is 17 values summing exactly to 2,675 (Approved Subject to Conditions 1007 / Approved 836 / Under Review 141 / Voided 113 / Dismissed 106 / Denied 105 / Recorded 93 / Review on Hold 62 / Cancelled - Customer 55 / Inactive 44 / Expired 38 / To Council 35 / Continued off-Docket 25 / To CPC 10 / To BZA 3 / Revoked 1 / '4' 1). Every one of those is self-describing except the single opaque numeric '4', which is left UNMAPPED and fails closed. The window is the standing 1825 default and is independently the correct choice here. 'Closed' IS NEVERTHELESS MAPPED -- TO exclude, DELIBERATELY. It cannot appear in today's window, but the window MOVES: a case filed in 2024 and closed in 2027 will be both in-window and Closed. Rather than leave that to fail closed silently later, it is mapped to exclude now, because 'Closed' alone asserts neither that a project was approved nor that it was built, and asserting either would be a guess about outcome. The other terminal states (Voided, Dismissed, Denied, Cancelled/Canceled - Customer, Inactive, Expired, Revoked) are excluded for the same reason. Statuses that can only appear outside the current window (Proposed, Pending, Accepted, Released) are mapped anyway so the entry stays correct as the window advances. use_type_const 'Development' because PLANTYPE IS UNUSABLE AS A VOCABULARY: 17,447 of 23,166 are NULL (75%), and the non-null tail is contaminated with individual case identifiers and free text -- 'CLD-FnPlat-2022-00046', 'CD-CPC-2023-00051', 'Jones Iron & Metal - Alley Vacation', 'Rezoning from R-0.5 to R-0.75', 'Somerbrook 7th Plat, Final Plat', 'Final Plat - The Preserve, 8th Plat'. Never guess a decode; the generic member asserts nothing. GEOMETRY is polygon and rides the shipped featurePoint() shoelace centroid; column_map lat/lng are __lat/__lng, without which every record silently lands on the ZIP centroid at scope=area (the Sussex defect). return_centroid is NOT set -- this is a classic ArcGIS Server MapServer, which silently ignores it. Scoping is spatial at 3 mi: there is no ZIP and no address column. COVERAGE IS FOUR COUNTIES because Kansas City itself straddles them, and the measured dark-page lift is Jackson +9, Clay +2, Platte +2, Cass +1 = 14. It is the CITY's docket, not the counties' -- Independence, Lee's Summit, Blue Springs, Liberty and the rest run their own planning departments and are not in this layer. Not a claim of four-county coverage. NEW HOST -- mapd.kcmo.org has never been fetched by the engine, so per governance section 0 the first post-deploy re-cache is a DEPLOY VERIFICATION read from arcgis_reports[].fetched/emitted, not from counts. The wire-and-see is legitimate here because there IS a positive control: pg_net returns 200 on the exact connector query shape. ALSO REJECTED IN KANSAS CITY: (a) the data.kcmo.org BLDS permit ledger (ntw8-aacc) was RE-PROBED this session and is STILL STALLED at max(:updated_at) = 2025-05-09T20:22:20.907Z over 681,036 rows -- byte-identical to the value recorded on 2026-07-17, so three further months produced no movement. It stays on the reprobe list. (b) BW_NewCommercial_Permits (797 rows, hosted on services.arcgis.com) is real and per-record but max(USER_Issue_Date) is 2025-06-17 and its 797 rows carry only 5 distinct ZIPs, so the measured lift is ONE dark page; combined with the BW_ prefix and 100+ USER_bldg_type_* analysis columns marking it as a one-off study extract rather than a maintained ledger, it is not worth an entry. Recorded, not wired."
+   "_receipts": "2026-08-05 MISSOURI PASS. The Kansas City metro seam: Jackson 25 dark, Cass 14, Clay 10, Platte 10. Config only. This is the best-formed source found anywhere in Missouri -- the City of Kansas City's full planning-case docket, 23,166 rows, 100% dated (count(APPLICATIONDATE) = 23,166 of 23,166), APPLICATIONDATE spanning 1985-05-03 to 2026-07-31, i.e. FRESH TO WITHIN FOUR DAYS of wiring. Schema carries PLANNUMBER, PLANTYPE, STATUS, APPLICATIONDATE, COMPLETEDATE, PLANNER, DESCRIPTION, LAND_USE, DWELL_UNITS, NON_RES_AREA, LOTS, PROJECTNAME, WORKCLASS and NEXTHEARINGDATE. THE 1825-DAY WINDOW IS LOAD-BEARING AND IT SOLVES THE ONE REAL PROBLEM. Unwindowed, STATUS is 26 values summing exactly to 23,166 but dominated by 'Closed' at 16,370 (71%) -- a terminal state whose OUTCOME is not recorded, so it can support neither an approved nor an operating claim. Inside 1825 days the layer is 2,675 rows and 'Closed' DISAPPEARS ENTIRELY: the windowed vocabulary is 17 values summing exactly to 2,675 (Approved Subject to Conditions 1007 / Approved 836 / Under Review 141 / Voided 113 / Dismissed 106 / Denied 105 / Recorded 93 / Review on Hold 62 / Cancelled - Customer 55 / Inactive 44 / Expired 38 / To Council 35 / Continued off-Docket 25 / To CPC 10 / To BZA 3 / Revoked 1 / '4' 1). Every one of those is self-describing except the single opaque numeric '4', which is left UNMAPPED and fails closed. The window is the standing 1825 default and is independently the correct choice here. 'Closed' IS NEVERTHELESS MAPPED -- TO exclude, DELIBERATELY. It cannot appear in today's window, but the window MOVES: a case filed in 2024 and closed in 2027 will be both in-window and Closed. Rather than leave that to fail closed silently later, it is mapped to exclude now, because 'Closed' alone asserts neither that a project was approved nor that it was built, and asserting either would be a guess about outcome. The other terminal states (Voided, Dismissed, Denied, Cancelled/Canceled - Customer, Inactive, Expired, Revoked) are excluded for the same reason. Statuses that can only appear outside the current window (Proposed, Pending, Accepted, Released) are mapped anyway so the entry stays correct as the window advances. use_type_const 'Development' because PLANTYPE IS UNUSABLE AS A VOCABULARY: 17,447 of 23,166 are NULL (75%), and the non-null tail is contaminated with individual case identifiers and free text -- 'CLD-FnPlat-2022-00046', 'CD-CPC-2023-00051', 'Jones Iron & Metal - Alley Vacation', 'Rezoning from R-0.5 to R-0.75', 'Somerbrook 7th Plat, Final Plat', 'Final Plat - The Preserve, 8th Plat'. Never guess a decode; the generic member asserts nothing. GEOMETRY is polygon and rides the shipped featurePoint() shoelace centroid; column_map lat/lng are __lat/__lng, without which every record silently lands on the ZIP centroid at scope=area (the Sussex defect). return_centroid is NOT set -- this is a classic ArcGIS Server MapServer, which silently ignores it. Scoping is spatial at 3 mi: there is no ZIP and no address column. COVERAGE IS FOUR COUNTIES because Kansas City itself straddles them, and the measured dark-page lift is Jackson +9, Clay +2, Platte +2, Cass +1 = 14. It is the CITY's docket, not the counties' -- Independence, Lee's Summit, Blue Springs, Liberty and the rest run their own planning departments and are not in this layer. Not a claim of four-county coverage. NEW HOST -- mapd.kcmo.org has never been fetched by the engine, so per governance section 0 the first post-deploy re-cache is a DEPLOY VERIFICATION read from arcgis_reports[].fetched/emitted, not from counts. The wire-and-see is legitimate here because there IS a positive control: pg_net returns 200 on the exact connector query shape. ALSO REJECTED IN KANSAS CITY: (a) the data.kcmo.org BLDS permit ledger (ntw8-aacc) was RE-PROBED this session and is STILL STALLED at max(:updated_at) = 2025-05-09T20:22:20.907Z over 681,036 rows -- byte-identical to the value recorded on 2026-07-17, so three further months produced no movement. It stays on the reprobe list. (b) BW_NewCommercial_Permits (797 rows, hosted on services.arcgis.com) is real and per-record but max(USER_Issue_Date) is 2025-06-17 and its 797 rows carry only 5 distinct ZIPs, so the measured lift is ONE dark page; combined with the BW_ prefix and 100+ USER_bldg_type_* analysis columns marking it as a one-off study extract rather than a maintained ledger, it is not worth an entry. Recorded, not wired. 2026-08-18 FLEET RULING (hold/stalled -> exclude): 'Review on Hold' moved proposed->exclude — pausing is not proposing; a held project supports neither resident claim."
   },
   {
    "registry_id": "columbia-mo-capital-projects",
