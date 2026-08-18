@@ -1,0 +1,43 @@
+name: measure-projects-read
+
+# On-demand, READ-ONLY measurement of the projects() read on the live site.
+#
+# Why it exists: spot-check-shell answers pass/fail at a fixed settle deadline, which
+# cannot report a duration and disagrees with itself on ZIPs that land near the deadline.
+# This reports the NUMBER — time to the score rail, and the two read paths head to head
+# (single-payload RPC vs 1,000-row range windows) in the same live browser.
+#
+# NOT scheduled — dispatch only. Writes nothing: no DB write, no site change, no artifact
+# beyond the job summary.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zips:
+        description: 'Comma-separated ZIPs to measure (default: heavy 57104 + mid 28468 + light 84302)'
+        required: false
+        default: '57104,28468,84302'
+      reps:
+        description: 'Repetitions per ZIP (default 3 — one sample cannot separate a change from run-to-run noise)'
+        required: false
+        default: '3'
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    # Bounded for the same reason every job here is: an unbounded job inherits GitHub's
+    # 6-hour default. Measured shape: 3 ZIPs x 3 reps of both halves, well under 30 min.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Measure
+        env:
+          SITE_BASE: https://homesignal.net
+          ZIPS: ${{ github.event.inputs.zips }}
+          REPS: ${{ github.event.inputs.reps }}
+        run: node scripts/measure-projects-read.mjs
