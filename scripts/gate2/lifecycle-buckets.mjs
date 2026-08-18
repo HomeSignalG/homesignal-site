@@ -41,14 +41,28 @@ export function bucketOf(r) {
  * five Del Valle TABS rows off 'On file' would have been reported the day it happened instead
  * of hiding inside eight days of red.
  *
+ * @param idOf REQUIRED, and deliberately has no default. The per-bucket id lists are what the
+ *   gate compares a filter's removed set against, so they must be 1:1 with rows. A content
+ *   default (`source_ref || name`) is exactly the collapse this parameter exists to prevent:
+ *   measured 2026-08-18 at ZIP 78617, that key yields 521 distinct values over 540 rows,
+ *   because the 20 TxDOT segments share one dataset-precision URL. A missing or colliding id
+ *   throws rather than silently merging two records.
  * @returns {{counts: Object, ids: Object}} per-bucket counts and per-bucket id lists, so a
  *   filter can be checked by MEMBERSHIP — a matching count over the wrong records is not a pass.
  */
-export function censusOf(rows, label) {
+export function censusOf(rows, label, idOf) {
+  if (typeof idOf !== 'function') throw new Error(`${label}: censusOf requires an explicit idOf`);
   const unrecognised = {};
   const counts = { proposed: 0, approved: 0, operating: 0, unknown: 0, facility: 0 };
   const ids = { proposed: [], approved: [], operating: [], unknown: [], facility: [] };
+  const seen = new Set();
   for (const r of rows) {
+    const gid = idOf(r);
+    if (gid === undefined || gid === null || gid === '')
+      throw new Error(`${label}: a row has no identity — idOf returned ${JSON.stringify(gid)}`);
+    if (seen.has(gid)) throw new Error(`${label}: duplicate identity ${JSON.stringify(gid)} — the `
+      + `id must be 1:1 with rows or a filter's removed set cannot be checked by membership`);
+    seen.add(gid);
     const b = bucketOf(r);
     if (!b) {
       const v = r.status === null || r.status === undefined ? '(null)' : JSON.stringify(r.status);
@@ -56,7 +70,7 @@ export function censusOf(rows, label) {
       continue;
     }
     counts[b]++;
-    ids[b].push(r.source_ref || r.name);
+    ids[b].push(gid);
   }
   const bad = Object.keys(unrecognised);
   if (bad.length) {

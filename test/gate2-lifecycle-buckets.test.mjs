@@ -18,6 +18,7 @@ import { dirname, join } from 'node:path';
 import { STATUS_BUCKET, LIFECYCLE_KEYS, bucketOf, censusOf } from '../scripts/gate2/lifecycle-buckets.mjs';
 import { ROWS as FROZEN_ROWS } from '../scripts/gate2/seed78617.mjs';
 
+const GID = r => r.__gid;
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 let fails = 0;
 const ok = (c, name, detail) => {
@@ -77,7 +78,7 @@ const HS = global.window.HS;
 }
 {
   let threw = null;
-  try { censusOf([{ status: 'Approved', name: 'a' }, { status: 'Zombie', name: 'b' }], 'probe'); }
+  try { censusOf([{ status: 'Approved', __gid: 'a' }, { status: 'Zombie', __gid: 'b' }], 'probe', GID); }
   catch (e) { threw = e; }
   ok(!!threw, 'D2 censusOf THROWS on an unrecognised status rather than bucketing it as unknown');
   ok(threw && /Zombie/.test(threw.message), 'D3 …and NAMES the offending value', threw && threw.message);
@@ -88,14 +89,14 @@ const HS = global.window.HS;
   // what `unknown` means — so silently accepting it would be defensible and wrong. The gate
   // must be told, because a column that started emitting NULL is a vocabulary change.
   let threw = null;
-  try { censusOf([{ status: null, name: 'n' }], 'probe'); } catch (e) { threw = e; }
+  try { censusOf([{ status: null, __gid: 'n' }], 'probe', GID); } catch (e) { threw = e; }
   ok(!!threw && /\(null\)/.test(threw.message), 'D5 a NULL status is reported as (null), not absorbed into unknown');
 }
 {
   // The guard must not fire on a healthy set — an over-eager guard is noise, and noise is how
   // a real signal gets ignored later.
   let threw = null;
-  try { censusOf([{ status: 'Approved', name: 'a' }, { record_kind: 'facility', status: 'Operating', name: 'f' }], 'probe'); }
+  try { censusOf([{ status: 'Approved', __gid: 'a' }, { record_kind: 'facility', status: 'Operating', __gid: 'f' }], 'probe', GID); }
   catch (e) { threw = e; }
   ok(!threw, 'D6 a recognised vocabulary does NOT trip the guard (no over-flagging)');
 }
@@ -103,12 +104,12 @@ const HS = global.window.HS;
 // ── E. census counts AND membership ──────────────────────────────────────────────────────
 {
   const rows = [
-    { status: 'Proposed', source_ref: 'p1' }, { status: 'Approved', source_ref: 'a1' },
-    { status: 'Operating', source_ref: 'o1' }, { status: 'Active', source_ref: 'o2' },
-    { status: 'On file', source_ref: 'u1' },
-    { record_kind: 'facility', status: 'Operating', source_ref: 'f1' },
+    { status: 'Proposed', __gid: 'p1' }, { status: 'Approved', __gid: 'a1' },
+    { status: 'Operating', __gid: 'o1' }, { status: 'Active', __gid: 'o2' },
+    { status: 'On file', __gid: 'u1' },
+    { record_kind: 'facility', status: 'Operating', __gid: 'f1' },
   ];
-  const { counts, ids } = censusOf(rows, 'probe');
+  const { counts, ids } = censusOf(rows, 'probe', GID);
   ok(counts.proposed === 1 && counts.approved === 1 && counts.operating === 2
      && counts.unknown === 1 && counts.facility === 1,
     'E1 counts split across all four lifecycle buckets plus facility', JSON.stringify(counts));
@@ -127,15 +128,59 @@ const HS = global.window.HS;
 // 'On file'. If someone edits that file and the unknown rows go, the branch would pass
 // vacuously; this is the check that refuses to let that happen quietly.
 {
-  const { counts, ids } = censusOf(FROZEN_ROWS, 'frozen fixture');
+  const { counts, ids } = censusOf(FROZEN_ROWS, 'frozen fixture', GID);
   ok(counts.unknown > 0,
     'F1 the frozen fixture still carries lifecycle-unknown rows — without them the gate\'s '
     + 'unknown-branch pass would prove nothing', JSON.stringify(counts));
-  ok(ids.unknown.every(i => i.includes('tdlr.texas.gov')),
+  const evidence = new Map(FROZEN_ROWS.map(r => [r.__gid, r.source_ref]));
+  ok(ids.unknown.every(gid => (evidence.get(gid) || '').includes('tdlr.texas.gov')),
     'F2 every frozen unknown row is a real TABS filing (production-derived, not invented)');
+  ok(new Set(FROZEN_ROWS.map(r => r.__gid)).size === FROZEN_ROWS.length,
+    'F4 the frozen fixture\'s own __gid values are unique — it can key a membership check');
   ok(counts.proposed > 0 && counts.approved > 0 && counts.operating > 0 && counts.facility > 0,
     'F3 the fixture spans every other bucket too, so the unknown pass runs against a realistic set',
     JSON.stringify(counts));
+}
+
+// ── G. THE IDENTITY GUARD — ids must be 1:1 with rows ────────────────────────────────────
+// Added after the 2026-08-18 finding: the gate's old identity was `source_ref || name`, which
+// collapses 540 live rows at ZIP 78617 into 521 distinct values because all 20 TxDOT route
+// segments share one dataset-precision url. That silently shrank the parity comparison and
+// produced a false coordinate-drift failure. The per-bucket id lists are what a filter's
+// removed set is compared against, so a colliding or missing id must never pass quietly.
+{
+  let threw = null;
+  try { censusOf([{ status: 'Approved', __gid: 'a' }], 'probe'); } catch (e) { threw = e; }
+  ok(!!threw && /idOf/.test(threw.message),
+    'G1 censusOf REFUSES to run without an explicit idOf — no content-key default to fall back to');
+}
+{
+  let threw = null;
+  try { censusOf([{ status: 'Approved' }], 'probe', GID); } catch (e) { threw = e; }
+  ok(!!threw && /no identity/.test(threw.message),
+    'G2 a row with no identity throws rather than being counted anonymously', threw && threw.message);
+}
+{
+  // THE COLLISION ITSELF, reproduced: two distinct records sharing one dataset-precision url.
+  const shared = 'https://services.arcgis.com/…/TxDOT_Projects_Info_All/FeatureServer/0';
+  const byContent = r => r.source_ref || r.name;
+  let threw = null;
+  try {
+    censusOf([{ status: 'Proposed', source_ref: shared, name: 'SH 130 Install Traffic Signal' },
+              { status: 'Proposed', source_ref: shared, name: 'CR 1288 Widen Road' }], 'probe', byContent);
+  } catch (e) { threw = e; }
+  ok(!!threw && /duplicate identity/.test(threw.message),
+    'G3 two records sharing one dataset url are caught as a DUPLICATE IDENTITY, not merged',
+    threw && threw.message);
+}
+{
+  // …and the same two rows pass cleanly once keyed on __gid — the fix, demonstrated.
+  const shared = 'https://services.arcgis.com/…/TxDOT_Projects_Info_All/FeatureServer/0';
+  const { counts, ids } = censusOf(
+    [{ status: 'Proposed', source_ref: shared, __gid: 'dv-1' },
+     { status: 'Proposed', source_ref: shared, __gid: 'dv-2' }], 'probe', GID);
+  ok(counts.proposed === 2 && ids.proposed.length === 2,
+    'G4 the same two records stay DISTINCT under __gid — both counted, both addressable');
 }
 
 console.log(fails ? `\n${fails} gate2-lifecycle-buckets assertion(s) FAILED.` : '\nAll gate2-lifecycle-buckets assertions passed.');

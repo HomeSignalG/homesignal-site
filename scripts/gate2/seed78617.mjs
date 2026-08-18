@@ -49,7 +49,11 @@ export const ROWS = RAW.trim().split('\n').map((line, i) => {
   const [record_kind, registry_id, type, status, lat, lng, tok, ...rest] = line.split('\t');
   const name = rest.join('\t');
   const source_ref = tok.startsWith('http') ? tok : tok.startsWith('TABS') ? TABS(tok) : AUSTIN(tok);
-  return { id: 'dv-' + i, zip: '78617', community_id: '8f673943-d972-4135-8d13-944452c76c32',
+  // __gid — the HARNESS identity, unique by construction (the row's index). Everything that
+  // has to match a record to itself keys on this, never on content. See the identity note in
+  // full-inventory.mjs: `source_ref` is NOT unique (dataset-precision sources share one URL),
+  // and neither is `name`.
+  return { id: 'dv-' + i, __gid: 'dv-' + i, zip: '78617', community_id: '8f673943-d972-4135-8d13-944452c76c32',
            record_kind, registry_id: registry_id || null, type, status, name,
            lat: Number(lat), lng: Number(lng), source_ref,
            submitted_at: '2026-01-15', impact_score: 55, stage: null, developer: 'City of Austin' };
@@ -79,6 +83,7 @@ function project(r) {
     approx: false,                  // STRUCTURAL: these are parcel-precise source points
     note: '',                       // STRUCTURAL empty
     // carried through for verification (the page ignores unknown keys):
+    __gid: r.__gid,                 // HARNESS IDENTITY — see the note on ROWS above
     record_kind: r.record_kind, registry_id: r.registry_id, zip: r.zip,
   };
 }

@@ -50,7 +50,7 @@ const fail = (m) => { console.error('GATE2B FAIL: ' + m); process.exit(1); };
 // on import and cannot be unit-tested in place). `censusOf` THROWS on an unrecognised status,
 // naming the value; the gate converts that into its own `fail()` so the message shape stays
 // consistent with every other failure here.
-const census = (rows, label) => { try { return censusOf(rows, label); } catch (e) { fail(e.message); } };
+const census = (rows, label, idOf) => { try { return censusOf(rows, label, idOf); } catch (e) { fail(e.message); } };
 
 // ── STEP 1 — export the full live inventory (keyset-paginated; PostgREST caps at 1000) ──
 async function fetchAll() {
@@ -67,6 +67,10 @@ async function fetchAll() {
   return rows;
 }
 const RAW = await fetchAll();
+// THE HARNESS IDENTITY, stamped once, before anything reads these rows. See the identity
+// note at STEP 2 for why it is an index and not `source_ref || name`.
+RAW.forEach((r, i) => { r.__gid = 'dv-' + i; });
+const GID = r => r.__gid;
 const DEV = RAW.filter(r => r.record_kind === 'development');
 const FAC = RAW.filter(r => r.record_kind === 'facility');
 const TABS = DEV.filter(r => !r.registry_id);
@@ -83,21 +87,46 @@ if (!FAC.length) fail('0 facility rows — Del Valle has EPA facilities; this is
   if (unexpected.length) fail(`unexpected record_kind(s): ${unexpected.join(', ')} — this gate `
     + `splits the inventory two ways and cannot classify a third`);
 }
-const LIVE = census(RAW, 'live inventory');   // also runs the fail-closed vocabulary guard
+const LIVE = census(RAW, 'live inventory', GID);   // also runs the fail-closed vocabulary guard
 console.log(`inventory: ${RAW.length} rows (${DEV.length} development, ${FAC.length} facility, `
   + `${TABS.length} null-registry) · lifecycle ` + LIFECYCLE_KEYS.map(k => `${k} ${LIVE.counts[k]}`).join(' / ')
   + ` · facility ${LIVE.counts.facility}`);
 
-const idOf = r => r.source_ref || r.name;
 const fixtureSha = createHash('sha256').update(
   RAW.map(r => [r.record_kind, r.registry_id || '', r.type || '', r.status || '', r.lat, r.lng, r.source_ref || '', r.name || ''].join('|')).sort().join('\n')
 ).digest('hex');
 const regDist = RAW.reduce((a, r) => { const k = r.registry_id || '(null)'; a[k] = (a[k] || 0) + 1; return a; }, {});
 
 // ── STEP 2 — the SAME adapter contract proven by the 39-row run ─────────────────────────
+//
+// ⚠️ THE HARNESS IDENTITY IS `__gid`, AND IT IS NOT CONTENT. Everything that has to match a
+// record back to itself — the adapter check, the three-mode parity comparison, the filter
+// membership check — keys on `__gid`, a per-row index assigned here.
+//
+// WHY: the previous key was `source_ref || name`, and it is NOT UNIQUE. Measured live at
+// 78617 on 2026-08-18: 540 rows collapse to 521 distinct values under that key, because
+// `txdot-projects-info-all` is `record_url_precision: "dataset"` — all 20 of its route
+// segments on this ZIP carry ONE url (17 distinct names, 20 distinct coordinates). Two
+// consequences, both real: `new Map()` kept the last row per key, so 19 adapted rows were
+// compared against a DIFFERENT row's coordinates and the gate reported a false
+// "coordinate drift on SH 130 Install Traffic Signal"; and the parity comparison silently
+// ran over 521 records instead of 540, able to report `same_id_set: true` while 19 records
+// were never checked at all. A gate under-reporting its own coverage is the failure class
+// this whole pass exists to remove.
+//
+// REJECTED: widening the content key to `source_ref|name|lat|lng`. Still not guaranteed
+// unique (two segments may legitimately share all four), and it keys the comparison on the
+// very field being verified — a circular check that cannot fail on the drift it looks for.
+//
+// ⚠️ DO NOT CONFLATE THIS WITH ENGINE v22 DEDUP IDENTITY. That key is deliberately
+// content-based and deliberately keeps `file_date` + `case_number`, because its job is to
+// decide whether two SOURCE ROWS are the same real filing (docs/maps-dedup-migration.sql).
+// This key's job is the opposite: to keep every row distinguishable from every other row
+// while it travels harness -> seed -> page -> collector. Different key, different problem;
+// neither is a model for the other.
 const ORIGIN = { lat: 30.1745, lng: -97.6134 };
-const project = (r, i) => ({
-  id: 'dv-' + i, name: r.name, type: r.type, status: r.status, stage: r.stage,
+const project = (r) => ({
+  id: r.__gid, __gid: r.__gid, name: r.name, type: r.type, status: r.status, stage: r.stage,
   lens: 'value', developer: r.developer, size: null, investment: null, jobs: null,
   submitted_at: r.submitted_at, lat: Number(r.lat), lng: Number(r.lng),
   impact_score: r.impact_score, impact_dimensions: [], source_ref: r.source_ref,
@@ -105,15 +134,23 @@ const project = (r, i) => ({
   record_kind: r.record_kind, registry_id: r.registry_id, zip: r.zip,
 });
 const aDev = DEV.map(project);
-const aFac = FAC.map((r, i) => Object.assign(project(r, 10000 + i), { _facility: true, record_kind: 'facility' }));
+const aFac = FAC.map(r => Object.assign(project(r), { _facility: true, record_kind: 'facility' }));
 const ADAPTED = aDev.concat(aFac);
+
+// SOURCE_OF is built POSITIONALLY, from the same .map() calls that produced the adapted rows,
+// so each adapted row is paired with its OWN source row by construction rather than by a
+// lookup that can collide.
+const SOURCE_OF = new Map();
+aDev.forEach((a, i) => SOURCE_OF.set(a.__gid, DEV[i]));
+aFac.forEach((a, i) => SOURCE_OF.set(a.__gid, FAC[i]));
 
 // THE RELATION, not a number: the adapter neither loses nor invents a row, whatever the
 // inventory happens to be today.
 if (ADAPTED.length !== RAW.length) fail(`adapter emitted ${ADAPTED.length} from ${RAW.length} input rows`);
-if (new Set(ADAPTED.map(r => r.id)).size !== RAW.length) fail('adapter produced duplicate ids');
+if (new Set(ADAPTED.map(r => r.__gid)).size !== RAW.length) fail('adapter produced duplicate ids');
+if (SOURCE_OF.size !== RAW.length) fail(`SOURCE_OF holds ${SOURCE_OF.size} of ${RAW.length} rows`);
 for (const r of ADAPTED) {
-  if (!r.id || typeof r.lat !== 'number' || typeof r.lng !== 'number' || !r.source_ref)
+  if (!r.__gid || typeof r.lat !== 'number' || typeof r.lng !== 'number' || !r.source_ref)
     fail('adapted row missing a required source value: ' + JSON.stringify(r).slice(0, 140));
 }
 // EXPECTED_TOTAL is derived once, here, and every later comparison reads it. Nothing
@@ -121,13 +158,12 @@ for (const r of ADAPTED) {
 const EXPECTED_TOTAL = ADAPTED.length;
 
 // coordinates / evidence / registry identity unchanged by the adapter
-const byId = new Map(RAW.map(r => [idOf(r), r]));
 for (const a of ADAPTED) {
-  const s = byId.get(a.source_ref || a.name);
+  const s = SOURCE_OF.get(a.__gid);
   if (!s) fail('adapted row lost its source row: ' + a.name);
-  if (Number(s.lat) !== a.lat || Number(s.lng) !== a.lng) fail('coordinate drift on ' + a.name);
-  if ((s.source_ref || '') !== (a.source_ref || '')) fail('evidence drift on ' + a.name);
-  if ((s.registry_id || null) !== (a.registry_id || null)) fail('registry drift on ' + a.name);
+  if (Number(s.lat) !== a.lat || Number(s.lng) !== a.lng) fail(`coordinate drift on ${a.name} [${a.__gid}]`);
+  if ((s.source_ref || '') !== (a.source_ref || '')) fail(`evidence drift on ${a.name} [${a.__gid}]`);
+  if ((s.registry_id || null) !== (a.registry_id || null)) fail(`registry drift on ${a.name} [${a.__gid}]`);
 }
 const adaptedSha = createHash('sha256').update(
   ADAPTED.map(r => [r.record_kind, r.registry_id || '', r.type || '', r.status || '', r.lat, r.lng, r.source_ref || '', r.name || ''].join('|')).sort().join('\n')
@@ -212,13 +248,20 @@ async function installCanonHooks() {
     // as hiding them instead of being papered over by the derivation.
     window.__canonSet = function () {
       const C = window.__CANON || { visible: [], facs: [] };
-      const facIds = new Set(C.facs.map(x => x.source_ref || x.name));
-      const derived = ((window.HS_SEED || {}).facilities || []).filter(f => !facIds.has(f.source_ref || f.name));
+      const facIds = new Set(C.facs.map(x => x.__gid));
+      const derived = ((window.HS_SEED || {}).facilities || []).filter(f => !facIds.has(f.__gid));
       const restFacs = window.__RESTFACS ? window.__RESTFACS : derived;
       return C.visible.concat(C.facs).concat(restFacs);
     };
+    // IDENTITY IS `__gid` AND THERE IS NO FALLBACK. Returning `source_ref || name` when the
+    // page has dropped __gid would silently collapse the 20 TxDOT segments that share one
+    // dataset url back into 1 — the exact bug this key replaced, reintroduced invisibly and
+    // reported as a pass. Missing __gid is therefore a THROWN error, surfaced by the caller.
     window.__canonIds = function () {
-      return window.__canonSet().map(x => (x && (x.source_ref || x.name)) || '?');
+      return window.__canonSet().map(function (x) {
+        if (!x || !x.__gid) throw new Error('plotted record carries no __gid: ' + JSON.stringify(x).slice(0, 160));
+        return x.__gid;
+      });
     };
   });
 }
@@ -240,12 +283,12 @@ for (const [key, label] of MODES) {
   await page.waitForTimeout(2500);
   per[label] = await page.evaluate(() => {
     const HS = window.HS, C = window.__CANON || { visible: [], facs: [] };
-    const id = x => (x && (x.source_ref || x.name)) || '?';
+    const id = x => { if (!x || !x.__gid) throw new Error('plotted record carries no __gid'); return x.__gid; };
     // restFacs: prefer the set the page itself passed to plottedMarkerSet; otherwise derive
     // it as (all seed facilities) minus (facs), and cross-check the count against the page's
     // own __HS_MAP.restFacTotal so the derivation can never silently invent or lose a record.
-    const facIds = new Set(C.facs.map(x => x.source_ref || x.name));
-    const derived = ((window.HS_SEED || {}).facilities || []).filter(f => !facIds.has(f.source_ref || f.name));
+    const facIds = new Set(C.facs.map(x => x.__gid));
+    const derived = ((window.HS_SEED || {}).facilities || []).filter(f => !facIds.has(f.__gid));
     const restFacs = window.__RESTFACS ? window.__RESTFACS : derived;
     const rec = window.__canonSet().map(it => { const m = HS.resolveMarker(it);
       return { id: id(it), name: it.name, kind: m.isFacility ? 'facility' : 'development',
@@ -277,8 +320,8 @@ if (A.total !== EXPECTED_TOTAL) {
   // truth for what SHOULD be present; whatever it has that the canonical set does not is
   // the exact loss, with the fields that decide inclusion attached.
   const seen = new Set(A.records.map(r => r.id));
-  const missing = ADAPTED.filter(r => !seen.has(r.source_ref || r.name)).map(r => ({
-    id: r.source_ref || r.name, name: r.name, record_kind: r.record_kind,
+  const missing = ADAPTED.filter(r => !seen.has(r.__gid)).map(r => ({
+    id: r.__gid, evidence: r.source_ref, name: r.name, record_kind: r.record_kind,
     registry_id: r.registry_id, type: r.type, status: r.status, lat: r.lat, lng: r.lng,
   }));
   const dbg = { canonical: A.total, expected: EXPECTED_TOTAL, missing_count: missing.length,
@@ -312,6 +355,10 @@ const FILTER_EXPECT = Object.fromEntries(LIFECYCLE_KEYS.map(k => [k, LIVE.counts
 console.log('filter expectations, derived from the live status census: '
   + LIFECYCLE_KEYS.map(k => `${k} ${FILTER_EXPECT[k]}`).join(' / '));
 const facIdSet = new Set(A.records.filter(r => r.kind === 'facility').map(r => r.id));
+// ids are __gid now, so "is this a TABS filing?" is answered by the record's EVIDENCE url,
+// looked up per id, never by pattern-matching the id itself.
+const evidenceOf = new Map(A.records.map(r => [r.id, r.evidence || '']));
+const isTabs = (gid) => (evidenceOf.get(gid) || '').includes('tdlr.texas.gov');
 const filters = {};
 const untestedBuckets = [];
 for (const key of LIFECYCLE_KEYS) {
@@ -337,7 +384,7 @@ for (const key of LIFECYCLE_KEYS) {
     const removed = ids.filter(i => !afterSet.has(i)).sort();
     const removedFacs = removed.filter(i => facIdSet.has(i)).length;
     filters[key][ml] = { before, after: after.length, restored, removed_count: removed.length,
-      removed_tabs: removed.filter(i => i.includes('tdlr.texas.gov')).length,
+      removed_tabs: removed.filter(isTabs).length,
       removed_facilities: removedFacs,
       // MEMBERSHIP, not just a count: the removed set must be exactly the records whose own
       // status buckets to this key. A matching count over the wrong records is not a pass.
@@ -378,7 +425,8 @@ if (untestedBuckets.length) {
 // 39 rows exported VERBATIM from production (README: "39 PRODUCTION rows exported verbatim
 // from app_projects (zip 78617)"), five of which still carry 'On file'. Frozen input, frozen
 // expectation, no fabrication — the vintage is the point.
-const FROZEN = census(FROZEN_ROWS, 'frozen fixture');
+const FROZEN = census(FROZEN_ROWS, 'frozen fixture', GID);
+const frozenEvidence = new Map(FROZEN_ROWS.map(r => [r.__gid, r.source_ref || '']));
 const frozenUnknownIds = FROZEN.ids.unknown.slice().sort();
 // The fixture must PROVE IT CAN TEST what it is here to test, before it is allowed to pass.
 if (!frozenUnknownIds.length)
@@ -405,7 +453,7 @@ const frozen_pass = {
   unknown_expected: frozenUnknownIds.length,
   unknown_removed: frozenRemoved.length,
   removed_is_exact_bucket: JSON.stringify(frozenRemoved) === JSON.stringify(frozenUnknownIds),
-  removed_all_tabs: frozenRemoved.every(i => i.includes('tdlr.texas.gov')),
+  removed_all_tabs: frozenRemoved.every(gid => (frozenEvidence.get(gid) || '').includes('tdlr.texas.gov')),
 };
 console.log('\nFROZEN FIXTURE (unknown branch): ' + JSON.stringify(frozen_pass));
 
