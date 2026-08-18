@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. No subject-matter claim is derived.",
-  "registry_entries": 209,
+  "registry_entries": 210,
   "statewide": {
     "AK": [
       {
@@ -1478,6 +1478,13 @@
       {
         "id": "frisco-active-building-permits",
         "label": "City of Frisco",
+        "scope": "city"
+      }
+    ],
+    "TX|El Paso": [
+      {
+        "id": "el-paso-new-residential-permits",
+        "label": "City of El Paso",
         "scope": "city"
       }
     ],
