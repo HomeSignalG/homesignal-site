@@ -8763,3 +8763,51 @@ transient-safe guard **correctly refused** to overwrite 30 cached facilities wit
 bypassed to produce a receipt; the fire was simply repeated, FRS had recovered (`epa.ok:true`,
 facilities 30), and the write went through the shipped path. A receipt obtained by disabling the
 control that protects the data is not a receipt.
+
+---
+
+## 2026-08-19 — ITEM B GATE: Cleveland's vocabulary re-enumerated LIVE. It had MOVED.
+
+The founder held B until the four values were re-verified live rather than quoted from recon.
+They were right to: **the recon is stale in BOTH directions, and the publisher has been actively
+migrating its labels.** Probed in the connector's own scope (Rule 13 — same `extra_where`, same
+365-day window, `include_types` deliberately NOT applied so exclusions are visible).
+
+**Every count is paired with its control and reconciles EXACTLY.**
+
+| scope | control rows | vocab sum | distinct values | agreeing methods |
+|---|---|---|---|---|
+| in-window (`ISSUE_DATE >= 2025-08-19`) | 14,618 | **14,618** | 4 | groupBy `n DESC` · groupBy `n ASC` · `returnDistinctValues` — all 3 say 4 |
+| all-time | 196,741 | **196,741** | 5 | groupBy |
+
+**The live vocabulary, with first and last appearance:**
+
+| `PERMIT_SUBTYPE` | in-window | all-time | first seen | last seen | in registry? |
+|---|---|---|---|---|---|
+| `Building Permits` | 8,340 | 8,340 | **2025-08-29** | 2026-08-14 | yes |
+| `Residential` | 4,556 | 136,798 | 2015-01-02 | 2026-08-12 | yes |
+| `Commercial` | 1,613 | 51,491 | 2015-01-02 | 2026-08-14 | yes |
+| `Install Permits` | 109 | 109 | **2026-03-18** | 2026-08-14 | **NO — dropped at source** |
+| `Mechanical` | 0 | 3 | 2025-07-09 | 2025-07-09 | no (inert, out of window) |
+| `Building` | **0** | **0** | — | — | yes — **a value that has NEVER existed** |
+
+**Three findings the recon did not have:**
+
+1. **`Building` is fiction.** It sits in both `include_types` and `type_map` and matches **0 rows
+   all-time**. Harmless today, but it is a config line asserting something untrue, and it is the
+   reason "four enumerated values" read as confirmed when the live four are different.
+2. **`Install Permits` (109 rows, current to 2026-08-14) is being DROPPED at source** by
+   `include_types`. It appeared **2026-03-18**, five months AFTER the entry was wired (OH wire
+   pass, 2026-07-17… itself after — so this value arrived between recon and now).
+3. **The publisher is migrating.** `Building Permits` did not exist before 2025-08-29 and is now
+   the **plurality in-window (57.1%)**, while `Residential`+`Commercial` — 96% of all-time volume —
+   have fallen to 42.2% of the last year. Two of the five values were introduced within 12 months.
+   This entry's vocabulary is not stable, and any "enumerated once" claim about it decays.
+
+**Stored footprint, reconciled:** `app_projects` holds **92,372 rows across 39 ZIP pages** for this
+entry (the recon's 92,378, drifted by 6 as the window rolled). **All 92,372 carry `type =
+'Development'`; ZERO are `unclassified`.** So this was never a type_map MISS — it is a type_map
+that maps every value onto the GENERIC member, which `lib/map.js` treats as non-terminal, so every
+record falls through to keyword guessing and lands on the "Other project" circle. 14,618 source
+rows → 92,372 stored is ~6.3x, the legitimate overlapping-3-mile-circle duplication (Chicago
+precedent), not a dedup defect.
