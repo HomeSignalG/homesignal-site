@@ -9001,3 +9001,53 @@ Cleveland's fictional `Building` was not a one-off — **13 more across the flee
 
 Suite 109 → **110 files**; 30 assertions in `test/type-domain-drift.test.mjs`, self-tested in both
 directions (a planted new value GATES; an unchanged vocabulary does NOT).
+
+### 🔴 BLOCKING FINDING — the source-monitor has FAILED EVERY RUN FOR 11+ DAYS, before any drift check
+
+Dispatching a `--dry-run` to prove Phase 3.6 executes (a syntax check is not proof it runs) found
+the workflow dying **80 seconds in, at a step that runs BEFORE the monitor**:
+
+```
+Live scoreboard (ranked work list)
+  [warn] dev_zip_source_ids HTTP 500 — retrying at p_limit=125
+  [warn] dev_zip_source_ids HTTP 500 — retrying at p_limit=62
+  [warn] dev_zip_source_ids HTTP 500 — retrying at p_limit=50
+  live-scoreboard failed: dev_zip_source_ids failed: HTTP 500
+    {"code":"57014","message":"canceling statement due to statement timeout"}
+  ##[error]Process completed with exit code 1
+```
+
+**Every run since at least 2026-08-09 has failed — 11 consecutive scheduled runs plus this
+dispatch — and four sampled runs all failed at the SAME step** (`Live scoreboard (ranked work
+list)`, confirmed via per-step conclusions on runs 32228642357 / 32112228423 / 32007699380 /
+31934013320).
+
+**The consequence is the part that matters: `node scripts/source-monitor.mjs` never executes, so
+NEITHER drift gate has run in 11+ days.** The status-domain gate — the one whose existence is the
+whole argument for building the type gate — has been inert that entire time. It is correct in
+code and unreachable in practice.
+
+⚠️ **So the honest status of this build: the type gate is MERGED and UNIT-PROVEN, but it has NOT
+yet executed against live data.** Its pure classification carries 30 assertions self-tested in
+both directions, and its I/O helpers (`arcgisGroupBy`, `arcgisDistinct`, `ckanStatusCounts`,
+`cartoStatusCounts`, `csvStatusCounts`, `windowClause`/`andWhere`) are the SAME functions the
+status check already runs in production — but "the same helpers work elsewhere" is not the same
+claim as "Phase 3.6 ran." It has not.
+
+**Not fixed here, deliberately.** The failure is a Postgres statement timeout on
+`dev_zip_source_ids`, which is a real query/performance defect needing its own judgement — not
+the minimum-necessary, no-behavioural-surface change the unblocking exception covers. The step is
+also deliberately NOT `continue-on-error` (workflow comment: *"that throw has to be able to fail
+the job or the assertion is decorative"*), so the fix is a decision about the query or about step
+ordering, not a flag flip.
+
+**The options, for a founder call:**
+1. **Fix `dev_zip_source_ids`** (paginate / index / lower the default `p_limit`) — addresses the
+   root cause; the scoreboard keeps its fail-loud property.
+2. **Move the scoreboard AFTER the monitor**, keeping it fail-loud. The drift gates then run even
+   when the scoreboard is broken, and a scoreboard failure still reds the run. Smallest change
+   that restores both gates tonight; does not fix the timeout.
+3. Both — 2 now, 1 properly.
+
+Recommendation: **2 then 1.** A monitor that cannot reach its own gates is worth less than a
+scoreboard, and option 2 restores eleven days of missing coverage in one line of ordering.
