@@ -9051,3 +9051,83 @@ ordering, not a flag flip.
 
 Recommendation: **2 then 1.** A monitor that cannot reach its own gates is worth less than a
 scoreboard, and option 2 restores eleven days of missing coverage in one line of ordering.
+
+---
+
+## ✅ CLOSED 2026-08-19 — both gates VERIFIED on live data, and the timeout fixed at its cause
+
+### Part 1 — the gates ran. Run `32276630120`, dispatched on `main` at `b7a2b73` (#823's ordering fix).
+
+**Correction to the entry above, made before anyone acted on it: the blockage was 4 days, not
+11+.** That claim was inferred from 11 consecutive red runs without reading which STEP failed. The
+per-step conclusions say two different things: runs from 2026-08-08 through 2026-08-15 failed at
+`Fail on status-domain drift` — the gate WORKING, exactly as designed — and only 2026-08-16
+onward failed at `Live scoreboard`. The boundary is 2026-08-16. The status gate was not inert for
+eleven days; it was firing.
+
+**Phase 3.6 — TYPE-domain drift, first live execution:**
+
+```
+### Type-domain drift — an unlisted `include_types` value is NEVER FETCHED
+- Entries checked: 10 · gating (in-window, in neither list): 0 · baseline not established: 2 · unreachable: 0
+- No in-window unlisted type values on any entry with an established baseline. Nothing gates.
+```
+
+- **BASELINE NOT ESTABLISHED (non-failing, and reported as NOT clean):** `portland-building-permits`
+  (NEWCLASS), `san-diego-approved-permits` (APPROVAL_TYPE) — "its live vocabulary has never been
+  enumerated, so the absence of findings here attests to NOTHING." The third state renders as its
+  own labelled section, not a blank cell, as specified.
+- **Tier 2 (out-of-window, non-failing):** columbus `Minor Alteration` (64,113) · `Repair Replace`
+  (63,682) · +11 more; slo-county 6; aurora 5; nashville 3; cincinnati 3; cleveland `Mechanical` (3).
+- **Tier 3 (declared, zero live rows):** columbus 3 · slo-county 5 · aurora 3 · nashville 2.
+- **Baseline matched, UNREVIEWED:** 5 entries, **64,311 records observed-not-fetched** (columbus
+  27,829 · slo 17,706 · aurora 9,316 · cincinnati 8,230 · nashville 1,230). The report states
+  plainly that listing one "records only that it already existed — never that excluding it was
+  reviewed or approved."
+- **The whitelist/mapping invariant held:** every whitelisted value has a `type_map` line or a
+  `use_type_const`.
+
+**Status-domain gate, same run: `STATUS_DRIFT=1`, 12 Tier-1 in-window unmapped values** across
+irving · fairfax ×2 · udot · fort-worth · san-jose · coconino · kcmo · vtrans · austin-subdivision ·
+cincinnati · new-orleans. **These are expected findings, not regressions** — five days of publisher
+vocabulary that nothing was watching. They are the queue, handled per entry.
+
+Run summary line: `0 wired, 141 flagged, 193 findings, 12 status-drift, 0 type-drift (10 entries
+checked, 2 without a baseline).`
+
+### Part 2 — `dev_zip_source_ids` no longer aggregates 3.08M rows per call
+
+**Diagnosis first.** `app_projects` is **3,079,005 rows / 4,209 MB** and the RPC did a grouped
+scan of all of it on every call, as `anon` (`statement_timeout=3s`, confirmed in
+`pg_db_role_setting`). Nothing changed on 2026-08-09; the table simply crossed the line.
+
+**The halving ladder was treating the wrong cause, and its own log proves it** — run 32276630120
+walked `250 → 125 → 62 → 50` and threw anyway, ~53 s spent, zero successes. A page a fifth the
+size still had to group the whole table. Removed, per founder call.
+
+**Fix (Option A, approved):** `public.app_zip_source_ids` (zip, source_ids, dev_rows, updated_at),
+upserted inside `app_refresh_zip()` right after the stale-row delete, so it summarises the ZIP's
+final row set. The RPC reads it. Signature, pagination, ordering and clamp unchanged.
+
+- `app_refresh_zip` patched **programmatically** from its own deployed text with a round-trip
+  identity check (rule 7). The first attempt's closing assert refused and the transaction rolled
+  back — re-read confirmed 17,487 chars unchanged. The assert was corrected, not deleted.
+- **Parity fingerprinted, not eyeballed** (rule 8), sort collation pinned (rule 9): 7 chunks,
+  **9,374 ZIPs, md5 identical on both sides in every chunk, 0 mismatches** — receipts in
+  `docs/app-zip-source-ids.sql` §4.
+- **Positive control:** mid-backfill the summary already held rows in ranges no chunk had written,
+  written by the patched function under the live 15-minute sweep. Write-time maintenance was
+  demonstrated, not asserted.
+- **Measured as anon after:** p_limit 250 → **1.6 ms** · 1000 → **0.8 ms** · 5000 → **3.1 ms**
+  (before: 14,350 ms for the 5000-row page).
+
+**New caller hazard, pinned in `test/live-scoreboard.test.mjs`:** the request must stay STRICTLY
+below the RPC's own 5000 clamp. At or above it a full page returns short, the keyset walk stops
+after one page, and the scoreboard ranks on a fraction of the ZIPs with no error at all. Both new
+assertions were proven to fail on their own violation before being accepted.
+
+**Did anything I reported rest on the dead scoreboard? No.** Every coverage/Live figure reported
+since 2026-08-16 was measured directly against Supabase in this session, not read from
+`docs/source-monitor-report.md`. What WAS lost is the ranked work list: it stopped refreshing on
+2026-08-16, so any *prioritisation* implied by that committed report is four days stale — it is
+regenerated by the next scheduled run.
