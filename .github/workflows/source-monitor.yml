@@ -67,18 +67,6 @@ jobs:
         with:
           node-version: '20'
 
-      # Regenerates the ranked work list nightly instead of it being computed by hand.
-      # Reads the committed anon key from config.js (public, RLS-gated) so it needs no secret,
-      # and runs BEFORE the monitor so the scoreboard lands in the log even if the drift gate
-      # later fails the run.
-      # NOT continue-on-error. It was, and the step completed in <=1s reporting success — so a
-      # failure was indistinguishable from a pass, in the one step whose whole job is to report
-      # a number (workbook row 429). The script now asserts its own row count and throws rather
-      # than emit a scoreboard of zeroes, and that throw has to be able to fail the job or the
-      # assertion is decorative.
-      - name: Live scoreboard (ranked work list)
-        run: node scripts/live-scoreboard.mjs
-
       - name: Run source monitor
         id: monitor
         run: |
@@ -163,3 +151,30 @@ jobs:
         run: |
           echo "::error::Live type value(s) found that are in NEITHER include_types NOR observed_types_unreviewed for one or more registry entries. Because include_types is pushed down into the query, those records are NEVER FETCHED — no record, no quarantine, no unclassified pin, only a count that fails to grow (Cleveland's 'Install Permits' was dropped this way for five months). See the 'Type-domain drift' Tier 1 table in docs/source-monitor-report.md (also in this run's job summary), then add each value VERBATIM to that entry's include_types WITH a type_map line — or, if it is deliberate noise, to observed_types_unreviewed with that decision recorded."
           exit 1
+      # MOVED AFTER THE MONITOR, 2026-08-19. It used to run first, and for **11+ consecutive
+      # runs** (every scheduled run from at least 2026-08-09 through 2026-08-19, plus a dispatch)
+      # it threw on a `dev_zip_source_ids` statement timeout ~80 s in and killed the job — so
+      # `source-monitor.mjs` never executed and NEITHER drift gate ran for eleven days. The
+      # status-domain gate was correct in code and unreachable in practice the entire time.
+      #
+      # A REPORTING step was gating DETECTION steps, which is backwards. Nothing downstream
+      # breaks if the ranked work list is late; a silently-dropped record class is exactly what
+      # the drift gates exist to catch. Detection first, reporting second.
+      #
+      # STILL NOT continue-on-error — the original reason stands verbatim: it was, and the step
+      # completed in <=1s reporting success, so a failure was indistinguishable from a pass in
+      # the one step whose whole job is to report a number (workbook row 429). The script asserts
+      # its own row count and throws rather than emit a scoreboard of zeroes, and that throw has
+      # to be able to fail the job or the assertion is decorative. It still fails the run — it
+      # just no longer takes the drift gates down with it.
+      #
+      # LAST, and `always()`, for the SAME reason the drift-fail steps are: every side effect
+      # above (report commit, registry auto-wire push, engine deploy dispatch) must complete
+      # first. Merely moving this below the monitor was not enough — a scoreboard throw would
+      # then have SKIPPED the commit step, and the monitor's evidence would die with it, which
+      # is the same class of mistake in a new place.
+      #
+      # Reads the committed anon key from config.js (public, RLS-gated), so it needs no secret.
+      - name: Live scoreboard (ranked work list)
+        if: always()
+        run: node scripts/live-scoreboard.mjs
