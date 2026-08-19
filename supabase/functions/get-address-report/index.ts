@@ -833,6 +833,17 @@ async function handleRequest(req: Request): Promise<Response> {
     }
     // v22: exact-identity dedup over the combined permit-connector output (see header). First-seen
     // wins; identity includes case_number + file_date so re-issues and per-unit permits survive.
+    //
+    // ⛔ `type_raw` IS DELIBERATELY NOT IN THIS KEY, AND MUST NOT BE ADDED. It is not an
+    // oversight to "complete" later. Two reasons:
+    //   1. It is derived from the same source row as `use_type`, so it carries no
+    //      discriminating information the key does not already have — adding it can only
+    //      ever split records, never merge them.
+    //   2. This key decides whether two rows are THE SAME REAL FILING. Widening it is how a
+    //      genuine duplicate starts surviving as two pins. The 2026-07-23 cleanup removed
+    //      9,631 excess copies across 273 cached rows; that is the cost of getting this key
+    //      wrong in the loose direction.
+    // A field added for AUDITABILITY has no business changing what the page renders.
     const dedupeExactPermits = (rows: Record<string, unknown>[]): Record<string, unknown>[] => {
       const seen = new Set<string>(); const out: Record<string, unknown>[] = [];
       for (const s of rows) {

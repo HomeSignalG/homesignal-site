@@ -8620,3 +8620,94 @@ policy constant — deriving it from production is what the 80249 ruling forbids
 `verify-maps-uncap`'s budgets, `delvalle-golden`'s frozen fixture, and `verify-maps-rest-shapes`'
 print-only baseline. `audit-marker-symbology.mjs` folded in the same vocabulary move (`Active`
 added, same fail-closed guard).
+
+---
+
+## 2026-08-19 — `type_raw`: the mapping is now AUDITABLE (item A of the FALLBACK:other plan)
+
+**What was wrong.** `use_type` is the MAPPED classification. Every connector emits
+`unclassified` when an entry's `type_map` misses — and `unclassified` is also what an entry
+that maps no type column at all emits. Once stored, two different situations were
+**indistinguishable**:
+
+| | | |
+|---|---|---|
+| (a) | the publisher genuinely states no project type | the generic "Other project" pin is **correct** |
+| (b) | the publisher stated a value our `type_map` lacks | the generic pin is a **config gap** |
+
+Measured 2026-08-18: **128,387 of 2,932,766** stored development rows carry `use_type`
+"unclassified". Telling (a) from (b) meant re-probing 43 live sources — an answer that goes
+stale the moment a publisher adds a value. It is now one `GROUP BY`, permanently.
+
+**What shipped.** `type_raw` — the publisher's own value, verbatim (trimmed, case preserved),
+BEFORE the mapping. Named `type_raw` in **both** layers; the exact discipline `status_raw`
+already follows (engine → `app_projects.stage`).
+- All five connectors, from the same expression: `type_raw: typeSrcVal || null`.
+- `development_reports.sites[].type_raw` → `public.app_projects.type_raw` via `app_refresh_zip`.
+- **NULL, never `''` and never the mapped word,** when the publisher stated nothing or the entry
+  maps no type column. That distinction IS the field's job.
+
+**⛔ NOT in the engine v22 exact-identity dedup key, and it must not be added.** It carries no
+discriminating information the key lacks (same source row as `use_type`), and widening that key
+is how a genuine duplicate starts surviving as two pins — the 2026-07-23 cleanup removed 9,631
+excess copies across 273 cached rows. The reason is recorded **at the key** in `index.ts`, not
+only here, and `test/type-raw-provenance.test.mjs` §8 fails if a future session "completes" it.
+
+**Storage, measured before shipping** (fingerprints matched: 151 entries / 2705.8682 / 4280;
+`dev_rows_matched` 2,799,246 equalled the independent count). Volume-weighted mean raw value
+**17.32 chars** → **+49 MB typical / +83 MB worst** on `app_projects` (4,191 MB) and
+**+26.2–27.0 bytes per jsonb element / +2.1–2.6% ≈ +12 MB** on `development_reports` (506 MB).
+Combined **~+61 MB on 4,697 MB (~2%)**; the 57104 RPC payload goes 26 MB → ~26.3 MB.
+
+**Deliberately UNINDEXED**, matching the `stage` precedent — the audit is an occasional report,
+not a page query, and an index on a 4.2 GB table would cost more than the column.
+
+### The denominator is REQUIRED, so it is a FUNCTION, not a query
+`type_raw` is **non-retroactive**: a row carries it only once its ZIP is re-cached and
+re-materialized. A partial turnover reported without its denominator reads exactly like a
+complete one — so `public.type_raw_audit()` (`docs/type-raw-audit.sql`) always returns
+`coverage.zips_not_yet_refreshed` first, reads the deploy time from `public.engine_deploy_marks`
+rather than accepting one from the caller, and **fails closed**: with no recorded mark it
+returns `complete:false` + an explicit error rather than a 100% figure. Positive control run
+before the mark was inserted — it refused, as designed.
+
+### Turnover: the CRON fills in. No deliberate full re-cache.
+⚠️ **`CLAUDE.md`'s "pg_cron daily auto-refresh (`dev_refresh_fire` 09:00 UTC →
+`dev_refresh_collect` 09:08)" is STALE.** Measured in `cron.job` 2026-08-19: those jobs are gone.
+What runs is **`dev_refresh_tick()` every 15 min** (batch 250, 20-min cooldown) — a continuous
+**oldest-first** rolling re-cache (`order by greatest(refreshed_at, last_refresh_attempt_at) asc
+nulls first`), plus `app_refresh_sweep()` every 15 min for the materializer.
+
+Firing all 12,722 at once is what the old `dev_refresh_fire` did and what this batched tick
+replaced; overriding it would re-introduce a pattern someone deliberately removed. Oldest-first
+ordering already guarantees full turnover with a bounded tail.
+
+**Expected full-pass window, measured from the live `refreshed_at` distribution (not predicted):**
+
+| within | ZIPs | of 12,722 |
+|---|---|---|
+| 1 day | 7,195 | 56.6% |
+| 2 days | 10,365 | 81.5% |
+| 3 days | 11,254 | 88.5% |
+| 7 days | 12,688 | 99.7% |
+| all | 12,722 | oldest 2026-08-07 (11.6 d) |
+
+So **the audit becomes ~complete at 7 days and fully complete at ~12 days.** The materializer is
+not the constraint — all 12,722 `app_community_meta` rows turn over inside ~3.5 h. Don't take
+those dates on faith: `type_raw_audit()` reports the exact outstanding count.
+
+### Item D, ruled and recorded so no future session reopens it
+**The `use_type` vocabulary STAYS CLOSED at six values** (`lib/map.js::TYPE_EXACT`). Evidence:
+fleet-wide there are **0 off-vocabulary rows** — every `FALLBACK:other` record reaches the
+generic circle through a *missing per-entry `type_map` line*, never through a value the
+vocabulary cannot express. The gap is per-entry config, not taxonomy. Widening the vocabulary
+would change every pin shape in the fleet to fix a config problem.
+
+### Still open from that plan
+- **B — Cleveland (`cleveland-issued-building-permits`, 92,378 rows).** HELD until its
+  four-value vocabulary is re-enumerated LIVE. The recon figure is not quotable as current on a
+  swing that size.
+- **C — the per-entry fallback report.** Buildable now that A has landed; run it only against
+  `type_raw_audit().complete`, or state the denominator with it.
+- **E — the "Other project" LABEL.** Founder ruling: *the label is wrong, the behavior is
+  right.* Bring the wording question back **after C exists**, not before.

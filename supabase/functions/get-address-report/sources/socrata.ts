@@ -174,6 +174,19 @@ export interface NormalizedRecord {
   label: string;
   title: string;
   use_type: string;                  // Industrial|Development|Residential|Utility|unclassified
+  /** The publisher's OWN type value, verbatim (trimmed, case preserved), BEFORE type_map is
+   *  applied. Null when the entry maps no type column or the row leaves it empty. The exact
+   *  discipline `status_raw` already follows — and it exists because the mapped `use_type`
+   *  destroys the evidence needed to audit the mapping.
+   *
+   *  WHY: measured 2026-08-18, 128,387 of 2,932,766 development rows carry use_type
+   *  "unclassified", which is what every connector emits when type_map MISSES. Which raw value
+   *  missed was unrecoverable from stored data, so sizing the gap meant re-probing 43 live
+   *  sources — and the answer went stale the moment a publisher added a value. With this field
+   *  the whole question is one GROUP BY, permanently.
+   *  NEVER interpret it, never normalise it, never fall back to the mapped value: a "raw" field
+   *  that has been cleaned up cannot prove what the publisher actually said. */
+  type_raw: string | null;
   bucket: Exclude<Bucket, "exclude">;
   type: "built" | "approved" | "proposed";   // lifecycle for the page (bucket→type)
   relevance: "development";          // permit/case filings are development by construction
@@ -496,6 +509,7 @@ async function normalizeRow(
     label: (title || caseNo || "Development record").slice(0, 120),
     title,
     use_type: useType,
+    type_raw: typeSrcVal || null,   // verbatim publisher value, pre-map (see NormalizedRecord)
     bucket,
     type: BUCKET_TO_TYPE[bucket],
     relevance: "development",

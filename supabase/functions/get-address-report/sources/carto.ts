@@ -281,6 +281,7 @@ async function normalizeRow(
     label: (title || caseNo || "Development record").slice(0, 120),
     title,
     use_type: useType,
+    type_raw: typeSrcVal || null,   // verbatim publisher value, pre-map (see NormalizedRecord)
     bucket,
     type: BUCKET_TO_TYPE[bucket],
     relevance: "development",
