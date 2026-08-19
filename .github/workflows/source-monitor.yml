@@ -96,6 +96,11 @@ jobs:
           else
             echo "status_drift=false" >> "$GITHUB_OUTPUT"
           fi
+          if grep -q '^TYPE_DRIFT=1$' monitor-out.txt; then
+            echo "type_drift=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "type_drift=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Commit report (+ any auto-wired registry entries)
         if: github.event.inputs.dry_run != 'true'
@@ -147,4 +152,14 @@ jobs:
         if: always() && steps.monitor.outputs.status_drift == 'true'
         run: |
           echo "::error::Unmapped status value(s) found in live data for one or more registry entries — those records are being DROPPED by the connectors. See the 'Status-domain drift' table in docs/source-monitor-report.md (also in this run's job summary) for the exact registry_id, status field, values and record counts, then add each value VERBATIM to that entry's status_to_bucket in jurisdiction-registry.json."
+          exit 1
+
+      # Its own step, not folded into the status one: the two failures need DIFFERENT fixes
+      # (status_to_bucket vs include_types + type_map), and one shared error message would send
+      # whoever reads it to the wrong file. Same `always()` + last-position discipline so every
+      # side effect above still completes before the run goes red.
+      - name: Fail on type-domain drift (unlisted include_types values are never fetched)
+        if: always() && steps.monitor.outputs.type_drift == 'true'
+        run: |
+          echo "::error::Live type value(s) found that are in NEITHER include_types NOR observed_types_unreviewed for one or more registry entries. Because include_types is pushed down into the query, those records are NEVER FETCHED — no record, no quarantine, no unclassified pin, only a count that fails to grow (Cleveland's 'Install Permits' was dropped this way for five months). See the 'Type-domain drift' Tier 1 table in docs/source-monitor-report.md (also in this run's job summary), then add each value VERBATIM to that entry's include_types WITH a type_map line — or, if it is deliberate noise, to observed_types_unreviewed with that decision recorded."
           exit 1
