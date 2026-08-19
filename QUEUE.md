@@ -8882,3 +8882,31 @@ estimate. Two design rulings, both recorded so they are not re-litigated:
 2. **Key it on "reaches the generic bucket", NOT on `type='unclassified'`.** Cleveland's 92,372 rows
    would have scored **clean** under the narrower key — they were mapped, just mapped to the generic
    member, which `lib/map.js` treats as non-terminal.
+
+### B GO-LIVE RECEIPTS — deployed 2026-08-19 14:46:48Z (run 32266012276, main@431f019, PR #819)
+
+Live smoke on **ZIP 44113** (Cleveland) through the deployed engine — 200, 5.47 MB, 4,779
+development records, `epa.ok:true`.
+
+**Before** (`app_projects`, same query): **4,664 rows — 4,664 generic `Development`, 0 classified.**
+
+**After** — engine output and `app_projects` agree row-for-row:
+
+| `type_raw` (publisher) | mapped `use_type` | rows |
+|---|---|---|
+| `Building Permits` | `Development` (generic) | 2,642 |
+| `Residential` | **`Residential`** | 1,240 |
+| `Commercial` | **`Commercial`** | 766 |
+| `Install Permits` | `Development` (generic) | **72 — previously ZERO, dropped at source** |
+
+**2,006 of 4,720 records on this page (42.5%) moved off the generic circle onto a real pin
+shape**, matching the 42.2% predicted from the in-window vocabulary. The 72 `Install Permits` rows
+are records that did not exist on any HomeSignal page before today.
+
+`type_raw` is populated on every row, so the mapping on this entry is now auditable from stored
+data alone — no re-probe needed to ask the question again.
+
+⚠️ **Pre-existing and untouched:** 44113's cached row is **5.47 MB**, the known Cleveland
+heavy-page class (44127 at 5.98 MB is the fleet high-water mark). The levers are
+`spatial_zip_radius_mi` or an `out_fields` projection, and radius changes what residents see —
+out of scope here, logged with numbers, unchanged by this PR.
