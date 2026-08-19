@@ -8811,3 +8811,74 @@ that maps every value onto the GENERIC member, which `lib/map.js` treats as non-
 record falls through to keyword guessing and lands on the "Other project" circle. 14,618 source
 rows → 92,372 stored is ~6.3x, the legitimate overlapping-3-mile-circle duplication (Chicago
 precedent), not a dedup defect.
+
+### B WIRED 2026-08-19 (founder ruling) — one PR
+
+| value | in-window rows | mapped to | why |
+|---|---|---|---|
+| `Residential` | 4,556 | **`Residential`** | states a class |
+| `Commercial` | 1,613 | **`Commercial`** | states a class |
+| `Building Permits` | 8,340 | `Development` (generic) | **states NO class** — a specific shape would be fabricated |
+| `Install Permits` | 109 | `Development` (generic) | **ADDED** to include_types — states no class |
+| ~~`Building`~~ | 0 all-time | — | **REMOVED** — a config line asserting a value that never existed |
+
+**6,169 of 14,618 in-window rows (42.2%)** gain a real pin shape; **8,340 (57.1%) correctly stay
+generic.** Founder ruling on the 109: *"Excluding 109 live rows because the whitelist is stale is
+silent under-coverage, not a ruling."*
+
+`test/cleveland-type-map.test.mjs` — 19 assertions. It does **not** stop at the config: it drives
+the SHIPPED `lib/map.js` resolver to prove the categoryKey AND the shape actually change
+(`Development` is non-terminal, so asserting the config alone would prove nothing), and drives the
+SHIPPED arcgis connector to prove an `Install Permits` row is now emitted rather than dropped.
+Suite 108 → 109 files.
+
+---
+
+## 2026-08-19 — 🔴 NEW ITEM: a new `include_types` value SILENTLY DROPS. Nothing catches it.
+
+Founder asked whether any existing mechanism would catch a new value appearing. **It would not**,
+and the two config domains fail in opposite ways — which is why this was invisible:
+
+| domain | entries | a NEW publisher value… | caught by? |
+|---|---|---|---|
+| `status_to_bucket` | **210** | is **excluded**, record DROPPED | ✅ **YES** — `scripts/source-monitor.mjs` reads distinct status values per entry, diffs against the entry's own `status_to_bucket`, and **GATES the run** on in-window unmapped values (tiered: in-window fails, out-of-window is latent/non-failing) |
+| `type_map` | **151** | still **fetched**, lands as `unclassified` | ⚠️ visible in the data — and now NAMEABLE, since `type_raw` records the value verbatim |
+| **`include_types`** | **10** | **NEVER FETCHED** — dropped at source by the pushed-down whitelist | ❌ **NOTHING.** No record, no quarantine, no `unclassified`, no monitor tier. The only symptom is a count that fails to grow. |
+
+The monitor's own comment scopes it: *"An unmapped status is the one soft-fail that DROPS a
+record"* (`source-monitor.mjs:606`). That was true when written. `include_types` drops records too,
+and got no equivalent.
+
+**The exposed fleet is 10 entries / 153 whitelisted values — smaller than feared, and named:**
+`aurora-building-permits` (50 values, CO) · `slo-county-planning-permits` (49, CA) ·
+`nashville-building-permits-issued` (14, TN) · `san-diego-approved-permits` (10, CA) ·
+`fairfax-active-site-construction` (9, VA) · `portland-building-permits` (6, OR) ·
+`columbus-building-permits` (5, OH) · `cleveland-issued-building-permits` (4, OH) ·
+`fairfax-recent-building-permits` (4, VA) · `cincinnati-building-permits` (2, OH).
+
+**Cleveland is the proof this is real, not theoretical:** `Install Permits` appeared 2026-03-18 and
+was silently dropped for five months. Nothing reported it. It surfaced only because a human asked
+for a re-enumeration.
+
+**Proposed shape (NOT built — needs a decision):** extend `source-monitor.mjs`'s existing
+drift machinery to the TYPE domain — probe each of the 10 entries' `type_source` distinct values in
+the connector's own scope **without** `include_types` applied, diff against the whitelist, and
+report in-window unlisted values. Same tiering as statuses. The 10-entry scope makes this cheap.
+
+**One invariant already holds and is now PINNED** (`cleveland-type-map.test.mjs` §4b): every
+whitelisted value has a `type_map` line or a `use_type_const`. Measured fleet-wide today: **0 gaps
+of 10**. That is the *other* direction — a value fetched only to be emitted `unclassified`.
+
+---
+
+## Item C — GATED ON THE AUDIT, NOT THE CALENDAR (founder ruling, 2026-08-19)
+
+Build the per-entry fallback report **when `public.type_raw_audit()` says the turnover is
+trustworthy** — read `coverage.zips_not_yet_refreshed` / `complete`, do not build to the ~2026-08-26
+estimate. Two design rulings, both recorded so they are not re-litigated:
+
+1. **EXACT, driving the shipped classifier over real rows. NOT sampled.** *"Sampling is how we get
+   another Cleveland."*
+2. **Key it on "reaches the generic bucket", NOT on `type='unclassified'`.** Cleveland's 92,372 rows
+   would have scored **clean** under the narrower key — they were mapped, just mapped to the generic
+   member, which `lib/map.js` treats as non-terminal.

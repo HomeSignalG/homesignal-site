@@ -3424,16 +3424,16 @@
    },
    "file_date_kind": "issued",
    "include_types": [
-    "Building",
     "Building Permits",
     "Commercial",
+    "Install Permits",
     "Residential"
    ],
    "type_map": {
-    "Building": "Development",
     "Building Permits": "Development",
-    "Commercial": "Development",
-    "Residential": "Development"
+    "Commercial": "Commercial",
+    "Install Permits": "Development",
+    "Residential": "Residential"
    },
    "status_const": "Issued",
    "extra_where": "PERMIT_TYPE IN ('Building Permit','Construction Project') AND ISSUE_DATE IS NOT NULL",
@@ -3446,7 +3446,12 @@
     "types",
     "record_precision",
     "icon_completeness_2026_07_27",
-    "file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUE_DATE` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8."
+    "file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUE_DATE` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8.",
+    "PERMIT_SUBTYPE RE-ENUMERATED LIVE 2026-08-19, in this entry's own scope (same extra_where, same 365-day window, include_types deliberately NOT applied so exclusions were visible). Every count paired with its control and reconciling EXACTLY: in-window 14,618 rows / 4 distinct values / sum 14,618, agreed by THREE methods (groupBy n DESC, groupBy n ASC, returnDistinctValues); all-time 196,741 rows / 5 values / sum 196,741. In-window: Building Permits 8,340 · Residential 4,556 · Commercial 1,613 · Install Permits 109. All-time adds Mechanical (3 rows, newest 2025-07-09, outside the window).",
+    "⚠️ THIS ENTRY'S VOCABULARY DECAYS — it moved TWICE in 12 months and must be re-probed periodically, not trusted as enumerated. `Building Permits` first appeared 2025-08-29 and is now the in-window PLURALITY (57.1%); `Install Permits` first appeared 2026-03-18, AFTER this entry was wired. Meanwhile `Residential`+`Commercial`, 96% of all-time volume, have fallen to 42.2% of the last year. The publisher is migrating its subtype labels.",
+    "`Building` REMOVED 2026-08-19 — it matched **0 rows all-time**. It was a config line asserting a value that has never existed, and it is why a stale 'four enumerated values' read as confirmed while the live four were different.",
+    "`Install Permits` ADDED to include_types 2026-08-19 (founder ruling): 109 live rows, current to 2026-08-14, were being dropped AT SOURCE purely because the whitelist predated the value. Excluding live rows because a whitelist is stale is silent under-coverage, not a ruling. Mapped to the GENERIC member for the same reason as Building Permits — the label does not state a project class.",
+    "type_map REBUCKETED 2026-08-19: Residential→Residential and Commercial→Commercial (6,169 of 14,618 in-window rows, 42.2%, gain a real pin shape). `Building Permits` (8,340, 57.1%) and `Install Permits` STAY on the generic `Development` member ON PURPOSE — those labels genuinely do not state what is being built, so a specific shape would be a fabricated claim. Before this change all 92,372 stored rows across 39 ZIP pages carried type='Development' and ZERO were 'unclassified': this was never a type_map MISS, it was a type_map that sent every value to the generic member, which lib/map.js treats as non-terminal."
    ],
    "status_to_bucket": {
     "proposed": [],
