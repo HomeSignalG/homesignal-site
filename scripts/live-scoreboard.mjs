@@ -87,57 +87,59 @@ async function fetchZipPages() {
 /**
  * Per-ZIP PAGE record evidence, via the read-only `dev_zip_source_ids` RPC.
  *
- * LIVE MEANS PAGES (founder, 2026-07-31). The RPC reads `app_projects` — the table pages
+ * LIVE MEANS PAGES (founder, 2026-07-31). The RPC's data is `app_projects` — the table pages
  * actually serve — NOT `development_reports`, which is the connector's cache. Those two
  * disagree for as long as it takes app_refresh_zip() to materialize, and reading the cache is
  * how Delaware got reported Live at 68/68 while its pages were still 46/68 with zero rows from
  * the new source. Wired + merged + emitting is not Live.
  *
- * Reading development_reports.sites directly is a multi-MB-per-row read (Cleveland 44127 is
- * 5.98 MB / 5,511 sites), so the aggregation happens server-side and only the ids come back.
+ * Since 2026-08-19 the RPC reads `app_zip_source_ids`, a 9,374-row per-ZIP summary that
+ * app_refresh_zip() maintains AT WRITE TIME, instead of grouping app_projects (3.08M rows /
+ * 4.2 GB) on every call. Same rows, same order, same semantics — verified before the swap by
+ * per-leading-digit md5 parity against the live GROUP BY, 0 mismatches across all 9,374 ZIPs.
+ *
  * Keyset-paginated on `zip` — and that pagination is NOT boilerplate: a single un-paginated
  * call returned the first 5,000 ZIPs only, NV's 89xxx range sorted past the end, and every
  * NV page read as dark. The zero looked exactly like a real finding.
  */
-// PAGE SIZE IS ONE CONSTANT, USED IN BOTH PLACES ON PURPOSE (2026-08-02), AND IT DEGRADES.
+// PAGE SIZE IS ONE CONSTANT, USED IN BOTH PLACES ON PURPOSE (2026-08-02).
 //
-// History, because the first repair was not enough. It was the literal 5000 twice; p_limit=5000
-// returns all 4,286 ZIPs in ONE statement and dies on anon's `statement_timeout=3s` (measured
-// 14,350 ms). Lowering it to 1000 STILL failed live — my timings were taken as `postgres` on a
-// warm cache, which is the wrong scope: the job runs as `anon`, and the scheduled 07:00 call is
-// COLD. Measured as anon, warm: 250 → 47 ms, 500 → 108 ms, 1000 → 216 ms. Cost is linear in page
-// size, so a smaller page is genuinely cheaper per STATEMENT — and the timeout is per statement,
-// not per run.
+// ⛔ THE HALVING LADDER IS GONE (2026-08-19, founder call: "it isn't a lever and only triples
+// time to failure"). It was built for a timeout whose cause is now removed at the source. It
+// never once succeeded on a retry: every run from 2026-08-15 through 2026-08-19 walked
+// 250 → 125 → 50 and then threw anyway, because the statement was not marginally too big — it
+// was aggregating the whole of app_projects, and a page a fifth the size still exceeded 3s.
+// A ladder over a cost that is not dominated by page size only spends three timeouts instead of
+// one, and it does it in the step that fails the job.
 //
-// So: start small, and HALVE on a timeout rather than trusting one tuned number. A constant
-// tuned against today's row count silently becomes wrong as the table grows; a ladder does not.
+// Measured as anon after the summary-table swap: p_limit 250 → 1.6 ms · 1000 → 0.8 ms ·
+// 5000 → 3.1 ms, against anon's `statement_timeout=3s` (pg_db_role_setting, confirmed live).
+// Three orders of magnitude of headroom, and flat rather than linear in page size, because the
+// read is now an index scan over 9,374 rows rather than a grouped scan over 3.08M.
+//
+// ⚠️ THIS MUST STAY STRICTLY BELOW THE RPC'S OWN `least(..., 5000)` CLAMP. The loop terminates
+// on a short page, so if the request ever equalled or exceeded the clamp, a full page would
+// come back SHORT and the walk would stop after one page — ranking on a fraction of the ZIPs
+// with no error at all. That is the same silent-truncation class the pagination exists to
+// prevent, just entered from the other side.
 //
 // The two uses MUST move together. Lowering only the request would leave the terminator at the
 // old size, so the loop would break after the first page and the scoreboard would rank on a
 // fraction of the ZIPs — a wrong answer that looks like a right one, which is worse than the
 // timeout it replaced, because the timeout was loud.
-const ZIP_SOURCE_PAGE = 250;
-const ZIP_SOURCE_PAGE_FLOOR = 50;
+const ZIP_SOURCE_PAGE = 1000;
 
 async function fetchZipSourceIds() {
   const hdr = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
   const map = new Map();
   let after = '';
-  let size = ZIP_SOURCE_PAGE;
   for (;;) {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/dev_zip_source_ids`, {
       method: 'POST', headers: hdr,
-      body: JSON.stringify({ p_after: after, p_limit: size }),
+      body: JSON.stringify({ p_after: after, p_limit: ZIP_SOURCE_PAGE }),
     });
     if (!r.ok) {
       const body = await r.text();
-      // 57014 = statement timeout. The page is too big for this statement — shrink and retry the
-      // SAME cursor position. Never advance `after` on a failure, or ZIPs are skipped silently.
-      if (size > ZIP_SOURCE_PAGE_FLOOR && (r.status >= 500 || body.includes('57014'))) {
-        size = Math.max(ZIP_SOURCE_PAGE_FLOOR, Math.floor(size / 2));
-        console.error(`  [warn] dev_zip_source_ids HTTP ${r.status} — retrying at p_limit=${size}`);
-        continue;
-      }
       throw new Error(`dev_zip_source_ids failed: HTTP ${r.status} ${body}`);
     }
     const page = await r.json();
@@ -148,8 +150,7 @@ async function fetchZipSourceIds() {
       throw new Error('keyset cursor missing: `zip` not returned — refusing to loop');
     }
     after = cursor;
-    // Compare against the size actually REQUESTED for this page, not the initial constant.
-    if (page.length < size) break;
+    if (page.length < ZIP_SOURCE_PAGE) break;
   }
   return map;
 }

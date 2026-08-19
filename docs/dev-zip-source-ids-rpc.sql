@@ -101,3 +101,50 @@ grant execute on function public.dev_zip_source_ids(text, int) to anon, authenti
 -- next call therefore RE-READS EVERYTHING and double-counts — DE read 136 of 68. The shipped
 -- runner is safe because it breaks on a short page, but any hand-written pagination must too.
 
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- v3, 2026-08-19 — migration `dev_zip_source_ids_reads_summary_table`. THIS IS PRODUCTION.
+--
+-- v1 read development_reports (the connector CACHE) and reported cache coverage as page
+-- coverage. v2 (above) corrected the SOURCE to app_projects but kept aggregating 3,079,005 rows
+-- / 4,209 MB on every call. That is what exceeded anon's `statement_timeout=3s`, and because a
+-- reporting step was ordered ahead of the drift gates it took the whole source-monitor job down
+-- with it from 2026-08-16 to 2026-08-19. #823 fixed the ordering; this fixes the cost.
+--
+-- The aggregate is over rows only app_refresh_zip() writes, so it is now computed once per WRITE
+-- into public.app_zip_source_ids and merely READ here. Full rationale, the programmatic function
+-- patch, the backfill and the per-chunk md5 parity receipts: docs/app-zip-source-ids.sql.
+--
+-- ⚠️ `dev_rows > 0` IS LOAD-BEARING, not a tidy-up. v2's GROUP BY emitted a row only for a ZIP
+-- that HAS development rows. The summary carries a row for every ZIP app_refresh_zip has
+-- visited, including ones at zero — deliberately, so a ZIP that loses its last record is
+-- positively written to 0 instead of left stale. Without this filter the RPC would emit ZIPs v2
+-- never did, and the scoreboard's denominator would silently change meaning.
+--
+-- Signature, keyset pagination, ordering and the 5000 clamp are all UNCHANGED, so every caller
+-- keeps working untouched. Pagination stays load-bearing for the reason recorded above.
+--
+-- MEASURED as anon after the swap: p_limit 250 -> 1.6 ms · 1000 -> 0.8 ms · 5000 -> 3.1 ms
+-- (v2's 5000-row page measured 14,350 ms). Flat rather than linear in page size.
+
+create or replace function public.dev_zip_source_ids(p_after text default '', p_limit int default 1000)
+returns table (zip text, source_ids text[])
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $$
+  select s.zip, s.source_ids
+  from public.app_zip_source_ids s
+  where s.dev_rows > 0
+    and s.zip > coalesce(p_after, '')
+  order by s.zip
+  limit least(greatest(coalesce(p_limit, 1000), 1), 5000);
+$$;
+
+revoke all on function public.dev_zip_source_ids(text, int) from public;
+grant execute on function public.dev_zip_source_ids(text, int) to anon, authenticated;
+
+-- ⚠️ CALLER HAZARD INTRODUCED BY THE CLAMP, pinned in test/live-scoreboard.test.mjs: a caller
+-- whose page size is >= 5000 gets a FULL page back SHORT, breaks its loop after one page, and
+-- ranks on a fraction of the ZIPs with no error at all. Request strictly below the clamp.

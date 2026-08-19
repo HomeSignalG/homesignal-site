@@ -230,7 +230,11 @@ test('ROW 264 — all four bucket KEYS must be present; a missing key is PARTIAL
 // The dangerous repair is the half one: lower the request but leave `page.length < 5000` and the
 // loop breaks after the first page, ranking on 1,000 of 4,286 ZIPs. That is a WRONG scoreboard
 // that looks right — strictly worse than the timeout, because the timeout was loud.
-test('dev_zip_source_ids paging: one identifier, no literals, and it degrades', () => {
+//
+// ⚠️ 2026-08-19: the timeout above was NOT a page-size problem and the shrinking that followed
+// treated it as one. The real cost was the RPC aggregating 3.08M app_projects rows per call; it
+// now reads a per-ZIP summary maintained at write time, and the ladder is removed. See check 2.
+test('dev_zip_source_ids paging: one identifier, no literals, and it stays under the clamp', () => {
   const src = readFileSync(new URL('../scripts/live-scoreboard.mjs', import.meta.url), 'utf8');
   const code = src.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
 
@@ -248,21 +252,46 @@ test('dev_zip_source_ids paging: one identifier, no literals, and it degrades', 
   assert.ok(term, 'the loop terminator must not be a numeric literal');
   assert.equal(req[1], term[1], `request uses ${req?.[1]}, terminator uses ${term?.[1]} — they must be the same`);
 
-  // 2. It must DEGRADE, not depend on one tuned number. A constant tuned to today's row count
-  // silently becomes wrong as the table grows; a ladder does not. anon's statement_timeout is
-  // 3s and the scheduled call is cold, which is exactly how p_limit=1000 still failed live.
+  // 2. THE PAGE MUST STAY STRICTLY BELOW THE RPC'S OWN CLAMP.
+  //
+  // ⛔ REPLACES the halving-ladder assertions (2026-08-19). Those required the loop to shrink on
+  // a 57014 and pinned ZIP_SOURCE_PAGE <= 500. Both are withdrawn because the premise was wrong:
+  // the cost was never dominated by page size. dev_zip_source_ids grouped app_projects (3.08M
+  // rows / 4.2 GB) on every call, so a page a fifth the size still blew a 3s timeout. Receipt —
+  // run 32276630120, the LAST run before the fix, walked the whole ladder and threw anyway:
+  //   [warn] HTTP 500 — retrying at p_limit=125 / 62 / 50
+  //   live-scoreboard failed: ... {"code":"57014", ... "canceling statement due to statement timeout"}
+  // Three retries, ~53s, zero successes. The ladder never once recovered a run.
+  //
+  // The RPC now reads the app_zip_source_ids summary app_refresh_zip maintains at write time.
+  // Measured as anon after the swap: 250 -> 1.6 ms · 1000 -> 0.8 ms · 5000 -> 3.1 ms, against
+  // anon's statement_timeout=3s. Flat, not linear — so a ladder has nothing left to trade.
+  //
+  // What DOES still bite is the clamp boundary. The RPC ends `limit least(greatest(p_limit,1),
+  // 5000)`, and the loop terminates on a short page. Request >= the clamp and a FULL result set
+  // comes back SHORT, the walk stops after one page, and the scoreboard ranks on a fraction of
+  // the ZIPs with no error at all — the same silent truncation as the half-repair above, entered
+  // from the other side. So the assertion is a strict inequality, not a tuned ceiling.
   assert.match(code, /const ZIP_SOURCE_PAGE = \d+;/);
-  assert.match(code, /ZIP_SOURCE_PAGE_FLOOR/, 'there must be a floor for the retry ladder');
-  assert.match(code, /57014/, 'a statement timeout must be recognised and retried smaller');
-  assert.match(code, /Math\.floor\(size \/ 2\)/, 'the page must halve on timeout');
+  assert.doesNotMatch(code, /ZIP_SOURCE_PAGE_FLOOR/,
+    'the halving ladder is gone — a floor constant means it came back');
+  assert.doesNotMatch(body, /Math\.floor\(size \/ 2\)/,
+    'the page must not halve on failure: it retries a cost that page size does not drive');
 
+  const RPC_LIMIT_CLAMP = 5000;   // public.dev_zip_source_ids: least(greatest(p_limit,1), 5000)
   const size = Number(code.match(/const ZIP_SOURCE_PAGE = (\d+);/)[1]);
-  assert.ok(size > 0 && size <= 500, `ZIP_SOURCE_PAGE=${size} is too large for anon's 3s timeout on a cold call`);
+  assert.ok(size > 0 && size < RPC_LIMIT_CLAMP,
+    `ZIP_SOURCE_PAGE=${size} must be > 0 and STRICTLY below the RPC's ${RPC_LIMIT_CLAMP} clamp — ` +
+    'at or above it, a full page returns short and the walk truncates silently');
 
-  // 3. THE CURSOR MUST NOT ADVANCE ON FAILURE — otherwise a shrink silently SKIPS ZIPs, which
-  // would under-report coverage while looking like a successful run.
-  const retryBlock = body.slice(body.indexOf('if (!r.ok)'), body.indexOf('const page = await r.json()'));
-  assert.doesNotMatch(retryBlock, /after\s*=/, 'the retry path must not move the keyset cursor');
+  // 3. A FAILED READ MUST THROW, NEVER DEGRADE INTO A PARTIAL WALK. With no retry path there is
+  // no cursor to mishandle, so the old "cursor must not advance on failure" check is subsumed:
+  // the error branch's only legal exit is a throw. A `continue` there would resume the loop with
+  // whatever `after` held and skip ZIPs — under-reporting coverage while looking successful.
+  const errBlock = body.slice(body.indexOf('if (!r.ok)'), body.indexOf('const page = await r.json()'));
+  assert.match(errBlock, /throw new Error/, 'a failed read must throw');
+  assert.doesNotMatch(errBlock, /\bcontinue\b/, 'the error path must not resume the walk');
+  assert.doesNotMatch(errBlock, /after\s*=/, 'the error path must not move the keyset cursor');
 
   // 4. The communities read has the SAME shape (URL limit + terminator) and the same hazard.
   assert.match(code, /const COMMUNITIES_PAGE = \d+;/);
