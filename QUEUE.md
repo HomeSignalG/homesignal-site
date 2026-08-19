@@ -9223,3 +9223,142 @@ from the source tables so it cannot go stale. **The report waits for hours marke
 - **The shadow run cannot measure the second-order effect.** The sweep is budget-limited, so real
   skipping would shorten the rotation, which changes the intervals every branch measures over.
   First-order estimate only.
+
+---
+
+## 🔴 P0 — `homesignal-ingest` Actions have been dead since 2026-08-18 20:18Z (diagnosed 2026-08-19)
+
+**Every notice and meeting feed is frozen for residents.** Ingest repo's jurisdiction; diagnosed
+here because the symptom was found here. **Propose-only on every fix below — nothing was changed.**
+
+### Where it fails: BEFORE a runner is assigned
+
+| | |
+|---|---|
+| last successful run (any workflow) | **2026-08-18 19:56:37Z** — `Ingest heartbeat`, run `32179458019` |
+| last successful `ingest.yml` schedule | **2026-08-18 16:25:55Z**, run `32160255644` |
+| **first failure** | **2026-08-18 20:18:19Z** — `HomeSignal ingest`, run `32181506635` |
+| since | **every run of every workflow fails** — schedule, push, pull_request, workflow_dispatch alike |
+
+**Runs ARE firing.** GitHub created scheduled runs all day (07:56, 08:05, 08:07, 08:31, 09:08,
+09:16, 09:35, 12:37, 13:22, 13:25, 14:17, 16:25 on 08-19). The scheduler is not dropping anything —
+this is not the "cron silently stopped" failure mode.
+
+```
+job 96143014234   started 16:25:55  completed 16:25:57  = 2 seconds
+                  runner_id: 0      runner_name: ""     log download: HTTP 404
+run 32181506635 (08-18 20:18)  billable.UBUNTU.total_ms = 0
+run 32236046924 (08-19 09:08)  billable.UBUNTU.total_ms = 0   <- 13h apart, same signature
+```
+
+**Zero billable milliseconds = the job never executed.** No logs exist because none were produced.
+It hits every workflow and every trigger identically, and a uniform failure across independent
+workflows is an infrastructure fault, never a code fault.
+
+**The discriminator: `homesignal-ingest` is PRIVATE; `homesignal-site` is PUBLIC.** Private-repo
+Actions consume billed minutes, public-repo Actions are free. Same account, same `ubuntu-latest`
+label — and the site repo has been green throughout (source-monitor 16:33, unit + browser CI 17:50).
+
+### ⚠️ CAUSE IS UNVERIFIED — an Actions spending-limit/billing block is the LEADING HYPOTHESIS ONLY
+
+GitHub does not expose the reason through the API (the check-run `output` is empty) and the billing
+endpoint needs account scope this session does not have. **Do not record billing as the cause until
+the billing page has been read.** It fits the documented history — the Actions budget was exhausted
+**twice in 36 hours** around 2026-08-16, which is what prompted the cadence cut — and this would be
+a third in four days, meaning that cut was insufficient. That is a reason to check, not a finding.
+
+Ruled out with receipts: Actions disabled for the repo (runs would not be CREATED; they are) · a
+GitHub incident (the public repo is unaffected on the same account and runner label) · a code or
+config bug (would not fail push, PR, schedule and dispatch identically at 0 ms with no logs) · the
+dead PAT (scheduled runs do not use one).
+
+### Two OTHER failures already in flight — distinct from this one, both already alarmed
+1. **`github_credential` = HTTP 401 Bad credentials** — the vault `github_actions_pat` is dead.
+   Last notified 2026-08-18 23:10. Blocks pg_cron from dispatching `digest.yml`. **Founder owns the
+   rotation.**
+2. **`digest_delivery`** — newest delivery **2026-08-01 22:06Z, 427 hours ago**. 18 days.
+
+### Why nothing alarmed, and the design flaw underneath it
+- `local_news_ingest` threshold is **72h**; at 21.1h it still reads `ok=true`. It fires ~**2026-08-21
+  20:00Z**, ~50 hours after the outage began.
+- `government_notice_ingest` and `meetings_ingest` are **explicitly NOT ALERTABLE**, and
+  `pipeline_health_tick()` records why: *"measured worst normal gap 101.3h vs 113.8h outage — no
+  separating threshold exists."* That reasoning is correct.
+- 🔑 **`Ingest heartbeat (a dropped cron is silent)` is itself a private-repo Actions job.** It dies
+  in exactly the scenario it exists to detect. **The watchdog is inside the thing it watches — that
+  is the design flaw, and it is independent of whatever the billing page says.**
+
+### Resident impact, measured 2026-08-19 17:5xZ
+946 meetings still upcoming (74 elapsed during the gap and correctly vanished — meetings render from
+a LIVE read, so no staleness there) · 4,944 government notices in the 14-day render window, none new
+for 22h · **2,970 local-news items in the 7-day window, and that window SLIDES** — `NEWS_MAX_AGE_DAYS
+= 7`, so local-news tiles start emptying with nothing replacing them · 440 communities fed in the
+last 7 days.
+
+---
+
+## 📋 PROPOSED (none built, none blocked on billing)
+
+### P1. Move the watchdog OUT of the watched repo
+A small scheduled workflow in **`homesignal-site`** (public → free Actions) that evaluates the ingest
+repo's liveness. This survives the exact failure that killed the in-repo heartbeat, and it would have
+survived it today.
+
+⚠️ **It must NOT read the GitHub API to do this.** `homesignal-ingest` is private, so a cross-repo
+read needs a PAT — which re-introduces the credential dependency in a second place, and that
+credential is dead right now. See P2 for what it reads instead.
+
+### P2. Alarm on RUN SUCCESS, not row arrival — and answer the dead-PAT case rather than assume it away
+
+The reasoning holds: row arrival cannot separate outage from quiet (101.3h normal gap vs 113.8h
+outage), but **a fixed schedule makes "no successful run in 6h" separating against a 4h cron.**
+
+**THE PAT DEPENDENCY IS REAL AND IS LIVE RIGHT NOW, so the design removes it from the critical path
+rather than documenting it.** Three layers, and only the middle one needs a credential:
+
+- **Layer 1 — the heartbeat ROW (no PAT, no GitHub API).** The ingest run writes one row to a
+  `ingest_run_heartbeat` table at the END of a successful run, using the `SUPABASE_WRITE_KEY` it
+  already holds. pg_cron reads it directly — no egress, no credential.
+  - 🔑 **This is NOT row-arrival alarming wearing a different hat.** `alerts` rows arrive only when
+    publishers publish, which is why 101.3h quiet gaps are normal. A heartbeat row is written
+    **unconditionally on every successful run, on a fixed schedule** — the denominator is runs, not
+    publisher behaviour. That is precisely what makes it separating.
+  - Written at the END so it attests to completion, not to having started.
+  - Today's failure produces no heartbeat → alarm fires. Correct by construction.
+- **Layer 2 — the GitHub API (PAT).** Adds only the DIAGNOSIS: did the run not fire, fire and fail,
+  or fail pre-runner? Useful, not load-bearing.
+  - ⚠️ **When the PAT is dead this check must go to an explicit UNKNOWN that IS ALERTABLE.** Note
+    the existing `github_credential` check deliberately treats unknown as *not* alertable
+    (`coalesce(_gh_status = 200, true)` / `(_gh_status is not null)`) — correct there, because
+    unknown means "probe fired this tick, read it next tick", a one-tick transient. It would be
+    **wrong here**: for a watchdog, "cannot read" means blind, and blind must never be silent.
+    Layer 1 is the floor underneath, so a dead PAT degrades detail, never detection.
+- **Layer 3 — P1's site-repo workflow reads Layer 1** via the Supabase anon key (already used by
+  `verify-communities`). No PAT anywhere in the detection path, and detection survives the ingest
+  repo being entirely dead.
+
+### P3. What the row-arrival thresholds should become once P2 exists
+
+**Not "tune them" — RE-SCOPE them.** Once run-success alarming exists, elapsed-time row-arrival is
+redundant *as an outage detector*. But it is NOT redundant outright: it is the only thing that
+catches **runs succeeding while writing nothing** — a config or regression fault (the feeds table
+emptied, a filter change dropping everything, the 1,000-row window class). P2 cannot see that at all.
+
+🔑 **Conditioning row arrival on run success makes it separating too.** "Zero rows across the last K
+*successful* runs" has no quiet analogue, because the denominator is runs rather than hours — which
+is exactly the property the 101.3h-vs-113.8h measurement said elapsed time lacks.
+
+- `local_news_ingest` (72h elapsed) → replace with "0 local_news rows across the last K successful
+  Local News registry runs". Stays alertable.
+- `government_notice_ingest` / `meetings_ingest` → **can BECOME alertable** under the same
+  conditioning. The recorded reason they are not — no separating elapsed-time threshold — dissolves
+  when the unit is runs.
+- ⚠️ **K CANNOT BE PROPOSED YET.** The per-run write distribution for gov notices and meetings has
+  NOT been measured, and a K guessed from intuition is how a gate becomes either noise or
+  decoration. Measure writes-per-successful-run over a healthy fortnight first, then set K.
+
+### Sequencing note
+**If the billing page confirms a third exhaustion in four days**, the fetch-layer work — conditional
+GETs (`If-None-Match` / `If-Modified-Since`) and killing the per-endpoint `sess.warm()` — moves ahead
+of any new state expansion, per `homesignal-ingest/CLAUDE.md`'s own ordering. Every tranche of feeds
+raises the burn, so the fetch layer has to get cheaper before the footprint gets bigger.
