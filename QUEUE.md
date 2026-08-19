@@ -8711,3 +8711,174 @@ would change every pin shape in the fleet to fix a config problem.
   `type_raw_audit().complete`, or state the denominator with it.
 - **E — the "Other project" LABEL.** Founder ruling: *the label is wrong, the behavior is
   right.* Bring the wording question back **after C exists**, not before.
+
+### GO-LIVE RECEIPTS — deployed 2026-08-19 13:30:26Z (run 32258428672, main@ca4bc0d, PR #817)
+
+**Before** (78617, pre-deploy control, same query): 505 rows across 4 entries, **0 with `type_raw`**.
+
+**After** — `public.app_projects`, ZIP 78617:
+
+| registry_id | rows | with type_raw | distinct raw | mapped `unclassified` |
+|---|---|---|---|---|
+| `austin-site-plan-cases` | 267 | 243 | 97 | 153 |
+| `austin-subdivision-cases` | 158 | 153 | 48 | 57 |
+| `austin-zoning-cases` | 60 | 60 | 4 | 0 |
+| `txdot-projects-info-all` | 20 | 20 | 9 | 0 |
+
+Verbatim rows, mapped value beside publisher value:
+
+```
+Interport Multifamily                      Commercial     ← "Commercial Multi Family"
+TRAVIS COUNTY CORRECTIONAL COMPLEX -#2     Commercial     ← "Commercial"
+Austin Surf Club                           Residential    ← "Single Family"
+SAND HILL ENERGY CENTER                    unclassified   ← "999"
+Jetstar FBO and Private Hangars ABIA        unclassified   ← "Airport"
+RAMI Transportation                        unclassified   ← "Truck Facility/Office/warehouw"
+Travis County Correctional Complex Storage  unclassified   ← "Storage Building"
+```
+
+**Every one of the 505 sites carries the `type_raw` KEY** in the engine's own output (`has_key = rows`
+on all four entries), so `null` means "the publisher stated nothing", never "the field is missing".
+
+**It answered the question on its first day.** The 166 fallback records gate 2B reported are no longer
+anonymous — top unmapped values at 78617: `999` **43** (an opaque code, not a type), publisher stated
+nothing **29**, `SF, PUB` 5, `SF, ROW` 4, `Mixed Use -  Complete Propsed Use below` 3, `Vacant` 3,
+plus `Mining`, `Light Industrial`, `Civic`, `Airport`, and the publisher's own typo `Miulti-family`.
+Three distinct causes that used to look identical: an opaque sentinel, a joined multi-value
+(`column_map` arrays JOIN), and free prose. That triage is Item C's input.
+
+**The audit, first run:**
+```
+deployed_at  2026-08-19T13:30:26Z      complete  false
+coverage     12,722 total · 108 refreshed since deploy (0.85%) · 12,614 NOT yet refreshed
+rows         2,930,575 connector development rows · 476 with type_raw
+caveat       "12614 of 12722 ZIPs have NOT been re-cached since the 2026-08-19 13:30Z deploy…"
+```
+Exactly the intended behaviour: a 0.85% picture **cannot** be read as complete.
+
+⚠️ **One real event during the go-live, worth keeping.** The first 78617 re-cache came back
+`facilities: 0` with `epa.ok:false, reason:"transient", attempts:18` — a genuine EPA FRS outage, which
+the independent probe cron corroborated (`atlanta-dense` ok=false at 13:30). `dev_refresh_collect`'s
+transient-safe guard **correctly refused** to overwrite 30 cached facilities with 0. The guard was not
+bypassed to produce a receipt; the fire was simply repeated, FRS had recovered (`epa.ok:true`,
+facilities 30), and the write went through the shipped path. A receipt obtained by disabling the
+control that protects the data is not a receipt.
+
+---
+
+## 2026-08-19 — ITEM B GATE: Cleveland's vocabulary re-enumerated LIVE. It had MOVED.
+
+The founder held B until the four values were re-verified live rather than quoted from recon.
+They were right to: **the recon is stale in BOTH directions, and the publisher has been actively
+migrating its labels.** Probed in the connector's own scope (Rule 13 — same `extra_where`, same
+365-day window, `include_types` deliberately NOT applied so exclusions are visible).
+
+**Every count is paired with its control and reconciles EXACTLY.**
+
+| scope | control rows | vocab sum | distinct values | agreeing methods |
+|---|---|---|---|---|
+| in-window (`ISSUE_DATE >= 2025-08-19`) | 14,618 | **14,618** | 4 | groupBy `n DESC` · groupBy `n ASC` · `returnDistinctValues` — all 3 say 4 |
+| all-time | 196,741 | **196,741** | 5 | groupBy |
+
+**The live vocabulary, with first and last appearance:**
+
+| `PERMIT_SUBTYPE` | in-window | all-time | first seen | last seen | in registry? |
+|---|---|---|---|---|---|
+| `Building Permits` | 8,340 | 8,340 | **2025-08-29** | 2026-08-14 | yes |
+| `Residential` | 4,556 | 136,798 | 2015-01-02 | 2026-08-12 | yes |
+| `Commercial` | 1,613 | 51,491 | 2015-01-02 | 2026-08-14 | yes |
+| `Install Permits` | 109 | 109 | **2026-03-18** | 2026-08-14 | **NO — dropped at source** |
+| `Mechanical` | 0 | 3 | 2025-07-09 | 2025-07-09 | no (inert, out of window) |
+| `Building` | **0** | **0** | — | — | yes — **a value that has NEVER existed** |
+
+**Three findings the recon did not have:**
+
+1. **`Building` is fiction.** It sits in both `include_types` and `type_map` and matches **0 rows
+   all-time**. Harmless today, but it is a config line asserting something untrue, and it is the
+   reason "four enumerated values" read as confirmed when the live four are different.
+2. **`Install Permits` (109 rows, current to 2026-08-14) is being DROPPED at source** by
+   `include_types`. It appeared **2026-03-18**, five months AFTER the entry was wired (OH wire
+   pass, 2026-07-17… itself after — so this value arrived between recon and now).
+3. **The publisher is migrating.** `Building Permits` did not exist before 2025-08-29 and is now
+   the **plurality in-window (57.1%)**, while `Residential`+`Commercial` — 96% of all-time volume —
+   have fallen to 42.2% of the last year. Two of the five values were introduced within 12 months.
+   This entry's vocabulary is not stable, and any "enumerated once" claim about it decays.
+
+**Stored footprint, reconciled:** `app_projects` holds **92,372 rows across 39 ZIP pages** for this
+entry (the recon's 92,378, drifted by 6 as the window rolled). **All 92,372 carry `type =
+'Development'`; ZERO are `unclassified`.** So this was never a type_map MISS — it is a type_map
+that maps every value onto the GENERIC member, which `lib/map.js` treats as non-terminal, so every
+record falls through to keyword guessing and lands on the "Other project" circle. 14,618 source
+rows → 92,372 stored is ~6.3x, the legitimate overlapping-3-mile-circle duplication (Chicago
+precedent), not a dedup defect.
+
+### B WIRED 2026-08-19 (founder ruling) — one PR
+
+| value | in-window rows | mapped to | why |
+|---|---|---|---|
+| `Residential` | 4,556 | **`Residential`** | states a class |
+| `Commercial` | 1,613 | **`Commercial`** | states a class |
+| `Building Permits` | 8,340 | `Development` (generic) | **states NO class** — a specific shape would be fabricated |
+| `Install Permits` | 109 | `Development` (generic) | **ADDED** to include_types — states no class |
+| ~~`Building`~~ | 0 all-time | — | **REMOVED** — a config line asserting a value that never existed |
+
+**6,169 of 14,618 in-window rows (42.2%)** gain a real pin shape; **8,340 (57.1%) correctly stay
+generic.** Founder ruling on the 109: *"Excluding 109 live rows because the whitelist is stale is
+silent under-coverage, not a ruling."*
+
+`test/cleveland-type-map.test.mjs` — 19 assertions. It does **not** stop at the config: it drives
+the SHIPPED `lib/map.js` resolver to prove the categoryKey AND the shape actually change
+(`Development` is non-terminal, so asserting the config alone would prove nothing), and drives the
+SHIPPED arcgis connector to prove an `Install Permits` row is now emitted rather than dropped.
+Suite 108 → 109 files.
+
+---
+
+## 2026-08-19 — 🔴 NEW ITEM: a new `include_types` value SILENTLY DROPS. Nothing catches it.
+
+Founder asked whether any existing mechanism would catch a new value appearing. **It would not**,
+and the two config domains fail in opposite ways — which is why this was invisible:
+
+| domain | entries | a NEW publisher value… | caught by? |
+|---|---|---|---|
+| `status_to_bucket` | **210** | is **excluded**, record DROPPED | ✅ **YES** — `scripts/source-monitor.mjs` reads distinct status values per entry, diffs against the entry's own `status_to_bucket`, and **GATES the run** on in-window unmapped values (tiered: in-window fails, out-of-window is latent/non-failing) |
+| `type_map` | **151** | still **fetched**, lands as `unclassified` | ⚠️ visible in the data — and now NAMEABLE, since `type_raw` records the value verbatim |
+| **`include_types`** | **10** | **NEVER FETCHED** — dropped at source by the pushed-down whitelist | ❌ **NOTHING.** No record, no quarantine, no `unclassified`, no monitor tier. The only symptom is a count that fails to grow. |
+
+The monitor's own comment scopes it: *"An unmapped status is the one soft-fail that DROPS a
+record"* (`source-monitor.mjs:606`). That was true when written. `include_types` drops records too,
+and got no equivalent.
+
+**The exposed fleet is 10 entries / 153 whitelisted values — smaller than feared, and named:**
+`aurora-building-permits` (50 values, CO) · `slo-county-planning-permits` (49, CA) ·
+`nashville-building-permits-issued` (14, TN) · `san-diego-approved-permits` (10, CA) ·
+`fairfax-active-site-construction` (9, VA) · `portland-building-permits` (6, OR) ·
+`columbus-building-permits` (5, OH) · `cleveland-issued-building-permits` (4, OH) ·
+`fairfax-recent-building-permits` (4, VA) · `cincinnati-building-permits` (2, OH).
+
+**Cleveland is the proof this is real, not theoretical:** `Install Permits` appeared 2026-03-18 and
+was silently dropped for five months. Nothing reported it. It surfaced only because a human asked
+for a re-enumeration.
+
+**Proposed shape (NOT built — needs a decision):** extend `source-monitor.mjs`'s existing
+drift machinery to the TYPE domain — probe each of the 10 entries' `type_source` distinct values in
+the connector's own scope **without** `include_types` applied, diff against the whitelist, and
+report in-window unlisted values. Same tiering as statuses. The 10-entry scope makes this cheap.
+
+**One invariant already holds and is now PINNED** (`cleveland-type-map.test.mjs` §4b): every
+whitelisted value has a `type_map` line or a `use_type_const`. Measured fleet-wide today: **0 gaps
+of 10**. That is the *other* direction — a value fetched only to be emitted `unclassified`.
+
+---
+
+## Item C — GATED ON THE AUDIT, NOT THE CALENDAR (founder ruling, 2026-08-19)
+
+Build the per-entry fallback report **when `public.type_raw_audit()` says the turnover is
+trustworthy** — read `coverage.zips_not_yet_refreshed` / `complete`, do not build to the ~2026-08-26
+estimate. Two design rulings, both recorded so they are not re-litigated:
+
+1. **EXACT, driving the shipped classifier over real rows. NOT sampled.** *"Sampling is how we get
+   another Cleveland."*
+2. **Key it on "reaches the generic bucket", NOT on `type='unclassified'`.** Cleveland's 92,372 rows
+   would have scored **clean** under the narrower key — they were mapped, just mapped to the generic
+   member, which `lib/map.js` treats as non-terminal.
