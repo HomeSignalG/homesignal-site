@@ -8882,3 +8882,122 @@ estimate. Two design rulings, both recorded so they are not re-litigated:
 2. **Key it on "reaches the generic bucket", NOT on `type='unclassified'`.** Cleveland's 92,372 rows
    would have scored **clean** under the narrower key — they were mapped, just mapped to the generic
    member, which `lib/map.js` treats as non-terminal.
+
+### B GO-LIVE RECEIPTS — deployed 2026-08-19 14:46:48Z (run 32266012276, main@431f019, PR #819)
+
+Live smoke on **ZIP 44113** (Cleveland) through the deployed engine — 200, 5.47 MB, 4,779
+development records, `epa.ok:true`.
+
+**Before** (`app_projects`, same query): **4,664 rows — 4,664 generic `Development`, 0 classified.**
+
+**After** — engine output and `app_projects` agree row-for-row:
+
+| `type_raw` (publisher) | mapped `use_type` | rows |
+|---|---|---|
+| `Building Permits` | `Development` (generic) | 2,642 |
+| `Residential` | **`Residential`** | 1,240 |
+| `Commercial` | **`Commercial`** | 766 |
+| `Install Permits` | `Development` (generic) | **72 — previously ZERO, dropped at source** |
+
+**2,006 of 4,720 records on this page (42.5%) moved off the generic circle onto a real pin
+shape**, matching the 42.2% predicted from the in-window vocabulary. The 72 `Install Permits` rows
+are records that did not exist on any HomeSignal page before today.
+
+`type_raw` is populated on every row, so the mapping on this entry is now auditable from stored
+data alone — no re-probe needed to ask the question again.
+
+⚠️ **Pre-existing and untouched:** 44113's cached row is **5.47 MB**, the known Cleveland
+heavy-page class (44127 at 5.98 MB is the fleet high-water mark). The levers are
+`spatial_zip_radius_mi` or an `out_fields` projection, and radius changes what residents see —
+out of scope here, logged with numbers, unchanged by this PR.
+
+---
+
+## 2026-08-19 — TYPE-DOMAIN DRIFT GATE (include_types) — built, approved shape
+
+`status_to_bucket` drift gates the run because an unmapped status drops a record. `include_types`
+drops records the same way and had **no equivalent**. It now gates at the same severity.
+
+**The three failure modes, which are NOT the same:**
+
+| domain | a new publisher value… | visible as |
+|---|---|---|
+| `status_to_bucket` | FETCHED, then excluded | an unmapped status in the run report |
+| `type_map` | FETCHED, emitted `unclassified` | a pin on the page, now NAMED by `type_raw` |
+| **`include_types`** | **NEVER FETCHED** — the whitelist is pushed down INTO THE QUERY | **nothing. A count that fails to grow.** |
+
+### The baseline, and why it is not a softening
+Measured live in each connector's own scope: SLO keeps 49 of 83 live values, Aurora 50 of 60,
+Columbus 5 of 7, Cincinnati 2 of 11. A literal "any unlisted value gates" fires on **80 values**
+night one, almost all deliberate noise. The gate therefore fires on a value in **NEITHER**
+`include_types` **NOR** `observed_types_unreviewed`.
+
+⚠️ **`observed_types_unreviewed` means "observed at baseline and NOT fetched". It does NOT mean
+reviewed and does NOT mean approved.** The name carries *unreviewed* so a future session reading
+it cold cannot mistake it for a blessing. Nothing in the code or the report asserts those 80
+values are correct to exclude — **that review is a separate pass the founder owns, and the gate
+does not wait on it.**
+
+**Seeded 2026-08-19 with an md5 fingerprint on BOTH sides** (server-side
+`md5(string_agg(val, E'\n' order by val collate "C"))` vs Python `sorted()` — rule 8 + rule 9),
+re-verified by reading the file back off disk. 210 → 210 entries, **nothing changed but the added
+field**, 8 entries seeded, 80 values.
+
+| entry | live values | fetched | observed-not-fetched |
+|---|---|---|---|
+| `slo-county-planning-permits` | 83 | 44 | **39** |
+| `nashville-building-permits-issued` | 26 | 12 | **14** |
+| `aurora-building-permits` | 60 | 47 | **13** |
+| `cincinnati-building-permits` | 11 | 2 | **9** |
+| `columbus-building-permits` | 7 | 2 | **5** |
+| `cleveland` · `fairfax-active` · `fairfax-recent` | 4 / 9 / 4 | all | **0** (enumerated, emits nothing unfetched) |
+| `portland-building-permits` · `san-diego-approved-permits` | — | — | **BASELINE NOT ESTABLISHED** |
+
+Every enumeration reconciled EXACTLY to its own `returnCountOnly` control: Cleveland 14,618 ·
+Columbus 42,395 · Nashville 9,080 · Aurora 15,890 · SLO 36,495 · Fairfax 2,148 / 4,049 ·
+Cincinnati 11,266.
+
+### 🔴 A REAL DROP THE BASELINE IS HIDING — first candidate for the review pass
+**SLO emits `Renewable Energy ` with a TRAILING SPACE — 3,386 in-window rows — while the entry
+declares `Renewable Energy` clean.** Those rows are **not fetched**. This is not a formatting
+artefact: `includeTypesClause` trims the CONFIG value when building `col IN (…)`, but the live
+side is the raw column and the database matches byte-exactly. Same for `Express ` (1,683 rows).
+It is on the baseline (so non-gating) precisely because a baseline records *what is*, not *what
+should be* — and it is exactly the class of genuine miss that hides among deliberate noise.
+
+**This asymmetry was a bug in my first implementation and the self-test caught it.** I trimmed the
+live value, which made a padded value look fetched. Corrected: **config trimmed, live verbatim**,
+matching the connector.
+
+### BASELINE NOT ESTABLISHED is a THIRD state, never "clean"
+An ABSENT `observed_types_unreviewed` means nobody ever enumerated that entry — its silence
+attests to nothing. An EMPTY ARRAY is the opposite: a positive "enumerated, emits nothing
+unfetched." Never collapsed to one falsy check (pinned, B1–B4). Two entries are in it:
+**Portland** (groupBy returned unreachable while its control returned 200/896 — the layer is
+alive, the groupBy specifically failed) and **San Diego** (15 MB CSV, not enumerable via pg_net).
+The monitor has runner egress and establishes them on its first pass. Both render as their own
+report table, never a blank cell.
+
+### Tier 3, permanent: DECLARED values matching ZERO live rows
+Cleveland's fictional `Building` was not a one-off — **13 more across the fleet** (Columbus 3 of
+5, Aurora 3, SLO 5, Nashville 2). Non-gating, own tier, permanent.
+
+### The rest
+- **`source-monitor.mjs:606` corrected.** It claimed an unmapped status was "THE ONE soft-fail
+  that DROPS a record" — true when written, false since, and a stale comment asserting
+  exclusivity is how this stayed invisible.
+- **`TYPE_DRIFT=1`** with its **own** failing workflow step — not folded into the status one,
+  because the two need different fixes and one shared error message would send the reader to the
+  wrong file. Same `always()` + last-position discipline so every side effect completes first.
+- **`soleTypeCol` restated** in `scripts/lib/type-drift.mjs`, not imported: the nightly workflow
+  pins **Node 20**, which has no TS type stripping. The test asserts the restatement against the
+  SHIPPED connector's exported version on a runtime that can (gate2 precedent).
+- **The whitelist/mapping invariant is now permanent** — every whitelisted value has a `type_map`
+  line or a `use_type_const`, asserted fleet-wide with a planted-gap positive control so its
+  silence means something. Holds today: **0 gaps of 10**.
+- **`observed_types_unreviewed` declared as an ANNOTATION key** in
+  `connector-option-surface.test.mjs` — that guard failed the build first, correctly: it is
+  monitor-only and must never influence a fetch, or the baseline would start widening ingestion.
+
+Suite 109 → **110 files**; 30 assertions in `test/type-domain-drift.test.mjs`, self-tested in both
+directions (a planted new value GATES; an unchanged vocabulary does NOT).

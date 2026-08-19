@@ -1264,6 +1264,17 @@
      "records_at_first_seen": 0,
      "asked": "ASKED 2026-07-30 (pg_net; sandbox has no egress). (1) Socrata dataset metadata https://data.cincinnati-oh.gov/api/views/uhjb-xac9.json -> 200: the `statuscurrentmapped` column carries an EMPTY description; so does `statuscurrent`. No column-level definition is published. (2) The dataset description states \"A data dictionary providing definitions of columns and attributes is available as an attachment\", and the attachment does exist: \"Cincinnati Building Permits Data Dictionary.pdf\", assetId 8a0b9735-8510-4281-9e7a-04fddc4525af. Fetched 200 but it is a FlateDecode-compressed PDF and pg_net stores responses as text (truncated at the first NUL, 206 chars), so it COULD NOT BE READ from this environment — not that it does not exist. A human with ordinary web access can open it and this value should be bucketed or confirmed from it. (3) Decisive live evidence instead: grouping `statuscurrent` (raw) against `statuscurrentmapped` over all history returns the value UNCHANGED for all seven codes (PAID 279, APRV_NR 81, REVIEWED 8, ADD INS/BILLED/CAGIS/RENEW 1 each) — the publisher's OWN mapping column does not expand them, which is why they read as raw internal codes. Not bucketed: the source states no lifecycle stage."
     }
+   ],
+   "observed_types_unreviewed": [
+    "Elevator Permit",
+    "Excavation/Fill",
+    "Fire Protection Systems",
+    "HVAC",
+    "Misc. Structures",
+    "Non-Standard Permit Type",
+    "Parking Lots",
+    "Plumbing Permits",
+    "Signs"
    ]
   },
   {
@@ -3395,7 +3406,14 @@
     "B1_ALT_ID",
     "ACA_URL"
    ],
-   "page_size": 2000
+   "page_size": 2000,
+   "observed_types_unreviewed": [
+    "Fire Protection",
+    "MEP",
+    "Plans Examination",
+    "Sign",
+    "Special"
+   ]
   },
   {
    "registry_id": "cleveland-issued-building-permits",
@@ -3460,7 +3478,8 @@
     ],
     "operating": [],
     "exclude": []
-   }
+   },
+   "observed_types_unreviewed": []
   },
   {
    "registry_id": "nashville-building-permits-issued",
@@ -3554,6 +3573,22 @@
     "icon_completeness_2026_07_27",
     "widened_before_enforcement_2026_08_03",
     "file_date_kind 'issued' — SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `Date_Issued` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md §Y6/§Y7/§Y8."
+   ],
+   "observed_types_unreviewed": [
+    "Building Commercial - Amend Permit",
+    "Building Commercial - Change Contractor",
+    "Building Commercial - Fire Damage",
+    "Building Commercial - Roofing / Siding",
+    "Building Demolition Storm Damage",
+    "Building Residential - Amend Permit",
+    "Building Residential - Change Contractor",
+    "Building Residential - Fire Damage",
+    "Building Residential - Roofing / Siding",
+    "Building Residential New Storm Damage",
+    "Building Residential Rehab Storm Damage",
+    "Building Sign Permit",
+    "Building Tree Removal Permit",
+    "Building Use & Occupancy"
    ]
   },
   {
@@ -4201,7 +4236,8 @@
    "extra_where": "APPTYPEALIAS NOT IN ('Bond Extension','Bond Reduction')",
    "spatial_zip_radius_mi": 3,
    "record_url_precision": "record",
-   "_receipts": "2026-07-25 pg_net recon (response ids 111159-111183). CORRECTED-URL RETRY: Fairfax County's ArcGIS Server is at www.fairfaxcounty.gov/mercator/rest/services (v10.91), NOT a data./opendata. host. LDS (Land Development Services) folder -> DevelopmentTracker FeatureServer, LAYER 1 'Active Site Construction - Centroid Point' (esriGeometryPoint, 2,183 rows). FRESHNESS GATE PASSED (Detroit precedent, checked BEFORE wiring): max last_edited_date 2026-07-25 (same day), max RECORD_STATUS_DATE 2026-07-22, max SUBMITTED_DATE 2026-07-21 -- actively maintained. RECORD-PRECISION record_url: LINK_URL is populated on EVERY row (IS NULL count = 0) and is a per-record Accela ACA deep link (plus.fairfaxcounty.gov/CitizenAccess/urlrouting.ashx?...capID1=... &agencyCode=FFX) -- Fairfax's Accela PLUS system republished through ArcGIS. RECORD_STATUS is a clean verbatim 8-value vocabulary mapped exactly: Approved 1,170 + Revised 871 -> approved (both are live approved site-construction records; 'Revised' is an approved plan under revision), Closed 133 -> operating (construction concluded), and Denied 1 / Expired 1 / Voided 3 / Withdrawn 3 / 'Revised - Pending Customer' 1 -> exclude. APPTYPEALIAS is an 11-value vocabulary; the 9 real development plan types are kept (Infill Lot Grading Plan 1,210, Site Plan 283, Minor Site Plan 168, Subdivision Grading Plan 139, Rough Grading Plan 119, DPWES Plan 90, Subdivision Plan 66, Public Improvement Plan 59, Conservation Plan 45) and the 4 financial-administration rows are dropped at source (Bond Reduction 3, Bond Extension 1). ZIP SCOPING IS SPATIAL, NOT NATIVE: ZIP_CODE is NULL on 457 of 2,183 rows (21%) and the populated values mix 5-digit with unpunctuated ZIP+4 ('201212503', '220035505'), so it is not a reliable filter key -> spatial_zip_radius_mi 3 on each record's own point. NO recency_days ON PURPOSE: this layer is the county's ACTIVE-construction tracker, not an issuance ledger -- the county already scopes it to what is currently being built, and a 365d filter on SUBMITTED_DATE would keep only 371 of 2,183 rows, dropping long-running projects that are actively under construction today (exactly what a resident needs to see). Freshness is instead assured by the daily-edited source + the RECORD_STATUS gate. Coverage gated to VA/Fairfax (47 modeled ZIP pages, all 47 dev-empty). NOT WIRED from the same server: Pbw_public/ROWMSPermits on Dallas's server is right-of-way work (its own serviceDescription: 'construction in public right-of-way, including the street, median and parkway') -- street cuts, not building development. | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 8 RECORD_STATUS values (Approved 1,165 / Revised 893 / Closed 139 / Withdrawn 4 / Voided 3 / 'Revised - Pending Customer' 1 / Denied 1 / Expired 1), all mapped — an ACTIVE site-construction layer carries no pre-approval state, so proposed:[]."
+   "_receipts": "2026-07-25 pg_net recon (response ids 111159-111183). CORRECTED-URL RETRY: Fairfax County's ArcGIS Server is at www.fairfaxcounty.gov/mercator/rest/services (v10.91), NOT a data./opendata. host. LDS (Land Development Services) folder -> DevelopmentTracker FeatureServer, LAYER 1 'Active Site Construction - Centroid Point' (esriGeometryPoint, 2,183 rows). FRESHNESS GATE PASSED (Detroit precedent, checked BEFORE wiring): max last_edited_date 2026-07-25 (same day), max RECORD_STATUS_DATE 2026-07-22, max SUBMITTED_DATE 2026-07-21 -- actively maintained. RECORD-PRECISION record_url: LINK_URL is populated on EVERY row (IS NULL count = 0) and is a per-record Accela ACA deep link (plus.fairfaxcounty.gov/CitizenAccess/urlrouting.ashx?...capID1=... &agencyCode=FFX) -- Fairfax's Accela PLUS system republished through ArcGIS. RECORD_STATUS is a clean verbatim 8-value vocabulary mapped exactly: Approved 1,170 + Revised 871 -> approved (both are live approved site-construction records; 'Revised' is an approved plan under revision), Closed 133 -> operating (construction concluded), and Denied 1 / Expired 1 / Voided 3 / Withdrawn 3 / 'Revised - Pending Customer' 1 -> exclude. APPTYPEALIAS is an 11-value vocabulary; the 9 real development plan types are kept (Infill Lot Grading Plan 1,210, Site Plan 283, Minor Site Plan 168, Subdivision Grading Plan 139, Rough Grading Plan 119, DPWES Plan 90, Subdivision Plan 66, Public Improvement Plan 59, Conservation Plan 45) and the 4 financial-administration rows are dropped at source (Bond Reduction 3, Bond Extension 1). ZIP SCOPING IS SPATIAL, NOT NATIVE: ZIP_CODE is NULL on 457 of 2,183 rows (21%) and the populated values mix 5-digit with unpunctuated ZIP+4 ('201212503', '220035505'), so it is not a reliable filter key -> spatial_zip_radius_mi 3 on each record's own point. NO recency_days ON PURPOSE: this layer is the county's ACTIVE-construction tracker, not an issuance ledger -- the county already scopes it to what is currently being built, and a 365d filter on SUBMITTED_DATE would keep only 371 of 2,183 rows, dropping long-running projects that are actively under construction today (exactly what a resident needs to see). Freshness is instead assured by the daily-edited source + the RECORD_STATUS gate. Coverage gated to VA/Fairfax (47 modeled ZIP pages, all 47 dev-empty). NOT WIRED from the same server: Pbw_public/ROWMSPermits on Dallas's server is right-of-way work (its own serviceDescription: 'construction in public right-of-way, including the street, median and parkway') -- street cuts, not building development. | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 8 RECORD_STATUS values (Approved 1,165 / Revised 893 / Closed 139 / Withdrawn 4 / Voided 3 / 'Revised - Pending Customer' 1 / Denied 1 / Expired 1), all mapped — an ACTIVE site-construction layer carries no pre-approval state, so proposed:[].",
+   "observed_types_unreviewed": []
   },
   {
    "registry_id": "fairfax-recent-building-permits",
@@ -4270,7 +4306,8 @@
    "recency_days": 365,
    "spatial_zip_radius_mi": 3,
    "record_url_precision": "record",
-   "_receipts": "2026-07-25 pg_net recon (response ids 111626-111653), Batch 5. Same DevelopmentTracker service already proven edge-runtime-reachable by fairfax-active-site-construction (8,112 records live in production), so the egress gate that killed El Paso is already satisfied for this host. LAYER 4 'Recent Building Permits - Centroid Point': 11,325 rows, esriGeometryPoint. FRESHNESS GATE PASSED: max last_edited_date 2026-07-25 (same day), max SUBMITTED_DATE 2026-07-21. RECORD-PRECISION record_url: LINK_URL IS NULL count = 0 -- every row carries a per-record Accela ACA Building deep link (plus.fairfaxcounty.gov/CitizenAccess/urlrouting.ashx?type=1000&Module=Building&capID1=...&agencyCode=FFX). RECORD_STATUS is a clean verbatim 7-value vocabulary mapped exactly: Issued 11,055 + Issued - Amendment Pending 219 + Critical Structures Approved 2 + Inspection Phase 1 -> approved; Inspections Completed 1 -> operating; Submitted 1 -> proposed; Refund Request Pending 46 -> exclude (permit being refunded/withdrawn). APPTYPEALIAS is a clean 4-value vocabulary, ALL of it real building construction, so all four are kept: Residential Addition/Alteration 6,604, Commercial Addition/Alteration 2,748, Residential New 1,105, Commercial New 868. TITLE: PROJECT_NAME is blank on 1,921 of 11,325 rows (17%), so the title leads with APPTYPEALIAS and appends PROJECT_NAME when present (Cleveland title:[PERMIT_SUBTYPE,JOB_DESCRIPTION] precedent) -- a record is never titled by its bare permit number. ADDRESS_1 is blank on exactly 1 row. SPATIAL ZIP scoping, not native: ZIP_CODE carries hyphenated ZIP+4 ('20124-1307'), same unreliability as layer 1. recency_days 365 (3,964 of 11,325 rows) -- unlike layer 1 this IS an issuance ledger spanning back to 2021, so the standard 365d permit window applies; showing 5-year-old issued permits as current development would be misleading. SIBLING LAYERS REJECTED WITH RECEIPTS -- all POLYGON, and the arcgis connector flattens POINT geometry only (f.geometry.x/y), so a polygon layer yields no coordinates, no markers, and would degrade every record to area scope: layer 0 'Data Center Development', layer 2 'Active Site Construction - Parcels' (a duplicate of the already-wired layer 1 in parcel form), layer 5 'Recent Building Permits - Parcels' (duplicate of this layer), layer 6 'Certificate of Occupancy', and LDS/PLUSApprovedSiteRecords. Layer index 3 does not exist. NOTE ON YIELD: Fairfax was already 46 of 47 ZIP pages populated by layer 1, so this source adds RECORDS to live pages (charter P3), not newly populated pages (charter P1). | 2026-08-01 coverage extension -> VA Arlington. Config only. Control 20120 (Fairfax, live) = 711. ALL 11 dark Arlington ZIPs carry records: 22213 1,304 / 22205 839 / 22207 597 / 22203 440 / 22204 264 / 22206 217 / 22201 200 / 22214 84 / 22211 67 / 22209 36 / 22202 5 in envelope. Go-live 1,365 records over 11 pages. The sibling entry fairfax-active-site-construction was NOT probed and is NOT extended."
+   "_receipts": "2026-07-25 pg_net recon (response ids 111626-111653), Batch 5. Same DevelopmentTracker service already proven edge-runtime-reachable by fairfax-active-site-construction (8,112 records live in production), so the egress gate that killed El Paso is already satisfied for this host. LAYER 4 'Recent Building Permits - Centroid Point': 11,325 rows, esriGeometryPoint. FRESHNESS GATE PASSED: max last_edited_date 2026-07-25 (same day), max SUBMITTED_DATE 2026-07-21. RECORD-PRECISION record_url: LINK_URL IS NULL count = 0 -- every row carries a per-record Accela ACA Building deep link (plus.fairfaxcounty.gov/CitizenAccess/urlrouting.ashx?type=1000&Module=Building&capID1=...&agencyCode=FFX). RECORD_STATUS is a clean verbatim 7-value vocabulary mapped exactly: Issued 11,055 + Issued - Amendment Pending 219 + Critical Structures Approved 2 + Inspection Phase 1 -> approved; Inspections Completed 1 -> operating; Submitted 1 -> proposed; Refund Request Pending 46 -> exclude (permit being refunded/withdrawn). APPTYPEALIAS is a clean 4-value vocabulary, ALL of it real building construction, so all four are kept: Residential Addition/Alteration 6,604, Commercial Addition/Alteration 2,748, Residential New 1,105, Commercial New 868. TITLE: PROJECT_NAME is blank on 1,921 of 11,325 rows (17%), so the title leads with APPTYPEALIAS and appends PROJECT_NAME when present (Cleveland title:[PERMIT_SUBTYPE,JOB_DESCRIPTION] precedent) -- a record is never titled by its bare permit number. ADDRESS_1 is blank on exactly 1 row. SPATIAL ZIP scoping, not native: ZIP_CODE carries hyphenated ZIP+4 ('20124-1307'), same unreliability as layer 1. recency_days 365 (3,964 of 11,325 rows) -- unlike layer 1 this IS an issuance ledger spanning back to 2021, so the standard 365d permit window applies; showing 5-year-old issued permits as current development would be misleading. SIBLING LAYERS REJECTED WITH RECEIPTS -- all POLYGON, and the arcgis connector flattens POINT geometry only (f.geometry.x/y), so a polygon layer yields no coordinates, no markers, and would degrade every record to area scope: layer 0 'Data Center Development', layer 2 'Active Site Construction - Parcels' (a duplicate of the already-wired layer 1 in parcel form), layer 5 'Recent Building Permits - Parcels' (duplicate of this layer), layer 6 'Certificate of Occupancy', and LDS/PLUSApprovedSiteRecords. Layer index 3 does not exist. NOTE ON YIELD: Fairfax was already 46 of 47 ZIP pages populated by layer 1, so this source adds RECORDS to live pages (charter P3), not newly populated pages (charter P1). | 2026-08-01 coverage extension -> VA Arlington. Config only. Control 20120 (Fairfax, live) = 711. ALL 11 dark Arlington ZIPs carry records: 22213 1,304 / 22205 839 / 22207 597 / 22203 440 / 22204 264 / 22206 217 / 22201 200 / 22214 84 / 22211 67 / 22209 36 / 22202 5 in envelope. Go-live 1,365 records over 11 pages. The sibling entry fairfax-active-site-construction was NOT probed and is NOT extended.",
+   "observed_types_unreviewed": []
   },
   {
    "registry_id": "frisco-active-building-permits",
@@ -8959,6 +8996,21 @@
     "Group E Private School",
     "Miscellaneous Structure",
     "Non-Res Fire Damage Repair-NT6"
+   ],
+   "observed_types_unreviewed": [
+    "Electrical Permit",
+    "Fence Permit",
+    "Fire Alarm Permit",
+    "Fire Sprinkler Permit",
+    "Gating System",
+    "Hood Suppression Permit",
+    "Mechanical Permit",
+    "Occupancy Load Sign Calculation",
+    "Plan Revisions",
+    "Plumbing Permit",
+    "Residential Elevator Permit",
+    "Roofing Commercial-NT2",
+    "Roofing-RT2"
    ]
   },
   {
@@ -11405,7 +11457,48 @@
    "recency_days": 1825,
    "spatial_zip_radius_mi": 3,
    "record_url_precision": "dataset",
-   "_receipts": "2026-08-05 CALIFORNIA pass. San Luis Obispo County's OWN ArcGIS Server (gis.slocounty.ca.gov), PLN folder, PLN_EG_SERVICES_DATA MapServer layer 79 'Prod1PointHistory' - the production EnerGov case-history point layer (Dev1*/Stage1* are the non-production twins and are NOT wired). 50,969 rows, esriGeometryPoint. FOUND BY ENUMERATION, NOT GUESS: /arcgis/rest/services -> folder roster -> PLN -> 6 MapServices -> layer roster of 84; the AGO title search for 'San Luis Obispo permits' returned 10 items and surfaced only water-well and inspection-zone layers (weak instrument, non-zero denominator). FRESH: max(ApplicationDate) = 2026-08-04, one day before this pass; min = 1988-09-27. ApplicationDate is esriFieldTypeDate and is populated on 50,969 of 50,969 (100%) - count(ApplicationDate) returned exactly the layer count. WINDOW - BOTH MEASURED per the standing decision policy: require-a-date is VACUOUS here (dates are 100% populated, so it filters nothing and would reach back to 1988); 365d = 8,319, 1095d = 24,119, 1825d = 36,386 of 50,969. The choice was made on the DENSEST PAGES MEASURED DIRECTLY, not projected: a 3-mile envelope around the two densest SLO ZIP centroids returns Paso Robles 93446 218 / 724 / 1,345 and San Luis Obispo 93401 299 / 797 / (n/a) at 365 / 1095 / 1825 days. 1825 chosen under the rule applied across this pass - take the largest window (capped at 1825) whose worst MEASURED page stays far under the ceiling (Cleveland 44127, 5,511 sites / 5.98 MB): Paso Robles at 1825 is 1,345 raw, ~875 after the 65% type whitelist. TYPE VOCABULARY IS COMPLETE: CaseType has 93 distinct values summing EXACTLY to 50,969, proven twice - groupBy ordered n DESC and n ASC both returned 93 values totalling 50,969 (the Mesa/Gilbert $limit-truncation defence). 49 construction/land-use values are kept (33,138 rows); the 44 dropped are records-research (Research 5,638), enforcement (Code Enforcement 2,187, Cannabis Code, Vehicle Abatement), trades noise (Residential/Commercial Mechanical / Electrical / Plumbing 1,389), over-the-counter minor work (Express 1,664 + PMTX 318), septic (888+28+4 - the same wrong-record-class call made against Sonoma's septic layer), and procedural records (Application, Map Number, Lot, Pre-Application, Determination, CEQA, monitoring, time extensions, appeals, amendments). WorkClass was measured too (209 values, also summing exactly to 50,969) and NOT used - CaseType is the coarser, self-describing field. TRAILING-SPACE VALUES VERIFIED, NOT ASSUMED: two publisher values carry a trailing space ('Renewable Energy ', 'Express ') and includeTypesClause trims before quoting. Probed live: CaseType IN ('Renewable Energy') -> 3,359 and IN ('Express') -> 1,664, exactly the groupBy counts for the space-carrying values, so the SQL Server padding semantics hold. 'Renewable Energy  ASB' keeps its INTERNAL double space in the type_map key (trim only strips the ends). STATUS: the layer publishes NO status column - 13 fields, none of them a status. status_const 'Submitted' is the self-describing value the record actually attests (an application was filed on ApplicationDate) and buckets to proposed; approved/operating/exclude are deliberately EMPTY because this vocabulary states no such stage, and inventing one would be a guess (NDOT/VTrans precedent). RECORD URL: no per-record URL column. The county's own Planning & Building page links its Tyler EnerGov Citizen Self Service portal, so dataset_url is that portal's search page - recovered from the county page's HTML, never templated from CaseId (the Boston/Philadelphia dataset-precision precedent). SCOPE: San Luis Obispo County had 29 modelled ZIP pages and 0 lit before this entry."
+   "_receipts": "2026-08-05 CALIFORNIA pass. San Luis Obispo County's OWN ArcGIS Server (gis.slocounty.ca.gov), PLN folder, PLN_EG_SERVICES_DATA MapServer layer 79 'Prod1PointHistory' - the production EnerGov case-history point layer (Dev1*/Stage1* are the non-production twins and are NOT wired). 50,969 rows, esriGeometryPoint. FOUND BY ENUMERATION, NOT GUESS: /arcgis/rest/services -> folder roster -> PLN -> 6 MapServices -> layer roster of 84; the AGO title search for 'San Luis Obispo permits' returned 10 items and surfaced only water-well and inspection-zone layers (weak instrument, non-zero denominator). FRESH: max(ApplicationDate) = 2026-08-04, one day before this pass; min = 1988-09-27. ApplicationDate is esriFieldTypeDate and is populated on 50,969 of 50,969 (100%) - count(ApplicationDate) returned exactly the layer count. WINDOW - BOTH MEASURED per the standing decision policy: require-a-date is VACUOUS here (dates are 100% populated, so it filters nothing and would reach back to 1988); 365d = 8,319, 1095d = 24,119, 1825d = 36,386 of 50,969. The choice was made on the DENSEST PAGES MEASURED DIRECTLY, not projected: a 3-mile envelope around the two densest SLO ZIP centroids returns Paso Robles 93446 218 / 724 / 1,345 and San Luis Obispo 93401 299 / 797 / (n/a) at 365 / 1095 / 1825 days. 1825 chosen under the rule applied across this pass - take the largest window (capped at 1825) whose worst MEASURED page stays far under the ceiling (Cleveland 44127, 5,511 sites / 5.98 MB): Paso Robles at 1825 is 1,345 raw, ~875 after the 65% type whitelist. TYPE VOCABULARY IS COMPLETE: CaseType has 93 distinct values summing EXACTLY to 50,969, proven twice - groupBy ordered n DESC and n ASC both returned 93 values totalling 50,969 (the Mesa/Gilbert $limit-truncation defence). 49 construction/land-use values are kept (33,138 rows); the 44 dropped are records-research (Research 5,638), enforcement (Code Enforcement 2,187, Cannabis Code, Vehicle Abatement), trades noise (Residential/Commercial Mechanical / Electrical / Plumbing 1,389), over-the-counter minor work (Express 1,664 + PMTX 318), septic (888+28+4 - the same wrong-record-class call made against Sonoma's septic layer), and procedural records (Application, Map Number, Lot, Pre-Application, Determination, CEQA, monitoring, time extensions, appeals, amendments). WorkClass was measured too (209 values, also summing exactly to 50,969) and NOT used - CaseType is the coarser, self-describing field. TRAILING-SPACE VALUES VERIFIED, NOT ASSUMED: two publisher values carry a trailing space ('Renewable Energy ', 'Express ') and includeTypesClause trims before quoting. Probed live: CaseType IN ('Renewable Energy') -> 3,359 and IN ('Express') -> 1,664, exactly the groupBy counts for the space-carrying values, so the SQL Server padding semantics hold. 'Renewable Energy  ASB' keeps its INTERNAL double space in the type_map key (trim only strips the ends). STATUS: the layer publishes NO status column - 13 fields, none of them a status. status_const 'Submitted' is the self-describing value the record actually attests (an application was filed on ApplicationDate) and buckets to proposed; approved/operating/exclude are deliberately EMPTY because this vocabulary states no such stage, and inventing one would be a guess (NDOT/VTrans precedent). RECORD URL: no per-record URL column. The county's own Planning & Building page links its Tyler EnerGov Citizen Self Service portal, so dataset_url is that portal's search page - recovered from the county page's HTML, never templated from CaseId (the Boston/Philadelphia dataset-precision precedent). SCOPE: San Luis Obispo County had 29 modelled ZIP pages and 0 lit before this entry.",
+   "observed_types_unreviewed": [
+    "Amendment",
+    "Appeal",
+    "Application",
+    "Auxiliary",
+    "CCM - Condition Compliance Monitoring",
+    "CEQA",
+    "Cannabis Appeal",
+    "Cannabis CEQA",
+    "Cannabis Code - P",
+    "Cannabis Code - S",
+    "Code Enforcement",
+    "Commercial Mechanical / Electrical / Plumbing",
+    "Commercial Mechanical / Electrical / Plumbing ASB",
+    "Conservation",
+    "Determination",
+    "Environmental Determination",
+    "Events",
+    "Express ",
+    "Housing Loan Information",
+    "Long-Range Planning",
+    "Lot",
+    "Map",
+    "Map Number",
+    "Mitigation Monitoring",
+    "Mitigation Monitoring / Condition Compliance",
+    "PMTX - Express Permit",
+    "Pre-Application",
+    "Project Modification",
+    "Public, Peace, Safety, and Morals",
+    "Renewable Energy ",
+    "Research",
+    "Residential Mechanical / Electrical / Plumbing",
+    "Residential Mechanical / Electrical / Plumbing ASB",
+    "Septic",
+    "Septic / Sewer",
+    "Septic ASB",
+    "Time Extension, Coastal Appealable",
+    "Time Extension, Non-Coastal Appealable",
+    "Zoning"
+   ]
   },
   {
    "registry_id": "ctdot-project-work-areas",

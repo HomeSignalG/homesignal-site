@@ -48,6 +48,9 @@ import {
   firstColOf, windowClause, andWhere, windowLabel, renderBytes, differenceCategory,
   unresolvedIndex, UNRESOLVED_VOLUME_BOUND, unreachableRows,
 } from './lib/status-drift.mjs';
+import {
+  soleTypeCol, typeDriftApplies, hasBaseline, classifyTypeValues, whitelistMappingGaps,
+} from './lib/type-drift.mjs';
 
 const DRY = process.argv.includes('--dry-run');
 // Gate-validation mode (DRY-RUN ONLY): probe targets even when a registry entry already
@@ -603,7 +606,14 @@ if (wired.length && !DRY) writeFileSync(REGISTRY_PATH, JSON.stringify(registry, 
 
 // Phase 3.5 — STATUS-DOMAIN DRIFT across the WHOLE registry.
 //
-// An unmapped status is the one soft-fail that DROPS a record: the connectors exclude it
+// ⚠️ CORRECTED 2026-08-19. This comment used to open "An unmapped status is THE ONE soft-fail
+// that DROPS a record." That was true when written and is false now — and a stale comment
+// asserting exclusivity is precisely how the type-domain hole stayed invisible for months. An
+// unlisted `include_types` value drops records too, and more completely: the whitelist is
+// pushed down INTO THE QUERY, so the row is never fetched, never counted and never
+// quarantined. See Phase 3.6 below, which gates at the same severity for that reason.
+//
+// An unmapped status DROPS a record: the connectors exclude it
 // (it cannot be bucketed) and only count it in their run report. verify-development already
 // fails on that report, but it drives a bounded RUN_REPORT_SAMPLE of ZIPs through the live
 // engine (3 by default) out of thousands, so an unmapped status on a quiet county can sit
@@ -769,6 +779,122 @@ const driftChecked = ['arcgis', 'socrata', 'ckan', 'csv', 'carto', 'opendatasoft
   .filter((e) => e.column_map?.status_raw && !e.status_const &&
     ['proposed', 'approved', 'operating', 'exclude'].some((b) => (e.status_to_bucket?.[b] || []).length)).length;
 
+// Phase 3.6 — TYPE-DOMAIN DRIFT (include_types). Mirrors Phase 3.5, at the SAME severity,
+// because both drop records — see the corrected note above 3.5.
+//
+// The read deliberately does NOT apply include_types: the whole question is what the publisher
+// emits that the whitelist does not fetch. Everything else about the scope is the connector's
+// own (extra_where + recency window, via the SAME windowClause/andWhere helpers 3.5 uses, so
+// the two checks cannot drift apart on Rule 13).
+async function typeDomainDrift() {
+  const out = [];
+  const families = [
+    ['arcgis', registry.arcgis || []],
+    ['socrata', registry.socrata || []],
+    ['ckan', registry.ckan || []],
+    ['csv', registry.csv || []],
+    ['carto', registry.carto || []],
+  ];
+  for (const [family, entries] of families) {
+    for (const e of entries) {
+      if (!typeDriftApplies(e)) continue;
+      const field = soleTypeCol(e);
+
+      // BASELINE NOT ESTABLISHED is reported BEFORE any read is attempted, because it is a
+      // statement about our own config, not about the publisher. Reading anyway would produce
+      // a value list nobody can interpret: with no baseline, "unlisted" and "new" are the same
+      // thing, and every deliberate exclusion would present as drift.
+      if (!hasBaseline(e)) {
+        out.push({
+          registry_id: e.registry_id, family, field, baselineMissing: true,
+          reason: 'no `observed_types_unreviewed` on this entry — its live vocabulary has never '
+                + 'been enumerated, so the absence of findings here attests to NOTHING',
+          gating: [], latent: [], listedNotLive: [], baselineHits: [], unreachable: false,
+        });
+        continue;
+      }
+
+      const readDomain = async (invert) => {
+        const win = windowClause(family, e, invert);
+        if (invert && !win && family !== 'csv') return e.recency_days > 0 ? null : [];
+        const where = andWhere(e.extra_where, win);
+        if (family === 'arcgis') {
+          const rows = await arcgisGroupBy(e.service_url, field, where);
+          return rows ? rows.map((r) => ({ value: r.value, n: r.n })) : null;
+        }
+        if (family === 'socrata') {
+          const w = where ? `&$where=${encodeURIComponent(where)}` : '';
+          const r = await jget(`https://${e.domain}/resource/${e.dataset_id}.json` +
+            `?$select=${encodeURIComponent(field)},count(*) as n&$group=${encodeURIComponent(field)}&$limit=2000${w}`);
+          return (r.ok && Array.isArray(r.json)) ? r.json.map((x) => ({ value: x[field], n: parseInt(x.n, 10) || 0 })) : null;
+        }
+        if (family === 'ckan')  return ckanStatusCounts({ ...e, extra_where: where }, field);
+        if (family === 'carto') return cartoStatusCounts({ ...e, extra_where: where }, field);
+        if (family === 'csv')   return csvStatusCounts(e, field, invert ? 'out' : 'in');
+        return null;
+      };
+
+      let inLive = null, outLive = null, readErr = null;
+      try { inLive = await readDomain(false); } catch (err) { inLive = null; readErr = err?.message || String(err); }
+      try { outLive = await readDomain(true); } catch { outLive = null; }
+      if (!inLive) {
+        out.push({
+          registry_id: e.registry_id, family, field, unreachable: true, baselineMissing: false,
+          unreachableReason: readErr
+            ? `in-window type read threw: ${readErr}`
+            : `in-window type read returned null (${family} reader could not resolve a type domain)`,
+          gating: [], latent: [], listedNotLive: [], baselineHits: [],
+        });
+        continue;
+      }
+
+      // arcgis groupBy can CASE-FOLD (the Denver standing answer). Confirm verbatim in the SAME
+      // window before reporting, or every night invents drift on identical data.
+      let presentIn = null;
+      if (family === 'arcgis') {
+        const verbatim = await arcgisDistinct(e.service_url, field, andWhere(e.extra_where, windowClause(family, e)));
+        if (!verbatim) {
+          out.push({
+            registry_id: e.registry_id, family, field, unreachable: true, baselineMissing: false,
+            unreachableReason: 'arcgis returnDistinctValues confirmation returned null — groupBy '
+              + 'values cannot be trusted verbatim without it',
+            gating: [], latent: [], listedNotLive: [], baselineHits: [],
+          });
+          continue;
+        }
+        presentIn = new Set(verbatim.filter((v) => v != null).map((v) => String(v).trim()));
+        inLive = inLive.filter((r) => r.value == null || presentIn.has(String(r.value).trim()));
+      }
+
+      const a = classifyTypeValues(e, inLive, true);
+      const b = classifyTypeValues(e, outLive || [], false);
+      const inTotal = inLive.reduce((s, v) => s + (v.n || 0), 0);
+      if (a.gating.length || b.latent.length || a.listedNotLive.length || a.baselineHits.length) {
+        out.push({
+          registry_id: e.registry_id, family, field, unreachable: false, baselineMissing: false,
+          window: windowLabel(family, e), outWindowReadable: outLive != null,
+          gating: a.gating, latent: b.latent, listedNotLive: a.listedNotLive,
+          baselineHits: a.baselineHits, inTotal,
+        });
+      }
+    }
+  }
+  return out;
+}
+const tdrift = await typeDomainDrift();
+// ONLY in-window unlisted values gate. Out-of-window, listed-not-live, baseline hits and
+// baseline-missing are reported and never gated — same tiering discipline as Phase 3.5.
+const tdriftReal = tdrift.filter((d) => !d.unreachable && !d.baselineMissing && d.gating.length);
+const tdriftLatent = tdrift.filter((d) => !d.unreachable && !d.baselineMissing && d.latent.length);
+const tdriftStale = tdrift.filter((d) => !d.unreachable && !d.baselineMissing && d.listedNotLive.length);
+const tdriftBaseline = tdrift.filter((d) => !d.unreachable && !d.baselineMissing && d.baselineHits.length);
+const tdriftUnreachable = tdrift.filter((d) => d.unreachable);
+const tdriftNoBaseline = tdrift.filter((d) => d.baselineMissing);
+const tdriftChecked = ['arcgis', 'socrata', 'ckan', 'csv', 'carto']
+  .flatMap((f) => registry[f] || []).filter(typeDriftApplies).length;
+const mappingGaps = whitelistMappingGaps(
+  ['arcgis', 'socrata', 'ckan', 'csv', 'carto'].flatMap((f) => registry[f] || []));
+
 // Phase 4 — report
 const snapshot = await devBackedSnapshot();
 let prevSnapshot = null;
@@ -865,14 +991,109 @@ const section = [
       ...driftUnresolved.flatMap((d) => d.unresolved.map((u) => `| ${d.registry_id} | \`${String(u.value).replace(/\|/g, '\\|')}\` | ${u.n}${u.nOut ? ` (+${u.nOut} out-of-window)` : ''} | ${d.inTotal ? (u.n / d.inTotal * 100).toFixed(2) + '%' : 'n/a'} | ${u.first_seen || '—'} | ${u.records_at_first_seen ?? '—'} | ${String(u.asked || '—').replace(/\|/g, '\\|').slice(0, 220)} |`)),
     ]
     : []),
+  ``,
+  `### Type-domain drift — an unlisted \`include_types\` value is NEVER FETCHED`,
+  `- Entries checked: **${tdriftChecked}** · **gating** (in-window, in neither list): **${tdriftReal.length}**`
+    + ` · baseline not established: **${tdriftNoBaseline.length}** · unreachable: **${tdriftUnreachable.length}**`,
+  `- The whitelist is pushed down into the query, so an unlisted value produces no record, no`
+    + ` quarantine and no \`unclassified\` pin — only a count that fails to grow. Cleveland's`
+    + ` \`Install Permits\` was dropped this way for five months.`,
+  ...(tdriftReal.length
+    ? [
+      ``,
+      `#### Tier 1 — IN-WINDOW unlisted · **these gate the run** (records the connector is not fetching today)`,
+      ``,
+      `| registry_id | type field | window scope probed | value(s) — records NOT fetched |`,
+      `|---|---|---|---|`,
+      ...tdriftReal.map((d) => `| ${d.registry_id} | ${d.field} | ${String(d.window).replace(/\|/g, '\\|')} | `
+        + `${d.gating.map((m) => `\`${String(m.value).replace(/\|/g, '\\|')}\` (${m.n})`).join(', ').slice(0, 400)} |`),
+      ``,
+      `Fix: add each value VERBATIM to that entry's \`include_types\` **and** give it a \`type_map\` line`
+        + ` (or set \`use_type_const\`) — a whitelisted value with no mapping is fetched only to render`
+        + ` \`unclassified\`. If the value is deliberate noise, add it to \`observed_types_unreviewed\` with`
+        + ` that decision recorded; never silently widen the baseline to quiet the gate.`,
+    ]
+    : [`- **No in-window unlisted type values on any entry with an established baseline.** Nothing gates.`]),
+  ...(tdriftNoBaseline.length
+    ? [
+      ``,
+      `#### BASELINE NOT ESTABLISHED · non-failing, and **NOT clean** — these entries were not tested`,
+      ``,
+      `| registry_id | type field | why no baseline |`,
+      `|---|---|---|`,
+      ...tdriftNoBaseline.map((d) => `| ${d.registry_id} | ${d.field} | ${d.reason} |`),
+      ``,
+      `An absent \`observed_types_unreviewed\` is a THIRD state, distinct from an empty one. Empty =`
+        + ` enumerated, emits nothing unfetched. Absent = never enumerated, so silence here means nothing.`,
+    ]
+    : []),
+  ...(tdriftLatent.length
+    ? [
+      ``,
+      `#### Tier 2 — OUT-OF-WINDOW unlisted · non-failing (outside \`recency_days\`, unfetchable today)`,
+      ``,
+      `| registry_id | value(s) |`,
+      `|---|---|`,
+      ...tdriftLatent.map((d) => `| ${d.registry_id} | ${d.latent.map((m) => `\`${String(m.value).replace(/\|/g, '\\|')}\` (${m.n})`).join(', ').slice(0, 300)} |`),
+    ]
+    : []),
+  ...(tdriftStale.length
+    ? [
+      ``,
+      `#### Tier 3 — DECLARED but matching ZERO live rows · non-failing`,
+      ``,
+      `A permanent tier, not a one-time sweep. Cleveland's \`Building\` sat in \`include_types\` **and**`
+        + ` \`type_map\` matching 0 rows all-time, which is exactly why a stale four-value enumeration read`
+        + ` as confirmed. Harmless to fetching; corrosive to trust in the config.`,
+      ``,
+      `| registry_id | declared value(s) with no live rows |`,
+      `|---|---|`,
+      ...tdriftStale.map((d) => `| ${d.registry_id} | ${d.listedNotLive.map((v) => `\`${String(v).replace(/\|/g, '\\|')}\``).join(', ').slice(0, 300)} |`),
+    ]
+    : []),
+  ...(tdriftBaseline.length
+    ? [
+      ``,
+      `#### observed_types_unreviewed — matched the baseline · non-failing, **UNREVIEWED**`,
+      ``,
+      `⚠️ These values were observed live when the gate was armed and are NOT fetched. Listing one`
+        + ` records only that it already existed — **never that excluding it was reviewed or approved.**`,
+      ``,
+      `| registry_id | value(s) observed-not-fetched | records |`,
+      `|---|---|---|`,
+      ...tdriftBaseline.map((d) => `| ${d.registry_id} | ${d.baselineHits.map((m) => `\`${String(m.value).replace(/\|/g, '\\|')}\``).join(', ').slice(0, 300)} | ${d.baselineHits.reduce((s, m) => s + (m.n || 0), 0)} |`),
+    ]
+    : []),
+  ...(tdriftUnreachable.length
+    ? [
+      ``,
+      `#### Type domain UNREACHABLE · non-failing, and **NOT clean**`,
+      ``,
+      `| registry_id | type field | reason |`,
+      `|---|---|---|`,
+      ...tdriftUnreachable.map((d) => `| ${d.registry_id} | ${d.field} | ${d.unreachableReason} |`),
+    ]
+    : []),
+  ...(mappingGaps.length
+    ? [
+      ``,
+      `#### ⚠️ WHITELIST/MAPPING GAP — a fetched value with no \`type_map\` line renders \`unclassified\``,
+      ``,
+      `| registry_id | whitelisted value(s) with no mapping |`,
+      `|---|---|`,
+      ...mappingGaps.map((g) => `| ${g.registry_id} | ${g.missing.map((v) => `\`${v}\``).join(', ')} |`),
+    ]
+    : [``, `- Whitelist/mapping invariant holds: every whitelisted value has a \`type_map\` line or a \`use_type_const\`.`]),
 ].filter((x) => x !== null).join('\n') + '\n';
 
 if (!DRY) appendFileSync(REPORT_PATH, section);
 console.log(section);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, section);
-console.log(`${DRY ? '[dry-run] ' : ''}done: ${wired.length} wired, ${flagged.length} flagged, ${findings.length} findings, ${driftReal.length} status-drift.`);
+console.log(`${DRY ? '[dry-run] ' : ''}done: ${wired.length} wired, ${flagged.length} flagged, ${findings.length} findings, ${driftReal.length} status-drift, ${tdriftReal.length} type-drift (${tdriftChecked} entries checked, ${tdriftNoBaseline.length} without a baseline).`);
 if (wired.length) console.log('REGISTRY_CHANGED=1');
 // Grep-able marker (same idiom as REGISTRY_CHANGED). The workflow fails the run on this
 // AFTER committing the report, so the evidence lands even though the run goes red. Printed
 // last so it is never confused with a per-target line.
 if (driftReal.length) console.log('STATUS_DRIFT=1');
+// Same idiom, same reason, same severity: an unlisted include_types value is never fetched.
+if (tdriftReal.length) console.log('TYPE_DRIFT=1');
