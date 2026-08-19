@@ -9170,3 +9170,56 @@ instrument-after is the ordering where a stale page is found by a resident.
 Newest `alerts.created_at` `2026-08-18 20:04`, newest `meetings.created_at` `2026-08-18 18:12`; zero
 rows on 2026-08-19 against a 7-day baseline of 200–4,700/day. Longer than the 4 h/6 h cadence the
 2026-08-16 Actions-budget cut set. `homesignal-ingest`, out of scope here, flagged not chased.
+
+---
+
+## 🔬 RUNNING — sweep skip probe, shadow mode (armed 2026-08-19 ~17:46 UTC)
+
+Founder decision: **instrument-first.** Evaluate the skip predicate every tick, log what it WOULD
+have decided, **act on nothing.** SQL of record: `docs/app-refresh-sweep-skip-probe.sql`.
+Kill switch: `update public.app_flags set enabled=false where name='sweep_skip_probe';`
+
+- **Max-age floor built in from the start** (24h) — the only one of the four failure modes that is
+  *prevented* rather than detected.
+- **The three OR branches are logged separately**, as instructed, plus the time branch's three
+  sub-conditions (`day_rollover`, `meeting_crossed`, `alert_aged_out`), so we learn which one does
+  the work.
+- **The wrong-skip audit is 100%, not a sample.** Because nothing is actually skipped, the real
+  refresh runs for every ZIP anyway — fingerprint before, refresh, fingerprint after. A 25-ZIP
+  sample is unnecessary. This is a property of instrument-first that skip-first would have thrown away.
+- **A simulated timeline** (`app_skip_probe_state.last_would_refresh_at`) is what every branch is
+  measured against. Against the real 4h rotation a 24h floor could never bind and we would learn
+  nothing about it.
+
+### ⛔ BLOCKER ON THE REPORT, not on the probe — the window is NOT yet representative
+
+The founder's premise for starting the clock was *"the 21h gap has cleared (152 alerts / 191
+meetings written in the last 24h, verified)"*. **Re-measured 2026-08-19 17:40 UTC: it has not
+cleared.** The rolling-24h counts are real but they are the OLD rows aging out of the window, not
+new arrivals:
+
+```
+max(alerts.created_at)   = 2026-08-18 20:04:00   -> 21.6 h ago
+max(meetings.created_at) = 2026-08-18 18:12:07   -> 23.5 h ago
+alerts/meetings created since 2026-08-18 21:00   = 0 / 0
+last 3 hours                                     = 0 / 0
+hourly histogram: last non-empty hour is 2026-08-18 20:00
+```
+
+The counts fell 152 -> 151 and 191 -> 188 between the founder's reading and mine — which is the
+tell: a rolling window that only ever decreases has nothing entering it.
+
+**Consequence:** the upstream branch reads 0 for reasons that have nothing to do with the
+predicate, so any would-skip rate measured now is an **overestimate**. The probe records this
+itself — `v_app_skip_probe.representativeness` marks every zero-ingest hour, computed at read time
+from the source tables so it cannot go stale. **The report waits for hours marked `ingest active`.**
+
+### Logged, not for now
+- **`pgstattuple` is not installed, so index bloat is unmeasurable today.** If churn keeps
+  mattering, installing it is a prerequisite for the next round of this question.
+- **Neither `alerts` nor `meetings` has an `updated_at` column**, so the upstream branch sees
+  INSERTS only — an in-place UPDATE (the ingest category backfill is exactly this shape) is
+  invisible to it. Adding that column upstream is a prerequisite for any real skipping.
+- **The shadow run cannot measure the second-order effect.** The sweep is budget-limited, so real
+  skipping would shorten the rotation, which changes the intervals every branch measures over.
+  First-order estimate only.
