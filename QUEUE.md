@@ -8711,3 +8711,55 @@ would change every pin shape in the fleet to fix a config problem.
   `type_raw_audit().complete`, or state the denominator with it.
 - **E — the "Other project" LABEL.** Founder ruling: *the label is wrong, the behavior is
   right.* Bring the wording question back **after C exists**, not before.
+
+### GO-LIVE RECEIPTS — deployed 2026-08-19 13:30:26Z (run 32258428672, main@ca4bc0d, PR #817)
+
+**Before** (78617, pre-deploy control, same query): 505 rows across 4 entries, **0 with `type_raw`**.
+
+**After** — `public.app_projects`, ZIP 78617:
+
+| registry_id | rows | with type_raw | distinct raw | mapped `unclassified` |
+|---|---|---|---|---|
+| `austin-site-plan-cases` | 267 | 243 | 97 | 153 |
+| `austin-subdivision-cases` | 158 | 153 | 48 | 57 |
+| `austin-zoning-cases` | 60 | 60 | 4 | 0 |
+| `txdot-projects-info-all` | 20 | 20 | 9 | 0 |
+
+Verbatim rows, mapped value beside publisher value:
+
+```
+Interport Multifamily                      Commercial     ← "Commercial Multi Family"
+TRAVIS COUNTY CORRECTIONAL COMPLEX -#2     Commercial     ← "Commercial"
+Austin Surf Club                           Residential    ← "Single Family"
+SAND HILL ENERGY CENTER                    unclassified   ← "999"
+Jetstar FBO and Private Hangars ABIA        unclassified   ← "Airport"
+RAMI Transportation                        unclassified   ← "Truck Facility/Office/warehouw"
+Travis County Correctional Complex Storage  unclassified   ← "Storage Building"
+```
+
+**Every one of the 505 sites carries the `type_raw` KEY** in the engine's own output (`has_key = rows`
+on all four entries), so `null` means "the publisher stated nothing", never "the field is missing".
+
+**It answered the question on its first day.** The 166 fallback records gate 2B reported are no longer
+anonymous — top unmapped values at 78617: `999` **43** (an opaque code, not a type), publisher stated
+nothing **29**, `SF, PUB` 5, `SF, ROW` 4, `Mixed Use -  Complete Propsed Use below` 3, `Vacant` 3,
+plus `Mining`, `Light Industrial`, `Civic`, `Airport`, and the publisher's own typo `Miulti-family`.
+Three distinct causes that used to look identical: an opaque sentinel, a joined multi-value
+(`column_map` arrays JOIN), and free prose. That triage is Item C's input.
+
+**The audit, first run:**
+```
+deployed_at  2026-08-19T13:30:26Z      complete  false
+coverage     12,722 total · 108 refreshed since deploy (0.85%) · 12,614 NOT yet refreshed
+rows         2,930,575 connector development rows · 476 with type_raw
+caveat       "12614 of 12722 ZIPs have NOT been re-cached since the 2026-08-19 13:30Z deploy…"
+```
+Exactly the intended behaviour: a 0.85% picture **cannot** be read as complete.
+
+⚠️ **One real event during the go-live, worth keeping.** The first 78617 re-cache came back
+`facilities: 0` with `epa.ok:false, reason:"transient", attempts:18` — a genuine EPA FRS outage, which
+the independent probe cron corroborated (`atlanta-dense` ok=false at 13:30). `dev_refresh_collect`'s
+transient-safe guard **correctly refused** to overwrite 30 cached facilities with 0. The guard was not
+bypassed to produce a receipt; the fire was simply repeated, FRS had recovered (`epa.ok:true`,
+facilities 30), and the write went through the shipped path. A receipt obtained by disabling the
+control that protects the data is not a receipt.
