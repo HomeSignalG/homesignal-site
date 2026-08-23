@@ -1,0 +1,55 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "uniqueIdField": { "name": "OBJECTID", "isSystemMaintained": true },
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": { "wkid": 4326, "latestWkid": 4326 },
+  "fields": [
+    { "name": "PermitType", "type": "esriFieldTypeString", "alias": "PermitType", "length": 60 },
+    { "name": "DESCRIPTION", "type": "esriFieldTypeString", "alias": "DESCRIPTION", "length": 60 },
+    { "name": "STATUS", "type": "esriFieldTypeString", "alias": "Status", "length": 60 },
+    { "name": "APPLIED", "type": "esriFieldTypeDate", "alias": "APPLIED", "length": 8 },
+    { "name": "SITE_ADDR", "type": "esriFieldTypeString", "alias": "SITE_ADDR", "length": 85 },
+    { "name": "SITE_ZIP", "type": "esriFieldTypeString", "alias": "SITE_ZIP", "length": 10 },
+    { "name": "PERMIT_NO", "type": "esriFieldTypeString", "alias": "PERMIT_NO", "length": 30 }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "PermitType": "BUILDING COMMERCIAL",
+        "DESCRIPTION": "KFC KITCHEN REMODEL",
+        "STATUS": "FINALED WITH CO",
+        "APPLIED": 1705557600000,
+        "SITE_ADDR": "2630 STATE ST",
+        "SITE_ZIP": "58503",
+        "PERMIT_NO": "BCOM2024-0010"
+      },
+      "geometry": { "x": -100.77388039807165, "y": 46.835926713506758 }
+    },
+    {
+      "attributes": {
+        "PermitType": "BUILDING COMMERCIAL",
+        "DESCRIPTION": "OFFICE RENOVATION  SUITE 240",
+        "STATUS": "FINALED WITH CO",
+        "APPLIED": 1706248800000,
+        "SITE_ADDR": "4204 BOULDER RIDGE RD",
+        "SITE_ZIP": "58503",
+        "PERMIT_NO": "BCOM2024-0016"
+      },
+      "geometry": { "x": -100.78901893169413, "y": 46.851700792195807 }
+    },
+    {
+      "attributes": {
+        "PermitType": "BUILDING COMMERCIAL",
+        "DESCRIPTION": "DIVIDING RETAIL SPACE WITH A 1HR FIRE BARRIER",
+        "STATUS": "ISSUED",
+        "APPLIED": 1706680800000,
+        "SITE_ADDR": "2700 STATE ST D",
+        "SITE_ZIP": "58503",
+        "PERMIT_NO": "BCOM2024-0019"
+      },
+      "geometry": { "x": -100.77823596776351, "y": 46.835632243413251 }
+    }
+  ]
+}

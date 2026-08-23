@@ -1350,7 +1350,248 @@ staging + seed docs are pre-built: docs/{california,arizona,maryland}-developmen
 
 ---
 
-## 2026-07-16 — CALIFORNIA WIRE PASS (finishing the CA/AZ/MD trio, state 2 of the four-state run)
+## 2026-08-23 — NORTH DAKOTA RECON: no statewide source exists; Bismarck is wireable but needs two rulings
+
+**Nothing wired yet — two founder decisions below.** ND was the only state with zero registry
+entries: **155 ZIP pages, 12 counties, 100 % dark**, every county at 100 %.
+
+### NDDOT publishes NO project layer — statewide lane REJECTED for ND
+
+| probe | result |
+|---|---|
+| `ndgishub.nd.gov/.../All_Transportation` | 200 — **reference only**: Airports, Railroads, Roads, Mile Markers, Scenic Byways. No projects. |
+| AGO `owner:NDGISHDP-DOT` (NDDOT's own account) | **11 items, all reference layers** — boundaries, county roads, railroads, mile markers, NDDOT districts |
+| AGO `"North Dakota" AND (STIP OR "construction projects" OR "highway projects")` | 9 hits, **none** an NDDOT project layer |
+| `gis.dot.nd.gov` · `www.gis.nd.gov` · `apps.dot.nd.gov` · `maps.dot.nd.gov` | 404 / `Couldn't resolve host name` |
+
+Unlike its neighbours SD and MT — both wired off published STIP layers — **NDDOT does not publish
+its program as a feature service.** Do not re-probe the hostnames above; they are guesses that do
+not resolve, and a guessed host that 404s is not evidence about the publisher (which is why the
+AGO owner-scoped enumeration is the receipt that matters here).
+
+### The city lane: `Building Permit Activity` (City of Bismarck) — VERIFIED, not wired
+
+`https://services1.arcgis.com/XxHmL09eFqJWI0gE/arcgis/rest/services/Map1/FeatureServer/0`
+(layer `BuildingPermitMain`, owner `BismarckGIS`).
+
+- **20,933 rows · `esriGeometryPoint` · native `SITE_ZIP` populated on 20,909 (99.9 %)** — no
+  spatial-radius approximation needed.
+- **FRESH: `max(APPLIED)` = 2026-08-21, two days before measurement**; `min(APPLIED)` 2022-09-16.
+  (`max(ISSUED)` is 2026-10-07 — ~6 weeks future-dated. Real, not a Contra-Costa-style `2099`
+  sentinel, but worth a bogus-date guard if wired.)
+- **Both vocabularies complete, each summing EXACTLY to 20,933**: `STATUS` 21 values (FINALED
+  10,873 · ISSUED 7,408 · FINALED WITH CO 794 · RECEIVED 551 · CLOSED 271 · VOID 195 · WITHDRAWN
+  177 · APPROVED 164 · UNDER REVIEW 135 · SUBMITTED 128 · HOLD 73 · PENDING 64 · FINALED WITH TEMP
+  CO 56 · DENIED 21 · OPEN 7 · FEES DUE 6 · OUT OF JURISDICTION 4 · REVISE AND RESUBMIT 3 · EXPIRED
+  1 · INCOMPLETE 1 · CANCELLED 1) and `PermitType` 44 values.
+- `SITE_CITY` is **BISMARCK 20,932 + one blank** — city only, **not** the Bismarck-Mandan MPO. So it
+  reaches **Burleigh County's 13 ZIP pages**, not Morton's 8. (`MPO Building Permits` is a separate,
+  older item and was not evaluated.)
+
+#### ⛔ DECISION 1 — the layer carries OWNER PII
+
+`BuildingPermitMain` exposes **`OWNER_NAME`, `OWNER_FIRST`, `OWNER_LAST`, `OWNER_ADDR1/2`,
+`OWNER_CITY`, `OWNER_STATE`, `OWNER_ZIP`, `OWNER_EMAIL`, `OWNER_PHONE`, `OWNER_CELL`, `OWNER_FAX`,
+`OWNER_PAGER`**, plus `APPLICANT_NAME` and `CONTRACTOR_NAME` — personal contact details of private
+individuals, on a residential permit ledger.
+
+The city publishes it openly, but **republishing it on homesignal.net is a different act**, and
+PII is an explicit §12 stop. It is technically avoidable — `column_map` selects fields and the
+additive `out_fields` option restricts what is actually fetched, so no owner column need ever leave
+the source — but the decision to wire a PII-bearing source at all is the founder's, not a session's.
+**Recorded, not decided.**
+
+#### ✅ WIRED 2026-08-23 — `bismarck-building-permits`, on the founder's "wire" with both calls
+settled as recommended: `out_fields` locked to non-owner columns, and the WA/MN/IL drop-trades
+default. See the entry + `test/bismarck-connector.test.mjs`.
+
+Two things the existing suite caught that recon had not:
+
+* **`HOLD` was bucketed `proposed` and the stalled-status lint rejected it.** Correctly — a
+  permit on hold is not progressing, and calling it proposed claims motion it does not have.
+  Moved to `exclude` (the ruling's endpoint) and pinned by an assertion.
+* **`file_date_kind: "applied"` is not a valid member** (`filed|issued|scheduled|estimated|
+  decided|awarded|completed|hearing`). It was an invented value; corrected to `filed`.
+
+#### DECISION 2 — the type whitelist is a judgment call
+
+Of the 44 `PermitType` values, most volume is **trades, not development**: BUILDING MECHANICAL
+6,524 · BUILDING ELECTRIC 3,691 · BUILDING PLUMBING 1,659 · BUILDING SIGN 633 · BUILDING DOCUMENTS
+632, plus the FIRE\_\* and minor ENG\_\* classes. The WA/MN/IL precedent drops trades at source; the
+MI precedent kept them because the founder specified the Detroit trio. Proposed keep-list on the
+WA/MN/IL default: BUILDING RESIDENTIAL 2,631 · BUILDING COMMERCIAL 1,042 · STORMWATER CONSTRUCTION
+SITE MANAGEMENT 415 · BUILDING SEPTIC 144 · BUILDING MANUFACTURED HOME 126 · BUILDING DEMOLITION 58
+· BUILDING CHANGE OF OCCUPANCY 39 · BUILDING FLOODPLAIN DEVELOPMENT 29 · BUILDING COMMERCIAL
+ALTERATION 1 — **~4,485 of 20,933**. Whether ENG WATER SEWER STORM (1,008) and ENG CONCRETE (723)
+count as development is the open half.
+
+### Scale, stated plainly
+
+Bismarck lifts **13 of ND's 155 dark pages (8.4 %)**. Covering ND properly means Fargo (Cass, 30),
+Minot (Ward, 24) and Grand Forks (21) as separate city passes — ND has no single lever.
+
+---
+
+## 2026-08-23 — WHAT ACTUALLY DRIVES A DARK ZIP PAGE (all 50 states measured)
+
+Ran to answer one question before spending more effort on statewide recon: **does having a
+statewide entry actually light pages, or does it fall short the way CA's candidate did?** Measured
+over all 12,722 modelled ZIP pages via `public.app_zip_source_ids` (a page is "dark" = cached and
+rendering, but `dev_rows = 0`, i.e. sitting on the EPA facilities floor with no permit/project record).
+
+| cohort | states | ZIP pages | dark | % dark |
+|---|---|---|---|---|
+| has a statewide registry entry | 35 | 10,117 | 1,752 | **17.3 %** |
+| county-scoped entries only | 14 | 2,450 | 1,425 | **58.2 %** |
+| **no registry entry at all** | **1 (ND)** | 155 | 155 | **100 %** |
+
+**A statewide entry cuts the dark rate from 58.2 % to 17.3 %.** That is the clearest evidence yet
+that the statewide lane is the efficient one, and it holds across 35 independent states.
+
+### The finding underneath it: REACH, not presence
+
+Having a statewide entry is not the variable — how much of the state it **reaches** is. Per-state,
+comparing `source_ids @> [statewide_rid]` against dark pages:
+
+| statewide entry | pages reached | % dark |
+|---|---|---|
+| `ctdot-project-work-areas` | 288 / 288 | **0.0** |
+| `ridot-rhode-restore-projects` | 81 / 81 | **0.0** |
+| `penndot-transportation-projects` | 558 / 560 | **0.0** |
+| `txdot-projects-info-all` | 663 / 668 | 0.3 |
+| `massdot-highway-projects` | 624 / 627 | 0.5 |
+| … | | |
+| `mt-mdt-stip-lines` | 61 / 125 | 50.4 |
+| `udot-active-projects` | 109 / 310 | 64.8 |
+| `akdot-stip-24-27` | 28 / 101 | 72.3 |
+| `iowa-dot-bid-projects` | 60 / 225 | **73.3** |
+
+The relationship is close to deterministic: reach ≈ 100 % → dark ≈ 0 %; reach ≈ ⅓ → dark ≈ 65-73 %.
+
+⚠️ **So "wire a statewide DOT source" is NOT a uniform win, and the expected yield is predictable
+BEFORE wiring.** The high-reach entries are dense and/or **line** geometry over highway corridors
+in compact states (CT/RI/PA/MA/TX — a polyline intersects many ZIP radii); the low-reach ones are
+sparse **point** layers in large states (UT 358 points over 310 ZIP pages → 35 % reach). When
+sizing a candidate, estimate reach from record count × geometry type × state area — do not assume
+a PennDOT outcome for a Wyoming-shaped state.
+
+### 🎯 NORTH DAKOTA — the single largest untouched block
+
+**ND has ZERO registry entries of any kind: 155 ZIP pages, 12 counties, 155 dark (100 %).** It was
+invisible to the earlier "13 states without a statewide entry" framing because it is not in the
+county-scoped cohort either — it is in neither. Its neighbours SD and MT are already wired from
+their STIP layers, so the same shape is the obvious first candidate.
+
+Not yet reconned — recorded, not claimed. `gis.dot.nd.gov` and `www.gis.nd.gov` both 404; the live
+host is **`ndgishub.nd.gov/arcgis/rest/services`** (ArcGIS 11.5, 200), whose only transport-shaped
+service is `All_Transportation`, which by name is likely a road *reference* layer rather than a
+project layer (the Caltrans `CHhighway` shape). Confirm before wiring.
+
+---
+
+## 2026-08-23 — CALTRANS SB1 STATEWIDE: REJECTED ON STALENESS (and the CA lane corrected)
+
+**Nothing was wired. `SB1/BuildingCA_Projects` is stalled ~15 months.** Recorded because an
+unusable source is documented, never wired — and because the *reason* CA is dark turned out not
+to be the reason assumed when this pass started.
+
+**Why it was probed:** CA is one of 13 states with no statewide registry entry, and it holds 360
+of the 3,332 facilities-floor ZIP pages — the largest single-state block.
+
+**Candidate:** `https://caltrans-gis.dot.ca.gov/arcgis/rest/services/SB1/BuildingCA_Projects/MapServer/0`
+(Rebuilding California / SB1), 17,441 rows, `esriGeometryMultipoint`, host 200 via pg_net.
+
+It got further than most: **all three vocabularies enumerated live and each summed EXACTLY to
+17,441** — `ProjectStatus` (Completed 9,429 · In Progress 5,290 · Planned 2,661 · null 61),
+`Category` (5 values), `Program` (18 values, so no `$limit` truncation). Multipoint needed no
+connector work — `featurePoint()` has handled `points` since the Lake County IL fix.
+
+**Two findings worth keeping even though the source was rejected:**
+
+1. 🔑 **A DOT project layer can carry JURISDICTION CENTROIDS, not project locations — check
+   before wiring, the ratio is the instrument.** Compare distinct geometry points to distinct
+   `CityName` values *within one county* (across the whole state the first-N sample clusters by
+   insertion order and the ratio lies). Los Angeles County, 400-row samples:
+
+   | filter | features | distinct points | distinct cities | verdict |
+   |---|---|---|---|---|
+   | `IsOnSHS='No'` | 400 | 97 | 75 | ≈ one point per city — **centroids** |
+   | `IsOnSHS='Yes'` | 400 | **361** | 161 | per-project geometry |
+   | `Category='Local Streets and Highways'` | 400 | **63** | 64 | **one point per city, exactly** |
+
+   Wiring the unfiltered layer would have stacked hundreds of distinct projects onto a handful of
+   city-hall pins. `IsOnSHS` is the clean per-row discriminator (Yes 6,280 + No 11,161 = 17,441
+   exactly) — worth remembering for any other state DOT layer that mixes state-highway projects
+   with pass-through local grants.
+
+2. ⚠️ **`DateUpdated` is FREE TEXT, not a date — and two sample rows said otherwise.** The first
+   rows sampled were ISO (`2023-11-22`, `2024-11-25`) and the field is `length: 10`, which is
+   exactly the shape that makes a lexicographic `extra_where` compare look safe. The pattern
+   check disagreed: `DateUpdated NOT LIKE '____-__-__'` returns **396 of 6,280** SHS rows, whose
+   values include `02-21-2025`, `03/20/2024`, `10/28/2020` — and the literal string
+   **`"Date Updated"`, the column header stored as a data value**. This is the
+   `nyc-dob-permit-issuance` defect class (TEXT `MM/DD/YYYY` vs an ISO literal, matching nothing).
+   **Never conclude a string date's format from sampled rows; run the negative pattern count.**
+
+**THE REJECTION — three independent instruments agree:**
+
+```
+max last_edited_date                     ≈ 2025-05-23   (epoch 1748025937000)
+max created_date                         ≈ 2025-03-26   (min 2025-02-04 → a bulk republish, not per-project)
+newest well-formed DateUpdated              2025-05-05   (order-by-desc freshness probe)
+rows with DateUpdated >= '2026-01-01'                0
+```
+
+Measured 2026-08-23 → **~15 months stale**. Same class as Fort Lauderdale (2021-01-05), Worcester
+(2025-09-09), St. Paul (2025-06-30), Syracuse (2025-08-16), KCMO (2025-05-09). → nightly reprobe list.
+
+**Rest of the Caltrans server checked and empty for this purpose:** `HQstatewide` is climate
+adaptation / sea-level rise; `CHhighway` is highway *reference* data (bridges, postmiles, AADT,
+CCTV, rest areas); `HQMaint/CEPS` and `HQohsip` carry no project records. `SB1/project_point_single_referenced_pro_2_9_12_20250528`
+is the same May-2025 vintage by its own name.
+
+### 🛑 RETRACTED WITHIN THE HOUR — "CA is 7 metro-county passes, not one statewide entry"
+
+That claim was published here and is **WRONG**. It read the county spread of CA's 360 dark pages —
+Orange 85 · San Diego 53 · Alameda 51 · Contra Costa 43 · Sonoma 40 · Ventura 34 · San Mateo 31 =
+337 of 360, "93.6% in 7 counties" — as evidence that CA is metro-shaped and that a statewide source
+would only lift pages incidentally.
+
+**It is a CEILING, not a concentration.** The 42-remaining-states build seeded **the top 10 counties
+per state**. California therefore has **10 modeled counties, and ALL 10 carry dark pages**. Seven of
+ten holding 94% of the pages is just the size distribution of ten counties; it says nothing about
+whether the dark pages cluster. The same artifact shows up across every state in this cohort —
+measured 2026-08-23:
+
+| state | modeled counties | counties carrying dark pages | dark / total ZIP pages |
+|---|---|---|---|
+| CA | 10 | **10** | 360 / 523 |
+| OR | 10 | **10** | 147 / 200 |
+| NM | 10 | **10** | 134 / 158 |
+| WY | 11 | 10 | 91 / 103 |
+| MS | 10 | 9 | 104 / 114 |
+| LA | 10 | 9 | 127 / 177 |
+| ID | 10 | 9 | 96 / 111 |
+
+**What follows from the corrected reading:** dark pages are spread across essentially *every*
+modeled county in these states, which is the condition under which a **statewide source is the
+efficient lever** — the opposite of what the retracted paragraph concluded. The statewide lane for
+CA is not closed; **Caltrans SB1 is rejected on STALENESS ALONE** (the receipts above), and a
+different fresh statewide CA source would be a legitimate candidate.
+
+⚠️ **The generalisable trap, because it was hit twice in one investigation:** a "top-N counties hold
+X%" statistic is meaningless while N is close to the number of counties that exist in the data. The
+first version of this check also reported "every state has ≤10 dark counties" as concentration —
+same ceiling, same mistake. **Always print the denominator (modeled counties) next to any
+concentration claim.**
+
+County/city passes remain independently worthwhile for these metros (Anaheim and the City of San
+Diego are already live entries, and San Diego County's 53 dark pages are its OTHER cities — Chula
+Vista, Oceanside, Escondido, Carlsbad …). But that is a second lane, not a replacement for the
+statewide one, and this document should not have said otherwise.
+
+---
+
 
 The DB is back; every recon verdict re-verified LIVE at wire time (pg_net + a runner
 `csv_stats` sweep — the new additive recon-fetch aggregate that prints distinct-value

@@ -1,0 +1,48 @@
+# EXTERNAL ingest heartbeat — the watchdog that is NOT inside the thing it watches.
+#
+# homesignal-ingest already has its own heartbeat check, and it works: dispatched by hand on
+# 2026-08-23 it correctly reported "none of the last 20 ingest runs SUCCEEDED". It never fired
+# during the 2026-08-18..23 outage for one reason only — it is a job in the repo whose Actions were
+# dead. A watchdog cannot survive its own trigger condition.
+#
+# This repo is PUBLIC, so its Actions minutes are free and unaffected by whatever stops the private
+# ingest repo. That is the entire reason this file lives here and not there.
+#
+# NO CREDENTIAL CAN TAKE THIS DOWN: it reads a public-select table with the PUBLIC anon key. No
+# PAT, no write key, no GitHub API. The account PAT was HTTP 401 throughout the outage — a
+# GitHub-API watchdog would have been blind at exactly the moment it was needed.
+name: Ingest heartbeat (external — the ingest repo cannot take this down)
+
+on:
+  schedule:
+    # Hourly. The threshold is 6h against ingest's 4h cron, so hourly gives ~6 chances to notice
+    # before the alarm is more than an hour late.
+    - cron: '25 * * * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/check-ingest-heartbeat-external.mjs'
+      - 'scripts/lib/ingest-heartbeat.mjs'
+      - '.github/workflows/check-ingest-heartbeat-external.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Deliberately NOT continue-on-error. A silent failure here is indistinguishable from a
+      # pass, in the one job whose entire purpose is to be loud.
+      - name: Check the ingest heartbeat
+        env:
+          SUPABASE_URL: https://qwnnmljucajnexpxdgxr.supabase.co
+          # PUBLIC anon key. Kept in a secret only to avoid a scraped-credentials false positive;
+          # it grants nothing beyond the public-select RLS policy on this one table.
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: node scripts/check-ingest-heartbeat-external.mjs
