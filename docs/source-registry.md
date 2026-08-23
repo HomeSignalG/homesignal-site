@@ -9577,3 +9577,60 @@ The source publishes **no status column**. The siblings keep layer 0's
 layer 0's sample carries no `ContractNumber` and a **2030** completion date, layer 2's carries
 contract `D265141` and a **2025** date — but bucketing them differently would assert a
 lifecycle the data does not state. Revisit only if NYSDOT documents the split.
+
+---
+
+## ✅ SAN DIEGO COUNTY — `EDGE_EGRESS_BLOCKED` **CONFIRMED** on a clean instrument (2026-08-23)
+
+The California pass could not settle *why* `san-diego-county-discretionary-permits` fails,
+because the only egress available from the sandbox — pg_net — had just been disqualified as an
+instrument for header questions. It named the fix: a **GitHub-runner probe**, which has neither
+pg_net's header handling nor the edge runtime's egress. Run: `recon-fetch` 32672000339,
+targets `scripts/recon/sandiego-edge-egress.json`.
+
+| target | status | bytes | ms |
+|---|---|---|---|
+| **CONTROL** Esri-hosted FeatureServer (UDOT lines) | 200 | `{"count":19951}` | 321 |
+| **CONTROL** classic ArcGIS Server (Ohio TIMS) | 200 | `{"count":1827}` | 617 |
+| SD service root | 200 | 9,045 | 328 |
+| SD bare count | 200 | `{"count":50306}` | 173 |
+| **SD connector query shape — Fallbrook 92028** | **200** | **93,050** | **345** |
+| **SD connector query shape — Ramona 92065** | **200** | **97,379** | **286** |
+| SD + `out_fields` projection | 200 carrying a **400** | 72 | 117 |
+| SD + `page_size` 25 | 200 | 13,052 | 299 |
+
+**Both controls are green, so the instrument is valid and the SD results mean what they say.**
+
+### What is now SETTLED
+
+**`gis-public.sandiegocounty.gov` is fully reachable, and the connector's own query shape works.**
+Two real dark ZIPs each returned ~95 KB of genuine features — `PER_TYPE_DESC`, `PER_STAT`,
+`PER_OPEN_DATE`, per-parcel `geometry` in wkid 4326 — in under 350 ms. So the 20-of-20 timeouts
+through the deployed engine are **not** a dead host, **not** a too-heavy query, and **not** a
+request-signature rule that a runner would also trip. Three egress paths, three different
+outcomes: **Postgres 200 · GitHub runner 200 · Supabase edge runtime timeout.** The
+`EDGE_EGRESS_BLOCKED` disposition is **confirmed rather than suspected** — the Tampa / El Paso
+class, and the layer's own metadata is unchanged and healthy (count still exactly **50,306**;
+the service root still describes the 11-value `PER_STAT` renderer).
+
+### ⚠️ THE PARKED CONTINGENCY WAS WRONG — `out_fields` IS NOT THE FIX
+
+The obvious remedy for a slow/heavy ArcGIS layer is the additive `out_fields` projection, and it
+is recorded as a lever throughout these notes (Miami, Columbus). **On this layer it returns
+`{"error":{"code":400,"message":"Failed to execute query."}}` in 117 ms** — the projection itself
+is rejected, so wiring the entry with `out_fields` would have failed *differently* and been read
+as confirmation of the original fault. **Probe the contingency, not just the fault.** `page_size`
+does work (13 KB), but a page-size fix is irrelevant when the transport never connects.
+
+### Disposition: STILL NOT WIREABLE — 53 pages stay dark, and that is now a KNOWN cost
+
+Nothing in the registry changes. The engine cannot fetch this layer, so wiring it would spend a
+30-second timeout per refresh on all 115 San Diego County pages and emit nothing — the same
+trade the California pass already refused, now refused on evidence instead of inference.
+
+**The two paths that would actually unblock it are both GATED and deliberately NOT taken here:**
+(a) Supabase edge egress changing, which is not ours to change; or (b) an architecture where a
+runner or pg_net fetches the layer and feeds the engine — a new scheduled job plus an engine
+change, i.e. a §12 stop. **Do not build (b) without the founder.** What this run bought is that
+the question is closed: the next session does not have to re-probe, and the entry can be re-wired
+in one commit the day the edge runtime can reach the host.
