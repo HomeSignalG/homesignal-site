@@ -1401,6 +1401,18 @@ additive `out_fields` option restricts what is actually fetched, so no owner col
 the source — but the decision to wire a PII-bearing source at all is the founder's, not a session's.
 **Recorded, not decided.**
 
+#### ✅ WIRED 2026-08-23 — `bismarck-building-permits`, on the founder's "wire" with both calls
+settled as recommended: `out_fields` locked to non-owner columns, and the WA/MN/IL drop-trades
+default. See the entry + `test/bismarck-connector.test.mjs`.
+
+Two things the existing suite caught that recon had not:
+
+* **`HOLD` was bucketed `proposed` and the stalled-status lint rejected it.** Correctly — a
+  permit on hold is not progressing, and calling it proposed claims motion it does not have.
+  Moved to `exclude` (the ruling's endpoint) and pinned by an assertion.
+* **`file_date_kind: "applied"` is not a valid member** (`filed|issued|scheduled|estimated|
+  decided|awarded|completed|hearing`). It was an invented value; corrected to `filed`.
+
 #### DECISION 2 — the type whitelist is a judgment call
 
 Of the 44 `PermitType` values, most volume is **trades, not development**: BUILDING MECHANICAL

@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. No subject-matter claim is derived.",
-  "registry_entries": 210,
+  "registry_entries": 211,
   "statewide": {
     "AK": [
       {
@@ -1059,6 +1059,13 @@
         "id": "wake-county-building-permits",
         "label": "Wake County",
         "scope": "local"
+      }
+    ],
+    "ND|Burleigh": [
+      {
+        "id": "bismarck-building-permits",
+        "label": "City of Bismarck",
+        "scope": "city"
       }
     ],
     "NE|Lancaster": [
