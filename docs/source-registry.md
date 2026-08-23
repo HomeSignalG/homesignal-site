@@ -1350,6 +1350,37 @@ staging + seed docs are pre-built: docs/{california,arizona,maryland}-developmen
 
 ---
 
+## 2026-08-23 — OREGON STATEWIDE: REJECTED. ODOT publishes only Region 1
+
+**Nothing wired.** OR carries **147 dark ZIP pages** and was the largest block in the
+county-scoped-only cohort. Portland is already wired (`portland-building-permits`), which is why
+Multnomah is 29/34 lit; the dark pages are everywhere else — Lane 37, Clackamas 19, Washington 19,
+Marion 19, Jackson 18, Yamhill 12, Benton 9, Deschutes 6, Multnomah 5, Hood River 3.
+
+**There is no statewide ODOT project layer to wire.** Four avenues, all closed:
+
+| probe | result |
+|---|---|
+| `owner:daniel.warren_ODOT` (ODOT's AGO account) | **Region 1 ONLY** — `ODOT_Region1_100_Percent_Projects`, `ODOT_Region1_Ops_150_Percent_CountyWide`, `ODOT_Region1_ARTS`, `Region_1_DRAFT_21_24_STIP_Projects_v2`. Region 1 is the Portland metro, already covered. |
+| `gis.odot.state.or.us/arcgis/rest/services` | **HTTP 500**; `/arcgis1006/` **times out at 25 s**; `/transgisportal/` **404** |
+| `ODOT_Traffic_Construction` (23,120 rows) | **REJECTED — traveler information, not development.** It is `TripCheck_Construction_Data_Upload`: `eventTypeName`, `eventSubTypeName`, `incidentId`, `delayInfo`, `incidentDirection`, `odotSeverityDescript`. Road closures and incidents, which would flood pages with transient non-development content. |
+| State-of-Oregon AGO org `uUvqNMGPm7axC2dD` | ~90 services with "project" in the name, but they are a multi-agency grab-bag (ODFW, OWRD, Business Oregon, drinking water, lidar, herbicide). The three closest: **`2024_2027_STIP_Project_Points_ATNI_redone` = 109 records and ATNI-FILTERED** (its own `ATNIBike`/`ATNIPed` fields show it is a tribal-consultation bike/ped subset, not the STIP); **`2024_2027_Pavement_projects_125` = 31 records**; **`Oregon_Projects_and_Developments_Approved` = 8 records** and actually energy-facility siting (`cap_kw`, `rotor_dia`, `hub_hgt`, `slrplnt_tp`). |
+
+⚠️ **"ODOT" IS SHARED BY OREGON, OHIO AND OKLAHOMA.** A plain `q=ODOT` search returns
+`msherron_ohiodot` and `wchen1_ohiodot` items (`District 9 Construction Overlaps`,
+`Ellis_lines_Central_Ohio`) alongside Oregon's. Same class as the Kent DE/RI trap — **scope by
+owner or orgid, never by the abbreviation.**
+
+⚠️ **The org host `services.arcgis.com/uUvqNMGPm7axC2dD` is the STATE OF OREGON's shared org, not
+ODOT's own.** Finding an ODOT layer there does not make a layer statewide, and the Region 1 naming
+is the tell.
+
+**Next lane for OR is county/city, not statewide**: Lane (Eugene, 37 pages) is the largest single
+target in the state, then Marion (Salem, 19), Clackamas 19, Washington 19, Jackson (Medford, 18).
+Unprobed.
+
+---
+
 ## 2026-08-23 — NORTH DAKOTA RECON: no statewide source exists; Bismarck is wireable but needs two rulings
 
 **Nothing wired yet — two founder decisions below.** ND was the only state with zero registry
