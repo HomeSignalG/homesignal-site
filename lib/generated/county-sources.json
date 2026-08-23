@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. No subject-matter claim is derived.",
-  "registry_entries": 213,
+  "registry_entries": 216,
   "statewide": {
     "AK": [
       {
@@ -120,6 +120,11 @@
         "id": "maine-dot-public-projects",
         "label": "Maine Department of Transportation",
         "scope": "statewide"
+      },
+      {
+        "id": "maine-dot-public-projects-lines",
+        "label": "Maine Department of Transportation",
+        "scope": "statewide"
       }
     ],
     "MI": [
@@ -193,6 +198,11 @@
     "OH": [
       {
         "id": "odot-current-projects",
+        "label": "Ohio Department of Transportation",
+        "scope": "statewide"
+      },
+      {
+        "id": "odot-current-projects-lines",
         "label": "Ohio Department of Transportation",
         "scope": "statewide"
       }
@@ -284,6 +294,11 @@
     "VT": [
       {
         "id": "vtrans-project-locations",
+        "label": "Vermont Agency of Transportation (VTrans)",
+        "scope": "statewide"
+      },
+      {
+        "id": "vtrans-project-locations-lines",
         "label": "Vermont Agency of Transportation (VTrans)",
         "scope": "statewide"
       }
