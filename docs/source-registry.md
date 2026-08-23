@@ -1350,6 +1350,63 @@ staging + seed docs are pre-built: docs/{california,arizona,maryland}-developmen
 
 ---
 
+## 2026-08-23 — WHAT ACTUALLY DRIVES A DARK ZIP PAGE (all 50 states measured)
+
+Ran to answer one question before spending more effort on statewide recon: **does having a
+statewide entry actually light pages, or does it fall short the way CA's candidate did?** Measured
+over all 12,722 modelled ZIP pages via `public.app_zip_source_ids` (a page is "dark" = cached and
+rendering, but `dev_rows = 0`, i.e. sitting on the EPA facilities floor with no permit/project record).
+
+| cohort | states | ZIP pages | dark | % dark |
+|---|---|---|---|---|
+| has a statewide registry entry | 35 | 10,117 | 1,752 | **17.3 %** |
+| county-scoped entries only | 14 | 2,450 | 1,425 | **58.2 %** |
+| **no registry entry at all** | **1 (ND)** | 155 | 155 | **100 %** |
+
+**A statewide entry cuts the dark rate from 58.2 % to 17.3 %.** That is the clearest evidence yet
+that the statewide lane is the efficient one, and it holds across 35 independent states.
+
+### The finding underneath it: REACH, not presence
+
+Having a statewide entry is not the variable — how much of the state it **reaches** is. Per-state,
+comparing `source_ids @> [statewide_rid]` against dark pages:
+
+| statewide entry | pages reached | % dark |
+|---|---|---|
+| `ctdot-project-work-areas` | 288 / 288 | **0.0** |
+| `ridot-rhode-restore-projects` | 81 / 81 | **0.0** |
+| `penndot-transportation-projects` | 558 / 560 | **0.0** |
+| `txdot-projects-info-all` | 663 / 668 | 0.3 |
+| `massdot-highway-projects` | 624 / 627 | 0.5 |
+| … | | |
+| `mt-mdt-stip-lines` | 61 / 125 | 50.4 |
+| `udot-active-projects` | 109 / 310 | 64.8 |
+| `akdot-stip-24-27` | 28 / 101 | 72.3 |
+| `iowa-dot-bid-projects` | 60 / 225 | **73.3** |
+
+The relationship is close to deterministic: reach ≈ 100 % → dark ≈ 0 %; reach ≈ ⅓ → dark ≈ 65-73 %.
+
+⚠️ **So "wire a statewide DOT source" is NOT a uniform win, and the expected yield is predictable
+BEFORE wiring.** The high-reach entries are dense and/or **line** geometry over highway corridors
+in compact states (CT/RI/PA/MA/TX — a polyline intersects many ZIP radii); the low-reach ones are
+sparse **point** layers in large states (UT 358 points over 310 ZIP pages → 35 % reach). When
+sizing a candidate, estimate reach from record count × geometry type × state area — do not assume
+a PennDOT outcome for a Wyoming-shaped state.
+
+### 🎯 NORTH DAKOTA — the single largest untouched block
+
+**ND has ZERO registry entries of any kind: 155 ZIP pages, 12 counties, 155 dark (100 %).** It was
+invisible to the earlier "13 states without a statewide entry" framing because it is not in the
+county-scoped cohort either — it is in neither. Its neighbours SD and MT are already wired from
+their STIP layers, so the same shape is the obvious first candidate.
+
+Not yet reconned — recorded, not claimed. `gis.dot.nd.gov` and `www.gis.nd.gov` both 404; the live
+host is **`ndgishub.nd.gov/arcgis/rest/services`** (ArcGIS 11.5, 200), whose only transport-shaped
+service is `All_Transportation`, which by name is likely a road *reference* layer rather than a
+project layer (the Caltrans `CHhighway` shape). Confirm before wiring.
+
+---
+
 ## 2026-08-23 — CALTRANS SB1 STATEWIDE: REJECTED ON STALENESS (and the CA lane corrected)
 
 **Nothing was wired. `SB1/BuildingCA_Projects` is stalled ~15 months.** Recorded because an
