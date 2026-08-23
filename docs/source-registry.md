@@ -1350,6 +1350,63 @@ staging + seed docs are pre-built: docs/{california,arizona,maryland}-developmen
 
 ---
 
+## 2026-08-23 — CA-METRO + SOCRATA SWEEP: 0 wired, and four traps worth more than the probes
+
+Working the standing directive to dev-back the 3,332 facilities-floor pages, largest block first
+(CA's 7 metro counties = 337 of CA's 360). **Nothing wireable found this pass.** The four failure
+modes below each cost a probe and each would have cost a bad wire.
+
+**1. `Sonoma County Construction Permits` (Socrata `88ms-k5e7`) — REJECTED ON STALENESS, and the
+CATALOG SAID IT WAS FRESH.** The Socrata discovery API reported `updatedAt = 2026-08-23` (the day
+of the probe). The data does not agree:
+
+```
+count            26,082
+max(started)     2025-05-30
+max(issued)      2025-05-30      ← ~15 months stale
+```
+
+⚠️ **STANDING ANSWER: a Socrata catalog `updatedAt` is a metadata-touch timestamp, not data
+recency. Always `max()` the actual date column before believing a portal.** Same class as the AGO
+item `modified` field. Everything else about this dataset was good — `application_type` enumerated
+to **exactly 26,082** across 12 self-describing values, `status` 26+ verbatim values, `file_number`,
+real ISO `started`/`issued` — which is precisely why the freshness gate has to come first.
+
+⚠️ **Second trap in the same dataset: `address` was ABSENT FROM THE SAMPLED ROWS but PRESENT IN THE
+SCHEMA.** Socrata omits null fields per row, so a 2-row sample is not a column list. Read
+`/api/views/<id>.json`. (Had I trusted the sample I would have rejected it for the wrong reason —
+the CA wire pass's older Sonoma rejection, "no city/ZIP/coords", is itself too strong: there is an
+`address` column, populated on 19,737 of 26,082.)
+
+**2. `data.oxnard.org` — the catalog entry is a GHOST.** Listed in the Socrata catalog as
+`vmzx-48vx Building Permits`, but the domain now serves an **OpenGov budget portal**: the Socrata
+resource path returns HTML (`OpenGov – Oxnard Finance and Budget Visualization`), not JSON.
+**A Socrata catalog hit is not proof the domain still serves Socrata.** Ventura's 34 pages stay dark.
+
+**3. `data.nola.gov` Building Permits — real, but ZERO YIELD.** A genuine Socrata dataset with
+`the_geom` Point coordinates, `address`, `permittype`, `landuse` (35,720 rows). It would lift
+**nothing**: LA's dark parishes are **Caddo 25, St. Tammany 18, Calcasieu 18, Lafayette 16,
+Livingston 16, Bossier 12, Jefferson 11, Ascension 7, East Baton Rouge 4** — and **Orleans is
+already fully lit (0 dark of 21 modelled rows)**. This is the Harris County shape in reverse:
+a correctly-wired source with no dark page to land on. (It is also ~9 months stale,
+`max(issuedate)` 2024-12-05.) **Check the target county's dark count BEFORE probing its source.**
+
+**4. Sonoma's AGO `District_N_Building_Permits_WFL1` — NOT FIRST-PARTY.** 4,270 point records under
+`@DylanA.src`, and one of its six fields is literally **`Sheet1__Project_Number`** — a spreadsheet
+published to ArcGIS Online by a personal account, not the county's system of record. Permit Sonoma's
+own `PRMDPublic` folder carries only basemaps, city limits and fire boundaries. **A `WFL1` suffix
+plus a `Sheet1__` column name is the signature of an uploaded spreadsheet.**
+
+**Also cleared with no hit:** Oakland (`data.oaklandca.gov` — parking permits and food vending only),
+Berkeley, San Mateo County (`data.smcgov.org`) — no building-permit datasets on their Socrata
+portals. Orange County CA and Contra Costa returned no permit services under AGO search.
+
+⚠️ **Operational note: the Socrata discovery API 404s the ENTIRE multi-domain query if any one
+`domains=` entry is unknown** (`{"error":"Domain not found: …"}`). Probe domains singly, or verify
+each first — a batch that silently fails on one bad name looks like "no results anywhere".
+
+---
+
 ## 2026-08-23 — OREGON STATEWIDE: REJECTED. ODOT publishes only Region 1
 
 **Nothing wired.** OR carries **147 dark ZIP pages** and was the largest block in the
