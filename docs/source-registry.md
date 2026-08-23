@@ -9469,3 +9469,54 @@ point records went **55 → 48**. 176 line records resolved to **127 distinct pi
 project). 0 missing `record_url`, 0 missing coordinates, 0 unclassified. Of the residual 36,
 **27 were re-run and came back dark** — rural ZIPs with no UDOT project inside the 3-mile radius,
 which is an honest terminal state, not a defect.
+
+### 📊 MEASURED YIELD OF THE SWEEP — and why a smoke test is mandatory before rollout
+
+All four wires shipped, deployed and rolled out 2026-08-23. The yields differ by more than an
+order of magnitude, and **nothing about the layer metadata predicted which was which**:
+
+| State | before | after | gain | line rows |
+|---|---|---|---|---|
+| **UT** | 109 lit / 201 dark | **282 / 28** | **+173** | 19,951 |
+| **ME** | 171 / 102 | **201 / 72** | **+30** | 1,138 |
+| **OH** | 249 / 86 | **275 / 60** | **+26** | 1,827 |
+| **VT** | 121 / 91 | **145 / 67** | **+24** | 518 |
+| **IA** | 60 / 165 | **70 / 155** | **+10** | 129 |
+
+**+263 pages from five registry entries, no engine change.**
+
+⚠️ **IOWA IS THE CAUTIONARY CASE, and the earlier framing of it was wrong.** It was pitched as a
+165-dark-page reach fix. The truth, measured before the rollout was spent: Iowa DOT publishes only
+**112 awarded corridors statewide**, and an envelope probe around five dark ZIP centroids at the
+connector's own 3-mile radius returned **0 lines on all five** — with a positive control (the same
+envelope over a statewide box) returning exactly **112**, which is what proved the query shape
+right and the zeros real. Actual yield: **+10**. **Smoke 3 dark ZIPs through the DEPLOYED function
+before firing a rollout** — it costs 3 invocations and it is the only thing that distinguishes a
+Utah-shaped lever from an Iowa-shaped one.
+
+⚠️ **A SMOKE TEST CAN ALSO UNDER-READ — do not reject on a small sample.** Vermont smoked **0 of 2**
+(plus one 503 cold start) and was rolled out anyway as unproven-not-failed. It delivered **+24**.
+Three ZIPs is enough to confirm a lever works; it is NOT enough to conclude one does not.
+
+### ⚠️ `dev_refresh_collect()` CAPS AT 120 ROWS PER CALL — call it in a LOOP
+
+It returns the number collected, so a return of exactly **120** means "there is probably more",
+never "done". Measured cost of getting this wrong on the OH/ME/VT rollout: the first two single
+calls left the states at ME 190 / VT 135 / OH 266 and the flat second reading was misread as
+"the tail is genuinely dark". Draining in a loop moved them to **ME 201 / VT 145 / OH 275** —
+roughly **a third of the entire gain** was sitting uncollected behind the cap.
+
+```sql
+do $$ declare n int; begin
+  loop select dev_refresh_collect() into n; exit when n = 0; end loop;
+end $$;
+```
+
+Same instrument class as the pruning trap above: a call that returns a plausible number while
+leaving work undone.
+
+⚠️ **The pg_net worker drains in BURSTS, and `http_request_queue` reads race it.** A queue sitting
+at its full fired count with `max(_http_response.id)` unmoved is **not** a stalled worker — 279
+requests sat apparently frozen for ~90 s and then cleared 200 at once. A repeated identical count
+across several reads is usually a stale read, not a backlog: one read of "82 queued" three times
+running was actually a queue of **3**. Do not restart the worker on this evidence.
