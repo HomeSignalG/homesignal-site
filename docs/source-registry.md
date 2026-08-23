@@ -9634,3 +9634,47 @@ runner or pg_net fetches the layer and feeds the engine — a new scheduled job 
 change, i.e. a §12 stop. **Do not build (b) without the founder.** What this run bought is that
 the question is closed: the next session does not have to re-probe, and the entry can be re-wired
 in one commit the day the edge runtime can reach the host.
+
+---
+
+## ✅ VIRGINIA WIRED — VDOT SYIP, and a CORRECTION to the `dev_refresh_collect()` rule (2026-08-23)
+
+**VA 184 pages: 92 lit / 92 dark → 127 lit / 57 dark. +35.** `vdot-syip-approved-projects`
+(+ `-lines`), PR #887, deployed `1f1c916`.
+
+**Discovery matters as much as the wire: VDOT had NEVER been probed.** Every prior `VDOT`
+string in this file is really **nv**dot (Nevada) — a substring collision that made the state
+look covered. The same check cleared **GA, ID and WY** as genuinely unprobed. Found through
+the `virginiaroads.org` ArcGIS Hub DCAT feed (991,455 bytes, 200): the Six-Year Improvement
+Program, 2,853 points + 2,682 lines, modified 2026-07-08.
+
+Go-live invariants across all cached VDOT records: **417 records on 35 pages, 0 missing
+`record_url`, 0 missing coordinates, 0 missing `use_type`**, both entries contributing,
+coordinates spanning lat 36.876–39.014 / lng −78.808 to −76.001 (Virginia).
+
+### ⛔ CORRECTION — the three `dev_refresh_collect()` claims recorded earlier today are WRONG
+
+They were inferred from return values instead of from the function, which is the exact
+mistake this file keeps warning about. `pg_get_functiondef` settles it: **no `LIMIT` anywhere,
+no `DELETE` anywhere**, the response scan is `where created > now() - interval '20 minutes'`
+with `distinct on (zip) … order by zip, id desc`, and the return is `get diagnostics
+row_count` from the `UPDATE`.
+
+| recorded earlier | actually |
+|---|---|
+| "caps at 120 rows per call" | **No cap exists.** The repeated 120s were simply how many distinct ZIPs had a response inside the 20-minute window at that moment. |
+| "call it in a loop until it returns 0" | **Harmful.** It is IDEMPOTENT within the window — it re-updates the same rows, so repeated calls return the same number (173, 173 measured) and never reach 0 until the window ages out. A loop-until-zero ran 30 iterations and timed out a statement. |
+| "it prunes `net._http_response`, so a pre-collect probe reads as a false zero" | **It deletes nothing.** Probe rows did disappear, but this function is not the cause and I have NOT established what is. Recorded as unexplained rather than replaced with a second guess. |
+
+**Also wrong was the CAUSAL claim** that draining in a loop recovered "about a third of the
+OH/ME/VT gain". The gain came from responses **arriving between the calls**. Waiting is the
+mechanism; looping did nothing.
+
+### THE REAL RULE, and it is a sharper hazard than the one it replaces
+
+**`dev_refresh_collect()` only sees responses newer than 20 MINUTES.** So the failure mode on a
+large rollout is not under-collecting — it is **losing** early responses that age out before
+any collect runs. Fire a batch, let the queue drain, and collect **within the window**; on a
+rollout that takes longer than 20 minutes to drain, collect periodically as it goes rather
+than once at the end. `distinct on (zip)` means a second collect inside the window is
+harmless, just redundant.
