@@ -1,0 +1,34 @@
+[
+  {
+    "id": "CONTROL-esri-hosted-known-good",
+    "url": "https://services.arcgis.com/pA2nEVnB6tquxgOW/arcgis/rest/services/All_Projects/FeatureServer/1/query?where=1%3D1&returnCountOnly=true&f=json"
+  },
+  {
+    "id": "CONTROL-arcgis-server-known-good-tims-ohio",
+    "url": "https://tims.dot.state.oh.us/ags/rest/services/Projects/Current_Projects_Lines/MapServer/0/query?where=1%3D1&returnCountOnly=true&f=json"
+  },
+  {
+    "id": "sandiego-01-service-root",
+    "url": "https://gis-public.sandiegocounty.gov/arcgis/rest/services/PDS/PDS_Layers/MapServer/20?f=json"
+  },
+  {
+    "id": "sandiego-02-count-only",
+    "url": "https://gis-public.sandiegocounty.gov/arcgis/rest/services/PDS/PDS_Layers/MapServer/20/query?where=1%3D1&returnCountOnly=true&f=json"
+  },
+  {
+    "id": "sandiego-03-connector-query-fallbrook-92028",
+    "url": "https://gis-public.sandiegocounty.gov/arcgis/rest/services/PDS/PDS_Layers/MapServer/20/query?where=1%3D1&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&geometry=-117.3085%2C33.3327%2C-117.1915%2C33.4197&outFields=*&outSR=4326&returnGeometry=true&resultRecordCount=200&f=json"
+  },
+  {
+    "id": "sandiego-04-connector-query-ramona-92065",
+    "url": "https://gis-public.sandiegocounty.gov/arcgis/rest/services/PDS/PDS_Layers/MapServer/20/query?where=1%3D1&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&geometry=-116.9285%2C32.9982%2C-116.8115%2C33.0852&outFields=*&outSR=4326&returnGeometry=true&resultRecordCount=200&f=json"
+  },
+  {
+    "id": "sandiego-05-projected-out-fields",
+    "url": "https://gis-public.sandiegocounty.gov/arcgis/rest/services/PDS/PDS_Layers/MapServer/20/query?where=1%3D1&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&geometry=-117.3085%2C33.3327%2C-117.1915%2C33.4197&outFields=PER_TYPE_DESC%2CPER_STAT%2CPER_OPEN_DATE%2CPER_DESCRIPTION%2CAPN&outSR=4326&returnGeometry=true&resultRecordCount=200&f=json"
+  },
+  {
+    "id": "sandiego-06-small-page-size",
+    "url": "https://gis-public.sandiegocounty.gov/arcgis/rest/services/PDS/PDS_Layers/MapServer/20/query?where=1%3D1&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&geometry=-117.3085%2C33.3327%2C-117.1915%2C33.4197&outFields=*&outSR=4326&returnGeometry=true&resultRecordCount=25&f=json"
+  }
+]
