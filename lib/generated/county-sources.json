@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. No subject-matter claim is derived.",
-  "registry_entries": 218,
+  "registry_entries": 220,
   "statewide": {
     "AK": [
       {
@@ -298,6 +298,18 @@
       {
         "id": "udot-active-projects-lines",
         "label": "Utah Department of Transportation",
+        "scope": "statewide"
+      }
+    ],
+    "VA": [
+      {
+        "id": "vdot-syip-approved-projects",
+        "label": "Virginia Department of Transportation (VDOT)",
+        "scope": "statewide"
+      },
+      {
+        "id": "vdot-syip-approved-projects-lines",
+        "label": "Virginia Department of Transportation (VDOT)",
         "scope": "statewide"
       }
     ],

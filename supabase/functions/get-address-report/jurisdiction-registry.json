@@ -14245,6 +14245,215 @@
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-27 UT/AZ Maps coverage pass. Utah Department of Transportation `All_Projects` layer 0 ('UDOT Projects (Points)'), published on UDOT's own UPlan open-data hub (data-uplan.opendata.arcgis.com, first-party state agency). This is the Utah analogue of the workbook's own TxDOT-PIA 'Utilities / Infrastructure' capability row. 2,145 rows total; extra_where keeps the 358 non-Closed/non-Abandoned ACTIVE PIPELINE (live returnCountOnly). esriGeometryPoint wkid 4326 \u2192 __lat/__lng; dataLastEditDate 2026-07-27 (edited the day of wiring). 13 pin_stat_nm values VERBATIM via groupBy (Closed 1368 / Abandoned 419 / Scoping 75 / Proposed 71 / STIP 62 / Active 53 / Close Out 47 / Under Construction 21 / Funding 15 / Substantially Compl 7 / Region Review 4 / Physically Complete 2 / Awarded 1); Closed + Abandoned excluded BOTH in status_to_bucket and at source in extra_where. 22 proj_typ_nm values enumerated live; 16 transportation-infrastructure classes map to use_type Utility (Traffic and Safety 849, Roadway 306, Traffic Management 211, Structures 80, Transportation Solutions 73, Safety 52, Maintenance 45, Capacity 32, \u2026); the non-physical classes (Other 152, Contingency 98, Not Applicable 39, Studies 38, Joint Highway Committee 37, Environmental 8) are deliberately UNMAPPED \u2192 'unclassified' (logged), never inferred. STATEWIDE coverage [{state:'UT'}] with no county \u2014 permitted by the registry contract for a statewide dataset (coverageMatches: `!cov.county` matches any UT county). Live cnty_name groupBy confirms real spread across the dark counties: SALT LAKE 675 / VARIOUS 570 / WEBER 116 / UTAH 112 / SUMMIT 92 / DAVIS 89 / TOOELE 85 / BOX ELDER 58 / CACHE 50 / SEVIER 32 / UINTAH 24 / WASHINGTON 20 / WASATCH 17 / GRAND 16 / SAN JUAN 15 / CARBON 13 / BEAVER 12 / GARFIELD 12 / MILLARD 12 / MORGAN 12 / DUCHESNE 10 / KANE 9 / IRON 7. No ZIP column \u2192 spatial_zip_radius_mi 3 on the layer's own points. file_date = created_dt \u2014 chosen on live non-null counts over the 358 active rows: created_dt 358/358 (100%), epm_plan_start_date 65, start_dat 43, advertise_date 27, est_compl_dat 2. start_dat was the first choice and was REJECTED on evidence: a smoke refresh left 11 of 12 emitted records with no file_date. est_compl_dat stays as decision_date and is legitimately absent on almost every row (absent fields stay absent, never interpolated). column_map arrays JOIN values rather than falling back (readCol in sources/arcgis.ts), so a multi-field date fallback is NOT available \u2014 one field must be chosen. DEFECT NOTED on the sibling UPlan `Permits` service (NOT wired): its `latitude` column repeats the LONGITUDE value (-111.88967 in both) \u2014 geometry, not those columns, is the trustworthy position. No per-row URL column \u2192 dataset-precision record_url."
+    },
+    {
+      "registry_id": "vdot-syip-approved-projects",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/SYIP_Approved_Projects/FeatureServer/0",
+      "dataset_url": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/SYIP_Approved_Projects/FeatureServer/0",
+      "jurisdiction": "Virginia Department of Transportation (VDOT) \u2014 Six-Year Improvement Program (SYIP), approved projects",
+      "coverage": [
+        {
+          "state": "VA"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "DESCRIPTION",
+          "SCOPE_OF_WORK_DESC"
+        ],
+        "status_raw": "POOL_PRJ_STATUS_DSC",
+        "type_source": "SCOPE_OF_WORK_DESC",
+        "file_date": "CN_START_DATE",
+        "address": [
+          "LIMITS_FROM",
+          "JURISDICTION_DESC"
+        ],
+        "case_number": "UPC",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "scheduled",
+      "type_map": {
+        "Facilities For Pedestrians And Bicycles": "Utility",
+        "Safety": "Utility",
+        "Reconstruction W/O Added Capacity": "Utility",
+        "Resurfacing": "Utility",
+        "Reconstruction W/ Added Capacity": "Utility",
+        "Bridge Replacement W/O Added Capacity": "Utility",
+        "Bridge Rehab W/O Added Capacity": "Utility",
+        "Traffic Management/Engineering": "Utility",
+        "Other": "Development",
+        "New Construction Roadway": "Utility",
+        "Restoration And Rehabilitation": "Utility",
+        "Transit": "Utility",
+        "Rail/Highway Crossing": "Utility",
+        "Preliminary Engineering": "Development",
+        "Mitigation Of Water Pollution Due To Highway Runof": "Utility",
+        "Bridge Replacement W/ Added Capacity": "Utility",
+        "Rehabilitation Of Historic Bldgs/Facilities": "Civic/Public",
+        "Bridge, New Construction": "Utility",
+        "Landscaping/Beautification": "Civic/Public",
+        "Safety And Education Of Pedestrians /Bicyclisits": "Utility",
+        "Environmental Only": "Development",
+        "Bridge Rehab W/ Added Capacity": "Utility",
+        "Scenic Or Historic Highway Programs": "Civic/Public",
+        "Relocation": "Utility",
+        "Special Bridge": "Utility",
+        "Preservation Of Abandoned Railway Corridors": "Utility",
+        "Ferry Boats": "Utility",
+        "Utilities": "Utility",
+        "Acqusition Of Scenic Easement Or Sites": "Civic/Public"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "No Dates Set Yet",
+          "No Dates Set Yet - PE Open",
+          "Activity Dates Set",
+          "Study Only",
+          "Critical Decision Needed"
+        ],
+        "approved": [
+          "Advertised",
+          "Awarded",
+          "Construction Started",
+          "Activity Dates Set - RW Started",
+          "Claims - RW"
+        ],
+        "operating": [
+          "Construction Completed",
+          "Waiting Financial Closure",
+          "Monitoring Funds",
+          "Project Closeout Complete"
+        ],
+        "exclude": [
+          "Canceled"
+        ]
+      },
+      "recency_days": 1825,
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "yields_to": "vdot-syip-approved-projects-lines",
+      "_receipts": {
+        "probed_utc": "2026-08-23",
+        "discovery": "VDOT had never been probed \u2014 every prior 'VDOT' hit in this file is actually nvdot (Nevada). Found via the virginiaroads.org ArcGIS Hub DCAT feed (991,455 bytes, HTTP 200), dataset 'SYIP Approved Projects', modified 2026-07-08.",
+        "status_vocabulary": "POOL_PRJ_STATUS_DSC = 15 values summing EXACTLY to the layer count on BOTH layers (2,853 points / 2,682 lines) \u2014 complete, not sampled. Identical value set on both, which is itself evidence the two layers describe the same projects.",
+        "status_bucket_arithmetic": "proposed 419+275+254+79+21 = 1,048 \u00b7 approved 161+181+484+163+1 = 990 \u00b7 operating 354+312+103+1 = 770 \u00b7 exclude 45 \u2192 2,853, every value bucketed exactly once.",
+        "type_vocabulary": "SCOPE_OF_WORK_DESC = 30 values summing EXACTLY to 2,853 on the point layer (27 summing to 2,682 on lines, a subset \u2014 unused mappings are safe). 29 non-null values are mapped; the 30th is a genuine NULL on 2 rows and is deliberately unmapped.",
+        "publisher_typos_kept_verbatim": "'\u2026Highway Runof' (truncated), '\u2026/Bicyclisits', 'Acqusition Of Scenic Easement Or Sites' \u2014 mapped exactly as published, because the connector matches the raw value.",
+        "date_choice": "CN_START_DATE, esriFieldTypeDate, populated 2,712/2,853. CURRENT_SYP_DATE was REJECTED despite better population (2,852/2,853): a groupBy returned only 2 DISTINCT VALUES, i.e. it is the program's adoption date repeated on every row, not a per-project date. Population alone is not evidence a date field is usable.",
+        "future_dates_bounded": "SYIP is a six-year programme so future construction starts are correct, and they were BOUNDED rather than assumed: 206 rows beyond 2030 and ZERO beyond 2040 \u2014 no 2099-style 'date TBD' sentinel of the Contra Costa kind.",
+        "recency": "1825 days keeps 2,437 of 2,853. NULL CN_START_DATE rows drop automatically (NULL fails the >= comparison), so no extra_where is needed to exclude them.",
+        "title_field": "DESCRIPTION, populated 2,853/2,853 with real per-project titles. MAP_PROJECT_DESC was REJECTED: it reads like a title but a groupBy returns only 3 DISTINCT VALUES and both samples were the literal string 'Map Project' \u2014 using it would have given all 2,853 records the same title.",
+        "record_url": "dataset precision. PORTAL_APP_ID looked like a per-record key and is 0 on every sampled row, so there is nothing to template; the service URL is the machine URL (Boulder/Philadelphia precedent).",
+        "coverage": "JURISDICTION_DESC carries 227 distinct values across Virginia's counties, independent cities and towns \u2014 statewide, so coverage declares {state: VA} with no county, per the UDOT statewide precedent.",
+        "layer": "0 STE_VDOT_SYIP_APPRVD_SUM, esriGeometryPoint, 2,853 rows",
+        "duplicate_guard": "This entry YIELDS to the line entry. The pair describes the SAME projects: 5 UPCs taken from the line layer matched 5 rows on the point layer, with a CONTROL \u2014 a fabricated UPC returned 0 \u2014 proving the query discriminates. Without the yield every project carrying both representations double-emits (the Houston-plats class, uncatchable by exact-identity dedup across two source_registry_ids)."
+      }
+    },
+    {
+      "registry_id": "vdot-syip-approved-projects-lines",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/SYIP_Approved_Projects/FeatureServer/1",
+      "dataset_url": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/SYIP_Approved_Projects/FeatureServer/1",
+      "jurisdiction": "Virginia Department of Transportation (VDOT) \u2014 Six-Year Improvement Program (SYIP), approved projects",
+      "coverage": [
+        {
+          "state": "VA"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "DESCRIPTION",
+          "SCOPE_OF_WORK_DESC"
+        ],
+        "status_raw": "POOL_PRJ_STATUS_DSC",
+        "type_source": "SCOPE_OF_WORK_DESC",
+        "file_date": "CN_START_DATE",
+        "address": [
+          "LIMITS_FROM",
+          "JURISDICTION_DESC"
+        ],
+        "case_number": "UPC",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "scheduled",
+      "type_map": {
+        "Facilities For Pedestrians And Bicycles": "Utility",
+        "Safety": "Utility",
+        "Reconstruction W/O Added Capacity": "Utility",
+        "Resurfacing": "Utility",
+        "Reconstruction W/ Added Capacity": "Utility",
+        "Bridge Replacement W/O Added Capacity": "Utility",
+        "Bridge Rehab W/O Added Capacity": "Utility",
+        "Traffic Management/Engineering": "Utility",
+        "Other": "Development",
+        "New Construction Roadway": "Utility",
+        "Restoration And Rehabilitation": "Utility",
+        "Transit": "Utility",
+        "Rail/Highway Crossing": "Utility",
+        "Preliminary Engineering": "Development",
+        "Mitigation Of Water Pollution Due To Highway Runof": "Utility",
+        "Bridge Replacement W/ Added Capacity": "Utility",
+        "Rehabilitation Of Historic Bldgs/Facilities": "Civic/Public",
+        "Bridge, New Construction": "Utility",
+        "Landscaping/Beautification": "Civic/Public",
+        "Safety And Education Of Pedestrians /Bicyclisits": "Utility",
+        "Environmental Only": "Development",
+        "Bridge Rehab W/ Added Capacity": "Utility",
+        "Scenic Or Historic Highway Programs": "Civic/Public",
+        "Relocation": "Utility",
+        "Special Bridge": "Utility",
+        "Preservation Of Abandoned Railway Corridors": "Utility",
+        "Ferry Boats": "Utility",
+        "Utilities": "Utility",
+        "Acqusition Of Scenic Easement Or Sites": "Civic/Public"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "No Dates Set Yet",
+          "No Dates Set Yet - PE Open",
+          "Activity Dates Set",
+          "Study Only",
+          "Critical Decision Needed"
+        ],
+        "approved": [
+          "Advertised",
+          "Awarded",
+          "Construction Started",
+          "Activity Dates Set - RW Started",
+          "Claims - RW"
+        ],
+        "operating": [
+          "Construction Completed",
+          "Waiting Financial Closure",
+          "Monitoring Funds",
+          "Project Closeout Complete"
+        ],
+        "exclude": [
+          "Canceled"
+        ]
+      },
+      "recency_days": 1825,
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": {
+        "probed_utc": "2026-08-23",
+        "discovery": "VDOT had never been probed \u2014 every prior 'VDOT' hit in this file is actually nvdot (Nevada). Found via the virginiaroads.org ArcGIS Hub DCAT feed (991,455 bytes, HTTP 200), dataset 'SYIP Approved Projects', modified 2026-07-08.",
+        "status_vocabulary": "POOL_PRJ_STATUS_DSC = 15 values summing EXACTLY to the layer count on BOTH layers (2,853 points / 2,682 lines) \u2014 complete, not sampled. Identical value set on both, which is itself evidence the two layers describe the same projects.",
+        "status_bucket_arithmetic": "proposed 419+275+254+79+21 = 1,048 \u00b7 approved 161+181+484+163+1 = 990 \u00b7 operating 354+312+103+1 = 770 \u00b7 exclude 45 \u2192 2,853, every value bucketed exactly once.",
+        "type_vocabulary": "SCOPE_OF_WORK_DESC = 30 values summing EXACTLY to 2,853 on the point layer (27 summing to 2,682 on lines, a subset \u2014 unused mappings are safe). 29 non-null values are mapped; the 30th is a genuine NULL on 2 rows and is deliberately unmapped.",
+        "publisher_typos_kept_verbatim": "'\u2026Highway Runof' (truncated), '\u2026/Bicyclisits', 'Acqusition Of Scenic Easement Or Sites' \u2014 mapped exactly as published, because the connector matches the raw value.",
+        "date_choice": "CN_START_DATE, esriFieldTypeDate, populated 2,712/2,853. CURRENT_SYP_DATE was REJECTED despite better population (2,852/2,853): a groupBy returned only 2 DISTINCT VALUES, i.e. it is the program's adoption date repeated on every row, not a per-project date. Population alone is not evidence a date field is usable.",
+        "future_dates_bounded": "SYIP is a six-year programme so future construction starts are correct, and they were BOUNDED rather than assumed: 206 rows beyond 2030 and ZERO beyond 2040 \u2014 no 2099-style 'date TBD' sentinel of the Contra Costa kind.",
+        "recency": "1825 days keeps 2,437 of 2,853. NULL CN_START_DATE rows drop automatically (NULL fails the >= comparison), so no extra_where is needed to exclude them.",
+        "title_field": "DESCRIPTION, populated 2,853/2,853 with real per-project titles. MAP_PROJECT_DESC was REJECTED: it reads like a title but a groupBy returns only 3 DISTINCT VALUES and both samples were the literal string 'Map Project' \u2014 using it would have given all 2,853 records the same title.",
+        "record_url": "dataset precision. PORTAL_APP_ID looked like a per-record key and is 0 on every sampled row, so there is nothing to template; the service URL is the machine URL (Boulder/Philadelphia precedent).",
+        "coverage": "JURISDICTION_DESC carries 227 distinct values across Virginia's counties, independent cities and towns \u2014 statewide, so coverage declares {state: VA} with no county, per the UDOT statewide precedent.",
+        "layer": "1 STE_VDOT_SYIP_APPRVD_LINE, esriGeometryPolyline, 2,682 rows",
+        "why_lines": "A polyline intersects many ZIP radii where a point sits in exactly one; this is the reach half of the pair. Virginia carried 92 dark pages before this wire."
+      }
     }
   ],
   "ckan": [
