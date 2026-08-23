@@ -12793,6 +12793,128 @@
       "_receipts": "2026-08-12 NY statewide wire. NY was 233/764 record-backed \u2014 531 dark pages, the largest single gap in any state. DISCOVERY: NYSDOT does not publish projects on ArcGIS Online (a 594-result AGO search returns MPOs, counties, consultants and survey123 forms, no NYSDOT project service) and its portal is NOT at the /arcgis/ path a host guess would try \u2014 gis.dot.ny.gov/arcgis/rest/services 404s. The real portal is /hostingny/, recovered from the service URLs of third-party AGO items that reference NYSDOT layers (columbiacounty1's NYSDOT Structures items). Root gisportalny.dot.ny.gov/hostingny/rest/services (gis.dot.ny.gov/hostingny mirrors it byte-for-byte) enumerates folders Agile, Asset, Environmental, Framework, Geocortex, Hosted, HWP, Maintenance, Projects, Roadways, Safety, Utilities. HWP holds only ExportImage[GPServer]. LAYER: Projects/CapitalProgramProjects/FeatureServer/0 'Project Points', esriGeometryPoint, 2,487 rows. REJECTED ALONGSIDE, with receipts, so neither is re-probed: (1) data.ny.gov 'Transportation Projects in Your Neighborhood' (rz8t-4kmq, 1,937 rows) is the obvious candidate BY NAME and fails NO_GEOGRAPHY outright \u2014 its full column list carries no lat, no lng, no ZIP and no address, only a 'region' ('10 LONG ISLAND') and county names buried in prose; same class as the NJ DCA rejection. (2) The NYS Thruway Authority capital-project sets (f9da-b8zj and siblings) are likewise coordinate-less and their active set samples a 2012 project. LAYER CHOICE \u2014 ONE LAYER ONLY, DELIBERATELY: the service exposes three point layers and three polygon layers all named 'Project Points'/'Project Polygons'. They are NOT duplicates of each other \u2014 PIN 581606 returns 4 rows on layer 0 and 0 rows on layers 1 and 2 \u2014 but their relationship is undocumented and layer1+layer2 (1,759+857=2,616) exceeds layer 0 (2,487), so wiring more than one risks the houston-plat-applications double-emit. Layer 0 is wired alone; layers 1-5 are left for a later pass. Note PIN is NOT unique (4 rows share 581606); the engine's dedup identity includes lat/lng so distinct sites survive as distinct records. TYPE \u2014 WORK_CATEGORY, self-describing. groupBy returns 12 values summing to EXACTLY 2,487, the layer row count and therefore the positive control: Corrective Maint 462, BRIDGE PRESERVATION 458, PAVEMENT RECONSTRUCTION 346, OTHER 265, SAFETY 259, BRIDGE REHABILITATION OR REPLACEMENT 254, Preventative Maint 208, PAVEMENT PRESERVATION 95, Renewal 87, Rehabilitation 39, MOBILITY 13, and 1 NULL. All 11 non-null values are mapped; the single NULL row renders unclassified, which is cosmetic under Rule 2. All map to Utility (the txdot/nvdot/okdot/idot/odot precedent) except 'OTHER' (265 rows), which names no specific work and takes the generic member 'Development'. \u26a0\ufe0f RULE 4 STAGE 2 IS UNAVAILABLE ON THIS SERVER, AND THAT IS RECORDED RATHER THAN GLOSSED: returnDistinctValues returns {'error':'Unable to complete operation.'} on this layer, so the verbatim-casing confirmation Rule 4 prescribes cannot be run. The obvious substitute ALSO fails \u2014 the server's where-clause comparison is CASE-INSENSITIVE, proven both ways: WORK_CATEGORY='BRIDGE PRESERVATION' and ='Bridge Preservation' both return 458, and ='Corrective Maint' and ='CORRECTIVE MAINT' both return 462. So the mixed casing visible in the vocabulary (SHOUTING vs Title Case, which is what makes this a real Rule 4 case) cannot be confirmed byte-exact by any method this endpoint offers. WHY THAT IS TOLERABLE HERE, SPECIFICALLY: the connector normalises type_map keys with trim + case-fold (buildTypeLookup), so a casing mismatch cannot cause a miss; and type is COSMETIC under Rule 2 \u2014 an unmapped type degrades pin shape, it never drops a record. The casing risk would NOT be tolerable on a status map, where a miss is record loss under Rule 1 \u2014 and this entry has no status column to expose that. STATUS \u2014 no status field exists in the layer, so status_const supplies it, mapped through status_to_bucket because in arcgis.ts the constant is the RAW VALUE: proposed ['Capital Program']. 'Capital Program' is the publisher's own term (the service is CapitalProgramProjects) and is used rather than the bucket name 'proposed' because test/status-const-must-be-mapped.test.mjs ratchets against bucket-named constants. THE proposed BUCKET IS EVIDENCE-BACKED, NOT ASSUMED: ConstructionCompleteDate is in the FUTURE on 2,486 of 2,487 rows, in the past on 1, and NULL on 0 \u2014 this layer is forward-looking planned work almost in its entirety. DATE \u2014 DELIBERATELY UNMAPPED. The only date is ConstructionCompleteDate, a PLANNED COMPLETION date, which is not a filing, award or issuance event and does not fit any file_date_kind. Mapping a future completion date as file_date would misdate every record. Undated is correct, as founder-ruled for butler-county-ks-permits and applied to okdot-workplan-roadways and the idot pair. RECORD URL: WEPIURL is genuinely per-record (piyn.dot.ny.gov/PublicPIYN/ProjectDetails?pin=<PIN>), so record_url_precision is 'record'. HOST: gisportalny.dot.ny.gov is SELF-HOSTED, so governance section 0 applies exactly as it did for Ohio's TIMS \u2014 a pg_net 200 is not proof the Deno edge runtime can connect. THE FIRST POST-DEPLOY RE-CACHE IS THE VERIFICATION: read arcgis_reports[].fetched/emitted, and if the edge cannot connect, REMOVE the entry (the Dayton precedent), do not leave it declaring coverage it cannot serve. spatial_zip_radius_mi 3: no ZIP column, matching txdot/okdot/idot/odot."
     },
     {
+      "registry_id": "nysdot-capital-program-projects-2",
+      "platform": "arcgis",
+      "service_url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/1",
+      "dataset_url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/1",
+      "jurisdiction": "New York State Department of Transportation",
+      "coverage": [
+        {
+          "state": "NY"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PublicFriendlyDescription",
+          "WORK_CATEGORY"
+        ],
+        "type_source": "WORK_CATEGORY",
+        "address": [
+          "PublicFriendlyDescription"
+        ],
+        "case_number": "PIN",
+        "record_url": "WEPIURL",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "Corrective Maint": "Utility",
+        "BRIDGE PRESERVATION": "Utility",
+        "PAVEMENT RECONSTRUCTION": "Utility",
+        "OTHER": "Development",
+        "SAFETY": "Utility",
+        "BRIDGE REHABILITATION OR REPLACEMENT": "Utility",
+        "Preventative Maint": "Utility",
+        "PAVEMENT PRESERVATION": "Utility",
+        "Renewal": "Utility",
+        "Rehabilitation": "Utility",
+        "MOBILITY": "Utility"
+      },
+      "status_const": "Capital Program",
+      "status_to_bucket": {
+        "proposed": [
+          "Capital Program"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "record",
+      "_receipts": {
+        "probed_utc": "2026-08-23",
+        "why": "Layer 1 'Project Points' \u2014 the second of NYSDOT's three POINT layers on this service. Only layer 0 was wired, so production read 2,459 of the service's 5,055 point projects (49%).",
+        "service_shape": "SIX layers = THREE programs x TWO geometries. Counts pair exactly: layer 0<->3 = 2,459, layer 1<->4 = 1,724, layer 2<->5 = 872. The three POINT layers share one identical 17-field schema and all carry duplicate display names, which is why this needed a pass of its own.",
+        "rows": 1724,
+        "work_category_vocabulary": "12 values summing exactly to the layer count, so complete rather than sampled. The 11 non-null values are IDENTICAL across all three point layers and are already the 11 in this entry's type_map \u2014 no new mapping was needed. The 12th is a genuine NULL (1 row on layer 0, 7 on layer 1, 7 on layer 2); it is deliberately unmapped, because a value the source leaves empty must not be invented.",
+        "disjoint_by_PIN": "The three point layers do NOT share projects. Layer 0 holds 0 rows for layer 2's PIN 881485; layer 2 holds 0 for layer 0's PIN 581606; layer 1 holds 0 for either. CONTROLS PASS, which is what makes those zeros real rather than a broken query: the same query shape returns 4 rows for layer 0's own PIN and 15 for layer 2's own. No yields_to is therefore declared BETWEEN the point layers.",
+        "polygon_twins_not_wired": "Layers 3/4/5 are polygon mirrors of 0/1/2 by exact count and WOULD duplicate every project. They are deliberately left unwired rather than wired-with-a-yield, because the points already carry the same projects and a polygon adds no project the points lack.",
+        "status_const": "Kept as the shipped 'Capital Program' -> proposed, matching layer 0's existing treatment of the SAME service. Note the layers may be lifecycle tranches (layer 0's sample has no ContractNumber and a 2030 completion date; layer 2's carries contract D265141 and a 2025 date). The source publishes NO status column, so bucketing them differently would assert a lifecycle the data does not state. Consistency with the sibling entry is the conservative choice; if NYSDOT ever documents what separates the three, revisit.",
+        "record_url": "WEPIURL is a real per-project piyn.dot.ny.gov/PublicPIYN/ProjectDetails?pin=<PIN> URL, so record precision carries over unchanged."
+      }
+    },
+    {
+      "registry_id": "nysdot-capital-program-projects-3",
+      "platform": "arcgis",
+      "service_url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/2",
+      "dataset_url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/2",
+      "jurisdiction": "New York State Department of Transportation",
+      "coverage": [
+        {
+          "state": "NY"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PublicFriendlyDescription",
+          "WORK_CATEGORY"
+        ],
+        "type_source": "WORK_CATEGORY",
+        "address": [
+          "PublicFriendlyDescription"
+        ],
+        "case_number": "PIN",
+        "record_url": "WEPIURL",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "Corrective Maint": "Utility",
+        "BRIDGE PRESERVATION": "Utility",
+        "PAVEMENT RECONSTRUCTION": "Utility",
+        "OTHER": "Development",
+        "SAFETY": "Utility",
+        "BRIDGE REHABILITATION OR REPLACEMENT": "Utility",
+        "Preventative Maint": "Utility",
+        "PAVEMENT PRESERVATION": "Utility",
+        "Renewal": "Utility",
+        "Rehabilitation": "Utility",
+        "MOBILITY": "Utility"
+      },
+      "status_const": "Capital Program",
+      "status_to_bucket": {
+        "proposed": [
+          "Capital Program"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "record",
+      "_receipts": {
+        "probed_utc": "2026-08-23",
+        "why": "Layer 2 'Project Points ' (the layer name carries a TRAILING SPACE upstream) \u2014 the third POINT layer. Only layer 0 was wired, so production read 2,459 of the service's 5,055 point projects (49%).",
+        "service_shape": "SIX layers = THREE programs x TWO geometries. Counts pair exactly: layer 0<->3 = 2,459, layer 1<->4 = 1,724, layer 2<->5 = 872. The three POINT layers share one identical 17-field schema and all carry duplicate display names, which is why this needed a pass of its own.",
+        "rows": 872,
+        "work_category_vocabulary": "12 values summing exactly to the layer count, so complete rather than sampled. The 11 non-null values are IDENTICAL across all three point layers and are already the 11 in this entry's type_map \u2014 no new mapping was needed. The 12th is a genuine NULL (1 row on layer 0, 7 on layer 1, 7 on layer 2); it is deliberately unmapped, because a value the source leaves empty must not be invented.",
+        "disjoint_by_PIN": "The three point layers do NOT share projects. Layer 0 holds 0 rows for layer 2's PIN 881485; layer 2 holds 0 for layer 0's PIN 581606; layer 1 holds 0 for either. CONTROLS PASS, which is what makes those zeros real rather than a broken query: the same query shape returns 4 rows for layer 0's own PIN and 15 for layer 2's own. No yields_to is therefore declared BETWEEN the point layers.",
+        "polygon_twins_not_wired": "Layers 3/4/5 are polygon mirrors of 0/1/2 by exact count and WOULD duplicate every project. They are deliberately left unwired rather than wired-with-a-yield, because the points already carry the same projects and a polygon adds no project the points lack.",
+        "status_const": "Kept as the shipped 'Capital Program' -> proposed, matching layer 0's existing treatment of the SAME service. Note the layers may be lifecycle tranches (layer 0's sample has no ContractNumber and a 2030 completion date; layer 2's carries contract D265141 and a 2025 date). The source publishes NO status column, so bucketing them differently would assert a lifecycle the data does not state. Consistency with the sibling entry is the conservative choice; if NYSDOT ever documents what separates the three, revisit.",
+        "record_url": "WEPIURL is a real per-project piyn.dot.ny.gov/PublicPIYN/ProjectDetails?pin=<PIN> URL, so record precision carries over unchanged."
+      }
+    },
+    {
       "registry_id": "nhdot-ten-year-plan-projects",
       "platform": "arcgis",
       "service_url": "https://maps.dot.nh.gov/arcgis_server/rest/services/Projects/NHDOT_PROJECT_PROPOSALS_BY_TYPE/FeatureServer/0",
