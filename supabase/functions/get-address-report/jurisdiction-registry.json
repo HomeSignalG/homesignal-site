@@ -4675,7 +4675,13 @@
         "Grade and Drainage": "Utility",
         "Non-Construction": "Utility",
         "Program Efficiency": "Utility",
-        "Railroad Related": "Utility"
+        "Railroad Related": "Utility",
+        "Preservation": "Utility",
+        "Rehabilitation": "Utility",
+        "Pavement Reconstruction": "Utility",
+        "Emergency Repairs": "Utility",
+        "ITS & Signals": "Utility",
+        "Federal Lands Access Program": "Utility"
       },
       "status_to_bucket": {
         "proposed": [
@@ -4683,27 +4689,34 @@
           "Scoping",
           "STIP",
           "Funding",
-          "Region Review"
+          "Region Review",
+          "Concept Scoping",
+          "Central Review"
         ],
         "approved": [
           "Active",
           "Awarded",
-          "Under Construction"
+          "Under Construction",
+          "Advertised"
         ],
         "operating": [
           "Substantially Compl",
           "Physically Complete",
-          "Close Out"
+          "Close Out",
+          "Contract Closed Out",
+          "Contract Complete"
         ],
         "exclude": [
           "Closed",
-          "Abandoned"
+          "Abandoned",
+          "Hold"
         ]
       },
       "extra_where": "pin_stat_nm NOT IN ('Closed', 'Abandoned')",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
-      "_receipts": "2026-07-27 UT/AZ Maps coverage pass. Utah Department of Transportation `All_Projects` layer 0 ('UDOT Projects (Points)'), published on UDOT's own UPlan open-data hub (data-uplan.opendata.arcgis.com, first-party state agency). This is the Utah analogue of the workbook's own TxDOT-PIA 'Utilities / Infrastructure' capability row. 2,145 rows total; extra_where keeps the 358 non-Closed/non-Abandoned ACTIVE PIPELINE (live returnCountOnly). esriGeometryPoint wkid 4326 → __lat/__lng; dataLastEditDate 2026-07-27 (edited the day of wiring). 13 pin_stat_nm values VERBATIM via groupBy (Closed 1368 / Abandoned 419 / Scoping 75 / Proposed 71 / STIP 62 / Active 53 / Close Out 47 / Under Construction 21 / Funding 15 / Substantially Compl 7 / Region Review 4 / Physically Complete 2 / Awarded 1); Closed + Abandoned excluded BOTH in status_to_bucket and at source in extra_where. 22 proj_typ_nm values enumerated live; 16 transportation-infrastructure classes map to use_type Utility (Traffic and Safety 849, Roadway 306, Traffic Management 211, Structures 80, Transportation Solutions 73, Safety 52, Maintenance 45, Capacity 32, …); the non-physical classes (Other 152, Contingency 98, Not Applicable 39, Studies 38, Joint Highway Committee 37, Environmental 8) are deliberately UNMAPPED → 'unclassified' (logged), never inferred. STATEWIDE coverage [{state:'UT'}] with no county — permitted by the registry contract for a statewide dataset (coverageMatches: `!cov.county` matches any UT county). Live cnty_name groupBy confirms real spread across the dark counties: SALT LAKE 675 / VARIOUS 570 / WEBER 116 / UTAH 112 / SUMMIT 92 / DAVIS 89 / TOOELE 85 / BOX ELDER 58 / CACHE 50 / SEVIER 32 / UINTAH 24 / WASHINGTON 20 / WASATCH 17 / GRAND 16 / SAN JUAN 15 / CARBON 13 / BEAVER 12 / GARFIELD 12 / MILLARD 12 / MORGAN 12 / DUCHESNE 10 / KANE 9 / IRON 7. No ZIP column → spatial_zip_radius_mi 3 on the layer's own points. file_date = created_dt — chosen on live non-null counts over the 358 active rows: created_dt 358/358 (100%), epm_plan_start_date 65, start_dat 43, advertise_date 27, est_compl_dat 2. start_dat was the first choice and was REJECTED on evidence: a smoke refresh left 11 of 12 emitted records with no file_date. est_compl_dat stays as decision_date and is legitimately absent on almost every row (absent fields stay absent, never interpolated). column_map arrays JOIN values rather than falling back (readCol in sources/arcgis.ts), so a multi-field date fallback is NOT available — one field must be chosen. DEFECT NOTED on the sibling UPlan `Permits` service (NOT wired): its `latitude` column repeats the LONGITUDE value (-111.88967 in both) — geometry, not those columns, is the trustworthy position. No per-row URL column → dataset-precision record_url."
+      "_receipts": "2026-07-27 UT/AZ Maps coverage pass. Utah Department of Transportation `All_Projects` layer 0 ('UDOT Projects (Points)'), published on UDOT's own UPlan open-data hub (data-uplan.opendata.arcgis.com, first-party state agency). This is the Utah analogue of the workbook's own TxDOT-PIA 'Utilities / Infrastructure' capability row. 2,145 rows total; extra_where keeps the 358 non-Closed/non-Abandoned ACTIVE PIPELINE (live returnCountOnly). esriGeometryPoint wkid 4326 → __lat/__lng; dataLastEditDate 2026-07-27 (edited the day of wiring). 13 pin_stat_nm values VERBATIM via groupBy (Closed 1368 / Abandoned 419 / Scoping 75 / Proposed 71 / STIP 62 / Active 53 / Close Out 47 / Under Construction 21 / Funding 15 / Substantially Compl 7 / Region Review 4 / Physically Complete 2 / Awarded 1); Closed + Abandoned excluded BOTH in status_to_bucket and at source in extra_where. 22 proj_typ_nm values enumerated live; 16 transportation-infrastructure classes map to use_type Utility (Traffic and Safety 849, Roadway 306, Traffic Management 211, Structures 80, Transportation Solutions 73, Safety 52, Maintenance 45, Capacity 32, …); the non-physical classes (Other 152, Contingency 98, Not Applicable 39, Studies 38, Joint Highway Committee 37, Environmental 8) are deliberately UNMAPPED → 'unclassified' (logged), never inferred. STATEWIDE coverage [{state:'UT'}] with no county — permitted by the registry contract for a statewide dataset (coverageMatches: `!cov.county` matches any UT county). Live cnty_name groupBy confirms real spread across the dark counties: SALT LAKE 675 / VARIOUS 570 / WEBER 116 / UTAH 112 / SUMMIT 92 / DAVIS 89 / TOOELE 85 / BOX ELDER 58 / CACHE 50 / SEVIER 32 / UINTAH 24 / WASHINGTON 20 / WASATCH 17 / GRAND 16 / SAN JUAN 15 / CARBON 13 / BEAVER 12 / GARFIELD 12 / MILLARD 12 / MORGAN 12 / DUCHESNE 10 / KANE 9 / IRON 7. No ZIP column → spatial_zip_radius_mi 3 on the layer's own points. file_date = created_dt — chosen on live non-null counts over the 358 active rows: created_dt 358/358 (100%), epm_plan_start_date 65, start_dat 43, advertise_date 27, est_compl_dat 2. start_dat was the first choice and was REJECTED on evidence: a smoke refresh left 11 of 12 emitted records with no file_date. est_compl_dat stays as decision_date and is legitimately absent on almost every row (absent fields stay absent, never interpolated). column_map arrays JOIN values rather than falling back (readCol in sources/arcgis.ts), so a multi-field date fallback is NOT available — one field must be chosen. DEFECT NOTED on the sibling UPlan `Permits` service (NOT wired): its `latitude` column repeats the LONGITUDE value (-111.88967 in both) — geometry, not those columns, is the trustworthy position. No per-row URL column → dataset-precision record_url.",
+      "yields_to": "udot-active-projects-lines"
     },
     {
       "registry_id": "arlington-planning-cases",
@@ -13722,6 +13735,102 @@
         "IND DENTAL",
         "IND SIGNIFICANT INDUSTRIAL USERS"
       ]
+    },
+    {
+      "registry_id": "udot-active-projects-lines",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/pA2nEVnB6tquxgOW/arcgis/rest/services/All_Projects/FeatureServer/1",
+      "dataset_url": "https://data-uplan.opendata.arcgis.com/datasets/udot-projects-points",
+      "jurisdiction": "Utah Department of Transportation",
+      "coverage": [
+        {
+          "state": "UT"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "pin_desc",
+          "proj_loc"
+        ],
+        "status_raw": "pin_stat_nm",
+        "type_source": "proj_typ_nm",
+        "file_date": "created_dt",
+        "decision_date": "est_compl_dat",
+        "address": "proj_loc",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "pin"
+      },
+      "type_map": {
+        "Traffic and Safety": "Utility",
+        "Roadway": "Utility",
+        "Traffic Management": "Utility",
+        "Structures": "Utility",
+        "Transportation Solutions": "Utility",
+        "Safety": "Utility",
+        "Maintenance": "Utility",
+        "Capacity": "Utility",
+        "Struct - Minor Structural Rehab": "Utility",
+        "Roadway Work": "Utility",
+        "Bridge - Major Structure": "Utility",
+        "Reconstruction": "Utility",
+        "Surfacing or Resurfacing": "Utility",
+        "Signal and Light": "Utility",
+        "Sidewalk": "Utility",
+        "Sign": "Utility",
+        "Other": "Utility",
+        "Joint Highway Committee": "Utility",
+        "Contingency": "Utility",
+        "Environmental": "Utility",
+        "Active Transportation": "Utility",
+        "Studies": "Utility",
+        "Not Applicable": "Utility",
+        "Enhancement": "Utility",
+        "Freight": "Utility",
+        "Grade and Drainage": "Utility",
+        "Non-Construction": "Utility",
+        "Program Efficiency": "Utility",
+        "Railroad Related": "Utility",
+        "Preservation": "Utility",
+        "Rehabilitation": "Utility",
+        "Pavement Reconstruction": "Utility",
+        "Emergency Repairs": "Utility",
+        "ITS & Signals": "Utility",
+        "Federal Lands Access Program": "Utility"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Proposed",
+          "Scoping",
+          "STIP",
+          "Funding",
+          "Region Review",
+          "Concept Scoping",
+          "Central Review"
+        ],
+        "approved": [
+          "Active",
+          "Awarded",
+          "Under Construction",
+          "Advertised"
+        ],
+        "operating": [
+          "Substantially Compl",
+          "Physically Complete",
+          "Close Out",
+          "Contract Closed Out",
+          "Contract Complete"
+        ],
+        "exclude": [
+          "Closed",
+          "Abandoned",
+          "Hold"
+        ]
+      },
+      "extra_where": "pin_stat_nm NOT IN ('Closed', 'Abandoned')",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-07-27 UT/AZ Maps coverage pass. Utah Department of Transportation `All_Projects` layer 0 ('UDOT Projects (Points)'), published on UDOT's own UPlan open-data hub (data-uplan.opendata.arcgis.com, first-party state agency). This is the Utah analogue of the workbook's own TxDOT-PIA 'Utilities / Infrastructure' capability row. 2,145 rows total; extra_where keeps the 358 non-Closed/non-Abandoned ACTIVE PIPELINE (live returnCountOnly). esriGeometryPoint wkid 4326 → __lat/__lng; dataLastEditDate 2026-07-27 (edited the day of wiring). 13 pin_stat_nm values VERBATIM via groupBy (Closed 1368 / Abandoned 419 / Scoping 75 / Proposed 71 / STIP 62 / Active 53 / Close Out 47 / Under Construction 21 / Funding 15 / Substantially Compl 7 / Region Review 4 / Physically Complete 2 / Awarded 1); Closed + Abandoned excluded BOTH in status_to_bucket and at source in extra_where. 22 proj_typ_nm values enumerated live; 16 transportation-infrastructure classes map to use_type Utility (Traffic and Safety 849, Roadway 306, Traffic Management 211, Structures 80, Transportation Solutions 73, Safety 52, Maintenance 45, Capacity 32, …); the non-physical classes (Other 152, Contingency 98, Not Applicable 39, Studies 38, Joint Highway Committee 37, Environmental 8) are deliberately UNMAPPED → 'unclassified' (logged), never inferred. STATEWIDE coverage [{state:'UT'}] with no county — permitted by the registry contract for a statewide dataset (coverageMatches: `!cov.county` matches any UT county). Live cnty_name groupBy confirms real spread across the dark counties: SALT LAKE 675 / VARIOUS 570 / WEBER 116 / UTAH 112 / SUMMIT 92 / DAVIS 89 / TOOELE 85 / BOX ELDER 58 / CACHE 50 / SEVIER 32 / UINTAH 24 / WASHINGTON 20 / WASATCH 17 / GRAND 16 / SAN JUAN 15 / CARBON 13 / BEAVER 12 / GARFIELD 12 / MILLARD 12 / MORGAN 12 / DUCHESNE 10 / KANE 9 / IRON 7. No ZIP column → spatial_zip_radius_mi 3 on the layer's own points. file_date = created_dt — chosen on live non-null counts over the 358 active rows: created_dt 358/358 (100%), epm_plan_start_date 65, start_dat 43, advertise_date 27, est_compl_dat 2. start_dat was the first choice and was REJECTED on evidence: a smoke refresh left 11 of 12 emitted records with no file_date. est_compl_dat stays as decision_date and is legitimately absent on almost every row (absent fields stay absent, never interpolated). column_map arrays JOIN values rather than falling back (readCol in sources/arcgis.ts), so a multi-field date fallback is NOT available — one field must be chosen. DEFECT NOTED on the sibling UPlan `Permits` service (NOT wired): its `latitude` column repeats the LONGITUDE value (-111.88967 in both) — geometry, not those columns, is the trustworthy position. No per-row URL column → dataset-precision record_url."
     }
   ],
   "ckan": [

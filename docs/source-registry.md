@@ -1350,6 +1350,94 @@ staging + seed docs are pre-built: docs/{california,arizona,maryland}-developmen
 
 ---
 
+## 2026-08-23 — CA-METRO + SOCRATA SWEEP: 0 wired, and four traps worth more than the probes
+
+Working the standing directive to dev-back the 3,332 facilities-floor pages, largest block first
+(CA's 7 metro counties = 337 of CA's 360). **Nothing wireable found this pass.** The four failure
+modes below each cost a probe and each would have cost a bad wire.
+
+**1. `Sonoma County Construction Permits` (Socrata `88ms-k5e7`) — REJECTED ON STALENESS, and the
+CATALOG SAID IT WAS FRESH.** The Socrata discovery API reported `updatedAt = 2026-08-23` (the day
+of the probe). The data does not agree:
+
+```
+count            26,082
+max(started)     2025-05-30
+max(issued)      2025-05-30      ← ~15 months stale
+```
+
+⚠️ **STANDING ANSWER: a Socrata catalog `updatedAt` is a metadata-touch timestamp, not data
+recency. Always `max()` the actual date column before believing a portal.** Same class as the AGO
+item `modified` field. Everything else about this dataset was good — `application_type` enumerated
+to **exactly 26,082** across 12 self-describing values, `status` 26+ verbatim values, `file_number`,
+real ISO `started`/`issued` — which is precisely why the freshness gate has to come first.
+
+⚠️ **Second trap in the same dataset: `address` was ABSENT FROM THE SAMPLED ROWS but PRESENT IN THE
+SCHEMA.** Socrata omits null fields per row, so a 2-row sample is not a column list. Read
+`/api/views/<id>.json`. (Had I trusted the sample I would have rejected it for the wrong reason —
+the CA wire pass's older Sonoma rejection, "no city/ZIP/coords", is itself too strong: there is an
+`address` column, populated on 19,737 of 26,082.)
+
+**2. `data.oxnard.org` — the catalog entry is a GHOST.** Listed in the Socrata catalog as
+`vmzx-48vx Building Permits`, but the domain now serves an **OpenGov budget portal**: the Socrata
+resource path returns HTML (`OpenGov – Oxnard Finance and Budget Visualization`), not JSON.
+**A Socrata catalog hit is not proof the domain still serves Socrata.** Ventura's 34 pages stay dark.
+
+**3. `data.nola.gov` Building Permits — real, but ZERO YIELD.** A genuine Socrata dataset with
+`the_geom` Point coordinates, `address`, `permittype`, `landuse` (35,720 rows). It would lift
+**nothing**: LA's dark parishes are **Caddo 25, St. Tammany 18, Calcasieu 18, Lafayette 16,
+Livingston 16, Bossier 12, Jefferson 11, Ascension 7, East Baton Rouge 4** — and **Orleans is
+already fully lit (0 dark of 21 modelled rows)**. This is the Harris County shape in reverse:
+a correctly-wired source with no dark page to land on. (It is also ~9 months stale,
+`max(issuedate)` 2024-12-05.) **Check the target county's dark count BEFORE probing its source.**
+
+**4. Sonoma's AGO `District_N_Building_Permits_WFL1` — NOT FIRST-PARTY.** 4,270 point records under
+`@DylanA.src`, and one of its six fields is literally **`Sheet1__Project_Number`** — a spreadsheet
+published to ArcGIS Online by a personal account, not the county's system of record. Permit Sonoma's
+own `PRMDPublic` folder carries only basemaps, city limits and fire boundaries. **A `WFL1` suffix
+plus a `Sheet1__` column name is the signature of an uploaded spreadsheet.**
+
+**Also cleared with no hit:** Oakland (`data.oaklandca.gov` — parking permits and food vending only),
+Berkeley, San Mateo County (`data.smcgov.org`) — no building-permit datasets on their Socrata
+portals. Orange County CA and Contra Costa returned no permit services under AGO search.
+
+⚠️ **Operational note: the Socrata discovery API 404s the ENTIRE multi-domain query if any one
+`domains=` entry is unknown** (`{"error":"Domain not found: …"}`). Probe domains singly, or verify
+each first — a batch that silently fails on one bad name looks like "no results anywhere".
+
+---
+
+## 2026-08-23 — OREGON STATEWIDE: REJECTED. ODOT publishes only Region 1
+
+**Nothing wired.** OR carries **147 dark ZIP pages** and was the largest block in the
+county-scoped-only cohort. Portland is already wired (`portland-building-permits`), which is why
+Multnomah is 29/34 lit; the dark pages are everywhere else — Lane 37, Clackamas 19, Washington 19,
+Marion 19, Jackson 18, Yamhill 12, Benton 9, Deschutes 6, Multnomah 5, Hood River 3.
+
+**There is no statewide ODOT project layer to wire.** Four avenues, all closed:
+
+| probe | result |
+|---|---|
+| `owner:daniel.warren_ODOT` (ODOT's AGO account) | **Region 1 ONLY** — `ODOT_Region1_100_Percent_Projects`, `ODOT_Region1_Ops_150_Percent_CountyWide`, `ODOT_Region1_ARTS`, `Region_1_DRAFT_21_24_STIP_Projects_v2`. Region 1 is the Portland metro, already covered. |
+| `gis.odot.state.or.us/arcgis/rest/services` | **HTTP 500**; `/arcgis1006/` **times out at 25 s**; `/transgisportal/` **404** |
+| `ODOT_Traffic_Construction` (23,120 rows) | **REJECTED — traveler information, not development.** It is `TripCheck_Construction_Data_Upload`: `eventTypeName`, `eventSubTypeName`, `incidentId`, `delayInfo`, `incidentDirection`, `odotSeverityDescript`. Road closures and incidents, which would flood pages with transient non-development content. |
+| State-of-Oregon AGO org `uUvqNMGPm7axC2dD` | ~90 services with "project" in the name, but they are a multi-agency grab-bag (ODFW, OWRD, Business Oregon, drinking water, lidar, herbicide). The three closest: **`2024_2027_STIP_Project_Points_ATNI_redone` = 109 records and ATNI-FILTERED** (its own `ATNIBike`/`ATNIPed` fields show it is a tribal-consultation bike/ped subset, not the STIP); **`2024_2027_Pavement_projects_125` = 31 records**; **`Oregon_Projects_and_Developments_Approved` = 8 records** and actually energy-facility siting (`cap_kw`, `rotor_dia`, `hub_hgt`, `slrplnt_tp`). |
+
+⚠️ **"ODOT" IS SHARED BY OREGON, OHIO AND OKLAHOMA.** A plain `q=ODOT` search returns
+`msherron_ohiodot` and `wchen1_ohiodot` items (`District 9 Construction Overlaps`,
+`Ellis_lines_Central_Ohio`) alongside Oregon's. Same class as the Kent DE/RI trap — **scope by
+owner or orgid, never by the abbreviation.**
+
+⚠️ **The org host `services.arcgis.com/uUvqNMGPm7axC2dD` is the STATE OF OREGON's shared org, not
+ODOT's own.** Finding an ODOT layer there does not make a layer statewide, and the Region 1 naming
+is the tell.
+
+**Next lane for OR is county/city, not statewide**: Lane (Eugene, 37 pages) is the largest single
+target in the state, then Marion (Salem, 19), Clackamas 19, Washington 19, Jackson (Medford, 18).
+Unprobed.
+
+---
+
 ## 2026-08-23 — NORTH DAKOTA RECON: no statewide source exists; Bismarck is wireable but needs two rulings
 
 **Nothing wired yet — two founder decisions below.** ND was the only state with zero registry
@@ -1412,6 +1500,115 @@ Two things the existing suite caught that recon had not:
   Moved to `exclude` (the ruling's endpoint) and pinned by an assertion.
 * **`file_date_kind: "applied"` is not a valid member** (`filed|issued|scheduled|estimated|
   decided|awarded|completed|hearing`). It was an invented value; corrected to `filed`.
+
+### ✅ GO-LIVE VERIFIED 2026-08-23 — and a CORRECTION to the page count I published
+
+Deployed (`deploy-edge-functions`, run 32664271716, merge `3a7e7248`), re-cached the 13 Burleigh
+ZIPs through the live engine (13/13 HTTP 200), collected and materialized.
+
+**1,021 Bismarck records live, and every invariant clean: 0 missing `record_url`, 0 missing
+coordinates, 0 unclassified.** The recency window is exact — oldest `file_date` 2025-08-25, newest
+2026-08-21, i.e. the 365-day boundary.
+
+**THE PII FENCE HOLDS IN PRODUCTION, measured not assumed:** across all 1,021 cached site objects,
+**0 carry any key matching owner / applicant / contractor / email / phone**, and 0 match a
+PII-shaped JSON key by regex. The fixture proved it offline; this proves it in the cache.
+
+⚠️ **CORRECTION — it lifts 3 ZIP pages, not the 13 I claimed** (in PR #878 and its merge commit).
+Records land only where the source actually has data:
+
+| 58503 | 520 | 58504 | 301 | 58501 | 200 | **other 10 Burleigh ZIPs** | **0** |
+|---|---|---|---|---|---|---|---|
+
+`app_refresh_zip` on the three: `development=200/200`, `520/520`, `301/301`, all `quality=pass`.
+The other ten — Tuttle, Wing, Baldwin, Braddock, Driscoll, Menoken, Moffit, Sterling, and the
+58505 state-government ZIP — are rural Burleigh, outside Bismarck city limits, and correctly get
+nothing.
+
+**This is the coverage-gate-vs-record distinction this very document already records** ("the
+workbook's Live column is COVERAGE-GATE based, not record based"), and I walked into it anyway:
+declaring `{ND, Burleigh}` makes 13 pages *eligible*, which is not the same as 13 pages *carrying
+records*. **Count `development_reports` sites with a non-null `source_registry_id` before quoting a
+page lift** — the coverage declaration is never the number.
+
+So ND moves **155 dark → 152 dark**.
+
+### ❌ MINOT / WARD (24 pages) and GRAND FORKS (21 pages) — no wireable source
+
+**Grand Forks** — `owner:GrandForksGIS`, **256 items** enumerated: utilities (water/sanitary/storm
+in exhaustive detail), parcels, address points, subdivisions, `Land Use Zoning`, `Land Use Current`,
+`Land Use Proposed`, historical districts. **No permit dataset of any kind.**
+
+⚠️ **CROSS-BORDER LOOKALIKE — do not wire `@mycity_admin`.** A search for "Grand Forks" + permit
+surfaces `OCP Development Permit Areas`, `Sensitive Ecosystems`, `Wetlands and Riparian Areas`,
+`Existing & Future Dike Footprint`. **`OCP` = Official Community Plan, a British Columbia planning
+instrument** — that is **Grand Forks, BC, Canada**, not North Dakota. Same class as the Kent DE/RI
+trap, one country further out. The give-away is vocabulary, not name.
+
+**Ward County** — `owner:WardCountyGIS`, **82 items**: parcels, sections, zoning (current, proposed,
+archived), roads, culverts, flood hazard, foreclosures. **No permit dataset.**
+
+**Minot** — `owner:Aleesha` is the city's account, **458 items**, and its real server is
+**`maps.minotnd.org`** (recovered by walking item service URLs). It publishes no building-permit
+ledger, but it does publish capital-project layers — the municipal analogue of a DOT STIP. Both were
+probed and both fail:
+
+- **`InfrastructureProjects_public`** (77 polygon records, rich schema: `projname`, `projdesc`,
+  `projid`, `projtype`, real `planstart`/`planend`/`actstart`/`actend` Date fields, costs, funding
+  sources). **REJECTED: `projphase` is the single value `"1"` on all 77 rows** — an opaque numeric
+  code with nothing to map verbatim. This is exactly the San Jose `planningpermits30` rejection
+  ("every row carries the single opaque status code '30'"), and opaque-coded values are an explicit
+  stop. `projtype` is fine by contrast — 9 self-describing values summing to exactly 77 (Facilities
+  25, Flood Control 13, Water Distribution 11, Active Transportation 10, Transportation 6, Signals
+  & Lighting 5, Other 3, Stormwater 3, Sanitary Sewer 1).
+  Note also `max(planstart)` = **2031-01-02** — a capital plan reaching years ahead, so its dates
+  are *planned* starts, not filings.
+- **`Street_Improvements_Construction_Projects`** (`maps.minotnd.org`) has a proper `Status` string
+  and real dates, but holds **9 records**. Its siblings (Flood Control, Patching, Water/Sanitary/
+  Storm Sewer, Street Light & Traffic Signal) are the same shape and scale — five registry entries
+  for a few dozen records between them, each carrying staff `Contact`/`Email`/`Phone` columns. Not
+  a worthwhile trade.
+
+**Minot's 24 and Grand Forks' 21 pages stay dark.**
+
+### 🔚 NORTH DAKOTA — FINAL STATE
+
+Every ND avenue is now probed and recorded: **statewide (NDDOT publishes no project layer),
+Bismarck (WIRED), Fargo/Cass, Minot/Ward, Grand Forks.** ND ends at **152 of 155 pages dark** —
+Bismarck's 3 are the only lift available. The remaining 8 counties (Richland, Ramsey, Williams,
+McKenzie, Stark, Morton, Dickey, McPherson, 57 pages) are small rural jurisdictions; on the
+evidence from the state's four largest cities, none is likely to publish a per-record permit feed.
+**Treat ND as closed unless a new source appears on the nightly reprobe list.**
+
+### ❌ FARGO / CASS COUNTY — no wireable source (30 pages stay dark)
+
+- **City of Fargo publishes no permit layer.** Its GIS account (`owner:darylmasten`) carries **59
+  items** — zoning, parcels, floodplains, trees, watermain breaks, road paving, police beats — and
+  **not one permit dataset**.
+- ⚠️ **The real host is `gis.cityoffargo.com`, recovered by walking an item's service URL** — NOT
+  the `gis.fargond.gov` / `opendata.fargond.gov` I guessed, which fail with
+  `SSL peer certificate ... was not OK`. Those two are not Fargo's GIS server at all, so that TLS
+  error is **not** a blocker and must not be recorded as one. (The Frisco lesson again: recover the
+  host from the item, never from a guess.)
+- Its 15 folders (Aerials, Assessors, Basemap, General, OpenData, Planning, Routing,
+  SpecialAssessmentBoundaries, Utilities …) contain **no Permits folder**.
+- **`General/SitePlans/0` is the near-miss** — 3,279 point records and genuinely current (35 dated
+  2026, 9 in 2024). But its only fields are `ADDRESS`, `NAME`, `SECTION` and a **free-text `DATE`**
+  (`M/D/YYYY`, including a literal `N/A`). **No status column, no type column, no case number, no
+  record URL.** Wiring it would mean inventing a status via `status_const` and a type via
+  `use_type_const` — and "a site plan is on file" does not state proposed / approved / operating.
+  **Absent fields stay absent**; this is the Baltimore-city shape (issuance ledger with no status
+  and no work-type → founder call, logged not wired) and the North Richland Hills shape.
+  ⚠️ Note the date trap: `DATE LIKE '2026%'` returns **0** and looks like a dead layer — the year
+  is at the END in `M/D/YYYY`. `LIKE '%/2026'` returns 35. Probe the format, never the prefix.
+- **`General/Plats`** carries Annexation / Dedication / Vacation plat *boundaries* — legal boundary
+  actions, not development filings.
+- **West Fargo** (`map.westfargond.gov`, `@prowest_westfargo`) has Commercial/Residential Civil Site
+  permitting layers, but the commercial one holds **28 rows** and its schema is saturated with PII
+  (`ApplicantPhoneCOMCVL`, `ApplicantRepEmailCOMCVL`, `SuperPhoneCOMCVL`, `WorkEmailCOMCVL`,
+  `BillEmail` …). Not worth wiring at that volume.
+
+**Cass County's 30 pages stay dark.** Minot (Ward, 24) and Grand Forks (21) are unprobed.
 
 #### DECISION 2 — the type whitelist is a judgment call
 
