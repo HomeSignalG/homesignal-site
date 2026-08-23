@@ -1350,6 +1350,76 @@ staging + seed docs are pre-built: docs/{california,arizona,maryland}-developmen
 
 ---
 
+## 2026-08-23 — NORTH DAKOTA RECON: no statewide source exists; Bismarck is wireable but needs two rulings
+
+**Nothing wired yet — two founder decisions below.** ND was the only state with zero registry
+entries: **155 ZIP pages, 12 counties, 100 % dark**, every county at 100 %.
+
+### NDDOT publishes NO project layer — statewide lane REJECTED for ND
+
+| probe | result |
+|---|---|
+| `ndgishub.nd.gov/.../All_Transportation` | 200 — **reference only**: Airports, Railroads, Roads, Mile Markers, Scenic Byways. No projects. |
+| AGO `owner:NDGISHDP-DOT` (NDDOT's own account) | **11 items, all reference layers** — boundaries, county roads, railroads, mile markers, NDDOT districts |
+| AGO `"North Dakota" AND (STIP OR "construction projects" OR "highway projects")` | 9 hits, **none** an NDDOT project layer |
+| `gis.dot.nd.gov` · `www.gis.nd.gov` · `apps.dot.nd.gov` · `maps.dot.nd.gov` | 404 / `Couldn't resolve host name` |
+
+Unlike its neighbours SD and MT — both wired off published STIP layers — **NDDOT does not publish
+its program as a feature service.** Do not re-probe the hostnames above; they are guesses that do
+not resolve, and a guessed host that 404s is not evidence about the publisher (which is why the
+AGO owner-scoped enumeration is the receipt that matters here).
+
+### The city lane: `Building Permit Activity` (City of Bismarck) — VERIFIED, not wired
+
+`https://services1.arcgis.com/XxHmL09eFqJWI0gE/arcgis/rest/services/Map1/FeatureServer/0`
+(layer `BuildingPermitMain`, owner `BismarckGIS`).
+
+- **20,933 rows · `esriGeometryPoint` · native `SITE_ZIP` populated on 20,909 (99.9 %)** — no
+  spatial-radius approximation needed.
+- **FRESH: `max(APPLIED)` = 2026-08-21, two days before measurement**; `min(APPLIED)` 2022-09-16.
+  (`max(ISSUED)` is 2026-10-07 — ~6 weeks future-dated. Real, not a Contra-Costa-style `2099`
+  sentinel, but worth a bogus-date guard if wired.)
+- **Both vocabularies complete, each summing EXACTLY to 20,933**: `STATUS` 21 values (FINALED
+  10,873 · ISSUED 7,408 · FINALED WITH CO 794 · RECEIVED 551 · CLOSED 271 · VOID 195 · WITHDRAWN
+  177 · APPROVED 164 · UNDER REVIEW 135 · SUBMITTED 128 · HOLD 73 · PENDING 64 · FINALED WITH TEMP
+  CO 56 · DENIED 21 · OPEN 7 · FEES DUE 6 · OUT OF JURISDICTION 4 · REVISE AND RESUBMIT 3 · EXPIRED
+  1 · INCOMPLETE 1 · CANCELLED 1) and `PermitType` 44 values.
+- `SITE_CITY` is **BISMARCK 20,932 + one blank** — city only, **not** the Bismarck-Mandan MPO. So it
+  reaches **Burleigh County's 13 ZIP pages**, not Morton's 8. (`MPO Building Permits` is a separate,
+  older item and was not evaluated.)
+
+#### ⛔ DECISION 1 — the layer carries OWNER PII
+
+`BuildingPermitMain` exposes **`OWNER_NAME`, `OWNER_FIRST`, `OWNER_LAST`, `OWNER_ADDR1/2`,
+`OWNER_CITY`, `OWNER_STATE`, `OWNER_ZIP`, `OWNER_EMAIL`, `OWNER_PHONE`, `OWNER_CELL`, `OWNER_FAX`,
+`OWNER_PAGER`**, plus `APPLICANT_NAME` and `CONTRACTOR_NAME` — personal contact details of private
+individuals, on a residential permit ledger.
+
+The city publishes it openly, but **republishing it on homesignal.net is a different act**, and
+PII is an explicit §12 stop. It is technically avoidable — `column_map` selects fields and the
+additive `out_fields` option restricts what is actually fetched, so no owner column need ever leave
+the source — but the decision to wire a PII-bearing source at all is the founder's, not a session's.
+**Recorded, not decided.**
+
+#### DECISION 2 — the type whitelist is a judgment call
+
+Of the 44 `PermitType` values, most volume is **trades, not development**: BUILDING MECHANICAL
+6,524 · BUILDING ELECTRIC 3,691 · BUILDING PLUMBING 1,659 · BUILDING SIGN 633 · BUILDING DOCUMENTS
+632, plus the FIRE\_\* and minor ENG\_\* classes. The WA/MN/IL precedent drops trades at source; the
+MI precedent kept them because the founder specified the Detroit trio. Proposed keep-list on the
+WA/MN/IL default: BUILDING RESIDENTIAL 2,631 · BUILDING COMMERCIAL 1,042 · STORMWATER CONSTRUCTION
+SITE MANAGEMENT 415 · BUILDING SEPTIC 144 · BUILDING MANUFACTURED HOME 126 · BUILDING DEMOLITION 58
+· BUILDING CHANGE OF OCCUPANCY 39 · BUILDING FLOODPLAIN DEVELOPMENT 29 · BUILDING COMMERCIAL
+ALTERATION 1 — **~4,485 of 20,933**. Whether ENG WATER SEWER STORM (1,008) and ENG CONCRETE (723)
+count as development is the open half.
+
+### Scale, stated plainly
+
+Bismarck lifts **13 of ND's 155 dark pages (8.4 %)**. Covering ND properly means Fargo (Cass, 30),
+Minot (Ward, 24) and Grand Forks (21) as separate city passes — ND has no single lever.
+
+---
+
 ## 2026-08-23 — WHAT ACTUALLY DRIVES A DARK ZIP PAGE (all 50 states measured)
 
 Ran to answer one question before spending more effort on statewide recon: **does having a
