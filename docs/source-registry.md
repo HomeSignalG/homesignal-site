@@ -9520,3 +9520,117 @@ at its full fired count with `max(_http_response.id)` unmoved is **not** a stall
 requests sat apparently frozen for ~90 s and then cleared 200 at once. A repeated identical count
 across several reads is usually a stale read, not a backlog: one read of "82 queued" three times
 running was actually a queue of **3**. Do not restart the worker on this evidence.
+
+## 🗽 NEW YORK — the six-layer service resolved, and the sweep's rule INVERTED (2026-08-23)
+
+`CapitalProgramProjects` was held out of the geometry-sibling sweep because its six layers
+carry **duplicate display names** — three "Project Points" (one with a trailing space) and
+three "Project Polygons" — so it could not be resolved by name. Resolved with its own pass.
+
+**It is THREE programs × TWO geometries, paired by exact row count:**
+
+| point layer | rows | polygon twin | rows |
+|---|---|---|---|
+| 0 | 2,459 | 3 | 2,459 |
+| 1 | 1,724 | 4 | 1,724 |
+| 2 |   872 | 5 |   872 |
+
+Only layer 0 was wired, so production read **2,459 of 5,055 point projects (49%)**.
+Wired layers 1 and 2 (`nysdot-capital-program-projects-2` / `-3`), PR #884.
+
+**Measured after rollout: NY 764 pages, 671 lit / 93 dark → 692 lit / 72 dark. +21.**
+
+### ⚠️ THE RULE FROM THE LINE-LAYER WIRES INVERTS HERE — `yields_to` WOULD HAVE DROPPED DATA
+
+On UT / IA / OH / ME / VT the point and line layers describe the **same** projects, so
+omitting `yields_to` **doubles** them. New York's three point layers are **DISJOINT by PIN**,
+so declaring a yield would have **silently dropped** real projects instead. Same mechanism,
+**opposite correct answer**, and only measurement distinguishes them:
+
+- layer 0 holds **0** rows for layer 2's PIN `881485`
+- layer 2 holds **0** for layer 0's PIN `581606`
+- layer 1 holds **0** for either
+- **CONTROLS PASS** — the same query shape returns **4** rows for layer 0's own PIN and **15**
+  for layer 2's own, which is what makes those zeros real rather than a broken query.
+
+**Never copy a `yields_to` decision from a sibling state. Measure the key overlap, with a
+control, every time.**
+
+### The polygon twins are deliberately NOT wired
+
+They mirror the points by exact count and would double every project. Unlike a line layer, a
+polygon twin adds **no project the points lack**, so there is nothing to yield *to* — the
+correct action is to leave them alone, not to wire-and-yield.
+
+### Vocabulary needed no extension, and the NULL is left unmapped
+
+Each layer's live `WORK_CATEGORY` groupBy returned **12 values summing exactly to that layer's
+row count** (2,459 / 1,724 / 872) — complete, not sampled. The **11 non-null values are
+identical across all three layers** and were already in layer 0's shipped `type_map`. The 12th
+is a genuine **NULL** (1 / 7 / 7 rows), deliberately unmapped: a value the source leaves empty
+must never be invented into a type.
+
+### Status is INHERITED, not invented — and the open question is recorded
+
+The source publishes **no status column**. The siblings keep layer 0's
+`status_const: "Capital Program"` → proposed. The layers may well be lifecycle tranches —
+layer 0's sample carries no `ContractNumber` and a **2030** completion date, layer 2's carries
+contract `D265141` and a **2025** date — but bucketing them differently would assert a
+lifecycle the data does not state. Revisit only if NYSDOT documents the split.
+
+---
+
+## ✅ SAN DIEGO COUNTY — `EDGE_EGRESS_BLOCKED` **CONFIRMED** on a clean instrument (2026-08-23)
+
+The California pass could not settle *why* `san-diego-county-discretionary-permits` fails,
+because the only egress available from the sandbox — pg_net — had just been disqualified as an
+instrument for header questions. It named the fix: a **GitHub-runner probe**, which has neither
+pg_net's header handling nor the edge runtime's egress. Run: `recon-fetch` 32672000339,
+targets `scripts/recon/sandiego-edge-egress.json`.
+
+| target | status | bytes | ms |
+|---|---|---|---|
+| **CONTROL** Esri-hosted FeatureServer (UDOT lines) | 200 | `{"count":19951}` | 321 |
+| **CONTROL** classic ArcGIS Server (Ohio TIMS) | 200 | `{"count":1827}` | 617 |
+| SD service root | 200 | 9,045 | 328 |
+| SD bare count | 200 | `{"count":50306}` | 173 |
+| **SD connector query shape — Fallbrook 92028** | **200** | **93,050** | **345** |
+| **SD connector query shape — Ramona 92065** | **200** | **97,379** | **286** |
+| SD + `out_fields` projection | 200 carrying a **400** | 72 | 117 |
+| SD + `page_size` 25 | 200 | 13,052 | 299 |
+
+**Both controls are green, so the instrument is valid and the SD results mean what they say.**
+
+### What is now SETTLED
+
+**`gis-public.sandiegocounty.gov` is fully reachable, and the connector's own query shape works.**
+Two real dark ZIPs each returned ~95 KB of genuine features — `PER_TYPE_DESC`, `PER_STAT`,
+`PER_OPEN_DATE`, per-parcel `geometry` in wkid 4326 — in under 350 ms. So the 20-of-20 timeouts
+through the deployed engine are **not** a dead host, **not** a too-heavy query, and **not** a
+request-signature rule that a runner would also trip. Three egress paths, three different
+outcomes: **Postgres 200 · GitHub runner 200 · Supabase edge runtime timeout.** The
+`EDGE_EGRESS_BLOCKED` disposition is **confirmed rather than suspected** — the Tampa / El Paso
+class, and the layer's own metadata is unchanged and healthy (count still exactly **50,306**;
+the service root still describes the 11-value `PER_STAT` renderer).
+
+### ⚠️ THE PARKED CONTINGENCY WAS WRONG — `out_fields` IS NOT THE FIX
+
+The obvious remedy for a slow/heavy ArcGIS layer is the additive `out_fields` projection, and it
+is recorded as a lever throughout these notes (Miami, Columbus). **On this layer it returns
+`{"error":{"code":400,"message":"Failed to execute query."}}` in 117 ms** — the projection itself
+is rejected, so wiring the entry with `out_fields` would have failed *differently* and been read
+as confirmation of the original fault. **Probe the contingency, not just the fault.** `page_size`
+does work (13 KB), but a page-size fix is irrelevant when the transport never connects.
+
+### Disposition: STILL NOT WIREABLE — 53 pages stay dark, and that is now a KNOWN cost
+
+Nothing in the registry changes. The engine cannot fetch this layer, so wiring it would spend a
+30-second timeout per refresh on all 115 San Diego County pages and emit nothing — the same
+trade the California pass already refused, now refused on evidence instead of inference.
+
+**The two paths that would actually unblock it are both GATED and deliberately NOT taken here:**
+(a) Supabase edge egress changing, which is not ours to change; or (b) an architecture where a
+runner or pg_net fetches the layer and feeds the engine — a new scheduled job plus an engine
+change, i.e. a §12 stop. **Do not build (b) without the founder.** What this run bought is that
+the question is closed: the next session does not have to re-probe, and the entry can be re-wired
+in one commit the day the edge runtime can reach the host.
