@@ -1350,7 +1350,83 @@ staging + seed docs are pre-built: docs/{california,arizona,maryland}-developmen
 
 ---
 
-## 2026-07-16 — CALIFORNIA WIRE PASS (finishing the CA/AZ/MD trio, state 2 of the four-state run)
+## 2026-08-23 — CALTRANS SB1 STATEWIDE: REJECTED ON STALENESS (and the CA lane corrected)
+
+**Nothing was wired. `SB1/BuildingCA_Projects` is stalled ~15 months.** Recorded because an
+unusable source is documented, never wired — and because the *reason* CA is dark turned out not
+to be the reason assumed when this pass started.
+
+**Why it was probed:** CA is one of 13 states with no statewide registry entry, and it holds 360
+of the 3,332 facilities-floor ZIP pages — the largest single-state block.
+
+**Candidate:** `https://caltrans-gis.dot.ca.gov/arcgis/rest/services/SB1/BuildingCA_Projects/MapServer/0`
+(Rebuilding California / SB1), 17,441 rows, `esriGeometryMultipoint`, host 200 via pg_net.
+
+It got further than most: **all three vocabularies enumerated live and each summed EXACTLY to
+17,441** — `ProjectStatus` (Completed 9,429 · In Progress 5,290 · Planned 2,661 · null 61),
+`Category` (5 values), `Program` (18 values, so no `$limit` truncation). Multipoint needed no
+connector work — `featurePoint()` has handled `points` since the Lake County IL fix.
+
+**Two findings worth keeping even though the source was rejected:**
+
+1. 🔑 **A DOT project layer can carry JURISDICTION CENTROIDS, not project locations — check
+   before wiring, the ratio is the instrument.** Compare distinct geometry points to distinct
+   `CityName` values *within one county* (across the whole state the first-N sample clusters by
+   insertion order and the ratio lies). Los Angeles County, 400-row samples:
+
+   | filter | features | distinct points | distinct cities | verdict |
+   |---|---|---|---|---|
+   | `IsOnSHS='No'` | 400 | 97 | 75 | ≈ one point per city — **centroids** |
+   | `IsOnSHS='Yes'` | 400 | **361** | 161 | per-project geometry |
+   | `Category='Local Streets and Highways'` | 400 | **63** | 64 | **one point per city, exactly** |
+
+   Wiring the unfiltered layer would have stacked hundreds of distinct projects onto a handful of
+   city-hall pins. `IsOnSHS` is the clean per-row discriminator (Yes 6,280 + No 11,161 = 17,441
+   exactly) — worth remembering for any other state DOT layer that mixes state-highway projects
+   with pass-through local grants.
+
+2. ⚠️ **`DateUpdated` is FREE TEXT, not a date — and two sample rows said otherwise.** The first
+   rows sampled were ISO (`2023-11-22`, `2024-11-25`) and the field is `length: 10`, which is
+   exactly the shape that makes a lexicographic `extra_where` compare look safe. The pattern
+   check disagreed: `DateUpdated NOT LIKE '____-__-__'` returns **396 of 6,280** SHS rows, whose
+   values include `02-21-2025`, `03/20/2024`, `10/28/2020` — and the literal string
+   **`"Date Updated"`, the column header stored as a data value**. This is the
+   `nyc-dob-permit-issuance` defect class (TEXT `MM/DD/YYYY` vs an ISO literal, matching nothing).
+   **Never conclude a string date's format from sampled rows; run the negative pattern count.**
+
+**THE REJECTION — three independent instruments agree:**
+
+```
+max last_edited_date                     ≈ 2025-05-23   (epoch 1748025937000)
+max created_date                         ≈ 2025-03-26   (min 2025-02-04 → a bulk republish, not per-project)
+newest well-formed DateUpdated              2025-05-05   (order-by-desc freshness probe)
+rows with DateUpdated >= '2026-01-01'                0
+```
+
+Measured 2026-08-23 → **~15 months stale**. Same class as Fort Lauderdale (2021-01-05), Worcester
+(2025-09-09), St. Paul (2025-06-30), Syracuse (2025-08-16), KCMO (2025-05-09). → nightly reprobe list.
+
+**Rest of the Caltrans server checked and empty for this purpose:** `HQstatewide` is climate
+adaptation / sea-level rise; `CHhighway` is highway *reference* data (bridges, postmiles, AADT,
+CCTV, rest areas); `HQMaint/CEPS` and `HQohsip` carry no project records. `SB1/project_point_single_referenced_pro_2_9_12_20250528`
+is the same May-2025 vintage by its own name.
+
+### ⚖️ STANDING CORRECTION — CA never needed a statewide source
+
+The premise that sent this pass at Caltrans was "CA has no statewide entry." Measured, CA's dark
+pages are **not** statewide-shaped at all — **93.6% sit in 7 metro counties**:
+
+| Orange 85 · San Diego 53 · Alameda 51 · Contra Costa 43 · Sonoma 40 · Ventura 34 · San Mateo 31 | = 337 of 360 |
+|---|---|
+
+Every one is a large urban county with first-party city permit portals of the kind already wired
+elsewhere (Anaheim and the City of San Diego are both live entries — note **San Diego County's 53
+dark pages are its OTHER cities**: Chula Vista, Oceanside, Escondido, Carlsbad …). **The CA lane is
+7 metro-county passes, not one statewide entry**, and a statewide DOT layer would have lifted these
+pages only incidentally. Do not re-probe Caltrans for CA coverage.
+
+---
+
 
 The DB is back; every recon verdict re-verified LIVE at wire time (pg_net + a runner
 `csv_stats` sweep — the new additive recon-fetch aggregate that prints distinct-value
