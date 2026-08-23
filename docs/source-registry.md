@@ -1411,19 +1411,45 @@ adaptation / sea-level rise; `CHhighway` is highway *reference* data (bridges, p
 CCTV, rest areas); `HQMaint/CEPS` and `HQohsip` carry no project records. `SB1/project_point_single_referenced_pro_2_9_12_20250528`
 is the same May-2025 vintage by its own name.
 
-### ⚖️ STANDING CORRECTION — CA never needed a statewide source
+### 🛑 RETRACTED WITHIN THE HOUR — "CA is 7 metro-county passes, not one statewide entry"
 
-The premise that sent this pass at Caltrans was "CA has no statewide entry." Measured, CA's dark
-pages are **not** statewide-shaped at all — **93.6% sit in 7 metro counties**:
+That claim was published here and is **WRONG**. It read the county spread of CA's 360 dark pages —
+Orange 85 · San Diego 53 · Alameda 51 · Contra Costa 43 · Sonoma 40 · Ventura 34 · San Mateo 31 =
+337 of 360, "93.6% in 7 counties" — as evidence that CA is metro-shaped and that a statewide source
+would only lift pages incidentally.
 
-| Orange 85 · San Diego 53 · Alameda 51 · Contra Costa 43 · Sonoma 40 · Ventura 34 · San Mateo 31 | = 337 of 360 |
-|---|---|
+**It is a CEILING, not a concentration.** The 42-remaining-states build seeded **the top 10 counties
+per state**. California therefore has **10 modeled counties, and ALL 10 carry dark pages**. Seven of
+ten holding 94% of the pages is just the size distribution of ten counties; it says nothing about
+whether the dark pages cluster. The same artifact shows up across every state in this cohort —
+measured 2026-08-23:
 
-Every one is a large urban county with first-party city permit portals of the kind already wired
-elsewhere (Anaheim and the City of San Diego are both live entries — note **San Diego County's 53
-dark pages are its OTHER cities**: Chula Vista, Oceanside, Escondido, Carlsbad …). **The CA lane is
-7 metro-county passes, not one statewide entry**, and a statewide DOT layer would have lifted these
-pages only incidentally. Do not re-probe Caltrans for CA coverage.
+| state | modeled counties | counties carrying dark pages | dark / total ZIP pages |
+|---|---|---|---|
+| CA | 10 | **10** | 360 / 523 |
+| OR | 10 | **10** | 147 / 200 |
+| NM | 10 | **10** | 134 / 158 |
+| WY | 11 | 10 | 91 / 103 |
+| MS | 10 | 9 | 104 / 114 |
+| LA | 10 | 9 | 127 / 177 |
+| ID | 10 | 9 | 96 / 111 |
+
+**What follows from the corrected reading:** dark pages are spread across essentially *every*
+modeled county in these states, which is the condition under which a **statewide source is the
+efficient lever** — the opposite of what the retracted paragraph concluded. The statewide lane for
+CA is not closed; **Caltrans SB1 is rejected on STALENESS ALONE** (the receipts above), and a
+different fresh statewide CA source would be a legitimate candidate.
+
+⚠️ **The generalisable trap, because it was hit twice in one investigation:** a "top-N counties hold
+X%" statistic is meaningless while N is close to the number of counties that exist in the data. The
+first version of this check also reported "every state has ≤10 dark counties" as concentration —
+same ceiling, same mistake. **Always print the denominator (modeled counties) next to any
+concentration claim.**
+
+County/city passes remain independently worthwhile for these metros (Anaheim and the City of San
+Diego are already live entries, and San Diego County's 53 dark pages are its OTHER cities — Chula
+Vista, Oceanside, Escondido, Carlsbad …). But that is a second lane, not a replacement for the
+statewide one, and this document should not have said otherwise.
 
 ---
 
