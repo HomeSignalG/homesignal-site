@@ -9388,3 +9388,84 @@ is byte-identical, and is proven to fail when the branch is removed.
 
 **`ckan` / `csv` / `carto` were checked and are NOT affected** — their `isoDay` delegates to
 `new Date()`, which already accepts the form.
+
+---
+
+## 🎯 THE GEOMETRY-SIBLING SWEEP — one question, asked of all 48 statewide entries (2026-08-23)
+
+**The finding that generalises: a statewide DOT usually publishes its project family across
+SEVERAL geometry layers, and wiring only the POINT layer is the single biggest cause of dark
+pages in a state that already has a working statewide source.** A polyline intersects many ZIP
+radii; a point sits in exactly one. This is the same lever behind the earlier reach study
+(statewide-entry states 17.3% dark vs county-scoped-only 58.2%) — the difference tracks
+**geometry, not presence**.
+
+**The sweep is cheap and should be re-run whenever a statewide entry is added:** enumerate every
+statewide entry, `GET` its service root (`?f=json`) and its parent FOLDER, and look for a sibling
+whose name differs only by geometry type. It cost ~10 probes and found four wires.
+
+### What it found
+
+| State | Wired | Unwired sibling | Rows | Outcome |
+|---|---|---|---|---|
+| **UT** | `All_Projects/FeatureServer/0` points | `/1` lines | 19,951 | wired #879 — **UT 109 → 274 lit, 201 → 36 dark** |
+| **IA** | `..._Bid_Point_View` | `..._Bid_Line_View` | 129 | wired #881 |
+| **OH** | `Current_Projects_Points` | `Current_Projects_Lines` | 1,827 | wired #882 |
+| **ME** | `MaineDOT_OpenData/MapServer/4` | `MapServer/5` | 1,138 | wired #882 |
+| **VT** | `AMP/FeatureServer/10` points | `/9` Project Segment Locations | 518 | wired #882 |
+| **AZ** | `lyrTIPAdoptions…/0` | — | — | already polyline, **no lever** |
+| **NJ** | `…STIP_Project_Locations/0` | — | — | already polyline, **no lever** |
+| **AK** | `STIP_24_27_Final_NewSchema/0` | — | — | **single layer, point-only — no lever exists** |
+
+**AK's 73 dark pages therefore have no geometry remedy** — do not re-open it looking for one.
+Iowa also publishes `..._Bid_Multipoint_View` (4 rows) and `..._Bid_Polygon_View` (44); both are
+deliberately unwired because `yields_to` is a single string and a three-way yield chain is
+unproven. **NY** carries six layers (3 Project Points + 3 Project Polygons) with duplicate names —
+unresolved, needs its own pass before anything is wired.
+
+### ⚠️ THE RATIO IS NOT THE POINT — three traps this sweep hit
+
+1. **"Fewer line rows" is not an argument against wiring.** Iowa's Line view holds 129 rows
+   against the Point view's 362 — the opposite of UDOT's 19,951-vs-2,148. The pool is the same
+   size either way; what a polyline buys is **reach**, and reach is what a dark page lacks.
+2. **A sibling layer can carry a WIDER vocabulary than the layer you already wired, and an
+   unmapped value is silently unclassified.** Ohio's lines layer publishes **35**
+   `PRIMARY_WORK_CATEGORY` values; **13 never occur on the points layer** and were therefore
+   absent from its `type_map` — Traffic Control (Safety) 215, Pedestrian Facilities 126,
+   Guardrail / Roadside Maintenance 24, Lighting (Safety) 22, Vegetative Maintenance 22 … all
+   1,827 rows would have landed unclassified, and `use_type` drives the pin SHAPE. Vermont's
+   lines layer carries **`COMPLETE`**, which does not occur on its points layer at all.
+   **Always re-enumerate the vocabulary on the SIBLING; never assume the pair shares one.**
+   Each of Ohio's 13 was resolved against a precedent already inside that entry's own map, never
+   invented.
+3. **Overlap must be MEASURED, and where it cannot be, the yield is declared anyway.** Ohio's
+   overlap is proven — 3 `PID_NBR` values from the lines layer match **9 rows** on the points
+   layer. Maine (6 `pin`s) and Vermont (4 `ProjectNumber`s) matched **0**, which is evidence of
+   low overlap and **not proof of none**. `yields_to` was declared on all of them, because the
+   yields hook leaves a points record with no matching line untouched: a yield on a disjoint pair
+   is a **structural no-op**, while its absence on an overlapping pair is a **silent doubling**.
+   Fail-safe in the correct direction.
+
+### Method notes (each cost a probe, so don't repeat them)
+
+- **`dev_refresh_collect()` prunes `net._http_response`.** A probe fired before a collect is
+  swept away, and its receipts then read as `0` / `null` — indistinguishable from a real zero.
+  **Always pair a probe read with `select count(*) … where id between …` as the positive
+  control**; two rounds of Iowa receipts were lost to this before the control caught it.
+- **`returnDistinctValues` fails on some classic MapServers** (OH returned HTTP 200 carrying
+  `{"error":{"code":400}}`) and on the VTrans FeatureServer. Fall back to a plain `outFields`
+  read with `resultRecordCount`.
+- **VTrans publishes `ProjectNumber` with leading spaces** (`" STP BP24(14)"`). The yields hook
+  matches on **trimmed** string equality, so the padding cannot defeat it — but any hand-written
+  `IN (…)` probe against it will silently miss those rows.
+
+### Utah rollout receipts (the proof the lever works)
+
+`udot-active-projects-lines` merged 2026-08-23. Rolled out in four batches through
+`net.http_post` → `dev_refresh_collect()` → `app_refresh_zip`:
+
+**UT 310 pages: 109 lit / 201 dark → 274 lit / 36 dark.** Control that the yield fired: 84123's
+point records went **55 → 48**. 176 line records resolved to **127 distinct pins** (1.4 rows per
+project). 0 missing `record_url`, 0 missing coordinates, 0 unclassified. Of the residual 36,
+**27 were re-run and came back dark** — rural ZIPs with no UDOT project inside the 3-mile radius,
+which is an honest terminal state, not a defect.

@@ -11247,7 +11247,66 @@
       "extra_where": "conbegin_forecast IS NOT NULL",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
-      "_receipts": "2026-08-05 eleven-zero-coverage-states pass. MaineDOT's OWN service on the state GIS host (gis.maine.gov), owner MaineDOT_OpenData, layer 4 'Public Projects Points'. 1,109 rows. *** THIS SOURCE IS ONLY WIREABLE BECAUSE OF THE MULTIPOINT FIX SHIPPED 2026-08-05 (PR #600). *** The layer is esriGeometryMultipoint; before that fix featurePoint() returned null for multipoint, so every record would have had NO coordinates, fallen through to scope 'area', and been dropped by the point-scope-only app_projects materializer - exactly the lake-county-il-construction-program failure. STATUS: USE reporting_status, NEVER proj_status_code. proj_status_code is OPAQUE NUMERIC CODES with NO coded-value domain ('10' 647, '20' 311, '01' 53, '54' 41, '60' 37, '63' 15, '50' 5 = 1,109 exact) - the San Jose '30' fail-closed class, undecodable without guessing. reporting_status on the SAME layer is SELF-DESCRIBING and also sums exactly to 1,109: '2 - Design/Permitting Phase' 503, '4 - Construction Complete' 414, '1 - Awaiting Kick-Off' 117, '3 - Construction Phase' 75. All 4 mapped -> 0 unmapped. STANDING LESSON: never let an opaque field decide when a self-describing one exists on the same layer. DATE CHOSEN ON LIVE NON-NULL COUNTS: conbegin_forecast 501/1,109 - the best available. Others measured and rejected: ko_actual 503 but only 402 survive a 2021 cutoff, ko_forecast 117, conbegin_actual 73, concomp_forecast 72. NO recency_days - all 501 non-null conbegin_forecast values already post-date 2021-08-06 (the window and the IS NOT NULL test return the SAME 501), so a window would be a pure no-op. *** STATED CEILING: only 501 of 1,109 rows (45%) emit. A MAJORITY OF THE LAYER IS UNDATED and is deliberately dropped rather than published undated. Understating is the honest direction. *** Layer 5 is the same projects as LINES (1,138) - points only are wired; wiring both would double-emit. HOST RISK: gis.maine.gov is STATE-HOSTED, not services*.arcgis.com, so a pg_net 200 is NOT evidence the Deno edge runtime can reach it (governance section 0, the Montgomery-OH/Dayton class). pg_net returned 200 on every probe - the positive control section 0 requires for wire-and-see. VERIFY FROM arcgis_reports POST-DEPLOY."
+      "_receipts": "2026-08-05 eleven-zero-coverage-states pass. MaineDOT's OWN service on the state GIS host (gis.maine.gov), owner MaineDOT_OpenData, layer 4 'Public Projects Points'. 1,109 rows. *** THIS SOURCE IS ONLY WIREABLE BECAUSE OF THE MULTIPOINT FIX SHIPPED 2026-08-05 (PR #600). *** The layer is esriGeometryMultipoint; before that fix featurePoint() returned null for multipoint, so every record would have had NO coordinates, fallen through to scope 'area', and been dropped by the point-scope-only app_projects materializer - exactly the lake-county-il-construction-program failure. STATUS: USE reporting_status, NEVER proj_status_code. proj_status_code is OPAQUE NUMERIC CODES with NO coded-value domain ('10' 647, '20' 311, '01' 53, '54' 41, '60' 37, '63' 15, '50' 5 = 1,109 exact) - the San Jose '30' fail-closed class, undecodable without guessing. reporting_status on the SAME layer is SELF-DESCRIBING and also sums exactly to 1,109: '2 - Design/Permitting Phase' 503, '4 - Construction Complete' 414, '1 - Awaiting Kick-Off' 117, '3 - Construction Phase' 75. All 4 mapped -> 0 unmapped. STANDING LESSON: never let an opaque field decide when a self-describing one exists on the same layer. DATE CHOSEN ON LIVE NON-NULL COUNTS: conbegin_forecast 501/1,109 - the best available. Others measured and rejected: ko_actual 503 but only 402 survive a 2021 cutoff, ko_forecast 117, conbegin_actual 73, concomp_forecast 72. NO recency_days - all 501 non-null conbegin_forecast values already post-date 2021-08-06 (the window and the IS NOT NULL test return the SAME 501), so a window would be a pure no-op. *** STATED CEILING: only 501 of 1,109 rows (45%) emit. A MAJORITY OF THE LAYER IS UNDATED and is deliberately dropped rather than published undated. Understating is the honest direction. *** Layer 5 is the same projects as LINES (1,138) - points only are wired; wiring both would double-emit. HOST RISK: gis.maine.gov is STATE-HOSTED, not services*.arcgis.com, so a pg_net 200 is NOT evidence the Deno edge runtime can reach it (governance section 0, the Montgomery-OH/Dayton class). pg_net returned 200 on every probe - the positive control section 0 requires for wire-and-see. VERIFY FROM arcgis_reports POST-DEPLOY.",
+      "yields_to": "maine-dot-public-projects-lines"
+    },
+    {
+      "registry_id": "maine-dot-public-projects-lines",
+      "platform": "arcgis",
+      "service_url": "https://gis.maine.gov/mapservices/rest/services/dot/MaineDOT_OpenData/MapServer/5",
+      "dataset_url": "https://gis.maine.gov/mapservices/rest/services/dot/MaineDOT_OpenData/MapServer/5",
+      "jurisdiction": "Maine Department of Transportation",
+      "coverage": [
+        {
+          "state": "ME"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "project_title",
+          "scope_desc"
+        ],
+        "status_raw": "reporting_status",
+        "file_date": "conbegin_forecast",
+        "address": "description",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "pin"
+      },
+      "file_date_kind": "estimated",
+      "use_type_const": "Utility",
+      "status_to_bucket": {
+        "proposed": [
+          "1 - Awaiting Kick-Off",
+          "2 - Design/Permitting Phase"
+        ],
+        "approved": [
+          "3 - Construction Phase"
+        ],
+        "operating": [
+          "4 - Construction Complete"
+        ],
+        "exclude": []
+      },
+      "extra_where": "conbegin_forecast IS NOT NULL",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": {
+        "layer": "Public Projects Lines, MapServer/5, esriGeometryPolyline",
+        "rows": 1138,
+        "points_layer_rows": 1109,
+        "reporting_status_groupBy": {
+          "4 - Construction Complete": 597,
+          "2 - Design/Permitting Phase": 366,
+          "1 - Awaiting Kick-Off": 96,
+          "3 - Construction Phase": 79
+        },
+        "status_control": "597+366+96+79 = 1138 = the layer count, so the vocabulary is complete and every value is already bucketed by the points entry",
+        "rows_passing_extra_where_conbegin_forecast_NOT_NULL": 363,
+        "overlap_with_points": "NOT PROVEN either way \u2014 6 pin values from the lines layer matched 0 rows in the points layer. That is a small sample, so it is evidence of low overlap, NOT proof of none. yields_to is declared anyway: the yields hook leaves a points record with no matching line untouched, so the declaration is a structural no-op on a disjoint pair and a guard if overlap exists beyond the sample.",
+        "probed_utc": "2026-08-23",
+        "why": "The publisher ships this project family across a POINT layer and a LINE layer and only the point layer was wired. A polyline crosses many ZIP radii where a point sits in one, which is what drives dark-page reach."
+      }
     },
     {
       "registry_id": "iowa-dot-bid-projects",
@@ -11400,7 +11459,69 @@
       "extra_where": "ProjectStatus IS NOT NULL AND ExpectedConstructionStart IS NOT NULL",
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
-      "_receipts": "2026-08-05 eleven-zero-coverage-states pass. VTrans' OWN server, Master/AMP layer 10 'Project Point Locations'. 1,037 rows, esriGeometryPoint, richest schema of the eleven-state pass (7 date fields, native County and Town). FRESH - PublishDate max 2026-08-02, THREE DAYS before this pass, and ExpectedConstructionStart runs to 2033. This is an actively published forward-looking program. STATUS: ProjectStatus is the field, and its vocabulary sums EXACTLY to 1,037 via groupBy: null 636, ACTIVE 350, ON HOLD 50, CANCELLED 1. ConstructionStatus was measured and REJECTED as worse - it is null on 954 of 1,037 (92%) (null 954, New 34, Proposed 30, Carry-Over 19 = 1,037 exact). Buckets per the source's own language: ACTIVE = under way -> approved; ON HOLD (paused) and CANCELLED (dead) -> exclude, and dropped at source in extra_where. proposed and operating are deliberately EMPTY - this vocabulary states no such stage, and inventing one would be a guess (the NDOT precedent permits empty buckets). *** STATED CEILING - THE SPARSEST OF THE FOUR: ProjectStatus is populated on only 401 of 1,037 (39%), and requiring BOTH a status and a date leaves 337 of 1,037 (33%). Two thirds of the layer is deliberately not published rather than published statusless or undated. *** County is populated on 795/1,037. NO recency_days: a 1825-day window on ExpectedConstructionStart returns 344, essentially the same as the IS NOT NULL population, so a window adds nothing - and on a forward-looking program a backward window is the wrong instrument. Layer 9 is the same projects as segments (588) - points only. HOST RISK: maps.vtrans.vermont.gov is STATE-HOSTED, not services*.arcgis.com - the Montgomery-OH/Dayton class. pg_net returned 200 on every probe (the section 0 positive control). VERIFY FROM arcgis_reports POST-DEPLOY."
+      "_receipts": "2026-08-05 eleven-zero-coverage-states pass. VTrans' OWN server, Master/AMP layer 10 'Project Point Locations'. 1,037 rows, esriGeometryPoint, richest schema of the eleven-state pass (7 date fields, native County and Town). FRESH - PublishDate max 2026-08-02, THREE DAYS before this pass, and ExpectedConstructionStart runs to 2033. This is an actively published forward-looking program. STATUS: ProjectStatus is the field, and its vocabulary sums EXACTLY to 1,037 via groupBy: null 636, ACTIVE 350, ON HOLD 50, CANCELLED 1. ConstructionStatus was measured and REJECTED as worse - it is null on 954 of 1,037 (92%) (null 954, New 34, Proposed 30, Carry-Over 19 = 1,037 exact). Buckets per the source's own language: ACTIVE = under way -> approved; ON HOLD (paused) and CANCELLED (dead) -> exclude, and dropped at source in extra_where. proposed and operating are deliberately EMPTY - this vocabulary states no such stage, and inventing one would be a guess (the NDOT precedent permits empty buckets). *** STATED CEILING - THE SPARSEST OF THE FOUR: ProjectStatus is populated on only 401 of 1,037 (39%), and requiring BOTH a status and a date leaves 337 of 1,037 (33%). Two thirds of the layer is deliberately not published rather than published statusless or undated. *** County is populated on 795/1,037. NO recency_days: a 1825-day window on ExpectedConstructionStart returns 344, essentially the same as the IS NOT NULL population, so a window adds nothing - and on a forward-looking program a backward window is the wrong instrument. Layer 9 is the same projects as segments (588) - points only. HOST RISK: maps.vtrans.vermont.gov is STATE-HOSTED, not services*.arcgis.com - the Montgomery-OH/Dayton class. pg_net returned 200 on every probe (the section 0 positive control). VERIFY FROM arcgis_reports POST-DEPLOY.",
+      "yields_to": "vtrans-project-locations-lines"
+    },
+    {
+      "registry_id": "vtrans-project-locations-lines",
+      "platform": "arcgis",
+      "service_url": "https://maps.vtrans.vermont.gov/arcgis/rest/services/Master/AMP/FeatureServer/9",
+      "dataset_url": "https://maps.vtrans.vermont.gov/arcgis/rest/services/Master/AMP/FeatureServer/9",
+      "jurisdiction": "Vermont Agency of Transportation (VTrans)",
+      "coverage": [
+        {
+          "state": "VT"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "ProjectName",
+          "WorkDescription"
+        ],
+        "status_raw": "ProjectStatus",
+        "file_date": "ExpectedConstructionStart",
+        "address": "ProjectDescription",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "ProjectNumber"
+      },
+      "file_date_kind": "estimated",
+      "use_type_const": "Utility",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "ACTIVE"
+        ],
+        "operating": [
+          "COMPLETE"
+        ],
+        "exclude": [
+          "ON HOLD",
+          "CANCELLED"
+        ]
+      },
+      "extra_where": "ProjectStatus IS NOT NULL AND ExpectedConstructionStart IS NOT NULL",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": {
+        "layer": "Project Segment Locations, FeatureServer/9, esriGeometryPolyline",
+        "rows": 518,
+        "points_layer_rows": 962,
+        "ProjectStatus_groupBy": {
+          "ACTIVE": 300,
+          "(null)": 198,
+          "ON HOLD": 18,
+          "CANCELLED": 1,
+          "COMPLETE": 1
+        },
+        "status_control": "300+198+18+1+1 = 518 = the layer count, so the vocabulary is complete",
+        "new_value": "COMPLETE (1 row) does not occur on the points layer and was unmapped; it buckets to operating. ON HOLD stays excluded \u2014 a stalled value must never claim motion.",
+        "rows_passing_extra_where": 228,
+        "leading_space_keys": "ProjectNumber is published with leading spaces on some rows (e.g. ' STP BP24(14)'). The yields hook matches on TRIMMED string equality, so the padding cannot defeat the yield.",
+        "overlap_with_points": "NOT PROVEN either way \u2014 4 ProjectNumber values from the lines layer matched 0 rows in the points layer. Same reasoning as Maine: declared as a fail-safe, not on a proven overlap.",
+        "probed_utc": "2026-08-23",
+        "why": "The publisher ships this project family across a POINT layer and a LINE layer and only the point layer was wired. A polyline crosses many ZIP radii where a point sits in one, which is what drives dark-page reach."
+      }
     },
     {
       "registry_id": "slo-county-planning-permits",
@@ -12516,7 +12637,109 @@
       },
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "record",
-      "_receipts": "2026-08-12 OH statewide wire. OH was 136/335 record-backed with 199 dark pages and no statewide source. HOST CHOICE, AND IT IS THE RISK ON THIS ENTRY: ODOT's project data lives ONLY on its own TIMS server (tims.dot.state.oh.us), NOT on ArcGIS Online. The ohiodot AGO org was enumerated first per governance section 0 (prefer AGO when both exist, because services*.arcgis.com is proven reachable by dozens of live entries): its only project-ish item is GCAT_UPDATE_2020_2025, nothing usable. So this is a SELF-HOSTED host and section 0 applies in full \u2014 a pg_net 200 proves POSTGRES egress, not that the Deno edge runtime can reach it. The Dayton precedent (dayton-oh-capital-improvement-projects, #594, reverted in #595 after 'Connection reset by peer' at Connect on 4 of 4 ZIPs) is the same class and the same state. THE FIRST POST-DEPLOY RE-CACHE IS THE DEPLOY VERIFICATION for this entry: read arcgis_reports[].fetched/emitted, never counts, and REMOVE the entry if the edge cannot connect. SERVER: /ags/rest/services enumerates folders Assets, Boundaries, CrashAnalytics, Environmental, MapViewers, Projects, Roadway_Information, Safety, StandardMaps, TIMS, Utilities; the Projects folder holds All_Project_Points, All_Projects_Linear, Current_Projects_Lines/Points, District_Work_Plan_Lines/Points, Next_4_Fiscal_Years_*, Previous_4_Fiscal_Years_*. LAYER: Current_Projects_Points/MapServer/0, esriGeometryPoint, 1,785 rows. LIVENESS: SOURCE_LAST_UPDATED and COD_LAST_UPDATED both read 1786507200000 = 2026-08-12, the day of wiring. POINTS ONLY, DELIBERATELY: Current_Projects_Lines carries 1,861 rows and is the SAME project set rendered as linework (the folder pairs every product Points/Lines). Wiring both would double-emit, which is the houston-plat-applications layer-0/layer-1 defect that exact-identity dedup cannot catch across two source_registry_ids. STATUS: PROJECT_STATUS two-stage probed (Rule 4) \u2014 groupBy returns 3 values summing to EXACTLY 1,785 (Awarded 1,780, Not Filed 3, Filed 2), the row count and therefore the positive control, and returnDistinctValues independently returns 3. Awarded -> approved (the contract is let, construction is committed but not necessarily complete); Filed and Not Filed are pre-award plan-filing states -> proposed. Nothing is unmapped, so no record is dropped under Rule 1. TYPE: PRIMARY_WORK_CATEGORY, self-describing, two-stage probed \u2014 24 values summing to EXACTLY 1,785, returnDistinctValues independently 24, 0 NULLs, 0 unclassified. All are state-highway construction -> Utility (the txdot/nvdot/okdot/idot precedent) except 'Other Studies/ Tasks' (2 rows), which names no physical work and takes the generic member 'Development'. DATE: AWARD_MILESTONE_DT, a real epoch-millisecond date field, with file_date_kind 'awarded' \u2014 the same field semantics and the same kind txdot uses for ACTUAL_LET_DATE. This is the FIRST statewide DOT entry wired this session that carries a real event date; OKDOT and IDOT are both correctly undated. RECORD URL: PROJECT_PLANS_URL is genuinely PER-RECORD (contracts.dot.state.oh.us/search.jsp?cabinetId=1002&PID_NUM=<PID_NBR>), so record_url_precision is 'record', not the 'dataset' fallback used for OKDOT and IDOT. spatial_zip_radius_mi 3: the layer has no ZIP column (COUNTY_NME only), matching txdot/okdot/idot."
+      "_receipts": "2026-08-12 OH statewide wire. OH was 136/335 record-backed with 199 dark pages and no statewide source. HOST CHOICE, AND IT IS THE RISK ON THIS ENTRY: ODOT's project data lives ONLY on its own TIMS server (tims.dot.state.oh.us), NOT on ArcGIS Online. The ohiodot AGO org was enumerated first per governance section 0 (prefer AGO when both exist, because services*.arcgis.com is proven reachable by dozens of live entries): its only project-ish item is GCAT_UPDATE_2020_2025, nothing usable. So this is a SELF-HOSTED host and section 0 applies in full \u2014 a pg_net 200 proves POSTGRES egress, not that the Deno edge runtime can reach it. The Dayton precedent (dayton-oh-capital-improvement-projects, #594, reverted in #595 after 'Connection reset by peer' at Connect on 4 of 4 ZIPs) is the same class and the same state. THE FIRST POST-DEPLOY RE-CACHE IS THE DEPLOY VERIFICATION for this entry: read arcgis_reports[].fetched/emitted, never counts, and REMOVE the entry if the edge cannot connect. SERVER: /ags/rest/services enumerates folders Assets, Boundaries, CrashAnalytics, Environmental, MapViewers, Projects, Roadway_Information, Safety, StandardMaps, TIMS, Utilities; the Projects folder holds All_Project_Points, All_Projects_Linear, Current_Projects_Lines/Points, District_Work_Plan_Lines/Points, Next_4_Fiscal_Years_*, Previous_4_Fiscal_Years_*. LAYER: Current_Projects_Points/MapServer/0, esriGeometryPoint, 1,785 rows. LIVENESS: SOURCE_LAST_UPDATED and COD_LAST_UPDATED both read 1786507200000 = 2026-08-12, the day of wiring. POINTS ONLY, DELIBERATELY: Current_Projects_Lines carries 1,861 rows and is the SAME project set rendered as linework (the folder pairs every product Points/Lines). Wiring both would double-emit, which is the houston-plat-applications layer-0/layer-1 defect that exact-identity dedup cannot catch across two source_registry_ids. STATUS: PROJECT_STATUS two-stage probed (Rule 4) \u2014 groupBy returns 3 values summing to EXACTLY 1,785 (Awarded 1,780, Not Filed 3, Filed 2), the row count and therefore the positive control, and returnDistinctValues independently returns 3. Awarded -> approved (the contract is let, construction is committed but not necessarily complete); Filed and Not Filed are pre-award plan-filing states -> proposed. Nothing is unmapped, so no record is dropped under Rule 1. TYPE: PRIMARY_WORK_CATEGORY, self-describing, two-stage probed \u2014 24 values summing to EXACTLY 1,785, returnDistinctValues independently 24, 0 NULLs, 0 unclassified. All are state-highway construction -> Utility (the txdot/nvdot/okdot/idot precedent) except 'Other Studies/ Tasks' (2 rows), which names no physical work and takes the generic member 'Development'. DATE: AWARD_MILESTONE_DT, a real epoch-millisecond date field, with file_date_kind 'awarded' \u2014 the same field semantics and the same kind txdot uses for ACTUAL_LET_DATE. This is the FIRST statewide DOT entry wired this session that carries a real event date; OKDOT and IDOT are both correctly undated. RECORD URL: PROJECT_PLANS_URL is genuinely PER-RECORD (contracts.dot.state.oh.us/search.jsp?cabinetId=1002&PID_NUM=<PID_NBR>), so record_url_precision is 'record', not the 'dataset' fallback used for OKDOT and IDOT. spatial_zip_radius_mi 3: the layer has no ZIP column (COUNTY_NME only), matching txdot/okdot/idot.",
+      "yields_to": "odot-current-projects-lines"
+    },
+    {
+      "registry_id": "odot-current-projects-lines",
+      "platform": "arcgis",
+      "service_url": "https://tims.dot.state.oh.us/ags/rest/services/Projects/Current_Projects_Lines/MapServer/0",
+      "dataset_url": "https://tims.dot.state.oh.us/ags/rest/services/Projects/Current_Projects_Lines/MapServer/0",
+      "jurisdiction": "Ohio Department of Transportation",
+      "coverage": [
+        {
+          "state": "OH"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PROJECT_NME",
+          "PRIMARY_WORK_CATEGORY"
+        ],
+        "status_raw": "PROJECT_STATUS",
+        "type_source": "PRIMARY_WORK_CATEGORY",
+        "file_date": "AWARD_MILESTONE_DT",
+        "address": [
+          "FEATURE_INTERSECT",
+          "COUNTY_NME"
+        ],
+        "case_number": "PID_NBR",
+        "record_url": "PROJECT_PLANS_URL",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "awarded",
+      "type_map": {
+        "Roadway Major Rehab": "Utility",
+        "Bridge Preservation": "Utility",
+        "Roadway Minor Rehab": "Utility",
+        "Add Through Lane(s)": "Utility",
+        "Bridge / Culvert Maintenance": "Utility",
+        "Culvert Preservation": "Utility",
+        "Intersection Improvement (Safety)": "Utility",
+        "Transit": "Utility",
+        "Bridge Expansion": "Utility",
+        "Pavement Maintenance": "Utility",
+        "Geologic Maintenance / Slide Repair": "Utility",
+        "Roadside / Median Improvement (Safety)": "Utility",
+        "Rest Area": "Utility",
+        "Traffic Control Maintenance": "Utility",
+        "Bike Facility": "Utility",
+        "Noise Wall": "Utility",
+        "Interchange Expansion": "Utility",
+        "Shared Use Path": "Utility",
+        "Other Studies/ Tasks": "Development",
+        "Railroad Improvements & Rehabilitation": "Utility",
+        "Roadway Improvement (Safety)": "Utility",
+        "Transport System Mgmt and Ops (TSMO)": "Utility",
+        "Roadway Improvement (Jobs & Commerce)": "Utility",
+        "New Roadway": "Utility",
+        "Traffic Control (Safety)": "Utility",
+        "Pedestrian Facilities": "Utility",
+        "Guardrail / Roadside Maintenance": "Utility",
+        "Lighting (Safety)": "Utility",
+        "Vegetative Maintenance": "Utility",
+        "Interchange Improvement (Safety)": "Utility",
+        "Emission Reduction": "Utility",
+        "Enhanced Crossing": "Utility",
+        "Other Building / Facility Work": "Civic/Public",
+        "Parks": "Civic/Public",
+        "Building Demolition": "Civic/Public",
+        "New Building/ Facility": "Civic/Public",
+        "Asset Inventory / Inspection": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Filed",
+          "Not Filed"
+        ],
+        "approved": [
+          "Awarded"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "record",
+      "_receipts": {
+        "layer": "Current Projects (Lines), MapServer/0, esriGeometryPolyline",
+        "rows": 1827,
+        "points_layer_rows": 1759,
+        "PROJECT_STATUS_groupBy": {
+          "Awarded": 1815,
+          "Filed": 10,
+          "Not Filed": 2
+        },
+        "status_control": "1815+10+2 = 1827 = the layer count, so the status vocabulary is complete",
+        "PRIMARY_WORK_CATEGORY_distinct": 35,
+        "type_control": "the 35 counts sum to 1827 = the layer count, so the type vocabulary is complete",
+        "type_values_absent_from_the_points_map": 13,
+        "why_that_matters": "an unmapped value lands unclassified; the 13 are resolved against precedents already inside this entry's own type_map, never invented",
+        "PROJECT_PLANS_URL_populated": "1827 of 1827, so record_url_precision stays 'record'",
+        "overlap_with_points": "PROVEN \u2014 3 PID_NBR values taken from the lines layer match 9 rows in the points layer, so the pair genuinely double-emits without the yield",
+        "probed_utc": "2026-08-23",
+        "why": "The publisher ships this project family across a POINT layer and a LINE layer and only the point layer was wired. A polyline crosses many ZIP radii where a point sits in one, which is what drives dark-page reach."
+      }
     },
     {
       "registry_id": "nysdot-capital-program-projects",
