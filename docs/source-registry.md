@@ -1413,6 +1413,68 @@ Two things the existing suite caught that recon had not:
 * **`file_date_kind: "applied"` is not a valid member** (`filed|issued|scheduled|estimated|
   decided|awarded|completed|hearing`). It was an invented value; corrected to `filed`.
 
+### ✅ GO-LIVE VERIFIED 2026-08-23 — and a CORRECTION to the page count I published
+
+Deployed (`deploy-edge-functions`, run 32664271716, merge `3a7e7248`), re-cached the 13 Burleigh
+ZIPs through the live engine (13/13 HTTP 200), collected and materialized.
+
+**1,021 Bismarck records live, and every invariant clean: 0 missing `record_url`, 0 missing
+coordinates, 0 unclassified.** The recency window is exact — oldest `file_date` 2025-08-25, newest
+2026-08-21, i.e. the 365-day boundary.
+
+**THE PII FENCE HOLDS IN PRODUCTION, measured not assumed:** across all 1,021 cached site objects,
+**0 carry any key matching owner / applicant / contractor / email / phone**, and 0 match a
+PII-shaped JSON key by regex. The fixture proved it offline; this proves it in the cache.
+
+⚠️ **CORRECTION — it lifts 3 ZIP pages, not the 13 I claimed** (in PR #878 and its merge commit).
+Records land only where the source actually has data:
+
+| 58503 | 520 | 58504 | 301 | 58501 | 200 | **other 10 Burleigh ZIPs** | **0** |
+|---|---|---|---|---|---|---|---|
+
+`app_refresh_zip` on the three: `development=200/200`, `520/520`, `301/301`, all `quality=pass`.
+The other ten — Tuttle, Wing, Baldwin, Braddock, Driscoll, Menoken, Moffit, Sterling, and the
+58505 state-government ZIP — are rural Burleigh, outside Bismarck city limits, and correctly get
+nothing.
+
+**This is the coverage-gate-vs-record distinction this very document already records** ("the
+workbook's Live column is COVERAGE-GATE based, not record based"), and I walked into it anyway:
+declaring `{ND, Burleigh}` makes 13 pages *eligible*, which is not the same as 13 pages *carrying
+records*. **Count `development_reports` sites with a non-null `source_registry_id` before quoting a
+page lift** — the coverage declaration is never the number.
+
+So ND moves **155 dark → 152 dark**.
+
+### ❌ FARGO / CASS COUNTY — no wireable source (30 pages stay dark)
+
+- **City of Fargo publishes no permit layer.** Its GIS account (`owner:darylmasten`) carries **59
+  items** — zoning, parcels, floodplains, trees, watermain breaks, road paving, police beats — and
+  **not one permit dataset**.
+- ⚠️ **The real host is `gis.cityoffargo.com`, recovered by walking an item's service URL** — NOT
+  the `gis.fargond.gov` / `opendata.fargond.gov` I guessed, which fail with
+  `SSL peer certificate ... was not OK`. Those two are not Fargo's GIS server at all, so that TLS
+  error is **not** a blocker and must not be recorded as one. (The Frisco lesson again: recover the
+  host from the item, never from a guess.)
+- Its 15 folders (Aerials, Assessors, Basemap, General, OpenData, Planning, Routing,
+  SpecialAssessmentBoundaries, Utilities …) contain **no Permits folder**.
+- **`General/SitePlans/0` is the near-miss** — 3,279 point records and genuinely current (35 dated
+  2026, 9 in 2024). But its only fields are `ADDRESS`, `NAME`, `SECTION` and a **free-text `DATE`**
+  (`M/D/YYYY`, including a literal `N/A`). **No status column, no type column, no case number, no
+  record URL.** Wiring it would mean inventing a status via `status_const` and a type via
+  `use_type_const` — and "a site plan is on file" does not state proposed / approved / operating.
+  **Absent fields stay absent**; this is the Baltimore-city shape (issuance ledger with no status
+  and no work-type → founder call, logged not wired) and the North Richland Hills shape.
+  ⚠️ Note the date trap: `DATE LIKE '2026%'` returns **0** and looks like a dead layer — the year
+  is at the END in `M/D/YYYY`. `LIKE '%/2026'` returns 35. Probe the format, never the prefix.
+- **`General/Plats`** carries Annexation / Dedication / Vacation plat *boundaries* — legal boundary
+  actions, not development filings.
+- **West Fargo** (`map.westfargond.gov`, `@prowest_westfargo`) has Commercial/Residential Civil Site
+  permitting layers, but the commercial one holds **28 rows** and its schema is saturated with PII
+  (`ApplicantPhoneCOMCVL`, `ApplicantRepEmailCOMCVL`, `SuperPhoneCOMCVL`, `WorkEmailCOMCVL`,
+  `BillEmail` …). Not worth wiring at that volume.
+
+**Cass County's 30 pages stay dark.** Minot (Ward, 24) and Grand Forks (21) are unprobed.
+
 #### DECISION 2 — the type whitelist is a judgment call
 
 Of the 44 `PermitType` values, most volume is **trades, not development**: BUILDING MECHANICAL
