@@ -1445,6 +1445,53 @@ page lift** — the coverage declaration is never the number.
 
 So ND moves **155 dark → 152 dark**.
 
+### ❌ MINOT / WARD (24 pages) and GRAND FORKS (21 pages) — no wireable source
+
+**Grand Forks** — `owner:GrandForksGIS`, **256 items** enumerated: utilities (water/sanitary/storm
+in exhaustive detail), parcels, address points, subdivisions, `Land Use Zoning`, `Land Use Current`,
+`Land Use Proposed`, historical districts. **No permit dataset of any kind.**
+
+⚠️ **CROSS-BORDER LOOKALIKE — do not wire `@mycity_admin`.** A search for "Grand Forks" + permit
+surfaces `OCP Development Permit Areas`, `Sensitive Ecosystems`, `Wetlands and Riparian Areas`,
+`Existing & Future Dike Footprint`. **`OCP` = Official Community Plan, a British Columbia planning
+instrument** — that is **Grand Forks, BC, Canada**, not North Dakota. Same class as the Kent DE/RI
+trap, one country further out. The give-away is vocabulary, not name.
+
+**Ward County** — `owner:WardCountyGIS`, **82 items**: parcels, sections, zoning (current, proposed,
+archived), roads, culverts, flood hazard, foreclosures. **No permit dataset.**
+
+**Minot** — `owner:Aleesha` is the city's account, **458 items**, and its real server is
+**`maps.minotnd.org`** (recovered by walking item service URLs). It publishes no building-permit
+ledger, but it does publish capital-project layers — the municipal analogue of a DOT STIP. Both were
+probed and both fail:
+
+- **`InfrastructureProjects_public`** (77 polygon records, rich schema: `projname`, `projdesc`,
+  `projid`, `projtype`, real `planstart`/`planend`/`actstart`/`actend` Date fields, costs, funding
+  sources). **REJECTED: `projphase` is the single value `"1"` on all 77 rows** — an opaque numeric
+  code with nothing to map verbatim. This is exactly the San Jose `planningpermits30` rejection
+  ("every row carries the single opaque status code '30'"), and opaque-coded values are an explicit
+  stop. `projtype` is fine by contrast — 9 self-describing values summing to exactly 77 (Facilities
+  25, Flood Control 13, Water Distribution 11, Active Transportation 10, Transportation 6, Signals
+  & Lighting 5, Other 3, Stormwater 3, Sanitary Sewer 1).
+  Note also `max(planstart)` = **2031-01-02** — a capital plan reaching years ahead, so its dates
+  are *planned* starts, not filings.
+- **`Street_Improvements_Construction_Projects`** (`maps.minotnd.org`) has a proper `Status` string
+  and real dates, but holds **9 records**. Its siblings (Flood Control, Patching, Water/Sanitary/
+  Storm Sewer, Street Light & Traffic Signal) are the same shape and scale — five registry entries
+  for a few dozen records between them, each carrying staff `Contact`/`Email`/`Phone` columns. Not
+  a worthwhile trade.
+
+**Minot's 24 and Grand Forks' 21 pages stay dark.**
+
+### 🔚 NORTH DAKOTA — FINAL STATE
+
+Every ND avenue is now probed and recorded: **statewide (NDDOT publishes no project layer),
+Bismarck (WIRED), Fargo/Cass, Minot/Ward, Grand Forks.** ND ends at **152 of 155 pages dark** —
+Bismarck's 3 are the only lift available. The remaining 8 counties (Richland, Ramsey, Williams,
+McKenzie, Stark, Morton, Dickey, McPherson, 57 pages) are small rural jurisdictions; on the
+evidence from the state's four largest cities, none is likely to publish a per-record permit feed.
+**Treat ND as closed unless a new source appears on the nightly reprobe list.**
+
 ### ❌ FARGO / CASS COUNTY — no wireable source (30 pages stay dark)
 
 - **City of Fargo publishes no permit layer.** Its GIS account (`owner:darylmasten`) carries **59
