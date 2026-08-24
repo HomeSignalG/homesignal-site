@@ -9714,3 +9714,64 @@ that already has cached facilities also blocks any new development records for t
 The guard is correct — blanking real EPA facility counts would be worse — and it self-reverts
 the moment FRS returns a real count for those ZIPs. **Do not work around it**; changing the
 guard is an engine/DB change and a §12 stop.
+
+---
+
+## 🟡 IDAHO — ITIP FOUND AND MEASURED, DELIBERATELY NOT WIRED (2026-08-24)
+
+ID carries **96 dark pages** and had no statewide entry. ITD had never been probed — the 10
+prior `ITD` hits in this file are substrings of `AppSubmitDate` / `permitdate`, not the agency.
+
+### The source exists and looks wireable
+
+**`ITIP_2025`** — the Idaho Transportation Investment Program, Idaho's STIP equivalent:
+`https://services1.arcgis.com/Qqv4dYPC8Vv8e3c3/arcgis/rest/services/ITIP_2025/FeatureServer`
+
+| layer | name | geometry | rows |
+|---|---|---|---|
+| 0 | ITIP_Lines_Regional | polyline | 507 |
+| 1 | ITIP_Lines_State | polyline | 237 |
+| 2 | ITIP_Points_Regional | point | 785 |
+| 3 | ITIP_Points_State | point | 1,055 |
+
+**2,584 rows total.** Schema is rich and self-describing: `KeyNo` (project key),
+`PublicDescription` (a real per-project narrative), `Project_Type`, `Location`, `County`,
+`City`, `ProgramYear`, `Program`, `MajorProgram`, `Work_`, `Total_Est`. Layer 0's
+`Project_Type` groupBy returns **12 values summing exactly to 507** — a complete vocabulary.
+There is no status column, so this is the MT/SD/NDOT `status_const` shape.
+
+⚠️ **The DCAT catalogue MISSES it.** Searching 804 KB of `data-iplan.opendata.arcgis.com`
+DCAT for `project|stip|construction|improvement|program` returns only two HPMS road-inventory
+attribute layers (Year Last Improvement / Year Last Construction — road segments carrying a
+year, the Caltrans `WRONG_RECORD_CLASS` shape). **The programme acronym is state-specific:
+Idaho says ITIP, not STIP, and the item is titled `ITIP_Hosted_Copy`.** It surfaced only from
+an org-scoped AGO search (`owner:ITDGISdata`, 62 hits of 495 items). Search the acronym, not
+the word.
+
+### ⛔ WHY IT IS NOT WIRED — the four-layer overlap does not resolve
+
+The layer NAMES do not describe the split. Measured by sampling `KeyNo` from three layers and
+cross-querying all four, with a positive control on each source layer (own keys → full count)
+and a negative control (a fabricated KeyNo → 0):
+
+| keys sampled from | L0 Lines_Reg | L1 Lines_State | L2 Points_Reg | L3 Points_State |
+|---|---|---|---|---|
+| **L0** (2 keys) | 2 ✓ control | 0 | 0 | **2** |
+| **L2** (8 keys) | 0 | 0 | 8 ✓ control | **8** |
+| **L1** (8 keys) | **8** | 8 ✓ control | 0 | 0 |
+
+`Lines_Regional` pairs with `Points_STATE`, not `Points_Regional` — so "Regional/State" labels
+the map view, not the programme. But the relations do not compose: L1 ⊂ L0 and L2 ⊂ L3, yet
+L0's keys reach L3 while L1's keys do not. **No single containment model fits these three
+samples**, so the `yields_to` topology cannot be derived from them.
+
+**Wiring on this evidence would be guessing at a duplicate topology — the Houston-plats class,
+which exact-identity dedup cannot catch across separate `source_registry_id`s.** Getting it
+wrong doubles (a missing yield) or drops (a wrong one), and this session has already produced
+one of each: OH/ME/VT/UT/IA/VA needed the yield, NY needed its absence.
+
+**What the next pass needs (a probe job, not a sample):** the DISTINCT `KeyNo` set per layer
+and the pairwise intersections over the full sets — not 8-key samples. Once the matrix is
+real, the entries are otherwise ready: statewide `{state: ID}`, `case_number: KeyNo`,
+`title: [PublicDescription, Project_Type]`, `type_source: Project_Type`, `status_const` with
+no status column, and dataset-precision `record_url`.
