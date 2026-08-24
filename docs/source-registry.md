@@ -10108,3 +10108,71 @@ Pinned by `test/ne-program-book-pair.test.mjs`, proven to fail on **9 mutations*
 reversing the yield, moving the match key, mapping `ProgramYear` as a date, adding
 `recency_days`, diverging `use_type` from the sibling, using an off-vocabulary type, claiming the
 programme is built, and stripping the NEBRASKA disambiguation.
+
+---
+
+## 🚫 NEW MEXICO — NMDOT's CATALOGUE ENUMERATED COMPLETE, NO CURRENT PROJECT REGISTER (2026-08-24)
+
+**NM: 158 ZIP pages · 24 lit · 134 dark.** One entry covers NM, none statewide. NMDOT had
+**never been probed** — `NMDOT` appeared **0 times** in this file beforehand.
+
+### What this stamp answers, and its scope
+
+**Question: does NMDOT publish a CURRENT project register?** Answer: no — and unlike the old ND
+row, this is measured against the **complete catalogue**, not a keyword search.
+
+**`orgid:hOpd7wfnKm16p9D9` paginated to exhaustion: `total=587`, 587 rows returned across 6
+pages, 587 distinct item ids — no truncation, no duplicates.** Org confirmed first-party by NAME:
+`/sharing/rest/portals/hOpd7wfnKm16p9D9` → **`name: "NMDOT ArcGIS Online"`, `urlKey: "NMDOT"`**.
+
+Of 587 items, **237 are services**, and exactly **6** are project candidates. All six are
+characterised below — none was left unexamined.
+
+### The six candidates, every one closed
+
+| item | rows | verdict |
+|---|---|---|
+| `NMDOT ESTIP Project Locations by Year` (`nmdot`, 2023-09-21) | 3 year-layers, **104 distinct** `CONTROLNUM` | ⛔ every FFY is PAST |
+| `Roadway Projects` (`alma.pacheco_NMDOT`, 2025-05-14) | layer **4**, **30** | ⛔ completed awards |
+| `Other Projects` (same, 2025-05-14) | layer 0, **8** | ⛔ completed awards, malformed keys |
+| `Bicycle and Pedestrian Projects` (same, 2023-08-10) | layer **1**, **13** | ⛔ completed awards |
+| `I40 Project Corridor (May 2022)` | — | single corridor, not a register (title-evident; rows not probed) |
+| `NM_302370_SCurve_Project_Features` | — | single project, not a register (title-evident; rows not probed) |
+
+**Maximum plausible volume across everything NMDOT publishes: ~155 records**, against 134 dark
+pages in a state of New Mexico's size. Wyoming needed 544 projects to light 55 pages.
+
+### ⚠️ Two findings that nearly produced a WRONG reject
+
+1. **ESTIP is a decoy, and a four-state acronym collision.** New Mexico calls its programme
+   **ESTIP**, not STIP — the control `STIP AND "New Mexico"` returns `total=2` with **zero**
+   candidates, exactly the Idaho ITIP trap. But searching `ESTIP` surfaces **Arizona**
+   (`lmurray@azdot.gov_adot`, `SPerfect@azdot.gov_adot`), **Rhode Island** (`RIDOA`,
+   `risegis.ri.gov`) and **Tennessee** alongside New Mexico. Only org confirmation separates
+   them. A first pass fixated on the ESTIP acronym and was about to stamp the reject on ESTIP's
+   staleness alone — while `Roadway Projects` and `Other Projects`, **two years fresher and
+   sitting in the same org**, were already visible in the same result set. **Read the whole
+   candidate list; do not stop at the acronym match.**
+2. **A recent `modified` date does NOT mean recent data.** `Roadway Projects` and `Other
+   Projects` are stamped **2025-05-14**, but their `DateAwarded` values are **2018, 2019, 2022**
+   — completed awards, not programmed work. The item was touched; the content was not. This is
+   the Worcester lesson in reverse: check the DATA's own dates in BOTH directions, because item
+   metadata can be misleadingly fresh as well as misleadingly stale.
+
+### What NMDOT publishes instead (so it is not re-derived)
+
+`National Highway System HPMS 2024 / 2025 / 2026`, `NMDOT State Owned Roads`, `Local Roads` —
+**road inventory**, the `WRONG_RECORD_CLASS` shape already recorded for Idaho's HPMS layers and
+North Dakota's bridge inventory: an inventory of what exists, never programmed work.
+
+### Still open — do not read this stamp as broader than it is
+
+- **Only ArcGIS Online was enumerated.** NMDOT's STIP may exist as a **PDF or non-Esri web
+  application**, which this pass did not look for and which no current connector could ingest.
+- **Two single-project items were rejected on their titles, not on row counts** (`I40 Project
+  Corridor`, `NM_302370_SCurve`). Neither could plausibly be a statewide register, but neither
+  was row-probed.
+- **Edge reachability was never tested** for any NM host — every candidate failed on class or
+  volume first. Any future attempt owes the 3× edge preflight.
+- **Cross-border control not run.** If an NM source is ever wired, the control is **El Paso TX
+  79821/79835** against Doña Ana County — the Council Bluffs shape.
