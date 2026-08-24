@@ -9639,7 +9639,7 @@ in one commit the day the edge runtime can reach the host.
 
 ## ✅ VIRGINIA WIRED — VDOT SYIP, and a CORRECTION to the `dev_refresh_collect()` rule (2026-08-23)
 
-**VA 184 pages: 92 lit / 92 dark → 127 lit / 57 dark. +35.** `vdot-syip-approved-projects`
+**VA 184 pages: 92 lit / 92 dark → 154 lit / 30 dark. +62.** `vdot-syip-approved-projects`
 (+ `-lines`), PR #887, deployed `1f1c916`.
 
 **Discovery matters as much as the wire: VDOT had NEVER been probed.** Every prior `VDOT`
@@ -9678,3 +9678,39 @@ any collect runs. Fire a batch, let the queue drain, and collect **within the wi
 rollout that takes longer than 20 minutes to drain, collect periodically as it goes rather
 than once at the end. `distinct on (zip)` means a second collect inside the window is
 harmless, just redundant.
+
+### ⚠️ The 20-minute window cost 27 pages ON THIS VERY ROLLOUT — measured, not hypothetical
+
+The correction above was written before its own hazard had been paid for. The first VA pass
+reported **+35**. A follow-up query then showed **52 of the 57 remaining dark ZIPs had a
+`refreshed_at` OLDER than the rollout** — i.e. their responses were never applied at all,
+having aged out of collect's 20-minute window while the 92-ZIP batch drained. Re-firing those
+52 recovered **27 more pages**: the true figure is **+62, not +35**.
+
+**A rollout is not finished when the queue empties. It is finished when every fired ZIP has a
+`refreshed_at` newer than the fire.** Check that explicitly — the page counts alone will look
+plausible and be short.
+
+### 🔒 A PAGE WITH CACHED FACILITIES CANNOT GAIN DEVELOPMENT RECORDS WHILE FRS RETURNS 0 FOR IT
+
+The 25 VA pages still dark are NOT a wiring defect and must not be forced. Each one has real
+VDOT content waiting — new `development` of 19, 57, 51, 54, 31, 20, 18, 16, 6, 2 … — but its
+response also carries `facilities: 0` against a cached facilities count above zero, so
+`dev_refresh_collect()`'s third guard refuses the whole row:
+
+```
+and not ( (not epa_ok or d.refreshed_at >= now() - interval '7 days')
+          and new facilities = 0 and cached facilities > 0 )
+```
+
+Measured while this was happening: `epa_ok` was **true** globally, so the refusal is driven by
+the `refreshed_at >= now() - 7 days` half — the row is fresh, and FRS is returning 0 for these
+particular ZIPs while the probe targets stay healthy. That is the **density-dependent FRS
+failure** the function's own comment describes, working as intended.
+
+**The structural consequence, which applies to every future rollout and not just Virginia: the
+facilities and development dimensions share ONE row update, so a transient FRS zero on a page
+that already has cached facilities also blocks any new development records for that page.**
+The guard is correct — blanking real EPA facility counts would be worse — and it self-reverts
+the moment FRS returns a real count for those ZIPs. **Do not work around it**; changing the
+guard is an engine/DB change and a §12 stop.
