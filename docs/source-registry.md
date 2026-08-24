@@ -9988,3 +9988,66 @@ Rejected anyway, on three independent grounds:
 - **Cross-border control not run.** If a ND source is ever wired, the control is **Moorhead MN
   56560**, across the Red River from Fargo — the Council Bluffs shape, proving ND records do not
   leak onto MN pages.
+
+---
+
+## 🔧 SOUTH DAKOTA — a live double-emit fixed, and 12 unwired layers characterised (2026-08-24)
+
+**SD: 126 ZIP pages · 95 lit · 31 dark** — already the healthiest state measured. Seven
+`sd-stip-*` entries run off ONE service,
+`https://dotgis.sd.gov/spearfishformation/rest/services/STIP/DOT_STIP_Approved/MapServer`.
+
+### ⚠️ The service has 19 layers, not 10
+
+Wired: **0,1,2,3,4,6,9**. The rest were never characterised until now:
+
+| layer | name | geom | rows | distinct PCN | verdict |
+|---|---|---|---|---|---|
+| 5 | ADA | line | 11 | 6 | disjoint — wireable, negligible |
+| 7 | Developmental STIP 2030-2033 | point | 197 | 151 | disjoint from all wired; **7 keys shared with L8** |
+| 8 | Developmental STIP 2030-2033 | line | 184 | 117 | as above — a pair, would need a yield |
+| 12 | Shared Use Paths | line | **0** | — | empty |
+| 13/14/15 | Local Roads / State Highways | line | — | — | **road reference geography, not projects** |
+| 16 | **Do Not Map** | point | — | — | ⛔ **publisher instruction, never wire** |
+| 18 | Shoulder Improvement | line | **0** | — | empty |
+| 19 | Local Structure Projects | point | 53 | 53 | ⛔ **48 of 53 keys already in wired L0** |
+| 20 | Local Road Projects | line | 2 | 2 | disjoint — wireable, negligible |
+| 21 | Developmental Local STIP | point | **0** | — | empty |
+
+### ✅ THE FIX — one real double-emit, live since the SD wire
+
+Layers **1 and 6 are both named "Safety"** — the same work category in two geometries, both
+wired, neither yielding. **They share 2 `ProjectCtrlNbr`**, so those 2 projects were emitted
+TWICE on any page within 3 mi of both geometries. `sd-stip-safety-points` now declares
+`yields_to: sd-stip-safety-lines`.
+
+**The measurement that matters is that this is the ONLY overlap.** Across all **21 pairs** of the
+7 wired layers, every other pair shares **ZERO** keys — which is why the remaining five entries
+correctly declare no yield, and why blanket-adding yields here would DROP records (the NY case).
+Complete `ProjectCtrlNbr` sets per layer, each groupBy summing exactly to its own row count:
+L0 216/330 · L1 74/104 · L2 105/140 · L3 108/199 · L4 59/430 · L6 31/153 · L9 42/44.
+
+### ⚠️ THIS MAPSERVER REJECTS `returnDistinctValues` — with a 200
+
+`?returnDistinctValues=true` returns **HTTP 200** carrying
+`{"error":{"code":400,"message":"Failed to execute query."}}`. The first overlap pass read those
+as empty key sets and would have reported **every pair as disjoint**, i.e. "no duplicates
+anywhere" — a clean-looking false negative that would have left the double-emit in place.
+**Measure overlap here with `groupByFieldsForStatistics`**, which this server does support. Same
+200-wrapping-an-error shape as TxDOT's `returnCentroid` rejection.
+
+### Not wired, deliberately
+
+- **L19** would add 5 new projects and duplicate 48. Only wireable behind a `yields_to` on L0.
+- **L16 "Do Not Map"** is an instruction from the publisher. It is not a dataset.
+- **L7/L8 "Developmental STIP 2030-2033"** are the only material volume (381 rows). They are a
+  points+lines PAIR sharing 7 keys, so they must be wired together with points yielding to lines
+  — never one alone. **Record class is unresolved**: "Developmental" inside a service named
+  `DOT_STIP_*Approved*` is a contradiction this pass did not settle, and it is the ND
+  `planning_grant_applications` question in a new form. Schema was requested but not read before
+  the fix shipped. **Do not wire on volume alone.**
+
+Pinned by `test/sd-stip-layer-set.test.mjs`, proven to fail on **8 mutations** — reverting the
+yield, reversing its direction, adding a yield to a disjoint pair, wiring L19, wiring L16, wiring
+road geography, depending on `returnDistinctValues`, and moving the match key off
+`ProjectCtrlNbr`.
