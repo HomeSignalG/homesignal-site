@@ -9910,3 +9910,81 @@ Pinned by `test/wydot-stip-pair.test.mjs`, **proven to fail on 12 mutations** �
 dropping the yield, wiring layer 2, pointing at the HDR consultant org, dropping *or inverting*
 the forward window, mapping `drft_year` or a cost estimate as a date, and claiming the programme
 is built.
+
+---
+
+## 🚫 NORTH DAKOTA — NDDOT's OWN ORGS ENUMERATED, NO PROJECT REGISTER (2026-08-24)
+
+**ND: 155 ZIP pages · 3 lit · 152 dark.** No registry entry covers ND.
+
+### ⚠️ What question this stamp answers — and what the OLD one didn't
+
+The prior ND row in the seven-zero-state table reads *"no first-party source — hits are City of
+Minot (`maps.minotnd.org`) and a consultant, not NDDOT."* That answered **"are there
+third-party candidates?"** It never enumerated **NDDOT's own accounts**, so it could not answer
+*"does NDDOT publish a project register?"* — and that table has already been wrong twice (its AK
+and HI rows were both later WIRED). WY's rejection in this same file was also wrong, disproved
+earlier the same day.
+
+**This stamp answers: NDDOT's own ArcGIS orgs were enumerated in full on 2026-08-24, and no
+project/STIP register exists in them.** Scope of what was checked is below, so the next session
+knows what NOT to redo — and what is still open.
+
+### NDDOT's own orgs — enumerated complete, not sampled
+
+| owner | items | of which services | project-register candidates |
+|---|---|---|---|
+| `NDDOT-GIS` | 75 (**total=75, complete**) | 26 | **0** |
+| `NDGISHDP-DOT` | 11 (**total=11, complete**) | 11 | **0** |
+| `NDGISHub` (state hub, not NDDOT) | 320 total | 47 sampled + 19 keyword-scoped | **0** |
+
+⚠️ The `NDGISHub` listing **was truncated** (100 returned of 320) and was therefore closed with a
+keyword-scoped query rather than left as an unchecked 220-item tail.
+
+**A statewide control: `q=STIP AND "North Dakota"` returns `total = 0`** — no STIP item exists
+anywhere on ArcGIS Online for this state. That is the query the Idaho lesson demands (search the
+programme acronym), and here it genuinely returns nothing, unlike Idaho where ITIP was hiding.
+
+### What NDDOT DOES publish (so nobody re-derives it)
+
+- **Bridge inventory, 7 layers** — State Owned / Non-State-Owned / Poor Condition / Posted and
+  Closed / Pre-1940 / Historic. This is **asset condition of existing structures**, the Idaho
+  HPMS `WRONG_RECORD_CLASS` shape: an inventory of what exists, never programmed work.
+- **Real-time road conditions** (Conditions-NE, Conditions-SW) and **RWIS** weather stations.
+- **Basemaps** (~8), **Material Sources / Materials Geotechnical**, **Right-of-Way and Corner
+  Recordation**, **Utilities District Viewer**.
+- `NDGISHDP-DOT` is pure reference geography: city boundaries, county roads, highway number
+  points, railroads, mile markers, state and federal roads, NDDOT districts.
+
+### The one real candidate — probed and REJECTED on record class
+
+**`planning_grant_applications`** (`utility.arcgis.com/usrsvcs/servers/12b63f03…/ext_ssl/`),
+HTTP 200, 2 layers: `Grant Application Locations (Pts)` multipoint **32 rows** + polyline
+**21 rows** = **53 rows**. Newest `last_edited_date` **2025-08-19**, so it is NOT stale.
+
+Rejected anyway, on three independent grounds:
+
+1. ⛔ **WRONG RECORD CLASS — decisive.** `Application_Status` is **Applied 25 · Awarded 6 ·
+   NULL 1** of 32. **78% are unfunded funding requests.** These are grant *applications*
+   (`Grant_Program` = RAISE, AID Demo; `Amount_Requested` / `Amount_Awarded` /
+   `Total_Project_Cost`), not construction filings — one sampled row is an equipment purchase,
+   "NDDOT Oversize Vehicle Measuring System". Rendering a speculative funding request as a
+   development record on a resident's map is precisely what the anti-fabrication prime directive
+   forbids.
+2. **Volume is negligible** — 53 rows across 155 ZIP pages, the Montana `STIP Points` shape
+   (5 rows) that was likewise not wired. It could not move 152 dark pages.
+3. **Data quality** — `State_Biennium` contains a literal `YYYY-YY` placeholder and a `2023-20`
+   typo among its 8 values.
+
+### Still open (NOT checked — do not read this stamp as broader than it is)
+
+- **Non-ArcGIS publication.** Only ArcGIS Online and NDDOT's own ArcGIS servers were enumerated.
+  NDDOT's STIP may exist as a **PDF or a non-Esri web application**, which this pass did not look
+  for and which would not be wireable by the existing connectors anyway.
+- **Edge reachability of `utility.arcgis.com/usrsvcs/…` was NEVER tested**, because the candidate
+  failed on record class first. That proxied path is the kind that commonly refuses the edge
+  runtime (the Tampa/El Paso WAF shape), so any future attempt must run the 3× edge preflight
+  before claiming it is reachable.
+- **Cross-border control not run.** If a ND source is ever wired, the control is **Moorhead MN
+  56560**, across the Red River from Fargo — the Council Bluffs shape, proving ND records do not
+  leak onto MN pages.
