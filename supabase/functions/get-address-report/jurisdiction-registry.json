@@ -14454,6 +14454,173 @@
         "layer": "1 STE_VDOT_SYIP_APPRVD_LINE, esriGeometryPolyline, 2,682 rows",
         "why_lines": "A polyline intersects many ZIP radii where a point sits in exactly one; this is the reach half of the pair. Virginia carried 92 dark pages before this wire."
       }
+    },
+    {
+      "registry_id": "itd-itip-projects-lines",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/Qqv4dYPC8Vv8e3c3/arcgis/rest/services/ITIP_2025/FeatureServer/0",
+      "dataset_url": "https://services1.arcgis.com/Qqv4dYPC8Vv8e3c3/arcgis/rest/services/ITIP_2025/FeatureServer/0",
+      "jurisdiction": "Idaho Transportation Department (ITD) \u2014 Idaho Transportation Investment Program (ITIP), FY2027\u20132033",
+      "coverage": [
+        {
+          "state": "ID"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Location",
+          "PublicDescription"
+        ],
+        "type_source": "Project_Type",
+        "address": [
+          "City",
+          "County"
+        ],
+        "case_number": "KeyNo",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "Pavement": "Utility",
+        "Bridge": "Utility",
+        "Safety & Traffic Operations": "Utility",
+        "Railroad Crossings": "Utility",
+        "Freight": "Utility",
+        "Active Transportation": "Utility",
+        "National Electric Vehicle Infrastructure (NEVI)": "Utility",
+        "Transit Projects": "Utility",
+        "Airport Projects": "Civic/Public",
+        "New Airport Facilities": "Civic/Public",
+        "Rest Areas": "Civic/Public",
+        "Corridor Studies": "Development",
+        "Early Development": "Development",
+        "Support": "Development"
+      },
+      "status_const": "Programmed in the Idaho Transportation Investment Program (FY2027\u20132033)",
+      "status_to_bucket": {
+        "proposed": [
+          "Programmed in the Idaho Transportation Investment Program (FY2027\u20132033)"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "KeyNo",
+        "Location",
+        "PublicDescription",
+        "Project_Type",
+        "City",
+        "County"
+      ],
+      "record_url_precision": "dataset",
+      "_receipts": {
+        "probed_utc": "2026-08-24",
+        "discovery": "ITD had never been probed \u2014 every prior 'ITD' hit in docs/source-registry.md is a substring of a column name (AppSubmitDate, permitdate), not the agency. The state DCAT catalogue (data-iplan.opendata.arcgis.com, 804,041 bytes) does NOT surface this service: searching it for project|stip|construction|improvement|program returns only HPMS road-inventory attribute layers. Idaho's programme acronym is ITIP, not STIP, and the item is titled ITIP_Hosted_Copy \u2014 found only by org-scoped AGO search (owner:ITDGISdata, 62 of 495 items). Search the acronym, not the word.",
+        "layer_set": "L0 ITIP_Lines_Regional polyline 507 \u00b7 L1 ITIP_Lines_State polyline 237 \u00b7 L2 ITIP_Points_Regional point 785 \u00b7 L3 ITIP_Points_State point 1,055 = 2,584 rows.",
+        "overlap_matrix_full_sets": "Resolved on COMPLETE distinct-KeyNo sets, not samples. Distinct KeyNo: L0 464 \u00b7 L1 229 \u00b7 L2 742 \u00b7 L3 977, each proven complete by a resultOffset==count re-query returning 0 features. Pairwise: L1\u2282L0 (229 shared, 0 L1-only) \u00b7 L2\u2282L3 (742 shared, 0 L2-only) \u00b7 L0\u2229L2 = 0 \u00b7 L1\u2229L3 = 0 \u00b7 L0\u2229L3 = 235. Three disjoint blocks: A=229 (lines only), B=235 (line AND point), C=742 (points only). Arithmetic closes exactly: L0=A+B=464, L1=A=229, L2=C=742, L3=B+C=977, and A+B+C=1,206 = |L0 \u222a L3| = |all four unioned|.",
+        "block_b_identity": "L0\\L1, L3\\L2 and L0\u2229L3 are all 235 AND are the SAME set \u2014 proven, not assumed: (L0\\L1) EXCEPT (L3\\L2) = 0, and because L1\u2229L3=0 and L0\u2229L2=0 the cardinalities force equality.",
+        "why_only_two_layers_wired": "L1 and L2 add ZERO keys (L1\u2282L0, L2\u2282L3) and are the same geometry type as their supersets, so wiring them would duplicate 229+742=971 keys for no reach. L0+L3 alone cover all 1,206 distinct projects.",
+        "earlier_wrong_verdict": "A first pass sampled 2 KeyNos from L0 and 8 from L1/L2 and concluded \"no single containment model fits\", parking the source as unwireable. That was a SAMPLING ARTIFACT: the 2 L0 keys both happened to land in block B (which reaches L3), while L1's 8 all lay in block A (which does not). The full sets resolve cleanly. A sample that is too small does not report itself as ambiguous \u2014 it reports a contradiction.",
+        "status": "No status column exists anywhere in the service. status_const, the MT/ADOT STIP precedent. Bucketed \"proposed\" and that is provable rather than assumed: ProgramYear is a COMPLETE 8-value vocabulary on both layers (L0 sums exactly to 507, L3 exactly to 1,055) and every value is 2027\u20132033 or \"Preliminary\" \u2014 today is 2026-08-24, so nothing in this programme is built or under construction.",
+        "no_date_field": "There is no esriFieldTypeDate field in the service. ProgramYear is a String holding a bare fiscal year, and the P2027_CN\u2026P2033_RW columns are DOLLAR AMOUNTS, not dates (verified on sampled rows). So file_date/file_date_kind/recency_days are all absent \u2014 the established shape for a programmed-work list, shared with 33 other wired entries incl. adot-tip-fy2026-2030, akdot-stip-24-27, mt-mdt-stip-lines and the seven sd-stip-* entries. Absent fields stay absent; a bare year is never interpolated into a day.",
+        "type_vocabulary": "Project_Type. L3 = 14 values summing EXACTLY to 1,055. L0 = 12 values summing EXACTLY to 507, of which 11 are non-null and are a strict SUBSET of L3's 14; the 12th is a genuine NULL on 2 rows and is deliberately left unmapped. Both complete, neither sampled.",
+        "use_type_rationale": "Roadway/bridge/rail/transit/freight/EV infrastructure \u2192 Utility (MT + ADOT DOT precedent). Airport projects and rest areas are public FACILITIES \u2192 Civic/Public. Corridor Studies / Early Development / Support are pre-construction stages with no built asset \u2192 Development, the closed vocabulary's generic member (Phoenix precedent), never the off-vocabulary string \"Other\".",
+        "state_or_local": "StateOrLocal is the real state/local discriminator (LHS 175 + SHS 332 = 507 on L0), i.e. Local vs State Highway System. It is NOT what the layer names split on \u2014 \"Regional\"/\"State\" in the layer titles labels the map view, which is why Lines_Regional pairs with Points_STATE.",
+        "projection": "wkid 102605 / latestWkid 8826 (Idaho Transverse Mercator), NOT WGS84. The connector sets outSR=4326 by default so the server reprojects; no special handling needed.",
+        "record_url": "dataset precision \u2014 no per-record URL column exists, so the service layer URL is the machine URL (Boulder/Philadelphia precedent).",
+        "coverage": "County carries Idaho county names statewide, so coverage declares {state: ID} with no county, per the UDOT statewide precedent. Idaho carried 96 dark pages of 111 before this wire.",
+        "layer": "0 ITIP_Lines_Regional, esriGeometryPolyline, 507 rows, 464 distinct KeyNo",
+        "why_lines": "A polyline intersects many ZIP radii where a point sits in exactly one; this is the reach half of the pair. It is also the SUPERSET of L1, so wiring it alone covers every line-geometry project.",
+        "type_vocabulary_this_layer": "Pavement 218 \u00b7 Safety & Traffic Operations 100 \u00b7 Bridge 63 \u00b7 Early Development 60 \u00b7 Active Transportation 31 \u00b7 Railroad Crossings 14 \u00b7 Freight 11 \u00b7 Support 3 \u00b7 Corridor Studies 3 \u00b7 NULL 2 \u00b7 Rest Areas 1 \u00b7 Transit Projects 1 = 507 exactly.",
+        "program_year_this_layer": "2027 115 \u00b7 2028 66 \u00b7 2029 67 \u00b7 2030 53 \u00b7 2031 45 \u00b7 2032 27 \u00b7 2033 31 \u00b7 Preliminary 103 = 507 exactly."
+      }
+    },
+    {
+      "registry_id": "itd-itip-projects",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/Qqv4dYPC8Vv8e3c3/arcgis/rest/services/ITIP_2025/FeatureServer/3",
+      "dataset_url": "https://services1.arcgis.com/Qqv4dYPC8Vv8e3c3/arcgis/rest/services/ITIP_2025/FeatureServer/3",
+      "jurisdiction": "Idaho Transportation Department (ITD) \u2014 Idaho Transportation Investment Program (ITIP), FY2027\u20132033",
+      "coverage": [
+        {
+          "state": "ID"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Location",
+          "PublicDescription"
+        ],
+        "type_source": "Project_Type",
+        "address": [
+          "City",
+          "County"
+        ],
+        "case_number": "KeyNo",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "yields_to": "itd-itip-projects-lines",
+      "type_map": {
+        "Pavement": "Utility",
+        "Bridge": "Utility",
+        "Safety & Traffic Operations": "Utility",
+        "Railroad Crossings": "Utility",
+        "Freight": "Utility",
+        "Active Transportation": "Utility",
+        "National Electric Vehicle Infrastructure (NEVI)": "Utility",
+        "Transit Projects": "Utility",
+        "Airport Projects": "Civic/Public",
+        "New Airport Facilities": "Civic/Public",
+        "Rest Areas": "Civic/Public",
+        "Corridor Studies": "Development",
+        "Early Development": "Development",
+        "Support": "Development"
+      },
+      "status_const": "Programmed in the Idaho Transportation Investment Program (FY2027\u20132033)",
+      "status_to_bucket": {
+        "proposed": [
+          "Programmed in the Idaho Transportation Investment Program (FY2027\u20132033)"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "KeyNo",
+        "Location",
+        "PublicDescription",
+        "Project_Type",
+        "City",
+        "County"
+      ],
+      "record_url_precision": "dataset",
+      "_receipts": {
+        "probed_utc": "2026-08-24",
+        "discovery": "ITD had never been probed \u2014 every prior 'ITD' hit in docs/source-registry.md is a substring of a column name (AppSubmitDate, permitdate), not the agency. The state DCAT catalogue (data-iplan.opendata.arcgis.com, 804,041 bytes) does NOT surface this service: searching it for project|stip|construction|improvement|program returns only HPMS road-inventory attribute layers. Idaho's programme acronym is ITIP, not STIP, and the item is titled ITIP_Hosted_Copy \u2014 found only by org-scoped AGO search (owner:ITDGISdata, 62 of 495 items). Search the acronym, not the word.",
+        "layer_set": "L0 ITIP_Lines_Regional polyline 507 \u00b7 L1 ITIP_Lines_State polyline 237 \u00b7 L2 ITIP_Points_Regional point 785 \u00b7 L3 ITIP_Points_State point 1,055 = 2,584 rows.",
+        "overlap_matrix_full_sets": "Resolved on COMPLETE distinct-KeyNo sets, not samples. Distinct KeyNo: L0 464 \u00b7 L1 229 \u00b7 L2 742 \u00b7 L3 977, each proven complete by a resultOffset==count re-query returning 0 features. Pairwise: L1\u2282L0 (229 shared, 0 L1-only) \u00b7 L2\u2282L3 (742 shared, 0 L2-only) \u00b7 L0\u2229L2 = 0 \u00b7 L1\u2229L3 = 0 \u00b7 L0\u2229L3 = 235. Three disjoint blocks: A=229 (lines only), B=235 (line AND point), C=742 (points only). Arithmetic closes exactly: L0=A+B=464, L1=A=229, L2=C=742, L3=B+C=977, and A+B+C=1,206 = |L0 \u222a L3| = |all four unioned|.",
+        "block_b_identity": "L0\\L1, L3\\L2 and L0\u2229L3 are all 235 AND are the SAME set \u2014 proven, not assumed: (L0\\L1) EXCEPT (L3\\L2) = 0, and because L1\u2229L3=0 and L0\u2229L2=0 the cardinalities force equality.",
+        "why_only_two_layers_wired": "L1 and L2 add ZERO keys (L1\u2282L0, L2\u2282L3) and are the same geometry type as their supersets, so wiring them would duplicate 229+742=971 keys for no reach. L0+L3 alone cover all 1,206 distinct projects.",
+        "earlier_wrong_verdict": "A first pass sampled 2 KeyNos from L0 and 8 from L1/L2 and concluded \"no single containment model fits\", parking the source as unwireable. That was a SAMPLING ARTIFACT: the 2 L0 keys both happened to land in block B (which reaches L3), while L1's 8 all lay in block A (which does not). The full sets resolve cleanly. A sample that is too small does not report itself as ambiguous \u2014 it reports a contradiction.",
+        "status": "No status column exists anywhere in the service. status_const, the MT/ADOT STIP precedent. Bucketed \"proposed\" and that is provable rather than assumed: ProgramYear is a COMPLETE 8-value vocabulary on both layers (L0 sums exactly to 507, L3 exactly to 1,055) and every value is 2027\u20132033 or \"Preliminary\" \u2014 today is 2026-08-24, so nothing in this programme is built or under construction.",
+        "no_date_field": "There is no esriFieldTypeDate field in the service. ProgramYear is a String holding a bare fiscal year, and the P2027_CN\u2026P2033_RW columns are DOLLAR AMOUNTS, not dates (verified on sampled rows). So file_date/file_date_kind/recency_days are all absent \u2014 the established shape for a programmed-work list, shared with 33 other wired entries incl. adot-tip-fy2026-2030, akdot-stip-24-27, mt-mdt-stip-lines and the seven sd-stip-* entries. Absent fields stay absent; a bare year is never interpolated into a day.",
+        "type_vocabulary": "Project_Type. L3 = 14 values summing EXACTLY to 1,055. L0 = 12 values summing EXACTLY to 507, of which 11 are non-null and are a strict SUBSET of L3's 14; the 12th is a genuine NULL on 2 rows and is deliberately left unmapped. Both complete, neither sampled.",
+        "use_type_rationale": "Roadway/bridge/rail/transit/freight/EV infrastructure \u2192 Utility (MT + ADOT DOT precedent). Airport projects and rest areas are public FACILITIES \u2192 Civic/Public. Corridor Studies / Early Development / Support are pre-construction stages with no built asset \u2192 Development, the closed vocabulary's generic member (Phoenix precedent), never the off-vocabulary string \"Other\".",
+        "state_or_local": "StateOrLocal is the real state/local discriminator (LHS 175 + SHS 332 = 507 on L0), i.e. Local vs State Highway System. It is NOT what the layer names split on \u2014 \"Regional\"/\"State\" in the layer titles labels the map view, which is why Lines_Regional pairs with Points_STATE.",
+        "projection": "wkid 102605 / latestWkid 8826 (Idaho Transverse Mercator), NOT WGS84. The connector sets outSR=4326 by default so the server reprojects; no special handling needed.",
+        "record_url": "dataset precision \u2014 no per-record URL column exists, so the service layer URL is the machine URL (Boulder/Philadelphia precedent).",
+        "coverage": "County carries Idaho county names statewide, so coverage declares {state: ID} with no county, per the UDOT statewide precedent. Idaho carried 96 dark pages of 111 before this wire.",
+        "layer": "3 ITIP_Points_State, esriGeometryPoint, 1,055 rows, 977 distinct KeyNo",
+        "yield_rationale": "POINTS yields_to LINES on the 235 shared KeyNo of block B, so a project published as BOTH a corridor and a point emits once (the line). This is the OH/ME/VT/UT/IA/VA case, NOT the NY case: here omitting the yield DOUBLES 235 projects, whereas on NY's disjoint layer set declaring one would have DROPPED records. Blocks A (229, lines only) and C (742, points only) are untouched by the yield, so the wired output is 464 line + 742 point = 1,206 records, one per distinct project.",
+        "type_vocabulary_this_layer": "Safety & Traffic Operations 227 \u00b7 Support 198 \u00b7 Bridge 148 \u00b7 Pavement 122 \u00b7 Active Transportation 113 \u00b7 Transit Projects 65 \u00b7 Corridor Studies 54 \u00b7 Early Development 48 \u00b7 Railroad Crossings 40 \u00b7 Airport Projects 30 \u00b7 Freight 6 \u00b7 Rest Areas 2 \u00b7 NEVI 1 \u00b7 New Airport Facilities 1 = 1,055 exactly.",
+        "program_year_this_layer": "2027 225 \u00b7 2028 169 \u00b7 2029 173 \u00b7 2030 137 \u00b7 2031 109 \u00b7 2032 78 \u00b7 2033 71 \u00b7 Preliminary 93 = 1,055 exactly."
+      }
     }
   ],
   "ckan": [

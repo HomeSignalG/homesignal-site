@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. No subject-matter claim is derived.",
-  "registry_entries": 220,
+  "registry_entries": 222,
   "statewide": {
     "AK": [
       {
@@ -72,6 +72,18 @@
       {
         "id": "iowa-dot-bid-projects-lines",
         "label": "Iowa Department of Transportation",
+        "scope": "statewide"
+      }
+    ],
+    "ID": [
+      {
+        "id": "itd-itip-projects",
+        "label": "Idaho Transportation Department (ITD)",
+        "scope": "statewide"
+      },
+      {
+        "id": "itd-itip-projects-lines",
+        "label": "Idaho Transportation Department (ITD)",
         "scope": "statewide"
       }
     ],
