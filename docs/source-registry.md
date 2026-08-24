@@ -9717,61 +9717,108 @@ guard is an engine/DB change and a §12 stop.
 
 ---
 
-## 🟡 IDAHO — ITIP FOUND AND MEASURED, DELIBERATELY NOT WIRED (2026-08-24)
+## 🟢 IDAHO — ITIP WIRED, statewide points+lines pair (2026-08-24)
 
-ID carries **96 dark pages** and had no statewide entry. ITD had never been probed — the 10
-prior `ITD` hits in this file are substrings of `AppSubmitDate` / `permitdate`, not the agency.
-
-### The source exists and looks wireable
+Idaho carried **96 dark pages of 111** (15 lit, 0 uncached — measured against `communities`
+`level='zip'` joined to `development_reports`) and had no statewide entry. ITD had never been
+probed: every prior `ITD` hit in this file is a substring of a column name (`AppSubmitDate`,
+`permitdate`), not the agency — the same substring-collision that had hidden VDOT behind
+`nvdot`.
 
 **`ITIP_2025`** — the Idaho Transportation Investment Program, Idaho's STIP equivalent:
 `https://services1.arcgis.com/Qqv4dYPC8Vv8e3c3/arcgis/rest/services/ITIP_2025/FeatureServer`
 
-| layer | name | geometry | rows |
-|---|---|---|---|
-| 0 | ITIP_Lines_Regional | polyline | 507 |
-| 1 | ITIP_Lines_State | polyline | 237 |
-| 2 | ITIP_Points_Regional | point | 785 |
-| 3 | ITIP_Points_State | point | 1,055 |
-
-**2,584 rows total.** Schema is rich and self-describing: `KeyNo` (project key),
-`PublicDescription` (a real per-project narrative), `Project_Type`, `Location`, `County`,
-`City`, `ProgramYear`, `Program`, `MajorProgram`, `Work_`, `Total_Est`. Layer 0's
-`Project_Type` groupBy returns **12 values summing exactly to 507** — a complete vocabulary.
-There is no status column, so this is the MT/SD/NDOT `status_const` shape.
+| layer | name | geometry | rows | distinct `KeyNo` | wired |
+|---|---|---|---|---|---|
+| 0 | ITIP_Lines_Regional | polyline | 507 | 464 | ✅ `itd-itip-projects-lines` |
+| 1 | ITIP_Lines_State | polyline | 237 | 229 | ❌ subset of L0 |
+| 2 | ITIP_Points_Regional | point | 785 | 742 | ❌ subset of L3 |
+| 3 | ITIP_Points_State | point | 1,055 | 977 | ✅ `itd-itip-projects` |
 
 ⚠️ **The DCAT catalogue MISSES it.** Searching 804 KB of `data-iplan.opendata.arcgis.com`
 DCAT for `project|stip|construction|improvement|program` returns only two HPMS road-inventory
 attribute layers (Year Last Improvement / Year Last Construction — road segments carrying a
 year, the Caltrans `WRONG_RECORD_CLASS` shape). **The programme acronym is state-specific:
 Idaho says ITIP, not STIP, and the item is titled `ITIP_Hosted_Copy`.** It surfaced only from
-an org-scoped AGO search (`owner:ITDGISdata`, 62 hits of 495 items). Search the acronym, not
-the word.
+an org-scoped AGO search (`owner:ITDGISdata`, 62 hits of 495 items). **Search the acronym, not
+the word.**
 
-### ⛔ WHY IT IS NOT WIRED — the four-layer overlap does not resolve
+### The four-layer topology — and the sampling artifact that first hid it
 
-The layer NAMES do not describe the split. Measured by sampling `KeyNo` from three layers and
-cross-querying all four, with a positive control on each source layer (own keys → full count)
-and a negative control (a fabricated KeyNo → 0):
+Each layer's distinct `KeyNo` set was pulled COMPLETE (`returnDistinctValues=true`), and each
+set was **proven** complete by re-querying at `resultOffset == count` and getting 0 features
+back. Full pairwise intersections over those sets:
 
-| keys sampled from | L0 Lines_Reg | L1 Lines_State | L2 Points_Reg | L3 Points_State |
-|---|---|---|---|---|
-| **L0** (2 keys) | 2 ✓ control | 0 | 0 | **2** |
-| **L2** (8 keys) | 0 | 0 | 8 ✓ control | **8** |
-| **L1** (8 keys) | **8** | 8 ✓ control | 0 | 0 |
+`L1 ⊂ L0` (229 shared, 0 L1-only) · `L2 ⊂ L3` (742 shared, 0 L2-only) · `L0 ∩ L2 = 0` ·
+`L1 ∩ L3 = 0` · `L0 ∩ L3 = 235`
 
-`Lines_Regional` pairs with `Points_STATE`, not `Points_Regional` — so "Regional/State" labels
-the map view, not the programme. But the relations do not compose: L1 ⊂ L0 and L2 ⊂ L3, yet
-L0's keys reach L3 while L1's keys do not. **No single containment model fits these three
-samples**, so the `yields_to` topology cannot be derived from them.
+That is three disjoint blocks, and the arithmetic closes exactly:
 
-**Wiring on this evidence would be guessing at a duplicate topology — the Houston-plats class,
-which exact-identity dedup cannot catch across separate `source_registry_id`s.** Getting it
-wrong doubles (a missing yield) or drops (a wrong one), and this session has already produced
-one of each: OH/ME/VT/UT/IA/VA needed the yield, NY needed its absence.
+| block | keys | where |
+|---|---|---|
+| **A** | 229 | lines only (L0 + L1) |
+| **B** | 235 | published as **both** a line and a point (L0 + L3) |
+| **C** | 742 | points only (L2 + L3) |
 
-**What the next pass needs (a probe job, not a sample):** the DISTINCT `KeyNo` set per layer
-and the pairwise intersections over the full sets — not 8-key samples. Once the matrix is
-real, the entries are otherwise ready: statewide `{state: ID}`, `case_number: KeyNo`,
-`title: [PublicDescription, Project_Type]`, `type_source: Project_Type`, `status_const` with
-no status column, and dataset-precision `record_url`.
+`L0 = A+B = 464` · `L1 = A = 229` · `L2 = C = 742` · `L3 = B+C = 977` ·
+`A+B+C = 1,206 = |L0 ∪ L3| = |all four unioned|`.
+
+Block B's identity is proven, not assumed: `(L0\L1) EXCEPT (L3\L2) = 0`, and since `L1∩L3 = 0`
+and `L0∩L2 = 0`, the cardinalities force `L0\L1 = L3\L2 = L0∩L3`.
+
+🛑 **RETRACTION — an earlier pass in this same session recorded ITIP as "measured, deliberately
+NOT wired" because "no single containment model fits".** That verdict was a **sampling
+artifact**, not a property of the data. It rested on 2 `KeyNo` sampled from L0 and 8 each from
+L1/L2 — and both L0 samples happened to land in block **B** (which reaches L3) while all eight
+L1 samples lay in block **A** (which does not), producing an apparent contradiction. **A sample
+that is too small does not report itself as too small; it reports a contradiction.** The rule
+this earns: *when an overlap matrix fails to resolve, enumerate the full sets before concluding
+the source is unwireable* — `returnDistinctValues` made it four cheap queries.
+
+### Why only two layers are wired
+
+L1 and L2 add **zero** keys and carry the same geometry type as their supersets, so wiring them
+would duplicate 229 + 742 = 971 projects for no additional reach. L0 + L3 alone cover all 1,206.
+The points entry declares **`yields_to: itd-itip-projects-lines`**, so a project published as
+both a corridor and a point emits once (the line). Blocks A and C are untouched by the yield →
+**464 line + 742 point = 1,206 records, one per distinct project.**
+
+This is the OH/ME/VT/UT/IA/VA case, **not** the NY case: here omitting the yield **doubles** 235
+projects, whereas on NY's disjoint layer set declaring one would have **dropped** records. The
+decision inverts per source and is measured every time, never inherited.
+
+### Config notes worth not re-deriving
+
+- **No status column exists anywhere in the service** → `status_const`, the MT/ADOT STIP shape.
+  Bucketed `proposed`, and that is *provable*: `ProgramYear` is a complete 8-value vocabulary on
+  both layers (summing exactly to 507 and 1,055) and every value is **2027–2033 or
+  "Preliminary"**. Today is 2026-08-24, so nothing in this programme is built or under way.
+- **No date field exists either.** `ProgramYear` is a String holding a bare fiscal year, and the
+  `P2027_CN`…`P2033_RW` columns are **dollar amounts**, not dates. So `file_date`,
+  `file_date_kind` and `recency_days` are all **absent** — the established shape for a
+  programmed-work list, shared with **33** other wired entries (`adot-tip-fy2026-2030`,
+  `akdot-stip-24-27`, `mt-mdt-stip-lines`, the seven `sd-stip-*`, `nysdot-capital-program-*`, …).
+  A bare year is never interpolated into a day.
+- **Type vocabulary complete on both layers.** L3 = 14 values summing exactly to 1,055; L0 = 12
+  summing exactly to 507, of which 11 are non-null and a strict **subset** of L3's — so one
+  shared `type_map` serves both, and the 12th (a genuine NULL on 2 rows) is deliberately left
+  unmapped. **0 unclassified on either layer.**
+- **`use_type` calls:** roadway/bridge/rail/transit/freight/EV → `Utility` (MT + ADOT DOT
+  precedent); **Airport Projects, New Airport Facilities and Rest Areas are public FACILITIES →
+  `Civic/Public`**; Corridor Studies / Early Development / Support are pre-construction stages
+  with no built asset → **`Development`**, the closed vocabulary's generic member (Phoenix
+  precedent), never the off-vocabulary string `"Other"`.
+- ⚠️ **`StateOrLocal` is the real state/local discriminator** (LHS 175 + SHS 332 = 507 on L0 —
+  Local vs State Highway System). It is **not** what the layer names split on, which is why
+  `Lines_Regional` pairs with `Points_STATE`: "Regional"/"State" in the layer titles labels the
+  **map view**, not the programme.
+- **Projection: wkid 102605 / latestWkid 8826 (Idaho Transverse Mercator), NOT WGS84.** The
+  connector sets `outSR=4326` by default so the server reprojects — no special handling.
+- `record_url_precision: "dataset"` (no per-record URL column exists), `spatial_zip_radius_mi: 3`
+  (no ZIP column), `out_fields` projected to the 7 mapped columns — the service carries 24
+  `P20NN_*` money columns and a 2,000-char `PublicDescription`.
+
+Pinned by `test/idaho-itip-pair.test.mjs` (61 assertions), which was **proven to fail on 9
+separate mutations**: dropping the yield, wiring the redundant L1, adding `recency_days`, mapping
+`ProgramYear` as a date, using `"Other"`, dropping a live type, calling an airport a Utility,
+shrinking `out_fields` past a mapped column, and claiming the programme is under construction.
