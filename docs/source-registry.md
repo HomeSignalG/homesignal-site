@@ -9822,3 +9822,91 @@ Pinned by `test/idaho-itip-pair.test.mjs` (61 assertions), which was **proven to
 separate mutations**: dropping the yield, wiring the redundant L1, adding `recency_days`, mapping
 `ProgramYear` as a date, using `"Other"`, dropping a live type, calling an airport a Utility,
 shrinking `out_fields` past a mapped column, and claiming the programme is under construction.
+
+---
+
+## 🟢 WYOMING — WYDOT STIP WIRED, statewide points+lines pair (2026-08-24)
+
+Wyoming carried **91 dark pages of 103** and only one entry (`sheridan-county-building-permits`).
+WYDOT had never been probed — **0 occurrences of `WYDOT`** in this file before the wire.
+
+🛑 **RETRACTION.** A prior session note recorded WY's STIP as existing only as an Oracle APEX
+document link (`webapp.dot.state.wy.us/ao/f?p=951:1`), *not* as a feature service. **That is
+wrong.** Org-scoped AGO search surfaced five STIP feature services.
+
+**`ITSM_STIP_Data_Layers`**, owner `jalynda.mckay`, modified **2025-09-16**:
+`https://services2.arcgis.com/WI04Bd6haCzitbuQ/arcgis/rest/services/ITSM_STIP_Data_Layers/FeatureServer`
+
+| layer | name | geometry | rows | distinct `project_id` | wired |
+|---|---|---|---|---|---|
+| 0 | ITSM STIP Point | point | 1,065 | 433 | ✅ `wydot-stip-projects` |
+| 1 | ITSM STIP Line | polyline | 706 | 356 | ✅ `wydot-stip-projects-lines` |
+| 2 | ITSM STIP ALL | point | 1,751 | 776 | ❌ see below |
+
+⚠️ **FIRST-PARTY IS THE DISCRIMINATOR HERE, NOT FRESHNESS ALONE.** The four *other* STIP
+services (`WYDOT_STIP_AGOL`, `WYDOT_STIPCombined_AGOL`, `WYDOT_STIPProjects_2021`) are owned by
+`Bridget.Wagner@hdrinc.com_HDR` — an **HDR consultant account** on org `04HiymDgLlsbhaV4` — and
+were last modified 2020-07-10, 2020-07-31 and 2021-07-15. Stale *and* third-party. The wired org
+was verified first-party via `/sharing/rest/portals/WI04Bd6haCzitbuQ` → **`name: "WYDOT"`,
+`urlKey: "WYDOT"`**. A title containing the agency acronym is not evidence of agency ownership.
+
+### Layer 2 "ALL" is not an independent layer
+
+Measured on **complete** distinct-`project_id` sets, each proven complete by a
+`resultOffset == count` re-query returning 0 features:
+
+`L1\L2 = 0` · `L2\(L0 ∪ L1) = 0` · `L0\L2 = 5` · `L0 ∩ L1 = 8` · `|L0 ∪ L1| = 781 = |all three unioned|`
+
+So **L2 = L0 ∪ L1 minus 5 point-only keys.** It contributes nothing, and wiring it alongside
+L0/L1 would multi-count almost every project. ⚠️ The row-count arithmetic
+(`1,065 + 706 = 1,771` vs `1,751`) only *hinted* at this — it is off by 20 and is consistent with
+several topologies. **The key sets are what established it.**
+
+Points declare `yields_to` lines (8 shared keys on the full sets, **6** on the wired forward
+subset). Same class as ID/OH/ME/VT/UT/IA/VA; NY remains the counter-case where declaring a yield
+would have dropped records.
+
+### ⚖️ THE FORWARD WINDOW — a deliberate under-claim, not a recency filter
+
+`extra_where: drft_year >= 2026` on both entries.
+
+`drft_year` is an Integer fiscal year with a complete vocabulary on both layers (L0 11 values
+summing exactly to 1,065, range **2020–2032**; L1 11 values summing exactly to 706, range
+2021–2032) — and **it includes past years: 559 of L0's 1,065 rows are 2020–2025.**
+
+This is where Wyoming **differs from Idaho's ITIP**, and the difference is load-bearing. Idaho's
+every `ProgramYear` was 2027+, so bucketing the whole layer `proposed` was *provable*. Here a
+2020-programmed project may well be built, and **the service carries no status column and no
+evidence either way**. Bucketing those `proposed` would assert not-yet-built without evidence;
+bucketing them `operating` would fabricate completion. They are therefore **excluded rather than
+guessed.**
+
+**The cost of that choice, stated plainly: 544 distinct projects wired of 781 total** (L0 256 +
+L1 294 forward keys, overlap 6). Roughly 30% of the programme is deliberately left out.
+
+🔭 **Annual maintenance:** the `2026` literal is fixed, so the window widens by a year every
+January. Revisit annually — or drop the restriction entirely if WYDOT ever publishes a real
+status column.
+
+### Config notes
+
+- **No status column on either layer** (schemas identical apart from `Shape__Length` on the
+  polyline) → `status_const`, the MT/ADOT STIP shape, bucketed `proposed`.
+- **No date field.** `drft_year` is a bare fiscal year; `ce11`/`con1` are **cost estimate
+  doubles** (sampled: `ce11 160163.24`, `con1 2912058.76`). So `file_date`, `file_date_kind` and
+  `recency_days` are absent — the shape 33 other wired programmed-work entries already use.
+- **Type vocabulary complete on both layers** — L0 46 values summing exactly to 1,065 (45
+  non-null + a genuine NULL on 1 row, left unmapped), L1 20 summing exactly to 706. The union of
+  **52** non-null values is mapped → **0 unclassified** on either layer.
+- **`use_type` calls:** roadway/structure/rail/ITS → `Utility`; airports, buildings, parking and
+  **transit rolling stock** (the many `PURCHASE …BUS/MINI-VAN` values) → `Civic/Public`; planning,
+  studies, administration and land acquisition → `Development`, the generic member — never
+  `"Other"`.
+- `project_id` encodes the year (`B25`4009 → 2025, `B30`5017 → 2030).
+- `record_url_precision: "dataset"`, `spatial_zip_radius_mi: 3`, `out_fields` projected to the 10
+  mapped columns.
+
+Pinned by `test/wydot-stip-pair.test.mjs`, **proven to fail on 12 mutations** — including
+dropping the yield, wiring layer 2, pointing at the HDR consultant org, dropping *or inverting*
+the forward window, mapping `drft_year` or a cost estimate as a date, and claiming the programme
+is built.

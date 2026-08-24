@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. No subject-matter claim is derived.",
-  "registry_entries": 222,
+  "registry_entries": 224,
   "statewide": {
     "AK": [
       {
@@ -365,6 +365,18 @@
       {
         "id": "wvdoh-active-projects",
         "label": "West Virginia Division of Highways (WVDOT)",
+        "scope": "statewide"
+      }
+    ],
+    "WY": [
+      {
+        "id": "wydot-stip-projects",
+        "label": "Wyoming Department of Transportation (WYDOT)",
+        "scope": "statewide"
+      },
+      {
+        "id": "wydot-stip-projects-lines",
+        "label": "Wyoming Department of Transportation (WYDOT)",
         "scope": "statewide"
       }
     ]
