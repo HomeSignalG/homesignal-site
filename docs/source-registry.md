@@ -9910,3 +9910,144 @@ Pinned by `test/wydot-stip-pair.test.mjs`, **proven to fail on 12 mutations** �
 dropping the yield, wiring layer 2, pointing at the HDR consultant org, dropping *or inverting*
 the forward window, mapping `drft_year` or a cost estimate as a date, and claiming the programme
 is built.
+
+---
+
+## 🚫 NORTH DAKOTA — NDDOT's OWN ORGS ENUMERATED, NO PROJECT REGISTER (2026-08-24)
+
+**ND: 155 ZIP pages · 3 lit · 152 dark.** No registry entry covers ND.
+
+### ⚠️ What question this stamp answers — and what the OLD one didn't
+
+The prior ND row in the seven-zero-state table reads *"no first-party source — hits are City of
+Minot (`maps.minotnd.org`) and a consultant, not NDDOT."* That answered **"are there
+third-party candidates?"** It never enumerated **NDDOT's own accounts**, so it could not answer
+*"does NDDOT publish a project register?"* — and that table has already been wrong twice (its AK
+and HI rows were both later WIRED). WY's rejection in this same file was also wrong, disproved
+earlier the same day.
+
+**This stamp answers: NDDOT's own ArcGIS orgs were enumerated in full on 2026-08-24, and no
+project/STIP register exists in them.** Scope of what was checked is below, so the next session
+knows what NOT to redo — and what is still open.
+
+### NDDOT's own orgs — enumerated complete, not sampled
+
+| owner | items | of which services | project-register candidates |
+|---|---|---|---|
+| `NDDOT-GIS` | 75 (**total=75, complete**) | 26 | **0** |
+| `NDGISHDP-DOT` | 11 (**total=11, complete**) | 11 | **0** |
+| `NDGISHub` (state hub, not NDDOT) | 320 total | 47 sampled + 19 keyword-scoped | **0** |
+
+⚠️ The `NDGISHub` listing **was truncated** (100 returned of 320) and was therefore closed with a
+keyword-scoped query rather than left as an unchecked 220-item tail.
+
+**A statewide control: `q=STIP AND "North Dakota"` returns `total = 0`** — no STIP item exists
+anywhere on ArcGIS Online for this state. That is the query the Idaho lesson demands (search the
+programme acronym), and here it genuinely returns nothing, unlike Idaho where ITIP was hiding.
+
+### What NDDOT DOES publish (so nobody re-derives it)
+
+- **Bridge inventory, 7 layers** — State Owned / Non-State-Owned / Poor Condition / Posted and
+  Closed / Pre-1940 / Historic. This is **asset condition of existing structures**, the Idaho
+  HPMS `WRONG_RECORD_CLASS` shape: an inventory of what exists, never programmed work.
+- **Real-time road conditions** (Conditions-NE, Conditions-SW) and **RWIS** weather stations.
+- **Basemaps** (~8), **Material Sources / Materials Geotechnical**, **Right-of-Way and Corner
+  Recordation**, **Utilities District Viewer**.
+- `NDGISHDP-DOT` is pure reference geography: city boundaries, county roads, highway number
+  points, railroads, mile markers, state and federal roads, NDDOT districts.
+
+### The one real candidate — probed and REJECTED on record class
+
+**`planning_grant_applications`** (`utility.arcgis.com/usrsvcs/servers/12b63f03…/ext_ssl/`),
+HTTP 200, 2 layers: `Grant Application Locations (Pts)` multipoint **32 rows** + polyline
+**21 rows** = **53 rows**. Newest `last_edited_date` **2025-08-19**, so it is NOT stale.
+
+Rejected anyway, on three independent grounds:
+
+1. ⛔ **WRONG RECORD CLASS — decisive.** `Application_Status` is **Applied 25 · Awarded 6 ·
+   NULL 1** of 32. **78% are unfunded funding requests.** These are grant *applications*
+   (`Grant_Program` = RAISE, AID Demo; `Amount_Requested` / `Amount_Awarded` /
+   `Total_Project_Cost`), not construction filings — one sampled row is an equipment purchase,
+   "NDDOT Oversize Vehicle Measuring System". Rendering a speculative funding request as a
+   development record on a resident's map is precisely what the anti-fabrication prime directive
+   forbids.
+2. **Volume is negligible** — 53 rows across 155 ZIP pages, the Montana `STIP Points` shape
+   (5 rows) that was likewise not wired. It could not move 152 dark pages.
+3. **Data quality** — `State_Biennium` contains a literal `YYYY-YY` placeholder and a `2023-20`
+   typo among its 8 values.
+
+### Still open (NOT checked — do not read this stamp as broader than it is)
+
+- **Non-ArcGIS publication.** Only ArcGIS Online and NDDOT's own ArcGIS servers were enumerated.
+  NDDOT's STIP may exist as a **PDF or a non-Esri web application**, which this pass did not look
+  for and which would not be wireable by the existing connectors anyway.
+- **Edge reachability of `utility.arcgis.com/usrsvcs/…` was NEVER tested**, because the candidate
+  failed on record class first. That proxied path is the kind that commonly refuses the edge
+  runtime (the Tampa/El Paso WAF shape), so any future attempt must run the 3× edge preflight
+  before claiming it is reachable.
+- **Cross-border control not run.** If a ND source is ever wired, the control is **Moorhead MN
+  56560**, across the Red River from Fargo — the Council Bluffs shape, proving ND records do not
+  leak onto MN pages.
+
+---
+
+## 🔧 SOUTH DAKOTA — a live double-emit fixed, and 12 unwired layers characterised (2026-08-24)
+
+**SD: 126 ZIP pages · 95 lit · 31 dark** — already the healthiest state measured. Seven
+`sd-stip-*` entries run off ONE service,
+`https://dotgis.sd.gov/spearfishformation/rest/services/STIP/DOT_STIP_Approved/MapServer`.
+
+### ⚠️ The service has 19 layers, not 10
+
+Wired: **0,1,2,3,4,6,9**. The rest were never characterised until now:
+
+| layer | name | geom | rows | distinct PCN | verdict |
+|---|---|---|---|---|---|
+| 5 | ADA | line | 11 | 6 | disjoint — wireable, negligible |
+| 7 | Developmental STIP 2030-2033 | point | 197 | 151 | disjoint from all wired; **7 keys shared with L8** |
+| 8 | Developmental STIP 2030-2033 | line | 184 | 117 | as above — a pair, would need a yield |
+| 12 | Shared Use Paths | line | **0** | — | empty |
+| 13/14/15 | Local Roads / State Highways | line | — | — | **road reference geography, not projects** |
+| 16 | **Do Not Map** | point | — | — | ⛔ **publisher instruction, never wire** |
+| 18 | Shoulder Improvement | line | **0** | — | empty |
+| 19 | Local Structure Projects | point | 53 | 53 | ⛔ **48 of 53 keys already in wired L0** |
+| 20 | Local Road Projects | line | 2 | 2 | disjoint — wireable, negligible |
+| 21 | Developmental Local STIP | point | **0** | — | empty |
+
+### ✅ THE FIX — one real double-emit, live since the SD wire
+
+Layers **1 and 6 are both named "Safety"** — the same work category in two geometries, both
+wired, neither yielding. **They share 2 `ProjectCtrlNbr`**, so those 2 projects were emitted
+TWICE on any page within 3 mi of both geometries. `sd-stip-safety-points` now declares
+`yields_to: sd-stip-safety-lines`.
+
+**The measurement that matters is that this is the ONLY overlap.** Across all **21 pairs** of the
+7 wired layers, every other pair shares **ZERO** keys — which is why the remaining five entries
+correctly declare no yield, and why blanket-adding yields here would DROP records (the NY case).
+Complete `ProjectCtrlNbr` sets per layer, each groupBy summing exactly to its own row count:
+L0 216/330 · L1 74/104 · L2 105/140 · L3 108/199 · L4 59/430 · L6 31/153 · L9 42/44.
+
+### ⚠️ THIS MAPSERVER REJECTS `returnDistinctValues` — with a 200
+
+`?returnDistinctValues=true` returns **HTTP 200** carrying
+`{"error":{"code":400,"message":"Failed to execute query."}}`. The first overlap pass read those
+as empty key sets and would have reported **every pair as disjoint**, i.e. "no duplicates
+anywhere" — a clean-looking false negative that would have left the double-emit in place.
+**Measure overlap here with `groupByFieldsForStatistics`**, which this server does support. Same
+200-wrapping-an-error shape as TxDOT's `returnCentroid` rejection.
+
+### Not wired, deliberately
+
+- **L19** would add 5 new projects and duplicate 48. Only wireable behind a `yields_to` on L0.
+- **L16 "Do Not Map"** is an instruction from the publisher. It is not a dataset.
+- **L7/L8 "Developmental STIP 2030-2033"** are the only material volume (381 rows). They are a
+  points+lines PAIR sharing 7 keys, so they must be wired together with points yielding to lines
+  — never one alone. **Record class is unresolved**: "Developmental" inside a service named
+  `DOT_STIP_*Approved*` is a contradiction this pass did not settle, and it is the ND
+  `planning_grant_applications` question in a new form. Schema was requested but not read before
+  the fix shipped. **Do not wire on volume alone.**
+
+Pinned by `test/sd-stip-layer-set.test.mjs`, proven to fail on **8 mutations** — reverting the
+yield, reversing its direction, adding a yield to a disjoint pair, wiring L19, wiring L16, wiring
+road geography, depending on `returnDistinctValues`, and moving the match key off
+`ProjectCtrlNbr`.
