@@ -10051,3 +10051,60 @@ Pinned by `test/sd-stip-layer-set.test.mjs`, proven to fail on **8 mutations** �
 yield, reversing its direction, adding a yield to a disjoint pair, wiring L19, wiring L16, wiring
 road geography, depending on `returnDistinctValues`, and moving the match key off
 `ProjectCtrlNbr`.
+
+---
+
+## 🟢 NEBRASKA — the Program Book POINTS sibling wired (2026-08-24)
+
+**NE: 174 ZIP pages · 138 lit · 36 dark** before this wire.
+`https://gis.ne.gov/dot/rest/services/ProgramBookDOT/FeatureServer` has **exactly two layers**:
+
+| layer | name | geometry | rows | distinct `ProjectNo` | state |
+|---|---|---|---|---|---|
+| 0 | Program Book Points | point | 337 | 130 | ✅ **wired now** — `ndot-program-book-points` |
+| 1 | Program Book Segments | polyline | 558 | 437 | already wired |
+
+Only layer 1 had ever been wired. This is the **same geometry-sibling gap as Montana's MDT
+service** — and the reason the two states got opposite answers is volume: **MT's unwired layer 0
+holds 5 rows, NE's holds 337.** Check the count before assuming a sibling is worth wiring, and
+before assuming it is not.
+
+### The overlap, on complete sets
+
+Measured with `groupByFieldsForStatistics`, each groupBy summing **exactly** to its layer's row
+count (337 and 558) — complete, not sampled:
+
+`L0 130 distinct · L1 437 · shared 28 · L0-only 102 · union 539`
+
+So layer 0 contributes **102 projects that exist nowhere else**, and would **double-emit 28**
+without a yield. Points therefore declare `yields_to: ndot-program-book-segments` — the
+ID/WY/OH/ME/VT/UT/IA/VA/SD case, not the NY counter-case.
+
+⚠️ **`ProjectNo` is right-padded upstream** (`"STP-283-2(108)             "`). The yield hook
+compares on **trimmed** string equality, which is what lets the match survive the padding — do
+not "fix" the padding in config.
+
+### Status is provably `proposed` — no forward window needed
+
+`ProgramYear` is a complete **2-value** vocabulary summing exactly to 337: **`"2027"` (76)** and
+**`"2028-2032"` (261)**. Both are future as of 2026-08-24, so `status_const: "Programmed"` →
+`proposed` asserts nothing unevidenced. **This is the Idaho ITIP situation, NOT the Wyoming one**
+where `drft_year` spanned 2020–2032 and forced an `extra_where` forward window that cost ~30% of
+the programme.
+
+`ProgramYear` also holds a **RANGE**, so it is not a date and is not mapped as one — no
+`file_date` / `file_date_kind` / `recency_days`.
+
+### `use_type` deliberately matches the sibling
+
+`use_type_const: "Utility"`, same as layer 1. `TypeImprovement` was enumerated complete (**47
+values summing exactly to 337**) and deliberately **not** mapped: it is free text carrying
+publisher typos and near-duplicates — `Br` vs `Br.`, `Resurf, Br` vs `Resurf. Br`,
+`Mill, Rusurf.` vs `Mill, Resurf.`. Mapping it on ONE layer while the sibling uses a flat const
+would make **the same project render as a different use_type depending on which geometry
+published it**.
+
+Pinned by `test/ne-program-book-pair.test.mjs`, proven to fail on **9 mutations** — dropping or
+reversing the yield, moving the match key, mapping `ProgramYear` as a date, adding
+`recency_days`, diverging `use_type` from the sibling, using an off-vocabulary type, claiming the
+programme is built, and stripping the NEBRASKA disambiguation.
