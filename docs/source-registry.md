@@ -10176,3 +10176,104 @@ North Dakota's bridge inventory: an inventory of what exists, never programmed w
   volume first. Any future attempt owes the 3× edge preflight.
 - **Cross-border control not run.** If an NM source is ever wired, the control is **El Paso TX
   79821/79835** against Doña Ana County — the Council Bluffs shape.
+
+---
+
+## 🚫 OREGON · LOUISIANA · MISSISSIPPI — three DOT rejects, three different reasons (2026-08-24)
+
+**378 dark pages across three states with no wireable statewide DOT source.** All three were
+genuinely unprobed: **`Oregon`, `Louisiana` and `Mississippi` had 0 DOT entries** in the registry
+(city permits only), and none appeared in this file. Each was rejected on a **different** ground,
+so none of the three tells you anything about the other two.
+
+### ⛔ OREGON — a real, current programme that is an INTERNAL WORKSHEET
+
+**OR: 200 pages · 53 lit · 147 dark.** ODOT's own account `OregonDOTGIS` exists and publishes a
+**2024–2027 STIP** — a programme window we are *inside* right now, unlike New Mexico's all-past
+ESTIP. Org: `uUvqNMGPm7axC2dD` = **"Oregon ArcGIS Online"** (urlKey `geo`) — the STATE enterprise
+org, first-party via the ODOT-owned account, the NDGISHub shape.
+
+| service | geometry | rows |
+|---|---|---|
+| `2024_2027_STIP_Project_Points_ATNI_redone` (title: *…Project_Lines*) | polyline | **109** |
+| `2024_2027point_projects_pedbike_scored` | point | **118** |
+| `2024_2027_STIP_Project_Lines_ATNIC` | polyline | 2021 variant |
+
+**Rejected on record class.** The 72-column schema is ODOT's internal prioritisation process, and
+the field CONTENTS say so outright:
+- `OTMeetingN`: *"Scoped for 21-24 in 2018 but **not selected**. These are a higher priority than
+  I-205: OR213"*
+- `OTActionIt`: *"What we need to add to the Business Case is to request the scoping team to
+  provide a cost per tower… We also need to ensure to invite Duc (Electrical Team)…"*
+- `ListStatus` is inconsistent across rows — `"Scoping - Update Prior scoping/estimate"`, `"150"`,
+  `"High"` — alongside `Readytosco`, `Submitforp`, `PRIORITZAT: 76.279…`, and `AMReviewUR`
+  pointing at a **Smartsheet review form**.
+
+These are **candidate projects under consideration, explicitly including ones NOT selected**, with
+staff deliberation in the fields. Rendering that as proposed development would present ODOT's
+internal scoping notes as planned public work — the ND `planning_grant_applications` failure in a
+sharper form (those were at least applications; these are meeting notes about what to maybe apply
+for). Also `CostEstima` is a **Double on the line layer and the string `"Phase"` on the point
+layer** — same field, different type per layer — plus shapefile-mangled duplicates
+(`OBJECTID`/`OBJECTID_1`, `TARGET_FID`/`TARGET_F_1`, `Join_Count`/`Join_Cou_1`).
+
+⚠️ **Title and service name disagree here**: the item titled `2024_2027_STIP_Project_Lines` lives
+at a URL ending `..._STIP_Project_Points_ATNI_redone`. It IS a polyline — verified by probing
+`geometryType`, not by reading either name. **Probe the geometry; never infer it from a name.**
+
+### 🚫 LOUISIANA — agency org enumerated complete, no register
+
+**LA: 177 pages · 50 lit · 127 dark.** `LADOTDOpenData` **enumerated to exhaustion: `total=336`,
+336 rows across 4 pages** (200 in an earlier pass — 0 candidates; 136 in the final pass). 65
+services in the tail. Staff accounts `LDOTD19A7`/`LDOTD2698` hold 20 items between them.
+
+**No statewide project register exists.** The only title matches in the whole catalogue are
+**`Last Construction`** and **`Last Improvement`** (2026-07) — road-inventory *year* attributes,
+the same `WRONG_RECORD_CLASS` shape as Idaho's HPMS layers and North Dakota's bridge inventory.
+
+⚠️ **The two fresh-looking candidates are an MPO, not the state.**
+`Transportation Improvement Projects 2019–2022 (RPC)` and
+`Obligated Project Locations FFY19–FFY24 (RPC 2025)` (both 2026-05) belong to the **New Orleans
+Regional Planning Commission** — a metropolitan planning organisation covering ~8 parishes, not
+DOTD and not statewide. Wiring an MPO under a `{state: LA}` coverage claim would assert statewide
+coverage from regional data. *(An RPC entry scoped to its actual parishes is a separate question
+this pass did not evaluate.)*
+
+### 🚫 MISSISSIPPI — no agency presence found at all
+
+**MS: 114 pages · 10 lit · 104 dark — 9% lit, the darkest state measured after ND.**
+
+⚠️ **MDOT is a three-way collision and Mississippi is the one that owns nothing here:**
+`mdot-stip-projects` is **Michigan**, `mdot-sha-project-portal` is **Maryland**. Mississippi's
+MDOT is unwired *and* unfindable.
+
+- `"Mississippi Department of Transportation"` → **`total=7`** across all of ArcGIS Online, **0
+  agency-owned accounts**, 0 candidates. (Oregon returned 466, Louisiana 232.)
+- `MDOT AND Mississippi` → 61 items, one candidate: a **consultant's** public-comment map
+  (`SPWray@GarverUSA.com_Garver`).
+- `Mississippi AND (highway OR transportation) AND type:"Feature Service"` → 448 items, **100
+  services, 0 project candidates**.
+- `mdot.ms.gov OR "MDOT Mississippi" OR MississippiDOT` → 12 items, 0 candidates.
+
+Four query shapes, no agency org. This is a stronger absence than ND's (where NDDOT's orgs existed
+and simply held no register).
+
+### ⚠️ `STIP` IS A POOR NATIONAL SEARCH TERM — it collides with lease *stipulations*
+
+The 3-state control `STIP AND (Oregon OR Louisiana OR Mississippi)` returned 34 items dominated by
+**BOEM offshore lease stipulations** (`stip_7_259_below_seabed_poly`, `STIPULATION 10 SALE 256`,
+`Stipulation10_Sale254` …) and **BLM mineral stipulations**. Combined with Idaho (ITIP) and New
+Mexico (ESTIP), the rule is: **search the agency by NAME and enumerate its org; use the programme
+acronym only as a supplement, and only where the state actually brands it that way.**
+
+### Still open — scope limits of these three stamps
+
+- **Only ArcGIS Online was enumerated** for all three. A PDF or non-Esri STIP would not have been
+  found and could not be ingested by any current connector anyway.
+- **Oregon's rejection is on record class, not availability** — if ODOT ever publishes an *adopted*
+  STIP (as opposed to the scoping list), it would be wireable: the org, the geometry pair and the
+  forward window are all already there.
+- **Louisiana's RPC/MPO data was not evaluated as a region-scoped entry** — only rejected as a
+  statewide claim.
+- **No edge preflight was run** for any of the three; every candidate failed on class, ownership
+  or absence first.
