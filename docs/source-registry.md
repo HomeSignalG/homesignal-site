@@ -10277,3 +10277,58 @@ acronym only as a supplement, and only where the state actually brands it that w
   statewide claim.
 - **No edge preflight was run** for any of the three; every candidate failed on class, ownership
   or absence first.
+
+---
+
+## 🟡 ALASKA — wire is CORRECT and current; 3 duplicate-traps recorded (2026-08-25)
+
+**AK: 101 pages · 28 lit · 73 dark**, with **909 records** already placed by the wired
+`akdot-stip-24-27`. Re-probed because 73 dark looked like a coverage gap. It is not one — but the
+pass turned up one measurement worth keeping and three traps worth naming.
+
+### The existing wire was verified, not assumed
+
+`AKDOT_GIS` **enumerated to exhaustion: `total=662`, 662 returned, 662 distinct — no truncation.**
+248 services, 28 project candidates, all triaged. `STIP 24 27 Approved Final` resolves to
+`STIP_24_27_Final_NewSchema` — **exactly the service the registry entry points at.** The service
+has a single point layer and 0 tables, so there is **no lines sibling** (unlike NE/MT/UT).
+
+### ⚠️ 316 ROWS (14%) FAIL CLOSED ON A NULL STATUS — measured, previously unrecorded
+
+Live groupBy on the wired layer, summing **exactly** to 2,282:
+
+`Approved 1094 · Draft 591 · **NULL 316** · Retired 225 · Archived 56`
+
+The entry's `status_to_bucket` maps Draft→proposed, Approved→approved, Retired/Archived→exclude.
+**`NULL` is unmapped**, so those 316 rows fail closed and never publish. That is the correct
+default — an unmapped status must never guess a bucket — but it had never been measured, and
+14% of a layer being silently withheld should be a **deliberate** decision rather than an
+accident. Recorded here so it is one. Do NOT map NULL to a bucket without evidence of what those
+rows are.
+
+### ⛔ THREE DUPLICATE-TRAPS IN THIS ORG — do not wire any of them
+
+1. **Six hosted views of the layer we already wire** — `STIP 24 27 Approved Final view`, and
+   `… Final 3/4/5/6/7 view` (all 2025-02). They are views of the SAME data. A future pass seeing
+   six "new" STIP services in AKDOT's org would duplicate **2,282 rows apiece**.
+2. **`STIP_24_27_Amendment_6`** (2026-07, the newest-looking item in the org) is a **DELTA, not a
+   replacement**: **57 rows** (Approved 28 · Draft 13 · NULL 10 · Retired 6) versus the Final's
+   2,282. It is the projects *changed* in amendment round 6. ⚠️ Its layer 0 is even **named
+   `STIP_24_27_Final_NewSchema`**, identical to the wired layer's name — so name-matching alone
+   would read it as the same source. **The Approved Final is NOT superseded by it.**
+3. **`STIP_Service`** carries three layers including a polyline — but they are
+   `Point_STIP_2020_2023` / `LRSE_STIP_2020_2023`, the **2020–2023** programme. Superseded.
+
+### `Emergency Relief Projects on Highway Assets` — rejected on record class
+
+445 polyline rows, genuinely good schema (`Project_Name`, `Project_Scope`, `Route_Name`,
+mileposts) and a real 2025-12 item date. **Rejected**: these are **completed disaster-repair
+expenditures**, not programmed work — sampled `NABESNA ROAD EARTHQUAKE PERMANENT REPAIRS` with
+`From_Date` **2018-10-23**, `Fed_Expenditure` / `Total_Expenditures` populated, `To_Date` null
+throughout. Same class as New Mexico's completed awards.
+
+### The 73 dark pages are sparsity, not a source gap
+
+**Only 20 of 73 carry ANY EPA facility** — 53 have zero on both dimensions. Those are remote
+Alaskan ZIPs with no regulated facility and no highway project within 3 mi. The collect guard is
+not implicated (it only fires when *cached* facilities > 0). Alaska is sparse, not under-sourced.
