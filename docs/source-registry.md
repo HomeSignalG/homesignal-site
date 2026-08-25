@@ -10511,22 +10511,55 @@ being 100% populated and genuinely record-precision.
   dictionary** on the item.
 - Edge reachability of the *data* host is now **4/4** (latest 200 / 3,952 ms, `{"count":43361}`).
 
-### Settled, and the one call left
+### ✅ WIRED — `kytc-syp-highway-plan` (all three founder calls settled 2026-08-25)
 
-**Settled (founder, 2026-08-25):** `record_url` → **dataset precision**, omitted from `column_map`
-so the ladder falls through. `dataset_url` → **`https://transportation.ky.gov/Program-Management/Pages/default.aspx`**
+**`record_url` → dataset precision**, omitted from `column_map` so the ladder falls through
+(`sources/arcgis.ts:398`). **`dataset_url` → `https://transportation.ky.gov/Program-Management/Pages/default.aspx`**
 (human page, owning division, verified 200 / 370 ms).
 
-**Bucket on `SYP_RPT_STAGEC`**, not on PRECONFLAG — the stage field describes where the project
-actually is: approved ← `AWARDED` (47) · `AUTHORIZED` (31) · `SENTTOFHWA` (17); proposed ←
-`ESTIMATED` (1607) · `REESTIMATED` (3); exclude ← `NON-SIXYEAR` (4) · `UNK` (2) · `NOTREQUIRED` (2).
-`Rejected`/`Withdrawn` (3 rows) drop at source via `extra_where` — they sit at `ESTIMATED` and would
-otherwise publish as proposed.
+**Status buckets on a COMPOSITE `status_raw: [SYP_RPT_STAGEC, SYP_RPT_PRECONFLAG]`, because
+NEITHER COLUMN ALONE IS CORRECT** — PRECONFLAG alone mis-files **47** approved rows as proposed;
+STAGEC alone fails **72** rows closed on a null stage. `readCol` joins a column array skipping
+empties, so a null STAGEC yields the bare `"A"` key — which is exactly why that key exists.
+All **18** enumerated combinations are mapped, so a new one fails closed and is *named* in
+`unmapped_statuses`:
 
-**OPEN: the 72 rows with a null construction stage, all of them `A`.** Either (1) let them fail
-closed — 4% silently withheld — or (2) map `A` + null stage → proposed, on the grounds that the null
-sits in the *construction*-stage column because construction has not been staged yet, which is what
-"proposed" means, and `A` independently attests the project is live.
+- **proposed** — `ESTIMATED A` · `A` · `ESTIMATED TentativeLetting` · `ESTIMATED I` ·
+  `REESTIMATED A` · `REESTIMATED TentativeLetting`
+- **approved** — `AWARDED I` · `AUTHORIZED A` · `SENTTOFHWA A` · `AWARDED Awarded` ·
+  `AUTHORIZED Awarded` · `SENTTOFHWA I` · `AWARDED A`
+- **exclude** — `NON-SIXYEAR A` · `ESTIMATED Rejected` · `UNK A` · `NOTREQUIRED I` ·
+  `ESTIMATED Withdrawn`
+
+`Rejected`/`Withdrawn` are excluded **in the map, not via `extra_where`**, so they show up in
+`excluded_by_status` instead of vanishing at source. Nothing is claimed `operating` — a
+programmed plan never asserts built.
+
+**The connector query shape was PROVEN LIVE before wiring**, not assumed: `where=1=1 AND (…)`
++ spatial envelope + qualified `outFields` projection + `outSR=4326` + `resultOffset` →
+Louisville offset 0 returned **50** features, offset 2 returned **48** with the first
+`DIST_ITEM` shifted (`5-10016.00` → `5-10064.00`), geometry `paths` present for
+`featurePoint()` centroiding.
+
+**Pinned by `test/kytc-syp-connector.test.mjs` (47 assertions), proven to fail on 19 mutations**
+— including moving `AWARDED I` to exclude, dropping the bare `"A"` key, deleting or inverting the
+vintage gate, un-qualifying a field name, collapsing the composite to one column, adding a
+`record_url` on the expired-cert host, mapping `UNKNOWN` to an off-vocabulary `"Other"`, dropping
+either duplicate spelling or the publisher typo, widening coverage to Ohio, and re-pointing
+`service_url` at the unqueryable dynamic LRS FeatureServer. The connector is driven over a REAL
+captured page (`fixtures/kytc-syp/louisville-current-plan.json`, pg_net request 33424), so the
+`AWARDED I → approved` guard is end-to-end, not a config assertion.
+
+⚠️ **A UI leak caught at generation time, worth the standing answer: the
+`lib/generated/county-sources.json` LABEL IS USER-VISIBLE** on the development coverage card,
+and `gen-county-sources.mjs` truncates `jurisdiction` **at the first EM-DASH**. The first draft
+used a plain hyphen, so the internal *"KDOT is KANSAS"* note would have rendered to a Kentucky
+resident. Caught by reading the generated diff rather than assuming it. **Use an em-dash before
+any internal note in `jurisdiction`** — and the test now pins the truncated label.
+
+**Cross-border control: Cincinnati OH 45202** — chosen over Evansville IN 47708 because it sits
+~1 mi from the Kentucky line, so its 3-mi radius genuinely overlaps KY geography and a coverage
+bug there would NOT present as an empty result. It emits nothing **and never fetches**.
 
 ⚠️ **Scratch table `public.ky_syp_probe`** (126 rows, zip → pg_net request id) holds the envelope
 receipts above. Drop it once the wire is verified.

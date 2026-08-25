@@ -14913,6 +14913,126 @@
         "layer": "0 ITSM STIP Point, esriGeometryPoint, 1,065 rows, 433 distinct project_id (256 forward)",
         "drft_year_this_layer": "2020 2 \u00b7 2023 8 \u00b7 2024 320 \u00b7 2025 229 \u00b7 2026 229 \u00b7 2027 92 \u00b7 2028 60 \u00b7 2029 42 \u00b7 2030 65 \u00b7 2031 11 \u00b7 2032 7 = 1,065 exactly."
       }
+    },
+    {
+      "registry_id": "kytc-syp-highway-plan",
+      "platform": "arcgis",
+      "service_url": "https://maps.kytc.ky.gov/arcgis/rest/services/Apps/ActiveHighwayPlanQuery_Ext_Prd/MapServer/0",
+      "dataset_url": "https://transportation.ky.gov/Program-Management/Pages/default.aspx",
+      "jurisdiction": "Kentucky Transportation Cabinet (KYTC) \u2014 Six-Year Highway Plan (SYP), 2026 enacted plan. KENTUCKY: the agency is the Transportation CABINET, not a DOT; KDOT is KANSAS.",
+      "coverage": [
+        {
+          "state": "KY"
+        }
+      ],
+      "column_map": {
+        "title": "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_DESC",
+        "type_source": "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_TYPEWORK",
+        "address": "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.COUNTYNAME",
+        "case_number": "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.DIST_ITEM",
+        "status_raw": [
+          "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_STAGEC",
+          "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_PRECONFLAG"
+        ],
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "AM-BRIDGE (P)": "Utility",
+        "SAFETY(P)": "Utility",
+        "RECONSTRUCTION(O)": "Utility",
+        "SAF-GUARDRAIL(P)": "Utility",
+        "CONGESTION MITIGTN(O)": "Utility",
+        "AM-PAVEMENT (INT)(P)": "Utility",
+        "AM-PAVEMENT (PRI)(P)": "Utility",
+        "MINOR WIDENING(O)": "Utility",
+        "MAJOR WIDENING(O)": "Utility",
+        "SPOT IMPROVEMENTS(O)": "Utility",
+        "RECONSTRUCTION": "Utility",
+        "NEW ROUTE(O)": "Utility",
+        "REALIGNMENT": "Utility",
+        "AM-PAVEMENT (PKY)(P)": "Utility",
+        "MAJOR WIDENING": "Utility",
+        "SAFETY": "Utility",
+        "BRIDGE REPLACEMENT(P)": "Utility",
+        "SPOT IMPROVEMENTS": "Utility",
+        "MINOR WIDENING": "Utility",
+        "LANDSLIDE REPAIR(P)": "Utility",
+        "CONGESTION MITIGATION": "Utility",
+        "DRAINAGE IMPROVE(P)": "Utility",
+        "NEW INTERCHANGE(O)": "Utility",
+        "RELOCATION(O)": "Utility",
+        "GUARDRAIL REPLCMNT(P)": "Utility",
+        "NEW ROUTE": "Utility",
+        "RESURFACING(P)": "Utility",
+        "NEW INTERCHANGE": "Utility",
+        "ROCKFALL MITIGTN(P)": "Utility",
+        "SAFETY-HAZARD ELIM(P)": "Utility",
+        "PAVEMENT REHAB-INT(P)": "Utility",
+        "I-CHANGE RECONST(O)": "Utility",
+        "SAFETY-RR PROTECTN(P)": "Utility",
+        "LIGHTING(P)": "Utility",
+        "SAFETY-RR SEPARATN(P)": "Utility",
+        "MINR WIDENING": "Utility",
+        "AM-ASSET MGT(P)": "Utility",
+        "PAVEMENT REHAB-PRK(P)": "Utility",
+        "BRIDGE REHAB(P)": "Utility",
+        "INDUSTRIAL ACCESS": "Utility",
+        "BIKE/PED FACIL(O)": "Civic/Public",
+        "TRANSP ENHANCEMENT(P)": "Civic/Public",
+        "REST AREA REHAB(P)": "Civic/Public",
+        "FERRY OPERATION(P)": "Civic/Public",
+        "WEIGH STA REHAB(P)": "Civic/Public",
+        "DESIGN ENGINEERING(O)": "Development",
+        "PLANNING-OKI(O)": "Development",
+        "AIR QUALITY(P)": "Development",
+        "ECONOMIC DEVEL(O)": "Development",
+        "PLANNING": "Development",
+        "SCOPING STUDY(O)": "Development",
+        "UNKNOWN": "Development",
+        "FEASIBILITY STUDY(O)": "Development",
+        "ENVIRO MITIGATION(P)": "Development",
+        "PE & ENVIRONMENTAL(O)": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "ESTIMATED A",
+          "A",
+          "ESTIMATED TentativeLetting",
+          "ESTIMATED I",
+          "REESTIMATED A",
+          "REESTIMATED TentativeLetting"
+        ],
+        "approved": [
+          "AWARDED I",
+          "AUTHORIZED A",
+          "SENTTOFHWA A",
+          "AWARDED Awarded",
+          "AUTHORIZED Awarded",
+          "SENTTOFHWA I",
+          "AWARDED A"
+        ],
+        "operating": [],
+        "exclude": [
+          "NON-SIXYEAR A",
+          "ESTIMATED Rejected",
+          "UNK A",
+          "NOTREQUIRED I",
+          "ESTIMATED Withdrawn"
+        ]
+      },
+      "extra_where": "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.CUR_PLANYEAR_IND = 'Y'",
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.DIST_ITEM",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_DESC",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_TYPEWORK",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_STAGEC",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_PRECONFLAG",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.COUNTYNAME"
+      ],
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-25 KY wire. KYTC's enacted Six-Year Highway Plan. SYPQuery = Project_Locations_Line JOINED to TED_CHIPS_ACTIVEPLAN; 43,361 rows unfiltered, 1,779 on the current plan. ORG IDENTITY VERIFIED BY NAME not acronym: service copyrightText 'KYTC', serviceDescription 'Highway Plan Projects service'; the companion AGO org CcI36Pduqd0OR4W9 is owned by 'KYTCGIS'. EDGE-REACHABLE 4/4 spaced (200 in 3,239 / 3,085 / 3,432 / 3,952 ms, {\"count\":43361} byte-identical every round, matching pg_net exactly). CONNECTOR QUERY SHAPE PROVEN LIVE before wiring: where=1=1 AND (...), spatial envelope, qualified outFields projection, outSR=4326, resultOffset paging - Louisville offset 0 returned 50 features / offset 2 returned 48 with the first DIST_ITEM shifted (5-10016.00 -> 5-10064.00), geometry paths present for featurePoint() centroiding. FULLY-QUALIFIED FIELD NAMES ARE MANDATORY: on a joined MapServer layer the short names do not exist, and querying them returns an HTTP 200 carrying {\"error\":{\"code\":400}} - the South Dakota class. readCol does plain row[ref] with no dot-path traversal (that is Socrata's feature), so dotted keys are safe here; verified in code before relying on it. VINTAGE GATE: the layer holds EVERY Highway Plan back to 1996 - PLANYEAR x CUR_PLANYEAR_IND enumerated complete, 16 biennial groups summing exactly to 18,683. extra_where CUR_PLANYEAR_IND='Y' is the PUBLISHER'S OWN current-plan flag; without it 1996 programme rows publish as live development. STATUS IS A COMPOSITE of Construction Stage + PRECONFLAG because NEITHER COLUMN ALONE IS CORRECT: PRECONFLAG alone mis-files 47 approved rows as proposed, STAGEC alone fails 72 rows closed on a null stage. The two-way crosstab was enumerated complete, all 18 combinations summing EXACTLY to 1,785, and every combination is mapped - so a new one fails closed and is named in unmapped_statuses. status_raw is DIAGNOSTIC ONLY, never rendered (lib/map.js renders the bucket), so the two-token key costs the resident nothing and makes the run report legible. Rejected/Withdrawn are excluded IN THE MAP rather than via extra_where so they show up in excluded_by_status instead of vanishing at source. CRITICAL - SYP_RPT_PRECONFLAG IS PRECON-SCOPED: 'I' MEANS PRECONSTRUCTION FINISHED, NOT PROJECT DEAD. An earlier draft proposed I -> exclude; that would have dropped 43 AWARDED construction contracts including the Covington/Newport 4th Street Bridge replacement (6-1086.00, authorized 2026-03-16) and the I-471 Ohio River bridge (6-10036.00). 43 of 57 I rows sit at construction stage AWARDED, all 57 carry a non-null construction authorized date, max construction FY 2031, and the explicit 'Awarded' flag holds only 4 rows. No written KYTC definition exists to confirm this on paper - every field carries domain:null - so the evidence is behavioural and is recorded here in full. TYPE_MAP: SYP_RPT_TYPEWORK enumerated complete on the current plan, 55 values summing EXACTLY to 1,785, including a literal 'UNKNOWN' (4 rows) mapped to the generic Development bucket rather than guessed (Phoenix rule). The vocabulary carries SUFFIXED AND UN-SUFFIXED DUPLICATES of the same work type (MAJOR WIDENING 24 vs MAJOR WIDENING(O) 46; RECONSTRUCTION 43 vs RECONSTRUCTION(O) 136) and a publisher typo (MINR WIDENING, 1) - all mapped verbatim, because mapping what the publisher emits is the contract. RECORD_URL IS DATASET PRECISION FOR A REASON, NOT A LIMITATION: PRECON_INFO_LINK is populated on 18,683 of 18,683 rows with a genuine per-record URL (pmtoolbox.kytc.ky.gov/SYPmapsPreconReport.asp?COMB=<DIST_ITEM>) and would be record precision - but that host serves an EXPIRED TLS CERTIFICATE, confirmed by two independent clients (pg_net 'SSL peer certificate or SSH remote key was not OK'; Deno 'invalid peer certificate: Expired'). The problem is AGENCY-WIDE, not one endpoint: datamart.kytc.ky.gov (KYTC's own SYP20detail.asp) fails identically. Shipping it would hand every Kentucky resident a browser certificate interstitial, so record_url is omitted from column_map and the ladder falls through to dataset_url. RE-PROBE BOTH HOSTS: the day KYTC renews, adding record_url + record precision is a ONE-LINE upgrade. dataset_url was chosen from VERIFIED candidates after four guessed URLs 404'd (maps.kytc.ky.gov/highwayplan/, /syp/, host root 406, transportation.ky.gov/.../Highway-Plan.aspx) - the Program Management page is the owning division's, 200 in 370 ms. COVERAGE PRE-VERIFIED on all 126 modelled KY ZIPs with the connector's own 3-mi envelope: 126/126 answered cleanly, 119 return >=1 current-plan project; 46 of the 51 DARK pages would light (337 records, avg 7, max 50), taking KY from 75 to 121 of 126 lit. Max 65 records on any page - no row-size concern. The 5 still dark: 40461, 41007, 42206, 42356, 42378. REJECTED IN THE SAME PASS with receipts: Apps/ProjectControl (its own description says Right-of-Way MONUMENTS and Project Control - survey control points, not projects); Apps/ProjectArchives (scanned project plans 1909-present - as-builts); SHIFT_2026_Statewide_Projects (40 rows, and SHIFT is the PRIORITISATION formula, not a programme); and the ActiveHighwayPlan_Ext_Prd FeatureServer's own layers 0/1/2, which are dynamic LRS layers that reject where=1=1 in EVERY form tried - and per the NDOT standing answer extra_where can never rescue a 1=1 failure, because buildWhere always prefixes the spatial clause 1=1 and ANDs after it."
     }
   ],
   "ckan": [
