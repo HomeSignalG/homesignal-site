@@ -1,0 +1,63 @@
+{
+  "_comment": "REAL captured response from the KYTC SYPQuery layer, pg_net request 33424 (2026-08-25). Query was the SHIPPED connector's own shape: where=1=1 AND (KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.CUR_PLANYEAR_IND='Y'), 3-mi Louisville envelope, qualified outFields projection, outSR=4326, returnGeometry=true. The live page held 50 features; 5 are kept here, chosen to cover every status combination that matters, and each feature's path is trimmed to its first and last vertex so the fixture stays small. Attributes are VERBATIM - including the null SYP_RPT_STAGEC on 6-80416.00, which is the case the composite status_raw exists to handle.",
+  "displayFieldName": "KYTCDynamic_Highways.DBO.Project_Locations_Line.IsValid",
+  "geometryType": "esriGeometryPolyline",
+  "spatialReference": { "wkid": 4326, "latestWkid": 4326 },
+  "features": [
+    {
+      "geometry": { "paths": [[[-85.773213937406027, 38.263514621648099], [-85.741677066429787, 38.25784237733626]]] },
+      "attributes": {
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.DIST_ITEM": "5-10016.00",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.COUNTYNAME": "JEFFERSON",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_DESC": "BRIDGE PROJECT IN JEFFERSON COUNTY ON (056B00142N) I-64 AT KY 3077 (RIVER RD).  (BRIDGE PAINTING OF I-64 RIVERSIDE EXPRESSWAY BRIDGES)",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_STAGEC": "AWARDED",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_TYPEWORK": "AM-BRIDGE (P)",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_PRECONFLAG": "I"
+      }
+    },
+    {
+      "geometry": { "paths": [[[-85.752818393937304, 38.211938985571585], [-85.752712432757932, 38.212541013469846]]] },
+      "attributes": {
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.DIST_ITEM": "5-10065.00",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.COUNTYNAME": "JEFFERSON",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_DESC": "BRIDGE PROJECT IN JEFFERSON COUNTY ON (056B00180N) I-65 AT US 60A (EASTERN PKWY)",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_STAGEC": "ESTIMATED",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_TYPEWORK": "AM-BRIDGE (P)",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_PRECONFLAG": "A"
+      }
+    },
+    {
+      "geometry": { "paths": [[[-85.812625543143554, 38.275103002861144], [-85.808744346459122, 38.271925269392476]]] },
+      "attributes": {
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.DIST_ITEM": "5-607.00",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.COUNTYNAME": "JEFFERSON",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_DESC": "INSTALLATION OF SOLAR LIGHTING AT I-64/I-264 INTERCHANGE AT SHERMAN MINTON BRIDGE; I-264/RIVER PARK-ALI; I-264/BELLS LANE; I-264/VIRGINA/DUMESNIL; AND I-264/RALPH AVE-CANE RUNE INTERSECTIONS IN JEFFERSON COUNTY KENTUCKY. (2024BOP)",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_STAGEC": "AUTHORIZED",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_TYPEWORK": "AIR QUALITY(P)",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_PRECONFLAG": "A"
+      }
+    },
+    {
+      "geometry": { "paths": [[[-85.784871780097461, 38.24210911226244], [-85.777774860406694, 38.241372556104203]]] },
+      "attributes": {
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.DIST_ITEM": "5-80311.00",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.COUNTYNAME": "JEFFERSON",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_DESC": "WEST KENTUCKY STREET (CS 1005) MASTER PLAN PROJECT FROM 18TH STREET TO 4TH STREET. PROJECT WILL CONSIDER SIDEWALK IMPROVEMENTS, BICYCLE FACILITIES, IMPROVEMENTS TO THE RAIL CROSSING AT 15TH STREET, AND THE ADDITION OF STREET TREES. (2024CCN)",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_STAGEC": "ESTIMATED",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_TYPEWORK": "BIKE/PED FACIL(O)",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_PRECONFLAG": "A"
+      }
+    },
+    {
+      "geometry": { "paths": [[[-85.724333575968558, 38.262066171697356], [-85.545360973990739, 38.328248420608709]]] },
+      "attributes": {
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.DIST_ITEM": "6-80416.00",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.COUNTYNAME": "JEFFERSON",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_DESC": "Planning study to determine feasibility of charging fees for using added capacity on projects (ie a convenience lane) in Kentucky and specifically reviewing the addition of a convenience lane on Interstate I-71 from Boone County to Louisville. (2026CCN)",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_STAGEC": null,
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_TYPEWORK": "PLANNING-OKI(O)",
+        "KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.SYP_RPT_PRECONFLAG": "A"
+      }
+    }
+  ]
+}

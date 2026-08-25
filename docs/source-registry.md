@@ -10277,3 +10277,296 @@ acronym only as a supplement, and only where the state actually brands it that w
   statewide claim.
 - **No edge preflight was run** for any of the three; every candidate failed on class, ownership
   or absence first.
+
+---
+
+## 🟡 ALASKA — wire is CORRECT and current; 3 duplicate-traps recorded (2026-08-25)
+
+**AK: 101 pages · 28 lit · 73 dark**, with **909 records** already placed by the wired
+`akdot-stip-24-27`. Re-probed because 73 dark looked like a coverage gap. It is not one — but the
+pass turned up one measurement worth keeping and three traps worth naming.
+
+### The existing wire was verified, not assumed
+
+`AKDOT_GIS` **enumerated to exhaustion: `total=662`, 662 returned, 662 distinct — no truncation.**
+248 services, 28 project candidates, all triaged. `STIP 24 27 Approved Final` resolves to
+`STIP_24_27_Final_NewSchema` — **exactly the service the registry entry points at.** The service
+has a single point layer and 0 tables, so there is **no lines sibling** (unlike NE/MT/UT).
+
+### ⚠️ 316 ROWS (14%) FAIL CLOSED ON A NULL STATUS — measured, previously unrecorded
+
+Live groupBy on the wired layer, summing **exactly** to 2,282:
+
+`Approved 1094 · Draft 591 · **NULL 316** · Retired 225 · Archived 56`
+
+The entry's `status_to_bucket` maps Draft→proposed, Approved→approved, Retired/Archived→exclude.
+**`NULL` is unmapped**, so those 316 rows fail closed and never publish. That is the correct
+default — an unmapped status must never guess a bucket — but it had never been measured, and
+14% of a layer being silently withheld should be a **deliberate** decision rather than an
+accident. Recorded here so it is one. Do NOT map NULL to a bucket without evidence of what those
+rows are.
+
+### ⛔ THREE DUPLICATE-TRAPS IN THIS ORG — do not wire any of them
+
+1. **Six hosted views of the layer we already wire** — `STIP 24 27 Approved Final view`, and
+   `… Final 3/4/5/6/7 view` (all 2025-02). They are views of the SAME data. A future pass seeing
+   six "new" STIP services in AKDOT's org would duplicate **2,282 rows apiece**.
+2. **`STIP_24_27_Amendment_6`** (2026-07, the newest-looking item in the org) is a **DELTA, not a
+   replacement**: **57 rows** (Approved 28 · Draft 13 · NULL 10 · Retired 6) versus the Final's
+   2,282. It is the projects *changed* in amendment round 6. ⚠️ Its layer 0 is even **named
+   `STIP_24_27_Final_NewSchema`**, identical to the wired layer's name — so name-matching alone
+   would read it as the same source. **The Approved Final is NOT superseded by it.**
+3. **`STIP_Service`** carries three layers including a polyline — but they are
+   `Point_STIP_2020_2023` / `LRSE_STIP_2020_2023`, the **2020–2023** programme. Superseded.
+
+### `Emergency Relief Projects on Highway Assets` — rejected on record class
+
+445 polyline rows, genuinely good schema (`Project_Name`, `Project_Scope`, `Route_Name`,
+mileposts) and a real 2025-12 item date. **Rejected**: these are **completed disaster-repair
+expenditures**, not programmed work — sampled `NABESNA ROAD EARTHQUAKE PERMANENT REPAIRS` with
+`From_Date` **2018-10-23**, `Fed_Expenditure` / `Total_Expenditures` populated, `To_Date` null
+throughout. Same class as New Mexico's completed awards.
+
+### The 73 dark pages are sparsity, not a source gap
+
+**Only 20 of 73 carry ANY EPA facility** — 53 have zero on both dimensions. Those are remote
+Alaskan ZIPs with no regulated facility and no highway project within 3 mi. The collect guard is
+not implicated (it only fires when *cached* facilities > 0). Alaska is sparse, not under-sourced.
+
+---
+
+## 🟡 KENTUCKY — the KYTC SIX-YEAR HIGHWAY PLAN found and fully measured; wire is FOUNDER-GATED on 3 calls (2026-08-25)
+
+**KY: 126 ZIP pages · 75 lit · 51 dark**, and **48 of the 51 dark pages carry EPA facilities** —
+populated, reachable places lacking only a project source. `KYTC` / `Kentucky` appeared **0 times**
+in this file beforehand; KY's 4 registry entries are all city/county, none statewide.
+
+⚠️ **Kentucky's agency is the Transportation CABINET (KYTC), not a "DOT".** `KDOT` is **Kansas**.
+Searching the DOT acronym finds the wrong state.
+
+### The source: `SYPQuery` — Kentucky's enacted Six-Year Highway Plan, with geometry
+
+`https://maps.kytc.ky.gov/arcgis/rest/services/Apps/ActiveHighwayPlanQuery_Ext_Prd/MapServer/0`
+— polyline, **43,361 rows**, `where=1=1` answers `{"count":43361}`. It is
+`Project_Locations_Line` ⋈ `TED_CHIPS_ACTIVEPLAN`, and it carries a real register's schema:
+`SYP_RPT_DESC` (4000 char), `SYP_RPT_TYPEWORK`, `DIST_ITEM`, `COUNTYNAME`, `BMP`/`EMP` mileposts,
+and **five phase blocks** (Plan / Design / Right-of-Way / Utility / Construction), each with
+funding code, cost, fiscal year, stage, authorized amount and authorized date. Fresh —
+`EXTRACT_DATE` max **2026-08-23**.
+
+### ⚠️ A JOINED MapServer layer exposes FULLY-QUALIFIED field names — and the short names FAIL AS A 200
+
+The first four enumeration queries returned `{"error":{"code":400,…}}` **inside an HTTP 200**, which
+reads exactly like a hostile server. It was the instrument: on the joined layer every field is
+`KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.<COL>`, so `outFields=DIST_ITEM`,
+`groupByFieldsForStatistics=SYP_RPT_PRECONFLAG`, `returnDistinctValues` and `orderByFields` all
+matched nothing. Re-run qualified, **every one works** — including the connector's own envelope +
+`outSR=4326` + `resultRecordCount` shape. Same 200-carrying-an-error class as South Dakota.
+- **Dotted keys are SAFE in `column_map`**: `sources/arcgis.ts::readCol` does plain `row[ref]` with
+  no dot-path traversal (that feature is Socrata's). Verified in code before relying on it.
+- Statistics on the join are unavailable regardless, so **vocabulary completeness was proved on the
+  un-joined `ACTIVEPLAN` table** (`ActiveHighwayPlan_Ext_Prd/FeatureServer/3`, 18,683 rows).
+
+### ⛔ THE VINTAGE TRAP: the layer holds EVERY Highway Plan back to 1996
+
+`PLANYEAR` × `CUR_PLANYEAR_IND` enumerated complete — 16 groups summing **exactly to 18,683**
+(1996 673 · 1998 933 · 2000 1,095 · 2002 856 · 2004 875 · 2006 1,030 · 2008 802 · 2010 913 ·
+2012 1,009 · 2014 1,155 · 2016 1,105 · 2018 1,429 · 2020 1,269 · 2022 1,822 · 2024 1,932 ·
+**2026 1,785**). Only `CUR_PLANYEAR_IND='Y'` is current, and it is **the publisher's own flag** —
+a cleaner filter than Wyoming's `drft_year >= 2026`, because it costs nothing that is current.
+**Wiring unfiltered would publish 1996 programme rows as live development.** Same superseded-vintage
+class as Alaska's `STIP_Service`.
+
+Filtered: **1,779 geometry rows · 1,785 plan rows · 1,578 distinct `DIST_ITEM`** — near one-to-one,
+so there is no fan-out problem and **no `yields_to` question**.
+
+### Both vocabularies complete, each summing EXACTLY to 1,785 on the current plan
+
+`SYP_RPT_PRECONFLAG` (alias "Active or Inactive"): `A` 1693 · `I` 57 · `TentativeLetting` 28 ·
+`Awarded` 4 · `Rejected` 2 · `Withdrawn` 1. (`InPreviousPlan` — 1,336 across all vintages — is
+**absent** from the current plan, as it should be.)
+
+`SYP_RPT_TYPEWORK`: **55 values**, self-describing (`BRIDGE REPLACEMENT(P)`, `MAJOR WIDENING(O)`,
+`NEW ROUTE(O)`, `SAFETY(P)` …), including a literal **`UNKNOWN` (4 rows)** → the generic
+`Development` bucket, never a guess (Phoenix rule). ⚠️ The vocabulary carries **suffixed and
+un-suffixed duplicates** of the same work type (`MAJOR WIDENING` 24 vs `MAJOR WIDENING(O)` 46;
+`RECONSTRUCTION` 43 vs `RECONSTRUCTION(O)` 136) — both spellings must be mapped or rows fall to
+`unclassified`.
+
+### The payoff, measured per page — not estimated
+
+All **126** KY ZIP centroids probed with the connector's own 3-mile envelope against the
+current-plan filter: **126/126 answered, all clean `{"count":N}`, 119 return ≥1 project.**
+
+| | pages | would carry SYP | rows | avg | max |
+|---|---|---|---|---|---|
+| dark | 51 | **46** | 337 | 7 | 50 |
+| already lit | 75 | 73 | 1,454 | 19 | 65 |
+
+**KY 75 → 121 lit of 126 (96%)**, 5 remaining dark: 40461, 41007, 42206, 42356, 42378.
+Max 65 rows on any page — no row-size concern anywhere.
+
+### ✅ EDGE-REACHABLE, 3/3 spaced — and the probe's own payload shape corrected
+
+`maps.kytc.ky.gov` from the deployed edge runtime: **16:52:23 → 200 / 3,239 ms · 16:52:56 → 200 /
+3,085 ms · 16:56:16 → 200 / 3,432 ms**, `{"count":43361}` byte-identical in all three and identical
+to pg_net. The current-plan filter: **200 / 302 ms, `{"count":1779}`**. No intermittency, no WAF.
+- ⚠️ **The first edge-probe call returned 502 and was nearly recorded as a KYTC finding.**
+  `edge-probe`'s body is **`{"targets":[{id,url},…]}`**, not `{"urls":[…]}`. A malformed payload
+  produces a gateway error indistinguishable from an unreachable host. **Send one target you know
+  answers, in the same call, every time.**
+
+### 🔴 `pmtoolbox.kytc.ky.gov` IS SERVING AN EXPIRED TLS CERTIFICATE (measured 2026-08-25)
+
+`PRECON_INFO_LINK` ("Additional Data (PM Toolbox)") is populated on **18,683 of 18,683** rows with a
+genuine per-record URL — `https://pmtoolbox.kytc.ky.gov/SYPmapsPreconReport.asp?COMB=5-10016.00` —
+which would be **record** precision. But that host fails TLS, and **two independent clients agree**:
+pg_net `SSL peer certificate or SSH remote key was not OK`; Deno `client error (Connect): invalid
+peer certificate: Expired`. Shipping it would hand every Kentucky resident a browser certificate
+interstitial.
+- ⚠️ It also ships with a **leading space** in the value. `extractUrl` trims, so no config
+  workaround is needed — but do not "fix" it in the column.
+- Omitting `record_url` from `column_map` makes the connector fall through to `dataset_url`
+  (`sources/arcgis.ts:398`), which is the intended dataset-precision path.
+- **Re-probe before assuming this is permanent** — a renewed certificate upgrades this to record
+  precision in one line.
+
+### `dataset_url` candidates — VERIFIED, after four guessed URLs 404'd
+
+Guessing publisher page URLs failed four times here (`maps.kytc.ky.gov/highwayplan/` 404 ·
+`/syp/` 404 · host root 406 · `transportation.ky.gov/Program-Management/Pages/Highway-Plan.aspx`
+404 SharePoint PageNotFound). The two that actually answer:
+- `https://transportation.ky.gov/Program-Management/Pages/default.aspx` — **200 / 370 ms**, the
+  KYTC Division of Program Management landing page (the division that owns the Highway Plan).
+- `https://maps.kytc.ky.gov/arcgis/rest/services/Apps/ActiveHighwayPlanQuery_Ext_Prd/MapServer` —
+  **200 / 83 ms**, `"Highway Plan Projects service"`, `copyrightText: "KYTC"` (machine endpoint,
+  Boulder/Philadelphia precedent).
+
+### ⛔ Three KYTC candidates REJECTED, with receipts
+
+1. **`Apps/ProjectControl/MapServer` — SURVEY MONUMENTS, not projects.** Its own
+   `serviceDescription`: *"Displays the location of Kentucky Transportation Cabinet's **Right-of-Way
+   monuments and Project Control**."* "Project Control" is the surveying term for geodetic control
+   points. Its two layers are one layer at two scale ranges, not two datasets.
+2. **`Apps/ProjectArchives/MapServer` — as-builts.** *"Archive of scanned KYTC project plans from
+   **1909 to the present**."* Completed construction plans. `WRONG_RECORD_CLASS`.
+3. **`SHIFT_2026_Statewide_Projects` — 40 rows.** SHIFT is KYTC's *prioritisation* formula, and the
+   layer's own description says it "displays the 2026 local projects **prioritized through**" it.
+   Candidate rankings, and 40 rows could not move 51 dark pages regardless.
+
+### ⛔ The `ActiveHighwayPlan_Ext_Prd` FeatureServer's OWN layers cannot be wired
+
+Layers 0/1/2 (`Awarded Current` / `Current` / `Previous Highway Plan Projects`) are **dynamic LRS
+layers that reject `where=1=1` in every form tried** — `1=1`, `OBJECTID>0`, with and without
+`returnCountOnly`. Per the NDOT standing answer, **`extra_where` can never rescue a `1=1` failure**
+(`buildWhere()` always prefixes the spatial clause `1=1` and ANDs after it). `SYPQuery` on the
+companion `…Query_Ext_Prd` MapServer is the queryable equivalent and is the one to wire.
+
+### 🛑 `SYP_RPT_PRECONFLAG` IS **PRECON**-SCOPED — `I` MEANS PRECONSTRUCTION FINISHED, NOT PROJECT DEAD
+
+**An earlier draft of this section proposed `I` → exclude. That was WRONG and would have dropped
+43 AWARDED construction contracts.** The founder's precondition — *"confirm from KYTC's own
+documentation or a pmtoolbox report what the code means; an unverified single-letter code is the
+`999`/`On file` class"* — is what caught it. Recorded so the inversion is never re-derived.
+
+`SYP_RPT_PRECONFLAG` × `SYP_RPT_STAGEC`, current plan, complete two-way crosstab summing **exactly
+to 1,785**:
+
+| PRECONFLAG | AWARDED | AUTHORIZED | SENTTOFHWA | ESTIMATED | REEST. | NON-SIXYEAR/UNK/NOTREQ. | null |
+|---|---|---|---|---|---|---|---|
+| `A` (1693) | 1 | 30 | 16 | 1566 | 2 | 6 | **72** |
+| **`I` (57)** | **43** | — | 1 | 11 | — | 2 | — |
+| `TentativeLetting` (28) | — | — | — | 27 | 1 | — | — |
+| `Awarded` (4) | 3 | 1 | — | — | — | — | — |
+| `Rejected` (2) | — | — | — | 2 | — | — | — |
+| `Withdrawn` (1) | — | — | — | 1 | — | — | — |
+
+**43 of 57 `I` rows are at construction stage `AWARDED`** — the contract is let. All 57 carry a
+non-null construction authorized date; their max construction fiscal year is **2031**. The explicit
+`Awarded` flag value holds only **4** rows, so `I` is where awarded projects actually live.
+
+Named `I` samples, read directly:
+- `6-1086.00` **REPLACE 4TH STREET BRIDGE OVER THE LICKING RIVER BETWEEN COVINGTON AND NEWPORT**,
+  AWARDED, construction authorized **2026-03-16**
+- `6-10036.00` I-471 bridge **at the Ohio River** (Campbell County), AWARDED, authorized 2024-01-05
+- `5-22098.00` I-71 pavement, AWARDED · `10-178.00` KY 7 landslide repair, AWARDED, FY2026
+
+The field is **`PRECON`**-scoped and its alias is *"Active or Inactive"*: it flags whether the
+**preconstruction phase** is still open. `I` = preconstruction **finished**. Excluding it would have
+removed the Covington 4th Street Bridge replacement from Kenton County's pages.
+
+⚠️ **No written KYTC definition exists to settle this on paper** — every field carries
+`"domain": null`, and **both** documentation hosts are unreachable (below). The evidence is
+behavioural, and it is specific and sufficient; do not weaken it to "the alias says so".
+
+### 🔴 THE EXPIRED CERTIFICATE IS KYTC-WIDE, NOT ONE STALE ENDPOINT
+
+`datamart.kytc.ky.gov` (KYTC's own "Detailed Six Year Plan Project Information", `SYP20detail.asp`)
+fails with the **same** `invalid peer certificate: Expired` as `pmtoolbox.kytc.ky.gov`, from both
+clients. **Two independent KYTC hosts, same failure** — an agency-wide certificate problem, not a
+single dead URL, and the reason this wire takes `dataset` precision despite `PRECON_INFO_LINK`
+being 100% populated and genuinely record-precision.
+- First-party ownership independently confirmed on Hub item `b55ba45fa1b6449d989351d683d6034b`:
+  `owner: KYTCGIS`, `orgId: CcI36Pduqd0OR4W9` — the same org that hosts SHIFT. **No field
+  dictionary** on the item.
+- Edge reachability of the *data* host is now **4/4** (latest 200 / 3,952 ms, `{"count":43361}`).
+
+### ✅ WIRED — `kytc-syp-highway-plan` (all three founder calls settled 2026-08-25)
+
+**`record_url` → dataset precision**, omitted from `column_map` so the ladder falls through
+(`sources/arcgis.ts:398`). **`dataset_url` → `https://transportation.ky.gov/Program-Management/Pages/default.aspx`**
+(human page, owning division, verified 200 / 370 ms).
+
+**Status buckets on a COMPOSITE `status_raw: [SYP_RPT_STAGEC, SYP_RPT_PRECONFLAG]`, because
+NEITHER COLUMN ALONE IS CORRECT** — PRECONFLAG alone mis-files **47** approved rows as proposed;
+STAGEC alone fails **72** rows closed on a null stage. `readCol` joins a column array skipping
+empties, so a null STAGEC yields the bare `"A"` key — which is exactly why that key exists.
+All **18** enumerated combinations are mapped, so a new one fails closed and is *named* in
+`unmapped_statuses`:
+
+- **proposed** — `ESTIMATED A` · `A` · `ESTIMATED TentativeLetting` · `ESTIMATED I` ·
+  `REESTIMATED A` · `REESTIMATED TentativeLetting`
+- **approved** — `AWARDED I` · `AUTHORIZED A` · `SENTTOFHWA A` · `AWARDED Awarded` ·
+  `AUTHORIZED Awarded` · `SENTTOFHWA I` · `AWARDED A`
+- **exclude** — `NON-SIXYEAR A` · `ESTIMATED Rejected` · `UNK A` · `NOTREQUIRED I` ·
+  `ESTIMATED Withdrawn`
+
+`Rejected`/`Withdrawn` are excluded **in the map, not via `extra_where`**, so they show up in
+`excluded_by_status` instead of vanishing at source. Nothing is claimed `operating` — a
+programmed plan never asserts built.
+
+**The connector query shape was PROVEN LIVE before wiring**, not assumed: `where=1=1 AND (…)`
++ spatial envelope + qualified `outFields` projection + `outSR=4326` + `resultOffset` →
+Louisville offset 0 returned **50** features, offset 2 returned **48** with the first
+`DIST_ITEM` shifted (`5-10016.00` → `5-10064.00`), geometry `paths` present for
+`featurePoint()` centroiding.
+
+**Pinned by `test/kytc-syp-connector.test.mjs` (47 assertions), proven to fail on 19 mutations**
+— including moving `AWARDED I` to exclude, dropping the bare `"A"` key, deleting or inverting the
+vintage gate, un-qualifying a field name, collapsing the composite to one column, adding a
+`record_url` on the expired-cert host, mapping `UNKNOWN` to an off-vocabulary `"Other"`, dropping
+either duplicate spelling or the publisher typo, widening coverage to Ohio, and re-pointing
+`service_url` at the unqueryable dynamic LRS FeatureServer. The connector is driven over a REAL
+captured page (`fixtures/kytc-syp/louisville-current-plan.json`, pg_net request 33424), so the
+`AWARDED I → approved` guard is end-to-end, not a config assertion.
+
+⚠️ **A UI leak caught at generation time, worth the standing answer: the
+`lib/generated/county-sources.json` LABEL IS USER-VISIBLE** on the development coverage card,
+and `gen-county-sources.mjs` truncates `jurisdiction` **at the first EM-DASH**. The first draft
+used a plain hyphen, so the internal *"KDOT is KANSAS"* note would have rendered to a Kentucky
+resident. Caught by reading the generated diff rather than assuming it. **Use an em-dash before
+any internal note in `jurisdiction`** — and the test now pins the truncated label.
+
+**Cross-border control: Cincinnati OH 45202** — chosen over Evansville IN 47708 because it sits
+~1 mi from the Kentucky line, so its 3-mi radius genuinely overlaps KY geography and a coverage
+bug there would NOT present as an empty result. It emits nothing **and never fetches**.
+
+⚠️ **Scratch table `public.ky_syp_probe`** (126 rows, zip → pg_net request id) holds the envelope
+receipts above. Drop it once the wire is verified.
+
+### Environment note — pg_net stalled repeatedly through this recon
+
+The queue froze with `max_id` unmoved at least four times (queued 54 @31551, 58 @31847, 60 @32033,
+61 @32095). `net.worker_restart()` clears it, but **not always immediately** — one stall persisted
+through three restarts and ~4 minutes before draining. Not a source signal; do not read a stalled
+queue as an unreachable host.
