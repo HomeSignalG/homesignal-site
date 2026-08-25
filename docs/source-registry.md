@@ -10462,15 +10462,71 @@ layers that reject `where=1=1` in every form tried** — `1=1`, `OBJECTID>0`, wi
 (`buildWhere()` always prefixes the spatial clause `1=1` and ANDs after it). `SYPQuery` on the
 companion `…Query_Ext_Prd` MapServer is the queryable equivalent and is the one to wire.
 
-### Open — the three founder calls this wire is gated on
+### 🛑 `SYP_RPT_PRECONFLAG` IS **PRECON**-SCOPED — `I` MEANS PRECONSTRUCTION FINISHED, NOT PROJECT DEAD
 
-1. **`record_url`** — dataset precision (recommended, given the expired certificate) vs shipping
-   `PRECON_INFO_LINK` at record precision anyway.
-2. **`dataset_url`** — the Program Management page (recommended) vs the service endpoint.
-3. **Status buckets for `TentativeLetting` (28) and `I` (57).** Proposed mapping: `A` → proposed ·
-   `Awarded` → approved · `TentativeLetting` → proposed (conservative — "tentative") ·
-   `I` / `Rejected` / `Withdrawn` → exclude. That fails **60 of 1,785 rows (3.4%)** closed, all in
-   the safe direction.
+**An earlier draft of this section proposed `I` → exclude. That was WRONG and would have dropped
+43 AWARDED construction contracts.** The founder's precondition — *"confirm from KYTC's own
+documentation or a pmtoolbox report what the code means; an unverified single-letter code is the
+`999`/`On file` class"* — is what caught it. Recorded so the inversion is never re-derived.
+
+`SYP_RPT_PRECONFLAG` × `SYP_RPT_STAGEC`, current plan, complete two-way crosstab summing **exactly
+to 1,785**:
+
+| PRECONFLAG | AWARDED | AUTHORIZED | SENTTOFHWA | ESTIMATED | REEST. | NON-SIXYEAR/UNK/NOTREQ. | null |
+|---|---|---|---|---|---|---|---|
+| `A` (1693) | 1 | 30 | 16 | 1566 | 2 | 6 | **72** |
+| **`I` (57)** | **43** | — | 1 | 11 | — | 2 | — |
+| `TentativeLetting` (28) | — | — | — | 27 | 1 | — | — |
+| `Awarded` (4) | 3 | 1 | — | — | — | — | — |
+| `Rejected` (2) | — | — | — | 2 | — | — | — |
+| `Withdrawn` (1) | — | — | — | 1 | — | — | — |
+
+**43 of 57 `I` rows are at construction stage `AWARDED`** — the contract is let. All 57 carry a
+non-null construction authorized date; their max construction fiscal year is **2031**. The explicit
+`Awarded` flag value holds only **4** rows, so `I` is where awarded projects actually live.
+
+Named `I` samples, read directly:
+- `6-1086.00` **REPLACE 4TH STREET BRIDGE OVER THE LICKING RIVER BETWEEN COVINGTON AND NEWPORT**,
+  AWARDED, construction authorized **2026-03-16**
+- `6-10036.00` I-471 bridge **at the Ohio River** (Campbell County), AWARDED, authorized 2024-01-05
+- `5-22098.00` I-71 pavement, AWARDED · `10-178.00` KY 7 landslide repair, AWARDED, FY2026
+
+The field is **`PRECON`**-scoped and its alias is *"Active or Inactive"*: it flags whether the
+**preconstruction phase** is still open. `I` = preconstruction **finished**. Excluding it would have
+removed the Covington 4th Street Bridge replacement from Kenton County's pages.
+
+⚠️ **No written KYTC definition exists to settle this on paper** — every field carries
+`"domain": null`, and **both** documentation hosts are unreachable (below). The evidence is
+behavioural, and it is specific and sufficient; do not weaken it to "the alias says so".
+
+### 🔴 THE EXPIRED CERTIFICATE IS KYTC-WIDE, NOT ONE STALE ENDPOINT
+
+`datamart.kytc.ky.gov` (KYTC's own "Detailed Six Year Plan Project Information", `SYP20detail.asp`)
+fails with the **same** `invalid peer certificate: Expired` as `pmtoolbox.kytc.ky.gov`, from both
+clients. **Two independent KYTC hosts, same failure** — an agency-wide certificate problem, not a
+single dead URL, and the reason this wire takes `dataset` precision despite `PRECON_INFO_LINK`
+being 100% populated and genuinely record-precision.
+- First-party ownership independently confirmed on Hub item `b55ba45fa1b6449d989351d683d6034b`:
+  `owner: KYTCGIS`, `orgId: CcI36Pduqd0OR4W9` — the same org that hosts SHIFT. **No field
+  dictionary** on the item.
+- Edge reachability of the *data* host is now **4/4** (latest 200 / 3,952 ms, `{"count":43361}`).
+
+### Settled, and the one call left
+
+**Settled (founder, 2026-08-25):** `record_url` → **dataset precision**, omitted from `column_map`
+so the ladder falls through. `dataset_url` → **`https://transportation.ky.gov/Program-Management/Pages/default.aspx`**
+(human page, owning division, verified 200 / 370 ms).
+
+**Bucket on `SYP_RPT_STAGEC`**, not on PRECONFLAG — the stage field describes where the project
+actually is: approved ← `AWARDED` (47) · `AUTHORIZED` (31) · `SENTTOFHWA` (17); proposed ←
+`ESTIMATED` (1607) · `REESTIMATED` (3); exclude ← `NON-SIXYEAR` (4) · `UNK` (2) · `NOTREQUIRED` (2).
+`Rejected`/`Withdrawn` (3 rows) drop at source via `extra_where` — they sit at `ESTIMATED` and would
+otherwise publish as proposed.
+
+**OPEN: the 72 rows with a null construction stage, all of them `A`.** Either (1) let them fail
+closed — 4% silently withheld — or (2) map `A` + null stage → proposed, on the grounds that the null
+sits in the *construction*-stage column because construction has not been staged yet, which is what
+"proposed" means, and `A` independently attests the project is live.
 
 ⚠️ **Scratch table `public.ky_syp_probe`** (126 rows, zip → pg_net request id) holds the envelope
 receipts above. Drop it once the wire is verified.
