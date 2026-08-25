@@ -10332,3 +10332,152 @@ throughout. Same class as New Mexico's completed awards.
 **Only 20 of 73 carry ANY EPA facility** — 53 have zero on both dimensions. Those are remote
 Alaskan ZIPs with no regulated facility and no highway project within 3 mi. The collect guard is
 not implicated (it only fires when *cached* facilities > 0). Alaska is sparse, not under-sourced.
+
+---
+
+## 🟡 KENTUCKY — the KYTC SIX-YEAR HIGHWAY PLAN found and fully measured; wire is FOUNDER-GATED on 3 calls (2026-08-25)
+
+**KY: 126 ZIP pages · 75 lit · 51 dark**, and **48 of the 51 dark pages carry EPA facilities** —
+populated, reachable places lacking only a project source. `KYTC` / `Kentucky` appeared **0 times**
+in this file beforehand; KY's 4 registry entries are all city/county, none statewide.
+
+⚠️ **Kentucky's agency is the Transportation CABINET (KYTC), not a "DOT".** `KDOT` is **Kansas**.
+Searching the DOT acronym finds the wrong state.
+
+### The source: `SYPQuery` — Kentucky's enacted Six-Year Highway Plan, with geometry
+
+`https://maps.kytc.ky.gov/arcgis/rest/services/Apps/ActiveHighwayPlanQuery_Ext_Prd/MapServer/0`
+— polyline, **43,361 rows**, `where=1=1` answers `{"count":43361}`. It is
+`Project_Locations_Line` ⋈ `TED_CHIPS_ACTIVEPLAN`, and it carries a real register's schema:
+`SYP_RPT_DESC` (4000 char), `SYP_RPT_TYPEWORK`, `DIST_ITEM`, `COUNTYNAME`, `BMP`/`EMP` mileposts,
+and **five phase blocks** (Plan / Design / Right-of-Way / Utility / Construction), each with
+funding code, cost, fiscal year, stage, authorized amount and authorized date. Fresh —
+`EXTRACT_DATE` max **2026-08-23**.
+
+### ⚠️ A JOINED MapServer layer exposes FULLY-QUALIFIED field names — and the short names FAIL AS A 200
+
+The first four enumeration queries returned `{"error":{"code":400,…}}` **inside an HTTP 200**, which
+reads exactly like a hostile server. It was the instrument: on the joined layer every field is
+`KYTCDynamic_Highways.DBO.TED_CHIPS_ACTIVEPLAN.<COL>`, so `outFields=DIST_ITEM`,
+`groupByFieldsForStatistics=SYP_RPT_PRECONFLAG`, `returnDistinctValues` and `orderByFields` all
+matched nothing. Re-run qualified, **every one works** — including the connector's own envelope +
+`outSR=4326` + `resultRecordCount` shape. Same 200-carrying-an-error class as South Dakota.
+- **Dotted keys are SAFE in `column_map`**: `sources/arcgis.ts::readCol` does plain `row[ref]` with
+  no dot-path traversal (that feature is Socrata's). Verified in code before relying on it.
+- Statistics on the join are unavailable regardless, so **vocabulary completeness was proved on the
+  un-joined `ACTIVEPLAN` table** (`ActiveHighwayPlan_Ext_Prd/FeatureServer/3`, 18,683 rows).
+
+### ⛔ THE VINTAGE TRAP: the layer holds EVERY Highway Plan back to 1996
+
+`PLANYEAR` × `CUR_PLANYEAR_IND` enumerated complete — 16 groups summing **exactly to 18,683**
+(1996 673 · 1998 933 · 2000 1,095 · 2002 856 · 2004 875 · 2006 1,030 · 2008 802 · 2010 913 ·
+2012 1,009 · 2014 1,155 · 2016 1,105 · 2018 1,429 · 2020 1,269 · 2022 1,822 · 2024 1,932 ·
+**2026 1,785**). Only `CUR_PLANYEAR_IND='Y'` is current, and it is **the publisher's own flag** —
+a cleaner filter than Wyoming's `drft_year >= 2026`, because it costs nothing that is current.
+**Wiring unfiltered would publish 1996 programme rows as live development.** Same superseded-vintage
+class as Alaska's `STIP_Service`.
+
+Filtered: **1,779 geometry rows · 1,785 plan rows · 1,578 distinct `DIST_ITEM`** — near one-to-one,
+so there is no fan-out problem and **no `yields_to` question**.
+
+### Both vocabularies complete, each summing EXACTLY to 1,785 on the current plan
+
+`SYP_RPT_PRECONFLAG` (alias "Active or Inactive"): `A` 1693 · `I` 57 · `TentativeLetting` 28 ·
+`Awarded` 4 · `Rejected` 2 · `Withdrawn` 1. (`InPreviousPlan` — 1,336 across all vintages — is
+**absent** from the current plan, as it should be.)
+
+`SYP_RPT_TYPEWORK`: **55 values**, self-describing (`BRIDGE REPLACEMENT(P)`, `MAJOR WIDENING(O)`,
+`NEW ROUTE(O)`, `SAFETY(P)` …), including a literal **`UNKNOWN` (4 rows)** → the generic
+`Development` bucket, never a guess (Phoenix rule). ⚠️ The vocabulary carries **suffixed and
+un-suffixed duplicates** of the same work type (`MAJOR WIDENING` 24 vs `MAJOR WIDENING(O)` 46;
+`RECONSTRUCTION` 43 vs `RECONSTRUCTION(O)` 136) — both spellings must be mapped or rows fall to
+`unclassified`.
+
+### The payoff, measured per page — not estimated
+
+All **126** KY ZIP centroids probed with the connector's own 3-mile envelope against the
+current-plan filter: **126/126 answered, all clean `{"count":N}`, 119 return ≥1 project.**
+
+| | pages | would carry SYP | rows | avg | max |
+|---|---|---|---|---|---|
+| dark | 51 | **46** | 337 | 7 | 50 |
+| already lit | 75 | 73 | 1,454 | 19 | 65 |
+
+**KY 75 → 121 lit of 126 (96%)**, 5 remaining dark: 40461, 41007, 42206, 42356, 42378.
+Max 65 rows on any page — no row-size concern anywhere.
+
+### ✅ EDGE-REACHABLE, 3/3 spaced — and the probe's own payload shape corrected
+
+`maps.kytc.ky.gov` from the deployed edge runtime: **16:52:23 → 200 / 3,239 ms · 16:52:56 → 200 /
+3,085 ms · 16:56:16 → 200 / 3,432 ms**, `{"count":43361}` byte-identical in all three and identical
+to pg_net. The current-plan filter: **200 / 302 ms, `{"count":1779}`**. No intermittency, no WAF.
+- ⚠️ **The first edge-probe call returned 502 and was nearly recorded as a KYTC finding.**
+  `edge-probe`'s body is **`{"targets":[{id,url},…]}`**, not `{"urls":[…]}`. A malformed payload
+  produces a gateway error indistinguishable from an unreachable host. **Send one target you know
+  answers, in the same call, every time.**
+
+### 🔴 `pmtoolbox.kytc.ky.gov` IS SERVING AN EXPIRED TLS CERTIFICATE (measured 2026-08-25)
+
+`PRECON_INFO_LINK` ("Additional Data (PM Toolbox)") is populated on **18,683 of 18,683** rows with a
+genuine per-record URL — `https://pmtoolbox.kytc.ky.gov/SYPmapsPreconReport.asp?COMB=5-10016.00` —
+which would be **record** precision. But that host fails TLS, and **two independent clients agree**:
+pg_net `SSL peer certificate or SSH remote key was not OK`; Deno `client error (Connect): invalid
+peer certificate: Expired`. Shipping it would hand every Kentucky resident a browser certificate
+interstitial.
+- ⚠️ It also ships with a **leading space** in the value. `extractUrl` trims, so no config
+  workaround is needed — but do not "fix" it in the column.
+- Omitting `record_url` from `column_map` makes the connector fall through to `dataset_url`
+  (`sources/arcgis.ts:398`), which is the intended dataset-precision path.
+- **Re-probe before assuming this is permanent** — a renewed certificate upgrades this to record
+  precision in one line.
+
+### `dataset_url` candidates — VERIFIED, after four guessed URLs 404'd
+
+Guessing publisher page URLs failed four times here (`maps.kytc.ky.gov/highwayplan/` 404 ·
+`/syp/` 404 · host root 406 · `transportation.ky.gov/Program-Management/Pages/Highway-Plan.aspx`
+404 SharePoint PageNotFound). The two that actually answer:
+- `https://transportation.ky.gov/Program-Management/Pages/default.aspx` — **200 / 370 ms**, the
+  KYTC Division of Program Management landing page (the division that owns the Highway Plan).
+- `https://maps.kytc.ky.gov/arcgis/rest/services/Apps/ActiveHighwayPlanQuery_Ext_Prd/MapServer` —
+  **200 / 83 ms**, `"Highway Plan Projects service"`, `copyrightText: "KYTC"` (machine endpoint,
+  Boulder/Philadelphia precedent).
+
+### ⛔ Three KYTC candidates REJECTED, with receipts
+
+1. **`Apps/ProjectControl/MapServer` — SURVEY MONUMENTS, not projects.** Its own
+   `serviceDescription`: *"Displays the location of Kentucky Transportation Cabinet's **Right-of-Way
+   monuments and Project Control**."* "Project Control" is the surveying term for geodetic control
+   points. Its two layers are one layer at two scale ranges, not two datasets.
+2. **`Apps/ProjectArchives/MapServer` — as-builts.** *"Archive of scanned KYTC project plans from
+   **1909 to the present**."* Completed construction plans. `WRONG_RECORD_CLASS`.
+3. **`SHIFT_2026_Statewide_Projects` — 40 rows.** SHIFT is KYTC's *prioritisation* formula, and the
+   layer's own description says it "displays the 2026 local projects **prioritized through**" it.
+   Candidate rankings, and 40 rows could not move 51 dark pages regardless.
+
+### ⛔ The `ActiveHighwayPlan_Ext_Prd` FeatureServer's OWN layers cannot be wired
+
+Layers 0/1/2 (`Awarded Current` / `Current` / `Previous Highway Plan Projects`) are **dynamic LRS
+layers that reject `where=1=1` in every form tried** — `1=1`, `OBJECTID>0`, with and without
+`returnCountOnly`. Per the NDOT standing answer, **`extra_where` can never rescue a `1=1` failure**
+(`buildWhere()` always prefixes the spatial clause `1=1` and ANDs after it). `SYPQuery` on the
+companion `…Query_Ext_Prd` MapServer is the queryable equivalent and is the one to wire.
+
+### Open — the three founder calls this wire is gated on
+
+1. **`record_url`** — dataset precision (recommended, given the expired certificate) vs shipping
+   `PRECON_INFO_LINK` at record precision anyway.
+2. **`dataset_url`** — the Program Management page (recommended) vs the service endpoint.
+3. **Status buckets for `TentativeLetting` (28) and `I` (57).** Proposed mapping: `A` → proposed ·
+   `Awarded` → approved · `TentativeLetting` → proposed (conservative — "tentative") ·
+   `I` / `Rejected` / `Withdrawn` → exclude. That fails **60 of 1,785 rows (3.4%)** closed, all in
+   the safe direction.
+
+⚠️ **Scratch table `public.ky_syp_probe`** (126 rows, zip → pg_net request id) holds the envelope
+receipts above. Drop it once the wire is verified.
+
+### Environment note — pg_net stalled repeatedly through this recon
+
+The queue froze with `max_id` unmoved at least four times (queued 54 @31551, 58 @31847, 60 @32033,
+61 @32095). `net.worker_restart()` clears it, but **not always immediately** — one stall persisted
+through three restarts and ~4 minutes before draining. Not a source signal; do not read a stalled
+queue as an unreachable host.
