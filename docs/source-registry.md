@@ -10570,3 +10570,204 @@ The queue froze with `max_id` unmoved at least four times (queued 54 @31551, 58 
 61 @32095). `net.worker_restart()` clears it, but **not always immediately** — one stall persisted
 through three restarts and ~4 minutes before draining. Not a source signal; do not read a stalled
 queue as an unreachable host.
+
+### 🚀 DEPLOYED + ROLLED OUT 2026-08-26 — KY 75 → 101 lit, and 20 pages held by the FRS guard
+
+Deploy: `deploy-edge-functions.yml` run **32973534921**, all steps green including the fail-loud
+`registry_incomplete_entries` gate. ⚠️ It ran on **`2c9199a`, not the merge commit `db1d232`** —
+`main` had advanced by two automated commits (`47df40c` sitemap regen, `2c9199a` nightly
+source-monitor) touching only `sitemap.xml` and `docs/source-monitor-report.md`. Delta reconciled
+before trusting the deploy: neither touches the registry, and the entry + both `kytc-syp` files
+are present on `origin/main`. **Rule #0a in practice — `main` moved and I did not move it.**
+
+**Live production result: 126 pages · 75 → 101 lit · 51 → 25 dark · 27 pages carry KYTC ·
+173 KYTC records stored.**
+
+Anti-fabrication invariants over all 173 stored records — **0 missing `record_url` · 0 missing
+coordinates · 0 unclassified · 0 outside the proposed/approved buckets · 0 pins outside Kentucky**
+(lat 36.783–38.984, lng −87.321 to −84.186) · **1 distinct `record_url`**, confirming dataset
+precision landed as designed. Both buckets and three `use_type`s are present, so the composite
+status and the type_map both resolve in production, not just in the test.
+
+### ⚠️ FIRING 51 AT ONCE BROKE THE FUNCTION — the edge runtime rate-limits at 12 req/min
+
+The first rollout attempt produced **25 × HTTP 503 `{"code":"BOOT_ERROR","message":"Function failed
+to start"}`** and **2 × HTTP 429 `"exceeded the rate limits (12 requests per minute) for this
+service"`**. That reads exactly like a deploy that broke production. **It was not**: a single
+request immediately after returned 200 with facilities 40 / development 274, so the failures were
+concurrency-induced. **A BOOT_ERROR storm under fan-out is a LOAD signal, not a bad bundle — prove
+it with one serial request before rolling anything back.** Re-fired in paced batches of 8.
+⚠️ A `DO` block with `pg_sleep` between batches **exceeds the 60 s MCP statement timeout** — pace
+across separate calls instead.
+
+### The 20 held pages are the FRS guard doing its job — do NOT touch it
+
+EPA FRS was genuinely degraded during the rollout: the `atlanta-dense` probe target was failing
+(fresh, not stale, so a real outage rather than a dead probe), `epa_ok` was **false**, and **23 of
+50 responses carried `epa.ok: false`**. `dev_refresh_collect()` refuses a row when
+**(EPA unhealthy OR the row is fresher than 7 days) AND new facilities = 0 AND cached facilities > 0**.
+Every KY row had been refreshed at 13:15 that day, so the freshness branch was true regardless.
+
+Measured before writing, which is the only way to know: **50 responses · 45 carried KYTC records ·
+26 wrote · 19 carried records but were blocked.** All 25 still-dark pages have `fac_before > 0`,
+and **all 25 kept their facility counts unchanged** — proof the guard *refused* the write rather
+than overwriting with a transient zero. Five of the 25 (40461, 41007, 42206, 42356, 42378) are the
+genuinely sourceless ZIPs predicted in the coverage probe.
+
+**Self-healing: the daily cron retries.** No manual step is required, and the guard must not be
+relaxed to force them through — it is a §12 stop, and it is the same mechanism holding the Idaho,
+Wyoming and Montana remainders.
+
+⚠️ **Scratch tables `public.ky_syp_probe` and `public.ky_rollout` were DROPPED** after verifying
+nothing was lost: the probe table's `req_id`s pointed at `net._http_response` rows already past
+their **6-hour retention**, and every blocked row still carries its original `counts.facilities`,
+so the pre-rollout baseline is recoverable from production itself.
+---
+
+## 🟢 NORTH CAROLINA — NCDOT STIP WIRED, statewide points+lines pair (2026-08-26)
+
+**NC: 170 ZIP pages · 126 lit · 44 dark** before this wire, and **39 of the 44 dark carry EPA
+facilities**. The dark set is concentrated where a statewide source reaches: **Chatham 12/12 ·
+Union 9/9 · Buncombe 11/20 · Orange 7/10**, plus 2 Mecklenburg, 2 Wake, 1 New Hanover.
+NC's 8 pre-existing entries are all city/county; there was no statewide source.
+
+The lead was already in this file — a 2026-08-23 sweep recorded `gis11.services.ncdot.gov`
+NCDOT_STIP as a "lead for LATER states" and never probed it.
+
+### The source
+
+`https://gis11.services.ncdot.gov/arcgis/rest/services/NCDOT_STIP/MapServer` —
+`serviceDescription`: *"NCDOT 2026-2035Transportation Improvement Program (STIP) Projects.
+(geoservice date: 7/16/2025)"*, `copyrightText`: **"NCDOT GIS Unit, NCDOT STIP Unit"**.
+**First-party confirmed by NAME in the service's own metadata**, not by acronym.
+**Edge-reachable 3/3 spaced** — 14:28:53 / 14:29:40 / 14:31:48 UTC, 200 in 475 / 470 / 503 ms,
+counts byte-identical every round and matching pg_net exactly.
+
+| layer | name | geometry | rows | in forward window |
+|---|---|---|---|---|
+| 0 | 2026-2035 STIP Points | **multipoint** | 1,120 | **556** |
+| 1 | 2026-2035 STIP Lines | polyline | 1,943 | **755** |
+
+⚠️ The **FeatureServer** endpoint of the same service returns **HTTP 500**; only the MapServer
+answers. Do not "fix" the entry by switching endpoints.
+
+### ⛔ THE WINDOW MUST BE A YEAR WHITELIST — `>= '2026'` SILENTLY ADMITS THE UNFUNDED PROJECTS
+
+`ConstructionYear` is **`esriFieldTypeString`** and carries three different kinds of value at
+once: years **2009–2035**, `NOT FUNDED`, and `FUNDED FOR PRELIMINARY ENGINEERING ONLY`. A
+`>= '2026'` clause is a **lexical** compare, and `'N'`(78) and `'F'`(70) both sort **above**
+`'2'`(50) — so the comparison form **includes** them.
+
+Measured live, both forms, same layers:
+
+| form | L0 | L1 |
+|---|---|---|
+| `ConstructionYear IN ('2026'…'2035')` | **556** | **755** |
+| `ConstructionYear >= '2026'` | 598 | 958 |
+
+**L0's +42 is exactly `NOT FUNDED` 4 + `FUNDED FOR PE` 38.** The naive form would have shipped
+every unfunded project in the programme while *reading* like a forward window in review. The
+whitelist also **fails closed** on any value NCDOT adds later.
+
+⚠️ **L1's `ConstructionYear` vocabulary was NOT enumerated to completeness** — the groupBy read
+was truncated, and L1's `+203` is one more than the 202 the known text values explain. The
+whitelist is immune (it admits only the 10 named years), but **no L1 sum-check is claimed here.**
+
+### The founder's three calls, 2026-08-26
+
+1. **`NOT FUNDED` (88 rows across both layers) — EXCLUDED.** The Oregon unfunded-projects
+   precedent.
+2. **Empty `ConstructionYear` (471 rows, ~15%) — FAILS CLOSED**, and the reason it is not
+   recoverable is recorded so nobody re-derives it: **the STIP layer carries no second column
+   that disambiguates them.** There is no phase, programming or lifecycle field — only
+   `RightOfWayYear` (same free-text problem) and `ProjectCost`. **If NCDOT ever exposes a phase
+   or programming field, those 471 become reclassifiable.** Fail-closed today, not forever.
+3. **Forward window, single entry.** Past-year rows (~1,031, some as old as 2009) are **not**
+   mapped to built or approved — nothing in this layer evidences that they were built.
+
+### Structure — points yields_to lines, on a MEASURED overlap
+
+Distinct `TIP`: **L0 1,120 · L1 1,943 · shared 12 · L0-only 1,108 · L1-only 1,931 · union 3,051.**
+Every TIP is unique *within* its layer.
+
+⚠️ `returnDistinctValues` returned exactly the row counts (1,120 / 1,943), which is equally
+consistent with "all unique" and "the parameter was ignored" — the South Dakota shape. **Positive
+control:** the same call on `Mode` returned **7**, not 1,120. The parameter is honoured.
+
+12 shared is small but **non-zero**, so this is the **NE case** — declare the yield or double-emit
+those 12. (The NY counter-case is a *fully disjoint* pair, where declaring would DROP records.)
+Decided by measurement, never inherited.
+
+### Status is a const because the layer has NO status column
+
+Every row surviving the window has a **future** construction year, so
+`status_const: "Programmed in the NCDOT 2026-2035 State Transportation Improvement Program"` →
+`proposed` asserts nothing unevidenced. The Idaho ITIP / WYDOT shape, not the Kentucky composite.
+Nothing is claimed approved or operating.
+
+### `Mode` is the type source — complete on both layers
+
+Each vocabulary sums **exactly** to its row count: L0 1,120 = Highway 796 · Rail 193 · Aviation 72
+· Transit 27 · Bike & Ped 24 · Ferry 7 · one empty string. L1 1,943 = Highway 1526 · Bike & Ped 390
+· Rail 13 · Transit 11 · Aviation 2 · Ferry 1. The **single empty-string Mode is deliberately
+unmapped** — mapping an empty string to a use_type would be a guess. Both entries carry the
+**identical** type_map so a shared project cannot render as a different use_type depending on which
+geometry published it (the NE rule).
+
+### ✅ Multipoint geometry was CHECKED IN CODE before wiring, not assumed
+
+Layer 0 is `esriGeometryMultipoint`, which this repo had never wired. `featurePoint()` handles it
+via a `points` branch **added 2026-08-05** after `lake-county-il-construction-program` shipped
+**77 records with ZERO pins across 27 ZIPs** — records that listed but never appeared on any map
+view and were dropped by the point-scope-only materializer. Verified present before proceeding.
+
+### ⛔ Rejected in the same pass, with receipts
+
+- **`NCDOTApp_PreConViewer/PreConProjectsViewer`** — deployed **11/16/2019**, self-described as
+  *"intended to be used in the viewer application only"*: a SharePoint-backing service, not a
+  register.
+- **The NCDOT_STIP FeatureServer** — HTTP 500 (above).
+
+### 🔭 Logged as a follow-up, NOT wired — `NCDOT_ActiveConstructionProjects`
+
+`NCDOT_RoadProjects/NCDOT_ActiveConstructionProjects` (263 points / 156 lines, a joined
+`GdbGisuPub.HICAMS.*` layer keyed on the **same `TIP`**) is **live and fresh**: max
+`ContractActiveDate` **2026-08-24**, `CompletionPercent` **0.00–94.99** corroborating its own
+*"less than 95% complete"* definition, and `ContractStatus` a single value `ACTIVE` summing
+exactly to 263. It would let a STIP row's status be **evidenced** rather than programmed.
+
+⚠️ **Its honest limit — it resolves the POSITIVE case only.** Presence promotes a project to
+under-construction; **absence proves nothing** (>95% complete, never started, or sitting in the
+`Unmapped HiCAMS Contracts` table, which NCDOT's own description admits the spatial layers do not
+cover). **Enrichment, never a substitute for the windowing decision.**
+
+### 📌 STANDING ANSWER — read the DATA's own dates, never the ITEM's (both directions receipted)
+
+- **NC:** `NCDOT_ActiveConstructionProjects` carries **`pub date: 2/7/2020`** in its service
+  metadata while its data is fresh to **2026-08-24**. Stale metadata, live data.
+- **NM:** `Roadway Projects` carried a **2025-05-14 `modified`** stamp over `DateAwarded` values
+  of **2018 / 2019 / 2022**. Fresh metadata, stale data.
+
+Both directions now have a receipt. The item's dates are not evidence either way.
+
+### Pinned by `test/ncdot-stip-pair.test.mjs` — 96 assertions, proven to fail on 21 mutations
+
+Including: swapping the whitelist for `>= '2026'` (the lexical trap), adding a past year,
+diverging the two windows, dropping or reversing the yield, moving the match key off `TIP`,
+claiming approved/operating, mapping `ConstructionYear` as a date, adding `recency_days`, mapping
+the empty Mode, diverging the type_maps, widening coverage to SC, dropping `ConstructionYear` from
+`out_fields`, re-pointing at the HTTP-500 FeatureServer, adding a record_url template, and
+replacing the em-dash so the public label leaks the internal note.
+
+**Cross-border control: Fort Mill SC 29715**, ~2 mi from the Mecklenburg line — its 3-mi radius
+genuinely overlaps North Carolina, so a coverage bug there could **not** hide behind an empty
+result. It emits nothing **and never fetches**.
+
+### ⚠️ A registry-writing hazard found here — pin the escape regex to ASCII
+
+The first apply produced **1,685 insertions / 1,584 deletions** instead of a clean additive diff.
+The round-trip's escape regex is meant to be the range U+0080 to U+FFFF, but written with those
+two bound characters as literals it had been mangled so the range **started at U+002D, the
+hyphen** — re-escaping **every hyphen in the file**. Build it from pure ASCII instead —
+`new RegExp('[\\u0080-\\uffff]', 'g')` — and **assert deletions === 0 before committing**, which
+is what caught it.
