@@ -15033,6 +15033,107 @@
       ],
       "record_url_precision": "dataset",
       "_receipts": "2026-08-25 KY wire. KYTC's enacted Six-Year Highway Plan. SYPQuery = Project_Locations_Line JOINED to TED_CHIPS_ACTIVEPLAN; 43,361 rows unfiltered, 1,779 on the current plan. ORG IDENTITY VERIFIED BY NAME not acronym: service copyrightText 'KYTC', serviceDescription 'Highway Plan Projects service'; the companion AGO org CcI36Pduqd0OR4W9 is owned by 'KYTCGIS'. EDGE-REACHABLE 4/4 spaced (200 in 3,239 / 3,085 / 3,432 / 3,952 ms, {\"count\":43361} byte-identical every round, matching pg_net exactly). CONNECTOR QUERY SHAPE PROVEN LIVE before wiring: where=1=1 AND (...), spatial envelope, qualified outFields projection, outSR=4326, resultOffset paging - Louisville offset 0 returned 50 features / offset 2 returned 48 with the first DIST_ITEM shifted (5-10016.00 -> 5-10064.00), geometry paths present for featurePoint() centroiding. FULLY-QUALIFIED FIELD NAMES ARE MANDATORY: on a joined MapServer layer the short names do not exist, and querying them returns an HTTP 200 carrying {\"error\":{\"code\":400}} - the South Dakota class. readCol does plain row[ref] with no dot-path traversal (that is Socrata's feature), so dotted keys are safe here; verified in code before relying on it. VINTAGE GATE: the layer holds EVERY Highway Plan back to 1996 - PLANYEAR x CUR_PLANYEAR_IND enumerated complete, 16 biennial groups summing exactly to 18,683. extra_where CUR_PLANYEAR_IND='Y' is the PUBLISHER'S OWN current-plan flag; without it 1996 programme rows publish as live development. STATUS IS A COMPOSITE of Construction Stage + PRECONFLAG because NEITHER COLUMN ALONE IS CORRECT: PRECONFLAG alone mis-files 47 approved rows as proposed, STAGEC alone fails 72 rows closed on a null stage. The two-way crosstab was enumerated complete, all 18 combinations summing EXACTLY to 1,785, and every combination is mapped - so a new one fails closed and is named in unmapped_statuses. status_raw is DIAGNOSTIC ONLY, never rendered (lib/map.js renders the bucket), so the two-token key costs the resident nothing and makes the run report legible. Rejected/Withdrawn are excluded IN THE MAP rather than via extra_where so they show up in excluded_by_status instead of vanishing at source. CRITICAL - SYP_RPT_PRECONFLAG IS PRECON-SCOPED: 'I' MEANS PRECONSTRUCTION FINISHED, NOT PROJECT DEAD. An earlier draft proposed I -> exclude; that would have dropped 43 AWARDED construction contracts including the Covington/Newport 4th Street Bridge replacement (6-1086.00, authorized 2026-03-16) and the I-471 Ohio River bridge (6-10036.00). 43 of 57 I rows sit at construction stage AWARDED, all 57 carry a non-null construction authorized date, max construction FY 2031, and the explicit 'Awarded' flag holds only 4 rows. No written KYTC definition exists to confirm this on paper - every field carries domain:null - so the evidence is behavioural and is recorded here in full. TYPE_MAP: SYP_RPT_TYPEWORK enumerated complete on the current plan, 55 values summing EXACTLY to 1,785, including a literal 'UNKNOWN' (4 rows) mapped to the generic Development bucket rather than guessed (Phoenix rule). The vocabulary carries SUFFIXED AND UN-SUFFIXED DUPLICATES of the same work type (MAJOR WIDENING 24 vs MAJOR WIDENING(O) 46; RECONSTRUCTION 43 vs RECONSTRUCTION(O) 136) and a publisher typo (MINR WIDENING, 1) - all mapped verbatim, because mapping what the publisher emits is the contract. RECORD_URL IS DATASET PRECISION FOR A REASON, NOT A LIMITATION: PRECON_INFO_LINK is populated on 18,683 of 18,683 rows with a genuine per-record URL (pmtoolbox.kytc.ky.gov/SYPmapsPreconReport.asp?COMB=<DIST_ITEM>) and would be record precision - but that host serves an EXPIRED TLS CERTIFICATE, confirmed by two independent clients (pg_net 'SSL peer certificate or SSH remote key was not OK'; Deno 'invalid peer certificate: Expired'). The problem is AGENCY-WIDE, not one endpoint: datamart.kytc.ky.gov (KYTC's own SYP20detail.asp) fails identically. Shipping it would hand every Kentucky resident a browser certificate interstitial, so record_url is omitted from column_map and the ladder falls through to dataset_url. RE-PROBE BOTH HOSTS: the day KYTC renews, adding record_url + record precision is a ONE-LINE upgrade. dataset_url was chosen from VERIFIED candidates after four guessed URLs 404'd (maps.kytc.ky.gov/highwayplan/, /syp/, host root 406, transportation.ky.gov/.../Highway-Plan.aspx) - the Program Management page is the owning division's, 200 in 370 ms. COVERAGE PRE-VERIFIED on all 126 modelled KY ZIPs with the connector's own 3-mi envelope: 126/126 answered cleanly, 119 return >=1 current-plan project; 46 of the 51 DARK pages would light (337 records, avg 7, max 50), taking KY from 75 to 121 of 126 lit. Max 65 records on any page - no row-size concern. The 5 still dark: 40461, 41007, 42206, 42356, 42378. REJECTED IN THE SAME PASS with receipts: Apps/ProjectControl (its own description says Right-of-Way MONUMENTS and Project Control - survey control points, not projects); Apps/ProjectArchives (scanned project plans 1909-present - as-builts); SHIFT_2026_Statewide_Projects (40 rows, and SHIFT is the PRIORITISATION formula, not a programme); and the ActiveHighwayPlan_Ext_Prd FeatureServer's own layers 0/1/2, which are dynamic LRS layers that reject where=1=1 in EVERY form tried - and per the NDOT standing answer extra_where can never rescue a 1=1 failure, because buildWhere always prefixes the spatial clause 1=1 and ANDs after it."
+    },
+    {
+      "registry_id": "ncdot-stip-projects-points",
+      "platform": "arcgis",
+      "service_url": "https://gis11.services.ncdot.gov/arcgis/rest/services/NCDOT_STIP/MapServer/0",
+      "dataset_url": "https://gis11.services.ncdot.gov/arcgis/rest/services/NCDOT_STIP/MapServer",
+      "jurisdiction": "North Carolina Department of Transportation (NCDOT) \u2014 2026-2035 State Transportation Improvement Program (STIP)",
+      "coverage": [
+        {
+          "state": "NC"
+        }
+      ],
+      "column_map": {
+        "title": "Description",
+        "type_source": "Mode",
+        "address": "Counties",
+        "case_number": "TIP",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "Highway": "Utility",
+        "Rail": "Utility",
+        "Bike & Ped": "Civic/Public",
+        "Aviation": "Civic/Public",
+        "Ferry": "Civic/Public",
+        "Public Transportation (Transit)": "Civic/Public"
+      },
+      "status_const": "Programmed in the NCDOT 2026-2035 State Transportation Improvement Program",
+      "status_to_bucket": {
+        "proposed": [
+          "Programmed in the NCDOT 2026-2035 State Transportation Improvement Program"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "extra_where": "ConstructionYear IN ('2026','2027','2028','2029','2030','2031','2032','2033','2034','2035')",
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "TIP",
+        "Description",
+        "Mode",
+        "Route",
+        "Counties",
+        "ConstructionYear"
+      ],
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-26 NC wire. NCDOT's 2026-2035 State Transportation Improvement Program. ORG IDENTITY VERIFIED BY NAME not acronym: the service's own copyrightText is 'NCDOT GIS Unit, NCDOT STIP Unit' and its serviceDescription is 'NCDOT 2026-2035Transportation Improvement Program (STIP) Projects. (geoservice date: 7/16/2025)'. EDGE-REACHABLE 3/3 spaced (14:28:53 / 14:29:40 / 14:31:48 UTC; 200 in 475 / 470 / 503 ms, counts byte-identical every round and matching pg_net exactly). THE WINDOW IS A YEAR WHITELIST FOR A MEASURED REASON: ConstructionYear is esriFieldTypeString carrying years 2009-2035 MIXED WITH 'NOT FUNDED' and 'FUNDED FOR PRELIMINARY ENGINEERING ONLY'. A `>= '2026'` comparison is LEXICAL, and 'N'(78)/'F'(70) both sort above '2'(50), so it ADMITS them. Measured live: whitelist L0 556 / L1 755 vs naive '>=' L0 598 / L1 958 \u2014 L0's +42 is exactly NOT FUNDED 4 + FUNDED FOR PE 38. The whitelist also FAILS CLOSED on any value NCDOT adds later. FOUNDER DECISIONS 2026-08-26: (1) NOT FUNDED (88 rows across both layers) EXCLUDED - the Oregon unfunded-projects precedent. (2) EMPTY ConstructionYear (471 rows, ~15%) FAILS CLOSED, and here is WHY IT IS NOT RECOVERABLE TODAY: the STIP layer carries NO second column that disambiguates them - there is no phase, programming, or lifecycle field, only RightOfWayYear (same free-text problem) and ProjectCost. IF NCDOT EVER EXPOSES A PHASE OR PROGRAMMING FIELD, THOSE 471 BECOME RECLASSIFIABLE. This is fail-closed today, not fail-closed forever; 15% is a big enough loss that someone will want to revisit it, and they should find this reason rather than re-deriving it. (3) FORWARD WINDOW, single entry - past ConstructionYear rows (~1,031, some as old as 2009) are NOT mapped to built/approved, because nothing in this layer evidences that they were built. STATUS IS A CONST, NOT A COLUMN: the layer has no status field at all, and every row surviving the window has a FUTURE construction year, so 'Programmed' asserts nothing unevidenced (the Idaho ITIP / WYDOT shape, not the Kentucky composite). TYPE_MAP: `Mode` enumerated live on both layers, EACH SUMMING EXACTLY to its row count (L0 1,120 = Highway 796 + Rail 193 + Aviation 72 + Transit 27 + Bike & Ped 24 + Ferry 7 + one empty string; L1 1,943 = Highway 1526 + Bike & Ped 390 + Rail 13 + Transit 11 + Aviation 2 + Ferry 1). The single empty-string Mode is deliberately NOT mapped - mapping '' to a use_type would be a guess; it falls to unclassified, honestly. Both entries carry the IDENTICAL type_map so a shared project cannot render as a different use_type depending on which geometry published it. GEOMETRY: layer 0 is esriGeometryMultipoint - handled by featurePoint()'s `points` branch, added 2026-08-05 after lake-county-il-construction-program shipped 77 records with ZERO pins across 27 ZIPs. Verified in code before wiring, not assumed. Layer 1 is polyline (midpoint-of-longest-path). RECORD_URL: no per-record URL column exists on either layer (fields are OBJECTID, TIP, SPOTID, Route, Description, Category, Mode, RightOfWayYear, ConstructionYear, COMMENT, ProjectCost, Symbology, Counties, Divisions, MPOsRPOs), so dataset precision on the service endpoint - templating one would be guessing. REJECTED IN THE SAME PASS WITH RECEIPTS: NCDOTApp_PreConViewer/PreConProjectsViewer - deployed 11/16/2019 and self-described as 'intended to be used in the viewer application only', a SharePoint-backing service rather than a register. The NCDOT_STIP FeatureServer endpoint returns HTTP 500; only the MapServer answers. FOLLOW-UP LOGGED, NOT WIRED: NCDOT_RoadProjects/NCDOT_ActiveConstructionProjects (263 points / 156 lines, joined GdbGisuPub.HICAMS.* layer, keyed on the SAME TIP) is LIVE and FRESH - max ContractActiveDate 2026-08-24, CompletionPercent 0.00-94.99 corroborating its own 'less than 95% complete' definition, ContractStatus a single value ACTIVE summing exactly to 263. It would let a STIP row's status be EVIDENCED rather than programmed. ITS HONEST LIMIT: it resolves the POSITIVE case only - presence promotes a project to under-construction, ABSENCE PROVES NOTHING (>95% complete, never started, or sitting in the Unmapped HiCAMS Contracts table, which NCDOT's own description admits the spatial layers do not cover). It is enrichment, never a substitute for the windowing decision above. STANDING ANSWER BANKED FROM THIS PASS: READ THE DATA'S OWN DATES, NEVER THE ITEM'S - both directions are now receipted. NC's active-construction service carries `pub date: 2/7/2020` in its metadata while its data is fresh to 2026-08-24; New Mexico's Roadway Projects carried a 2025-05-14 `modified` stamp over DateAwarded values of 2018/2019/2022. THIS ENTRY: layer 0 (multipoint), 1120 rows unfiltered, 556 inside the forward window; every TIP unique within the layer (returnDistinctValues returned 1120, and the POSITIVE CONTROL proved the parameter is honoured - the same call on Mode returned 7, not 1120).",
+      "yields_to": "ncdot-stip-projects-lines"
+    },
+    {
+      "registry_id": "ncdot-stip-projects-lines",
+      "platform": "arcgis",
+      "service_url": "https://gis11.services.ncdot.gov/arcgis/rest/services/NCDOT_STIP/MapServer/1",
+      "dataset_url": "https://gis11.services.ncdot.gov/arcgis/rest/services/NCDOT_STIP/MapServer",
+      "jurisdiction": "North Carolina Department of Transportation (NCDOT) \u2014 2026-2035 State Transportation Improvement Program (STIP)",
+      "coverage": [
+        {
+          "state": "NC"
+        }
+      ],
+      "column_map": {
+        "title": "Description",
+        "type_source": "Mode",
+        "address": "Counties",
+        "case_number": "TIP",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "Highway": "Utility",
+        "Rail": "Utility",
+        "Bike & Ped": "Civic/Public",
+        "Aviation": "Civic/Public",
+        "Ferry": "Civic/Public",
+        "Public Transportation (Transit)": "Civic/Public"
+      },
+      "status_const": "Programmed in the NCDOT 2026-2035 State Transportation Improvement Program",
+      "status_to_bucket": {
+        "proposed": [
+          "Programmed in the NCDOT 2026-2035 State Transportation Improvement Program"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "extra_where": "ConstructionYear IN ('2026','2027','2028','2029','2030','2031','2032','2033','2034','2035')",
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "TIP",
+        "Description",
+        "Mode",
+        "Route",
+        "Counties",
+        "ConstructionYear"
+      ],
+      "record_url_precision": "dataset",
+      "_receipts": "2026-08-26 NC wire. NCDOT's 2026-2035 State Transportation Improvement Program. ORG IDENTITY VERIFIED BY NAME not acronym: the service's own copyrightText is 'NCDOT GIS Unit, NCDOT STIP Unit' and its serviceDescription is 'NCDOT 2026-2035Transportation Improvement Program (STIP) Projects. (geoservice date: 7/16/2025)'. EDGE-REACHABLE 3/3 spaced (14:28:53 / 14:29:40 / 14:31:48 UTC; 200 in 475 / 470 / 503 ms, counts byte-identical every round and matching pg_net exactly). THE WINDOW IS A YEAR WHITELIST FOR A MEASURED REASON: ConstructionYear is esriFieldTypeString carrying years 2009-2035 MIXED WITH 'NOT FUNDED' and 'FUNDED FOR PRELIMINARY ENGINEERING ONLY'. A `>= '2026'` comparison is LEXICAL, and 'N'(78)/'F'(70) both sort above '2'(50), so it ADMITS them. Measured live: whitelist L0 556 / L1 755 vs naive '>=' L0 598 / L1 958 \u2014 L0's +42 is exactly NOT FUNDED 4 + FUNDED FOR PE 38. The whitelist also FAILS CLOSED on any value NCDOT adds later. FOUNDER DECISIONS 2026-08-26: (1) NOT FUNDED (88 rows across both layers) EXCLUDED - the Oregon unfunded-projects precedent. (2) EMPTY ConstructionYear (471 rows, ~15%) FAILS CLOSED, and here is WHY IT IS NOT RECOVERABLE TODAY: the STIP layer carries NO second column that disambiguates them - there is no phase, programming, or lifecycle field, only RightOfWayYear (same free-text problem) and ProjectCost. IF NCDOT EVER EXPOSES A PHASE OR PROGRAMMING FIELD, THOSE 471 BECOME RECLASSIFIABLE. This is fail-closed today, not fail-closed forever; 15% is a big enough loss that someone will want to revisit it, and they should find this reason rather than re-deriving it. (3) FORWARD WINDOW, single entry - past ConstructionYear rows (~1,031, some as old as 2009) are NOT mapped to built/approved, because nothing in this layer evidences that they were built. STATUS IS A CONST, NOT A COLUMN: the layer has no status field at all, and every row surviving the window has a FUTURE construction year, so 'Programmed' asserts nothing unevidenced (the Idaho ITIP / WYDOT shape, not the Kentucky composite). TYPE_MAP: `Mode` enumerated live on both layers, EACH SUMMING EXACTLY to its row count (L0 1,120 = Highway 796 + Rail 193 + Aviation 72 + Transit 27 + Bike & Ped 24 + Ferry 7 + one empty string; L1 1,943 = Highway 1526 + Bike & Ped 390 + Rail 13 + Transit 11 + Aviation 2 + Ferry 1). The single empty-string Mode is deliberately NOT mapped - mapping '' to a use_type would be a guess; it falls to unclassified, honestly. Both entries carry the IDENTICAL type_map so a shared project cannot render as a different use_type depending on which geometry published it. GEOMETRY: layer 0 is esriGeometryMultipoint - handled by featurePoint()'s `points` branch, added 2026-08-05 after lake-county-il-construction-program shipped 77 records with ZERO pins across 27 ZIPs. Verified in code before wiring, not assumed. Layer 1 is polyline (midpoint-of-longest-path). RECORD_URL: no per-record URL column exists on either layer (fields are OBJECTID, TIP, SPOTID, Route, Description, Category, Mode, RightOfWayYear, ConstructionYear, COMMENT, ProjectCost, Symbology, Counties, Divisions, MPOsRPOs), so dataset precision on the service endpoint - templating one would be guessing. REJECTED IN THE SAME PASS WITH RECEIPTS: NCDOTApp_PreConViewer/PreConProjectsViewer - deployed 11/16/2019 and self-described as 'intended to be used in the viewer application only', a SharePoint-backing service rather than a register. The NCDOT_STIP FeatureServer endpoint returns HTTP 500; only the MapServer answers. FOLLOW-UP LOGGED, NOT WIRED: NCDOT_RoadProjects/NCDOT_ActiveConstructionProjects (263 points / 156 lines, joined GdbGisuPub.HICAMS.* layer, keyed on the SAME TIP) is LIVE and FRESH - max ContractActiveDate 2026-08-24, CompletionPercent 0.00-94.99 corroborating its own 'less than 95% complete' definition, ContractStatus a single value ACTIVE summing exactly to 263. It would let a STIP row's status be EVIDENCED rather than programmed. ITS HONEST LIMIT: it resolves the POSITIVE case only - presence promotes a project to under-construction, ABSENCE PROVES NOTHING (>95% complete, never started, or sitting in the Unmapped HiCAMS Contracts table, which NCDOT's own description admits the spatial layers do not cover). It is enrichment, never a substitute for the windowing decision above. STANDING ANSWER BANKED FROM THIS PASS: READ THE DATA'S OWN DATES, NEVER THE ITEM'S - both directions are now receipted. NC's active-construction service carries `pub date: 2/7/2020` in its metadata while its data is fresh to 2026-08-24; New Mexico's Roadway Projects carried a 2025-05-14 `modified` stamp over DateAwarded values of 2018/2019/2022. THIS ENTRY: layer 1 (polyline), 1943 rows unfiltered, 755 inside the forward window; every TIP unique within the layer (returnDistinctValues returned 1943, and the POSITIVE CONTROL proved the parameter is honoured - the same call on Mode returned 7, not 1943)."
     }
   ],
   "ckan": [
