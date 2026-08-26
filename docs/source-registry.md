@@ -10570,3 +10570,55 @@ The queue froze with `max_id` unmoved at least four times (queued 54 @31551, 58 
 61 @32095). `net.worker_restart()` clears it, but **not always immediately** — one stall persisted
 through three restarts and ~4 minutes before draining. Not a source signal; do not read a stalled
 queue as an unreachable host.
+
+### 🚀 DEPLOYED + ROLLED OUT 2026-08-26 — KY 75 → 101 lit, and 20 pages held by the FRS guard
+
+Deploy: `deploy-edge-functions.yml` run **32973534921**, all steps green including the fail-loud
+`registry_incomplete_entries` gate. ⚠️ It ran on **`2c9199a`, not the merge commit `db1d232`** —
+`main` had advanced by two automated commits (`47df40c` sitemap regen, `2c9199a` nightly
+source-monitor) touching only `sitemap.xml` and `docs/source-monitor-report.md`. Delta reconciled
+before trusting the deploy: neither touches the registry, and the entry + both `kytc-syp` files
+are present on `origin/main`. **Rule #0a in practice — `main` moved and I did not move it.**
+
+**Live production result: 126 pages · 75 → 101 lit · 51 → 25 dark · 27 pages carry KYTC ·
+173 KYTC records stored.**
+
+Anti-fabrication invariants over all 173 stored records — **0 missing `record_url` · 0 missing
+coordinates · 0 unclassified · 0 outside the proposed/approved buckets · 0 pins outside Kentucky**
+(lat 36.783–38.984, lng −87.321 to −84.186) · **1 distinct `record_url`**, confirming dataset
+precision landed as designed. Both buckets and three `use_type`s are present, so the composite
+status and the type_map both resolve in production, not just in the test.
+
+### ⚠️ FIRING 51 AT ONCE BROKE THE FUNCTION — the edge runtime rate-limits at 12 req/min
+
+The first rollout attempt produced **25 × HTTP 503 `{"code":"BOOT_ERROR","message":"Function failed
+to start"}`** and **2 × HTTP 429 `"exceeded the rate limits (12 requests per minute) for this
+service"`**. That reads exactly like a deploy that broke production. **It was not**: a single
+request immediately after returned 200 with facilities 40 / development 274, so the failures were
+concurrency-induced. **A BOOT_ERROR storm under fan-out is a LOAD signal, not a bad bundle — prove
+it with one serial request before rolling anything back.** Re-fired in paced batches of 8.
+⚠️ A `DO` block with `pg_sleep` between batches **exceeds the 60 s MCP statement timeout** — pace
+across separate calls instead.
+
+### The 20 held pages are the FRS guard doing its job — do NOT touch it
+
+EPA FRS was genuinely degraded during the rollout: the `atlanta-dense` probe target was failing
+(fresh, not stale, so a real outage rather than a dead probe), `epa_ok` was **false**, and **23 of
+50 responses carried `epa.ok: false`**. `dev_refresh_collect()` refuses a row when
+**(EPA unhealthy OR the row is fresher than 7 days) AND new facilities = 0 AND cached facilities > 0**.
+Every KY row had been refreshed at 13:15 that day, so the freshness branch was true regardless.
+
+Measured before writing, which is the only way to know: **50 responses · 45 carried KYTC records ·
+26 wrote · 19 carried records but were blocked.** All 25 still-dark pages have `fac_before > 0`,
+and **all 25 kept their facility counts unchanged** — proof the guard *refused* the write rather
+than overwriting with a transient zero. Five of the 25 (40461, 41007, 42206, 42356, 42378) are the
+genuinely sourceless ZIPs predicted in the coverage probe.
+
+**Self-healing: the daily cron retries.** No manual step is required, and the guard must not be
+relaxed to force them through — it is a §12 stop, and it is the same mechanism holding the Idaho,
+Wyoming and Montana remainders.
+
+⚠️ **Scratch tables `public.ky_syp_probe` and `public.ky_rollout` were DROPPED** after verifying
+nothing was lost: the probe table's `req_id`s pointed at `net._http_response` rows already past
+their **6-hour retention**, and every blocked row still carries its original `counts.facilities`,
+so the pre-rollout baseline is recoverable from production itself.
