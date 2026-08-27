@@ -1,0 +1,57 @@
+[
+  { "id": "oakland-socrata-permit",
+    "url": "https://api.us.socrata.com/api/catalog/v1?domains=data.oaklandca.gov&q=permit&limit=100",
+    "extract": "\"resultSetSize\":\\s*\\d+|\"name\"\\s*:\\s*\"[^\"]*(?i:permit|building|planning|construction)[^\"]*\"",
+    "extract_context": 120, "extract_max": 40 },
+
+  { "id": "oakland-socrata-ALL-denominator",
+    "url": "https://api.us.socrata.com/api/catalog/v1?domains=data.oaklandca.gov&only=dataset&limit=1",
+    "print_chars": 400 },
+
+  { "id": "berkeley-socrata-permit",
+    "url": "https://api.us.socrata.com/api/catalog/v1?domains=data.cityofberkeley.info&q=permit&limit=100",
+    "extract": "\"resultSetSize\":\\s*\\d+|\"name\"\\s*:\\s*\"[^\"]*(?i:permit|building|planning|construction)[^\"]*\"",
+    "extract_context": 120, "extract_max": 40 },
+
+  { "id": "berkeley-socrata-ALL-denominator",
+    "url": "https://api.us.socrata.com/api/catalog/v1?domains=data.cityofberkeley.info&only=dataset&limit=1",
+    "print_chars": 400 },
+
+  { "id": "oakland-arcgis-root",
+    "url": "https://services.arcgis.com/wt5vnQ9OjRHYXCUW/ArcGIS/rest/services?f=json",
+    "extract": "\"name\"\\s*:\\s*\"[^\"]+\"", "extract_context": 40, "extract_max": 60 },
+
+  { "id": "oakland-hub-dcat",
+    "url": "https://data.oaklandca.gov/api/dcat.us.rdf?limit=400",
+    "extract": "(?i)permit|planning application|building",
+    "extract_context": 200, "extract_max": 25 },
+
+  { "id": "berkeley-arcgis-search",
+    "url": "https://www.arcgis.com/sharing/rest/search?q=Berkeley%20permit&f=json&num=50",
+    "extract": "\"title\"\\s*:\\s*\"[^\"]+\"|\"owner\"\\s*:\\s*\"[^\"]+\"|\"total\"\\s*:\\s*\\d+",
+    "extract_context": 60, "extract_max": 50 },
+
+  { "id": "alameda-county-arcgis-root",
+    "url": "https://services5.arcgis.com/ROBnTHSNjoZ2Wm1P/ArcGIS/rest/services?f=json",
+    "extract": "\"name\"\\s*:\\s*\"[^\"]+\"", "extract_context": 40, "extract_max": 60 },
+
+  { "id": "alameda-county-dcat",
+    "url": "https://data.acgov.org/api/dcat.us.rdf?limit=400",
+    "extract": "(?i)permit|planning|building",
+    "extract_context": 200, "extract_max": 25 },
+
+  { "id": "fremont-arcgis-search",
+    "url": "https://www.arcgis.com/sharing/rest/search?q=Fremont%20California%20permit&f=json&num=50",
+    "extract": "\"title\"\\s*:\\s*\"[^\"]+\"|\"owner\"\\s*:\\s*\"[^\"]+\"|\"total\"\\s*:\\s*\\d+",
+    "extract_context": 60, "extract_max": 50 },
+
+  { "id": "hayward-open-data",
+    "url": "https://openhayward.hayward-ca.gov/api/dcat.us.rdf?limit=400",
+    "extract": "(?i)permit|planning|building",
+    "extract_context": 200, "extract_max": 25 },
+
+  { "id": "sanleandro-arcgis-search",
+    "url": "https://www.arcgis.com/sharing/rest/search?q=%22San%20Leandro%22%20permit&f=json&num=50",
+    "extract": "\"title\"\\s*:\\s*\"[^\"]+\"|\"owner\"\\s*:\\s*\"[^\"]+\"|\"total\"\\s*:\\s*\\d+",
+    "extract_context": 60, "extract_max": 50 }
+]
