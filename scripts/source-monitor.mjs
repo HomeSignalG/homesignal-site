@@ -538,22 +538,43 @@ async function walkCkan(target, findings) {
 
 // ---------------------------------------------------------------- dev-backed snapshot
 
+// EXACT dev-backed ZIP coverage, via the server-side RPC.
+//
+// ⚠️ THIS REPLACED A SILENTLY-TRUNCATING WALK, and the failure is worth keeping in view.
+// The previous implementation paged app_projects over PostgREST with
+// `limit=1000&offset=page*1000` under `for (let page = 0; page < 100; page++)` — a HARD
+// CAP AT 100,000 ROWS against a 3,092,322-row table. Its early exit (`rows.length < 1000`)
+// could never fire, so it truncated at ~3% on EVERY run and reported the partial result
+// with no indication it was partial. It also passed NO `order=`, so PostgREST returned an
+// unstable slice and the distinct-ZIP count depended on which arbitrary 100k rows it saw.
+//
+// Measured effect: the headline metric wandered 472 / 478 / 477 / 3154 / 480 / 3501 /
+// 3444 / 478 across consecutive nights with no production change. The true value was
+// 10,039. Under-reported by ~21x, and — the part that actually mattered — a REAL collapse
+// of dev-backed pages would have looked exactly like the nightly noise, so the alarm was
+// unbelievable in both directions.
+//
+// app_dev_backed_zip_count() does a loose index scan over (zip, record_kind, …): ~12k
+// index seeks instead of 3M row reads. A plain count(distinct zip) here exceeds a 60s
+// statement timeout, which is why this is an RPC and not a query.
+//
+// FAILS CLOSED: any error returns null, and the report prints 'unavailable' rather than a
+// number. A missing measurement must never be mistaken for a small one.
 async function devBackedSnapshot() {
   try {
     const cfg = readFileSync(`${ROOT}/config.js`, 'utf8');
     const grab = (n) => (cfg.match(new RegExp(`${n}\\s*:\\s*'([^']+)'`)) || [])[1];
     const base = grab('SUPABASE_URL'), key = grab('SUPABASE_ANON_KEY');
     if (!base || !key) return null;
-    const zips = new Set();
-    for (let page = 0; page < 100; page++) {
-      const r = await fetch(`${base}/rest/v1/app_projects?select=zip&record_kind=eq.development&limit=1000&offset=${page * 1000}`,
-        { headers: { apikey: key, Authorization: `Bearer ${key}` } });
-      if (!r.ok) return null;
-      const rows = await r.json();
-      rows.forEach((x) => zips.add(x.zip));
-      if (rows.length < 1000) break;
-    }
-    return zips.size;
+    const r = await fetch(`${base}/rest/v1/rpc/app_dev_backed_zip_count`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const n = j?.dev_backed_zips;
+    return Number.isInteger(n) ? n : null;
   } catch { return null; }
 }
 
@@ -899,7 +920,13 @@ const mappingGaps = whitelistMappingGaps(
 const snapshot = await devBackedSnapshot();
 let prevSnapshot = null;
 if (existsSync(REPORT_PATH)) {
-  const prev = readFileSync(REPORT_PATH, 'utf8').match(/Dev-backed ZIPs snapshot: \*\*(\d+)\*\*/g);
+  // MATCHES THE NEW LABEL ONLY, deliberately. Every "Dev-backed ZIPs snapshot" value in
+  // the history above was produced by the truncated walk and is not comparable to an exact
+  // count — comparing across the fix would print a ~+9,500 delta that looks like an
+  // overnight explosion and is really just the instrument being repaired. The first run
+  // after this change therefore shows no delta, and every run after it compares like
+  // with like.
+  const prev = readFileSync(REPORT_PATH, 'utf8').match(/Dev-backed ZIP pages \(exact\): \*\*(\d+)\*\*/g);
   if (prev?.length) prevSnapshot = parseInt(prev[prev.length - 1].match(/(\d+)/)[1], 10);
 }
 const flagged = findings.filter((f) => f.result === 'flag');
@@ -910,7 +937,7 @@ const section = [
   `- Sources re-probed: **${targets.reprobe.length}** · discovery targets walked: **${targets.discovery.length}** · candidates evaluated: **${findings.length}**`,
   `- Auto-wired: ${wired.length ? wired.map((w) => `**${w}**`).join(', ') : '**none**'}`,
   `- Flagged new shapes (connector work needed — never guessed): **${flagged.length}**`,
-  `- Dev-backed ZIPs snapshot: **${snapshot ?? 'unavailable'}**${prevSnapshot != null && snapshot != null ? ` (Δ ${snapshot - prevSnapshot >= 0 ? '+' : ''}${snapshot - prevSnapshot} vs last run)` : ''}`,
+  `- Dev-backed ZIP pages (exact): **${snapshot ?? 'unavailable'}**${prevSnapshot != null && snapshot != null ? ` (Δ ${snapshot - prevSnapshot >= 0 ? '+' : ''}${snapshot - prevSnapshot} vs last run)` : ''}`,
   wired.length ? `- Newly wired entries land on pages after the next engine deploy + nightly refresh (09:00 UTC); the NEXT run's snapshot shows their delta.` : null,
   ``,
   `| target | result | evidence |`,
