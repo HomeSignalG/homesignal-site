@@ -214,5 +214,48 @@ ok(frsRadii(3).join(',') === '3,2,1.5,1,0.5,0.25', '11. frsRadii(3) is the docum
 ok(frsRadii(1).join(',') === '1,0.5,0.25', '11b. a smaller request never widens the search',
   frsRadii(1).join(','));
 
+// ── 12. THE CONCURRENCY UNDERCOUNT — a TRANSIENT failure must never shrink the search area ────
+// Found in production 2026-08-27. The nightly refresh fires 250 ZIPs at once; FRS then refuses
+// transiently at the wide radii, the ladder walked down to a tiny circle, and that circle
+// answered — ok:true, radius 0.25, a real but far smaller count. No guard could tell it from the
+// truth: `epa.ok` was true, and dev_refresh_collect only refuses a ZERO. Measured on ZIP 92867
+// minutes apart: 40 facilities (radius 1, alone) vs 5 (radius 0.25, in a batch of 6).
+//
+// Distinct from case 10 (EVERY rung fails) and case 9 (a transient that clears on retry). The
+// shape here is: transient exhaustion high on the ladder, then SUCCESS lower down.
+{
+  // 3 / 2 / 1.5 refuse transiently forever; 1 would happily answer with a smaller circle.
+  const f = recorder((rad) => (rad >= 1.5 ? res(503, 'busy') : res(200, body([FACILITY]))));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === false,
+    '12. transient exhaustion at a radius → ok:FALSE, never a smaller-radius "success"',
+    `got ok=${out.ok} radius=${out.radius_used} rows=${out.rows.length}`);
+  ok(out.radius_used === null && out.rows.length === 0,
+    '12b. the degraded outcome names no radius and carries no rows');
+  ok(out.reason === 'transient', '12c. the reason is reported as transient', `got ${out.reason}`);
+  // The load-bearing assertion: the ladder STOPPED at the first rung that exhausted. It never
+  // asked ANY smaller radius — not 2, not 1.5, and above all not the 1 that would have answered.
+  ok(f.seen.every((r) => r === 3),
+    '12d. INVARIANT: a transient never shrinks the area — only the requested radius was ever asked',
+    `radii requested: ${f.seen.join(',')}`);
+  ok(out.attempts === 3, '12e. 3 retries at the requested radius, then stop — not 6 ladder rungs',
+    `got ${out.attempts}`);
+}
+
+// ── 13. the DENSITY back-off is untouched — process-limit still shrinks, as designed ──────────
+// The counterpart to 12, and the reason this fix is narrow: Midtown Manhattan legitimately
+// answers only at a tiny radius because FRS's process limit is density-driven. 10169 returned 23
+// facilities at radius 0.25 both alone and under load. A rule that refused every small radius
+// would erase real data on exactly the densest pages.
+{
+  const f = recorder((rad) => (rad > 0.25 ? res(200, PROCESS_LIMIT) : res(200, body([FACILITY]))));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === true && out.radius_used === 0.25,
+    '13. process-limit refusals still walk the ladder down to a real answer',
+    `got ok=${out.ok} radius=${out.radius_used}`);
+  ok(out.attempts === 6, '13b. one attempt per rung — a process limit is never retried',
+    `got ${out.attempts}`);
+}
+
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll EPA result-semantics checks passed');
 process.exit(fails ? 1 : 0);

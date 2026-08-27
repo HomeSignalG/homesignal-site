@@ -107,12 +107,25 @@ export async function frsFacilities(
   let reason: "process_limit" | "transient" | null = null;
   let attempts = 0;
   for (const rad of frsRadii(radiusMi)) {
+    let transientExhausted = false;
     for (let attempt = 0; attempt < 3; attempt++) {
       attempts++;
       const { ok, tooBig, rows } = await frsAt(lat, lng, rad, fetchImpl);
       if (ok) return { ok: true, rows, radius_used: rad, reason: null, attempts };
       if (tooBig) { reason = "process_limit"; break; } // too large → next smaller radius
       reason = "transient";                            // else transient → retry the same radius
+      transientExhausted = attempt === 2;              // ...but only at THIS radius (see below)
+    }
+    // A TRANSIENT failure MUST NOT SHRINK THE SEARCH AREA. Falling through to the next, smaller
+    // radius here is what silently undercounted EPA facilities fleet-wide (2026-08-27): under
+    // load FRS refuses transiently at every rung, the ladder walks down to 0.25 mi, and that tiny
+    // circle finally answers — returning ok:true with a real but far smaller number that no guard
+    // can distinguish from the truth. Measured on ZIP 92867, minutes apart: 40 facilities at
+    // radius 1 fired alone, 5 at radius 0.25 fired in a batch of 6; identical development counts.
+    // "No answer at the radius we asked for" is the honest outcome, and ok:false preserves the
+    // page's last-known-good instead of overwriting it with a smaller truth.
+    if (transientExhausted) {
+      return { ok: false, rows: [], radius_used: null, reason: "transient", attempts };
     }
   }
   // Every radius and every retry failed. This is NOT zero facilities — it is no answer.
