@@ -10771,3 +10771,83 @@ two bound characters as literals it had been mangled so the range **started at U
 hyphen** — re-escaping **every hyphen in the file**. Build it from pure ASCII instead —
 `new RegExp('[\\u0080-\\uffff]', 'g')` — and **assert deletions === 0 before committing**, which
 is what caught it.
+
+### 🚀 DEPLOYED + ROLLED OUT 2026-08-27 — NC 126 → 161 lit, 44 → 9 dark, and every remaining dark page is an HONEST EMPTY
+
+Deployed `get-address-report` from `main@e730da1` — the merge commit itself, not a later tip
+(run 33079005178, deploy step green at 13:51:42Z). That is worth stating because the KY deploy a
+day earlier had to run on `2c9199a` after `main` advanced under it and needed reconciling before
+its receipts could be trusted. Here the ref and the merge commit are the same object.
+
+**Baseline, taken BEFORE any NCDOT record could land:** 170 NC cached pages · **126 lit · 44
+dark**, concentrated exactly where the PR predicted — Chatham 12, Buncombe 11, Union 9, Orange 7,
+Mecklenburg 2, Wake 2, New Hanover 1.
+
+**Live smoke, nothing persisted** (6 ZIPs through the deployed engine, all HTTP 200): 27231 Orange,
+28031 Mecklenburg, 28079 Union, 28701 Buncombe, 27207 Chatham, plus the cross-border control
+**29715 Fort Mill SC**, ~2 mi from the Mecklenburg line.
+
+| zip | ncdot-stip records | other sources |
+|---|---|---|
+| 28031 Mecklenburg | 16 lines + 2 points | 11 EPA |
+| 28079 Union | 12 lines + 6 points | 53 EPA |
+| 28701 Buncombe | 1 line + 2 points | 22 EPA |
+| 27231 Orange | 1 line | 29 EPA |
+| 27207 Chatham | **0** | 33 EPA |
+| **29715 SC (control)** | **0** | 55 EPA + **27 `scdot-project-viewer-lines`** |
+
+The control is the half that carries the proof. 29715 is **not empty** — it returns 27 SCDOT
+records — so its zero NCDOT records is the gate discriminating, not a blank page that would have
+scored the same either way. Cache-wide the same fact holds at scale: of every page carrying an
+`ncdot-stip-*` record, **`count(distinct state) = 1`, and that state is NC**.
+
+**Invariants across all 195 cached NCDOT records on 35 pages:** 0 missing `record_url` · 0 missing
+coordinates · 0 non-`point` scope · 0 unclassified · 0 outside the `proposed` bucket · **0 pins
+outside NC** (lat 35.06–36.21, lng −82.60 to −79.22, Buncombe in the west to Orange in the east).
+Two `use_type` values present — `Civic/Public` and `Utility` — so the shared `type_map` resolves in
+production rather than defaulting.
+
+#### ⚠️ THE `yields_to` HOOK IS **NOT** PRODUCTION-PROVEN BY THIS ROLLOUT — and the zero that looks like proof is empty
+
+Querying for a TIP carried by BOTH entries on the same page returns **0**. That is not evidence.
+The control says why: across the cached corpus, **`tips_under_both_entries_anywhere = 0` over 93
+distinct TIPs** — no TIP appears under both entries *anywhere*, so there was never an overlap for
+the hook to resolve. A dedup query run against a corpus with no duplicates returns zero whether the
+dedup works or not.
+
+The measured statewide overlap is **12 of 3,051 (~0.4%)**, so a 195-record sample containing none is
+the expected outcome, not a surprise. What *was* verified is that the detector itself fires: an
+injected known-duplicate returns 1 through the same query shape. **`yields_to` remains pinned by
+`test/yields-hook.test.mjs` offline only.** Re-check this once NC coverage grows; do not upgrade it
+to "verified in production" on the strength of a zero.
+
+#### The 9 remaining dark pages are HONEST EMPTIES, not blocked writes — and that was checked, not assumed
+
+The KY rollout left 20 pages held by the FRS facilities guard, so the same failure mode was tested
+for explicitly: each dark page's own response was re-read for `epa.ok` and for how many NCDOT
+records the engine actually returned.
+
+**All 9 returned `epa.ok: true` and `0` NCDOT records** — Chatham 27207 · 27208 · 27213 · 27298 ·
+27355, Buncombe 28709 · 28753, Orange 27541, Union 28112. There is simply no STIP project within
+3 mi of those centroids. **Zero FRS-guard blocks this time.**
+
+One page shows the guard's signature and is worth naming so it is not misread later: **27541 cached
+1 facility, response 0**, so the write was refused exactly as designed. It carried no NCDOT records
+either way, so the guard changed nothing about its lit/dark status. The guard was not touched — it
+is a §12 stop.
+
+#### Environment notes — the same two hazards as the KY rollout, both hit again
+
+- **pg_net stalled three times** mid-rollout (queue frozen at 16, then 24, then 20 while `max_id`
+  did not move). `net.worker_restart()` cleared each, but **not instantly** — the third took
+  several minutes to take effect, and a restart that appears not to have worked has usually just
+  not landed yet. Firing was paced in batches of 8 across separate calls against the edge runtime's
+  12 req/min limit; **0 non-200 across all 44**, versus the 25 BOOT_ERROR 503s the KY rollout
+  produced by firing 51 at once.
+- **`pg_sleep` in the same statement as the counters reports PRE-SLEEP state.** `select pg_sleep(25),
+  (select count(*) …)` returned the counts from the statement's own snapshot, which reads as "nothing
+  progressed" when the queue was in fact draining. Poll in a **separate call**, never after a sleep
+  in the same statement.
+
+Scratch table `nc_rollout_worklist` dropped after confirming all 44 rows had fired and every ZIP is
+recoverable from `development_reports` (0 zips absent from the cache).
