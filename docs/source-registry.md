@@ -11084,7 +11084,51 @@ Re-fire any ZIP whose count dropped, at concurrency ≤ 4 (measured safe here: `
 3–7 attempts), and only then collect. Every page in this rollout ended at a facility count **equal
 to or greater than** its cached value; that was achieved by re-firing, not by luck.
 
-🔭 **Logged, NOT done:** the nightly `dev_refresh_tick` fires in batches and is exposed to exactly
-this, so facility counts may already have been silently reduced fleet-wide. Measuring that, and
-tightening the guard from "refuse a zero" to "refuse an unexplained decrease", is a separate change
-— it alters a shipped guard, so it is recorded here rather than bundled into a data rollout.
+#### 🔴 IT IS ALREADY HAPPENING IN PRODUCTION — MEASURED, not inferred (2026-08-27)
+
+`cron.job` 14 `dev-reports-rolling-refresh` runs `dev_refresh_tick()` **every 15 minutes**, and
+`dev_refresh_tick(_batch integer DEFAULT 250, …)` → `dev_refresh_fire_batch` fires **250 ZIPs
+concurrently**. That is 60× the concurrency at which 92867 collapsed 40 → 5.
+
+Radius distribution over the tick's OWN responses, last 3 hours (2,905 responses; the total is
+quoted so a small degraded count cannot read as "clean"):
+
+| `radius_used` | responses | facilities returned |
+|---|--:|--:|
+| (null / failed) | **1,650** | 0 |
+| 3 (full) | 424 | 6,085 |
+| 2 | 131 | 1,606 |
+| 1.5 | 160 | 821 |
+| 1 | 206 | 1,163 |
+| 0.5 | 152 | 201 |
+| 0.25 | 182 | 72 |
+
+**Only 424 of 2,905 (15%) got the full 3-mi radius.** The 1,650 zeros are mostly refused by the
+existing guard — that part works. The danger is the degraded-but-nonzero band, which writes
+straight through: **87 pages currently store a facility count taken at a sub-mile radius**, in a
+3-hour window alone.
+
+Four of those were re-fired at concurrency 4 and compared against what was stored:
+
+| zip | stored (throttled) | true (re-fired) | radius then → now |
+|---|--:|--:|---|
+| 78729 Austin TX | 3 | **35** | 0.25 → 3 |
+| 11566 Merrick NY | 4 | **18** | 0.25 → 1.5 |
+| 46149 Lizton IN | 5 | **10** | 0.25 → 3 |
+| 10169 Manhattan NY | 23 | 23 | 0.25 → 0.25 |
+
+Understated by **2× to 11.7×** on three of four. All four re-collected at their true values.
+
+⚠️ **10169 is the control that stops this becoming a bad rule: a SMALL RADIUS IS NOT BY ITSELF
+EVIDENCE OF THROTTLING.** Midtown Manhattan legitimately shrinks to 0.25 mi because FRS's process
+limit is *density*-driven — that is the v13 back-off doing its job. The discriminator is whether
+re-firing at low concurrency returns a **larger** radius, not the radius value alone.
+
+🛑 **THE FIX IS AN ENGINE CHANGE AND IS NOT TAKEN HERE.** Three candidates, none of them free:
+lowering `_batch` would push a full-fleet cycle from ~13 hours to ~33 days (not viable);
+tightening the collect guard to refuse any unexplained *decrease* would freeze pages at stale
+inflated counts, since — unlike a retired source — a genuinely closed facility has no `explained`
+path; the real repair is bounding FRS concurrency (or retrying at the original radius on a
+throttle) inside `get-address-report`'s `frsFacilities()`. That is a shipped-guard/engine change
+with a real behavioural surface, so it is recorded with receipts for the founder rather than
+bundled into a data rollout.
