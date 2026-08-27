@@ -10945,3 +10945,85 @@ correct as they stand — empty is valid, fabricated is a defect.
 - **Berkeley** — `Planning/Building_Safety` layer 3 needs (a) `LASTISSUEDATE` to advance past
   2015 and (b) a published codebook for `PERMITSTATUS` / `BUILDINGPERMITTYPE`. Both are required;
   either alone still fails.
+
+## CA MUNICIPAL-TIER PASS #2 — ORANGE (2026-08-27): one candidate, and it needs a FOUNDER CALL
+
+Second municipal-tier pass. **Nothing wired. No registry change.**
+
+**Scope note that matters:** the 2026-08-05 CA pass stamped Orange `candidates_exhausted`, but
+every probe it ran was **county tier** — an AGO title search, the OC org (`UXmFoWC7yDHcDN5Q`)
+scoped to `permits` and to `development`, and two dead county hosts. **No city was probed.** That
+stamp was never evidence about the municipal tier.
+
+**Shape of the problem:** 85 dark of 92 pages, but spread across **46 places**, most at 1–2 pages.
+The top seven hold 38: Irvine 10 · Santa Ana 6 · Garden Grove 5 · Orange 5 · Fullerton 4 ·
+Huntington Beach 4 · Newport Beach 4. Anaheim appears nowhere in the dark list — `anaheim-land-use-cases`
+already lights all 7 of Orange's lit pages, so the city tier is proven viable here.
+
+### ⚠️ `GISOrangeCity` IS ORANGE CITY, **FLORIDA** — a cross-STATE owner-name trap
+
+The AGO account whose name reads exactly like our target owns *"Septic To Sewer, Orange City
+Florida"*, *"OC Septic to Sewer Future Property Connections"* and *"Orange City Pipe Rehabilitation
+Projects"*. It is **not** the City of Orange, CA. The real one is
+`jmcpherson@cityoforange.org_cityoforange` — identified by the **email domain in the owner string**,
+not by the display name. Same family as the Kent DE/RI and Midland TX misses: **verify a city
+account by its domain, never by a name that matches.**
+
+Also worth keeping: an unscoped AGO search for a city name is **mostly universities**. "Irvine"
+returned 161 items dominated by `_ucirvine`, `_CSULB`, `_USCSSI`, `_UPenn`, `_ucsc`. The
+denominators were healthy everywhere (12–273) — the noise is in *who owns the results*, so filter
+by owner before reading titles.
+
+### The seven cities, each with a non-zero denominator
+
+| city | dark | AGO total | what the CITY-OWNED accounts actually publish | verdict |
+|---|---|---|---|---|
+| **Irvine** | 10 | 161 | `Land_Districts`, `PlanningAreas_Districts`, `COI open space`, Sycamore pest infestation, 5G cellular sites | **no permit/project layer** |
+| **Santa Ana** | 6 | 273 | zoning classifications, redistricting wards ×5, neighborhood associations, general plan, focus areas; *Major Development Activity Report* is a **StoryMap** | no per-record layer |
+| **Garden Grove** | 5 | 12 | **no city-owned account in the result set at all** | nothing to probe |
+| **Orange** | 5 | 20 | **`Active Planning Projects view` — a real Feature Service** | see below |
+| **Fullerton** | 4 | 53 | *Major Development Activity* is a **Map Tour** — hand-authored `name`/`description` + Flickr `pic_url`, a storytelling app | not a data layer |
+| **Huntington Beach** | 4 | 39 | *Community Development Major Projects Map* is a web map whose data is an **embedded `featureCollection`** (`CD_MajorProjects_shapefile_4940`) — an uploaded shapefile, **no service URL** | not fetchable |
+| **Newport Beach** | 4 | 19 | `PermitJurisdictionAgency` is a jurisdiction-boundary layer; parks + community associations dashboards | wrong record class |
+
+⚠️ **New standing answer: a web map is not a data source until you have walked it.** Both HB and
+Fullerton *looked* like finds from their titles — "Major Projects Map", "Major Development
+Activity". Walking `sharing/rest/content/items/<id>/data` showed both carry `featureCollection`
+layers with the features **embedded in the web-map JSON**, so there is no REST endpoint for the
+connector to page. The Frisco walk-the-app precedent recovers a service *when one exists*; here it
+proves one does not.
+
+### `city-of-orange-active-planning-projects` — WIREABLE, but a founder call on VALUE
+
+`https://services5.arcgis.com/HsWup310bJE1lcGa/arcgis/rest/services/Active_Planning_Projects_view/FeatureServer/0`
+
+- **177 rows**, `esriGeometryPoint`, wkid 102646 / latestWkid 2230 (CA State Plane — the connector
+  requests `outSR=4326`, the CTDOT precedent).
+- **Fresh**: newest `CreatedDate` **2026-05-20**. This is an *active projects* layer, so a
+  three-month-old newest row is normal rather than the Ventura/Berkeley stall pattern.
+- `CreatedDate` is an `esriFieldTypeString` in `yyyy-mm-dd`, so recency rides in `extra_where` as
+  a **string compare** — never `recency_days`' `DATE` literal (the Anaheim standing answer). That
+  format string-compares correctly.
+- `PermitType` values are all **self-describing** — Planning Application 141 · Conditional Use
+  Permit 6 · Site Plan 5 · Design Review 3 · Environmental Review 2 · Administrative Design Review
+  1 · **blank 17**. ⚠️ **This vocabulary is INCOMPLETE as recorded** — the groupBy body truncated
+  at 175 of 177, so ~1 value is unseen. It must be re-enumerated to exhaustion before any wire.
+- No status column → `status_const` (Detroit / Cleveland / Nashville precedent).
+- No per-record URL column → dataset precision on the city's planning portal (Boston / Philadelphia
+  / SLO precedent).
+
+**🛑 THE BLOCKER IS NOT TECHNICAL — IT IS WHAT A RESIDENT WOULD SEE.** The layer carries **four
+fields**: `OBJECTID`, `PermitType`, `CreatedDate`, `GlobalID`. There is **no title, no address, no
+case number, no description, no valuation**. So every rendered pin's label would be its
+`PermitType` — and **141 of 177 rows carry the identical string "Planning Application"**. Five ZIP
+pages would gain ~141 identical unlabelled pins plus 17 that fail closed on a blank type.
+
+That is a change to what residents see, which the autonomy grant gates. It is recorded and **not
+wired**. The founder's call is whether ~141 same-labelled, address-less points are worth 5 pages
+coming off the facilities floor, or whether an honest empty is the better page.
+
+### Verdict
+
+**Orange's municipal tier is exhausted except for the one held candidate.** 80 of its 85 dark pages
+have no wireable first-party per-record source at any tier; the remaining 5 depend on the founder
+call above. Pages ship on the EPA facilities floor and are correct as they stand.
