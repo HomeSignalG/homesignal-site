@@ -1,0 +1,43 @@
+[
+  { "id": "irvine-ago",
+    "url": "https://www.arcgis.com/sharing/rest/search?q=Irvine%20AND%20(permit%20OR%20planning)&f=json&num=40",
+    "extract": "\"total\"\\s*:\\s*\\d+|\"title\"\\s*:\\s*\"[^\"]{0,70}\"", "extract_context": 0, "extract_max": 45 },
+  { "id": "irvine-host",
+    "url": "https://gis.cityofirvine.org/arcgis/rest/services?f=json", "print_chars": 900 },
+
+  { "id": "santaana-ago",
+    "url": "https://www.arcgis.com/sharing/rest/search?q=%22Santa%20Ana%22%20AND%20(permit%20OR%20planning)&f=json&num=40",
+    "extract": "\"total\"\\s*:\\s*\\d+|\"title\"\\s*:\\s*\"[^\"]{0,70}\"", "extract_context": 0, "extract_max": 45 },
+  { "id": "santaana-host",
+    "url": "https://gis.santa-ana.org/arcgis/rest/services?f=json", "print_chars": 900 },
+
+  { "id": "gardengrove-ago",
+    "url": "https://www.arcgis.com/sharing/rest/search?q=%22Garden%20Grove%22%20AND%20(permit%20OR%20planning)&f=json&num=40",
+    "extract": "\"total\"\\s*:\\s*\\d+|\"title\"\\s*:\\s*\"[^\"]{0,70}\"", "extract_context": 0, "extract_max": 45 },
+  { "id": "gardengrove-host",
+    "url": "https://gis.ggcity.org/arcgis/rest/services?f=json", "print_chars": 900 },
+
+  { "id": "orangecity-ago",
+    "url": "https://www.arcgis.com/sharing/rest/search?q=%22City%20of%20Orange%22%20AND%20(permit%20OR%20planning)&f=json&num=40",
+    "extract": "\"total\"\\s*:\\s*\\d+|\"title\"\\s*:\\s*\"[^\"]{0,70}\"", "extract_context": 0, "extract_max": 45 },
+
+  { "id": "huntingtonbeach-ago",
+    "url": "https://www.arcgis.com/sharing/rest/search?q=%22Huntington%20Beach%22%20AND%20(permit%20OR%20planning)&f=json&num=40",
+    "extract": "\"total\"\\s*:\\s*\\d+|\"title\"\\s*:\\s*\"[^\"]{0,70}\"", "extract_context": 0, "extract_max": 45 },
+  { "id": "huntingtonbeach-host",
+    "url": "https://gisservices.surfcity-hb.org/arcgis/rest/services?f=json", "print_chars": 900 },
+
+  { "id": "newportbeach-ago",
+    "url": "https://www.arcgis.com/sharing/rest/search?q=%22Newport%20Beach%22%20AND%20(permit%20OR%20planning)&f=json&num=40",
+    "extract": "\"total\"\\s*:\\s*\\d+|\"title\"\\s*:\\s*\"[^\"]{0,70}\"", "extract_context": 0, "extract_max": 45 },
+  { "id": "newportbeach-host",
+    "url": "https://gis.newportbeachca.gov/arcgis/rest/services?f=json", "print_chars": 900 },
+
+  { "id": "fullerton-ago",
+    "url": "https://www.arcgis.com/sharing/rest/search?q=Fullerton%20AND%20(permit%20OR%20planning)&f=json&num=40",
+    "extract": "\"total\"\\s*:\\s*\\d+|\"title\"\\s*:\\s*\"[^\"]{0,70}\"", "extract_context": 0, "extract_max": 45 },
+
+  { "id": "OC-COUNTY-recheck-permits",
+    "url": "https://www.arcgis.com/sharing/rest/search?q=orgid%3AUXmFoWC7yDHcDN5Q%20AND%20permit&f=json&num=40",
+    "extract": "\"total\"\\s*:\\s*\\d+|\"title\"\\s*:\\s*\"[^\"]{0,70}\"", "extract_context": 0, "extract_max": 45 }
+]
