@@ -11018,12 +11018,73 @@ case number, no description, no valuation**. So every rendered pin's label would
 `PermitType` — and **141 of 177 rows carry the identical string "Planning Application"**. Five ZIP
 pages would gain ~141 identical unlabelled pins plus 17 that fail closed on a blank type.
 
-That is a change to what residents see, which the autonomy grant gates. It is recorded and **not
-wired**. The founder's call is whether ~141 same-labelled, address-less points are worth 5 pages
-coming off the facilities floor, or whether an honest empty is the better page.
+That is a change to what residents see, which the autonomy grant gates. ⚖️ **RESOLVED — the founder
+ruled 2026-08-27: _"donot wait on e. your instruction is to coplete all zip codepages."_ The hold
+above is SUPERSEDED; the source is WIRED and rolled out.** Kept as the dated record of why it was
+held, not as a live gate.
 
-### Verdict
+### Verdict — WIRED AND ROLLED OUT (2026-08-27)
 
-**Orange's municipal tier is exhausted except for the one held candidate.** 80 of its 85 dark pages
-have no wireable first-party per-record source at any tier; the remaining 5 depend on the founder
-call above. Pages ship on the EPA facilities floor and are correct as they stand.
+Wired in PR #951 (merge `f734652`), deployed from `main` on that commit. **Orange County went
+9 → 23 lit pages** (83 → 69 dark); **16 pages carry 921 records**, far past the 5 originally
+scoped — the 3-mi spatial envelope reaches well beyond the City of Orange itself.
+
+| zip | place | recs | zip | place | recs |
+|---|---|--:|---|---|--:|
+| 92861 | Villa Park | 135 | 92869 | Orange | 81 |
+| 92867 | Orange | 122 | 92705 | Santa Ana | 42 |
+| 92866 | Orange | 112 | 92703 | Santa Ana | 22 |
+| 92865 | Orange | 102 | 92870 | Placentia | 8 |
+| 92868 | Orange | 102 | 92843 | Garden Grove | 6 |
+| 92701 | Santa Ana | 90 | 92840 | Garden Grove | 6 |
+| 92706 | Santa Ana | 83 | 92602 | Irvine | 5 |
+| | | | 92780 / 92782 | Tustin | 3 / 2 |
+
+**Invariants across all 921 records, cache-wide:** 0 missing `record_url` · 0 missing coordinates ·
+0 non-`point` scope · 0 unclassified · 0 non-`proposed` · 0 missing `file_date` · 0 pins outside the
+layer extent. `file_date` spans 2023-05-17 → 2026-05-20. **Bidirectional gate proof:** the 16
+carrying pages are 16/16 CA/Orange, **0 outside coverage**, 1 distinct state, 1 distinct county —
+and the control that makes that zero mean something is the 16 non-zero carrying pages themselves.
+
+**Which ZIPs the source can reach was DERIVED, not guessed.** The layer's true extent was read live
+(`returnExtentOnly`, request 77366): x −117.89822..−117.75311, y 33.77662..33.84463, over 177
+features (`returnCountOnly`, 77367). A ZIP is reachable when its 3-mi query envelope overlaps that
+rectangle. 16 dark ZIPs qualified; **92887 (gap 3.02 mi) and 92704 (gap 3.62 mi) were fired as
+NEGATIVE CONTROLS and both returned 0**, confirming the model in the direction that could have
+falsified it. Overlap is necessary but **not sufficient** — 92831 (gap 2.95) and 92832 (gap 2.29)
+overlap and still returned 0, because the envelope corner covers a part of the extent with no
+features. That is an honest empty, not a defect.
+
+### ⚠️ STANDING ANSWER — CONCURRENT ZIP REFRESHES SILENTLY UNDERCOUNT EPA FACILITIES
+
+Found here, and it is **not Orange-specific**. Firing many ZIPs at the edge function at once makes
+FRS throttle; `frsFacilities()` responds by shrinking its search radius (the v13 back-off, working
+as designed), so the report returns a **real but much smaller** facility count. Measured on the same
+ZIP, same day, minutes apart:
+
+| zip | concurrency | `radius_used` | attempts | facilities |
+|---|--:|--:|--:|--:|
+| 92867 | 6 | 0.25 | 15 | **5** |
+| 92867 | 1 | 1 | 4 | **40** |
+| 92865 | 6 | 0.25 | 14 | **5** |
+| 92865 | 2 | 1 | 4 | **40** |
+| 92868 | 6 | 0.25 | 16 | **1** |
+| 92868 | 2 | 1 | 4 | **18** |
+
+Development counts were **identical** across both runs (122 / 102 / 102) — only the EPA side moved.
+
+**Nothing catches this.** `epa.ok` stays `true` (a radius shrink is deterministic, not an error);
+the `epa_frs_probes` health signal read `ok=true` on both targets, 5 minutes fresh, throughout —
+because the probe fires only 2 points and is never itself throttled. And `dev_refresh_collect`'s
+facilities guard only refuses a **zero**, so `18 → 5` writes straight through. A batch refresh can
+therefore quietly delete real EPA facilities from live pages and report success.
+
+**The rule: never collect a batch refresh without diffing new vs cached facilities per ZIP first.**
+Re-fire any ZIP whose count dropped, at concurrency ≤ 4 (measured safe here: `radius_used` 1–1.5,
+3–7 attempts), and only then collect. Every page in this rollout ended at a facility count **equal
+to or greater than** its cached value; that was achieved by re-firing, not by luck.
+
+🔭 **Logged, NOT done:** the nightly `dev_refresh_tick` fires in batches and is exposed to exactly
+this, so facility counts may already have been silently reduced fleet-wide. Measuring that, and
+tightening the guard from "refuse a zero" to "refuse an unexplained decrease", is a separate change
+— it alters a shipped guard, so it is recorded here rather than bundled into a data rollout.
