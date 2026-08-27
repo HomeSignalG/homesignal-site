@@ -141,17 +141,17 @@ const UNCHANGED = [
 
 // ── D. the real registry ─────────────────────────────────────────────────────────────────
 {
-  ok(WHITELISTED.length === 11,
-    `D1 the include_types fleet is the expected 11 entries (${WHITELISTED.length})`,
+  ok(WHITELISTED.length === 12,
+    `D1 the include_types fleet is the expected 12 entries (${WHITELISTED.length})`,
     WHITELISTED.map((e) => e.registry_id).join(', '));
   const applies = WHITELISTED.filter(typeDriftApplies);
   ok(applies.length === WHITELISTED.length,
-    'D2 every whitelisted entry resolves a single type column, so all 11 are checkable',
+    'D2 every whitelisted entry resolves a single type column, so all 12 are checkable',
     WHITELISTED.filter((e) => !typeDriftApplies(e)).map((e) => e.registry_id).join(', '));
 
   const seeded = WHITELISTED.filter(hasBaseline);
-  ok(seeded.length === 9,
-    `D3 9 entries carry a seeded baseline (${seeded.length})`, seeded.map((e) => e.registry_id).join(', '));
+  ok(seeded.length === 10,
+    `D3 10 entries carry a seeded baseline (${seeded.length})`, seeded.map((e) => e.registry_id).join(', '));
   const pending = WHITELISTED.filter((e) => !hasBaseline(e)).map((e) => e.registry_id).sort();
   ok(JSON.stringify(pending) === JSON.stringify(['portland-building-permits', 'san-diego-approved-permits']),
     'D4 …and exactly the two that could not be enumerated are BASELINE NOT ESTABLISHED',

@@ -15134,6 +15134,74 @@
       ],
       "record_url_precision": "dataset",
       "_receipts": "2026-08-26 NC wire. NCDOT's 2026-2035 State Transportation Improvement Program. ORG IDENTITY VERIFIED BY NAME not acronym: the service's own copyrightText is 'NCDOT GIS Unit, NCDOT STIP Unit' and its serviceDescription is 'NCDOT 2026-2035Transportation Improvement Program (STIP) Projects. (geoservice date: 7/16/2025)'. EDGE-REACHABLE 3/3 spaced (14:28:53 / 14:29:40 / 14:31:48 UTC; 200 in 475 / 470 / 503 ms, counts byte-identical every round and matching pg_net exactly). THE WINDOW IS A YEAR WHITELIST FOR A MEASURED REASON: ConstructionYear is esriFieldTypeString carrying years 2009-2035 MIXED WITH 'NOT FUNDED' and 'FUNDED FOR PRELIMINARY ENGINEERING ONLY'. A `>= '2026'` comparison is LEXICAL, and 'N'(78)/'F'(70) both sort above '2'(50), so it ADMITS them. Measured live: whitelist L0 556 / L1 755 vs naive '>=' L0 598 / L1 958 \u2014 L0's +42 is exactly NOT FUNDED 4 + FUNDED FOR PE 38. The whitelist also FAILS CLOSED on any value NCDOT adds later. FOUNDER DECISIONS 2026-08-26: (1) NOT FUNDED (88 rows across both layers) EXCLUDED - the Oregon unfunded-projects precedent. (2) EMPTY ConstructionYear (471 rows, ~15%) FAILS CLOSED, and here is WHY IT IS NOT RECOVERABLE TODAY: the STIP layer carries NO second column that disambiguates them - there is no phase, programming, or lifecycle field, only RightOfWayYear (same free-text problem) and ProjectCost. IF NCDOT EVER EXPOSES A PHASE OR PROGRAMMING FIELD, THOSE 471 BECOME RECLASSIFIABLE. This is fail-closed today, not fail-closed forever; 15% is a big enough loss that someone will want to revisit it, and they should find this reason rather than re-deriving it. (3) FORWARD WINDOW, single entry - past ConstructionYear rows (~1,031, some as old as 2009) are NOT mapped to built/approved, because nothing in this layer evidences that they were built. STATUS IS A CONST, NOT A COLUMN: the layer has no status field at all, and every row surviving the window has a FUTURE construction year, so 'Programmed' asserts nothing unevidenced (the Idaho ITIP / WYDOT shape, not the Kentucky composite). TYPE_MAP: `Mode` enumerated live on both layers, EACH SUMMING EXACTLY to its row count (L0 1,120 = Highway 796 + Rail 193 + Aviation 72 + Transit 27 + Bike & Ped 24 + Ferry 7 + one empty string; L1 1,943 = Highway 1526 + Bike & Ped 390 + Rail 13 + Transit 11 + Aviation 2 + Ferry 1). The single empty-string Mode is deliberately NOT mapped - mapping '' to a use_type would be a guess; it falls to unclassified, honestly. Both entries carry the IDENTICAL type_map so a shared project cannot render as a different use_type depending on which geometry published it. GEOMETRY: layer 0 is esriGeometryMultipoint - handled by featurePoint()'s `points` branch, added 2026-08-05 after lake-county-il-construction-program shipped 77 records with ZERO pins across 27 ZIPs. Verified in code before wiring, not assumed. Layer 1 is polyline (midpoint-of-longest-path). RECORD_URL: no per-record URL column exists on either layer (fields are OBJECTID, TIP, SPOTID, Route, Description, Category, Mode, RightOfWayYear, ConstructionYear, COMMENT, ProjectCost, Symbology, Counties, Divisions, MPOsRPOs), so dataset precision on the service endpoint - templating one would be guessing. REJECTED IN THE SAME PASS WITH RECEIPTS: NCDOTApp_PreConViewer/PreConProjectsViewer - deployed 11/16/2019 and self-described as 'intended to be used in the viewer application only', a SharePoint-backing service rather than a register. The NCDOT_STIP FeatureServer endpoint returns HTTP 500; only the MapServer answers. FOLLOW-UP LOGGED, NOT WIRED: NCDOT_RoadProjects/NCDOT_ActiveConstructionProjects (263 points / 156 lines, joined GdbGisuPub.HICAMS.* layer, keyed on the SAME TIP) is LIVE and FRESH - max ContractActiveDate 2026-08-24, CompletionPercent 0.00-94.99 corroborating its own 'less than 95% complete' definition, ContractStatus a single value ACTIVE summing exactly to 263. It would let a STIP row's status be EVIDENCED rather than programmed. ITS HONEST LIMIT: it resolves the POSITIVE case only - presence promotes a project to under-construction, ABSENCE PROVES NOTHING (>95% complete, never started, or sitting in the Unmapped HiCAMS Contracts table, which NCDOT's own description admits the spatial layers do not cover). It is enrichment, never a substitute for the windowing decision above. STANDING ANSWER BANKED FROM THIS PASS: READ THE DATA'S OWN DATES, NEVER THE ITEM'S - both directions are now receipted. NC's active-construction service carries `pub date: 2/7/2020` in its metadata while its data is fresh to 2026-08-24; New Mexico's Roadway Projects carried a 2025-05-14 `modified` stamp over DateAwarded values of 2018/2019/2022. THIS ENTRY: layer 1 (polyline), 1943 rows unfiltered, 755 inside the forward window; every TIP unique within the layer (returnDistinctValues returned 1943, and the POSITIVE CONTROL proved the parameter is honoured - the same call on Mode returned 7, not 1943)."
+    },
+    {
+      "registry_id": "city-of-orange-active-planning-projects",
+      "platform": "arcgis",
+      "service_url": "https://services5.arcgis.com/HsWup310bJE1lcGa/arcgis/rest/services/Active_Planning_Projects_view/FeatureServer/0",
+      "dataset_url": "https://services5.arcgis.com/HsWup310bJE1lcGa/arcgis/rest/services/Active_Planning_Projects_view/FeatureServer",
+      "jurisdiction": "City of Orange, California",
+      "coverage": [
+        {
+          "state": "CA",
+          "county": "Orange"
+        }
+      ],
+      "column_map": {
+        "title": "PermitType",
+        "type_source": "PermitType",
+        "file_date": "CreatedDate",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "include_types": [
+        "Planning Application",
+        "Conditional Use Permit",
+        "Site Plan",
+        "Design Review",
+        "Environmental Review",
+        "Administrative Design Review",
+        "Tentative Tract Map",
+        "Zone Change"
+      ],
+      "type_map": {
+        "Planning Application": "Development",
+        "Conditional Use Permit": "Development",
+        "Site Plan": "Development",
+        "Design Review": "Development",
+        "Environmental Review": "Development",
+        "Administrative Design Review": "Development",
+        "Tentative Tract Map": "Development",
+        "Zone Change": "Development"
+      },
+      "status_const": "Active planning project",
+      "status_to_bucket": {
+        "proposed": [
+          "Active planning project"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "extra_where": "CreatedDate <> ''",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "observed_types_unreviewed": [],
+      "_receipts": {
+        "probed": "2026-08-27 via pg_net (Postgres egress); the sandbox has no egress",
+        "layer": "177 rows, esriGeometryPoint, wkid 102646 / latestWkid 2230 (CA State Plane) - the connector requests outSR=4326 (CTDOT precedent)",
+        "vocabulary_complete": "PermitType enumerated to EXHAUSTION two agreeing ways - groupBy n ASC and returnDistinctValues, 9 values each. Counts SUM EXACTLY to 177: Planning Application 141, blank 17, Conditional Use Permit 6, Site Plan 5, Design Review 3, Environmental Review 2, Administrative Design Review 1, Tentative Tract Map 1, Zone Change 1. An earlier groupBy body TRUNCATED at 175 and hid Tentative Tract Map and Zone Change - re-enumerated to exhaustion before wiring.",
+        "blank_rows": "The 17 blank-PermitType rows are the SAME 17 rows with no CreatedDate: typed AND dated = 160, dated = 160, blank type = 17, of 177. include_types drops both conditions in one filter; extra_where CreatedDate <> '' is belt-and-braces.",
+        "freshness": "newest CreatedDate 2026-05-20, oldest 2023-05-17. An ACTIVE-projects register, so a three-year span with a recent head is healthy - not the Ventura/Berkeley stall pattern.",
+        "no_recency_window": "deliberately ABSENT. A self-limiting active register of 177 rows, not a historical ledger (Frisco precedent). CreatedDate is esriFieldTypeString, so recency_days' DATE literal would not apply anyway (Anaheim standing answer).",
+        "status_const_why": "the layer has NO status column at all. status_const is self-describing, never an opaque code (Detroit/Cleveland/Nashville precedent).",
+        "type_map_why": "every value maps to the generic 'Development' member of the CLOSED six-value use_type vocabulary (lib/map.js TYPE_EXACT). The layer states no building USE, so inferring Residential from 'Tentative Tract Map' would add specificity the source does not carry. Conservative by design.",
+        "record_url": "dataset precision. No per-record URL column exists. The city's own planning page 403s pg_net with a WAF '$(SERVE_403)' body so it is NOT used - a dataset_url must be one this session actually verified. The service root returns HTTP 200, 4,408 bytes, titled 'Active_Planning_Projects_view (FeatureServer)' - the machine URL (Philadelphia/Boulder precedent).",
+        "KNOWN_THIN": "WARNING - FOUR FIELDS ONLY: OBJECTID, PermitType, CreatedDate, GlobalID. No title, no address, no case number, no description, no valuation. Each pin is labelled by its PermitType and 141 of 177 rows carry the identical string 'Planning Application'. The records are REAL (real point, real date, real self-describing type), so this is thin labelling and NOT fabrication - but a resident sees many identically-named pins. Recorded so a later session does not mistake it for a defect.",
+        "cross_state_trap": "the AGO account 'GISOrangeCity' is Orange City FLORIDA (its own items say 'Septic To Sewer, Orange City Florida'). The real City of Orange CA account is 'jmcpherson@cityoforange.org_cityoforange', identified by the EMAIL DOMAIN in the owner string, never by the matching display name.",
+        "expected_lift": "5 dark Orange County ZIP pages",
+        "geometry": "coordinates come from the feature's OWN point geometry via the connector's flattened __lat/__lng, never a column default. The layer has no lat/lng attribute columns at all. Omitting these emitted records with NO coordinates - caught by test/city-of-orange-connector.test.mjs before any deploy, which is what that test is for."
+      }
     }
   ],
   "ckan": [

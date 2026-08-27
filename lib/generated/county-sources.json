@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. No subject-matter claim is derived.",
-  "registry_entries": 228,
+  "registry_entries": 229,
   "statewide": {
     "AK": [
       {
@@ -517,6 +517,11 @@
       {
         "id": "anaheim-land-use-cases",
         "label": "City of Anaheim",
+        "scope": "city"
+      },
+      {
+        "id": "city-of-orange-active-planning-projects",
+        "label": "City of Orange, California",
         "scope": "city"
       }
     ],
