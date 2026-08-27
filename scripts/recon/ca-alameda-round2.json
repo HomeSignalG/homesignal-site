@@ -1,0 +1,45 @@
+[
+  { "id": "R2-oakland-socrata-COUNT",
+    "url": "https://api.us.socrata.com/api/catalog/v1?domains=data.oaklandca.gov&q=permit&limit=1",
+    "extract": "\"resultSetSize\"\\s*:\\s*\\d+", "extract_context": 5, "extract_max": 2 },
+
+  { "id": "R2-oakland-socrata-DENOMINATOR",
+    "url": "https://api.us.socrata.com/api/catalog/v1?domains=data.oaklandca.gov&only=dataset&limit=1",
+    "extract": "\"resultSetSize\"\\s*:\\s*\\d+", "extract_context": 5, "extract_max": 2 },
+
+  { "id": "R2-oakland-socrata-NAMES",
+    "url": "https://api.us.socrata.com/api/catalog/v1?domains=data.oaklandca.gov&q=permit&limit=60",
+    "extract": "\"name\"\\s*:\\s*\"[^\"]{0,90}\"", "extract_context": 0, "extract_max": 60 },
+
+  { "id": "R2-berkeley-socrata-COUNT",
+    "url": "https://api.us.socrata.com/api/catalog/v1?domains=data.cityofberkeley.info&q=permit&limit=1",
+    "extract": "\"resultSetSize\"\\s*:\\s*\\d+", "extract_context": 5, "extract_max": 2 },
+
+  { "id": "R2-berkeley-socrata-DENOMINATOR",
+    "url": "https://api.us.socrata.com/api/catalog/v1?domains=data.cityofberkeley.info&only=dataset&limit=1",
+    "extract": "\"resultSetSize\"\\s*:\\s*\\d+", "extract_context": 5, "extract_max": 2 },
+
+  { "id": "R2-berkeley-socrata-NAMES",
+    "url": "https://api.us.socrata.com/api/catalog/v1?domains=data.cityofberkeley.info&q=permit&limit=60",
+    "extract": "\"name\"\\s*:\\s*\"[^\"]{0,90}\"", "extract_context": 0, "extract_max": 60 },
+
+  { "id": "R2-oakland-ownGIS-root",
+    "url": "https://services2.arcgis.com/i5nQGujUeSmQZAbW/ArcGIS/rest/services?f=json",
+    "extract": "\"name\"\\s*:\\s*\"[^\"]{0,70}\"", "extract_context": 0, "extract_max": 80 },
+
+  { "id": "R2-oakland-AGO-orgsearch",
+    "url": "https://www.arcgis.com/sharing/rest/community/groups?q=Oakland%20California&f=json&num=1",
+    "print_chars": 300 },
+
+  { "id": "R2-berkeley-ownGIS-root",
+    "url": "https://gis.cityofberkeley.info/arcgis/rest/services?f=json",
+    "extract": "\"name\"\\s*:\\s*\"[^\"]{0,70}\"", "extract_context": 0, "extract_max": 80 },
+
+  { "id": "R2-oakland-accela-aca",
+    "url": "https://aca-prod.accela.com/OAKLAND/Default.aspx",
+    "extract": "(?i)<title>[^<]{0,120}</title>", "extract_context": 0, "extract_max": 2 },
+
+  { "id": "R2-berkeley-permits-portal",
+    "url": "https://aca-prod.accela.com/BERKELEY/Default.aspx",
+    "extract": "(?i)<title>[^<]{0,120}</title>", "extract_context": 0, "extract_max": 2 }
+]
