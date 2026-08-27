@@ -1,0 +1,34 @@
+[
+  { "id": "R3-berkeley-Planning-folder",
+    "url": "https://gis.cityofberkeley.info/arcgis/rest/services/Planning?f=json",
+    "print_chars": 2500 },
+
+  { "id": "R3-berkeley-Public-folder",
+    "url": "https://gis.cityofberkeley.info/arcgis/rest/services/Public?f=json",
+    "print_chars": 2500 },
+
+  { "id": "R3-berkeley-PublicWorks-folder",
+    "url": "https://gis.cityofberkeley.info/arcgis/rest/services/PublicWorks?f=json",
+    "print_chars": 2000 },
+
+  { "id": "R3-berkeley-CoB-folder",
+    "url": "https://gis.cityofberkeley.info/arcgis/rest/services/CoB?f=json",
+    "print_chars": 2000 },
+
+  { "id": "R3-oakland-gis-host-a",
+    "url": "https://gis.oaklandca.gov/arcgis/rest/services?f=json",
+    "print_chars": 1200 },
+
+  { "id": "R3-oakland-gis-host-b",
+    "url": "https://mapserver.oaklandca.gov/arcgis/rest/services?f=json",
+    "print_chars": 1200 },
+
+  { "id": "R3-oakland-AGO-content-by-title",
+    "url": "https://www.arcgis.com/sharing/rest/search?q=title%3A%22Oakland%22%20AND%20(permit%20OR%20%22planning%20application%22)&f=json&num=50",
+    "extract": "\"title\"\\s*:\\s*\"[^\"]{0,80}\"|\"owner\"\\s*:\\s*\"[^\"]{0,40}\"|\"total\"\\s*:\\s*\\d+",
+    "extract_context": 0, "extract_max": 60 },
+
+  { "id": "R3-oakland-hub-dcat-json",
+    "url": "https://hub.arcgis.com/api/feed/dcat-us/1.1.json?id=oakgis",
+    "extract": "(?i)\"title\"\\s*:\\s*\"[^\"]{0,80}\"", "extract_context": 0, "extract_max": 60 }
+]

@@ -10771,3 +10771,259 @@ two bound characters as literals it had been mangled so the range **started at U
 hyphen** — re-escaping **every hyphen in the file**. Build it from pure ASCII instead —
 `new RegExp('[\\u0080-\\uffff]', 'g')` — and **assert deletions === 0 before committing**, which
 is what caught it.
+
+### 🚀 DEPLOYED + ROLLED OUT 2026-08-27 — NC 126 → 161 lit, 44 → 9 dark, and every remaining dark page is an HONEST EMPTY
+
+Deployed `get-address-report` from `main@e730da1` — the merge commit itself, not a later tip
+(run 33079005178, deploy step green at 13:51:42Z). That is worth stating because the KY deploy a
+day earlier had to run on `2c9199a` after `main` advanced under it and needed reconciling before
+its receipts could be trusted. Here the ref and the merge commit are the same object.
+
+**Baseline, taken BEFORE any NCDOT record could land:** 170 NC cached pages · **126 lit · 44
+dark**, concentrated exactly where the PR predicted — Chatham 12, Buncombe 11, Union 9, Orange 7,
+Mecklenburg 2, Wake 2, New Hanover 1.
+
+**Live smoke, nothing persisted** (6 ZIPs through the deployed engine, all HTTP 200): 27231 Orange,
+28031 Mecklenburg, 28079 Union, 28701 Buncombe, 27207 Chatham, plus the cross-border control
+**29715 Fort Mill SC**, ~2 mi from the Mecklenburg line.
+
+| zip | ncdot-stip records | other sources |
+|---|---|---|
+| 28031 Mecklenburg | 16 lines + 2 points | 11 EPA |
+| 28079 Union | 12 lines + 6 points | 53 EPA |
+| 28701 Buncombe | 1 line + 2 points | 22 EPA |
+| 27231 Orange | 1 line | 29 EPA |
+| 27207 Chatham | **0** | 33 EPA |
+| **29715 SC (control)** | **0** | 55 EPA + **27 `scdot-project-viewer-lines`** |
+
+The control is the half that carries the proof. 29715 is **not empty** — it returns 27 SCDOT
+records — so its zero NCDOT records is the gate discriminating, not a blank page that would have
+scored the same either way. Cache-wide the same fact holds at scale: of every page carrying an
+`ncdot-stip-*` record, **`count(distinct state) = 1`, and that state is NC**.
+
+**Invariants across all 195 cached NCDOT records on 35 pages:** 0 missing `record_url` · 0 missing
+coordinates · 0 non-`point` scope · 0 unclassified · 0 outside the `proposed` bucket · **0 pins
+outside NC** (lat 35.06–36.21, lng −82.60 to −79.22, Buncombe in the west to Orange in the east).
+Two `use_type` values present — `Civic/Public` and `Utility` — so the shared `type_map` resolves in
+production rather than defaulting.
+
+#### ⚠️ THE `yields_to` HOOK IS **NOT** PRODUCTION-PROVEN BY THIS ROLLOUT — and the zero that looks like proof is empty
+
+Querying for a TIP carried by BOTH entries on the same page returns **0**. That is not evidence.
+The control says why: across the cached corpus, **`tips_under_both_entries_anywhere = 0` over 93
+distinct TIPs** — no TIP appears under both entries *anywhere*, so there was never an overlap for
+the hook to resolve. A dedup query run against a corpus with no duplicates returns zero whether the
+dedup works or not.
+
+The measured statewide overlap is **12 of 3,051 (~0.4%)**, so a 195-record sample containing none is
+the expected outcome, not a surprise. What *was* verified is that the detector itself fires: an
+injected known-duplicate returns 1 through the same query shape. **`yields_to` remains pinned by
+`test/yields-hook.test.mjs` offline only.** Re-check this once NC coverage grows; do not upgrade it
+to "verified in production" on the strength of a zero.
+
+#### The 9 remaining dark pages are HONEST EMPTIES, not blocked writes — and that was checked, not assumed
+
+The KY rollout left 20 pages held by the FRS facilities guard, so the same failure mode was tested
+for explicitly: each dark page's own response was re-read for `epa.ok` and for how many NCDOT
+records the engine actually returned.
+
+**All 9 returned `epa.ok: true` and `0` NCDOT records** — Chatham 27207 · 27208 · 27213 · 27298 ·
+27355, Buncombe 28709 · 28753, Orange 27541, Union 28112. There is simply no STIP project within
+3 mi of those centroids. **Zero FRS-guard blocks this time.**
+
+One page shows the guard's signature and is worth naming so it is not misread later: **27541 cached
+1 facility, response 0**, so the write was refused exactly as designed. It carried no NCDOT records
+either way, so the guard changed nothing about its lit/dark status. The guard was not touched — it
+is a §12 stop.
+
+#### Environment notes — the same two hazards as the KY rollout, both hit again
+
+- **pg_net stalled three times** mid-rollout (queue frozen at 16, then 24, then 20 while `max_id`
+  did not move). `net.worker_restart()` cleared each, but **not instantly** — the third took
+  several minutes to take effect, and a restart that appears not to have worked has usually just
+  not landed yet. Firing was paced in batches of 8 across separate calls against the edge runtime's
+  12 req/min limit; **0 non-200 across all 44**, versus the 25 BOOT_ERROR 503s the KY rollout
+  produced by firing 51 at once.
+- **`pg_sleep` in the same statement as the counters reports PRE-SLEEP state.** `select pg_sleep(25),
+  (select count(*) …)` returned the counts from the statement's own snapshot, which reads as "nothing
+  progressed" when the queue was in fact draining. Poll in a **separate call**, never after a sleep
+  in the same statement.
+
+Scratch table `nc_rollout_worklist` dropped after confirming all 44 rows had fired and every ZIP is
+recoverable from `development_reports` (0 zips absent from the cache).
+
+## CA MUNICIPAL-TIER PASS #1 — ALAMEDA (2026-08-27): `candidates_exhausted` at the top-5 city tier
+
+The 2026-08-05 CA pass stamped seven counties `MUNICIPAL_TIER_REQUIRED` and left Oakland and
+Berkeley on the reprobe list. This is that reprobe, plus the rest of Alameda's city tier.
+**Nothing was wired. No registry change.**
+
+**Why Alameda was picked over the larger county.** Re-measured live (the 2026-08-05 numbers are
+three weeks old): CA is **523 pages, 163 lit, 360 dark**. Alameda is 51 dark of 51 — but
+concentrated: **Oakland 14 + Berkeley 9 = 23 pages from two wires**. Orange has 85 dark spread
+across ~30 cities, best four = 26. Leverage per wire is ~3x better in Alameda.
+
+### Oakland — REJECT. The permit-scoped count was a SUBSTRING TRAP
+
+`data.oaklandca.gov` answers **14** results to `q=permit` against an unscoped denominator of
+**313 datasets** — so the catalogue is reachable and populated, and 14 looks like the
+2026-08-05 "no permit dataset" finding being overturned. **It is not.** Reading the names
+instead of the count:
+
+| what the 14 actually are | n |
+|---|---|
+| Residential Parking Permit Zones / Zone Map | 4 |
+| Mobile Food Vending + Vehicular Food Vending | 5 |
+| Alameda County / Gold Coast census tracts | 3 |
+| Downtown Off-street Parking Facilities · Soft Story Buildings | 2 |
+
+**Zero building-permit ledgers.** The newest `updatedAt` across all 14 is **2024-04-24**, and the
+one genuinely development-shaped dataset — `Affordable Housing Production Pipeline` (`7rwb-vf8t`)
+— last updated **2021-11-18**. The prior record was correct; only the count disagreed with it.
+⚠️ This is claims-discipline rule 1 hit live, on the same shape as the "~10 Google feeds" miss:
+**a count is a lead, not a fact.**
+
+Two Oakland instruments were also wrong and were replaced rather than believed: a guessed org id
+returned **72 bytes** (an invalid org, not an empty one), and an AGO query that searched
+**groups** rather than content returned a *Caltrans District 4* group — the cross-org lookalike
+trap. Neither is evidence about Oakland.
+
+### Berkeley — REJECT on `STALLED_2015`, and the instrument that found it is the lesson
+
+`data.cityofberkeley.info` is a **real zero, confirmed the right way**: 0 permit-scoped results
+against a **44-dataset** unscoped denominator. The catalogue was reached; it carries no permit data.
+
+**But the catalogue was never the whole question.** Berkeley's own self-hosted server answers 200:
+
+    https://gis.cityofberkeley.info/arcgis/rest/services
+    folders: CoB, Commission, GCGIS, Parks, Planning, Police, Public, PublicWorks, Utilities
+
+⚠️ **`Planning/Accela` is NOT a permit ledger** — the name is the trap. It is the reference
+basemap the Accela application consumes: 35 layers of Addresses, Parcels, Streets, Creeks,
+hazard zones, zoning overlays, building outlines. No permit records anywhere in it.
+
+The real candidates are `Planning/Building_Safety` layers **3 "Building Permit Types"** and
+**4 "Building Permit Valuation"** — and they are a genuine per-record ledger:
+`esriGeometryPoint`, per-record `APPLICATIONNUMBER` / `APPLICATIONSTATUS` / `PERMITSTATUS` /
+`BUILDINGPERMITTYPE` / `PERMITVALUATION` / `FullAddress` / `APN` / `latitude` / `longitude`, and
+`LASTISSUEDATE` as a true `esriFieldTypeDate`.
+
+**Both layers return exactly 8,302 rows with byte-identical field lists** — the same dataset
+rendered two ways (types vs valuation symbology). Only one could ever be wired; wiring both is
+the Houston layer-0/layer-1 double-emit class.
+
+**It is dead.** `max(LASTISSUEDATE)` = **2015-09-29**, min 1996-06-13, populated on all 8,302 —
+**eleven years stale**. Same failure as Ventura's Oil Permits in the 2026-08-05 pass, and the
+rule recorded there is what kept this cheap: *check the max date before enumerating the
+vocabulary, not after.* One query closed it.
+
+Secondary disqualifier, independent of staleness: **both vocabularies are opaque codes.**
+`PERMITSTATUS` is 2 chars (`PP`), `BUILDINGPERMITTYPE` is 4 (`BP-0` 3,270 · `EL-0` 1,940 ·
+`PL-0` 1,645 · `ME-0` 1,346 · `CEC1` 35 · `PL-2` 34 · `CEC2` 15 · `FI61` 11 · the rest ≤2).
+That is the San Jose `"30"` / `999` class — nothing self-describing to map. Even fresh, this
+layer would need a founder-approved codebook, and the mix is trades-dominated regardless.
+
+### The rest of the county — REJECT, with denominators
+
+| city | probe | result |
+|---|---|---|
+| **Fremont** | name-scoped AGO content search | `total:1` — a *Caltrans UC Davis Wildfire Assessment* layer. Cross-org lookalike, not Fremont. |
+| **Hayward** | `openhayward.hayward-ca.gov` | **fetch failed** (DNS) |
+| **San Leandro** | name-scoped AGO content search | `total:1` — "Creeks - from Data Portal" |
+| **Alameda County** | `data.acgov.org` DCAT | **404** |
+| **Alameda County** | own ArcGIS root | live, but the roster is boundaries / city limits / census tracts / **consolidated election precincts** — no permit or planning-application layer |
+
+### Verdict
+
+**Alameda stays `MUNICIPAL_TIER_REQUIRED` and adds `candidates_exhausted`** for its five
+largest cities plus the county tier. The 51 dark pages ship on the EPA facilities floor and are
+correct as they stand — empty is valid, fabricated is a defect.
+
+**Reprobe list, with the specific thing to re-check rather than "try again":**
+- **Oakland** — `Affordable Housing Production Pipeline` (`7rwb-vf8t`) is the right *shape*; it
+  needs to start updating again. Re-check its `updatedAt`, not the catalogue's `q=permit` count.
+- **Berkeley** — `Planning/Building_Safety` layer 3 needs (a) `LASTISSUEDATE` to advance past
+  2015 and (b) a published codebook for `PERMITSTATUS` / `BUILDINGPERMITTYPE`. Both are required;
+  either alone still fails.
+
+## CA MUNICIPAL-TIER PASS #2 — ORANGE (2026-08-27): one candidate, and it needs a FOUNDER CALL
+
+Second municipal-tier pass. **Nothing wired. No registry change.**
+
+**Scope note that matters:** the 2026-08-05 CA pass stamped Orange `candidates_exhausted`, but
+every probe it ran was **county tier** — an AGO title search, the OC org (`UXmFoWC7yDHcDN5Q`)
+scoped to `permits` and to `development`, and two dead county hosts. **No city was probed.** That
+stamp was never evidence about the municipal tier.
+
+**Shape of the problem:** 85 dark of 92 pages, but spread across **46 places**, most at 1–2 pages.
+The top seven hold 38: Irvine 10 · Santa Ana 6 · Garden Grove 5 · Orange 5 · Fullerton 4 ·
+Huntington Beach 4 · Newport Beach 4. Anaheim appears nowhere in the dark list — `anaheim-land-use-cases`
+already lights all 7 of Orange's lit pages, so the city tier is proven viable here.
+
+### ⚠️ `GISOrangeCity` IS ORANGE CITY, **FLORIDA** — a cross-STATE owner-name trap
+
+The AGO account whose name reads exactly like our target owns *"Septic To Sewer, Orange City
+Florida"*, *"OC Septic to Sewer Future Property Connections"* and *"Orange City Pipe Rehabilitation
+Projects"*. It is **not** the City of Orange, CA. The real one is
+`jmcpherson@cityoforange.org_cityoforange` — identified by the **email domain in the owner string**,
+not by the display name. Same family as the Kent DE/RI and Midland TX misses: **verify a city
+account by its domain, never by a name that matches.**
+
+Also worth keeping: an unscoped AGO search for a city name is **mostly universities**. "Irvine"
+returned 161 items dominated by `_ucirvine`, `_CSULB`, `_USCSSI`, `_UPenn`, `_ucsc`. The
+denominators were healthy everywhere (12–273) — the noise is in *who owns the results*, so filter
+by owner before reading titles.
+
+### The seven cities, each with a non-zero denominator
+
+| city | dark | AGO total | what the CITY-OWNED accounts actually publish | verdict |
+|---|---|---|---|---|
+| **Irvine** | 10 | 161 | `Land_Districts`, `PlanningAreas_Districts`, `COI open space`, Sycamore pest infestation, 5G cellular sites | **no permit/project layer** |
+| **Santa Ana** | 6 | 273 | zoning classifications, redistricting wards ×5, neighborhood associations, general plan, focus areas; *Major Development Activity Report* is a **StoryMap** | no per-record layer |
+| **Garden Grove** | 5 | 12 | **no city-owned account in the result set at all** | nothing to probe |
+| **Orange** | 5 | 20 | **`Active Planning Projects view` — a real Feature Service** | see below |
+| **Fullerton** | 4 | 53 | *Major Development Activity* is a **Map Tour** — hand-authored `name`/`description` + Flickr `pic_url`, a storytelling app | not a data layer |
+| **Huntington Beach** | 4 | 39 | *Community Development Major Projects Map* is a web map whose data is an **embedded `featureCollection`** (`CD_MajorProjects_shapefile_4940`) — an uploaded shapefile, **no service URL** | not fetchable |
+| **Newport Beach** | 4 | 19 | `PermitJurisdictionAgency` is a jurisdiction-boundary layer; parks + community associations dashboards | wrong record class |
+
+⚠️ **New standing answer: a web map is not a data source until you have walked it.** Both HB and
+Fullerton *looked* like finds from their titles — "Major Projects Map", "Major Development
+Activity". Walking `sharing/rest/content/items/<id>/data` showed both carry `featureCollection`
+layers with the features **embedded in the web-map JSON**, so there is no REST endpoint for the
+connector to page. The Frisco walk-the-app precedent recovers a service *when one exists*; here it
+proves one does not.
+
+### `city-of-orange-active-planning-projects` — WIREABLE, but a founder call on VALUE
+
+`https://services5.arcgis.com/HsWup310bJE1lcGa/arcgis/rest/services/Active_Planning_Projects_view/FeatureServer/0`
+
+- **177 rows**, `esriGeometryPoint`, wkid 102646 / latestWkid 2230 (CA State Plane — the connector
+  requests `outSR=4326`, the CTDOT precedent).
+- **Fresh**: newest `CreatedDate` **2026-05-20**. This is an *active projects* layer, so a
+  three-month-old newest row is normal rather than the Ventura/Berkeley stall pattern.
+- `CreatedDate` is an `esriFieldTypeString` in `yyyy-mm-dd`, so recency rides in `extra_where` as
+  a **string compare** — never `recency_days`' `DATE` literal (the Anaheim standing answer). That
+  format string-compares correctly.
+- `PermitType` values are all **self-describing** — Planning Application 141 · Conditional Use
+  Permit 6 · Site Plan 5 · Design Review 3 · Environmental Review 2 · Administrative Design Review
+  1 · **blank 17**. ⚠️ **This vocabulary is INCOMPLETE as recorded** — the groupBy body truncated
+  at 175 of 177, so ~1 value is unseen. It must be re-enumerated to exhaustion before any wire.
+- No status column → `status_const` (Detroit / Cleveland / Nashville precedent).
+- No per-record URL column → dataset precision on the city's planning portal (Boston / Philadelphia
+  / SLO precedent).
+
+**🛑 THE BLOCKER IS NOT TECHNICAL — IT IS WHAT A RESIDENT WOULD SEE.** The layer carries **four
+fields**: `OBJECTID`, `PermitType`, `CreatedDate`, `GlobalID`. There is **no title, no address, no
+case number, no description, no valuation**. So every rendered pin's label would be its
+`PermitType` — and **141 of 177 rows carry the identical string "Planning Application"**. Five ZIP
+pages would gain ~141 identical unlabelled pins plus 17 that fail closed on a blank type.
+
+That is a change to what residents see, which the autonomy grant gates. It is recorded and **not
+wired**. The founder's call is whether ~141 same-labelled, address-less points are worth 5 pages
+coming off the facilities floor, or whether an honest empty is the better page.
+
+### Verdict
+
+**Orange's municipal tier is exhausted except for the one held candidate.** 80 of its 85 dark pages
+have no wireable first-party per-record source at any tier; the remaining 5 depend on the founder
+call above. Pages ship on the EPA facilities floor and are correct as they stand.

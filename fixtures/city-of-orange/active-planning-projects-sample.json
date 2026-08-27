@@ -1,0 +1,18 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "uniqueIdField": { "name": "OBJECTID", "isSystemMaintained": true },
+  "globalIdFieldName": "GlobalID",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": { "wkid": 4326, "latestWkid": 4326 },
+  "fields": [
+    { "name": "OBJECTID", "type": "esriFieldTypeOID", "alias": "ObjectID", "sqlType": "sqlTypeOther", "length": 8, "domain": null, "defaultValue": null },
+    { "name": "PermitType", "type": "esriFieldTypeString", "alias": "Permit Type", "sqlType": "sqlTypeOther", "length": 250, "domain": null, "defaultValue": null },
+    { "name": "CreatedDate", "type": "esriFieldTypeString", "alias": "Created Date", "sqlType": "sqlTypeOther", "length": 30, "domain": null, "defaultValue": null }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    { "attributes": { "OBJECTID": 6, "PermitType": "Conditional Use Permit", "CreatedDate": "2025-05-20" }, "geometry": { "x": -117.77429249978539, "y": 33.8173379996461 } },
+    { "attributes": { "OBJECTID": 8, "PermitType": "Conditional Use Permit", "CreatedDate": "2025-07-17" }, "geometry": { "x": -117.85161150044244, "y": 33.828506999856906 } },
+    { "attributes": { "OBJECTID": 14, "PermitType": "Conditional Use Permit", "CreatedDate": "2023-05-17" }, "geometry": { "x": -117.80104049973599, "y": 33.797574000098642 } }
+  ]
+}
