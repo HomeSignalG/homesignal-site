@@ -10851,3 +10851,97 @@ is a §12 stop.
 
 Scratch table `nc_rollout_worklist` dropped after confirming all 44 rows had fired and every ZIP is
 recoverable from `development_reports` (0 zips absent from the cache).
+
+## CA MUNICIPAL-TIER PASS #1 — ALAMEDA (2026-08-27): `candidates_exhausted` at the top-5 city tier
+
+The 2026-08-05 CA pass stamped seven counties `MUNICIPAL_TIER_REQUIRED` and left Oakland and
+Berkeley on the reprobe list. This is that reprobe, plus the rest of Alameda's city tier.
+**Nothing was wired. No registry change.**
+
+**Why Alameda was picked over the larger county.** Re-measured live (the 2026-08-05 numbers are
+three weeks old): CA is **523 pages, 163 lit, 360 dark**. Alameda is 51 dark of 51 — but
+concentrated: **Oakland 14 + Berkeley 9 = 23 pages from two wires**. Orange has 85 dark spread
+across ~30 cities, best four = 26. Leverage per wire is ~3x better in Alameda.
+
+### Oakland — REJECT. The permit-scoped count was a SUBSTRING TRAP
+
+`data.oaklandca.gov` answers **14** results to `q=permit` against an unscoped denominator of
+**313 datasets** — so the catalogue is reachable and populated, and 14 looks like the
+2026-08-05 "no permit dataset" finding being overturned. **It is not.** Reading the names
+instead of the count:
+
+| what the 14 actually are | n |
+|---|---|
+| Residential Parking Permit Zones / Zone Map | 4 |
+| Mobile Food Vending + Vehicular Food Vending | 5 |
+| Alameda County / Gold Coast census tracts | 3 |
+| Downtown Off-street Parking Facilities · Soft Story Buildings | 2 |
+
+**Zero building-permit ledgers.** The newest `updatedAt` across all 14 is **2024-04-24**, and the
+one genuinely development-shaped dataset — `Affordable Housing Production Pipeline` (`7rwb-vf8t`)
+— last updated **2021-11-18**. The prior record was correct; only the count disagreed with it.
+⚠️ This is claims-discipline rule 1 hit live, on the same shape as the "~10 Google feeds" miss:
+**a count is a lead, not a fact.**
+
+Two Oakland instruments were also wrong and were replaced rather than believed: a guessed org id
+returned **72 bytes** (an invalid org, not an empty one), and an AGO query that searched
+**groups** rather than content returned a *Caltrans District 4* group — the cross-org lookalike
+trap. Neither is evidence about Oakland.
+
+### Berkeley — REJECT on `STALLED_2015`, and the instrument that found it is the lesson
+
+`data.cityofberkeley.info` is a **real zero, confirmed the right way**: 0 permit-scoped results
+against a **44-dataset** unscoped denominator. The catalogue was reached; it carries no permit data.
+
+**But the catalogue was never the whole question.** Berkeley's own self-hosted server answers 200:
+
+    https://gis.cityofberkeley.info/arcgis/rest/services
+    folders: CoB, Commission, GCGIS, Parks, Planning, Police, Public, PublicWorks, Utilities
+
+⚠️ **`Planning/Accela` is NOT a permit ledger** — the name is the trap. It is the reference
+basemap the Accela application consumes: 35 layers of Addresses, Parcels, Streets, Creeks,
+hazard zones, zoning overlays, building outlines. No permit records anywhere in it.
+
+The real candidates are `Planning/Building_Safety` layers **3 "Building Permit Types"** and
+**4 "Building Permit Valuation"** — and they are a genuine per-record ledger:
+`esriGeometryPoint`, per-record `APPLICATIONNUMBER` / `APPLICATIONSTATUS` / `PERMITSTATUS` /
+`BUILDINGPERMITTYPE` / `PERMITVALUATION` / `FullAddress` / `APN` / `latitude` / `longitude`, and
+`LASTISSUEDATE` as a true `esriFieldTypeDate`.
+
+**Both layers return exactly 8,302 rows with byte-identical field lists** — the same dataset
+rendered two ways (types vs valuation symbology). Only one could ever be wired; wiring both is
+the Houston layer-0/layer-1 double-emit class.
+
+**It is dead.** `max(LASTISSUEDATE)` = **2015-09-29**, min 1996-06-13, populated on all 8,302 —
+**eleven years stale**. Same failure as Ventura's Oil Permits in the 2026-08-05 pass, and the
+rule recorded there is what kept this cheap: *check the max date before enumerating the
+vocabulary, not after.* One query closed it.
+
+Secondary disqualifier, independent of staleness: **both vocabularies are opaque codes.**
+`PERMITSTATUS` is 2 chars (`PP`), `BUILDINGPERMITTYPE` is 4 (`BP-0` 3,270 · `EL-0` 1,940 ·
+`PL-0` 1,645 · `ME-0` 1,346 · `CEC1` 35 · `PL-2` 34 · `CEC2` 15 · `FI61` 11 · the rest ≤2).
+That is the San Jose `"30"` / `999` class — nothing self-describing to map. Even fresh, this
+layer would need a founder-approved codebook, and the mix is trades-dominated regardless.
+
+### The rest of the county — REJECT, with denominators
+
+| city | probe | result |
+|---|---|---|
+| **Fremont** | name-scoped AGO content search | `total:1` — a *Caltrans UC Davis Wildfire Assessment* layer. Cross-org lookalike, not Fremont. |
+| **Hayward** | `openhayward.hayward-ca.gov` | **fetch failed** (DNS) |
+| **San Leandro** | name-scoped AGO content search | `total:1` — "Creeks - from Data Portal" |
+| **Alameda County** | `data.acgov.org` DCAT | **404** |
+| **Alameda County** | own ArcGIS root | live, but the roster is boundaries / city limits / census tracts / **consolidated election precincts** — no permit or planning-application layer |
+
+### Verdict
+
+**Alameda stays `MUNICIPAL_TIER_REQUIRED` and adds `candidates_exhausted`** for its five
+largest cities plus the county tier. The 51 dark pages ship on the EPA facilities floor and are
+correct as they stand — empty is valid, fabricated is a defect.
+
+**Reprobe list, with the specific thing to re-check rather than "try again":**
+- **Oakland** — `Affordable Housing Production Pipeline` (`7rwb-vf8t`) is the right *shape*; it
+  needs to start updating again. Re-check its `updatedAt`, not the catalogue's `q=permit` count.
+- **Berkeley** — `Planning/Building_Safety` layer 3 needs (a) `LASTISSUEDATE` to advance past
+  2015 and (b) a published codebook for `PERMITSTATUS` / `BUILDINGPERMITTYPE`. Both are required;
+  either alone still fails.
