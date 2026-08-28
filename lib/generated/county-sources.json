@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. No subject-matter claim is derived.",
-  "registry_entries": 230,
+  "registry_entries": 231,
   "statewide": {
     "AK": [
       {
@@ -39,6 +39,13 @@
       {
         "id": "adot-tip-fy2026-2030",
         "label": "Arizona Department of Transportation (ADOT)",
+        "scope": "statewide"
+      }
+    ],
+    "CA": [
+      {
+        "id": "caltrans-sb1-projects",
+        "label": "California Department of Transportation (Caltrans)",
         "scope": "statewide"
       }
     ],

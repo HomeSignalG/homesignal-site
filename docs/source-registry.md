@@ -6439,7 +6439,7 @@ rushed). Every finding below is a live probe receipt.
 | **WV** | 212 | 🚫 `candidates_exhausted` | `owner:WVDOT_Publisher` enumerated — 64 items, **0** project/STIP services |
 | **NH** | 247 | 🚫 no first-party source | `owner:NHDOT` → **0 items** (no such org); `NHDOT_Projects` is owned by a personal account |
 | **OK** | 197 | 🚫 no source found | 2 query shapes → 0 ODOT project services |
-| **ND** | 155 | 🚫 no first-party source | hits are City of Minot (`maps.minotnd.org`) and a consultant, not NDDOT |
+| **ND** | 155 | ✅ **OVERTURNED 2026-08-28 — WIRED** | `nddot-special-road-fund-projects`. The rejection was a SEARCH artifact: `nddot.maps.arcgis.com` IS a real org (`EDijJFsQQwgz8X53`). See "NORTH DAKOTA WIRE PASS" below. |
 | **HI** | 97 | 🚫 no source found | 13 items, 0 project services |
 
 **Wireable total: 1,150 pages (NJ+ME+IA+VT) + RI 81.** Rejected: 1,009 pages across 6 states.
@@ -7902,7 +7902,7 @@ evidence**, never silently re-derived.
 | **OK** | 197 | 🚫 "no source found" | 🚫 **HELD, receipt upgraded** | 0 |
 | **WV** | 212 | 🚫 `candidates_exhausted` | 🚫 **CONFIRMED** | 0 |
 | **NH** | 247 | 🚫 no first-party org | 🚫 **CONFIRMED** | 0 |
-| **ND** | 155 | 🚫 no first-party org | 🚫 **CONFIRMED** (§0u) | 0 |
+| **ND** | 155 | 🚫 no first-party org | ✅ **OVERTURNED 2026-08-28** — the org exists | 6 |
 
 **113 pages lit. 977 stay on the EPA facilities floor** — and, importantly, **not because they were
 skipped**: every one of the five now has an enumeration receipt, not an inference.
@@ -11215,3 +11215,298 @@ a single burst, which is what the 2-minute cadence had to clear.
 ⚠️ **`pg_net.batch_size` (200) is the wrong lever and must not be touched for this** — it is a
 DATABASE-WIDE setting shared with the ingest pipeline, so narrowing it to protect FRS would
 throttle everything else in the project.
+
+
+## NORTH DAKOTA WIRE PASS (2026-08-28) — the rejection was a search artifact
+
+**ND's two standing verdicts ("no first-party source", "no first-party org — CONFIRMED") are
+OVERTURNED.** Both were reached by ArcGIS *search*, the same method already proven wrong for
+NH, OK and WV, and all three of those were later wired. ND was the fourth in that batch.
+
+| host | result |
+|---|---|
+| `nddot.maps.arcgis.com` | **REAL org** `EDijJFsQQwgz8X53` "North Dakota Dept. of Transportation" |
+| `bismarck.maps.arcgis.com` | **REAL org** `XxHmL09eFqJWI0gE` "City of Bismarck, ND" |
+| `fargond` / `grandforks` / `ndhub` `.maps.arcgis.com` | generic anonymous portal, `id:null` — **not orgs** |
+
+⚠️ **`ndot` is NEVADA.** An acronym search for ND is polluted by an unrelated live org for the
+wrong state, which is part of why the original pass concluded absence. North Dakota is **NDDOT**.
+
+### Wired
+
+**`nddot-special-road-fund-projects`** — Special Road Fund 2025-2026, statewide, 47 points, real
+named projects (`Arnegard - Ball Diamond Road Improvements`). `IMPROVE` complete: 20 values
+summing **exactly to 47**, 0 blank. `SRF_Year` is a single value, so every row is current.
+`use_type_const: Utility` + `status_const: Programmed` per the NE/MT/SD/UT/TX DOT precedent.
+No date field exists — acceptable (`file_date` is optional; five wired entries omit it).
+Both guessed NDDOT program URLs return a real `Page not found | NDDOT` 404, so nothing was
+templated: dataset precision on the service URL.
+
+**Rollout: ND 3 → 8 lit pages, 1,032 records across 8 pages.** SRF landed on **exactly the 6
+pages predicted before wiring**; Bismarck carries 3. Invariants: 0 missing `record_url`,
+0 missing coordinates, 0 unclassified. Gate proof: 0 records outside ND, and 0 Bismarck records
+outside Burleigh.
+
+### Rejected, with receipts
+
+- **TA_FY2028** — the service self-describes as *"Transportation Alternatives webmap to be used
+  by committee"*: an internal working layer, not a public register.
+- **NDDOT Bridge Inventory** (7 layers) — asset registers, not projects (North Richland Hills class).
+- **Minot** — server live (10.81, folders incl. `PublicMaps`) but that folder returns
+  `{"error":{"code":499,"message":"Token Required"}}`. Not public.
+- **Fargo / Grand Forks** — `gis.fargond.gov` and `gis.grandforksgov.com` both unreachable. The
+  only Fargo permit layer on ArcGIS is `2025_Building_Permits_Fargo` owned by
+  `david@horizonfargo.com_CCIM`, a **private commercial broker** — third-party, and precisely the
+  "a consultant, not NDDOT" trap the original verdict named. Fargo (30 dark) and Grand Forks (21)
+  remain the state's largest unclaimed prizes.
+- **Flex Fund Approved Projects** — real, 14 rows, left unwired pending need.
+
+### ⚠️ Two process lessons from this pass
+
+1. **CHECK THE REGISTRY FOR EXISTING STATE COVERAGE BEFORE RECONNING.** Bismarck was **already
+   wired** (`bismarck-building-permits`, PR #878). This pass rediscovered it from scratch —
+   including re-deriving its owner-PII fencing — because coverage was never checked first.
+2. **ND is genuinely low-density, not source-poor by oversight.** 155 rural ZIP pages spread wide;
+   even a good statewide source reaches few centroids. Measure the lift BEFORE spending a wire:
+   the 6-page prediction here was computed from the layer's live extent and matched exactly.
+
+
+## OREGON PASS (2026-08-28) — no new source; two corrections that matter more
+
+**OR was already wired** (`portland-building-permits` covering Multnomah/Washington/Clackamas,
+`salem-structure-permits` Marion, `bend-or-permit-applications` Deschutes). Checking that FIRST is
+the ND lesson applied, and it reframed the work: of OR's 147 dark pages, **68 sit in counties that
+already have a source** and only **79** are in counties with none (Lane 37, Jackson 18, Yamhill 12,
+Benton 9, Hood River 3).
+
+### ⚠️ CORRECTION TO THE HEADLINE DARK METRIC — 2,602 is not the number of empty pages
+
+"Dark" has been measured as *0 sites carrying a `source_registry_id`* (the UT/AZ standing answer,
+which exists to measure MAP-RENDERING source data). Measured cache-wide 2026-08-28:
+
+| | pages |
+|---|--:|
+| total | 12,722 |
+| lit by the registry metric | 10,120 |
+| **"dark" by the registry metric** | **2,602** |
+| — of those, carrying REAL development content from the planning-notices path | **504** (4,227 records) |
+| — **truly empty (no development content at all)** | **2,098** |
+
+**504 pages a resident would see content on are counted as dark.** The registry metric is still the
+right instrument for *source coverage*, but it is NOT the count of empty pages, and campaign
+reporting should say which one it means. Found because OR 97144 stored 15 development records with
+`sourced_stored = 0`.
+
+### Rejections, with receipts
+
+- **Corvallis** — `corvallis.maps.arcgis.com` IS a real org, `Qlfno8RRTw2bY041`, named
+  **"Corvallis S.p.A."** — an ITALIAN corporation (`S.p.A.` = Societa per Azioni), not the City of
+  Corvallis, Oregon. The WV/"World Vision" trap exactly: a live org for a completely different
+  entity. Wiring it would have published an Italian company's data on Oregon pages. **Always read
+  the org NAME, not just the id.**
+- **Eugene / Lane (37 dark, the state's biggest prize)** — `eugene`/`lanecounty`.maps.arcgis.com
+  return the generic anonymous portal. The city's real Hub (`mapping.eugene-or.gov`) offers
+  "Where Eugene Development is Happening", but walking app -> web map -> operationalLayers shows it
+  is a **Buildable Lands Inventory** (zoning, UGB, "Development Potential 2012-2032", protected
+  areas) — planning-capacity polygons, not permit records. The city's own server
+  `gis.eugene-or.gov/arcgis/rest/services/PDD` has 12 services, ALL cadastral reference
+  (Address/Buildings/Taxlots/Zoning/Historic/Property) — **no permits layer**.
+  **LCOG is a real org** (`9s1YtFmLS0YTl10F`, 465 items) and is the remaining lead, unexhausted.
+- **RVCOG is a real org** (`ULDicaHfvMRD52nd`, Rogue Valley COG) carrying MPO **TIP/RTP project
+  layers** — a STIP-class candidate for Jackson (18 dark), unexhausted.
+
+### 🔭 Also found: `public.dev_refresh_targets` is an ORPHANED QUEUE
+
+792 unfired rows, and **nothing drains it**: `dev_refresh_tick` calls `dev_refresh_fire_batch`,
+which selects from `development_reports` by oldest-refresh rotation and never reads
+`dev_refresh_targets`. `dev_refresh_fire_targets()` exists but no job calls it. Harmless today (no
+behaviour depends on it) but do not "queue" a rollout there expecting it to run — the oldest-refresh
+rotation is what actually re-fires pages, on the ~2.2-day full cycle.
+
+
+## IOWA PASS (2026-08-28) — a genuine source desert, and NOT a rollout gap
+
+Coverage checked FIRST (the ND lesson): IA has exactly one wired source,
+**`iowa-dot-bid-projects`** (statewide), reaching **60 pages with 225 records**.
+
+**IA: 225 pages · 83 lit · 142 registry-dark · but only 106 TRULY EMPTY** (36 of the dark carry
+real content from the planning-notices path — see the dark-metric correction in the Oregon pass).
+
+Truly-empty by county: Linn 17 (Cedar Rapids) · Dallas 16 · Warren 15 · Polk 14 (Des Moines) ·
+Scott 13 (Davenport) · Black Hawk 11 · Johnson 10 · Pottawattamie 9 · Dubuque 1 · Story 0.
+
+### ⚠️ IOWA IS NOT A ROLLOUT GAP — measured, not assumed
+
+Oregon's covered-but-dark pages were **25% recoverable** by a simple re-fire. Iowa is **0%**:
+6 truly-empty pages re-fired through the live engine returned **0 development records and gained
+0 pages**. The statewide DOT genuinely does not reach them, so the only lever here is a NEW source.
+**Run this 6-page re-fire test before reconning any state** — it costs one batch and tells you
+whether you are looking for a source or just a refresh.
+
+### Rejections, with receipts
+
+- **`data.iowa.gov` is NO LONGER A SOCRATA PORTAL.** The catalog API returns 404 and the site
+  returns a Next.js error page. ⚠️ **This zero is trustworthy only because of its POSITIVE
+  CONTROL**: the identical query against `data.cityofchicago.org` returned **66 results**, proving
+  the endpoint and query shape work. A bare 404 from a catalog API is otherwise indistinguishable
+  from a malformed query.
+- **Des Moines** — `desmoines.maps.arcgis.com` IS a real org (`HT7H9QGiZQoRJDpJ`, "City of Des
+  Moines"), 77 items, but the only permit-adjacent layers are **Building Footprints** (asset
+  inventory) and **Development Control Zones** (zoning polygons). No permit ledger. Inventory
+  rejection class.
+- **Cedar Rapids** (`cedar-rapids`, `cityofcr`) and **Iowa City** (`icgov`) and **`dsm`** — all
+  return the GENERIC ANONYMOUS PORTAL (`id:null`). Not orgs.
+- **`data.dsm.city`** — 404, not a Socrata domain.
+
+**Not exhausted:** Davenport/Scott (13), Waterloo/Black Hawk (11), and the Iowa cities' own
+non-ArcGIS-Online permit portals (Accela / eTRAKiT / city GIS servers) were not probed. Iowa's
+municipal tier likely needs the city-GIS-server path (the Frisco/Eugene pattern), not AGO orgs.
+
+---
+
+## DARK-BACKLOG TARGET CORRECTION (2026-08-28) — the campaign was aiming at the wrong 2,602
+
+Measured nationally, joining `development_reports` to `communities` (`level='zip'`) and calling a
+page **lit** when its cached `sites` array holds ≥1 record with a non-null `source_registry_id`:
+
+```
+12,722 pages · 10,120 lit (79.5%) · 2,602 dark · 546 counties
+```
+
+Classifying each dark page by whether ANY registry entry already covers its `(state, county)` —
+the 42 statewide states plus the 42 county-scoped keys in `lib/generated/county-sources.json`:
+
+| class | dark pages |
+|---|---|
+| in a county a source ALREADY covers | **1,919** |
+| in a county NO source covers | **683** |
+
+⚠️ **The 1,919 are NOT a rollout gap, and treating them as one is how the campaign would have
+burned weeks re-firing pages that are already correct.** Their refresh timestamps settle it:
+
+```
+oldest dark refresh  2026-08-15 10:00Z      newest  2026-08-28 17:42Z
+older than 30 days   0
+older than  7 days   51
+refreshed within 7d  1,868
+```
+
+**1,868 of the 1,919 were refreshed within the last seven days, through the live engine, with
+their covering source active — and still emitted zero registry records.** They are honest
+geographic empties: a statewide DOT register has no project within the 3-mile envelope of those
+ZIP centroids. The remaining **51** are the only recheck pool, and `dev_refresh_fire_batch`
+rotates on oldest-refresh, so they are already next in line and self-heal with no action.
+
+**This is the Iowa result generalised.** Iowa's 6-page re-fire test returned 0 records and 0 pages
+gained precisely because Iowa's dark pages sit under a statewide DOT that does not reach them —
+covered, refreshed, and legitimately empty. Oregon's 25% recovery was the exception, not the rule.
+
+**The real frontier is the 683 uncovered pages, in 42 counties across 8 states.** Every one of
+those counties is **100% dark** (`dark == pages`), which is the positive control on the
+classification: a county with zero covering sources has zero lit pages, exactly as it must.
+
+```
+CA Alameda 51 · CA Contra Costa 43 · CA Sonoma 40 · OR Lane 37 · CA Ventura 34 · CA San Mateo 31
+LA Caddo 25 · NM Doña Ana 23 · MS Hinds 22 · GA Cobb 22 · NM Taos 21 · NM San Juan 20
+LA St. Tammany 18 · OR Jackson 18 · LA Calcasieu 18 · NM Otero 17 · LA Lafayette 16 · LA Livingston 16
+GA Hall 15 · NM Santa Fe 15 · MS Lee 15 · MS Rankin 14 · MS Lafayette 13 · MS Harrison 12
+OR Yamhill 12 · LA Bossier 12 · TN Sumner 9 · OR Benton 9 · NM Eddy 9 · MS Madison 9
+GA Clarke 9 · GA Cherokee 9 · MS Jackson 9 · TN Maury 8 · NM Valencia 8 · LA Ascension 7
+MS Forrest 5 · MS Lamar 5 · OR Hood River 3 · NM Los Alamos 2 · CO La Plata 1 · GA Walker 1
+```
+
+**Standing answer: "dark" alone is not a work queue.** A dark page is only actionable when no
+source covers its county. Split the backlog on coverage BEFORE picking a state, or you will spend
+the budget re-firing pages that are already telling the truth.
+
+---
+
+## CALIFORNIA WIRE PASS — `caltrans-sb1-projects` (2026-08-28)
+
+**CA was the only large state with no statewide source** while 41 others had one, and it led the
+dark backlog (344 dark pages, of which **199 sit in five 100%-dark counties with no coverage at
+all** — Alameda 51, Contra Costa 43, Sonoma 40, Ventura 34, San Mateo 31). Registry checked FIRST
+(the Bismarck lesson): CA carried five county-scoped city entries only — `marin-county-building-
+permits`, `anaheim-land-use-cases`, `city-of-orange-active-planning-projects`, `san-diego-approved-
+permits`, `slo-county-planning-permits`, `san-jose-permits` — and **`statewide.CA` was empty**.
+
+**WIRED — `caltrans-sb1-projects`.** Caltrans SB1 / "Rebuilding California" project register on the
+agency's OWN server, `caltrans-gis.dot.ca.gov` (folder `SB1`, service `BuildingCA_Projects`,
+FeatureServer layer 0). 17,441 features, `esriGeometryMultipoint` — handled by the `featurePoint()`
+multipoint branch added 2026-08-05 for `lake-county-il`, so no connector change was needed.
+
+**Real named projects, not a type-only layer** (live sample, `outSR=4326`):
+`FY 22/23 Bus Shelter Improvements` (Arcata, Humboldt) · `Construct median barrier.` (Merced) ·
+`Marvin Braude Beach Trail Gap Closure (ATP Cycle 3A)`.
+
+**Two complete vocabularies, each enumerated in BOTH `orderByFields` directions** (the Mesa/Gilbert
+`$limit`-truncation defence) and each summing **EXACTLY** to the layer count 17,441:
+
+| `ProjectStatus` | n | `Category` | n |
+|---|---|---|---|
+| Completed | 9,429 | Local Streets and Highways | 7,213 |
+| In Progress | 5,290 | Maintaining Highways | 5,319 |
+| Planned | 2,661 | Transit/Commuter Rail/Bike and Walking Paths | 2,481 |
+| *(null)* | 61 | Federal IIJA | 2,312 |
+| | | Goods Movement | 116 |
+
+All five Categories are transportation infrastructure → every one maps to `Utility`, the
+statewide-DOT fleet shape (udot / txdot / ndot-NE / nvdot / mt-mdt / sd-stip / ar-ardot / nddot).
+
+- **`type_map`, NOT `use_type_const`, on purpose.** `use_type_const` is documented for a
+  type column that is FREE TEXT and therefore cannot be enumerated. `Category` enumerates
+  exactly, so a value Caltrans adds later must surface as `unclassified` rather than be silently
+  swallowed into `Utility` by a constant.
+- **`extra_where` keeps the forward pipeline only** — `ProjectStatus IN ('In Progress','Planned')`
+  = **7,951 of 17,441** (live `returnCountOnly`), dropping the 9,429 Completed and the 61 nulls.
+  The `udot-active-projects` precedent.
+- **No `file_date`, DELIBERATELY** (the `sd-stip`/`mt-mdt` rider). `DateUpdated` is a 10-char
+  STRING carrying at least **five mutually inconsistent formats in one column** — `2025-05-05`,
+  `9/20/2024`, `11/02/2023`, `02-21-2025`, and the ambiguous 2-digit `02-21-25`. Parsing it is
+  guessing, so the field is absent rather than wrong.
+- `out_fields` projects only the mapped columns — `outFields=*` would carry `ProjectDescription`
+  (declared length 4000) on every row (the Florida/Ohio dense-metro CPU-hazard precedent).
+- No ZIP attribute anywhere → `spatial_zip_radius_mi: 3`. No per-record URL column → precision
+  `dataset`, pointing at Caltrans' own public SB1 site `rebuildingca.ca.gov` (HTTP 200, same round).
+
+### ⚠️ NEW STANDING ANSWER — for a PROGRAM REGISTER the freshness instrument is `FiscalYear`, not the edit date
+
+**Reading only the edit date would have produced a WRONG REJECTION here.** `max(last_edited_date)`
+is **2025-05-23** and `max(DateUpdated)` is **2025-05-05** — roughly 15 months old, and *staler than
+all three sources this project has rejected on freshness*: St. Paul (2025-06-30), Syracuse
+(2025-08-16), Worcester (2025-09-09).
+
+But those three are **permit ledgers**, where staleness means records are **MISSING** because the
+publisher stopped emitting them. This is a multi-year **program register**, and its own forward
+horizon proves nothing is missing — the 24 `FiscalYear` values sum exactly to 17,441 and run
+**forward to 37/38**:
+
+```
+26/27:329  27/28:178  28/29:111  29/30:27  30/31:11  31/32:10  32/33:3  33/34:1  34/35:1  35/36:2  36/37:5  37/38:1
+25/26:644  24/25:1254  23/24:1766  22/23:2023  21/22:4399  20/21:2233  19/20:1738  18/19:1434
+17/18:561  16/17:233  15/16:209  14/15:268
+```
+
+The statuses are **as-of publication**, not a truncated feed. This is the same shape the SD/MT/NE
+STIP entries were accepted under ("layer IS the category… forecast dates rejected, `file_date`
+DELIBERATELY ABSENT"). **Apply the ledger freshness bar to ledgers and the horizon test to program
+registers; using one instrument on the other class rejects good sources and accepts dead ones.**
+
+### Rejected with receipts, same probe round
+
+- **Folder `CHhighway`** — 24 services, all **asset inventory**: `State_Highway_Bridges`,
+  `SHN_Postmiles`, `SHN_Postmiles_Tenth`, `Traffic_AADT`, `Truck_Volumes_AADT`, `Rest_Areas`,
+  `CCTV`, `Park_and_Ride`, `Vistas`, `Agricultural_Inspection_Stations`… The NDDOT
+  bridge-inventory class — an asset register is not a project.
+- **`CHhighway/Regional_Transportation_Grants`** — genuinely **FRESH** (portal item modified
+  **2026-08-27**, point geometry) and still rejected: its entire schema is `OBJECTID, Location,
+  Applicant, District, County, Grant_Award, Grant_Program, Project_Title` — **no date column and
+  no status column** (the North Richland Hills terminal) — and the publisher's own description says
+  the points represent "the applicants who received funding", i.e. the **agency office, not a
+  project site**. Freshness never rescues a schema that cannot date or place the work.
+- **Folder `HQstatewide`** — climate-adaptation and sea-level-rise layers only
+  (`DEA_CoSMoS_SLR`, `Groundwater_SLR`, `DEA_Vulnerability_Assessments`).
+- **`gis.data.ca.gov`** — no fresher Caltrans project dataset. A `SHOPP OR STIP` search returns
+  **zero features**; a `Caltrans projects` search returns only road-network, airport,
+  hydrogen-fueling and habitat-connectivity layers.
+
