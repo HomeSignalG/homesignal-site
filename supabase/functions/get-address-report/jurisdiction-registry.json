@@ -15301,6 +15301,87 @@
       ],
       "record_url_precision": "dataset",
       "_receipts": "[VERIFIED 2026-08-28 via pg_net against the live endpoint, in the connector's own scope] Caltrans SB1 / 'Rebuilding California' project register on the agency's OWN server caltrans-gis.dot.ca.gov (folder SB1, service BuildingCA_Projects). CALIFORNIA'S FIRST STATEWIDE SOURCE \u2014 CA was the only large state with no statewide entry while 41 states had one, and it led the dark backlog. 17,441 features, esriGeometryMultipoint (one point per project here; the featurePoint() multipoint branch added 2026-08-05 for lake-county-il already handles it). REAL NAMED PROJECTS, not a type-only layer: 'FY 22/23 Bus Shelter Improvements' (Arcata, Humboldt), 'Construct median barrier.' (Merced), 'Marvin Braude Beach Trail Gap Closure (ATP Cycle 3A)'. TWO COMPLETE VOCABULARIES, each enumerated in BOTH orderByFields directions (the Mesa/Gilbert $limit-truncation defence) and each summing EXACTLY to the layer count 17,441: ProjectStatus = Completed 9429 + In Progress 5290 + Planned 2661 + null 61; Category = Local Streets and Highways 7213 + Maintaining Highways 5319 + Transit/Commuter Rail/Bike and Walking Paths 2481 + Federal IIJA 2312 + Goods Movement 116. All five Categories are transportation infrastructure, so every one maps to Utility (the statewide-DOT fleet shape: udot / txdot / ndot-NE / nvdot / mt-mdt / sd-stip / ar-ardot / nddot). type_map rather than use_type_const ON PURPOSE \u2014 the vocabulary IS enumerable, so a Category Caltrans adds later must surface as `unclassified`, not be swallowed into Utility by a constant. extra_where keeps the FORWARD PIPELINE ONLY \u2014 7,951 of 17,441 (live returnCountOnly) \u2014 dropping 9,429 Completed and the 61 nulls, the udot-active-projects precedent. NO file_date, DELIBERATELY (the sd-stip/mt-mdt rider): DateUpdated is a 10-char STRING carrying at least five mutually inconsistent formats in one column \u2014 '2025-05-05', '9/20/2024', '11/02/2023', '02-21-2025' and the ambiguous 2-digit '02-21-25' \u2014 so parsing it is guessing. FRESHNESS \u2014 THE INSTRUMENT THAT MATTERS FOR A PROGRAM REGISTER IS FiscalYear, NOT THE EDIT DATE, and reading only the edit date would have produced a WRONG REJECTION. max(last_edited_date) is 2025-05-23 and max(DateUpdated) is 2025-05-05, ~15 months old \u2014 staler than St. Paul (2025-06-30), Syracuse (2025-08-16) and Worcester (2025-09-09), all three of which were rejected on freshness. But those were PERMIT LEDGERS, where staleness means records are MISSING because the source stopped publishing. This is a multi-year PROGRAM register: its 24 FiscalYear values sum exactly to 17,441 and run FORWARD to 37/38 \u2014 329 rows in the current 26/27, 178 in 27/28, 111 in 28/29. Nothing is missing; the statuses are as-of the publication. Same shape the SD/MT/NE STIP entries were accepted under. REJECTED WITH RECEIPTS, same probe round: (a) folder CHhighway is 24 ASSET-INVENTORY services (State_Highway_Bridges, SHN_Postmiles, Traffic_AADT, Rest_Areas, CCTV...) \u2014 the NDDOT bridge-inventory class, an asset register is not a project; (b) CHhighway/Regional_Transportation_Grants is genuinely FRESH (item modified 2026-08-27) but has NO date column and NO status column across its whole schema (OBJECTID, Location, Applicant, District, County, Grant_Award, Grant_Program, Project_Title) \u2014 the North Richland Hills terminal \u2014 and its point is the APPLICANT AGENCY, not a project site; (c) folder HQstatewide is climate-adaptation and sea-level-rise layers only; (d) gis.data.ca.gov carries no fresher Caltrans project dataset (a 'SHOPP OR STIP' search returns zero features, and the 'Caltrans projects' search returns only road-network, airport, hydrogen-fueling and habitat layers). dataset_url rebuildingca.ca.gov is Caltrans' own public SB1 project site (HTTP 200 same round); the layer carries no per-record URL column, so precision is `dataset` and templating one would be guessing. No ZIP attribute anywhere -> spatial_zip_radius_mi 3. out_fields projects only the mapped columns (the Florida/Ohio dense-metro CPU-hazard precedent; outFields=* would carry ProjectDescription at length 4000 on every row)."
+    },
+    {
+      "registry_id": "oregon-dot-stip-projects",
+      "platform": "arcgis",
+      "service_url": "https://gis.odot.state.or.us/arcgis1006/rest/services/facs_stip/data_catalog/MapServer/361",
+      "dataset_url": "https://www.oregon.gov/odot/STIP/Pages/index.aspx",
+      "jurisdiction": "Oregon Department of Transportation (ODOT)",
+      "coverage": [
+        {
+          "state": "OR"
+        }
+      ],
+      "column_map": {
+        "title": "PROJ_NM",
+        "address": "HWYNAME",
+        "case_number": "PROJ_KEY_NO",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "status_const": "Programmed in the ODOT 2024-2027 Statewide Transportation Improvement Program (STIP)",
+      "status_to_bucket": {
+        "proposed": [
+          "Programmed in the ODOT 2024-2027 Statewide Transportation Improvement Program (STIP)"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "use_type_const": "Utility",
+      "extra_where": "PROJ_PHASE_CURRENT_STIP_YR_NO >= 2026",
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "PROJ_KEY_NO",
+        "PROJ_NM",
+        "HWYNAME",
+        "PROJ_PHASE_CURRENT_STIP_YR_NO"
+      ],
+      "record_url_precision": "dataset",
+      "yields_to": "oregon-dot-stip-projects-lines",
+      "_receipts": "[VERIFIED 2026-08-28 via pg_net against the live endpoint, in the connector's own scope] ODOT Statewide Transportation Improvement Program 2024-2027, layers 361 (points, 595 rows) and 362 (lines, 684 rows) of facs_stip/data_catalog on the agency's OWN server gis.odot.state.or.us. OREGON'S FIRST STATEWIDE SOURCE \u2014 OR had five city-scoped entries (portland/salem/bend) and statewide.OR was EMPTY, leaving Lane 37, Jackson 18, Yamhill 12, Benton 9 and Hood River 3 with no coverage at all. \u26a0\ufe0f THE REST ROOT IS VERSIONED: gis.odot.state.or.us/arcgis returns HTTP 500 'Runtime Error'; the live root is /arcgis1006. A bare-path 500 is NOT evidence the agency has no GIS. \u26a0\ufe0f ACRONYM COLLISION \u2014 'odot-*' in this registry is OHIO (odot-current-projects). Oregon is 'oregon-dot-*' deliberately; do not read one as the other (the NDOT/NVDOT/NDDOT class). \u26a0\ufe0f THE LAT/LONGTD COLUMNS ARE A TRAP: both layers declare LAT and LONGTD (aliases 'Beginning Latitude'/'Beginning Longitude') and BOTH ARE NULL on live rows, while the SHAPE geometry is populated and correct (sample PROJ_KEY_NO 21719 -> x -124.2262, y 43.288..., wkid 4326). Mapping lat/lng to those columns would have emitted every record with no coordinates. The entry reads the connector's flattened __lat/__lng. REAL NAMED PROJECTS with full descriptions: 'OR42: US101 to Cedar Point Rd' (Coos, repair or replace culverts, federal fish-passage requirements), 'I-5: Monument Dr - N. Grants Pass' (Josephine), 'Cornelius Pass Hwy & US30 ITS improvements' (Multnomah). FRESHNESS: GIS_PRC_DT ('GIS Process Date') is '08/28/2026' on ALL 595 point rows \u2014 the layer was regenerated the day it was probed. BID_LET_DT runs 2024-01-05 to 2027-10-21, i.e. bid lettings scheduled 14 months forward. 0 rows have a null BID_LET_DT. COMPLETE VOCABULARIES, every one summing EXACTLY to its layer count with 0 nulls: COUNTYNAME 32 values -> 595 (points) and PROJ_PHASE_CURRENT_STIP_YR_NO 14 values -> 595 / 12 values -> 684. THE FORWARD WINDOW (the WYDOT discipline, byte-identical in shape to its drft_year >= 2026): PROJ_PHASE_CURRENT_STIP_YR_NO carries PAST years \u2014 285 of 595 point rows and 435 of 684 line rows are 2013-2025. A 2013 phase-year project may already be built and this service carries no evidence either way, so those rows are EXCLUDED rather than guessed: calling them proposed asserts not-yet-built without evidence, calling them operating fabricates completion. The window keeps 310 point + 249 line rows. NO file_date, DELIBERATELY (the sd-stip founder rider): PROJ_TRGT_DT and BID_LET_DT are FORECAST scheduling dates, and GIS_PRC_DT is the layer's own rebuild stamp, not a filing date. NO type_map: there is no work-type column at all. MNTR_CD ('Monitor Code') is the only type-ish field and is an UNDECODED 2-value code \u2014 PSEDOC 384 / CONST 211 on points (=595) and PSEDOC 363 / CONST 321 on lines (=684). It READS as a phase pair (PS&E-and-DOC vs Construction), which would let CONST bucket to `approved`, but the ARDOT discipline requires a DECODE RECEIPT from the agency's own material and there is none: the layer description and copyrightText are empty, the field alias says only 'Monitor Code', and the MapServer legend carries no labels for layers 361/362. Bucketing on a plausible reading would be a guess, so every row takes the status_const and buckets to `proposed` \u2014 the SD/MT/NE/WY STIP fleet shape. LOGGED, NOT DONE: decoding MNTR_CD would correctly move 211 point + 321 line rows to `approved`; that needs a founder-visible decode receipt first. REJECTED WITH RECEIPTS, same round: the other 20 folders on this server plus the ~250 sibling layers in data_catalog are ASSET INVENTORY, NEEDS and RISK surfaces (Bridges, SHN_Postmiles, Traffic-AADT, ADA Ramp Needs, Late-Century Wildfire Risk, ...) \u2014 the NDDOT bridge class; the SUPERSEDED STIP vintages 198/199 (2021-2024), 316-319, 200-203 and 202/203 are NOT wired, only the pair named '- Current'; odot.maps.arcgis.com is the GENERIC ANONYMOUS PORTAL (null name, null id), not an org \u2014 the Corvallis S.p.A. trap; AGO org uUvqNMGPm7axC2dD is named 'Oregon ArcGIS Online', the state's shared org rather than an ODOT-owned one, so the agency server is the first-party read. dataset_url is ODOT's own STIP page (HTTP 200 same round); neither layer has a per-record URL column, so precision is `dataset` and templating one would be guessing. THIS ENTRY reads layer 361, the POINT half, and YIELDS to the lines entry. The overlap is MEASURED, not assumed: on the wired forward subset the points carry 137 distinct PROJ_KEY_NO and the lines 60, sharing 22 \u2014 union 175 distinct projects. Without the yield those 22 would double-emit across two source_registry_ids, which exact-identity dedup cannot catch (the Houston-plats class). Points yield to lines because a polyline intersects many ZIP radii where a point sits in exactly one. 310 rows in the window, Lane 43 \u2014 Lane's 49 records across the pair are what lift its 37 dark pages."
+    },
+    {
+      "registry_id": "oregon-dot-stip-projects-lines",
+      "platform": "arcgis",
+      "service_url": "https://gis.odot.state.or.us/arcgis1006/rest/services/facs_stip/data_catalog/MapServer/362",
+      "dataset_url": "https://www.oregon.gov/odot/STIP/Pages/index.aspx",
+      "jurisdiction": "Oregon Department of Transportation (ODOT)",
+      "coverage": [
+        {
+          "state": "OR"
+        }
+      ],
+      "column_map": {
+        "title": "PROJ_NM",
+        "address": "HWYNAME",
+        "case_number": "PROJ_KEY_NO",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "status_const": "Programmed in the ODOT 2024-2027 Statewide Transportation Improvement Program (STIP)",
+      "status_to_bucket": {
+        "proposed": [
+          "Programmed in the ODOT 2024-2027 Statewide Transportation Improvement Program (STIP)"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "use_type_const": "Utility",
+      "extra_where": "PROJ_PHASE_CURRENT_STIP_YR_NO >= 2026",
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "PROJ_KEY_NO",
+        "PROJ_NM",
+        "HWYNAME",
+        "PROJ_PHASE_CURRENT_STIP_YR_NO"
+      ],
+      "record_url_precision": "dataset",
+      "_receipts": "[VERIFIED 2026-08-28 via pg_net against the live endpoint, in the connector's own scope] ODOT Statewide Transportation Improvement Program 2024-2027, layers 361 (points, 595 rows) and 362 (lines, 684 rows) of facs_stip/data_catalog on the agency's OWN server gis.odot.state.or.us. OREGON'S FIRST STATEWIDE SOURCE \u2014 OR had five city-scoped entries (portland/salem/bend) and statewide.OR was EMPTY, leaving Lane 37, Jackson 18, Yamhill 12, Benton 9 and Hood River 3 with no coverage at all. \u26a0\ufe0f THE REST ROOT IS VERSIONED: gis.odot.state.or.us/arcgis returns HTTP 500 'Runtime Error'; the live root is /arcgis1006. A bare-path 500 is NOT evidence the agency has no GIS. \u26a0\ufe0f ACRONYM COLLISION \u2014 'odot-*' in this registry is OHIO (odot-current-projects). Oregon is 'oregon-dot-*' deliberately; do not read one as the other (the NDOT/NVDOT/NDDOT class). \u26a0\ufe0f THE LAT/LONGTD COLUMNS ARE A TRAP: both layers declare LAT and LONGTD (aliases 'Beginning Latitude'/'Beginning Longitude') and BOTH ARE NULL on live rows, while the SHAPE geometry is populated and correct (sample PROJ_KEY_NO 21719 -> x -124.2262, y 43.288..., wkid 4326). Mapping lat/lng to those columns would have emitted every record with no coordinates. The entry reads the connector's flattened __lat/__lng. REAL NAMED PROJECTS with full descriptions: 'OR42: US101 to Cedar Point Rd' (Coos, repair or replace culverts, federal fish-passage requirements), 'I-5: Monument Dr - N. Grants Pass' (Josephine), 'Cornelius Pass Hwy & US30 ITS improvements' (Multnomah). FRESHNESS: GIS_PRC_DT ('GIS Process Date') is '08/28/2026' on ALL 595 point rows \u2014 the layer was regenerated the day it was probed. BID_LET_DT runs 2024-01-05 to 2027-10-21, i.e. bid lettings scheduled 14 months forward. 0 rows have a null BID_LET_DT. COMPLETE VOCABULARIES, every one summing EXACTLY to its layer count with 0 nulls: COUNTYNAME 32 values -> 595 (points) and PROJ_PHASE_CURRENT_STIP_YR_NO 14 values -> 595 / 12 values -> 684. THE FORWARD WINDOW (the WYDOT discipline, byte-identical in shape to its drft_year >= 2026): PROJ_PHASE_CURRENT_STIP_YR_NO carries PAST years \u2014 285 of 595 point rows and 435 of 684 line rows are 2013-2025. A 2013 phase-year project may already be built and this service carries no evidence either way, so those rows are EXCLUDED rather than guessed: calling them proposed asserts not-yet-built without evidence, calling them operating fabricates completion. The window keeps 310 point + 249 line rows. NO file_date, DELIBERATELY (the sd-stip founder rider): PROJ_TRGT_DT and BID_LET_DT are FORECAST scheduling dates, and GIS_PRC_DT is the layer's own rebuild stamp, not a filing date. NO type_map: there is no work-type column at all. MNTR_CD ('Monitor Code') is the only type-ish field and is an UNDECODED 2-value code \u2014 PSEDOC 384 / CONST 211 on points (=595) and PSEDOC 363 / CONST 321 on lines (=684). It READS as a phase pair (PS&E-and-DOC vs Construction), which would let CONST bucket to `approved`, but the ARDOT discipline requires a DECODE RECEIPT from the agency's own material and there is none: the layer description and copyrightText are empty, the field alias says only 'Monitor Code', and the MapServer legend carries no labels for layers 361/362. Bucketing on a plausible reading would be a guess, so every row takes the status_const and buckets to `proposed` \u2014 the SD/MT/NE/WY STIP fleet shape. LOGGED, NOT DONE: decoding MNTR_CD would correctly move 211 point + 321 line rows to `approved`; that needs a founder-visible decode receipt first. REJECTED WITH RECEIPTS, same round: the other 20 folders on this server plus the ~250 sibling layers in data_catalog are ASSET INVENTORY, NEEDS and RISK surfaces (Bridges, SHN_Postmiles, Traffic-AADT, ADA Ramp Needs, Late-Century Wildfire Risk, ...) \u2014 the NDDOT bridge class; the SUPERSEDED STIP vintages 198/199 (2021-2024), 316-319, 200-203 and 202/203 are NOT wired, only the pair named '- Current'; odot.maps.arcgis.com is the GENERIC ANONYMOUS PORTAL (null name, null id), not an org \u2014 the Corvallis S.p.A. trap; AGO org uUvqNMGPm7axC2dD is named 'Oregon ArcGIS Online', the state's shared org rather than an ODOT-owned one, so the agency server is the first-party read. dataset_url is ODOT's own STIP page (HTTP 200 same round); neither layer has a per-record URL column, so precision is `dataset` and templating one would be guessing. THIS ENTRY reads layer 362, the POLYLINE half; featurePoint() pins it at the midpoint of the longest path. 249 rows in the window, 60 distinct PROJ_KEY_NO, Lane 6. Note COUNTYNAME on this layer includes the non-county value 'VARIOUS' (3 rows) \u2014 never map it as a county; coverage is statewide and scoping is spatial."
     }
   ],
   "ckan": [
