@@ -11322,3 +11322,42 @@ which selects from `development_reports` by oldest-refresh rotation and never re
 `dev_refresh_targets`. `dev_refresh_fire_targets()` exists but no job calls it. Harmless today (no
 behaviour depends on it) but do not "queue" a rollout there expecting it to run — the oldest-refresh
 rotation is what actually re-fires pages, on the ~2.2-day full cycle.
+
+
+## IOWA PASS (2026-08-28) — a genuine source desert, and NOT a rollout gap
+
+Coverage checked FIRST (the ND lesson): IA has exactly one wired source,
+**`iowa-dot-bid-projects`** (statewide), reaching **60 pages with 225 records**.
+
+**IA: 225 pages · 83 lit · 142 registry-dark · but only 106 TRULY EMPTY** (36 of the dark carry
+real content from the planning-notices path — see the dark-metric correction in the Oregon pass).
+
+Truly-empty by county: Linn 17 (Cedar Rapids) · Dallas 16 · Warren 15 · Polk 14 (Des Moines) ·
+Scott 13 (Davenport) · Black Hawk 11 · Johnson 10 · Pottawattamie 9 · Dubuque 1 · Story 0.
+
+### ⚠️ IOWA IS NOT A ROLLOUT GAP — measured, not assumed
+
+Oregon's covered-but-dark pages were **25% recoverable** by a simple re-fire. Iowa is **0%**:
+6 truly-empty pages re-fired through the live engine returned **0 development records and gained
+0 pages**. The statewide DOT genuinely does not reach them, so the only lever here is a NEW source.
+**Run this 6-page re-fire test before reconning any state** — it costs one batch and tells you
+whether you are looking for a source or just a refresh.
+
+### Rejections, with receipts
+
+- **`data.iowa.gov` is NO LONGER A SOCRATA PORTAL.** The catalog API returns 404 and the site
+  returns a Next.js error page. ⚠️ **This zero is trustworthy only because of its POSITIVE
+  CONTROL**: the identical query against `data.cityofchicago.org` returned **66 results**, proving
+  the endpoint and query shape work. A bare 404 from a catalog API is otherwise indistinguishable
+  from a malformed query.
+- **Des Moines** — `desmoines.maps.arcgis.com` IS a real org (`HT7H9QGiZQoRJDpJ`, "City of Des
+  Moines"), 77 items, but the only permit-adjacent layers are **Building Footprints** (asset
+  inventory) and **Development Control Zones** (zoning polygons). No permit ledger. Inventory
+  rejection class.
+- **Cedar Rapids** (`cedar-rapids`, `cityofcr`) and **Iowa City** (`icgov`) and **`dsm`** — all
+  return the GENERIC ANONYMOUS PORTAL (`id:null`). Not orgs.
+- **`data.dsm.city`** — 404, not a Socrata domain.
+
+**Not exhausted:** Davenport/Scott (13), Waterloo/Black Hawk (11), and the Iowa cities' own
+non-ArcGIS-Online permit portals (Accela / eTRAKiT / city GIS servers) were not probed. Iowa's
+municipal tier likely needs the city-GIS-server path (the Frisco/Eugene pattern), not AGO orgs.
