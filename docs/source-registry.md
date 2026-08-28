@@ -11174,9 +11174,44 @@ full-fleet cycle from ~13 h to ~33 days; tightening the collect guard to refuse 
 *decrease* would freeze pages at stale inflated counts, since — unlike a retired source — a
 genuinely closed facility has no `explained` path.
 
-🔭 **Still open: firing concurrency.** The fix makes degradation honest, which means refreshes that
-would have written an undercount now correctly return `ok:false` and are refused. Under `_batch=250`
-that trades "silently wrong" for "correct but stale" — a strict improvement, but not the end state.
-Bounding the firing concurrency needs its own measurement. Note the natural knob,
-**`pg_net.batch_size` (currently 200), is DATABASE-WIDE and shared with the ingest pipeline**, so it
-is not the right lever.
+#### ✅ FIRING CONCURRENCY MEASURED AND SET — 8 every 2 minutes (2026-08-28)
+
+The fix makes degradation honest, which means a refresh that would have written an undercount now
+correctly returns `ok:false` and is refused. Under `_batch=250` that traded "silently wrong" for
+"correct but stale", so the batch size was **measured, not guessed**.
+
+**Method — the same 32 ZIPs in every arm**, so batch size is the only variable. Pool drawn from
+pages with cached `facilities > 0` (so a degraded read is detectable), `cron.job` 14 **paused for
+the duration** so the 250-wide tick could not contaminate the signal, and the queue confirmed
+empty before each arm.
+
+| arm | HTTP 200 | `epa.ok` | % of 32 | avg attempts | answered at full 3 mi |
+|---|--:|--:|--:|--:|--:|
+| A: 32 at once | 29 | 16 | **50.0%** | 2.21 | 16 |
+| B: 16 at a time | 32 | 28 | **87.5%** | 1.72 | 22 |
+| C: 8 at a time | 32 | 32 | **100%** | 1.69 | 22 |
+
+⚠️ **The internal control that makes this a real result: 22 ZIPs answered at the full 3 mi in BOTH
+B and C — identical.** The pool's density profile (22 full / 10 legitimately shrunk by the
+process limit) is stable across batch sizes, so the thing moving is the failure rate, not the
+geography. Without that control, "more ZIPs succeeded" could just have been a different mix.
+
+**Both ends are measured.** The live tick at `_batch=250`, running for 12 hours *after* the fix
+deployed: **1,932 responses, 275 with `epa.ok` — 14.2%.**
+
+| | fired/day | yield | **clean refreshes/day** |
+|---|--:|--:|--:|
+| was — 250 every 15 min | 24,000 | 14.2% | ~3,408 |
+| now — 8 every 2 min | 5,760 | ~100% | **5,760** |
+
+**Firing 4.2× fewer requests yields ~1.7× more correct refreshes.** Applied to `cron.job` 14:
+`*/2 * * * *` running `select public.dev_refresh_tick(8, 20);`. Full-fleet cycle 12,722 pages ÷
+5,760/day ≈ **2.2 days**, which is well inside the rate at which permit data changes.
+
+**Live confirmation at the new setting — 4 consecutive automated ticks, ~6 minutes: 31 of 32
+`epa.ok` (96.9%)**, avg 1.44 attempts, 435 facilities returned. That is the *sustained* rate, not
+a single burst, which is what the 2-minute cadence had to clear.
+
+⚠️ **`pg_net.batch_size` (200) is the wrong lever and must not be touched for this** — it is a
+DATABASE-WIDE setting shared with the ingest pipeline, so narrowing it to protect FRS would
+throttle everything else in the project.
