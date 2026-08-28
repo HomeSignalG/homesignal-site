@@ -11546,3 +11546,98 @@ cycle completes in ~2.2 days and reaches every CA page with no new machinery. Ad
 firing path would double concurrent FRS load, which is precisely the condition the batch-size
 measurement showed degrades correctness from 100% at 8 to 50% at 32. **A faster rollout that
 undercounts EPA facilities is worse than a slower one that does not.**
+
+---
+
+## OREGON DOT WIRE PASS — the ODOT STIP pair (2026-08-28)
+
+Follow-up to the Oregon pass above, which left Lane (37 dark) as the state's biggest prize with
+LCOG "unexhausted". The answer turned out not to be LCOG at all.
+
+**WIRED — `oregon-dot-stip-projects` + `oregon-dot-stip-projects-lines`.** ODOT's Statewide
+Transportation Improvement Program on the agency's OWN server, `gis.odot.state.or.us`, folder
+`facs_stip`, service `data_catalog`: layer **361** `STIP 2024-2027 Points - Current` (595 rows,
+point) and layer **362** `STIP 2024-2027 Lines - Current` (684 rows, polyline). **Oregon's first
+statewide source** — `statewide.OR` was empty and the state's five entries were all city-scoped
+(Portland, Salem, Bend).
+
+Real named projects with full descriptions: `OR42: US101 to Cedar Point Rd` (Coos — "Repair or
+replace culverts… address federal fish passage requirements") · `I-5: Monument Dr - N. Grants
+Pass` · `Cornelius Pass Hwy & US30 ITS improvements`.
+
+**Every vocabulary sums EXACTLY to its layer count, 0 nulls:** `COUNTYNAME` 32 values → 595 ·
+`PROJ_PHASE_CURRENT_STIP_YR_NO` 14 → 595 and 12 → 684 · `MNTR_CD` 2 → 595 and 684.
+
+**Freshness:** `GIS_PRC_DT` ("GIS Process Date") is `08/28/2026` on **all 595** point rows — the
+layer was regenerated the day it was probed. `BID_LET_DT` runs 2024-01-05 → 2027-10-21, 0 nulls.
+
+### ⚠️ THREE TRAPS, each pinned by `test/oregon-dot-stip-pair.test.mjs`
+
+1. **THE REST ROOT IS VERSIONED.** `gis.odot.state.or.us/arcgis` returns **HTTP 500 "Runtime
+   Error"**; the live root is **`/arcgis1006`**. **Standing answer: a bare-path 500 is not
+   evidence an agency has no GIS — it is evidence you guessed the instance path.** Had the probe
+   stopped at the 500, Oregon would have been recorded as a DOT-less state.
+2. **`LAT` and `LONGTD` ARE DECLARED AND NULL.** Both layers carry them with the aliases
+   "Beginning Latitude"/"Beginning Longitude", and both are **null on live rows**, while `SHAPE`
+   is populated and correct (`PROJ_KEY_NO` 21719 → x −124.2262, y 43.288…, wkid 4326). Mapping
+   `lat`/`lng` to those columns would have emitted **every record with no coordinates** — listed,
+   never pinned, and dropped by the point-scope-only materializer. The entries read `__lat`/`__lng`
+   and do not even fetch the null columns.
+3. **`odot-*` IN THIS REGISTRY IS OHIO** (`odot-current-projects`). Oregon is `oregon-dot-*` on
+   purpose — the NDOT-Nebraska / NVDOT-Nevada / NDDOT-North-Dakota class.
+
+### The forward window, and the duplicate guard
+
+`PROJ_PHASE_CURRENT_STIP_YR_NO` carries **2013–2027**: 285 of 595 point rows and 435 of 684 line
+rows sit at or before 2025. A 2013 phase-year project may already be built and the service carries
+no evidence either way, so `extra_where: PROJ_PHASE_CURRENT_STIP_YR_NO >= 2026` **excludes rather
+than guesses** — proposed asserts not-yet-built, operating fabricates completion. The WYDOT
+`drft_year >= 2026` call, byte-identical in shape. The window keeps **310 point + 249 line** rows.
+
+Overlap is **measured, not assumed**: on the wired subset the points carry **137** distinct
+`PROJ_KEY_NO`, the lines **60**, sharing **22** — union **175**. Points `yields_to` lines, so those
+22 cannot double-emit across two `source_registry_id`s (the Houston-plats class, which
+exact-identity dedup cannot catch).
+
+### `MNTR_CD` is NOT bucketed — logged, not guessed
+
+It reads as a phase pair (`PSEDOC` 384/363, `CONST` 211/321) and bucketing `CONST` to `approved`
+is tempting. The ARDOT discipline requires a **decode receipt from the agency's own material**, and
+there is none: the layer `description` and `copyrightText` are both empty, the field alias says
+only "Monitor Code", and the MapServer `legend` carries no labels for 361/362. **Decoding it would
+correctly move 211 point + 321 line rows to `approved` — a founder-visible improvement, deliberately
+not taken on a plausible reading.**
+
+### Go-live smoke — 4 pages lit, and the two refusals are the FRS fix working
+
+Deployed on merge commit `d8e4124` (`deploy-edge-functions` run 33209437499, success), then 8 dark
+Lane ZIPs re-fired at the measured-safe batch size. All 8 returned HTTP 200.
+
+| ZIP | STIP pts | lines | outcome |
+|---|--:|--:|---|
+| 97401 Eugene | 16 | 3 | **lit, 19 records** |
+| 97477 Springfield | 15 | 0 | **lit, 15** |
+| 97405 Eugene S | 9 | 0 | **lit, 9** |
+| 97478 Springfield E | 3 | 0 | **lit, 3** |
+| 97408 Eugene N | 0 | 0 | honest empty — no STIP project within 3 mi |
+| 97448 Junction City | 0 | 0 | honest empty |
+| 97402 Eugene W | 7 | 3 | **refused — EPA `ok:false`** |
+| 97439 Florence | 0 | 2 | **refused — EPA `ok:false`** |
+
+**46 records cached across 4 pages: 0 missing `record_url`, 0 missing coordinates, 0
+`unclassified`, 0 non-`point` scope**, one `use_type` (`Utility`), one bucket (`proposed`).
+Coordinates span lat 44.035–44.099 / lng −123.129…−122.929 — Eugene–Springfield, correct.
+Per-source run reports: `emitted 10 / fetched 10` and `emitted 3 / fetched 3`, with
+`quarantined []`, `no_record_url 0`, `geocode_failures 0`, `unmapped_statuses []`.
+Gate proof cache-wide: 4 pages, states = `OR` only, **0 records on any non-OR page**.
+
+⚠️ **The two refusals are the system behaving correctly and must not be forced.** Both returned
+`"epa": {"ok": false, "reason": "transient", "attempts": 4, "radius_used": null}` — the honest
+outcome from the 2026-08-27 FRS fix, which stops at the requested radius instead of walking down
+to 0.25 mi and returning a smaller truth. `dev_refresh_collect` reads that per-response flag (not
+just the global probe, which was HEALTHY at the time — both `epa_frs_probes` targets `ok`, 5
+minutes old) and its transient-safe clause blocked the whole row, so 97402 kept its cached 12
+facilities and 97439 its 6 rather than being overwritten with a false zero. Re-firing them ALONE
+returned `ok:false` again, so this is not concurrency. **The cost is that their STIP records wait
+too — the row is refused as a unit — and the right response is to let the 2-minute rotation retry
+them, never to collect a zero over real facility counts.**
