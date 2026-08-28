@@ -11510,3 +11510,39 @@ registers; using one instrument on the other class rejects good sources and acce
   **zero features**; a `Caltrans projects` search returns only road-network, airport,
   hydrogen-fueling and habitat-connectivity layers.
 
+### Go-live smoke — 10 of 10 previously-dark pages lit (2026-08-28)
+
+Deployed on merge commit `4b2583f` (`deploy-edge-functions` run 33205490125, all steps green),
+then ten previously-dark CA ZIPs re-fired through the LIVE engine at the measured-safe batch size
+of 8 (the 2026-08-27 FRS concurrency measurement: 32-at-once 50.0% correct · 16 87.5% · 8 100%).
+
+All ten returned HTTP 200 and **all ten lit** — two per uncovered county:
+
+| ZIP | county | Caltrans records | ZIP | county | Caltrans records |
+|---|---|---|---|---|---|
+| 94501 | Alameda | 143 | 94002 | San Mateo | 81 |
+| 94502 | Alameda | 16 | 94005 | San Mateo | 17 |
+| 94505 | Contra Costa | 1 | 94515 | Sonoma | 7 |
+| 94506 | Contra Costa | 1 | 94574 | Sonoma | 2 |
+| 90265 | Ventura | 6 | 91304 | Ventura | 5 |
+
+**Every record from the eight-ZIP batch passes every invariant — 268 records, 0 missing
+`record_url`, 0 missing coordinates, 0 `unclassified`, 0 non-`point` scope.** One `use_type`
+(`Utility`) and only the `approved`/`proposed` buckets, i.e. `extra_where` is doing its job and no
+Completed row reached a page. Coordinates span lat 37.489–38.621 / lng −122.598…−121.569 —
+Bay Area to Napa, geographically correct. Because these five counties had **zero** prior coverage,
+`sourced == caltrans` exactly on every page, which is its own control.
+
+Persistence confirmed after `dev_refresh_collect()`: all ten rows carry the same counts they
+returned live.
+
+**Bidirectional coverage-gate proof, cache-wide:** 10 pages carry `caltrans-sb1-projects`,
+**279 records, states = `CA` only, `caltrans_on_NON_CA_pages` = 0**, across exactly Alameda,
+Contra Costa, San Mateo, Sonoma and Ventura.
+
+⛔ **The remaining CA dark pages are deliberately left to the existing rotation, NOT accelerated.**
+`cron.job` 14 runs `dev_refresh_tick(8, 20)` every 2 minutes — 240 pages/hour, so the full 12,722
+cycle completes in ~2.2 days and reaches every CA page with no new machinery. Adding a second
+firing path would double concurrent FRS load, which is precisely the condition the batch-size
+measurement showed degrades correctness from 100% at 8 to 50% at 32. **A faster rollout that
+undercounts EPA facilities is worse than a slower one that does not.**
