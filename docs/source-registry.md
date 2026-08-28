@@ -11269,3 +11269,56 @@ outside Burleigh.
 2. **ND is genuinely low-density, not source-poor by oversight.** 155 rural ZIP pages spread wide;
    even a good statewide source reaches few centroids. Measure the lift BEFORE spending a wire:
    the 6-page prediction here was computed from the layer's live extent and matched exactly.
+
+
+## OREGON PASS (2026-08-28) — no new source; two corrections that matter more
+
+**OR was already wired** (`portland-building-permits` covering Multnomah/Washington/Clackamas,
+`salem-structure-permits` Marion, `bend-or-permit-applications` Deschutes). Checking that FIRST is
+the ND lesson applied, and it reframed the work: of OR's 147 dark pages, **68 sit in counties that
+already have a source** and only **79** are in counties with none (Lane 37, Jackson 18, Yamhill 12,
+Benton 9, Hood River 3).
+
+### ⚠️ CORRECTION TO THE HEADLINE DARK METRIC — 2,602 is not the number of empty pages
+
+"Dark" has been measured as *0 sites carrying a `source_registry_id`* (the UT/AZ standing answer,
+which exists to measure MAP-RENDERING source data). Measured cache-wide 2026-08-28:
+
+| | pages |
+|---|--:|
+| total | 12,722 |
+| lit by the registry metric | 10,120 |
+| **"dark" by the registry metric** | **2,602** |
+| — of those, carrying REAL development content from the planning-notices path | **504** (4,227 records) |
+| — **truly empty (no development content at all)** | **2,098** |
+
+**504 pages a resident would see content on are counted as dark.** The registry metric is still the
+right instrument for *source coverage*, but it is NOT the count of empty pages, and campaign
+reporting should say which one it means. Found because OR 97144 stored 15 development records with
+`sourced_stored = 0`.
+
+### Rejections, with receipts
+
+- **Corvallis** — `corvallis.maps.arcgis.com` IS a real org, `Qlfno8RRTw2bY041`, named
+  **"Corvallis S.p.A."** — an ITALIAN corporation (`S.p.A.` = Societa per Azioni), not the City of
+  Corvallis, Oregon. The WV/"World Vision" trap exactly: a live org for a completely different
+  entity. Wiring it would have published an Italian company's data on Oregon pages. **Always read
+  the org NAME, not just the id.**
+- **Eugene / Lane (37 dark, the state's biggest prize)** — `eugene`/`lanecounty`.maps.arcgis.com
+  return the generic anonymous portal. The city's real Hub (`mapping.eugene-or.gov`) offers
+  "Where Eugene Development is Happening", but walking app -> web map -> operationalLayers shows it
+  is a **Buildable Lands Inventory** (zoning, UGB, "Development Potential 2012-2032", protected
+  areas) — planning-capacity polygons, not permit records. The city's own server
+  `gis.eugene-or.gov/arcgis/rest/services/PDD` has 12 services, ALL cadastral reference
+  (Address/Buildings/Taxlots/Zoning/Historic/Property) — **no permits layer**.
+  **LCOG is a real org** (`9s1YtFmLS0YTl10F`, 465 items) and is the remaining lead, unexhausted.
+- **RVCOG is a real org** (`ULDicaHfvMRD52nd`, Rogue Valley COG) carrying MPO **TIP/RTP project
+  layers** — a STIP-class candidate for Jackson (18 dark), unexhausted.
+
+### 🔭 Also found: `public.dev_refresh_targets` is an ORPHANED QUEUE
+
+792 unfired rows, and **nothing drains it**: `dev_refresh_tick` calls `dev_refresh_fire_batch`,
+which selects from `development_reports` by oldest-refresh rotation and never reads
+`dev_refresh_targets`. `dev_refresh_fire_targets()` exists but no job calls it. Harmless today (no
+behaviour depends on it) but do not "queue" a rollout there expecting it to run — the oldest-refresh
+rotation is what actually re-fires pages, on the ~2.2-day full cycle.
