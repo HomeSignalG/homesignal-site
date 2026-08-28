@@ -79,3 +79,43 @@ select cron.schedule('dev-reports-refresh-collect', '8 9 * * *', 'select public.
 -- on its prior facility-floor row (re-collects on the next nightly fire). app_projects then
 -- materialized 136 Provo development rows across 84601/84604/84606, 0 missing coords/source_ref,
 -- statuses Approved+Proposed (honest), sourced to provo.gov/174/Projects-and-Planning.
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────
+-- UPDATE 2026-08-28: FIRING CONCURRENCY CUT TO 8 EVERY 2 MINUTES — measured, not guessed.
+--
+-- Applied to the live scheduler:
+--     select cron.alter_job(
+--       job_id   := 14,
+--       schedule := '*/2 * * * *',
+--       command  := 'select public.dev_refresh_tick(8, 20);',
+--       active   := true);
+--
+-- WHY. Job 14 fired dev_refresh_tick() at its DEFAULT _batch of 250 every 15 minutes, i.e. 250
+-- concurrent edge invocations and therefore up to 250 concurrent EPA FRS calls. FRS throttles
+-- under that load. Before PR #952 the throttling silently UNDERCOUNTED facilities (a transient
+-- failure shrank the search radius and the tiny circle answered ok:true); after #952 it fails
+-- honestly as ok:false, so the pages stayed correct but stopped updating. Both are fixed by
+-- firing fewer at once.
+--
+-- MEASUREMENT (the same 32 ZIPs in every arm, so batch size is the only variable; job 14 paused
+-- for the duration so the 250-wide tick could not contaminate the signal):
+--     32 at once     16/32 epa.ok   50.0%   avg 2.21 attempts   16 answered at full 3 mi
+--     16 at a time   28/32 epa.ok   87.5%   avg 1.72 attempts   22 answered at full 3 mi
+--      8 at a time   32/32 epa.ok  100.0%   avg 1.69 attempts   22 answered at full 3 mi
+-- The control that makes it a real result: 22 answered at the FULL 3 mi in both the 16 and 8
+-- arms — identical. The pool's density profile is stable across batch sizes, so what moves is
+-- the failure rate, not the geography.
+--
+-- Both ends measured. The live tick at _batch=250, running 12 h AFTER #952 deployed: 1,932
+-- responses, 275 with epa.ok = 14.2%.
+--     was:  250 / 15 min = 24,000 fired/day x 14.2%  ~= 3,408 clean refreshes/day
+--     now:    8 /  2 min =  5,760 fired/day x ~100%  =  5,760 clean refreshes/day
+-- 4.2x fewer requests, ~1.7x more CORRECT refreshes. Full-fleet cycle 12,722 / 5,760 ~= 2.2 days,
+-- well inside the rate at which permit data changes.
+--
+-- Live confirmation at the new setting: 4 consecutive automated ticks over ~6 minutes returned
+-- 31/32 epa.ok (96.9%), avg 1.44 attempts — the SUSTAINED rate, not a single burst.
+--
+-- DO NOT "fix" this by lowering pg_net.batch_size (currently 200). That is a DATABASE-WIDE
+-- setting shared with the ingest pipeline; narrowing it to protect FRS throttles everything else
+-- in the project. The tick's own _batch is the correctly-scoped lever.

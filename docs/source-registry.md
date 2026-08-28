@@ -11124,11 +11124,94 @@ EVIDENCE OF THROTTLING.** Midtown Manhattan legitimately shrinks to 0.25 mi beca
 limit is *density*-driven — that is the v13 back-off doing its job. The discriminator is whether
 re-firing at low concurrency returns a **larger** radius, not the radius value alone.
 
-🛑 **THE FIX IS AN ENGINE CHANGE AND IS NOT TAKEN HERE.** Three candidates, none of them free:
-lowering `_batch` would push a full-fleet cycle from ~13 hours to ~33 days (not viable);
-tightening the collect guard to refuse any unexplained *decrease* would freeze pages at stale
-inflated counts, since — unlike a retired source — a genuinely closed facility has no `explained`
-path; the real repair is bounding FRS concurrency (or retrying at the original radius on a
-throttle) inside `get-address-report`'s `frsFacilities()`. That is a shipped-guard/engine change
-with a real behavioural surface, so it is recorded with receipts for the founder rather than
-bundled into a data rollout.
+#### ✅ FIXED AND DEPLOYED — PR #952, merge `030b955` (2026-08-27)
+
+**The root cause was not concurrency itself. It was a CODE BUG that concurrency exposed: a
+TRANSIENT failure was shrinking the search area.** In `sources/epa-frs.ts`, when the three retries
+at a radius were exhausted, the inner loop exited normally and the **outer loop advanced to the
+next, smaller radius** — so a flaky upstream silently narrowed the search until some tiny circle
+answered:
+
+```ts
+for (const rad of frsRadii(radiusMi)) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (ok) return ...;
+    if (tooBig) { reason = "process_limit"; break; } // too large → next smaller radius
+    reason = "transient";                            // else transient → retry the same radius
+  }
+}                                                    // ← ...but then shrank anyway
+```
+
+That contradicts **the module's own docblock and this repo's CLAUDE.md**, which both say the ladder
+shrinks *only* on the deterministic process-limit error and retries in place on a transient,
+"shrinking there undercounts". **The documented intent was right for months; the code never
+implemented it.** Under load every rung fails transiently, the ladder walks to 0.25 mi, and that
+circle returns a real-but-tiny count as `ok:true` — invisible to every guard.
+
+**The fix:** the first radius to exhaust its retries returns `ok:false`, so the caller preserves
+last-known-good instead of overwriting it with a smaller truth. **The density back-off is
+deliberately untouched** — a process-limit refusal still steps down, which is what dense pages
+legitimately need (10169 Midtown Manhattan answers only at 0.25 mi, loaded or not).
+
+**Live proof — the same 6 Orange ZIPs re-fired as a batch of 6, the exact condition that broke:**
+
+| zip | before | after |
+|---|---|---|
+| 92867 | 5 @ r=0.25 | **40 @ r=1** |
+| 92865 | 5 @ r=0.25 | **40 @ r=1** |
+| 92868 | 1 @ r=0.25 | **18 @ r=1** |
+| 92701 | 0 | `ok:false`, r=null — honest refusal, kept cached 29 |
+| 92866 | — | `ok:false`, r=null — honest refusal, kept cached 9 |
+
+**Not one response came back at 0.25 or 0.5 mi**, and the two that could not get a trustworthy
+answer said so; `dev_refresh_collect` refused those writes and both pages kept their cached counts
+with `refreshed_at` untouched. Regression: `epa-result-semantics` cases 12 (pins the fix; asserts
+no request is ever made *below* the failing radius) and 13 (pins the density path so it cannot
+overcorrect), both driving the shipped module, verified by mutation.
+
+⚠️ **The two rejected alternatives, so nobody re-proposes them:** lowering `_batch` would push a
+full-fleet cycle from ~13 h to ~33 days; tightening the collect guard to refuse any unexplained
+*decrease* would freeze pages at stale inflated counts, since — unlike a retired source — a
+genuinely closed facility has no `explained` path.
+
+#### ✅ FIRING CONCURRENCY MEASURED AND SET — 8 every 2 minutes (2026-08-28)
+
+The fix makes degradation honest, which means a refresh that would have written an undercount now
+correctly returns `ok:false` and is refused. Under `_batch=250` that traded "silently wrong" for
+"correct but stale", so the batch size was **measured, not guessed**.
+
+**Method — the same 32 ZIPs in every arm**, so batch size is the only variable. Pool drawn from
+pages with cached `facilities > 0` (so a degraded read is detectable), `cron.job` 14 **paused for
+the duration** so the 250-wide tick could not contaminate the signal, and the queue confirmed
+empty before each arm.
+
+| arm | HTTP 200 | `epa.ok` | % of 32 | avg attempts | answered at full 3 mi |
+|---|--:|--:|--:|--:|--:|
+| A: 32 at once | 29 | 16 | **50.0%** | 2.21 | 16 |
+| B: 16 at a time | 32 | 28 | **87.5%** | 1.72 | 22 |
+| C: 8 at a time | 32 | 32 | **100%** | 1.69 | 22 |
+
+⚠️ **The internal control that makes this a real result: 22 ZIPs answered at the full 3 mi in BOTH
+B and C — identical.** The pool's density profile (22 full / 10 legitimately shrunk by the
+process limit) is stable across batch sizes, so the thing moving is the failure rate, not the
+geography. Without that control, "more ZIPs succeeded" could just have been a different mix.
+
+**Both ends are measured.** The live tick at `_batch=250`, running for 12 hours *after* the fix
+deployed: **1,932 responses, 275 with `epa.ok` — 14.2%.**
+
+| | fired/day | yield | **clean refreshes/day** |
+|---|--:|--:|--:|
+| was — 250 every 15 min | 24,000 | 14.2% | ~3,408 |
+| now — 8 every 2 min | 5,760 | ~100% | **5,760** |
+
+**Firing 4.2× fewer requests yields ~1.7× more correct refreshes.** Applied to `cron.job` 14:
+`*/2 * * * *` running `select public.dev_refresh_tick(8, 20);`. Full-fleet cycle 12,722 pages ÷
+5,760/day ≈ **2.2 days**, which is well inside the rate at which permit data changes.
+
+**Live confirmation at the new setting — 4 consecutive automated ticks, ~6 minutes: 31 of 32
+`epa.ok` (96.9%)**, avg 1.44 attempts, 435 facilities returned. That is the *sustained* rate, not
+a single burst, which is what the 2-minute cadence had to clear.
+
+⚠️ **`pg_net.batch_size` (200) is the wrong lever and must not be touched for this** — it is a
+DATABASE-WIDE setting shared with the ingest pipeline, so narrowing it to protect FRS would
+throttle everything else in the project.

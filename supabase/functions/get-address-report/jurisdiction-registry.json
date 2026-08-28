@@ -15202,6 +15202,51 @@
         "expected_lift": "5 dark Orange County ZIP pages",
         "geometry": "coordinates come from the feature's OWN point geometry via the connector's flattened __lat/__lng, never a column default. The layer has no lat/lng attribute columns at all. Omitting these emitted records with NO coordinates - caught by test/city-of-orange-connector.test.mjs before any deploy, which is what that test is for."
       }
+    },
+    {
+      "registry_id": "nddot-special-road-fund-projects",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/EDijJFsQQwgz8X53/arcgis/rest/services/Special_Road_Fund_2026_WFL1/FeatureServer/0",
+      "dataset_url": "https://services1.arcgis.com/EDijJFsQQwgz8X53/arcgis/rest/services/Special_Road_Fund_2026_WFL1/FeatureServer/0",
+      "jurisdiction": "North Dakota Department of Transportation (NDDOT)",
+      "coverage": [
+        {
+          "state": "ND"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PROJNAM"
+        ],
+        "status_raw": null,
+        "address": [
+          "PROJLOC"
+        ],
+        "case_number": "PROJNUM",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "out_fields": [
+        "PROJNAM",
+        "PROJLOC",
+        "PROJNUM",
+        "IMPROVE",
+        "PROJCAT",
+        "SRF_Year"
+      ],
+      "status_const": "Programmed",
+      "status_to_bucket": {
+        "proposed": [
+          "Programmed"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "use_type_const": "Utility",
+      "spatial_zip_radius_mi": 3,
+      "record_url_precision": "dataset",
+      "_receipts": "[VERIFIED 2026-08-28 via pg_net against the live endpoint, in the connector's own scope] NDDOT Special Road Fund 2025-2026, 47 point records, the first NDDOT source of any kind (ND was 152/155 dark). Real named projects, e.g. 'Arnegard - Ball Diamond Road Improvements' with PROJLOC 'Arnegard' - not a type-only layer. IMPROVE vocabulary is COMPLETE: 20 distinct values whose groupBy counts sum EXACTLY to 47 with 0 blank/null; PROJCAT is 3 values (Historical/Recreational/Tourist Areas); SRF_Year is a SINGLE value '2025-2026', so every row is the current program. use_type_const 'Utility' rather than a 20-row type_map that would all map to one value - the NE/MT/UT/TX DOT precedent for road work, and it cannot fail closed on a 21st IMPROVE value. status_const 'Programmed' -> proposed, matching ndot-program-book-segments / mt-mdt-stip-lines / sd-stip-*. NO DATE FIELD EXISTS on this layer, which is acceptable: file_date is optional and five wired entries omit it (the rule that made the original AK rejection wrong). record_url: BOTH guessed NDDOT program pages (dot.nd.gov/business/special-road-fund and /special-road-fund) return a real 'Page not found | NDDOT' 404, so no page URL was templated - dataset precision on the service URL instead (Boulder/MT/NE machine-URL precedent). Measured lift BEFORE wiring: 6 of ND's 152 dark pages have a centroid within the connector's own 3-mi envelope of any of the 47 points. REJECTED alongside, with receipts: TA_FY2028 is a service described 'Transportation Alternatives webmap to be used by committee' (an internal working layer, not a public register); the NDDOT Bridge Inventory layers are ASSET REGISTERS, not projects (the North Richland Hills rejection class); Flex Fund Approved Projects is real but only 14 rows and is left unwired pending need. NOTE: Bismarck was ALREADY WIRED as bismarck-building-permits (PR #878, 'North Dakota's first source, with owner PII fenced out'); this SRF entry is the SECOND ND source, not the first. Check the registry for existing state coverage BEFORE starting a recon pass - that check would have saved this one."
     }
   ],
   "ckan": [
