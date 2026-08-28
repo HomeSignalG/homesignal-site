@@ -6439,7 +6439,7 @@ rushed). Every finding below is a live probe receipt.
 | **WV** | 212 | 🚫 `candidates_exhausted` | `owner:WVDOT_Publisher` enumerated — 64 items, **0** project/STIP services |
 | **NH** | 247 | 🚫 no first-party source | `owner:NHDOT` → **0 items** (no such org); `NHDOT_Projects` is owned by a personal account |
 | **OK** | 197 | 🚫 no source found | 2 query shapes → 0 ODOT project services |
-| **ND** | 155 | 🚫 no first-party source | hits are City of Minot (`maps.minotnd.org`) and a consultant, not NDDOT |
+| **ND** | 155 | ✅ **OVERTURNED 2026-08-28 — WIRED** | `nddot-special-road-fund-projects`. The rejection was a SEARCH artifact: `nddot.maps.arcgis.com` IS a real org (`EDijJFsQQwgz8X53`). See "NORTH DAKOTA WIRE PASS" below. |
 | **HI** | 97 | 🚫 no source found | 13 items, 0 project services |
 
 **Wireable total: 1,150 pages (NJ+ME+IA+VT) + RI 81.** Rejected: 1,009 pages across 6 states.
@@ -7902,7 +7902,7 @@ evidence**, never silently re-derived.
 | **OK** | 197 | 🚫 "no source found" | 🚫 **HELD, receipt upgraded** | 0 |
 | **WV** | 212 | 🚫 `candidates_exhausted` | 🚫 **CONFIRMED** | 0 |
 | **NH** | 247 | 🚫 no first-party org | 🚫 **CONFIRMED** | 0 |
-| **ND** | 155 | 🚫 no first-party org | 🚫 **CONFIRMED** (§0u) | 0 |
+| **ND** | 155 | 🚫 no first-party org | ✅ **OVERTURNED 2026-08-28** — the org exists | 6 |
 
 **113 pages lit. 977 stay on the EPA facilities floor** — and, importantly, **not because they were
 skipped**: every one of the five now has an enumeration receipt, not an inference.
@@ -11215,3 +11215,57 @@ a single burst, which is what the 2-minute cadence had to clear.
 ⚠️ **`pg_net.batch_size` (200) is the wrong lever and must not be touched for this** — it is a
 DATABASE-WIDE setting shared with the ingest pipeline, so narrowing it to protect FRS would
 throttle everything else in the project.
+
+
+## NORTH DAKOTA WIRE PASS (2026-08-28) — the rejection was a search artifact
+
+**ND's two standing verdicts ("no first-party source", "no first-party org — CONFIRMED") are
+OVERTURNED.** Both were reached by ArcGIS *search*, the same method already proven wrong for
+NH, OK and WV, and all three of those were later wired. ND was the fourth in that batch.
+
+| host | result |
+|---|---|
+| `nddot.maps.arcgis.com` | **REAL org** `EDijJFsQQwgz8X53` "North Dakota Dept. of Transportation" |
+| `bismarck.maps.arcgis.com` | **REAL org** `XxHmL09eFqJWI0gE` "City of Bismarck, ND" |
+| `fargond` / `grandforks` / `ndhub` `.maps.arcgis.com` | generic anonymous portal, `id:null` — **not orgs** |
+
+⚠️ **`ndot` is NEVADA.** An acronym search for ND is polluted by an unrelated live org for the
+wrong state, which is part of why the original pass concluded absence. North Dakota is **NDDOT**.
+
+### Wired
+
+**`nddot-special-road-fund-projects`** — Special Road Fund 2025-2026, statewide, 47 points, real
+named projects (`Arnegard - Ball Diamond Road Improvements`). `IMPROVE` complete: 20 values
+summing **exactly to 47**, 0 blank. `SRF_Year` is a single value, so every row is current.
+`use_type_const: Utility` + `status_const: Programmed` per the NE/MT/SD/UT/TX DOT precedent.
+No date field exists — acceptable (`file_date` is optional; five wired entries omit it).
+Both guessed NDDOT program URLs return a real `Page not found | NDDOT` 404, so nothing was
+templated: dataset precision on the service URL.
+
+**Rollout: ND 3 → 8 lit pages, 1,032 records across 8 pages.** SRF landed on **exactly the 6
+pages predicted before wiring**; Bismarck carries 3. Invariants: 0 missing `record_url`,
+0 missing coordinates, 0 unclassified. Gate proof: 0 records outside ND, and 0 Bismarck records
+outside Burleigh.
+
+### Rejected, with receipts
+
+- **TA_FY2028** — the service self-describes as *"Transportation Alternatives webmap to be used
+  by committee"*: an internal working layer, not a public register.
+- **NDDOT Bridge Inventory** (7 layers) — asset registers, not projects (North Richland Hills class).
+- **Minot** — server live (10.81, folders incl. `PublicMaps`) but that folder returns
+  `{"error":{"code":499,"message":"Token Required"}}`. Not public.
+- **Fargo / Grand Forks** — `gis.fargond.gov` and `gis.grandforksgov.com` both unreachable. The
+  only Fargo permit layer on ArcGIS is `2025_Building_Permits_Fargo` owned by
+  `david@horizonfargo.com_CCIM`, a **private commercial broker** — third-party, and precisely the
+  "a consultant, not NDDOT" trap the original verdict named. Fargo (30 dark) and Grand Forks (21)
+  remain the state's largest unclaimed prizes.
+- **Flex Fund Approved Projects** — real, 14 rows, left unwired pending need.
+
+### ⚠️ Two process lessons from this pass
+
+1. **CHECK THE REGISTRY FOR EXISTING STATE COVERAGE BEFORE RECONNING.** Bismarck was **already
+   wired** (`bismarck-building-permits`, PR #878). This pass rediscovered it from scratch —
+   including re-deriving its owner-PII fencing — because coverage was never checked first.
+2. **ND is genuinely low-density, not source-poor by oversight.** 155 rural ZIP pages spread wide;
+   even a good statewide source reaches few centroids. Measure the lift BEFORE spending a wire:
+   the 6-page prediction here was computed from the layer's live extent and matched exactly.
