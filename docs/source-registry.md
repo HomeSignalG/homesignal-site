@@ -11641,3 +11641,99 @@ facilities and 97439 its 6 rather than being overwritten with a false zero. Re-f
 returned `ok:false` again, so this is not concurrency. **The cost is that their STIP records wait
 too — the row is refused as a unit — and the right response is to let the 2-minute rotation retry
 them, never to collect a zero over real facility counts.**
+
+---
+
+## NEW MEXICO PASS (2026-08-29) — a source desert, and four traps worth more than the state
+
+Coverage checked FIRST (the ND lesson): NM had **`statewide.NM` empty** and exactly one entry,
+`albuquerque-building-permits`, county-scoped to Bernalillo + Sandoval. **115 dark pages sit in 8
+counties with no covering source**: Doña Ana 23 · Taos 21 · San Juan 20 · Otero 17 · Santa Fe 15 ·
+Eddy 9 · Valencia 8 · Los Alamos 2.
+
+**NO SOURCE WIRED.** Every candidate failed on evidence, and the failures are more useful than the
+state is.
+
+### NMDOT — the STALLED stamp HOLDS, now with a much stronger receipt
+
+QUEUE.md stamped NMDOT rejected on 2026-08-17 (ESTIP Project Locations, `dataLastEditDate`
+2023-08-24). Re-probed here because it sits on the nightly reprobe list. It is still stalled, and
+the re-probe found **two services the original miss had not seen** — both dead ends:
+
+- `Roadway_Projects` (`services.arcgis.com/hOpd7wfnKm16p9D9/.../Roadway_Projects/FeatureServer`)
+  — serviceDescription **"HSIP Roadway Projects"**, `hasStaticData: true`, single layer **4**.
+- `Other_Projects` — snippet **"HSIP Funded Projects 2018-2023"**, tags `["HSIP"]`, owner
+  `alma.pacheco_NMDOT`.
+
+Both are the same closed **2018-2023 safety-funding retrospective**, not a forward program. Under
+the forward-window discipline every row would be excluded, and calling them proposed would be
+false. NMDOT's 40 newest items are traffic counts, AADT, HPMS, mileposts, revegetation zones and
+PDFs — there is no forward project register anywhere in the org.
+
+### ⚠️ FOUR STANDING ANSWERS — each of these nearly produced a wrong verdict here
+
+1. **AN ITEM'S `modified` DATE IS NOT ITS DATA'S FRESHNESS. Read
+   `editingInfo.dataLastEditDate` ON THE LAYER.** `Roadway Projects` reports item
+   `modified = 2025-05-14`, which reads as reasonably current. Its layer 4 reports
+   `dataLastEditDate = 2023-06-22` — **23 months older**. The item date moved because the *schema*
+   was touched (`schemaLastEditDate` also 2025-05-14). Judging freshness from the item date would
+   have overstated this source by nearly two years.
+2. **A "NEWEST N ITEMS" LISTING IS A FRESHNESS VIEW, NOT A COMPLETENESS VIEW.** The first re-probe
+   read NMDOT's 40 newest items, which reach back only to 2026-06-29 — so `Roadway_Projects`
+   (2025-05-14) and `Other Projects` (2025-05-14) were **invisible to it**. A register updated
+   before the cutoff is indistinguishable from one that does not exist. **Completeness needs a
+   TERM search (`orgid:… AND (STIP OR project OR construction OR program)`), never a date sort.**
+3. **A SERVICE TITLED "PERMITTING LAYERS" CAN CONTAIN ZERO PERMITS.** The City of Alamogordo's org
+   is genuine (`tZhkGVr1gXGPSz0S`, "City of Alamogordo, New Mexico") and its
+   `Opengov_Permitting_Layers` FeatureServer is fresh (2026-06-16) — and holds 16 layers that are
+   **all basemap, asset or boundary**: Address Point, Police Station, Water Pressure Zones, Fire
+   Stations, City Owned Buildings, Road, Zoning, Subdivisions, Park, Parcels, City Limits, Fire
+   Inspection Zones, Commission Districts, Law Zones, Code Enforcement Districts, FEMA Floodplain.
+   The title names the **consuming platform** (OpenGov), not the payload. Rule 1 exactly: the word
+   appears, the thing does not.
+4. **A PLAUSIBLE TITLE ON A PERSONAL ACCOUNT IS NOT A GOVERNMENT SOURCE.** An AGO search surfaced
+   **"City Building Permits, New Mexico"** — owned by `cwesson_insights`, and an **Insights app**
+   (`insights.arcgis.com/#/view/…`), not a queryable service. Same class as the Corvallis S.p.A.
+   and World Vision traps: read the OWNER and the TYPE, not the title.
+
+### The one live register, rejected on freshness
+
+**City of Santa Fe `Developments_Public_view`** (org `p0Gk2nDbPs7KEqSZ`, name verified **"City of
+Santa Fe"**) is a genuine residential development pipeline — layer 0 `Developments_Master`,
+polygon, **80 records**, with `PjctStatus` (Project Status), `PermitID`, `NAME` (Project Name),
+`TYPE` (Single or Multi-Family), `UNITS` and `AFFORDABLE` (affordable-unit count). The city's
+"Residential Pipeline" web map reads off it.
+
+**Rejected: `dataLastEditDate` = 2024-08-22, twelve months stale.** This is a **LEDGER**, not a
+multi-year program register, so the Caltrans `FiscalYear`-horizon exemption does not apply — for a
+ledger, staleness means records are MISSING. It is staler than all three sources this project has
+rejected on freshness (St. Paul 2025-06-30, Syracuse 2025-08-16, Worcester 2025-09-09), so wiring
+it would be an inconsistency, not a judgement call. → nightly reprobe list. The org's only other
+Feature Service is a fire-weather layer.
+
+### Other rejections, with receipts
+
+- **`gis.dot.state.nm.us`** — DNS does not resolve (`Couldn't resolve host name`). Unlike Oregon,
+  where a bare-path HTTP 500 hid a live `/arcgis1006` root, here the hostname itself is absent;
+  NMDOT publishes through its AGO org.
+- **Santa Fe County** (org `OrtlXpzQGtgBGqsz`, verified name) — community centers, well-meter
+  readings, roads, ownership, WUI. Asset and cadastral only, no permit register.
+- **San Juan County, New Mexico** (org `Iq7du96UAXAOM1at`, verified name) — parcels, road
+  centerlines, recorded `Subdivisions`, electoral precincts and ~15 Survey123 forms. Its own
+  server `webmaps.sjcounty.net` is live (13 folders) but its `opendata` folder lists **0 services**.
+- **Doña Ana / Las Cruces** — real city accounts (`…@las_cruces.org_las_cruces`) publishing
+  `Subdivisions and Condos`, `Lots and Tracts`, parcels and address points. Cadastral, not
+  applications. `gis.las-cruces.org` does not resolve.
+- **Taos** — `BuildingPermits2017` and `ManufacturedHomePermits` exist on `services5.arcgis.com/
+  udGSUpHqkA8dJvR0`, but that org's `name` resolves **null** and the owner is a personal account
+  (`Eric_M_`). Rejected on PROVENANCE, not on content: a layer that cannot be attributed to the
+  jurisdiction must not be published as its record.
+- Subdomain guesses that returned the **generic anonymous portal** (null name, null id), i.e. NOT
+  orgs: `lascruces`, `cityoflascruces`, `donaanacounty`, `dacnm`, `taoscounty`, `oterocountynm`,
+  `losalamosnm`, `losalamoscounty`, `cityofsantafe`, `mrcog`, `fmtn`, `nmdot`.
+
+**Not exhausted, logged rather than claimed:** Doña Ana's own county GIS server (the biggest single
+block at 23) was not located; Los Alamos County's own server was not probed; and the **NM Oil
+Conservation Division** well-permit register (Eddy 9, Permian Basin) is a real per-record permit
+source that this pass did not evaluate — whether an oil-and-gas drilling permit belongs in the
+`development` bucket is a founder call, not a technical one.
