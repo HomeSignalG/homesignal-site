@@ -11940,3 +11940,73 @@ Across all 227 cached records: **0 missing `record_url`, 0 missing coordinates, 
 — Sonoma County, correct. **Gate proof cache-wide: 4 pages, `CA` only, county `Sonoma` only.**
 The remaining ZIPs wait on FRS and are retried by the 2-minute rotation — never forced, because
 forcing means overwriting real facility counts with a false zero.
+
+---
+
+## CONTRA COSTA PASS (2026-08-30) — no wire; a real ledger that stopped publishing in 2023
+
+Contra Costa was the one Bay Area county the previous pass never reached — **43 dark pages, no
+covering source**, logged then as unexhausted rather than absent. Probed here in full.
+
+**NO SOURCE WIRED.**
+
+### The county's own server is live and has no permits
+
+`https://gis.cccounty.us/arcgis/rest/services` — HTTP 200, ArcGIS 11.5, **23 folders**
+(`_Authoritative, Address_Locators, AddressPoints, AES, AIRPORTS, AnimalServices, Assessor,
+AUTHORATIVE, CCMAP, ConFire, EHSD, Elections, EMPLOYEEGIS, Hosted, HSD, INTERNET, INTRANET, OTHER,
+PublicWorks, RASTER, SHERIFF, SOFiscal, Utilities`). `ccmap.cccounty.us` is the same server.
+Contents are boundaries and reference data throughout: `_Authoritative` holds Board of Supervisor
+Districts, City Limits, County Boundary, Fire Stations, **General Plan**, Maintained Roads, Urban
+Limit Line and **Zoning**; `CCMAP` holds `Assessment_Parcels`; `INTERNET` holds `BASE_DATA`;
+`Hosted` holds ConFire, dental/food resource providers and GIS request forms. `PublicWorks` and
+`OTHER` list **zero services**. There is no permit or planning-application layer on the county
+server, and the county's AGO account (`CCCGISADMIN`) publishes only City Limits, Urban Limit Line
+and Supervisor Districts.
+
+### The real find, rejected on freshness — Richmond's PermitTRAK ledger
+
+`www.transparentrichmond.org` (Socrata) carries **40 permit-matching datasets**. Most are
+performance-portal derivatives — `type=measure` (Industrial/Commercial/Residential Building
+Permits, permit revenues) and `type=chart` (Applications Year to Date, Median Processing Time) —
+the New Jersey DCA aggregate-by-design class.
+
+⚠️ **But `Building Permits [cam8-vanq]` is NOT one of them, and dismissing it on `type=filter`
+would have been wrong.** Its view metadata reports `viewType=tabular`, attribution **`PermitTRAK`**,
+and a full per-record schema: `permit_no, description, site_address, site_city, site_zip, site_apn,
+type, subtype, status, jobvalue, bldg_sf, no_units, applied, approved, issued, finaled, expired,
+geocoded_column`. **Standing answer: a Socrata `type=filter` is a VIEW, not a verdict — resolve it
+to its base and read the columns before rejecting.**
+
+Jurisdiction confirmed as Richmond **California** (not Richmond VA — the lookalike this county is
+full of): `site_city` = RICHMOND 32,882 · EL SOBRANTE 258 · SAN PABLO 51 · EL CERRITO 38, all
+Contra Costa cities, and `site_zip` = 94801 8,090 · 94804 8,088 · 94803 2,778 · 94806 2,687 ·
+94805 2,441 — Richmond CA's own ZIPs. 33,346 records in the view, **161,250 in the base dataset
+`Permit TRAK [tkbh-qmdj]`**. Native ZIP column, so it would have needed no spatial radius.
+
+**REJECTED: the ledger stopped publishing.** `max(applied)` is **2023-05-17** on BOTH the view and
+the base, and the base's `rowsUpdatedAt` is **2023-05-18** — 27 months. This is a permit ledger, so
+the Caltrans program-horizon exemption does not apply and staleness means records are MISSING. It
+is staler than every source this project has rejected on that bar: Ventura 2023-08-17, Santa Fe
+2024-08-22, St. Paul 2025-06-30, Syracuse 2025-08-16, Worcester 2025-09-09. → nightly reprobe list.
+
+⚠️ Also carries an **absurd future date**: `max(issued)` = **2108-06-18**, a data-entry sentinel of
+the Contra Costa Legistar `2099-09-09` class. Had this been wired, that row would have pinned a
+perpetual top "upcoming" item on a resident's page. **Check the DATE EXTREMES, not just the
+freshest value** — the same query that proves staleness at one end exposes fiction at the other.
+
+### Other rejections, with receipts
+
+- **Concord, Antioch, Walnut Creek, San Ramon, Brentwood** — an AGO search across all five returns
+  Walnut Creek **alcohol** permits, Concord zoning and "Vacation House Checks", a Berkeley pipeline
+  layer, and CalFire hazard zones. No development register. A scoped Socrata query across the same
+  five returns **1** hit, a Bay Area Metro population dataset.
+- ⚠️ **Another cross-border lookalike, third this session:** `Policial San Ramón 2026_form`
+  matched the "San Ramon" search — that is San Ramón, **COSTA RICA**, not San Ramon, California.
+  After Santa Rosa County FL and Corvallis S.p.A., the pattern is settled: **on any city-name
+  search, read the owner and confirm the country before the state.**
+
+**Not exhausted, logged rather than claimed:** the individual cities' own permitting systems
+(Accela / eTRAKiT / Tyler EnerGov behind `.gov` portals rather than AGO or Socrata) were not
+probed for Concord, Antioch, Walnut Creek, Pittsburg, Brentwood or Martinez. That is the Frisco and
+Ann Arbor pattern and remains Contra Costa's most plausible route.
