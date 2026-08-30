@@ -11811,3 +11811,132 @@ Both halves are false:
 Lafayette Consolidated Government's actual portal, and the own-GIS-server tier for Livingston,
 Bossier, Ascension, Caddo and Calcasieu were not located. Louisiana's remaining route is the
 parish tier, not the state.
+
+---
+
+## CALIFORNIA BAY AREA PASS (2026-08-30) — one wire, and two instrument faults worth more
+
+Target: the **199 dark pages in the five CA counties with no covering source** — Alameda 51,
+Contra Costa 43, Sonoma 40, Ventura 34, San Mateo 31. `caltrans-sb1-projects` reaches all of them
+statewide but only where a STIP project falls inside the 3-mile envelope, which is not most
+residential ZIPs. These needed CITY/COUNTY permit portals, not a DOT.
+
+**WIRED: `sonoma-county-fire-rebuild-permits`** — see its own section below.
+
+### ⚠️ INSTRUMENT FAULT 1 — a Socrata catalog probe was answering for the WHOLE FEDERATION
+
+`https://<domain>/api/catalog/v1?q=permit` was fired at `data.oaklandca.gov`,
+`data.cityofberkeley.info` and `data.smcgov.org`, with `data.cityofchicago.org` as a positive
+control. **All four returned the IDENTICAL 4,419 hits**, led by the same dataset ids —
+`ydr8-5enu` (Chicago building permits) and `ipu4-2q9a` (NYC DOB). That endpoint federates: it
+answers for every Socrata domain, not the host it is addressed to.
+
+**The control is what caught it, and not in the way controls usually work.** A positive control
+normally proves an instrument CAN return non-zero. Here it returned *the same thing as every test*,
+which is the tell: **a uniform result across independent hosts is an instrument fault, never a
+finding** (the CivicPlus custom-User-Agent precedent, second occurrence).
+
+**The fix is to SCOPE the query**: `https://api.us.socrata.com/api/catalog/v1?domains=<domain>&q=…`.
+Re-run scoped, the same four probes discriminate properly — Chicago 66, Oakland **14**, Berkeley
+**0**, San Mateo **0** — and every Oakland hit carries `metadata.domain = data.oaklandca.gov`.
+Had the unscoped form been trusted, Berkeley and San Mateo would have been recorded as rich permit
+publishers when they publish nothing.
+
+### ⚠️ INSTRUMENT FAULT 2 — "Santa Rosa" matched the WRONG STATE
+
+An AGO search for Sonoma/Santa Rosa permits returned **`District 1`–`District 5 Building
+Permits_WFL1`**, owner `DylanA.src`, alongside `Santa Rosa County Commercial Developments 2022`
+and a `santarosagis.maps.arcgis.com` viewer. `SRC` is **Santa Rosa County, FLORIDA** — a
+five-district Panhandle county, not Santa Rosa, California in Sonoma County. Wiring it would have
+published Florida building permits on California ZIP pages. Same class as the Kent DE/RI trap and
+Corvallis S.p.A.: **a place name is not a place — confirm the state before the schema.**
+
+### Rejections with receipts
+
+- **Oakland** (Alameda, 51 dark) — scoped catalog returns 14 permit-matching datasets and **not
+  one is a building-permit ledger**: residential parking permit zones (×3), mobile food vending
+  (×4), downtown parking, census tracts, and an `Affordable Housing Production Pipeline`. A
+  `q=building` re-query returns footprints, soft-story, zoning and habitability complaints.
+- **Berkeley** (`data.cityofberkeley.info`) and **San Mateo County** (`data.smcgov.org`) — **0
+  hits each** on the scoped catalog. These zeroes are trustworthy *because* the same query shape
+  returned 66 for Chicago in the same round.
+- **Fremont** (Alameda) — `Major_Residential_Projects_with_Building_Permits` exists on the City of
+  Fremont GIS account (`EChew_cofgis`) but was last modified **2021-10-26**, nearly five years
+  stale. Its live sibling services are broadband, public WiFi, transit and a traffic StoryMap.
+- **Ventura County** (34 dark) — `County_of_Ventura_Planning_Sites` is a real 133-record register
+  with `PERMIT`, `PERMITSTAT`, `APPLICANT`, `ZONING` — but `dataLastEditDate` is **2023-08-17**,
+  24 months, worse than the Santa Fe register already rejected on that bar in the New Mexico pass;
+  its `COLLOCATIO` column marks it as telecom-collocation permits rather than general development;
+  and its org id `umIjvohPcWJU5ij6` resolves to a **null name**, so it fails the Taos provenance
+  test too. `Active_CUPs` is 2021-10-22.
+- **Sonoma County PRMD's other registers** — genuinely live (2026-08-21) but narrow and not
+  development: cannabis permits, transient vacation-rental permits and licences, plus zoning and
+  hazard overlays (floodway, farmlands, urban growth boundary, air/water quality board).
+- **Contra Costa (43 dark) was not reached at all** — no probe was run against its cities
+  (Concord, Richmond, Antioch, Walnut Creek). Logged as unexhausted, not as an absence.
+
+### WIRED — `sonoma-county-fire-rebuild-permits`
+
+Permit Sonoma's rebuild register for the 2017 Sonoma Complex, Kincade, Glass and Lightning fires.
+Org NAME receipt: `arcgis.com/sharing/rest/portals/P5Mv5GY5S66M8Z1Q` → **"The County of Sonoma"**.
+**2,094 records.** **Scope is narrow and deliberate: these are homes being rebuilt after they
+burned — NOT a general Sonoma permit ledger — so it lights the fire-affected ZIPs only.**
+
+Both vocabularies enumerated in BOTH `orderByFields` directions, each summing **EXACTLY** to 2,094
+with 0 nulls: `Permit_Status` = Finaled 1611 · Issued 237 · Expired 164 · Plan Check Expired 45 ·
+Resubmittal Requested 13 · Plan Check Comments Sent 7 · Pre-Issue/Payment Due 6 · Payment Due 3 ·
+Plan Check Approved 3 · Ready for Plan Check 2 · Application Accepted/In Review 1 · Awaiting
+Applicant Response 1 · Waiting for Other Approvals 1. `Category` = Single Family Home 1778 ·
+Accessory Dwelling Unit 246 · Bridge 40 · Multi-Family Home 30.
+
+#### ⚠️ THE ITEM DATE UNDERSTATED THIS SOURCE BY TEN MONTHS — the NMDOT trap in reverse
+
+The AGO item reports `modified 2025-10-31`. The **layer** reports
+`editingInfo.dataLastEditDate = 2026-08-30` — the day it was probed. `Date_Opened` spans
+2017-08-14 → 2026-07-24.
+
+**Standing answer, now proven in both directions: read `dataLastEditDate` ON THE LAYER.** The item
+date can **overstate** freshness (NMDOT `Roadway Projects`: item 2025-05-14, data 2023-06-22 — 23
+months too generous) or **understate** it (here, by 10 months). Judging either source by its item
+date produces the wrong verdict; they just fail opposite ways.
+
+#### ⚠️ GEOMETRY-LESS TABLE WITH **STRING** LAT/LNG — the hazard cleared before wiring
+
+`type=Table`, no `geometryType`, so it rides `spatial_latlng_cols` (the Scottsdale attribute-bbox
+path), which ANDs `Latitude >= ymin AND … AND Longitude <= xmax` into WHERE. `Latitude` and
+`Longitude` are `esriFieldTypeString`, and a **LEXICOGRAPHIC** comparison would scope **negative
+longitudes backwards** — `'-122…'` sorts below `'-123…'` as text. That is silently wrong and never
+raises an error.
+
+**Proven numeric on the live server BEFORE wiring**: the exact clause the connector emits for a
+3-mile envelope around Santa Rosa 95404 returned **72 rows, and all 72 fall inside it** — lat
+38.459913–38.492265 within [38.4053, 38.4923]; lng −122.737044 to −122.631023 within [−122.7390,
+−122.6282]; **0 outside**. Control: **0 of the 2,094 rows** carry a null or empty coordinate, so
+the clause drops nothing silently. Pinned offline by `test/sonoma-fire-rebuild-permits.test.mjs`.
+
+Other calls: `file_date` is `Date_Opened` (`filed`); `Approval_Date`/`Issue_Date`/
+`First_Inspection_Date` are real milestones but are not the filing. `"Plan Check Approved"` buckets
+to `approved` on the **publisher's own word** (the Anaheim `Approved` precedent), not on an
+inference about whether the permit issued. `"Finaled"` is a **completed rebuild** → `operating`,
+never excluded. Both Expired states excluded. `Bridge` → Utility. No `recency_days` — a window
+would delete 1,611 real completed rebuilds, and per-ZIP subsets run ~72 rows, far from any
+row-size ceiling. `dataset` precision on `permitsonoma.org` (HTTP 200 same round).
+
+#### Go-live smoke — 4 pages lit, 227 records, and an FRS outage mid-run
+
+Deployed on merge commit `a1b696b` (`deploy-edge-functions` run 33323062703, success). Eight
+fire-affected dark Sonoma ZIPs re-fired at the measured-safe batch size; **all 8 returned HTTP 200
+and 7 of 8 carried Sonoma records** — 95442 Glen Ellen **176**, 95405 Santa Rosa 37, 95492 Windsor
+25, 95404 18, 95401 13, 95441 13, 95446 1, and 95407 an honest 0 (no rebuild permit within 3 mi).
+
+**A live FRS outage hit mid-run**: 6 of the 8 returned `epa.ok:false`, so `dev_refresh_collect`
+refused those whole rows rather than write a false facilities zero. A second pass two minutes
+later found FRS partially recovered and landed two more. **4 pages persisted: 95401, 95441, 95442,
+95492 — 227 records.**
+
+Across all 227 cached records: **0 missing `record_url`, 0 missing coordinates, 0 `unclassified`,
+0 non-`point` scope**; use types `Residential` + `Utility`; all three live buckets present
+(`proposed`, `approved`, `operating`); coordinates span lat 38.346–38.743 / lng −122.880…−122.464
+— Sonoma County, correct. **Gate proof cache-wide: 4 pages, `CA` only, county `Sonoma` only.**
+The remaining ZIPs wait on FRS and are retried by the 2-minute rotation — never forced, because
+forcing means overwriting real facility counts with a false zero.
