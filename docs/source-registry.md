@@ -12010,3 +12010,86 @@ freshest value** — the same query that proves staleness at one end exposes fic
 (Accela / eTRAKiT / Tyler EnerGov behind `.gov` portals rather than AGO or Socrata) were not
 probed for Concord, Antioch, Walnut Creek, Pittsburg, Brentwood or Martinez. That is the Frisco and
 Ann Arbor pattern and remains Contra Costa's most plausible route.
+
+---
+
+## VENDOR PERMIT-PORTAL TIER (2026-08-30) — the verdict, and a FOUNDER DECISION
+
+After Contra Costa, the remaining route for the large dark CA blocks (Alameda 51, Contra Costa 43,
+San Mateo 31) is the cities' own vendor permitting portals rather than ArcGIS Online or Socrata,
+which are exhausted there. This pass answers one question: **is that tier queryable at all?**
+
+**No source wired. The answer splits by vendor, and both branches are GATED — one on a credential,
+one on a code change.**
+
+### First, the pattern in everything already wired from these vendors
+
+`tacoma-accela`, `ann-arbor-energov-permits`, `frisco-active-building-permits` and
+`gilbert-energov-permits` are all named for a vendor portal, but **in every case the DATA came from
+an ArcGIS or Socrata endpoint and the portal supplied only the per-record URL.** Confirmed here:
+Ann Arbor's entry carries `column_map.record_url = "STREAMURL"`, and a live read of that column
+returns `https://stream.a2gov.org/energov_prod/selfservice/#/permit/<guid>` — a link, alongside
+data that comes from the city's own FeatureServer. **No wired source has ever read a vendor portal
+as its data source.**
+
+### Accela — BLOCKED ON A CREDENTIAL
+
+Accela Citizen Access is the dominant platform in the target counties: **Oakland** (Alameda, 51
+dark) at `aca-prod.accela.com/OAKLAND` and **Concord** (Contra Costa) at
+`aca-prod.accela.com/CONCORD`.
+
+- The ACA pages themselves are HTTP 200 but are an **AngularJS-wrapped ASP.NET WebForms UI**
+  (`<html ng-app="appAca">`) — a search form, not data.
+- Accela's real API answers, and states its own gate verbatim:
+  `GET https://apis.accela.com/v4/records` → **HTTP 400**,
+  `{"status":400,"code":"bad_request","message":"App ID or access token is required.","more":"Please set App ID to request HTTP header 'x-accela-appid' for anonymous access, or set access token to request HTTP header 'Authorization' for authenticated access."}`
+- A guessed per-agency route (`aca-prod.accela.com/CONCORD/api/v4/records`) returns an ASP.NET
+  **404 with no such controller** — there is no per-agency public API.
+
+**So even Accela's "anonymous" access needs a registered App ID.** That is a credential: it must be
+obtained, stored in the secret store, and — per Accela's model — enabled per agency. **Under this
+repo's security rules a credential is a stop-and-ask, so Accela cannot be wired autonomously.**
+
+### Tyler EnerGov CSS — a REAL unauthenticated API, but a NEW CONNECTOR
+
+Probed against a known-good EnerGov host (Ann Arbor's `stream.a2gov.org`, taken from the live
+`STREAMURL` above rather than guessed).
+
+⚠️ **The first three probes 404'd on paths I had guessed (`/EnerGovProd/…`, capitalised). Those
+404s were evidence about the GUESS, not the vendor** — the ODOT `/arcgis1006` and DOTD `/road`
+lesson, third occurrence. The real base is lowercase `energov_prod/selfservice`.
+
+Against the real base the responses discriminate:
+
+| probe | result | what it proves |
+|---|---|---|
+| `GET …/selfservice/api/energov/search/searchtypes` | **404** with `{"Message":"No HTTP resource was found that matches the request URI …"}` | an **ASP.NET Web API router is live** at that base — this is a Web API 404, not an IIS one |
+| `GET …/selfservice/api/energov/permit/permit-detail/<guid>` | plain **IIS 404** HTML | wrong prefix — a different failure shape from the above, which is how the two are distinguished |
+| `POST …/selfservice/api/energov/search/search` | **HTTP 500** `{"Message":"An error has occurred."}` | **the route EXISTS and the controller RAN.** A missing route returns 404; a 500 is the handler failing on a malformed body |
+
+**Tyler EnerGov CSS therefore exposes an unauthenticated search API**, and the failure was my
+request payload, not authorisation. If that holds, ONE adapter would unlock every EnerGov city at
+once — the same "vendor adapter, not per-jurisdiction portal" argument that `docs/state-notice-portals.md`
+makes for civic agendas, applied to permits.
+
+⛔ **DELIBERATELY NOT PURSUED FURTHER, for two reasons.** (1) A new platform connector is a **code
+change**, outside the `jurisdiction-registry.json`-only autonomy grant — it is a founder decision,
+not a config edit. (2) Reverse-engineering an undocumented payload by firing repeated guesses at a
+live government server is both poor practice and avoidable load; the honest stopping point is
+"route exists, unauthenticated, payload shape unknown".
+
+### THE DECISION THIS PASS EXISTS TO SURFACE
+
+The AGO/Socrata surface is picked over in the large CA blocks, and 43 of 50 states already carry a
+statewide DOT. Reaching the remaining dark pages at scale needs ONE of:
+
+1. **An Accela App ID** — a credential, per-agency enablement, unlocks Oakland + Concord and a
+   large national footprint (Accela is the most common US permitting platform).
+2. **A Tyler EnerGov CSS connector** — no credential, one adapter, unlocks every EnerGov city;
+   needs the search payload contract established first, ideally from Tyler's own documentation
+   rather than by probing.
+3. **Neither** — accept that the remaining dark pages stay on the EPA facilities floor plus
+   whatever a statewide DOT reaches, and stop spending recon effort on them.
+
+**No further vendor-portal work should be done until one of these is chosen**, because every
+additional city probed lands on the same two walls.
