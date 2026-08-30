@@ -15382,6 +15382,80 @@
       ],
       "record_url_precision": "dataset",
       "_receipts": "[VERIFIED 2026-08-28 via pg_net against the live endpoint, in the connector's own scope] ODOT Statewide Transportation Improvement Program 2024-2027, layers 361 (points, 595 rows) and 362 (lines, 684 rows) of facs_stip/data_catalog on the agency's OWN server gis.odot.state.or.us. OREGON'S FIRST STATEWIDE SOURCE \u2014 OR had five city-scoped entries (portland/salem/bend) and statewide.OR was EMPTY, leaving Lane 37, Jackson 18, Yamhill 12, Benton 9 and Hood River 3 with no coverage at all. \u26a0\ufe0f THE REST ROOT IS VERSIONED: gis.odot.state.or.us/arcgis returns HTTP 500 'Runtime Error'; the live root is /arcgis1006. A bare-path 500 is NOT evidence the agency has no GIS. \u26a0\ufe0f ACRONYM COLLISION \u2014 'odot-*' in this registry is OHIO (odot-current-projects). Oregon is 'oregon-dot-*' deliberately; do not read one as the other (the NDOT/NVDOT/NDDOT class). \u26a0\ufe0f THE LAT/LONGTD COLUMNS ARE A TRAP: both layers declare LAT and LONGTD (aliases 'Beginning Latitude'/'Beginning Longitude') and BOTH ARE NULL on live rows, while the SHAPE geometry is populated and correct (sample PROJ_KEY_NO 21719 -> x -124.2262, y 43.288..., wkid 4326). Mapping lat/lng to those columns would have emitted every record with no coordinates. The entry reads the connector's flattened __lat/__lng. REAL NAMED PROJECTS with full descriptions: 'OR42: US101 to Cedar Point Rd' (Coos, repair or replace culverts, federal fish-passage requirements), 'I-5: Monument Dr - N. Grants Pass' (Josephine), 'Cornelius Pass Hwy & US30 ITS improvements' (Multnomah). FRESHNESS: GIS_PRC_DT ('GIS Process Date') is '08/28/2026' on ALL 595 point rows \u2014 the layer was regenerated the day it was probed. BID_LET_DT runs 2024-01-05 to 2027-10-21, i.e. bid lettings scheduled 14 months forward. 0 rows have a null BID_LET_DT. COMPLETE VOCABULARIES, every one summing EXACTLY to its layer count with 0 nulls: COUNTYNAME 32 values -> 595 (points) and PROJ_PHASE_CURRENT_STIP_YR_NO 14 values -> 595 / 12 values -> 684. THE FORWARD WINDOW (the WYDOT discipline, byte-identical in shape to its drft_year >= 2026): PROJ_PHASE_CURRENT_STIP_YR_NO carries PAST years \u2014 285 of 595 point rows and 435 of 684 line rows are 2013-2025. A 2013 phase-year project may already be built and this service carries no evidence either way, so those rows are EXCLUDED rather than guessed: calling them proposed asserts not-yet-built without evidence, calling them operating fabricates completion. The window keeps 310 point + 249 line rows. NO file_date, DELIBERATELY (the sd-stip founder rider): PROJ_TRGT_DT and BID_LET_DT are FORECAST scheduling dates, and GIS_PRC_DT is the layer's own rebuild stamp, not a filing date. NO type_map: there is no work-type column at all. MNTR_CD ('Monitor Code') is the only type-ish field and is an UNDECODED 2-value code \u2014 PSEDOC 384 / CONST 211 on points (=595) and PSEDOC 363 / CONST 321 on lines (=684). It READS as a phase pair (PS&E-and-DOC vs Construction), which would let CONST bucket to `approved`, but the ARDOT discipline requires a DECODE RECEIPT from the agency's own material and there is none: the layer description and copyrightText are empty, the field alias says only 'Monitor Code', and the MapServer legend carries no labels for layers 361/362. Bucketing on a plausible reading would be a guess, so every row takes the status_const and buckets to `proposed` \u2014 the SD/MT/NE/WY STIP fleet shape. LOGGED, NOT DONE: decoding MNTR_CD would correctly move 211 point + 321 line rows to `approved`; that needs a founder-visible decode receipt first. REJECTED WITH RECEIPTS, same round: the other 20 folders on this server plus the ~250 sibling layers in data_catalog are ASSET INVENTORY, NEEDS and RISK surfaces (Bridges, SHN_Postmiles, Traffic-AADT, ADA Ramp Needs, Late-Century Wildfire Risk, ...) \u2014 the NDDOT bridge class; the SUPERSEDED STIP vintages 198/199 (2021-2024), 316-319, 200-203 and 202/203 are NOT wired, only the pair named '- Current'; odot.maps.arcgis.com is the GENERIC ANONYMOUS PORTAL (null name, null id), not an org \u2014 the Corvallis S.p.A. trap; AGO org uUvqNMGPm7axC2dD is named 'Oregon ArcGIS Online', the state's shared org rather than an ODOT-owned one, so the agency server is the first-party read. dataset_url is ODOT's own STIP page (HTTP 200 same round); neither layer has a per-record URL column, so precision is `dataset` and templating one would be guessing. THIS ENTRY reads layer 362, the POLYLINE half; featurePoint() pins it at the midpoint of the longest path. 249 rows in the window, 60 distinct PROJ_KEY_NO, Lane 6. Note COUNTYNAME on this layer includes the non-county value 'VARIOUS' (3 rows) \u2014 never map it as a county; coverage is statewide and scoping is spatial."
+    },
+    {
+      "registry_id": "sonoma-county-fire-rebuild-permits",
+      "platform": "arcgis",
+      "service_url": "https://services1.arcgis.com/P5Mv5GY5S66M8Z1Q/arcgis/rest/services/Wildfire_Rebuild_Permits_Public_View_Layer/FeatureServer/0",
+      "dataset_url": "https://permitsonoma.org/",
+      "jurisdiction": "County of Sonoma \u2014 Permit Sonoma",
+      "coverage": [
+        {
+          "state": "CA",
+          "county": "Sonoma"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Category",
+          "Permit_Type"
+        ],
+        "status_raw": "Permit_Status",
+        "type_source": "Category",
+        "file_date": "Date_Opened",
+        "address": "Situs_Address",
+        "case_number": "Record_ID",
+        "lat": "Latitude",
+        "lng": "Longitude"
+      },
+      "file_date_kind": "filed",
+      "status_to_bucket": {
+        "proposed": [
+          "Application Accepted/In Review",
+          "Awaiting Applicant Response",
+          "Waiting for Other Approvals",
+          "Ready for Plan Check",
+          "Payment Due",
+          "Pre-Issue/Payment Due",
+          "Plan Check Comments Sent",
+          "Resubmittal Requested"
+        ],
+        "approved": [
+          "Issued",
+          "Plan Check Approved"
+        ],
+        "operating": [
+          "Finaled"
+        ],
+        "exclude": [
+          "Expired",
+          "Plan Check Expired"
+        ]
+      },
+      "type_map": {
+        "Single Family Home": "Residential",
+        "Accessory Dwelling Unit": "Residential",
+        "Multi-Family Home": "Residential",
+        "Bridge": "Utility"
+      },
+      "spatial_zip_radius_mi": 3,
+      "spatial_latlng_cols": {
+        "lat": "Latitude",
+        "lng": "Longitude"
+      },
+      "out_fields": [
+        "OBJECTID",
+        "Record_ID",
+        "Permit_Status",
+        "Category",
+        "Permit_Type",
+        "Date_Opened",
+        "Situs_Address",
+        "Latitude",
+        "Longitude"
+      ],
+      "record_url_precision": "dataset",
+      "_receipts": "[VERIFIED 2026-08-30 via pg_net against the live endpoint, in the connector's own scope] Permit Sonoma (the County of Sonoma's Permit & Resource Management Department) wildfire-rebuild permit register. Org NAME receipt: arcgis.com/sharing/rest/portals/P5Mv5GY5S66M8Z1Q -> 'The County of Sonoma' (never the acronym, never the subdomain). Sonoma was one of five CA counties with 100% of its pages dark (40) and no covering source; caltrans-sb1-projects reaches it statewide but only where a STIP project falls within 3 mi. SCOPE IS HONEST AND NARROW: this is the rebuild register for the 2017 Sonoma Complex, Kincade, Glass and Lightning fires \u2014 homes being rebuilt after they burned. It is NOT a general Sonoma building-permit ledger and will light the fire-affected ZIPs only. 2,094 records. \u26a0\ufe0f FRESHNESS \u2014 THE ITEM DATE UNDERSTATED THIS SOURCE BY TEN MONTHS, the exact inverse of the NMDOT trap recorded in the New Mexico pass. The AGO item reports modified 2025-10-31; the LAYER reports editingInfo.dataLastEditDate = 2026-08-30, the day it was probed. Date_Opened spans 2017-08-14 to 2026-07-24. **Read dataLastEditDate on the layer in BOTH directions: the item date can overstate freshness (NMDOT, by 23 months) or understate it (here, by 10).** TWO COMPLETE VOCABULARIES, each enumerated in BOTH orderByFields directions and each summing EXACTLY to 2,094 with 0 nulls: Permit_Status = Finaled 1611 + Issued 237 + Expired 164 + Plan Check Expired 45 + Resubmittal Requested 13 + Plan Check Comments Sent 7 + Pre-Issue/Payment Due 6 + Payment Due 3 + Plan Check Approved 3 + Ready for Plan Check 2 + Application Accepted/In Review 1 + Awaiting Applicant Response 1 + Waiting for Other Approvals 1; Category = Single Family Home 1778 + Accessory Dwelling Unit 246 + Bridge 40 + Multi-Family Home 30. 'Plan Check Approved' buckets to approved on the publisher's OWN word, not on an inference about whether the permit has issued (the Anaheim 'Approved' precedent); both Expired states are excluded. Bridge maps to Utility, the rest to Residential. \u26a0\ufe0f GEOMETRY-LESS TABLE WITH **STRING** LAT/LNG COLUMNS \u2014 the hazard that had to be cleared before wiring. type=Table, no geometryType, so it rides spatial_latlng_cols (the Scottsdale attribute-bbox path) which ANDs `Latitude >= ymin AND ... AND Longitude <= xmax` into WHERE. Latitude and Longitude are esriFieldTypeString, and a LEXICOGRAPHIC comparison would scope NEGATIVE LONGITUDES BACKWARDS ('-122...' sorts below '-123...' as text) \u2014 silently wrong, never an error. PROVEN NUMERIC on the live server before wiring: the exact clause the connector emits for a 3-mi envelope around Santa Rosa 95404 returned 72 rows, and all 72 fall inside it \u2014 lat 38.459913-38.492265 within [38.4053, 38.4923], lng -122.737044 to -122.631023 within [-122.7390, -122.6282], **0 rows outside**. Control: 0 rows in the whole table have a null or empty Latitude/Longitude, so nothing is silently dropped by the clause. file_date is Date_Opened (when the application was opened) with file_date_kind 'filed'; Approval_Date, Issue_Date and First_Inspection_Date are real but are milestone dates, not the filing. No recency_days: the register is a bounded post-fire set and its 1,611 Finaled rows are completed rebuilds \u2014 real built work a resident should see \u2014 and per-ZIP subsets are ~72 rows, far from any row-size ceiling. No per-record URL column, so precision is `dataset` on Permit Sonoma's own site permitsonoma.org (HTTP 200 same round). REJECTED WITH RECEIPTS, same CA Bay Area round \u2014 see the source-registry pass for the full list, including the Santa Rosa County FLORIDA lookalike and the federated-catalog instrument fault."
     }
   ],
   "ckan": [
