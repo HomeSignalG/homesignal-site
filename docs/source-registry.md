@@ -11737,3 +11737,77 @@ block at 23) was not located; Los Alamos County's own server was not probed; and
 Conservation Division** well-permit register (Eddy 9, Permian Basin) is a real per-record permit
 source that this pass did not evaluate — whether an oil-and-gas drilling permit belongs in the
 `development` bucket is a founder call, not a technical one.
+
+---
+
+## LOUISIANA PASS (2026-08-29) — no wire, and the prior stamp's REASON was wrong
+
+Coverage checked FIRST: `statewide.LA` empty, three parishes covered (`east-baton-rouge-building-permits`,
+`new-orleans-permits` → Orleans + Jefferson). **112 dark pages in 7 uncovered parishes**: Caddo 25 ·
+Calcasieu 18 · St. Tammany 18 · Lafayette 16 · Livingston 16 · Bossier 12 · Ascension 7.
+
+**NO SOURCE WIRED** — but the 2026-08-17 stamp is **superseded**, because its reason does not hold.
+
+### ⚠️ THE PRIOR STAMP WAS WRONG ON THE FACTS, RIGHT ON THE OUTCOME
+
+QUEUE.md recorded: *"LA — STAMPED REJECTION: register is a Power BI embed. dotd.la.gov/projects/
+embeds app.powerbi.com … **no queryable per-record API** … AGO name-search: no register."*
+
+Both halves are false:
+
+- **DOTD runs a live public ArcGIS REST endpoint** — `https://gis.dotd.la.gov/road/rest/services`
+  (HTTP 200, 12 folders), whose `Roads_and_Highways_OpenData/FeatureServer` carries **107 layers**.
+  ⚠️ **The instance is `road`, NOT `arcgis`** — `gis.dotd.la.gov/arcgis/rest/services` and
+  `maps.dotd.la.gov/arcgis/rest/services` both return an IIS **404**. **This is the second
+  confirmation of the ODOT `/arcgis1006` standing answer in two days: a 404 or 500 on the guessed
+  instance path is evidence about the GUESS, never about the agency.** The Power BI page is a
+  presentation layer over data that is also served as REST.
+- **An AGO term search finds a register the name search missed.** `orgid`-free term search on
+  `(DOTD OR "Louisiana Department of Transportation") AND (project OR STIP OR construction)`
+  returns **54 items** including `LA DOTD Roadway Projects`, `DOTD Highway Priority Program`,
+  `ProjectLookUp`, and the official `LADOTDOpenData` hub. The earlier "name-search: no register"
+  is the **same completeness failure recorded in the New Mexico pass** — a name or date sort
+  answers a different question than a term search.
+
+### Why it still does not wire
+
+1. **`LA DOTD Roadway Projects` is an LRS EVENT LAYER, not a project register.** It is layer **127**
+   of that 107-layer asset service, sitting between `126:Toll Booth` and `128:Exits`, among
+   Signals, Soundwalls, Tunnel, Stop Signs, Mileposts and Intersection Points. Schema is pure
+   Roads & Highways linear referencing — `EventID`, `RouteID`, `FromMeasure`, `ToMeasure`,
+   `FromDate`, `ToDate`, `DataYear`, `DataSource`, `LocError`. **There is no status field and no
+   phase field.**
+   - 12,564 polylines. Project names are real and specific (`LA 14: 0.15 MI S LOGNION RD - LA 101`,
+     `LA3246 @I-10 SIGNAL PERFORMANCE MEASURE`, `DIVERGING DIAMOND INTERCHANGE STAGE 0`) with DOTD
+     H-numbers.
+   - **`DataYear` is a SINGLE value** — 2025 on 11,865 rows, NULL on 699, summing exactly to
+     12,564 — and `FromDate` is a uniform 2025-04-30 bulk-load stamp with `ToDate` null. So the
+     WYDOT-style forward window is **impossible to express**: nothing in the layer separates a
+     programmed project from one already built.
+   - Every bucket choice — proposed, approved or operating — would therefore be a guess applied to
+     12,564 real road segments. The publisher's own sibling hub page is titled **"Last
+     Construction"**, which points at as-built provenance rather than a pipeline, but that is a
+     hint and not a receipt either. **Not wired, because no honest bucket exists.**
+2. **Louisiana's ACTUAL programmed list is access-gated.** `DOTD Highway Priority Program`
+   (`services7.arcgis.com/HsavlueFx5YZacwn/…/DOTD_Highway_Priority_Program/FeatureServer/0`)
+   returns **`{"error":{"code":499,"message":"Token Required"}}`**, as do the `road` instance's
+   **`Grants`** and **`Applications`** folders. A token-gated service is not a public record.
+   (The AGO item is also stale — modified 2022-01-06.)
+3. **`ProjectLookUp`** (`services.arcgis.com/PLiuXYMBpMK5h36e`) — modified 2023-02-09, stale.
+
+### Parish tier — nothing found
+
+- **Caddo / Shreveport** and **Calcasieu / Lake Charles**: a 38-hit search returns city limits,
+  small-cell towers, an econ-dev mall polygon, a bond-proposal map, named drainage laterals and
+  watershed studies — plus a high-school class project on voting precincts. No permit register.
+- **Lafayette** — `data.lafayettela.gov` does not resolve (DNS).
+- **St. Tammany** — `stpgov.maps.arcgis.com` returns the generic anonymous portal (null name,
+  null id), not an org.
+- The `LADOTDOpenData` hub is very active (items dated 2026-08-26) but publishes districts,
+  parishes, municipalities, urban areas, signs, signals, stop signs, tunnels, AADT and roadways —
+  the inventory class throughout.
+
+**Not exhausted, logged rather than claimed:** St. Tammany's real org under a different subdomain,
+Lafayette Consolidated Government's actual portal, and the own-GIS-server tier for Livingston,
+Bossier, Ascension, Caddo and Calcasieu were not located. Louisiana's remaining route is the
+parish tier, not the state.
