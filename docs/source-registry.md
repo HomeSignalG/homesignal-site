@@ -12540,3 +12540,330 @@ exact prefix, **0 existing entries mutated, 0 sibling keys changed**. Full suite
 the ODOT precedent lit 4 pages from a statewide STIP, not the whole state. The go-live count
 comes from a cache refresh over GA ZIPs, and is deliberately not predicted here.
 
+
+### GEORGIA GO-LIVE (2026-08-31) — source PROVEN on 13/13 ZIPs; rollout gated on an EPA FRS outage
+
+Merged (#976, `9453159`) and deployed (`deploy-edge-functions` run 33413793150, all steps green
+including the fail-loud registry-completeness step). Then refreshed Georgia ZIPs through the live
+engine.
+
+**The source works on every Georgia ZIP tried — 13 of 13.** Measured GDOT records returned:
+
+```
+30008  7    30004 11    30011  1    30017  7    30019 11    30024 27    30043 24
+30044 17    30045 15    30046 25    30052 11    30060 39    30062  9
+```
+
+**197 GDOT records across 12 previously-dark ZIPs**, plus 30008. Cobb, Gwinnett, Fulton and
+Barrow ZIPs all produced records. There is no doubt about the wire.
+
+**One page actually lit: 30008 (Marietta, Cobb)** — development 0 → 13, 7 of them GDOT,
+facilities 10 preserved. Cobb was one of the four 100%-dark counties, so the end-to-end path is
+proven: registry → deploy → fetch → guard → write → lit.
+
+⚠️ **The other 12 did NOT write, and that is the anti-fabrication guard working, not a defect.**
+Every one returned `epa: {"ok": false, "reason": "transient", "attempts": 3, "radius_used": null}`
+→ `facilities: 0`. `dev_refresh_collect`'s transient-safe clause therefore refused the write,
+because each row holds real cached facilities (10–40) and is fresher than 7 days. **Verified by
+re-reading the rows afterward: 30601 and 30501 still hold facilities 40, `refreshed_at` still
+2026-08-29, unchanged.** Nothing was lost; the guard declined to trade 40 real EPA facilities for
+21 development records.
+
+**So Georgia's rollout is gated on EPA FRS recovering, not on anything in the registry.** The one
+success (30008, `epa.ok true, radius_used 3, kept 10`) in the same minutes as twelve failures is
+the signature of the known density-dependent FRS flakiness (the v13 finding), not a per-ZIP
+defect. The daily `dev_refresh` sweep retries every page, so these light on their own once FRS is
+healthy — no further code or config change is required.
+
+**Measured after this pass: GA 177 pages · 83 lit · 94 dark** (baseline 82 / 95).
+
+#### ⚠️ CORRECTION — the pg_net "wedge" diagnosis in the section above is UNRELIABLE, twice over
+
+The earlier operational finding claimed slow hosts wedge the worker and `net.worker_restart()`
+clears it. Both halves are now doubtful, and the honest record is that **I could not establish
+the cause**:
+
+1. **`net.worker_restart()` KILLS IN-FLIGHT REQUESTS.** These `get-address-report` calls carry
+   `timeout_milliseconds = 180000`. Restarting every few minutes while waiting on 3-minute calls
+   resets the very work being waited for. After I stopped restarting, `max(id)` advanced
+   100122 → 100130 on its own — so at least some "wedges" were **self-inflicted**.
+2. **But patience alone did not fix it either.** With no restarts for ~9 further minutes the
+   queue sat at `max(id) 100130 / 22 queued` and did not move.
+
+Neither "slow hosts wedge it" nor "restarting fixes it" nor "just wait" survives contact with the
+evidence. **Do not restart the worker as a reflex** — it is destructive to in-flight production
+refreshes — and do not report a cause for a stall without evidence that distinguishes these
+cases. Read `net.http_request_queue` contents first (it is shared with the `dev_refresh` cron,
+whose entries carry the 180 s timeout).
+
+
+### MISSISSIPPI RE-PROBE (2026-08-31) — the Georgia play does NOT transfer; still a source desert
+
+Georgia was unlocked by probing the agency's **own** host (`rnhp.dot.ga.gov`), found via the
+`url` field of AGO items. Applied the same play to Mississippi (104 dark pages, no statewide
+entry). It fails, and the reason is measurable rather than impressionistic:
+
+**Of MDOT's 25 AGO items carrying a `url`, ZERO point at any `ms.gov` host — all 25 are
+AGO-hosted** (`services.arcgis.com`, `services1/2/8`, `storymaps`). That is the discriminator:
+GDOT's items pointed at `dot.ga.gov`, which is how its live server was discovered. MDOT publishes
+only through AGO hosted services, so there is no agency server to find.
+
+The 61 MDOT items are also the wrong *content* — hurricane evacuation routes, transit and
+intercity-bus studies, freight networks, the Roadway Characteristics Inventory, mile markers,
+traffic cameras. No project or STIP inventory.
+
+The three near-miss candidates, all rejected on ownership or content:
+
+| item | why rejected |
+|---|---|
+| `MDOT LRSP Base Layers` | owned by `Levi.Hannon@hdrinc.com_HDR` — a **consultant**, not first-party; "LRSP" is a Local Road Safety Plan base layer, not projects |
+| `MS_MDOT` | owner `jjoiner31`, a **personal account**, last modified 2021 — not first-party |
+| `2025 Construction Projects` | a **StoryMap**, and owner `fridley` is a city in **MINNESOTA** |
+
+⚠️ **NEW LOOKALIKE TRAP: "Mississippi" matches the RIVER, not just the state.** The query
+`Mississippi STIP OR "Mississippi DOT" project` returned **2,473** results dominated by
+`Mississippi River Corridor Critical Area Overlay Zoning`, Upper Mississippi/Great Lakes Joint
+Venture waterfowl-habitat rasters, and `The City of St. Louis`. A raw hit count on "Mississippi"
+is meaningless — the river runs through ten states. Same class as Santa Rosa FL, San Ramón Costa
+Rica, Jackson TN, Grand Forks BC and Concord NC.
+
+**Mississippi remains a documented source desert.** Its 104 dark pages stay on the EPA facilities
+floor, which is a correct terminal state.
+
+
+### GEORGIA ROLLOUT RESULT — 82 → 109 lit pages (2026-08-31)
+
+Retry works, and the numbers are the receipt. Georgia's dark pages were re-fired through the
+live engine in batches, each followed by `dev_refresh_collect()`:
+
+| stage | GA lit | GA dark | pages w/ GDOT | GDOT records |
+|---|---|---|---|---|
+| baseline (pre-wire) | 82 | 95 | 0 | 0 |
+| after smoke (1 ZIP) | 83 | 94 | 1 | 7 |
+| after round 2 (14 ZIPs) | 97 | 80 | 15 | 223 |
+| after round 3 (16 ZIPs) | 109 | 68 | 27 | 458 |
+| after round 4 (18 ZIPs) | 126 | 51 | 44 | 727 |
+| after round 5 (20 ZIPs) | 140 | 37 | 58 | 1,039 |
+| **after round 6 (final 37 fired)** | **158** | **19** | **76** | **1,212** |
+
+**+76 pages lit, 1,212 GDOT records across 76 pages — Georgia went from 46.3% to 89.3% lit.**
+
+**The residual 19 is mostly a CORRECT terminal state, not a gap.** Four have already been through
+the new engine today and returned **zero** GDOT records: `Tybee Island (31328)` — a barrier island
+— plus `Alto (30510)`, `Hoschton (30548)` and `Jenkinsburg (30234)`, all rural. GDOT simply has no
+programmed project within the 3-mile radius of those ZIP centroids. **That is an honest empty and
+must not be "fixed"** — widening the radius to manufacture a pin is exactly the fabrication this
+tracker forbids. The remaining ~15 were still queued or awaiting another sweep pass and light on
+their own.
+
+Three Henry County ZIPs (`30234`, `30236`, `30253`) show `development: 3` while scoring dark:
+those 3 records carry a NULL `source_registry_id` (they are ingest planning notices, not a
+registry source), so "dark" is correct under the lit definition — lit means a **sourced** record.
+
+**Round 5 also confirmed that queued work needs no supervision.** Its 20 responses landed and were
+written by the pg_cron `dev_refresh_tick` job with no manual `dev_refresh_collect()` call at all —
+GA went 126 → 140 while unattended. Verified directly: `cron.job` 14 is `active`, schedule
+`*/2 * * * *`, and `cron.job_run_details` shows **15 succeeded runs in the preceding 30 minutes**.
+
+⚠️ **Round 4 is also the cleanest evidence for "prefer waiting".** Its batch sat with `max(id)`
+frozen for ~45 minutes; a `worker_restart()` was tried and **did not move it**; it then drained
+completely on its own a while later and every row wrote. Restarting was the useless action and
+patience was the effective one — on the very batch where the restart-rule predicted otherwise. Every batch that reached the collector
+wrote; the only limiter is EPA FRS availability and pg_net throughput, never the source.
+
+**Why retrying is the right strategy, measured rather than assumed:** over the preceding 24
+hours the FRS probes ran **atlanta-dense 51 ok / 44 fail** and **sheridan-rural 57 ok / 38 fail**
+— a ~40–46% failure rate. FRS is *flaky, not down*. A ZIP that fails one pass succeeds on a later
+one (30008 did exactly that), and the transient-safe guard means a failed pass costs nothing but
+a retry. The daily `dev_refresh` sweep performs this retry automatically, so **the remaining 68
+Georgia pages light with no further intervention.**
+
+#### ⚠️ FINAL WORD on the pg_net stalls — NO reliable rule was found, and three were tried
+
+This supersedes both earlier attempts in this document. Every candidate rule failed against
+evidence:
+
+| rule tried | how it failed |
+|---|---|
+| "slow hosts wedge it; restart clears it" | restarts sometimes changed nothing |
+| "restarts are the cause — just wait" | `max(id)` sat frozen for ~30 min of pure waiting |
+| "restart when `max(id)` is frozen AND the queue is static" | applied at a 30-min freeze; **`max(id)` did not move afterwards either**, and the queue then grew from 18 to 26 |
+
+**What IS established, and is all that should be relied on:**
+
+- `net.worker_restart()` **kills in-flight requests**, and these `get-address-report` calls carry
+  `timeout_milliseconds = 180000`. Restarting while genuinely-running calls are in flight destroys
+  work — including the `dev_refresh` cron's, since the queue is shared.
+- The queue **does** drain on its own eventually; two batches (14 and 16 ZIPs) completed fully and
+  wrote every row.
+- Therefore: **prefer waiting, do not restart as a reflex, and never report a cause for a stall.**
+  Read `net.http_request_queue` to see whose work is actually queued before acting.
+
+A stall is not a reason to force anything: the daily sweep re-fires every page regardless, so the
+patient path reaches the same end state without risking production refreshes.
+
+**Queued work is never lost.** `dev_refresh_tick` runs on pg_cron every 2 minutes and calls
+`dev_refresh_collect()` itself, so responses that land after a session ends are still collected
+and written. A batch left in the queue completes without supervision — which is why abandoning a
+stall is safe, and why forcing one buys nothing.
+
+
+## TENNESSEE + COLORADO RECON (2026-08-31) — the Georgia play transfers; two first-party candidates
+
+After Georgia, only **six** states lacked any statewide entry: **CO, DE, LA, MS, NM, TN.** LA, NM
+and MS are documented rejections. That leaves **TN (47 dark)** and **CO (35 dark)** — 82 pages.
+
+Applying the Georgia method (find the agency's OWN host through the `url` field of its AGO items,
+rather than trusting AGO-hosted copies) produced a first-party candidate for **both**.
+
+### TENNESSEE — `TDOT_GIS`, host `spatial.tdot.tn.gov` ✅ strongest candidate found this session
+
+```
+https://spatial.tdot.tn.gov/arcgis/rest/services/Roadway_Projects/Projects_Public_Viewer/FeatureServer/0
+```
+`esriGeometryPolyline` · **2,342 rows** · layer name "TDOT Projects" · description begins *"The
+information available is extracted from the Departme…"*. A second layer,
+`Roadway_Projects/STIP_Projects/FeatureServer`, exists on the same host.
+
+Fields are richer than Georgia's, and one looked decisive: `PROJECT_WEB_LINK`, a per-record URL.
+
+🛑 **CORRECTION — that is WRONG, and it is the exact trap this section warned about one paragraph
+later.** A live sample shows **`PROJECT_WEB_LINK` is declared but mostly NULL** — 1 of 4 sampled
+rows carried a link (`https://www.tn.gov/tdot/projects/projects-region-1/state-route-31.html`),
+the other 3 were `null`. **`PROJECT_TITLE` is worse: NULL on 3 of 4**, and that is the *title*
+field — a record with no title is the Marion `Tracking — M5886567` defect in another costume.
+So TDOT is **NOT** `record` precision — it is `dataset`, like Georgia. **A declared column is not a populated one** (the ODOT `LAT`/`LONGTD`
+precedent); I wrote "record, not dataset" from the *schema* and the data says otherwise.
+Exact non-null counts are still pending — the `PROJECT_WEB_LINK IS NOT NULL AND <> ''` count
+**400s** on this server (`"Query with count request failed"`), because the column is declared
+`length: 1073741822`, i.e. a CLOB that cannot take an equality comparison. Use `IS NOT NULL`
+alone.
+
+✅ **BUT THE SOURCE IS VIABLE — the field named "title" is simply not the title.** Measured
+non-null counts over all 2,342 rows:
+
+| column | non-null | share |
+|---|---|---|
+| `PROJECT_TITLE` | **126** | 5.4% |
+| `PROJECT_WEB_LINK` | **126** | 5.4% (the same rows) |
+| `PROJECT_DESCRIPTION` | 328 | 14% |
+| **`SCOPE_OF_WORK`** | **1,934** | **82.6%** |
+| `PROJECT_STATUS` | 2,342 | 100% |
+
+**`SCOPE_OF_WORK` is the real title field, and `column_map.title` should point at it.** Note it
+must be `SCOPE_OF_WORK` **alone**, not `["PROJECT_TITLE","SCOPE_OF_WORK"]` — a `column_map` array
+**JOINs** values, it does not fall back (the UDOT `column_map` standing answer), so an array would
+emit a joined string on the 126 rows and a bare scope everywhere else.
+
+**Standing answer: check which column is actually POPULATED before deciding a source is unusable —
+the publisher's naming is not a guide.** This layer would have been rejected on "its title column
+is 5% populated", which is the mirror image of the error made two paragraphs above (accepting
+`record` precision because a link column *existed*). **Both mistakes are the same mistake:
+reading the schema instead of the data.** One would have shipped a broken link on 95% of records;
+the other would have discarded a live statewide source for a state that has none.
+
+`PROJECT_STATUS` is a clean 4-value vocabulary, 100% populated, and **it sums EXACTLY to the
+layer count** — counted one status at a time, because the `groupBy` form times out on this server
+(as it did on Marion):
+
+| status | rows |
+|---|---|
+| `ACTIVE` | 1,923 |
+| `LET` | 393 |
+| `CONSTCOMP` | 25 |
+| `CLOSED` | 1 |
+| **total** | **2,342 ✓** |
+
+**This layer is almost entirely LIVE work** — 2,316 of 2,342 rows are ACTIVE or LET, and only 26
+are finished. That is unusually good for a development tracker; the Marion risk (a ledger that is
+mostly closed-out history) does not apply here.
+
+**The wireable set is 1,920 rows** — `PROJECT_STATUS IN ('ACTIVE','LET') AND SCOPE_OF_WORK IS NOT
+NULL`. Note that drops **396** ACTIVE/LET rows that carry no scope: they would render as a pin with
+no readable title, which is the Marion defect, so excluding them is required rather than optional.
+
+Proposed bucketing: `ACTIVE` + `LET` → **approved**; `CONSTCOMP` → operating; `CLOSED` → exclude.
+
+**Remaining before a wire** (fired, stalled in the pg_net queue — re-run them): freshness read off
+the layer, a per-ZIP volume count, a geometry sample confirming `outSR=4326` returns sane
+Tennessee coordinates, and a **verified** `dataset_url` (do NOT guess one — the Georgia lesson was
+that `www.dot.ga.gov`'s deep project pages all returned 200 with `<title>Page Has Moved</title>`;
+the only evidence so far is one sampled `PROJECT_WEB_LINK`,
+`https://www.tn.gov/tdot/projects/projects-region-1/state-route-31.html`, which implies a parent
+page but does not verify one).
+
+Other fields: `PROJECT_TITLE`,
+`PROJECT_DESCRIPTION`, `SCOPE_OF_WORK`, `TERMINI`, `PROJECT_STATUS`, `PROGRAM_TYPE`,
+`WORK_TYPE_INDICATOR`, `COUNTY_NAMES`, `ROUTE_NUMBERS`, `PIN`, `PROJECT_BID_AMOUNT`,
+`CURRENT_BUDGETED_PHASE`, `ESTIMATED_COMPLETION_DATE`, `CONTRACTOR`, `CONTRACT_ID`.
+
+⚠️ The AGO item's `modified` is **2022-06-07** — which, per the rule this document has now hit
+four times, says nothing about the data. Freshness must be read off the layer.
+
+Also noted: the layer's spatial reference is **wkid 102736 / 2274 (Tennessee State Plane, feet)**,
+not WGS84 — the connector must request `outSR`, and any coordinate sanity-check has to account for
+it rather than reading raw x/y as lon/lat.
+
+### COLORADO — `ColoradoDOT_GIS`, host `dtdapps.codot.gov`
+
+```
+.../server/rest/services/Webapps/open_data_sde/FeatureServer/25   "Projects (all types) - Point"   1,301 rows
+.../server/rest/services/Webapps/open_data_sde/FeatureServer/24   "Projects (all types) - Line"   18,369 rows
+```
+Item `modified` 2026-03-11. Fields: `PROJECT_ID`, `SAPLONGID`, `SAPPROJECTTYPE`,
+`SAPPROJECTDESCRIPTION`, `SAPPROJECTSTATUS`, `ROUTE`, `CURR_STIP`, `TPR`, `MPO`, `ORPHANED`,
+`created_date`, `last_edited_date`. **No per-record URL column** → `dataset` precision.
+
+Two cautions specific to Colorado, neither yet resolved:
+- **It is a POINT + LINE pair**, so it needs `yields_to` (points yield to lines), exactly like the
+  ODOT STIP pair — otherwise one project double-emits.
+- **The line layer is 14x the point layer** (18,369 vs 1,301). That ratio suggests the line layer
+  is *segments per project*, not one row per project, so the duplicate-identity question must be
+  settled before wiring rather than assumed away.
+- `Webapps/open_data_ROW/FeatureServer/1` is a **ROW Project ARCHIVE** — deliberately not a
+  candidate.
+
+### NOT YET DONE — do not wire either from this section alone
+
+Recorded as recon, not as a decision. Still required for both, and each has bitten a wire in this
+document already: enumerate every vocabulary **in both sort directions** and confirm each sums
+**exactly** to the layer count · read freshness off the **layer**, never the item · probe for an
+`All Counties`-style statewide-geometry class with `returnExtentOnly` before trusting spatial
+scoping · confirm `PROJECT_WEB_LINK` is actually populated (a declared column is not a populated
+one — the ODOT `LAT`/`LONGTD` trap) · measure per-ZIP volume before choosing `recency_days` ·
+keep `CONTRACTOR`/`created_user`/`last_edited_user` out of `out_fields`.
+
+
+### RESOLVED — `tennessee-dot-projects` WIRED (registry 237 → 238; statewide states 44 → 45)
+
+Wired on the measurements above. **Wireable set 1,920 rows** via
+`PROJECT_STATUS IN ('ACTIVE','LET') AND SCOPE_OF_WORK IS NOT NULL`.
+
+Final checks that cleared it:
+
+- **`dataset_url` VERIFIED, not guessed** — `https://www.tn.gov/tdot/projects.html` returns 200
+  with `<title>Transportation Projects</title>`. The sampled per-record link resolves too
+  (`…/projects-region-1/state-route-31.html` → 200, `<title>State Route 31</title>`). Georgia's
+  equivalent candidates all returned 200 with `<title>Page Has Moved</title>`, which is why this
+  was checked by title rather than status code.
+- **Geometry sane** — `outSR=4326` returns `wkid 4326` at `-83.228, 36.344` (Hawkins County). The
+  native SR is **wkid 102736 / 2274, Tennessee State Plane in FEET**; raw x/y must never be read
+  as lon/lat.
+- **Per-ZIP volume 78** in a Nashville-sized envelope under the wired filter.
+- **NO "All Counties" pathology.** Only **8 of 1,920** rows list 5+ counties (0.4%), and the
+  longest single corridor is `Shape__Length` **789,065 ft ≈ 149 miles** — a real highway length,
+  not a bundle. Georgia's pathology was **1,200 rows (7.5%) each carrying whole-state extent**; a
+  multi-county DOT corridor is legitimate content and genuinely does affect the ZIPs along it.
+  Accepted deliberately, with the numbers, rather than waved through.
+
+**No `file_date`, no `recency_days`, no `recency_expr`** — the layer exposes **no** edit or filing
+timestamp, and both its date columns are forecasts (~2030). Nothing may be bounded, so **the
+`ACTIVE`/`LET` filter IS the currency mechanism** and is load-bearing rather than cosmetic. That
+is a materially different posture from Georgia (which had `USER_DT` and a rolling `recency_expr`)
+and is recorded so nobody "adds the missing recency filter" later.
+
+`PROJECT_WEB_LINK` is **mapped even though precision is `dataset`**: the 126 rows that carry one
+emit a true deep link, and the other 1,794 fall back to the verified projects page. Mapping a
+sparsely-populated URL column is strictly better than omitting it, provided the declared precision
+tells the truth about the majority.
+
