@@ -12867,3 +12867,26 @@ emit a true deep link, and the other 1,794 fall back to the verified projects pa
 sparsely-populated URL column is strictly better than omitting it, provided the declared precision
 tells the truth about the majority.
 
+
+### TENNESSEE GO-LIVE FIRED (2026-08-31) — merged, deployed, 47 ZIPs refreshing
+
+Merged as **#977** (`b2ae11c`) and deployed (`deploy-edge-functions` run 33418715972, success on
+the merge commit). All **47** dark TN ZIPs were then fired through the live engine.
+
+**Baseline at fire time: TN 199 pages · 152 lit · 47 dark.** The result is **not yet measured** —
+the batch is still in the pg_net queue. It needs no supervision: `dev_refresh_tick` (pg_cron,
+`*/2 * * * *`) calls `dev_refresh_collect()` itself, which is exactly how Georgia's last two
+rounds completed while unattended (126 → 140 → 158 with no manual collect).
+
+⚠️ **A note on the PR, because it cost a cycle.** PR #977 initially registered **zero CI checks**
+for ~10 minutes despite matching every path filter. Cause: after #976 was squash-merged I did not
+apply this repo's own rule — *"after a PR is squash-merged, reset the designated branch to
+`origin/main` and commit forward"* — so the branch carried **17 commits**, including work already
+shipped by the squash, and `test/georgia-dot-gpas-projects.test.mjs` showed as **added** in a PR
+that had nothing to do with it. The **content** diff was correct throughout (`git diff origin/main
+HEAD` = exactly the 4 Tennessee files; the Georgia test was byte-identical to `main`), so nothing
+was wrong with the change — only with the history. Rebuilding the branch on `origin/main` as ONE
+commit and force-pushing with lease fixed both the commit list and the checks, which registered
+within two minutes. **The rule is not cosmetic: a divergent branch can suppress CI entirely, not
+just annoy a reviewer.**
+
