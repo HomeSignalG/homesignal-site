@@ -13109,3 +13109,56 @@ vocabulary — and the gap between the two numbers here was **6.4x**.
 **North Dakota therefore stays at 8 of 155 pages lit.** Its 147 dark pages remain honest EPA
 facilities-floor pages. Remaining unexplored: county/city permit portals in Cass (Fargo),
 Burleigh (Bismarck), Grand Forks and Ward (Minot), and NDDOT consent for the Work Zones layer.
+
+---
+
+## TENNESSEE ROLLOUT COMPLETE — 152 → 192 of 199 (96.5%), and the real lesson is EPA, not TDOT
+
+`tennessee-dot-projects` (PR #977) finished its rollout. Final measured state, 2026-08-31:
+
+| stage | lit / 199 | % |
+|---|---|---|
+| before the wire | 152 | 76.4% |
+| after round 1 (deploy-day fires) | 176 | 88.4% |
+| after re-firing the 19 untested dark ZIPs | **192** | **96.5%** |
+
+**The 7 remaining dark pages are VERIFIED honest empties**, not unmeasured ones — every one was
+refreshed today and returned real facility counts alongside zero TDOT records: 37087 (fac 40),
+38451 (1), 37184 (3), 37020 (7), 37191 (1), plus 37051 and 37118. TDOT genuinely has no project
+within 3 miles of those centroids.
+
+### ⚠️ The failure that cost two rounds: a batch fired into an EPA FRS outage writes NOTHING
+
+The first re-fire of all 19 ZIPs looked like a total source failure and was nothing of the kind.
+All 19 returned **200 with correct TDOT records** (16 non-zero, up to 29 for 37238) — and all 19
+were **refused by `dev_refresh_collect()`**, because every one also carried
+`epa: {ok:false, reason:"transient"}` and therefore `counts.facilities: 0`. The guard's third
+transient-safe clause refuses any write that would zero a fresh row's facilities. It did exactly
+its job; the pages kept their real counts.
+
+Re-firing the identical batch ~10 minutes later, after the FRS probe went green, landed **17 of 19
+immediately**.
+
+**Operating procedure, now explicit — CHECK THE FRS PROBE BEFORE FIRING A BATCH:**
+
+```sql
+select distinct on (target) target, ok, probed_at
+  from public.epa_frs_probes where resolved_at is not null
+ order by target, probed_at desc;   -- BOTH targets must be ok
+```
+
+FRS flips roughly every 15-30 minutes and fails **density-dependently** (that is why the probe
+carries both `atlanta-dense` and `sheridan-rural`). Firing blind wastes a full round: the edge
+function runs, the source is queried correctly, and the result is discarded.
+
+**Two more transient classes seen in the same rollout, both benign and both needing only a retry:**
+- **`503 BOOT_ERROR`** — `{"code":"BOOT_ERROR","message":"Function failed to start"}`, a cold
+  start. One ZIP (37238) hit it once.
+- **Dense-ZIP FRS persistence** — 37238 (downtown Nashville) failed FRS on three consecutive
+  attempts and succeeded on the fourth. A dense ZIP failing repeatedly is the documented FRS
+  radius/process-limit behaviour, not a defect in the page or the source.
+
+⚠️ **A read taken between the FETCH and the COLLECT is not a measurement of the source** (recorded
+earlier in this document and hit again here). `dev_refresh_collect()` runs on `dev_refresh_tick`
+every 2 minutes; calling it directly is the way to close the loop deterministically rather than
+reading a report row that has not been written yet.
