@@ -1,3 +1,7 @@
 
 # Personal Claude Code overrides (permissions); never committed
 .claude/settings.local.json
+
+# Python bytecode from scripts/gen_*.py (gen_sitemap imports gen_zip_pages)
+__pycache__/
+*.pyc
