@@ -13280,3 +13280,86 @@ bad patches happen and no pre-flight check can schedule around them.
 **Iowa's wire is VERIFIED CORRECT and its rollout is pending FRS, not pending work.** 21 ZIPs
 returned Iowa records on two independent rounds; the pages will light as the scheduled refresh
 finds green windows. IA stood at 89 of 225 at the time of writing, en route to the measured 147.
+
+---
+
+## LOUISIANA — NOT WIRED. The project data exists, is first-party, and is CLOSED (2026-08-31)
+
+Louisiana was the last state with no statewide source and no recorded rejection: **50 of 177
+modelled ZIP pages lit (28.2%), 127 dark.** It is not wireable, for two independent reasons that
+both come from LADOTD itself.
+
+### ⚠️ FIRST, A PATH BUG THAT WOULD HAVE PRODUCED A FALSE REJECTION
+
+`https://gis.dotd.la.gov/arcgis/rest/services?f=json` returns **404**. Every probe in this
+campaign has assumed the ArcGIS Server instance is named `arcgis`. **LADOTD's is not.** It runs
+**two** instances, recovered from the `url` field of its own AGO items:
+
+| instance | folders |
+|---|---|
+| `gis.dotd.la.gov/**topo**/rest/services` | `FHWAUrbanAreas` · `OpenData` · `Utilities` |
+| `gis.dotd.la.gov/**road**/rest/services` | `Agile` · `Applications` · **`Grants`** · `HPMS` · `Intersections` · `Local_FunctSys` · `PMS` · `PROD_LARH-Pro_MS2_TrafficStations` · `RouteEditing` · `SuperEdits` · `TrafficMonitoring` · `Utilities` |
+
+**Standing answer: a 404 on `/arcgis/rest/services` means the INSTANCE IS NAMED SOMETHING ELSE,
+not that the server is dead.** Recover the real instance from the agency's own AGO item URLs
+before recording "no server". This is a superset of the North Dakota lesson (there the root
+listing 404'd but `/arcgis/` was still correct and a *folder* was hidden); here the whole
+instance name differed.
+
+### The two blockers
+
+**1. Every project-shaped folder is AUTHENTICATED.** `Grants`, `Applications` and `Agile` each
+return HTTP 200 carrying `{"error":{"code":499,"message":"Token Required"}}`. Not public. There
+is no anonymous read to wire.
+
+**2. The one readable candidate is not projects, and is marked internal-only.**
+`road/rest/services/PROD_LARHPro_GP_FederalAid_FS/FeatureServer` reads anonymously, and its own
+`serviceDescription` says (quoted exactly):
+
+> GP_FederalAid … **identifies roadway segments eligible for federal funding** … updated on an
+> annual basis … The service was published on 02/09/2026 to be used in the Federal Aid
+> Eligibility viewer application for reference by DOTD leadership. **This data is for internal
+> use only and is not intended for public distribution.**
+
+It is a *roadway-eligibility* attribute, not a project pipeline — and the publisher explicitly
+scopes it to internal use. Reachable is not the same as published; the NDDOT standing answer
+("read the service description before measuring the vocabulary") applies verbatim.
+
+### First-party open data is asset inventory, exactly like North Dakota
+
+`LADOTDOpenData` (the real first-party account — 358 AGO items, publisher *"Louisiana Department
+of Transportation & Development"*, contact `@la.gov`, Hub at `open-ladotd.opendata.arcgis.com`,
+DCAT `"license": ""` so no usage restriction) exposes **21 Feature Services**, all inventory:
+`AADT · Considered Urban · Cross Drain · Equivalent Axle Load · Evacuation Routes · Functional
+System · HPMS Number Of Structures · LaDOTD Districts · Louisiana Roadways · LRSID Routes LRM ·
+Metropolitan Planning Area · Municipality · Parishes · Population Code · Prevailing Area · Sign
+Structures · Signals · Signs · Stop Signs · Tunnel · Widening Potential`. Not one project or
+programme layer. *(`Widening Potential` is a candidate-segment attribute, not a filed project.)*
+
+### The consultant copies are NOT a substitute — ownership and vintage both fail
+
+AGO search surfaces four project-shaped "LADOTD" layers. **None is owned by LADOTD:**
+
+| layer | owner | firm |
+|---|---|---|
+| `LADOTD_PROJECTS_TO_BE_LET_BETWEEN_OCT_2022_AND_JUNE_2023` | `brooks.andrews_CSRS_GIS` · `BRAndrews_westwood` | CSRS · Westwood |
+| `LADOTD_PROJECTS_LET_BETWEEN_JULY_2017_AND_SEPTEMBER_2022` | `brooks.andrews_CSRS_GIS` | CSRS |
+| `LADOTD_OTHER_PROJECTS_BEING_DEVELOPED` | `brooks.andrews_CSRS_GIS` | CSRS |
+| `LADOTD_Project_Point1` | `Alanna.Jajeh@freese.com_DM` | Freese & Nichols |
+
+Two disqualifiers each: **not first-party** (the Mississippi failure mode — an AGO copy carrying
+an agency's NAME is not the agency's FEED), and **frozen date windows** baked into the titles —
+engagement deliverables, not maintained pipelines.
+
+### Also recorded
+
+Both guessed Hub subdomains were wrong and **failed in different, misleading ways**:
+`gis-ladotd.opendata.arcgis.com` → `"Domain record(s) not found"`; `data-ladotd.opendata.arcgis.com`
+→ `"GWM_0003: You do not have permissions to access this resource"` — which reads like a private
+portal but is simply a non-existent one. The real domain is **`open-ladotd`**, recovered from an
+item URL, not guessed.
+
+**Louisiana therefore stays at 50 of 177.** Its 127 dark pages remain honest EPA facilities-floor
+pages. The unblock is either LADOTD publishing a public projects layer, or credentials for the
+`Grants` folder — both outside an autonomous grant. Parish/city permit portals (East Baton Rouge,
+Orleans, Jefferson, Caddo, Lafayette) were **not probed this pass** and are the remaining upside.
