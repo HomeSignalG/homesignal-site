@@ -15732,6 +15732,66 @@
         "pii": "CONTRACTOR and CONTRACT_ID are deliberately excluded from out_fields - not needed to render a project.",
         "dark_pages_targeted": "TN was 47 dark of 199 pages with no statewide source."
       }
+    },
+    {
+      "registry_id": "iowa-dot-five-year-program",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/8lRhdTsQyJpO52F1/arcgis/rest/services/Iowa_DOT_Five_Year_Program_Project_Data_V2_Public_VIEW/FeatureServer/0",
+      "dataset_url": "https://services.arcgis.com/8lRhdTsQyJpO52F1/arcgis/rest/services/Iowa_DOT_Five_Year_Program_Project_Data_V2_Public_VIEW/FeatureServer/0",
+      "jurisdiction": "Iowa Department of Transportation",
+      "coverage": [
+        {
+          "state": "IA"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "RouteID",
+          "Project_Location"
+        ],
+        "address": "Project_Location",
+        "case_number": "Project_Code",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "status_const": "Programmed in the Iowa DOT 2027-2031 Five Year Program",
+      "status_to_bucket": {
+        "proposed": [
+          "Programmed in the Iowa DOT 2027-2031 Five Year Program"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "use_type_const": "Utility",
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "PID",
+        "RouteID",
+        "Project_Location",
+        "Project_Code",
+        "Work_Type",
+        "Year2",
+        "County"
+      ],
+      "record_url_precision": "dataset",
+      "_receipts": {
+        "probed": "2026-08-31 via pg_net (sandbox has no egress)",
+        "rows": "668 polyline features; all 668 geometries retrieved untruncated (exceededTransferLimit absent)",
+        "freshness": "layer editingInfo.lastEditDate = 1747584916000 -> 2026-05-18 16:15:16Z",
+        "licence": "serviceDescription and copyrightText are both EMPTY - no access/use constraints published, unlike NDDOT",
+        "year2_vocabulary": "EXACTLY 5 values, all future: 2027, 2028, 2029, 2030, 2031",
+        "program_vocabulary": "single value: '2027-2031 Program' - the whole layer is one adopted programme",
+        "work_type_vocabulary": "32 self-describing values: Bridge Deck Overlay, Bridge New, Bridge Painting, Bridge Rail Retrofit, Bridge Rehabilitation, Bridge Removal, Bridge Replacement, Bridge Washing, Culvert Extension, Culvert New, Culvert Repair, Culvert Replacement, Erosion Control, Fencing, Grade & Pave, Grading, Guardrail, Landscaping, Lighting, Miscellaneous, Mitigation, Patching, Paved Shoulders, Pavement Markings, Pavement Rehab, Pavement Widening, Paving, Railroad Signals, Rest Area Improvement, Right of Way, Traffic Signals, Traffic Signs",
+        "field_population": "Project_Location 668/668, RouteID 668/668, Work_Type 668/668, Project_Code 668/668 - all 100%, so no TDOT-style title trap",
+        "why_status_const": "no per-record lifecycle field exists; Program is a single value and Year2 is all future. Same shape as the 20+ existing MT/SD/WY/NC/OR/MN/NJ STIP entries.",
+        "why_no_recency": "the layer publishes NO filing/edit date column at all - Year2 is a future fiscal year, not a filing date. Currency is inherent in a 2027-2031 programme (TDOT precedent).",
+        "why_no_return_centroid": "polyline layer - ArcGIS HARD-REJECTS returnCentroid on polylines (TxDOT precedent)",
+        "dataset_url_note": "iowadot.gov/program_management/fiveyearprogram 404s (a 285KB joke 404 page - status code, not <title>, is the discriminator); iowadot.gov/program_management is 200 but generic. Using the FeatureServer URL, matching the sibling iowa-dot-bid-projects entries (Boulder precedent).",
+        "additive_to_existing": "distinct from iowa-dot-bid-projects/-lines, which filter CONTRACT_AWARDED IS NOT NULL (awarded contracts). This layer is pre-award programmed work.",
+        "surface_measured": "all 668 geometries tested against all 225 modelled IA ZIP centroids at spatial_zip_radius_mi=3: reaches 135 pages, 61 of them currently dark. IA 86 -> 147 of 225 (38.2% -> 65.3%). No subset excluded - every row is publishable, unlike ND (85% declined) and NM (stalled layer)."
+      }
     }
   ],
   "ckan": [
