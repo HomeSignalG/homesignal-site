@@ -15584,6 +15584,86 @@
       ],
       "record_url_precision": "record",
       "_receipts": "[VERIFIED 2026-08-31 via pg_net against the live endpoint, in the connector's own scope] Jackson County, OREGON \u2014 the county's own server jcportal.jacksoncountyor.gov, folder Property. \u26a0\ufe0f THIS IS OREGON, NOT MISSISSIPPI. It was found by accident while probing a Mississippi lead: an AGO search for MS permits returned owner `JCGIS_Owner`, which resolves to jacksoncountyor.gov with extent lat 42.00-42.94 / lng -123.23 to -122.28 \u2014 southern Oregon (Medford). The same search also returned `City_of_Jackson_TN_Building_Permits` (Tennessee). \u26a0\ufe0f AND THE COUNTY'S OWN CITIES ARE TRAPS: Jackson County OR contains cities named **Phoenix** and **Talent**, so its layers `Phoenix_Building_Permits_view` and `Talent Building Permits View` are OREGON, not Phoenix ARIZONA. Confirm the state before the schema. WHY IT MATTERS BEYOND 13 PAGES: OR is statewide-covered by the ODOT STIP pair, yet 89 OR pages are still dark because a STIP reaches project corridors, not neighbourhoods. This is the first wire against the COVERED-BUT-UNREACHED class, which the 2026-08-31 measurement showed is 1,983 of the 2,388 remaining dark pages \u2014 the large majority of the work left. \u26a0\ufe0f PII IS FENCED OUT AT out_fields (the Bismarck precedent). Both layers carry `APPLICANT` and `CONTRACTOR`, which are PERSON NAMES. Neither is mapped and neither is fetched. RECORD PRECISION IS EARNED, NOT ASSUMED: `LINK` is a per-record Accela ACA deep link (aca-oregon.accela.com/oregon/Cap/CapDetail.aspx?...) and is NULL OR EMPTY ON **0** ROWS of both layers. Fitting confirmation of the vendor-tier standing answer: the portal supplies the LINK, the county's GIS supplies the DATA. `JURISDICTION` IS NOT MAPPED \u2014 a groupBy returns a single blank value for all 251,367 building rows, i.e. the column is unpopulated. TWO SERVERS CARRY THIS DATA AND ONLY ONE IS WIRED: spatial.jacksoncountyor.gov/.../DevServ/Permit/MapServer holds `0:Building Permit` (243,044) and `1:Land Use Permit` (40,648) \u2014 FEWER rows than jcportal's 251,367 and 88,801, so jcportal is the fuller copy and the DevServ MapServer is deliberately NOT wired. Wiring both would double-emit across two source_registry_ids, which exact-identity dedup cannot catch (the Houston-plats class). THIS ENTRY \u2014 Permits_LandUse layer 0, esriGeometryPoint, **88,801 records**, 5,811 in the last three years. Land-use APPLICATIONS (zoning, subdivision, site plan review), a different record class from the building-permit ledger \u2014 not the same records in two geometries \u2014 so no `yields_to` is declared; the two layers come from different county systems and carry different field sets (this one has PROCESSTYPE/APPLICATIONTYPE/MJCASE, the building layer has JURISDICTION/PERID1-3). TWO COMPLETE VOCABULARIES, each summing EXACTLY to 88,801 with 0 nulls: STATUSCAT = Approved 65948 + Pending 19073 + Withdrawn 2343 + Denial 1230 + Other 207; PERMITTYPE = Zoning 75509 + Subdivision 6774 + Pre-Application Conference 4778 + Site Plan Review 1740. \u26a0\ufe0f ITS STATUS VOCABULARY IS **NOT** THE BUILDING LAYER'S \u2014 this one says `Denial` where the building layer says `Denied or Expired`. The two status maps are deliberately separate; sharing one would leave a live value unmapped. Every kept type maps to `Development` \u2014 the honest generic for heterogeneous land-use cases (the Sussex DE / Phoenix residual precedent); none asserts a built use. `Pre-Application Conference` (4,778) is dropped by extra_where: a meeting about a possible application is not a filed development action."
+    },
+    {
+      "registry_id": "georgia-dot-gpas-projects",
+      "platform": "arcgis",
+      "service_url": "https://rnhp.dot.ga.gov/hosting/rest/services/GPAS/MapServer/13",
+      "dataset_url": "https://www.dot.ga.gov/",
+      "jurisdiction": "Georgia Department of Transportation (GDOT)",
+      "coverage": [
+        {
+          "state": "GA"
+        }
+      ],
+      "column_map": {
+        "title": "PROJECT_NAME",
+        "status_raw": "STATUS",
+        "type_source": "PROJECT_TYPE",
+        "address": "ROUTE_NUMS",
+        "case_number": "PROJECT_ID",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "Maintenance": "Utility",
+        "Capital": "Utility",
+        "Reconstruction/Rehabilitation": "Utility",
+        "Safety": "Utility",
+        "New Construction": "Utility",
+        "Replacement": "Utility",
+        "Enhancement": "Utility"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Long Range Program"
+        ],
+        "approved": [
+          "Construction Work Program",
+          "Under Construction"
+        ],
+        "operating": [],
+        "exclude": [
+          "Legacy Projects",
+          "Overhead Projects",
+          "Temporarily Shored Bridges",
+          "Deferred",
+          "Rejected",
+          "UNKNOWN"
+        ]
+      },
+      "extra_where": "COUNTIES <> 'All Counties' AND PROJECT_TYPE IN ('Maintenance','Capital','Reconstruction/Rehabilitation','Safety','New Construction','Replacement','Enhancement')",
+      "recency_days": 1095,
+      "recency_expr": "USER_DT >= DATE '{cutoff}'",
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "PROJECT_ID",
+        "PROJECT_NAME",
+        "PROJECT_TYPE",
+        "STATUS",
+        "PROJECT_DESCR",
+        "COUNTIES",
+        "ROUTE_NUMS"
+      ],
+      "record_url_precision": "dataset",
+      "_receipts": {
+        "probed": "2026-08-31",
+        "why_this_layer": "GDOT's GEOPI_APP project service is decommissioned on BOTH GDOT hosts (egis + rnhp, HTTP 200 carrying a 500 error body). Positive control: egis.dot.ga.gov/arcgis/rest/services itself answers and now exposes only a CountyCentroid GPServer, so the host is up and the service is retired. The rnhp STIP and GDOT_Public_Outreach folders return services:[] and Planning returns 499 Token Required, while Hosted (7 services) and Utilities (2) prove folders CAN list anonymously - so those are permission-filtered, not empty. GPAS layer 13 is the public first-party remainder.",
+        "layer_name_is_misleading": "Named 'Projects for Utilities Permit' because it backs a utility-permit picker, but the rows ARE GDOT's project inventory. Skipping on the name alone would have missed Georgia's only statewide source.",
+        "rows_total": 26544,
+        "geometry": "esriGeometryPolyline - pinned via the shipped featurePoint() shoelace centroid path. NO return_centroid: this is a classic 10.61 MapServer, the 'silently ignores the parameter' class.",
+        "status_vocabulary_sums_to_total": "9 values, identical DESC and ASC: Construction Work Program 14020, Under Construction 8139, Legacy Projects 1756, Overhead Projects 1497, Long Range Program 1098, Temporarily Shored Bridges 23, UNKNOWN 4, Deferred 4, Rejected 3 = 26544",
+        "type_vocabulary_sums_to_total": "13 values, identical DESC and ASC: Maintenance 6571, Intermodal 4731, Other 3320, Capital 3205, Reconstruction/Rehabilitation 2754, Safety 1291, Operating 1153, New Construction 1022, Replacement 880, Planning 717, Enhancement 588, ' ' 311, UNKNOWN 1 = 26544",
+        "freshness": "max(USER_DT) 2026-08-27, max(LOAD_DT) 2026-08-29, read off the LAYER. The AGO items pointing here were last modified 2018-2021, which would have read as abandoned.",
+        "why_all_counties_is_excluded": "returnExtentOnly on the single row 'SHARP CURVE WARNING SIGNS @ 304 LOCS IN DISTRICT 1' spans lat 30.31-34.99 / lng -85.60 to -80.75 - essentially the whole state in one polyline. Scoping is intersects, so that one record would attach to EVERY Georgia ZIP page and render as active construction on all of them. 1200 such rows survive the type filter. This is a correctness requirement, not tidying.",
+        "why_types_are_filtered": "Intermodal/Operating/Planning/Other/blank/UNKNOWN are transit grants, operating subsidy, studies and services contracts - not development a resident can stand next to (e.g. 'FY 2018-ALBANY MPO-SEC.5303-PLANNING'). Same defect class that rejected Marion County OR.",
+        "counts_measured": "26544 total; 16100 construction-only status+type; 1200 of those All Counties; 3493 survive filter + 1095d recency + All-Counties exclusion; 184 intersect a box around Marietta (Cobb).",
+        "why_no_file_date": "USER_DT is aliased 'Last Updated Date' - an edit stamp, not a filing date. Mapping it to file_date would claim a date the publisher never stated (ODOT STIP precedent). recency_expr applies the rolling window INSTEAD of the file_date-derived DATE literal (sources/arcgis.ts buildWhere), so the bound works without the false claim, and rolls rather than going stale.",
+        "why_dataset_url_is_the_homepage": "GDOT has no reachable deep project page. /InvestSmart/Pages/default.aspx, /InvestSmart/TransportationFundingAct/Pages/default.aspx all return HTTP 200 with <title>Page Has Moved</title>; ActiveProjectsNoFrame.html is 200 but titled 'Untitled 1' (a frameless fragment); /AboutGDOT and /InvestSmart/Pages/STIP.aspx return real SharePoint 404s. www.dot.ga.gov/ is 200 with title 'Georgia Department of Transportation - GDOT'. HTTP 200 is not verification - the title is what discriminated.",
+        "pii": "None in out_fields. GPAS layer 1 (Access Permit) carries REQUESTOR_NAME / SUBMITTED_BY_NAME / SUBMITTED_BY and is deliberately NOT wired.",
+        "dark_pages_targeted": "Georgia was 95 dark of 177 (46% lit) with no statewide entry: Cobb 22, Hall 15, Fulton 15, Gwinnett 14, Clarke 9, Cherokee 9, Henry 8, Forsyth 1, Walker 1, Chatham 1."
+      }
     }
   ],
   "ckan": [

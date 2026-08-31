@@ -12499,3 +12499,44 @@ The sandbox is not a fallback here: `WebFetch` on `www.dot.ga.gov` returns
 `EGRESS_BLOCKED … blocked by the network egress proxy`, so pg_net is the only instrument that
 can reach it, and the GDOT `dataset_url` verification is deferred rather than guessed.
 
+
+### RESOLVED — `georgia-dot-gpas-projects` WIRED (registry 236 → 237; statewide states 43 → 44)
+
+`dataset_url` is **`https://www.dot.ga.gov/`**, and the choice is deliberate. GDOT has no
+reachable deep project page, and **every candidate returned HTTP 200** — the `<title>` is what
+discriminated:
+
+| URL | status | `<title>` | verdict |
+|---|---|---|---|
+| `/InvestSmart/Pages/default.aspx` | 200 | **Page Has Moved** | stub |
+| `/InvestSmart/TransportationFundingAct/Pages/default.aspx` | 200 | **Page Has Moved** | stub |
+| `/InvestSmart/TransportationFundingAct/Pages/ActiveProjectsNoFrame.html` | 200 | **Untitled 1** | frameless fragment |
+| `/AboutGDOT` · `/InvestSmart/Pages/STIP.aspx` | **404** | SharePoint error | wrong path (my guess) |
+| **`https://www.dot.ga.gov/`** | **200** | **Georgia Department of Transportation – GDOT** | **real page** |
+
+**This is "HTTP 200 is not verification" in its most literal form.** Three 200s were unusable
+and only the title separated them. `dataset_url` is the `record_url` fallback for every emitted
+row, so a moved-page stub would have shipped a dead end on thousands of records. The homepage is
+not a lazy default — it is the only verified-valid GDOT landing page. (The GDOT homepage nav is
+JavaScript-driven: the static HTML carries just 38 hrefs and no project links, so no deeper page
+could be discovered rather than guessed.)
+
+**Entry shape** — `extra_where` excludes `All Counties` and whitelists the 7 construction types;
+`status_to_bucket` covers **all 9** publisher STATUS values with none in two buckets;
+`type_map` classifies all 7 kept types as `Utility` (DOT road work) for **0 unclassified**;
+**no `file_date`** and the rolling bound rides in `recency_expr` (`USER_DT >= DATE '{cutoff}'`,
+`recency_days` 1095); no `return_centroid`; `spatial_zip_radius_mi` 3;
+`record_url_precision: "dataset"`.
+
+**PII fence:** `out_fields` carries none, and **GPAS layer 1 (`Access Permit`) is deliberately
+NOT wired** — it holds `REQUESTOR_NAME`, `SUBMITTED_BY_NAME`, `SUBMITTED_BY`, `REQUESTOR_ID`.
+`test/georgia-dot-gpas-projects.test.mjs` asserts layer 1 appears nowhere in the registry.
+
+Additivity was proven programmatically, not eyeballed: arcgis 208 → 209, existing ids are an
+exact prefix, **0 existing entries mutated, 0 sibling keys changed**. Full suite green at
+**136 files**.
+
+**Not yet measured: how many of Georgia's 95 dark pages actually light.** Coverage is not reach —
+the ODOT precedent lit 4 pages from a statewide STIP, not the whole state. The go-live count
+comes from a cache refresh over GA ZIPs, and is deliberately not predicted here.
+
