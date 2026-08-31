@@ -12873,10 +12873,24 @@ tells the truth about the majority.
 Merged as **#977** (`b2ae11c`) and deployed (`deploy-edge-functions` run 33418715972, success on
 the merge commit). All **47** dark TN ZIPs were then fired through the live engine.
 
-**Baseline at fire time: TN 199 pages · 152 lit · 47 dark.** The result is **not yet measured** —
-the batch is still in the pg_net queue. It needs no supervision: `dev_refresh_tick` (pg_cron,
-`*/2 * * * *`) calls `dev_refresh_collect()` itself, which is exactly how Georgia's last two
-rounds completed while unattended (126 → 140 → 158 with no manual collect).
+**RESULT — TN 199 pages · 152 → 176 lit · 47 → 23 dark, in ONE round.** 24 pages carry **75
+TDOT records**. Tennessee went from **76.4% to 88.4% lit** on a single rollout, and the whole
+write was performed by the pg_cron collector with no manual `dev_refresh_collect()` call.
+
+⚠️ **A MEASUREMENT-TIMING ERROR worth recording, because it nearly became a false defect report.**
+The batch's 47 responses all landed at **17:19:39**. Measured at ~17:19 the table read
+**152 lit / 0 TDOT records**, which looks exactly like "the source returned nothing" — and was
+briefly reported that way. It was neither: `dev_refresh_tick` collected at **17:22:00** and the
+rows wrote correctly. Verified on the individual reports — 37014 `tdot 1`, 37025 `tdot 4`, 37032
+`tdot 2`, all `refreshed_at 17:22:00`.
+
+**The standing answer: a read taken between the FETCH and the COLLECT is not a measurement of the
+source.** `net._http_response` and `development_reports` are two stages, up to ~2 minutes apart.
+Before concluding a source produced nothing, check the responses themselves for
+`source_registry_id` records — they showed 5, 4, 1, 4, 2 per ZIP the whole time — and check
+`cron.job_run_details` for whether a tick has run since the responses landed. This is the same
+class as the EPA `ok:false` blocking in Georgia, but with an entirely different cause and cure:
+there, waiting would not have helped; here, waiting was the whole answer.
 
 ⚠️ **A note on the PR, because it cost a cycle.** PR #977 initially registered **zero CI checks**
 for ~10 minutes despite matching every path filter. Cause: after #976 was squash-merged I did not
