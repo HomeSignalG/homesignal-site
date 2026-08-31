@@ -15456,6 +15456,134 @@
       ],
       "record_url_precision": "dataset",
       "_receipts": "[VERIFIED 2026-08-30 via pg_net against the live endpoint, in the connector's own scope] Permit Sonoma (the County of Sonoma's Permit & Resource Management Department) wildfire-rebuild permit register. Org NAME receipt: arcgis.com/sharing/rest/portals/P5Mv5GY5S66M8Z1Q -> 'The County of Sonoma' (never the acronym, never the subdomain). Sonoma was one of five CA counties with 100% of its pages dark (40) and no covering source; caltrans-sb1-projects reaches it statewide but only where a STIP project falls within 3 mi. SCOPE IS HONEST AND NARROW: this is the rebuild register for the 2017 Sonoma Complex, Kincade, Glass and Lightning fires \u2014 homes being rebuilt after they burned. It is NOT a general Sonoma building-permit ledger and will light the fire-affected ZIPs only. 2,094 records. \u26a0\ufe0f FRESHNESS \u2014 THE ITEM DATE UNDERSTATED THIS SOURCE BY TEN MONTHS, the exact inverse of the NMDOT trap recorded in the New Mexico pass. The AGO item reports modified 2025-10-31; the LAYER reports editingInfo.dataLastEditDate = 2026-08-30, the day it was probed. Date_Opened spans 2017-08-14 to 2026-07-24. **Read dataLastEditDate on the layer in BOTH directions: the item date can overstate freshness (NMDOT, by 23 months) or understate it (here, by 10).** TWO COMPLETE VOCABULARIES, each enumerated in BOTH orderByFields directions and each summing EXACTLY to 2,094 with 0 nulls: Permit_Status = Finaled 1611 + Issued 237 + Expired 164 + Plan Check Expired 45 + Resubmittal Requested 13 + Plan Check Comments Sent 7 + Pre-Issue/Payment Due 6 + Payment Due 3 + Plan Check Approved 3 + Ready for Plan Check 2 + Application Accepted/In Review 1 + Awaiting Applicant Response 1 + Waiting for Other Approvals 1; Category = Single Family Home 1778 + Accessory Dwelling Unit 246 + Bridge 40 + Multi-Family Home 30. 'Plan Check Approved' buckets to approved on the publisher's OWN word, not on an inference about whether the permit has issued (the Anaheim 'Approved' precedent); both Expired states are excluded. Bridge maps to Utility, the rest to Residential. \u26a0\ufe0f GEOMETRY-LESS TABLE WITH **STRING** LAT/LNG COLUMNS \u2014 the hazard that had to be cleared before wiring. type=Table, no geometryType, so it rides spatial_latlng_cols (the Scottsdale attribute-bbox path) which ANDs `Latitude >= ymin AND ... AND Longitude <= xmax` into WHERE. Latitude and Longitude are esriFieldTypeString, and a LEXICOGRAPHIC comparison would scope NEGATIVE LONGITUDES BACKWARDS ('-122...' sorts below '-123...' as text) \u2014 silently wrong, never an error. PROVEN NUMERIC on the live server before wiring: the exact clause the connector emits for a 3-mi envelope around Santa Rosa 95404 returned 72 rows, and all 72 fall inside it \u2014 lat 38.459913-38.492265 within [38.4053, 38.4923], lng -122.737044 to -122.631023 within [-122.7390, -122.6282], **0 rows outside**. Control: 0 rows in the whole table have a null or empty Latitude/Longitude, so nothing is silently dropped by the clause. file_date is Date_Opened (when the application was opened) with file_date_kind 'filed'; Approval_Date, Issue_Date and First_Inspection_Date are real but are milestone dates, not the filing. No recency_days: the register is a bounded post-fire set and its 1,611 Finaled rows are completed rebuilds \u2014 real built work a resident should see \u2014 and per-ZIP subsets are ~72 rows, far from any row-size ceiling. No per-record URL column, so precision is `dataset` on Permit Sonoma's own site permitsonoma.org (HTTP 200 same round). REJECTED WITH RECEIPTS, same CA Bay Area round \u2014 see the source-registry pass for the full list, including the Santa Rosa County FLORIDA lookalike and the federated-catalog instrument fault."
+    },
+    {
+      "registry_id": "jackson-county-or-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://jcportal.jacksoncountyor.gov/server/rest/services/Property/Permits_Building/FeatureServer/1",
+      "dataset_url": "https://jcportal.jacksoncountyor.gov/server/rest/services/Property/Permits_Building/FeatureServer/1",
+      "jurisdiction": "Jackson County, Oregon",
+      "coverage": [
+        {
+          "state": "OR",
+          "county": "Jackson"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PERMITTYPE",
+          "PERMITDESC"
+        ],
+        "status_raw": "STATUSCAT",
+        "type_source": "PERMITTYPE",
+        "file_date": "SUBMITDT",
+        "decision_date": "APPROVEDT",
+        "address": "FULLADDR",
+        "case_number": "PERMITID",
+        "record_url": "LINK",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "filed",
+      "status_to_bucket": {
+        "proposed": [
+          "Pending"
+        ],
+        "approved": [
+          "Approved"
+        ],
+        "operating": [],
+        "exclude": [
+          "Denied or Expired",
+          "Withdrawn",
+          "Other"
+        ]
+      },
+      "type_map": {
+        "Residential": "Residential",
+        "Commercial": "Commercial",
+        "Disaster Relief": "Development"
+      },
+      "extra_where": "PERMITTYPE <> 'Inquiry'",
+      "recency_days": 1095,
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "PERMITID",
+        "PERMITTYPE",
+        "PERMITDESC",
+        "STATUSCAT",
+        "SUBMITDT",
+        "APPROVEDT",
+        "FULLADDR",
+        "LINK"
+      ],
+      "record_url_precision": "record",
+      "_receipts": "[VERIFIED 2026-08-31 via pg_net against the live endpoint, in the connector's own scope] Jackson County, OREGON \u2014 the county's own server jcportal.jacksoncountyor.gov, folder Property. \u26a0\ufe0f THIS IS OREGON, NOT MISSISSIPPI. It was found by accident while probing a Mississippi lead: an AGO search for MS permits returned owner `JCGIS_Owner`, which resolves to jacksoncountyor.gov with extent lat 42.00-42.94 / lng -123.23 to -122.28 \u2014 southern Oregon (Medford). The same search also returned `City_of_Jackson_TN_Building_Permits` (Tennessee). \u26a0\ufe0f AND THE COUNTY'S OWN CITIES ARE TRAPS: Jackson County OR contains cities named **Phoenix** and **Talent**, so its layers `Phoenix_Building_Permits_view` and `Talent Building Permits View` are OREGON, not Phoenix ARIZONA. Confirm the state before the schema. WHY IT MATTERS BEYOND 13 PAGES: OR is statewide-covered by the ODOT STIP pair, yet 89 OR pages are still dark because a STIP reaches project corridors, not neighbourhoods. This is the first wire against the COVERED-BUT-UNREACHED class, which the 2026-08-31 measurement showed is 1,983 of the 2,388 remaining dark pages \u2014 the large majority of the work left. \u26a0\ufe0f PII IS FENCED OUT AT out_fields (the Bismarck precedent). Both layers carry `APPLICANT` and `CONTRACTOR`, which are PERSON NAMES. Neither is mapped and neither is fetched. RECORD PRECISION IS EARNED, NOT ASSUMED: `LINK` is a per-record Accela ACA deep link (aca-oregon.accela.com/oregon/Cap/CapDetail.aspx?...) and is NULL OR EMPTY ON **0** ROWS of both layers. Fitting confirmation of the vendor-tier standing answer: the portal supplies the LINK, the county's GIS supplies the DATA. `JURISDICTION` IS NOT MAPPED \u2014 a groupBy returns a single blank value for all 251,367 building rows, i.e. the column is unpopulated. TWO SERVERS CARRY THIS DATA AND ONLY ONE IS WIRED: spatial.jacksoncountyor.gov/.../DevServ/Permit/MapServer holds `0:Building Permit` (243,044) and `1:Land Use Permit` (40,648) \u2014 FEWER rows than jcportal's 251,367 and 88,801, so jcportal is the fuller copy and the DevServ MapServer is deliberately NOT wired. Wiring both would double-emit across two source_registry_ids, which exact-identity dedup cannot catch (the Houston-plats class). THIS ENTRY \u2014 Permits_Building layer **1** (layer 0 does not exist), esriGeometryPoint wkid 4326, **251,367 records**, newest SUBMITDT **2026-08-30**, the day before probing; 7,348 submitted in the last year and 22,370 in the last three. TWO COMPLETE VOCABULARIES, each summing EXACTLY to 251,367 with 0 nulls: STATUSCAT = Approved 187905 + Pending 24363 + Other 14707 + Denied or Expired 13166 + Withdrawn 11226; PERMITTYPE = Residential 154725 + Commercial 95541 + Disaster Relief 760 + Inquiry 341. STATUSCAT IS USED IN PREFERENCE TO PERMITSTAT ON PURPOSE: PERMITSTAT is a 37-value operational vocabulary with **12,494 NULLs**, while STATUSCAT is the publisher's own 5-value roll-up with none. `Approved` buckets to approved on the publisher's own word \u2014 it rolls up Finaled (175,445) and Permit Issued alike, and claiming `operating` for a category the publisher calls Approved would overstate. `Other` (14,707) is EXCLUDED rather than guessed: an opaque residual cannot be bucketed honestly. `Inquiry` (341) is dropped by extra_where \u2014 a pre-application inquiry is not a permit for work, and rendering one as a development record would misstate it. recency_days 1095 IS MEASURED, NOT GUESSED \u2014 a live 3-mile envelope around Medford 97501 returns **21,980 records all-time**, which is the Cleveland row-size hazard on a single page; the same envelope returns **1,194 at 1095 days** and 443 at 365. 1095 keeps three years of real content well inside the ceiling."
+    },
+    {
+      "registry_id": "jackson-county-or-land-use-permits",
+      "platform": "arcgis",
+      "service_url": "https://jcportal.jacksoncountyor.gov/server/rest/services/Property/Permits_LandUse/FeatureServer/0",
+      "dataset_url": "https://jcportal.jacksoncountyor.gov/server/rest/services/Property/Permits_LandUse/FeatureServer/0",
+      "jurisdiction": "Jackson County, Oregon",
+      "coverage": [
+        {
+          "state": "OR",
+          "county": "Jackson"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PERMITTYPE",
+          "PERMITDESC"
+        ],
+        "status_raw": "STATUSCAT",
+        "type_source": "PERMITTYPE",
+        "file_date": "SUBMITDT",
+        "decision_date": "APPROVEDT",
+        "address": "FULLADDR",
+        "case_number": "PERMITID",
+        "record_url": "LINK",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "filed",
+      "status_to_bucket": {
+        "proposed": [
+          "Pending"
+        ],
+        "approved": [
+          "Approved"
+        ],
+        "operating": [],
+        "exclude": [
+          "Withdrawn",
+          "Denial",
+          "Other"
+        ]
+      },
+      "type_map": {
+        "Zoning": "Development",
+        "Subdivision": "Development",
+        "Site Plan Review": "Development"
+      },
+      "extra_where": "PERMITTYPE <> 'Pre-Application Conference'",
+      "recency_days": 1095,
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "PERMITID",
+        "PERMITTYPE",
+        "PERMITDESC",
+        "STATUSCAT",
+        "SUBMITDT",
+        "APPROVEDT",
+        "FULLADDR",
+        "LINK"
+      ],
+      "record_url_precision": "record",
+      "_receipts": "[VERIFIED 2026-08-31 via pg_net against the live endpoint, in the connector's own scope] Jackson County, OREGON \u2014 the county's own server jcportal.jacksoncountyor.gov, folder Property. \u26a0\ufe0f THIS IS OREGON, NOT MISSISSIPPI. It was found by accident while probing a Mississippi lead: an AGO search for MS permits returned owner `JCGIS_Owner`, which resolves to jacksoncountyor.gov with extent lat 42.00-42.94 / lng -123.23 to -122.28 \u2014 southern Oregon (Medford). The same search also returned `City_of_Jackson_TN_Building_Permits` (Tennessee). \u26a0\ufe0f AND THE COUNTY'S OWN CITIES ARE TRAPS: Jackson County OR contains cities named **Phoenix** and **Talent**, so its layers `Phoenix_Building_Permits_view` and `Talent Building Permits View` are OREGON, not Phoenix ARIZONA. Confirm the state before the schema. WHY IT MATTERS BEYOND 13 PAGES: OR is statewide-covered by the ODOT STIP pair, yet 89 OR pages are still dark because a STIP reaches project corridors, not neighbourhoods. This is the first wire against the COVERED-BUT-UNREACHED class, which the 2026-08-31 measurement showed is 1,983 of the 2,388 remaining dark pages \u2014 the large majority of the work left. \u26a0\ufe0f PII IS FENCED OUT AT out_fields (the Bismarck precedent). Both layers carry `APPLICANT` and `CONTRACTOR`, which are PERSON NAMES. Neither is mapped and neither is fetched. RECORD PRECISION IS EARNED, NOT ASSUMED: `LINK` is a per-record Accela ACA deep link (aca-oregon.accela.com/oregon/Cap/CapDetail.aspx?...) and is NULL OR EMPTY ON **0** ROWS of both layers. Fitting confirmation of the vendor-tier standing answer: the portal supplies the LINK, the county's GIS supplies the DATA. `JURISDICTION` IS NOT MAPPED \u2014 a groupBy returns a single blank value for all 251,367 building rows, i.e. the column is unpopulated. TWO SERVERS CARRY THIS DATA AND ONLY ONE IS WIRED: spatial.jacksoncountyor.gov/.../DevServ/Permit/MapServer holds `0:Building Permit` (243,044) and `1:Land Use Permit` (40,648) \u2014 FEWER rows than jcportal's 251,367 and 88,801, so jcportal is the fuller copy and the DevServ MapServer is deliberately NOT wired. Wiring both would double-emit across two source_registry_ids, which exact-identity dedup cannot catch (the Houston-plats class). THIS ENTRY \u2014 Permits_LandUse layer 0, esriGeometryPoint, **88,801 records**, 5,811 in the last three years. Land-use APPLICATIONS (zoning, subdivision, site plan review), a different record class from the building-permit ledger \u2014 not the same records in two geometries \u2014 so no `yields_to` is declared; the two layers come from different county systems and carry different field sets (this one has PROCESSTYPE/APPLICATIONTYPE/MJCASE, the building layer has JURISDICTION/PERID1-3). TWO COMPLETE VOCABULARIES, each summing EXACTLY to 88,801 with 0 nulls: STATUSCAT = Approved 65948 + Pending 19073 + Withdrawn 2343 + Denial 1230 + Other 207; PERMITTYPE = Zoning 75509 + Subdivision 6774 + Pre-Application Conference 4778 + Site Plan Review 1740. \u26a0\ufe0f ITS STATUS VOCABULARY IS **NOT** THE BUILDING LAYER'S \u2014 this one says `Denial` where the building layer says `Denied or Expired`. The two status maps are deliberately separate; sharing one would leave a live value unmapped. Every kept type maps to `Development` \u2014 the honest generic for heterogeneous land-use cases (the Sussex DE / Phoenix residual precedent); none asserts a built use. `Pre-Application Conference` (4,778) is dropped by extra_where: a meeting about a possible application is not a filed development action."
     }
   ],
   "ckan": [
