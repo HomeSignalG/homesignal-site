@@ -13219,3 +13219,64 @@ question. ND: 45 pages → **7**, once the 85% of applications that were DECLINE
 NM: 19 pages → **5**, once the layer stalled since 2023 was excluded. **The first number is the
 dataset's size; only the second is what a resident would see.** Neither state was wired, and in
 both cases the layer-wide figure would have justified a wire that the honest figure does not.
+
+---
+
+## ⚠️ CORRECTION: "check the FRS probe before firing" is NECESSARY BUT NOT SUFFICIENT (2026-08-31)
+
+Earlier today, in the Tennessee rollout section above, this document recorded an operating
+procedure: *"CHECK THE FRS PROBE BEFORE FIRING A BATCH … BOTH targets must be ok."* That advice
+is right as far as it goes and **it is not enough**. It was written after one good outcome and
+then failed on its first independent test, during the Iowa rollout the same evening.
+
+**What happened.** The probe was read green at **20:00** and a batch of 40 dark Iowa ZIPs was
+fired. Measured over the responses that came back:
+
+| | |
+|---|---|
+| Iowa ZIP responses | 39 |
+| carrying `iowa-dot-five-year-program` records | **20** (51% — the geometry pre-measurement predicted 44%) |
+| with `epa.ok = true` | **1** |
+| writes the collector accepted | **0 of the 20** |
+
+A retry of the same 21 ZIPs ~6 minutes later returned **21 with Iowa records, 1 `epa.ok`, 0
+written.** Same result twice.
+
+**Why the probe misled.** `epa_frs_probes` rows are written on a 15-minute cron and carry a
+`resolved_at` that is only stamped by the NEXT run, so the newest reading is up to 15 minutes old
+before it is even resolved, and `dev_refresh_collect`'s own staleness bound tolerates 60 minutes.
+Reading it at 20:00 said "green"; the 20:15 and 20:30 probes both came back FALSE. The batch ran
+in between. **A gate whose signal lags the thing it gates cannot prevent the failure it exists to
+prevent.**
+
+**FRS was also far worse than its documented baseline.** The ~40-46% failure rate recorded earlier
+in this document is a long-run average, not a bound. Over a 90-minute window: 19:15 ✗ · 19:30 ✗ ·
+19:45 ✗ · 20:00 ✓ · 20:15 ✗ · 20:30 ✗ — **one green 15-minute slot in six.** Sustained multi-hour
+bad patches happen and no pre-flight check can schedule around them.
+
+### The corrected procedure
+
+1. **The probe is a cheap hint, not a gate.** Reading it before a batch is still worth doing — it
+   costs one query and skips the obviously-bad case — but a green probe does NOT mean the batch
+   will land.
+2. **The ONLY ground truth is `epa.ok` inside each response.** After every batch, read it:
+   ```sql
+   select count(*) filter (where (content::jsonb)->'epa'->>'ok' = 'true') as epa_ok,
+          count(*) as responses
+     from net._http_response
+    where created > now() - interval '20 minutes' and status_code = 200
+      and left(ltrim(content),1) = '{' and (content::jsonb)->>'mode' = 'zip';
+   ```
+3. **Separate "the source failed" from "the write was refused" BEFORE concluding anything.** The
+   Iowa batch first presented as a 3-page gain against a 61-page prediction — which reads exactly
+   like a bad wire. Counting records by `source_registry_id` proved the source was emitting at the
+   predicted rate and every write was EPA-blocked. **A rollout that delivers nothing is not
+   evidence the source is wrong.**
+4. **Do not sit in a retry loop during a sustained outage.** `dev_refresh_tick` runs every 2
+   minutes and the daily refresh re-fires every cached ZIP, so a correctly-wired source completes
+   its own rollout as FRS windows open. Retrying by hand against a multi-hour outage spends the
+   queue for nothing.
+
+**Iowa's wire is VERIFIED CORRECT and its rollout is pending FRS, not pending work.** 21 ZIPs
+returned Iowa records on two independent rounds; the pages will light as the scheduled refresh
+finds green windows. IA stood at 89 of 225 at the time of writing, en route to the measured 147.
