@@ -12867,3 +12867,355 @@ emit a true deep link, and the other 1,794 fall back to the verified projects pa
 sparsely-populated URL column is strictly better than omitting it, provided the declared precision
 tells the truth about the majority.
 
+
+### TENNESSEE GO-LIVE FIRED (2026-08-31) — merged, deployed, 47 ZIPs refreshing
+
+Merged as **#977** (`b2ae11c`) and deployed (`deploy-edge-functions` run 33418715972, success on
+the merge commit). All **47** dark TN ZIPs were then fired through the live engine.
+
+**RESULT — TN 199 pages · 152 → 176 lit · 47 → 23 dark, in ONE round.** 24 pages carry **75
+TDOT records**. Tennessee went from **76.4% to 88.4% lit** on a single rollout, and the whole
+write was performed by the pg_cron collector with no manual `dev_refresh_collect()` call.
+
+⚠️ **A MEASUREMENT-TIMING ERROR worth recording, because it nearly became a false defect report.**
+The batch's 47 responses all landed at **17:19:39**. Measured at ~17:19 the table read
+**152 lit / 0 TDOT records**, which looks exactly like "the source returned nothing" — and was
+briefly reported that way. It was neither: `dev_refresh_tick` collected at **17:22:00** and the
+rows wrote correctly. Verified on the individual reports — 37014 `tdot 1`, 37025 `tdot 4`, 37032
+`tdot 2`, all `refreshed_at 17:22:00`.
+
+**The standing answer: a read taken between the FETCH and the COLLECT is not a measurement of the
+source.** `net._http_response` and `development_reports` are two stages, up to ~2 minutes apart.
+Before concluding a source produced nothing, check the responses themselves for
+`source_registry_id` records — they showed 5, 4, 1, 4, 2 per ZIP the whole time — and check
+`cron.job_run_details` for whether a tick has run since the responses landed. This is the same
+class as the EPA `ok:false` blocking in Georgia, but with an entirely different cause and cure:
+there, waiting would not have helped; here, waiting was the whole answer.
+
+⚠️ **A note on the PR, because it cost a cycle.** PR #977 initially registered **zero CI checks**
+for ~10 minutes despite matching every path filter. Cause: after #976 was squash-merged I did not
+apply this repo's own rule — *"after a PR is squash-merged, reset the designated branch to
+`origin/main` and commit forward"* — so the branch carried **17 commits**, including work already
+shipped by the squash, and `test/georgia-dot-gpas-projects.test.mjs` showed as **added** in a PR
+that had nothing to do with it. The **content** diff was correct throughout (`git diff origin/main
+HEAD` = exactly the 4 Tennessee files; the Georgia test was byte-identical to `main`), so nothing
+was wrong with the change — only with the history. Rebuilding the branch on `origin/main` as ONE
+commit and force-pushing with lease fixed both the commit list and the checks, which registered
+within two minutes. **The rule is not cosmetic: a divergent branch can suppress CI entirely, not
+just annoy a reviewer.**
+
+
+### COLORADO — NOT WIRED, and the "point/line pair" framing was WRONG (2026-08-31)
+
+Earlier in this document CDOT was described as *"a POINT + LINE pair … needs `yields_to` (points
+yield to lines), exactly like the ODOT STIP pair."* **That is incorrect.** Measured:
+
+| layer | rows | distinct `PROJECT_ID` |
+|---|---|---|
+| `/24` Projects (all types) — **Line** | 18,369 | **12,486** |
+| `/25` Projects (all types) — **Point** | 1,301 | **815** |
+
+**`yields_to` does not apply, because these are not the same records in two geometries.** The
+ODOT pair was one project set published twice; here the line layer covers **12,486** projects and
+the point layer **815** — the point layer is a small, largely different subset. Declaring
+`yields_to` between them would suppress line records that have no point counterpart at all.
+
+**Neither layer is one-row-per-project either** — lines average 1.47 rows per `PROJECT_ID`, points
+1.6. So the segments-per-project concern was real, and it applies to *both* layers, not just lines.
+
+⚠️ **The blocker that actually decides it: the status field is BLANK or OPAQUE.** Sampled
+`SAPPROJECTSTATUS` values are `" "` (a single space) on 3 of 4 rows and `"X"` on the fourth;
+`CURR_STIP` is likewise `" "`/`"X"`; `SAPPROJECTTYPE` is `ENG` / `STIP-WBS`. **Nothing there can be
+mapped verbatim to a self-describing bucket** — this is the San Jose `planningpermits30` precedent
+("every row carries the single opaque status code '30' — nothing to map verbatim, fail-closed"),
+and the standing autonomy grant explicitly gates **"any opaque-coded value."**
+
+`SAPPROJECTDESCRIPTION` *is* readable and would make a fine title (`US 160 AT S BROADWAY CORTEZ`,
+`West 10th @ 83rd Ave`, `Foothills Pkway Diag-Valmont`), so the layer is not junk — it simply
+cannot state a project's **lifecycle stage**, which is what `status_to_bucket` exists to express.
+
+**Status: a FOUNDER DECISION, not an autonomous wire.** The options, neither taken:
+1. Wire lines only with a `status_const` naming what the layer actually is (a CDOT programmed
+   project inventory), accepting that no per-record stage is available — the ODOT/GDOT
+   `status_const` precedent.
+2. Leave Colorado on its 5 existing city permit sources (Denver / Boulder / Fort Collins /
+   Colorado Springs), which already cover 105 of 140 CO pages; the 35 dark are mostly rural.
+
+#### The vocabularies, now FULLY ENUMERATED — and they make the rejection firm
+
+The stalled probes landed. This supersedes the "sample, not vocabulary" caveat above:
+
+- **`SAPPROJECTSTATUS` has exactly TWO values: `"X"` and `" "` (a single space)** — and
+  `SAPPROJECTSTATUS = ' '` matches **18,355 of 18,369 rows (99.92%)**. Only **14 rows** carry
+  anything at all. **This is not a status vocabulary; it is an almost-always-empty flag.** There is
+  no lifecycle information in this layer to map, so `status_to_bucket` has literally nothing to
+  express — worse than San Jose's opaque `"30"`, which at least appeared on every row.
+- **`SAPPROJECTTYPE` has 15 values, every one an internal accounting code:** `ARPA MMOF` ·
+  `NON-CAPITAL ENG` · `BE` · `MC` · `ENG` · `STIP` · `MTF` · `MTCE` · `LRP-WBS` · `HPTE` · `LRP` ·
+  `DTD` · `STIP-WBS` · `ARPA RMS` · `NON-ENG`. None is self-describing to a resident.
+- **`SAPPROJECTDESCRIPTION` is populated on 18,227 of 18,369 rows (99.2%)** — so the *title* half
+  is genuinely good, which is exactly what makes this a judgement call rather than a junk layer.
+
+**Consequence for the two options above: option 1 (`status_const`) is the ONLY technically viable
+path, and it is a founder call precisely because `status_const` asserts what the entire layer
+IS.** With 99.92% of rows blank, no per-record stage can ever be derived — a wire here would say
+"CDOT has a programmed project here" and nothing more. Option 2 (leave Colorado on its 5 city
+sources, 105 of 140 pages covered) remains available and costs nothing.
+
+Layer SR is **wkid 26913 (UTM 13N)**, not WGS84 — `outSR` required, as with Tennessee's State
+Plane.
+
+
+---
+
+## NORTH DAKOTA — NOT WIRED. The blocker is a LICENCE, not a missing layer (2026-08-31)
+
+North Dakota is the worst-covered state in the country: **8 of 155 modelled ZIP pages carry a
+sourced record (5.2%), 147 dark.** It was picked as the next statewide target for exactly that
+reason. It is **not wireable**, and the reason is one no amount of further probing will change.
+
+### What was probed, and the positive control for each
+
+Every step below ran through `pg_net`; the sandbox has no egress (`connect_rejected` on all three
+NDDOT hosts — an instrument fault, not a finding).
+
+| probe | result | control |
+|---|---|---|
+| AGO search `NDDOT` | 200 | `total: 250` |
+| AGO search `owner:NDDOT-GIS` | 200 | `total: 75` — full roster enumerated below |
+| AGO search `"North Dakota" (STIP OR "construction projects" OR "highway projects")` | 200 | `total: 9` |
+| `gis.dot.nd.gov/arcgis/rest/services?f=json` | **404** IIS "Object Not Found" | root listing disabled |
+| `gis.dot.nd.gov/arcgis/rest/info?f=json` | 200 | server is live, ArcGIS 11.5 |
+| `…/services/ext_ssl?f=json` | 200 | **3** services |
+| `…/services/**external**?f=json` | 200 | **35** services |
+
+⚠️ **The root 404 does NOT mean the server is empty — this is the Georgia trap again.** The
+`external` folder holding 35 services was invisible to both the root listing (404) and the
+`ext_ssl` listing (3 services). It was recovered the same way Georgia's was: by reading the `url`
+field of the agency's own AGO items (`Road Conditions Conditions-NE` →
+`…/services/external/rcrs_dynamic/MapServer/31`) and walking up to the folder.
+
+### There IS a project-shaped layer — the roster is not the problem
+
+All 75 `NDDOT-GIS` items are bridges (asset inventory, not development filings), road-weather,
+material sources, ROW recordation, and basemaps. But the recovered `external` folder carries
+`rcrs_dynamic` (the NDDOT Travel Information Map), whose 39 layers include **`21: Work Zones -
+Shorter than 8 miles`** and **`22: Work Zones - Longer than 8 miles`** — statewide, located,
+current road construction. Also present: `Flex_Fund_Committee_Published` and
+`LocalGov_Urban_Priorities_Interchanges` (funding-programme project locations).
+
+### ⛔ The stop: NDDOT's published Access and Use Constraints forbid this use, verbatim
+
+From the `rcrs_dynamic` MapServer's own `serviceDescription` (quoted exactly, not recalled):
+
+> **Access and Use Constraints:**
+> You may use the web services and the contents contained in the web services solely for your own
+> individual **non-commercial** and informational purposes only. Any other use, including for any
+> commercial purposes, is strictly prohibited without our expressed prior written consent.
+> **Systematic retrieval of data or other content from the web services, whether to create or
+> compile, directly or indirectly, a collection, compilation, database or directory, is
+> prohibited** absent our expressed prior written consent.
+
+Both clauses describe precisely what a wire would do: HomeSignal is a commercial service, and
+`development_reports` is a compiled database built by systematic retrieval. The same description
+adds that NDDOT's services *"are not designed for or intended to be used in any high usage
+application"* and that unintended use *"could affect public safety"* — a scheduled per-ZIP refresh
+across 155 pages is exactly the load pattern that sentence warns off.
+
+⚠️ **SCOPE CORRECTION — this licence covers `rcrs_dynamic`, NOT every NDDOT service.** An earlier
+draft of this section read the clause as blocking North Dakota outright. That was an overstatement
+made before the other two services' descriptions had come back. Measured: the
+`Flex_Fund_Committee_Published` MapServer returns `"serviceDescription": ""` (empty) and
+`LocalGov_Urban_Priorities_Interchanges` returns only *"Urban Priorities Interchanges map."* —
+**neither carries the Access and Use Constraints text at all.** The blocked layer is the Work
+Zones / Travel Information Map service specifically, which is also the one whose prose warns about
+load and public safety.
+
+**What this changes:** the *best* ND candidate (statewide located Work Zones) is licence-blocked
+and stays blocked. The *remaining* candidates are not, and are assessed on their merits below.
+An empty `serviceDescription` is not affirmative permission either — it is the ordinary absence of
+stated terms, the same posture under which every other source in this registry was wired.
+
+**This is a founder stop, not an engineering one.** `CLAUDE.md` §3 and §7 both list a
+legal/consent question as one of the only genuine stop conditions, and the one-time legal
+sign-off in `docs/development-tracker-source-of-truth.md` §10 covers *rendering a public fact with
+its link* — it does not grant permission a publisher has explicitly withheld.
+
+**Nothing was wired and nothing was cached from any NDDOT endpoint.** The probes above were
+metadata reads (`?f=json` service descriptions and folder listings); no feature query was run.
+
+### What would unblock it — one of three, all outside an autonomous grant
+
+1. **Written consent from NDDOT** for commercial systematic retrieval. Their own text names this
+   as the remedy ("absent our expressed prior written consent"), so it is a request that can
+   actually be made.
+2. **A different ND publisher whose terms permit it** — county/city permit portals in Cass
+   (Fargo), Burleigh (Bismarck), Grand Forks or Ward (Minot). Not probed in this pass.
+3. **Accept 147 dark ND pages** on the EPA facilities floor, which remains honest and correct.
+
+⚠️ **Standing answer for every future state pass: READ THE SERVICE DESCRIPTION BEFORE MEASURING
+THE VOCABULARY.** Nothing in the schema, the row counts, the freshness or the status vocabulary
+would have surfaced this — an ArcGIS layer that forbids its own use looks identical to one that
+welcomes it right up until someone reads the prose. North Dakota is the first state in this
+campaign rejected on terms rather than on data quality, and the check costs one field of a
+request already being made.
+
+### The two unlicensed candidates, MEASURED — and both fail on their own merits
+
+With the licence question scoped to `rcrs_dynamic`, the other two services were assessed normally.
+
+**`LocalGov_Urban_Priorities_Interchanges/FeatureServer/0` — REJECTED, wrong kind of thing.**
+64 point features whose fields are `Crossroad_FC`, `Crossroad_HPC`, `Facility_Type`, `Lighting`,
+`District`, `Urban_Area`, `EB_BC`, `WB_BC`. There is no status, no date, and no project — it is an
+**inventory of interchanges that already exist**, the same class as the bridge layers. An asset
+registry is not a development filing.
+
+**`Flex_Fund_Committee_Published/MapServer/1` (Flex Fund Line Applications) — REJECTED, and this
+one is worth reading, because it looked like a clear win right up until the last query.**
+
+It is genuinely project-shaped: 358 polyline features, `Approved` with exactly **two
+self-describing values** (`Yes` / `No` — not opaque codes, unlike Colorado's `" "`/`"X"`),
+`WorkType` with **24 self-describing values** (`AGGREGATE SURFACING`, `RECONSTRUCTION`,
+`ROADWAY EXPANSION`, `BIKEWAY/WALKWAY`, `RAILROAD CROSSING IMPROVEMENTS`, …), `ProNeed` carrying
+real 4,000-char prose ("Description of Project Need"), plus `LPANAME`, `TotProCost`, `PhaseInc`.
+
+**The surface was measured before proposing anything** (the `harris-county-plats` lesson: a
+correctly-wired source with no surface is wasted work). All 358 geometries were pulled at
+`outSR=4326` and every vertex tested against all 155 modelled ND ZIP centroids at the connector's
+own `spatial_zip_radius_mi: 3`:
+
+| set | reaches ND pages | of which currently dark |
+|---|---|---|
+| **all 358 applications** | 50 | **45** |
+| **`Approved = 'Yes'` only** | 8 | **7** |
+
+⛔ **`Approved='Yes'` is 52 rows. `Approved='No'` is 306 — 85% of this layer is applications the
+committee DECLINED.** Counts taken separately, and they sum to exactly 358.
+
+**That is what kills it.** The 45-page lift is almost entirely rejected funding applications.
+Rendering them would put "proposed project near you" on a resident's page for work that was
+turned down — a factual claim about a named jurisdiction that the source itself contradicts, and
+precisely what the development tracker's prime directive forbids. Mapping `No → exclude` is the
+only honest treatment, and it leaves **7 new pages** — not worth a registry entry, a test file, a
+deploy and a rollout.
+
+⚠️ **Standing answer: MEASURE THE SURFACE ON THE ROWS YOU WOULD ACTUALLY PUBLISH, never on the
+whole layer.** The first measurement here (45 pages) was arithmetically correct and completely
+misleading, because it silently included the 306 rows that must never be shown. A layer-wide
+count answers "how big is this dataset"; only the filtered count answers "what would a resident
+see". This is Rule 13 (probe the question the connector asks) applied to coverage rather than to
+vocabulary — and the gap between the two numbers here was **6.4x**.
+
+**North Dakota therefore stays at 8 of 155 pages lit.** Its 147 dark pages remain honest EPA
+facilities-floor pages. Remaining unexplored: county/city permit portals in Cass (Fargo),
+Burleigh (Bismarck), Grand Forks and Ward (Minot), and NDDOT consent for the Work Zones layer.
+
+---
+
+## TENNESSEE ROLLOUT COMPLETE — 152 → 192 of 199 (96.5%), and the real lesson is EPA, not TDOT
+
+`tennessee-dot-projects` (PR #977) finished its rollout. Final measured state, 2026-08-31:
+
+| stage | lit / 199 | % |
+|---|---|---|
+| before the wire | 152 | 76.4% |
+| after round 1 (deploy-day fires) | 176 | 88.4% |
+| after re-firing the 19 untested dark ZIPs | **192** | **96.5%** |
+
+**The 7 remaining dark pages are VERIFIED honest empties**, not unmeasured ones — every one was
+refreshed today and returned real facility counts alongside zero TDOT records: 37087 (fac 40),
+38451 (1), 37184 (3), 37020 (7), 37191 (1), plus 37051 and 37118. TDOT genuinely has no project
+within 3 miles of those centroids.
+
+### ⚠️ The failure that cost two rounds: a batch fired into an EPA FRS outage writes NOTHING
+
+The first re-fire of all 19 ZIPs looked like a total source failure and was nothing of the kind.
+All 19 returned **200 with correct TDOT records** (16 non-zero, up to 29 for 37238) — and all 19
+were **refused by `dev_refresh_collect()`**, because every one also carried
+`epa: {ok:false, reason:"transient"}` and therefore `counts.facilities: 0`. The guard's third
+transient-safe clause refuses any write that would zero a fresh row's facilities. It did exactly
+its job; the pages kept their real counts.
+
+Re-firing the identical batch ~10 minutes later, after the FRS probe went green, landed **17 of 19
+immediately**.
+
+**Operating procedure, now explicit — CHECK THE FRS PROBE BEFORE FIRING A BATCH:**
+
+```sql
+select distinct on (target) target, ok, probed_at
+  from public.epa_frs_probes where resolved_at is not null
+ order by target, probed_at desc;   -- BOTH targets must be ok
+```
+
+FRS flips roughly every 15-30 minutes and fails **density-dependently** (that is why the probe
+carries both `atlanta-dense` and `sheridan-rural`). Firing blind wastes a full round: the edge
+function runs, the source is queried correctly, and the result is discarded.
+
+**Two more transient classes seen in the same rollout, both benign and both needing only a retry:**
+- **`503 BOOT_ERROR`** — `{"code":"BOOT_ERROR","message":"Function failed to start"}`, a cold
+  start. One ZIP (37238) hit it once.
+- **Dense-ZIP FRS persistence** — 37238 (downtown Nashville) failed FRS on three consecutive
+  attempts and succeeded on the fourth. A dense ZIP failing repeatedly is the documented FRS
+  radius/process-limit behaviour, not a defect in the page or the source.
+
+⚠️ **A read taken between the FETCH and the COLLECT is not a measurement of the source** (recorded
+earlier in this document and hit again here). `dev_refresh_collect()` runs on `dev_refresh_tick`
+every 2 minutes; calling it directly is the way to close the loop deterministically rather than
+reading a report row that has not been written yet.
+
+---
+
+## NEW MEXICO — NOT WIRED. Four candidates, all real, all too small or too old (2026-08-31)
+
+New Mexico was the next target after North Dakota: **24 of 158 modelled ZIP pages lit (15.2%),
+134 dark.** NMDOT's AGO org is `services.arcgis.com/hOpd7wfnKm16p9D9`, recovered from the `url`
+field of its own AGO items (the Georgia method). Its full service list — **enumerated, 34,738
+bytes, not sampled** — contains four project-shaped services. Every one was probed. None is
+wireable.
+
+| service / layer | rows | last edit | verdict |
+|---|---|---|---|
+| `NMDOT_ESTIP_Project_Locations/2` "Project Locations **2025**" | 44 | **2023-08-24** | STALLED |
+| `NMDOT_ESTIP_Project_Locations/1` "Project Locations 2024" | — | **2023-08-24** | STALLED |
+| `Roadway_Projects/4` (HSIP Roadway Projects) | 30 | 2025-05-14 | too small |
+| `Other_Projects/0` (HSIP Funded Projects 2018-2023) | 8 | 2025-05-14 | too small |
+
+⚠️ **A YEAR IN A LAYER NAME IS A PROGRAMMING LABEL, NOT A DATA VINTAGE.** The eSTIP layer is
+called *"Project Locations 2025"* and its `editingInfo.lastEditDate` is `1692914075822` —
+**2023-08-24 21:54:35 UTC**. Layers 1 and 2 carry the *same* edit timestamp to the second, so the
+whole service was published once in August 2023 and never touched again. Reading the name and
+skipping `editingInfo` would have recorded New Mexico as having a current statewide STIP source.
+This is the Worcester / Syracuse / KCMO stall class, and the discriminator is one field of a
+request already being made.
+
+### The surface measurement, and why the honest number is 5
+
+Following the rule established in the North Dakota pass — *measure the surface on the rows you
+would actually publish* — all three layers' geometries were pulled at `outSR=4326` and tested
+against all 158 modelled NM ZIP centroids at `spatial_zip_radius_mi: 3`:
+
+| set | newly-lit dark NM pages |
+|---|---|
+| all three layers (82 records, 128 vertices) | **19** |
+| **HSIP only** — dropping the 2023-stalled eSTIP (38 points) | **5** |
+
+**14 of the 19 came from the stalled layer.** The publishable remainder is **38 records of
+completed 2018-2023 highway-safety work lighting 5 pages** — not worth two registry entries, two
+test files, a deploy and a rollout.
+
+`Roadway_Projects` is otherwise a clean little layer (`ProjectName`, `Agency`, `County`, `Amount`,
+`Type`, `DateAwarded`, `Description`, `CN`; point geometry; wkid 26913 so `outSR` is required, as
+with Colorado and Tennessee). `DateAwarded` is a STRING year (`"2018"`), so `recency_days` could
+not apply anyway — the Anaheim/Frisco string-date precedent.
+
+**New Mexico therefore stays at 24 of 158.** Its 134 dark pages remain honest EPA facilities-floor
+pages. Not probed this pass: Albuquerque / Bernalillo, Santa Fe, Las Cruces / Doña Ana city
+permit portals — the county-level tier, which is where NM's remaining upside is.
+
+### The pattern across ND and NM, stated once
+
+Both states had a project layer that measured well at first look and collapsed under the second
+question. ND: 45 pages → **7**, once the 85% of applications that were DECLINED were excluded.
+NM: 19 pages → **5**, once the layer stalled since 2023 was excluded. **The first number is the
+dataset's size; only the second is what a resident would see.** Neither state was wired, and in
+both cases the layer-wide figure would have justified a wire that the honest figure does not.
