@@ -12235,3 +12235,308 @@ grant. Flagged for a founder decision, not silently corrected.
 - **The portal supplies the link, the GIS supplies the data** — every one of the 4,128 record URLs
   is an Accela ACA deep link served from a county ArcGIS layer. The vendor-tier conclusion,
   confirmed from the inside.
+
+---
+
+## OREGON COVERED-BUT-UNREACHED SWEEP (2026-08-31) — five counties, five rejections, one instructive near-miss
+
+Follow-on to the Jackson County wire. Oregon's remaining dark pages sit under a statewide
+source (the ODOT STIP pair) that **covers** them without **reaching** them — the
+covered-but-unreached class. Target: **Lane 31 · Washington 15 · Clackamas 13 · Marion 9 ·
+Yamhill 8 = 76 dark pages.** Result: **no wire. All five rejected, with receipts.**
+
+### Three clean negatives
+
+| County | What its org actually publishes | Verdict |
+|---|---|---|
+| **Lane** | university research projects, DEQ cleanup sites, forest-conversion layers | no permit source |
+| **Washington** | Oregon Metro RLIS zoning + vacant-land layers | no permit source |
+| **Clackamas** | `CCGISWebService`/`Aaron@CCGIS` — Zoning, Rural/Urban Land Use Zoning, PLSS, and an "Application Feedback Septic Permitting Explorer" | septic **soils suitability**, not permits |
+
+Clackamas is the one worth naming: a layer whose title contains "Permitting" is not a permit
+ledger. It maps soil suitability for septic systems. **Title-matching "permit" is a lead, never
+a finding** — the same rule that caught the Champaign "Building_Permit_Data" 1-row subdivision
+polygon and the Dakota assessor extract.
+
+### MARION — the near-miss, and why a perfect schema still gets rejected
+
+`https://gis.co.marion.or.us/arcgis/rest/services/Public/PublicWorksPermits/MapServer/0`
+
+Everything the checklist asks for was **present and good**:
+
+- **point geometry**, real coordinates (sampled lat 44.77–45.26 / lng −122.77 to −122.96 — correctly inside Marion County)
+- **41,714 rows**; 3,572 in the last 1,095 days
+- **fresh** — `max(OPENDATE)` = **2026-08-27**, four days before probe (min 1981-01-01, so a 45-year tail needing `recency_days`)
+- **per-record `ACA_LINK`** — a real Accela Citizen Access deep link (`aca-oregon.accela.com/…agencyCode=MARION_CO`), i.e. **record** precision, not dataset
+- filed date, decision date (`FINALEDDATE`), site address, taxlot
+
+**It was still rejected, on CONTENT.** `TYPE` is not a development vocabulary — it is a
+four-value **workflow class**, enumerated with `returnDistinctValues`:
+`Tracking · Project · Inquiry · Revision`. There is no field anywhere in the layer saying what
+is being built. `SPEC_TEXT` (aliased "Description") is empty or an internal code — sampled
+values `""`, `"M5886567"`, `"SAL-JB2179924A-CO Revision"`.
+
+The number that decided it:
+
+```
+TYPE='Project' AND OPENDATE >= date '2023-09-01'  →  count = 1
+```
+
+One row in three years, and it reads `"PGE SHORT SIDE SERVICE CONDUIT"` — **Withdrawn**. So the
+~3,571 other recent rows are `Tracking`/`Inquiry`/`Revision`: county right-of-way and
+utility-conduit workflow records. Every sampled `Inquiry` had an empty description and status
+`Closed` — pre-application questions, not filings.
+
+**Standing answer: schema quality and content quality are independent, and the checklist only
+measures the first.** Geometry, freshness, a per-record URL and a clean status vocabulary can
+all pass while the layer still has nothing a resident can read. A pin titled
+`Tracking — M5886567` is worse than an honest empty page: it claims development activity and
+communicates nothing. The test that catches this is **"read the actual titles a resident would
+see"**, and it belongs after the schema checks, not instead of them.
+
+Two lesser findings from the same probe, recorded so nobody re-derives them:
+
+- **This server 400s on `groupByFieldsForStatistics`** — ArcGIS Server 10.91 MapServer returns
+  HTTP **200** carrying `{"error":{"code":400,"message":"Unable to complete operation"}}` for
+  every groupBy tried, in both sort directions. `returnDistinctValues=true` works fine and is
+  the substitute. A 200-wrapped error is exactly the shape that reads as "no values found."
+- `STATUS` carries **19 values including an empty string** (`App Submitted`, `In Review/Addl Info
+  Needed`, `Permit Issued`, `Finaled`, `Void`, `Denied`, …). Had this been wired, the empty
+  string would have had to fail closed rather than bucket.
+
+Also on that server, not pursued: `Public/WildfirePermits` (burn permits, not development) and
+`Public/LandUsePlanningZoning` (zoning polygons).
+
+### YAMHILL — a real lead, deliberately not pursued
+
+`Address_and_OpenGOV_Permit_Join` (`services.arcgis.com/LJLnwUl0uTPWJE9B`, owner
+`mckeela_Newberg`) is a live AGO **view** joining Newberg's address points to OpenGov permit
+records, `dataLastEditDate` 2026-06-09. It is an address registry first — the permit fields ride
+along on a join — and it covers **one city** in an 8-dark-page county. Logged as an unexhausted
+lead, not a rejection: if the OpenGov half proves to be a real per-record ledger it is wireable,
+but it was not the best available use of the next probe.
+
+### What this pass changes about the campaign
+
+Oregon's 76 covered-but-unreached pages are **not** recoverable at the county level with
+first-party GIS. The state is now fully explored: Jackson wired, the other five documented
+negatives. The remaining Oregon dark pages stay on the EPA facilities floor, which is a correct
+terminal state, not a gap.
+
+
+---
+
+## GEORGIA — GDOT's project inventory FOUND, and it was never probed before (2026-08-31)
+
+**Georgia appears nowhere in this document prior to this section.** It was never reconned in
+any earlier pass, and `jurisdiction-registry.json` carries **no statewide GA entry** — only four
+county/city entries (`dekalb-county-building-permits` declaring DeKalb+Fulton+Gwinnett+Henry,
+`forsyth-county-ga-building-permits`, `savannah-commercial-building-permits` on Chatham,
+`johns-creek-building-permits` on Fulton+Gwinnett). That is why GA sits at **95 dark of 177
+pages (46% lit)** with four counties **100% dark**: Cobb 22, Hall 15, Clarke 9, Cherokee 9,
+plus partial Fulton 15/40, Gwinnett 14/21, Henry 8/10.
+
+### The dead end first — GEOPI_APP is decommissioned, and the control proves it
+
+Every AGO item pointing at GDOT's public project map resolves to `GEOPI_APP`, on two GDOT hosts.
+Both are gone:
+
+```
+egis.dot.ga.gov/arcgis/rest/services/GEOPI_APP/MapServer   → 200 + {"error":{"code":500,
+    "message":"Could not find a service with the name 'MapServer/GEOPI_APP' …"}}
+rnhp.dot.ga.gov/hosting/rest/services/GEOPI_APP/MapServer  → 200 + {"error":{"code":500,
+    "message":"Could not find service. …"}}
+```
+
+**This is a clean negative, not a guessed-path artifact** — the positive control is that
+`egis.dot.ga.gov/arcgis/rest/services` itself answers `{"currentVersion":10.31,"folders":
+["Utilities"],"services":[{"name":"CountyCentroid","type":"GPServer"}]}`. The host is up and
+serving; the project service is retired. (The AGO-hosted copy `GDOT_Project_Locations` is
+`499 Token Required`, and the other AGO copies are third-party re-hosts by a city GIS shop, an
+Esri employee and a consultant — not first-party, so not wireable regardless.)
+
+### The folder-permission trap, and the control that settles it
+
+`rnhp.dot.ga.gov/hosting/rest/services` is **live** (10.61) and advertises folders including
+`STIP`, `Planning`, `TPro` and `GDOT_Public_Outreach`. Listing them anonymously:
+
+| folder | anonymous response | reading |
+|---|---|---|
+| `STIP` | `{"folders":[],"services":[]}` | permission-filtered |
+| `GDOT_Public_Outreach` | `{"folders":[],"services":[]}` | permission-filtered |
+| `Planning` | `{"error":{"code":499,"message":"Token Required"}}` | explicitly gated |
+| **`Hosted`** | **7 FeatureServers listed** | **control — folders CAN list** |
+| **`Utilities`** | **2 services listed (Geometry, PrintingTools)** | **control** |
+
+**Standing answer: an empty `services:[]` from an ArcGIS Server folder is NOT evidence the
+folder is empty — it is the shape permission-filtering takes.** The discriminator is a control
+folder on the same server: `Hosted` and `Utilities` both return services, so `STIP`'s emptiness
+is authorization, not absence. Without that control, "GDOT publishes no STIP" would have been
+recorded as a fact and Georgia would have been stamped a source desert. A `499` (Planning) and
+an empty list (STIP) are the same finding wearing two different faces.
+
+### WHAT WAS FOUND — GPAS layer 13, public, first-party, statewide
+
+`https://rnhp.dot.ga.gov/hosting/rest/services/GPAS/MapServer/13` — **"Projects for Utilities
+Permit"**, `esriGeometryPolyline`, **26,544 rows**, `copyrightText: "GDOT"`.
+
+⚠️ **The layer NAME describes its consumer, not its content.** It exists so a utility-permit
+applicant can pick the GDOT project their work attaches to — but the rows are GDOT's own project
+inventory: `PROJECT_ID`, `PROJECT_NAME`, `PROJECT_TYPE`, `PRIM_WORK_TYP`, `STATUS`,
+`PROJECT_ACCOUNTING_NUMBER`, `PROJECT_DESCR` (1,000 chars), `FUNDING_TYP`, `FUNDING_SOURCE`,
+`COUNTIES`, `CITIES`, `ROUTE_NUMS`, `GDOT_DISTRICTS`, `USER_DT`, `LOAD_DT`. Skipping it on the
+name alone would have missed the state's only statewide source.
+
+**Both vocabularies enumerated in both sort directions, each summing EXACTLY to 26,544:**
+
+`STATUS` (9) — Construction Work Program 14,020 · Under Construction 8,139 · Legacy Projects
+1,756 · Overhead Projects 1,497 · Long Range Program 1,098 · Temporarily Shored Bridges 23 ·
+UNKNOWN 4 · Deferred 4 · Rejected 3. **Sum = 26,544 ✓** (DESC and ASC returned identical sets).
+
+`PROJECT_TYPE` (13) — Maintenance 6,571 · Intermodal 4,731 · Other 3,320 · Capital 3,205 ·
+Reconstruction/Rehabilitation 2,754 · Safety 1,291 · Operating 1,153 · New Construction 1,022 ·
+Replacement 880 · Planning 717 · Enhancement 588 · `" "` (single space) 311 · UNKNOWN 1.
+**Sum = 26,544 ✓**
+
+**Freshness — read off the data, not the item.** The AGO items pointing here were last modified
+2018–2021, which would have read as abandoned. The layer itself: `max(USER_DT)` =
+**2026-08-27**, `max(LOAD_DT)` = **2026-08-29** — two and four days before probe. This is the
+"item `modified` ≠ data freshness" rule (NMDOT overstated by 23 months, Sonoma understated by
+10) firing a third time, in the understating direction.
+
+### The open content question — NOT yet resolved, and it is the deciding one
+
+Sampled rows include `"FY 2018-ALBANY MPO-SEC.5303-PLANNING"` (a transit planning **grant**,
+`PROJECT_TYPE: Intermodal`) and a whole `Overhead Projects` status bucket of 1,497
+administrative records. Those are not development a resident can stand next to — the same defect
+that rejected Marion County OR earlier today. A wire here is only honest behind a construction-only
+filter dropping `Intermodal` / `Operating` / `Planning` / `Other` / blank / `UNKNOWN` types and
+the `Legacy` / `Overhead` / `Rejected` / `Deferred` statuses, and the surviving volume has not
+yet been measured. **No entry is proposed until it is.**
+
+Also unresolved: there is **no per-record URL column** (`HAS_DOCUMENT` is a flag, not a link), so
+this would be `record_url_precision: "dataset"`; and `USER_DT` is aliased "Last Updated Date" —
+an edit stamp, **not** a filing date, so it must not be mapped to `file_date` (the ODOT STIP
+precedent: omit `file_date` rather than dress a rebuild stamp as one, and let any recency bound
+ride in `extra_where`).
+
+
+### GDOT layer 13 — the filter is MEASURED, and the "All Counties" row is why it is mandatory
+
+| query | count |
+|---|---|
+| layer total | **26,544** |
+| construction-only `STATUS` + `PROJECT_TYPE` | **16,100** |
+| …of which `COUNTIES = 'All Counties'` | **1,200** (7.5%) |
+| …construction-only, not All-Counties, `USER_DT >= 2023-09-01` | **3,493** |
+| …of those intersecting a ±0.15° box around Marietta (Cobb) | **184** |
+
+**The `All Counties` class is pathological, and it was measured rather than assumed.**
+`returnExtentOnly` on the single row `SHARP CURVE WARNING SIGNS @ 304 LOCS IN DISTRICT 1`
+returns (Web Mercator 102100) `xmin −9529523, ymin 3549362, xmax −8989208, ymax 4163971` —
+**lat 30.31–34.99, lng −85.60 to −80.75, essentially the whole state of Georgia in one
+polyline.** Its centroid is a meaningless point in mid-Georgia, and because scoping is
+`intersects`, that one record would attach to **every ZIP page in Georgia** and render as an
+active construction project on all of them. Excluding `COUNTIES <> 'All Counties'` is a
+correctness requirement, not tidying. 1,200 such rows survive the type filter.
+
+Two design points settled while sizing the entry, both verified against the shipped connector:
+
+- **`recency_expr` is the right instrument here, not `file_date`.** `buildWhere`
+  (`sources/arcgis.ts:725-736`) applies `recency_expr` *instead of* the `file_date`-derived
+  `DATE '{cutoff}'` literal, so a rolling window can bound `USER_DT` **without** mapping it to
+  `file_date`. That matters because `USER_DT` is aliased **"Last Updated Date"** — an edit
+  stamp. Mapping it to `file_date` would claim a filing date the publisher never stated (the
+  ODOT STIP precedent: omit `file_date` rather than dress a rebuild stamp as one). A literal
+  cutoff would also go stale; `recency_expr` + `recency_days` rolls.
+- **No `return_centroid`.** This is a classic 10.61 MapServer, which is the "silently ignores
+  the parameter" class — the polyline centroid comes from the shipped `featurePoint()`
+  shoelace path instead.
+
+**STILL OPEN, and the only thing between this and a wire:** `dataset_url` must be a real GDOT
+human landing page, and it is **not yet verified**. Probes of `www.dot.ga.gov` returned pg_net
+`Timeout of 5000 ms … TCP/SSL handshake time: 4994 ms` — and so did a re-run of an
+`rnhp.dot.ga.gov` query that had returned clean 200s minutes earlier. **Those timeouts are an
+instrument fault, not a finding about GDOT**, and nothing about the source is being inferred
+from them. No entry is written until a landing page returns a real response, because the
+registry's `dataset_url` is the record_url fallback for every emitted row and a guessed one
+would ship a broken link on ~3,493 records.
+
+
+### Operational finding — pg_net is SHARED WITH INGEST, and slow hosts wedge it
+
+Recorded because it cost real time this session and will again. `net.http_get` against
+`www.dot.ga.gov` (a slow SharePoint site — one observed response took **14.78 s** of HTTP time
+after a 0.2 s handshake) repeatedly **wedged the pg_net worker**: `max(id)` in
+`net._http_response` freezes while `net.http_request_queue` sits at a constant depth, and
+requests never resolve. `select net.worker_restart();` clears it — verified three times
+(99918 → 99926 immediately after a restart).
+
+Three consequences worth carrying forward:
+
+1. **The worker is shared with production, and the queue is HEAD-OF-LINE blocked.** ⚠️
+   **CORRECTION to the first version of this bullet, which claimed my probes stall production
+   fetches — the evidence shows the reverse is at least as likely, and I could not prove
+   either direction.** Reading `net.http_request_queue` directly during a stall showed 13
+   entries: my 5 GDOT probes, and **8 `get-address-report` calls each carrying
+   `timeout_milliseconds = 180000`** — the `dev_refresh` cron. Eight three-minute production
+   calls in the queue explain a multi-minute freeze on their own. Do not attribute a stall to
+   your own probes without reading the queue's contents first. Still keep probe timeouts modest
+   (the 5 s default, or ≤25 s): a slow probe adds to the same shared backlog even when it is
+   not the cause.
+2. **Do not diagnose a wedge from one observation.** Twice this session the queue *looked*
+   stuck at "13 queued" when `max(id)` was in fact advancing and the 13 were newer arrivals
+   from competing traffic. The discriminator is whether `max(id)` moves across two checks
+   ~60 s apart, not the queue depth.
+3. **A pg_net timeout is an INSTRUMENT fault and must never be recorded as a finding about the
+   source.** In the same minute, three GDOT probes returned `Timeout of 5000 ms … TCP/SSL
+   handshake time: 4994 ms` — including a re-run of an `rnhp.dot.ga.gov` query that had
+   returned clean `200`s minutes earlier, and which returned `{"count":26544}` again on the
+   next attempt. Reading those timeouts as "GDOT is unreachable" would have retired a live,
+   fresh, first-party statewide source.
+
+The sandbox is not a fallback here: `WebFetch` on `www.dot.ga.gov` returns
+`EGRESS_BLOCKED … blocked by the network egress proxy`, so pg_net is the only instrument that
+can reach it, and the GDOT `dataset_url` verification is deferred rather than guessed.
+
+
+### RESOLVED — `georgia-dot-gpas-projects` WIRED (registry 236 → 237; statewide states 43 → 44)
+
+`dataset_url` is **`https://www.dot.ga.gov/`**, and the choice is deliberate. GDOT has no
+reachable deep project page, and **every candidate returned HTTP 200** — the `<title>` is what
+discriminated:
+
+| URL | status | `<title>` | verdict |
+|---|---|---|---|
+| `/InvestSmart/Pages/default.aspx` | 200 | **Page Has Moved** | stub |
+| `/InvestSmart/TransportationFundingAct/Pages/default.aspx` | 200 | **Page Has Moved** | stub |
+| `/InvestSmart/TransportationFundingAct/Pages/ActiveProjectsNoFrame.html` | 200 | **Untitled 1** | frameless fragment |
+| `/AboutGDOT` · `/InvestSmart/Pages/STIP.aspx` | **404** | SharePoint error | wrong path (my guess) |
+| **`https://www.dot.ga.gov/`** | **200** | **Georgia Department of Transportation – GDOT** | **real page** |
+
+**This is "HTTP 200 is not verification" in its most literal form.** Three 200s were unusable
+and only the title separated them. `dataset_url` is the `record_url` fallback for every emitted
+row, so a moved-page stub would have shipped a dead end on thousands of records. The homepage is
+not a lazy default — it is the only verified-valid GDOT landing page. (The GDOT homepage nav is
+JavaScript-driven: the static HTML carries just 38 hrefs and no project links, so no deeper page
+could be discovered rather than guessed.)
+
+**Entry shape** — `extra_where` excludes `All Counties` and whitelists the 7 construction types;
+`status_to_bucket` covers **all 9** publisher STATUS values with none in two buckets;
+`type_map` classifies all 7 kept types as `Utility` (DOT road work) for **0 unclassified**;
+**no `file_date`** and the rolling bound rides in `recency_expr` (`USER_DT >= DATE '{cutoff}'`,
+`recency_days` 1095); no `return_centroid`; `spatial_zip_radius_mi` 3;
+`record_url_precision: "dataset"`.
+
+**PII fence:** `out_fields` carries none, and **GPAS layer 1 (`Access Permit`) is deliberately
+NOT wired** — it holds `REQUESTOR_NAME`, `SUBMITTED_BY_NAME`, `SUBMITTED_BY`, `REQUESTOR_ID`.
+`test/georgia-dot-gpas-projects.test.mjs` asserts layer 1 appears nowhere in the registry.
+
+Additivity was proven programmatically, not eyeballed: arcgis 208 → 209, existing ids are an
+exact prefix, **0 existing entries mutated, 0 sibling keys changed**. Full suite green at
+**136 files**.
+
+**Not yet measured: how many of Georgia's 95 dark pages actually light.** Coverage is not reach —
+the ODOT precedent lit 4 pages from a statewide STIP, not the whole state. The go-live count
+comes from a cache refresh over GA ZIPs, and is deliberately not predicted here.
+
