@@ -12904,3 +12904,45 @@ commit and force-pushing with lease fixed both the commit list and the checks, w
 within two minutes. **The rule is not cosmetic: a divergent branch can suppress CI entirely, not
 just annoy a reviewer.**
 
+
+### COLORADO — NOT WIRED, and the "point/line pair" framing was WRONG (2026-08-31)
+
+Earlier in this document CDOT was described as *"a POINT + LINE pair … needs `yields_to` (points
+yield to lines), exactly like the ODOT STIP pair."* **That is incorrect.** Measured:
+
+| layer | rows | distinct `PROJECT_ID` |
+|---|---|---|
+| `/24` Projects (all types) — **Line** | 18,369 | **12,486** |
+| `/25` Projects (all types) — **Point** | 1,301 | **815** |
+
+**`yields_to` does not apply, because these are not the same records in two geometries.** The
+ODOT pair was one project set published twice; here the line layer covers **12,486** projects and
+the point layer **815** — the point layer is a small, largely different subset. Declaring
+`yields_to` between them would suppress line records that have no point counterpart at all.
+
+**Neither layer is one-row-per-project either** — lines average 1.47 rows per `PROJECT_ID`, points
+1.6. So the segments-per-project concern was real, and it applies to *both* layers, not just lines.
+
+⚠️ **The blocker that actually decides it: the status field is BLANK or OPAQUE.** Sampled
+`SAPPROJECTSTATUS` values are `" "` (a single space) on 3 of 4 rows and `"X"` on the fourth;
+`CURR_STIP` is likewise `" "`/`"X"`; `SAPPROJECTTYPE` is `ENG` / `STIP-WBS`. **Nothing there can be
+mapped verbatim to a self-describing bucket** — this is the San Jose `planningpermits30` precedent
+("every row carries the single opaque status code '30' — nothing to map verbatim, fail-closed"),
+and the standing autonomy grant explicitly gates **"any opaque-coded value."**
+
+`SAPPROJECTDESCRIPTION` *is* readable and would make a fine title (`US 160 AT S BROADWAY CORTEZ`,
+`West 10th @ 83rd Ave`, `Foothills Pkway Diag-Valmont`), so the layer is not junk — it simply
+cannot state a project's **lifecycle stage**, which is what `status_to_bucket` exists to express.
+
+**Status: a FOUNDER DECISION, not an autonomous wire.** The options, neither taken:
+1. Wire lines only with a `status_const` naming what the layer actually is (a CDOT programmed
+   project inventory), accepting that no per-record stage is available — the ODOT/GDOT
+   `status_const` precedent.
+2. Leave Colorado on its 5 existing city permit sources (Denver / Boulder / Fort Collins /
+   Colorado Springs), which already cover 105 of 140 CO pages; the 35 dark are mostly rural.
+
+⚠️ Also unresolved and required either way: the `SAPPROJECTSTATUS` / `SAPPROJECTTYPE` vocabularies
+were **never fully enumerated** — those probes stalled in the pg_net queue and are NOT reported
+here as counts. The four values above are a **sample**, not the vocabulary. Layer SR is
+**wkid 26913 (UTM 13N)**, not WGS84 — `outSR` required, as with Tennessee's State Plane.
+
