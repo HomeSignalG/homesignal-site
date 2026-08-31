@@ -12235,3 +12235,91 @@ grant. Flagged for a founder decision, not silently corrected.
 - **The portal supplies the link, the GIS supplies the data** — every one of the 4,128 record URLs
   is an Accela ACA deep link served from a county ArcGIS layer. The vendor-tier conclusion,
   confirmed from the inside.
+
+---
+
+## OREGON COVERED-BUT-UNREACHED SWEEP (2026-08-31) — five counties, five rejections, one instructive near-miss
+
+Follow-on to the Jackson County wire. Oregon's remaining dark pages sit under a statewide
+source (the ODOT STIP pair) that **covers** them without **reaching** them — the
+covered-but-unreached class. Target: **Lane 31 · Washington 15 · Clackamas 13 · Marion 9 ·
+Yamhill 8 = 76 dark pages.** Result: **no wire. All five rejected, with receipts.**
+
+### Three clean negatives
+
+| County | What its org actually publishes | Verdict |
+|---|---|---|
+| **Lane** | university research projects, DEQ cleanup sites, forest-conversion layers | no permit source |
+| **Washington** | Oregon Metro RLIS zoning + vacant-land layers | no permit source |
+| **Clackamas** | `CCGISWebService`/`Aaron@CCGIS` — Zoning, Rural/Urban Land Use Zoning, PLSS, and an "Application Feedback Septic Permitting Explorer" | septic **soils suitability**, not permits |
+
+Clackamas is the one worth naming: a layer whose title contains "Permitting" is not a permit
+ledger. It maps soil suitability for septic systems. **Title-matching "permit" is a lead, never
+a finding** — the same rule that caught the Champaign "Building_Permit_Data" 1-row subdivision
+polygon and the Dakota assessor extract.
+
+### MARION — the near-miss, and why a perfect schema still gets rejected
+
+`https://gis.co.marion.or.us/arcgis/rest/services/Public/PublicWorksPermits/MapServer/0`
+
+Everything the checklist asks for was **present and good**:
+
+- **point geometry**, real coordinates (sampled lat 44.77–45.26 / lng −122.77 to −122.96 — correctly inside Marion County)
+- **41,714 rows**; 3,572 in the last 1,095 days
+- **fresh** — `max(OPENDATE)` = **2026-08-27**, four days before probe (min 1981-01-01, so a 45-year tail needing `recency_days`)
+- **per-record `ACA_LINK`** — a real Accela Citizen Access deep link (`aca-oregon.accela.com/…agencyCode=MARION_CO`), i.e. **record** precision, not dataset
+- filed date, decision date (`FINALEDDATE`), site address, taxlot
+
+**It was still rejected, on CONTENT.** `TYPE` is not a development vocabulary — it is a
+four-value **workflow class**, enumerated with `returnDistinctValues`:
+`Tracking · Project · Inquiry · Revision`. There is no field anywhere in the layer saying what
+is being built. `SPEC_TEXT` (aliased "Description") is empty or an internal code — sampled
+values `""`, `"M5886567"`, `"SAL-JB2179924A-CO Revision"`.
+
+The number that decided it:
+
+```
+TYPE='Project' AND OPENDATE >= date '2023-09-01'  →  count = 1
+```
+
+One row in three years, and it reads `"PGE SHORT SIDE SERVICE CONDUIT"` — **Withdrawn**. So the
+~3,571 other recent rows are `Tracking`/`Inquiry`/`Revision`: county right-of-way and
+utility-conduit workflow records. Every sampled `Inquiry` had an empty description and status
+`Closed` — pre-application questions, not filings.
+
+**Standing answer: schema quality and content quality are independent, and the checklist only
+measures the first.** Geometry, freshness, a per-record URL and a clean status vocabulary can
+all pass while the layer still has nothing a resident can read. A pin titled
+`Tracking — M5886567` is worse than an honest empty page: it claims development activity and
+communicates nothing. The test that catches this is **"read the actual titles a resident would
+see"**, and it belongs after the schema checks, not instead of them.
+
+Two lesser findings from the same probe, recorded so nobody re-derives them:
+
+- **This server 400s on `groupByFieldsForStatistics`** — ArcGIS Server 10.91 MapServer returns
+  HTTP **200** carrying `{"error":{"code":400,"message":"Unable to complete operation"}}` for
+  every groupBy tried, in both sort directions. `returnDistinctValues=true` works fine and is
+  the substitute. A 200-wrapped error is exactly the shape that reads as "no values found."
+- `STATUS` carries **19 values including an empty string** (`App Submitted`, `In Review/Addl Info
+  Needed`, `Permit Issued`, `Finaled`, `Void`, `Denied`, …). Had this been wired, the empty
+  string would have had to fail closed rather than bucket.
+
+Also on that server, not pursued: `Public/WildfirePermits` (burn permits, not development) and
+`Public/LandUsePlanningZoning` (zoning polygons).
+
+### YAMHILL — a real lead, deliberately not pursued
+
+`Address_and_OpenGOV_Permit_Join` (`services.arcgis.com/LJLnwUl0uTPWJE9B`, owner
+`mckeela_Newberg`) is a live AGO **view** joining Newberg's address points to OpenGov permit
+records, `dataLastEditDate` 2026-06-09. It is an address registry first — the permit fields ride
+along on a join — and it covers **one city** in an 8-dark-page county. Logged as an unexhausted
+lead, not a rejection: if the OpenGov half proves to be a real per-record ledger it is wireable,
+but it was not the best available use of the next probe.
+
+### What this pass changes about the campaign
+
+Oregon's 76 covered-but-unreached pages are **not** recoverable at the county level with
+first-party GIS. The state is now fully explored: Jackson wired, the other five documented
+negatives. The remaining Oregon dark pages stay on the EPA facilities floor, which is a correct
+terminal state, not a gap.
+
