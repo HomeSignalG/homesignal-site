@@ -12965,3 +12965,83 @@ sources, 105 of 140 pages covered) remains available and costs nothing.
 Layer SR is **wkid 26913 (UTM 13N)**, not WGS84 — `outSR` required, as with Tennessee's State
 Plane.
 
+
+---
+
+## NORTH DAKOTA — NOT WIRED. The blocker is a LICENCE, not a missing layer (2026-08-31)
+
+North Dakota is the worst-covered state in the country: **8 of 155 modelled ZIP pages carry a
+sourced record (5.2%), 147 dark.** It was picked as the next statewide target for exactly that
+reason. It is **not wireable**, and the reason is one no amount of further probing will change.
+
+### What was probed, and the positive control for each
+
+Every step below ran through `pg_net`; the sandbox has no egress (`connect_rejected` on all three
+NDDOT hosts — an instrument fault, not a finding).
+
+| probe | result | control |
+|---|---|---|
+| AGO search `NDDOT` | 200 | `total: 250` |
+| AGO search `owner:NDDOT-GIS` | 200 | `total: 75` — full roster enumerated below |
+| AGO search `"North Dakota" (STIP OR "construction projects" OR "highway projects")` | 200 | `total: 9` |
+| `gis.dot.nd.gov/arcgis/rest/services?f=json` | **404** IIS "Object Not Found" | root listing disabled |
+| `gis.dot.nd.gov/arcgis/rest/info?f=json` | 200 | server is live, ArcGIS 11.5 |
+| `…/services/ext_ssl?f=json` | 200 | **3** services |
+| `…/services/**external**?f=json` | 200 | **35** services |
+
+⚠️ **The root 404 does NOT mean the server is empty — this is the Georgia trap again.** The
+`external` folder holding 35 services was invisible to both the root listing (404) and the
+`ext_ssl` listing (3 services). It was recovered the same way Georgia's was: by reading the `url`
+field of the agency's own AGO items (`Road Conditions Conditions-NE` →
+`…/services/external/rcrs_dynamic/MapServer/31`) and walking up to the folder.
+
+### There IS a project-shaped layer — the roster is not the problem
+
+All 75 `NDDOT-GIS` items are bridges (asset inventory, not development filings), road-weather,
+material sources, ROW recordation, and basemaps. But the recovered `external` folder carries
+`rcrs_dynamic` (the NDDOT Travel Information Map), whose 39 layers include **`21: Work Zones -
+Shorter than 8 miles`** and **`22: Work Zones - Longer than 8 miles`** — statewide, located,
+current road construction. Also present: `Flex_Fund_Committee_Published` and
+`LocalGov_Urban_Priorities_Interchanges` (funding-programme project locations).
+
+### ⛔ The stop: NDDOT's published Access and Use Constraints forbid this use, verbatim
+
+From the `rcrs_dynamic` MapServer's own `serviceDescription` (quoted exactly, not recalled):
+
+> **Access and Use Constraints:**
+> You may use the web services and the contents contained in the web services solely for your own
+> individual **non-commercial** and informational purposes only. Any other use, including for any
+> commercial purposes, is strictly prohibited without our expressed prior written consent.
+> **Systematic retrieval of data or other content from the web services, whether to create or
+> compile, directly or indirectly, a collection, compilation, database or directory, is
+> prohibited** absent our expressed prior written consent.
+
+Both clauses describe precisely what a wire would do: HomeSignal is a commercial service, and
+`development_reports` is a compiled database built by systematic retrieval. The same description
+adds that NDDOT's services *"are not designed for or intended to be used in any high usage
+application"* and that unintended use *"could affect public safety"* — a scheduled per-ZIP refresh
+across 155 pages is exactly the load pattern that sentence warns off.
+
+**This is a founder stop, not an engineering one.** `CLAUDE.md` §3 and §7 both list a
+legal/consent question as one of the only genuine stop conditions, and the one-time legal
+sign-off in `docs/development-tracker-source-of-truth.md` §10 covers *rendering a public fact with
+its link* — it does not grant permission a publisher has explicitly withheld.
+
+**Nothing was wired and nothing was cached from any NDDOT endpoint.** The probes above were
+metadata reads (`?f=json` service descriptions and folder listings); no feature query was run.
+
+### What would unblock it — one of three, all outside an autonomous grant
+
+1. **Written consent from NDDOT** for commercial systematic retrieval. Their own text names this
+   as the remedy ("absent our expressed prior written consent"), so it is a request that can
+   actually be made.
+2. **A different ND publisher whose terms permit it** — county/city permit portals in Cass
+   (Fargo), Burleigh (Bismarck), Grand Forks or Ward (Minot). Not probed in this pass.
+3. **Accept 147 dark ND pages** on the EPA facilities floor, which remains honest and correct.
+
+⚠️ **Standing answer for every future state pass: READ THE SERVICE DESCRIPTION BEFORE MEASURING
+THE VOCABULARY.** Nothing in the schema, the row counts, the freshness or the status vocabulary
+would have surfaced this — an ArcGIS layer that forbids its own use looks identical to one that
+welcomes it right up until someone reads the prose. North Dakota is the first state in this
+campaign rejected on terms rather than on data quality, and the check costs one field of a
+request already being made.
