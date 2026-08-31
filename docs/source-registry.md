@@ -13162,3 +13162,60 @@ function runs, the source is queried correctly, and the result is discarded.
 earlier in this document and hit again here). `dev_refresh_collect()` runs on `dev_refresh_tick`
 every 2 minutes; calling it directly is the way to close the loop deterministically rather than
 reading a report row that has not been written yet.
+
+---
+
+## NEW MEXICO — NOT WIRED. Four candidates, all real, all too small or too old (2026-08-31)
+
+New Mexico was the next target after North Dakota: **24 of 158 modelled ZIP pages lit (15.2%),
+134 dark.** NMDOT's AGO org is `services.arcgis.com/hOpd7wfnKm16p9D9`, recovered from the `url`
+field of its own AGO items (the Georgia method). Its full service list — **enumerated, 34,738
+bytes, not sampled** — contains four project-shaped services. Every one was probed. None is
+wireable.
+
+| service / layer | rows | last edit | verdict |
+|---|---|---|---|
+| `NMDOT_ESTIP_Project_Locations/2` "Project Locations **2025**" | 44 | **2023-08-24** | STALLED |
+| `NMDOT_ESTIP_Project_Locations/1` "Project Locations 2024" | — | **2023-08-24** | STALLED |
+| `Roadway_Projects/4` (HSIP Roadway Projects) | 30 | 2025-05-14 | too small |
+| `Other_Projects/0` (HSIP Funded Projects 2018-2023) | 8 | 2025-05-14 | too small |
+
+⚠️ **A YEAR IN A LAYER NAME IS A PROGRAMMING LABEL, NOT A DATA VINTAGE.** The eSTIP layer is
+called *"Project Locations 2025"* and its `editingInfo.lastEditDate` is `1692914075822` —
+**2023-08-24 21:54:35 UTC**. Layers 1 and 2 carry the *same* edit timestamp to the second, so the
+whole service was published once in August 2023 and never touched again. Reading the name and
+skipping `editingInfo` would have recorded New Mexico as having a current statewide STIP source.
+This is the Worcester / Syracuse / KCMO stall class, and the discriminator is one field of a
+request already being made.
+
+### The surface measurement, and why the honest number is 5
+
+Following the rule established in the North Dakota pass — *measure the surface on the rows you
+would actually publish* — all three layers' geometries were pulled at `outSR=4326` and tested
+against all 158 modelled NM ZIP centroids at `spatial_zip_radius_mi: 3`:
+
+| set | newly-lit dark NM pages |
+|---|---|
+| all three layers (82 records, 128 vertices) | **19** |
+| **HSIP only** — dropping the 2023-stalled eSTIP (38 points) | **5** |
+
+**14 of the 19 came from the stalled layer.** The publishable remainder is **38 records of
+completed 2018-2023 highway-safety work lighting 5 pages** — not worth two registry entries, two
+test files, a deploy and a rollout.
+
+`Roadway_Projects` is otherwise a clean little layer (`ProjectName`, `Agency`, `County`, `Amount`,
+`Type`, `DateAwarded`, `Description`, `CN`; point geometry; wkid 26913 so `outSR` is required, as
+with Colorado and Tennessee). `DateAwarded` is a STRING year (`"2018"`), so `recency_days` could
+not apply anyway — the Anaheim/Frisco string-date precedent.
+
+**New Mexico therefore stays at 24 of 158.** Its 134 dark pages remain honest EPA facilities-floor
+pages. Not probed this pass: Albuquerque / Bernalillo, Santa Fe, Las Cruces / Doña Ana city
+permit portals — the county-level tier, which is where NM's remaining upside is.
+
+### The pattern across ND and NM, stated once
+
+Both states had a project layer that measured well at first look and collapsed under the second
+question. ND: 45 pages → **7**, once the 85% of applications that were DECLINED were excluded.
+NM: 19 pages → **5**, once the layer stalled since 2023 was excluded. **The first number is the
+dataset's size; only the second is what a resident would see.** Neither state was wired, and in
+both cases the layer-wide figure would have justified a wire that the honest figure does not.
