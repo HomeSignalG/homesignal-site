@@ -12093,3 +12093,81 @@ statewide DOT. Reaching the remaining dark pages at scale needs ONE of:
 
 **No further vendor-portal work should be done until one of these is chosen**, because every
 additional city probed lands on the same two walls.
+
+---
+
+## ENERGOV CONNECTOR — AUTHORIZED, INVESTIGATED, AND **NOT BUILT** (2026-08-30)
+
+The founder authorized building a Tyler EnerGov CSS connector on the strength of the previous
+pass's finding that its search API is reachable unauthenticated. **Establishing the payload
+contract from the client's own code — as that pass insisted — showed the connector should NOT be
+built. The recommendation was wrong, and this section is the retraction with the evidence.**
+
+### How the contract was obtained (not by guessing at the server)
+
+The previous pass stopped at "route exists, payload unknown" and refused to reverse-engineer it by
+firing guesses at a live government host. The correct source is the SPA's own bundle — a **public
+static asset, fetched once**: `stream.a2gov.org/EnerGov_Prod/selfservice/app/energov` (1,199,183
+bytes). Everything below is read from it.
+
+⚠️ Note the casing: the SPA references **`/EnerGov_Prod/`** while the live `STREAMURL` values use
+lowercase `energov_prod`. IIS is case-insensitive so both resolve — which is why the earlier
+lowercase probes reached the API at all.
+
+**The route was right all along.** The bundle builds relative routes like
+`/energov/search/searchcontactcards` and `/energov/permits/subrecordapply/data/<id>` under the app
+base, so the earlier `POST …/selfservice/api/energov/search/search` was correctly addressed and its
+**HTTP 500 was purely the request body** — confirming the 500-vs-404 reasoning.
+
+### THE DISQUALIFYING FINDING — the search API cannot scope to a place
+
+The complete `PermitCriteria` field set, read verbatim from the bundle's own validation branch:
+
+```
+PermitNumber · PermitTypeId · ProjectName · Address · IssueDateFrom · IssueDateTo
+ExpireDateFrom · ExpireDateTo · FinalDateFrom · FinalDateTo · SortBy · PageSize · PageNumber
+```
+
+`SearchModule` is an enum (`All=1, Permit=2, Plan=3, Inspection=4, CodeCase=5, Request=6,
+Business=7, BusinessLicense=8, ProfessionalLicense=9, License=10, Project=11, OperationalPermit=12`)
+and each module has its own parallel criteria object (`PlanCriteria`, `ProjectCriteria`, …).
+
+**There is no ZIP, no bounding box, no coordinate filter — only a free-text `Address`.** Confirmed
+by absence as well as presence: the strings `ZipCode` and `SearchMainAddress` appear **nowhere** in
+the 1.2 MB bundle, while `IssueDateFrom` and `ApplyDateFrom` do. This is a **keyword search built
+for a human typing a query**, not a bulk extract.
+
+Three consequences, each sufficient on its own:
+
+1. **No per-ZIP scoping is expressible.** The engine's entire model is a ZIP scope — a native ZIP
+   column or a lat/lng envelope. Neither exists here.
+2. **Results carry no coordinates**, so every record would need geocoding, at volume, through the
+   `GEOCODE_FENCE_MI` fence — and a fence miss NULLs the coordinate, so a large fraction would
+   list without pinning.
+3. ⛔ **The only way to build a ZIP page would be to page a city's ENTIRE permit corpus on every
+   refresh** — the rotation runs 8 pages every 2 minutes, continuously — against a server built for
+   interactive human searches. **That is an imposition on municipal infrastructure this project
+   should not ship**, independent of whether it would work.
+
+### AND IT IS UNNECESSARY — the CSS map already points at the city's own ArcGIS service
+
+The CSS map bundle (`selfservice/selfservice/map`, 49,247 bytes) loads the ArcGIS JS API but
+contains **no `FeatureServer` or `MapServer` literal** — the service URL comes from per-tenant
+settings at runtime. In other words the CSS map view renders **the jurisdiction's own ArcGIS
+service**, which is exactly what the already-wired EnerGov cities read:
+`ann-arbor-energov-permits` reads `utility.arcgis.com/usrsvcs/servers/<id>/…/PublicStaffPermits/
+FeatureServer/0` and carries the CSS link only as `column_map.record_url = "STREAMURL"`;
+`gilbert-energov-permits` is the same shape.
+
+**So the data behind an EnerGov portal is already reachable with the EXISTING arcgis connector,
+config-only.** A new connector would take a worse path to the same records.
+
+### Standing answer
+
+**For an EnerGov city, do not read the CSS API — find the ArcGIS service behind its CSS map and
+wire that with the existing connector.** The portal supplies the per-record URL, never the data.
+This is the same conclusion the vendor-tier pass reached from the outside (no wired source has ever
+read a vendor portal as its data source); the bundle explains *why* it keeps coming out that way.
+
+**Accela is unaffected** — it remains blocked on an App ID credential, which is a separate founder
+decision.
