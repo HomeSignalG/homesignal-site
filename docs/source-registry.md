@@ -12171,3 +12171,67 @@ read a vendor portal as its data source); the bundle explains *why* it keeps com
 
 **Accela is unaffected** — it remains blocked on an App ID credential, which is a separate founder
 decision.
+
+---
+
+## JACKSON COUNTY OREGON — go-live, and the COVERED-BUT-UNREACHED class opens (2026-08-31)
+
+`jackson-county-or-building-permits` + `jackson-county-or-land-use-permits` (#974), deployed on
+merge commit `ec69002a` (`deploy-edge-functions` run 33403888523, success).
+
+**Why this wire matters more than 6 pages.** Oregon has been statewide-covered by the ODOT STIP
+pair since 2026-08-28, and 96 Oregon pages were still dark — because a STIP reaches project
+corridors, not neighbourhoods. The 2026-08-31 measurement put numbers on it: of **2,388** dark
+pages nationally, **1,983 sit in counties a source already covers** and only **405** in counties
+nothing covers. **The covered-but-unreached pages are the large majority of the work left, and
+this is the first wire against them.**
+
+### Go-live smoke — 6 of 8, 4,128 records, every invariant clean
+
+Eight dark Jackson ZIPs re-fired at the measured-safe batch size; **all 8 returned HTTP 200 and
+EPA was healthy on every one** (`epa.ok:true` throughout — no outage to work around this time).
+
+| ZIP | building | land-use | sourced |
+|---|--:|--:|--:|
+| 97501 Medford | 1,065 | 439 | **1,505** |
+| 97520 Ashland | 583 | 224 | 808 |
+| 97525 Gold Hill | 538 | 202 | 742 |
+| 97524 Eagle Point | 366 | 291 | 658 |
+| 97530 Jacksonville | 179 | 114 | 293 |
+| 97541 Phoenix **(OR)** | 79 | 48 | 128 |
+| 97526 / 97527 Grants Pass | 0 | 0 | 0 — see below |
+
+**Across all 4,128 cached records: 0 missing `record_url`, 0 missing coordinates, 0
+`unclassified`, 0 non-`point` scope**, and **0 record_urls outside `aca-oregon.accela.com`**. Use
+types `Residential` + `Commercial` + `Development`; buckets `approved` + `proposed` only, with
+nothing claimed built. Coordinates span lat 42.138–42.730 — Jackson County, correct.
+**Gate proof cache-wide: 6 pages, and 0 records on any page outside OR/Jackson.**
+
+**Row size confirms the measured window was right:** the heaviest row is **247,771 bytes (242 KB)**
+— against the Cleveland high-water mark of 5.98 MB. Had `recency_days` been omitted, Medford's
+envelope would have carried **21,980** records instead of ~1,500.
+
+Jackson dark **13 → 7**; national dark 2,388 → 2,381.
+
+### ⚠️ FOUND EN ROUTE — THREE JOSEPHINE COUNTY ZIPs ARE PARENTED TO JACKSON
+
+The two zeros are not a defect of this source, and the reason is worth recording so nobody
+re-investigates it: **Grants Pass 97526 and 97527, and Wolf Creek 97497, are JOSEPHINE County
+ZIPs filed under Jackson County in `public.communities`.** Verified: `communities` contains **no
+Josephine County rows at all** — Jackson holds 18 `level=zip` pages including those three.
+
+So Jackson County's permit layer legitimately holds nothing within 3 miles of those centroids.
+The zeros are honest, and they are in fact *evidence the spatial scoping works*.
+
+**These three pages can never be lit by a Jackson County source**, because they are not in Jackson
+County. They need a Josephine County / City of Grants Pass source. ⛔ **Not fixed here on purpose:**
+re-parenting a community changes what residents see and is outside the registry-only autonomy
+grant. Flagged for a founder decision, not silently corrected.
+
+### Standing answers reinforced
+
+- **`recency_days` is measured against a real envelope, never guessed.** 21,980 all-time vs 1,194
+  at 1095 days on the same Medford envelope is the whole argument.
+- **The portal supplies the link, the GIS supplies the data** — every one of the 4,128 record URLs
+  is an Accela ACA deep link served from a county ArcGIS layer. The vendor-tier conclusion,
+  confirmed from the inside.
