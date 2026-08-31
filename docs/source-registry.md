@@ -13022,6 +13022,20 @@ adds that NDDOT's services *"are not designed for or intended to be used in any 
 application"* and that unintended use *"could affect public safety"* — a scheduled per-ZIP refresh
 across 155 pages is exactly the load pattern that sentence warns off.
 
+⚠️ **SCOPE CORRECTION — this licence covers `rcrs_dynamic`, NOT every NDDOT service.** An earlier
+draft of this section read the clause as blocking North Dakota outright. That was an overstatement
+made before the other two services' descriptions had come back. Measured: the
+`Flex_Fund_Committee_Published` MapServer returns `"serviceDescription": ""` (empty) and
+`LocalGov_Urban_Priorities_Interchanges` returns only *"Urban Priorities Interchanges map."* —
+**neither carries the Access and Use Constraints text at all.** The blocked layer is the Work
+Zones / Travel Information Map service specifically, which is also the one whose prose warns about
+load and public safety.
+
+**What this changes:** the *best* ND candidate (statewide located Work Zones) is licence-blocked
+and stays blocked. The *remaining* candidates are not, and are assessed on their merits below.
+An empty `serviceDescription` is not affirmative permission either — it is the ordinary absence of
+stated terms, the same posture under which every other source in this registry was wired.
+
 **This is a founder stop, not an engineering one.** `CLAUDE.md` §3 and §7 both list a
 legal/consent question as one of the only genuine stop conditions, and the one-time legal
 sign-off in `docs/development-tracker-source-of-truth.md` §10 covers *rendering a public fact with
@@ -13045,3 +13059,53 @@ would have surfaced this — an ArcGIS layer that forbids its own use looks iden
 welcomes it right up until someone reads the prose. North Dakota is the first state in this
 campaign rejected on terms rather than on data quality, and the check costs one field of a
 request already being made.
+
+### The two unlicensed candidates, MEASURED — and both fail on their own merits
+
+With the licence question scoped to `rcrs_dynamic`, the other two services were assessed normally.
+
+**`LocalGov_Urban_Priorities_Interchanges/FeatureServer/0` — REJECTED, wrong kind of thing.**
+64 point features whose fields are `Crossroad_FC`, `Crossroad_HPC`, `Facility_Type`, `Lighting`,
+`District`, `Urban_Area`, `EB_BC`, `WB_BC`. There is no status, no date, and no project — it is an
+**inventory of interchanges that already exist**, the same class as the bridge layers. An asset
+registry is not a development filing.
+
+**`Flex_Fund_Committee_Published/MapServer/1` (Flex Fund Line Applications) — REJECTED, and this
+one is worth reading, because it looked like a clear win right up until the last query.**
+
+It is genuinely project-shaped: 358 polyline features, `Approved` with exactly **two
+self-describing values** (`Yes` / `No` — not opaque codes, unlike Colorado's `" "`/`"X"`),
+`WorkType` with **24 self-describing values** (`AGGREGATE SURFACING`, `RECONSTRUCTION`,
+`ROADWAY EXPANSION`, `BIKEWAY/WALKWAY`, `RAILROAD CROSSING IMPROVEMENTS`, …), `ProNeed` carrying
+real 4,000-char prose ("Description of Project Need"), plus `LPANAME`, `TotProCost`, `PhaseInc`.
+
+**The surface was measured before proposing anything** (the `harris-county-plats` lesson: a
+correctly-wired source with no surface is wasted work). All 358 geometries were pulled at
+`outSR=4326` and every vertex tested against all 155 modelled ND ZIP centroids at the connector's
+own `spatial_zip_radius_mi: 3`:
+
+| set | reaches ND pages | of which currently dark |
+|---|---|---|
+| **all 358 applications** | 50 | **45** |
+| **`Approved = 'Yes'` only** | 8 | **7** |
+
+⛔ **`Approved='Yes'` is 52 rows. `Approved='No'` is 306 — 85% of this layer is applications the
+committee DECLINED.** Counts taken separately, and they sum to exactly 358.
+
+**That is what kills it.** The 45-page lift is almost entirely rejected funding applications.
+Rendering them would put "proposed project near you" on a resident's page for work that was
+turned down — a factual claim about a named jurisdiction that the source itself contradicts, and
+precisely what the development tracker's prime directive forbids. Mapping `No → exclude` is the
+only honest treatment, and it leaves **7 new pages** — not worth a registry entry, a test file, a
+deploy and a rollout.
+
+⚠️ **Standing answer: MEASURE THE SURFACE ON THE ROWS YOU WOULD ACTUALLY PUBLISH, never on the
+whole layer.** The first measurement here (45 pages) was arithmetically correct and completely
+misleading, because it silently included the 306 rows that must never be shown. A layer-wide
+count answers "how big is this dataset"; only the filtered count answers "what would a resident
+see". This is Rule 13 (probe the question the connector asks) applied to coverage rather than to
+vocabulary — and the gap between the two numbers here was **6.4x**.
+
+**North Dakota therefore stays at 8 of 155 pages lit.** Its 147 dark pages remain honest EPA
+facilities-floor pages. Remaining unexplored: county/city permit portals in Cass (Fargo),
+Burleigh (Bismarck), Grand Forks and Ward (Minot), and NDDOT consent for the Work Zones layer.
