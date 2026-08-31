@@ -15664,6 +15664,74 @@
         "pii": "None in out_fields. GPAS layer 1 (Access Permit) carries REQUESTOR_NAME / SUBMITTED_BY_NAME / SUBMITTED_BY and is deliberately NOT wired.",
         "dark_pages_targeted": "Georgia was 95 dark of 177 (46% lit) with no statewide entry: Cobb 22, Hall 15, Fulton 15, Gwinnett 14, Clarke 9, Cherokee 9, Henry 8, Forsyth 1, Walker 1, Chatham 1."
       }
+    },
+    {
+      "registry_id": "tennessee-dot-projects",
+      "platform": "arcgis",
+      "service_url": "https://spatial.tdot.tn.gov/arcgis/rest/services/Roadway_Projects/Projects_Public_Viewer/FeatureServer/0",
+      "dataset_url": "https://www.tn.gov/tdot/projects.html",
+      "jurisdiction": "Tennessee Department of Transportation (TDOT)",
+      "coverage": [
+        {
+          "state": "TN"
+        }
+      ],
+      "column_map": {
+        "title": "SCOPE_OF_WORK",
+        "status_raw": "PROJECT_STATUS",
+        "address": "ROUTE_NUMBERS",
+        "case_number": "PIN",
+        "record_url": "PROJECT_WEB_LINK",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "ACTIVE",
+          "LET"
+        ],
+        "operating": [
+          "CONSTCOMP"
+        ],
+        "exclude": [
+          "CLOSED"
+        ]
+      },
+      "use_type_const": "Utility",
+      "extra_where": "PROJECT_STATUS IN ('ACTIVE','LET') AND SCOPE_OF_WORK IS NOT NULL",
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "PIN",
+        "SCOPE_OF_WORK",
+        "PROJECT_STATUS",
+        "PROGRAM_TYPE",
+        "COUNTY_NAMES",
+        "ROUTE_NUMBERS",
+        "TERMINI",
+        "PROJECT_WEB_LINK"
+      ],
+      "record_url_precision": "dataset",
+      "_receipts": {
+        "probed": "2026-08-31",
+        "why_this_layer": "Tennessee had NO statewide entry (only 8 city/county permit entries) and 47 dark pages. Found by the Georgia method: read the agency's OWN host out of the url field of its AGO items, rather than trusting AGO-hosted third-party copies. Owner TDOT_GIS, host spatial.tdot.tn.gov.",
+        "rows_total": 2342,
+        "geometry": "esriGeometryPolyline, pinned via the shipped featurePoint() shoelace centroid path. NO return_centroid: ArcGIS HARD-REJECTS it on polyline layers ('Return geometry centroid is only supported on layer with polygon geometry type' - the TxDOT precedent).",
+        "status_vocabulary_sums_to_total": "4 values, 100% populated, counted one at a time because groupBy times out on this server: ACTIVE 1923 + LET 393 + CONSTCOMP 25 + CLOSED 1 = 2342 exactly.",
+        "layer_is_live_work": "2,316 of 2,342 rows are ACTIVE or LET; only 26 are finished. The Marion risk (a ledger that is mostly closed-out history) does not apply.",
+        "why_title_is_SCOPE_OF_WORK": "MEASURED non-null counts over all 2,342 rows: SCOPE_OF_WORK 1934 (82.6%), PROJECT_DESCRIPTION 328 (14%), PROJECT_TITLE 126 (5.4%), PROJECT_WEB_LINK 126 (the same rows). The column NAMED title is 5.4% populated; SCOPE_OF_WORK is the real title and reads as a sentence a resident can use ('Spot improvements include widening, adding a turn lane at Helton Drive, and replacing the bridge over Mooresburg Branch and Poor Valley Creek'). Mapped ALONE, never as an array with PROJECT_TITLE - a column_map array JOINs values, it does not fall back (UDOT standing answer).",
+        "why_dataset_precision": "PROJECT_WEB_LINK is real and works (https://www.tn.gov/tdot/projects/projects-region-1/state-route-31.html returns 200, title 'State Route 31') but is populated on only 126 of 2342 rows. It is still MAPPED, so those 126 emit a true deep link and the remaining rows fall back to dataset_url; precision is declared 'dataset' because that is what the majority get.",
+        "dataset_url_verified": "https://www.tn.gov/tdot/projects.html returns 200 with <title>Transportation Projects</title> - a real page. Verified rather than guessed, because Georgia's equivalent candidates all returned 200 with <title>Page Has Moved</title>.",
+        "why_no_file_date_and_no_recency": "The layer exposes NO edit or filing timestamp. Its two date columns are FORECASTS - max(ESTIMATED_COMPLETION_DATE) approx 2030-06 and max(CURRENT_PHASE_FED_YR_DATE) approx 2030-10 - so neither may be mapped to file_date (the ODOT STIP precedent: never dress a forecast or rebuild stamp as a filing date). With no date column there is nothing to bound, so recency_days is deliberately absent; currency is carried by the ACTIVE/LET filter instead, which is why that filter is load-bearing rather than cosmetic.",
+        "why_396_rows_are_dropped": "extra_where requires SCOPE_OF_WORK IS NOT NULL, which drops 396 ACTIVE/LET rows carrying no scope. They would render as a pin with no readable title - the Marion 'Tracking - M5886567' defect. Wireable set is 1,920 rows.",
+        "no_statewide_geometry_class": "Checked because of Georgia's 'All Counties' rows. Only 8 of 1,920 rows list 5+ counties (0.4%) and the longest single corridor is Shape__Length 789,065 (TN State Plane FEET, approx 149 miles) - a real highway length, not a bundle. Georgia's pathology was 1,200 rows (7.5%) each carrying whole-state extent; a multi-county DOT corridor is legitimate content and genuinely does affect the ZIPs along it.",
+        "per_zip_volume": "78 rows intersect a Nashville-sized envelope (-86.9,36.0 to -86.6,36.3) under the wired filter.",
+        "spatial_reference_trap": "The layer's native SR is wkid 102736 / 2274 - Tennessee State Plane in FEET, not WGS84. outSR=4326 was verified to return correct coordinates (-83.228, 36.344 in Hawkins County). Raw x/y must never be read as lon/lat.",
+        "query_shape_trap": "PROJECT_WEB_LINK IS NOT NULL AND <> '' returns HTTP 200 carrying a 400 ('Query with count request failed') because the column is declared length 1073741822, a CLOB that cannot take an equality comparison. Use IS NOT NULL alone. Shape__Length also cannot be filtered on.",
+        "pii": "CONTRACTOR and CONTRACT_ID are deliberately excluded from out_fields - not needed to render a project.",
+        "dark_pages_targeted": "TN was 47 dark of 199 pages with no statewide source."
+      }
     }
   ],
   "ckan": [
