@@ -12462,3 +12462,33 @@ from them. No entry is written until a landing page returns a real response, bec
 registry's `dataset_url` is the record_url fallback for every emitted row and a guessed one
 would ship a broken link on ~3,493 records.
 
+
+### Operational finding — pg_net is SHARED WITH INGEST, and slow hosts wedge it
+
+Recorded because it cost real time this session and will again. `net.http_get` against
+`www.dot.ga.gov` (a slow SharePoint site — one observed response took **14.78 s** of HTTP time
+after a 0.2 s handshake) repeatedly **wedged the pg_net worker**: `max(id)` in
+`net._http_response` freezes while `net.http_request_queue` sits at a constant depth, and
+requests never resolve. `select net.worker_restart();` clears it — verified three times
+(99918 → 99926 immediately after a restart).
+
+Three consequences worth carrying forward:
+
+1. **The worker is shared with the ingest job.** Long-timeout probes are not free; they stall
+   production fetches too. Keep probe timeouts modest (the 5 s default, or ≤25 s), and never
+   fire a 55 s fetch — both of this session's 55 s calls wedged the worker without returning.
+2. **Do not diagnose a wedge from one observation.** Twice this session the queue *looked*
+   stuck at "13 queued" when `max(id)` was in fact advancing and the 13 were newer arrivals
+   from competing traffic. The discriminator is whether `max(id)` moves across two checks
+   ~60 s apart, not the queue depth.
+3. **A pg_net timeout is an INSTRUMENT fault and must never be recorded as a finding about the
+   source.** In the same minute, three GDOT probes returned `Timeout of 5000 ms … TCP/SSL
+   handshake time: 4994 ms` — including a re-run of an `rnhp.dot.ga.gov` query that had
+   returned clean `200`s minutes earlier, and which returned `{"count":26544}` again on the
+   next attempt. Reading those timeouts as "GDOT is unreachable" would have retired a live,
+   fresh, first-party statewide source.
+
+The sandbox is not a fallback here: `WebFetch` on `www.dot.ga.gov` returns
+`EGRESS_BLOCKED … blocked by the network egress proxy`, so pg_net is the only instrument that
+can reach it, and the GDOT `dataset_url` verification is deferred rather than guessed.
+
