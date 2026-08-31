@@ -12323,3 +12323,100 @@ first-party GIS. The state is now fully explored: Jackson wired, the other five 
 negatives. The remaining Oregon dark pages stay on the EPA facilities floor, which is a correct
 terminal state, not a gap.
 
+
+---
+
+## GEORGIA — GDOT's project inventory FOUND, and it was never probed before (2026-08-31)
+
+**Georgia appears nowhere in this document prior to this section.** It was never reconned in
+any earlier pass, and `jurisdiction-registry.json` carries **no statewide GA entry** — only four
+county/city entries (`dekalb-county-building-permits` declaring DeKalb+Fulton+Gwinnett+Henry,
+`forsyth-county-ga-building-permits`, `savannah-commercial-building-permits` on Chatham,
+`johns-creek-building-permits` on Fulton+Gwinnett). That is why GA sits at **95 dark of 177
+pages (46% lit)** with four counties **100% dark**: Cobb 22, Hall 15, Clarke 9, Cherokee 9,
+plus partial Fulton 15/40, Gwinnett 14/21, Henry 8/10.
+
+### The dead end first — GEOPI_APP is decommissioned, and the control proves it
+
+Every AGO item pointing at GDOT's public project map resolves to `GEOPI_APP`, on two GDOT hosts.
+Both are gone:
+
+```
+egis.dot.ga.gov/arcgis/rest/services/GEOPI_APP/MapServer   → 200 + {"error":{"code":500,
+    "message":"Could not find a service with the name 'MapServer/GEOPI_APP' …"}}
+rnhp.dot.ga.gov/hosting/rest/services/GEOPI_APP/MapServer  → 200 + {"error":{"code":500,
+    "message":"Could not find service. …"}}
+```
+
+**This is a clean negative, not a guessed-path artifact** — the positive control is that
+`egis.dot.ga.gov/arcgis/rest/services` itself answers `{"currentVersion":10.31,"folders":
+["Utilities"],"services":[{"name":"CountyCentroid","type":"GPServer"}]}`. The host is up and
+serving; the project service is retired. (The AGO-hosted copy `GDOT_Project_Locations` is
+`499 Token Required`, and the other AGO copies are third-party re-hosts by a city GIS shop, an
+Esri employee and a consultant — not first-party, so not wireable regardless.)
+
+### The folder-permission trap, and the control that settles it
+
+`rnhp.dot.ga.gov/hosting/rest/services` is **live** (10.61) and advertises folders including
+`STIP`, `Planning`, `TPro` and `GDOT_Public_Outreach`. Listing them anonymously:
+
+| folder | anonymous response | reading |
+|---|---|---|
+| `STIP` | `{"folders":[],"services":[]}` | permission-filtered |
+| `GDOT_Public_Outreach` | `{"folders":[],"services":[]}` | permission-filtered |
+| `Planning` | `{"error":{"code":499,"message":"Token Required"}}` | explicitly gated |
+| **`Hosted`** | **7 FeatureServers listed** | **control — folders CAN list** |
+| **`Utilities`** | **2 services listed (Geometry, PrintingTools)** | **control** |
+
+**Standing answer: an empty `services:[]` from an ArcGIS Server folder is NOT evidence the
+folder is empty — it is the shape permission-filtering takes.** The discriminator is a control
+folder on the same server: `Hosted` and `Utilities` both return services, so `STIP`'s emptiness
+is authorization, not absence. Without that control, "GDOT publishes no STIP" would have been
+recorded as a fact and Georgia would have been stamped a source desert. A `499` (Planning) and
+an empty list (STIP) are the same finding wearing two different faces.
+
+### WHAT WAS FOUND — GPAS layer 13, public, first-party, statewide
+
+`https://rnhp.dot.ga.gov/hosting/rest/services/GPAS/MapServer/13` — **"Projects for Utilities
+Permit"**, `esriGeometryPolyline`, **26,544 rows**, `copyrightText: "GDOT"`.
+
+⚠️ **The layer NAME describes its consumer, not its content.** It exists so a utility-permit
+applicant can pick the GDOT project their work attaches to — but the rows are GDOT's own project
+inventory: `PROJECT_ID`, `PROJECT_NAME`, `PROJECT_TYPE`, `PRIM_WORK_TYP`, `STATUS`,
+`PROJECT_ACCOUNTING_NUMBER`, `PROJECT_DESCR` (1,000 chars), `FUNDING_TYP`, `FUNDING_SOURCE`,
+`COUNTIES`, `CITIES`, `ROUTE_NUMS`, `GDOT_DISTRICTS`, `USER_DT`, `LOAD_DT`. Skipping it on the
+name alone would have missed the state's only statewide source.
+
+**Both vocabularies enumerated in both sort directions, each summing EXACTLY to 26,544:**
+
+`STATUS` (9) — Construction Work Program 14,020 · Under Construction 8,139 · Legacy Projects
+1,756 · Overhead Projects 1,497 · Long Range Program 1,098 · Temporarily Shored Bridges 23 ·
+UNKNOWN 4 · Deferred 4 · Rejected 3. **Sum = 26,544 ✓** (DESC and ASC returned identical sets).
+
+`PROJECT_TYPE` (13) — Maintenance 6,571 · Intermodal 4,731 · Other 3,320 · Capital 3,205 ·
+Reconstruction/Rehabilitation 2,754 · Safety 1,291 · Operating 1,153 · New Construction 1,022 ·
+Replacement 880 · Planning 717 · Enhancement 588 · `" "` (single space) 311 · UNKNOWN 1.
+**Sum = 26,544 ✓**
+
+**Freshness — read off the data, not the item.** The AGO items pointing here were last modified
+2018–2021, which would have read as abandoned. The layer itself: `max(USER_DT)` =
+**2026-08-27**, `max(LOAD_DT)` = **2026-08-29** — two and four days before probe. This is the
+"item `modified` ≠ data freshness" rule (NMDOT overstated by 23 months, Sonoma understated by
+10) firing a third time, in the understating direction.
+
+### The open content question — NOT yet resolved, and it is the deciding one
+
+Sampled rows include `"FY 2018-ALBANY MPO-SEC.5303-PLANNING"` (a transit planning **grant**,
+`PROJECT_TYPE: Intermodal`) and a whole `Overhead Projects` status bucket of 1,497
+administrative records. Those are not development a resident can stand next to — the same defect
+that rejected Marion County OR earlier today. A wire here is only honest behind a construction-only
+filter dropping `Intermodal` / `Operating` / `Planning` / `Other` / blank / `UNKNOWN` types and
+the `Legacy` / `Overhead` / `Rejected` / `Deferred` statuses, and the surviving volume has not
+yet been measured. **No entry is proposed until it is.**
+
+Also unresolved: there is **no per-record URL column** (`HAS_DOCUMENT` is a flag, not a link), so
+this would be `record_url_precision: "dataset"`; and `USER_DT` is aliased "Last Updated Date" —
+an edit stamp, **not** a filing date, so it must not be mapped to `file_date` (the ODOT STIP
+precedent: omit `file_date` rather than dress a rebuild stamp as one, and let any recency bound
+ride in `extra_where`).
+
