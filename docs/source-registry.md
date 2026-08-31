@@ -12474,9 +12474,16 @@ requests never resolve. `select net.worker_restart();` clears it — verified th
 
 Three consequences worth carrying forward:
 
-1. **The worker is shared with the ingest job.** Long-timeout probes are not free; they stall
-   production fetches too. Keep probe timeouts modest (the 5 s default, or ≤25 s), and never
-   fire a 55 s fetch — both of this session's 55 s calls wedged the worker without returning.
+1. **The worker is shared with production, and the queue is HEAD-OF-LINE blocked.** ⚠️
+   **CORRECTION to the first version of this bullet, which claimed my probes stall production
+   fetches — the evidence shows the reverse is at least as likely, and I could not prove
+   either direction.** Reading `net.http_request_queue` directly during a stall showed 13
+   entries: my 5 GDOT probes, and **8 `get-address-report` calls each carrying
+   `timeout_milliseconds = 180000`** — the `dev_refresh` cron. Eight three-minute production
+   calls in the queue explain a multi-minute freeze on their own. Do not attribute a stall to
+   your own probes without reading the queue's contents first. Still keep probe timeouts modest
+   (the 5 s default, or ≤25 s): a slow probe adds to the same shared backlog even when it is
+   not the cause.
 2. **Do not diagnose a wedge from one observation.** Twice this session the queue *looked*
    stuck at "13 queued" when `max(id)` was in fact advancing and the 13 were newer arrivals
    from competing traffic. The discriminator is whether `max(id)` moves across two checks
