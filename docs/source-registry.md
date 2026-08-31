@@ -12420,3 +12420,45 @@ an edit stamp, **not** a filing date, so it must not be mapped to `file_date` (t
 precedent: omit `file_date` rather than dress a rebuild stamp as one, and let any recency bound
 ride in `extra_where`).
 
+
+### GDOT layer 13 — the filter is MEASURED, and the "All Counties" row is why it is mandatory
+
+| query | count |
+|---|---|
+| layer total | **26,544** |
+| construction-only `STATUS` + `PROJECT_TYPE` | **16,100** |
+| …of which `COUNTIES = 'All Counties'` | **1,200** (7.5%) |
+| …construction-only, not All-Counties, `USER_DT >= 2023-09-01` | **3,493** |
+| …of those intersecting a ±0.15° box around Marietta (Cobb) | **184** |
+
+**The `All Counties` class is pathological, and it was measured rather than assumed.**
+`returnExtentOnly` on the single row `SHARP CURVE WARNING SIGNS @ 304 LOCS IN DISTRICT 1`
+returns (Web Mercator 102100) `xmin −9529523, ymin 3549362, xmax −8989208, ymax 4163971` —
+**lat 30.31–34.99, lng −85.60 to −80.75, essentially the whole state of Georgia in one
+polyline.** Its centroid is a meaningless point in mid-Georgia, and because scoping is
+`intersects`, that one record would attach to **every ZIP page in Georgia** and render as an
+active construction project on all of them. Excluding `COUNTIES <> 'All Counties'` is a
+correctness requirement, not tidying. 1,200 such rows survive the type filter.
+
+Two design points settled while sizing the entry, both verified against the shipped connector:
+
+- **`recency_expr` is the right instrument here, not `file_date`.** `buildWhere`
+  (`sources/arcgis.ts:725-736`) applies `recency_expr` *instead of* the `file_date`-derived
+  `DATE '{cutoff}'` literal, so a rolling window can bound `USER_DT` **without** mapping it to
+  `file_date`. That matters because `USER_DT` is aliased **"Last Updated Date"** — an edit
+  stamp. Mapping it to `file_date` would claim a filing date the publisher never stated (the
+  ODOT STIP precedent: omit `file_date` rather than dress a rebuild stamp as one). A literal
+  cutoff would also go stale; `recency_expr` + `recency_days` rolls.
+- **No `return_centroid`.** This is a classic 10.61 MapServer, which is the "silently ignores
+  the parameter" class — the polyline centroid comes from the shipped `featurePoint()`
+  shoelace path instead.
+
+**STILL OPEN, and the only thing between this and a wire:** `dataset_url` must be a real GDOT
+human landing page, and it is **not yet verified**. Probes of `www.dot.ga.gov` returned pg_net
+`Timeout of 5000 ms … TCP/SSL handshake time: 4994 ms` — and so did a re-run of an
+`rnhp.dot.ga.gov` query that had returned clean 200s minutes earlier. **Those timeouts are an
+instrument fault, not a finding about GDOT**, and nothing about the source is being inferred
+from them. No entry is written until a landing page returns a real response, because the
+registry's `dataset_url` is the record_url fallback for every emitted row and a guessed one
+would ship a broken link on ~3,493 records.
+
