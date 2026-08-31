@@ -12941,8 +12941,27 @@ cannot state a project's **lifecycle stage**, which is what `status_to_bucket` e
 2. Leave Colorado on its 5 existing city permit sources (Denver / Boulder / Fort Collins /
    Colorado Springs), which already cover 105 of 140 CO pages; the 35 dark are mostly rural.
 
-⚠️ Also unresolved and required either way: the `SAPPROJECTSTATUS` / `SAPPROJECTTYPE` vocabularies
-were **never fully enumerated** — those probes stalled in the pg_net queue and are NOT reported
-here as counts. The four values above are a **sample**, not the vocabulary. Layer SR is
-**wkid 26913 (UTM 13N)**, not WGS84 — `outSR` required, as with Tennessee's State Plane.
+#### The vocabularies, now FULLY ENUMERATED — and they make the rejection firm
+
+The stalled probes landed. This supersedes the "sample, not vocabulary" caveat above:
+
+- **`SAPPROJECTSTATUS` has exactly TWO values: `"X"` and `" "` (a single space)** — and
+  `SAPPROJECTSTATUS = ' '` matches **18,355 of 18,369 rows (99.92%)**. Only **14 rows** carry
+  anything at all. **This is not a status vocabulary; it is an almost-always-empty flag.** There is
+  no lifecycle information in this layer to map, so `status_to_bucket` has literally nothing to
+  express — worse than San Jose's opaque `"30"`, which at least appeared on every row.
+- **`SAPPROJECTTYPE` has 15 values, every one an internal accounting code:** `ARPA MMOF` ·
+  `NON-CAPITAL ENG` · `BE` · `MC` · `ENG` · `STIP` · `MTF` · `MTCE` · `LRP-WBS` · `HPTE` · `LRP` ·
+  `DTD` · `STIP-WBS` · `ARPA RMS` · `NON-ENG`. None is self-describing to a resident.
+- **`SAPPROJECTDESCRIPTION` is populated on 18,227 of 18,369 rows (99.2%)** — so the *title* half
+  is genuinely good, which is exactly what makes this a judgement call rather than a junk layer.
+
+**Consequence for the two options above: option 1 (`status_const`) is the ONLY technically viable
+path, and it is a founder call precisely because `status_const` asserts what the entire layer
+IS.** With 99.92% of rows blank, no per-record stage can ever be derived — a wire here would say
+"CDOT has a programmed project here" and nothing more. Option 2 (leave Colorado on its 5 city
+sources, 105 of 140 pages covered) remains available and costs nothing.
+
+Layer SR is **wkid 26913 (UTM 13N)**, not WGS84 — `outSR` required, as with Tennessee's State
+Plane.
 
