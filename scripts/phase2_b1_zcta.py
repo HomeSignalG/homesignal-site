@@ -125,8 +125,10 @@ def _signed_area(pts):
 def read_shp(raw):
     """Minimal shapefile reader for polygon (5) and null (0) records.
 
-    Yields (record_index, bbox, rings) in file order. Ring grouping into
-    polygons is done by the caller so the orientation rule is stated once.
+    Yields (record_index, bbox, rings) in file order, with rings None for a null
+    shape or for any record whose own bounding box misses the selection extent.
+    Ring grouping into polygons is done by the caller so the orientation rule is
+    stated once.
     """
     n = len(raw)
     off = 100                               # 100-byte file header
@@ -137,13 +139,20 @@ def read_shp(raw):
         end = off + clen * 2
         shp_type = struct.unpack_from("<i", raw, off)[0]
         if shp_type == 0:                   # null shape
-            yield idx, None, []
+            yield idx, None, None
             idx += 1
             off = end
             continue
         if shp_type != 5:
             raise SystemExit(f"unexpected shape type {shp_type} at record {idx}")
         bbox = struct.unpack_from("<4d", raw, off + 4)
+        if not bbox_hits(bbox):
+            # 33,735 of 33,791 features are nowhere near Box Elder. Skipping the
+            # coordinate parse for them turns a ~1 GB parse into a bbox scan.
+            yield idx, bbox, None
+            idx += 1
+            off = end
+            continue
         n_parts, n_pts = struct.unpack_from("<ii", raw, off + 36)
         parts = struct.unpack_from(f"<{n_parts}i", raw, off + 44)
         pbase = off + 44 + 4 * n_parts
@@ -275,7 +284,7 @@ def extract(data):
     picked, n_seen, n_bbox = [], 0, 0
     for idx, bbox, rings in read_shp(shp_raw):
         n_seen += 1
-        if not bbox_hits(bbox):
+        if rings is None:
             continue
         n_bbox += 1
         if not exact_hits(rings):
