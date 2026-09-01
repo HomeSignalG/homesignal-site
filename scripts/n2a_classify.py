@@ -314,10 +314,196 @@ def main():
         step0_zcta()
     elif mode == "n2a-classify":
         step1_classify()
+    elif mode == "n2a-fidelity":
+        step3_fidelity()
     else:
-        raise SystemExit("MODE must be n2a-zcta or n2a-classify")
+        raise SystemExit("MODE must be n2a-zcta, n2a-classify or n2a-fidelity")
     return 0
 
+
+
+
+# ------------------------------------------------------------------ step 3
+#
+# POINT fidelity. The question is NOT "is the stored point near itself" but
+# "does the stored point reproduce the publisher's OWN coordinate for the same
+# feature identity". So every comparison is against a freshly fetched publisher
+# coordinate, matched by the case number the identity was built from.
+#
+# Sampling design, stated before any result is read:
+#   * every POINT source is covered - breadth over depth, so a failing source
+#     cannot hide inside a national average;
+#   * a source with <= SAMPLE_N testable identities is compared EXHAUSTIVELY;
+#   * a larger source is sampled deterministically at a fixed stride across the
+#     source_key ordering, so the sample is reproducible and spans the corpus
+#     rather than clustering at one end;
+#   * only cases the publisher returns with EXACTLY ONE feature are scored, since
+#     a multi-feature case has no unambiguous counterpart for one stored row.
+#     Multi-feature and not-found cases are reported separately, never as passes.
+
+SAMPLE_N = 20
+FID_TIMEOUT = 45
+
+
+def fidelity_sample(point_regs):
+    lst = ",".join("'" + r.replace("'", "''") + "'" for r in point_regs)
+    rows = sql(f"""
+      with r as (
+        select registry_id, source_key, source_seq, lat, lng,
+               row_number() over (partition by registry_id order by source_key, source_seq) rn,
+               count(*)     over (partition by registry_id) n
+          from preservation.app_project_identity
+         where snapshot_id='{SNAPSHOT}' and record_kind='development'
+           and registry_id in ({lst}) and lat is not null and lng is not null
+      )
+      select registry_id, source_key, source_seq, lat, lng, n, rn
+        from r
+       where (rn - 1) %% greatest(1, (n / {SAMPLE_N})::int) = 0
+       order by registry_id, rn;""", "fidelity sample")
+    by = {}
+    for r in rows:
+        by.setdefault(r["registry_id"], [])
+        if len(by[r["registry_id"]]) < SAMPLE_N:
+            by[r["registry_id"]].append(r)
+    return by
+
+
+def case_of(source_key):
+    parts = source_key.split(":")
+    return parts[2] if len(parts) >= 3 else None
+
+
+def fetch_points(layer_url, case_field, oid_field, cases):
+    """Publisher coordinates for these case numbers, in EPSG:4326. Returns
+    {case: [(x, y), ...]} or raises."""
+    lits = ",".join("'" + str(c).replace("'", "''") + "'" for c in cases)
+    j = post(qurl_n2a(layer_url), {
+        "where": f"{case_field} IN ({lits})",
+        "outFields": f"{oid_field},{case_field}",
+        "returnGeometry": "true", "outSR": "4326", "f": "json"}, timeout=FID_TIMEOUT)
+    if "error" in j:
+        raise RuntimeError("SERVICE_ERROR " + json.dumps(j["error"])[:120])
+    out = {}
+    for f in (j.get("features") or []):
+        g = f.get("geometry") or {}
+        a = f.get("attributes") or {}
+        c = str(a.get(case_field))
+        if g.get("x") is not None and g.get("y") is not None:
+            out.setdefault(c, []).append((float(g["x"]), float(g["y"])))
+    return out
+
+
+def qurl_n2a(u):
+    return u.rstrip("/") + "/query"
+
+
+def post(url, params, timeout=45):
+    body = urllib.parse.urlencode(params).encode()
+    req = urllib.request.Request(url, data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded",
+                 "User-Agent": UA, "Accept": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode())
+
+
+def haversine_m(lat1, lon1, lat2, lon2):
+    import math
+    R = 6371008.8
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * R * math.asin(min(1.0, math.sqrt(a)))
+
+
+def step3_fidelity():
+    say("mode", "n2a-fidelity (step 3, read-only)")
+    cls = json.load(open("data/n2a_classes.json"))
+    idx = registry_index()
+    point = [d["registry_id"] for d in cls if d["class"] == "POINT"]
+    say("POINT sources to test", len(point))
+    say("sampling", f"every source covered; exhaustive if <= {SAMPLE_N}, else stride sample of {SAMPLE_N}")
+
+    samples = fidelity_sample(point)
+    say("sources with sampled identities", len(samples))
+
+    results = []
+    for i, rid in enumerate(sorted(samples), 1):
+        ent = idx.get(rid) or {}
+        rows = samples[rid]
+        cm = ent.get("column_map") or {}
+        case_field = cm.get("case_number")
+        rec = {"registry_id": rid, "sampled": len(rows), "exhaustive": rows[0]["n"] <= SAMPLE_N,
+               "population": rows[0]["n"], "scored": 0, "match": 0, "rounded": 0,
+               "swapped": 0, "moved": 0, "not_found": 0, "multi_feature": 0,
+               "max_delta_m": 0.0, "error": None, "verdict": None}
+        if ent.get("group") != "arcgis" or not ent.get("service_url") or not case_field:
+            rec["error"] = ("NO_ARCGIS_SERVICE_URL" if ent.get("group") != "arcgis"
+                            else "NO_CASE_FIELD")
+            rec["verdict"] = "POINT_FIDELITY_UNRESOLVED"
+            results.append(rec)
+            print(f"[{i:3d}/{len(samples)}] {rid:46s} {rec['verdict']} ({rec['error']})", flush=True)
+            continue
+        time.sleep(POLITE)
+        try:
+            meta, why = get_json(ent["service_url"].rstrip("/") + "?f=json")
+            oid = (meta or {}).get("objectIdField") or "OBJECTID"
+            cases = [case_of(r["source_key"]) for r in rows]
+            cases = [c for c in cases if c]
+            pub = fetch_points(ent["service_url"], case_field, oid, cases)
+        except Exception as e:
+            rec["error"] = f"{type(e).__name__} {str(e)[:90]}"
+            rec["verdict"] = "POINT_FIDELITY_UNRESOLVED"
+            results.append(rec)
+            print(f"[{i:3d}/{len(samples)}] {rid:46s} {rec['verdict']} ({rec['error']})", flush=True)
+            continue
+
+        for r in rows:
+            c = case_of(r["source_key"])
+            pts = pub.get(str(c)) or []
+            if not pts:
+                rec["not_found"] += 1
+                continue
+            if len(pts) > 1:
+                rec["multi_feature"] += 1
+                continue
+            px, py = pts[0]
+            slat, slng = float(r["lat"]), float(r["lng"])
+            d = haversine_m(slat, slng, py, px)
+            dswap = haversine_m(slat, slng, px, py)
+            rec["scored"] += 1
+            rec["max_delta_m"] = max(rec["max_delta_m"], d)
+            if d < 0.01:
+                rec["match"] += 1
+            elif d <= 1.5:
+                rec["rounded"] += 1
+            elif dswap < d and dswap < 1.5:
+                rec["swapped"] += 1
+            else:
+                rec["moved"] += 1
+
+        if rec["scored"] == 0:
+            rec["verdict"] = "POINT_FIDELITY_UNRESOLVED"
+        elif rec["moved"] == 0 and rec["swapped"] == 0:
+            rec["verdict"] = "POINT_STORED_COORDINATE_FIDELITY_PROVEN"
+        else:
+            rec["verdict"] = "POINT_REFETCH_REQUIRED"
+        results.append(rec)
+        print(f"[{i:3d}/{len(samples)}] {rid:46s} pop {rec['population']:7,} "
+              f"scored {rec['scored']:3d} exact {rec['match']:3d} rnd {rec['rounded']:3d} "
+              f"swap {rec['swapped']:3d} moved {rec['moved']:3d} nf {rec['not_found']:3d} "
+              f"multi {rec['multi_feature']:3d} maxd {rec['max_delta_m']:.3f}m -> {rec['verdict']}",
+              flush=True)
+
+    print("\n===== FIDELITY RESULT (json) =====")
+    print(json.dumps(results, separators=(",", ":")))
+    agg = {}
+    for r in results:
+        agg[r["verdict"]] = agg.get(r["verdict"], 0) + 1
+    print("\n===== VERDICT TOTALS =====")
+    for k in sorted(agg):
+        print(f"{k:44s} {agg[k]} sources")
+    print("\nSTEP 3 COMPLETE - nothing written.")
 
 if __name__ == "__main__":
     sys.exit(main())
