@@ -1,0 +1,48 @@
+[
+  {
+    "id": "r2-tiger-vintages",
+    "url": "https://www2.census.gov/geo/tiger/",
+    "extract": "TIGER20[0-9]{2}/</a>.{0,120}",
+    "extract_context": 10,
+    "extract_max": 20
+  },
+  {
+    "id": "r2-tiger2025-zcta520-listing",
+    "url": "https://www2.census.gov/geo/tiger/TIGER2025/ZCTA520/",
+    "extract": "tl_2025_us_zcta520",
+    "extract_context": 260,
+    "extract_max": 4
+  },
+  {
+    "id": "r2-tiger2024-zcta520-listing",
+    "url": "https://www2.census.gov/geo/tiger/TIGER2024/ZCTA520/",
+    "extract": "tl_2024_us_zcta520",
+    "extract_context": 260,
+    "extract_max": 4
+  },
+  {
+    "id": "r2-geom-50-with-geometry",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=1%3D1&outFields=GEOID&returnGeometry=true&outSR=4326&resultRecordCount=50&f=json",
+    "print_chars": 220
+  },
+  {
+    "id": "r2-geom-50-no-geometry-CONTROL",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=1%3D1&outFields=GEOID&returnGeometry=false&resultRecordCount=50&f=json",
+    "print_chars": 220
+  },
+  {
+    "id": "r2-geom-boxelder-84302",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%3D%2784302%27&outFields=GEOID%2CAREALAND%2CAREAWATER&returnGeometry=true&outSR=4326&f=json",
+    "print_chars": 300
+  },
+  {
+    "id": "r2-geom-nyc-10001",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%3D%2710001%27&outFields=GEOID%2CAREALAND%2CAREAWATER&returnGeometry=true&outSR=4326&f=json",
+    "print_chars": 300
+  },
+  {
+    "id": "r2-geom-alaska-99723",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%3D%2799723%27&outFields=GEOID%2CAREALAND%2CAREAWATER&returnGeometry=true&outSR=4326&f=json",
+    "print_chars": 300
+  }
+]

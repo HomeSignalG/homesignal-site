@@ -1,0 +1,64 @@
+[
+  { "id": "layer-01-current-zcta-meta",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2?f=json",
+    "extract": "\"name\"|\"currentVersion\"|maxRecordCount|spatialReference|latestWkid|\"wkid\"|geometryType|\"fields\"|\"alias\"|extent",
+    "extract_context": 400, "extract_max": 30 },
+
+  { "id": "layer-02-current-zcta-fields-sample",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=1%3D1&outFields=*&returnGeometry=false&resultRecordCount=3&f=json",
+    "print_chars": 6000 },
+
+  { "id": "layer-03-national-count",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=1%3D1&returnCountOnly=true&f=json",
+    "print_chars": 2000 },
+
+  { "id": "layer-04-acs2023-count-control",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/2/query?where=1%3D1&returnCountOnly=true&f=json",
+    "print_chars": 2000 },
+
+  { "id": "layer-05-zcta-service-layers",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/PUMA_TAD_TAZ_UGA_ZCTA/MapServer?f=json",
+    "extract": "\"id\"\\s*:\\s*\\d+\\s*,\\s*\"name\"", "extract_context": 160, "extract_max": 30 },
+
+  { "id": "probe-geoid-in-list",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%20IN%20('84684','84685','84604')&outFields=*&returnGeometry=false&f=json",
+    "print_chars": 6000 },
+
+  { "id": "probe-basename-in-list",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=BASENAME%20IN%20('84684','84685','84604')&outFields=*&returnGeometry=false&f=json",
+    "print_chars": 6000 },
+
+  { "id": "probe-zcta5ce20-in-list",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=ZCTA5CE20%20IN%20('84684','84685','84604')&outFields=*&returnGeometry=false&f=json",
+    "print_chars": 6000 },
+
+  { "id": "enum-geoid-0", "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%20LIKE%20'0%25'&outFields=GEOID&returnGeometry=false&returnDistinctValues=true&f=json", "print_chars": 400000 },
+  { "id": "enum-geoid-1", "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%20LIKE%20'1%25'&outFields=GEOID&returnGeometry=false&returnDistinctValues=true&f=json", "print_chars": 400000 },
+  { "id": "enum-geoid-2", "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%20LIKE%20'2%25'&outFields=GEOID&returnGeometry=false&returnDistinctValues=true&f=json", "print_chars": 400000 },
+  { "id": "enum-geoid-3", "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%20LIKE%20'3%25'&outFields=GEOID&returnGeometry=false&returnDistinctValues=true&f=json", "print_chars": 400000 },
+  { "id": "enum-geoid-4", "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%20LIKE%20'4%25'&outFields=GEOID&returnGeometry=false&returnDistinctValues=true&f=json", "print_chars": 400000 },
+  { "id": "enum-geoid-5", "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%20LIKE%20'5%25'&outFields=GEOID&returnGeometry=false&returnDistinctValues=true&f=json", "print_chars": 400000 },
+  { "id": "enum-geoid-6", "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%20LIKE%20'6%25'&outFields=GEOID&returnGeometry=false&returnDistinctValues=true&f=json", "print_chars": 400000 },
+  { "id": "enum-geoid-7", "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%20LIKE%20'7%25'&outFields=GEOID&returnGeometry=false&returnDistinctValues=true&f=json", "print_chars": 400000 },
+  { "id": "enum-geoid-8", "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%20LIKE%20'8%25'&outFields=GEOID&returnGeometry=false&returnDistinctValues=true&f=json", "print_chars": 400000 },
+  { "id": "enum-geoid-9", "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%20LIKE%20'9%25'&outFields=GEOID&returnGeometry=false&returnDistinctValues=true&f=json", "print_chars": 400000 },
+
+  { "id": "enum-basename-0-fallback", "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=BASENAME%20LIKE%20'0%25'&outFields=BASENAME&returnGeometry=false&returnDistinctValues=true&f=json", "print_chars": 400000 },
+  { "id": "enum-basename-8-fallback", "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=BASENAME%20LIKE%20'8%25'&outFields=BASENAME&returnGeometry=false&returnDistinctValues=true&f=json", "print_chars": 400000 },
+
+  { "id": "tiger-01-zcta520-2024-files",
+    "url": "https://www2.census.gov/geo/tiger/TIGER2024/ZCTA520/",
+    "extract": "zcta5|\\.zip", "extract_context": 300, "extract_max": 12 },
+
+  { "id": "tiger-02-zcta520-2025-files",
+    "url": "https://www2.census.gov/geo/tiger/TIGER2025/ZCTA520/",
+    "extract": "zcta5|\\.zip", "extract_context": 300, "extract_max": 12 },
+
+  { "id": "tiger-03-year-index-listing",
+    "url": "https://www2.census.gov/geo/tiger/",
+    "extract": "TIGER20\\d\\d", "extract_context": 120, "extract_max": 30 },
+
+  { "id": "doc-01-zcta-definition-extract",
+    "url": "https://www.census.gov/programs-surveys/geography/guidance/geo-areas/zctas.html",
+    "extract": "ZCTAs are|not the same as|USPS|vintage|delineat|2020 Census|do not|update", "extract_context": 700, "extract_max": 14 }
+]

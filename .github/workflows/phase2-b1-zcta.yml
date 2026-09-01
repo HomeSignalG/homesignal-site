@@ -1,0 +1,67 @@
+name: phase2-b1-zcta
+
+# Phase 2 / B1 — authoritative Box Elder ZCTA boundary acquisition and load.
+#
+# MANUAL DISPATCH ONLY. There is deliberately no `schedule:` and no trigger from
+# production: this workflow does nothing at all until a human dispatches it, which is
+# the restriction it was approved under (founder ruling 2026-09-01).
+#
+# It runs on a GitHub runner because the build sandbox has no egress to
+# www2.census.gov, and because the TIGER archive is 505 MB and must NEVER be committed
+# to this repository. Nothing is uploaded as an artifact either — the receipt channel
+# is the job log, as with recon-fetch.yml and db-sql.yml.
+#
+# Two modes, and the separation is the point:
+#   validate  acquire, checksum, read the archive's own .prj, count features, derive
+#             the in-scope ZCTA set, size the payload. NO DATABASE CREDENTIAL IS
+#             EVEN PLACED IN THE ENVIRONMENT, so it cannot write if it tried.
+#   load      re-acquire, refuse unless the recorded sha256 and GEOID-set fingerprint
+#             both reproduce exactly, then send ONE SQL request that is ONE
+#             transaction. Any in-transaction assertion raises and the whole
+#             transaction rolls back.
+#
+# Credentials: SUPABASE_ACCESS_TOKEN only, and only in load mode. It already exists
+# (db-sql.yml, deploy-edge-functions.yml). No new secret was created for this work.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'validate (no write, no credential) or load (one transaction)'
+        required: true
+        type: choice
+        options: [validate, load]
+        default: validate
+      expect_sha256:
+        description: 'load only: archive sha256 recorded by the validate run'
+        required: false
+        default: ''
+      expect_geoid_fp:
+        description: 'load only: in-scope GEOID-set md5 recorded by the validate run'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  b1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate (no database credential in scope)
+        if: ${{ github.event.inputs.mode == 'validate' }}
+        env:
+          MODE: validate
+        run: python3 scripts/phase2_b1_zcta.py
+
+      - name: Load (one transaction, fail closed)
+        if: ${{ github.event.inputs.mode == 'load' }}
+        env:
+          MODE: load
+          EXPECT_SHA256: ${{ github.event.inputs.expect_sha256 }}
+          EXPECT_GEOID_FP: ${{ github.event.inputs.expect_geoid_fp }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/phase2_b1_zcta.py

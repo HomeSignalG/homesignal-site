@@ -1,0 +1,372 @@
+[
+ {
+  "id": "F-adot-tip-fy2026-2030",
+  "url": "https://services6.arcgis.com/clPWQMwZfdWn4MQZ/arcgis/rest/services/lyrTIPAdoptions_Final2630_view/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-anne-arundel-commercial-site-plans",
+  "url": "https://gis.aacounty.org/arcgis/rest/services/OpenData/Planning_OpenData/MapServer/4/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-anne-arundel-subdivision-activity",
+  "url": "https://gis.aacounty.org/arcgis/rest/services/OpenData/Planning_OpenData/MapServer/30/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-ar-ardot-job-status-lines",
+  "url": "https://gis.ardot.gov/referenced/rest/services/ProgramManagement/Job_Status_Web_Application/MapServer/3/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-boone-county-ky-planning-board-actions",
+  "url": "https://secure.boonecountygis.com/server/rest/services/ServicesBoone/PlanningAndZoningGroup_Boone/MapServer/7/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-caltrans-sb1-projects",
+  "url": "https://caltrans-gis.dot.ca.gov/arcgis/rest/services/SB1/BuildingCA_Projects/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-centre-county-pa-building-permits",
+  "url": "https://gissites4.centrecountypa.gov/arcgis/rest/services/Building_Permits/MapServer/2/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-champaign-il-special-use-permits",
+  "url": "https://gisportal.champaignil.gov/ms/rest/services/Open_Data/Open_Data/MapServer/20/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-charlotte-land-dev-commercial-projects",
+  "url": "https://gis.charlottenc.gov/arcgis/rest/services/PLN/LandDevCommercialProjects/MapServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-chester-county-pa-act247-plans",
+  "url": "https://gisprodops.chesco.org/server/rest/services/Planning_Services/Plan_Act247_AGOL_D/MapServer/5/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-clark-county-active-projects",
+  "url": "https://services2.arcgis.com/MLoS3Qx4BXmDoTIY/arcgis/rest/services/Active_Projects/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-clarksville-montgomery-final-subdivisions",
+  "url": "https://services8.arcgis.com/bsMxxAoaPLw5EHPS/arcgis/rest/services/FinalSD/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-clarksville-montgomery-preliminary-subdivisions",
+  "url": "https://services8.arcgis.com/bsMxxAoaPLw5EHPS/arcgis/rest/services/PrelimSD/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-coconino-county-permits",
+  "url": "https://services1.arcgis.com/Rlvx5g8pKeK13apH/arcgis/rest/services/County_Permits/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-cook-county-il-highway-construction-program",
+  "url": "https://services2.arcgis.com/I5Or36sMcO7Y9vQ3/arcgis/rest/services/DOTH_Construction_Projects_2026/FeatureServer/6/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-ctdot-project-work-areas",
+  "url": "https://services1.arcgis.com/FCaUeJ5SOVtImake/arcgis/rest/services/CTDOT_Project_Work_Areas/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-dallas-specific-use-permits",
+  "url": "https://gis.dallascityhall.com/arcgis/rest/services/sdc_public/PD_SUP_Search/MapServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-delaware-county-pa-subdivisions-land-developments",
+  "url": "https://gis.delcopa.gov/arcgis/rest/services/SLD_Review/Delaware_County_Subdivisions_and_Land_Developments/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-fairfax-active-site-construction",
+  "url": "https://www.fairfaxcounty.gov/mercator/rest/services/LDS/DevelopmentTracker/FeatureServer/1/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-fairfax-recent-building-permits",
+  "url": "https://www.fairfaxcounty.gov/mercator/rest/services/LDS/DevelopmentTracker/FeatureServer/4/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-fdot-active-construction-projects",
+  "url": "https://gis.fdot.gov/arcgis/rest/services/Active_Construction_Projects/FeatureServer/1/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-fort-worth-zoning-cases",
+  "url": "https://mapit.fortworthtexas.gov/ags/rest/services/Planning_Development/Zoning_case_service/MapServer/12/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-georgia-dot-gpas-projects",
+  "url": "https://rnhp.dot.ga.gov/hosting/rest/services/GPAS/MapServer/13/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-harris-county-plats",
+  "url": "https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/Plats_NonHouston_SV/MapServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-hdot-active-design-projects",
+  "url": "https://services.arcgis.com/HQ0xoN0EzDPBOEci/arcgis/rest/services/HDOT_Active_Design_Projects_Layer_view/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-henderson-commercial-permits",
+  "url": "https://maps.cityofhenderson.com/arcgis/rest/services/public/OpenDevPermits/MapServer/2/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-henderson-residential-permits",
+  "url": "https://maps.cityofhenderson.com/arcgis/rest/services/public/OpenDevPermits/MapServer/1/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-houston-plat-applications",
+  "url": "https://mycity2.houstontx.gov/geoplat01/rest/services/PlatTracker/PT365_PLAT_MAPPING/MapServer/1/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-idot-annual-program-construction",
+  "url": "https://services2.arcgis.com/aIrBD8yn1TDTEXoz/arcgis/rest/services/Annual_Highway_Improvement_Program/FeatureServer/2/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-indot-spms-active-projects",
+  "url": "https://gis.indot.in.gov/ro/rest/services/DOT/SPMS_ACTIVE_LET/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-iowa-dot-bid-projects-lines",
+  "url": "https://services.arcgis.com/8lRhdTsQyJpO52F1/arcgis/rest/services/Project_Scheduling_Public_Bid_Line_View/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-iowa-dot-five-year-program",
+  "url": "https://services.arcgis.com/8lRhdTsQyJpO52F1/arcgis/rest/services/Iowa_DOT_Five_Year_Program_Project_Data_V2_Public_VIEW/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-itd-itip-projects-lines",
+  "url": "https://services1.arcgis.com/Qqv4dYPC8Vv8e3c3/arcgis/rest/services/ITIP_2025/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-kcmo-development-cases",
+  "url": "https://mapd.kcmo.org/kcgis/rest/services/AGOL/MapServer/25/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-kdot-wincpms-project-locations",
+  "url": "https://kanplan.ksdot.gov/arcgis_web_adaptor/rest/services/Transportation/Projects_KHUB/MapServer/2/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-kytc-syp-highway-plan",
+  "url": "https://maps.kytc.ky.gov/arcgis/rest/services/Apps/ActiveHighwayPlanQuery_Ext_Prd/MapServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-lake-county-il-construction-program",
+  "url": "https://services3.arcgis.com/HESxeTbDliKKvec2/arcgis/rest/services/AnnualConstructionProgram/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-lee-county-fl-development-orders",
+  "url": "https://services2.arcgis.com/LvWGAAhHwbCJ2GMP/arcgis/rest/services/DevelopmentOrders/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-maine-dot-public-projects",
+  "url": "https://gis.maine.gov/mapservices/rest/services/dot/MaineDOT_OpenData/MapServer/4/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-maine-dot-public-projects-lines",
+  "url": "https://gis.maine.gov/mapservices/rest/services/dot/MaineDOT_OpenData/MapServer/5/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-massdot-highway-projects",
+  "url": "https://gis.massdot.state.ma.us/arcgis/rest/services/Projects/HighwayProjects/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-mndot-chip-roadway-projects",
+  "url": "https://services.arcgis.com/qWbGMYB49y8mLbRt/arcgis/rest/services/2026_2035_Capital_Highway_Investment_Plan_Feature_Layers_view/FeatureServer/23/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-mndot-stip-roadway-projects",
+  "url": "https://services.arcgis.com/qWbGMYB49y8mLbRt/arcgis/rest/services/2026_2035_Capital_Highway_Investment_Plan_Feature_Layers_view/FeatureServer/22/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-modot-stip-locations-accepted",
+  "url": "https://services2.arcgis.com/bjUoZiotEHKudso3/arcgis/rest/services/DRAFT_STIP_Locations/FeatureServer/1/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-montgomery-county-pa-act247-proposals",
+  "url": "https://gis.montcopa.org/arcgis/rest/services/Planning/Montgomery_County_Act247_Proposals/MapServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-mt-mdt-stip-lines",
+  "url": "https://gis.mtmdt.us/server/rest/services/MDTGIS/State_Transportation_Improvement_Program/MapServer/1/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-ncdot-stip-projects-lines",
+  "url": "https://gis11.services.ncdot.gov/arcgis/rest/services/NCDOT_STIP/MapServer/1/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-ncdot-stip-projects-points",
+  "url": "https://gis11.services.ncdot.gov/arcgis/rest/services/NCDOT_STIP/MapServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-ndot-program-book-segments",
+  "url": "https://gis.ne.gov/dot/rest/services/ProgramBookDOT/FeatureServer/1/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-nhdot-ten-year-plan-projects",
+  "url": "https://maps.dot.nh.gov/arcgis_server/rest/services/Projects/NHDOT_PROJECT_PROPOSALS_BY_TYPE/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-nj-stip-projects",
+  "url": "https://services.arcgis.com/HggmsDF7UJsNN1FK/arcgis/rest/services/Statewide_Transportation_Improvement_Program_STIP_Project_Locations/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-nvdot-project-boundaries",
+  "url": "https://gis.dot.nv.gov/arcgis/rest/services/Project_Boundaries/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-odot-current-projects-lines",
+  "url": "https://tims.dot.state.oh.us/ags/rest/services/Projects/Current_Projects_Lines/MapServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-okdot-workplan-roadways",
+  "url": "https://services6.arcgis.com/RBtoEUQ2lmN0K3GY/arcgis/rest/services/ODOT_Workplan_Roads_2026to2033/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-oregon-dot-stip-projects-lines",
+  "url": "https://gis.odot.state.or.us/arcgis1006/rest/services/facs_stip/data_catalog/MapServer/362/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-scdot-project-viewer-lines",
+  "url": "https://gis.scdot.org/hosting/rest/services/Hosted/Project_Viewer_Lines/FeatureServer/1/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-sd-stip-construction-reconstruction",
+  "url": "https://dotgis.sd.gov/spearfishformation/rest/services/STIP/DOT_STIP_Approved/MapServer/2/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-sd-stip-pavement-preservation",
+  "url": "https://dotgis.sd.gov/spearfishformation/rest/services/STIP/DOT_STIP_Approved/MapServer/4/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-sd-stip-resurfacing",
+  "url": "https://dotgis.sd.gov/spearfishformation/rest/services/STIP/DOT_STIP_Approved/MapServer/3/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-sd-stip-safety-lines",
+  "url": "https://dotgis.sd.gov/spearfishformation/rest/services/STIP/DOT_STIP_Approved/MapServer/6/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-summit-county-oh-planning-commission-items",
+  "url": "https://services3.arcgis.com/3Ukh5HzAdI6WZ3KP/arcgis/rest/services/SCPC_Items_Public_View/FeatureServer/2/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-sussex-county-de-conditional-use",
+  "url": "https://maps.sussexcountyde.gov/server/rest/services/Hosted/Conditional_Use_View/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-tennessee-dot-projects",
+  "url": "https://spatial.tdot.tn.gov/arcgis/rest/services/Roadway_Projects/Projects_Public_Viewer/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-txdot-projects-info-all",
+  "url": "https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/TxDOT_Projects_Info_All/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-udot-active-projects-lines",
+  "url": "https://services.arcgis.com/pA2nEVnB6tquxgOW/arcgis/rest/services/All_Projects/FeatureServer/1/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-vdot-syip-approved-projects-lines",
+  "url": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/SYIP_Approved_Projects/FeatureServer/1/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-vtrans-project-locations-lines",
+  "url": "https://maps.vtrans.vermont.gov/arcgis/rest/services/Master/AMP/FeatureServer/9/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-weld-county-site-plan-review",
+  "url": "https://services.arcgis.com/ewjSqmSyHJnkfBLL/arcgis/rest/services/Site_Plan_Review_open_data/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-wisdot-highway-program-6yr",
+  "url": "https://dotmaps.wi.gov/arcgis/rest/services/agohub/HIGHWAY_PROGRAM_2_4_6_YEAR/MapServer/1/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-wsdot-project-delivery-plan-complete",
+  "url": "https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-wsdot-project-delivery-plan-proposed",
+  "url": "https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-wsdot-project-delivery-plan-under-construction",
+  "url": "https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-wvdoh-active-projects",
+  "url": "https://services2.arcgis.com/xLpB90lOmCXYDAWo/arcgis/rest/services/2026_Active_Project/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "F-wydot-stip-projects-lines",
+  "url": "https://services2.arcgis.com/WI04Bd6haCzitbuQ/arcgis/rest/services/ITSM_STIP_Data_Layers/FeatureServer/1/query?geometry=%7B%22xmin%22%3A-115.042029%2C%22ymin%22%3A39.999896%2C%22xmax%22%3A-110.873171%2C%22ymax%22%3A43.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ }
+]

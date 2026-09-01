@@ -1,0 +1,499 @@
+[
+ {
+  "id": "adams-county-building-permits",
+  "url": "https://services3.arcgis.com/4PNQOtAivErR7nbT/arcgis/rest/services/Building_Permits_Eye_On_Adams/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "adot-tip-fy2026-2030",
+  "url": "https://services6.arcgis.com/clPWQMwZfdWn4MQZ/arcgis/rest/services/lyrTIPAdoptions_Final2630_view/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "akdot-stip-24-27",
+  "url": "https://services.arcgis.com/r4A0V7UzH9fcLVvv/arcgis/rest/services/STIP_24_27_Final_NewSchema/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "albuquerque-building-permits",
+  "url": "https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/MapServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "aldot-atrip-ii-projects",
+  "url": "https://services.arcgis.com/LZzQi3xDiclG6XvQ/arcgis/rest/services/ATRIPIICenterPoint03282022/FeatureServer/23?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "aldot-rebuild-alabama-grant-projects",
+  "url": "https://services.arcgis.com/LZzQi3xDiclG6XvQ/arcgis/rest/services/RALGCenterPoint08102023/FeatureServer/38?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "allentown-energov-building-permits",
+  "url": "https://services1.arcgis.com/WUqVDRuvIiIiH2Pl/arcgis/rest/services/EnerGov_Building_Permits_Current/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "anaheim-land-use-cases",
+  "url": "https://services3.arcgis.com/hPs600I3X0RTaaaq/arcgis/rest/services/Open_Data_Land_Use_Permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "ann-arbor-energov-permits",
+  "url": "https://utility.arcgis.com/usrsvcs/servers/7f4ea28cb31e4c618bc0f291c69dad36/rest/services/CustomMaps/PublicStaffPermits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "anne-arundel-commercial-site-plans",
+  "url": "https://gis.aacounty.org/arcgis/rest/services/OpenData/Planning_OpenData/MapServer/4?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "anne-arundel-subdivision-activity",
+  "url": "https://gis.aacounty.org/arcgis/rest/services/OpenData/Planning_OpenData/MapServer/30?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "ar-ardot-job-status-lines",
+  "url": "https://gis.ardot.gov/referenced/rest/services/ProgramManagement/Job_Status_Web_Application/MapServer/3?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "ar-ardot-job-status-points",
+  "url": "https://gis.ardot.gov/referenced/rest/services/ProgramManagement/Job_Status_Web_Application/MapServer/2?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "arlington-issued-permits",
+  "url": "https://gis2.arlingtontx.gov/agsext2/rest/services/OpenData/OD_Property/MapServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "arlington-permit-applications",
+  "url": "https://gis2.arlingtontx.gov/agsext2/rest/services/OpenData/OD_Property/MapServer/9?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "arlington-planning-cases",
+  "url": "https://gis2.arlingtontx.gov/agsext2/rest/services/OpenData/OD_Property/MapServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "asheville-accela-permits",
+  "url": "https://gis.ashevillenc.gov/server/rest/services/Permits/AccelaPermitsView/MapServer/2?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "aurora-building-permits",
+  "url": "https://ags.auroragov.org/aurora/rest/services/OpenData/MapServer/44?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "baltimore-county-permits",
+  "url": "https://bcgisdata.baltimorecountymd.gov/arcgis/rest/services/DevelopmentManagement/ActiveDevelopment/MapServer/4?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "bellevue-permits",
+  "url": "https://services1.arcgis.com/EYzEZbDhXZjURPbP/arcgis/rest/services/Bellevue_Permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "bend-or-permit-applications",
+  "url": "https://services5.arcgis.com/JisFYcK2mIVg9ueP/arcgis/rest/services/Permit_Applications_Point/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "bentonville-catalyst-permits",
+  "url": "https://gis.bentonvillear.com/arcgis/rest/services/Electric_System/Catalyst_Planning/FeatureServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "bismarck-building-permits",
+  "url": "https://services1.arcgis.com/XxHmL09eFqJWI0gE/arcgis/rest/services/Map1/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "boone-county-ky-planning-board-actions",
+  "url": "https://secure.boonecountygis.com/server/rest/services/ServicesBoone/PlanningAndZoningGroup_Boone/MapServer/7?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "boulder-construction-permits",
+  "url": "https://services.arcgis.com/ePKBjXrBZ2vEEgWd/arcgis/rest/services/Construction_Permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "bozeman-building-permits",
+  "url": "https://gisweb.bozeman.net/arcgis/rest/services/Internal/Building_Permits/MapServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "brunswick-county-permits",
+  "url": "https://services1.arcgis.com/W6gamXPYQeLXrdAd/arcgis/rest/services/Permit_Locations/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "burlington-vt-building-permits",
+  "url": "https://services1.arcgis.com/1bO0c7PxQdsGidPK/arcgis/rest/services/OpenGov_Building/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "burlington-vt-zoning-permits",
+  "url": "https://services1.arcgis.com/1bO0c7PxQdsGidPK/arcgis/rest/services/OpenGov_Zoning/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "butler-county-ks-permits",
+  "url": "https://services5.arcgis.com/SU4Aj97XUNDcwkDb/arcgis/rest/services/Permits_Premium/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "cabarrus-county-plan-reviews",
+  "url": "https://location.cabarruscounty.us/arcgisservices/rest/services/Current_Accela_Permits/Plan_Reviews/MapServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "caltrans-sb1-projects",
+  "url": "https://caltrans-gis.dot.ca.gov/arcgis/rest/services/SB1/BuildingCA_Projects/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "canyon-county-building-permits",
+  "url": "https://maps.canyonco.org/arcgisserver/rest/services/DSD/Building_Permits_NEW_2023/FeatureServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "casa-grande-active-development-sites",
+  "url": "https://rogue.casagrandeaz.gov/arcgis/rest/services/Planning/Active_Development_Sites/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "centre-county-pa-building-permits",
+  "url": "https://gissites4.centrecountypa.gov/arcgis/rest/services/Building_Permits/MapServer/2?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "champaign-il-special-use-permits",
+  "url": "https://gisportal.champaignil.gov/ms/rest/services/Open_Data/Open_Data/MapServer/20?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "charleston-county-permits",
+  "url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/ENERGOV/energov_history/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "charlotte-land-dev-commercial-projects",
+  "url": "https://gis.charlottenc.gov/arcgis/rest/services/PLN/LandDevCommercialProjects/MapServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "chattanooga-building-permits",
+  "url": "https://services2.arcgis.com/cclAu9OKhOfjeUdr/arcgis/rest/services/Building_Permits_to_April_2021/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "chattanooga-permits-archive",
+  "url": "https://services2.arcgis.com/cclAu9OKhOfjeUdr/arcgis/rest/services/Chatt_permits_to_12_31_2025/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "chester-county-pa-act247-plans",
+  "url": "https://gisprodops.chesco.org/server/rest/services/Planning_Services/Plan_Act247_AGOL_D/MapServer/5?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "city-of-orange-active-planning-projects",
+  "url": "https://services5.arcgis.com/HsWup310bJE1lcGa/arcgis/rest/services/Active_Planning_Projects_view/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "clark-county-active-dev-permits",
+  "url": "https://gis.clark.wa.gov/arcgisfed/rest/services/DevelopmentPermits/ActiveDevelopmentPermits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "clark-county-active-projects",
+  "url": "https://services2.arcgis.com/MLoS3Qx4BXmDoTIY/arcgis/rest/services/Active_Projects/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "clarksville-montgomery-final-subdivisions",
+  "url": "https://services8.arcgis.com/bsMxxAoaPLw5EHPS/arcgis/rest/services/FinalSD/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "clarksville-montgomery-preliminary-subdivisions",
+  "url": "https://services8.arcgis.com/bsMxxAoaPLw5EHPS/arcgis/rest/services/PrelimSD/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "cleveland-issued-building-permits",
+  "url": "https://services3.arcgis.com/dty2kHktVXHrqO8i/arcgis/rest/services/Building_Permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "clv-planning-cases",
+  "url": "https://services1.arcgis.com/F1v0ufATbBQScMtY/arcgis/rest/services/CLV_Planning_Cases/FeatureServer/2?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "coconino-county-permits",
+  "url": "https://services1.arcgis.com/Rlvx5g8pKeK13apH/arcgis/rest/services/County_Permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "colorado-springs-planning-applications",
+  "url": "https://gis.coloradosprings.gov/arcgis/rest/services/Planning/PlanDevTracker_PRO/MapServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "columbia-mo-capital-projects",
+  "url": "https://services.arcgis.com/GHhNHT1xiCkCAXvo/arcgis/rest/services/CIPCentroids/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "columbia-mo-permits",
+  "url": "https://gis.gocolumbiamo.com/arcgis/rest/services/View_Services/City_Projects_Construction_Updated/MapServer/3?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "columbus-building-permits",
+  "url": "https://services1.arcgis.com/9yy6msODkIBzkUXU/arcgis/rest/services/Building_Permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "cook-county-il-highway-construction-program",
+  "url": "https://services2.arcgis.com/I5Or36sMcO7Y9vQ3/arcgis/rest/services/DOTH_Construction_Projects_2026/FeatureServer/6?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "ctdot-project-work-areas",
+  "url": "https://services1.arcgis.com/FCaUeJ5SOVtImake/arcgis/rest/services/CTDOT_Project_Work_Areas/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "dallas-specific-use-permits",
+  "url": "https://gis.dallascityhall.com/arcgis/rest/services/sdc_public/PD_SUP_Search/MapServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "dekalb-county-building-permits",
+  "url": "https://dcgis.dekalbcountyga.gov/mapping/rest/services/Building_Permit_Applications/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "delaware-county-pa-subdivisions-land-developments",
+  "url": "https://gis.delcopa.gov/arcgis/rest/services/SLD_Review/Delaware_County_Subdivisions_and_Land_Developments/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "denton-county-dev-permits",
+  "url": "https://gis.dentoncounty.gov/arcgis/rest/services/DEV_Permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "denver-commercial-construction-permits",
+  "url": "https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_DEV_COMMERCIALCONSTPERMIT_P/FeatureServer/317?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "denver-residential-construction-permits",
+  "url": "https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_DEV_RESIDENTIALCONSTPERMIT_P/FeatureServer/316?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "desoto-county-permits",
+  "url": "https://gis.desotocountyms.gov/arcgis/rest/services/Permits_Energov/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "detroit-building-permits",
+  "url": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/bseed_building_permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "detroit-demolition-permits",
+  "url": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/bseed_demolition_permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "detroit-trades-permits",
+  "url": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/bseed_trades_permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "durham-building-permits",
+  "url": "https://webgis.durhamnc.gov/server/rest/services/PublicServices/Inspections/MapServer/12?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "el-paso-new-residential-permits",
+  "url": "https://gis.elpasotexas.gov/arcgis/rest/services/Planning/NewResidential/FeatureServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "fairfax-active-site-construction",
+  "url": "https://www.fairfaxcounty.gov/mercator/rest/services/LDS/DevelopmentTracker/FeatureServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "fairfax-recent-building-permits",
+  "url": "https://www.fairfaxcounty.gov/mercator/rest/services/LDS/DevelopmentTracker/FeatureServer/4?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "fdot-active-construction-projects",
+  "url": "https://gis.fdot.gov/arcgis/rest/services/Active_Construction_Projects/FeatureServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "flathead-county-building-permits",
+  "url": "https://services6.arcgis.com/o8tYBvi7zCbkyszZ/arcgis/rest/services/Building_Permits/FeatureServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ }
+]

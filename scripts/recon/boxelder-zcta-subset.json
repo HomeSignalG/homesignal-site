@@ -1,0 +1,32 @@
+[
+  {
+    "id": "zcta-count-in-county-extent",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?geometry=%7B%22xmin%22%3A-114.042029%2C%22ymin%22%3A40.999896%2C%22xmax%22%3A-111.873171%2C%22ymax%22%3A42.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+    "print_chars": 200
+  },
+  {
+    "id": "zcta-count-in-county-extent-padded-025",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?geometry=%7B%22xmin%22%3A-114.292029%2C%22ymin%22%3A40.749896%2C%22xmax%22%3A-111.623171%2C%22ymax%22%3A42.251515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+    "print_chars": 200
+  },
+  {
+    "id": "zcta-count-tiny-envelope-CONTROL",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?geometry=%7B%22xmin%22%3A-112.02%2C%22ymin%22%3A41.49%2C%22xmax%22%3A-112.00%2C%22ymax%22%3A41.51%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+    "print_chars": 200
+  },
+  {
+    "id": "zcta-geoids-in-county-extent",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?geometry=%7B%22xmin%22%3A-114.042029%2C%22ymin%22%3A40.999896%2C%22xmax%22%3A-111.873171%2C%22ymax%22%3A42.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&outFields=GEOID&returnGeometry=false&f=json",
+    "print_chars": 6000
+  },
+  {
+    "id": "zcta-geometry-bytes-84313-largest",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%3D%2784313%27&outFields=GEOID&returnGeometry=true&outSR=4326&f=json",
+    "print_chars": 150
+  },
+  {
+    "id": "zcta-geometry-bytes-84334-smallest",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%3D%2784334%27&outFields=GEOID&returnGeometry=true&outSR=4326&f=json",
+    "print_chars": 150
+  }
+]

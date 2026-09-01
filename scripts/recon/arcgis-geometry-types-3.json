@@ -1,0 +1,485 @@
+[
+ {
+  "id": "nysdot-capital-program-projects-2",
+  "url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "nysdot-capital-program-projects-3",
+  "url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/2?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "odot-current-projects",
+  "url": "https://tims.dot.state.oh.us/ags/rest/services/Projects/Current_Projects_Points/MapServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "odot-current-projects-lines",
+  "url": "https://tims.dot.state.oh.us/ags/rest/services/Projects/Current_Projects_Lines/MapServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "okdot-workplan-roadways",
+  "url": "https://services6.arcgis.com/RBtoEUQ2lmN0K3GY/arcgis/rest/services/ODOT_Workplan_Roads_2026to2033/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "oregon-dot-stip-projects",
+  "url": "https://gis.odot.state.or.us/arcgis1006/rest/services/facs_stip/data_catalog/MapServer/361?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "oregon-dot-stip-projects-lines",
+  "url": "https://gis.odot.state.or.us/arcgis1006/rest/services/facs_stip/data_catalog/MapServer/362?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "overland-park-building-permits",
+  "url": "https://services1.arcgis.com/YQsWDBr0DjMtoTQo/arcgis/rest/services/Building_Permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "penndot-transportation-projects",
+  "url": "https://gis.penndot.pa.gov/gis/rest/services/opendata/transportationprojectspoints/MapServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "peoria-az-building-permits",
+  "url": "https://gis.peoriaaz.gov/arcgis/rest/services/Accela/Peoria_Building_Permit_All/FeatureServer/3?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "phoenix-building-permits",
+  "url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "pierce-county-pals-permits",
+  "url": "https://services2.arcgis.com/1UvBaQ5y1ubjUPmd/arcgis/rest/services/Permits_Pierce_County/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "portland-building-permits",
+  "url": "https://www.portlandmaps.com/od/rest/services/COP_OpenData_PlanningDevelopment/MapServer/89?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "provo-planning-applications",
+  "url": "https://gispublicweb.provo.gov/ArcGIS/rest/services/DevServ/CurrentProjects/MapServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "raleigh-building-permits",
+  "url": "https://services.arcgis.com/v400IkDOw1ad7Yad/arcgis/rest/services/Building_Permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "reno-ldc-projects",
+  "url": "https://services5.arcgis.com/RjM4BJrv5ZkqP4XC/arcgis/rest/services/LDC_Projects_view/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "ridot-rhode-restore-projects",
+  "url": "https://services5.arcgis.com/JfTJE9T2RFfUZzVx/arcgis/rest/services/MRBF_Projects/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "round-rock-large-development-projects",
+  "url": "https://services.arcgis.com/KaARkuoKF9vrGr3P/arcgis/rest/services/Large_Development_Projects_view/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "salem-structure-permits",
+  "url": "https://services.arcgis.com/kIA6yS9KDGqZL7U3/arcgis/rest/services/Structure_Permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "san-antonio-permits-issued",
+  "url": "https://services.arcgis.com/g1fRTDLeMgspWrYp/ArcGIS/rest/services/Permits_Issued/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "san-antonio-prelim-plan-review",
+  "url": "https://services.arcgis.com/g1fRTDLeMgspWrYp/arcgis/rest/services/Preliminary_Plan_Review_Meetings/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "san-jose-permits",
+  "url": "https://geo.sanjoseca.gov/server/rest/services/PLN/PLN_PermitsAndComplaints/MapServer/8?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "san-marcos-planning-cases",
+  "url": "https://smgis.sanmarcostx.gov/arcgis/rest/services/Planning/PlanningFeatures/MapServer/15?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "savannah-commercial-building-permits",
+  "url": "https://pub.sagis.org/arcgis/rest/services/Savannah/BuildingPermit_FC/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "scdot-project-viewer-lines",
+  "url": "https://gis.scdot.org/hosting/rest/services/Hosted/Project_Viewer_Lines/FeatureServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "scottsdale-building-permits",
+  "url": "https://maps.scottsdaleaz.gov/arcgis/rest/services/OpenData_Tabular/MapServer/12?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "sd-stip-construction-reconstruction",
+  "url": "https://dotgis.sd.gov/spearfishformation/rest/services/STIP/DOT_STIP_Approved/MapServer/2?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "sd-stip-pavement-preservation",
+  "url": "https://dotgis.sd.gov/spearfishformation/rest/services/STIP/DOT_STIP_Approved/MapServer/4?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "sd-stip-railroad-crossings",
+  "url": "https://dotgis.sd.gov/spearfishformation/rest/services/STIP/DOT_STIP_Approved/MapServer/9?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "sd-stip-resurfacing",
+  "url": "https://dotgis.sd.gov/spearfishformation/rest/services/STIP/DOT_STIP_Approved/MapServer/3?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "sd-stip-safety-lines",
+  "url": "https://dotgis.sd.gov/spearfishformation/rest/services/STIP/DOT_STIP_Approved/MapServer/6?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "sd-stip-safety-points",
+  "url": "https://dotgis.sd.gov/spearfishformation/rest/services/STIP/DOT_STIP_Approved/MapServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "sd-stip-structures",
+  "url": "https://dotgis.sd.gov/spearfishformation/rest/services/STIP/DOT_STIP_Approved/MapServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "sheridan-county-building-permits",
+  "url": "https://services5.arcgis.com/V4b98G4pSkzvUam9/arcgis/rest/services/Building_Permits_view/FeatureServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "sioux-falls-building-permits",
+  "url": "https://gis.siouxfalls.gov/arcgis/rest/services/Data/Community/MapServer/3?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "slc-planning-petitions",
+  "url": "https://services.arcgis.com/mMBpeYj0vPFotzbe/arcgis/rest/services/Planning_Petition/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "slo-county-planning-permits",
+  "url": "https://gis.slocounty.ca.gov/arcgis/rest/services/PLN/PLN_EG_SERVICES_DATA/MapServer/79?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "sonoma-county-fire-rebuild-permits",
+  "url": "https://services1.arcgis.com/P5Mv5GY5S66M8Z1Q/arcgis/rest/services/Wildfire_Rebuild_Permits_Public_View_Layer/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "spokane-county-building-planning-permits",
+  "url": "https://services3.arcgis.com/WlYQgAChrqj0tuQi/arcgis/rest/services/Spokane_County_Building_and_Planning_Permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "stamford-major-developments",
+  "url": "https://services3.arcgis.com/V28nrLFIbcYZbnPl/arcgis/rest/services/Stamford_Developments/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "stlouis-county-mo-subdivisions",
+  "url": "https://services2.arcgis.com/w657bnjzrjguNyOy/arcgis/rest/services/Subdivisions2025/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "summit-county-oh-planning-commission-items",
+  "url": "https://services3.arcgis.com/3Ukh5HzAdI6WZ3KP/arcgis/rest/services/SCPC_Items_Public_View/FeatureServer/2?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "sussex-county-de-conditional-use",
+  "url": "https://maps.sussexcountyde.gov/server/rest/services/Hosted/Conditional_Use_View/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "tacoma-accela-permits",
+  "url": "https://services3.arcgis.com/SCwJH1pD8WSn5T5y/arcgis/rest/services/accela_permit_data/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "tempe-building-permits",
+  "url": "https://services.arcgis.com/lQySeXwbBg53XWDi/arcgis/rest/services/building_permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "tennessee-dot-projects",
+  "url": "https://spatial.tdot.tn.gov/arcgis/rest/services/Roadway_Projects/Projects_Public_Viewer/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "thurston-county-residential-permits",
+  "url": "https://services1.arcgis.com/MA2nPVLxVTdAZLej/arcgis/rest/services/Residential_Building_Permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "topeka-building-permits",
+  "url": "https://maps.topeka.gov/arcgis/rest/services/CityworksViews/BuildingPermits/MapServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "tucson-commercial-building-permits",
+  "url": "https://mapdata.tucsonaz.gov/arcgis/rest/services/PublicMaps/PermitsCode/MapServer/81?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "tucson-residential-building-permits",
+  "url": "https://mapdata.tucsonaz.gov/arcgis/rest/services/PublicMaps/PermitsCode/MapServer/85?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "txdot-projects-info-all",
+  "url": "https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/TxDOT_Projects_Info_All/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "udot-active-projects",
+  "url": "https://services.arcgis.com/pA2nEVnB6tquxgOW/arcgis/rest/services/All_Projects/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "udot-active-projects-lines",
+  "url": "https://services.arcgis.com/pA2nEVnB6tquxgOW/arcgis/rest/services/All_Projects/FeatureServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "vdot-syip-approved-projects",
+  "url": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/SYIP_Approved_Projects/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "vdot-syip-approved-projects-lines",
+  "url": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/SYIP_Approved_Projects/FeatureServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "virginia-beach-building-permits",
+  "url": "https://services2.arcgis.com/CyVvlIiUfRBmMQuu/arcgis/rest/services/Building_Permits_Applications_view/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "vtrans-project-locations",
+  "url": "https://maps.vtrans.vermont.gov/arcgis/rest/services/Master/AMP/FeatureServer/10?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "vtrans-project-locations-lines",
+  "url": "https://maps.vtrans.vermont.gov/arcgis/rest/services/Master/AMP/FeatureServer/9?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "wake-county-building-permits",
+  "url": "https://maps.wake.gov/arcgis/rest/services/Inspections/Building_Permits/MapServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "weld-county-site-plan-review",
+  "url": "https://services.arcgis.com/ewjSqmSyHJnkfBLL/arcgis/rest/services/Site_Plan_Review_open_data/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "wisdot-highway-program-6yr",
+  "url": "https://dotmaps.wi.gov/arcgis/rest/services/agohub/HIGHWAY_PROGRAM_2_4_6_YEAR/MapServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "worcester-building-permits",
+  "url": "https://services1.arcgis.com/j8dqo2DJE7mVUBU1/arcgis/rest/services/Building_Permits/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "wsdot-project-delivery-plan-complete",
+  "url": "https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "wsdot-project-delivery-plan-proposed",
+  "url": "https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "wsdot-project-delivery-plan-under-construction",
+  "url": "https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "wvdoh-active-projects",
+  "url": "https://services2.arcgis.com/xLpB90lOmCXYDAWo/arcgis/rest/services/2026_Active_Project/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "wydot-stip-projects",
+  "url": "https://services2.arcgis.com/WI04Bd6haCzitbuQ/arcgis/rest/services/ITSM_STIP_Data_Layers/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "wydot-stip-projects-lines",
+  "url": "https://services2.arcgis.com/WI04Bd6haCzitbuQ/arcgis/rest/services/ITSM_STIP_Data_Layers/FeatureServer/1?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ },
+ {
+  "id": "york-county-pa-planning-subdivisions",
+  "url": "https://arcweb1.ycpc.org/server/rest/services/OPEN_DATA/PLANNING_Subdivisions/FeatureServer/0?f=json",
+  "extract": "\"geometryType\"\\s*:\\s*\"[A-Za-z]*\"|\"type\"\\s*:\\s*\"(Feature Layer|Table)\"",
+  "extract_context": 0,
+  "extract_max": 2
+ }
+]
