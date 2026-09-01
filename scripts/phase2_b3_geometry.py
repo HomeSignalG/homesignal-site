@@ -292,6 +292,16 @@ def geom_to_wkt(g):
 
 # ---------------------------------------------------------------- controls
 
+FULL_FINGERPRINT_SQL = """
+select sum(('x'||substr(encode(identity_hash,'hex'),1,8))::bit(32)::bigint) as fp_corpus_all
+  from preservation.app_project_identity;
+"""
+
+# The per-tranche control deliberately EXCLUDES the corpus fingerprint. That sum is a
+# full scan of 3,172,292 rows, and running it between every tranche made the load
+# slower than the recovery itself. Everything below is a catalog read or an indexed
+# count, so the gate stays real without becoming the cost. The full fingerprint is
+# re-derived at the start and the end of the run, where it belongs.
 CONTROLS_SQL = """
 select
   (select count(*) from geo.project_geometry_candidate)                          as candidates,
@@ -302,8 +312,6 @@ select
   (select md5(string_agg(zcta5, ',' order by zcta5 collate "C"))
      from geo.zcta_boundary)                                                     as b1_fp,
   (select count(*) from preservation.app_project_identity)                       as n_identity,
-  (select sum(('x'||substr(encode(identity_hash,'hex'),1,8))::bit(32)::bigint)
-     from preservation.app_project_identity)                                     as fp_corpus_all,
   (select md5(string_agg(sig, ',' order by sig collate "C")) from (
       select c.relname||':'||t.tgname||':'||t.tgenabled::text as sig
         from pg_trigger t join pg_class c on c.oid=t.tgrelid
@@ -323,10 +331,12 @@ select
   pg_current_wal_lsn()::text                                                     as lsn;
 """
 
+EXPECT_FULL = {"fp_corpus_all": "6809816297333320"}
+
 EXPECT = {
     "candidates": 9571, "c1": 67, "b1_rows": 56,
     "b1_fp": "0a8b5fcea3827aac5ed32fbfa2713a46",
-    "n_identity": 3172292, "fp_corpus_all": "6809816297333320",
+    "n_identity": 3172292,
     "guard_md5": "d55a010018cf5c345f4c8051b8a67279",
     "fn_projects_for_zip": "ec1b01ae4485ad2c59b9f946c9d565b6",
     "fn_refresh_zip": "dfd09ac72c5b6b65e61ad597665570a0",
@@ -357,6 +367,23 @@ def controls(tag):
     row["_db_mb"] = db_mb
     row["_wal_mb"] = wal_mb
     return row
+
+
+def full_fingerprint(tag):
+    """The expensive one: the order-independent sum over every baseline identity.
+    Run at the boundaries of the load, not between tranches."""
+    row = full_sql_row(FULL_FINGERPRINT_SQL, tag)
+    got = str(row.get("fp_corpus_all"))
+    say(f"[{tag}] corpus:all fingerprint", got)
+    if got != EXPECT_FULL["fp_corpus_all"]:
+        raise SystemExit(f"STOP: corpus:all fingerprint {got} != {EXPECT_FULL['fp_corpus_all']}")
+
+
+def full_sql_row(query, tag):
+    res = sql(query, tag)
+    if not isinstance(res, list) or not res:
+        raise SystemExit(f"STOP: {tag} returned no row")
+    return res[0]
 
 
 def load_candidates():
@@ -573,6 +600,7 @@ def recover(cands):
     for c in cands:
         by_reg.setdefault(c["registry_id"], []).append(c)
 
+    full_fingerprint("pre-write")
     controls("pre-create")
     say("creating", "geo.project_source_geometry")
     sql("begin;\nset local search_path = public;\n" + DDL + "\ncommit;\nselect 1 as created;",
@@ -686,6 +714,8 @@ def recover(cands):
             total_written += flush(batch)
         controls(f"after {reg}")
 
+    controls("post-write")
+    full_fingerprint("post-write")
     say("total rows written", f"{total_written:,}")
 
 
