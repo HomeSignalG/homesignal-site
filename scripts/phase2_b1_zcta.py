@@ -444,6 +444,76 @@ end
 $assert$;
 
 commit;
+
+-- Post-commit receipt. RAISE NOTICE does not survive the Management API, so the
+-- last statement has to BE the receipt or the run reports nothing it measured.
+select (select count(*) from geo.zcta_boundary)                                as rows_loaded,
+       (select md5(string_agg(zcta5, ',' order by zcta5 collate "C"))
+          from geo.zcta_boundary)                                              as geoid_fingerprint,
+       (select count(*) from geo.zcta_boundary where not ST_IsValid(geom))     as invalid_geometries,
+       (select count(distinct ST_SRID(geom)) from geo.zcta_boundary)           as distinct_srids,
+       (select min(ST_SRID(geom)) from geo.zcta_boundary)                      as srid,
+       (select count(*) from geo.zcta_boundary
+         where zcta5 = any (array[{','.join(chr(39)+z+chr(39) for z in CANONICAL_18)}]))                                   as canonical_18_present,
+       (select sum(ST_NPoints(geom)) from geo.zcta_boundary)                   as total_vertices,
+       pg_size_pretty(pg_total_relation_size('geo.zcta_boundary'))             as total_size,
+       pg_size_pretty(pg_relation_size('geo.zcta_boundary'))                   as heap_size,
+       pg_size_pretty(pg_total_relation_size('geo.zcta_boundary')
+                      - pg_relation_size('geo.zcta_boundary'))                 as toast_and_index,
+       pg_size_pretty(pg_relation_size('geo.zcta_boundary_geom_gix'))          as gist_size,
+       pg_size_pretty(pg_database_size(current_database()))                    as db_size_after,
+       (select pg_size_pretty(sum(size)) from pg_ls_waldir())                  as wal_size_after,
+       pg_current_wal_lsn()::text                                              as wal_lsn_after;
+"""
+
+
+PREFLIGHT_SQL = """
+-- Read-only pre-write controls, run in the same job as the write so the numbers
+-- belong to the same instant. Every value here is compared against the recorded
+-- Phase-1 / D2 receipts before the transaction is allowed to open.
+select
+  (select count(*) from pg_namespace where nspname = 'geo')                 as geo_exists,
+  (select count(*) from preservation.app_project_identity)                  as n_identity,
+  (select count(*) from preservation.development_report)                    as n_development_report,
+  (select count(*) from preservation.community_meta)                        as n_community_meta,
+  (select count(*) from preservation.rollup)                                as n_rollup,
+  (select count(*) from preservation.box_elder_cache_site)                  as n_box_elder,
+  (select count(*) from preservation.fingerprint)                           as n_fingerprint,
+  (select count(*) from preservation.baseline_run)                          as n_baseline_run,
+  (select count(*) from preservation.protected_snapshot)                    as n_protected,
+  (select count(*) from pg_trigger t
+     join pg_class c on c.oid = t.tgrelid
+     join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'preservation' and not t.tgisinternal
+      and t.tgname like 'zz_guard_%')                                       as guard_triggers,
+  (select count(*) from pg_trigger t
+     join pg_class c on c.oid = t.tgrelid
+     join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'preservation' and not t.tgisinternal
+      and t.tgname like 'zz_guard_%' and t.tgenabled <> 'O')                as guard_disabled,
+  (select md5(string_agg(sig, ',' order by sig collate "C")) from (
+      select c.relname || ':' || t.tgname || ':' || t.tgenabled::text as sig
+        from pg_trigger t
+        join pg_class c on c.oid = t.tgrelid
+        join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'preservation' and not t.tgisinternal
+         and t.tgname like 'zz_guard_%') q)                                 as guard_md5,
+  (select md5(pg_get_functiondef(p.oid)) from pg_proc p
+     join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'app_projects_for_zip')      as fn_projects_for_zip,
+  (select md5(pg_get_functiondef(p.oid)) from pg_proc p
+     join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'app_refresh_zip')           as fn_refresh_zip,
+  (select md5(string_agg(jobid::text||'|'||jobname||'|'||schedule||'|'||command||'|'||active::text,
+                         ';' order by jobid)) from cron.job)                as cron_md5,
+  (select count(*) from cron.job)                                           as cron_jobs,
+  (select sum(('x'||substr(encode(identity_hash,'hex'),1,8))::bit(32)::bigint)
+     from preservation.app_project_identity)                                as fp_corpus_all,
+  pg_size_pretty(pg_database_size(current_database()))                      as db_size_before,
+  pg_database_size(current_database())                                      as db_bytes_before,
+  (select pg_size_pretty(sum(size)) from pg_ls_waldir())                    as wal_size_before,
+  (select sum(size) from pg_ls_waldir())                                    as wal_bytes_before,
+  pg_current_wal_lsn()::text                                                as wal_lsn_before;
 """
 
 
@@ -540,6 +610,9 @@ def main():
     if fp != expect_fp:
         raise SystemExit(f"STOP: GEOID-set fingerprint {fp} != recorded {expect_fp}")
     say("pre-write gates", "sha256 and GEOID fingerprint both reproduced")
+    print("\n--- pre-write controls (read-only) ---")
+    if run_sql(PREFLIGHT_SQL) != 0:
+        raise SystemExit("STOP: pre-write controls could not be read")
     print("\nExecuting ONE transaction: schema, table, insert, index, assertions.")
     return run_sql(sql)
 
