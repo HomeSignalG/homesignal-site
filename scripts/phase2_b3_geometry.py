@@ -382,7 +382,7 @@ def case_of(source_key, registry_id):
 # ---------------------------------------------------------------- table
 
 DDL = f"""
-create table geo.project_source_geometry (
+create table if not exists geo.project_source_geometry (
   geometry_instance_key text        primary key,
   source_key            text        not null
       references geo.project_geometry_candidate (source_key),
@@ -422,9 +422,9 @@ comment on table geo.project_source_geometry is
   'the same value. No geometry is ever fabricated, and no line or polygon is ever reduced to '
   'a representative point.';
 
-create index project_source_geometry_gix on geo.project_source_geometry using gist (geom);
-create index project_source_geometry_source_key_idx on geo.project_source_geometry (source_key);
-create index project_source_geometry_outcome_idx on geo.project_source_geometry (recovery_outcome);
+create index if not exists project_source_geometry_gix on geo.project_source_geometry using gist (geom);
+create index if not exists project_source_geometry_source_key_idx on geo.project_source_geometry (source_key);
+create index if not exists project_source_geometry_outcome_idx on geo.project_source_geometry (recovery_outcome);
 """
 
 
@@ -459,7 +459,7 @@ def tranche_sql(rows):
             "  geometry_instance_key, source_key, registry_id, source_feature_id, geom,\n"
             "  geom_kind, source_geometry_type, geom_origin, recovery_outcome, source_crs,\n"
             "  requested_out_sr, transformation, canonical_srid, source_url, request_basis,\n"
-            "  fetched_at, recovery_version)\nvalues\n" + ",\n".join(values) + ";\n"
+            "  fetched_at, recovery_version)\nvalues\n" + ",\n".join(values) + "\non conflict (geometry_instance_key) do nothing;\n"
             "do $a$ declare v int; begin\n"
             "  select count(*) into v from geo.project_source_geometry\n"
             "   where geom is not null and not ST_IsValid(geom);\n"
@@ -656,7 +656,7 @@ def recover(cands):
                 seen_cases.add(str(case))
 
             # write when the tranche is big enough, so no request carries a huge body
-            if sum(len(p.get("wkt") or "") for p in pending) > 1_800_000 or len(pending) > 900:
+            if sum(len(p.get("wkt") or "") for p in pending) > MAX_TRANCHE_BYTES or len(pending) > 900:
                 total_written += flush(pending)
                 pending = []
                 controls(f"tranche {reg}")
@@ -689,15 +689,50 @@ def recover(cands):
     say("total rows written", f"{total_written:,}")
 
 
+MAX_TRANCHE_BYTES = 1_200_000   # the API refused 4.28 MB with HTTP 413 and accepted
+                                # 2.57 MB; this sits well under the proven-good size.
+
+
+def _subtranches(rows, budget=MAX_TRANCHE_BYTES):
+    """Split by RENDERED size, not by a threshold tested before the row is added.
+    The first design checked the accumulated total before appending a whole batch,
+    so one batch of long corridors could overshoot by megabytes - which is exactly
+    how the load hit HTTP 413."""
+    cur, size = [], 0
+    for r in rows:
+        cost = len(r.get("wkt") or "") + 700
+        if cur and size + cost > budget:
+            yield cur
+            cur, size = [], 0
+        cur.append(r)
+        size += cost
+    if cur:
+        yield cur
+
+
 def flush(rows):
     if not rows:
         return 0
-    body = tranche_sql(rows)
-    say("  writing tranche", f"{len(rows):,} rows, {len(body)/1048576:.2f} MB of SQL")
-    res = sql(body, "tranche")
-    if isinstance(res, list) and res:
-        say("  table now", f"{res[0].get('rows_total'):,} rows, {res[0].get('size')}")
-    return len(rows)
+    written = 0
+    for part in _subtranches(rows):
+        queue = [part]
+        while queue:
+            chunk = queue.pop(0)
+            body = tranche_sql(chunk)
+            say("  writing tranche", f"{len(chunk):,} rows, {len(body)/1048576:.2f} MB of SQL")
+            try:
+                res = sql(body, "tranche")
+            except SystemExit as e:
+                if "413" in str(e) and len(chunk) > 1:
+                    say("  413 - halving", f"{len(chunk)} -> {len(chunk)//2} + rest")
+                    queue.insert(0, chunk[len(chunk) // 2:])
+                    queue.insert(0, chunk[:len(chunk) // 2])
+                    continue
+                raise
+            if isinstance(res, list) and res:
+                say("  table now", f"{res[0].get('rows_total'):,} rows, {res[0].get('size')}")
+            written += len(chunk)
+    return written
 
 
 def main():
