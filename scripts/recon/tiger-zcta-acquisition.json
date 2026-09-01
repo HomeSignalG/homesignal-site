@@ -1,0 +1,57 @@
+[
+  {
+    "id": "tiger-vintages",
+    "url": "https://www2.census.gov/geo/tiger/",
+    "extract": "TIGER20(2[4-9])",
+    "extract_context": 120,
+    "extract_max": 12
+  },
+  {
+    "id": "tiger2025-zcta520-dir",
+    "url": "https://www2.census.gov/geo/tiger/TIGER2025/ZCTA520/",
+    "print_chars": 4000
+  },
+  {
+    "id": "tiger2024-zcta520-dir",
+    "url": "https://www2.census.gov/geo/tiger/TIGER2024/ZCTA520/",
+    "print_chars": 4000
+  },
+  {
+    "id": "tiger2025-zcta520-range-probe",
+    "url": "https://www2.census.gov/geo/tiger/TIGER2025/ZCTA520/tl_2025_us_zcta520.zip",
+    "headers": { "Range": "bytes=0-63" },
+    "print_chars": 200
+  },
+  {
+    "id": "tiger2024-zcta520-range-probe",
+    "url": "https://www2.census.gov/geo/tiger/TIGER2024/ZCTA520/tl_2024_us_zcta520.zip",
+    "headers": { "Range": "bytes=0-63" },
+    "print_chars": 200
+  },
+  {
+    "id": "tigerweb-zcta-layer-meta",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2?f=json",
+    "extract": "spatialReference|geometryType|latestWkid|wkid|copyrightText|extent",
+    "extract_context": 300,
+    "extract_max": 8
+  },
+  {
+    "id": "tigerweb-zcta-count",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=1%3D1&returnCountOnly=true&f=json",
+    "print_chars": 400
+  },
+  {
+    "id": "tiger-technical-doc-crs",
+    "url": "https://www.census.gov/programs-surveys/geography/technical-documentation/complete-technical-documentation/tiger-geo-line.html",
+    "extract": "North American Datum|NAD ?83|coordinate system|projection",
+    "extract_context": 400,
+    "extract_max": 8
+  },
+  {
+    "id": "census-open-data-terms",
+    "url": "https://www.census.gov/data/developers/about/terms-of-service.html",
+    "extract": "public domain|licen[cs]|attribution|free of charge",
+    "extract_context": 500,
+    "extract_max": 8
+  }
+]
