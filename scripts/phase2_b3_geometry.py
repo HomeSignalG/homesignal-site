@@ -1141,11 +1141,67 @@ def nvdot_complete():
     return 0
 
 
+def invalid_probe():
+    """Read-only. Answers the one question the completion run could not: is the
+    geometry already invalid in the publisher's OWN projection, before any transform?
+
+    The completion run re-fetched at outSR=4326 - the same projection it had already
+    used - so it tested repeat-fetch stability, not native validity. This asks the
+    publisher for EPSG:26911 and validates the rings there. Nothing is written and
+    nothing is altered."""
+    reg = "nvdot-project-boundaries"
+    cfg = LAYERS[reg]
+    rows = sql("""select source_key, source_feature_id, validity_reason
+                    from geo.project_source_geometry
+                   where recovery_outcome = 'feature_geometry_invalid'
+                   order by source_key collate "C";""", "invalid list")
+    say("invalid features on record", len(rows))
+    if not rows:
+        return 0
+
+    meta = layer_meta(cfg["url"])
+    say("layer declared SR", f"wkid {meta['wkid']} / latestWkid {meta['latestWkid']}")
+    real_field, ftype, use_quote = resolve_case_binding(
+        cfg["url"], meta, cfg["case_field"], [case_of(r["source_key"], reg) for r in rows])
+    say("case binding", f"{real_field} ({ftype}) quoted={use_quote}")
+
+    for r in rows:
+        case = case_of(r["source_key"], reg)
+        print(f"\n===== {r['source_key']}  OBJECTID {r['source_feature_id']}")
+        for out_sr in (26911, 4326):
+            time.sleep(POLITE)
+            where = "{} {}".format(real_field,
+                                   "IN ('" + esc(case) + "')" if use_quote
+                                   else "IN (" + str(case) + ")")
+            j = post(qurl(cfg["url"]), {
+                "where": where, "outFields": f"{meta['objectIdField']},{real_field}",
+                "returnGeometry": "true", "outSR": str(out_sr), "f": "json"},
+                timeout=NVDOT_TIMEOUT)
+            hit = None
+            for f in (j.get("features") or []):
+                if str((f.get("attributes") or {}).get(meta["objectIdField"])) == r["source_feature_id"]:
+                    hit = f
+            if hit is None:
+                say(f"  outSR {out_sr}", "feature not returned")
+                continue
+            wkt, kind = geom_to_wkt(hit.get("geometry"))
+            if not wkt:
+                say(f"  outSR {out_sr}", "returned without geometry")
+                continue
+            chk = sql("select ST_IsValid(g) as ok, ST_IsValidReason(g) as why,"
+                      " ST_NPoints(g) as n from (select ST_GeomFromText($w$" + wkt +
+                      "$w$, " + str(out_sr) + ") as g) q;", f"validate {out_sr}")[0]
+            say(f"  outSR {out_sr}",
+                f"{kind} · {chk['n']} vertices · valid={chk['ok']} · {chk['why']}")
+    print("\nINVALID-GEOMETRY PROBE COMPLETE - nothing written, nothing altered.")
+    return 0
+
+
 def main():
     mode = os.environ.get("MODE", "").strip()
     say("mode", mode)
-    if mode not in ("b3-probe", "b3-load", "b3-nvdot"):
-        raise SystemExit("MODE must be b3-probe, b3-load or b3-nvdot")
+    if mode not in ("b3-probe", "b3-load", "b3-nvdot", "b3-invalid-probe"):
+        raise SystemExit("MODE must be b3-probe, b3-load, b3-nvdot or b3-invalid-probe")
     cands = load_candidates()
     if len(cands) != 9571:
         raise SystemExit(f"STOP: candidate universe drifted - {len(cands)} != 9,571")
@@ -1153,6 +1209,8 @@ def main():
         probe(cands)
     elif mode == "b3-nvdot":
         nvdot_complete()
+    elif mode == "b3-invalid-probe":
+        invalid_probe()
     else:
         recover(cands)
     return 0
