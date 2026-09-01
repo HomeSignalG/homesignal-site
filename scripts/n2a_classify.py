@@ -358,7 +358,7 @@ def fidelity_sample(point_regs):
       )
       select registry_id, source_key, source_seq, lat, lng, n, rn
         from r
-       where (rn - 1) %% greatest(1, (n / {SAMPLE_N})::int) = 0
+       where (rn - 1) % greatest(1, (n / {SAMPLE_N})::int) = 0
        order by registry_id, rn;""", "fidelity sample")
     by = {}
     for r in rows:
