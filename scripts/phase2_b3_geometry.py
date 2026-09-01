@@ -404,13 +404,14 @@ create table geo.project_source_geometry (
   constraint psg_origin_vocab check (geom_origin in
       ('source_supplied','stored_source_point','geocoded','unreachable','not_applicable')),
   constraint psg_outcome_vocab check (recovery_outcome in
-      ('recovered','no_feature_returned','source_unreachable','not_attempted')),
+      ('recovered','no_feature_returned','feature_has_no_geometry',
+       'source_unreachable','not_attempted')),
   constraint psg_geometry_semantics check (
       (geom is not null and recovery_outcome = 'recovered'
        and geom_origin in ('source_supplied','stored_source_point','geocoded')
        and geom_kind is not null and canonical_srid = {CANONICAL_SRID})
    or (geom is null and recovery_outcome <> 'recovered'
-       and source_feature_id is null))
+       and geom_kind is null and canonical_srid is null))
 );
 
 comment on table geo.project_source_geometry is
@@ -632,8 +633,12 @@ def recover(cands):
                         pending.append({
                             "geometry_instance_key": f"{r['source_key']}#f:{oid}",
                             "source_key": r["source_key"], "registry_id": reg,
+                            "source_feature_id": oid,
                             "geom_origin": "not_applicable",
-                            "recovery_outcome": "no_feature_returned",
+                            # The publisher HAS this feature and returned it without
+                            # geometry. That is a different fact from "no feature", and
+                            # WYDOT's sample proved it real: 173 features, 171 geometries.
+                            "recovery_outcome": "feature_has_no_geometry",
                             "source_crs": src_crs, "requested_out_sr": str(REQUEST_OUT_SR),
                             "source_url": cfg["url"], "request_basis": basis, "fetched_at": ts,
                         })
