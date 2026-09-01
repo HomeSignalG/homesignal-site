@@ -39,7 +39,7 @@ on:
         description: 'validate | load (B1) · b3-probe | b3-load (B3 source geometry)'
         required: true
         type: choice
-        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe]
+        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify]
         default: validate
       expect_sha256:
         description: 'load only: archive sha256 recorded by the validate run'
@@ -86,6 +86,20 @@ jobs:
           MODE: b3-nvdot
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/phase2_b3_geometry.py
+
+      - name: N2A step 0 - re-derive national ZCTA denominators (read-only)
+        if: ${{ github.event.inputs.mode == 'n2a-zcta' }}
+        env:
+          MODE: n2a-zcta
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n2a_classify.py
+
+      - name: N2A step 1 - classify publisher geometry types (read-only)
+        if: ${{ github.event.inputs.mode == 'n2a-classify' }}
+        env:
+          MODE: n2a-classify
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n2a_classify.py
 
       - name: B3 invalid-geometry probe (read-only, native CRS)
         if: ${{ github.event.inputs.mode == 'b3-invalid-probe' }}
