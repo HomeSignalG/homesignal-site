@@ -508,7 +508,7 @@ def tranche_sql(rows):
                 q(r["recovery_outcome"]), q(r.get("source_crs")),
                 q(r.get("requested_out_sr")), q(r.get("transformation")),
                 (str(CANONICAL_SRID) if r.get("wkt") else "null"),
-                q(r["source_url"]), q(r["request_basis"]),
+                q(r["source_url"]), q(r["request_basis"]), q(r.get("validity_reason")),
                 (q(r["fetched_at"]) + "::timestamptz" if r.get("fetched_at") else "null"),
                 q(RECOVERY_VERSION),
             ]) + ")")
@@ -517,7 +517,7 @@ def tranche_sql(rows):
             "  geometry_instance_key, source_key, registry_id, source_feature_id, geom,\n"
             "  geom_kind, source_geometry_type, geom_origin, recovery_outcome, source_crs,\n"
             "  requested_out_sr, transformation, canonical_srid, source_url, request_basis,\n"
-            "  fetched_at, recovery_version)\nvalues\n" + ",\n".join(values) + "\non conflict (geometry_instance_key) do nothing;\n"
+            "  validity_reason, fetched_at, recovery_version)\nvalues\n" + ",\n".join(values) + "\non conflict (geometry_instance_key) do nothing;\n"
             "do $a$ declare v int; begin\n"
             "  select count(*) into v from geo.project_source_geometry\n"
             "   where geom is not null and not ST_IsValid(geom);\n"
@@ -788,6 +788,9 @@ def nvdot_tranche_sql(rows, source_keys):
                         "set local search_path = public;\n\n" + delete, 1)
 
 
+isolated_failures = []
+
+
 def flush_nvdot(rows, source_keys):
     if not rows:
         return 0
@@ -797,7 +800,22 @@ def flush_nvdot(rows, source_keys):
         sqltext = nvdot_tranche_sql(part, part_keys)
         say("  writing tranche", f"{len(part):,} rows / {len(part_keys)} candidates, "
                                  f"{len(sqltext)/1048576:.2f} MB")
-        res = sql(sqltext, "nvdot tranche")
+        try:
+            res = sql(sqltext, "nvdot tranche")
+        except SystemExit as e:
+            if len(part_keys) == 1:
+                raise
+            # A tranche refused for one candidate's sake must not hold back the others.
+            say("  tranche refused - isolating", f"{str(e)[:140]}")
+            for k in part_keys:
+                mine = [r for r in part if r["source_key"] == k]
+                try:
+                    sql(nvdot_tranche_sql(mine, [k]), "nvdot single")
+                    written += len(mine)
+                except SystemExit as e2:
+                    say(f"  candidate {k} REFUSED", str(e2)[:200])
+                    isolated_failures.append({"source_key": k, "error": str(e2)[:300]})
+            continue
         if isinstance(res, list) and res:
             say("  table now", f"{res[0].get('rows_total'):,} rows")
         written += len(part)
@@ -829,6 +847,74 @@ def flush(rows):
     return written
 
 
+MIGRATION_SQL = """
+begin;
+set local search_path = public;
+
+-- The minimum change: one column to hold the validity reason, and the two CHECKs
+-- widened to admit exactly one new outcome. No redesign, no functions, views,
+-- triggers or policies, and no other column.
+alter table geo.project_source_geometry add column if not exists validity_reason text;
+
+alter table geo.project_source_geometry drop constraint psg_outcome_vocab;
+alter table geo.project_source_geometry add constraint psg_outcome_vocab check (
+  recovery_outcome in ('recovered','no_feature_returned','feature_has_no_geometry',
+                       'feature_geometry_invalid','source_unreachable','not_attempted'));
+
+alter table geo.project_source_geometry drop constraint psg_geometry_semantics;
+alter table geo.project_source_geometry add constraint psg_geometry_semantics check (
+     (geom is not null and recovery_outcome = 'recovered'
+      and geom_origin in ('source_supplied','stored_source_point','geocoded')
+      and geom_kind is not null and canonical_srid = 4269)
+  or (geom is null and recovery_outcome = 'feature_geometry_invalid'
+      and source_feature_id is not null and validity_reason is not null
+      and geom_kind is null and canonical_srid is null)
+  or (geom is null and recovery_outcome in ('no_feature_returned','feature_has_no_geometry',
+                                            'source_unreachable','not_attempted')
+      and geom_kind is null and canonical_srid is null));
+
+comment on column geo.project_source_geometry.validity_reason is
+  'ST_IsValidReason for a publisher feature whose returned geometry failed validity. '
+  'Present only on feature_geometry_invalid rows, where the canonical geom stays NULL '
+  'because storing it, repairing it, or substituting anything for it would all be false.';
+
+commit;
+select conname, pg_get_constraintdef(oid) as def from pg_constraint
+ where conrelid = 'geo.project_source_geometry'::regclass and contype = 'c' order by conname;
+"""
+
+
+def screen_validity(feats):
+    """Ask the database whether each returned geometry is valid - BEFORE any write.
+
+    Screening beats discovering: a tranche that fails on one bad polygon rolls back
+    24 good ones with it, which is what happened on the first attempt. This returns
+    validity in the requested CRS (4326) and after the canonical transform (4269),
+    with ST_IsValidReason for both, so an invalid feature is classified rather than
+    thrown."""
+    out = {}
+    chunk, size = [], 0
+    def run(batch):
+        if not batch:
+            return
+        vals = ",".join("({},{})".format(i, "$w$" + w + "$w$") for i, w in batch)
+        rows = sql(
+            "select v.i, ST_IsValid(g.g4326) as v4326, ST_IsValidReason(g.g4326) as r4326,"
+            " ST_IsValid(ST_Transform(g.g4326,4269)) as v4269,"
+            " ST_IsValidReason(ST_Transform(g.g4326,4269)) as r4269"
+            " from (values " + vals + ") as v(i, wkt),"
+            " lateral (select ST_GeomFromText(v.wkt, 4326) as g4326) g;", "validity screen")
+        for r in rows:
+            out[int(r["i"])] = r
+    for i, w in feats:
+        cost = len(w) + 40
+        if chunk and size + cost > 900_000:
+            run(chunk); chunk, size = [], 0
+        chunk.append((i, w)); size += cost
+    run(chunk)
+    return out
+
+
 def nvdot_complete():
     """Resume ONLY the NVDOT candidates still marked not_attempted.
 
@@ -842,6 +928,16 @@ def nvdot_complete():
 
     full_fingerprint("pre-write")
     controls("pre-write")
+
+    print("\n--- CHECK constraints BEFORE the minimum schema change ---")
+    for r in sql("""select conname, pg_get_constraintdef(oid) as def from pg_constraint
+                     where conrelid='geo.project_source_geometry'::regclass and contype='c'
+                     order by conname;""", "constraints before"):
+        say("  " + r["conname"], r["def"])
+    print("\n--- applying the minimum schema change ---")
+    for r in sql(MIGRATION_SQL, "migration"):
+        say("  " + r["conname"], r["def"])
+    controls("post-migration")
 
     before = sql("""select recovery_outcome, count(*) as rows,
                            count(distinct source_key) as candidates
@@ -879,6 +975,7 @@ def nvdot_complete():
     say("retry policy", policy)
 
     dead_streak, attempted, written = 0, 0, 0
+    invalid_seen = []
     for i in range(0, len(keys), NVDOT_BATCH):
         chunk = keys[i:i + NVDOT_BATCH]
         cases = [case_of(k, reg) for k in chunk]
@@ -910,14 +1007,20 @@ def nvdot_complete():
             continue
 
         dead_streak = 0
-        got = {}
+        got, to_screen = {}, []
         for f in feats:
             a = f.get("attributes") or {}
+            oid = str(a.get(meta["objectIdField"]))
+            wkt, kind = geom_to_wkt(f.get("geometry"))
+            idx = len(to_screen)
+            if wkt:
+                to_screen.append((idx, wkt))
             got.setdefault(str(a.get(real_field)), []).append(
-                (str(a.get(meta["objectIdField"])), *geom_to_wkt(f.get("geometry"))))
+                (oid, wkt, kind, idx if wkt else None))
+        screened = screen_validity(to_screen) if to_screen else {}
         basis = (f"{real_field} IN (<{len(cases)} case numbers>, quoted={use_quote})"
                  f" · no spatial filter · {policy}")
-        n_rec = n_nofeat = n_nogeom = 0
+        n_rec = n_nofeat = n_nogeom = n_invalid = 0
         for k, case in zip(chunk, cases):
             hits = got.get(str(case)) or []
             if not hits:
@@ -929,7 +1032,7 @@ def nvdot_complete():
                     "source_url": cfg["url"], "request_basis": basis, "fetched_at": ts,
                 })
                 continue
-            for oid, wkt, kind in hits:
+            for oid, wkt, kind, idx in hits:
                 if not wkt:
                     n_nogeom += 1
                     rows.append({
@@ -940,6 +1043,29 @@ def nvdot_complete():
                         "source_crs": src_crs, "requested_out_sr": str(REQUEST_OUT_SR),
                         "source_url": cfg["url"], "request_basis": basis, "fetched_at": ts,
                     })
+                    continue
+                v = screened.get(idx) or {}
+                if not v.get("v4269") or not v.get("v4326"):
+                    # The publisher HAS this feature and it HAS geometry; the geometry
+                    # is simply not valid. Storing it, repairing it, or substituting a
+                    # point for it would each be false in a different way.
+                    n_invalid += 1
+                    rows.append({
+                        "geometry_instance_key": f"{k}#f:{oid}", "source_key": k,
+                        "registry_id": reg, "source_feature_id": oid,
+                        "geom_origin": "not_applicable",
+                        "recovery_outcome": "feature_geometry_invalid",
+                        "validity_reason": (f"EPSG:4326 valid={v.get('v4326')} "
+                                            f"reason={v.get('r4326')} · "
+                                            f"EPSG:4269 valid={v.get('v4269')} "
+                                            f"reason={v.get('r4269')}"),
+                        "source_crs": src_crs, "requested_out_sr": str(REQUEST_OUT_SR),
+                        "source_url": cfg["url"], "request_basis": basis, "fetched_at": ts,
+                    })
+                    invalid_seen.append({"source_key": k, "oid": oid, "kind": kind,
+                                         "v4326": v.get("v4326"), "r4326": v.get("r4326"),
+                                         "v4269": v.get("v4269"), "r4269": v.get("r4269"),
+                                         "wkt_len": len(wkt)})
                     continue
                 n_rec += 1
                 rows.append({
@@ -952,9 +1078,54 @@ def nvdot_complete():
                     "request_basis": basis, "fetched_at": ts,
                 })
         say("  batch outcome",
-            f"{len(feats)} features · recovered {n_rec} · no feature {n_nofeat} · no geometry {n_nogeom}")
+            f"{len(feats)} features · recovered {n_rec} · no feature {n_nofeat} · "
+            f"no geometry {n_nogeom} · invalid geometry {n_invalid}")
         written += flush_nvdot(rows, chunk)
         controls(f"nvdot batch {i // NVDOT_BATCH + 1}")
+
+    if invalid_seen:
+        print("\n===== INVALID-GEOMETRY INVESTIGATION (evidence only, nothing repaired)")
+        for inv in invalid_seen:
+            print(f"\n  candidate        {inv['source_key']}")
+            say("  publisher OBJECTID", inv["oid"])
+            say("  publisher geom type", f"{meta['geometryType']} -> {inv['kind']}")
+            say("  publisher CRS", src_crs)
+            say("  valid in EPSG:4326", f"{inv['v4326']} · {inv['r4326']}")
+            say("  valid in EPSG:4269", f"{inv['v4269']} · {inv['r4269']}")
+
+            # item 5 - is it already invalid in the publisher's OWN projection?
+            case = case_of(inv["source_key"], reg)
+            time.sleep(POLITE)
+            try:
+                native = fetch_by_cases(cfg["url"], real_field, meta["objectIdField"],
+                                        [case], quote=use_quote, timeout=NVDOT_TIMEOUT)
+            except SystemExit as e:
+                native = None
+                say("  native-CRS refetch", f"failed: {str(e)[:120]}")
+            if native is not None:
+                nat = None
+                for f in native:
+                    if str((f.get("attributes") or {}).get(meta["objectIdField"])) == inv["oid"]:
+                        nat = f
+                if nat is None:
+                    say("  repeat fetch", "feature NOT returned on repeat")
+                else:
+                    w2, _k2 = geom_to_wkt(nat.get("geometry"))
+                    say("  repeat fetch",
+                        "identical geometry" if w2 and len(w2) == inv["wkt_len"]
+                        else f"differs (len {len(w2) if w2 else 0} vs {inv['wkt_len']})")
+
+            other = sql(f"""select count(*) as n from geo.project_source_geometry
+                             where source_key = {q(inv['source_key'])}
+                               and recovery_outcome = 'recovered';""", "sibling check")
+            say("  other VALID instances", other[0]["n"] if other else "?")
+        print()
+
+    if isolated_failures:
+        print("===== CANDIDATES REFUSED EVEN IN A ONE-CANDIDATE TRANSACTION")
+        for f in isolated_failures:
+            say("  " + f["source_key"], f["error"][:180])
+        print()
 
     say("candidates attempted", f"{attempted:,}")
     say("rows written", f"{written:,}")
