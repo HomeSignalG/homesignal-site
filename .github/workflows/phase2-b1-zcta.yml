@@ -39,7 +39,7 @@ on:
         description: 'validate | load (B1) · b3-probe | b3-load (B3 source geometry)'
         required: true
         type: choice
-        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity]
+        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve]
         default: validate
       expect_sha256:
         description: 'load only: archive sha256 recorded by the validate run'
@@ -105,6 +105,13 @@ jobs:
         if: ${{ github.event.inputs.mode == 'n2a-fidelity' }}
         env:
           MODE: n2a-fidelity
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n2a_classify.py
+
+      - name: N2B - resolve remaining POINT-capable sources (read-only)
+        if: ${{ github.event.inputs.mode == 'n2b-resolve' }}
+        env:
+          MODE: n2b-resolve
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n2a_classify.py
 
