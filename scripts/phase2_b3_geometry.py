@@ -117,6 +117,13 @@ def sql(query, tag=""):
 
 # ---------------------------------------------------------------- arcgis
 
+def qurl(layer_url):
+    """ArcGIS queries go to <layer>/query. Posting query parameters at the bare layer
+    URL returns the layer DESCRIPTION instead — HTTP 200, no error key, no features —
+    which is exactly how five independent hosts all reported zero."""
+    return layer_url.rstrip("/") + "/query"
+
+
 def post(url, params, timeout=180):
     body = urllib.parse.urlencode(params).encode()
     req = urllib.request.Request(
@@ -165,8 +172,13 @@ def resolve_case_binding(url, meta, case_field, sample):
         try:
             feats = fetch_by_cases(url, real_field, meta["objectIdField"],
                                    sample, want_geometry=False, quote=use_quote)
-        except Exception:
+        except SystemExit as e:
+            print(f"    quoted={use_quote} refused: {str(e)[:220]}", flush=True)
             continue
+        except Exception as e:
+            print(f"    quoted={use_quote} raised: {type(e).__name__} {str(e)[:200]}", flush=True)
+            continue
+        print(f"    quoted={use_quote} -> {len(feats)} features", flush=True)
         if feats:
             return real_field, ftype, use_quote
     return real_field, ftype, None
@@ -174,9 +186,10 @@ def resolve_case_binding(url, meta, case_field, sample):
 
 def total_count(url):
     """The positive control. A zero from a filtered query means nothing until the
-    same endpoint proves it answers at all."""
-    j = post(url, {"where": "1=1", "returnCountOnly": "true", "f": "json"})
-    return j.get("count")
+    same endpoint proves it answers at all. Returns (count, raw) so a missing count
+    is visible as the server's own words rather than as a None."""
+    j = post(qurl(url), {"where": "1=1", "returnCountOnly": "true", "f": "json"})
+    return j.get("count"), json.dumps(j)[:300]
 
 
 def esc(v):
@@ -203,7 +216,7 @@ def fetch_by_cases(url, case_field, oid_field, cases, want_geometry=True, quote=
         p = dict(params)
         if offset:
             p["resultOffset"] = str(offset)
-        j = post(url, p)
+        j = post(qurl(url), p)
         if "error" in j:
             raise SystemExit(f"STOP: source error {json.dumps(j['error'])[:400]}")
         feats = j.get("features") or []
@@ -491,17 +504,22 @@ def probe(cands):
         real_field, ftype = field_type(meta, cfg["case_field"])
         say("  case field / declared type", f"{real_field} / {ftype}")
         time.sleep(POLITE)
-        say("  CONTROL unfiltered count", f"{total_count(cfg['url']):,}")
+        n, raw = total_count(cfg["url"])
+        say("  CONTROL unfiltered count", f"{n:,}" if isinstance(n, int) else f"MISSING · {raw}")
 
         # What does the publisher's own value actually look like? A stored case
         # number that has been reformatted anywhere in the pipeline is the other way
         # a correct-looking IN clause matches nothing.
         time.sleep(POLITE)
-        live = post(cfg["url"], {"where": "1=1", "outFields": real_field,
+        live = post(qurl(cfg["url"]), {"where": "1=1", "outFields": real_field,
                                  "returnGeometry": "false", "resultRecordCount": "5",
                                  "f": "json"})
-        say("  publisher sample values",
-            [f.get("attributes", {}).get(real_field) for f in (live.get("features") or [])])
+        if live.get("error"):
+            say("  publisher sample values", "ERROR " + json.dumps(live["error"])[:260])
+        else:
+            say("  publisher sample values",
+                [f.get("attributes", {}).get(real_field)
+                 for f in (live.get("features") or [])] or f"no features · {json.dumps(live)[:200]}")
 
         cases = [case_of(r["source_key"], reg) for r in rows]
         say("  our stored sample values", cases[:5])
