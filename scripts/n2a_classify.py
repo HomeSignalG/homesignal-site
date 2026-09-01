@@ -316,8 +316,10 @@ def main():
         step1_classify()
     elif mode == "n2a-fidelity":
         step3_fidelity()
+    elif mode == "n2b-resolve":
+        n2b_resolve()
     else:
-        raise SystemExit("MODE must be n2a-zcta, n2a-classify or n2a-fidelity")
+        raise SystemExit("MODE must be n2a-zcta, n2a-classify, n2a-fidelity or n2b-resolve")
     return 0
 
 
@@ -504,6 +506,285 @@ def step3_fidelity():
     for k in sorted(agg):
         print(f"{k:44s} {agg[k]} sources")
     print("\nSTEP 3 COMPLETE - nothing written.")
+
+
+
+# ------------------------------------------------------------------ N2B
+#
+# Resolve the 41 POINT-capable sources N2A could not settle, plus the two with no
+# stored coordinate at all. The controlling question per source is TWO questions,
+# kept apart because they have different answers and different consequences:
+#
+#   (1) does the publisher expose authoritative POINT geometry?     -> class
+#   (2) can a FROZEN identity reconnect to that publisher record?   -> recoverable
+#
+# A live endpoint answers (1) and says nothing about (2). A source whose geometry
+# exists but whose frozen identities cannot be found again is not refetchable, and
+# saying so is the point of the identity-reconnection gate.
+#
+# Nothing here writes. A geocoded HomeSignal coordinate is never compared as if it
+# were publisher geometry, and no address is ever geocoded as a substitute.
+
+N2B_SAMPLE = 12
+N2B_TIMEOUT = 45
+TOL_M = 1.5          # the N2A-derived tolerance; proven max 1.179 m, failures from 18.032 m
+
+
+def dotget(obj, path):
+    cur = obj
+    for part in str(path).split("."):
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(part)
+    return cur
+
+
+def n2b_sample(regs, require_coords=True):
+    lst = ",".join("'" + r.replace("'", "''") + "'" for r in regs)
+    coord = "and lat is not null and lng is not null" if require_coords else ""
+    rows = sql(f"""
+      with r as (
+        select registry_id, source_key, source_seq, lat, lng,
+               row_number() over (partition by registry_id order by source_key, source_seq) rn,
+               count(*)     over (partition by registry_id) n
+          from preservation.app_project_identity
+         where snapshot_id='{SNAPSHOT}' and record_kind='development'
+           and registry_id in ({lst}) {coord}
+      )
+      select registry_id, source_key, source_seq, lat, lng, n, rn
+        from r
+       where (rn - 1) % greatest(1, (n / {N2B_SAMPLE})::int) = 0
+       order by registry_id, rn;""", "n2b sample")
+    by = {}
+    for r in rows:
+        by.setdefault(r["registry_id"], [])
+        if len(by[r["registry_id"]]) < N2B_SAMPLE:
+            by[r["registry_id"]].append(r)
+    return by
+
+
+def pub_socrata(ent, cases):
+    dom, ds = ent.get("domain"), ent.get("dataset_id")
+    cm = ent.get("column_map") or {}
+    ident, la, lo = cm.get("case_number"), cm.get("lat"), cm.get("lng")
+    if not (dom and ds and ident):
+        raise RuntimeError("NO_DOMAIN_DATASET_OR_IDENT")
+    where = ident + " in (" + ",".join("'" + str(c).replace("'", "''") + "'" for c in cases) + ")"
+    url = f"https://{dom}/resource/{ds}.json?$limit=200&$where=" + urllib.parse.quote(where)
+    j, why = get_json(url, N2B_TIMEOUT)
+    if j is None:
+        raise RuntimeError(why)
+    out = {}
+    for row in (j if isinstance(j, list) else []):
+        c = str(dotget(row, ident))
+        y = dotget(row, la) if la and not str(la).startswith("__") else None
+        x = dotget(row, lo) if lo and not str(lo).startswith("__") else None
+        if y is None or x is None:
+            loc = row.get("location") or row.get("point") or {}
+            if isinstance(loc, dict):
+                if loc.get("coordinates"):
+                    x, y = loc["coordinates"][0], loc["coordinates"][1]
+                else:
+                    y, x = loc.get("latitude"), loc.get("longitude")
+        if y is None or x is None:
+            continue
+        try:
+            out.setdefault(c, []).append((float(x), float(y)))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def pub_carto(ent, cases):
+    cm = ent.get("column_map") or {}
+    ident, geom, tbl = cm.get("case_number"), ent.get("geom_col"), ent.get("table")
+    if not (ident and geom and tbl and ent.get("sql_url")):
+        raise RuntimeError("NO_CARTO_IDENT_OR_GEOM")
+    lits = ",".join("'" + str(c).replace("'", "''") + "'" for c in cases)
+    q = (f"SELECT {ident} AS ident, ST_Y({geom}) AS la, ST_X({geom}) AS lo "
+         f"FROM {tbl} WHERE {ident} IN ({lits}) LIMIT 200")
+    j, why = get_json(ent["sql_url"] + "?q=" + urllib.parse.quote(q), N2B_TIMEOUT)
+    if j is None:
+        raise RuntimeError(why)
+    if j.get("error"):
+        raise RuntimeError("CARTO_ERROR " + str(j["error"])[:80])
+    out = {}
+    for row in (j.get("rows") or []):
+        if row.get("la") is None or row.get("lo") is None:
+            continue
+        out.setdefault(str(row["ident"]), []).append((float(row["lo"]), float(row["la"])))
+    return out
+
+
+def pub_ckan(ent, cases):
+    cm = ent.get("column_map") or {}
+    ident, la, lo = cm.get("case_number"), cm.get("lat"), cm.get("lng")
+    if not (ident and la and lo and ent.get("base_url") and ent.get("resource_id")):
+        raise RuntimeError("NO_CKAN_IDENT_OR_COORDS")
+    lits = ",".join("'" + str(c).replace("'", "''") + "'" for c in cases)
+    q = (f'SELECT "{ident}", "{la}", "{lo}" FROM "{ent["resource_id"]}" '
+         f'WHERE "{ident}" IN ({lits}) LIMIT 200')
+    j, why = get_json(ent["base_url"].rstrip("/") + "/api/3/action/datastore_search_sql?sql="
+                      + urllib.parse.quote(q), N2B_TIMEOUT)
+    if j is None:
+        raise RuntimeError(why)
+    if not j.get("success"):
+        raise RuntimeError("CKAN_ERROR " + str(j.get("error"))[:80])
+    out = {}
+    for row in ((j.get("result") or {}).get("records") or []):
+        try:
+            out.setdefault(str(row[ident]), []).append((float(row[lo]), float(row[la])))
+        except (TypeError, ValueError, KeyError):
+            continue
+    return out
+
+
+def pub_arcgis_single(ent, cases):
+    """One case per request. The N2A 400s came from long IN lists; a narrow request
+    distinguishes a query-shape limit from a dead layer."""
+    cm = ent.get("column_map") or {}
+    ident = cm.get("case_number")
+    if not (ident and ent.get("service_url")):
+        raise RuntimeError("NO_IDENT_OR_SERVICE_URL")
+    meta, why = get_json(ent["service_url"].rstrip("/") + "?f=json", N2B_TIMEOUT)
+    oid = (meta or {}).get("objectIdField") or "OBJECTID"
+    out, errs = {}, []
+    for c in cases:
+        time.sleep(0.25)
+        try:
+            j = post(qurl_n2a(ent["service_url"]), {
+                "where": f"{ident}='" + str(c).replace("'", "''") + "'",
+                "outFields": f"{oid},{ident}", "returnGeometry": "true",
+                "outSR": "4326", "f": "json"}, timeout=N2B_TIMEOUT)
+            if "error" in j:
+                errs.append(json.dumps(j["error"])[:70])
+                continue
+            for f in (j.get("features") or []):
+                g = f.get("geometry") or {}
+                if g.get("x") is not None:
+                    out.setdefault(str(c), []).append((float(g["x"]), float(g["y"])))
+        except Exception as e:
+            errs.append(f"{type(e).__name__} {str(e)[:50]}")
+    if not out and errs:
+        raise RuntimeError("ALL_SINGLE_REQUESTS_FAILED " + errs[0])
+    return out
+
+
+FETCHERS = {"socrata": pub_socrata, "carto": pub_carto, "ckan": pub_ckan, "arcgis": pub_arcgis_single}
+
+
+def n2b_resolve():
+    say("mode", "n2b-resolve (read-only)")
+    inv = json.load(open("data/n2b_inventory.json"))
+    idx = registry_index()
+    say("inventory sources", len(inv))
+    say("inventory projects", f"{sum(r['proj'] for r in inv):,}")
+    say("tolerance", f"{TOL_M} m (N2A-derived; proven max 1.179 m, failures from 18.032 m)")
+
+    zero = [{"rid": "little-rock-permits", "grp": "arcgis", "proj": 49005, "pairs": 49005,
+             "n2a_reason": "NO_STORED_COORDINATES", "bucket": "ZERO_COORD"},
+            {"rid": "bozeman-building-permits", "grp": "arcgis", "proj": 548, "pairs": 590,
+             "n2a_reason": "NO_STORED_COORDINATES", "bucket": "ZERO_COORD"}]
+
+    s1 = n2b_sample([r["rid"] for r in inv], require_coords=True)
+    s2 = n2b_sample([r["rid"] for r in zero], require_coords=False)
+    say("sources with coord samples", len(s1))
+    say("zero-coord sources sampled", len(s2))
+
+    results = []
+    for i, r in enumerate(inv + zero, 1):
+        rid, grp = r["rid"], r["grp"]
+        ent = idx.get(rid) or {}
+        rows = s1.get(rid) or s2.get(rid) or []
+        rec = {"registry_id": rid, "connector": grp, "projects": r["proj"], "pairs": r["pairs"],
+               "n2a_reason": r["n2a_reason"], "requested": 0, "identity_matched": 0,
+               "compared": 0, "exact": 0, "within_tol": 0, "outside_tol": 0,
+               "max_m": 0.0, "median_m": None, "missing": 0, "ambiguous": 0,
+               "error": None, "verdict": None,
+               "identity_field": (ent.get("column_map") or {}).get("case_number")}
+        if not rows:
+            rec["error"] = "NO_FROZEN_SAMPLE"
+            rec["verdict"] = "POINT_FIDELITY_UNRESOLVED"
+            results.append(rec)
+            print(f"[{i:2d}/{len(inv)+len(zero)}] {rid:48s} {rec['verdict']} (no sample)", flush=True)
+            continue
+        cases = [c for c in (case_of(x["source_key"]) for x in rows) if c]
+        rec["requested"] = len(cases)
+        fetch = FETCHERS.get(grp)
+        if fetch is None:
+            rec["error"] = f"NO_FETCHER_FOR_{grp}"
+            rec["verdict"] = "POINT_FIDELITY_UNRESOLVED"
+            results.append(rec)
+            print(f"[{i:2d}/{len(inv)+len(zero)}] {rid:48s} {rec['verdict']} ({rec['error']})", flush=True)
+            continue
+        time.sleep(POLITE)
+        try:
+            pub = fetch(ent, cases)
+        except Exception as e:
+            rec["error"] = f"{type(e).__name__} {str(e)[:100]}"
+            rec["verdict"] = "POINT_FIDELITY_UNRESOLVED"
+            results.append(rec)
+            print(f"[{i:2d}/{len(inv)+len(zero)}] {rid:48s} {rec['verdict']} ({rec['error']})", flush=True)
+            continue
+
+        deltas = []
+        for x in rows:
+            c = case_of(x["source_key"])
+            pts = pub.get(str(c)) or []
+            if not pts:
+                rec["missing"] += 1
+                continue
+            rec["identity_matched"] += 1
+            if len(pts) > 1:
+                rec["ambiguous"] += 1
+                continue
+            if x["lat"] is None or x["lng"] is None:
+                continue          # zero-coord source: identity reconnects, nothing to compare
+            px, py = pts[0]
+            d = haversine_m(float(x["lat"]), float(x["lng"]), py, px)
+            deltas.append(d)
+            rec["compared"] += 1
+            rec["max_m"] = max(rec["max_m"], d)
+            if d < 0.01:
+                rec["exact"] += 1
+            elif d <= TOL_M:
+                rec["within_tol"] += 1
+            else:
+                rec["outside_tol"] += 1
+        if deltas:
+            sd = sorted(deltas)
+            rec["median_m"] = round(sd[len(sd) // 2], 3)
+
+        if r.get("bucket") == "ZERO_COORD":
+            rec["verdict"] = ("POINT_REFETCH_REQUIRED" if rec["identity_matched"] > 0
+                              else "POINT_FIDELITY_UNRESOLVED")
+        elif rec["compared"] == 0:
+            rec["verdict"] = "POINT_FIDELITY_UNRESOLVED"
+        elif rec["outside_tol"] == 0:
+            rec["verdict"] = "POINT_NO_REFETCH_PROVEN"
+        else:
+            rec["verdict"] = "POINT_REFETCH_REQUIRED"
+        results.append(rec)
+        print(f"[{i:2d}/{len(inv)+len(zero)}] {rid:48s} req {rec['requested']:3d} "
+              f"idmatch {rec['identity_matched']:3d} cmp {rec['compared']:3d} "
+              f"exact {rec['exact']:3d} tol {rec['within_tol']:3d} out {rec['outside_tol']:3d} "
+              f"miss {rec['missing']:3d} amb {rec['ambiguous']:3d} "
+              f"max {rec['max_m']:.3f}m -> {rec['verdict']}", flush=True)
+
+    print("\n===== N2B RESULT (json) =====")
+    print(json.dumps(results, separators=(",", ":")))
+    agg = {}
+    for r in results:
+        a = agg.setdefault(r["verdict"], {"sources": 0, "projects": 0, "pairs": 0})
+        a["sources"] += 1
+        a["projects"] += r["projects"]
+        a["pairs"] += r["pairs"]
+    print("\n===== N2B VERDICT TOTALS =====")
+    for k in sorted(agg):
+        v = agg[k]
+        print(f"{k:34s} sources {v['sources']:3d}  projects {v['projects']:8,}  pairs {v['pairs']:9,}")
+    print("\nN2B COMPLETE - nothing written.")
+
 
 if __name__ == "__main__":
     sys.exit(main())
