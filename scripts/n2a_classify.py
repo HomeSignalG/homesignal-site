@@ -130,6 +130,7 @@ def registry_index():
                 "domain": e.get("domain"), "dataset_id": e.get("dataset_id"),
                 "base_url": e.get("base_url"), "resource_id": e.get("resource_id"),
                 "sql_url": e.get("sql_url"), "url": e.get("url"),
+                "table": e.get("table"), "geom_col": e.get("geom_col"),
                 "column_map": e.get("column_map") or {},
             }
     return out
@@ -370,9 +371,25 @@ def fidelity_sample(point_regs):
     return by
 
 
+# source_key layout is NOT uniform across connectors. Measured over the whole frozen
+# corpus, the component count is exactly determined by the prefix:
+#   arcgis:<registry_id>:<case>                        3 parts   2,629,630 rows
+#   socrata|ckan|csv|carto:<host>:<dataset>:<case>     4 parts     346,640 rows
+#   tdlr_tabs:<case>                                   2 parts           5 rows
+# Taking parts[2] unconditionally returns the DATASET ID for every 4-part key, which
+# is why an earlier run reported 295 "missing" identities: it was asking publishers
+# for their own dataset id as if it were a permit number. The index is derived from
+# the prefix rather than guessed, and an unknown prefix returns None instead of a
+# plausible wrong value.
+_CASE_INDEX = {"arcgis": 2, "socrata": 3, "ckan": 3, "csv": 3, "carto": 3, "tdlr_tabs": 1}
+
+
 def case_of(source_key):
     parts = source_key.split(":")
-    return parts[2] if len(parts) >= 3 else None
+    i = _CASE_INDEX.get(parts[0])
+    if i is None or len(parts) <= i:
+        return None
+    return ":".join(parts[i:])
 
 
 def fetch_points(layer_url, case_field, oid_field, cases):
@@ -670,7 +687,34 @@ def pub_arcgis_single(ent, cases):
     return out
 
 
-FETCHERS = {"socrata": pub_socrata, "carto": pub_carto, "ckan": pub_ckan, "arcgis": pub_arcgis_single}
+_CSV_CACHE = {}
+
+
+def pub_csv(ent, cases):
+    cm = ent.get("column_map") or {}
+    ident, la, lo = cm.get("case_number"), cm.get("lat"), cm.get("lng")
+    if not (ident and la and lo and ent.get("url")):
+        raise RuntimeError("NO_CSV_IDENT_OR_COORDS")
+    url = ent["url"]
+    if url not in _CSV_CACHE:
+        import csv as _csv
+        raw = get(url, timeout=300).decode("utf-8", "replace")
+        idx = {}
+        for row in _csv.DictReader(raw.splitlines()):
+            k = str(row.get(ident, "")).strip()
+            try:
+                y, x = float(row.get(la)), float(row.get(lo))
+            except (TypeError, ValueError):
+                continue
+            if k:
+                idx.setdefault(k, []).append((x, y))
+        _CSV_CACHE[url] = idx
+    idx = _CSV_CACHE[url]
+    return {str(c): idx[str(c)] for c in cases if str(c) in idx}
+
+
+FETCHERS = {"socrata": pub_socrata, "carto": pub_carto, "ckan": pub_ckan,
+            "arcgis": pub_arcgis_single, "csv": pub_csv}
 
 
 def n2b_resolve():
