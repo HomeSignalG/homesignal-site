@@ -1,0 +1,621 @@
+#!/usr/bin/env python3
+"""Phase 2 / B3 — source-geometry recovery for the frozen Box Elder candidate universe.
+
+Recovers the publisher's OWN geometry for the 9,571 frozen candidates in
+geo.project_geometry_candidate and preserves it in geo.project_source_geometry.
+
+B3 does not determine project-to-ZIP membership, does not touch legacy associations,
+and does not read or write any production object.
+
+Three rules this file exists to enforce:
+
+  * RECOVERY IS BY IDENTITY, NEVER BY GEOGRAPHY. Every query asks the publisher for
+    specific case numbers. No spatial filter is sent, ever. Asking a source only for
+    features that already intersect Box Elder would reintroduce exactly the
+    false-negative problem the candidate universe was built to expose.
+
+  * ONE ROW PER AUTHORITATIVE SOURCE FEATURE. Measured on the frozen baseline: 554 of
+    the 9,571 identities carry more than one source feature, up to 15 on one identity.
+    A one-row-per-candidate table would silently destroy that. The publisher's own
+    OBJECTID is the feature identity; a candidate with no feature still gets exactly
+    one outcome row carrying NULL geometry and a stated reason, so "not recovered" and
+    "nothing there" are never the same thing.
+
+  * NOTHING IS FABRICATED. A line is stored as a line and a polygon as a polygon; no
+    representative point is ever substituted, no geometry is invented for an
+    unreachable source, and a NULL geometry is only ever written beside an outcome
+    that makes NULL correct.
+
+Modes:
+  b3-probe  read-only. Reads the candidate list, reads each layer's own metadata
+            (geometry type, spatial reference, objectIdField, maxRecordCount), asks
+            the publisher how many features each case number really has, and sizes
+            the payload. Writes nothing and holds no database credential it needs.
+  b3-load   creates the table in one bounded transaction, then recovers and writes
+            tranche by tranche, each tranche its own bounded transaction, with the
+            preservation and disk controls re-read between tranches. Network calls
+            never happen inside a database transaction.
+
+stdlib only.
+"""
+
+import json
+import os
+import struct  # noqa: F401  (kept for parity with the B1 loader's shapefile path)
+import sys
+import time
+import urllib.parse
+import urllib.request
+
+UA = "HomeSignal-phase2-b3/1.0 (+https://homesignal.net)"
+PROJECT_REF = "qwnnmljucajnexpxdgxr"
+CANONICAL_SRID = 4269
+REQUEST_OUT_SR = 4326
+RECOVERY_VERSION = "b3/2026-09-01/boxelder/identity-recovery/outSR4326-to-4269"
+
+# The five reachable layers, each keyed by the field the identity's case number came
+# from. `extra_where` from the registry is deliberately NOT applied: recovery is by
+# identity, and a candidate whose status changed since ingestion must still be
+# recoverable or the frozen universe silently shrinks.
+LAYERS = {
+    "udot-active-projects-lines": {
+        "url": "https://services.arcgis.com/pA2nEVnB6tquxgOW/arcgis/rest/services/All_Projects/FeatureServer/1",
+        "case_field": "pin",
+    },
+    "udot-active-projects": {
+        "url": "https://services.arcgis.com/pA2nEVnB6tquxgOW/arcgis/rest/services/All_Projects/FeatureServer/0",
+        "case_field": "pin",
+    },
+    "itd-itip-projects-lines": {
+        "url": "https://services1.arcgis.com/Qqv4dYPC8Vv8e3c3/arcgis/rest/services/ITIP_2025/FeatureServer/0",
+        "case_field": "KeyNo",
+    },
+    "wydot-stip-projects-lines": {
+        "url": "https://services2.arcgis.com/WI04Bd6haCzitbuQ/arcgis/rest/services/ITSM_STIP_Data_Layers/FeatureServer/1",
+        "case_field": "project_id",
+    },
+    "nvdot-project-boundaries": {
+        "url": "https://gis.dot.nv.gov/arcgis/rest/services/Project_Boundaries/FeatureServer/0",
+        "case_field": "LPN",
+    },
+}
+
+# Unreachable at the candidate-universe proof, and included wholesale for that reason.
+UNREACHABLE = {
+    "boone-county-ky-planning-board-actions": "HTTP 400 on three query shapes; denominator 1,778 proves the host alive",
+    "fairfax-active-site-construction": "HTTP 499 Token Required on spatial and unfiltered queries alike",
+    "fairfax-recent-building-permits": "HTTP 499 Token Required on spatial and unfiltered queries alike",
+}
+
+BATCH = 60          # case numbers per request; keeps the form body well inside limits
+POLITE = 1.0        # seconds between requests to one host
+
+
+def say(k, v):
+    print(f"{k:<38} {v}", flush=True)
+
+
+# ---------------------------------------------------------------- database
+
+def sql(query, tag=""):
+    token = os.environ["SUPABASE_ACCESS_TOKEN"]
+    req = urllib.request.Request(
+        f"https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query",
+        data=json.dumps({"query": query}).encode(),
+        headers={"Authorization": f"Bearer {token}",
+                 "Content-Type": "application/json",
+                 "Accept": "application/json",
+                 "User-Agent": UA},
+        method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=600) as r:
+            return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()[:4000]
+        raise SystemExit(f"STOP: SQL {tag} failed HTTP {e.code}\n{body}")
+
+
+# ---------------------------------------------------------------- arcgis
+
+def post(url, params, timeout=180):
+    body = urllib.parse.urlencode(params).encode()
+    req = urllib.request.Request(
+        url, data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded",
+                 "User-Agent": UA, "Accept": "application/json"},
+        method="POST")
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode())
+
+
+def layer_meta(url):
+    m = post(url, {"f": "json"})
+    sr = (m.get("extent") or {}).get("spatialReference") or m.get("spatialReference") or {}
+    return {
+        "geometryType": m.get("geometryType"),
+        "objectIdField": m.get("objectIdField") or "OBJECTID",
+        "maxRecordCount": m.get("maxRecordCount"),
+        "wkid": sr.get("wkid"),
+        "latestWkid": sr.get("latestWkid"),
+        "name": m.get("name"),
+    }
+
+
+def esc(v):
+    return str(v).replace("'", "''")
+
+
+def fetch_by_cases(url, case_field, oid_field, cases, want_geometry=True):
+    """Ask the publisher for these exact case numbers. No spatial filter, ever."""
+    where = "{} IN ({})".format(case_field, ",".join("'" + esc(c) + "'" for c in cases))
+    params = {
+        "where": where,
+        "outFields": f"{oid_field},{case_field}",
+        "returnGeometry": "true" if want_geometry else "false",
+        "f": "json",
+    }
+    if want_geometry:
+        params["outSR"] = str(REQUEST_OUT_SR)
+    out, offset = [], 0
+    while True:
+        p = dict(params)
+        if offset:
+            p["resultOffset"] = str(offset)
+        j = post(url, p)
+        if "error" in j:
+            raise SystemExit(f"STOP: source error {json.dumps(j['error'])[:400]}")
+        feats = j.get("features") or []
+        out.extend(feats)
+        if not j.get("exceededTransferLimit") or not feats:
+            break
+        offset += len(feats)
+        time.sleep(POLITE)
+    return out
+
+
+# ---------------------------------------------------------------- geometry
+
+def _signed_area(pts):
+    a = 0.0
+    for i in range(len(pts) - 1):
+        a += pts[i][0] * pts[i + 1][1] - pts[i + 1][0] * pts[i][1]
+    return a / 2.0
+
+
+def _ring_wkt(r):
+    return "(" + ",".join(f"{repr(float(x))} {repr(float(y))}" for x, y in r) + ")"
+
+
+def geom_to_wkt(g):
+    """Esri JSON -> WKT, preserving dimension. Never reduces to a point.
+
+    Polyline and polygon are emitted as MULTI* unconditionally: an Esri polyline is a
+    set of paths and an Esri polygon a set of rings, so collapsing a single-part
+    feature to LINESTRING/POLYGON would make the stored type depend on the data rather
+    than the source's own model. The Esri type is recorded separately.
+    """
+    if not g:
+        return None, None
+    if "x" in g and "y" in g:
+        if g["x"] is None or g["y"] is None:
+            return None, None
+        return f"POINT({repr(float(g['x']))} {repr(float(g['y']))})", "POINT"
+    if "points" in g:
+        pts = [p for p in g["points"] if p and p[0] is not None]
+        if not pts:
+            return None, None
+        return ("MULTIPOINT(" + ",".join(f"({repr(float(p[0]))} {repr(float(p[1]))})"
+                                         for p in pts) + ")", "MULTIPOINT")
+    if "paths" in g:
+        paths = [p for p in g["paths"] if p and len(p) >= 2]
+        if not paths:
+            return None, None
+        return ("MULTILINESTRING(" + ",".join(
+            "(" + ",".join(f"{repr(float(x))} {repr(float(y))}" for x, y in p) + ")"
+            for p in paths) + ")", "MULTILINESTRING")
+    if "rings" in g:
+        polys = []
+        for ring in g["rings"]:
+            if not ring or len(ring) < 4:
+                continue
+            r = list(ring)
+            if r[0] != r[-1]:
+                r.append(r[0])
+            if _signed_area(r) < 0:          # clockwise -> outer ring
+                polys.append([r])
+            elif polys:                       # counter-clockwise -> hole
+                polys[-1].append(r)
+            else:
+                polys.append([r])             # leading hole: keep it, never discard
+        if not polys:
+            return None, None
+        return ("MULTIPOLYGON(" + ",".join(
+            "(" + ",".join(_ring_wkt(r) for r in p) + ")" for p in polys) + ")",
+            "MULTIPOLYGON")
+    return None, None
+
+
+# ---------------------------------------------------------------- controls
+
+CONTROLS_SQL = """
+select
+  (select count(*) from geo.project_geometry_candidate)                          as candidates,
+  (select md5(string_agg(source_key, ',' order by source_key collate "C"))
+     from geo.project_geometry_candidate)                                        as candidate_fp,
+  (select count(*) from geo.project_geometry_candidate where is_c1_legacy)       as c1,
+  (select count(*) from geo.zcta_boundary)                                       as b1_rows,
+  (select md5(string_agg(zcta5, ',' order by zcta5 collate "C"))
+     from geo.zcta_boundary)                                                     as b1_fp,
+  (select count(*) from preservation.app_project_identity)                       as n_identity,
+  (select sum(('x'||substr(encode(identity_hash,'hex'),1,8))::bit(32)::bigint)
+     from preservation.app_project_identity)                                     as fp_corpus_all,
+  (select md5(string_agg(sig, ',' order by sig collate "C")) from (
+      select c.relname||':'||t.tgname||':'||t.tgenabled::text as sig
+        from pg_trigger t join pg_class c on c.oid=t.tgrelid
+        join pg_namespace n on n.oid=c.relnamespace
+       where n.nspname='preservation' and not t.tgisinternal
+         and t.tgname like 'zz_guard_%') q)                                      as guard_md5,
+  (select md5(pg_get_functiondef(p.oid)) from pg_proc p
+     join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='public' and p.proname='app_projects_for_zip')               as fn_projects_for_zip,
+  (select md5(pg_get_functiondef(p.oid)) from pg_proc p
+     join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='public' and p.proname='app_refresh_zip')                    as fn_refresh_zip,
+  (select md5(string_agg(jobid::text||'|'||jobname||'|'||schedule||'|'||command||'|'||active::text,
+                         ';' order by jobid)) from cron.job)                     as cron_md5,
+  pg_database_size(current_database())                                           as db_bytes,
+  (select sum(size) from pg_ls_waldir())                                         as wal_bytes,
+  pg_current_wal_lsn()::text                                                     as lsn;
+"""
+
+EXPECT = {
+    "candidates": 9571, "c1": 67, "b1_rows": 56,
+    "b1_fp": "0a8b5fcea3827aac5ed32fbfa2713a46",
+    "n_identity": 3172292, "fp_corpus_all": "6809816297333320",
+    "guard_md5": "d55a010018cf5c345f4c8051b8a67279",
+    "fn_projects_for_zip": "ec1b01ae4485ad2c59b9f946c9d565b6",
+    "fn_refresh_zip": "dfd09ac72c5b6b65e61ad597665570a0",
+    "cron_md5": "75b49e8c7e274ea10a3c17e979f86e6f",
+}
+
+# 12 GB provisioned. Everything the database itself does not account for was measured
+# at the B1 commit and is held constant here; it is disclosed rather than hidden
+# inside a threshold, because free disk is not readable from SQL on this platform.
+DISK_TOTAL_MB = 12288
+DISK_OTHER_MB = 681
+DISK_STOP_MB = 2048
+
+
+def controls(tag):
+    row = sql(CONTROLS_SQL, tag)[0]
+    bad = [f"{k}: expected {v}, got {row.get(k)}"
+           for k, v in EXPECT.items() if str(row.get(k)) != str(v)]
+    db_mb = int(row["db_bytes"]) / 1048576.0
+    wal_mb = int(row["wal_bytes"]) / 1048576.0
+    free_mb = DISK_TOTAL_MB - (db_mb + wal_mb + DISK_OTHER_MB)
+    say(f"[{tag}] db / wal / free (MB)", f"{db_mb:,.0f} / {wal_mb:,.0f} / {free_mb:,.0f}")
+    if bad:
+        raise SystemExit("STOP: control failure\n  " + "\n  ".join(bad))
+    if free_mb < DISK_STOP_MB:
+        raise SystemExit(f"STOP: free disk {free_mb:,.0f} MB below the {DISK_STOP_MB} MB hard stop")
+    row["_free_mb"] = free_mb
+    row["_db_mb"] = db_mb
+    row["_wal_mb"] = wal_mb
+    return row
+
+
+def load_candidates():
+    rows = sql("""select source_key, registry_id,
+                         is_c1_legacy, is_c2_point_in_zcta,
+                         is_c3_nonpoint_source, is_residual_unreachable
+                    from geo.project_geometry_candidate
+                   order by registry_id, source_key collate "C";""", "candidates")
+    say("frozen candidates read", f"{len(rows):,}")
+    return rows
+
+
+def case_of(source_key, registry_id):
+    """source_key is 'arcgis:<registry_id>:<case number>'. The case number may itself
+    contain ':' (none observed, but the split is anchored on the registry prefix so it
+    cannot matter)."""
+    prefix = f"arcgis:{registry_id}:"
+    if not source_key.startswith(prefix):
+        raise SystemExit(f"STOP: source_key {source_key!r} does not carry its registry prefix")
+    return source_key[len(prefix):]
+
+
+# ---------------------------------------------------------------- table
+
+DDL = f"""
+create table geo.project_source_geometry (
+  geometry_instance_key text        primary key,
+  source_key            text        not null
+      references geo.project_geometry_candidate (source_key),
+  registry_id           text        not null,
+  source_feature_id     text,
+  geom                  geometry(Geometry, {CANONICAL_SRID}),
+  geom_kind             text,
+  source_geometry_type  text,
+  geom_origin           text        not null,
+  recovery_outcome      text        not null,
+  source_crs            text,
+  requested_out_sr      text,
+  transformation        text,
+  canonical_srid        int,
+  source_url            text        not null,
+  request_basis         text        not null,
+  fetched_at            timestamptz,
+  recovery_version      text        not null,
+  constraint psg_origin_vocab check (geom_origin in
+      ('source_supplied','stored_source_point','geocoded','unreachable','not_applicable')),
+  constraint psg_outcome_vocab check (recovery_outcome in
+      ('recovered','no_feature_returned','source_unreachable','not_attempted')),
+  constraint psg_geometry_semantics check (
+      (geom is not null and recovery_outcome = 'recovered'
+       and geom_origin in ('source_supplied','stored_source_point','geocoded')
+       and geom_kind is not null and canonical_srid = {CANONICAL_SRID})
+   or (geom is null and recovery_outcome <> 'recovered'
+       and source_feature_id is null))
+);
+
+comment on table geo.project_source_geometry is
+  'Phase 2 / B3. The publisher''s own source geometry for the frozen Box Elder candidate '
+  'universe, at ONE ROW PER AUTHORITATIVE SOURCE FEATURE - 554 of the 9,571 candidates carry '
+  'more than one, up to 15. A candidate with no recoverable feature carries exactly one row '
+  'with NULL geometry and a stated outcome, so "not recovered" and "nothing there" are never '
+  'the same value. No geometry is ever fabricated, and no line or polygon is ever reduced to '
+  'a representative point.';
+
+create index project_source_geometry_gix on geo.project_source_geometry using gist (geom);
+create index project_source_geometry_source_key_idx on geo.project_source_geometry (source_key);
+create index project_source_geometry_outcome_idx on geo.project_source_geometry (recovery_outcome);
+"""
+
+
+def q(v):
+    if v is None:
+        return "null"
+    return "'" + str(v).replace("'", "''") + "'"
+
+
+def tranche_sql(rows):
+    """One bounded transaction carrying one validated tranche. Network work is already
+    finished before this is built - no fetch ever happens inside a transaction."""
+    values = []
+    for r in rows:
+        geom = ("ST_Transform(ST_GeomFromText($g$" + r["wkt"] + "$g$, "
+                + str(REQUEST_OUT_SR) + "), " + str(CANONICAL_SRID) + ")") \
+               if r.get("wkt") else "null"
+        values.append(
+            "(" + ",".join([
+                q(r["geometry_instance_key"]), q(r["source_key"]), q(r["registry_id"]),
+                q(r.get("source_feature_id")), geom, q(r.get("geom_kind")),
+                q(r.get("source_geometry_type")), q(r["geom_origin"]),
+                q(r["recovery_outcome"]), q(r.get("source_crs")),
+                q(r.get("requested_out_sr")), q(r.get("transformation")),
+                (str(CANONICAL_SRID) if r.get("wkt") else "null"),
+                q(r["source_url"]), q(r["request_basis"]),
+                (q(r["fetched_at"]) + "::timestamptz" if r.get("fetched_at") else "null"),
+                q(RECOVERY_VERSION),
+            ]) + ")")
+    return ("begin;\nset local search_path = public;\n"
+            "insert into geo.project_source_geometry (\n"
+            "  geometry_instance_key, source_key, registry_id, source_feature_id, geom,\n"
+            "  geom_kind, source_geometry_type, geom_origin, recovery_outcome, source_crs,\n"
+            "  requested_out_sr, transformation, canonical_srid, source_url, request_basis,\n"
+            "  fetched_at, recovery_version)\nvalues\n" + ",\n".join(values) + ";\n"
+            "do $a$ declare v int; begin\n"
+            "  select count(*) into v from geo.project_source_geometry\n"
+            "   where geom is not null and not ST_IsValid(geom);\n"
+            "  if v <> 0 then raise exception 'B3 tranche: % invalid geometries', v; end if;\n"
+            "  select count(*) into v from geo.project_source_geometry\n"
+            "   where geom is not null and ST_SRID(geom) <> " + str(CANONICAL_SRID) + ";\n"
+            "  if v <> 0 then raise exception 'B3 tranche: % rows with wrong SRID', v; end if;\n"
+            "  select count(*) into v from geo.project_source_geometry g\n"
+            "   where not exists (select 1 from geo.project_geometry_candidate c\n"
+            "                      where c.source_key = g.source_key);\n"
+            "  if v <> 0 then raise exception 'B3 tranche: % rows outside the frozen universe', v; end if;\n"
+            "end $a$;\ncommit;\n"
+            "select count(*) as rows_total,\n"
+            "       count(*) filter (where geom is not null) as with_geometry,\n"
+            "       pg_size_pretty(pg_total_relation_size('geo.project_source_geometry')) as size,\n"
+            "       pg_database_size(current_database()) as db_bytes,\n"
+            "       (select sum(size) from pg_ls_waldir()) as wal_bytes\n"
+            "  from geo.project_source_geometry;")
+
+
+# ---------------------------------------------------------------- modes
+
+def probe(cands):
+    """Read-only. Establishes source-side cardinality, CRS and payload size."""
+    by_reg = {}
+    for c in cands:
+        by_reg.setdefault(c["registry_id"], []).append(c)
+    say("registries in the frozen universe", len(by_reg))
+    print()
+
+    for reg, cfg in LAYERS.items():
+        rows = by_reg.get(reg, [])
+        if not rows:
+            continue
+        print(f"===== {reg}  ({len(rows):,} candidates)")
+        meta = layer_meta(cfg["url"])
+        say("  layer name", meta["name"])
+        say("  geometryType", meta["geometryType"])
+        say("  objectIdField", meta["objectIdField"])
+        say("  maxRecordCount", meta["maxRecordCount"])
+        say("  spatialReference wkid", f"{meta['wkid']} (latestWkid {meta['latestWkid']})")
+
+        cases = [case_of(r["source_key"], reg) for r in rows]
+        sample = cases[:BATCH]
+        time.sleep(POLITE)
+        feats = fetch_by_cases(cfg["url"], cfg["case_field"], meta["objectIdField"], sample)
+        per_case = {}
+        for f in feats:
+            k = str(f["attributes"].get(cfg["case_field"]))
+            per_case.setdefault(k, 0)
+            per_case[k] += 1
+        wkt_bytes = 0
+        kinds = {}
+        for f in feats:
+            w, kind = geom_to_wkt(f.get("geometry"))
+            if w:
+                wkt_bytes += len(w)
+                kinds[kind] = kinds.get(kind, 0) + 1
+        say("  sample case numbers asked", len(sample))
+        say("  cases the publisher answered", len(per_case))
+        say("  cases with NO feature", len([c for c in sample if str(c) not in per_case]))
+        say("  features returned", len(feats))
+        say("  max features on one case", max(per_case.values()) if per_case else 0)
+        say("  multi-feature cases in sample", len([v for v in per_case.values() if v > 1]))
+        say("  geometry kinds", kinds)
+        if feats:
+            say("  mean WKT bytes/feature", f"{wkt_bytes/max(1,len(feats)):,.0f}")
+            say("  projected WKT for this source",
+                f"{wkt_bytes/max(1,len(feats)) * len(feats)/max(1,len(sample)) * len(rows)/1048576:,.2f} MB")
+        print()
+        time.sleep(POLITE)
+
+    for reg, why in UNREACHABLE.items():
+        rows = by_reg.get(reg, [])
+        print(f"===== {reg}  ({len(rows):,} candidates)  UNREACHABLE")
+        say("  reason on record", why)
+        print()
+
+    print("PROBE COMPLETE - nothing was written to any database.")
+
+
+def recover(cands):
+    by_reg = {}
+    for c in cands:
+        by_reg.setdefault(c["registry_id"], []).append(c)
+
+    controls("pre-create")
+    say("creating", "geo.project_source_geometry")
+    sql("begin;\nset local search_path = public;\n" + DDL + "\ncommit;\nselect 1 as created;",
+        "create table")
+
+    total_written = 0
+    for reg, cfg in LAYERS.items():
+        rows = by_reg.get(reg, [])
+        if not rows:
+            continue
+        print(f"\n===== recovering {reg}  ({len(rows):,} candidates)")
+        meta = layer_meta(cfg["url"])
+        src_crs = f"wkid {meta['wkid']} / latestWkid {meta['latestWkid']}"
+        transformation = (f"publisher server outSR={REQUEST_OUT_SR}; "
+                          f"ST_Transform({REQUEST_OUT_SR} -> {CANONICAL_SRID}) in database")
+        say("  geometryType / SR", f"{meta['geometryType']} / {src_crs}")
+
+        pending, seen_cases = [], set()
+        for i in range(0, len(rows), BATCH):
+            chunk = rows[i:i + BATCH]
+            cases = [case_of(r["source_key"], reg) for r in chunk]
+            time.sleep(POLITE)
+            feats = fetch_by_cases(cfg["url"], cfg["case_field"], meta["objectIdField"], cases)
+            ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            basis = f"{cfg['case_field']} IN (<{len(cases)} case numbers>) · no spatial filter"
+            got = {}
+            for f in feats:
+                a = f.get("attributes") or {}
+                case = str(a.get(cfg["case_field"]))
+                oid = str(a.get(meta["objectIdField"]))
+                wkt, kind = geom_to_wkt(f.get("geometry"))
+                got.setdefault(case, []).append((oid, wkt, kind))
+            for r, case in zip(chunk, cases):
+                feats_for = got.get(str(case)) or []
+                if not feats_for:
+                    pending.append({
+                        "geometry_instance_key": r["source_key"] + "#none",
+                        "source_key": r["source_key"], "registry_id": reg,
+                        "geom_origin": "not_applicable",
+                        "recovery_outcome": "no_feature_returned",
+                        "source_crs": src_crs, "requested_out_sr": str(REQUEST_OUT_SR),
+                        "source_url": cfg["url"], "request_basis": basis, "fetched_at": ts,
+                    })
+                    continue
+                for oid, wkt, kind in feats_for:
+                    if not wkt:
+                        pending.append({
+                            "geometry_instance_key": f"{r['source_key']}#f:{oid}",
+                            "source_key": r["source_key"], "registry_id": reg,
+                            "geom_origin": "not_applicable",
+                            "recovery_outcome": "no_feature_returned",
+                            "source_crs": src_crs, "requested_out_sr": str(REQUEST_OUT_SR),
+                            "source_url": cfg["url"], "request_basis": basis, "fetched_at": ts,
+                        })
+                        continue
+                    pending.append({
+                        "geometry_instance_key": f"{r['source_key']}#f:{oid}",
+                        "source_key": r["source_key"], "registry_id": reg,
+                        "source_feature_id": oid, "wkt": wkt, "geom_kind": kind,
+                        "source_geometry_type": meta["geometryType"],
+                        "geom_origin": "source_supplied", "recovery_outcome": "recovered",
+                        "source_crs": src_crs, "requested_out_sr": str(REQUEST_OUT_SR),
+                        "transformation": transformation,
+                        "source_url": cfg["url"], "request_basis": basis, "fetched_at": ts,
+                    })
+                seen_cases.add(str(case))
+
+            # write when the tranche is big enough, so no request carries a huge body
+            if sum(len(p.get("wkt") or "") for p in pending) > 1_800_000 or len(pending) > 900:
+                total_written += flush(pending)
+                pending = []
+                controls(f"tranche {reg}")
+        if pending:
+            total_written += flush(pending)
+        say(f"  {reg} written so far", f"{total_written:,}")
+        controls(f"after {reg}")
+
+    # the unreachable residual: an explicit outcome row each, never silence
+    for reg, why in UNREACHABLE.items():
+        rows = by_reg.get(reg, [])
+        if not rows:
+            continue
+        print(f"\n===== {reg}: {len(rows):,} explicit unreachable outcome rows")
+        batch = []
+        for r in rows:
+            batch.append({
+                "geometry_instance_key": r["source_key"] + "#none",
+                "source_key": r["source_key"], "registry_id": reg,
+                "geom_origin": "unreachable", "recovery_outcome": "source_unreachable",
+                "source_url": "(not fetched)", "request_basis": why,
+            })
+            if len(batch) >= 900:
+                total_written += flush(batch)
+                batch = []
+        if batch:
+            total_written += flush(batch)
+        controls(f"after {reg}")
+
+    say("total rows written", f"{total_written:,}")
+
+
+def flush(rows):
+    if not rows:
+        return 0
+    body = tranche_sql(rows)
+    say("  writing tranche", f"{len(rows):,} rows, {len(body)/1048576:.2f} MB of SQL")
+    res = sql(body, "tranche")
+    if isinstance(res, list) and res:
+        say("  table now", f"{res[0].get('rows_total'):,} rows, {res[0].get('size')}")
+    return len(rows)
+
+
+def main():
+    mode = os.environ.get("MODE", "").strip()
+    say("mode", mode)
+    if mode not in ("b3-probe", "b3-load"):
+        raise SystemExit("MODE must be b3-probe or b3-load")
+    cands = load_candidates()
+    if len(cands) != 9571:
+        raise SystemExit(f"STOP: candidate universe drifted - {len(cands)} != 9,571")
+    if mode == "b3-probe":
+        probe(cands)
+    else:
+        recover(cands)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
