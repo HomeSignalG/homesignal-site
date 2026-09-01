@@ -90,6 +90,15 @@ UNREACHABLE = {
 BATCH = 60          # case numbers per request; keeps the form body well inside limits
 POLITE = 1.0        # seconds between requests to one host
 
+# NVDOT stopped responding mid-run and the first design waited on it indefinitely.
+# Every number here exists to make waiting BOUNDED: a request cannot hang past the
+# timeout, a batch cannot retry forever, and a run of dead batches ends the pass
+# rather than burning the job's whole budget on a host that is not answering.
+NVDOT_TIMEOUT = 45          # seconds per HTTP request
+NVDOT_BACKOFF = (5, 15, 30) # seconds between attempts; 3 attempts per batch
+NVDOT_BATCH = 25            # smaller than BATCH - gentler on a host that already stalled
+NVDOT_MAX_DEAD_BATCHES = 4  # consecutive all-attempts-failed batches before stopping
+
 
 def say(k, v):
     print(f"{k:<38} {v}", flush=True)
@@ -196,7 +205,29 @@ def esc(v):
     return str(v).replace("'", "''")
 
 
-def fetch_by_cases(url, case_field, oid_field, cases, want_geometry=True, quote=True):
+def fetch_bounded(url, case_field, oid_field, cases, quote, timeout, backoff):
+    """One bounded attempt sequence for one batch.
+
+    Returns (features, None) on success, or (None, reason) when every attempt failed.
+    A failure is NEVER converted into "no geometry" by this function - it returns the
+    reason so the caller can record the truth."""
+    last = ""
+    for i, wait in enumerate((0,) + tuple(backoff)):
+        if wait:
+            time.sleep(wait)
+        try:
+            return fetch_by_cases(url, case_field, oid_field, cases,
+                                  quote=quote, timeout=timeout), None
+        except SystemExit as e:
+            last = str(e)[:200]
+        except Exception as e:
+            last = f"{type(e).__name__}: {str(e)[:200]}"
+        print(f"    attempt {i + 1} failed: {last}", flush=True)
+    return None, last
+
+
+def fetch_by_cases(url, case_field, oid_field, cases, want_geometry=True, quote=True,
+                   timeout=180):
     """Ask the publisher for these exact case numbers. No spatial filter, ever."""
     if quote:
         lits = ",".join("'" + esc(c) + "'" for c in cases)
@@ -216,7 +247,7 @@ def fetch_by_cases(url, case_field, oid_field, cases, want_geometry=True, quote=
         p = dict(params)
         if offset:
             p["resultOffset"] = str(offset)
-        j = post(qurl(url), p)
+        j = post(qurl(url), p, timeout=timeout)
         if "error" in j:
             raise SystemExit(f"STOP: source error {json.dumps(j['error'])[:400]}")
         feats = j.get("features") or []
@@ -740,6 +771,39 @@ def _subtranches(rows, budget=MAX_TRANCHE_BYTES):
         yield cur
 
 
+def nvdot_tranche_sql(rows, source_keys):
+    """One bounded transaction: retire the not_attempted placeholders for exactly these
+    candidates, then write what the bounded attempt actually observed.
+
+    The DELETE is tightly guarded - it can only remove a row whose outcome is still
+    not_attempted, so it can never touch a recovered geometry. Retiring the placeholder
+    is required rather than optional: leaving it beside a real outcome would assert that
+    the candidate was never asked, which after a bounded attempt is false."""
+    keys = ",".join(q(k) for k in source_keys)
+    body = tranche_sql(rows)
+    delete = ("delete from geo.project_source_geometry\n"
+              " where recovery_outcome = 'not_attempted'\n"
+              "   and source_key in (" + keys + ");\n")
+    return body.replace("set local search_path = public;\n",
+                        "set local search_path = public;\n\n" + delete, 1)
+
+
+def flush_nvdot(rows, source_keys):
+    if not rows:
+        return 0
+    written = 0
+    for part in _subtranches(rows):
+        part_keys = sorted({r["source_key"] for r in part})
+        sqltext = nvdot_tranche_sql(part, part_keys)
+        say("  writing tranche", f"{len(part):,} rows / {len(part_keys)} candidates, "
+                                 f"{len(sqltext)/1048576:.2f} MB")
+        res = sql(sqltext, "nvdot tranche")
+        if isinstance(res, list) and res:
+            say("  table now", f"{res[0].get('rows_total'):,} rows")
+        written += len(part)
+    return written
+
+
 def flush(rows):
     if not rows:
         return 0
@@ -765,16 +829,159 @@ def flush(rows):
     return written
 
 
+def nvdot_complete():
+    """Resume ONLY the NVDOT candidates still marked not_attempted.
+
+    Nothing already recovered is refetched or overwritten: the working set is read
+    from the table itself, as exactly those candidates whose only row is a
+    not_attempted placeholder. Every bounded outcome is written truthfully -
+    a network failure never becomes a no-geometry finding, and a successful query
+    that returns nothing for a case number is recorded as its own distinct fact."""
+    reg = "nvdot-project-boundaries"
+    cfg = LAYERS[reg]
+
+    full_fingerprint("pre-write")
+    controls("pre-write")
+
+    before = sql("""select recovery_outcome, count(*) as rows,
+                           count(distinct source_key) as candidates
+                      from geo.project_source_geometry
+                     group by 1 order by 1;""", "b3 state before")
+    for r in before:
+        say(f"  before · {r['recovery_outcome']}", f"{r['rows']} rows / {r['candidates']} candidates")
+
+    todo = sql("""select source_key from geo.project_source_geometry
+                   where registry_id = 'nvdot-project-boundaries'
+                     and recovery_outcome = 'not_attempted'
+                   order by source_key collate "C";""", "nvdot todo")
+    keys = [r["source_key"] for r in todo]
+    say("NVDOT candidates to attempt", f"{len(keys):,}")
+    if not keys:
+        say("nothing to do", "no not_attempted NVDOT candidates remain")
+        return 0
+
+    meta = layer_meta(cfg["url"])
+    src_crs = f"wkid {meta['wkid']} / latestWkid {meta['latestWkid']}"
+    say("layer geometryType / SR", f"{meta['geometryType']} / {src_crs}")
+    if str(meta["wkid"]) != "26911":
+        raise SystemExit(f"STOP: NVDOT source CRS is now {meta['wkid']}, not the recorded 26911")
+    transformation = (f"publisher server outSR={REQUEST_OUT_SR}; "
+                      f"ST_Transform({REQUEST_OUT_SR} -> {CANONICAL_SRID}) in database")
+
+    real_field, ftype, use_quote = resolve_case_binding(
+        cfg["url"], meta, cfg["case_field"], [case_of(k, reg) for k in keys[:NVDOT_BATCH]])
+    say("case binding", f"{real_field} ({ftype}) quoted={use_quote}")
+    if use_quote is None:
+        raise SystemExit("STOP: no working literal form for NVDOT; nothing would be recovered")
+
+    policy = (f"bounded: timeout {NVDOT_TIMEOUT}s, 3 attempts, backoff "
+              f"{'/'.join(str(b) for b in NVDOT_BACKOFF)}s, batch {NVDOT_BATCH}, concurrency 1")
+    say("retry policy", policy)
+
+    dead_streak, attempted, written = 0, 0, 0
+    for i in range(0, len(keys), NVDOT_BATCH):
+        chunk = keys[i:i + NVDOT_BATCH]
+        cases = [case_of(k, reg) for k in chunk]
+        say(f"batch {i // NVDOT_BATCH + 1}", f"{len(chunk)} candidates")
+        time.sleep(POLITE)
+        feats, failure = fetch_bounded(cfg["url"], real_field, meta["objectIdField"],
+                                       cases, use_quote, NVDOT_TIMEOUT, NVDOT_BACKOFF)
+        ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        attempted += len(chunk)
+        rows = []
+
+        if feats is None:
+            dead_streak += 1
+            say("  batch outcome", f"source unavailable after bounded retries ({failure[:90]})")
+            for k in chunk:
+                rows.append({
+                    "geometry_instance_key": k + "#none", "source_key": k, "registry_id": reg,
+                    "geom_origin": "unreachable", "recovery_outcome": "source_unreachable",
+                    "source_crs": src_crs, "requested_out_sr": str(REQUEST_OUT_SR),
+                    "source_url": cfg["url"], "fetched_at": ts,
+                    "request_basis": f"{policy} · every attempt failed: {failure[:160]}",
+                })
+            written += flush_nvdot(rows, chunk)
+            if dead_streak >= NVDOT_MAX_DEAD_BATCHES:
+                say("STOPPING EARLY",
+                    f"{dead_streak} consecutive batches failed every bounded attempt")
+                break
+            controls(f"nvdot batch {i // NVDOT_BATCH + 1}")
+            continue
+
+        dead_streak = 0
+        got = {}
+        for f in feats:
+            a = f.get("attributes") or {}
+            got.setdefault(str(a.get(real_field)), []).append(
+                (str(a.get(meta["objectIdField"])), *geom_to_wkt(f.get("geometry"))))
+        basis = (f"{real_field} IN (<{len(cases)} case numbers>, quoted={use_quote})"
+                 f" · no spatial filter · {policy}")
+        n_rec = n_nofeat = n_nogeom = 0
+        for k, case in zip(chunk, cases):
+            hits = got.get(str(case)) or []
+            if not hits:
+                n_nofeat += 1
+                rows.append({
+                    "geometry_instance_key": k + "#none", "source_key": k, "registry_id": reg,
+                    "geom_origin": "not_applicable", "recovery_outcome": "no_feature_returned",
+                    "source_crs": src_crs, "requested_out_sr": str(REQUEST_OUT_SR),
+                    "source_url": cfg["url"], "request_basis": basis, "fetched_at": ts,
+                })
+                continue
+            for oid, wkt, kind in hits:
+                if not wkt:
+                    n_nogeom += 1
+                    rows.append({
+                        "geometry_instance_key": f"{k}#f:{oid}", "source_key": k,
+                        "registry_id": reg, "source_feature_id": oid,
+                        "geom_origin": "not_applicable",
+                        "recovery_outcome": "feature_has_no_geometry",
+                        "source_crs": src_crs, "requested_out_sr": str(REQUEST_OUT_SR),
+                        "source_url": cfg["url"], "request_basis": basis, "fetched_at": ts,
+                    })
+                    continue
+                n_rec += 1
+                rows.append({
+                    "geometry_instance_key": f"{k}#f:{oid}", "source_key": k,
+                    "registry_id": reg, "source_feature_id": oid, "wkt": wkt,
+                    "geom_kind": kind, "source_geometry_type": meta["geometryType"],
+                    "geom_origin": "source_supplied", "recovery_outcome": "recovered",
+                    "source_crs": src_crs, "requested_out_sr": str(REQUEST_OUT_SR),
+                    "transformation": transformation, "source_url": cfg["url"],
+                    "request_basis": basis, "fetched_at": ts,
+                })
+        say("  batch outcome",
+            f"{len(feats)} features · recovered {n_rec} · no feature {n_nofeat} · no geometry {n_nogeom}")
+        written += flush_nvdot(rows, chunk)
+        controls(f"nvdot batch {i // NVDOT_BATCH + 1}")
+
+    say("candidates attempted", f"{attempted:,}")
+    say("rows written", f"{written:,}")
+    controls("post-write")
+    full_fingerprint("post-write")
+
+    after = sql("""select recovery_outcome, count(*) as rows,
+                          count(distinct source_key) as candidates
+                     from geo.project_source_geometry
+                    group by 1 order by 1;""", "b3 state after")
+    for r in after:
+        say(f"  after · {r['recovery_outcome']}", f"{r['rows']} rows / {r['candidates']} candidates")
+    return 0
+
+
 def main():
     mode = os.environ.get("MODE", "").strip()
     say("mode", mode)
-    if mode not in ("b3-probe", "b3-load"):
-        raise SystemExit("MODE must be b3-probe or b3-load")
+    if mode not in ("b3-probe", "b3-load", "b3-nvdot"):
+        raise SystemExit("MODE must be b3-probe, b3-load or b3-nvdot")
     cands = load_candidates()
     if len(cands) != 9571:
         raise SystemExit(f"STOP: candidate universe drifted - {len(cands)} != 9,571")
     if mode == "b3-probe":
         probe(cands)
+    elif mode == "b3-nvdot":
+        nvdot_complete()
     else:
         recover(cands)
     return 0
