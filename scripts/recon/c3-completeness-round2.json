@@ -1,0 +1,49 @@
+[
+ {
+  "id": "CTY-udot-active-projects-lines",
+  "url": "https://services.arcgis.com/pA2nEVnB6tquxgOW/arcgis/rest/services/All_Projects/FeatureServer/1/query?geometry=%7B%22xmin%22%3A-114.042029%2C%22ymin%22%3A40.999896%2C%22xmax%22%3A-111.873171%2C%22ymax%22%3A42.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "CTY-itd-itip-projects-lines",
+  "url": "https://services1.arcgis.com/Qqv4dYPC8Vv8e3c3/arcgis/rest/services/ITIP_2025/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-114.042029%2C%22ymin%22%3A40.999896%2C%22xmax%22%3A-111.873171%2C%22ymax%22%3A42.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "CTY-nvdot-project-boundaries",
+  "url": "https://gis.dot.nv.gov/arcgis/rest/services/Project_Boundaries/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-114.042029%2C%22ymin%22%3A40.999896%2C%22xmax%22%3A-111.873171%2C%22ymax%22%3A42.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "CTY-wydot-stip-projects-lines",
+  "url": "https://services2.arcgis.com/WI04Bd6haCzitbuQ/arcgis/rest/services/ITSM_STIP_Data_Layers/FeatureServer/1/query?geometry=%7B%22xmin%22%3A-114.042029%2C%22ymin%22%3A40.999896%2C%22xmax%22%3A-111.873171%2C%22ymax%22%3A42.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ },
+ {
+  "id": "RETRY-boone-envelopeIntersects",
+  "url": "https://secure.boonecountygis.com/server/rest/services/ServicesBoone/PlanningAndZoningGroup_Boone/MapServer/7/query?geometry=%7B%22xmin%22%3A-114.042029%2C%22ymin%22%3A40.999896%2C%22xmax%22%3A-111.873171%2C%22ymax%22%3A42.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelEnvelopeIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 200
+ },
+ {
+  "id": "RETRY-boone-no-inSR",
+  "url": "https://secure.boonecountygis.com/server/rest/services/ServicesBoone/PlanningAndZoningGroup_Boone/MapServer/7/query?geometry=%7B%22xmin%22%3A-114.042029%2C%22ymin%22%3A40.999896%2C%22xmax%22%3A-111.873171%2C%22ymax%22%3A42.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 200
+ },
+ {
+  "id": "RETRY-fortworth-envelopeIntersects",
+  "url": "https://mapit.fortworthtexas.gov/ags/rest/services/Planning_Development/Zoning_case_service/MapServer/12/query?geometry=%7B%22xmin%22%3A-114.042029%2C%22ymin%22%3A40.999896%2C%22xmax%22%3A-111.873171%2C%22ymax%22%3A42.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelEnvelopeIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 200
+ },
+ {
+  "id": "RETRY-fortworth-layer-extent",
+  "url": "https://mapit.fortworthtexas.gov/ags/rest/services/Planning_Development/Zoning_case_service/MapServer/12?f=json",
+  "extract": "\"extent\"\\s*:\\s*\\{[^}]{0,240}",
+  "extract_context": 0,
+  "extract_max": 1
+ },
+ {
+  "id": "CTRL-txdot-county-extent",
+  "url": "https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/TxDOT_Projects_Info_All/FeatureServer/0/query?geometry=%7B%22xmin%22%3A-114.042029%2C%22ymin%22%3A40.999896%2C%22xmax%22%3A-111.873171%2C%22ymax%22%3A42.001515%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&where=1%3D1&returnCountOnly=true&f=json",
+  "print_chars": 120
+ }
+]
