@@ -1,0 +1,64 @@
+[
+  { "id": "doc-01-zcta-definition",
+    "url": "https://www.census.gov/programs-surveys/geography/guidance/geo-areas/zctas.html" },
+
+  { "id": "doc-02-zcta-faq-relationship-to-zip",
+    "url": "https://www.census.gov/programs-surveys/geography/technical-documentation/records-layout/2020-zcta-record-layout.html" },
+
+  { "id": "doc-03-tiger-year-index",
+    "url": "https://www2.census.gov/geo/tiger/" },
+
+  { "id": "doc-04-tiger2024-zcta520-listing",
+    "url": "https://www2.census.gov/geo/tiger/TIGER2024/ZCTA520/" },
+
+  { "id": "doc-05-tiger2025-zcta520-listing",
+    "url": "https://www2.census.gov/geo/tiger/TIGER2025/ZCTA520/" },
+
+  { "id": "doc-06-tiger2023-zcta520-listing",
+    "url": "https://www2.census.gov/geo/tiger/TIGER2023/ZCTA520/" },
+
+  { "id": "doc-07-tiger2020-zcta520-listing",
+    "url": "https://www2.census.gov/geo/tiger/TIGER2020/ZCTA520/" },
+
+  { "id": "doc-08-tiger-line-shapefiles-landing",
+    "url": "https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html" },
+
+  { "id": "tigerweb-01-service-list",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb?f=json" },
+
+  { "id": "tigerweb-02-census2020-layers",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer?f=json" },
+
+  { "id": "tigerweb-03-current-layers",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer?f=json" },
+
+  { "id": "tigerweb-04-acs2023-layers",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer?f=json" },
+
+  { "id": "api-01-geographies-2023-acs5",
+    "url": "https://api.census.gov/data/2023/acs/acs5/geography.json" },
+
+  { "id": "api-02-geographies-2020-dhc",
+    "url": "https://api.census.gov/data/2020/dec/dhc/geography.json" },
+
+  { "id": "enum-01-acs5-2023-all-zcta",
+    "url": "https://api.census.gov/data/2023/acs/acs5?get=NAME&for=zip%20code%20tabulation%20area:*" },
+
+  { "id": "enum-02-acs5-2022-all-zcta",
+    "url": "https://api.census.gov/data/2022/acs/acs5?get=NAME&for=zip%20code%20tabulation%20area:*" },
+
+  { "id": "enum-03-dec-dhc-2020-all-zcta",
+    "url": "https://api.census.gov/data/2020/dec/dhc?get=NAME&for=zip%20code%20tabulation%20area:*" },
+
+  { "id": "enum-04-dec-pl-2020-all-zcta",
+    "url": "https://api.census.gov/data/2020/dec/pl?get=NAME&for=zip%20code%20tabulation%20area:*" },
+
+  { "id": "probe-84684-acs5-2023",
+    "url": "https://api.census.gov/data/2023/acs/acs5?get=NAME&for=zip%20code%20tabulation%20area:84684" },
+
+  { "id": "probe-84685-acs5-2023",
+    "url": "https://api.census.gov/data/2023/acs/acs5?get=NAME&for=zip%20code%20tabulation%20area:84685" },
+
+  { "id": "probe-84604-acs5-2023-control",
+    "url": "https://api.census.gov/data/2023/acs/acs5?get=NAME&for=zip%20code%20tabulation%20area:84604" }
+]
