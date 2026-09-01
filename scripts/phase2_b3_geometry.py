@@ -138,16 +138,58 @@ def layer_meta(url):
         "wkid": sr.get("wkid"),
         "latestWkid": sr.get("latestWkid"),
         "name": m.get("name"),
+        "fields": {f.get("name"): f.get("type") for f in (m.get("fields") or [])},
     }
+
+
+def field_type(meta, name):
+    """Case-insensitively resolve a field's declared Esri type. A quoted literal
+    against a numeric field is the classic silent-zero, so the type decides the
+    quoting rather than a guess."""
+    for k, v in (meta.get("fields") or {}).items():
+        if k.lower() == name.lower():
+            return k, v
+    return name, None
+
+
+def resolve_case_binding(url, meta, case_field, sample):
+    """Decide the exact field name and literal quoting that actually match, by trying
+    them against the live endpoint. The probe and the load MUST use the same
+    resolution or the load can silently recover nothing."""
+    real_field, ftype = field_type(meta, case_field)
+    numeric = (ftype or "").lower() in ("esrifieldtypeinteger", "esrifieldtypesmallinteger",
+                                        "esrifieldtypedouble", "esrifieldtypesingle",
+                                        "esrifieldtypeoid", "esrifieldtypebiginteger")
+    for use_quote in ([False, True] if numeric else [True, False]):
+        time.sleep(POLITE)
+        try:
+            feats = fetch_by_cases(url, real_field, meta["objectIdField"],
+                                   sample, want_geometry=False, quote=use_quote)
+        except Exception:
+            continue
+        if feats:
+            return real_field, ftype, use_quote
+    return real_field, ftype, None
+
+
+def total_count(url):
+    """The positive control. A zero from a filtered query means nothing until the
+    same endpoint proves it answers at all."""
+    j = post(url, {"where": "1=1", "returnCountOnly": "true", "f": "json"})
+    return j.get("count")
 
 
 def esc(v):
     return str(v).replace("'", "''")
 
 
-def fetch_by_cases(url, case_field, oid_field, cases, want_geometry=True):
+def fetch_by_cases(url, case_field, oid_field, cases, want_geometry=True, quote=True):
     """Ask the publisher for these exact case numbers. No spatial filter, ever."""
-    where = "{} IN ({})".format(case_field, ",".join("'" + esc(c) + "'" for c in cases))
+    if quote:
+        lits = ",".join("'" + esc(c) + "'" for c in cases)
+    else:
+        lits = ",".join(str(c) for c in cases)
+    where = "{} IN ({})".format(case_field, lits)
     params = {
         "where": where,
         "outFields": f"{oid_field},{case_field}",
@@ -446,10 +488,32 @@ def probe(cands):
         say("  maxRecordCount", meta["maxRecordCount"])
         say("  spatialReference wkid", f"{meta['wkid']} (latestWkid {meta['latestWkid']})")
 
-        cases = [case_of(r["source_key"], reg) for r in rows]
-        sample = cases[:BATCH]
+        real_field, ftype = field_type(meta, cfg["case_field"])
+        say("  case field / declared type", f"{real_field} / {ftype}")
         time.sleep(POLITE)
-        feats = fetch_by_cases(cfg["url"], cfg["case_field"], meta["objectIdField"], sample)
+        say("  CONTROL unfiltered count", f"{total_count(cfg['url']):,}")
+
+        # What does the publisher's own value actually look like? A stored case
+        # number that has been reformatted anywhere in the pipeline is the other way
+        # a correct-looking IN clause matches nothing.
+        time.sleep(POLITE)
+        live = post(cfg["url"], {"where": "1=1", "outFields": real_field,
+                                 "returnGeometry": "false", "resultRecordCount": "5",
+                                 "f": "json"})
+        say("  publisher sample values",
+            [f.get("attributes", {}).get(real_field) for f in (live.get("features") or [])])
+
+        cases = [case_of(r["source_key"], reg) for r in rows]
+        say("  our stored sample values", cases[:5])
+        sample = cases[:BATCH]
+
+        _f, _t, use_quote = resolve_case_binding(cfg["url"], meta, cfg["case_field"], sample)
+        say("  resolved literal quoting", use_quote)
+        feats = []
+        if use_quote is not None:
+            time.sleep(POLITE)
+            feats = fetch_by_cases(cfg["url"], real_field, meta["objectIdField"],
+                                   sample, quote=use_quote)
         per_case = {}
         for f in feats:
             k = str(f["attributes"].get(cfg["case_field"]))
@@ -507,18 +571,29 @@ def recover(cands):
                           f"ST_Transform({REQUEST_OUT_SR} -> {CANONICAL_SRID}) in database")
         say("  geometryType / SR", f"{meta['geometryType']} / {src_crs}")
 
+        all_cases = [case_of(r["source_key"], reg) for r in rows]
+        real_field, ftype, use_quote = resolve_case_binding(
+            cfg["url"], meta, cfg["case_field"], all_cases[:BATCH])
+        say("  case binding", f"{real_field} ({ftype}) quoted={use_quote}")
+        if use_quote is None:
+            raise SystemExit(
+                f"STOP: no working literal form for {reg}.{real_field}; recovery would "
+                f"silently return nothing for every candidate")
+
         pending, seen_cases = [], set()
         for i in range(0, len(rows), BATCH):
             chunk = rows[i:i + BATCH]
             cases = [case_of(r["source_key"], reg) for r in chunk]
             time.sleep(POLITE)
-            feats = fetch_by_cases(cfg["url"], cfg["case_field"], meta["objectIdField"], cases)
+            feats = fetch_by_cases(cfg["url"], real_field, meta["objectIdField"],
+                                   cases, quote=use_quote)
             ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            basis = f"{cfg['case_field']} IN (<{len(cases)} case numbers>) · no spatial filter"
+            basis = (f"{real_field} IN (<{len(cases)} case numbers>, quoted={use_quote})"
+                     f" · no spatial filter")
             got = {}
             for f in feats:
                 a = f.get("attributes") or {}
-                case = str(a.get(cfg["case_field"]))
+                case = str(a.get(real_field))
                 oid = str(a.get(meta["objectIdField"]))
                 wkt, kind = geom_to_wkt(f.get("geometry"))
                 got.setdefault(case, []).append((oid, wkt, kind))
