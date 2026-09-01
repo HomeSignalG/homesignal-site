@@ -1,0 +1,39 @@
+[
+  {
+    "id": "be-18-zips-as-zcta",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%20IN%20('84301','84302','84306','84307','84309','84311','84312','84313','84314','84316','84324','84329','84330','84331','84334','84336','84337','84340')&outFields=GEOID%2CAREALAND%2CAREAWATER&returnGeometry=false&f=json",
+    "print_chars": 3000
+  },
+  {
+    "id": "be-18-zips-count-CONTROL",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%20IN%20('84301','84302','84306','84307','84309','84311','84312','84313','84314','84316','84324','84329','84330','84331','84334','84336','84337','84340')&returnCountOnly=true&f=json",
+    "print_chars": 200
+  },
+  {
+    "id": "be-known-good-CONTROL-84302",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2/query?where=GEOID%3D%2784302%27&returnCountOnly=true&f=json",
+    "print_chars": 200
+  },
+  {
+    "id": "county-layer-roster",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer?f=json",
+    "extract": "\\{\"id\":\\d+,\"name\":\"[^\"]*(?:Count|County|Counties)[^\"]*\"",
+    "extract_context": 40,
+    "extract_max": 12
+  },
+  {
+    "id": "boxelder-county-extent-l86",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/86/query?where=GEOID%3D%2749003%27&outFields=GEOID%2CBASENAME%2CAREALAND&returnExtentOnly=true&outSR=4326&f=json",
+    "print_chars": 900
+  },
+  {
+    "id": "boxelder-county-extent-l84",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/84/query?where=GEOID%3D%2749003%27&outFields=GEOID%2CBASENAME%2CAREALAND&returnExtentOnly=true&outSR=4326&f=json",
+    "print_chars": 900
+  },
+  {
+    "id": "boxelder-county-extent-l82",
+    "url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=GEOID%3D%2749003%27&outFields=GEOID%2CBASENAME%2CAREALAND&returnExtentOnly=true&outSR=4326&f=json",
+    "print_chars": 900
+  }
+]
