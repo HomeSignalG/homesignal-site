@@ -117,6 +117,13 @@ def sql(query, tag=""):
 
 # ---------------------------------------------------------------- arcgis
 
+def qurl(layer_url):
+    """ArcGIS queries go to <layer>/query. Posting query parameters at the bare layer
+    URL returns the layer DESCRIPTION instead — HTTP 200, no error key, no features —
+    which is exactly how five independent hosts all reported zero."""
+    return layer_url.rstrip("/") + "/query"
+
+
 def post(url, params, timeout=180):
     body = urllib.parse.urlencode(params).encode()
     req = urllib.request.Request(
@@ -181,7 +188,7 @@ def total_count(url):
     """The positive control. A zero from a filtered query means nothing until the
     same endpoint proves it answers at all. Returns (count, raw) so a missing count
     is visible as the server's own words rather than as a None."""
-    j = post(url, {"where": "1=1", "returnCountOnly": "true", "f": "json"})
+    j = post(qurl(url), {"where": "1=1", "returnCountOnly": "true", "f": "json"})
     return j.get("count"), json.dumps(j)[:300]
 
 
@@ -209,7 +216,7 @@ def fetch_by_cases(url, case_field, oid_field, cases, want_geometry=True, quote=
         p = dict(params)
         if offset:
             p["resultOffset"] = str(offset)
-        j = post(url, p)
+        j = post(qurl(url), p)
         if "error" in j:
             raise SystemExit(f"STOP: source error {json.dumps(j['error'])[:400]}")
         feats = j.get("features") or []
@@ -504,7 +511,7 @@ def probe(cands):
         # number that has been reformatted anywhere in the pipeline is the other way
         # a correct-looking IN clause matches nothing.
         time.sleep(POLITE)
-        live = post(cfg["url"], {"where": "1=1", "outFields": real_field,
+        live = post(qurl(cfg["url"]), {"where": "1=1", "outFields": real_field,
                                  "returnGeometry": "false", "resultRecordCount": "5",
                                  "f": "json"})
         if live.get("error"):
