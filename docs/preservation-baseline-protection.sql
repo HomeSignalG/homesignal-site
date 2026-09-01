@@ -16,7 +16,10 @@
 --    connects as `postgres`). `DROP TABLE ... CASCADE` and
 --    `DROP SCHEMA preservation CASCADE` both succeed.
 --    The primary protection against a catastrophic DROP remains, in order:
---      1. verified platform backup / recovery   (K12 — still open)
+--      1. verified platform backup / recovery   (K12 — CLEARED 2026-09-01 with a
+--         documented limitation: Pro plan, scheduled DAILY physical backups active,
+--         PITR NOT enabled. Recovery granularity is the available scheduled backups,
+--         not arbitrary point-in-time. See docs/preservation-recovery-posture.md.)
 --      2. the preservation baseline itself
 --      3. repository / audit evidence
 --      4. deliberate administrative controls (this file)
