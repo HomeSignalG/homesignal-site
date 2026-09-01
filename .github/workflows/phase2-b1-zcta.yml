@@ -1,5 +1,12 @@
 name: phase2-b1-zcta
 
+# Phase 2 execution workflow — B1 boundary load, and B3 source-geometry recovery.
+#
+# One workflow rather than several, because "the approved manually dispatched workflow"
+# is the thing that carries the restrictions: no schedule, no trigger from production,
+# no new credential, concurrency 1. Adding a mode keeps those properties; adding a
+# second workflow would duplicate them and let them drift apart.
+#
 # Phase 2 / B1 — authoritative Box Elder ZCTA boundary acquisition and load.
 #
 # MANUAL DISPATCH ONLY. There is deliberately no `schedule:` and no trigger from
@@ -27,10 +34,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'validate (no write, no credential) or load (one transaction)'
+        description: 'validate | load (B1) · b3-probe | b3-load (B3 source geometry)'
         required: true
         type: choice
-        options: [validate, load]
+        options: [validate, load, b3-probe, b3-load]
         default: validate
       expect_sha256:
         description: 'load only: archive sha256 recorded by the validate run'
@@ -47,7 +54,7 @@ permissions:
 jobs:
   b1:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -56,6 +63,20 @@ jobs:
         env:
           MODE: validate
         run: python3 scripts/phase2_b1_zcta.py
+
+      - name: B3 probe (read-only: source cardinality, CRS, payload size)
+        if: ${{ github.event.inputs.mode == 'b3-probe' }}
+        env:
+          MODE: b3-probe
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/phase2_b3_geometry.py
+
+      - name: B3 recover source geometry (tranched, network never inside a transaction)
+        if: ${{ github.event.inputs.mode == 'b3-load' }}
+        env:
+          MODE: b3-load
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/phase2_b3_geometry.py
 
       - name: Load (one transaction, fail closed)
         if: ${{ github.event.inputs.mode == 'load' }}
