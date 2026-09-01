@@ -27,8 +27,10 @@ name: phase2-b1-zcta
 #             transaction. Any in-transaction assertion raises and the whole
 #             transaction rolls back.
 #
-# Credentials: SUPABASE_ACCESS_TOKEN only, and only in load mode. It already exists
-# (db-sql.yml, deploy-edge-functions.yml). No new secret was created for this work.
+# Credentials: SUPABASE_ACCESS_TOKEN only, and never in B1 validate mode. It already
+# exists (db-sql.yml, deploy-edge-functions.yml). No new secret was created for this
+# work. B3's two modes both hold it: b3-probe to READ the frozen candidate list,
+# b3-load to write recovered geometry.
 
 on:
   workflow_dispatch:
@@ -64,7 +66,7 @@ jobs:
           MODE: validate
         run: python3 scripts/phase2_b1_zcta.py
 
-      - name: B3 probe (read-only: source cardinality, CRS, payload size)
+      - name: 'B3 probe (read-only): source cardinality, CRS, payload size'
         if: ${{ github.event.inputs.mode == 'b3-probe' }}
         env:
           MODE: b3-probe
