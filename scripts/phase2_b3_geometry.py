@@ -1148,7 +1148,13 @@ def invalid_probe():
     The completion run re-fetched at outSR=4326 - the same projection it had already
     used - so it tested repeat-fetch stability, not native validity. This asks the
     publisher for EPSG:26911 and validates the rings there. Nothing is written and
-    nothing is altered."""
+    nothing is altered.
+
+    It selects by OBJECTID, not by case number. The OBJECTID is the exact feature
+    identity already recorded for each invalid instance, so no case-field binding
+    has to be resolved and a "not returned" cannot be an artefact of the wrong
+    literal quoting. Every fetch is preceded by a positive control on the same
+    endpoint, because a silent zero and a broken instrument look identical."""
     reg = "nvdot-project-boundaries"
     cfg = LAYERS[reg]
     rows = sql("""select source_key, source_feature_id, validity_reason
@@ -1160,39 +1166,53 @@ def invalid_probe():
         return 0
 
     meta = layer_meta(cfg["url"])
+    oid_f = meta["objectIdField"]
     say("layer declared SR", f"wkid {meta['wkid']} / latestWkid {meta['latestWkid']}")
-    real_field, ftype, use_quote = resolve_case_binding(
-        cfg["url"], meta, cfg["case_field"], [case_of(r["source_key"], reg) for r in rows])
-    say("case binding", f"{real_field} ({ftype}) quoted={use_quote}")
+    say("objectIdField", f"{oid_f} ({meta['fields'].get(oid_f)})")
 
-    for r in rows:
-        case = case_of(r["source_key"], reg)
-        print(f"\n===== {r['source_key']}  OBJECTID {r['source_feature_id']}")
-        for out_sr in (26911, 4326):
-            time.sleep(POLITE)
-            where = "{} {}".format(real_field,
-                                   "IN ('" + esc(case) + "')" if use_quote
-                                   else "IN (" + str(case) + ")")
-            j = post(qurl(cfg["url"]), {
-                "where": where, "outFields": f"{meta['objectIdField']},{real_field}",
-                "returnGeometry": "true", "outSR": str(out_sr), "f": "json"},
-                timeout=NVDOT_TIMEOUT)
-            hit = None
-            for f in (j.get("features") or []):
-                if str((f.get("attributes") or {}).get(meta["objectIdField"])) == r["source_feature_id"]:
-                    hit = f
-            if hit is None:
-                say(f"  outSR {out_sr}", "feature not returned")
+    cnt, raw = total_count(cfg["url"])
+    say("POSITIVE CONTROL where=1=1", f"count={cnt}" if cnt is not None else raw)
+    if not cnt:
+        raise SystemExit("STOP: endpoint control failed - a zero below would be "
+                         "the instrument, not the publisher")
+
+    oids = [r["source_feature_id"] for r in rows]
+    where = "{} IN ({})".format(oid_f, ",".join(str(int(o)) for o in oids))
+    say("selector", where)
+
+    for out_sr in (26911, 4326):
+        print(f"\n########## outSR {out_sr}", flush=True)
+        time.sleep(POLITE)
+        j = post(qurl(cfg["url"]), {
+            "where": where, "outFields": f"{oid_f},{cfg['case_field']}",
+            "returnGeometry": "true", "outSR": str(out_sr), "f": "json"},
+            timeout=NVDOT_TIMEOUT)
+        if "error" in j:
+            say(f"  outSR {out_sr}", "SOURCE ERROR " + json.dumps(j["error"])[:300])
+            continue
+        feats = j.get("features") or []
+        sr_back = ((j.get("spatialReference") or {}).get("latestWkid")
+                   or (j.get("spatialReference") or {}).get("wkid"))
+        say("  features returned", f"{len(feats)} of {len(oids)} requested")
+        say("  SR the server actually returned", sr_back)
+        by_oid = {}
+        for f in feats:
+            by_oid[str((f.get("attributes") or {}).get(oid_f))] = f
+        for r in rows:
+            f = by_oid.get(str(r["source_feature_id"]))
+            tag = f"  {r['source_key']} oid {r['source_feature_id']}"
+            if f is None:
+                say(tag, "feature not returned")
                 continue
-            wkt, kind = geom_to_wkt(hit.get("geometry"))
+            wkt, kind = geom_to_wkt(f.get("geometry"))
             if not wkt:
-                say(f"  outSR {out_sr}", "returned without geometry")
+                say(tag, "returned without geometry")
                 continue
             chk = sql("select ST_IsValid(g) as ok, ST_IsValidReason(g) as why,"
                       " ST_NPoints(g) as n from (select ST_GeomFromText($w$" + wkt +
-                      "$w$, " + str(out_sr) + ") as g) q;", f"validate {out_sr}")[0]
-            say(f"  outSR {out_sr}",
-                f"{kind} · {chk['n']} vertices · valid={chk['ok']} · {chk['why']}")
+                      "$w$, " + str(sr_back or out_sr) + ") as g) q;",
+                      f"validate {out_sr}")[0]
+            say(tag, f"{kind} · {chk['n']} vertices · valid={chk['ok']} · {chk['why']}")
     print("\nINVALID-GEOMETRY PROBE COMPLETE - nothing written, nothing altered.")
     return 0
 
