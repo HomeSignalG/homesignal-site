@@ -44,7 +44,8 @@ wal_level         = logical      wal_compression = zstd
 pg_stat_archiver  = 3,209 segments archived, 0 failures
 last archived     = 0000000100000192000000D1 at 2026-09-01 14:21:22Z
 pg_is_in_recovery = false        replication slots = 0
-database size     = 6,382 MB     (of which schema `preservation` = 1,312 MB)
+database size     = 6,382 MB     (of which schema `preservation` = 1,132 MB
+                                   -- 951 MB heap + 180 MB indexes)
 ```
 
 ⚠️ **`archive_mode = on` is NOT evidence that PITR is available.** Supabase archives WAL
