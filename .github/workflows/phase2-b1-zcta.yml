@@ -44,8 +44,18 @@ on:
         description: 'validate | load (B1) · b3-* (B3 source geometry) · n2a-* | n2b-resolve | n2c-diagnose (national classification, read-only)'
         required: true
         type: choice
-        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover]
+        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard]
         default: validate
+      z3:
+        description: 'n5-shard: ZIP3 to build, or AUTO for the next pending shard'
+        required: false
+        default: 'AUTO'
+        type: string
+      max_shards:
+        description: 'n5-shard: how many shards this run may complete'
+        required: false
+        default: '1'
+        type: string
       expect_sha256:
         description: 'load only: archive sha256 recorded by the validate run'
         required: false
@@ -149,6 +159,16 @@ jobs:
           BATCH: ${{ github.event.inputs.batch }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n3_pilot.py
+
+      - name: N5 - bounded national association build, shard by shard
+        if: ${{ github.event.inputs.mode == 'n5-shard' }}
+        env:
+          MODE: n5-shard
+          SNAPSHOT: phase1-2026-09-01
+          Z3: ${{ github.event.inputs.z3 }}
+          MAX_SHARDS: ${{ github.event.inputs.max_shards }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n5_shard.py
 
       - name: B3 invalid-geometry probe (read-only, native CRS)
         if: ${{ github.event.inputs.mode == 'b3-invalid-probe' }}
