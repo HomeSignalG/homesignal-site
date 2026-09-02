@@ -62,11 +62,15 @@ control (a `find / -name "*.bundle"` that returns cleanly, so the empty result m
   `source_seq` multiplicity, unique index `(zip, source_key, source_seq)`), the multi-geometry
   design (`geo.n5_geom` keyed `(source_key, feature_id)`), and the treatment-eligibility gap (no
   coordinate-fidelity field; `geo.n5_association` is only `(source_key, zip, evidence)`;
-  `treatment` is a per-source label discarded per shard) are **VERIFIED**. Every **live number**
-  (`2 of 544`, `723,449 PROVEN POINT`, association/cache counts) is **NOT VERIFIED** — this
-  container has no DB access — and the ruling's **read-surface RPC does not exist in `main`**. One
-  correction: the claim's "`source_ref` is dataset-level" is wrong; in `app_projects` `source_ref`
-  is the record URL, and the dataset-level id is `registry_id`/`source_registry_id`.
+  `treatment` is a per-source label discarded per shard) are **VERIFIED**. Live numbers were
+  **founder-measured 2026-09-02** (this container has no DB access): distinct `source_key`
+  (development) **932,736** vs distinct `(source_ref, lat, lng)` **629,617** — so `source_ref`
+  merges distinct projects and must not be identity; **9,121** development projects carry >1
+  `(lat,lng)`; `geo.n5_association` **4,068**, `geo.n5_geom` **449** (consistent with only shards
+  520/062 run). `723,449 PROVEN POINT` stays **NOT VERIFIED** (transcript-only). The ruling's
+  **read-surface RPC does not exist in `main`**; `app_projects` is the ZIP read model, **not** the
+  address-radius source (one representative `lat/lng` per row; authoritative geometry is
+  polygons/polylines, so no view over it answers distance-to-polygon).
 - 🔑 **General lesson (applies to every future agent):** work produced by an agent that cannot
   push to the target repo exists only on that agent's disk. **Push first, or do not rely on it.**
 

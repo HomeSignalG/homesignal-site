@@ -18,12 +18,14 @@ Verification was performed in a Cloud Agent container with **no live-database ac
   source of truth — chiefly `scripts/n5_shard.py`, `docs/app-projects-stable-key-migration.sql`,
   and `docs/maps-source-identity-migration.sql`.
 - **Live-count claims** (distinct counts, row counts, "N of 544 shards", "723,449 PROVEN POINT",
-  cache size) **cannot be run here**. They are marked NOT VERIFIED unless a committed artifact
-  already carries the number. None of `544`, `723,449`, or a shard-state manifest exists anywhere
-  in the repo (searched); the only committed corpus figures are the frozen-baseline numbers in
-  `n5_shard.py` and the coverage table in `app-projects-stable-key-migration.sql`.
+  cache size) **cannot be run here**. Where a number was needed, it was **founder-measured
+  directly against the live database on 2026-09-02** and is labelled as such below — this agent
+  did not reach the DB itself. Numbers with no founder measurement and no committed artifact stay
+  NOT VERIFIED (the only committed corpus figures are the frozen-baseline numbers in `n5_shard.py`
+  and the coverage table in `app-projects-stable-key-migration.sql`).
 
-To close the NOT-VERIFIED items, run the queries named below with service-role credentials.
+To re-close any FOUNDER-MEASURED item independently, run the queries named below with
+service-role credentials.
 
 ---
 
@@ -48,32 +50,29 @@ create unique index concurrently if not exists app_projects_zip_source_key_uidx
   where the source key is unique (88.3% of sites). >1 only inside the 37,965 measured duplicate
   groups." (Column comment.) That is multiplicity, not identity, exactly as claimed.
 
-**CORRECTION — the "`source_ref`" label in the claim is wrong for `app_projects`.** In
-`app_projects`, `source_ref` is populated as `coalesce(el->>'record_url', el->>'url')` — the
-**per-record URL**, not a dataset id (`app-projects-stable-key-migration.sql` materialiser insert;
-`maps-source-identity-migration.sql`). The **dataset-level** identifier is `registry_id`
-( = `el->>'source_registry_id'`, e.g. `austin-site-plan-cases`), which is shared across every
-project a connector emits. The claim's *intent* — "do not use the dataset-level source reference
-as project identity; use `source_key`" — is correct and is enforced by the unique index above.
-The specific field named (`source_ref`) is not the dataset-level field; `registry_id` /
-`source_registry_id` is.
+**RECONCILED — `source_ref` IS a record-URL field, and that is exactly why it must not be the
+identity.** Both halves of the transcript claim are right once reconciled, so neither is "the
+wrong side": in `app_projects`, `source_ref` is populated as `coalesce(el->>'record_url',
+el->>'url')` — a record-URL field (`app-projects-stable-key-migration.sql` materialiser insert;
+`maps-source-identity-migration.sql`). **But for sources at `record_url_precision = "dataset"` it
+holds the same URL for every record**, so it does not distinguish per-record identity for those
+sources. The dataset-level source identifier proper is `registry_id` ( = `el->>'source_registry_id'`,
+e.g. `austin-site-plan-cases`).
 
-**NOT VERIFIED — the distinct-count numbers.** "distinct counts for `source_key` vs
-`source_ref`-based keys" requires the live DB. The committed **basis distribution** (measured
-2026-08-10, not re-run here), over 3,022,921 qualifying sites, is the closest committed evidence
-(`app-projects-stable-key-migration.sql` §1):
+**FOUNDER-MEASURED 2026-09-02 (live DB):**
 
-```
-source_id:case_number    2,819,607   93.274%
-epa_frs:registry_id        197,571    6.536%
-source_id:row_id             5,113    0.169%
-source_id:title(MUTABLE)       625    0.021%
-tdlr:project_no                  5    0.000%
-(no key)                         0    0.000%
-```
+- distinct `source_key` (development) = **932,736** — the real project count.
+- distinct `(source_ref, lat, lng)` = **629,617** — **below** 932,736.
 
-To close: `select count(distinct source_key), count(distinct source_ref) from public.app_projects
-where record_kind='development';`
+The `source_ref`-based key measures **303,119 fewer** than the real projects, precisely because it
+collapses every dataset-precision source's rows onto one shared URL. So using `source_ref` as
+project identity **merges distinct projects** — the claim's conclusion, now with a number behind
+it. Identity must be `source_key`, enforced by the unique index above.
+
+To re-measure: `select count(distinct source_key) from public.app_projects where
+record_kind='development';` and
+`select count(distinct (source_ref, lat, lng)) from public.app_projects where
+record_kind='development';`
 
 ---
 
@@ -93,11 +92,11 @@ intersects **all** of a project's geometries and only then reduces to distinct `
 other geometry of that project — i.e. destroy real associations. The design is explicitly
 multi-geometry.
 
-**NOT VERIFIED — the count.** "development projects with >1 distinct `(lat,lng)`" requires the
-live DB. To close, against the frozen baseline:
-`select count(*) from (select source_key from preservation.app_project_identity where
-snapshot_id='phase1-2026-09-01' and record_kind='development' group by source_key
-having count(distinct (lat,lng)) > 1) t;`
+**FOUNDER-MEASURED 2026-09-02 (live DB) — the count is real and non-trivial.** Development
+projects with >1 distinct `(lat,lng)` = **9,121**. A `DISTINCT ON (source_key)` collapse would
+therefore silently drop spatial memberships for 9,121 real projects. To re-measure:
+`select count(*) from (select source_key from public.app_projects where record_kind='development'
+group by source_key having count(distinct (lat,lng)) > 1) t;`
 
 ---
 
@@ -168,12 +167,13 @@ boundary steps had already succeeded" on the `rings_to_wkt` `(wkt, reason)` mars
 "Shard `520` could not have caught it: its source is a polyline, so it never took the rings
 branch." So "the two shards worked were 520 and 062" is consistent with the repo.
 
-**NOT VERIFIED — "2 of 544", the association count, and cache size.** These are live state in
-`geo.n5_shard` / `geo.n5_association` / `geo.n5_geom`. There is no DB access here, and neither the
-number `544` nor a shard-state manifest is committed. To close:
+**FOUNDER-MEASURED 2026-09-02 (live DB) — the layer is barely started, consistent with two shards
+done.** `geo.n5_association` = **4,068** rows and `geo.n5_geom` = **449** rows. Those tiny counts
+are exactly what "only shards 520 and 062 have run" predicts (a national build over 544 shards
+would carry orders of magnitude more). The `2 of 544` fraction itself is not separately
+founder-measured here, but the association/cache counts corroborate it. To re-measure:
+`select count(*) from geo.n5_association;` · `select count(*) from geo.n5_geom;` ·
 `select state, count(*) from geo.n5_shard where snapshot_id='phase1-2026-09-01' group by 1;`
-`select count(*) from geo.n5_association;`
-`select pg_size_pretty(pg_total_relation_size('geo.n5_geom'));`
 
 ---
 
@@ -189,16 +189,22 @@ Recorded verbatim in intent:
   `SECURITY DEFINER` read function over any `geo.n5_*` table. This is consistent with the read
   surface having lived only on the unpushed branch — the ruling stands as a decision, but its
   implementation is not present and must be built (from scratch) if address mode is rebuilt.
-- **`app_projects` remains the ZIP read model and is NOT the canonical spatial store.**
-  ⚠️ The instruction text was truncated at "…and is NOT"; the clause is completed here to the
-  evident intent (NOT the canonical spatial store — the geometry lives in the N-series layer),
-  and is flagged as **inferred, not dictated**. Confirm before relying on the completion.
+- **`app_projects` remains the ZIP read model and is NOT the address-radius source** — it stores
+  one representative `lat/lng` per row, while authoritative geometry is polygons and polylines, so
+  no view over it can answer distance-to-polygon at any effort. (Founder-confirmed wording,
+  2026-09-02; supersedes the earlier truncated/inferred completion.)
 
 ---
 
 ## One-line summary
 
-Of the five claims: **1 and 3 are VERIFIED structurally** (with a field-name correction on 1);
-**2 is VERIFIED structurally** but its count is unrun; **4 is corroborated only as to which two
-shards (520, 062)**; every **numeric/live-state figure is NOT VERIFIED** for lack of DB access;
-**5 is a recorded founder ruling whose read-surface RPC does not yet exist in `main`.**
+Of the five claims: **1 is VERIFIED** — structure from the repo, and the `source_ref` question
+reconciled with founder-measured numbers (932,736 real projects vs 629,617 distinct
+`(source_ref, lat, lng)`, so `source_ref` merges distinct projects); **2 is VERIFIED** — multi-geometry
+by design, with 9,121 development projects carrying >1 `(lat,lng)` (founder-measured); **3 is
+VERIFIED structurally** — no coordinate-fidelity field, `treatment` a per-source label discarded
+per shard, association only `(source_key, zip, evidence)` — with the `723,449` PROVEN-POINT figure
+left **NOT VERIFIED** (transcript-only); **4 is corroborated** as shards 520/062 with the live
+layer barely started (`n5_association` 4,068, `n5_geom` 449, founder-measured); **5 is a recorded
+founder ruling** whose read-surface RPC does not yet exist in `main`. Live numbers are
+founder-measured 2026-09-02; this agent had no DB access.
