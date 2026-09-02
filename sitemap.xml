@@ -3,7 +3,7 @@
      only ZIP pages whose materializer-stamped app_community_meta.indexable is
      true (pass AND dev-backed OR >=3 facilities) are advertised; empties and
      thin pages are real, reachable pages but noindexed. do NOT hand-edit.
-     11631 community ZIP pages + 11631 development ZIP pages + 5 static pages (0 newcomer(s) deferred by the ramp).
+     11667 community ZIP pages + 11667 development ZIP pages + 5 static pages (0 newcomer(s) deferred by the ramp).
      Regenerated on a schedule. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -12987,6 +12987,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=12514</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=12522</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -25947,6 +25952,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=36608</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=36609</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -27262,6 +27272,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=39193</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=39201</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -27453,6 +27468,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=39574</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=39577</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -32452,6 +32472,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=50055</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=50056</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -32553,6 +32578,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=50229</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=50230</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -32782,6 +32812,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=51541</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=51542</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -32857,6 +32892,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=52032</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=52033</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -32878,6 +32918,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=52052</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=52056</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -41832,6 +41877,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=70462</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=70466</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -41903,6 +41953,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=70578</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=70583</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -42233,6 +42288,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=71082</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=71101</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -51172,6 +51232,16 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=87041</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=87042</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=87043</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -51407,6 +51477,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=87529</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=87532</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -51543,6 +51618,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=88253</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=88255</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -52882,7 +52962,17 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=92007</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=92008</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=92009</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -52923,6 +53013,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=92025</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=92026</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -52987,6 +53082,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=92060</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=92061</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -53038,6 +53138,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=92083</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=92084</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -53317,6 +53422,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=92617</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=92618</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -53348,6 +53458,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=92629</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=92630</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -53463,6 +53578,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=92692</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=92694</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -53987,6 +54107,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=94041</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=94043</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -54122,6 +54247,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=94507</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=94509</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -54172,6 +54302,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=94521</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=94523</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -54182,7 +54317,22 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=94526</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=94528</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=94530</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=94531</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -54193,6 +54343,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=94538</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=94539</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -54353,6 +54508,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=94586</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=94587</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -54628,6 +54788,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=94950</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=94951</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -56242,6 +56407,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/community.html?zip=97536</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/community.html?zip=97539</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -56283,6 +56453,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=97756</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=97759</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -58098,6 +58273,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=99578</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=99587</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -71142,6 +71322,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=12514</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=12522</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -84102,6 +84287,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=36608</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=36609</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -85417,6 +85607,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=39193</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=39201</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -85608,6 +85803,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=39574</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=39577</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -90607,6 +90807,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=50055</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=50056</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -90708,6 +90913,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=50229</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=50230</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -90937,6 +91147,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=51541</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=51542</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -91012,6 +91227,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=52032</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=52033</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -91033,6 +91253,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=52052</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=52056</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -99987,6 +100212,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=70462</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=70466</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -100058,6 +100288,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=70578</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=70583</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -100388,6 +100623,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=71082</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=71101</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -109327,6 +109567,16 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=87041</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=87042</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=87043</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -109562,6 +109812,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=87529</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=87532</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -109698,6 +109953,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=88253</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=88255</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -111037,7 +111297,17 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=92007</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=92008</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=92009</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -111078,6 +111348,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=92025</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=92026</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -111142,6 +111417,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=92060</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=92061</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -111193,6 +111473,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=92083</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=92084</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -111472,6 +111757,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=92617</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=92618</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -111503,6 +111793,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=92629</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=92630</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -111618,6 +111913,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=92692</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=92694</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -112142,6 +112442,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=94041</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=94043</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -112277,6 +112582,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=94507</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=94509</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -112327,6 +112637,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=94521</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=94523</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -112337,7 +112652,22 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=94526</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=94528</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=94530</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=94531</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -112348,6 +112678,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=94538</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=94539</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -112508,6 +112843,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=94586</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=94587</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -112783,6 +113123,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=94950</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=94951</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -114397,6 +114742,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=97536</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=97539</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -114438,6 +114788,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=97756</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=97759</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -116253,6 +116608,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=99578</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=99587</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
