@@ -40,6 +40,25 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-02 — map-address-search branch is GONE (tip `ff71dcd`) — never pushed, do not hunt for it
+
+**The blocked `feature/map-address-search` branch and its six commits (tip `ff71dcd`) no longer
+exist and cannot be recovered.** They lived only on a previous Cursor agent's VM, plus a
+`.bundle` on that same disk (`/opt/cursor/artifacts/map-address-search/…treatment-gated.bundle`).
+Both are unreachable — verified from **two separate containers**, each with a working positive
+control (a `find / -name "*.bundle"` that returns cleanly, so the empty result means something).
+**Nothing was ever pushed; no remote branch ever existed.**
+
+- **The implementation does NOT survive.** If address mode is rebuilt after **N5**, the UI
+  scaffolding is rebuilt **from scratch** — do **not** go looking for `ff71dcd` or the bundle.
+- ⚠️ **Honest correction to the handoff:** the findings that were said to "survive in QUEUE"
+  (the architecture ruling, the classification-D audit, the identity correction, and treatment
+  eligibility) are **NOT present in this QUEUE.md or anywhere in `main`** — they were on the same
+  unpushed branch and did not survive here either. If the founder holds them elsewhere, commit
+  them here, because as of this note they are not durable in the repo.
+- 🔑 **General lesson (applies to every future agent):** work produced by an agent that cannot
+  push to the target repo exists only on that agent's disk. **Push first, or do not rely on it.**
+
 ### 2026-08-14 — KANSAS WIRED (#712): 61 → 182/202 (90.1%). Statewide-DOT lever, 5th state.
 
 **`kdot-wincpms-project-locations`, arcgis 166 → 167, merged `22868af`, deployed (run 31831595244).
