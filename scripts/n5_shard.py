@@ -191,7 +191,8 @@ def recover_shard(z3, registry):
                            "unstable": n_unstable})
             continue
         cached = {x["source_key"] for x in sql(
-            "select distinct source_key from geo.n5_geom where source_key in ("
+            "select distinct source_key from geo.n5_geom "
+            "where provenance='recovered_authoritative' and source_key in ("
             + ",".join(lit(k) for k in keys) + ");", "cache probe")}
         todo = [k for k in keys if k not in cached]
         st = {"registry_id": rid, "status": "OK", "projects": len(keys),
@@ -371,13 +372,27 @@ def proven_candidates(z3):
 with fr as (select * from geo.n5_frozen where z3={lit(z3)} and treatment='PROVEN'),
 verdict as (select registry_id from geo.n5_accepted_source where treatment='PROVEN'),
 bnd as (select geom from geo.n5_zcta where z3={lit(z3)}),
+base as (select distinct source_key from fr),
+reg as (select source_key, min(registry_id) registry_id from fr group by source_key),
+-- Distinct OBSERVED coordinate PAIRS. Deriving lat and lng with independent aggregates
+-- (min(lat), min(lng)) could pair a latitude from one row with a longitude from another and
+-- emit a point present in NO source row - fabrication. Rows A(42,-71) and B(41,NULL) must
+-- never yield (41,-71). A pair is only observed when BOTH values are non-null on the SAME row.
+pairs as (select distinct source_key, lat, lng
+            from fr where lat is not null and lng is not null),
+cnt as (select b.source_key,
+               (select count(*) from pairs p where p.source_key = b.source_key) ncoord
+          from base b),
+-- The candidate coordinate is taken ONLY when exactly one distinct pair was observed, and it
+-- is that whole row - never assembled from parts.
+sel as (select p.source_key, p.lat, p.lng
+          from pairs p join cnt c on c.source_key = p.source_key and c.ncoord = 1),
 agg as (
-  select fr.source_key,
-         min(fr.registry_id) registry_id,
-         count(distinct (fr.lat, fr.lng)) filter (where fr.lat is not null and fr.lng is not null) ncoord,
-         min(fr.lat) filter (where fr.lat is not null) lat,
-         min(fr.lng) filter (where fr.lng is not null) lng
-    from fr group by fr.source_key),
+  select b.source_key, r.registry_id, c.ncoord, sl.lat, sl.lng
+    from base b
+    join reg r using (source_key)
+    join cnt c using (source_key)
+    left join sel sl using (source_key)),
 gated as (
   select a.*,
          (a.registry_id is not null
@@ -406,7 +421,34 @@ def materialize_proven_points(z3):
 
     feature_id is the reserved slot 'pt:1' - see FEATURE_ID_PT1_DOC. Multi-coordinate
     projects are NOT materialized in v1: they are recorded MULTI_COORD_UNRESOLVED and
-    'pt:2' is never generated."""
+    'pt:2' is never generated.
+
+    *** DISABLED - TWO RULINGS OUTSTANDING. DO NOT ENABLE WITHOUT THEM. ***
+
+    (a) OWNERSHIP / DELETION BOUNDARY is unresolved. Measured on the frozen baseline
+        2026-09-02: of 723,449 PROVEN source_keys, 72,856 (10.1%) appear in MORE THAN ONE z3
+        shard - up to 12 shards and 217 distinct ZIPs for one project. But the canonical point
+        is ONE row per project, keyed (source_key,'pt:1'). So a per-z3 destructive delete would
+        let shards erase each other's points, and eligibility judged on a shard-LOCAL slice can
+        disagree between shards for the same project. This insert is still append-only
+        (ON CONFLICT DO NOTHING), which the audit correctly rejected: a stale pt:1 survives
+        ineligibility and a corrected coordinate is never applied.
+
+    (b) JURISDICTION is unresolved. The gate below tests "intersects ANY ZCTA loaded for this
+        shard", which the audit classified TOO BROAD. The narrower rule needs a project-level
+        jurisdiction, and the freeze source preservation.app_project_identity carries only
+        (zip, lat, lng) where `zip` is the ZIP PAGE the project was materialized onto - up to
+        217 of them per project - not an address ZIP. There is therefore no unambiguous "own
+        jurisdiction" field available.
+
+    Until both are ruled, this refuses to run rather than writing geometry under semantics
+    known to be wrong. Fail closed."""
+    if os.environ.get("N5_PROVEN_MATERIALIZE", "0").strip() != "1":
+        raise SystemExit(
+            "STOP: PROVEN point materialization is disabled pending two rulings - the "
+            "cross-shard ownership/deletion boundary (10.1% of PROVEN projects span multiple "
+            "shards) and the 'own jurisdiction' definition (the freeze source carries only the "
+            "page ZIP). See materialize_proven_points.__doc__.")
     q = proven_candidates(z3) + f"""
 insert into geo.n5_geom (source_key, registry_id, feature_id, outcome, geom,
                          invalid_reason, first_z3, provenance)
@@ -466,7 +508,18 @@ def reconcile_stage(z3):
            and provenance='recovered_authoritative') geom_recovered,
         (select count(*) from geo.n5_geom where first_z3={lit(z3)}
            and provenance='proven_stored_point') geom_proven,
-        (select count(*) from geo.n5_point_reject where z3={lit(z3)}) rejects;""",
+        (select count(*) from geo.n5_point_reject where z3={lit(z3)}) rejects,
+        (select count(*) from (
+            select source_key, zip, evidence from geo.n5_association_stage where z3={lit(z3)}
+            except
+            select source_key, zip, evidence from geo.n5_association
+             where left(zip,3)={lit(z3)}) d) staged_not_prior,
+        (select count(*) from (
+            select source_key, zip, evidence from geo.n5_association
+             where left(zip,3)={lit(z3)}
+            except
+            select source_key, zip, evidence from geo.n5_association_stage
+             where z3={lit(z3)}) d) prior_not_staged;""",
                    "reconcile " + z3), None)
 
 
@@ -490,6 +543,14 @@ def swap_shard(z3):
     sql(body, "swap " + z3)
 
 
+# A REBUILD of an already-populated shard must not change association semantics. Persisting a
+# PROVEN point cannot add, remove or reclassify a pair, because those points already
+# participate through the `pt` CTE. So for a rebuild, ANY membership or evidence delta HALTS
+# BEFORE THE SWAP - it is not printed and swapped anyway. A deliberately authorized semantic
+# change sets ALLOW_ASSOCIATION_DELTA=1 explicitly; the invariant is never weakened silently.
+ALLOW_ASSOCIATION_DELTA = os.environ.get("ALLOW_ASSOCIATION_DELTA", "0").strip() == "1"
+
+
 def associate(z3):
     """Stage -> reconcile -> swap. Rerunning is idempotent: staging clears its own z3 first
     and the swap is a full scoped replacement, never an append."""
@@ -498,6 +559,15 @@ def associate(z3):
     if int(rc["staged"]) != int(rc["staged_pairs"]):
         raise SystemExit(f"STOP: shard {z3} staged {rc['staged']} rows for "
                          f"{rc['staged_pairs']} distinct pairs - refusing to swap.")
+    prior = int(rc["prior"])
+    drift = int(rc["staged_not_prior"]) + int(rc["prior_not_staged"])
+    if prior > 0 and drift and not ALLOW_ASSOCIATION_DELTA:
+        raise SystemExit(
+            f"STOP: shard {z3} rebuild changes associations - staged {rc['staged']} vs prior "
+            f"{prior}; {rc['staged_not_prior']} staged-not-prior, {rc['prior_not_staged']} "
+            f"prior-not-staged (evidence 1/2/3/4 staged {rc['s1']}/{rc['s2']}/{rc['s3']}/"
+            f"{rc['s4']}). Persisting PROVEN points must not alter association semantics. "
+            f"Refusing to swap. Set ALLOW_ASSOCIATION_DELTA=1 only for an authorized change.")
     swap_shard(z3)
     return rc
 
@@ -791,9 +861,11 @@ def main():
     rem = one(sql(f"select count(*) n from geo.n5_shard where snapshot_id={lit(SNAPSHOT)} "
                   f"and state='pending';", "rem"), "n")
     say("shards still pending", rem)
-    cache = sql("select count(*) feats, count(distinct source_key) projects, "
-                "pg_size_pretty(pg_total_relation_size('geo.n5_geom')) sz from geo.n5_geom;", "cache")[0]
-    say("geometry cache", f"{cache['feats']} features / {cache['projects']} projects / {cache['sz']}")
+    corpus = sql("select count(*) feats, count(distinct source_key) projects, "
+                 "pg_size_pretty(pg_total_relation_size('geo.n5_geom')) sz from geo.n5_geom;",
+                 "corpus")[0]
+    say("canonical geometry corpus (NOT reclaimable)",
+        f"{corpus['feats']} features / {corpus['projects']} projects / {corpus['sz']}")
     say("publisher requests this run", STATS["requests"])
     say("publisher bytes this run", f"{STATS['bytes_in']:,}")
     return 0

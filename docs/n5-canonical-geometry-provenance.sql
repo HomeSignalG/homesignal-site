@@ -12,6 +12,20 @@
 -- receipt and no way to attribute them to a shard.
 --
 -- ============================================================================
+-- §0  ONE TRANSACTION — this file must be applied whole or not at all
+-- ============================================================================
+-- Every statement below is transactional DDL in PostgreSQL. Applied statement-by-statement
+-- (which is what the Supabase query endpoint does with separate calls), a failure after the
+-- association PK is DROPPED but before it is ADDED would leave geo.n5_association with NO
+-- primary key and no uniqueness, in production, with nothing to detect it.
+--
+-- APPLY THIS FILE AS A SINGLE STATEMENT/SCRIPT so BEGIN...COMMIT actually brackets it. If the
+-- execution mechanism cannot do that, DO NOT APPLY IT: emulating atomic DDL with
+-- application-side best effort is exactly the failure this guard exists to prevent.
+
+begin;
+
+-- ============================================================================
 -- §1  geo.n5_geom IS CANONICAL PRODUCT DATA — NOT A DISPOSABLE CACHE
 -- ============================================================================
 -- The builder previously described this table as "the cross-shard geometry cache".
@@ -65,6 +79,27 @@ comment on column geo.n5_geom.provenance is
   'stored coordinate of a PROVEN-treatment project, admitted at INSERTION through the registry '
   'verdict + per-project sanity gate. Allowlist + NOT NULL + no DEFAULT: an unrecognised or '
   'absent provenance cannot be written, so it can never become radius-eligible by default.';
+
+-- Structurally reserve the 'pt:' namespace. Until now it was only OBSERVED that publisher
+-- feature ids do not start 'pt:' (0 of 8,626). Observation is not a guarantee, so the
+-- biconditional is enforced: a proven stored point is EXACTLY 'pt:1', and no recovered row
+-- may squat the reserved namespace. 'pt:2'+ stays undefined and is therefore prohibited.
+do $$
+declare bad bigint;
+begin
+  select count(*) into bad from geo.n5_geom
+   where (provenance = 'proven_stored_point') <> (feature_id = 'pt:1')
+      or (provenance = 'recovered_authoritative' and feature_id like 'pt:%');
+  if bad <> 0 then
+    raise exception
+      'STOP: % existing geo.n5_geom row(s) violate the pt: namespace reservation. '
+      'Existing feature ids are NOT modified automatically - resolve manually.', bad;
+  end if;
+end $$;
+
+alter table geo.n5_geom drop constraint if exists n5_geom_pt_namespace_ck;
+alter table geo.n5_geom add constraint n5_geom_pt_namespace_ck
+  check ((provenance = 'proven_stored_point') = (feature_id = 'pt:1'));
 
 -- ============================================================================
 -- §3  ASSOCIATION PRIMARY KEY CORRECTION  (a correctness bug, not cleanup)
@@ -145,3 +180,5 @@ comment on table geo.n5_association_stage is
   'Per-shard staging for the stage-and-swap rebuild. The PK (z3, source_key, zip) enforces the '
   'same one-class-per-pair identity as the authoritative table, so a staging run that would '
   'produce two rows for one pair fails HERE rather than corrupting production.';
+
+commit;

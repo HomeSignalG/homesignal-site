@@ -132,7 +132,7 @@ const swapSeg = py.slice(swapAt, swapAt + 600);
 ok(/delete from geo\.n5_association where/.test(swapSeg) && /insert into geo\.n5_association \(/.test(swapSeg),
   'swap deletes then inserts inside the same transaction');
 ok(/left\(zip,3\)=/.test(swapSeg), 'swap is scoped to the verified shard boundary');
-ok(/stage_associations\(z3\)[\s\S]{0,300}reconcile_stage\(z3\)[\s\S]{0,400}swap_shard\(z3\)/.test(py),
+ok(/stage_associations\(z3\)[\s\S]{0,300}reconcile_stage\(z3\)[\s\S]{0,1600}swap_shard\(z3\)/.test(py),
   'order is stage -> reconcile -> swap');
 ok(/refusing to swap/.test(py), 'reconciliation failure prevents the swap');
 ok(/staged.*!=.*staged_pairs|int\(rc\["staged"\]\) != int\(rc\["staged_pairs"\]\)/.test(py),
@@ -170,5 +170,51 @@ ok(!/update geo\.n5_shard|delete from geo\.n5_association\b/i.test(code),
   'migration rebuilds no shard and deletes no association');
 ok(!/insert into geo\.n5_geom/i.test(code),
   'migration performs NO national PROVEN backfill — materialization is shard-time only');
+
+// ---- 11. AUDIT CORRECTIONS (PR #1016 round 2) ----
+// #1 migration atomicity
+ok(/^begin;$/m.test(code) && /^commit;$/m.test(code), 'migration is wrapped in ONE transaction');
+ok(code.indexOf('begin;') < code.indexOf('drop constraint if exists n5_association_pkey')
+   && code.indexOf('add constraint n5_association_pkey') < code.lastIndexOf('commit;'),
+  'the DROP PK / ADD PK window is inside the transaction (no unprotected interval)');
+
+// #8 pt: namespace structurally reserved
+ok(/check \(\(provenance = 'proven_stored_point'\) = \(feature_id = 'pt:1'\)\)/.test(code),
+  'pt: namespace reserved by a biconditional CHECK, not by observation');
+ok(/violate the pt: namespace reservation/.test(code) && /NOT modified automatically/.test(code),
+  'pre-existing violators STOP the migration rather than being rewritten');
+
+// #2 coordinate pairs — never assembled from parts
+ok(!/min\(fr\.lat\)|min\(fr\.lng\)/.test(pycode), 'independent min(lat)/min(lng) selection is GONE');
+ok(/pairs as \(select distinct source_key, lat, lng/.test(py)
+  && /from fr where lat is not null and lng is not null\)/.test(py),
+  'distinct OBSERVED coordinate pairs are derived first');
+ok(/join cnt c on c\.source_key = p\.source_key and c\.ncoord = 1/.test(py),
+  'a candidate coordinate is taken only when exactly ONE distinct pair was observed');
+ok(/never yield \(41,-71\)/.test(py), 'the fabrication case is documented at the fix site');
+
+// #7 cache probe is RECOVERY-only
+ok(/where provenance='recovered_authoritative' and source_key in \(/.test(py),
+  'cache-hit probe counts only recovered_authoritative geometry');
+
+// #6 reconciliation actually gates the swap
+ok(/staged_not_prior/.test(py) && /prior_not_staged/.test(py), 'staged-vs-prior diffs are computed');
+ok(/if prior > 0 and drift and not ALLOW_ASSOCIATION_DELTA:/.test(py),
+  'a rebuild with ANY association delta HALTS before the swap');
+ok(/raise SystemExit\([\s\S]{0,400}Refusing to swap/.test(py), 'the halt is a raise, not a print');
+ok(/ALLOW_ASSOCIATION_DELTA = os\.environ/.test(py),
+  'the invariant is explicitly overridable, never silently weakened');
+ok(/prior > 0/.test(py), 'a first-run shard (prior=0) is not blocked by the delta gate');
+
+// #9 no disposable-cache language remains
+ok(!/geometry cache/i.test(py), 'no "geometry cache" wording remains anywhere in the builder');
+ok(/canonical geometry corpus \(NOT reclaimable\)/.test(py), 'reporting names it a canonical corpus');
+
+// #3/#5 unresolved -> materialization must fail closed
+ok(/N5_PROVEN_MATERIALIZE/.test(py), 'PROVEN materialization is gated behind an explicit flag');
+ok(/STOP: PROVEN point materialization is disabled pending two rulings/.test(py),
+  'it refuses to run while the ownership and jurisdiction rulings are outstanding');
+ok(/72,856 \(10\.1%\) appear in MORE THAN ONE z3/.test(py),
+  'the cross-shard ownership measurement is recorded at the decision site');
 
 process.exit(fails ? 1 : 0);
