@@ -40,6 +40,55 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-02 — N5 A0/A1 APPLIED: PROVEN points materialised, and three things logged as untested or deviant
+
+**A1 landed: `geo.n5_geom` is no longer RECOVERY-only.** 718,278 `proven_stored_point`
+rows + 8,626 `recovered_authoritative`; rejects 4,877 `MULTI_COORD_UNRESOLVED` + 294
+`NULL_COORD`; **718,278 + 4,877 + 294 = 723,449 PROVEN projects, closing exactly.**
+Founder-verified independently. **Measured, replacing the estimate: 419–442 bytes per
+PROVEN point row all-in (0.318 GB nationally)** — index is 55% of it. `VACUUM FULL` ran
+before materialisation so the delta is not inflated by the backfill's dead tuples.
+
+⚠️ **THE CAPACITY QUESTION IS NOT CLOSED, and the narrowed bracket must not be read as
+if it were (founder, 2026-09-02).** The **membership-output term, 0.5–1.35 GB, is NOT
+collapsed by these passes** and stays open until the boundary-first pass actually runs.
+Only the PROVEN term became measured here; the RECOVERY term collapses with A2.
+
+🔻 **DEVIATION, KNOWINGLY TAKEN — #1015 was modified after an authorization said it would
+not be.** The instruction "#1015 stays draft and unmodified" and the later instruction
+naming "#1015's SQL header" as one of three required canonical-data comment locations are
+in direct conflict, and the header was the urgent one: it argues eligibility from
+*"the table is populated only by the RECOVERY path … Presence in this table is therefore
+itself the treatment gate"*, which **PROVEN materialisation makes false**, silently
+widening what that RPC returns rather than failing. Resolution taken and **accepted by
+the founder**: comment-only, on **its own branch** (`claude/n5-spatial-read-rpc`,
+`87e9147`), function body untouched, the old sentence **quoted and marked corrected
+rather than deleted**, and the one-line predicate change named
+(`provenance = 'recovered_authoritative'`) for whoever un-drafts it. Recorded here so the
+next reader sees a knowing exception, not an oversight.
+
+⚠️ **TWO IMPLEMENTATION CHOICES ARE UNTESTED IN PRODUCTION — both returned 0, which is
+exactly how an untested default survives to surprise someone later.** Neither was in the
+migration authorization; both are mine and both are overridable:
+
+1. **Reject precedence** — `NO_REGISTRY_VERDICT` → `NULL_COORD` → `INVALID_COORD` →
+   `NULL_ISLAND` → `OUTSIDE_JURISDICTION` → `MULTI_COORD_UNRESOLVED`. Only the first and
+   last ever fired (294 / 4,877); the middle four returned **0**, so the ordering among
+   them has never been exercised on real data.
+2. **`OUTSIDE_JURISDICTION` envelope** — lat 17–72, lng −180 to −64 (CONUS + AK + HI +
+   PR). It rejected **0** of 723,449 projects. A coordinate outside it would be dropped
+   from materialisation, so if the corpus ever gains a territory outside that box
+   (Guam, American Samoa, USVI) the envelope silently excludes it. **Widen the envelope
+   before adding such a source; do not discover it as a mystery zero.**
+
+**`lit(None)` residue: NONE — receipted, not assumed.** `fetch_features` wrote `first_z3`
+as `lit(z3)`, and `lit(None)` yields the literal string `'None'`, which `char(3)` would
+truncate to `'Non'` — a fabricated value shaped like a ZIP3 prefix in a provenance
+column. Fixed to emit SQL NULL. Measured after: **0 rows `first_z3 IN ('Non','None')`,
+0 rows non-numeric**, and the positive control that makes that zero meaningful —
+the 8,626 rows that DO carry `first_z3` carry exactly the 13 completed shard prefixes
+(`010`–`019`, `062`, `063`, `520`), nothing else.
+
 ### 2026-09-02 — N5 ANSWERS ONLY HALF THE COMPLETENESS REQUIREMENT — and 544 shards does not change that
 
 **The standing requirement is both directions: nothing on a ZIP page that is not inside that
