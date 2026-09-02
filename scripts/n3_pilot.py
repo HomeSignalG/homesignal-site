@@ -446,6 +446,15 @@ def recover_source(cfg):
                     order by source_key;""", "frozen " + rid)
     keys = [r["source_key"] for r in rows]
     cases = [k.split(":", 2)[2] for k in keys]
+    # Map the publisher's ECHO of an identity back to the FROZEN identity it answers.
+    # A recovered feature must be keyed by the frozen source_key we asked for, never by
+    # the string the publisher hands back: Anne Arundel stores SUB_NUM 'S2025-017 ' with
+    # a trailing space, ArcGIS matches it against 'S2025-017' because CHAR comparison
+    # ignores trailing blanks, and keying on the echo minted a phantom project whose
+    # geometry then failed to reach the real frozen one.
+    by_case = {}
+    for k, c in zip(keys, cases):
+        by_case.setdefault(str(c).strip(), k)
     say("  frozen projects", f"{len(keys)} (expect {cfg['expect_projects']})")
     if len(keys) != cfg["expect_projects"]:
         raise SystemExit(f"STOP: frozen project count for {rid} moved")
@@ -474,7 +483,7 @@ def recover_source(cfg):
     say("  POSITIVE CONTROL where=1=1", f"{ctl['count']:,} features")
 
     oid_f = meta.get("objectIdField") or "OBJECTID"
-    out, errs, feats_total, capped = [], [], 0, 0
+    out, errs, feats_total, capped, unasked = [], [], 0, 0, []
     maxrc = meta.get("maxRecordCount") or 1000
     for i in range(0, len(cases), in_batch):
         chunk = cases[i:i + in_batch]
@@ -496,7 +505,14 @@ def recover_source(cfg):
             capped += 1
         for f in feats:
             a = f.get("attributes") or {}
-            c = str(a.get(ident))
+            echo = str(a.get(ident))
+            sk = by_case.get(echo.strip())
+            if sk is None:
+                # the publisher returned an identity we never asked for; record it as an
+                # anomaly rather than minting a key for it
+                unasked.append(echo)
+                continue
+            c = sk.split(":", 2)[2]
             g = f.get("geometry") or {}
             if kind == "polyline":
                 wkt, bad = paths_to_multilinestring_wkt(g.get("paths") or []), None
@@ -504,13 +520,14 @@ def recover_source(cfg):
                     bad = "NO_PATHS"
             else:
                 wkt, bad = rings_to_wkt(g.get("rings"), c)
-            out.append({"sk": f"arcgis:{rid}:{c}", "rid": rid, "fid": a.get(oid_f),
+            out.append({"sk": sk, "rid": rid, "fid": a.get(oid_f),
                         "wkt": wkt, "bad": bad, "srid": srid})
         say(f"    batch {i//in_batch:2d}",
             f"{len(chunk)} ids -> {len(feats)} features, srid {srid}")
 
     proj = {r["sk"] for r in out}
     stats = {"registry_id": rid, "kind": kind, "requested": len(keys),
+             "unasked_echoes": len(unasked),
              "reconnected": len(proj), "features": feats_total, "errors": len(errs),
              "capped_batches": capped, "control": ctl["count"],
              "srids": sorted({r["srid"] for r in out if r["srid"] is not None})}
@@ -518,6 +535,11 @@ def recover_source(cfg):
     say("  projects reconnected", f"{len(proj)} of {len(keys)}")
     say("  batch errors", len(errs))
     say("  capped batches (must be 0)", capped)
+    say("  identities echoed but never asked for", len(unasked))
+    if unasked:
+        say("    sample", unasked[:5])
+    say("  identity echo needed normalising",
+        sum(1 for k, c in zip(keys, cases) if str(c) != str(c).strip()))
     say("  returned SRIDs", stats["srids"])
     for e in errs:
         say("    error", e)
