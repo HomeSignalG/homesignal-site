@@ -161,7 +161,9 @@ def recover_shard(z3, registry):
     Publisher feature multiplicity is preserved (one row per source_key x OBJECTID) and a
     recovered feature is keyed by the FROZEN identity we asked for, never by the string the
     publisher echoes back - the N4 trailing-space defect. Geometry already in geo.n5_geom
-    from an earlier shard is a cache HIT and is not refetched."""
+    from an earlier shard is REUSED rather than refetched. That reuse is a side benefit:
+    geo.n5_geom is PERMANENT CANONICAL PRODUCT GEOMETRY, not a build cache - see the table
+    comment in docs/n5-canonical-geometry-provenance.sql."""
     rows = sql(f"""select registry_id,
                           count(distinct source_key) filter (where source_key_basis is null
                               or source_key_basis not in ({','.join(lit(b) for b in UNRECOVERABLE_BASES)})) recoverable,
@@ -282,14 +284,17 @@ def fetch_features(rid, entry, keys, z3):
         nfeat += 1
         if not wkt:
             reason = bad or "no usable geometry"
-            rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,{lit(reason)},{lit(z3)})")
+            rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,{lit(reason)},{lit(z3)},"
+                        f"'recovered_authoritative')")
         else:
             # Dollar-quoted, as the pilot loaders do: a polygon WKT runs to tens of
             # thousands of characters and must not be re-escaped per quote.
             rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},1,"
-                        f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{lit(z3)})")
+                        f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{lit(z3)},"
+                        f"'recovered_authoritative')")
     for i in range(0, len(rows), 25):
-        sql("insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,invalid_reason,first_z3) values "
+        sql("insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,invalid_reason,first_z3,"
+            "provenance) values "
             + ",".join(rows[i:i + 25]) + " on conflict (source_key,feature_id) do nothing;", "geom ins")
     return {"status": "OK", "fetched": len(keys), "features": len(feats),
             "geometry_type": gtype, "batch_errors": errors, "unasked_echoes": len(unasked),
@@ -342,12 +347,159 @@ adds as (select v.source_key, v.zip, 1 ev from ver v
 """
 
 
+# ------------------------------------------------- PROVEN point materialization
+
+def proven_candidates(z3):
+    """Resolve the admission gate for every PROVEN project in this shard.
+
+    ZERO NEW ASSOCIATION SEMANTICS. These exact points ALREADY participate in association
+    construction through the `pt` CTE in build_associations, which computes
+    ST_MakePoint(fr.lng, fr.lat) for PROVEN projects and unions it into `allgeom`. This
+    function does not introduce a second PROVEN association path and does not change what
+    associations are produced; it makes the spatial representation the builder is already
+    using DURABLE in the canonical geometry corpus.
+
+    ELIGIBILITY IS ENFORCED AT INSERTION, NOT AT QUERY TIME. A query-time join is a rule
+    every future caller must remember; an insertion gate is a rule callers cannot forget.
+    A point that fails any check is never written to geo.n5_geom, so no reader - however
+    it is written - can return it as radius-eligible.
+
+    The registry verdict is necessary but NOT sufficient: it is a per-SOURCE statement and
+    cannot see a per-project geocode failure, so each candidate must also pass coordinate
+    sanity and fall inside its own shard's jurisdiction."""
+    return f"""
+with fr as (select * from geo.n5_frozen where z3={lit(z3)} and treatment='PROVEN'),
+verdict as (select registry_id from geo.n5_accepted_source where treatment='PROVEN'),
+bnd as (select geom from geo.n5_zcta where z3={lit(z3)}),
+agg as (
+  select fr.source_key,
+         min(fr.registry_id) registry_id,
+         count(distinct (fr.lat, fr.lng)) filter (where fr.lat is not null and fr.lng is not null) ncoord,
+         min(fr.lat) filter (where fr.lat is not null) lat,
+         min(fr.lng) filter (where fr.lng is not null) lng
+    from fr group by fr.source_key),
+gated as (
+  select a.*,
+         (a.registry_id is not null
+          and exists (select 1 from verdict v where v.registry_id = a.registry_id)) has_verdict,
+         case when a.ncoord = 0 then null
+              else ST_SetSRID(ST_MakePoint(a.lng, a.lat), {CANON_SRID}) end g
+    from agg a),
+judged as (
+  select gg.*,
+         case
+           when not gg.has_verdict                             then 'NO_REGISTRY_VERDICT'
+           when gg.ncoord > 1                                  then 'MULTI_COORD_UNRESOLVED'
+           when gg.ncoord = 0                                  then 'NULL_COORD'
+           when gg.lat not between -90 and 90
+             or gg.lng not between -180 and 180                then 'INVALID_COORD'
+           when abs(gg.lat) < 1e-9 and abs(gg.lng) < 1e-9      then 'NULL_ISLAND'
+           when not exists (select 1 from bnd b where ST_Intersects(gg.g, b.geom))
+                                                               then 'OUTSIDE_JURISDICTION'
+           else null end reject_reason
+    from gated gg)
+"""
+
+
+def materialize_proven_points(z3):
+    """Persist admitted PROVEN points, and record every rejection with its reason.
+
+    feature_id is the reserved slot 'pt:1' - see FEATURE_ID_PT1_DOC. Multi-coordinate
+    projects are NOT materialized in v1: they are recorded MULTI_COORD_UNRESOLVED and
+    'pt:2' is never generated."""
+    q = proven_candidates(z3) + f"""
+insert into geo.n5_geom (source_key, registry_id, feature_id, outcome, geom,
+                         invalid_reason, first_z3, provenance)
+select source_key, registry_id, 'pt:1', 1, g, null, {lit(z3)}, 'proven_stored_point'
+  from judged where reject_reason is null
+on conflict (source_key, feature_id) do nothing;"""
+    sql(q, "proven points " + z3)
+    r = proven_candidates(z3) + f"""
+insert into geo.n5_point_reject (z3, source_key, registry_id, lat, lng, reason)
+select {lit(z3)}, source_key, registry_id, lat, lng, reject_reason
+  from judged where reject_reason is not null
+on conflict (z3, source_key, reason) do nothing;"""
+    sql(r, "proven rejects " + z3)
+    return one(sql(f"""select
+        (select count(*) from geo.n5_geom
+          where first_z3={lit(z3)} and provenance='proven_stored_point') materialized,
+        (select count(*) from geo.n5_point_reject where z3={lit(z3)}) rejected;""",
+                   "proven counts"), None)
+
+
+# 'pt:' is a RESERVED synthetic namespace meaning "the canonical fidelity-proven stored point
+# slot for this source_key". It cannot collide with publisher feature ids: those use '#' as
+# their ordinal separator (e.g. '0001-0100#2', 'NHSX-020-9(183)--3H-31#0') and contain no
+# colon. Identity is the SLOT, not the coordinate value, so correcting a coordinate updates
+# geom in place and leaves feature_id unchanged. 'pt:2' and beyond are RESERVED AND UNDEFINED
+# and MUST NOT be generated until multi-coordinate PROVEN semantics are separately approved.
+FEATURE_ID_PT1_DOC = "pt:1"
+
+
+# ------------------------------------------------- stage / reconcile / swap
+
+def stage_associations(z3):
+    """Build this shard's complete candidate output WITHOUT touching the authoritative set."""
+    sql(f"delete from geo.n5_association_stage where z3={lit(z3)};", "stage clear " + z3)
+    q = build_associations(z3) + f"""
+insert into geo.n5_association_stage (z3, source_key, zip, evidence)
+select {lit(z3)}, source_key, zip::char(5), ev
+  from (select * from cls union all select * from adds) z;"""
+    # Deliberately NO `on conflict`: the stage PK (z3, source_key, zip) enforces one class per
+    # pair, so a run that would produce two evidence values for one pair fails HERE instead of
+    # corrupting production.
+    sql(q, "stage " + z3)
+
+
+def reconcile_stage(z3):
+    """Verify the staged set before anything authoritative is touched."""
+    return one(sql(f"""select
+        (select count(*) from geo.n5_association_stage where z3={lit(z3)}) staged,
+        (select count(distinct (source_key, zip)) from geo.n5_association_stage
+          where z3={lit(z3)}) staged_pairs,
+        (select count(*) from geo.n5_association_stage where z3={lit(z3)} and evidence=1) s1,
+        (select count(*) from geo.n5_association_stage where z3={lit(z3)} and evidence=2) s2,
+        (select count(*) from geo.n5_association_stage where z3={lit(z3)} and evidence=3) s3,
+        (select count(*) from geo.n5_association_stage where z3={lit(z3)} and evidence=4) s4,
+        (select count(*) from geo.n5_association where left(zip,3)={lit(z3)}) prior,
+        (select count(*) from geo.n5_geom where first_z3={lit(z3)}
+           and provenance='recovered_authoritative') geom_recovered,
+        (select count(*) from geo.n5_geom where first_z3={lit(z3)}
+           and provenance='proven_stored_point') geom_proven,
+        (select count(*) from geo.n5_point_reject where z3={lit(z3)}) rejects;""",
+                   "reconcile " + z3), None)
+
+
+def swap_shard(z3):
+    """Atomically replace this shard's authoritative association set.
+
+    One DO block = one statement = one transaction. The old authoritative rows survive until
+    this commits, so a failure before or during the swap leaves production untouched. The
+    boundary left(zip,3)=z3 is exact: association ZIPs can only come from geo.n5_zcta rows
+    loaded for this shard, and that partition was verified against all 13 completed shards."""
+    z = lit(z3)
+    body = ("do $swap$\n"
+            "begin\n"
+            "  delete from geo.n5_association where left(zip,3)=" + z + ";\n"
+            "  insert into geo.n5_association (source_key, zip, evidence)\n"
+            "    select source_key, zip, evidence from geo.n5_association_stage"
+            " where z3=" + z + ";\n"
+            "  delete from geo.n5_association_stage where z3=" + z + ";\n"
+            "end\n"
+            "$swap$;")
+    sql(body, "swap " + z3)
+
+
 def associate(z3):
-    q = build_associations(z3) + """
-insert into geo.n5_association (source_key, zip, evidence)
-select source_key, zip::char(5), ev from (select * from cls union all select * from adds) z
-on conflict do nothing;"""
-    sql(q, "associate " + z3)
+    """Stage -> reconcile -> swap. Rerunning is idempotent: staging clears its own z3 first
+    and the swap is a full scoped replacement, never an append."""
+    stage_associations(z3)
+    rc = reconcile_stage(z3)
+    if int(rc["staged"]) != int(rc["staged_pairs"]):
+        raise SystemExit(f"STOP: shard {z3} staged {rc['staged']} rows for "
+                         f"{rc['staged_pairs']} distinct pairs - refusing to swap.")
+    swap_shard(z3)
+    return rc
 
 
 def shard_counts(z3):
@@ -414,7 +566,7 @@ def run_shard(z3):
     if bad:
         return halt(z3, "INVALID_BOUNDARY", {"invalid": bad})
 
-    # 3 - RECOVER (cache is cross-shard; hit rate is measured, not assumed)
+    # 3 - RECOVER (geometry reuse is cross-shard; hit rate is measured, not assumed)
     rec = recover_shard(z3, load_registry())
     for r in rec:
         say(f"  recovery {r['registry_id']}",
@@ -426,9 +578,18 @@ def run_shard(z3):
         if r.get("unasked_echoes"):
             say("    identities echoed but never asked for", r["unasked_echoes"])
 
-    # 4 - ASSOCIATE
+    # 3b - MATERIALIZE fidelity-proven stored points into canonical geometry.
+    #      ZERO NEW ASSOCIATION SEMANTICS: these points already participate through the `pt`
+    #      CTE in build_associations. This only makes them durable. Association output must
+    #      therefore be unchanged by this step - that is the invariant the receipt checks.
+    pts = materialize_proven_points(z3)
+    say("proven points materialized / rejected",
+        f"{pts['materialized']} / {pts['rejected']}")
+
+    # 4 - ASSOCIATE (stage -> reconcile -> swap)
     before = shard_counts(z3)
-    associate(z3)
+    rc = associate(z3)
+    say("staged / prior associations", f"{rc['staged']} / {rc['prior']}")
     got = int(one(sql(f"select count(*) n from geo.n5_association where left(zip,3)={lit(z3)};",
                       "assoc n"), "n"))
     say("", "")
@@ -472,7 +633,11 @@ def run_shard(z3):
     say("VERIFIED CLEAN", "yes" if verified else "NO")
 
     # 6 - DISCARD the per-shard disposable working set (boundaries + frozen slice).
-    #     geo.n5_geom is deliberately NOT discarded: it is the cross-shard geometry cache.
+    #     geo.n5_geom is deliberately NOT discarded, and NOT because it is a cache. It is
+    #     PERMANENT CANONICAL PRODUCT GEOMETRY - the authoritative spatial corpus behind Map 1
+    #     address/radius reads. It incidentally enables geometry reuse across shards, but that
+    #     does NOT make it disposable. It MUST NOT be reclaimed, truncated, or dropped to
+    #     recover disk: reclaiming it deletes the product's spatial corpus.
     sql(f"delete from geo.n5_zcta where z3={lit(z3)};", "drop zcta")
     sql(f"delete from geo.n5_frozen where z3={lit(z3)};", "drop frozen")
     left_z = int(one(sql(f"select count(*) n from geo.n5_zcta where z3={lit(z3)};", "z left"), "n"))
