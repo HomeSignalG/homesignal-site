@@ -66,8 +66,9 @@ control (a `find / -name "*.bundle"` that returns cleanly, so the empty result m
   **founder-measured 2026-09-02** (this container has no DB access): distinct `source_key`
   (development) **932,736** vs distinct `(source_ref, lat, lng)` **629,617** — so `source_ref`
   merges distinct projects and must not be identity; **9,121** development projects carry >1
-  `(lat,lng)`; `geo.n5_association` **4,068**, `geo.n5_geom` **449** (consistent with only shards
-  520/062 run). `723,449 PROVEN POINT` stays **NOT VERIFIED** (transcript-only). The ruling's
+`(lat,lng)`; `geo.n5_association` **4,068** and `geo.n5_geom` **449** — which **exceed** what
+shards 520/062 alone produced (1,892 / 256), so **≥1 further shard completed since** (likely 063);
+exact shard count NOT VERIFIED. `723,449 PROVEN POINT` stays **NOT VERIFIED** (transcript-only). The ruling's
   **read-surface RPC does not exist in `main`**; `app_projects` is the ZIP read model, **not** the
   address-radius source (one representative `lat/lng` per row; authoritative geometry is
   polygons/polylines, so no view over it answers distance-to-polygon).

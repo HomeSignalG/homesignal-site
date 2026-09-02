@@ -167,13 +167,27 @@ boundary steps had already succeeded" on the `rings_to_wkt` `(wkt, reason)` mars
 "Shard `520` could not have caught it: its source is a polyline, so it never took the rings
 branch." So "the two shards worked were 520 and 062" is consistent with the repo.
 
-**FOUNDER-MEASURED 2026-09-02 (live DB) — the layer is barely started, consistent with two shards
-done.** `geo.n5_association` = **4,068** rows and `geo.n5_geom` = **449** rows. Those tiny counts
-are exactly what "only shards 520 and 062 have run" predicts (a national build over 544 shards
-would carry orders of magnitude more). The `2 of 544` fraction itself is not separately
-founder-measured here, but the association/cache counts corroborate it. To re-measure:
-`select count(*) from geo.n5_association;` · `select count(*) from geo.n5_geom;` ·
-`select state, count(*) from geo.n5_shard where snapshot_id='phase1-2026-09-01' group by 1;`
+**Shards `520` and `062` are corroborated from committed source** (named in `n5_shard.py` as the
+two run/debugged). **But the live counts do NOT match "only those two."** Founder-measured:
+
+| measurement | shards 520 + 062 (earlier 2026-09-02) | live now (2026-09-02) |
+|---|---|---|
+| `geo.n5_association` rows | 1,892 | **4,068** |
+| `geo.n5_geom` features | 256 | **449** |
+
+4,068 > 1,892 and 449 > 256, so **at least one further shard completed after the two-shard
+measurement** — almost certainly `063` (the next-smallest-`pairs` pending shard, and the one whose
+`rings` branch the `062` fix unblocked). **The exact current shard count is NOT VERIFIED from this
+container.** The transcript's "2 of 544" was true when written and is now stale.
+
+⚠️ **Method note (this is a corrected mistake, kept as the lesson): a number that merely fails to
+contradict a hypothesis is not corroboration of it.** An earlier version of this section read the
+small `4,068 / 449` counts as "consistent with only two shards done." They are not: they *exceed*
+what two shards produced, which is evidence *against* that hypothesis, not for it. Before a number
+counts as corroboration, check that the hypothesis actually *predicts* it — not merely that it is
+not obviously refuted. To re-measure the true state:
+`select state, count(*) from geo.n5_shard where snapshot_id='phase1-2026-09-01' group by 1;` ·
+`select count(*) from geo.n5_association;` · `select count(*) from geo.n5_geom;`
 
 ---
 
@@ -204,7 +218,9 @@ reconciled with founder-measured numbers (932,736 real projects vs 629,617 disti
 by design, with 9,121 development projects carrying >1 `(lat,lng)` (founder-measured); **3 is
 VERIFIED structurally** — no coordinate-fidelity field, `treatment` a per-source label discarded
 per shard, association only `(source_key, zip, evidence)` — with the `723,449` PROVEN-POINT figure
-left **NOT VERIFIED** (transcript-only); **4 is corroborated** as shards 520/062 with the live
-layer barely started (`n5_association` 4,068, `n5_geom` 449, founder-measured); **5 is a recorded
-founder ruling** whose read-surface RPC does not yet exist in `main`. Live numbers are
+left **NOT VERIFIED** (transcript-only); **4** corroborates shards 520/062 from source, but
+the live counts (`n5_association` 4,068 > 1,892; `n5_geom` 449 > 256, founder-measured) show **at
+least one further shard completed since** the two-shard measurement (likely 063) — exact shard
+count NOT VERIFIED; **5 is a recorded founder ruling** whose read-surface RPC does not yet exist in
+`main`. Live numbers are
 founder-measured 2026-09-02; this agent had no DB access.
