@@ -53,9 +53,20 @@ control (a `find / -name "*.bundle"` that returns cleanly, so the empty result m
   scaffolding is rebuilt **from scratch** — do **not** go looking for `ff71dcd` or the bundle.
 - ⚠️ **Honest correction to the handoff:** the findings that were said to "survive in QUEUE"
   (the architecture ruling, the classification-D audit, the identity correction, and treatment
-  eligibility) are **NOT present in this QUEUE.md or anywhere in `main`** — they were on the same
-  unpushed branch and did not survive here either. If the founder holds them elsewhere, commit
-  them here, because as of this note they are not durable in the repo.
+  eligibility) were **NOT present in this QUEUE.md or anywhere in `main`** — they were on the same
+  unpushed branch and did not survive here either.
+- ✅ **RE-DERIVED AND VERIFIED 2026-09-02 → `docs/n5-address-search-architecture-record.md`.**
+  Because the transcript claims are hypotheses, not findings, each was re-checked against the
+  committed source of truth (`scripts/n5_shard.py`, `docs/app-projects-stable-key-migration.sql`,
+  `docs/maps-source-identity-migration.sql`). Result: the identity model (`source_key` identity,
+  `source_seq` multiplicity, unique index `(zip, source_key, source_seq)`), the multi-geometry
+  design (`geo.n5_geom` keyed `(source_key, feature_id)`), and the treatment-eligibility gap (no
+  coordinate-fidelity field; `geo.n5_association` is only `(source_key, zip, evidence)`;
+  `treatment` is a per-source label discarded per shard) are **VERIFIED**. Every **live number**
+  (`2 of 544`, `723,449 PROVEN POINT`, association/cache counts) is **NOT VERIFIED** — this
+  container has no DB access — and the ruling's **read-surface RPC does not exist in `main`**. One
+  correction: the claim's "`source_ref` is dataset-level" is wrong; in `app_projects` `source_ref`
+  is the record URL, and the dataset-level id is `registry_id`/`source_registry_id`.
 - 🔑 **General lesson (applies to every future agent):** work produced by an agent that cannot
   push to the target repo exists only on that agent's disk. **Push first, or do not rely on it.**
 
