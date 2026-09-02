@@ -176,27 +176,22 @@ def read_shp_polygons(raw, wanted_idx):
     return out, idx
 
 
-def _area(ring):
-    s = 0.0
-    for i in range(len(ring) - 1):
-        s += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1]
-    return s / 2.0
+# ONE definition of the shapefile ring convention, imported from the B1 loader
+# rather than re-derived here.
+#
+# WHY: the first version of this file re-derived it and INVERTED it - it treated a
+# negative (clockwise) signed area as a HOLE, when the shapefile spec makes clockwise
+# the OUTER ring. On single-ring ZCTAs that is invisible; on the two multi-ring ones
+# in this prefix it attached a second outer part to the previous polygon as a hole and
+# produced invalid geometry. The load guard caught it (35 valid of 37) and stopped
+# before anything downstream read it, but the real fix is not to have two definitions
+# of the same convention. B1's has been correct across 56 loaded polygons.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from phase2_b1_zcta import rings_to_multipolygon_wkt as _b1_rings_to_wkt   # noqa: E402
 
 
-def rings_to_multipolygon_wkt(rings):
-    """Shapefile rings are CW outer / CCW inner. Group holes onto the outer ring
-    that precedes them, which is the shapefile spec's own ordering."""
-    polys = []
-    for r in rings:
-        ring = r if r[0] == r[-1] else r + [r[0]]
-        if _area(ring) < 0 and polys:
-            polys[-1].append(ring)
-        else:
-            polys.append([ring])
-    def rw(r):
-        return "(" + ",".join(f"{repr(x)} {repr(y)}" for x, y in r) + ")"
-    return ("MULTIPOLYGON(" +
-            ",".join("(" + ",".join(rw(r) for r in p) + ")" for p in polys) + ")")
+def rings_to_multipolygon_wkt(rings, geoid):
+    return _b1_rings_to_wkt(rings, geoid)
 
 
 # ------------------------------------------------------------------ DDL
@@ -325,7 +320,7 @@ def mode_zcta():
         rings = geoms.get(i)
         if not rings:
             raise SystemExit(f"STOP: {g} has no polygon geometry in the .shp")
-        picked.append({"zcta5": g, "wkt": rings_to_multipolygon_wkt(rings),
+        picked.append({"zcta5": g, "wkt": rings_to_multipolygon_wkt(rings, g),
                        "rings": len(rings), "pts": sum(len(r) for r in rings)})
     say("polygons extracted", len(picked))
     say("total vertices", f"{sum(p['pts'] for p in picked):,}")
@@ -334,6 +329,10 @@ def mode_zcta():
 
     say("ddl", "creating geo.n3_* if absent (RLS on, 0 grants)")
     sql(DDL, "n3 ddl")
+    # The scratch table is a P3 disposable and this mode is the only writer, so a
+    # reload replaces it wholesale. ON CONFLICT DO NOTHING would silently keep a
+    # previous run's rows, which is exactly how a bad geometry survives a fix.
+    sql("delete from geo.n3_zcta_scratch;", "zcta reset")
 
     # tranched: network is already finished, and no single statement is huge
     total = 0
