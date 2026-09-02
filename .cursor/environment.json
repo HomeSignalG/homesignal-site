@@ -1,0 +1,14 @@
+{
+  "name": "HomeSignal site",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "site",
+      "command": "python3 -m http.server 8080",
+      "description": "Static file server for homesignal-site (plain HTML/JS, no build step). Open http://localhost:8080/ — append ?data=seed for the zero-database preview, or ?demo=1 for the demo session."
+    }
+  ],
+  "ports": [
+    { "name": "site", "port": 8080 }
+  ]
+}
