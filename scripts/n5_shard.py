@@ -266,19 +266,28 @@ def fetch_features(rid, entry, keys, z3):
     for sk, ft in feats:
         g = ft.get("geometry") or {}
         oid = str((ft.get("attributes") or {}).get(ident, "")).strip() + f"#{nfeat}"
-        wkt = None
+        # rings_to_wkt returns a (wkt, reason) PAIR - a malformed publisher ring set is
+        # reported rather than raised, so one bad record cannot end the batch. paths_ and
+        # POINT return a bare string. Unpacking the pair is not optional: assigning it
+        # whole stringifies the tuple into the SQL as ('MULTIPOLYGON(...)', None) and
+        # Postgres rejects it with "parse error at position 2 within geometry".
         if "rings" in g:
-            wkt = rings_to_wkt(g["rings"], sk)
+            wkt, bad = rings_to_wkt(g["rings"], sk)
         elif "paths" in g:
-            wkt = paths_to_multilinestring_wkt(g["paths"])
+            wkt, bad = paths_to_multilinestring_wkt(g["paths"]), None
         elif "x" in g and "y" in g:
-            wkt = f"POINT({g['x']} {g['y']})"
+            wkt, bad = f"POINT({g['x']} {g['y']})", None
+        else:
+            wkt, bad = None, "NO_GEOMETRY"
         nfeat += 1
         if not wkt:
-            rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,{lit('no usable geometry')},{lit(z3)})")
+            reason = bad or "no usable geometry"
+            rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,{lit(reason)},{lit(z3)})")
         else:
+            # Dollar-quoted, as the pilot loaders do: a polygon WKT runs to tens of
+            # thousands of characters and must not be re-escaped per quote.
             rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},1,"
-                        f"ST_GeomFromText({lit(wkt)},{CANON_SRID}),null,{lit(z3)})")
+                        f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{lit(z3)})")
     for i in range(0, len(rows), 25):
         sql("insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,invalid_reason,first_z3) values "
             + ",".join(rows[i:i + 25]) + " on conflict (source_key,feature_id) do nothing;", "geom ins")
@@ -510,8 +519,33 @@ def halt(z3, reason, detail):
     return False
 
 
+def _assert_helper_contracts():
+    """Fail loudly if an imported helper's RETURN SHAPE changes.
+
+    This repo's CI suite is JS-only (test/*.test.mjs); no workflow runs pytest, so a
+    Python regression test here would never execute and would be scaffolding that
+    attests to nothing. This check does run - on every shard, before any network or
+    write - and it fails closed.
+
+    It exists because rings_to_wkt returns a (wkt, reason) PAIR while the polyline and
+    point paths return a bare string. Assigning the pair whole put the literal
+    ('MULTIPOLYGON(...)', None) into the SQL and Postgres rejected it with "parse error
+    at position 2 within geometry", failing shard 062 after the freeze and boundary
+    steps had already succeeded. Shard 520 could not have caught it: its source is a
+    polyline, so it never took the rings branch.
+    """
+    probe = rings_to_wkt([[(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (0.0, 0.0)]], "_contract")
+    if not isinstance(probe, tuple) or len(probe) != 2:
+        raise SystemExit("STOP: rings_to_wkt no longer returns (wkt, reason); "
+                         "the geometry marshalling in fetch_features must be re-checked")
+    if not isinstance(paths_to_multilinestring_wkt([[(0.0, 0.0), (1.0, 1.0)]]), str):
+        raise SystemExit("STOP: paths_to_multilinestring_wkt no longer returns a bare WKT string")
+    say("helper return-shape contracts", "ok (rings pair, paths string)")
+
+
 def main():
     say("mode", "n5-shard (bounded national association build, shard by shard)")
+    _assert_helper_contracts()
     say("freeze basis", f"preservation.app_project_identity @ {SNAPSHOT}, record_kind=development")
     snap = sql(f"select sources, projects, pairs, n_rows from geo.n5_snapshot "
                f"where snapshot_id={lit(SNAPSHOT)};", "snap")[0]
@@ -536,7 +570,15 @@ def main():
     for z3 in todo:
         sql(f"update geo.n5_shard set state='running', started_at=now() "
             f"where snapshot_id={lit(SNAPSHOT)} and z3={lit(z3)};", "mark running")
-        if not run_shard(z3):
+        try:
+            ok = run_shard(z3)
+        except BaseException as e:
+            # Without this the shard stays 'running' forever: neither done nor halted,
+            # so a resume skips it and the run reports no failure. A crash is a halt.
+            say("SHARD RESULT", f"HALTED - CRASH {type(e).__name__}")
+            halt(z3, "CRASH", {"error": f"{type(e).__name__}: {str(e)[:400]}"})
+            raise
+        if not ok:
             say("", "")
             say("RUN HALTED", "advance requires VERIFIED CLEAN **and** disk above floor")
             return 1
