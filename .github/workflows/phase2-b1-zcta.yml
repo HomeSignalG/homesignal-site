@@ -18,7 +18,7 @@ name: phase2-b1-zcta
 # to this repository. Nothing is uploaded as an artifact either — the receipt channel
 # is the job log, as with recon-fetch.yml and db-sql.yml.
 #
-# Two modes, and the separation is the point:
+# The B1 modes, and the separation is the point:
 #   validate  acquire, checksum, read the archive's own .prj, count features, derive
 #             the in-scope ZCTA set, size the payload. NO DATABASE CREDENTIAL IS
 #             EVEN PLACED IN THE ENVIRONMENT, so it cannot write if it tried.
@@ -26,6 +26,12 @@ name: phase2-b1-zcta
 #             both reproduce exactly, then send ONE SQL request that is ONE
 #             transaction. Any in-transaction assertion raises and the whole
 #             transaction rolls back.
+#
+#   n5-verify re-derive the completed shards' geometry-verified associations from the
+#             frozen snapshot alone and compare them, exactly, against what those shards
+#             wrote. Read-only against every durable N5 artifact; its one write is a
+#             scratch boundary table it creates and drops in the same run, because the
+#             per-shard ZCTA slices are correctly discarded at cleanup.
 #
 # Credentials: SUPABASE_ACCESS_TOKEN only, and never in B1 validate mode. It already
 # exists (db-sql.yml, deploy-edge-functions.yml). No new secret was created for this
@@ -44,7 +50,7 @@ on:
         description: 'validate | load (B1) · b3-* (B3 source geometry) · n2a-* | n2b-resolve | n2c-diagnose (national classification, read-only)'
         required: true
         type: choice
-        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard]
+        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard, n5-verify]
         default: validate
       z3:
         description: 'n5-shard: ZIP3 to build, or AUTO for the next pending shard'
@@ -169,6 +175,14 @@ jobs:
           MAX_SHARDS: ${{ github.event.inputs.max_shards }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n5_shard.py
+
+      - name: N5 Part 1 - does the snapshot reproduce what the shards built (read-only)
+        if: ${{ github.event.inputs.mode == 'n5-verify' }}
+        env:
+          MODE: n5-verify
+          SNAPSHOT: phase1-2026-09-01
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n5_verify_snapshot.py
 
       - name: B3 invalid-geometry probe (read-only, native CRS)
         if: ${{ github.event.inputs.mode == 'b3-invalid-probe' }}
