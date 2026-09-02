@@ -50,7 +50,7 @@ on:
         description: 'validate | load (B1) · b3-* (B3 source geometry) · n2a-* | n2b-resolve | n2c-diagnose (national classification, read-only)'
         required: true
         type: choice
-        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard, n5-verify]
+        options: [validate, load, b3-probe, b3-load, b3-nvdot, b3-invalid-probe, n2a-zcta, n2a-classify, n2a-fidelity, n2b-resolve, n2c-diagnose, n2c-attrgeom, n3-zcta, n3-recover, n5-shard, n5-verify, n5-acquire]
         default: validate
       z3:
         description: 'n5-shard: ZIP3 to build, or AUTO for the next pending shard'
@@ -61,6 +61,11 @@ on:
         description: 'n5-shard: how many shards this run may complete'
         required: false
         default: '1'
+        type: string
+      registry_id:
+        description: 'n5-acquire: the ONE registry_id to acquire in full'
+        required: false
+        default: ''
         type: string
       expect_sha256:
         description: 'load only: archive sha256 recorded by the validate run'
@@ -183,6 +188,15 @@ jobs:
           SNAPSHOT: phase1-2026-09-01
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n5_verify_snapshot.py
+
+      - name: N5 A2 - acquire ONE registry's geometry in full (not a shard run)
+        if: ${{ github.event.inputs.mode == 'n5-acquire' }}
+        env:
+          MODE: n5-acquire
+          SNAPSHOT: phase1-2026-09-01
+          REGISTRY_ID: ${{ github.event.inputs.registry_id }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/n5_acquire_registry.py
 
       - name: B3 invalid-geometry probe (read-only, native CRS)
         if: ${{ github.event.inputs.mode == 'b3-invalid-probe' }}

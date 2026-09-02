@@ -272,6 +272,10 @@ def fetch_features(rid, entry, keys, z3):
                 unasked.append(echo)
                 continue
             feats.append((sk, ft))
+    # A registry-wide acquisition has no originating shard, and `lit(None)` would write
+    # the literal string 'None' into a char(3) column rather than SQL NULL - i.e. a
+    # fabricated provenance value that looks like a ZIP3. Emit NULL instead.
+    z3sql = lit(z3) if z3 else "null"
     rows, nfeat = [], 0
     for sk, ft in feats:
         g = ft.get("geometry") or {}
@@ -292,13 +296,13 @@ def fetch_features(rid, entry, keys, z3):
         nfeat += 1
         if not wkt:
             reason = bad or "no usable geometry"
-            rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,{lit(reason)},{lit(z3)},"
+            rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},3,null,{lit(reason)},{z3sql},"
                         f"'recovered_authoritative')")
         else:
             # Dollar-quoted, as the pilot loaders do: a polygon WKT runs to tens of
             # thousands of characters and must not be re-escaped per quote.
             rows.append(f"({lit(sk)},{lit(rid)},{lit(oid)},1,"
-                        f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{lit(z3)},"
+                        f"ST_GeomFromText($g${wkt}$g$,{CANON_SRID}),null,{z3sql},"
                         f"'recovered_authoritative')")
     for i in range(0, len(rows), 25):
         sql("insert into geo.n5_geom (source_key,registry_id,feature_id,outcome,geom,invalid_reason,first_z3,provenance) values "
