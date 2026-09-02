@@ -519,6 +519,26 @@ def halt(z3, reason, detail):
     return False
 
 
+def parse_shard_list(z3_env, max_shards):
+    """Turn the Z3 input into shard identifiers. Pure and side-effect free so the CI
+    gate can exercise it without a database.
+
+    "AUTO" -> None, meaning "caller selects the next pending shards".
+    Anything else is a COMMA-SEPARATED LIST: "062,063" is two shards, never one shard
+    literally named "062,063". That distinction is the whole point of this function -
+    when the split was missing, the driver looked up a manifest row for "062,063",
+    found none, and crashed with IndexError after the run had already been dispatched.
+    """
+    if z3_env.strip().upper() == "AUTO":
+        return None
+    out = []
+    for tok in z3_env.split(","):
+        t = tok.strip()
+        if t and t not in out:
+            out.append(t)
+    return out[:max_shards]
+
+
 def _assert_helper_contracts():
     """Fail loudly if an imported helper's RETURN SHAPE changes.
 
@@ -540,7 +560,11 @@ def _assert_helper_contracts():
                          "the geometry marshalling in fetch_features must be re-checked")
     if not isinstance(paths_to_multilinestring_wkt([[(0.0, 0.0), (1.0, 1.0)]]), str):
         raise SystemExit("STOP: paths_to_multilinestring_wkt no longer returns a bare WKT string")
-    say("helper return-shape contracts", "ok (rings pair, paths string)")
+    if parse_shard_list("062,063", 10) != ["062", "063"]:
+        raise SystemExit("STOP: shard-list parsing regressed; 'a,b' must yield two shard ids")
+    if parse_shard_list("AUTO", 10) is not None:
+        raise SystemExit("STOP: AUTO must not be parsed as a shard id")
+    say("helper return-shape contracts", "ok (rings pair, paths string, shard list)")
 
 
 def main():
@@ -558,13 +582,27 @@ def main():
     if free0 <= DISK_FLOOR_MB:
         raise SystemExit("STOP: free disk is at or below the floor before any shard ran")
 
-    if Z3_ENV != "AUTO":
-        todo = [Z3_ENV]
-    else:
+    todo = parse_shard_list(Z3_ENV, MAX_SHARDS)
+    if todo is None:
         todo = [r["z3"] for r in sql(
             f"""select z3 from geo.n5_shard where snapshot_id={lit(SNAPSHOT)} and state='pending'
                  order by pairs asc, z3 limit {MAX_SHARDS};""", "pick")]
     say("shards this run", f"{len(todo)}: " + ",".join(todo))
+
+    # Refuse an identifier that is not in the manifest BEFORE marking anything running
+    # or writing a single row. A malformed id previously reached run_shard and crashed
+    # at the manifest lookup; nothing durable was written then either, but failing here
+    # makes that a guarantee of the control flow rather than a property of where the
+    # first query happened to sit.
+    if todo:
+        known = {r["z3"] for r in sql(
+            f"select z3 from geo.n5_shard where snapshot_id={lit(SNAPSHOT)};", "manifest ids")}
+        unknown = [z for z in todo if z not in known]
+        if unknown:
+            raise SystemExit(f"STOP: shard id(s) not in the {SNAPSHOT} manifest: {unknown}. "
+                             f"Nothing was written.")
+    if not todo:
+        raise SystemExit("STOP: no shards selected")
 
     done = 0
     for z3 in todo:
