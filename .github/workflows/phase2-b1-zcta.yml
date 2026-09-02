@@ -35,6 +35,11 @@ name: phase2-b1-zcta
 on:
   workflow_dispatch:
     inputs:
+      batch:
+        description: 'pilot batch key for n3-zcta / n3-recover (786 | 207)'
+        required: false
+        default: '786'
+        type: string
       mode:
         description: 'validate | load (B1) · b3-* (B3 source geometry) · n2a-* | n2b-resolve | n2c-diagnose (national classification, read-only)'
         required: true
@@ -133,6 +138,7 @@ jobs:
         if: ${{ github.event.inputs.mode == 'n3-zcta' }}
         env:
           MODE: n3-zcta
+          BATCH: ${{ github.event.inputs.batch }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n3_pilot.py
 
@@ -140,6 +146,7 @@ jobs:
         if: ${{ github.event.inputs.mode == 'n3-recover' }}
         env:
           MODE: n3-recover
+          BATCH: ${{ github.event.inputs.batch }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/n3_pilot.py
 
