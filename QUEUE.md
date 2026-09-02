@@ -40,6 +40,20 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-09-02 — HANDOFF: Claude Code is now the SOLE agent (Cursor retired)
+
+Cursor has been retired from this project; **Claude Code is the only agent going forward.** Two
+risks that earlier rules guarded against are **retired** with it:
+
+- **The two-writer / two-session drift risk** (CLAUDE.md "Rule #0a — TWO SESSIONS WRITE THIS
+  REPO"): there is now a single writer, so session-vs-session drift between concurrent agents no
+  longer applies. The `−24` shared-table discipline still applies to scheduled jobs and any other
+  non-agent writer — re-read row counts before writing a shared table.
+- **The agent-local-VM loss pattern** that killed `feature/map-address-search` (six commits that
+  existed only on a Cursor agent's VM plus a same-disk bundle, never pushed — see PR #1011 and
+  `docs/n5-address-search-architecture-record.md`). "Push first or it does not exist" remains the
+  standing rule; the specific cross-agent, unreachable-VM handoff that lost that work is gone.
+
 ### 2026-09-02 — STANDING ANSWER: make a version visible via a PATH binary, not an rc variable
 
 **Environment state dies with the shell; filesystem state does not.** A `~/.bashrc` entry cannot
