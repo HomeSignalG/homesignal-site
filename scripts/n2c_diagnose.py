@@ -611,7 +611,276 @@ def diagnose(rid, bucket, ent, rows):
     return rec
 
 
+
+# ================================================================== N2C PASS 2
+#
+# Pass 1 answered four of the five COORD_COLUMNS_FIDELITY_UNTESTED sources by
+# re-asserting the premise instead of testing it: it saw "publisher layer is a
+# Table" and returned NO_AUTHORITATIVE_SOURCE_GEOMETRY. But those five entered the
+# unresolved set PRECISELY BECAUSE they publish coordinates as attribute COLUMNS
+# whose fidelity had never been tested, and a lat/lng column the publisher fills is
+# authoritative publisher geometry - it is simply not a geometry OBJECT. Calling it
+# "no authoritative source geometry" is a false negative, and a false negative here
+# would silently strip 82,860 projects of a recoverable treatment.
+#
+# Pass 2 also fixes a second, narrower blindness. Pass 1 could only compare a stored
+# coordinate when the identity returned EXACTLY ONE feature, so a DOT project whose
+# PIN legitimately covers 142 points scored nothing at all. Set membership is the
+# honest test for those: does our stored point reproduce ONE OF the publisher's own
+# points for that identity? It cannot say which feature the row came from - and it is
+# not asked to. It answers the only question the association build needs.
+#
+# Nothing here writes. No coordinate is geocoded, invented or defaulted.
+
+PASS2 = [
+    ("sonoma-county-fire-rebuild-permits", "ATTR_COLUMNS"),
+    ("gilbert-energov-permits",            "ATTR_COLUMNS"),
+    ("scottsdale-building-permits",        "ATTR_COLUMNS"),
+    ("nyc-dobnow-approved-permits",        "ATTR_COLUMNS"),
+    ("nyc-dob-permit-issuance",            "ATTR_COLUMNS+SET"),
+    ("fort-worth-development-permits",     "SET"),
+    ("penndot-transportation-projects",    "SET"),
+    ("mdot-stip-projects",                 "SET"),
+    ("odot-current-projects",              "SET"),
+    ("desoto-county-permits",              "SET+IDENT"),
+    ("nysdot-capital-program-projects-2",  "SET"),
+    ("sd-stip-safety-points",              "SET"),
+]
+
+_IDENTISH = ("id", "num", "no", "permit", "case", "record", "pin", "project",
+             "app", "file", "ref", "key")
+
+
+def identity_candidates(rows, exclude=()):
+    """Fields that behave like a record identity in a real 200-row page: present on
+    every row and distinct on (nearly) every row. Reported so a config correction can
+    be recommended from measured uniqueness rather than from a field's NAME."""
+    if not rows:
+        return []
+    n = len(rows)
+    out = []
+    for f in sorted({k for r in rows for k in r.keys()}):
+        if f in exclude:
+            continue
+        vals = [r.get(f) for r in rows]
+        filled = [v for v in vals if v is not None and str(v).strip() != ""]
+        if len(filled) < n:
+            continue
+        d = len({str(v) for v in filled})
+        if d / float(n) >= 0.95:
+            looks = any(t in f.lower() for t in _IDENTISH)
+            out.append({"field": f, "distinct": d, "rows": n, "namelike": looks})
+    out.sort(key=lambda c: (not c["namelike"], -c["distinct"]))
+    return out[:12]
+
+
+def arcgis_page(ent, limit=200):
+    j, why = http(q(ent["service_url"]),
+                  {"where": "1=1", "outFields": "*", "resultRecordCount": str(limit),
+                   "returnGeometry": "false", "f": "json"}, "POST")
+    if j is None or esri(j):
+        return []
+    return [(f.get("attributes") or {}) for f in (j.get("features") or [])]
+
+
+def socrata_page(ent, limit=200):
+    j, why = http(f"https://{ent['domain']}/resource/{ent['dataset_id']}.json",
+                  {"$limit": str(limit)})
+    return j if isinstance(j, list) else []
+
+
+def points_from(feat_or_row, ent, is_arcgis):
+    """Every publisher-supplied coordinate this record carries: the geometry object
+    when there is one, and the registry-declared lat/lng ATTRIBUTE columns when the
+    publisher fills them. A '__'-prefixed column name is the connector's sentinel for
+    'no column', never a real field, so it is not read."""
+    cm = ent.get("column_map") or {}
+    la, lo = cm.get("lat"), cm.get("lng")
+    pts = []
+    if is_arcgis:
+        g = feat_or_row.get("geometry") or {}
+        if g.get("x") is not None and g.get("y") is not None:
+            pts.append((float(g["x"]), float(g["y"]), "geometry"))
+        a = feat_or_row.get("attributes") or {}
+    else:
+        a = feat_or_row
+    if la and lo and not str(la).startswith("__") and not str(lo).startswith("__"):
+        y, x = dotget(a, la), dotget(a, lo)
+        try:
+            if y is not None and x is not None:
+                pts.append((float(x), float(y), "attr_columns"))
+        except (TypeError, ValueError):
+            pass
+    return pts
+
+
+def pass2_source(rid, mode, ent, rows):
+    rec = {"registry_id": rid, "mode": mode, "connector": ent["_group"],
+           "layer_kind": None, "max_record_count": None, "control": None,
+           "identity_strategy": None, "requested": len(rows), "matched": 0,
+           "capped": 0, "features_max": 0, "with_points": 0, "no_points": 0,
+           "in_set_exact": 0, "in_set_tol": 0, "outside_tol": 0, "worst_m": 0.0,
+           "point_sources": {}, "candidates": [], "error": None, "verdict": None,
+           "why": None}
+    is_arc = ent["_group"] == "arcgis"
+
+    if is_arc:
+        layer = arcgis_layer(ent)
+        if layer.get("error"):
+            rec["error"] = "LAYER " + layer["error"]
+            rec["verdict"] = "IDENTITY_UNRESOLVED"
+            return rec
+        rec["layer_kind"] = layer.get("type")
+        rec["control"] = arcgis_control(ent)
+        meta, _ = http(ent["service_url"].rstrip("/"), {"f": "json"})
+        rec["max_record_count"] = (meta or {}).get("maxRecordCount")
+        fields = layer.get("fields") or []
+        ftypes = layer.get("field_types") or {}
+        ident = (ent.get("column_map") or {}).get("case_number")
+        ent["_ident_numeric"] = ident and str(ftypes.get(ident, "")).endswith(
+            ("Integer", "Double", "Single", "SmallInteger", "OID"))
+        plan = identity_plan(ent, fields)
+    else:
+        sch = socrata_schema(ent)
+        if sch.get("error"):
+            rec["error"] = "SCHEMA " + sch["error"]
+            rec["verdict"] = "IDENTITY_UNRESOLVED"
+            return rec
+        rec["layer_kind"] = "socrata"
+        rec["control"] = socrata_control(ent)
+        rec["max_record_count"] = 200
+        plan = identity_plan(ent, sch["fields"])
+    rec["identity_strategy"] = plan["strategy"]
+
+    if not rec["control"] or not rec["control"]["ok"]:
+        rec["error"] = "CONTROL_FAILED " + str((rec["control"] or {}).get("err"))
+        rec["verdict"] = "IDENTITY_UNRESOLVED"
+        rec["why"] = "positive control failed - negatives discarded"
+        return rec
+
+    if "IDENT" in mode:
+        page = arcgis_page(ent) if is_arc else socrata_page(ent)
+        rec["candidates"] = identity_candidates(page)
+
+    for r in rows:
+        c = case_of(r["source_key"])
+        if not c:
+            continue
+        time.sleep(0.25)
+        if is_arc:
+            w = where_for(plan, ent, {"objectIdField": "OBJECTID"}, c,
+                          bool(ent.get("_ident_numeric")))
+            if w is None:
+                continue
+            feats, why = arcgis_fetch(ent, {"objectIdField": "OBJECTID"}, w)
+            if feats is None or not feats:
+                continue
+            items = feats
+        else:
+            w = soql_for(plan, ent, c)
+            if w is None:
+                continue
+            got, why = socrata_fetch(ent, w)
+            if got is None or not got:
+                continue
+            items = got
+        rec["matched"] += 1
+        rec["features_max"] = max(rec["features_max"], len(items))
+        if rec["max_record_count"] and len(items) >= rec["max_record_count"]:
+            rec["capped"] += 1
+        pts = []
+        for it in items:
+            pts.extend(points_from(it, ent, is_arc))
+        for _, _, kind in pts:
+            rec["point_sources"][kind] = rec["point_sources"].get(kind, 0) + 1
+        if not pts:
+            rec["no_points"] += 1
+            continue
+        rec["with_points"] += 1
+        if r.get("lat") is None or r.get("lng") is None:
+            continue
+        best = min(haversine_m(float(r["lat"]), float(r["lng"]), y, x) for x, y, _ in pts)
+        rec["worst_m"] = max(rec["worst_m"], best)
+        if best < 0.01:
+            rec["in_set_exact"] += 1
+        elif best <= TOL_M:
+            rec["in_set_tol"] += 1
+        else:
+            rec["outside_tol"] += 1
+
+    scored = rec["in_set_exact"] + rec["in_set_tol"] + rec["outside_tol"]
+    if rec["matched"] == 0:
+        rec["verdict"] = "HISTORICAL_GEOMETRY_UNRECOVERABLE"
+        rec["why"] = (f"control {rec['control']['count']:,} but 0 of {rec['requested']} "
+                      "frozen identities reconnect")
+    elif rec["with_points"] == 0:
+        rec["verdict"] = "NO_AUTHORITATIVE_SOURCE_GEOMETRY"
+        rec["why"] = (f"{rec['matched']} identities reconnect but the publisher supplies "
+                      "no coordinate on any of them - neither geometry nor a filled lat/lng column")
+    elif rec["capped"] and rec["capped"] >= rec["matched"]:
+        rec["verdict"] = "IDENTITY_UNRESOLVED"
+        rec["why"] = (f"every matched identity returns the page cap "
+                      f"({rec['max_record_count']}) - the configured field is a category, "
+                      "not a record identity")
+    elif scored == 0:
+        rec["verdict"] = "SOURCE_GEOMETRY_REFETCH_REQUIRED"
+        rec["why"] = "identities reconnect and carry coordinates, but nothing was comparable"
+    elif rec["outside_tol"] == 0:
+        rec["verdict"] = "POINT_NO_REFETCH_PROVEN"
+        rec["why"] = (f"{scored} stored coordinates all reproduce a publisher coordinate for "
+                      f"their own identity ({rec['in_set_exact']} exact), worst "
+                      f"{rec['worst_m']:.3f} m, 0 outside {TOL_M} m")
+    else:
+        rec["verdict"] = "SOURCE_GEOMETRY_REFETCH_REQUIRED"
+        rec["why"] = (f"{rec['outside_tol']} of {scored} stored coordinates match no "
+                      f"publisher coordinate for their identity, worst {rec['worst_m']:.3f} m")
+    return rec
+
+
+def pass2():
+    say("mode", "n2c-attrgeom (pass 2, read-only)")
+    say("tolerance", f"{TOL_M} m (unchanged)")
+    say("targets", f"{len(PASS2)} sources pass 1 could not honestly settle")
+    idx = registry_index()
+    rids = [r[0] for r in PASS2]
+    samples = frozen_sample(rids)
+    say("sources with a frozen sample", len(samples))
+
+    out = []
+    for i, (rid, mode) in enumerate(PASS2, 1):
+        ent = idx.get(rid)
+        rows = samples.get(rid) or []
+        time.sleep(POLITE)
+        try:
+            rec = pass2_source(rid, mode, ent, rows)
+        except Exception as e:
+            rec = {"registry_id": rid, "mode": mode, "error": f"{type(e).__name__} {str(e)[:120]}",
+                   "verdict": "IDENTITY_UNRESOLVED", "why": "probe raised", "matched": 0,
+                   "requested": len(rows), "capped": 0, "features_max": 0, "with_points": 0,
+                   "no_points": 0, "in_set_exact": 0, "in_set_tol": 0, "outside_tol": 0,
+                   "worst_m": 0.0, "point_sources": {}, "candidates": [], "control": None,
+                   "layer_kind": None, "max_record_count": None, "identity_strategy": None,
+                   "connector": (ent or {}).get("_group")}
+        out.append(rec)
+        print(f"[{i:2d}/{len(PASS2)}] {rid:42s} {mode:16s} "
+              f"match {rec['matched']:2d}/{rec['requested']:2d} pts {rec['with_points']:2d} "
+              f"capped {rec['capped']:2d} fmax {rec['features_max']:4d} "
+              f"exact {rec['in_set_exact']:2d} tol {rec['in_set_tol']:2d} "
+              f"out {rec['outside_tol']:2d} worst {rec['worst_m']:.3f}m -> {rec['verdict']}",
+              flush=True)
+        print(f"        point sources: {rec['point_sources']}   why: {rec['why']}", flush=True)
+        for c in (rec.get("candidates") or []):
+            print(f"        identity candidate {c['field']:28s} distinct {c['distinct']:4d}"
+                  f"/{c['rows']:4d} namelike={c['namelike']}", flush=True)
+
+    print("\n===== N2C PASS 2 RESULT (json) =====")
+    print(json.dumps(out, separators=(",", ":"), default=str))
+    print("\nPASS 2 COMPLETE - nothing written.")
+    return 0
+
 def main():
+    if os.environ.get("MODE", "").strip() == "n2c-attrgeom":
+        return pass2()
     say("mode", "n2c-diagnose (read-only)")
     say("snapshot", SNAPSHOT)
     say("tolerance", f"{TOL_M} m (unchanged from N2A/N2B)")
