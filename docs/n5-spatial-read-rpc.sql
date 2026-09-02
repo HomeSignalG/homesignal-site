@@ -41,12 +41,24 @@
 -- eligibility cannot be established there. That gap is real and this function
 -- deliberately does NOT read geo.n5_association.
 --
--- For geo.n5_geom the gap does not apply, because the table is populated only by
--- the RECOVERY path: scripts/n5_shard.py::recover_shard selects
---     ... where z3=<shard> and treatment='RECOVERY'
--- and only those projects ever receive an n5_geom row. Presence in this table is
--- therefore itself the treatment gate — recovered authoritative publisher
--- geometry, not a derived or geocoded point.
+-- For geo.n5_geom the gap does not apply, because the table carries a per-row
+-- `provenance` label: 'recovered_authoritative' (publisher geometry fetched by
+-- scripts/n5_shard.py::recover_shard) or 'proven_stored_point' (the frozen snapshot
+-- coordinate materialised as a point, feature_id 'pt:1'; 'pt:2'+ are RESERVED and
+-- UNDEFINED). The column is NOT NULL with a CHECKed domain and NO DEFAULT, so a
+-- writer must state which kind of geometry it is writing.
+--
+-- ⚠️ CORRECTED — DO NOT RESTORE THE EARLIER WORDING. This block previously read
+-- "the table is populated only by the RECOVERY path … Presence in this table is
+-- therefore itself the treatment gate". That was TRUE when written and is now
+-- FALSE: PROVEN stored points are materialised into the same table (145 of 234
+-- sources, 723,155 projects with coordinates), so presence no longer implies
+-- recovered publisher geometry. A reader resting on the old sentence would widen
+-- silently rather than fail. **If this function is meant to return recovered
+-- geometry ONLY, its predicate must say so** — add
+-- `provenance = 'recovered_authoritative'` to the allowlist below; the fail-closed
+-- `outcome = 1` clause does NOT discriminate provenance and never did.
+-- Migration of record: docs/n5-provenance-and-key-migration.sql.
 --
 -- The predicate is a POSITIVE ALLOWLIST (`outcome = 1`), never a denylist, so an
 -- outcome code minted in future fails CLOSED instead of being trusted by default:
